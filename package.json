@@ -1,0 +1,33 @@
+{
+  "name": "sketch",
+  "version": "0.1.0",
+  "description": "A WebAssembly sketch",
+  "main": "src/index.ts",
+  "repository": "https://github.com/Ameobea/sketches",
+  "author": "Casey Primozic <me@ameo.link>",
+  "devDependencies": {
+    "handlebars": "^4.0.11",
+    "handlebars-loader": "^1.7.0",
+    "html-webpack-plugin": "^4.0.0-alpha",
+    "ts-loader": "^4.4.2",
+    "tslint-config-prettier": "^1.15.0",
+    "typescript": "^2.9.2",
+    "webpack": "^4.19.0",
+    "webpack-cli": "^3.1.0",
+    "webpack-dev-server": "^3.1.4"
+  },
+  "scripts": {
+    "start": "webpack-dev-server",
+    "build": "rm -rf dist/* && webpack --config webpack.prod.js"
+  },
+  "dependencies": {
+    "@types/ramda": "^0.25.38",
+    "@types/react": "^16.4.14",
+    "@types/react-dom": "^16.0.7",
+    "ramda": "^0.25.0",
+    "react": "^16.5.2",
+    "react-dom": "^16.5.2",
+    "tonal": "^2.0.0",
+    "tone": "^0.12.80"
+  }
+}
