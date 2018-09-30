@@ -6,9 +6,12 @@
   "repository": "https://github.com/Ameobea/sketches",
   "author": "Casey Primozic <me@ameo.link>",
   "devDependencies": {
+    "@types/redux": "^3.6.0",
+    "css-loader": "^1.0.0",
     "handlebars": "^4.0.11",
     "handlebars-loader": "^1.7.0",
     "html-webpack-plugin": "^4.0.0-alpha",
+    "style-loader": "^0.23.0",
     "ts-loader": "^4.4.2",
     "tslint-config-prettier": "^1.15.0",
     "typescript": "^2.9.2",
@@ -26,7 +29,11 @@
     "@types/react-dom": "^16.0.7",
     "ramda": "^0.25.0",
     "react": "^16.5.2",
+    "react-control-panel": "=0.2.3",
     "react-dom": "^16.5.2",
+    "react-redux": "^5.0.7",
+    "recompose": "^0.30.0",
+    "redux": "^4.0.0",
     "tonal": "^2.0.0",
     "tone": "^0.12.80"
   }

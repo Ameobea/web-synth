@@ -21,10 +21,14 @@ module.exports = {
         test: /\.hbs$/,
         use: 'handlebars-loader',
       },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
+      },
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.tsx', '.js', '.wasm'],
+    extensions: ['.tsx', '.ts', '.tsx', '.js', '.jsx', '.wasm'],
     modules: [path.resolve('./node_modules'), path.resolve('.')],
   },
   plugins: [
