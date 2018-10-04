@@ -3493,13 +3493,14 @@ rc@^1.2.7:
     minimist "^1.2.0"
     strip-json-comments "~2.0.1"
 
-react-control-panel@=0.2.3:
-  version "0.2.3"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.2.3.tgz#2502164fc46838b199523ddda6731b0a56b2fbb8"
-  integrity sha512-n/F5CLcPHyRhNYEOfG98XME4dYI43CBBNK7f0+2LZnOj055Z4WCOFYRRqT3yX9rS9kV0d/n2S8nB9zDe7c1n1g==
+react-control-panel@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.3.0.tgz#40190d4ab373a2f7fa711f0c3b2f23341cad3932"
+  integrity sha512-g/F4QqhcvwFEXUcrTHqq7RmRcQkzw7Po/KqThig0FGDWCMA53umdqpDcykeVhLGzBw/gJ3tmwGATFKy6NkIb1g==
   dependencies:
     is-numeric "0.0.5"
     is-string "^1.0.4"
+    prop-types "^15.6.2"
     react-css-component "^1.0.2"
     simple-color-picker "^0.1.2"
     uuid "^3.3.2"

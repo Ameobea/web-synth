@@ -1,8 +1,7 @@
 import * as React from 'react';
 import * as R from 'ramda';
 import ControlPanel, { Range } from 'react-control-panel';
-
-import { Tone } from '../chords';
+import DuoSynth from 'tone/Tone/instrument/DuoSynth';
 
 const getDefaultSettings = () => ({
   vibratoAmount: 0.5,
@@ -90,7 +89,7 @@ class DuoSynthControls extends React.Component {
 
   constructor(props) {
     super(props);
-    this.synth = new Tone.DuoSynth(getDefaultSettings()).toMaster();
+    this.synth = new DuoSynth(getDefaultSettings()).toMaster();
     this.state = {};
   }
 

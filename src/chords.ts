@@ -1,15 +1,15 @@
 import * as R from 'ramda';
-import * as _Tone from 'tone';
+import Master from 'tone/Tone/core/Master';
+import Synth from 'tone/Tone/instrument/Synth';
+import PolySynth from 'tone/Tone/instrument/PolySynth';
 import * as tonal from 'tonal';
 import { transpose } from 'tonal-distance';
 
-export const Tone = _Tone;
-export const synth = new Tone.PolySynth(4, Tone.Synth).toMaster();
-(window as any).Tone = Tone;
+export const synth = new PolySynth(4, Synth).toMaster();
 (window as any).SYNTH = synth;
 (window as any).tonal = tonal;
 
-Tone.Master.volume.value = -24;
+Master.volume.value = -24;
 
 export const chord = (notes: string[], durationMillis: number) => {
   synth.triggerAttack(notes);
