@@ -5,3 +5,5 @@ cd engine \
 cd -
 cp ./engine/build/* ./src
 yarn build || npm build
+./opt.sh
+
