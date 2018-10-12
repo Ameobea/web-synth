@@ -52,21 +52,3 @@ const rest = (beats: number): Chord => ({ notes: [], beats });
 
 const transposeChord = (transposition: string, notes: string[]): string[] =>
   notes.map(note => transpose(note, transposition));
-
-export const main = (engine: typeof import('./engine')) => {
-  engine.init();
-
-  const baseNotes = ['A4', 'A5', 'G4', 'B6', 'C7', 'E7'];
-
-  const intervals = tonal.Interval.names('d');
-  const chords = R.range(1, 7)
-    .map(i => [{ notes: transposeChord(`${intervals[i]}${i}`, baseNotes), beats: 8 }, rest(4)])
-    .reverse();
-  // playChords(60, [{ notes: baseNotes, beats: 16 }, rest(4), ...R.unnest(chords)]);
-
-  // const c = (notes: Note[]): Chord => ({ notes, beats: 8 });
-  // playChords(60, [
-  //   c(['A4', 'A5', 'G4', 'B6', 'C7', 'E7']),
-  //   c(['G#4', 'G#5', 'D#6', 'F#6', 'A#7', 'B7', 'D#7']),
-  // ]);
-};

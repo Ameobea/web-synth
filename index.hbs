@@ -7,11 +7,36 @@
   <style>
     body {
       background-color: #151515;
+      margin: 0;
+      padding: 0;
+    }
+
+    svg {
+      background-color: transparent;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .grid-line-1 {
+      fill: rgb(30, 38, 73);
+    }
+
+    .grid-line-2 {
+      fill: rgb(47, 54, 85);
+    }
+
+    .measure-line {
+      stroke: #666;
+      stroke-width: 1px;
+      z-index: 4;
     }
   </style>
 </head>
 
 <body>
+  <svg height="720" width="4000" id="background-svg"></svg>
+  <svg height="720" width="4000" id="foreground-svg"></svg>
   <div id="root"></div>
 </body>
 
