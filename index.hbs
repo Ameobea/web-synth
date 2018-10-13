@@ -5,10 +5,17 @@
   <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <title>{{ htmlWebpackPlugin.options.title }}</title>
   <style>
+    html {
+      height: 100vh;
+      overflow: hidden;
+    }
+
     body {
       background-color: #151515;
       margin: 0;
       padding: 0;
+      height: 100vh;
+      overflow: hidden;
     }
 
     svg {
@@ -19,11 +26,11 @@
     }
 
     .grid-line-1 {
-      fill: rgb(30, 38, 73);
+      fill: rgb(39, 39, 39);
     }
 
     .grid-line-2 {
-      fill: rgb(47, 54, 85);
+      fill: rgb(62, 62, 62);
     }
 
     .measure-line {
@@ -31,12 +38,30 @@
       stroke-width: 1px;
       z-index: 4;
     }
+
+    .note {
+      fill: rgb(116, 100, 225);
+    }
+
+    #canvases {
+      height: 100vh;
+      overflow-y: scroll;
+      overflow-x: hidden;
+    }
+
+    #canvases-wrapper {
+      position: relative;
+    }
   </style>
 </head>
 
 <body>
-  <svg height="720" width="4000" id="background-svg"></svg>
-  <svg height="720" width="4000" id="foreground-svg"></svg>
+  <div height="100vh" width="100vh" id="canvases">
+    <div height="720" width="100vh" id="canvases-wrapper">
+      <svg height="720" width="4000" id="background-svg"></svg>
+      <svg height="720" width="4000" id="foreground-svg"></svg>
+    </div>
+  </div>
   <div id="root"></div>
 </body>
 
