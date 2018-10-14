@@ -1,11 +1,21 @@
-#![feature(box_syntax)]
+#![feature(box_syntax, test)]
 
 extern crate common;
+extern crate rand;
+extern crate rand_pcg;
+extern crate slab;
+extern crate statrs;
+extern crate test;
 extern crate wasm_bindgen;
 
+use std::mem;
 use std::ptr;
 
+use rand::prelude::*;
+use rand_pcg::Pcg32;
 use wasm_bindgen::prelude::*;
+
+mod skip_list;
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -48,7 +58,7 @@ pub enum Note {
 }
 
 #[derive(Clone)]
-struct NoteBox {
+pub struct NoteBox {
     pub start_beat: f32,
     pub end_beat: f32,
 }
@@ -144,10 +154,12 @@ static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
 // static mut NOTES: *mut Vec<NoteBox> = ptr::null_mut();
 ///
 static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
+pub static mut RNG: *mut Pcg32 = ptr::null_mut();
 
 fn init_state() {
     // unsafe { NOTES = Box::into_raw(box Vec::new()) };
     unsafe { NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT)) }
+    unsafe { RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128))) };
 }
 
 #[inline]
