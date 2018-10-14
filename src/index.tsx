@@ -11,6 +11,7 @@ const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
 ) as any[];
 
 let ACTIVE_SHAPE: SVGElement = null!;
+const notes: SVGElement[] = [];
 
 export const get_active_attr = (key: string): string | null => ACTIVE_SHAPE.getAttribute(key);
 
@@ -75,6 +76,14 @@ export const render_line = renderHelper(
     },
   })
 );
+
+/**
+ * The current `ACTIVE_SHAPE` is pushed into the `notes` array and its index is returned.
+ */
+export const push_note = (): number => {
+  notes.push(ACTIVE_SHAPE);
+  return notes.length - 1;
+};
 
 const deleteAllChildren = (node: HTMLElement) => {
   while (node.firstChild) {

@@ -1,14 +1,17 @@
+#![feature(box_syntax)]
+
 extern crate common;
 extern crate wasm_bindgen;
 
-use common::log;
+use std::ptr;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
     pub fn render_quad(canvas_index: usize, x: f32, y: f32, width: f32, height: f32, class: &str);
     pub fn render_line(canvas_index: usize, x1: f32, y1: f32, x2: f32, y2: f32, class: &str);
-    // pub fn get_active_attr(key: &str) -> Option<&str>;
+    pub fn get_active_attr(key: &str) -> Option<String>;
     pub fn set_active_attr(key: &str, val: &str);
 }
 
@@ -28,9 +31,6 @@ const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
 const BG_CANVAS_IX: usize = 0;
 const FG_CANVAS_IX: usize = 1;
 
-static mut MOUSE_DOWN: bool = false;
-static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
-
 #[wasm_bindgen]
 pub enum Note {
     A,
@@ -45,6 +45,109 @@ pub enum Note {
     Fs,
     G,
     Ab,
+}
+
+#[derive(Clone)]
+struct NoteBox {
+    pub start_beat: f32,
+    pub end_beat: f32,
+}
+
+struct NoteLines(Vec<Vec<NoteBox>>);
+
+impl NoteLines {
+    fn new(line_count: usize) -> Self {
+        NoteLines(vec![Vec::new(); line_count])
+    }
+
+    /// Performs the guessing game on the collection, finding the index
+    fn locate_index(&self, line_ix: usize, beat: f32) -> Option<usize> {
+        let line = &self.0[line_ix];
+        if line.is_empty() {
+            return Some(0);
+        }
+
+        let mut lower_bound = 0;
+        let mut higher_bound = line.len();
+        let mut prev_guess = 0;
+        while lower_bound != higher_bound {
+            let guess = (lower_bound + higher_bound) / 2;
+            if guess == prev_guess {
+                // check if the guess index contains the search beat
+                if line[guess].start_beat <= beat && line[guess].end_beat >= beat {
+                    // envolping confirmed.
+                    return None;
+                }
+            }
+            prev_guess = guess;
+
+            let lower_valid = guess == 0 || line[guess - 1].end_beat < beat;
+            if !lower_valid {
+                // too high
+                higher_bound = guess;
+                continue;
+            }
+
+            let higher_valid = guess == line.len() || line[guess].start_beat > beat;
+            if !higher_valid {
+                // too low
+                lower_bound = guess;
+                continue;
+            }
+
+            return Some(guess);
+        }
+        None
+    }
+
+    /// Finds other notes on the line that surround the given pixel position.  If `None` is
+    /// returned, then the given pixel position is within a note already.  Otherwise, the end point
+    /// of the preceeding note box and the start point of the following one will be returned.
+    /// If there is no preceeding box, then `None` is returned (same for following).
+    fn get_bounds(&self, line_ix: usize, beat: f32) -> Option<(Option<f32>, Option<f32>)> {
+        let line = &self.0[line_ix];
+        // Check if we're off the front of the back up front (commo cases)
+        let first_note_start = line[0].start_beat;
+        let last_note_end = line[line.len() - 1].end_beat;
+        if beat < first_note_start {
+            return Some((None, Some(first_note_start)));
+        } else if beat > last_note_end {
+            return Some((Some(last_note_end), None));
+        }
+
+        let niche_index = self.locate_index(line_ix, beat)?;
+
+        Some((
+            if niche_index > 0 {
+                Some(line[niche_index - 1].end_beat)
+            } else {
+                None
+            },
+            if !line.is_empty() && niche_index < line.len() {
+                Some(line[niche_index].start_beat)
+            } else {
+                None
+            },
+        ))
+    }
+
+    /// Adds a new note box to the given line index
+    fn push(&mut self, line_ix: usize, note_box: NoteBox) {
+        // TODO: actually properly handle out-of-order inserts.  We're doing this temporarily.
+        self.0[line_ix].push(note_box);
+    }
+}
+
+static mut MOUSE_DOWN: bool = false;
+static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
+// /// Corresponds to the SVG rectangles that represent the notes
+// static mut NOTES: *mut Vec<NoteBox> = ptr::null_mut();
+///
+static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
+
+fn init_state() {
+    // unsafe { NOTES = Box::into_raw(box Vec::new()) };
+    unsafe { NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT)) }
 }
 
 #[inline]
@@ -85,6 +188,11 @@ fn get_line_index(y: usize) -> usize {
     (y as f32 / ((LINE_HEIGHT + LINE_BORDER_WIDTH) as f32)).trunc() as usize
 }
 
+#[inline(always)]
+fn px_to_beat(px: f32) -> f32 {
+    px / BEAT_LENGTH_PX
+}
+
 #[wasm_bindgen]
 pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
     let note_line_ix = LINE_COUNT - ((octave * NOTES_PER_OCTAVE) + (note as usize));
@@ -118,21 +226,43 @@ pub fn handle_mouse_down(x: usize, y: usize) {
     );
 }
 
-#[wasm_bindgen]
-pub fn handle_mouse_up(x: usize, y: usize) {
-    unsafe { MOUSE_DOWN = false };
+struct NoteBoxData {
+    pub width: usize,
+    pub x: usize,
+}
+
+fn compute_note_box(x: usize) -> NoteBoxData {
+    let down_x = unsafe { MOUSE_DOWN_COORDS.0 };
+    let (minx, maxx) = if x < down_x { (x, down_x) } else { (down_x, x) };
+    let width = maxx - minx;
+
+    NoteBoxData { x: minx, width }
 }
 
 #[wasm_bindgen]
-pub fn handle_mouse_move(x: usize, y: usize) {
+pub fn handle_mouse_up(x: usize, _y: usize) {
+    unsafe { MOUSE_DOWN = false };
+
+    let NoteBoxData { x, width } = compute_note_box(x);
+    let x_px = x as f32;
+    let y_px: usize = get_active_attr("y").unwrap().parse().unwrap();
+    let line_ix = get_line_index(y_px);
+    let note_box = NoteBox {
+        start_beat: px_to_beat(x_px),
+        end_beat: px_to_beat(x_px + width as f32),
+    };
+    // unsafe { (&mut *NOTES).push(note_box) };
+    unsafe { (&mut *NOTE_LINES).push(line_ix, note_box) };
+}
+
+#[wasm_bindgen]
+pub fn handle_mouse_move(x: usize, _y: usize) {
     if !unsafe { MOUSE_DOWN } {
         return;
     }
 
-    let down_x = unsafe { MOUSE_DOWN_COORDS.0 };
-    let (minx, maxx) = if x < down_x { (x, down_x) } else { (down_x, x) };
-    let width = maxx - minx;
-    set_active_attr("x", &minx.to_string());
+    let NoteBoxData { x, width } = compute_note_box(x);
+    set_active_attr("x", &x.to_string());
     set_active_attr("width", &width.to_string());
 }
 
@@ -141,6 +271,39 @@ pub fn handle_mouse_wheel(_ydiff: isize) {}
 
 #[wasm_bindgen]
 pub fn init() {
+    init_state();
     draw_grid();
     draw_measure_lines();
+}
+
+#[test]
+fn note_lines_index_location() {
+    let mut lines = NoteLines::new(1);
+    let mut mkbox = |start_beat: f32, end_beat: f32| {
+        lines.push(
+            0,
+            NoteBox {
+                start_beat,
+                end_beat,
+            },
+        )
+    };
+
+    for (start_beat, end_beat) in &[
+        (2.0, 10.0),
+        (10.0, 12.0),
+        (14.0, 18.0),
+        (19.0, 24.0),
+        (25.0, 25.0),
+    ] {
+        mkbox(*start_beat, *end_beat);
+    }
+
+    assert_eq!(lines.get_bounds(0, 5.0), None);
+    assert_eq!(lines.get_bounds(0, 1.0), Some((None, Some(2.0))));
+    assert_eq!(lines.get_bounds(0, 2.0), None);
+    assert_eq!(lines.get_bounds(0, 10.0), None);
+    assert_eq!(lines.get_bounds(0, 13.0), Some((Some(12.0), Some(14.0))));
+    assert_eq!(lines.get_bounds(0, 24.2), Some((Some(24.0), Some(25.0))));
+    assert_eq!(lines.get_bounds(0, 200.2), Some((Some(25.0), None)));
 }
