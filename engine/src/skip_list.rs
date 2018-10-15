@@ -15,12 +15,22 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
 
-use super::{NoteBox, RNG};
+use super::{NoteBox, NOTE_BOXES, NOTE_SKIPLIST_NODES, RNG};
 
 const NOTE_SKIP_LIST_LEVELS: usize = 3;
 
+#[inline(always)]
+fn notes() -> &'static mut Slab<NoteBox> {
+    unsafe { &mut *NOTE_BOXES }
+}
+
+#[inline(always)]
+fn nodes() -> &'static mut Slab<NoteSkipListNode> {
+    unsafe { &mut *NOTE_SKIPLIST_NODES }
+}
+
 #[derive(Clone, Copy)]
-struct SlabKey<T>(NonZeroU32, PhantomData<T>);
+pub struct SlabKey<T>(NonZeroU32, PhantomData<T>);
 
 impl<T> SlabKey<T> {
     #[inline]
@@ -37,6 +47,14 @@ impl<T> From<usize> for SlabKey<T> {
             PhantomData,
         )
     }
+}
+
+#[derive(Clone)]
+pub struct NoteSkipListNode {
+    val_slot_key: SlabKey<NoteBox>,
+    /// Contains links to the next node in the sequence as well as all shortcuts that exist for
+    /// that node.  In the case that there are no shortcuts available
+    links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS],
 }
 
 impl Index<SlabKey<NoteSkipListNode>> for Slab<NoteSkipListNode> {
@@ -75,12 +93,12 @@ fn blank_shortcuts() -> [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVEL
     shortcuts
 }
 
-#[derive(Clone)]
-struct NoteSkipListNode {
-    val_slot_key: SlabKey<NoteBox>,
-    /// Contains links to the next node in the sequence as well as all shortcuts that exist for
-    /// that node.  In the case that there are no shortcuts available
-    links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS],
+impl NoteSkipListNode {
+    #[inline]
+    pub fn contains_beat(&self, beat: f32) -> bool {
+        let note: NoteBox = notes()[self.val_slot_key.clone()];
+        note.start_beat <= beat && note.end_beat >= beat
+    }
 }
 
 impl NoteSkipListNode {
@@ -89,8 +107,6 @@ impl NoteSkipListNode {
     /// is returned.
     pub fn search(
         &self,
-        nodes: &Slab<NoteSkipListNode>,
-        notes: &Slab<NoteBox>,
         prev_node_slot_key: Option<SlabKey<NoteSkipListNode>>,
         cur_node_slot_key: SlabKey<NoteSkipListNode>,
         target_val: f32,
@@ -102,14 +118,12 @@ impl NoteSkipListNode {
             if let &Some(ref shortcut_node_slot_key) = &self.links[link_level] {
                 let shortcut_node_slot_key: SlabKey<NoteSkipListNode> =
                     shortcut_node_slot_key.clone();
-                let shortcut_node = &nodes[shortcut_node_slot_key.clone()];
-                let shortcut_val = &notes[shortcut_node.val_slot_key.clone()];
+                let shortcut_node = &nodes()[shortcut_node_slot_key.clone()];
+                let shortcut_val = &notes()[shortcut_node.val_slot_key.clone()];
 
                 // if this shortcut value is still smaller, take the shortcut and continue searching.
                 if shortcut_val.end_beat < target_val {
                     return shortcut_node.search(
-                        nodes,
-                        notes,
                         Some(cur_node_slot_key),
                         shortcut_node_slot_key,
                         target_val,
@@ -131,9 +145,7 @@ impl NoteSkipListNode {
 
 #[derive(Clone)]
 struct NoteSkipList {
-    head_key: Option<NonZeroU32>,
-    nodes: Slab<NoteSkipListNode>,
-    notes: Slab<NoteBox>,
+    head_key: Option<SlabKey<NoteSkipListNode>>,
 }
 
 impl NoteSkipList {
@@ -155,32 +167,27 @@ impl NoteSkipList {
         });
         assert_eq!(placeholder_node_key, 0);
 
-        NoteSkipList {
-            head_key: None,
-            nodes: Slab::new(),
-            notes: Slab::new(),
-        }
+        NoteSkipList { head_key: None }
     }
 
     pub fn head<'a>(&'a self) -> Option<&'a NoteSkipListNode> {
-        let head_key = self.head_key?;
-        self.nodes.get(head_key.get() as usize)
+        let head_key = self.head_key.as_ref()?;
+        nodes().get(head_key.key())
     }
 
     pub fn head_mut<'a>(&'a mut self) -> Option<&'a mut NoteSkipListNode> {
-        let head_key = self.head_key?;
-        self.nodes.get_mut(head_key.get() as usize)
+        let head_key = self.head_key.as_ref()?;
+        nodes().get_mut(head_key.key())
     }
 
     pub fn insert(&mut self, note: NoteBox) {
         let new_node = NoteSkipListNode {
-            val_slot_key: self.notes.insert(note).into(),
+            val_slot_key: notes().insert(note).into(),
             links: blank_shortcuts(),
         };
 
         if self.head_key.is_none() {
-            self.head_key =
-                Some(unsafe { NonZeroU32::new_unchecked(self.nodes.insert(new_node) as u32) });
+            self.head_key = Some(nodes().insert(new_node).into());
             return;
         }
 

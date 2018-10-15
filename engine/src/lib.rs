@@ -13,9 +13,11 @@ use std::ptr;
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
+use slab::Slab;
 use wasm_bindgen::prelude::*;
 
 mod skip_list;
+use self::skip_list::NoteSkipListNode;
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -41,6 +43,15 @@ const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
 const BG_CANVAS_IX: usize = 0;
 const FG_CANVAS_IX: usize = 1;
 
+static mut MOUSE_DOWN: bool = false;
+static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
+pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
+pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut();
+/// Represents the position of all of the notes on all of the lines, providing efficient operations
+/// for determining bounds, intersections with beats, etc.
+static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
+pub static mut RNG: *mut Pcg32 = ptr::null_mut();
+
 #[wasm_bindgen]
 pub enum Note {
     A,
@@ -57,7 +68,7 @@ pub enum Note {
     Ab,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct NoteBox {
     pub start_beat: f32,
     pub end_beat: f32,
@@ -148,17 +159,10 @@ impl NoteLines {
     }
 }
 
-static mut MOUSE_DOWN: bool = false;
-static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
-// /// Corresponds to the SVG rectangles that represent the notes
-// static mut NOTES: *mut Vec<NoteBox> = ptr::null_mut();
-///
-static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
-pub static mut RNG: *mut Pcg32 = ptr::null_mut();
-
 fn init_state() {
-    // unsafe { NOTES = Box::into_raw(box Vec::new()) };
-    unsafe { NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT)) }
+    unsafe { NOTE_BOXES = Box::into_raw(box Slab::new()) };
+    unsafe { NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new()) };
+    unsafe { NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT)) };
     unsafe { RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128))) };
 }
 
