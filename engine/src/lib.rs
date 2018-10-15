@@ -9,6 +9,7 @@ extern crate test;
 extern crate wasm_bindgen;
 
 use std::cmp::Ordering;
+use std::fmt::{self, Debug, Formatter};
 use std::mem;
 use std::ptr;
 
@@ -69,10 +70,16 @@ pub enum Note {
     Ab,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct NoteBox {
     pub start_beat: f32,
     pub end_beat: f32,
+}
+
+impl Debug for NoteBox {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "|{}, {}|", self.start_beat, self.end_beat)
+    }
 }
 
 impl Eq for NoteBox {}
@@ -199,6 +206,7 @@ unsafe fn init_state() {
             end_beat: 0.0,
         })
         .into();
+    println!("{:?}", note_slot_key);
     assert_eq!(note_slot_key.key(), 0);
     let placeholder_node_key = (&mut *NOTE_SKIPLIST_NODES).insert(NoteSkipListNode {
         val_slot_key: note_slot_key,
