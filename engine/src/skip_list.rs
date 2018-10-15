@@ -215,3 +215,17 @@ fn bench_add_two(b: &mut test::Bencher) {
     unsafe { RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128))) };
     b.iter(|| get_skip_list_level())
 }
+
+/// Make sure that our `SlabKey` abstraction really is zero-cost in terms of memory for options,
+/// meaning that the null pointer optimization did indeed apply.
+#[test]
+fn slab_key_size() {
+    use std::mem;
+    let (s1, s2, s3) = (
+        mem::size_of::<NonZeroU32>(),
+        mem::size_of::<SlabKey<(u64, u64)>>(),
+        mem::size_of::<Option<SlabKey<(u64, u64)>>>(),
+    );
+    assert_eq!(s1, s2);
+    assert_eq!(s2, s3);
+}
