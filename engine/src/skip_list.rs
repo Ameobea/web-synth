@@ -15,7 +15,7 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
 
-use super::{NoteBox, NOTE_BOXES, NOTE_SKIPLIST_NODES, RNG};
+use super::{init_state, NoteBox, NOTE_BOXES, NOTE_SKIPLIST_NODES, RNG};
 
 const NOTE_SKIP_LIST_LEVELS: usize = 3;
 
@@ -29,7 +29,7 @@ fn nodes() -> &'static mut Slab<NoteSkipListNode> {
     unsafe { &mut *NOTE_SKIPLIST_NODES }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SlabKey<T>(NonZeroU32, PhantomData<T>);
 
 impl<T> SlabKey<T> {
@@ -77,12 +77,12 @@ impl DerefMut for SlabKey<NoteSkipListNode> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NoteSkipListNode {
-    val_slot_key: SlabKey<NoteBox>,
+    pub val_slot_key: SlabKey<NoteBox>,
     /// Contains links to the next node in the sequence as well as all shortcuts that exist for
     /// that node.  In the case that there are no shortcuts available
-    links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS],
+    pub links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS],
 }
 
 impl Index<SlabKey<NoteSkipListNode>> for Slab<NoteSkipListNode> {
@@ -105,10 +105,19 @@ impl Index<SlabKey<NoteBox>> for Slab<NoteBox> {
 
 /// Skip list levels are taken via a geometric distribution - each level has 50% less of a chance
 /// to have a shortcut than the one below it.
+///
+/// TODO: Make O(1)
 #[inline]
 fn get_skip_list_level() -> usize {
-    let rng: usize = unsafe { (*RNG).gen() };
-    rng & ((1 << NOTE_SKIP_LIST_LEVELS) - 1)
+    let rng = unsafe { &mut (*RNG) };
+    let mut level = 0;
+    for _ in 0..(NOTE_SKIP_LIST_LEVELS - 1) {
+        if rng.gen::<bool>() {
+            break;
+        }
+        level += 1;
+    }
+    level
 }
 
 #[inline]
@@ -135,7 +144,7 @@ impl NoteSkipListNode {
     pub fn search<'a>(
         &'a mut self,
         target_val: f32,
-        self_key: Option<SlabKey<NoteSkipListNode>>,
+        self_key: &Option<SlabKey<NoteSkipListNode>>,
         levels: &mut [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS],
     ) {
         // Starting with the top level and working down, check if the value behind the shortcut is
@@ -153,7 +162,7 @@ impl NoteSkipListNode {
                     }
                     return shortcut_node.search(
                         target_val,
-                        Some(shortcut_node_slot_key.clone()),
+                        &Some(shortcut_node_slot_key.clone()),
                         levels,
                     );
                 }
@@ -172,25 +181,21 @@ struct NoteSkipList {
     head_key: Option<SlabKey<NoteSkipListNode>>,
 }
 
+struct NoteSkipListIterator<'a>(Option<&'a NoteSkipListNode>);
+
+impl<'a> Iterator for NoteSkipListIterator<'a> {
+    type Item = NoteBox;
+
+    fn next(&mut self) -> Option<NoteBox> {
+        let node = self.0.as_ref()?;
+        let note = *self.0?.val_slot_key;
+        self.0 = node.links[0].as_ref().map(|key| &**key);
+        Some(note)
+    }
+}
+
 impl NoteSkipList {
     pub fn new() -> Self {
-        let mut nodes = Slab::new();
-        let mut notes = Slab::new();
-        // insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
-        // assumptions remain true
-        let note_slot_key: SlabKey<NoteBox> = notes
-            .insert(NoteBox {
-                start_beat: 0.0,
-                end_beat: 0.0,
-            })
-            .into();
-        assert_eq!(note_slot_key.key(), 0);
-        let placeholder_node_key = nodes.insert(NoteSkipListNode {
-            val_slot_key: note_slot_key,
-            links: blank_shortcuts(),
-        });
-        assert_eq!(placeholder_node_key, 0);
-
         NoteSkipList { head_key: None }
     }
 
@@ -210,24 +215,44 @@ impl NoteSkipList {
             links: blank_shortcuts(),
         };
         let new_node_key: SlabKey<NoteSkipListNode> = nodes().insert(new_node).into();
+        println!("New node key: {:?}", new_node_key);
         let new_node: &mut NoteSkipListNode = &mut *(new_node_key.clone());
 
         if self.head_key.is_none() {
+            println!("No head; setting one.");
             self.head_key = Some(new_node_key);
             return;
         }
 
-        let mut head_key = self.head_key.as_mut().unwrap().clone();
-        let head: &mut NoteSkipListNode = &mut *head_key;
-        let mut preceeding_links = blank_shortcuts();
-        head.search(note.start_beat, None, &mut preceeding_links);
+        let head_key = self.head_key.as_mut().unwrap();
+        let head: &mut NoteSkipListNode = &mut *(head_key.clone());
+
+        let mut preceeding_links: [Option<SlabKey<NoteSkipListNode>>;
+                                      NOTE_SKIP_LIST_LEVELS] = unsafe { mem::uninitialized() };
+        if head.val_slot_key.start_beat > note.end_beat {
+            // If the first value is already greater than the new note, we don't have to search and
+            // insert it at the front.
+            for i in 0..NOTE_SKIP_LIST_LEVELS {
+                preceeding_links[i] = None;
+            }
+        } else {
+            // If the first value is less, then we start off with the head node as the first node
+            // for all of the different levels.
+            for i in 0..NOTE_SKIP_LIST_LEVELS {
+                preceeding_links[i] = Some(head_key.clone());
+            }
+        }
+
+        head.search(note.start_beat, &None, &mut preceeding_links);
+        println!("{:?}", preceeding_links);
         let level = get_skip_list_level();
-        if preceeding_links[NOTE_SKIP_LIST_LEVELS - 1].is_some() {
+        println!("Generated level: {}", level);
+        if preceeding_links[0].is_some() {
             // Insert the new node between this node and its child (if it has one).
             // For levels through the generated level, we link the inserted node to where the
             // previous node was linking before and link the to the new node from it.
 
-            for i in 0..level {
+            for i in 0..=level {
                 let preceeding_node_for_level = &mut **preceeding_links[i].as_mut().unwrap();
                 new_node.links[i] = preceeding_node_for_level.links[i].clone();
                 preceeding_node_for_level.links[i] = Some(new_node_key.clone());
@@ -237,7 +262,7 @@ impl NoteSkipList {
         } else {
             // The new note is the smallest one in the list, so insert it before the head.
             // Link to the old head for levels up to the one we generated
-            for i in 0..level {
+            for i in 0..=level {
                 new_node.links[i] = self.head_key.clone();
             }
             // Steal links from the old head for all other levels above that
@@ -253,6 +278,10 @@ impl NoteSkipList {
     pub fn remove(&mut self, beat: f32) {
         unimplemented!() // TODO
     }
+
+    pub fn iter<'a>(&'a self) -> NoteSkipListIterator<'a> {
+        NoteSkipListIterator(self.head_key.as_ref().map(|key| &**key))
+    }
 }
 
 /// This data structure holds a list of ordered note boxes
@@ -267,8 +296,30 @@ impl Notes {
         }
     }
 
-    fn locate_index(&self, beat: f32) -> Option<(Option<f32>, Option<f32>)> {
-        unimplemented!() // TODO
+    fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Option<(f32, Option<f32>)> {
+        let mut preceeding_links = blank_shortcuts();
+        let line = &mut self.lines[line_ix];
+        let mut head = match line.head_key.clone() {
+            Some(node) => node,
+            None => return Some((0.0, None)),
+        };
+        head.search(beat, &None, &mut preceeding_links);
+
+        let preceeding_node = match &preceeding_links[0] {
+            Some(node) => node,
+            None => return Some((0.0, Some(head.val_slot_key.start_beat))),
+        };
+        let following_node = match &preceeding_node.links[0] {
+            Some(node) => node,
+            None => return Some((preceeding_node.val_slot_key.end_beat, None)),
+        };
+        if following_node.contains_beat(beat) {
+            return None;
+        }
+        Some((
+            preceeding_node.val_slot_key.end_beat,
+            Some(following_node.val_slot_key.start_beat),
+        ))
     }
 }
 
@@ -290,4 +341,25 @@ fn slab_key_size() {
     );
     assert_eq!(s1, s2);
     assert_eq!(s2, s3);
+}
+
+#[test]
+fn skiplist_construction_iteration() {
+    unsafe { init_state() };
+
+    let mut skip_list = NoteSkipList::new();
+    let mut notes: Vec<_> = vec![(1.0, 2.0), (5.0, 10.0), (3.0, 4.0)]
+        .into_iter()
+        .map(|(start_beat, end_beat)| NoteBox {
+            start_beat,
+            end_beat,
+        })
+        .collect();;
+    for note in &notes {
+        skip_list.insert(note.clone());
+    }
+
+    let actual_notes: Vec<_> = skip_list.iter().collect();
+    notes.sort();
+    assert_eq!(notes, actual_notes);
 }

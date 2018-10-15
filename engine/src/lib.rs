@@ -8,6 +8,7 @@ extern crate statrs;
 extern crate test;
 extern crate wasm_bindgen;
 
+use std::cmp::Ordering;
 use std::mem;
 use std::ptr;
 
@@ -17,7 +18,7 @@ use slab::Slab;
 use wasm_bindgen::prelude::*;
 
 mod skip_list;
-use self::skip_list::NoteSkipListNode;
+use self::skip_list::{NoteSkipListNode, SlabKey};
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -68,10 +69,38 @@ pub enum Note {
     Ab,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NoteBox {
     pub start_beat: f32,
     pub end_beat: f32,
+}
+
+impl Eq for NoteBox {}
+
+impl PartialOrd for NoteBox {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.start_beat > other.end_beat {
+            Some(Ordering::Greater)
+        } else if self.end_beat < other.start_beat {
+            Some(Ordering::Less)
+        } else {
+            None
+        }
+    }
+}
+
+impl Ord for NoteBox {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.start_beat > other.end_beat {
+            Ordering::Greater
+        } else if self.end_beat < other.start_beat {
+            Ordering::Less
+        } else if self.start_beat > other.start_beat {
+            Ordering::Greater
+        } else {
+            Ordering::Less
+        }
+    }
 }
 
 struct NoteLines(Vec<Vec<NoteBox>>);
@@ -159,11 +188,26 @@ impl NoteLines {
     }
 }
 
-fn init_state() {
-    unsafe { NOTE_BOXES = Box::into_raw(box Slab::new()) };
-    unsafe { NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new()) };
-    unsafe { NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT)) };
-    unsafe { RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128))) };
+unsafe fn init_state() {
+    NOTE_BOXES = Box::into_raw(box Slab::new());
+    NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new());
+    // insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
+    // assumptions remain true
+    let note_slot_key: SlabKey<NoteBox> = (&mut *NOTE_BOXES)
+        .insert(NoteBox {
+            start_beat: 0.0,
+            end_beat: 0.0,
+        })
+        .into();
+    assert_eq!(note_slot_key.key(), 0);
+    let placeholder_node_key = (&mut *NOTE_SKIPLIST_NODES).insert(NoteSkipListNode {
+        val_slot_key: note_slot_key,
+        links: mem::uninitialized(),
+    });
+    assert_eq!(placeholder_node_key, 0);
+
+    NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT));
+    RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128)));
 }
 
 #[inline]
@@ -287,7 +331,7 @@ pub fn handle_mouse_wheel(_ydiff: isize) {}
 
 #[wasm_bindgen]
 pub fn init() {
-    init_state();
+    unsafe { init_state() };
     draw_grid();
     draw_measure_lines();
 }
