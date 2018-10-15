@@ -1,4 +1,4 @@
-#![feature(box_syntax, test)]
+#![feature(box_syntax, test, slice_patterns, nll)]
 
 extern crate common;
 extern crate rand;
@@ -93,13 +93,13 @@ impl NoteLines {
         let mut prev_guess = 0;
         while lower_bound != higher_bound {
             let guess = (lower_bound + higher_bound) / 2;
-            if guess == prev_guess {
-                // check if the guess index contains the search beat
-                if line[guess].start_beat <= beat && line[guess].end_beat >= beat {
-                    // envolping confirmed.
-                    return None;
-                }
+            // check if the guess index contains the search beat
+            if guess == prev_guess && line[guess].start_beat <= beat && line[guess].end_beat >= beat
+            {
+                // envolping confirmed.
+                return None;
             }
+
             prev_guess = guess;
 
             let lower_valid = guess == 0 || line[guess - 1].end_beat < beat;
