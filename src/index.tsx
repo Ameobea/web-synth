@@ -96,9 +96,10 @@ wasm.then(engine => {
 
   const scrollOffset = () => document.getElementById('canvases')!.scrollTop - 4;
   const foregroundCanvas = SVGS[1];
-  foregroundCanvas.addEventListener('mousedown', evt =>
-    engine.handle_mouse_down(evt.pageX, evt.pageY + scrollOffset())
-  );
+  foregroundCanvas.addEventListener('mousedown', evt => {
+    evt.preventDefault();
+    engine.handle_mouse_down(evt.pageX, evt.pageY + scrollOffset());
+  });
   foregroundCanvas.addEventListener('mouseup', evt =>
     engine.handle_mouse_up(evt.pageX, evt.pageY + scrollOffset())
   );

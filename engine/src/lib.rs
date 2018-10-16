@@ -1,4 +1,4 @@
-#![feature(box_syntax, test, slice_patterns, nll)]
+#![feature(box_syntax, test, slice_patterns, nll, thread_local)]
 
 extern crate common;
 extern crate rand;
@@ -19,7 +19,9 @@ use slab::Slab;
 use wasm_bindgen::prelude::*;
 
 mod skip_list;
-use self::skip_list::{NoteSkipListNode, SlabKey};
+use self::skip_list::{
+    blank_shortcuts, NoteLines, NoteSkipListNode, SKIP_LIST_NODE_DEBUG_POINTERS,
+};
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -44,15 +46,46 @@ const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
 const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
 const BG_CANVAS_IX: usize = 0;
 const FG_CANVAS_IX: usize = 1;
+pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 
+// All of the statics are made thread local so taht multiple tests can run concurrently without
+// causing all kinds of horrible async UB stuff.
+#[thread_local]
 static mut MOUSE_DOWN: bool = false;
+#[thread_local]
 static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
+#[thread_local]
 pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
+#[thread_local]
 pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut();
 /// Represents the position of all of the notes on all of the lines, providing efficient operations
 /// for determining bounds, intersections with beats, etc.
+#[thread_local]
 static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
+#[thread_local]
 pub static mut RNG: *mut Pcg32 = ptr::null_mut();
+#[thread_local]
+static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
+
+#[inline(always)]
+pub fn notes() -> &'static mut Slab<NoteBox> {
+    unsafe { &mut *NOTE_BOXES }
+}
+
+#[inline(always)]
+pub fn nodes() -> &'static mut Slab<NoteSkipListNode> {
+    unsafe { &mut *NOTE_SKIPLIST_NODES }
+}
+
+#[inline(always)]
+pub fn lines() -> &'static mut NoteLines {
+    unsafe { &mut *NOTE_LINES }
+}
+
+#[inline(always)]
+pub fn bounds() -> (f32, Option<f32>) {
+    unsafe { CUR_NOTE_BOUNDS }
+}
 
 #[wasm_bindgen]
 pub enum Note {
@@ -110,112 +143,26 @@ impl Ord for NoteBox {
     }
 }
 
-struct NoteLines(Vec<Vec<NoteBox>>);
-
-impl NoteLines {
-    fn new(line_count: usize) -> Self {
-        NoteLines(vec![Vec::new(); line_count])
-    }
-
-    /// Performs the guessing game on the collection, finding the index
-    fn locate_index(&self, line_ix: usize, beat: f32) -> Option<usize> {
-        let line = &self.0[line_ix];
-        if line.is_empty() {
-            return Some(0);
-        }
-
-        let mut lower_bound = 0;
-        let mut higher_bound = line.len();
-        let mut prev_guess = 0;
-        while lower_bound != higher_bound {
-            let guess = (lower_bound + higher_bound) / 2;
-            // check if the guess index contains the search beat
-            if guess == prev_guess && line[guess].start_beat <= beat && line[guess].end_beat >= beat
-            {
-                // envolping confirmed.
-                return None;
-            }
-
-            prev_guess = guess;
-
-            let lower_valid = guess == 0 || line[guess - 1].end_beat < beat;
-            if !lower_valid {
-                // too high
-                higher_bound = guess;
-                continue;
-            }
-
-            let higher_valid = guess == line.len() || line[guess].start_beat > beat;
-            if !higher_valid {
-                // too low
-                lower_bound = guess;
-                continue;
-            }
-
-            return Some(guess);
-        }
-        None
-    }
-
-    /// Finds other notes on the line that surround the given pixel position.  If `None` is
-    /// returned, then the given pixel position is within a note already.  Otherwise, the end point
-    /// of the preceeding note box and the start point of the following one will be returned.
-    /// If there is no preceeding box, then `None` is returned (same for following).
-    fn get_bounds(&self, line_ix: usize, beat: f32) -> Option<(Option<f32>, Option<f32>)> {
-        let line = &self.0[line_ix];
-        // Check if we're off the front of the back up front (commo cases)
-        let first_note_start = line[0].start_beat;
-        let last_note_end = line[line.len() - 1].end_beat;
-        if beat < first_note_start {
-            return Some((None, Some(first_note_start)));
-        } else if beat > last_note_end {
-            return Some((Some(last_note_end), None));
-        }
-
-        let niche_index = self.locate_index(line_ix, beat)?;
-
-        Some((
-            if niche_index > 0 {
-                Some(line[niche_index - 1].end_beat)
-            } else {
-                None
-            },
-            if !line.is_empty() && niche_index < line.len() {
-                Some(line[niche_index].start_beat)
-            } else {
-                None
-            },
-        ))
-    }
-
-    /// Adds a new note box to the given line index
-    fn push(&mut self, line_ix: usize, note_box: NoteBox) {
-        // TODO: actually properly handle out-of-order inserts.  We're doing this temporarily.
-        self.0[line_ix].push(note_box);
-    }
-}
-
 unsafe fn init_state() {
     NOTE_BOXES = Box::into_raw(box Slab::new());
     NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new());
-    // insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
-    // assumptions remain true
-    let note_slot_key: SlabKey<NoteBox> = (&mut *NOTE_BOXES)
-        .insert(NoteBox {
-            start_beat: 0.0,
-            end_beat: 0.0,
-        })
-        .into();
-    println!("{:?}", note_slot_key);
-    assert_eq!(note_slot_key.key(), 0);
-    let placeholder_node_key = (&mut *NOTE_SKIPLIST_NODES).insert(NoteSkipListNode {
-        val_slot_key: note_slot_key,
-        links: mem::uninitialized(),
+
+    // Insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
+    // assumptions remain true.
+    let note_slot_key = notes().insert(NoteBox {
+        start_beat: 0.0,
+        end_beat: 0.0,
+    });
+    assert_eq!(note_slot_key, 0);
+    let placeholder_node_key = nodes().insert(NoteSkipListNode {
+        val_slot_key: 0.into(),
+        links: mem::zeroed(),
     });
     assert_eq!(placeholder_node_key, 0);
 
     NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT));
     RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128)));
+    SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box blank_shortcuts());
 }
 
 #[inline]
@@ -261,6 +208,11 @@ fn px_to_beat(px: f32) -> f32 {
     px / BEAT_LENGTH_PX
 }
 
+#[inline(always)]
+fn beats_to_px(beats: f32) -> f32 {
+    beats * BEAT_LENGTH_PX
+}
+
 #[wasm_bindgen]
 pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
     let note_line_ix = LINE_COUNT - ((octave * NOTES_PER_OCTAVE) + (note as usize));
@@ -276,14 +228,63 @@ pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
     );
 }
 
+struct NoteBoxData {
+    pub width: usize,
+    pub x: usize,
+}
+
+impl NoteBoxData {
+    pub fn compute(x: usize) -> Self {
+        let (low_bound, high_bound) = bounds();
+        let x = clamp(x, beats_to_px(low_bound), high_bound.map(beats_to_px));
+
+        let down_x = unsafe { MOUSE_DOWN_COORDS.0 };
+        let (minx, maxx) = if x < down_x { (x, down_x) } else { (down_x, x) };
+        let width = maxx - minx;
+
+        NoteBoxData { x: minx, width }
+    }
+}
+
+#[inline(always)]
+fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
+    let fval = val as f32;
+    if fval < min {
+        return min as usize;
+    } else if max.is_some() {
+        let max = max.unwrap();
+        if fval > max {
+            return max as usize;
+        }
+    }
+
+    val
+}
+
 #[wasm_bindgen]
 pub fn handle_mouse_down(x: usize, y: usize) {
+    let note_lines = lines();
+
+    // Determine if the requested location intersects an existing note and if not, determine the
+    // bounds on the note that will be drawn next.
+    let line_ix = get_line_index(y);
+    let beat = px_to_beat(x as f32);
+    match note_lines.get_bounds(line_ix, beat) {
+        Some(bounds) => {
+            unsafe { CUR_NOTE_BOUNDS = bounds };
+        }
+        None => {
+            // log("Invalid note placement - intersects an existing note.");
+            return;
+        }
+    };
+
     unsafe {
         MOUSE_DOWN = true;
         MOUSE_DOWN_COORDS = (x, y);
     }
 
-    let line_ix = get_line_index(y);
+    // Draw the temporary/candidate note after storing its bounds
     render_quad(
         FG_CANVAS_IX,
         x as f32,
@@ -294,44 +295,37 @@ pub fn handle_mouse_down(x: usize, y: usize) {
     );
 }
 
-struct NoteBoxData {
-    pub width: usize,
-    pub x: usize,
-}
+#[wasm_bindgen]
+pub fn handle_mouse_move(x: usize, _y: usize) {
+    if unsafe { !MOUSE_DOWN } {
+        return;
+    }
 
-fn compute_note_box(x: usize) -> NoteBoxData {
-    let down_x = unsafe { MOUSE_DOWN_COORDS.0 };
-    let (minx, maxx) = if x < down_x { (x, down_x) } else { (down_x, x) };
-    let width = maxx - minx;
-
-    NoteBoxData { x: minx, width }
+    let NoteBoxData { x, width } = NoteBoxData::compute(x);
+    set_active_attr("x", &x.to_string());
+    set_active_attr("width", &width.to_string());
 }
 
 #[wasm_bindgen]
 pub fn handle_mouse_up(x: usize, _y: usize) {
+    // if `MOUSE_DOWN` is not set, the user tried to place an invalid note and we ignore it.
+    if unsafe { !MOUSE_DOWN } {
+        return;
+    }
     unsafe { MOUSE_DOWN = false };
 
-    let NoteBoxData { x, width } = compute_note_box(x);
+    let NoteBoxData { x, width } = NoteBoxData::compute(x);
     let x_px = x as f32;
-    let y_px: usize = get_active_attr("y").unwrap().parse().unwrap();
+    let y_px = unsafe { MOUSE_DOWN_COORDS.1 };
     let line_ix = get_line_index(y_px);
-    let note_box = NoteBox {
+    let note = NoteBox {
         start_beat: px_to_beat(x_px),
         end_beat: px_to_beat(x_px + width as f32),
     };
-    // unsafe { (&mut *NOTES).push(note_box) };
-    unsafe { (&mut *NOTE_LINES).push(line_ix, note_box) };
-}
 
-#[wasm_bindgen]
-pub fn handle_mouse_move(x: usize, _y: usize) {
-    if !unsafe { MOUSE_DOWN } {
-        return;
-    }
-
-    let NoteBoxData { x, width } = compute_note_box(x);
-    set_active_attr("x", &x.to_string());
-    set_active_attr("width", &width.to_string());
+    // Actually insert the node into the skip list
+    lines().insert(line_ix, note);
+    // log(format!("{:?}", lines().lines[line_ix]));
 }
 
 #[wasm_bindgen]
@@ -344,11 +338,12 @@ pub fn init() {
     draw_measure_lines();
 }
 
-#[test]
-fn note_lines_index_location() {
+#[cfg(test)]
+fn mklines(notes: &[(f32, f32)]) -> NoteLines {
+    unsafe { init_state() };
     let mut lines = NoteLines::new(1);
     let mut mkbox = |start_beat: f32, end_beat: f32| {
-        lines.push(
+        lines.insert(
             0,
             NoteBox {
                 start_beat,
@@ -357,21 +352,43 @@ fn note_lines_index_location() {
         )
     };
 
-    for (start_beat, end_beat) in &[
+    for (start_beat, end_beat) in notes {
+        mkbox(*start_beat, *end_beat);
+    }
+
+    lines
+}
+
+#[test]
+fn note_lines_bounds() {
+    let mut lines = mklines(&[
         (2.0, 10.0),
         (10.0, 12.0),
         (14.0, 18.0),
         (19.0, 24.0),
         (25.0, 25.0),
-    ] {
-        mkbox(*start_beat, *end_beat);
-    }
+    ]);
 
     assert_eq!(lines.get_bounds(0, 5.0), None);
-    assert_eq!(lines.get_bounds(0, 1.0), Some((None, Some(2.0))));
+    assert_eq!(lines.get_bounds(0, 1.0), Some((0.0, Some(2.0))));
     assert_eq!(lines.get_bounds(0, 2.0), None);
     assert_eq!(lines.get_bounds(0, 10.0), None);
-    assert_eq!(lines.get_bounds(0, 13.0), Some((Some(12.0), Some(14.0))));
-    assert_eq!(lines.get_bounds(0, 24.2), Some((Some(24.0), Some(25.0))));
-    assert_eq!(lines.get_bounds(0, 200.2), Some((Some(25.0), None)));
+    assert_eq!(lines.get_bounds(0, 13.0), Some((12.0, Some(14.0))));
+    assert_eq!(lines.get_bounds(0, 24.2), Some((24.0, Some(25.0))));
+    assert_eq!(lines.get_bounds(0, 200.2), Some((25.0, None)));
+}
+
+#[test]
+fn note_lines_bounds_2() {
+    let mut lines = mklines(&[(4.65, 7.35), (16.5, 18.8)]);
+
+    assert_eq!(lines.get_bounds(0, 30.0), Some((18.8, None)));
+    assert_eq!(lines.get_bounds(0, 10.95), Some((7.35, Some(16.5))));
+}
+
+#[test]
+fn note_lines_bounds_3() {
+    let mut lines = mklines(&[(5.0, 10.0)]);
+
+    assert_eq!(lines.get_bounds(0, 20.0), Some((10.0, None)));
 }
