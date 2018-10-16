@@ -16,7 +16,7 @@ use std::ptr;
 use rand::prelude::*;
 use slab::Slab;
 
-use super::{init_state, nodes, notes, NoteBox, NOTE_SKIP_LIST_LEVELS, RNG};
+use super::{nodes, notes, NoteBox, NOTE_SKIP_LIST_LEVELS, RNG};
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct SlabKey<T>(NonZeroU32, PhantomData<T>);
@@ -48,7 +48,11 @@ impl Deref for SlabKey<NoteBox> {
     type Target = NoteBox;
 
     fn deref(&self) -> &NoteBox {
-        &notes()[*self]
+        if cfg!(debug_assertions) {
+            &notes()[self.key()]
+        } else {
+            unsafe { notes().get_unchecked(self.key()) }
+        }
     }
 }
 
@@ -56,19 +60,31 @@ impl Deref for SlabKey<NoteSkipListNode> {
     type Target = NoteSkipListNode;
 
     fn deref(&self) -> &NoteSkipListNode {
-        &nodes()[self.clone()]
+        if cfg!(debug_assertions) {
+            &nodes()[self.key()]
+        } else {
+            unsafe { nodes().get_unchecked(self.key()) }
+        }
     }
 }
 
 impl DerefMut for SlabKey<NoteBox> {
     fn deref_mut(&mut self) -> &mut NoteBox {
-        &mut notes()[self.key()]
+        if cfg!(debug_assertions) {
+            &mut notes()[self.key()]
+        } else {
+            unsafe { notes().get_unchecked_mut(self.key()) }
+        }
     }
 }
 
 impl DerefMut for SlabKey<NoteSkipListNode> {
     fn deref_mut(&mut self) -> &mut NoteSkipListNode {
-        &mut nodes()[self.key()]
+        if cfg!(debug_assertions) {
+            &mut nodes()[self.key()]
+        } else {
+            unsafe { nodes().get_unchecked_mut(self.key()) }
+        }
     }
 }
 
@@ -90,7 +106,7 @@ pub struct NoteSkipListNode {
 pub static mut SKIP_LIST_NODE_DEBUG_POINTERS: *mut [Option<SlabKey<NoteSkipListNode>>;
     NOTE_SKIP_LIST_LEVELS] = ptr::null_mut();
 
-fn init_node_dbg_ptrs(head_key: &SlabKey<NoteSkipListNode>) {
+pub fn init_node_dbg_ptrs(head_key: &SlabKey<NoteSkipListNode>) {
     for p in get_debug_ptrs() {
         *p = Some(head_key.clone());
     }
@@ -195,7 +211,11 @@ impl Index<SlabKey<NoteSkipListNode>> for Slab<NoteSkipListNode> {
 
     #[inline]
     fn index(&self, index: SlabKey<NoteSkipListNode>) -> &NoteSkipListNode {
-        &self.get(index.key()).unwrap()
+        if cfg!(debug_assertions) {
+            self.get(index.key()).unwrap()
+        } else {
+            unsafe { &self.get_unchecked(index.key()) }
+        }
     }
 }
 
@@ -204,7 +224,11 @@ impl Index<SlabKey<NoteBox>> for Slab<NoteBox> {
 
     #[inline]
     fn index(&self, index: SlabKey<NoteBox>) -> &NoteBox {
-        &self.get(index.key()).unwrap()
+        if cfg!(debug_assertions) {
+            &self.get(index.key()).unwrap()
+        } else {
+            unsafe { self.get_unchecked(index.key()) }
+        }
     }
 }
 
@@ -213,7 +237,7 @@ impl Index<SlabKey<NoteBox>> for Slab<NoteBox> {
 ///
 /// TODO: Make O(1)?
 #[inline]
-fn get_skip_list_level() -> usize {
+pub fn get_skip_list_level() -> usize {
     let rng = unsafe { &mut (*RNG) };
     let mut level = 0;
     for _ in 0..(NOTE_SKIP_LIST_LEVELS - 1) {
@@ -234,25 +258,15 @@ pub fn blank_shortcuts<T>() -> [Option<T>; NOTE_SKIP_LIST_LEVELS] {
     shortcuts
 }
 
-fn debug_links(links: &[Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS]) -> String {
-    format!(
-        "{:?}",
-        links
-            .iter()
-            .map(|link_opt| -> Option<&NoteBox> {
-                link_opt
-                    .as_ref()
-                    .map(|p| -> &NoteSkipListNode { &**p })
-                    .map(|node| &*node.val_slot_key)
-            })
-            .collect::<Vec<_>>()
-    )
-}
-
 impl NoteSkipListNode {
     #[inline]
     pub fn contains_beat(&self, beat: f32) -> bool {
-        let note: NoteBox = notes()[self.val_slot_key];
+        let note: &NoteBox = if cfg!(debug_assertions) {
+            &notes()[self.val_slot_key]
+        } else {
+            unsafe { notes().get_unchecked(self.val_slot_key.key()) }
+        };
+
         note.start_beat <= beat && note.end_beat >= beat
     }
 
@@ -262,7 +276,7 @@ impl NoteSkipListNode {
     pub fn search<'a>(
         &'a mut self,
         target_val: f32,
-        self_key: SlabKey<NoteSkipListNode>,
+        self_key: &SlabKey<NoteSkipListNode>,
         levels: &mut [SlabKey<NoteSkipListNode>; NOTE_SKIP_LIST_LEVELS],
     ) {
         // if we try searching a node greater than the target value, we've messed up badly
@@ -280,7 +294,7 @@ impl NoteSkipListNode {
                     for level in &mut levels[0..=link_level] {
                         *level = shortcut_node_slot_key.clone();
                     }
-                    return shortcut_node.search(target_val, shortcut_node_slot_key.clone(), levels);
+                    return shortcut_node.search(target_val, shortcut_node_slot_key, levels);
                 } else {
                     // we're the largest node less than `target_val` in the current level
                     levels[link_level] = self_key.clone();
@@ -295,19 +309,18 @@ impl NoteSkipListNode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct NoteSkipList {
-    head_key: Option<SlabKey<NoteSkipListNode>>,
+    pub head_key: Option<SlabKey<NoteSkipListNode>>,
 }
 
 impl Debug for NoteSkipList {
     /// We want the end result to look something like this:
     ///
-    /// ```
     /// |1.0, 2.0|------------------------->|4.0, 5.0|->x
     /// |1.0, 2.0|->----------->|3.0, 4.0|->|4.0, 5.0|->x
     /// |1.0, 2.0|->|2.0, 3.0|->|3.0, 4.0|->|4.0, 5.0|->x
-    /// ```
+    ///
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         let mut node_debug_lines = Vec::new();
         // initialize the debug pointers with the head
@@ -366,12 +379,12 @@ impl NoteSkipList {
     }
 
     #[inline(always)]
-    pub fn head<'a>(&'a self) -> Option<&'a NoteSkipListNode> {
+    pub fn head(&self) -> Option<&NoteSkipListNode> {
         self.head_key.as_ref().map(|k| &**k)
     }
 
     #[inline(always)]
-    pub fn head_mut<'a>(&'a mut self) -> Option<&'a mut NoteSkipListNode> {
+    pub fn head_mut(&mut self) -> Option<&mut NoteSkipListNode> {
         self.head_key.as_mut().map(|k| &mut **k)
     }
 
@@ -420,7 +433,7 @@ impl NoteSkipList {
             *link = head_key.clone();
         }
 
-        head.search(note.start_beat, head_key.clone(), &mut preceeding_links);
+        head.search(note.start_beat, head_key, &mut preceeding_links);
 
         // Insert the new node between this node and its child (if it has one).
         // For levels through the generated level, we link the inserted node to where the
@@ -440,11 +453,11 @@ impl NoteSkipList {
         unimplemented!() // TODO
     }
 
-    pub fn iter<'a>(&'a self) -> NoteSkipListIterator<'a> {
+    pub fn iter(&self) -> NoteSkipListIterator {
         NoteSkipListIterator(self.head_key.as_ref().map(|key| &**key))
     }
 
-    pub fn iter_nodes<'a>(&'a self) -> NoteSkipListNodeIterator<'a> {
+    pub fn iter_nodes(&self) -> NoteSkipListNodeIterator {
         NoteSkipListNodeIterator(self.head_key.as_ref().map(|key| &**key))
     }
 }
@@ -500,11 +513,7 @@ impl NoteLines {
         } else if head.val_slot_key.start_beat > beat {
             return Bounds::Bounded(0.0, Some(head.val_slot_key.start_beat));
         }
-        head.search(
-            beat,
-            line.head_key.as_ref().unwrap().clone(),
-            &mut preceeding_links,
-        );
+        head.search(beat, line.head_key.as_ref().unwrap(), &mut preceeding_links);
 
         let preceeding_node = &preceeding_links[0];
         let following_node = match &preceeding_node.links[0] {
@@ -524,178 +533,4 @@ impl NoteLines {
     pub fn insert(&mut self, line_ix: usize, note: NoteBox) {
         self.lines[line_ix].insert(note);
     }
-}
-
-#[bench]
-fn bench_add_two(b: &mut test::Bencher) {
-    extern crate rand_pcg;
-    unsafe { RNG = Box::into_raw(box rand_pcg::Pcg32::from_seed(mem::transmute(0u128))) };
-    b.iter(get_skip_list_level)
-}
-
-/// Make sure that our `SlabKey` abstraction really is zero-cost in terms of memory for options,
-/// meaning that the null pointer optimization did indeed apply.
-#[test]
-fn slab_key_size() {
-    use std::mem;
-    let (s1, s2, s3) = (
-        mem::size_of::<NonZeroU32>(),
-        mem::size_of::<SlabKey<(u64, u64)>>(),
-        mem::size_of::<Option<SlabKey<(u64, u64)>>>(),
-    );
-    assert_eq!(s1, s2);
-    assert_eq!(s2, s3);
-}
-
-#[test]
-fn skiplist_construction_iteration() {
-    unsafe { init_state() };
-
-    let mut skip_list = NoteSkipList::new();
-    let mut notes: Vec<_> = vec![(1.0, 2.0), (5.0, 10.0), (3.0, 4.0)]
-        .into_iter()
-        .map(|(start_beat, end_beat)| NoteBox {
-            start_beat,
-            end_beat,
-        })
-        .collect();;
-    for note in &notes {
-        skip_list.insert(note.clone());
-    }
-
-    let actual_notes: Vec<_> = skip_list.iter().collect();
-    notes.sort();
-    assert_eq!(notes, actual_notes);
-}
-
-#[test]
-fn skiplist_bulk_insertion() {
-    unsafe { init_state() };
-    let mut skip_list = NoteSkipList::new();
-
-    let rng = unsafe { &mut *RNG };
-    let mut notes = Vec::with_capacity(1000 / 2);
-    for i in 0..500 {
-        notes.push(((i * 2) as f32, ((i * 2) + 1) as f32));
-    }
-    rng.shuffle(&mut notes);
-
-    for (start_beat, end_beat) in notes {
-        skip_list.insert(NoteBox {
-            start_beat,
-            end_beat,
-        });
-        println!("{:?}\n", skip_list);
-    }
-}
-
-#[bench]
-fn level_generation(b: &mut test::Bencher) {
-    unsafe { init_state() };
-    b.iter(get_skip_list_level)
-}
-
-#[test]
-fn skiplist_node_debug() {
-    unsafe { init_state() };
-
-    let next_node_ptr: SlabKey<NoteSkipListNode> = nodes()
-        .insert(NoteSkipListNode {
-            val_slot_key: notes()
-                .insert(NoteBox {
-                    start_beat: 20.0,
-                    end_beat: 30.0,
-                })
-                .into(),
-            links: blank_shortcuts(),
-        })
-        .into();
-
-    let node = NoteSkipListNode {
-        val_slot_key: notes()
-            .insert(NoteBox {
-                start_beat: 0.0,
-                end_beat: 10.0,
-            })
-            .into(),
-        links: [
-            Some(next_node_ptr.clone()),
-            Some(next_node_ptr),
-            None,
-            None,
-            None,
-        ],
-    };
-    let node_key: SlabKey<NoteSkipListNode> = nodes().insert(node).into();
-    let node: &NoteSkipListNode = &*node_key;
-    // pretend that we're inside of a full `SkipList` and initialize the global debug pointers
-    init_node_dbg_ptrs(&node_key);
-
-    let expected = "|0, 10|--\n|0, 10|--\n|0, 10|--\n|0, 10|->\n|0, 10|->";
-    let actual = format!("{:?}", node);
-    println!("\nEXPECTED:\n{}", expected);
-    println!("\nACTUAL:\n{}", actual);
-    assert_eq!(expected, &actual);
-}
-
-#[test]
-fn skiplist_debug() {
-    unsafe { init_state() };
-
-    let mut skip_list = NoteSkipList::new();
-    let notes = &[(1., 2.), (4., 5.), (3., 4.), (2., 3.)]
-        .into_iter()
-        .map(|(start, end)| NoteBox {
-            start_beat: *start,
-            end_beat: *end,
-        })
-        .map(|note| -> SlabKey<NoteBox> { notes().insert(note).into() })
-        .collect::<Vec<_>>()[0..4];
-    let [note_1_2, note_4_5, note_3_4, note_2_3] = match notes {
-        [n1, n2, n3, n4] => [n1, n2, n3, n4],
-        _ => unreachable!(),
-    };
-
-    let mknode = |val_slot_key: SlabKey<NoteBox>,
-                  links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS]|
-     -> SlabKey<NoteSkipListNode> {
-        nodes()
-            .insert(NoteSkipListNode {
-                val_slot_key,
-                links,
-            })
-            .into()
-    };
-
-    let node_4_5 = mknode(*note_4_5, [None, None, None, None, None]);
-    let node_3_4 = mknode(
-        *note_3_4,
-        [
-            Some(node_4_5.clone()),
-            Some(node_4_5.clone()),
-            None,
-            None,
-            None,
-        ],
-    );
-    let node_2_3 = mknode(*note_2_3, [Some(node_3_4.clone()), None, None, None, None]);
-    let head = mknode(
-        *note_1_2,
-        [
-            Some(node_2_3.clone()),
-            Some(node_3_4.clone()),
-            Some(node_4_5.clone()),
-            Some(node_4_5.clone()),
-            None,
-        ],
-    );
-    println!("head: \n{:?}", *head);
-
-    // nodes are pre-linked, so all we have to do is insert the head.
-    skip_list.head_key = Some(head);
-    let expected = "|1, 2|------------------------->x\n|1, 2|----------------->|4, 5|->x\n|1, 2|----------------->|4, 5|->x\n|1, 2|--------->|3, 4|->|4, 5|->x\n|1, 2|->|2, 3|->|3, 4|->|4, 5|->x";
-    let actual = format!("{:?}", skip_list);
-    println!("\nEXPECTED:\n{}", expected);
-    println!("\nACTUAL:\n{}", actual);
-    assert_eq!(actual, expected);
 }

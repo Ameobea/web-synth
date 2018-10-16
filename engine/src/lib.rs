@@ -18,7 +18,7 @@ use rand_pcg::Pcg32;
 use slab::Slab;
 use wasm_bindgen::prelude::*;
 
-mod skip_list;
+pub mod skip_list;
 use self::skip_list::{
     blank_shortcuts, Bounds, NoteLines, NoteSkipListNode, SKIP_LIST_NODE_DEBUG_POINTERS,
 };
@@ -32,28 +32,28 @@ extern "C" {
 }
 
 /// Height of one of the lines rendered in the grid
-const LINE_HEIGHT: usize = 12;
-const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
-const OCTAVES: usize = 5;
-const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
-const LINE_BORDER_WIDTH: usize = 1;
-const GRID_HEIGHT: usize = LINE_COUNT * LINE_HEIGHT;
+pub const LINE_HEIGHT: usize = 12;
+pub const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
+pub const OCTAVES: usize = 5;
+pub const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
+pub const LINE_BORDER_WIDTH: usize = 1;
+pub const GRID_HEIGHT: usize = LINE_COUNT * LINE_HEIGHT;
 /// How long one beat is in pixels
-const BEAT_LENGTH_PX: f32 = 20.0;
-const MEASURE_COUNT: usize = 16;
-const BEATS_PER_MEASURE: usize = 4;
-const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
-const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
-const BG_CANVAS_IX: usize = 0;
-const FG_CANVAS_IX: usize = 1;
+pub const BEAT_LENGTH_PX: f32 = 20.0;
+pub const MEASURE_COUNT: usize = 16;
+pub const BEATS_PER_MEASURE: usize = 4;
+pub const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
+pub const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
+pub const BG_CANVAS_IX: usize = 0;
+pub const FG_CANVAS_IX: usize = 1;
 pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 
-// All of the statics are made thread local so taht multiple tests can run concurrently without
+// All of the statics are made thread local so that multiple tests can run concurrently without
 // causing all kinds of horrible async UB stuff.
 #[thread_local]
-static mut MOUSE_DOWN: bool = false;
+pub static mut MOUSE_DOWN: bool = false;
 #[thread_local]
-static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
+pub static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
 #[thread_local]
 pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
 #[thread_local]
@@ -61,11 +61,11 @@ pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut(
 /// Represents the position of all of the notes on all of the lines, providing efficient operations
 /// for determining bounds, intersections with beats, etc.
 #[thread_local]
-static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
+pub static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
 #[thread_local]
 pub static mut RNG: *mut Pcg32 = ptr::null_mut();
 #[thread_local]
-static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
+pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
 
 #[inline(always)]
 pub fn notes() -> &'static mut Slab<NoteBox> {
@@ -143,7 +143,7 @@ impl Ord for NoteBox {
     }
 }
 
-unsafe fn init_state() {
+pub unsafe fn init_state() {
     NOTE_BOXES = Box::into_raw(box Slab::new());
     NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new());
 
@@ -233,6 +233,16 @@ struct NoteBoxData {
     pub x: usize,
 }
 
+#[inline(always)]
+fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
+    let fval = val as f32;
+    match max {
+        _ if fval < min => min as usize,
+        Some(max) if fval > max => max as usize,
+        _ => val,
+    }
+}
+
 impl NoteBoxData {
     pub fn compute(x: usize) -> Self {
         let (low_bound, high_bound) = bounds();
@@ -244,21 +254,6 @@ impl NoteBoxData {
 
         NoteBoxData { x: minx, width }
     }
-}
-
-#[inline(always)]
-fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
-    let fval = val as f32;
-    if fval < min {
-        return min as usize;
-    } else if max.is_some() {
-        let max = max.unwrap();
-        if fval > max {
-            return max as usize;
-        }
-    }
-
-    val
 }
 
 #[wasm_bindgen]
@@ -336,62 +331,4 @@ pub fn init() {
     unsafe { init_state() };
     draw_grid();
     draw_measure_lines();
-}
-
-#[cfg(test)]
-fn mklines(notes: &[(f32, f32)]) -> NoteLines {
-    unsafe { init_state() };
-    let mut lines = NoteLines::new(1);
-    let mut mkbox = |start_beat: f32, end_beat: f32| {
-        lines.insert(
-            0,
-            NoteBox {
-                start_beat,
-                end_beat,
-            },
-        )
-    };
-
-    for (start_beat, end_beat) in notes {
-        mkbox(*start_beat, *end_beat);
-    }
-
-    lines
-}
-
-#[test]
-fn note_lines_bounds() {
-    let mut lines = mklines(&[
-        (2.0, 10.0),
-        (10.0, 12.0),
-        (14.0, 18.0),
-        (19.0, 24.0),
-        (25.0, 25.0),
-    ]);
-
-    assert_eq!(lines.get_bounds(0, 5.0).bounds(), None);
-    assert_eq!(lines.get_bounds(0, 1.0).bounds(), Some((0.0, Some(2.0))));
-    assert_eq!(lines.get_bounds(0, 2.0).bounds(), None);
-    assert_eq!(lines.get_bounds(0, 10.0).bounds(), None);
-    assert_eq!(lines.get_bounds(0, 13.0).bounds(), Some((12.0, Some(14.0))));
-    assert_eq!(lines.get_bounds(0, 24.2).bounds(), Some((24.0, Some(25.0))));
-    assert_eq!(lines.get_bounds(0, 200.2).bounds(), Some((25.0, None)));
-}
-
-#[test]
-fn note_lines_bounds_2() {
-    let mut lines = mklines(&[(4.65, 7.35), (16.5, 18.8)]);
-
-    assert_eq!(lines.get_bounds(0, 30.0).bounds(), Some((18.8, None)));
-    assert_eq!(
-        lines.get_bounds(0, 10.95).bounds(),
-        Some((7.35, Some(16.5)))
-    );
-}
-
-#[test]
-fn note_lines_bounds_3() {
-    let mut lines = mklines(&[(5.0, 10.0)]);
-
-    assert_eq!(lines.get_bounds(0, 20.0).bounds(), Some((10.0, None)));
 }
