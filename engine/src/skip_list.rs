@@ -454,6 +454,28 @@ pub struct NoteLines {
     pub lines: Vec<NoteSkipList>,
 }
 
+#[derive(Debug)]
+pub enum Bounds {
+    Intersecting(SlabKey<NoteSkipListNode>),
+    Bounded(f32, Option<f32>),
+}
+
+impl Bounds {
+    pub fn is_bounded(&self) -> bool {
+        match self {
+            Bounds::Bounded(_, _) => true,
+            _ => false,
+        }
+    }
+
+    pub fn bounds(&self) -> Option<(f32, Option<f32>)> {
+        match self {
+            Bounds::Bounded(low, high) => Some((*low, *high)),
+            _ => None,
+        }
+    }
+}
+
 impl NoteLines {
     pub fn new(lines: usize) -> Self {
         NoteLines {
@@ -461,11 +483,11 @@ impl NoteLines {
         }
     }
 
-    pub fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Option<(f32, Option<f32>)> {
+    pub fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Bounds {
         let line = &mut self.lines[line_ix];
         let mut head = match line.head_key.clone() {
             Some(node) => node,
-            None => return Some((0.0, None)),
+            None => return Bounds::Bounded(0.0, None),
         };
         let mut preceeding_links: [SlabKey<NoteSkipListNode>; 5] = unsafe { mem::uninitialized() };
         for link in &mut preceeding_links {
@@ -474,9 +496,9 @@ impl NoteLines {
         // If the first value is already greater than the new note, we don't have to search and
         // simply bound it on the top side by the head's start beat.
         if head.contains_beat(beat) {
-            return None;
+            return Bounds::Intersecting(line.head_key.as_mut().unwrap().clone());
         } else if head.val_slot_key.start_beat > beat {
-            return Some((0.0, Some(head.val_slot_key.start_beat)));
+            return Bounds::Bounded(0.0, Some(head.val_slot_key.start_beat));
         }
         head.search(
             beat,
@@ -487,17 +509,18 @@ impl NoteLines {
         let preceeding_node = &preceeding_links[0];
         let following_node = match &preceeding_node.links[0] {
             Some(node) => node,
-            None => return Some((preceeding_node.val_slot_key.end_beat, None)),
+            None => return Bounds::Bounded(preceeding_node.val_slot_key.end_beat, None),
         };
         if following_node.contains_beat(beat) {
-            return None;
+            return Bounds::Intersecting(following_node.clone());
         }
-        Some((
+        Bounds::Bounded(
             preceeding_node.val_slot_key.end_beat,
             Some(following_node.val_slot_key.start_beat),
-        ))
+        )
     }
 
+    #[inline(always)]
     pub fn insert(&mut self, line_ix: usize, note: NoteBox) {
         self.lines[line_ix].insert(note);
     }

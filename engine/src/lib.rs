@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 
 mod skip_list;
 use self::skip_list::{
-    blank_shortcuts, NoteLines, NoteSkipListNode, SKIP_LIST_NODE_DEBUG_POINTERS,
+    blank_shortcuts, Bounds, NoteLines, NoteSkipListNode, SKIP_LIST_NODE_DEBUG_POINTERS,
 };
 
 #[wasm_bindgen(module = "./index")]
@@ -270,10 +270,10 @@ pub fn handle_mouse_down(x: usize, y: usize) {
     let line_ix = get_line_index(y);
     let beat = px_to_beat(x as f32);
     match note_lines.get_bounds(line_ix, beat) {
-        Some(bounds) => {
-            unsafe { CUR_NOTE_BOUNDS = bounds };
+        Bounds::Bounded(lower, upper) => {
+            unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
         }
-        None => {
+        Bounds::Intersecting(_) => {
             // log("Invalid note placement - intersects an existing note.");
             return;
         }
@@ -369,26 +369,29 @@ fn note_lines_bounds() {
         (25.0, 25.0),
     ]);
 
-    assert_eq!(lines.get_bounds(0, 5.0), None);
-    assert_eq!(lines.get_bounds(0, 1.0), Some((0.0, Some(2.0))));
-    assert_eq!(lines.get_bounds(0, 2.0), None);
-    assert_eq!(lines.get_bounds(0, 10.0), None);
-    assert_eq!(lines.get_bounds(0, 13.0), Some((12.0, Some(14.0))));
-    assert_eq!(lines.get_bounds(0, 24.2), Some((24.0, Some(25.0))));
-    assert_eq!(lines.get_bounds(0, 200.2), Some((25.0, None)));
+    assert_eq!(lines.get_bounds(0, 5.0).bounds(), None);
+    assert_eq!(lines.get_bounds(0, 1.0).bounds(), Some((0.0, Some(2.0))));
+    assert_eq!(lines.get_bounds(0, 2.0).bounds(), None);
+    assert_eq!(lines.get_bounds(0, 10.0).bounds(), None);
+    assert_eq!(lines.get_bounds(0, 13.0).bounds(), Some((12.0, Some(14.0))));
+    assert_eq!(lines.get_bounds(0, 24.2).bounds(), Some((24.0, Some(25.0))));
+    assert_eq!(lines.get_bounds(0, 200.2).bounds(), Some((25.0, None)));
 }
 
 #[test]
 fn note_lines_bounds_2() {
     let mut lines = mklines(&[(4.65, 7.35), (16.5, 18.8)]);
 
-    assert_eq!(lines.get_bounds(0, 30.0), Some((18.8, None)));
-    assert_eq!(lines.get_bounds(0, 10.95), Some((7.35, Some(16.5))));
+    assert_eq!(lines.get_bounds(0, 30.0).bounds(), Some((18.8, None)));
+    assert_eq!(
+        lines.get_bounds(0, 10.95).bounds(),
+        Some((7.35, Some(16.5)))
+    );
 }
 
 #[test]
 fn note_lines_bounds_3() {
     let mut lines = mklines(&[(5.0, 10.0)]);
 
-    assert_eq!(lines.get_bounds(0, 20.0), Some((10.0, None)));
+    assert_eq!(lines.get_bounds(0, 20.0).bounds(), Some((10.0, None)));
 }
