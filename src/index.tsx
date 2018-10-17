@@ -11,6 +11,7 @@ const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
 ) as any[];
 
 let ACTIVE_SHAPE: SVGElement = null!;
+let ATTR_COUNTER: number = 0;
 const notes: SVGElement[] = [];
 
 export const get_active_attr = (key: string): string | null => ACTIVE_SHAPE.getAttribute(key);
@@ -23,14 +24,19 @@ export const set_active_attr = (key: string, val: string) => ACTIVE_SHAPE.setAtt
 const renderHelper = (fn: (...args) => { name: string; attrs: { [key: string]: string } }) => (
   canvasIndex,
   ...args
-) => {
+): number => {
   const svg = SVGS[canvasIndex];
   const { name, attrs } = fn(...args);
   const shape = document.createElementNS('http://www.w3.org/2000/svg', name);
-  Object.entries(attrs).forEach(([key, val]) => shape.setAttribute(key, val));
+  const id = ATTR_COUNTER;
+  Object.entries({ ...attrs, id: `e-${id}` }).forEach(([key, val]) => shape.setAttribute(key, val));
   svg.appendChild(shape);
   ACTIVE_SHAPE = shape;
+  ATTR_COUNTER += 1;
+  return id;
 };
+
+const getElem = (id: number): HTMLElement => console.log(id) || document.getElementById(`e-${id}`)!;
 
 export const render_triangle = renderHelper(
   (
@@ -77,6 +83,24 @@ export const render_line = renderHelper(
   })
 );
 
+export const delete_element = (id: number): void => {
+  const elem = getElem(id);
+  elem.parentNode!.removeChild(elem);
+};
+
+export const get_attr = (id: number, key: string): string | null => getElem(id)!.getAttribute(key);
+
+export const set_attr = (id: number, key: string, val: string): void =>
+  getElem(id).setAttribute(key, val);
+
+export const del_attr = (id: number, key: string): void => getElem(id).removeAttribute(key);
+
+export const add_class = (id: number, className: string): void =>
+  getElem(id).classList.add(className);
+
+export const remove_class = (id: number, className: string): void =>
+  getElem(id).classList.remove(className);
+
 /**
  * The current `ACTIVE_SHAPE` is pushed into the `notes` array and its index is returned.
  */
@@ -94,7 +118,7 @@ const deleteAllChildren = (node: HTMLElement) => {
 wasm.then(engine => {
   engine.init();
 
-  const scrollOffset = () => document.getElementById('canvases')!.scrollTop - 4;
+  const scrollOffset = () => document.getElementById('canvases')!.scrollTop - 2;
   const foregroundCanvas = SVGS[1];
   foregroundCanvas.addEventListener('mousedown', evt => {
     evt.preventDefault();
@@ -107,8 +131,7 @@ wasm.then(engine => {
     engine.handle_mouse_move(evt.pageX, evt.pageY + scrollOffset())
   );
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
-
-  engine.draw_note(engine.Note.Cs, 2, 12.0, 16.0);
+  document.addEventListener('keypress', evt => engine.handle_key_press(evt.key));
 });
 
 ReactDOM.render(

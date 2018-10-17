@@ -25,10 +25,30 @@ use self::skip_list::{
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
-    pub fn render_quad(canvas_index: usize, x: f32, y: f32, width: f32, height: f32, class: &str);
-    pub fn render_line(canvas_index: usize, x1: f32, y1: f32, x2: f32, y2: f32, class: &str);
+    pub fn render_quad(
+        canvas_index: usize,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        class: &str,
+    ) -> usize;
+    pub fn render_line(
+        canvas_index: usize,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        class: &str,
+    ) -> usize;
     pub fn get_active_attr(key: &str) -> Option<String>;
     pub fn set_active_attr(key: &str, val: &str);
+    pub fn set_attr(id: usize, key: &str, val: &str);
+    pub fn get_attr(id: usize, key: &str) -> Option<String>;
+    pub fn del_attr(id: usize, key: &str);
+    pub fn add_class(id: usize, className: &str);
+    pub fn remove_class(id: usize, className: &str);
+    pub fn delete_element(id: usize);
 }
 
 /// Height of one of the lines rendered in the grid
@@ -37,7 +57,7 @@ pub const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
 pub const OCTAVES: usize = 5;
 pub const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
 pub const LINE_BORDER_WIDTH: usize = 1;
-pub const GRID_HEIGHT: usize = LINE_COUNT * LINE_HEIGHT;
+pub const GRID_HEIGHT: usize = LINE_COUNT * (LINE_HEIGHT + LINE_BORDER_WIDTH) - 1;
 /// How long one beat is in pixels
 pub const BEAT_LENGTH_PX: f32 = 20.0;
 pub const MEASURE_COUNT: usize = 16;
@@ -48,12 +68,27 @@ pub const BG_CANVAS_IX: usize = 0;
 pub const FG_CANVAS_IX: usize = 1;
 pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 
+pub struct MouseDownData {
+    pub down: bool,
+    pub x: usize,
+    pub y: usize,
+    pub dom_id: usize,
+}
+
+pub struct SelectedNoteData {
+    pub line_ix: usize,
+    pub dom_id: usize,
+}
+
 // All of the statics are made thread local so that multiple tests can run concurrently without
 // causing all kinds of horrible async UB stuff.
 #[thread_local]
-pub static mut MOUSE_DOWN: bool = false;
-#[thread_local]
-pub static mut MOUSE_DOWN_COORDS: (usize, usize) = (0, 0);
+pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
+    down: false,
+    x: 0,
+    y: 0,
+    dom_id: 0,
+};
 #[thread_local]
 pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
 #[thread_local]
@@ -66,6 +101,8 @@ pub static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
 pub static mut RNG: *mut Pcg32 = ptr::null_mut();
 #[thread_local]
 pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
+#[thread_local]
+pub static mut SELECTED_NOTE: Option<SelectedNoteData> = None;
 
 #[inline(always)]
 pub fn notes() -> &'static mut Slab<NoteBox> {
@@ -85,6 +122,11 @@ pub fn lines() -> &'static mut NoteLines {
 #[inline(always)]
 pub fn bounds() -> (f32, Option<f32>) {
     unsafe { CUR_NOTE_BOUNDS }
+}
+
+#[inline(always)]
+fn mouse_down() -> bool {
+    unsafe { MOUSE_DOWN_DATA.down }
 }
 
 #[wasm_bindgen]
@@ -107,6 +149,7 @@ pub enum Note {
 pub struct NoteBox {
     pub start_beat: f32,
     pub end_beat: f32,
+    pub dom_id: usize,
 }
 
 impl Debug for NoteBox {
@@ -152,6 +195,7 @@ pub unsafe fn init_state() {
     let note_slot_key = notes().insert(NoteBox {
         start_beat: 0.0,
         end_beat: 0.0,
+        dom_id: 0,
     });
     assert_eq!(note_slot_key, 0);
     let placeholder_node_key = nodes().insert(NoteSkipListNode {
@@ -248,7 +292,7 @@ impl NoteBoxData {
         let (low_bound, high_bound) = bounds();
         let x = clamp(x, beats_to_px(low_bound), high_bound.map(beats_to_px));
 
-        let down_x = unsafe { MOUSE_DOWN_COORDS.0 };
+        let down_x = unsafe { MOUSE_DOWN_DATA.x };
         let (minx, maxx) = if x < down_x { (x, down_x) } else { (down_x, x) };
         let width = maxx - minx;
 
@@ -268,19 +312,30 @@ pub fn handle_mouse_down(x: usize, y: usize) {
         Bounds::Bounded(lower, upper) => {
             unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
         }
-        Bounds::Intersecting(_) => {
-            // log("Invalid note placement - intersects an existing note.");
+        Bounds::Intersecting(node) => {
+            let selected_note = unsafe { &mut SELECTED_NOTE };
+            let NoteBox { dom_id, .. } = *node.val_slot_key;
+
+            if let Some(SelectedNoteData {
+                line_ix: selected_line_ix,
+                dom_id: selected_dom_id,
+            }) = selected_note
+            {
+                remove_class(*selected_dom_id, "selected");
+                if *selected_dom_id == dom_id {
+                    *selected_note = None;
+                    return;
+                }
+            }
+
+            *selected_note = Some(SelectedNoteData { dom_id, line_ix });
+            add_class(dom_id, "selected");
             return;
         }
     };
 
-    unsafe {
-        MOUSE_DOWN = true;
-        MOUSE_DOWN_COORDS = (x, y);
-    }
-
     // Draw the temporary/candidate note after storing its bounds
-    render_quad(
+    let dom_id = render_quad(
         FG_CANVAS_IX,
         x as f32,
         line_ix as f32 * (LINE_HEIGHT + LINE_BORDER_WIDTH) as f32,
@@ -288,11 +343,20 @@ pub fn handle_mouse_down(x: usize, y: usize) {
         LINE_HEIGHT as f32,
         "note",
     );
+
+    unsafe {
+        MOUSE_DOWN_DATA = MouseDownData {
+            down: true,
+            x,
+            y,
+            dom_id,
+        };
+    }
 }
 
 #[wasm_bindgen]
 pub fn handle_mouse_move(x: usize, _y: usize) {
-    if unsafe { !MOUSE_DOWN } {
+    if !mouse_down() {
         return;
     }
 
@@ -304,16 +368,23 @@ pub fn handle_mouse_move(x: usize, _y: usize) {
 #[wasm_bindgen]
 pub fn handle_mouse_up(x: usize, _y: usize) {
     // if `MOUSE_DOWN` is not set, the user tried to place an invalid note and we ignore it.
-    if unsafe { !MOUSE_DOWN } {
+    if !mouse_down() {
         return;
     }
-    unsafe { MOUSE_DOWN = false };
+    let &mut MouseDownData {
+        ref mut down,
+        y,
+        dom_id,
+        ..
+    } = unsafe { &mut MOUSE_DOWN_DATA };
+    *down = false;
 
     let NoteBoxData { x, width } = NoteBoxData::compute(x);
     let x_px = x as f32;
-    let y_px = unsafe { MOUSE_DOWN_COORDS.1 };
+    let y_px = y;
     let line_ix = get_line_index(y_px);
     let note = NoteBox {
+        dom_id,
         start_beat: px_to_beat(x_px),
         end_beat: px_to_beat(x_px + width as f32),
     };
@@ -325,6 +396,56 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 
 #[wasm_bindgen]
 pub fn handle_mouse_wheel(_ydiff: isize) {}
+
+#[wasm_bindgen]
+pub fn handle_key_press(key: &str) {
+    // TODO: Check for focus on the canvas either on the frontend or here
+    let selected_note = unsafe { &mut SELECTED_NOTE };
+
+    match key {
+        "Backspace" | "Delete" => {
+            match *selected_note {
+                Some(SelectedNoteData { line_ix, dom_id }) => {
+                    delete_element(dom_id);
+                    lines().lines[line_ix].remove_by_dom_id(dom_id);
+                }
+                None => return,
+            }
+            *selected_note = None;
+        }
+        "ArrowUp" | "w" => {
+            if let Some(SelectedNoteData {
+                ref mut line_ix,
+                dom_id,
+            }) = *selected_note
+            {
+                if *line_ix == 0 {
+                    return;
+                }
+
+                lines().move_note(*line_ix, *line_ix - 1, dom_id);
+                *line_ix -= 1;
+            }
+        }
+        "ArrowDown" | "s" => {
+            if let Some(SelectedNoteData {
+                ref mut line_ix,
+                dom_id,
+            }) = *selected_note
+            {
+                if *line_ix == LINE_COUNT - 1 {
+                    return;
+                }
+
+                lines().move_note(*line_ix, *line_ix + 1, dom_id);
+                *line_ix += 1;
+            }
+        }
+        "ArrowRight" | "d" => {} // TODO
+        "ArrowLeft" | "a" => {}  // TODO
+        _ => (),
+    }
+}
 
 #[wasm_bindgen]
 pub fn init() {

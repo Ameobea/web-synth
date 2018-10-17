@@ -43,6 +43,12 @@
       fill: rgb(116, 100, 225);
     }
 
+    .note.selected {
+      fill: rgb(170, 100, 225);
+      stroke-width: 1px;
+      stroke: #661166;
+    }
+
     #canvases {
       height: 100vh;
       overflow-y: scroll;
@@ -58,8 +64,8 @@
 <body>
   <div height="100vh" width="100vh" id="canvases">
     <div height="720" width="100vh" id="canvases-wrapper">
-      <svg height="720" width="4000" id="background-svg"></svg>
-      <svg height="720" width="4000" id="foreground-svg"></svg>
+      <svg height="780" width="4000" id="background-svg"></svg>
+      <svg height="780" width="4000" id="foreground-svg"></svg>
     </div>
   </div>
   <div id="root"></div>

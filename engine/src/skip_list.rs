@@ -450,7 +450,11 @@ impl NoteSkipList {
 
     /// Removes any note box that contains the given beat.
     pub fn remove(&mut self, beat: f32) {
-        unimplemented!() // TODO
+        unimplemented!(); // TODO
+    }
+
+    pub fn remove_by_dom_id(&mut self, dom_id: usize) {
+        unimplemented!(); // TODO
     }
 
     pub fn iter(&self) -> NoteSkipListIterator {
@@ -532,5 +536,9 @@ impl NoteLines {
     #[inline(always)]
     pub fn insert(&mut self, line_ix: usize, note: NoteBox) {
         self.lines[line_ix].insert(note);
+    }
+
+    pub fn move_note(&mut self, prev_line_ix: usize, new_line_ix: usize, dom_id: usize) {
+        unimplemented!(); // TODO
     }
 }
