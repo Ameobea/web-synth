@@ -9,6 +9,7 @@ extern crate test;
 extern crate wasm_bindgen;
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fmt::{self, Debug, Formatter};
 use std::mem;
 use std::ptr;
@@ -72,12 +73,26 @@ pub struct MouseDownData {
     pub down: bool,
     pub x: usize,
     pub y: usize,
-    pub dom_id: usize,
+    pub dom_id: Option<usize>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SelectedNoteData {
     pub line_ix: usize,
     pub dom_id: usize,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Tool {
+    /// A new note will be drawn starting at wherever the mouse is pressed
+    DrawNote,
+    /// A selection box will be drawn, selecting all notes that it intersects
+    SelectNotes,
+    /// Any note clicked on will be deleted
+    DeleteNote,
+    /// The user is holding down control, and any note clicked will be added to the set of
+    /// currently selected notes.
+    CtrlSelect,
 }
 
 // All of the statics are made thread local so that multiple tests can run concurrently without
@@ -87,7 +102,7 @@ pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
     down: false,
     x: 0,
     y: 0,
-    dom_id: 0,
+    dom_id: None,
 };
 #[thread_local]
 pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
@@ -102,7 +117,9 @@ pub static mut RNG: *mut Pcg32 = ptr::null_mut();
 #[thread_local]
 pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
 #[thread_local]
-pub static mut SELECTED_NOTE: Option<SelectedNoteData> = None;
+pub static mut SELECTED_NOTES: *mut HashSet<SelectedNoteData> = ptr::null_mut();
+#[thread_local]
+pub static mut CUR_TOOL: Tool = Tool::DrawNote;
 
 #[inline(always)]
 pub fn notes() -> &'static mut Slab<NoteBox> {
@@ -207,6 +224,7 @@ pub unsafe fn init_state() {
     NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT));
     RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128)));
     SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box blank_shortcuts());
+    SELECTED_NOTES = Box::into_raw(box HashSet::new());
 }
 
 #[inline]
@@ -303,53 +321,87 @@ impl NoteBoxData {
 #[wasm_bindgen]
 pub fn handle_mouse_down(x: usize, y: usize) {
     let note_lines = lines();
+    let selected_notes = unsafe { &mut *SELECTED_NOTES };
+    let cur_tool = unsafe { CUR_TOOL };
 
     // Determine if the requested location intersects an existing note and if not, determine the
     // bounds on the note that will be drawn next.
     let line_ix = get_line_index(y);
     let beat = px_to_beat(x as f32);
-    match note_lines.get_bounds(line_ix, beat) {
-        Bounds::Bounded(lower, upper) => {
-            unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
-        }
-        Bounds::Intersecting(node) => {
-            let selected_note = unsafe { &mut SELECTED_NOTE };
-            let NoteBox { dom_id, .. } = *node.val_slot_key;
 
-            if let Some(SelectedNoteData {
-                line_ix: selected_line_ix,
-                dom_id: selected_dom_id,
-            }) = selected_note
-            {
-                remove_class(*selected_dom_id, "selected");
-                if *selected_dom_id == dom_id {
-                    *selected_note = None;
-                    return;
+    let select_note = |dom_id: usize| add_class(dom_id, "selected");
+    let deselect_note = |dom_id: usize| remove_class(dom_id, "selected");
+
+    let bounds = note_lines.get_bounds(line_ix, beat);
+    let mut drawing_dom_id = None;
+    match bounds {
+        Bounds::Intersecting(node) => match cur_tool {
+            Tool::CtrlSelect => {
+                let dom_id = node.val_slot_key.dom_id;
+                let selected_data = SelectedNoteData { line_ix, dom_id };
+
+                if selected_notes.contains(&selected_data) {
+                    deselect_note(dom_id);
+                    selected_notes.remove(&selected_data);
+                } else {
+                    selected_notes.insert(selected_data);
+                    select_note(dom_id);
                 }
             }
+            Tool::DeleteNote => {
+                let dom_id = node.val_slot_key.dom_id;
+                selected_notes.remove(&SelectedNoteData { line_ix, dom_id });
+                lines().remove_by_dom_id(line_ix, dom_id);
+            }
+            Tool::DrawNote | Tool::SelectNotes => {
+                let NoteBox { dom_id, .. } = *node.val_slot_key;
 
-            *selected_note = Some(SelectedNoteData { dom_id, line_ix });
-            add_class(dom_id, "selected");
-            return;
-        }
+                let mut select_new: bool = true;
+                // Deselect all selected notes
+                for SelectedNoteData {
+                    line_ix: selected_line_ix,
+                    dom_id: selected_dom_id,
+                } in selected_notes.drain()
+                {
+                    deselect_note(selected_dom_id);
+                    if selected_dom_id == dom_id {
+                        select_new = false;
+                    }
+                }
+                if !select_new {
+                    return;
+                }
+
+                // Select the clicked note since it wasn't previously selected
+                selected_notes.insert(SelectedNoteData { dom_id, line_ix });
+                add_class(dom_id, "selected");
+            }
+        },
+        Bounds::Bounded(lower, upper) => match cur_tool {
+            Tool::SelectNotes => {} // TODO
+            Tool::DrawNote => {
+                unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
+
+                // Draw the temporary/candidate note after storing its bounds
+                drawing_dom_id = Some(render_quad(
+                    FG_CANVAS_IX,
+                    x as f32,
+                    line_ix as f32 * (LINE_HEIGHT + LINE_BORDER_WIDTH) as f32,
+                    0.0,
+                    LINE_HEIGHT as f32,
+                    "note",
+                ));
+            }
+            _ => (),
+        },
     };
-
-    // Draw the temporary/candidate note after storing its bounds
-    let dom_id = render_quad(
-        FG_CANVAS_IX,
-        x as f32,
-        line_ix as f32 * (LINE_HEIGHT + LINE_BORDER_WIDTH) as f32,
-        0.0,
-        LINE_HEIGHT as f32,
-        "note",
-    );
 
     unsafe {
         MOUSE_DOWN_DATA = MouseDownData {
             down: true,
             x,
             y,
-            dom_id,
+            dom_id: drawing_dom_id,
         };
     }
 }
@@ -360,9 +412,17 @@ pub fn handle_mouse_move(x: usize, _y: usize) {
         return;
     }
 
-    let NoteBoxData { x, width } = NoteBoxData::compute(x);
-    set_active_attr("x", &x.to_string());
-    set_active_attr("width", &width.to_string());
+    match unsafe { CUR_TOOL } {
+        Tool::SelectNotes => unimplemented!(), // TODO,
+        Tool::DrawNote => {
+            if let Some(dom_id) = unsafe { &mut MOUSE_DOWN_DATA }.dom_id {
+                let NoteBoxData { x, width } = NoteBoxData::compute(x);
+                set_attr(dom_id, "x", &x.to_string());
+                set_attr(dom_id, "width", &width.to_string());
+            }
+        }
+        _ => (),
+    }
 }
 
 #[wasm_bindgen]
@@ -379,19 +439,23 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
     } = unsafe { &mut MOUSE_DOWN_DATA };
     *down = false;
 
-    let NoteBoxData { x, width } = NoteBoxData::compute(x);
-    let x_px = x as f32;
-    let y_px = y;
-    let line_ix = get_line_index(y_px);
-    let note = NoteBox {
-        dom_id,
-        start_beat: px_to_beat(x_px),
-        end_beat: px_to_beat(x_px + width as f32),
-    };
+    if unsafe { CUR_TOOL } == Tool::DrawNote {
+        if let Some(dom_id) = dom_id {
+            let NoteBoxData { x, width } = NoteBoxData::compute(x);
+            let x_px = x as f32;
+            let y_px = y;
+            let line_ix = get_line_index(y_px);
+            let note = NoteBox {
+                dom_id,
+                start_beat: px_to_beat(x_px),
+                end_beat: px_to_beat(x_px + width as f32),
+            };
 
-    // Actually insert the node into the skip list
-    lines().insert(line_ix, note);
-    // log(format!("{:?}", lines().lines[line_ix]));
+            // Actually insert the node into the skip list
+            lines().insert(line_ix, note);
+            // log(format!("{:?}", lines().lines[line_ix]));
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -400,47 +464,45 @@ pub fn handle_mouse_wheel(_ydiff: isize) {}
 #[wasm_bindgen]
 pub fn handle_key_press(key: &str) {
     // TODO: Check for focus on the canvas either on the frontend or here
-    let selected_note = unsafe { &mut SELECTED_NOTE };
+    let selected_notes = unsafe { &mut *SELECTED_NOTES };
+
+    // Drains the selected notes collection and creates a new one after applying `f` to each of the
+    // notes contained within it.
+    fn map_selected_notes<F: Fn(SelectedNoteData) -> SelectedNoteData>(f: F) {
+        unsafe { *SELECTED_NOTES = (&mut *SELECTED_NOTES).drain().map(f).collect() };
+    };
 
     match key {
+        // Delete all currently selected notes
         "Backspace" | "Delete" => {
-            match *selected_note {
-                Some(SelectedNoteData { line_ix, dom_id }) => {
-                    delete_element(dom_id);
-                    lines().lines[line_ix].remove_by_dom_id(dom_id);
-                }
-                None => return,
+            for SelectedNoteData { line_ix, dom_id } in selected_notes.drain() {
+                lines().remove_by_dom_id(line_ix, dom_id);
             }
-            *selected_note = None;
         }
-        "ArrowUp" | "w" => {
-            if let Some(SelectedNoteData {
-                ref mut line_ix,
-                dom_id,
-            }) = *selected_note
-            {
-                if *line_ix == 0 {
-                    return;
-                }
+        "ArrowUp" | "w" => map_selected_notes(|note_data: SelectedNoteData| {
+            let SelectedNoteData { line_ix, dom_id } = note_data;
+            if line_ix == 0 {
+                return note_data;
+            }
 
-                lines().move_note(*line_ix, *line_ix - 1, dom_id);
-                *line_ix -= 1;
-            }
-        }
-        "ArrowDown" | "s" => {
-            if let Some(SelectedNoteData {
-                ref mut line_ix,
+            lines().move_note(line_ix, line_ix - 1, dom_id);
+            SelectedNoteData {
+                line_ix: line_ix - 1,
                 dom_id,
-            }) = *selected_note
-            {
-                if *line_ix == LINE_COUNT - 1 {
-                    return;
-                }
-
-                lines().move_note(*line_ix, *line_ix + 1, dom_id);
-                *line_ix += 1;
             }
-        }
+        }),
+        "ArrowDown" | "s" => map_selected_notes(|note_data: SelectedNoteData| {
+            let SelectedNoteData { line_ix, dom_id } = note_data;
+            if line_ix == LINE_COUNT - 1 {
+                return note_data;
+            }
+
+            lines().move_note(line_ix, line_ix + 1, dom_id);
+            SelectedNoteData {
+                line_ix: line_ix + 1,
+                dom_id,
+            }
+        }),
         "ArrowRight" | "d" => {} // TODO
         "ArrowLeft" | "a" => {}  // TODO
         _ => (),

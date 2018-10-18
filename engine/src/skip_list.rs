@@ -88,7 +88,7 @@ impl DerefMut for SlabKey<NoteSkipListNode> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct NoteSkipListNode {
     pub val_slot_key: SlabKey<NoteBox>,
     /// Contains links to the next node in the sequence as well as all shortcuts that exist for
@@ -453,7 +453,7 @@ impl NoteSkipList {
         unimplemented!(); // TODO
     }
 
-    pub fn remove_by_dom_id(&mut self, dom_id: usize) {
+    pub fn remove_by_dom_id(&mut self, dom_id: usize) -> Option<NoteBox> {
         unimplemented!(); // TODO
     }
 
@@ -471,7 +471,7 @@ pub struct NoteLines {
     pub lines: Vec<NoteSkipList>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Bounds {
     Intersecting(SlabKey<NoteSkipListNode>),
     Bounded(f32, Option<f32>),
@@ -494,6 +494,7 @@ impl Bounds {
 }
 
 impl NoteLines {
+    #[inline(always)]
     pub fn new(lines: usize) -> Self {
         NoteLines {
             lines: vec![NoteSkipList::new(); lines],
@@ -539,6 +540,13 @@ impl NoteLines {
     }
 
     pub fn move_note(&mut self, prev_line_ix: usize, new_line_ix: usize, dom_id: usize) {
-        unimplemented!(); // TODO
+        if let Some(note) = self.lines[prev_line_ix].remove_by_dom_id(dom_id) {
+            self.lines[new_line_ix].insert(note);
+        }
+    }
+
+    #[inline(always)]
+    pub fn remove_by_dom_id(&mut self, line_ix: usize, dom_id: usize) -> Option<NoteBox> {
+        self.lines[line_ix].remove_by_dom_id(dom_id)
     }
 }

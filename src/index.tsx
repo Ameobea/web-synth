@@ -36,7 +36,7 @@ const renderHelper = (fn: (...args) => { name: string; attrs: { [key: string]: s
   return id;
 };
 
-const getElem = (id: number): HTMLElement => console.log(id) || document.getElementById(`e-${id}`)!;
+const getElem = (id: number): HTMLElement => document.getElementById(`e-${id}`)!;
 
 export const render_triangle = renderHelper(
   (
@@ -131,7 +131,13 @@ wasm.then(engine => {
     engine.handle_mouse_move(evt.pageX, evt.pageY + scrollOffset())
   );
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
-  document.addEventListener('keypress', evt => engine.handle_key_press(evt.key));
+  document.addEventListener('keypress', evt => {
+    if (evt.key == 'Backspace') {
+      evt.preventDefault();
+    }
+
+    engine.handle_key_press(evt.key);
+  });
 });
 
 ReactDOM.render(

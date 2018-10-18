@@ -21,6 +21,7 @@ fn mklines(notes: &[(f32, f32)]) -> NoteLines {
             NoteBox {
                 start_beat,
                 end_beat,
+                dom_id: 0,
             },
         )
     };
@@ -100,6 +101,7 @@ fn skiplist_construction_iteration() {
         .map(|(start_beat, end_beat)| NoteBox {
             start_beat,
             end_beat,
+            dom_id: 0,
         })
         .collect();;
     for note in &notes {
@@ -127,6 +129,7 @@ fn skiplist_bulk_insertion() {
         skip_list.insert(NoteBox {
             start_beat,
             end_beat,
+            dom_id: 0,
         });
         println!("{:?}\n", skip_list);
     }
@@ -148,6 +151,7 @@ fn skiplist_node_debug() {
                 .insert(NoteBox {
                     start_beat: 20.0,
                     end_beat: 30.0,
+                    dom_id: 0,
                 })
                 .into(),
             links: blank_shortcuts(),
@@ -159,6 +163,7 @@ fn skiplist_node_debug() {
             .insert(NoteBox {
                 start_beat: 0.0,
                 end_beat: 10.0,
+                dom_id: 0,
             })
             .into(),
         links: [
@@ -191,6 +196,7 @@ fn skiplist_debug_fmt() {
         .map(|(start, end)| NoteBox {
             start_beat: *start,
             end_beat: *end,
+            dom_id: 0,
         })
         .map(|note| -> SlabKey<NoteBox> { notes().insert(note).into() })
         .collect::<Vec<_>>()[0..4];
