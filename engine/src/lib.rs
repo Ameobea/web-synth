@@ -73,7 +73,8 @@ pub struct MouseDownData {
     pub down: bool,
     pub x: usize,
     pub y: usize,
-    pub dom_id: Option<usize>,
+    pub note_dom_id: Option<usize>,
+    pub selection_box_dom_id: Option<usize>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -86,13 +87,8 @@ pub struct SelectedNoteData {
 pub enum Tool {
     /// A new note will be drawn starting at wherever the mouse is pressed
     DrawNote,
-    /// A selection box will be drawn, selecting all notes that it intersects
-    SelectNotes,
     /// Any note clicked on will be deleted
     DeleteNote,
-    /// The user is holding down control, and any note clicked will be added to the set of
-    /// currently selected notes.
-    CtrlSelect,
 }
 
 // All of the statics are made thread local so that multiple tests can run concurrently without
@@ -102,7 +98,8 @@ pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
     down: false,
     x: 0,
     y: 0,
-    dom_id: None,
+    note_dom_id: None,
+    selection_box_dom_id: None,
 };
 #[thread_local]
 pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
@@ -120,6 +117,12 @@ pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
 pub static mut SELECTED_NOTES: *mut HashSet<SelectedNoteData> = ptr::null_mut();
 #[thread_local]
 pub static mut CUR_TOOL: Tool = Tool::DrawNote;
+#[thread_local]
+pub static mut CONTROL_PRESSED: bool = false;
+#[thread_local]
+pub static mut SHIFT_PRESSED: bool = false;
+#[thread_local]
+pub static mut CUR_MOUSE_COORDS: (usize, usize) = (0, 0);
 
 #[inline(always)]
 pub fn notes() -> &'static mut Slab<NoteBox> {
@@ -290,11 +293,6 @@ pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
     );
 }
 
-struct NoteBoxData {
-    pub width: usize,
-    pub x: usize,
-}
-
 #[inline(always)]
 fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
     let fval = val as f32;
@@ -303,6 +301,11 @@ fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
         Some(max) if fval > max => max as usize,
         _ => val,
     }
+}
+
+struct NoteBoxData {
+    pub width: usize,
+    pub x: usize,
 }
 
 impl NoteBoxData {
@@ -318,25 +321,254 @@ impl NoteBoxData {
     }
 }
 
+/// A rectangular region of 2D space
+#[derive(Clone)]
+struct SelectionRegion {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
+#[derive(Clone, Copy)]
+enum ChangedRegionStatus {
+    Added,
+    Removed,
+}
+
+impl From<bool> for ChangedRegionStatus {
+    fn from(b: bool) -> Self {
+        if b {
+            ChangedRegionStatus::Added
+        } else {
+            ChangedRegionStatus::Removed
+        }
+    }
+}
+
+/// Represents a rectangle of space that was either added or removed from the selection region.
+#[derive(Clone)]
+struct ChangedRegion {
+    pub was_added: ChangedRegionStatus,
+    pub region: SelectionRegion,
+}
+
+#[inline(always)]
+fn min_max(n1: usize, n2: usize) -> (usize, usize) {
+    if n2 < n1 {
+        (n2, n1)
+    } else {
+        (n1, n2)
+    }
+}
+
+#[inline(always)]
+fn mp(b: bool) -> isize {
+    if b {
+        1
+    } else {
+        -1
+    }
+}
+
+impl SelectionRegion {
+    pub fn from_points(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
+        let (minx, maxx) = min_max(x1, x2);
+        let (miny, maxy) = min_max(y1, y1);
+
+        SelectionRegion {
+            x: minx,
+            y: miny,
+            width: maxx - minx,
+            height: maxy - miny,
+        }
+    }
+
+    pub fn diff(
+        &self,
+        origin_x: usize,
+        origin_y: usize,
+        other: &Self,
+    ) -> (ChangedRegion, ChangedRegion) {
+        let sum_origin = (self.x.min(other.x), self.y.min(other.y));
+        let sum_rev_origin = (
+            (self.x + self.width).max(other.x + other.width),
+            (self.y + self.height).max(other.y + other.height),
+        );
+
+        let sum_width = sum_rev_origin.0 - sum_origin.0;
+        let sum_height = sum_rev_origin.1 - sum_origin.1;
+
+        let x_diff_left = other.x - sum_origin.0;
+        let x_diff_right = sum_rev_origin.0 - (self.x + self.width);
+        let y_diff_top = other.y - sum_origin.1;
+        let y_diff_bottom = sum_rev_origin.1 - (self.y + self.height);
+
+        let y_crossed = (self.x >= origin_x) != (other.x >= origin_x);
+        let x_crossed = (self.y >= origin_y) != (other.y >= origin_y);
+
+        // TODO: try getting the four corners and then adding them together conditionally
+        // based off of which are added/removed/ignored/etc.
+
+        match (y_crossed, y_crossed) {
+            (false, false) => {
+                let (x_region_added, x_region_bounds) = if x_diff_left > 0 {
+                    let bounds = (sum_origin.0, sum_origin.0 + x_diff_left);
+                    let added = other.x == sum_origin.0;
+                    (added, bounds)
+                } else {
+                    let bounds = (self.x + self.width, sum_rev_origin.0);
+                    let added = (other.x + other.width) == sum_rev_origin.0;
+                    (added, bounds)
+                };
+
+                let (y_region_added, y_region_bounds) = if y_diff_top > 0 {
+                    let bounds = (sum_origin.1, sum_origin.1 + y_diff_top);
+                    let added = other.y == sum_origin.1;
+                    (added, bounds)
+                } else {
+                    let bounds = (self.y + self.height, sum_rev_origin.1);
+                    let added = (other.y + other.height) == sum_rev_origin.1;
+                    (added, bounds)
+                };
+
+                // TODO: calculate the intersection of the two regions.
+                (
+                    ChangedRegion {
+                        was_added: x_region_added.into(),
+                        region: SelectionRegion {
+                            x: x_region_bounds.0,
+                            y: sum_origin.1.max(y_region_bounds.0),
+                            width: x_region_bounds.1 - x_region_bounds.0,
+                            height: (sum_rev_origin.1 - sum_origin.1).min(y_region_bounds.1),
+                        },
+                    },
+                    ChangedRegion {
+                        was_added: y_region_added.into(),
+                        region: SelectionRegion {
+                            x: sum_origin.0,
+                            y: y_region_bounds.0,
+                            width: sum_rev_origin.0 - sum_origin.0,
+                            height: y_region_bounds.1 - y_region_bounds.0,
+                        },
+                    },
+                )
+            }
+            (true, false) => (
+                // left
+                ChangedRegion {
+                    was_added: (other.x == sum_origin.0).into(),
+                    region: SelectionRegion {
+                        x: sum_origin.0,
+                        y: unimplemented!(), // TODO
+                        width: origin_x - sum_origin.0,
+                        height: unimplemented!(), // TODO
+                    },
+                },
+                // right
+                ChangedRegion {
+                    was_added: (other.x == origin_x).into(),
+                    region: SelectionRegion {
+                        x: origin_x,
+                        y: unimplemented!(), // TODO
+                        width: sum_rev_origin.x - origin_x,
+                        height: unimplemented!(), // TODO
+                    },
+                },
+            ),
+            (false, true) => (
+                // top
+                ChangedRegion {
+                    was_added: (other.y == sum_origin.1).into(),
+                    region: SelectionRegion {
+                        x: unimplemented!(), // TODO
+                        y: sum_origin.1,
+                        width: unimplemented!(), // TODO
+                        height: origin_y - sum_origin.1,
+                    },
+                },
+                // bottom
+                ChangedRegion {
+                    was_added: (other.y == origin_y).into(),
+                    region: SelectionRegion {
+                        x: unimplemented!(), // TODO
+                        y: origin_y,
+                        width: unimplemented!(), // TODO
+                        height: sum_rev_origin.1 - origin_y,
+                    },
+                },
+            ),
+            (true, true) => (
+                ChangedRegion {
+                    was_added: true.into(),
+                    region: other.clone(),
+                },
+                ChangedRegion {
+                    was_added: false.into(),
+                    region: self.clone(),
+                },
+            ),
+        }
+    }
+}
+
+struct SelectionBoxData {
+    pub region: SelectionRegion,
+    pub changed_region_1: ChangedRegion,
+    pub changed_region_2: ChangedRegion,
+}
+
+impl SelectionBoxData {
+    pub fn compute(x: usize, y: usize, last_x: usize, last_y: usize) -> Self {
+        let &MouseDownData {
+            x: down_x,
+            y: down_y,
+            ..
+        } = unsafe { &MOUSE_DOWN_DATA };
+        let region = SelectionRegion::from_points(down_x, down_y, x, y);
+        let last_region = SelectionRegion::from_points(down_x, down_y, last_x, last_y);
+        let (changed_region_1, changed_region_2) = region.diff(down_x, down_y, &last_region);
+
+        SelectionBoxData {
+            region,
+            changed_region_1,
+            changed_region_2,
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub fn handle_mouse_down(x: usize, y: usize) {
     let note_lines = lines();
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
     let cur_tool = unsafe { CUR_TOOL };
+    let ctrl_pressed = unsafe { CONTROL_PRESSED };
+    let shift_pressed = unsafe { SHIFT_PRESSED };
 
     // Determine if the requested location intersects an existing note and if not, determine the
     // bounds on the note that will be drawn next.
     let line_ix = get_line_index(y);
     let beat = px_to_beat(x as f32);
+    let bounds = note_lines.get_bounds(line_ix, beat);
+    let mut drawing_dom_id = None;
+    let mut selection_box_dom_id = None;
 
     let select_note = |dom_id: usize| add_class(dom_id, "selected");
     let deselect_note = |dom_id: usize| remove_class(dom_id, "selected");
+    let mut draw_selection_box = || {
+        selection_box_dom_id = Some(render_quad(
+            FG_CANVAS_IX,
+            x as f32,
+            y as f32,
+            0.0,
+            0.0,
+            "selection-box",
+        ));
+    };
 
-    let bounds = note_lines.get_bounds(line_ix, beat);
-    let mut drawing_dom_id = None;
     match bounds {
         Bounds::Intersecting(node) => match cur_tool {
-            Tool::CtrlSelect => {
+            Tool::DrawNote if ctrl_pressed => {
                 let dom_id = node.val_slot_key.dom_id;
                 let selected_data = SelectedNoteData { line_ix, dom_id };
 
@@ -348,12 +580,13 @@ pub fn handle_mouse_down(x: usize, y: usize) {
                     select_note(dom_id);
                 }
             }
+            Tool::DrawNote if shift_pressed => draw_selection_box(),
             Tool::DeleteNote => {
                 let dom_id = node.val_slot_key.dom_id;
                 selected_notes.remove(&SelectedNoteData { line_ix, dom_id });
                 lines().remove_by_dom_id(line_ix, dom_id);
             }
-            Tool::DrawNote | Tool::SelectNotes => {
+            Tool::DrawNote => {
                 let NoteBox { dom_id, .. } = *node.val_slot_key;
 
                 let mut select_new: bool = true;
@@ -378,7 +611,8 @@ pub fn handle_mouse_down(x: usize, y: usize) {
             }
         },
         Bounds::Bounded(lower, upper) => match cur_tool {
-            Tool::SelectNotes => {} // TODO
+            Tool::DrawNote if ctrl_pressed => {} // TODO
+            Tool::DrawNote if shift_pressed => draw_selection_box(),
             Tool::DrawNote => {
                 unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
 
@@ -401,21 +635,49 @@ pub fn handle_mouse_down(x: usize, y: usize) {
             down: true,
             x,
             y,
-            dom_id: drawing_dom_id,
+            note_dom_id: drawing_dom_id,
+            selection_box_dom_id,
         };
     }
 }
 
 #[wasm_bindgen]
-pub fn handle_mouse_move(x: usize, _y: usize) {
+pub fn handle_mouse_move(x: usize, y: usize) {
+    let (last_x, last_y) = unsafe { CUR_MOUSE_COORDS };
+    unsafe { CUR_MOUSE_COORDS = (x, y) };
     if !mouse_down() {
         return;
     }
+    let shift_pressed = unsafe { SHIFT_PRESSED };
+    let &mut MouseDownData {
+        note_dom_id,
+        selection_box_dom_id,
+        ..
+    } = unsafe { &mut MOUSE_DOWN_DATA };
+    let cur_tool = unsafe { CUR_TOOL };
 
-    match unsafe { CUR_TOOL } {
-        Tool::SelectNotes => unimplemented!(), // TODO,
+    match cur_tool {
+        Tool::DrawNote if shift_pressed => {
+            if let Some(selection_box_dom_id) = selection_box_dom_id {
+                let SelectionBoxData {
+                    region:
+                        SelectionRegion {
+                            x,
+                            y,
+                            width,
+                            height,
+                        },
+                    new_region_1,
+                    new_region_2,
+                } = SelectionBoxData::compute(x, y, last_x, last_y);
+                set_attr(selection_box_dom_id, "x", &x.to_string());
+                set_attr(selection_box_dom_id, "y", &y.to_string());
+                set_attr(selection_box_dom_id, "width", &width.to_string());
+                set_attr(selection_box_dom_id, "height", &height.to_string());
+            }
+        }
         Tool::DrawNote => {
-            if let Some(dom_id) = unsafe { &mut MOUSE_DOWN_DATA }.dom_id {
+            if let Some(dom_id) = note_dom_id {
                 let NoteBoxData { x, width } = NoteBoxData::compute(x);
                 set_attr(dom_id, "x", &x.to_string());
                 set_attr(dom_id, "width", &width.to_string());
@@ -434,26 +696,34 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
     let &mut MouseDownData {
         ref mut down,
         y,
-        dom_id,
+        note_dom_id,
+        selection_box_dom_id,
         ..
     } = unsafe { &mut MOUSE_DOWN_DATA };
     *down = false;
 
     if unsafe { CUR_TOOL } == Tool::DrawNote {
-        if let Some(dom_id) = dom_id {
-            let NoteBoxData { x, width } = NoteBoxData::compute(x);
-            let x_px = x as f32;
-            let y_px = y;
-            let line_ix = get_line_index(y_px);
-            let note = NoteBox {
-                dom_id,
-                start_beat: px_to_beat(x_px),
-                end_beat: px_to_beat(x_px + width as f32),
-            };
+        match (note_dom_id, selection_box_dom_id) {
+            (Some(note_dom_id), None) => {
+                let NoteBoxData { x, width } = NoteBoxData::compute(x);
+                let x_px = x as f32;
+                let y_px = y;
+                let line_ix = get_line_index(y_px);
+                let note = NoteBox {
+                    dom_id: note_dom_id,
+                    start_beat: px_to_beat(x_px),
+                    end_beat: px_to_beat(x_px + width as f32),
+                };
 
-            // Actually insert the node into the skip list
-            lines().insert(line_ix, note);
-            // log(format!("{:?}", lines().lines[line_ix]));
+                // Actually insert the node into the skip list
+                lines().insert(line_ix, note);
+                // log(format!("{:?}", lines().lines[line_ix]));
+            }
+            (None, Some(selection_box_dom_id)) => delete_element(selection_box_dom_id),
+            (Some(_), Some(_)) => common::error(
+                "Both `note_dom_id` and `selection_box_dom_id` exist in `MOUSE_DOWN_DATA`!",
+            ),
+            (None, None) => (),
         }
     }
 }
@@ -462,7 +732,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 pub fn handle_mouse_wheel(_ydiff: isize) {}
 
 #[wasm_bindgen]
-pub fn handle_key_press(key: &str) {
+pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
@@ -505,6 +775,17 @@ pub fn handle_key_press(key: &str) {
         }),
         "ArrowRight" | "d" => {} // TODO
         "ArrowLeft" | "a" => {}  // TODO
+        "Control" => unsafe { CONTROL_PRESSED = true },
+        "Shift" => unsafe { SHIFT_PRESSED = true },
+        _ => (),
+    }
+}
+
+#[wasm_bindgen]
+pub fn handle_key_up(key: &str) {
+    match key {
+        "Control" => unsafe { CONTROL_PRESSED = false },
+        "Shift" => unsafe { SHIFT_PRESSED = false },
         _ => (),
     }
 }

@@ -549,4 +549,8 @@ impl NoteLines {
     pub fn remove_by_dom_id(&mut self, line_ix: usize, dom_id: usize) -> Option<NoteBox> {
         self.lines[line_ix].remove_by_dom_id(dom_id)
     }
+
+    pub fn find_all_notes_in_region(x: f32, y: f32, width: f32, height: f32) -> () {
+        unimplemented!(); // TODO
+    }
 }

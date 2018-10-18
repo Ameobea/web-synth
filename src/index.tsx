@@ -131,13 +131,14 @@ wasm.then(engine => {
     engine.handle_mouse_move(evt.pageX, evt.pageY + scrollOffset())
   );
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
-  document.addEventListener('keypress', evt => {
+  document.addEventListener('keydown', evt => {
     if (evt.key == 'Backspace') {
       evt.preventDefault();
     }
 
-    engine.handle_key_press(evt.key);
+    engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);
   });
+  document.addEventListener('keyup', evt => engine.handle_key_up(evt.key));
 });
 
 ReactDOM.render(
