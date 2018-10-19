@@ -4,7 +4,6 @@ extern crate common;
 extern crate rand;
 extern crate rand_pcg;
 extern crate slab;
-extern crate statrs;
 extern crate test;
 extern crate wasm_bindgen;
 
@@ -19,10 +18,10 @@ use rand_pcg::Pcg32;
 use slab::Slab;
 use wasm_bindgen::prelude::*;
 
+pub mod selection_box;
 pub mod skip_list;
-use self::skip_list::{
-    blank_shortcuts, Bounds, NoteLines, NoteSkipListNode, SKIP_LIST_NODE_DEBUG_POINTERS,
-};
+use self::selection_box::*;
+use self::skip_list::*;
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -77,7 +76,7 @@ pub struct MouseDownData {
     pub selection_box_dom_id: Option<usize>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SelectedNoteData {
     pub line_ix: usize,
     pub dom_id: usize,
@@ -149,6 +148,14 @@ fn mouse_down() -> bool {
     unsafe { MOUSE_DOWN_DATA.down }
 }
 
+fn select_note(dom_id: usize) {
+    add_class(dom_id, "selected")
+}
+
+fn deselect_note(dom_id: usize) {
+    remove_class(dom_id, "selected")
+}
+
 #[wasm_bindgen]
 pub enum Note {
     A,
@@ -203,6 +210,21 @@ impl Ord for NoteBox {
         } else {
             Ordering::Less
         }
+    }
+}
+
+impl NoteBox {
+    #[inline(always)]
+    pub fn contains(&self, beat: f32) -> bool {
+        self.start_beat <= beat && self.end_beat >= beat
+    }
+
+    #[inline(always)]
+    pub fn intersects(&self, other: &Self) -> bool {
+        other.contains(self.start_beat)
+            || other.contains(self.end_beat)
+            || self.contains(other.start_beat)
+            || self.contains(other.end_beat)
     }
 }
 
@@ -269,12 +291,12 @@ fn get_line_index(y: usize) -> usize {
 }
 
 #[inline(always)]
-fn px_to_beat(px: f32) -> f32 {
+pub fn px_to_beat(px: f32) -> f32 {
     px / BEAT_LENGTH_PX
 }
 
 #[inline(always)]
-fn beats_to_px(beats: f32) -> f32 {
+pub fn beats_to_px(beats: f32) -> f32 {
     beats * BEAT_LENGTH_PX
 }
 
@@ -303,7 +325,7 @@ fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
     }
 }
 
-struct NoteBoxData {
+pub struct NoteBoxData {
     pub width: usize,
     pub x: usize,
 }
@@ -318,222 +340,6 @@ impl NoteBoxData {
         let width = maxx - minx;
 
         NoteBoxData { x: minx, width }
-    }
-}
-
-/// A rectangular region of 2D space
-#[derive(Clone)]
-struct SelectionRegion {
-    pub x: usize,
-    pub y: usize,
-    pub width: usize,
-    pub height: usize,
-}
-
-#[derive(Clone, Copy)]
-enum ChangedRegionStatus {
-    Added,
-    Removed,
-}
-
-impl From<bool> for ChangedRegionStatus {
-    fn from(b: bool) -> Self {
-        if b {
-            ChangedRegionStatus::Added
-        } else {
-            ChangedRegionStatus::Removed
-        }
-    }
-}
-
-/// Represents a rectangle of space that was either added or removed from the selection region.
-#[derive(Clone)]
-struct ChangedRegion {
-    pub was_added: ChangedRegionStatus,
-    pub region: SelectionRegion,
-}
-
-#[inline(always)]
-fn min_max(n1: usize, n2: usize) -> (usize, usize) {
-    if n2 < n1 {
-        (n2, n1)
-    } else {
-        (n1, n2)
-    }
-}
-
-#[inline(always)]
-fn mp(b: bool) -> isize {
-    if b {
-        1
-    } else {
-        -1
-    }
-}
-
-impl SelectionRegion {
-    pub fn from_points(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
-        let (minx, maxx) = min_max(x1, x2);
-        let (miny, maxy) = min_max(y1, y1);
-
-        SelectionRegion {
-            x: minx,
-            y: miny,
-            width: maxx - minx,
-            height: maxy - miny,
-        }
-    }
-
-    pub fn diff(
-        &self,
-        origin_x: usize,
-        origin_y: usize,
-        other: &Self,
-    ) -> (ChangedRegion, ChangedRegion) {
-        let sum_origin = (self.x.min(other.x), self.y.min(other.y));
-        let sum_rev_origin = (
-            (self.x + self.width).max(other.x + other.width),
-            (self.y + self.height).max(other.y + other.height),
-        );
-
-        let sum_width = sum_rev_origin.0 - sum_origin.0;
-        let sum_height = sum_rev_origin.1 - sum_origin.1;
-
-        let x_diff_left = other.x - sum_origin.0;
-        let x_diff_right = sum_rev_origin.0 - (self.x + self.width);
-        let y_diff_top = other.y - sum_origin.1;
-        let y_diff_bottom = sum_rev_origin.1 - (self.y + self.height);
-
-        let y_crossed = (self.x >= origin_x) != (other.x >= origin_x);
-        let x_crossed = (self.y >= origin_y) != (other.y >= origin_y);
-
-        // TODO: try getting the four corners and then adding them together conditionally
-        // based off of which are added/removed/ignored/etc.
-
-        match (y_crossed, y_crossed) {
-            (false, false) => {
-                let (x_region_added, x_region_bounds) = if x_diff_left > 0 {
-                    let bounds = (sum_origin.0, sum_origin.0 + x_diff_left);
-                    let added = other.x == sum_origin.0;
-                    (added, bounds)
-                } else {
-                    let bounds = (self.x + self.width, sum_rev_origin.0);
-                    let added = (other.x + other.width) == sum_rev_origin.0;
-                    (added, bounds)
-                };
-
-                let (y_region_added, y_region_bounds) = if y_diff_top > 0 {
-                    let bounds = (sum_origin.1, sum_origin.1 + y_diff_top);
-                    let added = other.y == sum_origin.1;
-                    (added, bounds)
-                } else {
-                    let bounds = (self.y + self.height, sum_rev_origin.1);
-                    let added = (other.y + other.height) == sum_rev_origin.1;
-                    (added, bounds)
-                };
-
-                // TODO: calculate the intersection of the two regions.
-                (
-                    ChangedRegion {
-                        was_added: x_region_added.into(),
-                        region: SelectionRegion {
-                            x: x_region_bounds.0,
-                            y: sum_origin.1.max(y_region_bounds.0),
-                            width: x_region_bounds.1 - x_region_bounds.0,
-                            height: (sum_rev_origin.1 - sum_origin.1).min(y_region_bounds.1),
-                        },
-                    },
-                    ChangedRegion {
-                        was_added: y_region_added.into(),
-                        region: SelectionRegion {
-                            x: sum_origin.0,
-                            y: y_region_bounds.0,
-                            width: sum_rev_origin.0 - sum_origin.0,
-                            height: y_region_bounds.1 - y_region_bounds.0,
-                        },
-                    },
-                )
-            }
-            (true, false) => (
-                // left
-                ChangedRegion {
-                    was_added: (other.x == sum_origin.0).into(),
-                    region: SelectionRegion {
-                        x: sum_origin.0,
-                        y: unimplemented!(), // TODO
-                        width: origin_x - sum_origin.0,
-                        height: unimplemented!(), // TODO
-                    },
-                },
-                // right
-                ChangedRegion {
-                    was_added: (other.x == origin_x).into(),
-                    region: SelectionRegion {
-                        x: origin_x,
-                        y: unimplemented!(), // TODO
-                        width: sum_rev_origin.x - origin_x,
-                        height: unimplemented!(), // TODO
-                    },
-                },
-            ),
-            (false, true) => (
-                // top
-                ChangedRegion {
-                    was_added: (other.y == sum_origin.1).into(),
-                    region: SelectionRegion {
-                        x: unimplemented!(), // TODO
-                        y: sum_origin.1,
-                        width: unimplemented!(), // TODO
-                        height: origin_y - sum_origin.1,
-                    },
-                },
-                // bottom
-                ChangedRegion {
-                    was_added: (other.y == origin_y).into(),
-                    region: SelectionRegion {
-                        x: unimplemented!(), // TODO
-                        y: origin_y,
-                        width: unimplemented!(), // TODO
-                        height: sum_rev_origin.1 - origin_y,
-                    },
-                },
-            ),
-            (true, true) => (
-                ChangedRegion {
-                    was_added: true.into(),
-                    region: other.clone(),
-                },
-                ChangedRegion {
-                    was_added: false.into(),
-                    region: self.clone(),
-                },
-            ),
-        }
-    }
-}
-
-struct SelectionBoxData {
-    pub region: SelectionRegion,
-    pub changed_region_1: ChangedRegion,
-    pub changed_region_2: ChangedRegion,
-}
-
-impl SelectionBoxData {
-    pub fn compute(x: usize, y: usize, last_x: usize, last_y: usize) -> Self {
-        let &MouseDownData {
-            x: down_x,
-            y: down_y,
-            ..
-        } = unsafe { &MOUSE_DOWN_DATA };
-        let region = SelectionRegion::from_points(down_x, down_y, x, y);
-        let last_region = SelectionRegion::from_points(down_x, down_y, last_x, last_y);
-        let (changed_region_1, changed_region_2) = region.diff(down_x, down_y, &last_region);
-
-        SelectionBoxData {
-            region,
-            changed_region_1,
-            changed_region_2,
-        }
     }
 }
 
@@ -553,8 +359,6 @@ pub fn handle_mouse_down(x: usize, y: usize) {
     let mut drawing_dom_id = None;
     let mut selection_box_dom_id = None;
 
-    let select_note = |dom_id: usize| add_class(dom_id, "selected");
-    let deselect_note = |dom_id: usize| remove_class(dom_id, "selected");
     let mut draw_selection_box = || {
         selection_box_dom_id = Some(render_quad(
             FG_CANVAS_IX,
@@ -655,6 +459,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         ..
     } = unsafe { &mut MOUSE_DOWN_DATA };
     let cur_tool = unsafe { CUR_TOOL };
+    let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
     match cur_tool {
         Tool::DrawNote if shift_pressed => {
@@ -667,13 +472,35 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                             width,
                             height,
                         },
-                    new_region_1,
-                    new_region_2,
+                    changed_region_1,
+                    changed_region_2,
                 } = SelectionBoxData::compute(x, y, last_x, last_y);
                 set_attr(selection_box_dom_id, "x", &x.to_string());
                 set_attr(selection_box_dom_id, "y", &y.to_string());
                 set_attr(selection_box_dom_id, "width", &width.to_string());
                 set_attr(selection_box_dom_id, "height", &height.to_string());
+
+                // Look for all notes in the added/removed regions and add/remove them from the
+                // selected notes set and select/deselect their UI representations
+                common::log(format!(
+                    "Changed regions: {:?}, {:?}",
+                    changed_region_1, changed_region_2
+                ));
+                for (was_added, region) in [
+                    (changed_region_1.was_added, changed_region_1.region),
+                    (changed_region_2.was_added, changed_region_2.region),
+                ]
+                    .into_iter()
+                {
+                    for note_data in lines().iter_region(region) {
+                        common::log(format!("{:?}", note_data));
+                        if *was_added && selected_notes.insert(note_data) {
+                            select_note(note_data.dom_id);
+                        } else if selected_notes.remove(&note_data) {
+                            deselect_note(note_data.dom_id);
+                        }
+                    }
+                }
             }
         }
         Tool::DrawNote => {

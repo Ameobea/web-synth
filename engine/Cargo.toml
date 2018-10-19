@@ -12,6 +12,5 @@ wasm-bindgen = "=0.2.21"
 rand = "0.5.5"
 rand_pcg = "0.1.1"
 slab = "0.4"
-statrs = "0.10.0"
 
 common = { path="../../common" }
