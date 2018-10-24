@@ -1,6 +1,7 @@
 #![feature(box_syntax, test, slice_patterns, nll, thread_local)]
 
 extern crate common;
+extern crate fnv;
 extern crate rand;
 extern crate rand_pcg;
 extern crate slab;
@@ -8,11 +9,11 @@ extern crate test;
 extern crate wasm_bindgen;
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::fmt::{self, Debug, Formatter};
 use std::mem;
 use std::ptr;
 
+use fnv::FnvHashSet;
 use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
@@ -57,7 +58,8 @@ pub const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
 pub const OCTAVES: usize = 5;
 pub const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
 pub const LINE_BORDER_WIDTH: usize = 1;
-pub const GRID_HEIGHT: usize = LINE_COUNT * (LINE_HEIGHT + LINE_BORDER_WIDTH) - 1;
+pub const PADDED_LINE_HEIGHT: usize = LINE_HEIGHT + LINE_BORDER_WIDTH;
+pub const GRID_HEIGHT: usize = LINE_COUNT * PADDED_LINE_HEIGHT - 1;
 /// How long one beat is in pixels
 pub const BEAT_LENGTH_PX: f32 = 20.0;
 pub const MEASURE_COUNT: usize = 16;
@@ -113,7 +115,7 @@ pub static mut RNG: *mut Pcg32 = ptr::null_mut();
 #[thread_local]
 pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
 #[thread_local]
-pub static mut SELECTED_NOTES: *mut HashSet<SelectedNoteData> = ptr::null_mut();
+pub static mut SELECTED_NOTES: *mut FnvHashSet<SelectedNoteData> = ptr::null_mut();
 #[thread_local]
 pub static mut CUR_TOOL: Tool = Tool::DrawNote;
 #[thread_local]
@@ -219,12 +221,25 @@ impl NoteBox {
         self.start_beat <= beat && self.end_beat >= beat
     }
 
+    /// Same as `NoteBox::contains` except edges exactly touching don't count.
+    pub fn contains_exclusive(&self, beat: f32) -> bool {
+        self.start_beat < beat && self.end_beat > beat
+    }
+
     #[inline(always)]
     pub fn intersects(&self, other: &Self) -> bool {
         other.contains(self.start_beat)
             || other.contains(self.end_beat)
             || self.contains(other.start_beat)
             || self.contains(other.end_beat)
+    }
+
+    /// Same as `NoteBox::intersects` except edges exactly touching don't count.
+    pub fn intersects_exclusive(&self, other: &Self) -> bool {
+        other.contains_exclusive(self.start_beat)
+            || other.contains_exclusive(self.end_beat)
+            || self.contains_exclusive(other.start_beat)
+            || self.contains_exclusive(other.end_beat)
     }
 }
 
@@ -249,7 +264,7 @@ pub unsafe fn init_state() {
     NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT));
     RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128)));
     SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box blank_shortcuts());
-    SELECTED_NOTES = Box::into_raw(box HashSet::new());
+    SELECTED_NOTES = Box::into_raw(box FnvHashSet::default());
 }
 
 #[inline]
@@ -263,7 +278,7 @@ fn draw_grid_line(y: usize) {
     render_quad(
         BG_CANVAS_IX,
         0.0,
-        (y * (LINE_HEIGHT + LINE_BORDER_WIDTH)) as f32,
+        (y * PADDED_LINE_HEIGHT) as f32,
         GRID_WIDTH as f32,
         LINE_HEIGHT as f32,
         class,
@@ -287,7 +302,7 @@ fn draw_measure_lines() {
 
 #[inline(always)]
 fn get_line_index(y: usize) -> usize {
-    (y as f32 / ((LINE_HEIGHT + LINE_BORDER_WIDTH) as f32)).trunc() as usize
+    (y as f32 / (PADDED_LINE_HEIGHT as f32)).trunc() as usize
 }
 
 #[inline(always)]
@@ -308,7 +323,7 @@ pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
     render_quad(
         FG_CANVAS_IX,
         start_x,
-        (note_line_ix * (LINE_HEIGHT + LINE_BORDER_WIDTH)) as f32,
+        (note_line_ix * PADDED_LINE_HEIGHT) as f32,
         width,
         LINE_HEIGHT as f32,
         "note",
@@ -396,8 +411,8 @@ pub fn handle_mouse_down(x: usize, y: usize) {
                 let mut select_new: bool = true;
                 // Deselect all selected notes
                 for SelectedNoteData {
-                    line_ix: selected_line_ix,
                     dom_id: selected_dom_id,
+                    ..
                 } in selected_notes.drain()
                 {
                     deselect_note(selected_dom_id);
@@ -424,7 +439,7 @@ pub fn handle_mouse_down(x: usize, y: usize) {
                 drawing_dom_id = Some(render_quad(
                     FG_CANVAS_IX,
                     x as f32,
-                    line_ix as f32 * (LINE_HEIGHT + LINE_BORDER_WIDTH) as f32,
+                    line_ix as f32 * PADDED_LINE_HEIGHT as f32,
                     0.0,
                     LINE_HEIGHT as f32,
                     "note",
@@ -484,32 +499,62 @@ pub fn handle_mouse_move(x: usize, y: usize) {
             set_attr(selection_box_dom_id, "y", &y.to_string());
             set_attr(selection_box_dom_id, "width", &width.to_string());
             set_attr(selection_box_dom_id, "height", &height.to_string());
+            // render_quad(
+            //     1,
+            //     changed_region_1.region.x as f32,
+            //     changed_region_1.region.y as f32,
+            //     changed_region_1.region.width as f32,
+            //     changed_region_1.region.height as f32,
+            //     if changed_region_1.was_added {
+            //         "added"
+            //     } else {
+            //         "removed "
+            //     },
+            // );
+            // render_quad(
+            //     1,
+            //     changed_region_2.region.x as f32,
+            //     changed_region_2.region.y as f32,
+            //     changed_region_2.region.width as f32,
+            //     changed_region_2.region.height as f32,
+            //     if changed_region_2.was_added {
+            //         "added"
+            //     } else {
+            //         "removed "
+            //     },
+            // );
 
             // Look for all notes in the added/removed regions and add/remove them from the
             // selected notes set and select/deselect their UI representations
-            common::log(format!("Retained region: {:?}", retained_region));
-            common::log(format!(
-                "Changed regions: {:?}, {:?}",
-                changed_region_1, changed_region_2
-            ));
+            // common::log(format!("Retained region: {:?}", retained_region));
+            // common::log(format!(
+            //     "Changed regions: {:?}, {:?}",
+            //     changed_region_1, changed_region_2
+            // ));
             for (was_added, region) in [
                 (changed_region_1.was_added, changed_region_1.region),
                 (changed_region_2.was_added, changed_region_2.region),
             ]
             .into_iter()
             {
+                // common::log(format!("added: {}, region: {:?}", was_added, region));
                 for note_data in lines().iter_region(region) {
+                    // common::log(format!("Note: {:?}", note_data));
                     // Ignore notes that are also contained in the retained region
-                    if note_data.intersects_region(&retained_region) {
-                        continue;
+                    if let Some(retained_region) = retained_region.as_ref() {
+                        if note_data.intersects_region(&retained_region) {
+                            // common::log("Intersects retained region; skipping.");
+                            continue;
+                        }
                     }
 
-                    common::log(format!("{:?}", note_data));
                     let dom_id = note_data.note_box.dom_id;
                     let selected_note_data = note_data.into();
                     if *was_added && selected_notes.insert(selected_note_data) {
+                        // common::log("Newly selected; selecting...");
                         select_note(dom_id);
-                    } else if selected_notes.remove(&selected_note_data) {
+                    } else if !*was_added && selected_notes.remove(&selected_note_data) {
+                        // common::log("Newly deselected; deselecting...");
                         deselect_note(dom_id);
                     }
                 }
@@ -556,7 +601,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 
                 // Actually insert the node into the skip list
                 lines().insert(line_ix, note);
-                // log(format!("{:?}", lines().lines[line_ix]));
+                // common::log(format!("{:?}", lines().lines[line_ix]));
             }
             (None, Some(selection_box_dom_id)) => delete_element(selection_box_dom_id),
             (Some(_), Some(_)) => common::error(
@@ -580,6 +625,9 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     fn map_selected_notes<F: Fn(SelectedNoteData) -> SelectedNoteData>(f: F) {
         unsafe { *SELECTED_NOTES = (&mut *SELECTED_NOTES).drain().map(f).collect() };
     };
+
+    unsafe { CONTROL_PRESSED = control_pressed };
+    unsafe { SHIFT_PRESSED = shift_pressed };
 
     match key {
         // Delete all currently selected notes
@@ -614,23 +662,19 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         }),
         "ArrowRight" | "d" => {} // TODO
         "ArrowLeft" | "a" => {}  // TODO
-        "Control" => unsafe { CONTROL_PRESSED = true },
-        "Shift" => unsafe { SHIFT_PRESSED = true },
         _ => (),
     }
 }
 
 #[wasm_bindgen]
-pub fn handle_key_up(key: &str) {
-    match key {
-        "Control" => unsafe { CONTROL_PRESSED = false },
-        "Shift" => unsafe { SHIFT_PRESSED = false },
-        _ => (),
-    }
+pub fn handle_key_up(_key: &str, control_pressed: bool, shift_pressed: bool) {
+    unsafe { CONTROL_PRESSED = control_pressed };
+    unsafe { SHIFT_PRESSED = shift_pressed };
 }
 
 #[wasm_bindgen]
 pub fn init() {
+    common::set_panic_hook();
     unsafe { init_state() };
     draw_grid();
     draw_measure_lines();

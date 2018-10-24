@@ -7,11 +7,12 @@ fn test_selection_box_diff(
     origin_y: usize,
     box1: &SelectionRegion,
     box2: &SelectionRegion,
+    expected_retained_region: &Option<SelectionRegion>,
     expected_changed_region_1: &ChangedRegion,
     expected_changed_region_2: &ChangedRegion,
 ) {
-    // TODO: check retained regions as well
-    let (_, region_1, region_2) = box1.diff(origin_x, origin_y, &box2);
+    let (retained_region, region_1, region_2) = box1.diff(origin_x, origin_y, &box2);
+    assert_eq!(retained_region, *expected_retained_region);
     assert_eq!(region_1, *expected_changed_region_1);
     assert_eq!(region_2, *expected_changed_region_2);
 }
@@ -36,13 +37,14 @@ fn selection_box_diff_disjoint() {
         10,
         &original_box,
         &new_box,
-        &ChangedRegion {
-            was_added: true,
-            region: new_box.clone(),
-        },
+        &None,
         &ChangedRegion {
             was_added: false,
             region: original_box.clone(),
+        },
+        &ChangedRegion {
+            was_added: true,
+            region: new_box.clone(),
         },
     );
 }
@@ -67,6 +69,12 @@ fn selection_box_diff_intersecting_1() {
         0,
         &original_box,
         &new_box,
+        &Some(SelectionRegion {
+            x: 0,
+            y: 0,
+            width: 2,
+            height: 1,
+        }),
         &ChangedRegion {
             was_added: true,
             region: SelectionRegion {
@@ -108,6 +116,12 @@ fn selection_box_diff_intersecting_2() {
         3,
         &original_box,
         &new_box,
+        &Some(SelectionRegion {
+            x: 3,
+            y: 3,
+            width: 2,
+            height: 1,
+        }),
         &ChangedRegion {
             was_added: true,
             region: SelectionRegion {
@@ -123,6 +137,53 @@ fn selection_box_diff_intersecting_2() {
                 x: 3,
                 y: 4,
                 width: 2,
+                height: 1,
+            },
+        },
+    );
+}
+
+#[test]
+fn selection_box_diff_intersecting_3() {
+    let original_box = SelectionRegion {
+        x: 169,
+        y: 96,
+        width: 1,
+        height: 2,
+    };
+    let new_box = SelectionRegion {
+        x: 169,
+        y: 96,
+        width: 2,
+        height: 3,
+    };
+
+    test_selection_box_diff(
+        169,
+        96,
+        &original_box,
+        &new_box,
+        &Some(SelectionRegion {
+            x: 169,
+            y: 96,
+            width: 1,
+            height: 2,
+        }),
+        &ChangedRegion {
+            was_added: true,
+            region: SelectionRegion {
+                x: 170,
+                y: 96,
+                width: 1,
+                height: 3,
+            },
+        },
+        &ChangedRegion {
+            was_added: true,
+            region: SelectionRegion {
+                x: 169,
+                y: 98,
+                width: 1,
                 height: 1,
             },
         },
@@ -163,12 +224,28 @@ fn selection_box_diff_both_grow_shrink() {
     };
 
     // grow
-    test_selection_box_diff(0, 0, &original_box, &new_box, &change_1, &change_2);
+    test_selection_box_diff(
+        0,
+        0,
+        &original_box,
+        &new_box,
+        &Some(original_box.clone()),
+        &change_1,
+        &change_2,
+    );
 
     // shrink
     change_1.was_added = false;
     change_2.was_added = false;
-    test_selection_box_diff(0, 0, &new_box, &original_box, &change_1, &change_2);
+    test_selection_box_diff(
+        0,
+        0,
+        &new_box,
+        &original_box,
+        &Some(original_box.clone()),
+        &change_1,
+        &change_2,
+    );
 }
 
 #[test]

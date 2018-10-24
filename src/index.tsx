@@ -138,7 +138,7 @@ wasm.then(engine => {
 
     engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);
   });
-  document.addEventListener('keyup', evt => engine.handle_key_up(evt.key));
+  document.addEventListener('keyup', evt => engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey));
 });
 
 ReactDOM.render(

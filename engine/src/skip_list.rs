@@ -326,7 +326,7 @@ impl NoteSkipListNode {
                 let shortcut_node: &mut NoteSkipListNode = &mut *(shortcut_node_slot_key.clone());
 
                 // if this shortcut value is still smaller, take the shortcut and continue searching.
-                if shortcut_node.val_slot_key.end_beat < target_val {
+                if shortcut_node.val_slot_key.end_beat <= target_val {
                     // Record the preceeding index for all levels for which we have a pointer
                     for level in &mut levels[0..=link_level] {
                         *level = shortcut_node_slot_key.clone();
@@ -434,35 +434,39 @@ impl<'a> NoteSkipListRegionIterator<'a> {
         if self.cur_line_ix > self.end_line_ix {
             return None;
         }
-
-        let head_key = match self.lines.lines[self.cur_line_ix].head_key.as_ref() {
-            Some(head_key) => head_key,
-            None => return self.next_line(),
-        };
-        let head = &*head_key;
-        if !head.intersects_beats(self.min_beat, self.max_beat) {
-            return self.next_line();
-        }
+        // common::log(format!(" checking line {}", self.cur_line_ix));
 
         // look for the first node in the new line that is in the valid range
-        self.cur_node = match self
-            .lines
-            .find_first_node_before(self.cur_line_ix, self.min_beat)
-        {
+        self.cur_node = match self.lines.find_first_node_in_range(
+            self.cur_line_ix,
+            self.min_beat,
+            self.max_beat,
+        ) {
             Some(node) => {
-                let note = *node.val_slot_key;
                 if node.intersects_beats(self.min_beat, self.max_beat) {
                     // the found note intersects the start beat, so it's valid
+                    // common::log(format!(
+                    //     "the found note ({:?}) intersects the start beat, so it's valid",
+                    //     &*node.val_slot_key,
+                    // ));
                     Some(node)
                 } else if node.links[0].is_some() {
+                    // common::log(format!(
+                    //     "the found note ({:?}) doesn't match itself, but its child does",
+                    //     &*node.val_slot_key,
+                    // ));
                     // the found note doesn't match itself, but its child does
                     node.links[0].as_ref().map(|p| &**p)
                 } else {
-                    // this was the last node in the line, and there are none after the start
+                    // this was the last node in the line, and there are none after it
+                    // common::log("this was the last node in the line, and there are none after it");
                     return self.next_line();
                 }
             }
-            None => return self.next_line(),
+            None => {
+                // common::log("No valid notes in the current line.");
+                return self.next_line();
+            }
         };
 
         Some(())
@@ -479,7 +483,7 @@ impl<'a> NoteData<'a> {
     pub fn get_selection_region(&self) -> SelectionRegion {
         SelectionRegion {
             x: (self.note_box.start_beat * BEAT_LENGTH_PX) as usize,
-            y: self.line_ix * (LINE_HEIGHT + LINE_BORDER_WIDTH),
+            y: self.line_ix * PADDED_LINE_HEIGHT,
             width: ((self.note_box.end_beat - self.note_box.start_beat) * BEAT_LENGTH_PX) as usize,
             height: LINE_HEIGHT,
         }
@@ -505,20 +509,19 @@ impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
     type Item = NoteData<'a>;
 
     fn next(&mut self) -> Option<NoteData<'a>> {
-        let node = self.cur_node?;
-
-        self.cur_node = node.links[0].as_ref().map(|key| &**key);
-        let cur_node = match self.cur_node {
-            Some(cur_node) if cur_node.intersects_beats(self.min_beat, self.max_beat) => cur_node,
+        let node = match self.cur_node {
+            Some(node) if node.intersects_beats(self.min_beat, self.max_beat) => node,
             _ => {
                 self.next_line()?;
                 return self.next();
             }
         };
 
+        self.cur_node = node.links[0].as_ref().map(|key| &**key);
+
         Some(NoteData {
             line_ix: self.cur_line_ix,
-            note_box: &*cur_node.val_slot_key,
+            note_box: &*node.val_slot_key,
         })
     }
 }
@@ -560,12 +563,21 @@ impl NoteSkipList {
         if (*head.val_slot_key).end_beat > note.start_beat {
             // The new note is the smallest one in the list, so insert it before the head.
             // Link to the old head for levels up to the one we generated
+            debug_assert!(!head.val_slot_key.intersects_exclusive(&note));
             for link in &mut new_node.links[0..=level] {
                 *link = self.head_key.clone();
             }
 
             // Steal links from the old head for all other levels above that
             let old_links_range = (level + 1)..NOTE_SKIP_LIST_LEVELS;
+            for level in old_links_range.clone() {
+                let preceeding_node = match head.links[level].as_ref() {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                debug_assert!(!preceeding_node.val_slot_key.intersects_exclusive(&note));
+            }
             new_node.links[old_links_range.clone()].clone_from_slice(&head.links[old_links_range]);
             self.head_key = Some(new_node_key);
 
@@ -583,9 +595,13 @@ impl NoteSkipList {
         // Insert the new node between this node and its child (if it has one).
         // For levels through the generated level, we link the inserted node to where the
         // previous node was linking before and link the to the new node from it.
+        #[allow(clippy::needless_range_loop)]
         for i in 0..=level {
             let preceeding_node_for_level = &mut *preceeding_links[i];
             new_node.links[i] = preceeding_node_for_level.links[i].clone();
+            debug_assert!(!preceeding_node_for_level
+                .val_slot_key
+                .intersects_exclusive(&note));
             preceeding_node_for_level.links[i] = Some(new_node_key.clone());
         }
 
@@ -610,23 +626,48 @@ impl NoteSkipList {
         NoteSkipListNodeIterator(self.head())
     }
 
-    fn find_first_node_before(&self, beat: f32) -> Option<&NoteSkipListNode> {
+    fn find_first_node_in_range(
+        &self,
+        start_beat: f32,
+        end_beat: f32,
+    ) -> Option<&NoteSkipListNode> {
         let head = self.head()?;
-        if head.val_slot_key.start_beat > beat {
+        if head.val_slot_key.start_beat > end_beat {
             return None;
+        } else if head.intersects_beats(start_beat, end_beat) {
+            return Some(head);
         }
 
         let mut cur_node = head;
-        let mut max_level = NOTE_SKIP_LIST_LEVELS;
+        let mut max_level = NOTE_SKIP_LIST_LEVELS - 1;
         'outer: loop {
-            for level in (0..max_level).rev() {
-                match cur_node.links[level] {
-                    Some(ref node) if node.val_slot_key.start_beat < beat => {
+            let checking_node = cur_node;
+            for level in (0..=max_level).rev() {
+                match checking_node.links[level] {
+                    // shortcut takes us to an invalid node that is still before our desired range
+                    Some(ref node) if node.val_slot_key.end_beat < start_beat => {
+                        // common::log(format!(
+                        //     "shortcut level {} takes us to an invalid node ({:?}) that is still before our desired range",
+                        //     level,
+                        //     &*node.val_slot_key
+                        // ));
                         max_level = level;
                         cur_node = &*node;
                         continue 'outer;
                     }
-                    _ => (),
+                    // shortcut takes us to a valid node, but one lower down may still lead us to
+                    // an earlier one that is still valid so keep checking.
+                    Some(ref node) if node.intersects_beats(start_beat, end_beat) => {
+                        // common::log(format!("shortcut level {} ({:?}) intersects and is valid; possibly checking lower levels before returning.", level, &*node.val_slot_key));
+                        cur_node = &*node;
+                    }
+                    Some(ref node) => {
+                        // common::log(format!(
+                        //     "shortcut level {} ({:?}) did not match.",
+                        //     level, &*node.val_slot_key
+                        // ))
+                    }
+                    None => (), // common::log(format!("Level {} is `None`.", level)),
                 }
             }
             break;
@@ -702,11 +743,13 @@ impl NoteLines {
         &'a self,
         region: &'a SelectionRegion,
     ) -> NoteSkipListRegionIterator<'a> {
-        let start_line_ix = (region.y - (region.y % LINE_HEIGHT)) / LINE_HEIGHT;
+        let start_line_ix = (region.y - (region.y % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT;
         let end_px_ix = region.y + region.height;
-        let end_line_ix = ((end_px_ix - (end_px_ix % LINE_HEIGHT)) / LINE_HEIGHT).min(LINE_COUNT);
+        let end_line_ix = ((end_px_ix - (end_px_ix % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT)
+            .min(LINE_COUNT - 1);
         let min_beat = px_to_beat(region.x as f32);
         let max_beat = px_to_beat((region.x + region.width) as f32);
+        // common::log(format!("start beat: {}, end beat: {}", min_beat, max_beat));
 
         let mut iterator = NoteSkipListRegionIterator {
             start_line_ix,
@@ -727,7 +770,12 @@ impl NoteLines {
     }
 
     #[inline(always)]
-    pub fn find_first_node_before(&self, line_ix: usize, beat: f32) -> Option<&NoteSkipListNode> {
-        self.lines[line_ix].find_first_node_before(beat)
+    pub fn find_first_node_in_range(
+        &self,
+        line_ix: usize,
+        start_beat: f32,
+        end_beat: f32,
+    ) -> Option<&NoteSkipListNode> {
+        self.lines[line_ix].find_first_node_in_range(start_beat, end_beat)
     }
 }

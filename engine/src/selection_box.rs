@@ -78,7 +78,7 @@ impl SelectionRegion {
         origin_x: usize,
         origin_y: usize,
         other: &Self,
-    ) -> (SelectionRegion, ChangedRegion, ChangedRegion) {
+    ) -> (Option<SelectionRegion>, ChangedRegion, ChangedRegion) {
         let sum_origin = (self.x.min(other.x), self.y.min(other.y));
         let sum_rev_origin = (
             (self.x + self.width).max(other.x + other.width),
@@ -136,7 +136,7 @@ impl SelectionRegion {
             };
 
             (
-                retained_region,
+                Some(retained_region),
                 ChangedRegion {
                     was_added: x_region_added,
                     region: SelectionRegion {
@@ -186,25 +186,20 @@ impl SelectionRegion {
             // swapping over the origin means that the two regions must be disjoint, so the
             // changed regions are the regions themselves.
             (
-                SelectionRegion {
-                    x: 0,
-                    y: 0,
-                    width: 0,
-                    height: 0,
+                None,
+                ChangedRegion {
+                    was_added: false,
+                    region: self.clone(),
                 },
                 ChangedRegion {
                     was_added: true,
                     region: other.clone(),
                 },
-                ChangedRegion {
-                    was_added: false,
-                    region: self.clone(),
-                },
             )
         }
     }
 
-    pub fn iter_points<'a>(&'a self) -> SelectionRegionPointIterator<'a> {
+    pub fn iter_points(&'_ self) -> SelectionRegionPointIterator<'_> {
         SelectionRegionPointIterator::new(&self)
     }
 
@@ -217,7 +212,7 @@ impl SelectionRegion {
 }
 
 pub struct SelectionBoxData {
-    pub retained_region: SelectionRegion,
+    pub retained_region: Option<SelectionRegion>,
     pub region: SelectionRegion,
     pub changed_region_1: ChangedRegion,
     pub changed_region_2: ChangedRegion,
@@ -232,8 +227,9 @@ impl SelectionBoxData {
         } = unsafe { &MOUSE_DOWN_DATA };
         let region = SelectionRegion::from_points(down_x, down_y, x, y);
         let last_region = SelectionRegion::from_points(down_x, down_y, last_x, last_y);
+        // common::log(format!("{:?} -> {:?}", last_region, region));
         let (retained_region, changed_region_1, changed_region_2) =
-            region.diff(down_x, down_y, &last_region);
+            last_region.diff(down_x, down_y, &region);
 
         SelectionBoxData {
             retained_region,

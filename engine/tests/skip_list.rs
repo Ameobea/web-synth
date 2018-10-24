@@ -8,6 +8,7 @@ extern crate test;
 use std::mem;
 use std::num::NonZeroU32;
 
+use engine::selection_box::SelectionRegion;
 use engine::skip_list::*;
 use engine::*;
 use rand::prelude::*;
@@ -247,4 +248,69 @@ fn skiplist_debug_fmt() {
     println!("\nEXPECTED:\n{}", expected);
     println!("\nACTUAL:\n{}", actual);
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn skiplist_region_iter() {
+    unsafe { init_state() };
+
+    let mut lines = NoteLines::new(6);
+    let notes = &[
+        (0, (1.0, 2.0)),
+        (0, (4.0, 6.0)),
+        (0, (6.0, 7.0)),
+        (1, (0.0, 6.0)),
+        (2, (1.0, 2.0)),
+        (2, (3.0, 4.0)),
+        (2, (6.0, 7.0)),
+        (4, (2.0, 5.0)),
+        (5, (0.0, 7.0)),
+        // the following will not be matched by the selection box
+        (0, (8.0, 10.0)),
+        (1, (7.0, 9.0)),
+        (2, (0.0, 0.1)),
+        (5, (9.0, 10.0)),
+    ];
+    for (i, (line_ix, (start_beat, end_beat))) in notes.into_iter().enumerate() {
+        lines.insert(
+            *line_ix,
+            NoteBox {
+                dom_id: i,
+                start_beat: *start_beat,
+                end_beat: *end_beat,
+            },
+        );
+    }
+
+    type Note = (usize, (f32, f32));
+    fn compare_notes(a: &'_ Note, b: &'_ Note) -> ::std::cmp::Ordering {
+        if a.0 == b.0 {
+            ((a.1).0).partial_cmp(&(b.1).0).unwrap()
+        } else {
+            a.0.cmp(&b.0)
+        }
+    }
+
+    let selection_start_beat = 0.4;
+    let selection_end_beat = 6.5;
+    let mut expected_results = notes[0..=8].to_owned();
+    expected_results.sort_by(compare_notes);
+
+    let mut actual_results = lines
+        .iter_region(&SelectionRegion {
+            x: beats_to_px(selection_start_beat) as usize,
+            y: LINE_HEIGHT / 2,
+            width: beats_to_px(selection_end_beat - selection_start_beat) as usize,
+            height: PADDED_LINE_HEIGHT * 5,
+        })
+        .map(|note_data| {
+            (
+                note_data.line_ix,
+                (note_data.note_box.start_beat, note_data.note_box.end_beat),
+            )
+        })
+        .collect::<Vec<_>>();
+    actual_results.sort_by(compare_notes);
+
+    assert_eq!(expected_results, actual_results);
 }
