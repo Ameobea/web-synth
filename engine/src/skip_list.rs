@@ -434,7 +434,6 @@ impl<'a> NoteSkipListRegionIterator<'a> {
         if self.cur_line_ix > self.end_line_ix {
             return None;
         }
-        // common::log(format!(" checking line {}", self.cur_line_ix));
 
         // look for the first node in the new line that is in the valid range
         self.cur_node = match self.lines.find_first_node_in_range(
@@ -445,28 +444,16 @@ impl<'a> NoteSkipListRegionIterator<'a> {
             Some(node) => {
                 if node.intersects_beats(self.min_beat, self.max_beat) {
                     // the found note intersects the start beat, so it's valid
-                    // common::log(format!(
-                    //     "the found note ({:?}) intersects the start beat, so it's valid",
-                    //     &*node.val_slot_key,
-                    // ));
                     Some(node)
                 } else if node.links[0].is_some() {
-                    // common::log(format!(
-                    //     "the found note ({:?}) doesn't match itself, but its child does",
-                    //     &*node.val_slot_key,
-                    // ));
                     // the found note doesn't match itself, but its child does
                     node.links[0].as_ref().map(|p| &**p)
                 } else {
                     // this was the last node in the line, and there are none after it
-                    // common::log("this was the last node in the line, and there are none after it");
                     return self.next_line();
                 }
             }
-            None => {
-                // common::log("No valid notes in the current line.");
-                return self.next_line();
-            }
+            None => return self.next_line(),
         };
 
         Some(())
@@ -501,6 +488,7 @@ impl<'a> Into<SelectedNoteData> for NoteData<'a> {
         SelectedNoteData {
             line_ix: self.line_ix,
             dom_id: self.note_box.dom_id,
+            start_beat: self.note_box.start_beat,
         }
     }
 }
@@ -526,6 +514,12 @@ impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
     }
 }
 
+/// Deallocates the slab slots for both the node and its `NoteBox`, returning the inner `NoteBox`.
+fn dealloc_node(node_key: SlabKey<NoteSkipListNode>) -> NoteBox {
+    let node = nodes().remove(node_key.key());
+    notes().remove(node.val_slot_key.key())
+}
+
 impl NoteSkipList {
     pub fn new() -> Self {
         NoteSkipList { head_key: None }
@@ -541,7 +535,9 @@ impl NoteSkipList {
         self.head_key.as_mut().map(|k| &mut **k)
     }
 
-    pub fn insert(&mut self, note: NoteBox) {
+    /// Inserts a node into the skip list in order.  Returns `false` if the node was inserted
+    /// successfully and `true` if there is an intersecting node blocking it from being inserted.
+    pub fn insert(&mut self, note: NoteBox) -> bool {
         let new_node = NoteSkipListNode {
             val_slot_key: notes().insert(note).into(),
             links: blank_shortcuts(),
@@ -551,7 +547,7 @@ impl NoteSkipList {
 
         if self.head_key.is_none() {
             self.head_key = Some(new_node_key);
-            return;
+            return false;
         }
 
         let head_key = self.head_key.as_mut().unwrap();
@@ -561,9 +557,12 @@ impl NoteSkipList {
         // Only bother searching if the head is smaller than the target value.  If the head is
         // larger, we automatically insert it at the front.
         if (*head.val_slot_key).end_beat > note.start_beat {
+            if head.val_slot_key.intersects_exclusive(&note) {
+                return true;
+            }
+
             // The new note is the smallest one in the list, so insert it before the head.
             // Link to the old head for levels up to the one we generated
-            debug_assert!(!head.val_slot_key.intersects_exclusive(&note));
             for link in &mut new_node.links[0..=level] {
                 *link = self.head_key.clone();
             }
@@ -586,11 +585,22 @@ impl NoteSkipList {
             for link in &mut head.links[(level + 1)..NOTE_SKIP_LIST_LEVELS] {
                 *link = None;
             }
-            return;
+            return false;
         }
 
         let mut preceeding_links = init_preceeding_links(&head_key);
         head.search(note.start_beat, head_key, &mut preceeding_links);
+
+        // check if the note before the new one intersects it
+        if preceeding_links[0].val_slot_key.intersects_exclusive(&note) {
+            return true;
+        }
+        // check if the note after the new one intersects it (if it exists)
+        if let Some(next_node) = &preceeding_links[0].links[0] {
+            if next_node.val_slot_key.intersects_exclusive(&note) {
+                return true;
+            }
+        }
 
         // Insert the new node between this node and its child (if it has one).
         // For levels through the generated level, we link the inserted node to where the
@@ -607,15 +617,47 @@ impl NoteSkipList {
 
         // For levels after the generated level, we take no action.  We let the existing
         // links stay as they are and leave the new nodes' blank.
+        false
     }
 
     /// Removes any note box that contains the given beat.
-    pub fn remove(&mut self, beat: f32) {
-        unimplemented!(); // TODO
-    }
+    pub fn remove(&mut self, start_beat: f32) -> Option<NoteBox> {
+        let head_key = self.head_key.as_mut().unwrap().clone();
+        let head = &mut *(head_key.clone());
+        common::log(format!(
+            "Head: {:?}, start_beat: {}",
+            *head.val_slot_key, start_beat
+        ));
+        if head.val_slot_key.start_beat == start_beat {
+            // The head is being removed.  Replace it with the next child (copying over links where
+            // applicable) if there is one.
+            if let Some(mut new_head_key) = head.links[0].clone() {
+                let new_head = &mut *new_head_key;
+                for level in 0..NOTE_SKIP_LIST_LEVELS {
+                    if new_head.links[level].is_none() {
+                        new_head.links[level] = head.links[level].clone();
+                    }
+                }
+            } else {
+                self.head_key = None;
+            }
 
-    pub fn remove_by_dom_id(&mut self, dom_id: usize) -> Option<NoteBox> {
-        unimplemented!(); // TODO
+            return Some(dealloc_node(head_key.clone()));
+        }
+
+        let mut preceeding_links = init_preceeding_links(&head_key);
+        head.search(start_beat, &head_key, &mut preceeding_links);
+        let removed_node_key = preceeding_links[0].links[0].clone()?;
+
+        // For each preceeding link, sever the link to the node being removed and attach it to
+        // wherever the node being removed is pointing for that level (if anywhere).
+        let removed_node = &*removed_node_key;
+        for level in 0..NOTE_SKIP_LIST_LEVELS {
+            preceeding_links[level].links[level] = removed_node.links[level].clone();
+        }
+
+        // free the slab slots for the removed node and note
+        Some(dealloc_node(removed_node_key))
     }
 
     pub fn iter(&self) -> NoteSkipListIterator {
@@ -646,11 +688,6 @@ impl NoteSkipList {
                 match checking_node.links[level] {
                     // shortcut takes us to an invalid node that is still before our desired range
                     Some(ref node) if node.val_slot_key.end_beat < start_beat => {
-                        // common::log(format!(
-                        //     "shortcut level {} takes us to an invalid node ({:?}) that is still before our desired range",
-                        //     level,
-                        //     &*node.val_slot_key
-                        // ));
                         max_level = level;
                         cur_node = &*node;
                         continue 'outer;
@@ -658,16 +695,9 @@ impl NoteSkipList {
                     // shortcut takes us to a valid node, but one lower down may still lead us to
                     // an earlier one that is still valid so keep checking.
                     Some(ref node) if node.intersects_beats(start_beat, end_beat) => {
-                        // common::log(format!("shortcut level {} ({:?}) intersects and is valid; possibly checking lower levels before returning.", level, &*node.val_slot_key));
-                        cur_node = &*node;
+                        cur_node = &*node
                     }
-                    Some(ref node) => {
-                        // common::log(format!(
-                        //     "shortcut level {} ({:?}) did not match.",
-                        //     level, &*node.val_slot_key
-                        // ))
-                    }
-                    None => (), // common::log(format!("Level {} is `None`.", level)),
+                    _ => (),
                 }
             }
             break;
@@ -723,20 +753,35 @@ impl NoteLines {
         )
     }
 
+    /// Inserts a node into the skip list at the specified level in order.  Returns `false` if the
+    /// node was inserted successfully and `true` if there is an intersecting node blocking it from
+    /// being inserted.
     #[inline(always)]
-    pub fn insert(&mut self, line_ix: usize, note: NoteBox) {
-        self.lines[line_ix].insert(note);
+    pub fn insert(&mut self, line_ix: usize, note: NoteBox) -> bool {
+        self.lines[line_ix].insert(note)
     }
 
-    pub fn move_note(&mut self, prev_line_ix: usize, new_line_ix: usize, dom_id: usize) {
-        if let Some(note) = self.lines[prev_line_ix].remove_by_dom_id(dom_id) {
-            self.lines[new_line_ix].insert(note);
+    #[inline(always)]
+    pub fn remove(&mut self, line_ix: usize, start_beat: f32) -> Option<NoteBox> {
+        self.lines[line_ix].remove(start_beat)
+    }
+
+    /// Attempts to move a note from one line to another, keeping it at the same start and end
+    /// beat.  Returns `false` if the move is successful and `true` if there was another note
+    /// blocking it from being inserted on the destination line or there was no note with the
+    /// specified `start_beat` in the source line.
+    pub fn move_note(&mut self, src_line_ix: usize, dst_line_ix: usize, start_beat: f32) -> bool {
+        if let Some(note) = self.lines[src_line_ix].remove(start_beat) {
+            if self.lines[dst_line_ix].insert(note) {
+                // insertion failed due to a collision; re-insert into the original line.
+                debug_assert!(!self.lines[src_line_ix].insert(note));
+                true
+            } else {
+                false
+            }
+        } else {
+            true
         }
-    }
-
-    #[inline(always)]
-    pub fn remove_by_dom_id(&mut self, line_ix: usize, dom_id: usize) -> Option<NoteBox> {
-        self.lines[line_ix].remove_by_dom_id(dom_id)
     }
 
     pub fn iter_region<'a>(
@@ -749,7 +794,6 @@ impl NoteLines {
             .min(LINE_COUNT - 1);
         let min_beat = px_to_beat(region.x as f32);
         let max_beat = px_to_beat((region.x + region.width) as f32);
-        // common::log(format!("start beat: {}, end beat: {}", min_beat, max_beat));
 
         let mut iterator = NoteSkipListRegionIterator {
             start_line_ix,

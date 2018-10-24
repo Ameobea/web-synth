@@ -10,6 +10,7 @@ extern crate wasm_bindgen;
 
 use std::cmp::Ordering;
 use std::fmt::{self, Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ptr;
 
@@ -78,10 +79,43 @@ pub struct MouseDownData {
     pub selection_box_dom_id: Option<usize>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug)]
 pub struct SelectedNoteData {
     pub line_ix: usize,
     pub dom_id: usize,
+    pub start_beat: f32,
+}
+
+impl PartialEq for SelectedNoteData {
+    fn eq(&self, other: &Self) -> bool {
+        self.dom_id == other.dom_id
+    }
+}
+
+impl Eq for SelectedNoteData {}
+
+// Since `dom_id` is guarenteed to be unique, we can skip hashing the `line_ix` as an optimization.
+impl Hash for SelectedNoteData {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.dom_id.hash(state)
+    }
+}
+
+impl PartialOrd for SelectedNoteData {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let ix_ordering = self.line_ix.cmp(&other.line_ix);
+        let ordering = match ix_ordering {
+            Ordering::Equal => self.start_beat.partial_cmp(&other.start_beat).unwrap(),
+            _ => ix_ordering,
+        };
+        Some(ordering)
+    }
+}
+
+impl Ord for SelectedNoteData {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(&other).unwrap()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -387,46 +421,46 @@ pub fn handle_mouse_down(x: usize, y: usize) {
 
     match bounds {
         Bounds::Intersecting(node) => match cur_tool {
-            Tool::DrawNote if ctrl_pressed => {
-                let dom_id = node.val_slot_key.dom_id;
-                let selected_data = SelectedNoteData { line_ix, dom_id };
-
-                if selected_notes.contains(&selected_data) {
-                    deselect_note(dom_id);
-                    selected_notes.remove(&selected_data);
-                } else {
-                    selected_notes.insert(selected_data);
-                    select_note(dom_id);
-                }
-            }
             Tool::DrawNote if shift_pressed => draw_selection_box(),
             Tool::DeleteNote => {
-                let dom_id = node.val_slot_key.dom_id;
-                selected_notes.remove(&SelectedNoteData { line_ix, dom_id });
-                lines().remove_by_dom_id(line_ix, dom_id);
+                let &NoteBox {
+                    start_beat, dom_id, ..
+                } = &*node.val_slot_key;
+                unimplemented!(); // TODO
+                lines().remove(line_ix, start_beat);
             }
             Tool::DrawNote => {
                 let NoteBox { dom_id, .. } = *node.val_slot_key;
+                let selected_data = SelectedNoteData {
+                    line_ix,
+                    dom_id,
+                    start_beat: node.val_slot_key.start_beat,
+                };
 
-                let mut select_new: bool = true;
-                // Deselect all selected notes
-                for SelectedNoteData {
-                    dom_id: selected_dom_id,
-                    ..
-                } in selected_notes.drain()
-                {
-                    deselect_note(selected_dom_id);
-                    if selected_dom_id == dom_id {
-                        select_new = false;
+                if ctrl_pressed {
+                    if selected_notes.contains(&selected_data) {
+                        deselect_note(dom_id);
+                        selected_notes.remove(&selected_data);
+                        return;
                     }
-                }
-                if !select_new {
-                    return;
+                } else {
+                    let mut select_new: bool = true;
+                    // Deselect all selected notes
+                    for note_data in selected_notes.drain() {
+                        deselect_note(note_data.dom_id);
+                        if note_data.dom_id == dom_id {
+                            select_new = false;
+                        }
+                    }
+
+                    if !select_new {
+                        return;
+                    }
                 }
 
                 // Select the clicked note since it wasn't previously selected
-                selected_notes.insert(SelectedNoteData { dom_id, line_ix });
-                add_class(dom_id, "selected");
+                selected_notes.insert(selected_data);
+                select_note(dom_id);
             }
         },
         Bounds::Bounded(lower, upper) => match cur_tool {
@@ -499,51 +533,19 @@ pub fn handle_mouse_move(x: usize, y: usize) {
             set_attr(selection_box_dom_id, "y", &y.to_string());
             set_attr(selection_box_dom_id, "width", &width.to_string());
             set_attr(selection_box_dom_id, "height", &height.to_string());
-            // render_quad(
-            //     1,
-            //     changed_region_1.region.x as f32,
-            //     changed_region_1.region.y as f32,
-            //     changed_region_1.region.width as f32,
-            //     changed_region_1.region.height as f32,
-            //     if changed_region_1.was_added {
-            //         "added"
-            //     } else {
-            //         "removed "
-            //     },
-            // );
-            // render_quad(
-            //     1,
-            //     changed_region_2.region.x as f32,
-            //     changed_region_2.region.y as f32,
-            //     changed_region_2.region.width as f32,
-            //     changed_region_2.region.height as f32,
-            //     if changed_region_2.was_added {
-            //         "added"
-            //     } else {
-            //         "removed "
-            //     },
-            // );
 
             // Look for all notes in the added/removed regions and add/remove them from the
             // selected notes set and select/deselect their UI representations
-            // common::log(format!("Retained region: {:?}", retained_region));
-            // common::log(format!(
-            //     "Changed regions: {:?}, {:?}",
-            //     changed_region_1, changed_region_2
-            // ));
             for (was_added, region) in [
                 (changed_region_1.was_added, changed_region_1.region),
                 (changed_region_2.was_added, changed_region_2.region),
             ]
             .into_iter()
             {
-                // common::log(format!("added: {}, region: {:?}", was_added, region));
                 for note_data in lines().iter_region(region) {
-                    // common::log(format!("Note: {:?}", note_data));
                     // Ignore notes that are also contained in the retained region
                     if let Some(retained_region) = retained_region.as_ref() {
                         if note_data.intersects_region(&retained_region) {
-                            // common::log("Intersects retained region; skipping.");
                             continue;
                         }
                     }
@@ -551,10 +553,8 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                     let dom_id = note_data.note_box.dom_id;
                     let selected_note_data = note_data.into();
                     if *was_added && selected_notes.insert(selected_note_data) {
-                        // common::log("Newly selected; selecting...");
                         select_note(dom_id);
                     } else if !*was_added && selected_notes.remove(&selected_note_data) {
-                        // common::log("Newly deselected; deselecting...");
                         deselect_note(dom_id);
                     }
                 }
@@ -601,7 +601,9 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 
                 // Actually insert the node into the skip list
                 lines().insert(line_ix, note);
-                // common::log(format!("{:?}", lines().lines[line_ix]));
+                if cfg!(debug_assertions) {
+                    common::log(format!("{:?}", lines().lines[line_ix]));
+                }
             }
             (None, Some(selection_box_dom_id)) => delete_element(selection_box_dom_id),
             (Some(_), Some(_)) => common::error(
@@ -620,46 +622,83 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
-    // Drains the selected notes collection and creates a new one after applying `f` to each of the
-    // notes contained within it.
-    fn map_selected_notes<F: Fn(SelectedNoteData) -> SelectedNoteData>(f: F) {
-        unsafe { *SELECTED_NOTES = (&mut *SELECTED_NOTES).drain().map(f).collect() };
+    /// Drains the selected notes collection and creates a new one after applying `f` to each of
+    /// the notes contained within it.
+    fn map_selected_notes<F: FnMut(SelectedNoteData) -> SelectedNoteData>(
+        f: F,
+        sort_reverse: bool,
+    ) {
+        let mut mapped_notes: Vec<&SelectedNoteData> =
+            unsafe { &mut *SELECTED_NOTES }.iter().collect::<Vec<_>>();
+
+        if sort_reverse {
+            mapped_notes.sort_unstable_by(|a, b| b.cmp(a));
+        } else {
+            mapped_notes.sort_unstable();
+        }
+
+        let new_selected_notes: FnvHashSet<_> = mapped_notes.into_iter().cloned().map(f).collect();
+        unsafe { *SELECTED_NOTES = new_selected_notes };
     };
 
     unsafe { CONTROL_PRESSED = control_pressed };
     unsafe { SHIFT_PRESSED = shift_pressed };
 
+    let line_diff = if control_pressed || shift_pressed {
+        3
+    } else {
+        1
+    };
+
     match key {
         // Delete all currently selected notes
         "Backspace" | "Delete" => {
-            for SelectedNoteData { line_ix, dom_id } in selected_notes.drain() {
-                lines().remove_by_dom_id(line_ix, dom_id);
+            for note_data in selected_notes.drain() {
+                delete_element(note_data.dom_id);
+                debug_assert!(lines()
+                    .remove(note_data.line_ix, note_data.start_beat)
+                    .is_some());
+                common::log(format!("{:?}", lines().lines[note_data.line_ix]));
             }
         }
-        "ArrowUp" | "w" => map_selected_notes(|note_data: SelectedNoteData| {
-            let SelectedNoteData { line_ix, dom_id } = note_data;
-            if line_ix == 0 {
-                return note_data;
-            }
-
-            lines().move_note(line_ix, line_ix - 1, dom_id);
-            SelectedNoteData {
-                line_ix: line_ix - 1,
-                dom_id,
-            }
-        }),
-        "ArrowDown" | "s" => map_selected_notes(|note_data: SelectedNoteData| {
-            let SelectedNoteData { line_ix, dom_id } = note_data;
-            if line_ix == LINE_COUNT - 1 {
-                return note_data;
-            }
-
-            lines().move_note(line_ix, line_ix + 1, dom_id);
-            SelectedNoteData {
-                line_ix: line_ix + 1,
-                dom_id,
-            }
-        }),
+        "ArrowUp" | "w" => map_selected_notes(
+            |mut note_data: SelectedNoteData| {
+                if note_data.line_ix >= line_diff
+                    && !lines().move_note(
+                        note_data.line_ix,
+                        note_data.line_ix - line_diff,
+                        note_data.start_beat,
+                    ) {
+                    note_data.line_ix -= line_diff;
+                    set_attr(
+                        note_data.dom_id,
+                        "y",
+                        &(note_data.line_ix * PADDED_LINE_HEIGHT).to_string(),
+                    );
+                }
+                note_data
+            },
+            false,
+        ),
+        "ArrowDown" | "s" => map_selected_notes(
+            |mut note_data: SelectedNoteData| {
+                if note_data.line_ix != LINE_COUNT - line_diff
+                    && !lines().move_note(
+                        note_data.line_ix,
+                        note_data.line_ix + line_diff,
+                        note_data.start_beat,
+                    ) {
+                    note_data.line_ix += line_diff;
+                    set_attr(
+                        note_data.dom_id,
+                        "y",
+                        &(note_data.line_ix * PADDED_LINE_HEIGHT).to_string(),
+                    );
+                }
+                note_data
+            },
+            true,
+        ),
         "ArrowRight" | "d" => {} // TODO
         "ArrowLeft" | "a" => {}  // TODO
         _ => (),
