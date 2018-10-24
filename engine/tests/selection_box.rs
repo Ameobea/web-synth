@@ -10,7 +10,8 @@ fn test_selection_box_diff(
     expected_changed_region_1: &ChangedRegion,
     expected_changed_region_2: &ChangedRegion,
 ) {
-    let (region_1, region_2) = box1.diff(origin_x, origin_y, &box2);
+    // TODO: check retained regions as well
+    let (_, region_1, region_2) = box1.diff(origin_x, origin_y, &box2);
     assert_eq!(region_1, *expected_changed_region_1);
     assert_eq!(region_2, *expected_changed_region_2);
 }

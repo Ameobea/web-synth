@@ -25,6 +25,41 @@ fn min_max(n1: usize, n2: usize) -> (usize, usize) {
     }
 }
 
+pub struct SelectionRegionPointIterator<'a> {
+    i: usize,
+    region: &'a SelectionRegion,
+}
+
+impl<'a> SelectionRegionPointIterator<'a> {
+    pub fn new(region: &'a SelectionRegion) -> Self {
+        SelectionRegionPointIterator { i: 0, region }
+    }
+}
+
+impl<'a> Iterator for SelectionRegionPointIterator<'a> {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<(usize, usize)> {
+        if self.i > 3 {
+            return None;
+        }
+
+        let pt = match self.i {
+            0 => (self.region.x, self.region.y),
+            1 => (self.region.x + self.region.width, self.region.y),
+            2 => (self.region.x, self.region.y + self.region.height),
+            3 => (
+                self.region.x + self.region.width,
+                self.region.y + self.region.height,
+            ),
+            _ => unreachable!(),
+        };
+
+        self.i += 1;
+        Some(pt)
+    }
+}
+
 impl SelectionRegion {
     pub fn from_points(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
         let (minx, maxx) = min_max(x1, x2);
@@ -43,7 +78,7 @@ impl SelectionRegion {
         origin_x: usize,
         origin_y: usize,
         other: &Self,
-    ) -> (ChangedRegion, ChangedRegion) {
+    ) -> (SelectionRegion, ChangedRegion, ChangedRegion) {
         let sum_origin = (self.x.min(other.x), self.y.min(other.y));
         let sum_rev_origin = (
             (self.x + self.width).max(other.x + other.width),
@@ -89,7 +124,19 @@ impl SelectionRegion {
             let x_region_length = x_region_bounds.1 - x_region_bounds.0;
             let y_region_height = y_region_bounds.1 - y_region_bounds.0;
 
+            let retained_x = self.x.max(other.x);
+            let retained_y = self.y.max(other.y);
+            let min_max_x = (self.x + self.width).min(other.x + other.width);
+            let min_max_y = (self.y + self.height).min(other.y + other.height);
+            let retained_region = SelectionRegion {
+                x: retained_x,
+                y: retained_y,
+                width: min_max_x - retained_x,
+                height: min_max_y - retained_y,
+            };
+
             (
+                retained_region,
                 ChangedRegion {
                     was_added: x_region_added,
                     region: SelectionRegion {
@@ -139,6 +186,12 @@ impl SelectionRegion {
             // swapping over the origin means that the two regions must be disjoint, so the
             // changed regions are the regions themselves.
             (
+                SelectionRegion {
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                },
                 ChangedRegion {
                     was_added: true,
                     region: other.clone(),
@@ -150,9 +203,21 @@ impl SelectionRegion {
             )
         }
     }
+
+    pub fn iter_points<'a>(&'a self) -> SelectionRegionPointIterator<'a> {
+        SelectionRegionPointIterator::new(&self)
+    }
+
+    pub fn contains_point(&self, pt: (usize, usize)) -> bool {
+        pt.0 >= self.x
+            && pt.0 <= (self.x + self.width)
+            && pt.1 >= self.y
+            && pt.1 <= (self.y + self.height)
+    }
 }
 
 pub struct SelectionBoxData {
+    pub retained_region: SelectionRegion,
     pub region: SelectionRegion,
     pub changed_region_1: ChangedRegion,
     pub changed_region_2: ChangedRegion,
@@ -167,9 +232,11 @@ impl SelectionBoxData {
         } = unsafe { &MOUSE_DOWN_DATA };
         let region = SelectionRegion::from_points(down_x, down_y, x, y);
         let last_region = SelectionRegion::from_points(down_x, down_y, last_x, last_y);
-        let (changed_region_1, changed_region_2) = region.diff(down_x, down_y, &last_region);
+        let (retained_region, changed_region_1, changed_region_2) =
+            region.diff(down_x, down_y, &last_region);
 
         SelectionBoxData {
+            retained_region,
             region,
             changed_region_1,
             changed_region_2,

@@ -432,18 +432,15 @@ impl<'a> NoteSkipListRegionIterator<'a> {
         };
 
         if self.cur_line_ix > self.end_line_ix {
-            common::log("Reached max line ix; breaking.");
             return None;
         }
 
-        common::log("Getting new line's head...");
         let head_key = match self.lines.lines[self.cur_line_ix].head_key.as_ref() {
             Some(head_key) => head_key,
             None => return self.next_line(),
         };
         let head = &*head_key;
         if !head.intersects_beats(self.min_beat, self.max_beat) {
-            common::log("New line's head already too high; moving on.");
             return self.next_line();
         }
 
@@ -454,7 +451,6 @@ impl<'a> NoteSkipListRegionIterator<'a> {
         {
             Some(node) => {
                 let note = *node.val_slot_key;
-                common::log(format!("{:?}", note));
                 if node.intersects_beats(self.min_beat, self.max_beat) {
                     // the found note intersects the start beat, so it's valid
                     Some(node)
@@ -463,37 +459,66 @@ impl<'a> NoteSkipListRegionIterator<'a> {
                     node.links[0].as_ref().map(|p| &**p)
                 } else {
                     // this was the last node in the line, and there are none after the start
-                    common::log(
-                        "this was the last node in the line, and there are none after the start",
-                    );
                     return self.next_line();
                 }
             }
-            None => {
-                common::log("No in-range notes for the given line; moving on...");
-                return self.next_line();
-            }
+            None => return self.next_line(),
         };
 
         Some(())
     }
 }
 
-impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
-    type Item = SelectedNoteData;
+#[derive(Debug)]
+pub struct NoteData<'a> {
+    pub line_ix: usize,
+    pub note_box: &'a NoteBox,
+}
 
-    fn next(&mut self) -> Option<SelectedNoteData> {
+impl<'a> NoteData<'a> {
+    pub fn get_selection_region(&self) -> SelectionRegion {
+        SelectionRegion {
+            x: (self.note_box.start_beat * BEAT_LENGTH_PX) as usize,
+            y: self.line_ix * (LINE_HEIGHT + LINE_BORDER_WIDTH),
+            width: ((self.note_box.end_beat - self.note_box.start_beat) * BEAT_LENGTH_PX) as usize,
+            height: LINE_HEIGHT,
+        }
+    }
+
+    pub fn intersects_region(&self, region: &SelectionRegion) -> bool {
+        let our_region = self.get_selection_region();
+        // regions intersect if any point bounding our origin is contained in the other region
+        our_region.iter_points().any(|pt| region.contains_point(pt))
+    }
+}
+
+impl<'a> Into<SelectedNoteData> for NoteData<'a> {
+    fn into(self) -> SelectedNoteData {
+        SelectedNoteData {
+            line_ix: self.line_ix,
+            dom_id: self.note_box.dom_id,
+        }
+    }
+}
+
+impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
+    type Item = NoteData<'a>;
+
+    fn next(&mut self) -> Option<NoteData<'a>> {
         let node = self.cur_node?;
 
         self.cur_node = node.links[0].as_ref().map(|key| &**key);
-        match self.cur_node {
-            Some(cur_node) if cur_node.intersects_beats(self.min_beat, self.max_beat) => (),
-            _ => self.next_line()?,
-        }
+        let cur_node = match self.cur_node {
+            Some(cur_node) if cur_node.intersects_beats(self.min_beat, self.max_beat) => cur_node,
+            _ => {
+                self.next_line()?;
+                return self.next();
+            }
+        };
 
-        Some(SelectedNoteData {
-            dom_id: node.val_slot_key.dom_id,
+        Some(NoteData {
             line_ix: self.cur_line_ix,
+            note_box: &*cur_node.val_slot_key,
         })
     }
 }
@@ -682,10 +707,6 @@ impl NoteLines {
         let end_line_ix = ((end_px_ix - (end_px_ix % LINE_HEIGHT)) / LINE_HEIGHT).min(LINE_COUNT);
         let min_beat = px_to_beat(region.x as f32);
         let max_beat = px_to_beat((region.x + region.width) as f32);
-        common::log(format!(
-            "Iterating lines {}..={} beats {}..{}",
-            start_line_ix, end_line_ix, min_beat, max_beat
-        ));
 
         let mut iterator = NoteSkipListRegionIterator {
             start_line_ix,

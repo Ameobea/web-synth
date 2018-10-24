@@ -463,42 +463,54 @@ pub fn handle_mouse_move(x: usize, y: usize) {
 
     match cur_tool {
         Tool::DrawNote if shift_pressed => {
-            if let Some(selection_box_dom_id) = selection_box_dom_id {
-                let SelectionBoxData {
-                    region:
-                        SelectionRegion {
-                            x,
-                            y,
-                            width,
-                            height,
-                        },
-                    changed_region_1,
-                    changed_region_2,
-                } = SelectionBoxData::compute(x, y, last_x, last_y);
-                set_attr(selection_box_dom_id, "x", &x.to_string());
-                set_attr(selection_box_dom_id, "y", &y.to_string());
-                set_attr(selection_box_dom_id, "width", &width.to_string());
-                set_attr(selection_box_dom_id, "height", &height.to_string());
+            let selection_box_dom_id = match selection_box_dom_id {
+                Some(id) => id,
+                None => return,
+            };
 
-                // Look for all notes in the added/removed regions and add/remove them from the
-                // selected notes set and select/deselect their UI representations
-                common::log(format!(
-                    "Changed regions: {:?}, {:?}",
-                    changed_region_1, changed_region_2
-                ));
-                for (was_added, region) in [
-                    (changed_region_1.was_added, changed_region_1.region),
-                    (changed_region_2.was_added, changed_region_2.region),
-                ]
-                    .into_iter()
-                {
-                    for note_data in lines().iter_region(region) {
-                        common::log(format!("{:?}", note_data));
-                        if *was_added && selected_notes.insert(note_data) {
-                            select_note(note_data.dom_id);
-                        } else if selected_notes.remove(&note_data) {
-                            deselect_note(note_data.dom_id);
-                        }
+            let SelectionBoxData {
+                region:
+                    SelectionRegion {
+                        x,
+                        y,
+                        width,
+                        height,
+                    },
+                retained_region,
+                changed_region_1,
+                changed_region_2,
+            } = SelectionBoxData::compute(x, y, last_x, last_y);
+            set_attr(selection_box_dom_id, "x", &x.to_string());
+            set_attr(selection_box_dom_id, "y", &y.to_string());
+            set_attr(selection_box_dom_id, "width", &width.to_string());
+            set_attr(selection_box_dom_id, "height", &height.to_string());
+
+            // Look for all notes in the added/removed regions and add/remove them from the
+            // selected notes set and select/deselect their UI representations
+            common::log(format!("Retained region: {:?}", retained_region));
+            common::log(format!(
+                "Changed regions: {:?}, {:?}",
+                changed_region_1, changed_region_2
+            ));
+            for (was_added, region) in [
+                (changed_region_1.was_added, changed_region_1.region),
+                (changed_region_2.was_added, changed_region_2.region),
+            ]
+            .into_iter()
+            {
+                for note_data in lines().iter_region(region) {
+                    // Ignore notes that are also contained in the retained region
+                    if note_data.intersects_region(&retained_region) {
+                        continue;
+                    }
+
+                    common::log(format!("{:?}", note_data));
+                    let dom_id = note_data.note_box.dom_id;
+                    let selected_note_data = note_data.into();
+                    if *was_added && selected_notes.insert(selected_note_data) {
+                        select_note(dom_id);
+                    } else if selected_notes.remove(&selected_note_data) {
+                        deselect_note(dom_id);
                     }
                 }
             }
