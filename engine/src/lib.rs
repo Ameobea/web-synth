@@ -712,6 +712,7 @@ pub fn handle_key_down(key: String, control_pressed: bool, shift_pressed: bool) 
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[wasm_bindgen]
 pub fn handle_key_up(_key: String, control_pressed: bool, shift_pressed: bool) {
     unsafe { CONTROL_PRESSED = control_pressed };

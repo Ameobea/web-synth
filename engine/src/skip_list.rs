@@ -6,6 +6,7 @@
 //! The time complexity for insertion, removal, and querying is `O(log n)`.
 
 extern crate test;
+use std::f32;
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::mem;
@@ -151,9 +152,7 @@ pub fn debug_links(links: &LinkOpts) -> String {
 
 impl Debug for NoteSkipListNode {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        // common::log(format!("Debugging node: {:?}", *self.val_slot_key));
         let debug_ptrs = get_debug_ptrs();
-        // common::log(format!("Debug ptrs: {:?}", debug_links(&debug_ptrs)));
         let next_node = &self.links[0];
         for (level, next_node_for_level) in self.links.iter().enumerate() {
             if next_node_for_level.is_some()
@@ -339,10 +338,6 @@ impl NoteSkipListNode {
         self_key: &NodeSlabKey,
         levels: &mut PreceedingLinks,
     ) {
-        // common::log(format!(
-        //     "Searching node id {:?} ({:?})",
-        //     self_key, *self_key.val_slot_key
-        // ));
         // if we try searching a node greater than the target value, we've messed up badly
         debug_assert!((*self.val_slot_key).end_beat <= target_val);
         // Starting with the top level and working down, check if the value behind the shortcut is
@@ -542,8 +537,8 @@ impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
 }
 
 /// Deallocates the slab slots for both the node and its `NoteBox`, returning the inner `NoteBox`.
+#[allow(clippy::needless_pass_by_value)]
 fn dealloc_node(node_key: NodeSlabKey) -> NoteBox {
-    // common::log(format!("Removing node key: {:?}", node_key));
     let node = nodes().remove(node_key.key());
     notes().remove(node.val_slot_key.key())
 }
@@ -656,12 +651,10 @@ impl NoteSkipList {
 
     /// Removes any note box that contains the given beat.
     pub fn remove(&mut self, start_beat: f32) -> Option<NoteBox> {
-        // common::log(format!("Removing start beat {}", start_beat));
         let head_key = self.head_key.as_mut().unwrap().clone();
         let head = &mut *(head_key.clone());
-        // common::log(format!("Head links: {:?}", debug_links(&head.links)));
 
-        if head.val_slot_key.start_beat == start_beat {
+        if (head.val_slot_key.start_beat - start_beat).abs() <= f32::EPSILON {
             // The head is being removed.  Replace it with the next child (copying over links where
             // applicable) if there is one.
             if let Some(new_head_key) = head.links[0].clone() {
@@ -682,20 +675,13 @@ impl NoteSkipList {
         }
 
         let mut preceeding_links = init_preceeding_links(&head_key);
-        // common::log(format!(
-        //     "Preceeding links before: {}",
-        //     debug_preceeding_links(&preceeding_links)
-        // ));
         head.search(start_beat, &head_key, &mut preceeding_links);
-        // common::log(format!(
-        //     "Preceeding links after: {}",
-        //     debug_preceeding_links(&preceeding_links)
-        // ));
         let removed_node_key = preceeding_links[0].links[0].clone()?;
 
         // For each preceeding link, sever the link to the node being removed and attach it to
         // wherever the node being removed is pointing for that level (if anywhere).
         let removed_node = &*removed_node_key;
+        #[allow(clippy::needless_range_loop, clippy::manual_memcpy)]
         for level in 0..NOTE_SKIP_LIST_LEVELS {
             preceeding_links[level].links[level] = removed_node.links[level].clone();
         }
@@ -807,9 +793,7 @@ impl NoteLines {
 
     #[inline(always)]
     pub fn remove(&mut self, line_ix: usize, start_beat: f32) -> Option<NoteBox> {
-        let removed = self.lines[line_ix].remove(start_beat);
-        // common::log(format!("Removed node: {:?}", removed));
-        removed
+        self.lines[line_ix].remove(start_beat)
     }
 
     /// Attempts to move a note from one line to another, keeping it at the same start and end
@@ -820,7 +804,8 @@ impl NoteLines {
         if let Some(note) = self.lines[src_line_ix].remove(start_beat) {
             if self.lines[dst_line_ix].insert(note) {
                 // insertion failed due to a collision; re-insert into the original line.
-                debug_assert!(!self.lines[src_line_ix].insert(note));
+                let insertion_error = self.lines[src_line_ix].insert(note);
+                debug_assert!(!insertion_error);
                 true
             } else {
                 false
