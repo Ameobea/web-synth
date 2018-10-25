@@ -19,6 +19,11 @@ use slab::Slab;
 
 use super::*;
 
+pub type NodeSlabKey = SlabKey<NoteSkipListNode>;
+pub type NoteBoxSlabKey = SlabKey<NoteBox>;
+pub type PreceedingLinks = [NodeSlabKey; NOTE_SKIP_LIST_LEVELS];
+pub type LinkOpts = [Option<NodeSlabKey>; NOTE_SKIP_LIST_LEVELS];
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct SlabKey<T>(NonZeroU32, PhantomData<T>);
 
@@ -45,7 +50,7 @@ impl<T> From<usize> for SlabKey<T> {
     }
 }
 
-impl Deref for SlabKey<NoteBox> {
+impl Deref for NoteBoxSlabKey {
     type Target = NoteBox;
 
     fn deref(&self) -> &NoteBox {
@@ -57,7 +62,7 @@ impl Deref for SlabKey<NoteBox> {
     }
 }
 
-impl Deref for SlabKey<NoteSkipListNode> {
+impl Deref for NodeSlabKey {
     type Target = NoteSkipListNode;
 
     fn deref(&self) -> &NoteSkipListNode {
@@ -69,7 +74,7 @@ impl Deref for SlabKey<NoteSkipListNode> {
     }
 }
 
-impl DerefMut for SlabKey<NoteBox> {
+impl DerefMut for NoteBoxSlabKey {
     fn deref_mut(&mut self) -> &mut NoteBox {
         if cfg!(debug_assertions) {
             &mut notes()[self.key()]
@@ -79,7 +84,7 @@ impl DerefMut for SlabKey<NoteBox> {
     }
 }
 
-impl DerefMut for SlabKey<NoteSkipListNode> {
+impl DerefMut for NodeSlabKey {
     fn deref_mut(&mut self) -> &mut NoteSkipListNode {
         if cfg!(debug_assertions) {
             &mut nodes()[self.key()]
@@ -94,7 +99,7 @@ pub struct NoteSkipListNode {
     pub val_slot_key: SlabKey<NoteBox>,
     /// Contains links to the next node in the sequence as well as all shortcuts that exist for
     /// that node.  In the case that there are no shortcuts available
-    pub links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS],
+    pub links: LinkOpts,
 }
 
 /// When debug-printing a `NoteSkipList`, we aren't able to implement debugging of an individual
@@ -104,33 +109,51 @@ pub struct NoteSkipListNode {
 /// This data structure holds a pointer to the next node for each of the levels of the skip list,
 /// allowing equality to be tested for arrow drawing.
 #[thread_local]
-pub static mut SKIP_LIST_NODE_DEBUG_POINTERS: *mut [Option<SlabKey<NoteSkipListNode>>;
-    NOTE_SKIP_LIST_LEVELS] = ptr::null_mut();
+pub static mut SKIP_LIST_NODE_DEBUG_POINTERS: *mut LinkOpts = ptr::null_mut();
 
-pub fn init_node_dbg_ptrs(head_key: &SlabKey<NoteSkipListNode>) {
+pub fn init_node_dbg_ptrs(head_key: &NodeSlabKey) {
     for p in get_debug_ptrs() {
         *p = Some(head_key.clone());
     }
 }
 
-fn get_debug_ptrs() -> &'static mut [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS] {
+fn get_debug_ptrs() -> &'static mut LinkOpts {
     unsafe { &mut *SKIP_LIST_NODE_DEBUG_POINTERS }
 }
 
-fn init_preceeding_links(
-    head_key: &SlabKey<NoteSkipListNode>,
-) -> [SlabKey<NoteSkipListNode>; NOTE_SKIP_LIST_LEVELS] {
-    let mut preceeding_links: [SlabKey<NoteSkipListNode>; NOTE_SKIP_LIST_LEVELS] =
-        unsafe { mem::uninitialized() };
+fn init_preceeding_links(head_key: &NodeSlabKey) -> PreceedingLinks {
+    let mut preceeding_links: PreceedingLinks = unsafe { mem::uninitialized() };
     for link in &mut preceeding_links {
         *link = head_key.clone();
     }
     preceeding_links
 }
 
+pub fn debug_preceeding_links(links: &PreceedingLinks) -> String {
+    format!(
+        "{:?}",
+        links
+            .iter()
+            .map(|key| &*key.val_slot_key)
+            .collect::<Vec<_>>()
+    )
+}
+
+pub fn debug_links(links: &LinkOpts) -> String {
+    format!(
+        "{:?}",
+        links
+            .iter()
+            .map(|k| k.as_ref().map(|k| &*k.val_slot_key))
+            .collect::<Vec<_>>()
+    )
+}
+
 impl Debug for NoteSkipListNode {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
+        // common::log(format!("Debugging node: {:?}", *self.val_slot_key));
         let debug_ptrs = get_debug_ptrs();
+        // common::log(format!("Debug ptrs: {:?}", debug_links(&debug_ptrs)));
         let next_node = &self.links[0];
         for (level, next_node_for_level) in self.links.iter().enumerate() {
             if next_node_for_level.is_some()
@@ -218,11 +241,11 @@ impl Debug for NoteSkipListNode {
     }
 }
 
-impl Index<SlabKey<NoteSkipListNode>> for Slab<NoteSkipListNode> {
+impl Index<NodeSlabKey> for Slab<NoteSkipListNode> {
     type Output = NoteSkipListNode;
 
     #[inline]
-    fn index(&self, index: SlabKey<NoteSkipListNode>) -> &NoteSkipListNode {
+    fn index(&self, index: NodeSlabKey) -> &NoteSkipListNode {
         if cfg!(debug_assertions) {
             self.get(index.key()).unwrap()
         } else {
@@ -272,7 +295,7 @@ pub fn blank_shortcuts<T>() -> [Option<T>; NOTE_SKIP_LIST_LEVELS] {
 
 #[derive(Debug, PartialEq)]
 pub enum Bounds {
-    Intersecting(SlabKey<NoteSkipListNode>),
+    Intersecting(NodeSlabKey),
     Bounded(f32, Option<f32>),
 }
 
@@ -313,9 +336,13 @@ impl NoteSkipListNode {
     pub fn search<'a>(
         &'a mut self,
         target_val: f32,
-        self_key: &SlabKey<NoteSkipListNode>,
-        levels: &mut [SlabKey<NoteSkipListNode>; NOTE_SKIP_LIST_LEVELS],
+        self_key: &NodeSlabKey,
+        levels: &mut PreceedingLinks,
     ) {
+        // common::log(format!(
+        //     "Searching node id {:?} ({:?})",
+        //     self_key, *self_key.val_slot_key
+        // ));
         // if we try searching a node greater than the target value, we've messed up badly
         debug_assert!((*self.val_slot_key).end_beat <= target_val);
         // Starting with the top level and working down, check if the value behind the shortcut is
@@ -348,14 +375,14 @@ impl NoteSkipListNode {
 
 #[derive(Clone, Default)]
 pub struct NoteSkipList {
-    pub head_key: Option<SlabKey<NoteSkipListNode>>,
+    pub head_key: Option<NodeSlabKey>,
 }
 
 impl Debug for NoteSkipList {
     /// We want the end result to look something like this:
     ///
     /// |1.0, 2.0|------------------------->|4.0, 5.0|->x
-    /// |1.0, 2.0|->----------->|3.0, 4.0|->|4.0, 5.0|->x
+    /// |1.0, 2.0|------------->|3.0, 4.0|->|4.0, 5.0|->x
     /// |1.0, 2.0|->|2.0, 3.0|->|3.0, 4.0|->|4.0, 5.0|->x
     ///
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
@@ -515,7 +542,8 @@ impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
 }
 
 /// Deallocates the slab slots for both the node and its `NoteBox`, returning the inner `NoteBox`.
-fn dealloc_node(node_key: SlabKey<NoteSkipListNode>) -> NoteBox {
+fn dealloc_node(node_key: NodeSlabKey) -> NoteBox {
+    // common::log(format!("Removing node key: {:?}", node_key));
     let node = nodes().remove(node_key.key());
     notes().remove(node.val_slot_key.key())
 }
@@ -542,8 +570,14 @@ impl NoteSkipList {
             val_slot_key: notes().insert(note).into(),
             links: blank_shortcuts(),
         };
-        let new_node_key: SlabKey<NoteSkipListNode> = nodes().insert(new_node).into();
+        let new_node_key: NodeSlabKey = nodes().insert(new_node).into();
         let new_node: &mut NoteSkipListNode = &mut *(new_node_key.clone());
+
+        // Deallocate the new node and note we created for this insertion attempt and return `true`
+        let insertion_fail = || {
+            dealloc_node(new_node_key.clone());
+            true
+        };
 
         if self.head_key.is_none() {
             self.head_key = Some(new_node_key);
@@ -558,7 +592,7 @@ impl NoteSkipList {
         // larger, we automatically insert it at the front.
         if (*head.val_slot_key).end_beat > note.start_beat {
             if head.val_slot_key.intersects_exclusive(&note) {
-                return true;
+                return insertion_fail();
             }
 
             // The new note is the smallest one in the list, so insert it before the head.
@@ -593,12 +627,12 @@ impl NoteSkipList {
 
         // check if the note before the new one intersects it
         if preceeding_links[0].val_slot_key.intersects_exclusive(&note) {
-            return true;
+            return insertion_fail();
         }
         // check if the note after the new one intersects it (if it exists)
         if let Some(next_node) = &preceeding_links[0].links[0] {
             if next_node.val_slot_key.intersects_exclusive(&note) {
-                return true;
+                return insertion_fail();
             }
         }
 
@@ -622,22 +656,24 @@ impl NoteSkipList {
 
     /// Removes any note box that contains the given beat.
     pub fn remove(&mut self, start_beat: f32) -> Option<NoteBox> {
+        // common::log(format!("Removing start beat {}", start_beat));
         let head_key = self.head_key.as_mut().unwrap().clone();
         let head = &mut *(head_key.clone());
-        common::log(format!(
-            "Head: {:?}, start_beat: {}",
-            *head.val_slot_key, start_beat
-        ));
+        // common::log(format!("Head links: {:?}", debug_links(&head.links)));
+
         if head.val_slot_key.start_beat == start_beat {
             // The head is being removed.  Replace it with the next child (copying over links where
             // applicable) if there is one.
-            if let Some(mut new_head_key) = head.links[0].clone() {
-                let new_head = &mut *new_head_key;
-                for level in 0..NOTE_SKIP_LIST_LEVELS {
-                    if new_head.links[level].is_none() {
+            if let Some(new_head_key) = head.links[0].clone() {
+                let new_head = &mut *new_head_key.clone();
+                for level in 1..NOTE_SKIP_LIST_LEVELS {
+                    if new_head.links[level].is_none()
+                        && head.links[level] != Some(new_head_key.clone())
+                    {
                         new_head.links[level] = head.links[level].clone();
                     }
                 }
+                self.head_key = Some(new_head_key);
             } else {
                 self.head_key = None;
             }
@@ -646,7 +682,15 @@ impl NoteSkipList {
         }
 
         let mut preceeding_links = init_preceeding_links(&head_key);
+        // common::log(format!(
+        //     "Preceeding links before: {}",
+        //     debug_preceeding_links(&preceeding_links)
+        // ));
         head.search(start_beat, &head_key, &mut preceeding_links);
+        // common::log(format!(
+        //     "Preceeding links after: {}",
+        //     debug_preceeding_links(&preceeding_links)
+        // ));
         let removed_node_key = preceeding_links[0].links[0].clone()?;
 
         // For each preceeding link, sever the link to the node being removed and attach it to
@@ -726,7 +770,7 @@ impl NoteLines {
             Some(node) => node,
             None => return Bounds::Bounded(0.0, None),
         };
-        let mut preceeding_links: [SlabKey<NoteSkipListNode>; 5] = unsafe { mem::uninitialized() };
+        let mut preceeding_links: PreceedingLinks = unsafe { mem::uninitialized() };
         for link in &mut preceeding_links {
             unsafe { ptr::write(link, line.head_key.as_ref().unwrap().clone()) };
         }
@@ -763,7 +807,9 @@ impl NoteLines {
 
     #[inline(always)]
     pub fn remove(&mut self, line_ix: usize, start_beat: f32) -> Option<NoteBox> {
-        self.lines[line_ix].remove(start_beat)
+        let removed = self.lines[line_ix].remove(start_beat);
+        // common::log(format!("Removed node: {:?}", removed));
+        removed
     }
 
     /// Attempts to move a note from one line to another, keeping it at the same start and end

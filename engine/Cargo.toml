@@ -15,3 +15,12 @@ slab = "0.4"
 fnv = "1.0.6"
 
 common = { path="../../common" }
+
+[profile.dev]
+opt-level = 1
+debug-assertions = true
+
+[profile.release]
+opt-level = 3
+debug-assertions = false
+codegen-units = 1

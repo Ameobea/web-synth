@@ -590,6 +590,10 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
         match (note_dom_id, selection_box_dom_id) {
             (Some(note_dom_id), None) => {
                 let NoteBoxData { x, width } = NoteBoxData::compute(x);
+                if width == 0 {
+                    return;
+                }
+
                 let x_px = x as f32;
                 let y_px = y;
                 let line_ix = get_line_index(y_px);
@@ -618,7 +622,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 pub fn handle_mouse_wheel(_ydiff: isize) {}
 
 #[wasm_bindgen]
-pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
+pub fn handle_key_down(key: String, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
@@ -650,15 +654,18 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         1
     };
 
-    match key {
+    match key.as_str() {
         // Delete all currently selected notes
         "Backspace" | "Delete" => {
             for note_data in selected_notes.drain() {
-                delete_element(note_data.dom_id);
                 debug_assert!(lines()
                     .remove(note_data.line_ix, note_data.start_beat)
                     .is_some());
-                common::log(format!("{:?}", lines().lines[note_data.line_ix]));
+                delete_element(note_data.dom_id);
+
+                if cfg!(debug_assertions) {
+                    common::log(format!("{:?}", lines().lines[note_data.line_ix]));
+                }
             }
         }
         "ArrowUp" | "w" => map_selected_notes(
@@ -706,7 +713,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
 }
 
 #[wasm_bindgen]
-pub fn handle_key_up(_key: &str, control_pressed: bool, shift_pressed: bool) {
+pub fn handle_key_up(_key: String, control_pressed: bool, shift_pressed: bool) {
     unsafe { CONTROL_PRESSED = control_pressed };
     unsafe { SHIFT_PRESSED = shift_pressed };
 }
