@@ -9,6 +9,7 @@ extern crate test;
 extern crate wasm_bindgen;
 
 use std::cmp::Ordering;
+use std::f32;
 use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::mem;
@@ -70,6 +71,7 @@ pub const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
 pub const BG_CANVAS_IX: usize = 0;
 pub const FG_CANVAS_IX: usize = 1;
 pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
+pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 1.0;
 
 pub struct MouseDownData {
     pub down: bool,
@@ -184,12 +186,21 @@ fn mouse_down() -> bool {
     unsafe { MOUSE_DOWN_DATA.down }
 }
 
+#[inline(always)]
 fn select_note(dom_id: usize) {
     add_class(dom_id, "selected")
 }
 
+#[inline(always)]
 fn deselect_note(dom_id: usize) {
     remove_class(dom_id, "selected")
+}
+
+#[inline(always)]
+fn snap_to_beat_interval(px: usize, lower_bound_px: f32) -> f32 {
+    let beat = px_to_beat(px as f32);
+    let beats_to_shave = beat % NOTE_SNAP_BEAT_INTERVAL;
+    beats_to_px(beat - beats_to_shave).max(lower_bound_px)
 }
 
 #[wasm_bindgen]
@@ -331,6 +342,10 @@ fn draw_measure_lines() {
     for i in 0..MEASURE_COUNT {
         let x: f32 = MEASURE_WIDTH_PX * (i as f32);
         render_line(FG_CANVAS_IX, x, 0., x, GRID_HEIGHT as f32, "measure-line");
+        for j in 1..4 {
+            let x = x + ((MEASURE_WIDTH_PX / 4.) * j as f32);
+            render_line(FG_CANVAS_IX, x, 0., x, GRID_HEIGHT as f32, "beat-line");
+        }
     }
 }
 
@@ -381,11 +396,19 @@ pub struct NoteBoxData {
 
 impl NoteBoxData {
     pub fn compute(x: usize) -> Self {
+        let start_x = unsafe { MOUSE_DOWN_DATA.x };
         let (low_bound, high_bound) = bounds();
-        let x = clamp(x, beats_to_px(low_bound), high_bound.map(beats_to_px));
-
-        let down_x = unsafe { MOUSE_DOWN_DATA.x };
-        let (minx, maxx) = if x < down_x { (x, down_x) } else { (down_x, x) };
+        let snap_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
+        let snap_to_px = snap_to_beat_interval(x, beats_to_px(low_bound));
+        let (minx, maxx) = if x >= start_x {
+            let end = (snap_to_px + snap_interval_px)
+                .min(beats_to_px(high_bound.unwrap_or(f32::INFINITY)))
+                as usize;
+            (start_x, end)
+        } else {
+            let end = snap_to_px as usize;
+            (end, start_x)
+        };
         let width = maxx - minx;
 
         NoteBoxData { x: minx, width }
@@ -394,6 +417,7 @@ impl NoteBoxData {
 
 #[wasm_bindgen]
 pub fn handle_mouse_down(x: usize, y: usize) {
+    let mut x = x;
     let note_lines = lines();
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
     let cur_tool = unsafe { CUR_TOOL };
@@ -467,17 +491,22 @@ pub fn handle_mouse_down(x: usize, y: usize) {
             Tool::DrawNote if ctrl_pressed => {} // TODO
             Tool::DrawNote if shift_pressed => draw_selection_box(),
             Tool::DrawNote => {
+                let snapped_lower = snap_to_beat_interval(x, beats_to_px(lower));
+                let snapped_upper = (snapped_lower + beats_to_px(NOTE_SNAP_BEAT_INTERVAL))
+                    .min(beats_to_px(upper.unwrap_or(f32::INFINITY)));
+                let width = snapped_upper - snapped_lower;
                 unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
 
                 // Draw the temporary/candidate note after storing its bounds
                 drawing_dom_id = Some(render_quad(
                     FG_CANVAS_IX,
-                    x as f32,
+                    snapped_lower,
                     line_ix as f32 * PADDED_LINE_HEIGHT as f32,
-                    0.0,
+                    width,
                     LINE_HEIGHT as f32,
                     "note",
                 ));
+                x = snapped_lower as usize;
             }
             _ => (),
         },
@@ -658,9 +687,8 @@ pub fn handle_key_down(key: String, control_pressed: bool, shift_pressed: bool) 
         // Delete all currently selected notes
         "Backspace" | "Delete" => {
             for note_data in selected_notes.drain() {
-                debug_assert!(lines()
-                    .remove(note_data.line_ix, note_data.start_beat)
-                    .is_some());
+                let removed_note = lines().remove(note_data.line_ix, note_data.start_beat);
+                debug_assert!(removed_note.is_some());
                 delete_element(note_data.dom_id);
 
                 if cfg!(debug_assertions) {

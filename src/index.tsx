@@ -118,7 +118,7 @@ const deleteAllChildren = (node: HTMLElement) => {
 wasm.then(engine => {
   engine.init();
 
-  const scrollOffset = () => document.getElementById('canvases')!.scrollTop - 2;
+  const scrollOffset = () => Math.max(document.getElementById('canvases')!.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];
   foregroundCanvas.addEventListener('mousedown', evt => {
     evt.preventDefault();
