@@ -52,6 +52,10 @@ extern "C" {
     pub fn add_class(id: usize, className: &str);
     pub fn remove_class(id: usize, className: &str);
     pub fn delete_element(id: usize);
+    pub fn trigger_attack(note: f32);
+    pub fn trigger_release(note: f32);
+    pub fn trigger_attack_release(note: f32, duration: f32);
+    pub fn trigger_attack_release_multiple(notes: &[f32], duration: f32);
 }
 
 /// Height of one of the lines rendered in the grid
@@ -188,12 +192,12 @@ fn mouse_down() -> bool {
 
 #[inline(always)]
 fn select_note(dom_id: usize) {
-    add_class(dom_id, "selected")
+    add_class(dom_id, "selected");
 }
 
 #[inline(always)]
 fn deselect_note(dom_id: usize) {
-    remove_class(dom_id, "selected")
+    remove_class(dom_id, "selected");
 }
 
 #[inline(always)]
@@ -207,6 +211,10 @@ pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
 
 pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
     val.max(min).min(max)
+}
+
+pub fn midi_to_frequency(line_ix: usize) -> f32 {
+    27.5 * (2.0f32).powf((line_ix as f32) / 12.0)
 }
 
 #[inline(always)]
@@ -450,9 +458,20 @@ pub fn handle_mouse_down(x: usize, y: usize) {
         ));
     };
 
+    if cur_tool == Tool::DrawNote && !shift_pressed {
+        trigger_attack(midi_to_frequency(line_ix));
+    }
+
+    let mut init_selection_box = || {
+        for note_data in selected_notes.drain() {
+            deselect_note(note_data.dom_id);
+        }
+        draw_selection_box();
+    };
+
     match bounds {
         Bounds::Intersecting(node) => match cur_tool {
-            Tool::DrawNote if shift_pressed => draw_selection_box(),
+            Tool::DrawNote if shift_pressed => init_selection_box(),
             Tool::DeleteNote => {
                 let &NoteBox {
                     start_beat, dom_id, ..
@@ -468,11 +487,13 @@ pub fn handle_mouse_down(x: usize, y: usize) {
                     start_beat: node.val_slot_key.start_beat,
                 };
 
-                if ctrl_pressed {
+                let select_new = if ctrl_pressed {
                     if selected_notes.contains(&selected_data) {
                         deselect_note(dom_id);
                         selected_notes.remove(&selected_data);
-                        return;
+                        false
+                    } else {
+                        true
                     }
                 } else {
                     let mut select_new: bool = true;
@@ -484,19 +505,19 @@ pub fn handle_mouse_down(x: usize, y: usize) {
                         }
                     }
 
-                    if !select_new {
-                        return;
-                    }
-                }
+                    select_new
+                };
 
-                // Select the clicked note since it wasn't previously selected
-                selected_notes.insert(selected_data);
-                select_note(dom_id);
+                if select_new {
+                    // Select the clicked note since it wasn't previously selected
+                    selected_notes.insert(selected_data);
+                    select_note(dom_id);
+                }
             }
         },
         Bounds::Bounded(lower, upper) => match cur_tool {
             Tool::DrawNote if ctrl_pressed => {} // TODO
-            Tool::DrawNote if shift_pressed => draw_selection_box(),
+            Tool::DrawNote if shift_pressed => init_selection_box(),
             Tool::DrawNote => {
                 let snapped_lower = snap_to_beat_interval(x, beats_to_px(lower));
                 let snapped_upper = (snapped_lower + beats_to_px(NOTE_SNAP_BEAT_INTERVAL))
@@ -587,11 +608,14 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                     }
 
                     let dom_id = note_data.note_box.dom_id;
-                    let selected_note_data = note_data.into();
+                    let selected_note_data: SelectedNoteData = note_data.into();
+                    let line_ix = selected_note_data.line_ix;
                     if *was_added && selected_notes.insert(selected_note_data) {
                         select_note(dom_id);
+                        trigger_attack(midi_to_frequency(line_ix));
                     } else if !*was_added && selected_notes.remove(&selected_note_data) {
                         deselect_note(dom_id);
+                        trigger_release(midi_to_frequency(line_ix));
                     }
                 }
             }
@@ -621,6 +645,15 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
         ..
     } = unsafe { &mut MOUSE_DOWN_DATA };
     *down = false;
+    let down_line_ix = get_line_index(y);
+
+    if selection_box_dom_id.is_some() {
+        for note_data in unsafe { &*SELECTED_NOTES }.iter() {
+            trigger_release(midi_to_frequency(note_data.line_ix));
+        }
+    } else {
+        trigger_release(midi_to_frequency(down_line_ix));
+    }
 
     if unsafe { CUR_TOOL } == Tool::DrawNote {
         match (note_dom_id, selection_box_dom_id) {
@@ -631,11 +664,11 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                 }
 
                 let x_px = x as f32;
-                let y_px = y;
-                let line_ix = get_line_index(y_px);
+                let start_beat = px_to_beat(x_px);
+                let line_ix = down_line_ix;
                 let note = NoteBox {
                     dom_id: note_dom_id,
-                    start_beat: px_to_beat(x_px),
+                    start_beat,
                     end_beat: px_to_beat(x_px + width as f32),
                 };
 
@@ -644,6 +677,17 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                 if cfg!(debug_assertions) {
                     common::log(format!("{:?}", lines().lines[line_ix]));
                 }
+
+                let selected_notes = unsafe { &mut *SELECTED_NOTES };
+                for note_data in selected_notes.drain() {
+                    deselect_note(note_data.dom_id);
+                }
+                selected_notes.insert(SelectedNoteData {
+                    line_ix,
+                    dom_id: note_dom_id,
+                    start_beat,
+                });
+                select_note(note_dom_id);
             }
             (None, Some(selection_box_dom_id)) => delete_element(selection_box_dom_id),
             (Some(_), Some(_)) => common::error(
@@ -662,11 +706,14 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
-    let line_diff_vertical = tern(control_pressed || shift_pressed, 3, 1);
-    let beat_diff_horizontal = tern(control_pressed || shift_pressed, 4.0, 1.0);
+    let (line_diff_vertical, beat_diff_horizontal) = match (control_pressed, shift_pressed) {
+        (true, false) | (false, true) => (3, 4.0),
+        (true, true) => (5, 16.0),
+        (false, false) => (1, 1.0),
+    };
 
     fn map_selected_notes<
-        F: Fn(SelectedNoteData) -> SelectedNoteData,
+        F: FnMut(SelectedNoteData) -> SelectedNoteData,
         I: Iterator<Item = SelectedNoteData>,
     >(
         notes_iter: I,
@@ -691,6 +738,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
 
     let move_notes_vertical = |up: bool| {
         let notes = get_sorted_notes(!up);
+        let mut notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
 
         let move_note_vertical = |mut note_data: SelectedNoteData| -> SelectedNoteData {
             if !tern(
@@ -706,6 +754,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
             } else {
                 note_data.line_ix + line_diff_vertical
             };
+            notes_to_play.push(midi_to_frequency(dst_line_ix));
 
             if !lines().move_note_vertical(note_data.line_ix, dst_line_ix, note_data.start_beat) {
                 note_data.line_ix = dst_line_ix;
@@ -720,6 +769,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         };
 
         map_selected_notes(notes.into_iter().cloned(), move_note_vertical);
+        trigger_attack_release_multiple(&notes_to_play, 0.0);
     };
 
     let mut move_selected_notes_horizontal = |right: bool| {
