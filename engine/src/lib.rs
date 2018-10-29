@@ -197,6 +197,19 @@ fn deselect_note(dom_id: usize) {
 }
 
 #[inline(always)]
+pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
+    if cond {
+        if_true
+    } else {
+        if_false
+    }
+}
+
+pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
+    val.max(min).min(max)
+}
+
+#[inline(always)]
 fn snap_to_beat_interval(px: usize, lower_bound_px: f32) -> f32 {
     let beat = px_to_beat(px as f32);
     let beats_to_shave = beat % NOTE_SNAP_BEAT_INTERVAL;
@@ -285,6 +298,13 @@ impl NoteBox {
             || other.contains_exclusive(self.end_beat)
             || self.contains_exclusive(other.start_beat)
             || self.contains_exclusive(other.end_beat)
+            || self.start_beat == other.start_beat
+            || self.end_beat == other.end_beat
+    }
+
+    #[inline(always)]
+    pub fn width(&self) -> f32 {
+        self.end_beat - self.start_beat
     }
 }
 
@@ -314,11 +334,7 @@ pub unsafe fn init_state() {
 
 #[inline]
 fn draw_grid_line(y: usize) {
-    let class = if y % 2 == 0 {
-        "grid-line-1"
-    } else {
-        "grid-line-2"
-    };
+    let class = tern(y % 2 == 0, "grid-line-1", "grid-line-2");
 
     render_quad(
         BG_CANVAS_IX,
@@ -369,6 +385,7 @@ pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
     let note_line_ix = LINE_COUNT - ((octave * NOTES_PER_OCTAVE) + (note as usize));
     let start_x = start_beat * BEAT_LENGTH_PX;
     let width = (end_beat * BEAT_LENGTH_PX) - start_x;
+
     render_quad(
         FG_CANVAS_IX,
         start_x,
@@ -377,16 +394,6 @@ pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
         LINE_HEIGHT as f32,
         "note",
     );
-}
-
-#[inline(always)]
-fn clamp(val: usize, min: f32, max: Option<f32>) -> usize {
-    let fval = val as f32;
-    match max {
-        _ if fval < min => min as usize,
-        Some(max) if fval > max => max as usize,
-        _ => val,
-    }
 }
 
 pub struct NoteBoxData {
@@ -651,39 +658,98 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 pub fn handle_mouse_wheel(_ydiff: isize) {}
 
 #[wasm_bindgen]
-pub fn handle_key_down(key: String, control_pressed: bool, shift_pressed: bool) {
+pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
-    /// Drains the selected notes collection and creates a new one after applying `f` to each of
-    /// the notes contained within it.
-    fn map_selected_notes<F: FnMut(SelectedNoteData) -> SelectedNoteData>(
+    let line_diff_vertical = tern(control_pressed || shift_pressed, 3, 1);
+    let beat_diff_horizontal = tern(control_pressed || shift_pressed, 4.0, 1.0);
+
+    fn map_selected_notes<
+        F: Fn(SelectedNoteData) -> SelectedNoteData,
+        I: Iterator<Item = SelectedNoteData>,
+    >(
+        notes_iter: I,
         f: F,
-        sort_reverse: bool,
     ) {
-        let mut mapped_notes: Vec<&SelectedNoteData> =
+        let new_selected_notes: FnvHashSet<_> = notes_iter.map(f).collect();
+        unsafe { *SELECTED_NOTES = new_selected_notes };
+    };
+
+    fn get_sorted_notes(sort_reverse: bool) -> Vec<&'static SelectedNoteData> {
+        let mut notes: Vec<&SelectedNoteData> =
             unsafe { &mut *SELECTED_NOTES }.iter().collect::<Vec<_>>();
 
         if sort_reverse {
-            mapped_notes.sort_unstable_by(|a, b| b.cmp(a));
+            notes.sort_unstable_by(|a, b| b.cmp(a));
         } else {
-            mapped_notes.sort_unstable();
+            notes.sort_unstable();
         }
 
-        let new_selected_notes: FnvHashSet<_> = mapped_notes.into_iter().cloned().map(f).collect();
-        unsafe { *SELECTED_NOTES = new_selected_notes };
+        notes
+    }
+
+    let move_notes_vertical = |up: bool| {
+        let notes = get_sorted_notes(!up);
+
+        let move_note_vertical = |mut note_data: SelectedNoteData| -> SelectedNoteData {
+            if !tern(
+                up,
+                note_data.line_ix >= line_diff_vertical,
+                note_data.line_ix + line_diff_vertical < LINE_COUNT,
+            ) {
+                return note_data;
+            }
+
+            let dst_line_ix = if up {
+                note_data.line_ix - line_diff_vertical
+            } else {
+                note_data.line_ix + line_diff_vertical
+            };
+
+            if !lines().move_note_vertical(note_data.line_ix, dst_line_ix, note_data.start_beat) {
+                note_data.line_ix = dst_line_ix;
+                set_attr(
+                    note_data.dom_id,
+                    "y",
+                    &(note_data.line_ix * PADDED_LINE_HEIGHT).to_string(),
+                );
+            }
+
+            note_data
+        };
+
+        map_selected_notes(notes.into_iter().cloned(), move_note_vertical);
+    };
+
+    let mut move_selected_notes_horizontal = |right: bool| {
+        let beats_to_move = beat_diff_horizontal * tern(right, 1.0, -1.0);
+        let move_note_horizontal = |mut note_data: SelectedNoteData| -> SelectedNoteData {
+            let new_start_beat = lines().move_note_horizontal(
+                note_data.line_ix,
+                note_data.start_beat,
+                beats_to_move,
+            );
+
+            set_attr(
+                note_data.dom_id,
+                "x",
+                &(new_start_beat * BEAT_LENGTH_PX).to_string(),
+            );
+
+            note_data.start_beat = new_start_beat;
+            note_data
+        };
+
+        let notes = get_sorted_notes(right);
+
+        map_selected_notes(notes.into_iter().cloned(), move_note_horizontal);
     };
 
     unsafe { CONTROL_PRESSED = control_pressed };
     unsafe { SHIFT_PRESSED = shift_pressed };
 
-    let line_diff = if control_pressed || shift_pressed {
-        3
-    } else {
-        1
-    };
-
-    match key.as_str() {
+    match key {
         // Delete all currently selected notes
         "Backspace" | "Delete" => {
             for note_data in selected_notes.drain() {
@@ -696,53 +762,17 @@ pub fn handle_key_down(key: String, control_pressed: bool, shift_pressed: bool) 
                 }
             }
         }
-        "ArrowUp" | "w" => map_selected_notes(
-            |mut note_data: SelectedNoteData| {
-                if note_data.line_ix >= line_diff
-                    && !lines().move_note(
-                        note_data.line_ix,
-                        note_data.line_ix - line_diff,
-                        note_data.start_beat,
-                    ) {
-                    note_data.line_ix -= line_diff;
-                    set_attr(
-                        note_data.dom_id,
-                        "y",
-                        &(note_data.line_ix * PADDED_LINE_HEIGHT).to_string(),
-                    );
-                }
-                note_data
-            },
-            false,
-        ),
-        "ArrowDown" | "s" => map_selected_notes(
-            |mut note_data: SelectedNoteData| {
-                if note_data.line_ix != LINE_COUNT - line_diff
-                    && !lines().move_note(
-                        note_data.line_ix,
-                        note_data.line_ix + line_diff,
-                        note_data.start_beat,
-                    ) {
-                    note_data.line_ix += line_diff;
-                    set_attr(
-                        note_data.dom_id,
-                        "y",
-                        &(note_data.line_ix * PADDED_LINE_HEIGHT).to_string(),
-                    );
-                }
-                note_data
-            },
-            true,
-        ),
-        "ArrowRight" | "d" => {} // TODO
-        "ArrowLeft" | "a" => {}  // TODO
+        "ArrowUp" | "w" => move_notes_vertical(true),
+        "ArrowDown" | "s" => move_notes_vertical(false),
+        "ArrowRight" | "d" => move_selected_notes_horizontal(true),
+        "ArrowLeft" | "a" => move_selected_notes_horizontal(false),
         _ => (),
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
 #[wasm_bindgen]
-pub fn handle_key_up(_key: String, control_pressed: bool, shift_pressed: bool) {
+pub fn handle_key_up(_key: &str, control_pressed: bool, shift_pressed: bool) {
     unsafe { CONTROL_PRESSED = control_pressed };
     unsafe { SHIFT_PRESSED = shift_pressed };
 }

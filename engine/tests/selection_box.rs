@@ -1,6 +1,7 @@
 extern crate engine;
 
 use engine::selection_box::*;
+use engine::NoteBox;
 
 fn test_selection_box_diff(
     origin_x: usize,
@@ -274,4 +275,14 @@ fn selection_region_from_mouse_coords() {
     check_region(10, 10, 10, 0, 10, 0, 0, 10);
     check_region(0, 0, 0, 0, 0, 0, 0, 0);
     check_region(10, 10, 20, 0, 10, 0, 10, 10);
+}
+
+#[test]
+fn note_box_self_intersection_exclusive() {
+    let note_box = NoteBox {
+        start_beat: 0.0,
+        end_beat: 10.0,
+        dom_id: 0,
+    };
+    assert!(note_box.intersects_exclusive(&note_box));
 }

@@ -153,7 +153,7 @@ pub fn debug_links(links: &LinkOpts) -> String {
 impl Debug for NoteSkipListNode {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         let debug_ptrs = get_debug_ptrs();
-        let next_node = &self.links[0];
+        let next_node_key = &self.links[0];
         for (level, next_node_for_level) in self.links.iter().enumerate() {
             if next_node_for_level.is_some()
                 && debug_ptrs[level].is_some()
@@ -177,10 +177,10 @@ impl Debug for NoteSkipListNode {
             .map(|(level, link_opt)| -> (Option<String>, bool) {
                 // update the debug ptrs with our links
                 let next_valid_node_for_level = debug_ptrs[level].as_ref().map(|p| &*p);
-                let has_next_for_level = match (next_node, link_opt) {
+                let has_next_for_level = match (next_node_key, link_opt) {
                     (None, _) => true,
                     (Some(next_link), Some(our_link)) => next_link.key() == our_link.key(),
-                    _ => match (next_valid_node_for_level, next_node) {
+                    _ => match (next_valid_node_for_level, next_node_key) {
                         (Some(ref expected_val), Some(ref next_node_val)) => {
                             expected_val.key() == next_node_val.key()
                         }
@@ -366,6 +366,16 @@ impl NoteSkipListNode {
             link_level -= 1;
         }
     }
+
+    #[inline(always)]
+    pub fn next_node(&self) -> Option<&Self> {
+        self.links[0].as_ref().map(|p| &**p)
+    }
+
+    #[inline(always)]
+    pub fn next_node_mut(&mut self) -> Option<&mut Self> {
+        self.links[0].as_mut().map(|p| &mut **p)
+    }
 }
 
 #[derive(Clone, Default)]
@@ -415,7 +425,7 @@ impl<'a> Iterator for NoteSkipListIterator<'a> {
     fn next(&mut self) -> Option<NoteBox> {
         let node = self.0.as_ref()?;
         let note = *self.0?.val_slot_key;
-        self.0 = node.links[0].as_ref().map(|key| &**key);
+        self.0 = node.next_node();
         Some(note)
     }
 }
@@ -467,9 +477,9 @@ impl<'a> NoteSkipListRegionIterator<'a> {
                 if node.intersects_beats(self.min_beat, self.max_beat) {
                     // the found note intersects the start beat, so it's valid
                     Some(node)
-                } else if node.links[0].is_some() {
+                } else if node.next_node().is_some() {
                     // the found note doesn't match itself, but its child does
-                    node.links[0].as_ref().map(|p| &**p)
+                    node.next_node()
                 } else {
                     // this was the last node in the line, and there are none after it
                     return self.next_line();
@@ -735,6 +745,20 @@ impl NoteSkipList {
 
         Some(cur_node)
     }
+
+    pub fn find_first_node_before_beat_mut(&mut self, beat: f32) -> Option<&mut NoteSkipListNode> {
+        let head_key = self.head_key.as_mut()?;
+        let mut head = head_key.clone();
+
+        if head.val_slot_key.end_beat > beat {
+            return None;
+        }
+
+        let mut preceeding_links = init_preceeding_links(&head_key);
+        head.search(beat, &head_key, &mut preceeding_links);
+
+        Some(&mut nodes()[preceeding_links[0].key()]) // borrow checker begone
+    }
 }
 
 /// This data structure holds a list of ordered note boxes
@@ -800,7 +824,12 @@ impl NoteLines {
     /// beat.  Returns `false` if the move is successful and `true` if there was another note
     /// blocking it from being inserted on the destination line or there was no note with the
     /// specified `start_beat` in the source line.
-    pub fn move_note(&mut self, src_line_ix: usize, dst_line_ix: usize, start_beat: f32) -> bool {
+    pub fn move_note_vertical(
+        &mut self,
+        src_line_ix: usize,
+        dst_line_ix: usize,
+        start_beat: f32,
+    ) -> bool {
         if let Some(note) = self.lines[src_line_ix].remove(start_beat) {
             if self.lines[dst_line_ix].insert(note) {
                 // insertion failed due to a collision; re-insert into the original line.
@@ -813,6 +842,50 @@ impl NoteLines {
         } else {
             true
         }
+    }
+
+    /// Moves a note horizontally a given number of beats, stopping early if it collides with
+    /// another note or the beginning of the line.  This can be done by simply mutating the
+    /// targeted note since it is guarenteed to not change its line or index in its line.
+    ///
+    /// Returns the start beat of the note after its move.
+    pub fn move_note_horizontal(
+        &mut self,
+        line_ix: usize,
+        start_beat: f32,
+        beats_to_move: f32,
+    ) -> f32 {
+        let (preceeding_note_end_beat, target_node) =
+            match self.find_first_node_before_beat_mut(line_ix, start_beat) {
+                Some(preceeding_node) => (
+                    preceeding_node.val_slot_key.end_beat,
+                    preceeding_node.next_node_mut().unwrap(),
+                ),
+                None => {
+                    // No preceeding node, so it's either the head or doesn't exist.
+                    let head = self.lines[line_ix].head_mut().unwrap();
+                    debug_assert_eq!(head.val_slot_key.start_beat, start_beat);
+
+                    (0.0, head)
+                }
+            };
+
+        let target_note = target_node.val_slot_key;
+        let following_note_start_beat = target_node
+            .next_node()
+            .map(|node| node.val_slot_key.start_beat)
+            .unwrap_or(f32::INFINITY);
+        let target_note_length = target_note.width();
+        let new_target_node_start = clamp(
+            target_note.start_beat + beats_to_move,
+            preceeding_note_end_beat,
+            following_note_start_beat - target_note_length,
+        );
+
+        target_node.val_slot_key.start_beat = new_target_node_start;
+        target_node.val_slot_key.end_beat = new_target_node_start + target_note_length;
+
+        new_target_node_start
     }
 
     pub fn iter_region<'a>(
@@ -852,5 +925,14 @@ impl NoteLines {
         end_beat: f32,
     ) -> Option<&NoteSkipListNode> {
         self.lines[line_ix].find_first_node_in_range(start_beat, end_beat)
+    }
+
+    #[inline(always)]
+    pub fn find_first_node_before_beat_mut(
+        &mut self,
+        line_ix: usize,
+        beat: f32,
+    ) -> Option<&mut NoteSkipListNode> {
+        self.lines[line_ix].find_first_node_before_beat_mut(beat)
     }
 }
