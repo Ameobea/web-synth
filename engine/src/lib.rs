@@ -784,7 +784,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
             set_attr(
                 note_data.dom_id,
                 "x",
-                &(new_start_beat * BEAT_LENGTH_PX).to_string(),
+                &((new_start_beat * BEAT_LENGTH_PX) as usize).to_string(),
             );
 
             note_data.start_beat = new_start_beat;

@@ -9,7 +9,6 @@ import { transpose } from 'tonal-distance';
 
 const bitcrusher = new BitCrusher(5).toMaster();
 export const synth = new PolySynth(50, Synth).connect(bitcrusher).toMaster();
-synth.set('detune', -1200);
 (window as any).SYNTH = synth;
 (window as any).tonal = tonal;
 (window as any).BITCRUSHER = bitcrusher;
