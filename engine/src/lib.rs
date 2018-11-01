@@ -76,9 +76,49 @@ pub const BG_CANVAS_IX: usize = 0;
 pub const FG_CANVAS_IX: usize = 1;
 pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 1.0;
+pub const CURSOR_GUTTER_HEIGHT: usize = 16;
+
+// All of the statics are made thread local so that multiple tests can run concurrently without
+// causing all kinds of horrible async UB stuff.
+#[thread_local]
+pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
+    down: false,
+    cursor_movement: false,
+    x: 0,
+    y: 0,
+    note_dom_id: None,
+    selection_box_dom_id: None,
+};
+#[thread_local]
+pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
+#[thread_local]
+pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut();
+/// Represents the position of all of the notes on all of the lines, providing efficient operations
+/// for determining bounds, intersections with beats, etc.
+#[thread_local]
+pub static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
+#[thread_local]
+pub static mut RNG: *mut Pcg32 = ptr::null_mut();
+#[thread_local]
+pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
+#[thread_local]
+pub static mut SELECTED_NOTES: *mut FnvHashSet<SelectedNoteData> = ptr::null_mut();
+#[thread_local]
+pub static mut CUR_TOOL: Tool = Tool::DrawNote;
+#[thread_local]
+pub static mut CONTROL_PRESSED: bool = false;
+#[thread_local]
+pub static mut SHIFT_PRESSED: bool = false;
+#[thread_local]
+pub static mut CUR_MOUSE_COORDS: (usize, usize) = (0, 0);
+#[thread_local]
+pub static mut CURSOR_POS: f32 = 0.0;
+#[thread_local]
+pub static mut CURSOR_DOM_ID: usize = 0;
 
 pub struct MouseDownData {
     pub down: bool,
+    pub cursor_movement: bool,
     pub x: usize,
     pub y: usize,
     pub note_dom_id: Option<usize>,
@@ -132,39 +172,6 @@ pub enum Tool {
     DeleteNote,
 }
 
-// All of the statics are made thread local so that multiple tests can run concurrently without
-// causing all kinds of horrible async UB stuff.
-#[thread_local]
-pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
-    down: false,
-    x: 0,
-    y: 0,
-    note_dom_id: None,
-    selection_box_dom_id: None,
-};
-#[thread_local]
-pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
-#[thread_local]
-pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut();
-/// Represents the position of all of the notes on all of the lines, providing efficient operations
-/// for determining bounds, intersections with beats, etc.
-#[thread_local]
-pub static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
-#[thread_local]
-pub static mut RNG: *mut Pcg32 = ptr::null_mut();
-#[thread_local]
-pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
-#[thread_local]
-pub static mut SELECTED_NOTES: *mut FnvHashSet<SelectedNoteData> = ptr::null_mut();
-#[thread_local]
-pub static mut CUR_TOOL: Tool = Tool::DrawNote;
-#[thread_local]
-pub static mut CONTROL_PRESSED: bool = false;
-#[thread_local]
-pub static mut SHIFT_PRESSED: bool = false;
-#[thread_local]
-pub static mut CUR_MOUSE_COORDS: (usize, usize) = (0, 0);
-
 #[inline(always)]
 pub fn notes() -> &'static mut Slab<NoteBox> {
     unsafe { &mut *NOTE_BOXES }
@@ -209,10 +216,12 @@ pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
     }
 }
 
+#[inline(always)]
 pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
     val.max(min).min(max)
 }
 
+#[inline(always)]
 pub fn midi_to_frequency(line_ix: usize) -> f32 {
     27.5 * (2.0f32).powf((line_ix as f32) / 12.0)
 }
@@ -224,20 +233,15 @@ fn snap_to_beat_interval(px: usize, lower_bound_px: f32) -> f32 {
     beats_to_px(beat - beats_to_shave).max(lower_bound_px)
 }
 
-#[wasm_bindgen]
-pub enum Note {
-    A,
-    Bb,
-    B,
-    C,
-    Cs,
-    D,
-    Eb,
-    E,
-    F,
-    Fs,
-    G,
-    Ab,
+fn set_cursor_pos(x: usize) -> f32 {
+    unsafe { CURSOR_POS = px_to_beat(x as f32) };
+    let note_snap_beat_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
+    let intervals = ((x as f32) / note_snap_beat_interval_px).round();
+    let x = intervals * note_snap_beat_interval_px;
+    let x_str = x.to_string();
+    set_attr(unsafe { CURSOR_DOM_ID }, "x1", &x_str);
+    set_attr(unsafe { CURSOR_DOM_ID }, "x2", &x_str);
+    x
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -347,7 +351,7 @@ fn draw_grid_line(y: usize) {
     render_quad(
         BG_CANVAS_IX,
         0.0,
-        (y * PADDED_LINE_HEIGHT) as f32,
+        CURSOR_GUTTER_HEIGHT as f32 + (y * PADDED_LINE_HEIGHT) as f32,
         GRID_WIDTH as f32,
         LINE_HEIGHT as f32,
         class,
@@ -374,8 +378,36 @@ fn draw_measure_lines() {
 }
 
 #[inline(always)]
-fn get_line_index(y: usize) -> usize {
-    (y as f32 / (PADDED_LINE_HEIGHT as f32)).trunc() as usize
+fn draw_cursor_gutter() {
+    render_quad(
+        FG_CANVAS_IX,
+        0.0,
+        0.0,
+        GRID_WIDTH as f32,
+        CURSOR_GUTTER_HEIGHT as f32,
+        "cursor-gutter",
+    );
+}
+
+#[inline(always)]
+fn draw_cursor() -> usize {
+    render_line(
+        FG_CANVAS_IX,
+        unsafe { CURSOR_POS },
+        0.0,
+        unsafe { CURSOR_POS },
+        GRID_HEIGHT as f32,
+        "cursor",
+    )
+}
+
+#[inline(always)]
+fn get_line_index(y: usize) -> Option<usize> {
+    if y > CURSOR_GUTTER_HEIGHT {
+        Some(((y - CURSOR_GUTTER_HEIGHT) as f32 / (PADDED_LINE_HEIGHT as f32)).trunc() as usize)
+    } else {
+        None
+    }
 }
 
 #[inline(always)]
@@ -386,22 +418,6 @@ pub fn px_to_beat(px: f32) -> f32 {
 #[inline(always)]
 pub fn beats_to_px(beats: f32) -> f32 {
     beats * BEAT_LENGTH_PX
-}
-
-#[wasm_bindgen]
-pub fn draw_note(note: Note, octave: usize, start_beat: f32, end_beat: f32) {
-    let note_line_ix = LINE_COUNT - ((octave * NOTES_PER_OCTAVE) + (note as usize));
-    let start_x = start_beat * BEAT_LENGTH_PX;
-    let width = (end_beat * BEAT_LENGTH_PX) - start_x;
-
-    render_quad(
-        FG_CANVAS_IX,
-        start_x,
-        (note_line_ix * PADDED_LINE_HEIGHT) as f32,
-        width,
-        LINE_HEIGHT as f32,
-        "note",
-    );
 }
 
 pub struct NoteBoxData {
@@ -431,22 +447,15 @@ impl NoteBoxData {
 }
 
 #[wasm_bindgen]
-pub fn handle_mouse_down(x: usize, y: usize) {
-    let mut x = x;
+pub fn handle_mouse_down(mut x: usize, y: usize) {
     let note_lines = lines();
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
     let cur_tool = unsafe { CUR_TOOL };
     let ctrl_pressed = unsafe { CONTROL_PRESSED };
     let shift_pressed = unsafe { SHIFT_PRESSED };
 
-    // Determine if the requested location intersects an existing note and if not, determine the
-    // bounds on the note that will be drawn next.
-    let line_ix = get_line_index(y);
-    let beat = px_to_beat(x as f32);
-    let bounds = note_lines.get_bounds(line_ix, beat);
     let mut drawing_dom_id = None;
     let mut selection_box_dom_id = None;
-
     let mut draw_selection_box = || {
         selection_box_dom_id = Some(render_quad(
             FG_CANVAS_IX,
@@ -457,6 +466,40 @@ pub fn handle_mouse_down(x: usize, y: usize) {
             "selection-box",
         ));
     };
+
+    // Determine if the requested location intersects an existing note and if not, determine the
+    // bounds on the note that will be drawn next.
+    let line_ix = match get_line_index(y) {
+        Some(line_ix) => line_ix,
+        None => {
+            if shift_pressed {
+                unsafe {
+                    MOUSE_DOWN_DATA.selection_box_dom_id = Some(render_quad(
+                        FG_CANVAS_IX,
+                        0.0,
+                        y as f32,
+                        0.0,
+                        GRID_HEIGHT as f32,
+                        "selection-box",
+                    ))
+                };
+            } else {
+                unsafe { MOUSE_DOWN_DATA.selection_box_dom_id = None };
+            }
+
+            let x = set_cursor_pos(x) as usize;
+            unsafe {
+                MOUSE_DOWN_DATA.cursor_movement = true;
+                MOUSE_DOWN_DATA.down = true;
+                MOUSE_DOWN_DATA.x = x;
+                MOUSE_DOWN_DATA.y = GRID_HEIGHT;
+            };
+
+            return;
+        }
+    };
+    let beat = px_to_beat(x as f32);
+    let bounds = note_lines.get_bounds(line_ix, beat);
 
     if cur_tool == Tool::DrawNote && !shift_pressed {
         trigger_attack(midi_to_frequency(line_ix));
@@ -529,7 +572,7 @@ pub fn handle_mouse_down(x: usize, y: usize) {
                 drawing_dom_id = Some(render_quad(
                     FG_CANVAS_IX,
                     snapped_lower,
-                    line_ix as f32 * PADDED_LINE_HEIGHT as f32,
+                    (CURSOR_GUTTER_HEIGHT + (line_ix * PADDED_LINE_HEIGHT)) as f32,
                     width,
                     LINE_HEIGHT as f32,
                     "note",
@@ -543,6 +586,7 @@ pub fn handle_mouse_down(x: usize, y: usize) {
     unsafe {
         MOUSE_DOWN_DATA = MouseDownData {
             down: true,
+            cursor_movement: false,
             x,
             y,
             note_dom_id: drawing_dom_id,
@@ -560,6 +604,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
     }
     let shift_pressed = unsafe { SHIFT_PRESSED };
     let &mut MouseDownData {
+        cursor_movement,
         note_dom_id,
         selection_box_dom_id,
         ..
@@ -567,57 +612,76 @@ pub fn handle_mouse_move(x: usize, y: usize) {
     let cur_tool = unsafe { CUR_TOOL };
     let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
-    match cur_tool {
-        Tool::DrawNote if shift_pressed => {
-            let selection_box_dom_id = match selection_box_dom_id {
-                Some(id) => id,
-                None => return,
-            };
+    let mut update_selection_box = |selection_box_dom_id: usize, x: usize, y: usize| {
+        let SelectionBoxData {
+            region:
+                SelectionRegion {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            retained_region,
+            changed_region_1,
+            changed_region_2,
+        } = SelectionBoxData::compute(
+            x,
+            y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+            last_x,
+            last_y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+        );
+        set_attr(selection_box_dom_id, "x", &x.to_string());
+        set_attr(
+            selection_box_dom_id,
+            "y",
+            &(y + CURSOR_GUTTER_HEIGHT).to_string(),
+        );
+        set_attr(selection_box_dom_id, "width", &width.to_string());
+        set_attr(selection_box_dom_id, "height", &height.to_string());
 
-            let SelectionBoxData {
-                region:
-                    SelectionRegion {
-                        x,
-                        y,
-                        width,
-                        height,
-                    },
-                retained_region,
-                changed_region_1,
-                changed_region_2,
-            } = SelectionBoxData::compute(x, y, last_x, last_y);
-            set_attr(selection_box_dom_id, "x", &x.to_string());
-            set_attr(selection_box_dom_id, "y", &y.to_string());
-            set_attr(selection_box_dom_id, "width", &width.to_string());
-            set_attr(selection_box_dom_id, "height", &height.to_string());
-
-            // Look for all notes in the added/removed regions and add/remove them from the
-            // selected notes set and select/deselect their UI representations
-            for (was_added, region) in [
-                (changed_region_1.was_added, changed_region_1.region),
-                (changed_region_2.was_added, changed_region_2.region),
-            ]
-            .into_iter()
-            {
-                for note_data in lines().iter_region(region) {
-                    // Ignore notes that are also contained in the retained region
-                    if let Some(retained_region) = retained_region.as_ref() {
-                        if note_data.intersects_region(&retained_region) {
-                            continue;
-                        }
-                    }
-
-                    let dom_id = note_data.note_box.dom_id;
-                    let selected_note_data: SelectedNoteData = note_data.into();
-                    let line_ix = selected_note_data.line_ix;
-                    if *was_added && selected_notes.insert(selected_note_data) {
-                        select_note(dom_id);
-                        trigger_attack(midi_to_frequency(line_ix));
-                    } else if !*was_added && selected_notes.remove(&selected_note_data) {
-                        deselect_note(dom_id);
-                        trigger_release(midi_to_frequency(line_ix));
+        // Look for all notes in the added/removed regions and add/remove them from the
+        // selected notes set and select/deselect their UI representations
+        for (was_added, region) in [
+            (changed_region_1.was_added, changed_region_1.region),
+            (changed_region_2.was_added, changed_region_2.region),
+        ]
+        .into_iter()
+        {
+            for note_data in lines().iter_region(region) {
+                // Ignore notes that are also contained in the retained region
+                if let Some(retained_region) = retained_region.as_ref() {
+                    if note_data.intersects_region(&retained_region) {
+                        continue;
                     }
                 }
+
+                let dom_id = note_data.note_box.dom_id;
+                let selected_note_data: SelectedNoteData = note_data.into();
+                let line_ix = selected_note_data.line_ix;
+                if *was_added && selected_notes.insert(selected_note_data) {
+                    select_note(dom_id);
+                    trigger_attack(midi_to_frequency(line_ix));
+                } else if !*was_added && selected_notes.remove(&selected_note_data) {
+                    deselect_note(dom_id);
+                    trigger_release(midi_to_frequency(line_ix));
+                }
+            }
+        }
+    };
+
+    if cursor_movement {
+        if let Some(selection_box_dom_id) = selection_box_dom_id {
+            update_selection_box(selection_box_dom_id, x, 1);
+        } else {
+            set_cursor_pos(x);
+        }
+        return;
+    }
+
+    match cur_tool {
+        Tool::DrawNote if shift_pressed => {
+            if let Some(selection_box_dom_id) = selection_box_dom_id {
+                update_selection_box(selection_box_dom_id, x, y);
             }
         }
         Tool::DrawNote => {
@@ -640,17 +704,34 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
     let &mut MouseDownData {
         ref mut down,
         y,
+        cursor_movement,
         note_dom_id,
         selection_box_dom_id,
         ..
     } = unsafe { &mut MOUSE_DOWN_DATA };
     *down = false;
-    let down_line_ix = get_line_index(y);
 
-    if selection_box_dom_id.is_some() {
+    let delete_selection_box = |selection_box_dom_id: usize| {
+        delete_element(selection_box_dom_id);
+
         for note_data in unsafe { &*SELECTED_NOTES }.iter() {
             trigger_release(midi_to_frequency(note_data.line_ix));
         }
+    };
+
+    if cursor_movement {
+        if let Some(selection_box_dom_id) = selection_box_dom_id {
+            delete_selection_box(selection_box_dom_id);
+        }
+
+        set_cursor_pos(x);
+        return;
+    }
+
+    let down_line_ix = get_line_index(y).unwrap();
+
+    if let Some(selection_box_dom_id) = selection_box_dom_id {
+        delete_selection_box(selection_box_dom_id);
     } else {
         trigger_release(midi_to_frequency(down_line_ix));
     }
@@ -689,7 +770,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                 });
                 select_note(note_dom_id);
             }
-            (None, Some(selection_box_dom_id)) => delete_element(selection_box_dom_id),
+            (None, Some(_)) => (),
             (Some(_), Some(_)) => common::error(
                 "Both `note_dom_id` and `selection_box_dom_id` exist in `MOUSE_DOWN_DATA`!",
             ),
@@ -833,4 +914,6 @@ pub fn init() {
     unsafe { init_state() };
     draw_grid();
     draw_measure_lines();
+    draw_cursor_gutter();
+    unsafe { CURSOR_DOM_ID = draw_cursor() };
 }
