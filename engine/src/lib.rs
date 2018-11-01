@@ -8,23 +8,21 @@ extern crate slab;
 extern crate test;
 extern crate wasm_bindgen;
 
-use std::cmp::Ordering;
 use std::f32;
-use std::fmt::{self, Debug, Formatter};
-use std::hash::{Hash, Hasher};
-use std::mem;
-use std::ptr;
 
 use fnv::FnvHashSet;
-use rand::prelude::*;
-use rand_pcg::Pcg32;
-use slab::Slab;
 use wasm_bindgen::prelude::*;
 
+pub mod render;
 pub mod selection_box;
 pub mod skip_list;
+pub mod state;
+pub mod util;
+use self::render::*;
 use self::selection_box::*;
 use self::skip_list::*;
+use self::state::*;
+use self::util::*;
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -56,394 +54,6 @@ extern "C" {
     pub fn trigger_release(note: f32);
     pub fn trigger_attack_release(note: f32, duration: f32);
     pub fn trigger_attack_release_multiple(notes: &[f32], duration: f32);
-}
-
-/// Height of one of the lines rendered in the grid
-pub const LINE_HEIGHT: usize = 12;
-pub const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
-pub const OCTAVES: usize = 5;
-pub const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
-pub const LINE_BORDER_WIDTH: usize = 1;
-pub const PADDED_LINE_HEIGHT: usize = LINE_HEIGHT + LINE_BORDER_WIDTH;
-pub const GRID_HEIGHT: usize = LINE_COUNT * PADDED_LINE_HEIGHT - 1;
-/// How long one beat is in pixels
-pub const BEAT_LENGTH_PX: f32 = 20.0;
-pub const MEASURE_COUNT: usize = 16;
-pub const BEATS_PER_MEASURE: usize = 4;
-pub const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
-pub const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
-pub const BG_CANVAS_IX: usize = 0;
-pub const FG_CANVAS_IX: usize = 1;
-pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
-pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 1.0;
-pub const CURSOR_GUTTER_HEIGHT: usize = 16;
-
-// All of the statics are made thread local so that multiple tests can run concurrently without
-// causing all kinds of horrible async UB stuff.
-#[thread_local]
-pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
-    down: false,
-    cursor_movement: false,
-    x: 0,
-    y: 0,
-    note_dom_id: None,
-    selection_box_dom_id: None,
-};
-#[thread_local]
-pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
-#[thread_local]
-pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut();
-/// Represents the position of all of the notes on all of the lines, providing efficient operations
-/// for determining bounds, intersections with beats, etc.
-#[thread_local]
-pub static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
-#[thread_local]
-pub static mut RNG: *mut Pcg32 = ptr::null_mut();
-#[thread_local]
-pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
-#[thread_local]
-pub static mut SELECTED_NOTES: *mut FnvHashSet<SelectedNoteData> = ptr::null_mut();
-#[thread_local]
-pub static mut CUR_TOOL: Tool = Tool::DrawNote;
-#[thread_local]
-pub static mut CONTROL_PRESSED: bool = false;
-#[thread_local]
-pub static mut SHIFT_PRESSED: bool = false;
-#[thread_local]
-pub static mut CUR_MOUSE_COORDS: (usize, usize) = (0, 0);
-#[thread_local]
-pub static mut CURSOR_POS: f32 = 0.0;
-#[thread_local]
-pub static mut CURSOR_DOM_ID: usize = 0;
-
-pub struct MouseDownData {
-    pub down: bool,
-    pub cursor_movement: bool,
-    pub x: usize,
-    pub y: usize,
-    pub note_dom_id: Option<usize>,
-    pub selection_box_dom_id: Option<usize>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct SelectedNoteData {
-    pub line_ix: usize,
-    pub dom_id: usize,
-    pub start_beat: f32,
-}
-
-impl PartialEq for SelectedNoteData {
-    fn eq(&self, other: &Self) -> bool {
-        self.dom_id == other.dom_id
-    }
-}
-
-impl Eq for SelectedNoteData {}
-
-// Since `dom_id` is guarenteed to be unique, we can skip hashing the `line_ix` as an optimization.
-impl Hash for SelectedNoteData {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.dom_id.hash(state)
-    }
-}
-
-impl PartialOrd for SelectedNoteData {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let ix_ordering = self.line_ix.cmp(&other.line_ix);
-        let ordering = match ix_ordering {
-            Ordering::Equal => self.start_beat.partial_cmp(&other.start_beat).unwrap(),
-            _ => ix_ordering,
-        };
-        Some(ordering)
-    }
-}
-
-impl Ord for SelectedNoteData {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(&other).unwrap()
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum Tool {
-    /// A new note will be drawn starting at wherever the mouse is pressed
-    DrawNote,
-    /// Any note clicked on will be deleted
-    DeleteNote,
-}
-
-#[inline(always)]
-pub fn notes() -> &'static mut Slab<NoteBox> {
-    unsafe { &mut *NOTE_BOXES }
-}
-
-#[inline(always)]
-pub fn nodes() -> &'static mut Slab<NoteSkipListNode> {
-    unsafe { &mut *NOTE_SKIPLIST_NODES }
-}
-
-#[inline(always)]
-pub fn lines() -> &'static mut NoteLines {
-    unsafe { &mut *NOTE_LINES }
-}
-
-#[inline(always)]
-pub fn bounds() -> (f32, Option<f32>) {
-    unsafe { CUR_NOTE_BOUNDS }
-}
-
-#[inline(always)]
-fn mouse_down() -> bool {
-    unsafe { MOUSE_DOWN_DATA.down }
-}
-
-#[inline(always)]
-fn select_note(dom_id: usize) {
-    add_class(dom_id, "selected");
-}
-
-#[inline(always)]
-fn deselect_note(dom_id: usize) {
-    remove_class(dom_id, "selected");
-}
-
-#[inline(always)]
-pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
-    if cond {
-        if_true
-    } else {
-        if_false
-    }
-}
-
-#[inline(always)]
-pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
-    val.max(min).min(max)
-}
-
-#[inline(always)]
-pub fn midi_to_frequency(line_ix: usize) -> f32 {
-    27.5 * (2.0f32).powf((line_ix as f32) / 12.0)
-}
-
-#[inline(always)]
-fn snap_to_beat_interval(px: usize, lower_bound_px: f32) -> f32 {
-    let beat = px_to_beat(px as f32);
-    let beats_to_shave = beat % NOTE_SNAP_BEAT_INTERVAL;
-    beats_to_px(beat - beats_to_shave).max(lower_bound_px)
-}
-
-fn set_cursor_pos(x: usize) -> f32 {
-    unsafe { CURSOR_POS = px_to_beat(x as f32) };
-    let note_snap_beat_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
-    let intervals = ((x as f32) / note_snap_beat_interval_px).round();
-    let x = intervals * note_snap_beat_interval_px;
-    let x_str = x.to_string();
-    set_attr(unsafe { CURSOR_DOM_ID }, "x1", &x_str);
-    set_attr(unsafe { CURSOR_DOM_ID }, "x2", &x_str);
-    x
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub struct NoteBox {
-    pub start_beat: f32,
-    pub end_beat: f32,
-    pub dom_id: usize,
-}
-
-impl Debug for NoteBox {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "|{}, {}|", self.start_beat, self.end_beat)
-    }
-}
-
-impl Eq for NoteBox {}
-
-impl PartialOrd for NoteBox {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.start_beat > other.end_beat {
-            Some(Ordering::Greater)
-        } else if self.end_beat < other.start_beat {
-            Some(Ordering::Less)
-        } else {
-            None
-        }
-    }
-}
-
-impl Ord for NoteBox {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.start_beat > other.end_beat {
-            Ordering::Greater
-        } else if self.end_beat < other.start_beat {
-            Ordering::Less
-        } else if self.start_beat > other.start_beat {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
-    }
-}
-
-impl NoteBox {
-    #[inline(always)]
-    pub fn contains(&self, beat: f32) -> bool {
-        self.start_beat <= beat && self.end_beat >= beat
-    }
-
-    /// Same as `NoteBox::contains` except edges exactly touching don't count.
-    pub fn contains_exclusive(&self, beat: f32) -> bool {
-        self.start_beat < beat && self.end_beat > beat
-    }
-
-    #[inline(always)]
-    pub fn intersects(&self, other: &Self) -> bool {
-        other.contains(self.start_beat)
-            || other.contains(self.end_beat)
-            || self.contains(other.start_beat)
-            || self.contains(other.end_beat)
-    }
-
-    /// Same as `NoteBox::intersects` except edges exactly touching don't count.
-    pub fn intersects_exclusive(&self, other: &Self) -> bool {
-        other.contains_exclusive(self.start_beat)
-            || other.contains_exclusive(self.end_beat)
-            || self.contains_exclusive(other.start_beat)
-            || self.contains_exclusive(other.end_beat)
-            || self.start_beat == other.start_beat
-            || self.end_beat == other.end_beat
-    }
-
-    #[inline(always)]
-    pub fn width(&self) -> f32 {
-        self.end_beat - self.start_beat
-    }
-}
-
-pub unsafe fn init_state() {
-    NOTE_BOXES = Box::into_raw(box Slab::new());
-    NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new());
-
-    // Insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
-    // assumptions remain true.
-    let note_slot_key = notes().insert(NoteBox {
-        start_beat: 0.0,
-        end_beat: 0.0,
-        dom_id: 0,
-    });
-    assert_eq!(note_slot_key, 0);
-    let placeholder_node_key = nodes().insert(NoteSkipListNode {
-        val_slot_key: 0.into(),
-        links: mem::zeroed(),
-    });
-    assert_eq!(placeholder_node_key, 0);
-
-    NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT));
-    RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128)));
-    SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box blank_shortcuts());
-    SELECTED_NOTES = Box::into_raw(box FnvHashSet::default());
-}
-
-#[inline]
-fn draw_grid_line(y: usize) {
-    let class = tern(y % 2 == 0, "grid-line-1", "grid-line-2");
-
-    render_quad(
-        BG_CANVAS_IX,
-        0.0,
-        CURSOR_GUTTER_HEIGHT as f32 + (y * PADDED_LINE_HEIGHT) as f32,
-        GRID_WIDTH as f32,
-        LINE_HEIGHT as f32,
-        class,
-    );
-}
-
-/// This renders the background grid that contains the lines for the notes.  It is rendered to a
-/// background SVG that doesn't change.
-fn draw_grid() {
-    for y in 0..LINE_COUNT {
-        draw_grid_line(y);
-    }
-}
-
-fn draw_measure_lines() {
-    for i in 0..MEASURE_COUNT {
-        let x: f32 = MEASURE_WIDTH_PX * (i as f32);
-        render_line(FG_CANVAS_IX, x, 0., x, GRID_HEIGHT as f32, "measure-line");
-        for j in 1..4 {
-            let x = x + ((MEASURE_WIDTH_PX / 4.) * j as f32);
-            render_line(FG_CANVAS_IX, x, 0., x, GRID_HEIGHT as f32, "beat-line");
-        }
-    }
-}
-
-#[inline(always)]
-fn draw_cursor_gutter() {
-    render_quad(
-        FG_CANVAS_IX,
-        0.0,
-        0.0,
-        GRID_WIDTH as f32,
-        CURSOR_GUTTER_HEIGHT as f32,
-        "cursor-gutter",
-    );
-}
-
-#[inline(always)]
-fn draw_cursor() -> usize {
-    render_line(
-        FG_CANVAS_IX,
-        unsafe { CURSOR_POS },
-        0.0,
-        unsafe { CURSOR_POS },
-        GRID_HEIGHT as f32,
-        "cursor",
-    )
-}
-
-#[inline(always)]
-fn get_line_index(y: usize) -> Option<usize> {
-    if y > CURSOR_GUTTER_HEIGHT {
-        Some(((y - CURSOR_GUTTER_HEIGHT) as f32 / (PADDED_LINE_HEIGHT as f32)).trunc() as usize)
-    } else {
-        None
-    }
-}
-
-#[inline(always)]
-pub fn px_to_beat(px: f32) -> f32 {
-    px / BEAT_LENGTH_PX
-}
-
-#[inline(always)]
-pub fn beats_to_px(beats: f32) -> f32 {
-    beats * BEAT_LENGTH_PX
-}
-
-pub struct NoteBoxData {
-    pub width: usize,
-    pub x: usize,
-}
-
-impl NoteBoxData {
-    pub fn compute(x: usize) -> Self {
-        let start_x = unsafe { MOUSE_DOWN_DATA.x };
-        let (low_bound, high_bound) = bounds();
-        let snap_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
-        let snap_to_px = snap_to_beat_interval(x, beats_to_px(low_bound));
-        let (minx, maxx) = if x >= start_x {
-            let end = (snap_to_px + snap_interval_px)
-                .min(beats_to_px(high_bound.unwrap_or(f32::INFINITY)))
-                as usize;
-            (start_x, end)
-        } else {
-            let end = snap_to_px as usize;
-            (end, start_x)
-        };
-        let width = maxx - minx;
-
-        NoteBoxData { x: minx, width }
-    }
 }
 
 #[wasm_bindgen]
@@ -492,7 +102,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 MOUSE_DOWN_DATA.cursor_movement = true;
                 MOUSE_DOWN_DATA.down = true;
                 MOUSE_DOWN_DATA.x = x;
-                MOUSE_DOWN_DATA.y = GRID_HEIGHT;
+                MOUSE_DOWN_DATA.y = GRID_HEIGHT - 2;
             };
 
             return;
@@ -670,6 +280,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
     };
 
     if cursor_movement {
+        unsafe { CUR_MOUSE_COORDS.1 = 1 };
         if let Some(selection_box_dom_id) = selection_box_dom_id {
             update_selection_box(selection_box_dom_id, x, 1);
         } else {
@@ -873,7 +484,6 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         };
 
         let notes = get_sorted_notes(right);
-
         map_selected_notes(notes.into_iter().cloned(), move_note_horizontal);
     };
 
