@@ -1,11 +1,6 @@
 use super::*;
 
 #[inline(always)]
-pub fn mouse_down() -> bool {
-    unsafe { MOUSE_DOWN_DATA.down }
-}
-
-#[inline(always)]
 pub fn select_note(dom_id: usize) {
     add_class(dom_id, "selected");
 }
@@ -16,13 +11,13 @@ pub fn deselect_note(dom_id: usize) {
 }
 
 pub fn set_cursor_pos(x: usize) -> f32 {
-    unsafe { CURSOR_POS = px_to_beat(x as f32) };
+    state().cursor_pos = px_to_beat(x as f32);
     let note_snap_beat_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
     let intervals = ((x as f32) / note_snap_beat_interval_px).round();
     let x = intervals * note_snap_beat_interval_px;
-    let x_str = x.to_string();
-    set_attr(unsafe { CURSOR_DOM_ID }, "x1", &x_str);
-    set_attr(unsafe { CURSOR_DOM_ID }, "x2", &x_str);
+    let x_str = (x as usize).to_string();
+    set_attr(state().cursor_dom_id, "x1", &x_str);
+    set_attr(state().cursor_dom_id, "x2", &x_str);
     x
 }
 
@@ -75,9 +70,9 @@ pub fn draw_cursor_gutter() {
 pub fn draw_cursor() -> usize {
     render_line(
         FG_CANVAS_IX,
-        unsafe { CURSOR_POS },
+        state().cursor_pos,
         0.0,
-        unsafe { CURSOR_POS },
+        state().cursor_pos,
         GRID_HEIGHT as f32,
         "cursor",
     )

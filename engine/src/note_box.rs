@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::{self, Debug, Formatter};
 
-use super::super::*;
+use super::*;
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct NoteBox {
@@ -86,8 +86,8 @@ pub struct NoteBoxData {
 
 impl NoteBoxData {
     pub fn compute(x: usize) -> Self {
-        let start_x = unsafe { MOUSE_DOWN_DATA.x };
-        let (low_bound, high_bound) = bounds();
+        let start_x = state().mouse_down_x;
+        let (low_bound, high_bound) = state().cur_note_bounds;
         let snap_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
         let snap_to_px = snap_to_beat_interval(x, beats_to_px(low_bound));
         let (minx, maxx) = if x >= start_x {

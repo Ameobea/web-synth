@@ -8,9 +8,11 @@ extern crate test;
 use std::mem;
 use std::num::NonZeroU32;
 
+use engine::note_box::NoteBox;
 use engine::selection_box::SelectionRegion;
 use engine::skip_list::*;
-use engine::*;
+use engine::state::*;
+use engine::util::beats_to_px;
 use rand::prelude::*;
 
 fn mklines(notes: &[(f32, f32)]) -> NoteLines {
@@ -74,7 +76,7 @@ fn note_lines_bounds_3() {
 #[bench]
 fn bench_add_two(b: &mut test::Bencher) {
     extern crate rand_pcg;
-    unsafe { RNG = Box::into_raw(box rand_pcg::Pcg32::from_seed(mem::transmute(0u128))) };
+    state().rng = rand_pcg::Pcg32::from_seed(unsafe { mem::transmute(0u128) });
     b.iter(get_skip_list_level)
 }
 
@@ -119,12 +121,11 @@ fn skiplist_bulk_insertion() {
     unsafe { init_state() };
     let mut skip_list = NoteSkipList::new();
 
-    let rng = unsafe { &mut *RNG };
     let mut notes = Vec::with_capacity(1000 / 2);
     for i in 0..500 {
         notes.push(((i * 2) as f32, ((i * 2) + 1) as f32));
     }
-    rng.shuffle(&mut notes);
+    state().rng.shuffle(&mut notes);
 
     for (start_beat, end_beat) in notes {
         skip_list.insert(NoteBox {
@@ -146,9 +147,11 @@ fn skiplist_level_generation(b: &mut test::Bencher) {
 fn skiplist_node_debug() {
     unsafe { init_state() };
 
-    let next_node_ptr: SlabKey<NoteSkipListNode> = nodes()
+    let next_node_ptr: SlabKey<NoteSkipListNode> = state()
+        .nodes
         .insert(NoteSkipListNode {
-            val_slot_key: notes()
+            val_slot_key: state()
+                .notes
                 .insert(NoteBox {
                     start_beat: 20.0,
                     end_beat: 30.0,
@@ -160,7 +163,8 @@ fn skiplist_node_debug() {
         .into();
 
     let node = NoteSkipListNode {
-        val_slot_key: notes()
+        val_slot_key: state()
+            .notes
             .insert(NoteBox {
                 start_beat: 0.0,
                 end_beat: 10.0,
@@ -175,7 +179,7 @@ fn skiplist_node_debug() {
             None,
         ],
     };
-    let node_key: SlabKey<NoteSkipListNode> = nodes().insert(node).into();
+    let node_key: SlabKey<NoteSkipListNode> = state().nodes.insert(node).into();
     let node: &NoteSkipListNode = &*node_key;
     // pretend that we're inside of a full `SkipList` and initialize the global debug pointers
     init_node_dbg_ptrs(&node_key);
@@ -199,7 +203,7 @@ fn skiplist_debug_fmt() {
             end_beat: *end,
             dom_id: 0,
         })
-        .map(|note| -> SlabKey<NoteBox> { notes().insert(note).into() })
+        .map(|note| -> SlabKey<NoteBox> { state().notes.insert(note).into() })
         .collect::<Vec<_>>()[0..4];
     let [note_1_2, note_4_5, note_3_4, note_2_3] = match notes {
         [n1, n2, n3, n4] => [n1, n2, n3, n4],
@@ -209,7 +213,8 @@ fn skiplist_debug_fmt() {
     let mknode = |val_slot_key: SlabKey<NoteBox>,
                   links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS]|
      -> SlabKey<NoteSkipListNode> {
-        nodes()
+        state()
+            .nodes
             .insert(NoteSkipListNode {
                 val_slot_key,
                 links,
@@ -241,7 +246,7 @@ fn skiplist_debug_fmt() {
     );
     println!("head: \n{:?}", *head);
 
-    // nodes are pre-linked, so all we have to do is insert the head.
+    // state().nodes are pre-linked, so all we have to do is insert the head.
     skip_list.head_key = Some(head);
     let expected = "|1, 2|------------------------->x\n|1, 2|----------------->|4, 5|->x\n|1, 2|----------------->|4, 5|->x\n|1, 2|--------->|3, 4|->|4, 5|->x\n|1, 2|->|2, 3|->|3, 4|->|4, 5|->x";
     let actual = format!("{:?}", skip_list);

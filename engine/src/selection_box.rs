@@ -1,4 +1,4 @@
-use super::{MouseDownData, MOUSE_DOWN_DATA};
+use super::state::state;
 
 /// A rectangular region of 2D space
 #[derive(Clone, PartialEq, Debug)]
@@ -220,11 +220,7 @@ pub struct SelectionBoxData {
 
 impl SelectionBoxData {
     pub fn compute(x: usize, y: usize, last_x: usize, last_y: usize) -> Self {
-        let &MouseDownData {
-            x: down_x,
-            y: down_y,
-            ..
-        } = unsafe { &MOUSE_DOWN_DATA };
+        let (down_x, down_y) = (state().mouse_down_x, state().mouse_down_y);
         let region = SelectionRegion::from_points(down_x, down_y, x, y);
         let last_region = SelectionRegion::from_points(down_x, down_y, last_x, last_y);
         // common::log(format!("{:?} -> {:?}", last_region, region));

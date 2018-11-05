@@ -56,9 +56,9 @@ impl Deref for NoteBoxSlabKey {
 
     fn deref(&self) -> &NoteBox {
         if cfg!(debug_assertions) {
-            &notes()[self.key()]
+            &state().notes[self.key()]
         } else {
-            unsafe { notes().get_unchecked(self.key()) }
+            unsafe { state().notes.get_unchecked(self.key()) }
         }
     }
 }
@@ -68,9 +68,9 @@ impl Deref for NodeSlabKey {
 
     fn deref(&self) -> &NoteSkipListNode {
         if cfg!(debug_assertions) {
-            &nodes()[self.key()]
+            &state().nodes[self.key()]
         } else {
-            unsafe { nodes().get_unchecked(self.key()) }
+            unsafe { state().nodes.get_unchecked(self.key()) }
         }
     }
 }
@@ -78,9 +78,9 @@ impl Deref for NodeSlabKey {
 impl DerefMut for NoteBoxSlabKey {
     fn deref_mut(&mut self) -> &mut NoteBox {
         if cfg!(debug_assertions) {
-            &mut notes()[self.key()]
+            &mut state().notes[self.key()]
         } else {
-            unsafe { notes().get_unchecked_mut(self.key()) }
+            unsafe { state().notes.get_unchecked_mut(self.key()) }
         }
     }
 }
@@ -88,9 +88,9 @@ impl DerefMut for NoteBoxSlabKey {
 impl DerefMut for NodeSlabKey {
     fn deref_mut(&mut self) -> &mut NoteSkipListNode {
         if cfg!(debug_assertions) {
-            &mut nodes()[self.key()]
+            &mut state().nodes[self.key()]
         } else {
-            unsafe { nodes().get_unchecked_mut(self.key()) }
+            unsafe { state().nodes.get_unchecked_mut(self.key()) }
         }
     }
 }
@@ -272,10 +272,9 @@ impl Index<SlabKey<NoteBox>> for Slab<NoteBox> {
 /// TODO: Make O(1)?
 #[inline]
 pub fn get_skip_list_level() -> usize {
-    let rng = unsafe { &mut (*RNG) };
     let mut level = 0;
     for _ in 0..(NOTE_SKIP_LIST_LEVELS - 1) {
-        if rng.gen::<bool>() {
+        if state().rng.gen::<bool>() {
             break;
         }
         level += 1;
@@ -549,8 +548,8 @@ impl<'a> Iterator for NoteSkipListRegionIterator<'a> {
 /// Deallocates the slab slots for both the node and its `NoteBox`, returning the inner `NoteBox`.
 #[allow(clippy::needless_pass_by_value)]
 fn dealloc_node(node_key: NodeSlabKey) -> NoteBox {
-    let node = nodes().remove(node_key.key());
-    notes().remove(node.val_slot_key.key())
+    let node = state().nodes.remove(node_key.key());
+    state().notes.remove(node.val_slot_key.key())
 }
 
 impl NoteSkipList {
@@ -572,10 +571,10 @@ impl NoteSkipList {
     /// successfully and `true` if there is an intersecting node blocking it from being inserted.
     pub fn insert(&mut self, note: NoteBox) -> bool {
         let new_node = NoteSkipListNode {
-            val_slot_key: notes().insert(note).into(),
+            val_slot_key: state().notes.insert(note).into(),
             links: blank_shortcuts(),
         };
-        let new_node_key: NodeSlabKey = nodes().insert(new_node).into();
+        let new_node_key: NodeSlabKey = state().nodes.insert(new_node).into();
         let new_node: &mut NoteSkipListNode = &mut *(new_node_key.clone());
 
         // Deallocate the new node and note we created for this insertion attempt and return `true`
@@ -757,7 +756,7 @@ impl NoteSkipList {
         let mut preceeding_links = init_preceeding_links(&head_key);
         head.search(beat, &head_key, &mut preceeding_links);
 
-        Some(&mut nodes()[preceeding_links[0].key()]) // borrow checker begone
+        Some(&mut state().nodes[preceeding_links[0].key()]) // borrow checker begone
     }
 }
 

@@ -1,7 +1,7 @@
 extern crate engine;
 
+use engine::note_box::NoteBox;
 use engine::selection_box::*;
-use engine::NoteBox;
 
 fn test_selection_box_diff(
     origin_x: usize,

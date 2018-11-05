@@ -8,11 +8,8 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
 
-pub mod note_box;
-pub use self::note_box::*;
-use super::skip_list::{
-    blank_shortcuts, NoteLines, NoteSkipListNode, SKIP_LIST_NODE_DEBUG_POINTERS,
-};
+use super::note_box::NoteBox;
+use super::skip_list::*;
 
 /// Height of one of the lines rendered in the grid
 pub const LINE_HEIGHT: usize = 12;
@@ -34,51 +31,59 @@ pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 1.0;
 pub const CURSOR_GUTTER_HEIGHT: usize = 16;
 
-// All of the statics are made thread local so that multiple tests can run concurrently without
-// causing all kinds of horrible async UB stuff.
-#[thread_local]
-pub static mut MOUSE_DOWN_DATA: MouseDownData = MouseDownData {
-    down: false,
-    cursor_movement: false,
-    x: 0,
-    y: 0,
-    note_dom_id: None,
-    selection_box_dom_id: None,
-};
-#[thread_local]
-pub static mut NOTE_BOXES: *mut Slab<NoteBox> = ptr::null_mut();
-#[thread_local]
-pub static mut NOTE_SKIPLIST_NODES: *mut Slab<NoteSkipListNode> = ptr::null_mut();
-/// Represents the position of all of the notes on all of the lines, providing efficient operations
-/// for determining bounds, intersections with beats, etc.
-#[thread_local]
-pub static mut NOTE_LINES: *mut NoteLines = ptr::null_mut();
-#[thread_local]
-pub static mut RNG: *mut Pcg32 = ptr::null_mut();
-#[thread_local]
-pub static mut CUR_NOTE_BOUNDS: (f32, Option<f32>) = (0.0, None);
-#[thread_local]
-pub static mut SELECTED_NOTES: *mut FnvHashSet<SelectedNoteData> = ptr::null_mut();
-#[thread_local]
-pub static mut CUR_TOOL: Tool = Tool::DrawNote;
-#[thread_local]
-pub static mut CONTROL_PRESSED: bool = false;
-#[thread_local]
-pub static mut SHIFT_PRESSED: bool = false;
-#[thread_local]
-pub static mut CUR_MOUSE_COORDS: (usize, usize) = (0, 0);
-#[thread_local]
-pub static mut CURSOR_POS: f32 = 0.0;
-#[thread_local]
-pub static mut CURSOR_DOM_ID: usize = 0;
-
-pub struct MouseDownData {
-    pub down: bool,
-    pub cursor_movement: bool,
-    pub x: usize,
-    pub y: usize,
-    pub note_dom_id: Option<usize>,
+pub struct State {
+    pub mouse_down: bool,
+    pub cursor_moving: bool,
+    pub mouse_down_x: usize,
+    pub mouse_down_y: usize,
+    pub drawing_note_dom_id: Option<usize>,
     pub selection_box_dom_id: Option<usize>,
+    pub notes: Slab<NoteBox>,
+    pub nodes: Slab<NoteSkipListNode>,
+    pub note_lines: NoteLines,
+    pub rng: Pcg32,
+    pub cur_note_bounds: (f32, Option<f32>),
+    pub selected_notes: FnvHashSet<SelectedNoteData>,
+    pub cur_tool: Tool,
+    pub control_pressed: bool,
+    pub shift_pressed: bool,
+    pub mouse_x: usize,
+    pub mouse_y: usize,
+    pub cursor_pos: f32,
+    pub cursor_dom_id: usize,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State {
+            mouse_down: false,
+            cursor_moving: false,
+            mouse_down_x: 0,
+            mouse_down_y: 0,
+            drawing_note_dom_id: None,
+            selection_box_dom_id: None,
+            notes: Slab::new(),
+            nodes: Slab::new(),
+            note_lines: NoteLines::new(LINE_COUNT),
+            rng: Pcg32::from_seed(unsafe { mem::transmute(128u128) }),
+            cur_note_bounds: (0.0, None),
+            selected_notes: FnvHashSet::default(),
+            cur_tool: Tool::DrawNote,
+            control_pressed: false,
+            shift_pressed: false,
+            mouse_x: 0,
+            mouse_y: 0,
+            cursor_pos: 0.0,
+            cursor_dom_id: 0,
+        }
+    }
+}
+
+#[thread_local]
+pub static STATE: *mut State = ptr::null_mut();
+
+pub fn state() -> &'static mut State {
+    unsafe { &mut *STATE }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -128,46 +133,22 @@ pub enum Tool {
     DeleteNote,
 }
 
-#[inline(always)]
-pub fn notes() -> &'static mut Slab<NoteBox> {
-    unsafe { &mut *NOTE_BOXES }
-}
-
-#[inline(always)]
-pub fn nodes() -> &'static mut Slab<NoteSkipListNode> {
-    unsafe { &mut *NOTE_SKIPLIST_NODES }
-}
-
-#[inline(always)]
-pub fn lines() -> &'static mut NoteLines {
-    unsafe { &mut *NOTE_LINES }
-}
-
-#[inline(always)]
-pub fn bounds() -> (f32, Option<f32>) {
-    unsafe { CUR_NOTE_BOUNDS }
-}
-
 pub unsafe fn init_state() {
-    NOTE_BOXES = Box::into_raw(box Slab::new());
-    NOTE_SKIPLIST_NODES = Box::into_raw(box Slab::new());
+    ptr::write(STATE as *mut _, State::default());
 
     // Insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
     // assumptions remain true.
-    let note_slot_key = notes().insert(NoteBox {
+    let note_slot_key = state().notes.insert(NoteBox {
         start_beat: 0.0,
         end_beat: 0.0,
         dom_id: 0,
     });
     assert_eq!(note_slot_key, 0);
-    let placeholder_node_key = nodes().insert(NoteSkipListNode {
+    let placeholder_node_key = state().nodes.insert(NoteSkipListNode {
         val_slot_key: 0.into(),
         links: mem::zeroed(),
     });
     assert_eq!(placeholder_node_key, 0);
 
-    NOTE_LINES = Box::into_raw(box NoteLines::new(LINE_COUNT));
-    RNG = Box::into_raw(box Pcg32::from_seed(mem::transmute(0u128)));
     SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box blank_shortcuts());
-    SELECTED_NOTES = Box::into_raw(box FnvHashSet::default());
 }

@@ -1,4 +1,5 @@
-#![feature(box_syntax, test, slice_patterns, nll, thread_local)]
+#![feature(box_syntax, test, slice_patterns, thread_local)]
+#![allow(clippy::float_cmp)]
 
 extern crate common;
 extern crate fnv;
@@ -10,14 +11,15 @@ extern crate wasm_bindgen;
 
 use std::f32;
 
-use fnv::FnvHashSet;
 use wasm_bindgen::prelude::*;
 
+pub mod note_box;
 pub mod render;
 pub mod selection_box;
 pub mod skip_list;
 pub mod state;
 pub mod util;
+use self::note_box::*;
 use self::render::*;
 use self::selection_box::*;
 use self::skip_list::*;
@@ -58,12 +60,6 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn handle_mouse_down(mut x: usize, y: usize) {
-    let note_lines = lines();
-    let selected_notes = unsafe { &mut *SELECTED_NOTES };
-    let cur_tool = unsafe { CUR_TOOL };
-    let ctrl_pressed = unsafe { CONTROL_PRESSED };
-    let shift_pressed = unsafe { SHIFT_PRESSED };
-
     let mut drawing_dom_id = None;
     let mut selection_box_dom_id = None;
     let mut draw_selection_box = || {
@@ -82,55 +78,51 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     let line_ix = match get_line_index(y) {
         Some(line_ix) => line_ix,
         None => {
-            if shift_pressed {
-                unsafe {
-                    MOUSE_DOWN_DATA.selection_box_dom_id = Some(render_quad(
-                        FG_CANVAS_IX,
-                        0.0,
-                        y as f32,
-                        0.0,
-                        GRID_HEIGHT as f32,
-                        "selection-box",
-                    ))
-                };
+            if state().shift_pressed {
+                state().selection_box_dom_id = Some(render_quad(
+                    FG_CANVAS_IX,
+                    0.0,
+                    y as f32,
+                    0.0,
+                    GRID_HEIGHT as f32,
+                    "selection-box",
+                ))
             } else {
-                unsafe { MOUSE_DOWN_DATA.selection_box_dom_id = None };
+                state().selection_box_dom_id = None;
             }
 
             let x = set_cursor_pos(x) as usize;
-            unsafe {
-                MOUSE_DOWN_DATA.cursor_movement = true;
-                MOUSE_DOWN_DATA.down = true;
-                MOUSE_DOWN_DATA.x = x;
-                MOUSE_DOWN_DATA.y = GRID_HEIGHT - 2;
-            };
+            state().cursor_moving = true;
+            state().mouse_down = true;
+            state().mouse_down_x = x;
+            state().mouse_down_y = GRID_HEIGHT - 2;
 
             return;
         }
     };
     let beat = px_to_beat(x as f32);
-    let bounds = note_lines.get_bounds(line_ix, beat);
+    let bounds = state().note_lines.get_bounds(line_ix, beat);
 
-    if cur_tool == Tool::DrawNote && !shift_pressed {
+    if state().cur_tool == Tool::DrawNote && !state().shift_pressed {
         trigger_attack(midi_to_frequency(line_ix));
     }
 
     let mut init_selection_box = || {
-        for note_data in selected_notes.drain() {
+        for note_data in state().selected_notes.drain() {
             deselect_note(note_data.dom_id);
         }
         draw_selection_box();
     };
 
     match bounds {
-        Bounds::Intersecting(node) => match cur_tool {
-            Tool::DrawNote if shift_pressed => init_selection_box(),
+        Bounds::Intersecting(node) => match state().cur_tool {
+            Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DeleteNote => {
                 let &NoteBox {
                     start_beat, dom_id, ..
                 } = &*node.val_slot_key;
                 unimplemented!(); // TODO
-                lines().remove(line_ix, start_beat);
+                state().note_lines.remove(line_ix, start_beat);
             }
             Tool::DrawNote => {
                 let NoteBox { dom_id, .. } = *node.val_slot_key;
@@ -140,10 +132,10 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                     start_beat: node.val_slot_key.start_beat,
                 };
 
-                let select_new = if ctrl_pressed {
-                    if selected_notes.contains(&selected_data) {
+                let select_new = if state().control_pressed {
+                    if state().selected_notes.contains(&selected_data) {
                         deselect_note(dom_id);
-                        selected_notes.remove(&selected_data);
+                        state().selected_notes.remove(&selected_data);
                         false
                     } else {
                         true
@@ -151,7 +143,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 } else {
                     let mut select_new: bool = true;
                     // Deselect all selected notes
-                    for note_data in selected_notes.drain() {
+                    for note_data in state().selected_notes.drain() {
                         deselect_note(note_data.dom_id);
                         if note_data.dom_id == dom_id {
                             select_new = false;
@@ -163,20 +155,20 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
 
                 if select_new {
                     // Select the clicked note since it wasn't previously selected
-                    selected_notes.insert(selected_data);
+                    state().selected_notes.insert(selected_data);
                     select_note(dom_id);
                 }
             }
         },
-        Bounds::Bounded(lower, upper) => match cur_tool {
-            Tool::DrawNote if ctrl_pressed => {} // TODO
-            Tool::DrawNote if shift_pressed => init_selection_box(),
+        Bounds::Bounded(lower, upper) => match state().cur_tool {
+            Tool::DrawNote if state().control_pressed => {} // TODO
+            Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote => {
                 let snapped_lower = snap_to_beat_interval(x, beats_to_px(lower));
                 let snapped_upper = (snapped_lower + beats_to_px(NOTE_SNAP_BEAT_INTERVAL))
                     .min(beats_to_px(upper.unwrap_or(f32::INFINITY)));
                 let width = snapped_upper - snapped_lower;
-                unsafe { CUR_NOTE_BOUNDS = (lower, upper) };
+                state().cur_note_bounds = (lower, upper);
 
                 // Draw the temporary/candidate note after storing its bounds
                 drawing_dom_id = Some(render_quad(
@@ -193,36 +185,24 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
         },
     };
 
-    unsafe {
-        MOUSE_DOWN_DATA = MouseDownData {
-            down: true,
-            cursor_movement: false,
-            x,
-            y,
-            note_dom_id: drawing_dom_id,
-            selection_box_dom_id,
-        };
-    }
+    state().mouse_down = true;
+    state().cursor_moving = false;
+    state().mouse_down_x = x;
+    state().mouse_down_y = y;
+    state().drawing_note_dom_id = drawing_dom_id;
+    state().selection_box_dom_id = selection_box_dom_id;
 }
 
 #[wasm_bindgen]
 pub fn handle_mouse_move(x: usize, y: usize) {
-    let (last_x, last_y) = unsafe { CUR_MOUSE_COORDS };
-    unsafe { CUR_MOUSE_COORDS = (x, y) };
-    if !mouse_down() {
+    let (last_x, last_y) = (state().mouse_x, state().mouse_y);
+    state().mouse_x = x;
+    state().mouse_y = y;
+    if !state().mouse_down {
         return;
     }
-    let shift_pressed = unsafe { SHIFT_PRESSED };
-    let &mut MouseDownData {
-        cursor_movement,
-        note_dom_id,
-        selection_box_dom_id,
-        ..
-    } = unsafe { &mut MOUSE_DOWN_DATA };
-    let cur_tool = unsafe { CUR_TOOL };
-    let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
-    let mut update_selection_box = |selection_box_dom_id: usize, x: usize, y: usize| {
+    let update_selection_box = |selection_box_dom_id: usize, x: usize, y: usize| {
         let SelectionBoxData {
             region:
                 SelectionRegion {
@@ -257,7 +237,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         ]
         .into_iter()
         {
-            for note_data in lines().iter_region(region) {
+            for note_data in state().note_lines.iter_region(region) {
                 // Ignore notes that are also contained in the retained region
                 if let Some(retained_region) = retained_region.as_ref() {
                     if note_data.intersects_region(&retained_region) {
@@ -268,10 +248,10 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                 let dom_id = note_data.note_box.dom_id;
                 let selected_note_data: SelectedNoteData = note_data.into();
                 let line_ix = selected_note_data.line_ix;
-                if *was_added && selected_notes.insert(selected_note_data) {
+                if *was_added && state().selected_notes.insert(selected_note_data) {
                     select_note(dom_id);
                     trigger_attack(midi_to_frequency(line_ix));
-                } else if !*was_added && selected_notes.remove(&selected_note_data) {
+                } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
                     deselect_note(dom_id);
                     trigger_release(midi_to_frequency(line_ix));
                 }
@@ -279,9 +259,9 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         }
     };
 
-    if cursor_movement {
-        unsafe { CUR_MOUSE_COORDS.1 = 1 };
-        if let Some(selection_box_dom_id) = selection_box_dom_id {
+    if state().cursor_moving {
+        state().mouse_y = 1;
+        if let Some(selection_box_dom_id) = state().selection_box_dom_id {
             update_selection_box(selection_box_dom_id, x, 1);
         } else {
             set_cursor_pos(x);
@@ -289,14 +269,14 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         return;
     }
 
-    match cur_tool {
-        Tool::DrawNote if shift_pressed => {
-            if let Some(selection_box_dom_id) = selection_box_dom_id {
+    match state().cur_tool {
+        Tool::DrawNote if state().shift_pressed => {
+            if let Some(selection_box_dom_id) = state().selection_box_dom_id {
                 update_selection_box(selection_box_dom_id, x, y);
             }
         }
         Tool::DrawNote => {
-            if let Some(dom_id) = note_dom_id {
+            if let Some(dom_id) = state().drawing_note_dom_id {
                 let NoteBoxData { x, width } = NoteBoxData::compute(x);
                 set_attr(dom_id, "x", &x.to_string());
                 set_attr(dom_id, "width", &width.to_string());
@@ -309,29 +289,21 @@ pub fn handle_mouse_move(x: usize, y: usize) {
 #[wasm_bindgen]
 pub fn handle_mouse_up(x: usize, _y: usize) {
     // if `MOUSE_DOWN` is not set, the user tried to place an invalid note and we ignore it.
-    if !mouse_down() {
+    if !state().mouse_down {
         return;
     }
-    let &mut MouseDownData {
-        ref mut down,
-        y,
-        cursor_movement,
-        note_dom_id,
-        selection_box_dom_id,
-        ..
-    } = unsafe { &mut MOUSE_DOWN_DATA };
-    *down = false;
+    state().mouse_down = false;
 
     let delete_selection_box = |selection_box_dom_id: usize| {
         delete_element(selection_box_dom_id);
 
-        for note_data in unsafe { &*SELECTED_NOTES }.iter() {
+        for note_data in state().selected_notes.iter() {
             trigger_release(midi_to_frequency(note_data.line_ix));
         }
     };
 
-    if cursor_movement {
-        if let Some(selection_box_dom_id) = selection_box_dom_id {
+    if state().cursor_moving {
+        if let Some(selection_box_dom_id) = state().selection_box_dom_id {
             delete_selection_box(selection_box_dom_id);
         }
 
@@ -339,16 +311,16 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
         return;
     }
 
-    let down_line_ix = get_line_index(y).unwrap();
+    let down_line_ix = get_line_index(state().mouse_down_y).unwrap();
 
-    if let Some(selection_box_dom_id) = selection_box_dom_id {
+    if let Some(selection_box_dom_id) = state().selection_box_dom_id {
         delete_selection_box(selection_box_dom_id);
     } else {
         trigger_release(midi_to_frequency(down_line_ix));
     }
 
-    if unsafe { CUR_TOOL } == Tool::DrawNote {
-        match (note_dom_id, selection_box_dom_id) {
+    if state().cur_tool == Tool::DrawNote {
+        match (state().drawing_note_dom_id, state().selection_box_dom_id) {
             (Some(note_dom_id), None) => {
                 let NoteBoxData { x, width } = NoteBoxData::compute(x);
                 if width == 0 {
@@ -365,16 +337,15 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                 };
 
                 // Actually insert the node into the skip list
-                lines().insert(line_ix, note);
+                state().note_lines.insert(line_ix, note);
                 if cfg!(debug_assertions) {
-                    common::log(format!("{:?}", lines().lines[line_ix]));
+                    common::log(format!("{:?}", state().note_lines.lines[line_ix]));
                 }
 
-                let selected_notes = unsafe { &mut *SELECTED_NOTES };
-                for note_data in selected_notes.drain() {
+                for note_data in state().selected_notes.drain() {
                     deselect_note(note_data.dom_id);
                 }
-                selected_notes.insert(SelectedNoteData {
+                state().selected_notes.insert(SelectedNoteData {
                     line_ix,
                     dom_id: note_dom_id,
                     start_beat,
@@ -396,7 +367,6 @@ pub fn handle_mouse_wheel(_ydiff: isize) {}
 #[wasm_bindgen]
 pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
-    let selected_notes = unsafe { &mut *SELECTED_NOTES };
 
     let (line_diff_vertical, beat_diff_horizontal) = match (control_pressed, shift_pressed) {
         (true, false) | (false, true) => (3, 4.0),
@@ -404,20 +374,8 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         (false, false) => (1, 1.0),
     };
 
-    fn map_selected_notes<
-        F: FnMut(SelectedNoteData) -> SelectedNoteData,
-        I: Iterator<Item = SelectedNoteData>,
-    >(
-        notes_iter: I,
-        f: F,
-    ) {
-        let new_selected_notes: FnvHashSet<_> = notes_iter.map(f).collect();
-        unsafe { *SELECTED_NOTES = new_selected_notes };
-    };
-
     fn get_sorted_notes(sort_reverse: bool) -> Vec<&'static SelectedNoteData> {
-        let mut notes: Vec<&SelectedNoteData> =
-            unsafe { &mut *SELECTED_NOTES }.iter().collect::<Vec<_>>();
+        let mut notes: Vec<&SelectedNoteData> = state().selected_notes.iter().collect::<Vec<_>>();
 
         if sort_reverse {
             notes.sort_unstable_by(|a, b| b.cmp(a));
@@ -433,11 +391,12 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         let mut notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
 
         let move_note_vertical = |mut note_data: SelectedNoteData| -> SelectedNoteData {
-            if !tern(
+            let cond = tern(
                 up,
                 note_data.line_ix >= line_diff_vertical,
                 note_data.line_ix + line_diff_vertical < LINE_COUNT,
-            ) {
+            );
+            if !cond {
                 return note_data;
             }
 
@@ -448,7 +407,12 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
             };
             notes_to_play.push(midi_to_frequency(dst_line_ix));
 
-            if !lines().move_note_vertical(note_data.line_ix, dst_line_ix, note_data.start_beat) {
+            let move_failed = state().note_lines.move_note_vertical(
+                note_data.line_ix,
+                dst_line_ix,
+                note_data.start_beat,
+            );
+            if move_failed {
                 note_data.line_ix = dst_line_ix;
                 set_attr(
                     note_data.dom_id,
@@ -460,14 +424,14 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
             note_data
         };
 
-        map_selected_notes(notes.into_iter().cloned(), move_note_vertical);
+        state().selected_notes = notes.into_iter().cloned().map(move_note_vertical).collect();
         trigger_attack_release_multiple(&notes_to_play, 0.0);
     };
 
-    let mut move_selected_notes_horizontal = |right: bool| {
+    let move_selected_notes_horizontal = |right: bool| {
         let beats_to_move = beat_diff_horizontal * tern(right, 1.0, -1.0);
         let move_note_horizontal = |mut note_data: SelectedNoteData| -> SelectedNoteData {
-            let new_start_beat = lines().move_note_horizontal(
+            let new_start_beat = state().note_lines.move_note_horizontal(
                 note_data.line_ix,
                 note_data.start_beat,
                 beats_to_move,
@@ -483,23 +447,28 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
             note_data
         };
 
-        let notes = get_sorted_notes(right);
-        map_selected_notes(notes.into_iter().cloned(), move_note_horizontal);
+        state().selected_notes = get_sorted_notes(right)
+            .into_iter()
+            .cloned()
+            .map(move_note_horizontal)
+            .collect();
     };
 
-    unsafe { CONTROL_PRESSED = control_pressed };
-    unsafe { SHIFT_PRESSED = shift_pressed };
+    state().control_pressed = control_pressed;
+    state().shift_pressed = shift_pressed;
 
     match key {
         // Delete all currently selected notes
         "Backspace" | "Delete" => {
-            for note_data in selected_notes.drain() {
-                let removed_note = lines().remove(note_data.line_ix, note_data.start_beat);
+            for note_data in state().selected_notes.drain() {
+                let removed_note = state()
+                    .note_lines
+                    .remove(note_data.line_ix, note_data.start_beat);
                 debug_assert!(removed_note.is_some());
                 delete_element(note_data.dom_id);
 
                 if cfg!(debug_assertions) {
-                    common::log(format!("{:?}", lines().lines[note_data.line_ix]));
+                    common::log(format!("{:?}", state().note_lines.lines[note_data.line_ix]));
                 }
             }
         }
@@ -514,8 +483,8 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
 #[allow(clippy::needless_pass_by_value)]
 #[wasm_bindgen]
 pub fn handle_key_up(_key: &str, control_pressed: bool, shift_pressed: bool) {
-    unsafe { CONTROL_PRESSED = control_pressed };
-    unsafe { SHIFT_PRESSED = shift_pressed };
+    state().control_pressed = control_pressed;
+    state().shift_pressed = shift_pressed;
 }
 
 #[wasm_bindgen]
@@ -525,5 +494,5 @@ pub fn init() {
     draw_grid();
     draw_measure_lines();
     draw_cursor_gutter();
-    unsafe { CURSOR_DOM_ID = draw_cursor() };
+    state().cursor_dom_id = draw_cursor();
 }
