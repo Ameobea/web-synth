@@ -31,9 +31,7 @@
     "react": "^16.5.2",
     "react-control-panel": "^0.3.0",
     "react-dom": "^16.5.2",
-    "react-redux": "^5.0.7",
     "recompose": "^0.30.0",
-    "redux": "^4.0.0",
     "tonal": "^2.0.0",
     "tone": "^0.12.80"
   }

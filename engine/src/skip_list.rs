@@ -673,16 +673,11 @@ impl NoteSkipList {
         let head_key = self
             .head_key
             .as_mut()
-            .unwrap_or_else(|| {
-                panic!(
-                    "Attempted to remove node at start beat {} from line with no head node",
-                    start_beat
-                )
-            })
+            .expect("Attempted to remove node from line with no head node")
             .clone();
         let head = &mut *(head_key.clone());
 
-        if (head.val_slot_key.start_beat - start_beat).abs() <= f32::EPSILON {
+        if head.val_slot_key.start_beat == start_beat {
             // The head is being removed.  Replace it with the next child (copying over links where
             // applicable) if there is one.
             if let Some(new_head_key) = head.links[0].clone() {

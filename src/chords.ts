@@ -5,13 +5,13 @@ import PolySynth from 'tone/Tone/instrument/PolySynth';
 import BitCrusher from 'tone/Tone/effect/BitCrusher';
 import * as tonal from 'tonal';
 
-const bitcrusher = new BitCrusher(5).toMaster();
+export const bitcrusher = new BitCrusher(5).toMaster();
 
-export const createSynth = () => new PolySynth(50, Synth).toMaster();
+export const createSynth = () => new PolySynth(50, Synth).connect(bitcrusher).toMaster();
 
 export const synth = createSynth();
 (window as any).SYNTH = synth;
 (window as any).tonal = tonal;
 (window as any).BITCRUSHER = bitcrusher;
 
-Master.volume.value = -24;
+Master.set('volume', -19.22);

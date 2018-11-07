@@ -45,6 +45,7 @@ pub struct State {
     pub note_lines: NoteLines,
     pub rng: Pcg32,
     pub cur_note_bounds: (f32, Option<f32>),
+    // TODO: Make this something better, like mapping dom_id to line index and start beat or sth.
     pub selected_notes: FnvHashSet<SelectedNoteData>,
     pub cur_tool: Tool,
     pub control_pressed: bool,
@@ -83,7 +84,7 @@ impl Default for State {
 }
 
 #[thread_local]
-pub static STATE: *mut State = ptr::null_mut();
+pub static mut STATE: *mut State = ptr::null_mut();
 
 pub fn state() -> &'static mut State {
     unsafe { &mut *STATE }
@@ -147,7 +148,8 @@ pub enum Tool {
 }
 
 pub unsafe fn init_state() {
-    ptr::write(STATE as *mut _, State::default());
+    let created_state = box State::default();
+    STATE = Box::into_raw(created_state) as *mut _;
 
     // Insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
     // assumptions remain true.

@@ -62,6 +62,7 @@ extern "C" {
 pub fn handle_mouse_down(mut x: usize, y: usize) {
     let mut drawing_dom_id = None;
     let mut selection_box_dom_id = None;
+    let mut dragging_note_data = None;
 
     // Determine if the requested location intersects an existing note and if not, determine the
     // bounds on the note that will be drawn next.
@@ -119,7 +120,8 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 let &NoteBox {
                     start_beat, dom_id, ..
                 } = &*node.val_slot_key;
-                unimplemented!(); // TODO
+                deselect_note(dom_id);
+                delete_element(dom_id);
                 state().note_lines.remove(line_ix, start_beat);
             }
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
@@ -142,7 +144,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
             }
             Tool::DrawNote => {
                 let note = &*node.val_slot_key;
-                state().dragging_note_data = Some((
+                dragging_note_data = Some((
                     note.start_beat,
                     SelectedNoteData::from_note_box(line_ix, note),
                 ))
@@ -179,6 +181,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     state().mouse_down_y = y;
     state().drawing_note_dom_id = drawing_dom_id;
     state().selection_box_dom_id = selection_box_dom_id;
+    state().dragging_note_data = dragging_note_data;
 }
 
 fn update_selection_box(
@@ -323,6 +326,9 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                     return;
                 }
 
+                state().selected_notes.remove(dragging_note);
+                state().selected_notes.insert(*dragging_note);
+
                 if dragging_note.start_beat != original_start_beat {
                     set_attr(
                         dragging_note.dom_id,
@@ -336,7 +342,9 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                         "y",
                         &((dragging_note.line_ix * PADDED_LINE_HEIGHT + CURSOR_GUTTER_HEIGHT)
                             .to_string()),
-                    )
+                    );
+                    trigger_release(midi_to_frequency(original_line_ix));
+                    trigger_attack(midi_to_frequency(dragging_note.line_ix));
                 }
             }
         }
@@ -373,6 +381,8 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 
     if let Some(selection_box_dom_id) = state().selection_box_dom_id {
         delete_selection_box(selection_box_dom_id);
+    } else if let Some((_, dragging_note_data)) = state().dragging_note_data {
+        trigger_release(midi_to_frequency(dragging_note_data.line_ix));
     } else {
         trigger_release(midi_to_frequency(down_line_ix));
     }
@@ -470,12 +480,12 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
                 dst_line_ix,
                 note_data.start_beat,
             );
-            if move_failed {
+            if !move_failed {
                 note_data.line_ix = dst_line_ix;
                 set_attr(
                     note_data.dom_id,
                     "y",
-                    &(note_data.line_ix * PADDED_LINE_HEIGHT).to_string(),
+                    &(note_data.line_ix * PADDED_LINE_HEIGHT + CURSOR_GUTTER_HEIGHT).to_string(),
                 );
             }
 
