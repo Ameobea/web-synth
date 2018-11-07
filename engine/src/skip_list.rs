@@ -246,7 +246,12 @@ impl Index<NodeSlabKey> for Slab<NoteSkipListNode> {
     #[inline]
     fn index(&self, index: NodeSlabKey) -> &NoteSkipListNode {
         if cfg!(debug_assertions) {
-            self.get(index.key()).unwrap()
+            self.get(index.key()).unwrap_or_else(|| {
+                panic!(
+                    "Tried to get node with slab index {} but it doesn't exist",
+                    index.key()
+                )
+            })
         } else {
             unsafe { &self.get_unchecked(index.key()) }
         }
@@ -259,7 +264,12 @@ impl Index<SlabKey<NoteBox>> for Slab<NoteBox> {
     #[inline]
     fn index(&self, index: SlabKey<NoteBox>) -> &NoteBox {
         if cfg!(debug_assertions) {
-            &self.get(index.key()).unwrap()
+            &self.get(index.key()).unwrap_or_else(|| {
+                panic!(
+                    "Tried to get note with slab index {} but it doesn't exist",
+                    index.key()
+                )
+            })
         } else {
             unsafe { self.get_unchecked(index.key()) }
         }
@@ -660,7 +670,16 @@ impl NoteSkipList {
 
     /// Removes any note box that contains the given beat.
     pub fn remove(&mut self, start_beat: f32) -> Option<NoteBox> {
-        let head_key = self.head_key.as_mut().unwrap().clone();
+        let head_key = self
+            .head_key
+            .as_mut()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Attempted to remove node at start beat {} from line with no head node",
+                    start_beat
+                )
+            })
+            .clone();
         let head = &mut *(head_key.clone());
 
         if (head.val_slot_key.start_beat - start_beat).abs() <= f32::EPSILON {

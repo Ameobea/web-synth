@@ -197,7 +197,7 @@ fn skiplist_debug_fmt() {
 
     let mut skip_list = NoteSkipList::new();
     let notes = &[(1., 2.), (4., 5.), (3., 4.), (2., 3.)]
-        .into_iter()
+        .iter()
         .map(|(start, end)| NoteBox {
             start_beat: *start,
             end_beat: *end,
@@ -276,7 +276,7 @@ fn skiplist_region_iter() {
         (2, (0.0, 0.1)),
         (5, (9.0, 10.0)),
     ];
-    for (i, (line_ix, (start_beat, end_beat))) in notes.into_iter().enumerate() {
+    for (i, (line_ix, (start_beat, end_beat))) in notes.iter().enumerate() {
         lines.insert(
             *line_ix,
             NoteBox {

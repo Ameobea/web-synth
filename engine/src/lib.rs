@@ -62,22 +62,13 @@ extern "C" {
 pub fn handle_mouse_down(mut x: usize, y: usize) {
     let mut drawing_dom_id = None;
     let mut selection_box_dom_id = None;
-    let mut draw_selection_box = || {
-        selection_box_dom_id = Some(render_quad(
-            FG_CANVAS_IX,
-            x as f32,
-            y as f32,
-            0.0,
-            0.0,
-            "selection-box",
-        ));
-    };
 
     // Determine if the requested location intersects an existing note and if not, determine the
     // bounds on the note that will be drawn next.
     let line_ix = match get_line_index(y) {
         Some(line_ix) => line_ix,
         None => {
+            // click must be in the cursor gutter
             if state().shift_pressed {
                 state().selection_box_dom_id = Some(render_quad(
                     FG_CANVAS_IX,
@@ -111,12 +102,19 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
         for note_data in state().selected_notes.drain() {
             deselect_note(note_data.dom_id);
         }
-        draw_selection_box();
+
+        selection_box_dom_id = Some(render_quad(
+            FG_CANVAS_IX,
+            x as f32,
+            y as f32,
+            0.0,
+            0.0,
+            "selection-box",
+        ));
     };
 
     match bounds {
         Bounds::Intersecting(node) => match state().cur_tool {
-            Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DeleteNote => {
                 let &NoteBox {
                     start_beat, dom_id, ..
@@ -124,7 +122,8 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 unimplemented!(); // TODO
                 state().note_lines.remove(line_ix, start_beat);
             }
-            Tool::DrawNote => {
+            Tool::DrawNote if state().shift_pressed => init_selection_box(),
+            Tool::DrawNote if state().control_pressed => {
                 let NoteBox { dom_id, .. } = *node.val_slot_key;
                 let selected_data = SelectedNoteData {
                     line_ix,
@@ -132,32 +131,21 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                     start_beat: node.val_slot_key.start_beat,
                 };
 
-                let select_new = if state().control_pressed {
-                    if state().selected_notes.contains(&selected_data) {
-                        deselect_note(dom_id);
-                        state().selected_notes.remove(&selected_data);
-                        false
-                    } else {
-                        true
-                    }
+                if state().selected_notes.contains(&selected_data) {
+                    state().selected_notes.remove(&selected_data);
+                    deselect_note(dom_id);
                 } else {
-                    let mut select_new: bool = true;
-                    // Deselect all selected notes
-                    for note_data in state().selected_notes.drain() {
-                        deselect_note(note_data.dom_id);
-                        if note_data.dom_id == dom_id {
-                            select_new = false;
-                        }
-                    }
-
-                    select_new
-                };
-
-                if select_new {
                     // Select the clicked note since it wasn't previously selected
                     state().selected_notes.insert(selected_data);
                     select_note(dom_id);
                 }
+            }
+            Tool::DrawNote => {
+                let note = &*node.val_slot_key;
+                state().dragging_note_data = Some((
+                    note.start_beat,
+                    SelectedNoteData::from_note_box(line_ix, note),
+                ))
             }
         },
         Bounds::Bounded(lower, upper) => match state().cur_tool {
@@ -193,6 +181,67 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     state().selection_box_dom_id = selection_box_dom_id;
 }
 
+fn update_selection_box(
+    selection_box_dom_id: usize,
+    last_x: usize,
+    last_y: usize,
+    x: usize,
+    y: usize,
+) {
+    let SelectionBoxData {
+        region:
+            SelectionRegion {
+                x,
+                y,
+                width,
+                height,
+            },
+        retained_region,
+        changed_region_1,
+        changed_region_2,
+    } = SelectionBoxData::compute(
+        x,
+        y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+        last_x,
+        last_y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+    );
+    set_attr(selection_box_dom_id, "x", &x.to_string());
+    set_attr(
+        selection_box_dom_id,
+        "y",
+        &(y + CURSOR_GUTTER_HEIGHT).to_string(),
+    );
+    set_attr(selection_box_dom_id, "width", &width.to_string());
+    set_attr(selection_box_dom_id, "height", &height.to_string());
+
+    // Look for all notes in the added/removed regions and add/remove them from the
+    // selected notes set and select/deselect their UI representations
+    for (was_added, region) in &[
+        (changed_region_1.was_added, changed_region_1.region),
+        (changed_region_2.was_added, changed_region_2.region),
+    ] {
+        for note_data in state().note_lines.iter_region(region) {
+            // Ignore notes that are also contained in the retained region
+            if let Some(retained_region) = retained_region.as_ref() {
+                if note_data.intersects_region(&retained_region) {
+                    continue;
+                }
+            }
+
+            let dom_id = note_data.note_box.dom_id;
+            let selected_note_data: SelectedNoteData = note_data.into();
+            let line_ix = selected_note_data.line_ix;
+            if *was_added && state().selected_notes.insert(selected_note_data) {
+                select_note(dom_id);
+                trigger_attack(midi_to_frequency(line_ix));
+            } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
+                deselect_note(dom_id);
+                trigger_release(midi_to_frequency(line_ix));
+            }
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub fn handle_mouse_move(x: usize, y: usize) {
     let (last_x, last_y) = (state().mouse_x, state().mouse_y);
@@ -202,67 +251,10 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         return;
     }
 
-    let update_selection_box = |selection_box_dom_id: usize, x: usize, y: usize| {
-        let SelectionBoxData {
-            region:
-                SelectionRegion {
-                    x,
-                    y,
-                    width,
-                    height,
-                },
-            retained_region,
-            changed_region_1,
-            changed_region_2,
-        } = SelectionBoxData::compute(
-            x,
-            y.saturating_sub(CURSOR_GUTTER_HEIGHT),
-            last_x,
-            last_y.saturating_sub(CURSOR_GUTTER_HEIGHT),
-        );
-        set_attr(selection_box_dom_id, "x", &x.to_string());
-        set_attr(
-            selection_box_dom_id,
-            "y",
-            &(y + CURSOR_GUTTER_HEIGHT).to_string(),
-        );
-        set_attr(selection_box_dom_id, "width", &width.to_string());
-        set_attr(selection_box_dom_id, "height", &height.to_string());
-
-        // Look for all notes in the added/removed regions and add/remove them from the
-        // selected notes set and select/deselect their UI representations
-        for (was_added, region) in [
-            (changed_region_1.was_added, changed_region_1.region),
-            (changed_region_2.was_added, changed_region_2.region),
-        ]
-        .into_iter()
-        {
-            for note_data in state().note_lines.iter_region(region) {
-                // Ignore notes that are also contained in the retained region
-                if let Some(retained_region) = retained_region.as_ref() {
-                    if note_data.intersects_region(&retained_region) {
-                        continue;
-                    }
-                }
-
-                let dom_id = note_data.note_box.dom_id;
-                let selected_note_data: SelectedNoteData = note_data.into();
-                let line_ix = selected_note_data.line_ix;
-                if *was_added && state().selected_notes.insert(selected_note_data) {
-                    select_note(dom_id);
-                    trigger_attack(midi_to_frequency(line_ix));
-                } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
-                    deselect_note(dom_id);
-                    trigger_release(midi_to_frequency(line_ix));
-                }
-            }
-        }
-    };
-
     if state().cursor_moving {
         state().mouse_y = 1;
         if let Some(selection_box_dom_id) = state().selection_box_dom_id {
-            update_selection_box(selection_box_dom_id, x, 1);
+            update_selection_box(selection_box_dom_id, last_x, last_y, x, 1);
         } else {
             set_cursor_pos(x);
         }
@@ -272,7 +264,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
     match state().cur_tool {
         Tool::DrawNote if state().shift_pressed => {
             if let Some(selection_box_dom_id) = state().selection_box_dom_id {
-                update_selection_box(selection_box_dom_id, x, y);
+                update_selection_box(selection_box_dom_id, last_x, last_y, x, y);
             }
         }
         Tool::DrawNote => {
@@ -280,6 +272,72 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                 let NoteBoxData { x, width } = NoteBoxData::compute(x);
                 set_attr(dom_id, "x", &x.to_string());
                 set_attr(dom_id, "width", &width.to_string());
+            } else if let Some((first_dragging_note_start_beat, ref mut dragging_note)) =
+                state().dragging_note_data
+            {
+                // Figure out if we've moved far enough to warrant a move
+                let original_line_ix = dragging_note.line_ix;
+                let new_line_ix = get_line_index(y).unwrap();
+
+                let horizontal_movement_diff_px = x as f32 - state().mouse_down_x as f32;
+                let horizontal_movement_diff_beats = px_to_beat(horizontal_movement_diff_px);
+                let horizontal_movement_intervals =
+                    (horizontal_movement_diff_beats / NOTE_SNAP_BEAT_INTERVAL).round();
+                let original_start_beat = dragging_note.start_beat;
+                let new_start_beat = first_dragging_note_start_beat
+                    + (horizontal_movement_intervals * NOTE_SNAP_BEAT_INTERVAL);
+
+                if original_line_ix == new_line_ix && original_start_beat == new_start_beat {
+                    return;
+                }
+
+                // Go with the simple solution: remove from the source line, try to add to the
+                // destination line, re-insert in source line if it's blocked.
+                let original_note = state()
+                    .note_lines
+                    .remove(original_line_ix, dragging_note.start_beat)
+                    .unwrap();
+                let note_width = original_note.width();
+                let mut note = original_note;
+
+                let mut try_insert = |line_ix: usize, start_beat: f32| -> bool {
+                    note.start_beat = start_beat;
+                    note.end_beat = start_beat + note_width;
+                    let insertion_error = state().note_lines.insert(line_ix, note);
+                    if !insertion_error {
+                        dragging_note.start_beat = start_beat;
+                        dragging_note.line_ix = line_ix;
+                    }
+                    insertion_error
+                };
+
+                let insertion_succeeded = !try_insert(new_line_ix, new_start_beat)
+                    || (new_start_beat != original_start_beat
+                        && !try_insert(original_line_ix, new_start_beat))
+                    || (new_line_ix != original_line_ix
+                        && !try_insert(new_line_ix, original_start_beat));
+                if !insertion_succeeded {
+                    let reinsertion_error =
+                        state().note_lines.insert(original_line_ix, original_note);
+                    debug_assert!(!reinsertion_error);
+                    return;
+                }
+
+                if dragging_note.start_beat != original_start_beat {
+                    set_attr(
+                        dragging_note.dom_id,
+                        "x",
+                        &(beats_to_px(dragging_note.start_beat) as usize).to_string(),
+                    );
+                }
+                if dragging_note.line_ix != original_line_ix {
+                    set_attr(
+                        dragging_note.dom_id,
+                        "y",
+                        &((dragging_note.line_ix * PADDED_LINE_HEIGHT + CURSOR_GUTTER_HEIGHT)
+                            .to_string()),
+                    )
+                }
             }
         }
         _ => (),

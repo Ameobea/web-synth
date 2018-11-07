@@ -37,6 +37,8 @@ pub struct State {
     pub mouse_down_x: usize,
     pub mouse_down_y: usize,
     pub drawing_note_dom_id: Option<usize>,
+    /// (original_dragging_note_start_beat, SelectedNoteData)
+    pub dragging_note_data: Option<(f32, SelectedNoteData)>,
     pub selection_box_dom_id: Option<usize>,
     pub notes: Slab<NoteBox>,
     pub nodes: Slab<NoteSkipListNode>,
@@ -61,6 +63,7 @@ impl Default for State {
             mouse_down_x: 0,
             mouse_down_y: 0,
             drawing_note_dom_id: None,
+            dragging_note_data: None,
             selection_box_dom_id: None,
             notes: Slab::new(),
             nodes: Slab::new(),
@@ -122,6 +125,16 @@ impl PartialOrd for SelectedNoteData {
 impl Ord for SelectedNoteData {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(&other).unwrap()
+    }
+}
+
+impl SelectedNoteData {
+    pub fn from_note_box(line_ix: usize, note_box: &NoteBox) -> Self {
+        SelectedNoteData {
+            line_ix,
+            dom_id: note_box.dom_id,
+            start_beat: note_box.start_beat,
+        }
     }
 }
 
