@@ -100,9 +100,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     }
 
     let mut init_selection_box = || {
-        for note_data in state().selected_notes.drain() {
-            deselect_note(note_data.dom_id);
-        }
+        deselect_all_notes();
 
         selection_box_dom_id = Some(render_quad(
             FG_CANVAS_IX,
@@ -144,10 +142,11 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
             }
             Tool::DrawNote => {
                 let note = &*node.val_slot_key;
-                dragging_note_data = Some((
-                    note.start_beat,
-                    SelectedNoteData::from_note_box(line_ix, note),
-                ))
+                let note_data = SelectedNoteData::from_note_box(line_ix, note);
+                dragging_note_data = Some((note.start_beat, note_data));
+                deselect_all_notes();
+                state().selected_notes.insert(note_data);
+                select_note(note.dom_id);
             }
         },
         Bounds::Bounded(lower, upper) => match state().cur_tool {
@@ -410,9 +409,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     common::log(format!("{:?}", state().note_lines.lines[line_ix]));
                 }
 
-                for note_data in state().selected_notes.drain() {
-                    deselect_note(note_data.dom_id);
-                }
+                deselect_all_notes();
                 state().selected_notes.insert(SelectedNoteData {
                     line_ix,
                     dom_id: note_dom_id,

@@ -44,3 +44,9 @@ pub fn px_to_beat(px: f32) -> f32 {
 pub fn beats_to_px(beats: f32) -> f32 {
     beats * BEAT_LENGTH_PX
 }
+
+pub fn deselect_all_notes() {
+    for note_data in state().selected_notes.drain() {
+        deselect_note(note_data.dom_id);
+    }
+}
