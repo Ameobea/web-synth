@@ -521,6 +521,7 @@ impl<'a> Into<SelectedNoteData> for NoteData<'a> {
             line_ix: self.line_ix,
             dom_id: self.note_box.dom_id,
             start_beat: self.note_box.start_beat,
+            width: self.note_box.width(),
         }
     }
 }

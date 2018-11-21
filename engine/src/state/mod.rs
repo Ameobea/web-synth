@@ -52,7 +52,7 @@ pub struct State {
     pub shift_pressed: bool,
     pub mouse_x: usize,
     pub mouse_y: usize,
-    pub cursor_pos: f32,
+    pub cursor_pos_beats: f32,
     pub cursor_dom_id: usize,
 }
 
@@ -77,7 +77,7 @@ impl Default for State {
             shift_pressed: false,
             mouse_x: 0,
             mouse_y: 0,
-            cursor_pos: 0.0,
+            cursor_pos_beats: 0.0,
             cursor_dom_id: 0,
         }
     }
@@ -93,6 +93,7 @@ pub struct SelectedNoteData {
     pub line_ix: usize,
     pub dom_id: usize,
     pub start_beat: f32,
+    pub width: f32,
 }
 
 impl PartialEq for SelectedNoteData {
@@ -127,6 +128,7 @@ impl SelectedNoteData {
             line_ix,
             dom_id: note_box.dom_id,
             start_beat: note_box.start_beat,
+            width: note_box.width(),
         }
     }
 }
@@ -137,6 +139,18 @@ pub enum Tool {
     DrawNote,
     /// Any note clicked on will be deleted
     DeleteNote,
+}
+
+pub fn get_sorted_selected_notes(sort_reverse: bool) -> Vec<&'static SelectedNoteData> {
+    let mut notes: Vec<&SelectedNoteData> = state().selected_notes.iter().collect::<Vec<_>>();
+
+    if sort_reverse {
+        notes.sort_unstable_by(|a, b| b.cmp(a));
+    } else {
+        notes.sort_unstable();
+    }
+
+    notes
 }
 
 pub unsafe fn init_state() {

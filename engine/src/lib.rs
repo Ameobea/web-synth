@@ -11,6 +11,7 @@ extern crate wasm_bindgen;
 
 use std::f32;
 
+use fnv::FnvHashSet;
 use wasm_bindgen::prelude::*;
 
 pub mod note_box;
@@ -78,7 +79,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 state().selection_box_dom_id = None;
             }
 
-            let x = set_cursor_pos(x) as usize;
+            let x = set_cursor_pos(px_to_beat(x as f32)) as usize;
             state().cursor_moving = true;
             state().mouse_down = true;
             state().mouse_down_x = x;
@@ -119,11 +120,14 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
             },
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote if state().control_pressed => {
-                let NoteBox { dom_id, .. } = *node.val_slot_key;
+                let NoteBox {
+                    dom_id, start_beat, ..
+                } = *node.val_slot_key;
                 let selected_data = SelectedNoteData {
                     line_ix,
                     dom_id,
-                    start_beat: node.val_slot_key.start_beat,
+                    start_beat,
+                    width: node.val_slot_key.width(),
                 };
 
                 if state().selected_notes.contains(&selected_data) {
@@ -155,14 +159,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 state().cur_note_bounds = (lower, upper);
 
                 // Draw the temporary/candidate note after storing its bounds
-                drawing_dom_id = Some(render_quad(
-                    FG_CANVAS_IX,
-                    snapped_lower,
-                    (CURSOR_GUTTER_HEIGHT + (line_ix * PADDED_LINE_HEIGHT)) as f32,
-                    width,
-                    LINE_HEIGHT as f32,
-                    "note",
-                ));
+                drawing_dom_id = Some(draw_note(line_ix, snapped_lower, width));
                 x = snapped_lower as usize;
             },
             _ => (),
@@ -184,8 +181,7 @@ fn update_selection_box(
     last_y: usize,
     x: usize,
     y: usize,
-)
-{
+) {
     let SelectionBoxData {
         region:
             SelectionRegion {
@@ -254,7 +250,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         if let Some(selection_box_dom_id) = state().selection_box_dom_id {
             update_selection_box(selection_box_dom_id, last_x, last_y, x, 1);
         } else {
-            set_cursor_pos(x);
+            set_cursor_pos(px_to_beat(x as f32));
         }
         return;
     }
@@ -368,7 +364,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
             delete_selection_box(selection_box_dom_id);
         }
 
-        set_cursor_pos(x);
+        set_cursor_pos(px_to_beat(x as f32));
         return;
     }
 
@@ -410,6 +406,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     line_ix,
                     dom_id: note_dom_id,
                     start_beat,
+                    width: note.width(),
                 });
                 select_note(note_dom_id);
             },
@@ -425,6 +422,75 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
 #[wasm_bindgen]
 pub fn handle_mouse_wheel(_ydiff: isize) {}
 
+fn copy_selected_notes() {
+    let (earliest_start_beat, latest_end_beat) = state().selected_notes.iter().fold(
+        (f32::INFINITY, f32::NEG_INFINITY),
+        |(cur_earliest_start, cur_latest_end_beat),
+         SelectedNoteData {
+             start_beat, width, ..
+         }| {
+            (
+                cur_earliest_start.min(*start_beat),
+                cur_latest_end_beat.max(start_beat + width),
+            )
+        },
+    );
+    if earliest_start_beat == f32::INFINITY {
+        return;
+    }
+
+    let offset_beats = state().cursor_pos_beats - earliest_start_beat;
+    let mut new_selected_notes = FnvHashSet::default();
+    new_selected_notes.reserve(state().selected_notes.len());
+    for SelectedNoteData {
+        start_beat,
+        width,
+        line_ix,
+        dom_id,
+    } in state().selected_notes.iter()
+    {
+        deselect_note(*dom_id);
+        let new_start_beat = start_beat + offset_beats;
+        let new_end_beat = start_beat + width + offset_beats;
+        // try to insert a note `offset_beats` away from the previous note on the same line
+        if let Bounds::Bounded(start_bound, end_bound_opt) = state()
+            .note_lines
+            .get_bounds(*line_ix, new_start_beat + (width / 0.5))
+        {
+            if start_bound > new_start_beat
+                || (end_bound_opt
+                    .map(|end_bound| end_bound < new_end_beat)
+                    .unwrap_or(false))
+            {
+                // unable to place note at this position
+                continue;
+            }
+        }
+        let dom_id = draw_note(*line_ix, beats_to_px(new_start_beat), beats_to_px(*width));
+        let new_note = NoteBox {
+            start_beat: start_beat + offset_beats,
+            end_beat: start_beat + width + offset_beats,
+            dom_id,
+        };
+        let insertion_failed = state().note_lines.insert(*line_ix, new_note);
+        debug_assert!(!insertion_failed);
+        select_note(dom_id);
+        new_selected_notes.insert(SelectedNoteData::from_note_box(*line_ix, &new_note));
+    }
+
+    // deselect the old notes and select the new ones
+    state().selected_notes = new_selected_notes;
+
+    // move the cursor forward
+    let clipboard_end_beat = tern(
+        state().cursor_pos_beats < latest_end_beat,
+        latest_end_beat,
+        earliest_start_beat + offset_beats.abs(),
+    );
+    let clipboard_width_beats = clipboard_end_beat - earliest_start_beat;
+    set_cursor_pos(state().cursor_pos_beats + clipboard_width_beats);
+}
+
 #[wasm_bindgen]
 pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
@@ -435,20 +501,8 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         (false, false) => (1, 1.0),
     };
 
-    fn get_sorted_notes(sort_reverse: bool) -> Vec<&'static SelectedNoteData> {
-        let mut notes: Vec<&SelectedNoteData> = state().selected_notes.iter().collect::<Vec<_>>();
-
-        if sort_reverse {
-            notes.sort_unstable_by(|a, b| b.cmp(a));
-        } else {
-            notes.sort_unstable();
-        }
-
-        notes
-    }
-
     let move_notes_vertical = |up: bool| {
-        let notes = get_sorted_notes(!up);
+        let notes = get_sorted_selected_notes(!up);
         let mut notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
 
         let move_note_vertical = |mut note_data: SelectedNoteData| -> SelectedNoteData {
@@ -508,7 +562,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
             note_data
         };
 
-        state().selected_notes = get_sorted_notes(right)
+        state().selected_notes = get_sorted_selected_notes(right)
             .into_iter()
             .cloned()
             .map(move_note_horizontal)
@@ -536,6 +590,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         "ArrowDown" | "s" => move_notes_vertical(false),
         "ArrowRight" | "d" => move_selected_notes_horizontal(true),
         "ArrowLeft" | "a" => move_selected_notes_horizontal(false),
+        "p" => copy_selected_notes(),
         _ => (),
     }
 }
