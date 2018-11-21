@@ -1,4 +1,4 @@
-#![feature(box_syntax, test, slice_patterns, thread_local)]
+#![feature(box_syntax, test, slice_patterns, thread_local, core_intrinsics)]
 #![allow(clippy::float_cmp)]
 
 extern crate common;
@@ -19,6 +19,7 @@ pub mod render;
 pub mod selection_box;
 pub mod skip_list;
 pub mod state;
+pub mod synth;
 pub mod util;
 use self::{note_box::*, render::*, selection_box::*, skip_list::*, state::*, util::*};
 
