@@ -114,19 +114,6 @@ const deleteAllChildren = (node: HTMLElement) => {
   }
 };
 
-export const trigger_attack = (note: number) => synth.triggerAttack(note);
-export const trigger_attacks = (notes: Float32Array[]) => synth.triggerAttack(Array.from(notes));
-export const trigger_release = (note: number) => synth.triggerRelease(note);
-export const trigger_releases = (notes: Float32Array[]) => synth.triggerRelease(Array.from(notes));
-export const trigger_attack_release = (note: number, durationMs: number) => {
-  synth.triggerAttack(note);
-  setTimeout(() => synth.triggerRelease(note), durationMs);
-};
-export const trigger_attack_release_multiple = (notes: Float32Array[], durationMs: number) => {
-  synth.triggerAttack(Array.from(notes));
-  setTimeout(() => synth.triggerRelease(Array.from(notes)), durationMs);
-};
-
 wasm.then(engine => {
   engine.init();
 

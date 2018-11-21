@@ -9,7 +9,7 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
 
-use super::{note_box::NoteBox, skip_list::*};
+use super::{note_box::NoteBox, skip_list::*, synth::*};
 
 /// Height of one of the lines rendered in the grid
 pub const LINE_HEIGHT: usize = 12;
@@ -54,6 +54,7 @@ pub struct State {
     pub mouse_y: usize,
     pub cursor_pos_beats: f32,
     pub cursor_dom_id: usize,
+    pub synth: PolySynth,
 }
 
 impl Default for State {
@@ -79,6 +80,7 @@ impl Default for State {
             mouse_y: 0,
             cursor_pos_beats: 0.0,
             cursor_dom_id: 0,
+            synth: PolySynth::new(),
         }
     }
 }

@@ -49,10 +49,6 @@ extern "C" {
     pub fn add_class(id: usize, className: &str);
     pub fn remove_class(id: usize, className: &str);
     pub fn delete_element(id: usize);
-    pub fn trigger_attack(note: f32);
-    pub fn trigger_release(note: f32);
-    pub fn trigger_attack_release(note: f32, duration: f32);
-    pub fn trigger_attack_release_multiple(notes: &[f32], duration: f32);
 }
 
 #[wasm_bindgen]
@@ -93,7 +89,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     let bounds = state().note_lines.get_bounds(line_ix, beat);
 
     if state().cur_tool == Tool::DrawNote && !state().shift_pressed {
-        trigger_attack(midi_to_frequency(line_ix));
+        state().synth.trigger_attack(midi_to_frequency(line_ix));
     }
 
     let mut init_selection_box = || {
@@ -228,10 +224,10 @@ fn update_selection_box(
             let line_ix = selected_note_data.line_ix;
             if *was_added && state().selected_notes.insert(selected_note_data) {
                 select_note(dom_id);
-                trigger_attack(midi_to_frequency(line_ix));
+                state().synth.trigger_attack(midi_to_frequency(line_ix));
             } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
                 deselect_note(dom_id);
-                trigger_release(midi_to_frequency(line_ix));
+                state().synth.trigger_release(midi_to_frequency(line_ix));
             }
         }
     }
@@ -335,8 +331,12 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                         &((dragging_note.line_ix * PADDED_LINE_HEIGHT + CURSOR_GUTTER_HEIGHT)
                             .to_string()),
                     );
-                    trigger_release(midi_to_frequency(original_line_ix));
-                    trigger_attack(midi_to_frequency(dragging_note.line_ix));
+                    state()
+                        .synth
+                        .trigger_release(midi_to_frequency(original_line_ix));
+                    state()
+                        .synth
+                        .trigger_attack(midi_to_frequency(dragging_note.line_ix));
                 }
             }
         },
@@ -356,7 +356,9 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
         delete_element(selection_box_dom_id);
 
         for note_data in state().selected_notes.iter() {
-            trigger_release(midi_to_frequency(note_data.line_ix));
+            state()
+                .synth
+                .trigger_release(midi_to_frequency(note_data.line_ix));
         }
     };
 
@@ -374,9 +376,13 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
     if let Some(selection_box_dom_id) = state().selection_box_dom_id {
         delete_selection_box(selection_box_dom_id);
     } else if let Some((_, dragging_note_data)) = state().dragging_note_data {
-        trigger_release(midi_to_frequency(dragging_note_data.line_ix));
+        state()
+            .synth
+            .trigger_release(midi_to_frequency(dragging_note_data.line_ix));
     } else {
-        trigger_release(midi_to_frequency(down_line_ix));
+        state()
+            .synth
+            .trigger_release(midi_to_frequency(down_line_ix));
     }
 
     if state().cur_tool == Tool::DrawNote {
@@ -541,7 +547,8 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         };
 
         state().selected_notes = notes.into_iter().cloned().map(move_note_vertical).collect();
-        trigger_attack_release_multiple(&notes_to_play, 0.0);
+        state().synth.trigger_attacks(&notes_to_play);
+        state().synth.trigger_releases(&notes_to_play);
     };
 
     let move_selected_notes_horizontal = |right: bool| {

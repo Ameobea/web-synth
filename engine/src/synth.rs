@@ -3,15 +3,25 @@
 
 use std::{intrinsics::likely, mem, ptr};
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(module = "./synth")]
+extern "C" {
+    /// Initializes a synth on the JavaScript side, returning its index in the gloabl synth array.
+    pub fn init_synth(voice_count: usize) -> usize;
+    pub fn trigger_attack(synth_ix: usize, voice_ix: usize, frequency: f32);
+    pub fn trigger_release(synth_ix: usize, voice_ix: usize);
+}
+
 pub const POLY_SYNTH_VOICE_COUNT: usize = 64;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum VoicePlayingStatus {
     Tacent,
     Playing(f32),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Voice {
     pub playing: VoicePlayingStatus,
     /// Index mapping this voice to its position in the array of voices on the JavaScript/WebAudio
@@ -29,14 +39,6 @@ impl Voice {
     }
 }
 
-pub fn trigger_wa_attack(synth_id: usize, voice_ix: usize, frequency: f32) {
-    unimplemented!(); // TODO
-}
-
-pub fn trigger_wa_release(synth_id: usize, voice_ix: usize) {
-    unimplemented!(); // TODO
-}
-
 pub struct PolySynth {
     /// ID mapping this struct to the set of WebAudio voices on the JavaScript side
     id: usize,
@@ -48,12 +50,13 @@ pub struct PolySynth {
 }
 
 impl PolySynth {
-    pub fn new(id: usize) -> Self {
+    pub fn new() -> Self {
         let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] = unsafe { mem::uninitialized() };
         let voices_ptr = &mut voices as *mut _ as *mut Voice;
         for i in 0..POLY_SYNTH_VOICE_COUNT {
             unsafe { ptr::write(voices_ptr.add(i), Voice::new(i)) };
         }
+        let id = init_synth(POLY_SYNTH_VOICE_COUNT);
 
         PolySynth {
             id,
@@ -67,7 +70,7 @@ impl PolySynth {
     /// frequency.
     pub fn trigger_attack(&mut self, frequency: f32) {
         self.voices[self.idle_voice_ix].playing = VoicePlayingStatus::Playing(frequency);
-        trigger_wa_attack(self.id, self.voices[self.idle_voice_ix].src_ix, frequency);
+        trigger_attack(self.id, self.voices[self.idle_voice_ix].src_ix, frequency);
 
         if self.idle_voice_ix == (POLY_SYNTH_VOICE_COUNT - 1) {
             self.idle_voice_ix = 0;
@@ -91,9 +94,15 @@ impl PolySynth {
             .position(|voice| voice.playing == VoicePlayingStatus::Playing(frequency))
         {
             Some(pos) => pos,
-            None => return,
+            None => {
+                common::warn(format!(
+                    "Attempted to release frequency {} but it isn't being played.",
+                    frequency
+                ));
+                return;
+            },
         };
-        trigger_wa_release(self.id, self.voices[target_voice_ix].src_ix);
+        trigger_release(self.id, self.voices[target_voice_ix].src_ix);
 
         if unsafe { likely(self.voices[self.idle_voice_ix].playing == VoicePlayingStatus::Tacent) }
         {
@@ -104,9 +113,8 @@ impl PolySynth {
             // All synth slots were currently full, so move our idle pointer to the end.
             self.idle_voice_ix = POLY_SYNTH_VOICE_COUNT - 1;
         }
-        self.voices[target_voice_ix] = self.voices[self.idle_voice_ix];
+        self.voices.swap(target_voice_ix, self.idle_voice_ix);
         self.voices[self.idle_voice_ix].playing = VoicePlayingStatus::Tacent;
-        unimplemented!();
     }
 
     #[inline]
