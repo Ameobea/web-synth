@@ -1,14 +1,10 @@
 use super::*;
 
 #[inline(always)]
-pub fn select_note(dom_id: usize) {
-    add_class(dom_id, "selected");
-}
+pub fn select_note(dom_id: usize) { add_class(dom_id, "selected"); }
 
 #[inline(always)]
-pub fn deselect_note(dom_id: usize) {
-    remove_class(dom_id, "selected");
-}
+pub fn deselect_note(dom_id: usize) { remove_class(dom_id, "selected"); }
 
 pub fn set_cursor_pos(x: usize) -> f32 {
     state().cursor_pos = px_to_beat(x as f32);

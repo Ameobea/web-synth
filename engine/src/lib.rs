@@ -19,12 +19,7 @@ pub mod selection_box;
 pub mod skip_list;
 pub mod state;
 pub mod util;
-use self::note_box::*;
-use self::render::*;
-use self::selection_box::*;
-use self::skip_list::*;
-use self::state::*;
-use self::util::*;
+use self::{note_box::*, render::*, selection_box::*, skip_list::*, state::*, util::*};
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -90,7 +85,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
             state().mouse_down_y = GRID_HEIGHT - 2;
 
             return;
-        }
+        },
     };
     let beat = px_to_beat(x as f32);
     let bounds = state().note_lines.get_bounds(line_ix, beat);
@@ -121,7 +116,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 deselect_note(dom_id);
                 delete_element(dom_id);
                 state().note_lines.remove(line_ix, start_beat);
-            }
+            },
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote if state().control_pressed => {
                 let NoteBox { dom_id, .. } = *node.val_slot_key;
@@ -139,7 +134,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                     state().selected_notes.insert(selected_data);
                     select_note(dom_id);
                 }
-            }
+            },
             Tool::DrawNote => {
                 let note = &*node.val_slot_key;
                 let note_data = SelectedNoteData::from_note_box(line_ix, note);
@@ -147,10 +142,10 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 deselect_all_notes();
                 state().selected_notes.insert(note_data);
                 select_note(note.dom_id);
-            }
+            },
         },
         Bounds::Bounded(lower, upper) => match state().cur_tool {
-            Tool::DrawNote if state().control_pressed => {} // TODO
+            Tool::DrawNote if state().control_pressed => {}, // TODO
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote => {
                 let snapped_lower = snap_to_beat_interval(x, beats_to_px(lower));
@@ -169,7 +164,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                     "note",
                 ));
                 x = snapped_lower as usize;
-            }
+            },
             _ => (),
         },
     };
@@ -189,7 +184,8 @@ fn update_selection_box(
     last_y: usize,
     x: usize,
     y: usize,
-) {
+)
+{
     let SelectionBoxData {
         region:
             SelectionRegion {
@@ -268,7 +264,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
             if let Some(selection_box_dom_id) = state().selection_box_dom_id {
                 update_selection_box(selection_box_dom_id, last_x, last_y, x, y);
             }
-        }
+        },
         Tool::DrawNote => {
             if let Some(dom_id) = state().drawing_note_dom_id {
                 let NoteBoxData { x, width } = NoteBoxData::compute(x);
@@ -346,7 +342,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                     trigger_attack(midi_to_frequency(dragging_note.line_ix));
                 }
             }
-        }
+        },
         _ => (),
     }
 }
@@ -416,7 +412,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     start_beat,
                 });
                 select_note(note_dom_id);
-            }
+            },
             (None, Some(_)) => (),
             (Some(_), Some(_)) => common::error(
                 "Both `note_dom_id` and `selection_box_dom_id` exist in `MOUSE_DOWN_DATA`!",
@@ -524,7 +520,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
 
     match key {
         // Delete all currently selected notes
-        "Backspace" | "Delete" => {
+        "Backspace" | "Delete" =>
             for note_data in state().selected_notes.drain() {
                 let removed_note = state()
                     .note_lines
@@ -535,8 +531,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
                 if cfg!(debug_assertions) {
                     common::log(format!("{:?}", state().note_lines.lines[note_data.line_ix]));
                 }
-            }
-        }
+            },
         "ArrowUp" | "w" => move_notes_vertical(true),
         "ArrowDown" | "s" => move_notes_vertical(false),
         "ArrowRight" | "d" => move_selected_notes_horizontal(true),

@@ -10,13 +10,11 @@ pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
 }
 
 #[inline(always)]
-pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
-    val.max(min).min(max)
-}
+pub fn clamp(val: f32, min: f32, max: f32) -> f32 { val.max(min).min(max) }
 
 #[inline(always)]
 pub fn midi_to_frequency(line_ix: usize) -> f32 {
-    27.5 * (2.0f32).powf((line_ix as f32) / 12.0)
+    27.5 * (2.0f32).powf(((LINE_COUNT - line_ix) as f32) / 12.0)
 }
 
 #[inline(always)]
@@ -36,14 +34,10 @@ pub fn get_line_index(y: usize) -> Option<usize> {
 }
 
 #[inline(always)]
-pub fn px_to_beat(px: f32) -> f32 {
-    px / BEAT_LENGTH_PX
-}
+pub fn px_to_beat(px: f32) -> f32 { px / BEAT_LENGTH_PX }
 
 #[inline(always)]
-pub fn beats_to_px(beats: f32) -> f32 {
-    beats * BEAT_LENGTH_PX
-}
+pub fn beats_to_px(beats: f32) -> f32 { beats * BEAT_LENGTH_PX }
 
 pub fn deselect_all_notes() {
     for note_data in state().selected_notes.drain() {

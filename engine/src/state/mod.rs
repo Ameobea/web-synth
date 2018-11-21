@@ -1,15 +1,15 @@
-use std::cmp::Ordering;
-use std::hash::{Hash, Hasher};
-use std::mem;
-use std::ptr;
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    mem, ptr,
+};
 
 use fnv::FnvHashSet;
 use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
 
-use super::note_box::NoteBox;
-use super::skip_list::*;
+use super::{note_box::NoteBox, skip_list::*};
 
 /// Height of one of the lines rendered in the grid
 pub const LINE_HEIGHT: usize = 12;
@@ -86,9 +86,7 @@ impl Default for State {
 #[thread_local]
 pub static mut STATE: *mut State = ptr::null_mut();
 
-pub fn state() -> &'static mut State {
-    unsafe { &mut *STATE }
-}
+pub fn state() -> &'static mut State { unsafe { &mut *STATE } }
 
 #[derive(Clone, Copy, Debug)]
 pub struct SelectedNoteData {
@@ -98,18 +96,14 @@ pub struct SelectedNoteData {
 }
 
 impl PartialEq for SelectedNoteData {
-    fn eq(&self, other: &Self) -> bool {
-        self.dom_id == other.dom_id
-    }
+    fn eq(&self, other: &Self) -> bool { self.dom_id == other.dom_id }
 }
 
 impl Eq for SelectedNoteData {}
 
 // Since `dom_id` is guarenteed to be unique, we can skip hashing the `line_ix` as an optimization.
 impl Hash for SelectedNoteData {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.dom_id.hash(state)
-    }
+    fn hash<H: Hasher>(&self, state: &mut H) { self.dom_id.hash(state) }
 }
 
 impl PartialOrd for SelectedNoteData {
@@ -124,9 +118,7 @@ impl PartialOrd for SelectedNoteData {
 }
 
 impl Ord for SelectedNoteData {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(&other).unwrap()
-    }
+    fn cmp(&self, other: &Self) -> Ordering { self.partial_cmp(&other).unwrap() }
 }
 
 impl SelectedNoteData {

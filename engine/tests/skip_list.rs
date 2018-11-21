@@ -5,28 +5,22 @@ extern crate rand;
 extern crate rand_pcg;
 extern crate test;
 
-use std::mem;
-use std::num::NonZeroU32;
+use std::{mem, num::NonZeroU32};
 
-use engine::note_box::NoteBox;
-use engine::selection_box::SelectionRegion;
-use engine::skip_list::*;
-use engine::state::*;
-use engine::util::beats_to_px;
+use engine::{
+    note_box::NoteBox, selection_box::SelectionRegion, skip_list::*, state::*, util::beats_to_px,
+};
 use rand::prelude::*;
 
 fn mklines(notes: &[(f32, f32)]) -> NoteLines {
     unsafe { init_state() };
     let mut lines = NoteLines::new(1);
     let mut mkbox = |start_beat: f32, end_beat: f32| {
-        lines.insert(
-            0,
-            NoteBox {
-                start_beat,
-                end_beat,
-                dom_id: 0,
-            },
-        )
+        lines.insert(0, NoteBox {
+            start_beat,
+            end_beat,
+            dom_id: 0,
+        })
     };
 
     for (start_beat, end_beat) in notes {
@@ -223,32 +217,28 @@ fn skiplist_debug_fmt() {
     };
 
     let node_4_5 = mknode(*note_4_5, [None, None, None, None, None]);
-    let node_3_4 = mknode(
-        *note_3_4,
-        [
-            Some(node_4_5.clone()),
-            Some(node_4_5.clone()),
-            None,
-            None,
-            None,
-        ],
-    );
+    let node_3_4 = mknode(*note_3_4, [
+        Some(node_4_5.clone()),
+        Some(node_4_5.clone()),
+        None,
+        None,
+        None,
+    ]);
     let node_2_3 = mknode(*note_2_3, [Some(node_3_4.clone()), None, None, None, None]);
-    let head = mknode(
-        *note_1_2,
-        [
-            Some(node_2_3.clone()),
-            Some(node_3_4.clone()),
-            Some(node_4_5.clone()),
-            Some(node_4_5.clone()),
-            None,
-        ],
-    );
+    let head = mknode(*note_1_2, [
+        Some(node_2_3.clone()),
+        Some(node_3_4.clone()),
+        Some(node_4_5.clone()),
+        Some(node_4_5.clone()),
+        None,
+    ]);
     println!("head: \n{:?}", *head);
 
     // state().nodes are pre-linked, so all we have to do is insert the head.
     skip_list.head_key = Some(head);
-    let expected = "|1, 2|------------------------->x\n|1, 2|----------------->|4, 5|->x\n|1, 2|----------------->|4, 5|->x\n|1, 2|--------->|3, 4|->|4, 5|->x\n|1, 2|->|2, 3|->|3, 4|->|4, 5|->x";
+    let expected = "|1, 2|------------------------->x\n|1, 2|----------------->|4, 5|->x\n|1, \
+                    2|----------------->|4, 5|->x\n|1, 2|--------->|3, 4|->|4, 5|->x\n|1, 2|->|2, \
+                    3|->|3, 4|->|4, 5|->x";
     let actual = format!("{:?}", skip_list);
     println!("\nEXPECTED:\n{}", expected);
     println!("\nACTUAL:\n{}", actual);
@@ -277,14 +267,11 @@ fn skiplist_region_iter() {
         (5, (9.0, 10.0)),
     ];
     for (i, (line_ix, (start_beat, end_beat))) in notes.iter().enumerate() {
-        lines.insert(
-            *line_ix,
-            NoteBox {
-                dom_id: i,
-                start_beat: *start_beat,
-                end_beat: *end_beat,
-            },
-        );
+        lines.insert(*line_ix, NoteBox {
+            dom_id: i,
+            start_beat: *start_beat,
+            end_beat: *end_beat,
+        });
     }
 
     type Note = (usize, (f32, f32));

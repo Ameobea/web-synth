@@ -1,5 +1,7 @@
-use std::cmp::Ordering;
-use std::fmt::{self, Debug, Formatter};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Debug, Formatter},
+};
 
 use super::*;
 
@@ -46,9 +48,7 @@ impl Ord for NoteBox {
 
 impl NoteBox {
     #[inline(always)]
-    pub fn contains(&self, beat: f32) -> bool {
-        self.start_beat <= beat && self.end_beat >= beat
-    }
+    pub fn contains(&self, beat: f32) -> bool { self.start_beat <= beat && self.end_beat >= beat }
 
     /// Same as `NoteBox::contains` except edges exactly touching don't count.
     pub fn contains_exclusive(&self, beat: f32) -> bool {
@@ -74,9 +74,7 @@ impl NoteBox {
     }
 
     #[inline(always)]
-    pub fn width(&self) -> f32 {
-        self.end_beat - self.start_beat
-    }
+    pub fn width(&self) -> f32 { self.end_beat - self.start_beat }
 }
 
 pub struct NoteBoxData {
