@@ -16,7 +16,6 @@ pub struct ChangedRegion {
     pub region: SelectionRegion,
 }
 
-#[inline(always)]
 fn min_max(n1: usize, n2: usize) -> (usize, usize) {
     if n2 < n1 {
         (n2, n1)

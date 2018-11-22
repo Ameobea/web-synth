@@ -1,9 +1,7 @@
 use super::*;
 
-#[inline(always)]
 pub fn select_note(dom_id: usize) { add_class(dom_id, "selected"); }
 
-#[inline(always)]
 pub fn deselect_note(dom_id: usize) { remove_class(dom_id, "selected"); }
 
 pub fn set_cursor_pos(x_beats: f32) -> f32 {
@@ -53,7 +51,6 @@ pub fn draw_measure_lines() {
     }
 }
 
-#[inline(always)]
 pub fn draw_cursor_gutter() {
     render_quad(
         FG_CANVAS_IX,
@@ -66,7 +63,7 @@ pub fn draw_cursor_gutter() {
 }
 
 /// Draws a note on the canvas and returns its DOM id.
-#[inline(always)]
+
 pub fn draw_note(line_ix: usize, start_px: f32, width_px: f32) -> usize {
     render_quad(
         FG_CANVAS_IX,
@@ -78,7 +75,6 @@ pub fn draw_note(line_ix: usize, start_px: f32, width_px: f32) -> usize {
     )
 }
 
-#[inline(always)]
 pub fn draw_cursor() -> usize {
     render_line(
         FG_CANVAS_IX,

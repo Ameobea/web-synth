@@ -318,11 +318,120 @@ impl Bounds {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct NoteEvent {
+    pub line_ix: usize,
+    pub is_start: bool,
+    pub beat: f32,
+}
+
+pub struct NoteEventIterator<'a> {
+    pub cur_beat: f32,
+    pub last_consumed_start_line: usize,
+    pub last_consumed_end_line: usize,
+    /// Set to true if all notes ending on `cur_beat` have been returned as events already
+    pub cur_beat_end_notes_consumed: bool,
+    pub frontier_nodes: [Option<&'a NoteSkipListNode>; LINE_COUNT],
+}
+
+impl<'a> Iterator for NoteEventIterator<'a> {
+    type Item = NoteEvent;
+
+    fn next(&mut self) -> Option<NoteEvent> {
+        let mut min_valid_event: NoteEvent = NoteEvent {
+            line_ix: 0,
+            is_start: true,
+            beat: f32::INFINITY,
+        };
+        // \/ 90% sure this is all a state machine and would be much better represented as such...
+        let mut min_valid_line_ix = 0;
+        for (i, frontier_node_opt) in self.frontier_nodes.iter().enumerate() {
+            if let Some(frontier_node) = frontier_node_opt {
+                let &NoteBox {
+                    start_beat,
+                    end_beat,
+                    ..
+                } = &*frontier_node.val_slot_key;
+
+                if end_beat == self.cur_beat
+                    && (i > self.last_consumed_end_line || self.cur_beat_end_notes_consumed)
+                {
+                    min_valid_line_ix = i;
+                    min_valid_event.beat = end_beat;
+                    min_valid_event.is_start = false;
+                    self.cur_beat_end_notes_consumed = false;
+                    break;
+                } else if start_beat == self.cur_beat
+                    && (i > self.last_consumed_start_line || !self.cur_beat_end_notes_consumed)
+                {
+                    min_valid_line_ix = i;
+                    min_valid_event.beat = start_beat;
+                    min_valid_event.is_start = true;
+                    self.cur_beat_end_notes_consumed = true;
+                } else if start_beat > self.cur_beat && start_beat < min_valid_event.beat {
+                    min_valid_line_ix = i;
+                    min_valid_event.beat = start_beat;
+                    min_valid_event.is_start = true;
+                } else if end_beat > self.cur_beat && end_beat < min_valid_event.beat {
+                    min_valid_line_ix = i;
+                    min_valid_event.beat = end_beat;
+                    min_valid_event.is_start = false;
+                }
+            }
+        }
+
+        if min_valid_event.beat == f32::INFINITY {
+            // we've returned all events
+            None
+        } else {
+            // if we're consuming an end beat, move to the next line for the line we used
+            if !min_valid_event.is_start {
+                self.frontier_nodes[min_valid_line_ix] = self.frontier_nodes[min_valid_line_ix]
+                    .map(|node| node.next_node())
+                    .unwrap();
+                self.last_consumed_end_line = min_valid_line_ix;
+            } else {
+                self.last_consumed_start_line = min_valid_line_ix;
+            }
+
+            // set a new min beat based on this event
+            self.cur_beat = min_valid_event.beat;
+
+            min_valid_event.line_ix = min_valid_line_ix;
+            Some(min_valid_event)
+        }
+    }
+}
+
+impl<'a> NoteEventIterator<'a> {
+    pub fn new(note_lines: &'a NoteLines, start_beat: f32) -> Self {
+        let frontier_nodes = unsafe {
+            let mut frontier_nodes: [Option<&'a NoteSkipListNode>; LINE_COUNT] =
+                mem::uninitialized();
+            let frontier_nodes_ptr =
+                &mut frontier_nodes as *mut _ as *mut Option<&'a NoteSkipListNode>;
+            for i in 0..LINE_COUNT {
+                ptr::write(
+                    frontier_nodes_ptr.add(i),
+                    note_lines.lines.get_unchecked(i).head(),
+                );
+            }
+            frontier_nodes
+        };
+
+        NoteEventIterator {
+            cur_beat: start_beat,
+            last_consumed_start_line: 0,
+            last_consumed_end_line: 0,
+            cur_beat_end_notes_consumed: true,
+            frontier_nodes,
+        }
+    }
+}
+
 impl NoteSkipListNode {
-    #[inline(always)]
     pub fn contains_beat(&self, beat: f32) -> bool { self.val_slot_key.contains(beat) }
 
-    #[inline(always)]
     pub fn intersects_beats(&self, start_beat: f32, end_beat: f32) -> bool {
         self.val_slot_key.intersects(&NoteBox {
             dom_id: 0,
@@ -370,10 +479,8 @@ impl NoteSkipListNode {
         }
     }
 
-    #[inline(always)]
     pub fn next_node(&self) -> Option<&Self> { self.links[0].as_ref().map(|p| &**p) }
 
-    #[inline(always)]
     pub fn next_node_mut(&mut self) -> Option<&mut Self> {
         self.links[0].as_mut().map(|p| &mut **p)
     }
@@ -557,10 +664,8 @@ fn dealloc_node(node_key: NodeSlabKey) -> NoteBox {
 impl NoteSkipList {
     pub fn new() -> Self { NoteSkipList { head_key: None } }
 
-    #[inline(always)]
     pub fn head(&self) -> Option<&NoteSkipListNode> { self.head_key.as_ref().map(|k| &**k) }
 
-    #[inline(always)]
     pub fn head_mut(&mut self) -> Option<&mut NoteSkipListNode> {
         self.head_key.as_mut().map(|k| &mut **k)
     }
@@ -701,9 +806,13 @@ impl NoteSkipList {
         Some(dealloc_node(removed_node_key))
     }
 
-    pub fn iter(&self) -> NoteSkipListIterator { NoteSkipListIterator(self.head()) }
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = NoteBox> + 'a {
+        NoteSkipListIterator(self.head())
+    }
 
-    pub fn iter_nodes(&self) -> NoteSkipListNodeIterator { NoteSkipListNodeIterator(self.head()) }
+    pub fn iter_nodes<'a>(&'a self) -> impl Iterator<Item = &'a NoteSkipListNode> + 'a {
+        NoteSkipListNodeIterator(self.head())
+    }
 
     fn find_first_node_in_range(
         &self,
@@ -763,7 +872,6 @@ pub struct NoteLines {
 }
 
 impl NoteLines {
-    #[inline(always)]
     pub fn new(lines: usize) -> Self {
         NoteLines {
             lines: vec![NoteSkipList::new(); lines],
@@ -806,12 +914,10 @@ impl NoteLines {
     /// Inserts a node into the skip list at the specified level in order.  Returns `false` if the
     /// node was inserted successfully and `true` if there is an intersecting node blocking it from
     /// being inserted.
-    #[inline(always)]
     pub fn insert(&mut self, line_ix: usize, note: NoteBox) -> bool {
         self.lines[line_ix].insert(note)
     }
 
-    #[inline(always)]
     pub fn remove(&mut self, line_ix: usize, start_beat: f32) -> Option<NoteBox> {
         self.lines[line_ix].remove(start_beat)
     }
@@ -887,7 +993,7 @@ impl NoteLines {
     pub fn iter_region<'a>(
         &'a self,
         region: &'a SelectionRegion,
-    ) -> NoteSkipListRegionIterator<'a> {
+    ) -> impl Iterator<Item = NoteData<'a>> + 'a {
         let start_line_ix = (region.y - (region.y % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT;
         let end_px_ix = region.y + region.height;
         let end_line_ix = ((end_px_ix - (end_px_ix % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT)
@@ -913,7 +1019,6 @@ impl NoteLines {
         iterator
     }
 
-    #[inline(always)]
     pub fn find_first_node_in_range(
         &self,
         line_ix: usize,
@@ -923,12 +1028,18 @@ impl NoteLines {
         self.lines[line_ix].find_first_node_in_range(start_beat, end_beat)
     }
 
-    #[inline(always)]
     pub fn find_first_node_before_beat_mut(
         &mut self,
         line_ix: usize,
         beat: f32,
     ) -> Option<&mut NoteSkipListNode> {
         self.lines[line_ix].find_first_node_before_beat_mut(beat)
+    }
+
+    pub fn iter_events<'a>(
+        &'a self,
+        start_beat: Option<f32>,
+    ) -> impl Iterator<Item = NoteEvent> + 'a {
+        NoteEventIterator::new(self, start_beat.unwrap_or(-1.0))
     }
 }

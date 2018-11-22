@@ -1,4 +1,4 @@
-#![feature(box_syntax, test, slice_patterns, thread_local, core_intrinsics)]
+#![feature(box_syntax, test, slice_patterns, thread_local)]
 #![allow(clippy::float_cmp)]
 
 extern crate common;
@@ -21,7 +21,7 @@ pub mod skip_list;
 pub mod state;
 pub mod synth;
 pub mod util;
-use self::{note_box::*, render::*, selection_box::*, skip_list::*, state::*, util::*};
+use self::{note_box::*, render::*, selection_box::*, skip_list::*, state::*, synth::*, util::*};
 
 #[wasm_bindgen(module = "./index")]
 extern "C" {
@@ -498,6 +498,18 @@ fn copy_selected_notes() {
     set_cursor_pos(state().cursor_pos_beats + clipboard_width_beats);
 }
 
+fn play_selected_notes() {
+    for SelectedNoteData { line_ix, .. } in state().selected_notes.iter() {
+        state().synth.trigger_attack(midi_to_frequency(*line_ix));
+    }
+}
+
+fn release_selected_notes() {
+    for SelectedNoteData { line_ix, .. } in state().selected_notes.iter() {
+        state().synth.trigger_release(midi_to_frequency(*line_ix));
+    }
+}
+
 #[wasm_bindgen]
 pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
@@ -599,15 +611,23 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         "ArrowRight" | "d" => move_selected_notes_horizontal(true),
         "ArrowLeft" | "a" => move_selected_notes_horizontal(false),
         "p" => copy_selected_notes(),
+        "z" | "x" => play_selected_notes(),
+        " " => start_playback(),
         _ => (),
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
 #[wasm_bindgen]
-pub fn handle_key_up(_key: &str, control_pressed: bool, shift_pressed: bool) {
+pub fn handle_key_up(key: &str, control_pressed: bool, shift_pressed: bool) {
     state().control_pressed = control_pressed;
     state().shift_pressed = shift_pressed;
+
+    match key {
+        "z" | "x" => release_selected_notes(),
+        " " => stop_playback(),
+        _ => (),
+    }
 }
 
 #[wasm_bindgen]

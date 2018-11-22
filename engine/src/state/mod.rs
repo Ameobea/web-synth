@@ -30,6 +30,7 @@ pub const FG_CANVAS_IX: usize = 1;
 pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 1.0;
 pub const CURSOR_GUTTER_HEIGHT: usize = 16;
+pub const BPM: f32 = 110.0;
 
 pub struct State {
     pub mouse_down: bool,
@@ -55,6 +56,7 @@ pub struct State {
     pub cursor_pos_beats: f32,
     pub cursor_dom_id: usize,
     pub synth: PolySynth,
+    pub playback_active: bool,
 }
 
 impl Default for State {
@@ -80,7 +82,8 @@ impl Default for State {
             mouse_y: 0,
             cursor_pos_beats: 0.0,
             cursor_dom_id: 0,
-            synth: PolySynth::new(),
+            synth: PolySynth::new(true),
+            playback_active: false,
         }
     }
 }

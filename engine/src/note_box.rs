@@ -47,7 +47,6 @@ impl Ord for NoteBox {
 }
 
 impl NoteBox {
-    #[inline(always)]
     pub fn contains(&self, beat: f32) -> bool { self.start_beat <= beat && self.end_beat >= beat }
 
     /// Same as `NoteBox::contains` except edges exactly touching don't count.
@@ -55,7 +54,6 @@ impl NoteBox {
         self.start_beat < beat && self.end_beat > beat
     }
 
-    #[inline(always)]
     pub fn intersects(&self, other: &Self) -> bool {
         other.contains(self.start_beat)
             || other.contains(self.end_beat)
@@ -73,7 +71,6 @@ impl NoteBox {
             || self.end_beat == other.end_beat
     }
 
-    #[inline(always)]
     pub fn width(&self) -> f32 { self.end_beat - self.start_beat }
 }
 
