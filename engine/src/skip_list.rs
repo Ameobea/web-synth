@@ -325,95 +325,96 @@ pub struct NoteEvent {
     pub beat: f32,
 }
 
+#[derive(Clone, Copy)]
+pub enum FrontierNode<'a> {
+    NoneConsumed(&'a NoteSkipListNode),
+    StartBeatConsumed(&'a NoteSkipListNode),
+}
+
+impl<'a> FrontierNode<'a> {
+    pub fn beat(&'a self) -> f32 {
+        match self {
+            FrontierNode::NoneConsumed(node) => node.val_slot_key.start_beat,
+            FrontierNode::StartBeatConsumed(node) => node.val_slot_key.end_beat,
+        }
+    }
+
+    pub fn next(&self) -> Option<Self> {
+        match self {
+            FrontierNode::NoneConsumed(node) => Some(FrontierNode::StartBeatConsumed(node)),
+            FrontierNode::StartBeatConsumed(node) =>
+                node.next_node().map(FrontierNode::NoneConsumed),
+        }
+    }
+
+    pub fn get_note_event(&self, line_ix: usize) -> NoteEvent {
+        NoteEvent {
+            line_ix,
+            is_start: match self {
+                FrontierNode::NoneConsumed(_) => true,
+                FrontierNode::StartBeatConsumed(_) => false,
+            },
+            beat: self.beat(),
+        }
+    }
+}
+
 pub struct NoteEventIterator<'a> {
     pub cur_beat: f32,
-    pub last_consumed_start_line: usize,
-    pub last_consumed_end_line: usize,
-    /// Set to true if all notes ending on `cur_beat` have been returned as events already
-    pub cur_beat_end_notes_consumed: bool,
-    pub frontier_nodes: [Option<&'a NoteSkipListNode>; LINE_COUNT],
+    pub frontier_nodes: [Option<FrontierNode<'a>>; LINE_COUNT],
 }
 
 impl<'a> Iterator for NoteEventIterator<'a> {
     type Item = NoteEvent;
 
     fn next(&mut self) -> Option<NoteEvent> {
-        let mut min_valid_event: NoteEvent = NoteEvent {
-            line_ix: 0,
-            is_start: true,
-            beat: f32::INFINITY,
-        };
-        // \/ 90% sure this is all a state machine and would be much better represented as such...
-        let mut min_valid_line_ix = 0;
-        for (i, frontier_node_opt) in self.frontier_nodes.iter().enumerate() {
-            if let Some(frontier_node) = frontier_node_opt {
-                let &NoteBox {
-                    start_beat,
-                    end_beat,
-                    ..
-                } = &*frontier_node.val_slot_key;
+        let mut min_valid_line_ix = None;
 
-                if end_beat == self.cur_beat
-                    && (i > self.last_consumed_end_line || self.cur_beat_end_notes_consumed)
-                {
-                    min_valid_line_ix = i;
-                    min_valid_event.beat = end_beat;
-                    min_valid_event.is_start = false;
-                    self.cur_beat_end_notes_consumed = false;
+        for (i, frontier_node) in self.frontier_nodes.iter().enumerate() {
+            if let Some(frontier_node) = frontier_node {
+                let beat = frontier_node.beat();
+                if beat == self.cur_beat {
+                    min_valid_line_ix = Some(i);
                     break;
-                } else if start_beat == self.cur_beat
-                    && (i > self.last_consumed_start_line || !self.cur_beat_end_notes_consumed)
-                {
-                    min_valid_line_ix = i;
-                    min_valid_event.beat = start_beat;
-                    min_valid_event.is_start = true;
-                    self.cur_beat_end_notes_consumed = true;
-                } else if start_beat > self.cur_beat && start_beat < min_valid_event.beat {
-                    min_valid_line_ix = i;
-                    min_valid_event.beat = start_beat;
-                    min_valid_event.is_start = true;
-                } else if end_beat > self.cur_beat && end_beat < min_valid_event.beat {
-                    min_valid_line_ix = i;
-                    min_valid_event.beat = end_beat;
-                    min_valid_event.is_start = false;
+                }
+
+                let cur_min_beat_opt =
+                    min_valid_line_ix.map(|i| self.frontier_nodes[i].as_ref().unwrap().beat());
+                match cur_min_beat_opt {
+                    Some(cur_min_beat) if cur_min_beat < frontier_node.beat() => (),
+                    _ => min_valid_line_ix = Some(i),
                 }
             }
         }
 
-        if min_valid_event.beat == f32::INFINITY {
-            // we've returned all events
-            None
-        } else {
-            // if we're consuming an end beat, move to the next line for the line we used
-            if !min_valid_event.is_start {
-                self.frontier_nodes[min_valid_line_ix] = self.frontier_nodes[min_valid_line_ix]
-                    .map(|node| node.next_node())
-                    .unwrap();
-                self.last_consumed_end_line = min_valid_line_ix;
-            } else {
-                self.last_consumed_start_line = min_valid_line_ix;
-            }
+        min_valid_line_ix.map(|line_ix| {
+            let frontier_node_opt = &mut self.frontier_nodes[line_ix];
+            let frontier_node = frontier_node_opt.as_mut().unwrap();
+            self.cur_beat = frontier_node.beat();
+            let event = frontier_node.get_note_event(line_ix);
 
-            // set a new min beat based on this event
-            self.cur_beat = min_valid_event.beat;
+            // get the next event and swap it into the frontier array
+            let next_frontier_node_opt = frontier_node.next();
+            mem::replace(frontier_node_opt, next_frontier_node_opt);
 
-            min_valid_event.line_ix = min_valid_line_ix;
-            Some(min_valid_event)
-        }
+            event
+        })
     }
 }
 
 impl<'a> NoteEventIterator<'a> {
     pub fn new(note_lines: &'a NoteLines, start_beat: f32) -> Self {
         let frontier_nodes = unsafe {
-            let mut frontier_nodes: [Option<&'a NoteSkipListNode>; LINE_COUNT] =
-                mem::uninitialized();
-            let frontier_nodes_ptr =
-                &mut frontier_nodes as *mut _ as *mut Option<&'a NoteSkipListNode>;
+            let mut frontier_nodes: [Option<FrontierNode<'a>>; LINE_COUNT] = mem::uninitialized();
+            let frontier_nodes_ptr = &mut frontier_nodes as *mut _ as *mut Option<FrontierNode<'a>>;
             for i in 0..LINE_COUNT {
                 ptr::write(
                     frontier_nodes_ptr.add(i),
-                    note_lines.lines.get_unchecked(i).head(),
+                    note_lines
+                        .lines
+                        .get_unchecked(i)
+                        .head()
+                        .map(FrontierNode::NoneConsumed),
                 );
             }
             frontier_nodes
@@ -421,9 +422,6 @@ impl<'a> NoteEventIterator<'a> {
 
         NoteEventIterator {
             cur_beat: start_beat,
-            last_consumed_start_line: 0,
-            last_consumed_end_line: 0,
-            cur_beat_end_notes_consumed: true,
             frontier_nodes,
         }
     }

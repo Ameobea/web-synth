@@ -146,10 +146,12 @@ impl PolySynth {
         {
             Some(pos) => pos,
             None => {
-                common::warn(format!(
-                    "Attempted to release frequency {} but it isn't being played.",
-                    frequency
-                ));
+                if cfg!(debug_assertions) {
+                    common::warn(format!(
+                        "Attempted to release frequency {} but it isn't being played.",
+                        frequency
+                    ));
+                }
                 return;
             },
         };
@@ -195,10 +197,9 @@ pub fn start_playback() {
     let mut frequencies: Vec<f32> = Vec::with_capacity(events.size_hint().0 / 2);
     let mut event_timings: Vec<f32> = Vec::with_capacity(events.size_hint().0);
     for event in events {
-        common::log(format!("{:?}", event));
         let frequency = midi_to_frequency(event.line_ix);
         scheduled_events.push(tern(event.is_start, 1, 0));
-        let event_time_seconds = (event.beat / BPM) * 60.0;
+        let event_time_seconds = ((event.beat / BPM) * 60.0) / 4.0;
         event_timings.push(event_time_seconds);
 
         if event.is_start {

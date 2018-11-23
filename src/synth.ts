@@ -30,12 +30,10 @@ export const schedule_events = (
   frequencies: Float32Array,
   eventTimings: Float32Array
 ) => {
-  console.log(scheduledEvents, frequencies, eventTimings);
   let consumedFrequencies = 0;
   for (let i = 0; i < eventTimings.length; i += 1) {
     const [isAttack, voiceIx] = [scheduledEvents[i * 2] == 1, scheduledEvents[i * 2 + 1]];
     const time = eventTimings[i];
-    console.log(isAttack, voiceIx, time);
     const voice = SYNTHS[synthIx].voices[voiceIx];
 
     if (isAttack) {

@@ -1,4 +1,4 @@
-#![feature(box_syntax, test, slice_patterns, thread_local)]
+#![feature(box_syntax, test, slice_patterns, thread_local, nll)]
 #![allow(clippy::float_cmp)]
 
 extern crate common;
