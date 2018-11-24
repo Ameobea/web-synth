@@ -3353,10 +3353,10 @@ rc@^1.2.7:
     minimist "^1.2.0"
     strip-json-comments "~2.0.1"
 
-react-control-panel@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.3.0.tgz#40190d4ab373a2f7fa711f0c3b2f23341cad3932"
-  integrity sha512-g/F4QqhcvwFEXUcrTHqq7RmRcQkzw7Po/KqThig0FGDWCMA53umdqpDcykeVhLGzBw/gJ3tmwGATFKy6NkIb1g==
+react-control-panel@^0.3.2:
+  version "0.3.2"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.3.2.tgz#4550fa90938159dba777065a37f1f06709c7fc71"
+  integrity sha512-zSSJ651r72zBmXzZOz4wsj7B8tFIcXQ8yKw3QGwS5y9Ldmy48IUBR7TBqX5LQI450/uOFYyii3o8CN+qk+NStQ==
   dependencies:
     is-numeric "0.0.5"
     is-string "^1.0.4"

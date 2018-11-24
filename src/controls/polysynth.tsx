@@ -40,8 +40,9 @@ class DuoSynthControls extends React.Component {
               }
             }
           }}
-          width={600}
+          width={400}
           position="top-right"
+          draggable
           settings={[
             { type: 'range', label: 'volume', min: -20, max: 20, initial: 0, steps: 200 },
             {

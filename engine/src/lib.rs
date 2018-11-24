@@ -1,17 +1,24 @@
 #![feature(box_syntax, test, slice_patterns, thread_local, nll)]
 #![allow(clippy::float_cmp)]
 
+extern crate base64;
+extern crate bincode;
 extern crate common;
 extern crate fnv;
 extern crate rand;
 extern crate rand_pcg;
+extern crate serde;
 extern crate slab;
 extern crate test;
 extern crate wasm_bindgen;
+#[macro_use]
+extern crate serde_derive;
+extern crate libflate;
 
-use std::f32;
+use std::{f32, io::Read};
 
 use fnv::FnvHashSet;
+use libflate::deflate::{Decoder, Encoder};
 use wasm_bindgen::prelude::*;
 
 pub mod note_box;
@@ -49,6 +56,8 @@ extern "C" {
     pub fn add_class(id: usize, className: &str);
     pub fn remove_class(id: usize, className: &str);
     pub fn delete_element(id: usize);
+    pub fn save_composition(base64: &str);
+    pub fn load_composition() -> Option<String>;
 }
 
 #[wasm_bindgen]
@@ -510,6 +519,40 @@ fn release_selected_notes() {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct RawNoteData {
+    line_ix: usize,
+    start_beat: f32,
+    width: f32,
+}
+
+fn serialize_and_save_composition() {
+    // Get a list of every note in the composition matched with its line index
+    let all_notes: Vec<RawNoteData> = state()
+        .note_lines
+        .lines
+        .iter()
+        .enumerate()
+        .flat_map(|(line_ix, line)| {
+            line.iter().map(move |note_box| RawNoteData {
+                line_ix,
+                start_beat: note_box.start_beat,
+                width: note_box.width(),
+            })
+        })
+        .collect();
+
+    let mut deflate_encoder = Encoder::new(Vec::new());
+    bincode::serialize_into(&mut deflate_encoder, &all_notes)
+        .expect("Error serializing `Vec<RawNoteData>`");
+    let compressed_data = deflate_encoder
+        .finish()
+        .into_result()
+        .expect("Error compressing composition data");
+    let base64_data = base64::encode(&compressed_data);
+    save_composition(&base64_data);
+}
+
 #[wasm_bindgen]
 pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
     // TODO: Check for focus on the canvas either on the frontend or here
@@ -612,7 +655,10 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         "ArrowLeft" | "a" => move_selected_notes_horizontal(false),
         "p" => copy_selected_notes(),
         "z" | "x" => play_selected_notes(),
-        " " => start_playback(),
+        " " => {
+            start_playback();
+            serialize_and_save_composition();
+        },
         _ => (),
     }
 }
@@ -630,6 +676,36 @@ pub fn handle_key_up(key: &str, control_pressed: bool, shift_pressed: bool) {
     }
 }
 
+fn try_load_saved_composition() {
+    let base64_data: String = match load_composition() {
+        Some(data) => data,
+        None => return,
+    };
+
+    let decoded_bytes: Vec<u8> = base64::decode(&base64_data).expect("Invalid base64 was saved.");
+    let mut deflate_decoder = Decoder::new(&decoded_bytes[..]);
+    let mut decompressed_data = Vec::new();
+    deflate_decoder
+        .read_to_end(&mut decompressed_data)
+        .expect("Error decompressing saved composition");
+    let raw_notes: Vec<RawNoteData> = bincode::deserialize(&decompressed_data)
+        .expect("Unable to decode saved composition from raw bytes.");
+    for raw_note in raw_notes {
+        let RawNoteData {
+            line_ix,
+            start_beat,
+            width,
+        } = raw_note;
+        let dom_id = draw_note(line_ix, beats_to_px(start_beat), beats_to_px(width));
+        let insertion_error = state().note_lines.lines[line_ix].insert(NoteBox {
+            dom_id,
+            start_beat,
+            end_beat: start_beat + width,
+        });
+        debug_assert!(!insertion_error);
+    }
+}
+
 #[wasm_bindgen]
 pub fn init() {
     common::set_panic_hook();
@@ -638,4 +714,5 @@ pub fn init() {
     draw_measure_lines();
     draw_cursor_gutter();
     state().cursor_dom_id = draw_cursor();
+    try_load_saved_composition();
 }

@@ -30,7 +30,7 @@ pub const FG_CANVAS_IX: usize = 1;
 pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
 pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 0.5;
 pub const CURSOR_GUTTER_HEIGHT: usize = 16;
-pub const BPM: f32 = 110.0;
+pub const BPM: f32 = 50.0;
 
 pub struct State {
     pub mouse_down: bool,

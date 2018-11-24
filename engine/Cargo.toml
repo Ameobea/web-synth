@@ -13,6 +13,11 @@ rand = "0.5.5"
 rand_pcg = "0.1.1"
 slab = "0.4"
 fnv = "1.0.6"
+base64 = "0.10.0"
+bincode = "1.0.1"
+serde = "1.0.80"
+serde_derive = "1.0.80"
+libflate = "0.1"
 
 common = { git = "https://github.com/Ameobea/sketches.git" }
 

@@ -29,7 +29,7 @@
     "@types/react-dom": "^16.0.7",
     "ramda": "^0.25.0",
     "react": "^16.5.2",
-    "react-control-panel": "^0.3.0",
+    "react-control-panel": "^0.3.2",
     "react-dom": "^16.5.2",
     "recompose": "^0.30.0",
     "tonal": "^2.0.0",

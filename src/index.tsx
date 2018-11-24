@@ -108,6 +108,11 @@ export const push_note = (): number => {
   return notes.length - 1;
 };
 
+export const save_composition = (base64Data: string) =>
+  window.localStorage.setItem('composition', base64Data);
+
+export const load_composition = (): string | null => window.localStorage.getItem('composition');
+
 const deleteAllChildren = (node: HTMLElement) => {
   while (node.firstChild) {
     node.removeChild(node.firstChild);
