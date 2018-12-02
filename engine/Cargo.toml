@@ -17,7 +17,6 @@ base64 = "0.10.0"
 bincode = "1.0.1"
 serde = "1.0.80"
 serde_derive = "1.0.80"
-libflate = "0.1"
 
 common = { git = "https://github.com/Ameobea/sketches.git" }
 
