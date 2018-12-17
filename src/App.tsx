@@ -1,8 +1,10 @@
 import * as React from 'react';
 import * as R from 'ramda';
 
-import PolySynthSettings from './controls/polysynth';
+import PolySynthSettings_ from './controls/polysynth';
 
-export default () => {
-  return <PolySynthSettings />;
+const PolySynthSettings = PolySynthSettings_ as any;
+
+export default ({ loadComp }) => {
+  return <PolySynthSettings loadComp={loadComp} />;
 };

@@ -147,6 +147,18 @@ wasm.then(engine => {
   document.addEventListener('keyup', evt =>
     engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey)
   );
-});
 
-ReactDOM.render(<App />, document.getElementById('root'));
+  ReactDOM.render(
+    <App
+      loadComp={comp => {
+        if (!comp) {
+          return;
+        }
+
+        save_composition(comp);
+        location.reload();
+      }}
+    />,
+    document.getElementById('root')
+  );
+});

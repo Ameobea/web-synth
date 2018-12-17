@@ -519,7 +519,7 @@ fn release_selected_notes() {
 
 #[derive(Serialize, Deserialize)]
 struct RawNoteData {
-    line_ix: u32,
+    line_ix: usize,
     start_beat: f32,
     width: f32,
 }
@@ -533,7 +533,7 @@ fn serialize_and_save_composition() {
         .enumerate()
         .flat_map(|(line_ix, line)| {
             line.iter().map(move |note_box| RawNoteData {
-                line_ix: line_ix as u32,
+                line_ix,
                 start_beat: note_box.start_beat,
                 width: note_box.width(),
             })
