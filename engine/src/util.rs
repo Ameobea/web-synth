@@ -1,4 +1,4 @@
-use super::*;
+use super::prelude::*;
 
 pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
     if cond {
@@ -34,6 +34,6 @@ pub fn beats_to_px(beats: f32) -> f32 { beats * BEAT_LENGTH_PX }
 
 pub fn deselect_all_notes() {
     for note_data in state().selected_notes.drain() {
-        deselect_note(note_data.dom_id);
+        render::deselect_note(note_data.dom_id);
     }
 }

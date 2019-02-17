@@ -3,12 +3,7 @@
 
 use std::{mem, ptr};
 
-use wasm_bindgen::prelude::*;
-
-use super::{
-    state::{state, BPM},
-    util::{midi_to_frequency, tern},
-};
+use super::prelude::*;
 
 #[wasm_bindgen(module = "./synth")]
 extern "C" {
@@ -44,13 +39,7 @@ impl Voice {
         }
     }
 
-    pub fn is_playing(&self) -> bool {
-        if self.playing == VoicePlayingStatus::Tacent {
-            false
-        } else {
-            true
-        }
-    }
+    pub fn is_playing(&self) -> bool { !(self.playing == VoicePlayingStatus::Tacent) }
 }
 
 pub struct PolySynth {
@@ -73,7 +62,7 @@ impl PolySynth {
         for i in 0..POLY_SYNTH_VOICE_COUNT {
             unsafe { ptr::write(voices_ptr.add(i), Voice::new(i)) };
         }
-        let id = if link {
+        let id = if link && cfg!(target_arch = "wasm32") {
             init_synth(POLY_SYNTH_VOICE_COUNT)
         } else {
             0
@@ -128,16 +117,14 @@ impl PolySynth {
         {
             // all voices active; have to search the whole range
             (0..POLY_SYNTH_VOICE_COUNT, 0..0)
+        } else if self.first_active_voice_ix > self.first_idle_voice_ix {
+            // range is split; idle range is in the middle
+            (
+                self.first_active_voice_ix..POLY_SYNTH_VOICE_COUNT,
+                0..self.first_idle_voice_ix,
+            )
         } else {
-            if self.first_active_voice_ix > self.first_idle_voice_ix {
-                // range is split; idle range is in the middle
-                (
-                    self.first_active_voice_ix..POLY_SYNTH_VOICE_COUNT,
-                    0..self.first_idle_voice_ix,
-                )
-            } else {
-                (self.first_active_voice_ix..self.first_idle_voice_ix, 0..0)
-            }
+            (self.first_active_voice_ix..self.first_idle_voice_ix, 0..0)
         };
         let combined_search_range = search_range_1.chain(search_range_2);
         let (target_voice_ix, _) = match combined_search_range

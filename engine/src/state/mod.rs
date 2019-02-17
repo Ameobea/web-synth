@@ -9,28 +9,7 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 use slab::Slab;
 
-use super::{note_box::NoteBox, skip_list::*, synth::*};
-
-/// Height of one of the lines rendered in the grid
-pub const LINE_HEIGHT: usize = 12;
-pub const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
-pub const OCTAVES: usize = 5;
-pub const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
-pub const LINE_BORDER_WIDTH: usize = 1;
-pub const PADDED_LINE_HEIGHT: usize = LINE_HEIGHT + LINE_BORDER_WIDTH;
-pub const GRID_HEIGHT: usize = LINE_COUNT * PADDED_LINE_HEIGHT - 1;
-/// How long one beat is in pixels
-pub const BEAT_LENGTH_PX: f32 = 20.0;
-pub const MEASURE_COUNT: usize = 16;
-pub const BEATS_PER_MEASURE: usize = 4;
-pub const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
-pub const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
-pub const BG_CANVAS_IX: usize = 0;
-pub const FG_CANVAS_IX: usize = 1;
-pub const NOTE_SKIP_LIST_LEVELS: usize = 5;
-pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 0.5;
-pub const CURSOR_GUTTER_HEIGHT: usize = 16;
-pub const BPM: f32 = 50.0;
+use super::prelude::*;
 
 pub struct State {
     pub mouse_down: bool,
@@ -159,8 +138,8 @@ pub fn get_sorted_selected_notes(sort_reverse: bool) -> Vec<&'static SelectedNot
 }
 
 pub unsafe fn init_state() {
-    let created_state = box State::default();
-    STATE = Box::into_raw(created_state) as *mut _;
+    let initial_state = box State::default();
+    STATE = Box::into_raw(initial_state);
 
     // Insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
     // assumptions remain true.
@@ -176,5 +155,5 @@ pub unsafe fn init_state() {
     });
     assert_eq!(placeholder_node_key, 0);
 
-    SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box blank_shortcuts());
+    skip_list::SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box skip_list::blank_shortcuts());
 }

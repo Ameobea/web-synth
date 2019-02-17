@@ -1,4 +1,4 @@
-use super::state::state;
+use super::prelude::*;
 
 /// A rectangular region of 2D space
 #[derive(Clone, PartialEq, Debug)]
@@ -231,6 +231,67 @@ impl SelectionBoxData {
             region,
             changed_region_1,
             changed_region_2,
+        }
+    }
+}
+
+pub fn update_selection_box(
+    selection_box_dom_id: usize,
+    last_x: usize,
+    last_y: usize,
+    x: usize,
+    y: usize,
+) {
+    let SelectionBoxData {
+        region:
+            SelectionRegion {
+                x,
+                y,
+                width,
+                height,
+            },
+        retained_region,
+        changed_region_1,
+        changed_region_2,
+    } = SelectionBoxData::compute(
+        x,
+        y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+        last_x,
+        last_y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+    );
+    js::set_attr(selection_box_dom_id, "x", &x.to_string());
+    js::set_attr(
+        selection_box_dom_id,
+        "y",
+        &(y + CURSOR_GUTTER_HEIGHT).to_string(),
+    );
+    js::set_attr(selection_box_dom_id, "width", &width.to_string());
+    js::set_attr(selection_box_dom_id, "height", &height.to_string());
+
+    // Look for all notes in the added/removed regions and add/remove them from the
+    // selected notes set and select/deselect their UI representations
+    for (was_added, region) in &[
+        (changed_region_1.was_added, changed_region_1.region),
+        (changed_region_2.was_added, changed_region_2.region),
+    ] {
+        for note_data in state().note_lines.iter_region(region) {
+            // Ignore notes that are also contained in the retained region
+            if let Some(retained_region) = retained_region.as_ref() {
+                if note_data.intersects_region(&retained_region) {
+                    continue;
+                }
+            }
+
+            let dom_id = note_data.note_box.dom_id;
+            let selected_note_data: SelectedNoteData = note_data.into();
+            let line_ix = selected_note_data.line_ix;
+            if *was_added && state().selected_notes.insert(selected_note_data) {
+                select_note(dom_id);
+                state().synth.trigger_attack(midi_to_frequency(line_ix));
+            } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
+                deselect_note(dom_id);
+                state().synth.trigger_release(midi_to_frequency(line_ix));
+            }
         }
     }
 }

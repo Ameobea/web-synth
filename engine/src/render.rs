@@ -1,4 +1,6 @@
-use super::*;
+//! Functions for interacting with the DOM to render the UI
+
+use super::prelude::{js::*, *};
 
 pub fn select_note(dom_id: usize) { add_class(dom_id, "selected"); }
 

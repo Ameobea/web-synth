@@ -1,5 +1,5 @@
-//! Defines a skip list data structure that is used to hold the intervals occupied by all of the
-//! notes in all of the lines.  It supports functions for finding the preceeding and following
+//! Defines a custom skip list data structure that is used to hold the intervals occupied by all of
+//! the notes in all of the lines.  It supports functions for finding the preceeding and following
 //! note for a given beat, handling cases where the query is within an existing note or unbounded
 //! one or both sides.
 //!
@@ -19,7 +19,7 @@ use std::{
 use rand::prelude::*;
 use slab::Slab;
 
-use super::*;
+use super::prelude::*;
 
 pub type NodeSlabKey = SlabKey<NoteSkipListNode>;
 pub type NoteBoxSlabKey = SlabKey<NoteBox>;

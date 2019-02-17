@@ -8,7 +8,8 @@ extern crate test;
 use std::{mem, num::NonZeroU32};
 
 use engine::{
-    note_box::NoteBox, selection_box::SelectionRegion, skip_list::*, state::*, util::beats_to_px,
+    note_box::NoteBox, prelude::*, selection_box::SelectionRegion, skip_list::*, state::*,
+    util::beats_to_px,
 };
 use rand::prelude::*;
 
@@ -70,7 +71,7 @@ fn note_lines_bounds_3() {
 #[bench]
 fn bench_add_two(b: &mut test::Bencher) {
     extern crate rand_pcg;
-    state().rng = rand_pcg::Pcg32::from_seed(unsafe { mem::transmute(0u128) });
+    state().rng = rand_pcg::Pcg32::from_seed(unsafe { mem::transmute(9228u128) });
     b.iter(get_skip_list_level)
 }
 

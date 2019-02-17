@@ -6,7 +6,6 @@
   "repository": "https://github.com/Ameobea/sketches",
   "author": "Casey Primozic <me@ameo.link>",
   "devDependencies": {
-    "@types/redux": "^3.6.0",
     "css-loader": "^1.0.0",
     "handlebars": "^4.0.11",
     "handlebars-loader": "^1.7.0",

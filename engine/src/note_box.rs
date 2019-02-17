@@ -3,7 +3,16 @@ use std::{
     fmt::{self, Debug, Formatter},
 };
 
-use super::*;
+use std::f32;
+
+use super::prelude::*;
+
+#[derive(Serialize, Deserialize)]
+pub struct RawNoteData {
+    pub line_ix: u32,
+    pub start_beat: f32,
+    pub width: f32,
+}
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct NoteBox {
