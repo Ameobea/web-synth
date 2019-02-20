@@ -1,17 +1,57 @@
 import Synth from 'tone/Tone/instrument/Synth';
 import * as R from 'ramda';
 
+import * as Tone from 'tone';
+(window as any).Tone = Tone;
+
+import { ADSRValues, defaultAdsrEnvelope } from './controls/adsr';
+
+type ToneSynth = {
+  envelope: ToneEnvelope;
+  triggerAttack: (
+    frequency: number | string,
+    duration?: number | string,
+    velocity?: number
+  ) => void;
+  triggerRelease: (time?: number | string) => void;
+};
+
+type ToneEnvelope = {
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+};
+
 class PolySynth {
   constructor(voiceCount: number) {
     this.voices = R.times(R.identity, voiceCount).map(() =>
-      new Synth({ envelope: { release: 0.1 } }).toMaster()
+      new Synth({
+        envelope: {
+          attack: defaultAdsrEnvelope.attack.pos,
+          decay: defaultAdsrEnvelope.decay.pos,
+          sustain: defaultAdsrEnvelope.decay.magnitude,
+          release: defaultAdsrEnvelope.release.pos,
+        },
+      }).toMaster()
     );
   }
 
-  voices: Synth[];
+  voices: ToneSynth[];
+
+  public setEnvelope(newEnvelope: ADSRValues) {
+    const { attack, decay, release } = newEnvelope;
+    this.voices.map(R.prop('envelope')).forEach(envelope => {
+      envelope.attack = attack.pos;
+      envelope.decay = decay.pos - attack.pos;
+      envelope.sustain = decay.magnitude;
+      envelope.release = release.pos;
+      console.log(envelope.attack, envelope.decay, envelope.sustain, envelope.release);
+    });
+  }
 }
 
-const SYNTHS: PolySynth[] = [];
+export const SYNTHS: PolySynth[] = [];
 
 export const init_synth = (voiceCount: number): number => {
   const synth = new PolySynth(voiceCount);

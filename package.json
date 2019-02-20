@@ -28,8 +28,8 @@
     "@types/react-dom": "^16.8.2",
     "ramda": "^0.25.0",
     "react": "^16.8.2",
-    "react-control-panel": "^0.3.2",
-    "react-dom": "^16.8.2",
+    "react-control-panel": ">=0.3.3",
+    "react-dom": "16.8.2",
     "recompose": "^0.30.0",
     "tonal": "^2.0.0",
     "tone": "^0.12.80"

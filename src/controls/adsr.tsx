@@ -8,6 +8,25 @@ import { useState, useRef, Fragment } from 'react';
 import { SVGAttributes } from 'react';
 import keys from 'ramda/es/keys';
 
+export type ADSRValue = {
+  // Number [0,1] indicating how far the level is from the left to the right
+  pos: number;
+  // Number [0,1] indicating at what level the value is from the bottom to the top
+  magnitude: number;
+};
+
+export type ADSRValues = {
+  attack: ADSRValue;
+  decay: ADSRValue;
+  release: ADSRValue;
+};
+
+export const defaultAdsrEnvelope: ADSRValues = {
+  attack: { pos: 0.04, magnitude: 0.8 },
+  decay: { pos: 0.14, magnitude: 0.35 },
+  release: { pos: 0.9, magnitude: 0.35 },
+};
+
 const styles = {
   root: {
     backgroundColor: '#222',
@@ -16,7 +35,7 @@ const styles = {
 
 type MousePos = { x: number; y: number };
 
-const Handle = ({ x, y, onDrag }) => {
+const Handle = ({ x, y, onDrag, radius }) => {
   const setMousePos = evt => onDrag({ x: evt.clientX, y: evt.clientY });
 
   const handleMouseDown = evt => {
@@ -27,22 +46,15 @@ const Handle = ({ x, y, onDrag }) => {
   };
 
   return (
-    <circle cx={x} cy={y} r={6} stroke="#ccc" style={{ zIndex: 2 }} onMouseDown={handleMouseDown} />
+    <circle
+      cx={x}
+      cy={y}
+      r={radius}
+      stroke="#ccc"
+      style={{ zIndex: 2, cursor: 'pointer' }}
+      onMouseDown={handleMouseDown}
+    />
   );
-};
-
-type ADSRValue = {
-  // Number [0,1] indicating how far the level is from the left to the right
-  pos: number;
-  // Number [0,1] indicating at what level the value is from the bottom to the top
-  magnitude: number;
-};
-
-type ADSRValues = {
-  attack: ADSRValue;
-  decay: ADSRValue;
-  sustain: ADSRValue;
-  release: ADSRValue;
 };
 
 type ADSRControlPropTypes = {
@@ -50,24 +62,50 @@ type ADSRControlPropTypes = {
   height: number;
   value: ADSRValues;
   onChange: (newValue: ADSRValues) => void;
+  handleRadius?: number;
   style?: SVGAttributes<SVGSVGElement>['style'];
 };
 
 const clamp = (min, max, val) => Math.min(Math.max(val, min), max);
 
-const ADSRControls = ({ width, height, value, onChange, style = {} }: ADSRControlPropTypes) => {
+const ADSRSegment = ({ x1, y1, x2, y2, height }) => (
+  <Fragment>
+    <path
+      d={`M${x1} ${height} L${x1} ${y1} L${x2} ${y2} L${x2} ${height} Z`}
+      fill="#498"
+      stroke="rgba(100,200,150,124)"
+    />
+    <line x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: '#ccc' }} />
+  </Fragment>
+);
+
+const ADSRControls = ({
+  width,
+  height,
+  value,
+  onChange,
+  handleRadius = 6,
+  style = {},
+}: ADSRControlPropTypes) => {
   const svgElement = useRef<null | SVGSVGElement>(null);
 
   return (
     <svg style={{ ...styles.root, width, height, ...style }} ref={svgElement}>
-      {['attack', 'decay', 'sustain', 'release'].map((key, i, keys) => {
+      <ADSRSegment
+        x1={0}
+        y1={height}
+        x2={value.attack.pos * width}
+        y2={(1 - value.attack.magnitude) * height}
+        height={height}
+      />
+      {['attack', 'decay', 'release'].map((key, i, keys) => {
         const x = value[key].pos * width;
-        const y = value[key].magnitude * height;
+        const y = (1 - value[key].magnitude) * height;
         const onDrag = ({ x, y }) => {
           const { top: yOffset, left: xOffset } = svgElement.current!.getBoundingClientRect();
 
           const pos = (x - xOffset) / width;
-          const magnitude = (y - yOffset) / height;
+          const magnitude = 1 - (y - yOffset) / height;
 
           // Avoid setting a pos lower than that of the previous setting or higher than the next
           // setting (if they exist).
@@ -75,22 +113,34 @@ const ADSRControls = ({ width, height, value, onChange, style = {} }: ADSRContro
           const nextPos = i === keys.length - 1 ? 1.0 : value[keys[i + 1]].pos;
           const clampedPos = clamp(previousPos, nextPos, pos);
 
-          onChange({ ...value, [key]: { pos: clampedPos, magnitude } });
+          // Lock the magnitudes of decay and release
+          const otherKey: string | undefined = {
+            decay: 'release',
+            release: 'decay',
+          }[key];
+          const updatedValue = { pos: clampedPos, magnitude };
+          const updatedValues = !!otherKey
+            ? { [otherKey]: { ...value[otherKey], magnitude }, [key]: updatedValue }
+            : { [key]: updatedValue };
+
+          onChange({ ...value, ...updatedValues });
         };
         const nextKey = i < keys.length - 1 ? keys[i + 1] : null;
 
         return (
-          <Fragment>
-            <Handle key={key} x={x} y={y} onDrag={onDrag} />
+          <Fragment key={key}>
             {!!nextKey ? (
-              <line
+              <ADSRSegment
                 x1={x}
                 y1={y}
                 x2={value[nextKey].pos * width}
-                y2={value[nextKey].magnitude * height}
-                style={{ stroke: '#ccc' }}
+                y2={(1 - value[nextKey].magnitude) * height}
+                height={height}
               />
-            ) : null}
+            ) : (
+              <ADSRSegment x1={x} y1={y} x2={width} y2={height} height={height} />
+            )}
+            <Handle key={key} x={x} y={y} onDrag={onDrag} radius={handleRadius} />
           </Fragment>
         );
       })}

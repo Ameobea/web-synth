@@ -121,6 +121,7 @@ const deleteAllChildren = (node: HTMLElement) => {
 
 wasm.then(engine => {
   engine.init();
+  ReactDOM.render(<App engine={engine} />, document.getElementById('root'));
 
   const scrollOffset = () => Math.max(document.getElementById('canvases')!.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];
@@ -148,5 +149,3 @@ wasm.then(engine => {
     engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey)
   );
 });
-
-ReactDOM.render(<App />, document.getElementById('root'));
