@@ -1,17 +1,21 @@
 import * as React from 'react';
+import { connect } from 'react-redux';
 import { Fragment, useState } from 'react';
 import * as R from 'ramda';
 
 import PolySynthSettings from './controls/polysynth';
 import ADSRControls, { ADSRValues, defaultAdsrEnvelope } from './controls/adsr';
-import { SYNTHS } from './synth';
+import { PolySynth } from './synth';
 
-export default ({ engine }: { engine: typeof import('./engine') }) => {
+type AppProps = { engine: typeof import('./engine'); synths: PolySynth[] };
+
+const App = ({ engine, synths }: AppProps) => {
   const [adsrEnvelope, setAdsrEnvelope] = useState(defaultAdsrEnvelope);
+  console.log('synths: ', synths);
 
   return (
     <Fragment>
-      <PolySynthSettings synth={SYNTHS[0]} />
+      <PolySynthSettings synth={synths[0]} />
       <ADSRControls
         value={adsrEnvelope}
         height={200}
@@ -19,7 +23,7 @@ export default ({ engine }: { engine: typeof import('./engine') }) => {
         handleRadius={4}
         onChange={newEnvelope => {
           setAdsrEnvelope(newEnvelope);
-          SYNTHS.forEach(synth => synth.setEnvelope(newEnvelope));
+          synths.forEach(synth => synth.setEnvelope(newEnvelope));
         }}
         style={{ marginTop: 1000 }}
       />
@@ -27,3 +31,9 @@ export default ({ engine }: { engine: typeof import('./engine') }) => {
     </Fragment>
   );
 };
+
+const mapStateToProps = ({ synths: { synths } }) => ({ synths });
+
+const EnhancedApp = connect(mapStateToProps)(App);
+
+export default EnhancedApp;

@@ -1,9 +1,10 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
+import { Provider } from 'react-redux';
 
 const wasm = import('./engine');
-import { synth } from './chords';
 import App from './App';
+import { store } from './redux';
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
@@ -121,7 +122,12 @@ const deleteAllChildren = (node: HTMLElement) => {
 
 wasm.then(engine => {
   engine.init();
-  ReactDOM.render(<App engine={engine} />, document.getElementById('root'));
+  ReactDOM.render(
+    <Provider store={store}>
+      <App engine={engine} />
+    </Provider>,
+    document.getElementById('root')
+  );
 
   const scrollOffset = () => Math.max(document.getElementById('canvases')!.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];

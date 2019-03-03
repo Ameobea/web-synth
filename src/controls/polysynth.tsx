@@ -1,8 +1,11 @@
 import * as React from 'react';
 import * as R from 'ramda';
 import ControlPanel, { Range } from 'react-control-panel';
+import BitCrusher from 'tone/Tone/effect/BitCrusher';
 
-import { bitcrusher } from '../chords';
+import { PolySynth } from '../synth';
+
+export const mkBitcrusher = () => new BitCrusher(5).toMaster();
 
 const flatten = (obj, prefix = '') =>
   Object.entries(obj).reduce((acc, [key, val]) => {
@@ -12,17 +15,28 @@ const flatten = (obj, prefix = '') =>
     return { ...acc, [`${prefix}${prefix ? '.' : ''}${key}`]: val };
   }, {});
 
-const PolySynthControls = ({ synth }) => (
+type PolySynthProps = { synth: PolySynth };
+
+const PolySynthControls = ({ synth }: PolySynthProps) => (
   <ControlPanel
     onChange={(key, val) => {
       switch (key) {
         case 'bitcrusher': {
-          synth.disconnect();
+          synth.volume.disconnect();
           if (val) {
-            synth.connect(bitcrusher);
+            synth.volume.connect(mkBitcrusher());
           } else {
-            synth.toMaster();
+            // TODO: we have to store children somewhere so we can disconnect from them
+            // explicitly and `.dispose()` of them properly.  Probably keep an array of children in
+            // `PolySynth` and do that handling there.
+            synth.volume.toMaster();
+            // synth.volume.output.dispose();
           }
+          break;
+        }
+        case 'volume': {
+          synth.volume.set('volume', parseFloat(val));
+          break;
         }
         default: {
           const parsed = parseFloat(val);
@@ -41,7 +55,7 @@ const PolySynthControls = ({ synth }) => (
         options: ['sine', 'square', 'triangle', 'sawtooth'],
         initial: 'sine',
       },
-      { type: 'checkbox', label: 'bitcrusher', initial: true },
+      { type: 'checkbox', label: 'bitcrusher', initial: false },
     ]}
   />
 );

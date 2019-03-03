@@ -30,7 +30,9 @@
     "react": "^16.8.2",
     "react-control-panel": ">=0.3.3",
     "react-dom": "16.8.2",
+    "react-redux": "^6.0.1",
     "recompose": "^0.30.0",
+    "redux": "^4.0.1",
     "tonal": "^2.0.0",
     "tone": "^0.12.80"
   }

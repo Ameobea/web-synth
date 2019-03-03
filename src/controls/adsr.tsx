@@ -27,12 +27,6 @@ export const defaultAdsrEnvelope: ADSRValues = {
   release: { pos: 0.9, magnitude: 0.35 },
 };
 
-const styles = {
-  root: {
-    backgroundColor: '#222',
-  },
-};
-
 type MousePos = { x: number; y: number };
 
 const Handle = ({ x, y, onDrag, radius }) => {
@@ -90,7 +84,7 @@ const ADSRControls = ({
   const svgElement = useRef<null | SVGSVGElement>(null);
 
   return (
-    <svg style={{ ...styles.root, width, height, ...style }} ref={svgElement}>
+    <svg style={{ backgroundColor: '#222', width, height, ...style }} ref={svgElement}>
       <ADSRSegment
         x1={0}
         y1={height}
@@ -129,17 +123,14 @@ const ADSRControls = ({
 
         return (
           <Fragment key={key}>
-            {!!nextKey ? (
-              <ADSRSegment
-                x1={x}
-                y1={y}
-                x2={value[nextKey].pos * width}
-                y2={(1 - value[nextKey].magnitude) * height}
-                height={height}
-              />
-            ) : (
-              <ADSRSegment x1={x} y1={y} x2={width} y2={height} height={height} />
-            )}
+            <ADSRSegment
+              x1={x}
+              y1={y}
+              x2={!!nextKey ? value[nextKey].pos * width : width}
+              y2={!!nextKey ? (1 - value[nextKey].magnitude) * height : height}
+              height={height}
+            />
+
             <Handle key={key} x={x} y={y} onDrag={onDrag} radius={handleRadius} />
           </Fragment>
         );
