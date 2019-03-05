@@ -28,7 +28,7 @@
     "@types/react-dom": "^16.8.2",
     "ramda": "^0.25.0",
     "react": "^16.8.2",
-    "react-control-panel": ">=0.3.3",
+    "react-control-panel": ">=0.4.5",
     "react-dom": "16.8.2",
     "react-redux": "^6.0.1",
     "recompose": "^0.30.0",

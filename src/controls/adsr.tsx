@@ -6,7 +6,9 @@
 import * as React from 'react';
 import { useState, useRef, Fragment } from 'react';
 import { SVGAttributes } from 'react';
-import keys from 'ramda/es/keys';
+import { Value } from 'react-control-panel';
+
+import { roundTo } from '../util';
 
 export type ADSRValue = {
   // Number [0,1] indicating how far the level is from the left to the right
@@ -138,5 +140,19 @@ const ADSRControls = ({
     </svg>
   );
 };
+
+const formatAdsrValue = ({ attack, decay, release }: ADSRValues): string =>
+  [attack.pos, decay.pos - attack.pos, decay.magnitude, release.pos]
+    .map(val => roundTo(val, 3))
+    .join(' - ');
+
+export const ControlPanelADSR = ({ value, onChange, theme }) => (
+  <Fragment>
+    <span style={{ paddingTop: 4 }}>
+      <Value text={formatAdsrValue(value)} width={225} />
+    </span>
+    <ADSRControls width={350} height={200} value={value} onChange={onChange} />
+  </Fragment>
+);
 
 export default ADSRControls;

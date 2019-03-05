@@ -4,6 +4,7 @@ import ControlPanel, { Range } from 'react-control-panel';
 import BitCrusher from 'tone/Tone/effect/BitCrusher';
 
 import { PolySynth } from '../synth';
+import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
 
 export const mkBitcrusher = () => new BitCrusher(5).toMaster();
 
@@ -38,6 +39,10 @@ const PolySynthControls = ({ synth }: PolySynthProps) => (
           synth.volume.set('volume', parseFloat(val));
           break;
         }
+        case 'adsr': {
+          synth.setEnvelope(val);
+          break;
+        }
         default: {
           const parsed = parseFloat(val);
           synth.voices.forEach(voice => voice.set(key, isNaN(parsed) ? val : parsed));
@@ -56,6 +61,7 @@ const PolySynthControls = ({ synth }: PolySynthProps) => (
         initial: 'sine',
       },
       { type: 'checkbox', label: 'bitcrusher', initial: false },
+      { type: 'custom', label: 'adsr', initial: defaultAdsrEnvelope, Comp: ControlPanelADSR },
     ]}
   />
 );

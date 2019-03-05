@@ -9,28 +9,7 @@ import { PolySynth } from './synth';
 
 type AppProps = { engine: typeof import('./engine'); synths: PolySynth[] };
 
-const App = ({ engine, synths }: AppProps) => {
-  const [adsrEnvelope, setAdsrEnvelope] = useState(defaultAdsrEnvelope);
-  console.log('synths: ', synths);
-
-  return (
-    <Fragment>
-      <PolySynthSettings synth={synths[0]} />
-      <ADSRControls
-        value={adsrEnvelope}
-        height={200}
-        width={350}
-        handleRadius={4}
-        onChange={newEnvelope => {
-          setAdsrEnvelope(newEnvelope);
-          synths.forEach(synth => synth.setEnvelope(newEnvelope));
-        }}
-        style={{ marginTop: 1000 }}
-      />
-      <div style={{ marginTop: 1500 }}>a</div>
-    </Fragment>
-  );
-};
+const App = ({ engine, synths }: AppProps) => <PolySynthSettings synth={synths[0]} />;
 
 const mapStateToProps = ({ synths: { synths } }) => ({ synths });
 
