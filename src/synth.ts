@@ -2,8 +2,8 @@ import Synth from 'tone/Tone/instrument/Synth';
 import Volume from 'tone/Tone/component/Volume';
 import * as R from 'ramda';
 
-import * as Tone from 'tone';
-(window as any).Tone = Tone;
+// import * as Tone from 'tone';
+// (window as any).Tone = Tone;
 
 import { ADSRValues, defaultAdsrEnvelope } from './controls/adsr';
 import { store } from './redux';
@@ -12,7 +12,7 @@ import { actionCreators as synthActionCreators } from './redux/reducers/synths';
 /**
  * These are manual type definitions for the ToneJS `Synth` class.
  */
-export type ToneSynth = {
+export interface ToneSynth {
   envelope: ToneEnvelope;
   triggerAttack: (
     frequency: number | string,
@@ -24,17 +24,28 @@ export type ToneSynth = {
   toMaster: () => void;
   connect: (connectTo: any) => void;
   set: (key: string, val: any) => void;
-};
+}
 
-type ToneEnvelope = {
+interface ToneEnvelope {
   attack: number;
   decay: number;
   sustain: number;
   release: number;
-};
+}
 
 export class PolySynth {
-  constructor(voiceCount: number, volume = 10.0) {
+  /**
+   * An array of monophonic synths that make up the poly synth's voices
+   */
+  public voices: ToneSynth[];
+  /**
+   * This acts as a bus between all of the inner `voices` and tone's `Master`.  Rather than
+   * applying effects to all of the individual voice synths, we chain the effects off of
+   * `volume` to make them more efficient.
+   */
+  public volume: typeof Volume;
+
+  constructor(voiceCount: number, volume: number = 10.0) {
     this.volume = new Volume(volume).toMaster();
 
     this.voices = R.times(R.identity, voiceCount).map(() =>
@@ -49,17 +60,6 @@ export class PolySynth {
     );
   }
 
-  /**
-   * An array of monophonic synths that make up the poly synth's voices
-   */
-  public voices: ToneSynth[];
-  /**
-   * This acts as a bus between all of the inner `voices` and tone's `Master`.  Rather than
-   * applying effects to all of the individual voice synths, we chain the effects off of
-   * `volume` to make them more efficient.
-   */
-  public volume: Volume;
-
   public setEnvelope(newEnvelope: ADSRValues) {
     const { attack, decay, release } = newEnvelope;
     this.voices.forEach(({ envelope }) => {
@@ -70,6 +70,8 @@ export class PolySynth {
     });
   }
 }
+
+const x = 2;
 
 const getSynths = (): PolySynth[] => store.getState().synths.synths;
 
@@ -101,7 +103,7 @@ export const schedule_events = (
 
   // JS `Float32Array` doesn't have `.forEach()` and friends :(
   for (let i = 0; i < eventTimings.length; i += 1) {
-    const [isAttack, voiceIx] = [scheduledEvents[i * 2] == 1, scheduledEvents[i * 2 + 1]];
+    const [isAttack, voiceIx] = [scheduledEvents[i * 2] === 1, scheduledEvents[i * 2 + 1]];
     const time = eventTimings[i];
     const voice = synths[synthIx].voices[voiceIx];
 

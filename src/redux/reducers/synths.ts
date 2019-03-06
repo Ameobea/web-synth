@@ -4,7 +4,11 @@
 
 import { PolySynth } from '../../synth';
 
-const initialState: { synths: PolySynth[] } = { synths: [] };
+interface State {
+  synths: PolySynth[];
+}
+
+const initialState: State = { synths: [] };
 
 export const actions = {
   SET_SYNTH: 'SET_SYNTH',
@@ -14,7 +18,12 @@ export const actionCreators = {
   setSynth: (synth: PolySynth) => ({ type: actions.SET_SYNTH, synth }),
 };
 
-const synthsReducer = (state = initialState, action) =>
+interface Action {
+  type: string;
+  synth: PolySynth;
+}
+
+const synthsReducer = (state = initialState, action: Action): State =>
   ({
     [actions.SET_SYNTH]: { ...state, synths: [...state.synths, action.synth] },
   }[action.type] || state);

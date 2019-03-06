@@ -3,25 +3,24 @@
  * side with callbacks into Wasm for value changes.
  */
 
-import * as React from 'react';
-import { useState, useRef, Fragment } from 'react';
-import { SVGAttributes } from 'react';
+import React, { useRef, Fragment, SVGAttributes } from 'react';
+
 import { Value } from 'react-control-panel';
 
-import { roundTo } from '../util';
+import { clamp, roundTo } from '../util';
 
-export type ADSRValue = {
+export interface ADSRValue {
   // Number [0,1] indicating how far the level is from the left to the right
   pos: number;
   // Number [0,1] indicating at what level the value is from the bottom to the top
   magnitude: number;
-};
+}
 
-export type ADSRValues = {
+export interface ADSRValues {
   attack: ADSRValue;
   decay: ADSRValue;
   release: ADSRValue;
-};
+}
 
 export const defaultAdsrEnvelope: ADSRValues = {
   attack: { pos: 0.04, magnitude: 0.8 },
@@ -29,12 +28,22 @@ export const defaultAdsrEnvelope: ADSRValues = {
   release: { pos: 0.9, magnitude: 0.35 },
 };
 
-type MousePos = { x: number; y: number };
+interface MousePos {
+  x: number;
+  y: number;
+}
 
-const Handle = ({ x, y, onDrag, radius }) => {
-  const setMousePos = evt => onDrag({ x: evt.clientX, y: evt.clientY });
+interface HandleProps {
+  x: number;
+  y: number;
+  onDrag: (pos: MousePos) => void;
+  radius: number;
+}
 
-  const handleMouseDown = evt => {
+const Handle = ({ x, y, onDrag, radius }: HandleProps) => {
+  const setMousePos: (evt: MouseEvent) => void = evt => onDrag({ x: evt.clientX, y: evt.clientY });
+
+  const handleMouseDown: (evt: React.MouseEvent<SVGCircleElement, MouseEvent>) => void = evt => {
     window.addEventListener('mousemove', setMousePos);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', setMousePos), {
       once: true,
@@ -46,30 +55,36 @@ const Handle = ({ x, y, onDrag, radius }) => {
       cx={x}
       cy={y}
       r={radius}
-      stroke="#ccc"
+      stroke='#ccc'
       style={{ zIndex: 2, cursor: 'pointer' }}
       onMouseDown={handleMouseDown}
     />
   );
 };
 
-type ADSRControlPropTypes = {
+interface ADSRControlPropTypes {
   width: number;
   height: number;
   value: ADSRValues;
   onChange: (newValue: ADSRValues) => void;
   handleRadius?: number;
   style?: SVGAttributes<SVGSVGElement>['style'];
-};
+}
 
-const clamp = (min, max, val) => Math.min(Math.max(val, min), max);
+interface ADSRSegmentProps {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  height: number;
+}
 
-const ADSRSegment = ({ x1, y1, x2, y2, height }) => (
+const ADSRSegment = ({ x1, y1, x2, y2, height }: ADSRSegmentProps) => (
   <Fragment>
     <path
       d={`M${x1} ${height} L${x1} ${y1} L${x2} ${y2} L${x2} ${height} Z`}
-      fill="#498"
-      stroke="rgba(100,200,150,124)"
+      fill='#498'
+      stroke='rgba(100,200,150,124)'
     />
     <line x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: '#ccc' }} />
   </Fragment>
@@ -97,7 +112,7 @@ const ADSRControls = ({
       {['attack', 'decay', 'release'].map((key, i, keys) => {
         const x = value[key].pos * width;
         const y = (1 - value[key].magnitude) * height;
-        const onDrag = ({ x, y }) => {
+        const onDrag: (pos: MousePos) => void = ({ x, y }) => {
           const { top: yOffset, left: xOffset } = svgElement.current!.getBoundingClientRect();
 
           const pos = (x - xOffset) / width;
@@ -116,7 +131,10 @@ const ADSRControls = ({
           }[key];
           const updatedValue = { pos: clampedPos, magnitude };
           const updatedValues = !!otherKey
-            ? { [otherKey]: { ...value[otherKey], magnitude }, [key]: updatedValue }
+            ? {
+                [otherKey]: { ...value[otherKey], magnitude },
+                [key]: updatedValue,
+              }
             : { [key]: updatedValue };
 
           onChange({ ...value, ...updatedValues });
@@ -146,7 +164,13 @@ const formatAdsrValue = ({ attack, decay, release }: ADSRValues): string =>
     .map(val => roundTo(val, 3))
     .join(' - ');
 
-export const ControlPanelADSR = ({ value, onChange, theme }) => (
+interface ControlPanelADSRProps {
+  value: ADSRValues;
+  onChange: (newValue: ADSRValues) => void;
+  theme: { [key: string]: any };
+}
+
+export const ControlPanelADSR = ({ value, onChange, theme }: ControlPanelADSRProps) => (
   <Fragment>
     <span style={{ paddingTop: 4 }}>
       <Value text={formatAdsrValue(value)} width={225} />

@@ -11,14 +11,8 @@
     "indent": [true, "spaces"],
     "interface-name": [true, "never-prefix"],
     "jsdoc-format": true,
+    "jsx-boolean-value": false,
     "label-position": true,
-    "member-ordering": [
-      true,
-      "public-before-private",
-      "static-before-instance",
-      "variables-before-functions"
-    ],
-    "no-any": false,
     "no-arg": true,
     "no-bitwise": true,
     "no-console": [false, "log", "error", "debug", "info", "time", "timeEnd", "trace"],
@@ -30,11 +24,13 @@
     "no-eval": true,
     "no-shadowed-variable": false,
     "no-string-literal": true,
+    "no-submodule-imports": [true, "tone"],
     "no-switch-case-fall-through": true,
     "no-trailing-whitespace": false,
-    "no-unused-expression": false,
     "no-use-before-declare": true,
     "one-line": [true, "check-catch", "check-else", "check-open-brace", "check-whitespace"],
+    "ordered-imports": false,
+    "object-literal-sort-keys": false,
     "quotemark": [true, "single"],
     "radix": true,
     "semicolon": [true, "always", "ignore-bound-class-methods"],
@@ -68,16 +64,8 @@
       "ban-keywords",
       "check-format",
       "allow-leading-underscore",
-      "allow-pascal-case"
-    ],
-    "whitespace": [
-      "check-branch",
-      "check-decl",
-      "check-module",
-      "check-operator",
-      "check-separator",
-      "check-type",
-      "check-typecast"
+      "allow-pascal-case",
+      "allow-snake-case"
     ]
   }
 }

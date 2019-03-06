@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React, { useMemo } from 'react';
 import * as R from 'ramda';
 import ControlPanel, { Range } from 'react-control-panel';
 import BitCrusher from 'tone/Tone/effect/BitCrusher';
@@ -8,7 +8,7 @@ import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
 
 export const mkBitcrusher = () => new BitCrusher(5).toMaster();
 
-const flatten = (obj, prefix = '') =>
+const flatten = (obj: object, prefix = ''): object =>
   Object.entries(obj).reduce((acc, [key, val]) => {
     if (typeof val === 'object') {
       return { ...acc, ...flatten(val, `${prefix}${prefix ? '.' : ''}${key}`) };
@@ -16,11 +16,13 @@ const flatten = (obj, prefix = '') =>
     return { ...acc, [`${prefix}${prefix ? '.' : ''}${key}`]: val };
   }, {});
 
-type PolySynthProps = { synth: PolySynth };
+interface PolySynthProps {
+  synth: PolySynth;
+}
 
-const PolySynthControls = ({ synth }: PolySynthProps) => (
-  <ControlPanel
-    onChange={(key, val) => {
+const PolySynthControls = ({ synth }: PolySynthProps) => {
+  const onChange = useMemo<(key: string, val: any) => void>(
+    () => (key, val) => {
       switch (key) {
         case 'bitcrusher': {
           synth.volume.disconnect();
@@ -48,22 +50,29 @@ const PolySynthControls = ({ synth }: PolySynthProps) => (
           synth.voices.forEach(voice => voice.set(key, isNaN(parsed) ? val : parsed));
         }
       }
-    }}
-    width={400}
-    position="top-right"
-    draggable
-    settings={[
-      { type: 'range', label: 'volume', min: -20, max: 20, initial: 0, steps: 200 },
-      {
-        type: 'select',
-        label: 'oscillator.type',
-        options: ['sine', 'square', 'triangle', 'sawtooth'],
-        initial: 'sine',
-      },
-      { type: 'checkbox', label: 'bitcrusher', initial: false },
-      { type: 'custom', label: 'adsr', initial: defaultAdsrEnvelope, Comp: ControlPanelADSR },
-    ]}
-  />
-);
+    },
+    [synth]
+  );
+
+  return (
+    <ControlPanel
+      onChange={onChange}
+      width={400}
+      position='top-right'
+      draggable
+      settings={[
+        { type: 'range', label: 'volume', min: -20, max: 20, initial: 0, steps: 200 },
+        {
+          type: 'select',
+          label: 'oscillator.type',
+          options: ['sine', 'square', 'triangle', 'sawtooth'],
+          initial: 'sine',
+        },
+        { type: 'checkbox', label: 'bitcrusher', initial: false },
+        { type: 'custom', label: 'adsr', initial: defaultAdsrEnvelope, Comp: ControlPanelADSR },
+      ]}
+    />
+  );
+};
 
 export default PolySynthControls;

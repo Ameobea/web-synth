@@ -21,10 +21,9 @@ export const get_active_attr = (key: string): string | null => ACTIVE_SHAPE.getA
  */
 export const set_active_attr = (key: string, val: string) => ACTIVE_SHAPE.setAttribute(key, val);
 
-const renderHelper = (fn: (...args) => { name: string; attrs: { [key: string]: string } }) => (
-  canvasIndex,
-  ...args
-): number => {
+const renderHelper = (
+  fn: (...args: any[]) => { name: string; attrs: { [key: string]: string } }
+) => (canvasIndex: number, ...args: any[]): number => {
   const svg = SVGS[canvasIndex];
   const { name, attrs } = fn(...args);
   const shape = document.createElementNS('http://www.w3.org/2000/svg', name);
@@ -49,11 +48,11 @@ export const render_triangle = renderHelper(
     color: string,
     border_color: string
   ) => ({
-    name: 'polygon',
     attrs: {
       points: `${x1},${y1} ${x2},${y2} ${x3},${y3}`,
       style: `fill:${color};stroke:${border_color};stroke-width:1`,
     },
+    name: 'polygon',
   })
 );
 
@@ -144,8 +143,9 @@ wasm.then(engine => {
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());
 
+  // Event listeners for
   document.addEventListener('keydown', evt => {
-    if (evt.key == 'Backspace') {
+    if (evt.key === 'Backspace') {
       evt.preventDefault();
     }
 
