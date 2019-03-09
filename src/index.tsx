@@ -130,6 +130,7 @@ wasm.then(engine => {
 
   const scrollOffset = () => Math.max(document.getElementById('canvases')!.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];
+
   foregroundCanvas.addEventListener('mousedown', evt => {
     evt.preventDefault();
     engine.handle_mouse_down(evt.pageX, evt.pageY + scrollOffset());
@@ -143,7 +144,6 @@ wasm.then(engine => {
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());
 
-  // Event listeners for
   document.addEventListener('keydown', evt => {
     if (evt.key === 'Backspace') {
       evt.preventDefault();

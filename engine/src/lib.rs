@@ -27,6 +27,7 @@ pub mod skip_list;
 pub mod state;
 pub mod synth;
 pub mod util;
+pub mod view_context;
 use self::prelude::*;
 
 /// Entrypoint for the application.  This function is called from the JS side as soon as the Wasm

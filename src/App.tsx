@@ -5,6 +5,7 @@ import * as R from 'ramda';
 import PolySynthSettings from './controls/polysynth';
 import ADSRControls, { ADSRValues, defaultAdsrEnvelope } from './controls/adsr';
 import { PolySynth } from './synth';
+import './index.css';
 
 interface AppProps {
   engine: typeof import('./engine');
