@@ -21,8 +21,8 @@ pub struct State {
     pub dragging_note_data: Option<(f32, SelectedNoteData)>,
     pub selection_box_dom_id: Option<usize>,
     pub notes: Slab<NoteBox>,
-    pub nodes: Slab<NoteSkipListNode>,
-    pub note_lines: NoteLines,
+    pub nodes: Slab<skip_list::NoteSkipListNode>,
+    pub note_lines: skip_list::NoteLines,
     pub rng: Pcg32,
     pub cur_note_bounds: (f32, Option<f32>),
     // TODO: Make this something better, like mapping dom_id to line index and start beat or sth.
@@ -50,7 +50,7 @@ impl Default for State {
             selection_box_dom_id: None,
             notes: Slab::new(),
             nodes: Slab::new(),
-            note_lines: NoteLines::new(LINE_COUNT),
+            note_lines: skip_list::NoteLines::new(LINE_COUNT),
             rng: Pcg32::from_seed(unsafe { mem::transmute(128u128) }),
             cur_note_bounds: (0.0, None),
             selected_notes: FnvHashSet::default(),
@@ -149,7 +149,7 @@ pub unsafe fn init_state() {
         dom_id: 0,
     });
     assert_eq!(note_slot_key, 0);
-    let placeholder_node_key = state().nodes.insert(NoteSkipListNode {
+    let placeholder_node_key = state().nodes.insert(skip_list::NoteSkipListNode {
         val_slot_key: 0.into(),
         links: mem::zeroed(),
     });

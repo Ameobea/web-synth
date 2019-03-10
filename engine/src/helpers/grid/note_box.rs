@@ -5,8 +5,6 @@ use std::{
 
 use std::f32;
 
-use super::prelude::*;
-
 #[derive(Serialize, Deserialize)]
 pub struct RawNoteData {
     pub line_ix: u32,
@@ -86,25 +84,4 @@ impl NoteBox {
 pub struct NoteBoxData {
     pub width: usize,
     pub x: usize,
-}
-
-impl NoteBoxData {
-    pub fn compute(x: usize) -> Self {
-        let start_x = state().mouse_down_x;
-        let (low_bound, high_bound) = state().cur_note_bounds;
-        let snap_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
-        let snap_to_px = snap_to_beat_interval(x, beats_to_px(low_bound));
-        let (minx, maxx) = if x >= start_x {
-            let end = (snap_to_px + snap_interval_px)
-                .min(beats_to_px(high_bound.unwrap_or(f32::INFINITY)))
-                as usize;
-            (start_x, end)
-        } else {
-            let end = snap_to_px as usize;
-            (end, start_x)
-        };
-        let width = maxx - minx;
-
-        NoteBoxData { x: minx, width }
-    }
 }

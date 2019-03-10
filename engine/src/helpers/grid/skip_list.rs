@@ -23,8 +23,8 @@ use super::prelude::*;
 
 pub type NodeSlabKey = SlabKey<NoteSkipListNode>;
 pub type NoteBoxSlabKey = SlabKey<NoteBox>;
-pub type PreceedingLinks = [NodeSlabKey; NOTE_SKIP_LIST_LEVELS];
-pub type LinkOpts = [Option<NodeSlabKey>; NOTE_SKIP_LIST_LEVELS];
+pub type PreceedingLinks = [NodeSlabKey; 5]; // TODO
+pub type LinkOpts = [Option<NodeSlabKey>; 5]; // TODO
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct SlabKey<T>(NonZeroU32, PhantomData<T>);

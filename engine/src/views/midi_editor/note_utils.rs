@@ -37,7 +37,7 @@ pub fn copy_selected_notes() {
         let new_start_beat = start_beat + offset_beats;
         let new_end_beat = start_beat + width + offset_beats;
         // try to insert a note `offset_beats` away from the previous note on the same line
-        if let Bounds::Bounded(start_bound, end_bound_opt) = state()
+        if let skip_list::Bounds::Bounded(start_bound, end_bound_opt) = state()
             .note_lines
             .get_bounds(*line_ix, new_start_beat + (width / 0.5))
         {

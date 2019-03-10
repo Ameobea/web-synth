@@ -8,8 +8,11 @@ extern crate test;
 use std::{mem, num::NonZeroU32};
 
 use engine::{
-    note_box::NoteBox, prelude::*, selection_box::SelectionRegion, skip_list::*, state::*,
-    util::beats_to_px,
+    helpers::grid::{
+        note_box::NoteBox, selection_box::SelectionRegion, skip_list::*, state::*,
+        util::beats_to_px,
+    },
+    prelude::*,
 };
 use rand::prelude::*;
 

@@ -3,6 +3,8 @@
 
 use std::f32;
 
+use wasm_bindgen::prelude::*;
+
 use super::prelude::*;
 
 #[wasm_bindgen]
@@ -108,7 +110,7 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         "p" => note_utils::copy_selected_notes(),
         "z" | "x" => note_utils::play_selected_notes(),
         " " => {
-            synth::start_playback();
+            playback::start_playback();
             serialize_and_save_composition();
         },
         _ => (),
@@ -185,7 +187,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     };
 
     match bounds {
-        Bounds::Intersecting(node) => match state().cur_tool {
+        skip_list::Bounds::Intersecting(node) => match state().cur_tool {
             Tool::DeleteNote => {
                 let &NoteBox {
                     start_beat, dom_id, ..
@@ -224,7 +226,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 select_note(note.dom_id);
             },
         },
-        Bounds::Bounded(lower, upper) => match state().cur_tool {
+        skip_list::Bounds::Bounded(lower, upper) => match state().cur_tool {
             Tool::DrawNote if state().control_pressed => {}, // TODO
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote => {
@@ -249,6 +251,87 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     state().drawing_note_dom_id = drawing_dom_id;
     state().selection_box_dom_id = selection_box_dom_id;
     state().dragging_note_data = dragging_note_data;
+}
+
+pub fn compute_note_box_data(state: &State, x: usize) -> NoteBoxData {
+    // let start_x = state().mouse_down_x; // TODO
+    let (low_bound, high_bound) = state().cur_note_bounds;
+    let snap_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
+    let snap_to_px = snap_to_beat_interval(x, beats_to_px(low_bound));
+    let (minx, maxx) = if x >= start_x {
+        let end = (snap_to_px + snap_interval_px)
+            .min(beats_to_px(high_bound.unwrap_or(f32::INFINITY))) as usize;
+        (start_x, end)
+    } else {
+        let end = snap_to_px as usize;
+        (end, start_x)
+    };
+    let width = maxx - minx;
+
+    NoteBoxData { x: minx, width }
+}
+
+pub fn update_selection_box(
+    selection_box_dom_id: usize,
+    last_x: usize,
+    last_y: usize,
+    x: usize,
+    y: usize,
+) {
+    let SelectionBoxData {
+        region:
+            SelectionRegion {
+                x,
+                y,
+                width,
+                height,
+            },
+        retained_region,
+        changed_region_1,
+        changed_region_2,
+    } = SelectionBoxData::compute(
+        state().mouse_down_x,
+        state().mouse_down_y,
+        x,
+        y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+        last_x,
+        last_y.saturating_sub(CURSOR_GUTTER_HEIGHT),
+    );
+    js::set_attr(selection_box_dom_id, "x", &x.to_string());
+    js::set_attr(
+        selection_box_dom_id,
+        "y",
+        &(y + CURSOR_GUTTER_HEIGHT).to_string(),
+    );
+    js::set_attr(selection_box_dom_id, "width", &width.to_string());
+    js::set_attr(selection_box_dom_id, "height", &height.to_string());
+
+    // Look for all notes in the added/removed regions and add/remove them from the
+    // selected notes set and select/deselect their UI representations
+    for (was_added, region) in &[
+        (changed_region_1.was_added, changed_region_1.region),
+        (changed_region_2.was_added, changed_region_2.region),
+    ] {
+        for note_data in state().note_lines.iter_region(region) {
+            // Ignore notes that are also contained in the retained region
+            if let Some(retained_region) = retained_region.as_ref() {
+                if note_data.intersects_region(&retained_region) {
+                    continue;
+                }
+            }
+
+            let dom_id = note_data.note_box.dom_id;
+            let selected_note_data: SelectedNoteData = note_data.into();
+            let line_ix = selected_note_data.line_ix;
+            if *was_added && state().selected_notes.insert(selected_note_data) {
+                select_note(dom_id);
+                state().synth.trigger_attack(midi_to_frequency(line_ix));
+            } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
+                deselect_note(dom_id);
+                state().synth.trigger_release(midi_to_frequency(line_ix));
+            }
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -278,7 +361,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         },
         Tool::DrawNote => {
             if let Some(dom_id) = state().drawing_note_dom_id {
-                let NoteBoxData { x, width } = NoteBoxData::compute(x);
+                let NoteBoxData { x, width } = compute_note_box_data(state(), x);
                 js::set_attr(dom_id, "x", &x.to_string());
                 js::set_attr(dom_id, "width", &width.to_string());
             } else if let Some((first_dragging_note_start_beat, ref mut dragging_note)) =
@@ -406,7 +489,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
     if state().cur_tool == Tool::DrawNote {
         match (state().drawing_note_dom_id, state().selection_box_dom_id) {
             (Some(note_dom_id), None) => {
-                let NoteBoxData { x, width } = NoteBoxData::compute(x);
+                let NoteBoxData { x, width } = compute_note_box_data(get_state(), x: usize)
                 if width == 0 {
                     return;
                 }
