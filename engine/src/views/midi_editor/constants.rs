@@ -15,4 +15,6 @@ pub const BEATS_PER_MEASURE: usize = 4;
 pub const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
 pub const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
 
+pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 2.;
+
 pub const BPM: f32 = 50.0;

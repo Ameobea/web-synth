@@ -9,7 +9,6 @@ You must have several tools installed in order to use this template:
 - The Rust programming language: https://rustup.rs/
 - The `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`
 - `wasm-bindgen-cli`: `cargo install wasm-bindgen-cli`
-- `wasm-gc`: `cargo install wasm-gc`
 - `wasm-opt`: Clone [https://github.com/WebAssembly/binaryen](binaryen) and follow install instructions there
 - NodeJS and [Yarn](https://yarnpkg.com/en/)
 

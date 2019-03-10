@@ -1,5 +1,3 @@
-use super::prelude::*;
-
 /// A rectangular region of 2D space
 #[derive(Clone, PartialEq, Debug)]
 pub struct SelectionRegion {

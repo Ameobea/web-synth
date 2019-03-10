@@ -33,7 +33,7 @@ pub fn copy_selected_notes() {
         dom_id,
     } in state().selected_notes.iter()
     {
-        deselect_note(*dom_id);
+        render::deselect_note(*dom_id);
         let new_start_beat = start_beat + offset_beats;
         let new_end_beat = start_beat + width + offset_beats;
         // try to insert a note `offset_beats` away from the previous note on the same line
@@ -50,7 +50,7 @@ pub fn copy_selected_notes() {
                 continue;
             }
         }
-        let dom_id = draw_note(*line_ix, beats_to_px(new_start_beat), beats_to_px(*width));
+        let dom_id = render::draw_note(*line_ix, beats_to_px(new_start_beat), beats_to_px(*width));
         let new_note = NoteBox {
             start_beat: start_beat + offset_beats,
             end_beat: start_beat + width + offset_beats,
@@ -58,7 +58,7 @@ pub fn copy_selected_notes() {
         };
         let insertion_failed = state().note_lines.insert(*line_ix, new_note);
         debug_assert!(!insertion_failed);
-        select_note(dom_id);
+        render::select_note(dom_id);
         new_selected_notes.insert(SelectedNoteData::from_note_box(*line_ix, &new_note));
     }
 

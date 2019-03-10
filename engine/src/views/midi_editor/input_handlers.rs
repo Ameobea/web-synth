@@ -156,7 +156,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 state().selection_box_dom_id = None;
             }
 
-            let x = set_cursor_pos(px_to_beat(x as f32)) as usize;
+            let x = render::set_cursor_pos(px_to_beat(x as f32)) as usize;
             state().cursor_moving = true;
             state().mouse_down = true;
             state().mouse_down_x = x;
@@ -187,43 +187,36 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     };
 
     match bounds {
-        skip_list::Bounds::Intersecting(node) => match state().cur_tool {
+        skip_list::Bounds::Intersecting(note) => match state().cur_tool {
             Tool::DeleteNote => {
-                let &NoteBox {
-                    start_beat, dom_id, ..
-                } = &*node.val_slot_key;
-                deselect_note(dom_id);
-                js::delete_element(dom_id);
-                state().note_lines.remove(line_ix, start_beat);
+                render::deselect_note(note.dom_id);
+                js::delete_element(note.dom_id);
+                state().note_lines.remove(line_ix, note.start_beat);
             },
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote if state().control_pressed => {
-                let NoteBox {
-                    dom_id, start_beat, ..
-                } = *node.val_slot_key;
                 let selected_data = SelectedNoteData {
                     line_ix,
-                    dom_id,
-                    start_beat,
-                    width: node.val_slot_key.width(),
+                    dom_id: note.dom_id,
+                    start_beat: note.start_beat,
+                    width: note.width(),
                 };
 
                 if state().selected_notes.contains(&selected_data) {
                     state().selected_notes.remove(&selected_data);
-                    deselect_note(dom_id);
+                    render::deselect_note(note.dom_id);
                 } else {
                     // Select the clicked note since it wasn't previously selected
                     state().selected_notes.insert(selected_data);
-                    select_note(dom_id);
+                    render::select_note(note.dom_id);
                 }
             },
             Tool::DrawNote => {
-                let note = &*node.val_slot_key;
                 let note_data = SelectedNoteData::from_note_box(line_ix, note);
                 dragging_note_data = Some((note.start_beat, note_data));
                 deselect_all_notes();
                 state().selected_notes.insert(note_data);
-                select_note(note.dom_id);
+                render::select_note(note.dom_id);
             },
         },
         skip_list::Bounds::Bounded(lower, upper) => match state().cur_tool {
@@ -237,7 +230,7 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
                 state().cur_note_bounds = (lower, upper);
 
                 // Draw the temporary/candidate note after storing its bounds
-                drawing_dom_id = Some(draw_note(line_ix, snapped_lower, width));
+                drawing_dom_id = Some(render::draw_note(line_ix, snapped_lower, width));
                 x = snapped_lower as usize;
             },
             _ => (),
@@ -253,8 +246,8 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     state().dragging_note_data = dragging_note_data;
 }
 
-pub fn compute_note_box_data(state: &State, x: usize) -> NoteBoxData {
-    // let start_x = state().mouse_down_x; // TODO
+pub fn compute_note_box_data(x: usize) -> NoteBoxData {
+    let start_x = state().mouse_down_x; // TODO
     let (low_bound, high_bound) = state().cur_note_bounds;
     let snap_interval_px = beats_to_px(NOTE_SNAP_BEAT_INTERVAL);
     let snap_to_px = snap_to_beat_interval(x, beats_to_px(low_bound));
@@ -324,10 +317,10 @@ pub fn update_selection_box(
             let selected_note_data: SelectedNoteData = note_data.into();
             let line_ix = selected_note_data.line_ix;
             if *was_added && state().selected_notes.insert(selected_note_data) {
-                select_note(dom_id);
+                render::select_note(dom_id);
                 state().synth.trigger_attack(midi_to_frequency(line_ix));
             } else if !*was_added && state().selected_notes.remove(&selected_note_data) {
-                deselect_note(dom_id);
+                render::deselect_note(dom_id);
                 state().synth.trigger_release(midi_to_frequency(line_ix));
             }
         }
@@ -348,7 +341,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         if let Some(selection_box_dom_id) = state().selection_box_dom_id {
             update_selection_box(selection_box_dom_id, last_x, last_y, x, 1);
         } else {
-            set_cursor_pos(px_to_beat(x as f32));
+            render::set_cursor_pos(px_to_beat(x as f32));
         }
         return;
     }
@@ -361,7 +354,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
         },
         Tool::DrawNote => {
             if let Some(dom_id) = state().drawing_note_dom_id {
-                let NoteBoxData { x, width } = compute_note_box_data(state(), x);
+                let NoteBoxData { x, width } = compute_note_box_data(x);
                 js::set_attr(dom_id, "x", &x.to_string());
                 js::set_attr(dom_id, "width", &width.to_string());
             } else if let Some((first_dragging_note_start_beat, ref mut dragging_note)) =
@@ -468,7 +461,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
             delete_selection_box(selection_box_dom_id);
         }
 
-        set_cursor_pos(px_to_beat(x as f32));
+        render::set_cursor_pos(px_to_beat(x as f32));
         return;
     }
 
@@ -489,7 +482,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
     if state().cur_tool == Tool::DrawNote {
         match (state().drawing_note_dom_id, state().selection_box_dom_id) {
             (Some(note_dom_id), None) => {
-                let NoteBoxData { x, width } = compute_note_box_data(get_state(), x: usize)
+                let NoteBoxData { x, width } = compute_note_box_data(x);
                 if width == 0 {
                     return;
                 }
@@ -516,7 +509,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     start_beat,
                     width: note.width(),
                 });
-                select_note(note_dom_id);
+                render::select_note(note_dom_id);
             },
             (None, Some(_)) => (),
             (Some(_), Some(_)) => common::error(

@@ -7,7 +7,6 @@ use std::{
 use fnv::FnvHashSet;
 use rand::prelude::*;
 use rand_pcg::Pcg32;
-use slab::Slab;
 
 use super::prelude::*;
 
@@ -20,8 +19,6 @@ pub struct State {
     /// (original_dragging_note_start_beat, SelectedNoteData)
     pub dragging_note_data: Option<(f32, SelectedNoteData)>,
     pub selection_box_dom_id: Option<usize>,
-    pub notes: Slab<NoteBox>,
-    pub nodes: Slab<skip_list::NoteSkipListNode>,
     pub note_lines: skip_list::NoteLines,
     pub rng: Pcg32,
     pub cur_note_bounds: (f32, Option<f32>),
@@ -48,8 +45,6 @@ impl Default for State {
             drawing_note_dom_id: None,
             dragging_note_data: None,
             selection_box_dom_id: None,
-            notes: Slab::new(),
-            nodes: Slab::new(),
             note_lines: skip_list::NoteLines::new(LINE_COUNT),
             rng: Pcg32::from_seed(unsafe { mem::transmute(128u128) }),
             cur_note_bounds: (0.0, None),
@@ -140,20 +135,6 @@ pub fn get_sorted_selected_notes(sort_reverse: bool) -> Vec<&'static SelectedNot
 pub unsafe fn init_state() {
     let initial_state = box State::default();
     STATE = Box::into_raw(initial_state);
-
-    // Insert dummy values to ensure that we never have anything at index 0 and our `NonZero`
-    // assumptions remain true.
-    let note_slot_key = state().notes.insert(NoteBox {
-        start_beat: 0.0,
-        end_beat: 0.0,
-        dom_id: 0,
-    });
-    assert_eq!(note_slot_key, 0);
-    let placeholder_node_key = state().nodes.insert(skip_list::NoteSkipListNode {
-        val_slot_key: 0.into(),
-        links: mem::zeroed(),
-    });
-    assert_eq!(placeholder_node_key, 0);
 
     skip_list::SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box skip_list::blank_shortcuts());
 }

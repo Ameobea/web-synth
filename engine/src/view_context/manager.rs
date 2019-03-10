@@ -1,4 +1,7 @@
-use super::ViewContext;
+use super::{
+    super::views::midi_editor::{state::State as MidiEditorState, MidiEditor},
+    ViewContext,
+};
 
 pub struct ViewContextEntry {
     pub context: Box<dyn ViewContext>,
@@ -30,6 +33,15 @@ impl Default for ViewContextManager {
 }
 
 impl ViewContextManager {
+    pub fn add_view(&mut self, view: Box<dyn ViewContext>) {
+        self.contexts.push(ViewContextEntry {
+            context: view,
+            touched: false,
+        });
+    }
+
+    pub fn init(&mut self) { self.contexts[self.active_context_ix].context.init(); }
+
     pub fn get_active_view(&self) -> &dyn ViewContext {
         &*self.contexts[self.active_context_ix].context
     }
@@ -54,5 +66,12 @@ impl ViewContextManager {
         self.get_active_view_mut().cleanup();
         self.active_context_ix = view_ix;
         self.get_active_view_mut().init();
+    }
+}
+
+pub fn build_view(name: &str, definition: &str) -> Box<dyn ViewContext> {
+    match name {
+        "midi_editor" => box MidiEditor(MidiEditorState::default()), // TODO: Actually use def
+        _ => unimplemented!(),
     }
 }
