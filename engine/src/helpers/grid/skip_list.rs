@@ -1042,7 +1042,7 @@ impl NoteLines {
                 Some(preceeding_node_key) => (
                     line.get_note(line.get_node(preceeding_node_key).val_slot_key)
                         .end_beat,
-                    preceeding_node_key,
+                    line.get_node(preceeding_node_key).links[0].unwrap(),
                 ),
                 None => {
                     // No preceeding node, so it's either the head or doesn't exist.

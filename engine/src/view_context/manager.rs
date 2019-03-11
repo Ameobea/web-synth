@@ -1,5 +1,5 @@
 use super::{
-    super::views::midi_editor::{state::State as MidiEditorState, MidiEditor},
+    super::views::midi_editor::{mk_midi_editor, state::State as MidiEditorState},
     ViewContext,
 };
 
@@ -71,7 +71,7 @@ impl ViewContextManager {
 
 pub fn build_view(name: &str, definition: &str) -> Box<dyn ViewContext> {
     match name {
-        "midi_editor" => box MidiEditor(MidiEditorState::default()), // TODO: Actually use def
+        "midi_editor" => mk_midi_editor(definition),
         _ => unimplemented!(),
     }
 }

@@ -2,7 +2,10 @@
 //! that correspond to individual notes.  It supports operations like dragging notes around,
 //! selecting/deleting notes, and playing the current composition.
 
-use super::super::view_context::ViewContext;
+use super::super::{
+    helpers::grid::{Grid, GridConf, GridHandler, GridRenderer},
+    view_context::ViewContext,
+};
 
 pub mod composition_saving_loading;
 pub mod constants;
@@ -14,9 +17,26 @@ pub mod render;
 pub mod state;
 pub mod util;
 
-pub struct MidiEditor(pub state::State);
+pub struct MidiEditorGridHandler(pub state::State);
 
-impl ViewContext for MidiEditor {
+struct MidiEditorGridRenderer;
+
+impl GridRenderer for MidiEditorGridRenderer {
+    fn create_note(&mut self, x: usize, y: usize, width: usize, height: usize) -> usize {
+        0
+        // render::draw_note(line_ix: usize, start_px: f32, width_px: f32) // TODO
+    }
+
+    fn select_note(dom_id: usize) {
+        // TODO
+    }
+
+    fn deselect_note(dom_id: usize) {
+        // TODO
+    }
+}
+
+impl GridHandler for MidiEditorGridHandler {
     fn init(&mut self) {
         unsafe {
             state::init_state();
@@ -27,26 +47,13 @@ impl ViewContext for MidiEditor {
         state::state().cursor_dom_id = render::draw_cursor();
         composition_saving_loading::try_load_saved_composition();
     }
+}
 
-    fn cleanup(&mut self) { unimplemented!() }
-
-    fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
-        unimplemented!()
-    }
-
-    fn handle_key_up(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
-        unimplemented!()
-    }
-
-    fn handle_mouse_down(&mut self, x: usize, y: usize) { unimplemented!() }
-
-    fn handle_mouse_move(&mut self, x: usize, y: usize) { unimplemented!() }
-
-    fn handle_mouse_up(&mut self, x: usize, y: usize) { unimplemented!() }
-
-    fn handle_mouse_wheel(&mut self, ydiff: isize) { unimplemented!() }
-
-    fn load(&mut self, serialized: &str) { unimplemented!() }
-
-    fn save(&self) -> String { unimplemented!() }
+pub fn mk_midi_editor(config: &str) -> Box<dyn ViewContext> {
+    let conf = GridConf {
+        gutter_height: constants::CURSOR_GUTTER_HEIGHT,
+        row_height: constants::LINE_HEIGHT,
+        row_count: constants::LINE_COUNT,
+    };
+    box Grid::new(&conf, MidiEditorGridHandler(state::State::default()))
 }
