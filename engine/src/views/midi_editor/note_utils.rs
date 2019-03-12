@@ -52,9 +52,11 @@ pub fn copy_selected_notes() {
         }
         let dom_id = render::draw_note(*line_ix, beats_to_px(new_start_beat), beats_to_px(*width));
         let new_note = NoteBox {
-            start_beat: start_beat + offset_beats,
-            end_beat: start_beat + width + offset_beats,
-            dom_id,
+            bounds: NoteBoxBounds {
+                start_beat: start_beat + offset_beats,
+                end_beat: start_beat + width + offset_beats,
+            },
+            data: dom_id,
         };
         let insertion_failed = state().note_lines.insert(*line_ix, new_note);
         debug_assert!(!insertion_failed);

@@ -189,34 +189,30 @@ pub fn handle_mouse_down(mut x: usize, y: usize) {
     match bounds {
         skip_list::Bounds::Intersecting(note) => match state().cur_tool {
             Tool::DeleteNote => {
-                render::deselect_note(note.dom_id);
-                js::delete_element(note.dom_id);
-                state().note_lines.remove(line_ix, note.start_beat);
+                let dom_id = note.data;
+                render::deselect_note(dom_id);
+                js::delete_element(dom_id);
+                state().note_lines.remove(line_ix, note.bounds.start_beat);
             },
             Tool::DrawNote if state().shift_pressed => init_selection_box(),
             Tool::DrawNote if state().control_pressed => {
-                let selected_data = SelectedNoteData {
-                    line_ix,
-                    dom_id: note.dom_id,
-                    start_beat: note.start_beat,
-                    width: note.width(),
-                };
+                let selected_data = SelectedNoteData::from_note_box(line_ix, note);
 
                 if state().selected_notes.contains(&selected_data) {
                     state().selected_notes.remove(&selected_data);
-                    render::deselect_note(note.dom_id);
+                    render::deselect_note(note.data);
                 } else {
                     // Select the clicked note since it wasn't previously selected
                     state().selected_notes.insert(selected_data);
-                    render::select_note(note.dom_id);
+                    render::select_note(note.data);
                 }
             },
             Tool::DrawNote => {
                 let note_data = SelectedNoteData::from_note_box(line_ix, note);
-                dragging_note_data = Some((note.start_beat, note_data));
+                dragging_note_data = Some((note.bounds.start_beat, note_data));
                 deselect_all_notes();
                 state().selected_notes.insert(note_data);
-                render::select_note(note.dom_id);
+                render::select_note(note.data);
             },
         },
         skip_list::Bounds::Bounded(lower, upper) => match state().cur_tool {
@@ -313,7 +309,7 @@ pub fn update_selection_box(
                 }
             }
 
-            let dom_id = note_data.note_box.dom_id;
+            let dom_id = note_data.note_box.data;
             let selected_note_data: SelectedNoteData = note_data.into();
             let line_ix = selected_note_data.line_ix;
             if *was_added && state().selected_notes.insert(selected_note_data) {
@@ -382,12 +378,12 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                     .note_lines
                     .remove(original_line_ix, dragging_note.start_beat)
                     .unwrap();
-                let note_width = original_note.width();
+                let note_width = original_note.bounds.width();
                 let mut note = original_note;
 
                 let mut try_insert = |line_ix: usize, start_beat: f32| -> bool {
-                    note.start_beat = start_beat;
-                    note.end_beat = start_beat + note_width;
+                    note.bounds.start_beat = start_beat;
+                    note.bounds.end_beat = start_beat + note_width;
                     let insertion_error = state().note_lines.insert(line_ix, note);
                     if !insertion_error {
                         dragging_note.start_beat = start_beat;
@@ -491,9 +487,11 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                 let start_beat = px_to_beat(x_px);
                 let line_ix = down_line_ix;
                 let note = NoteBox {
-                    dom_id: note_dom_id,
-                    start_beat,
-                    end_beat: px_to_beat(x_px + width as f32),
+                    data: note_dom_id,
+                    bounds: NoteBoxBounds {
+                        start_beat,
+                        end_beat: px_to_beat(x_px + width as f32),
+                    },
                 };
 
                 // Actually insert the node into the skip list
@@ -507,7 +505,7 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     line_ix,
                     dom_id: note_dom_id,
                     start_beat,
-                    width: note.width(),
+                    width: note.bounds.width(),
                 });
                 render::select_note(note_dom_id);
             },

@@ -19,7 +19,7 @@ pub struct State {
     /// (original_dragging_note_start_beat, SelectedNoteData)
     pub dragging_note_data: Option<(f32, SelectedNoteData)>,
     pub selection_box_dom_id: Option<usize>,
-    pub note_lines: skip_list::NoteLines,
+    pub note_lines: skip_list::NoteLines<usize>,
     pub rng: Pcg32,
     pub cur_note_bounds: (f32, Option<f32>),
     // TODO: Make this something better, like mapping dom_id to line index and start beat or sth.
@@ -102,12 +102,12 @@ impl Ord for SelectedNoteData {
 }
 
 impl SelectedNoteData {
-    pub fn from_note_box(line_ix: usize, note_box: &NoteBox) -> Self {
+    pub fn from_note_box(line_ix: usize, note_box: &NoteBox<usize>) -> Self {
         SelectedNoteData {
             line_ix,
-            dom_id: note_box.dom_id,
-            start_beat: note_box.start_beat,
-            width: note_box.width(),
+            dom_id: note_box.data,
+            start_beat: note_box.bounds.start_beat,
+            width: note_box.bounds.width(),
         }
     }
 }

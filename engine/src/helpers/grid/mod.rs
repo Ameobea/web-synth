@@ -1,3 +1,7 @@
+use std::marker::PhantomData;
+
+use super::super::view_context::ViewContext;
+
 pub mod constants;
 pub mod note_box;
 pub mod prelude;
@@ -5,7 +9,6 @@ pub mod selection_box;
 pub mod skip_list;
 
 use self::skip_list::NoteLines;
-use super::super::view_context::ViewContext;
 
 type DomId = usize;
 
@@ -35,8 +38,9 @@ pub trait GridHandler {
 /// Finally, it has a `GridRenderer` which is just a bunch of type-level functions that are used
 /// to render custom versions of the individual elements of the grid.
 pub struct Grid<S, R: GridRenderer, H: GridHandler> {
-    pub data: NoteLines,
+    pub data: NoteLines<S>,
     pub handler: H,
+    renderer: PhantomData<R>,
 }
 
 pub struct GridConf {
@@ -50,6 +54,7 @@ impl<S, R: GridRenderer, H: GridHandler> Grid<S, R, H> {
         Grid {
             data: NoteLines::new(constants::NOTE_SKIP_LIST_LEVELS),
             handler,
+            renderer: PhantomData,
         }
     }
 

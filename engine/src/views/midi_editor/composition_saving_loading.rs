@@ -14,8 +14,8 @@ pub fn serialize_and_save_composition() {
         .flat_map(|(line_ix, line)| {
             line.iter().map(move |note_box| RawNoteData {
                 line_ix: line_ix as u32,
-                start_beat: note_box.start_beat,
-                width: note_box.width(),
+                start_beat: note_box.bounds.start_beat,
+                width: note_box.bounds.width(),
             })
         })
         .collect();
@@ -58,9 +58,11 @@ pub fn try_load_saved_composition() {
             beats_to_px(width),
         );
         let insertion_error = state().note_lines.lines[line_ix as usize].insert(NoteBox {
-            dom_id,
-            start_beat,
-            end_beat: start_beat + width,
+            data: dom_id,
+            bounds: NoteBoxBounds {
+                start_beat,
+                end_beat: start_beat + width,
+            },
         });
         debug_assert!(!insertion_error);
     }

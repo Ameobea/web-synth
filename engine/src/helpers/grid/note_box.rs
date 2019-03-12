@@ -12,48 +12,13 @@ pub struct RawNoteData {
     pub width: f32,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub struct NoteBox {
+#[derive(Clone, PartialEq)]
+pub struct NoteBoxBounds {
     pub start_beat: f32,
     pub end_beat: f32,
-    pub dom_id: usize,
 }
 
-impl Debug for NoteBox {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "|{}, {}|", self.start_beat, self.end_beat)
-    }
-}
-
-impl Eq for NoteBox {}
-
-impl PartialOrd for NoteBox {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.start_beat > other.end_beat {
-            Some(Ordering::Greater)
-        } else if self.end_beat < other.start_beat {
-            Some(Ordering::Less)
-        } else {
-            None
-        }
-    }
-}
-
-impl Ord for NoteBox {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.start_beat > other.end_beat {
-            Ordering::Greater
-        } else if self.end_beat < other.start_beat {
-            Ordering::Less
-        } else if self.start_beat > other.start_beat {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
-    }
-}
-
-impl NoteBox {
+impl NoteBoxBounds {
     pub fn contains(&self, beat: f32) -> bool { self.start_beat <= beat && self.end_beat >= beat }
 
     /// Same as `NoteBox::contains` except edges exactly touching don't count.
@@ -69,7 +34,7 @@ impl NoteBox {
     }
 
     /// Same as `NoteBox::intersects` except edges exactly touching don't count.
-    pub fn intersects_exclusive(&self, other: &Self) -> bool {
+    pub fn intersects_exclusive(&self, other: &NoteBoxBounds) -> bool {
         other.contains_exclusive(self.start_beat)
             || other.contains_exclusive(self.end_beat)
             || self.contains_exclusive(other.start_beat)
@@ -79,6 +44,56 @@ impl NoteBox {
     }
 
     pub fn width(&self) -> f32 { self.end_beat - self.start_beat }
+}
+
+#[derive(Clone)]
+pub struct NoteBox<S> {
+    pub bounds: NoteBoxBounds,
+    pub data: S,
+}
+
+impl<S> Debug for NoteBox<S> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(
+            fmt,
+            "|{}, {}|",
+            self.bounds.start_beat, self.bounds.end_beat
+        )
+    }
+}
+
+impl Eq for NoteBoxBounds {}
+
+impl<S> PartialEq for NoteBox<S> {
+    fn eq(&self, other: &Self) -> bool { self.bounds == other.bounds }
+}
+
+impl<S> Eq for NoteBox<S> {}
+
+impl PartialOrd for NoteBoxBounds {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.start_beat > other.end_beat {
+            Some(Ordering::Greater)
+        } else if self.end_beat < other.start_beat {
+            Some(Ordering::Less)
+        } else {
+            None
+        }
+    }
+}
+
+impl Ord for NoteBoxBounds {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.start_beat > other.end_beat {
+            Ordering::Greater
+        } else if self.end_beat < other.start_beat {
+            Ordering::Less
+        } else if self.start_beat > other.start_beat {
+            Ordering::Greater
+        } else {
+            Ordering::Less
+        }
+    }
 }
 
 pub struct NoteBoxData {
