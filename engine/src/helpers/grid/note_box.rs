@@ -12,7 +12,7 @@ pub struct RawNoteData {
     pub width: f32,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NoteBoxBounds {
     pub start_beat: f32,
     pub end_beat: f32,
@@ -50,6 +50,17 @@ impl NoteBoxBounds {
 pub struct NoteBox<S> {
     pub bounds: NoteBoxBounds,
     pub data: S,
+}
+
+impl<S> NoteBox<S> {
+    pub fn contains_beat(&self, beat: f32) -> bool { self.bounds.contains(beat) }
+
+    pub fn intersects_beats(&self, start_beat: f32, end_beat: f32) -> bool {
+        self.bounds.intersects(&NoteBoxBounds {
+            start_beat,
+            end_beat,
+        })
+    }
 }
 
 impl<S> Debug for NoteBox<S> {
@@ -94,6 +105,14 @@ impl Ord for NoteBoxBounds {
             Ordering::Less
         }
     }
+}
+
+impl<S> PartialOrd for NoteBox<S> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.bounds.cmp(&other.bounds)) }
+}
+
+impl<S> Ord for NoteBox<S> {
+    fn cmp(&self, other: &Self) -> Ordering { self.bounds.cmp(&other.bounds) }
 }
 
 pub struct NoteBoxData {

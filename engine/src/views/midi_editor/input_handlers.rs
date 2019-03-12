@@ -374,22 +374,32 @@ pub fn handle_mouse_move(x: usize, y: usize) {
 
                 // Go with the simple solution: remove from the source line, try to add to the
                 // destination line, re-insert in source line if it's blocked.
+                common::log(format!(
+                    "Removing dragging note starting at {}",
+                    dragging_note.start_beat
+                ));
                 let original_note = state()
                     .note_lines
                     .remove(original_line_ix, dragging_note.start_beat)
-                    .unwrap();
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Tried removing original note starting at {} from the original line \
+                             but it wasn't found",
+                            dragging_note.start_beat
+                        )
+                    });
                 let note_width = original_note.bounds.width();
-                let mut note = original_note;
+                let mut note = original_note.clone();
 
                 let mut try_insert = |line_ix: usize, start_beat: f32| -> bool {
                     note.bounds.start_beat = start_beat;
                     note.bounds.end_beat = start_beat + note_width;
-                    let insertion_error = state().note_lines.insert(line_ix, note);
-                    if !insertion_error {
+                    let insertion_error = state().note_lines.insert(line_ix, note.clone());
+                    if insertion_error.is_none() {
                         dragging_note.start_beat = start_beat;
                         dragging_note.line_ix = line_ix;
                     }
-                    insertion_error
+                    insertion_error.is_some()
                 };
 
                 let insertion_succeeded = !try_insert(new_line_ix, new_start_beat)
@@ -400,7 +410,7 @@ pub fn handle_mouse_move(x: usize, y: usize) {
                 if !insertion_succeeded {
                     let reinsertion_error =
                         state().note_lines.insert(original_line_ix, original_note);
-                    debug_assert!(!reinsertion_error);
+                    debug_assert!(reinsertion_error.is_none());
                     return;
                 }
 
@@ -494,12 +504,6 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     },
                 };
 
-                // Actually insert the node into the skip list
-                state().note_lines.insert(line_ix, note);
-                if cfg!(debug_assertions) {
-                    common::log(format!("{:?}", state().note_lines.lines[line_ix]));
-                }
-
                 deselect_all_notes();
                 state().selected_notes.insert(SelectedNoteData {
                     line_ix,
@@ -508,6 +512,12 @@ pub fn handle_mouse_up(x: usize, _y: usize) {
                     width: note.bounds.width(),
                 });
                 render::select_note(note_dom_id);
+
+                // Actually insert the node into the skip list
+                state().note_lines.insert(line_ix, note);
+                if cfg!(debug_assertions) {
+                    common::log(format!("{:?}", state().note_lines.lines[line_ix]));
+                }
             },
             (None, Some(_)) => (),
             (Some(_), Some(_)) => common::error(

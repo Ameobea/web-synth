@@ -58,8 +58,8 @@ pub fn copy_selected_notes() {
             },
             data: dom_id,
         };
-        let insertion_failed = state().note_lines.insert(*line_ix, new_note);
-        debug_assert!(!insertion_failed);
+        let insertion_failed = state().note_lines.insert(*line_ix, new_note.clone());
+        debug_assert!(!insertion_failed.is_none());
         render::select_note(dom_id);
         new_selected_notes.insert(SelectedNoteData::from_note_box(*line_ix, &new_note));
     }

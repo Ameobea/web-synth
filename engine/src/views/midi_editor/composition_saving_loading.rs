@@ -64,6 +64,6 @@ pub fn try_load_saved_composition() {
                 end_beat: start_beat + width,
             },
         });
-        debug_assert!(!insertion_error);
+        debug_assert!(insertion_error.is_none());
     }
 }

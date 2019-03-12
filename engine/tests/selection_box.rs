@@ -1,6 +1,9 @@
 extern crate engine;
 
-use engine::helpers::grid::{note_box::NoteBox, selection_box::*};
+use engine::helpers::grid::{
+    note_box::{NoteBox, NoteBoxBounds},
+    selection_box::*,
+};
 
 fn test_selection_box_diff(
     origin_x: usize,
@@ -279,9 +282,11 @@ fn selection_region_from_mouse_coords() {
 #[test]
 fn note_box_self_intersection_exclusive() {
     let note_box = NoteBox {
-        start_beat: 0.0,
-        end_beat: 10.0,
-        dom_id: 0,
+        bounds: NoteBoxBounds {
+            start_beat: 0.0,
+            end_beat: 10.0,
+        },
+        data: 0,
     };
-    assert!(note_box.intersects_exclusive(&note_box));
+    assert!(note_box.bounds.intersects_exclusive(&note_box.bounds));
 }

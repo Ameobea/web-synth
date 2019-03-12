@@ -58,7 +58,7 @@ impl<T> From<usize> for SlabKey<T> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct NoteSkipListNode<S> {
-    pub val_slot_key: SlabKey<NoteBox<S>>,
+    pub val: NoteBox<S>,
     /// Contains links to the next node in the sequence as well as all shortcuts that exist for
     /// that node.  In the case that there are no shortcuts available
     pub links: LinkOpts<S>,
@@ -96,7 +96,7 @@ pub fn debug_preceeding_links<S>(line: &NoteSkipList<S>, links: &PreceedingLinks
         "{:?}",
         links
             .iter()
-            .map(|key| line.get_note(line.get_node(*key).val_slot_key))
+            .map(|key| &line.get_node(*key).val)
             .collect::<Vec<_>>()
     )
 }
@@ -106,7 +106,7 @@ pub fn debug_links<S>(line: &NoteSkipList<S>, links: &LinkOpts<S>) -> String {
         "{:?}",
         links
             .iter()
-            .map(|key_opt| key_opt.map(|key| line.get_note(line.get_node(key).val_slot_key)))
+            .map(|key_opt| key_opt.map(|key| &line.get_node(key).val))
             .collect::<Vec<_>>()
     )
 }
@@ -174,10 +174,8 @@ pub enum FrontierNode<'a, S> {
 impl<'a, S> FrontierNode<'a, S> {
     pub fn beat(&'a self) -> f32 {
         match self {
-            FrontierNode::NoneConsumed(list, node) =>
-                list.get_note(node.val_slot_key).bounds.start_beat,
-            FrontierNode::StartBeatConsumed(list, node) =>
-                list.get_note(node.val_slot_key).bounds.end_beat,
+            FrontierNode::NoneConsumed(list, node) => node.val.bounds.start_beat,
+            FrontierNode::StartBeatConsumed(list, node) => node.val.bounds.end_beat,
         }
     }
 
@@ -223,7 +221,7 @@ impl<'a, S> Iterator for NoteEventIterator<'a, S> {
                 }
 
                 let cur_min_beat_opt =
-                    min_valid_line_ix.map(|i| self.frontier_nodes[i].unwrap().beat());
+                    min_valid_line_ix.map(|i| self.frontier_nodes[i].as_ref().unwrap().beat());
                 match cur_min_beat_opt {
                     Some(cur_min_beat) if cur_min_beat < frontier_node.beat() => (),
                     _ => min_valid_line_ix = Some(i),
@@ -233,7 +231,7 @@ impl<'a, S> Iterator for NoteEventIterator<'a, S> {
 
         min_valid_line_ix.map(|line_ix| {
             let frontier_node_opt = &mut self.frontier_nodes[line_ix];
-            let frontier_node = frontier_node_opt.unwrap();
+            let frontier_node = frontier_node_opt.as_ref().unwrap();
             self.cur_beat = frontier_node.beat();
             let event = frontier_node.get_note_event(line_ix);
 
@@ -272,21 +270,6 @@ impl<'a, S> NoteEventIterator<'a, S> {
 }
 
 impl<S> NoteSkipListNode<S> {
-    pub fn contains_beat(&self, line: &NoteSkipList<S>, beat: f32) -> bool {
-        line.get_note(self.val_slot_key).bounds.contains(beat)
-    }
-
-    // TODO: This needs to be a `NoteBox` method or something.  And we need to pull it out anyway.
-    // Actually, we need to change `beats` to some other unit and keep it internal.
-    pub fn intersects_beats(&self, line: &NoteSkipList<S>, start_beat: f32, end_beat: f32) -> bool {
-        line.get_note(self.val_slot_key)
-            .bounds
-            .intersects(&NoteBoxBounds {
-                start_beat,
-                end_beat,
-            })
-    }
-
     /// Returns the slot index of the last node that has a value less than that of the target
     /// value.  If `target_val` is less than all other values in the collection, then `None`
     /// is returned.
@@ -297,16 +280,15 @@ impl<S> NoteSkipListNode<S> {
         self_key: NodeSlabKey<S>,
         levels: &mut PreceedingLinks<S>,
     ) {
-        let note = *list.get_note(self.val_slot_key);
         // if we try searching a node greater than the target value, we've messed up badly
-        debug_assert!(note.bounds.end_beat <= target_val);
+        debug_assert!(self.val.bounds.end_beat <= target_val);
         // Starting with the top level and working down, check if the value behind the shortcut is
         // higher or lower than the current value.
         let mut link_level = NOTE_SKIP_LIST_LEVELS - 1;
         loop {
             if let Some(shortcut_node_slot_key) = self.links[link_level] {
                 let shortcut_node: &NoteSkipListNode<S> = list.get_node(shortcut_node_slot_key);
-                let shortcut_note = list.get_note(shortcut_node.val_slot_key);
+                let shortcut_note = &shortcut_node.val;
 
                 // if this shortcut value is still smaller, take the shortcut and continue
                 // searching.
@@ -332,7 +314,7 @@ impl<S> NoteSkipListNode<S> {
 
 #[derive(Clone)]
 pub struct NoteSkipList<S> {
-    pub notes: Slab<NoteBox<S>>,
+    // pub notes: Slab<NoteBox<S>>,
     pub nodes: Slab<NoteSkipListNode<S>>,
     pub head_key: Option<NodeSlabKey<S>>,
 }
@@ -379,13 +361,12 @@ pub struct NoteSkipListIterator<'a, S> {
 }
 
 impl<'a, S> Iterator for NoteSkipListIterator<'a, S> {
-    type Item = NoteBox<S>;
+    type Item = &'a NoteBox<S>;
 
-    fn next(&mut self) -> Option<NoteBox<S>> {
+    fn next(&mut self) -> Option<&'a NoteBox<S>> {
         let node = self.cur_node?;
-        let note = self.line.get_note(node.val_slot_key);
         self.cur_node = self.line.next_node(node);
-        Some(*note)
+        Some(&node.val)
     }
 }
 
@@ -437,7 +418,7 @@ impl<'a, S> NoteSkipListRegionIterator<'a, S> {
             self.max_beat,
         ) {
             Some(node) => {
-                if node.intersects_beats(cur_line, self.min_beat, self.max_beat) {
+                if node.val.intersects_beats(self.min_beat, self.max_beat) {
                     // the found note intersects the start beat, so it's valid
                     Some(node)
                 } else if cur_line.next_node(node).is_some() {
@@ -495,13 +476,7 @@ impl<'a, S> Iterator for NoteSkipListRegionIterator<'a, S> {
 
     fn next(&mut self) -> Option<NoteData<'a, S>> {
         let node = match self.cur_node {
-            Some(node)
-                if node.intersects_beats(
-                    &self.lines.lines[self.cur_line_ix],
-                    self.min_beat,
-                    self.max_beat,
-                ) =>
-                node,
+            Some(node) if node.val.intersects_beats(self.min_beat, self.max_beat) => node,
             _ => {
                 self.next_line()?;
                 return self.next();
@@ -513,44 +488,29 @@ impl<'a, S> Iterator for NoteSkipListRegionIterator<'a, S> {
 
         Some(NoteData {
             line_ix: self.cur_line_ix,
-            note_box: cur_line.get_note(node.val_slot_key),
+            note_box: &node.val,
         })
     }
 }
 
-impl<S> NoteSkipList<S> {
-    pub fn new() -> Self {
-        let mut notes = Slab::with_capacity(NOTES_SLAB_CAPACITY);
+impl<S> Default for NoteSkipList<S> {
+    fn default() -> Self {
         let mut nodes = Slab::with_capacity(NODES_SLAB_CAPACITY);
 
-        // Insert placeholders since we can't use index 0 due to the `NonZeroU32` optimization
-        notes.insert(NoteBox {
-            data: unsafe { mem::uninitialized() },
-            bounds: NoteBoxBounds {
-                start_beat: 0.,
-                end_beat: 0.,
-            },
-        });
+        // Insert a placeholder since we can't use index 0 due to the `NonZeroU32` optimization
         nodes.insert(NoteSkipListNode {
-            val_slot_key: 0.into(),
+            val: unsafe { mem::uninitialized() },
             links: blank_shortcuts(),
         });
 
         NoteSkipList {
             head_key: None,
-            notes,
             nodes,
         }
     }
+}
 
-    pub fn get_note<'a>(&'a self, key: SlabKey<NoteBox<S>>) -> &'a NoteBox<S> {
-        &self.notes[key.key()]
-    }
-
-    pub fn get_note_mut<'a>(&'a mut self, key: SlabKey<NoteBox<S>>) -> &'a mut NoteBox<S> {
-        &mut self.notes[key.key()]
-    }
-
+impl<S> NoteSkipList<S> {
     pub fn get_node<'a>(&'a self, key: SlabKey<NoteSkipListNode<S>>) -> &'a NoteSkipListNode<S> {
         &self.nodes[key.key()]
     }
@@ -588,34 +548,33 @@ impl<S> NoteSkipList<S> {
     /// Deallocates the slab slots for both the node and its `NoteBox`, returning the inner
     /// `NoteBox`.
     fn dealloc_node(&mut self, node_key: NodeSlabKey<S>) -> NoteBox<S> {
-        let node = self.nodes.remove(node_key.key());
-        self.notes.remove(node.val_slot_key.key())
+        self.nodes.remove(node_key.key()).val
     }
 
-    /// Inserts a node into the skip list in order.  Returns `false` if the node was inserted
-    /// successfully and `true` if there is an intersecting node blocking it from being inserted.
-    pub fn insert(&mut self, note: NoteBox<S>) -> bool {
+    /// Inserts a node into the skip list in order.  Returns `None` if the node was inserted
+    /// successfully and `Some(note)` returning the supplied note if there is an intersecting node
+    /// blocking it from being inserted.
+    pub fn insert(&mut self, note: NoteBox<S>) -> Option<NoteBox<S>> {
         let mut new_node = NoteSkipListNode {
-            val_slot_key: self.notes.insert(note).into(),
+            val: note,
             links: blank_shortcuts(),
         };
 
         if self.head_key.is_none() {
             let new_node_key = self.nodes.insert(new_node);
             self.head_key = Some(new_node_key.into());
-            return false;
+            return None;
         }
 
         let head_key = self.head_key.unwrap();
 
         let level = get_skip_list_level();
-        let head_note = self.get_note(self.get_node(head_key).val_slot_key);
+        let head_note = &self.get_node(head_key).val;
         // Only bother searching if the head is smaller than the target value.  If the head is
         // larger, we automatically insert it at the front.
-        if head_note.bounds.end_beat > note.bounds.start_beat {
-            if head_note.bounds.intersects_exclusive(&note.bounds) {
-                self.notes.remove(new_node.val_slot_key.key());
-                return true;
+        if head_note.bounds.end_beat > new_node.val.bounds.start_beat {
+            if head_note.bounds.intersects_exclusive(&new_node.val.bounds) {
+                return Some(new_node.val);
             }
 
             // The new note is the smallest one in the list, so insert it before the head.
@@ -631,9 +590,11 @@ impl<S> NoteSkipList<S> {
                     Some(node_key) => self.get_node(node_key),
                     None => continue,
                 };
-                let preceeding_note = self.get_note(preceeding_node.val_slot_key);
+                let preceeding_note = &preceeding_node.val;
 
-                debug_assert!(!preceeding_note.bounds.intersects_exclusive(&note.bounds));
+                debug_assert!(!preceeding_note
+                    .bounds
+                    .intersects_exclusive(&new_node.val.bounds));
             }
             new_node.links[old_links_range.clone()]
                 .clone_from_slice(&self.head().unwrap().links[old_links_range]);
@@ -644,33 +605,32 @@ impl<S> NoteSkipList<S> {
             for link in &mut self.head_mut().unwrap().links[(level + 1)..NOTE_SKIP_LIST_LEVELS] {
                 *link = None;
             }
-            return false;
+            return None;
         }
 
         let mut preceeding_links = init_preceeding_links(head_key);
         self.head().unwrap().search(
             &self,
-            note.bounds.start_beat,
+            new_node.val.bounds.start_beat,
             head_key,
             &mut preceeding_links,
         );
 
         // check if the note before the new one intersects it
         let first_link_node = self.get_node(preceeding_links[0]);
-        let first_link_note = self.get_note(first_link_node.val_slot_key);
-        if first_link_note.bounds.intersects_exclusive(&note.bounds) {
-            self.notes.remove(new_node.val_slot_key.key());
-            return true;
+        let first_link_note = &first_link_node.val;
+        if first_link_note
+            .bounds
+            .intersects_exclusive(&new_node.val.bounds)
+        {
+            return Some(new_node.val);
         }
 
         // check if the note after the new one intersects it (if it exists)
-
         if let Some(next_node_key) = first_link_node.links[0] {
-            let next_node = self.get_node(next_node_key);
-            let next_note = self.get_note(next_node.val_slot_key);
-            if next_note.bounds.intersects_exclusive(&note.bounds) {
-                self.notes.remove(new_node.val_slot_key.key());
-                return true;
+            let next_note = &self.get_node(next_node_key).val;
+            if next_note.bounds.intersects_exclusive(&new_node.val.bounds) {
+                return Some(new_node.val);
             }
         }
 
@@ -685,10 +645,10 @@ impl<S> NoteSkipList<S> {
         for i in 0..=level {
             let preceeding_node_for_level = &mut self.get_node(preceeding_links[i]);
             new_node.links[i] = preceeding_node_for_level.links[i];
-            debug_assert!(!self
-                .get_note(preceeding_node_for_level.val_slot_key)
+            debug_assert!(!preceeding_node_for_level
+                .val
                 .bounds
-                .intersects_exclusive(&note.bounds));
+                .intersects_exclusive(&new_node.val.bounds));
         }
 
         // Actually insert the new node into the nodes slab
@@ -701,7 +661,7 @@ impl<S> NoteSkipList<S> {
 
         // For levels after the generated level, we take no action.  We let the existing
         // links stay as they are and leave the new nodes' blank.
-        false
+        None
     }
 
     /// Removes any note box that contains the given beat.
@@ -709,17 +669,12 @@ impl<S> NoteSkipList<S> {
         let head_key = self
             .head_key
             .expect("Attempted to remove node from line with no head node");
-        let head_note = {
-            let head = self.get_node(head_key);
-            *self.get_note(head.val_slot_key)
-        };
+        let head_note = &self.get_node(head_key).val;
 
         if head_note.bounds.start_beat == start_beat {
             // The head is being removed.  Replace it with the next child (copying over links where
             // applicable) if there is one.
 
-            // It's sad we have to clone this, but that's the price we pay for lifetime safety.
-            // Think of it as the lifetime tax.
             let head_links = self.get_node(head_key).links;
             if let Some(new_head_key) = head_links[0] {
                 let new_head = self.get_node_mut(new_head_key);
@@ -752,7 +707,7 @@ impl<S> NoteSkipList<S> {
         Some(self.dealloc_node(removed_node_key))
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = NoteBox<S>> + 'a {
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &'a NoteBox<S>> + 'a {
         NoteSkipListIterator {
             line: self,
             cur_node: self.head(),
@@ -772,9 +727,9 @@ impl<S> NoteSkipList<S> {
         end_beat: f32,
     ) -> Option<&NoteSkipListNode<S>> {
         let head = self.head()?;
-        if self.get_note(head.val_slot_key).bounds.start_beat > end_beat {
+        if head.val.bounds.start_beat > end_beat {
             return None;
-        } else if head.intersects_beats(self, start_beat, end_beat) {
+        } else if head.val.intersects_beats(start_beat, end_beat) {
             return Some(head);
         }
 
@@ -785,24 +740,19 @@ impl<S> NoteSkipList<S> {
             for level in (0..=max_level).rev() {
                 match checking_node.links[level] {
                     // shortcut takes us to an invalid node that is still before our desired range
-                    Some(node_key)
-                        if self
-                            .get_note(self.get_node(node_key).val_slot_key)
-                            .bounds
-                            .end_beat
-                            < start_beat =>
-                    {
+                    Some(node_key) if self.get_node(node_key).val.bounds.end_beat < start_beat => {
                         let node = self.get_node(node_key);
                         max_level = level;
                         cur_node = &*node;
                         continue 'outer;
-                    }
+                    },
                     // shortcut takes us to a valid node, but one lower down may still lead us to
                     // an earlier one that is still valid so keep checking.
                     Some(node_key)
                         if self
                             .get_node(node_key)
-                            .intersects_beats(self, start_beat, end_beat) =>
+                            .val
+                            .intersects_beats(start_beat, end_beat) =>
                         cur_node = &*self.get_node(node_key),
                     _ => (),
                 }
@@ -817,7 +767,7 @@ impl<S> NoteSkipList<S> {
         let head_key = self.head_key?;
         let head = self.get_node(head_key);
 
-        if self.get_note(head.val_slot_key).bounds.end_beat > beat {
+        if head.val.bounds.end_beat > beat {
             return None;
         }
 
@@ -835,9 +785,9 @@ pub struct NoteLines<S> {
 
 impl<S> NoteLines<S> {
     pub fn new(line_count: usize) -> Self {
-        let lines = Vec::with_capacity(line_count);
+        let mut lines = Vec::with_capacity(line_count);
         for _ in 0..line_count {
-            lines.push(NoteSkipList::new());
+            lines.push(NoteSkipList::default());
         }
 
         NoteLines { lines }
@@ -855,44 +805,31 @@ impl<S> NoteLines<S> {
         }
         // If the first value is already greater than the new note, we don't have to search and
         // simply bound it on the top side by the head's start beat.
-        if head.contains_beat(line, beat) {
-            return Bounds::Intersecting(line.get_note(line.head().unwrap().val_slot_key));
-        } else if line.get_note(head.val_slot_key).bounds.start_beat > beat {
-            return Bounds::Bounded(
-                0.0,
-                Some(line.get_note(head.val_slot_key).bounds.start_beat),
-            );
+        if head.val.contains_beat(beat) {
+            return Bounds::Intersecting(&line.head().unwrap().val);
+        } else if head.val.bounds.start_beat > beat {
+            return Bounds::Bounded(0.0, Some(head.val.bounds.start_beat));
         }
         head.search(line, beat, line.head_key.unwrap(), &mut preceeding_links);
 
         let preceeding_node = line.get_node(preceeding_links[0]);
         let following_node_key = match &preceeding_node.links[0] {
             Some(node_key) => *node_key,
-            None =>
-                return Bounds::Bounded(
-                    line.get_note(preceeding_node.val_slot_key).bounds.end_beat,
-                    None,
-                ),
+            None => return Bounds::Bounded(preceeding_node.val.bounds.end_beat, None),
         };
-        if line.get_node(following_node_key).contains_beat(line, beat) {
-            return Bounds::Intersecting(
-                line.get_note(line.get_node(following_node_key).val_slot_key),
-            );
+        if line.get_node(following_node_key).val.contains_beat(beat) {
+            return Bounds::Intersecting(&line.get_node(following_node_key).val);
         }
         Bounds::Bounded(
-            line.get_note(preceeding_node.val_slot_key).bounds.end_beat,
-            Some(
-                line.get_note(line.get_node(following_node_key).val_slot_key)
-                    .bounds
-                    .start_beat,
-            ),
+            preceeding_node.val.bounds.end_beat,
+            Some(line.get_node(following_node_key).val.bounds.start_beat),
         )
     }
 
-    /// Inserts a node into the skip list at the specified level in order.  Returns `false` if the
-    /// node was inserted successfully and `true` if there is an intersecting node blocking it from
-    /// being inserted.
-    pub fn insert(&mut self, line_ix: usize, note: NoteBox<S>) -> bool {
+    /// Inserts a node into the skip list at the specified level in order.  Returns `None` if the
+    /// node was inserted successfully and `Some(note)` if there is an intersecting node blocking
+    /// it from being inserted.
+    pub fn insert(&mut self, line_ix: usize, note: NoteBox<S>) -> Option<NoteBox<S>> {
         self.lines[line_ix].insert(note)
     }
 
@@ -911,10 +848,10 @@ impl<S> NoteLines<S> {
         start_beat: f32,
     ) -> bool {
         if let Some(note) = self.lines[src_line_ix].remove(start_beat) {
-            if self.lines[dst_line_ix].insert(note) {
+            if let Some(note) = self.lines[dst_line_ix].insert(note) {
                 // insertion failed due to a collision; re-insert into the original line.
-                let insertion_error = self.lines[src_line_ix].insert(note);
-                debug_assert!(!insertion_error);
+                let returned_note = self.lines[src_line_ix].insert(note);
+                debug_assert!(returned_note.is_none());
                 true
             } else {
                 false
@@ -939,19 +876,12 @@ impl<S> NoteLines<S> {
         let (preceeding_note_end_beat, target_node_key) =
             match line.find_first_node_before_beat(start_beat) {
                 Some(preceeding_node_key) => (
-                    line.get_note(line.get_node(preceeding_node_key).val_slot_key)
-                        .bounds
-                        .end_beat,
+                    line.get_node(preceeding_node_key).val.bounds.end_beat,
                     line.get_node(preceeding_node_key).links[0].unwrap(),
                 ),
                 None => {
                     // No preceeding node, so it's either the head or doesn't exist.
-                    debug_assert_eq!(
-                        line.get_note(line.head().unwrap().val_slot_key)
-                            .bounds
-                            .start_beat,
-                        start_beat
-                    );
+                    debug_assert_eq!(line.head().unwrap().val.bounds.start_beat, start_beat);
                     let head = line.head_key.unwrap();
 
                     (0.0, head)
@@ -960,9 +890,9 @@ impl<S> NoteLines<S> {
 
         let following_note_start_beat = line
             .next_node(line.get_node(target_node_key))
-            .map(|node| line.get_note(node.val_slot_key).bounds.start_beat)
+            .map(|node| node.val.bounds.start_beat)
             .unwrap_or(f32::INFINITY);
-        let target_note = line.get_note_mut(line.get_node(target_node_key).val_slot_key);
+        let target_note = &mut line.get_node_mut(target_node_key).val;
         let target_note_length = target_note.bounds.width();
         let new_target_node_start = clamp(
             target_note.bounds.start_beat + beats_to_move,
@@ -1030,14 +960,13 @@ impl NoteSkipList<usize> {
         for (level, next_node_for_level) in node.links.iter().enumerate() {
             if next_node_for_level.is_some()
                 && debug_ptrs[level].is_some()
-                && self.get_note(node.val_slot_key)
-                    != self.get_note(self.get_node(debug_ptrs[level].unwrap()).val_slot_key)
+                && node.val != self.get_node(debug_ptrs[level].unwrap()).val
             {
                 // Make sure that the next node in the level is what we expect it to be,
                 // ensuring that none of our fast paths skip nodes in their level.
                 debug_assert_eq!(
-                    debug_ptrs[level].map(|p| self.get_note(self.get_node(p).val_slot_key)),
-                    next_node_for_level.map(|p| self.get_note(self.get_node(p).val_slot_key))
+                    debug_ptrs[level].map(|p| self.get_node(p).val.bounds),
+                    next_node_for_level.map(|p| self.get_node(p).val.bounds)
                 );
             }
         }
@@ -1063,11 +992,11 @@ impl NoteSkipList<usize> {
                 };
 
                 if next_valid_node_for_level
-                    .map(|p| self.get_note(self.get_node(p).val_slot_key)) == Some(self.get_note(node.val_slot_key)) {
+                    .map(|p| self.get_node(p).val.bounds) == Some(node.val.bounds) {
                     // If we are the node that was pointed to by the last node in this level,
                     // set the next valid node in the level to be the one we point to.
                     debug_ptrs[level] = link_opt;
-                    let link_s = format!("{:?}", self.get_note(node.val_slot_key));
+                    let link_s = format!("{:?}", node.val);
                     let string_len = link_s.len();
                     if string_len > longest_link_s {
                         longest_link_s = string_len;

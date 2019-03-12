@@ -47,6 +47,14 @@ impl GridHandler for MidiEditorGridHandler {
         state::state().cursor_dom_id = render::draw_cursor();
         composition_saving_loading::try_load_saved_composition();
     }
+
+    fn on_note_select(&mut self, dom_id: usize) {
+        // TODO
+    }
+
+    fn on_note_double_click(&mut self, dom_id: usize) {
+        // TODO
+    }
 }
 
 pub fn mk_midi_editor(config: &str) -> Box<dyn ViewContext> {
@@ -55,5 +63,7 @@ pub fn mk_midi_editor(config: &str) -> Box<dyn ViewContext> {
         row_height: constants::LINE_HEIGHT,
         row_count: constants::LINE_COUNT,
     };
-    box Grid::new(&conf, MidiEditorGridHandler(state::State::default()))
+    let grid: Box<Grid<usize, MidiEditorGridRenderer, MidiEditorGridHandler>> =
+        box Grid::new(&conf, MidiEditorGridHandler(state::State::default()));
+    grid
 }

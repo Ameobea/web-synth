@@ -13,14 +13,16 @@ use engine::{
 };
 use rand::prelude::*;
 
-fn mklines(notes: &[(f32, f32)]) -> NoteLines {
+fn mklines(notes: &[(f32, f32)]) -> NoteLines<usize> {
     unsafe { init_state() };
     let mut lines = NoteLines::new(1);
     let mut mkbox = |start_beat: f32, end_beat: f32| {
         lines.insert(0, NoteBox {
-            start_beat,
-            end_beat,
-            dom_id: 0,
+            bounds: NoteBoxBounds {
+                start_beat,
+                end_beat,
+            },
+            data: 0,
         })
     };
 
@@ -94,20 +96,22 @@ fn slab_key_size() {
 fn skiplist_construction_iteration() {
     unsafe { init_state() };
 
-    let mut skip_list = NoteSkipList::new();
-    let mut notes: Vec<_> = vec![(1.0, 2.0), (5.0, 10.0), (3.0, 4.0)]
+    let mut skip_list = NoteSkipList::default();
+    let mut notes: Vec<NoteBox<usize>> = vec![(1.0, 2.0), (5.0, 10.0), (3.0, 4.0)]
         .into_iter()
         .map(|(start_beat, end_beat)| NoteBox {
-            start_beat,
-            end_beat,
-            dom_id: 0,
+            bounds: NoteBoxBounds {
+                start_beat,
+                end_beat,
+            },
+            data: 0,
         })
         .collect();;
     for note in &notes {
         skip_list.insert(note.clone());
     }
 
-    let actual_notes: Vec<_> = skip_list.iter().collect();
+    let actual_notes: Vec<_> = skip_list.iter().cloned().collect();
     notes.sort();
     assert_eq!(notes, actual_notes);
 }
@@ -115,7 +119,7 @@ fn skiplist_construction_iteration() {
 #[test]
 fn skiplist_bulk_insertion() {
     unsafe { init_state() };
-    let mut skip_list = NoteSkipList::new();
+    let mut skip_list = NoteSkipList::default();
 
     let mut notes = Vec::with_capacity(1000 / 2);
     for i in 0..500 {
@@ -125,9 +129,11 @@ fn skiplist_bulk_insertion() {
 
     for (start_beat, end_beat) in notes {
         skip_list.insert(NoteBox {
-            start_beat,
-            end_beat,
-            dom_id: 0,
+            bounds: NoteBoxBounds {
+                start_beat,
+                end_beat,
+            },
+            data: 0,
         });
         println!("{:?}\n", skip_list);
     }
@@ -141,36 +147,34 @@ fn skiplist_level_generation(b: &mut test::Bencher) {
 
 #[test]
 fn skiplist_node_debug() {
-    let mut line = NoteSkipList::new();
+    let mut line = NoteSkipList::default();
 
-    let next_node_ptr: SlabKey<NoteSkipListNode> = line
+    let next_node_ptr: SlabKey<NoteSkipListNode<usize>> = line
         .nodes
         .insert(NoteSkipListNode {
-            val_slot_key: line
-                .notes
-                .insert(NoteBox {
+            val: NoteBox {
+                bounds: NoteBoxBounds {
                     start_beat: 20.0,
                     end_beat: 30.0,
-                    dom_id: 0,
-                })
-                .into(),
+                },
+                data: 0,
+            },
             links: blank_shortcuts(),
         })
         .into();
 
     let node = NoteSkipListNode {
-        val_slot_key: line
-            .notes
-            .insert(NoteBox {
+        val: NoteBox {
+            bounds: NoteBoxBounds {
                 start_beat: 0.0,
                 end_beat: 10.0,
-                dom_id: 0,
-            })
-            .into(),
+            },
+            data: 0,
+        },
         links: [Some(next_node_ptr), Some(next_node_ptr), None, None, None],
     };
-    let node_key: SlabKey<NoteSkipListNode> = line.nodes.insert(node).into();
-    let node: &NoteSkipListNode = line.get_node(node_key);
+    let node_key: SlabKey<NoteSkipListNode<usize>> = line.nodes.insert(node).into();
+    let node: &NoteSkipListNode<usize> = line.get_node(node_key);
     // pretend that we're inside of a full `SkipList` and initialize the global debug pointers
     init_node_dbg_ptrs(node_key);
 
@@ -183,58 +187,58 @@ fn skiplist_node_debug() {
 
 #[test]
 fn skiplist_debug_fmt() {
-    let mut line = NoteSkipList::new();
+    let mut skip_list = NoteSkipList::default();
 
-    let mut skip_list = NoteSkipList::new();
     let notes = &[(1., 2.), (4., 5.), (3., 4.), (2., 3.)]
         .iter()
         .map(|(start, end)| NoteBox {
-            start_beat: *start,
-            end_beat: *end,
-            dom_id: 0,
+            bounds: NoteBoxBounds {
+                start_beat: *start,
+                end_beat: *end,
+            },
+            data: 0,
         })
-        .map(|note| -> SlabKey<NoteBox> { line.notes.insert(note).into() })
         .collect::<Vec<_>>()[0..4];
     let [note_1_2, note_4_5, note_3_4, note_2_3] = match notes {
         [n1, n2, n3, n4] => [n1, n2, n3, n4],
         _ => unreachable!(),
     };
 
-    let mknode = |line: &mut NoteSkipList,
-                  val_slot_key: SlabKey<NoteBox>,
-                  links: [Option<SlabKey<NoteSkipListNode>>; NOTE_SKIP_LIST_LEVELS]|
-     -> SlabKey<NoteSkipListNode> {
-        line.nodes
-            .insert(NoteSkipListNode {
-                val_slot_key,
-                links,
-            })
-            .into()
+    let mknode = |line: &mut NoteSkipList<usize>,
+                  val: NoteBox<usize>,
+                  links: [Option<SlabKey<NoteSkipListNode<usize>>>; NOTE_SKIP_LIST_LEVELS]|
+     -> SlabKey<NoteSkipListNode<usize>> {
+        line.nodes.insert(NoteSkipListNode { val, links }).into()
     };
 
-    let node_4_5 = mknode(&mut line, *note_4_5, [None, None, None, None, None]);
-    let node_3_4 = mknode(&mut line, *note_3_4, [
+    let node_4_5 = mknode(&mut skip_list, note_4_5.clone(), [
+        None, None, None, None, None,
+    ]);
+    let node_3_4 = mknode(&mut skip_list, note_3_4.clone(), [
         Some(node_4_5),
         Some(node_4_5),
         None,
         None,
         None,
     ]);
-    let node_2_3 = mknode(&mut line, *note_2_3, [
+    let node_2_3 = mknode(&mut skip_list, note_2_3.clone(), [
         Some(node_3_4),
         None,
         None,
         None,
         None,
     ]);
-    let head = mknode(&mut line, *note_1_2, [
+    let head = mknode(&mut skip_list, note_1_2.clone(), [
         Some(node_2_3),
         Some(node_3_4),
         Some(node_4_5),
         Some(node_4_5),
         None,
     ]);
-    println!("head: \n{:?}", line.debug_node(&line.get_node(head)));
+    println!(
+        "head: \n{:?}",
+        skip_list.debug_node(&skip_list.get_node(head))
+    );
 
     // state().nodes are pre-linked, so all we have to do is insert the head.
     skip_list.head_key = Some(head);
@@ -270,9 +274,11 @@ fn skiplist_region_iter() {
     ];
     for (i, (line_ix, (start_beat, end_beat))) in notes.iter().enumerate() {
         lines.insert(*line_ix, NoteBox {
-            dom_id: i,
-            start_beat: *start_beat,
-            end_beat: *end_beat,
+            data: i,
+            bounds: NoteBoxBounds {
+                start_beat: *start_beat,
+                end_beat: *end_beat,
+            },
         });
     }
 
@@ -300,7 +306,10 @@ fn skiplist_region_iter() {
         .map(|note_data| {
             (
                 note_data.line_ix,
-                (note_data.note_box.start_beat, note_data.note_box.end_beat),
+                (
+                    note_data.note_box.bounds.start_beat,
+                    note_data.note_box.bounds.end_beat,
+                ),
             )
         })
         .collect::<Vec<_>>();
