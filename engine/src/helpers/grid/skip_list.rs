@@ -119,7 +119,7 @@ pub fn debug_links<S>(line: &NoteSkipList<S>, links: &LinkOpts<S>) -> String {
 pub fn get_skip_list_level() -> usize {
     let mut level = 0;
     for _ in 0..(NOTE_SKIP_LIST_LEVELS - 1) {
-        if state().rng.gen::<bool>() {
+        if rng().gen::<bool>() {
             break;
         }
         level += 1;
@@ -433,30 +433,6 @@ impl<'a, S> NoteSkipListRegionIterator<'a, S> {
         };
 
         Some(())
-    }
-}
-
-#[derive(Debug)]
-pub struct NoteData<'a, S> {
-    pub line_ix: usize,
-    pub note_box: &'a NoteBox<S>,
-}
-
-impl<'a, S> NoteData<'a, S> {
-    pub fn get_selection_region(&self) -> SelectionRegion {
-        SelectionRegion {
-            x: (self.note_box.bounds.start_beat * BEAT_LENGTH_PX) as usize,
-            y: self.line_ix * PADDED_LINE_HEIGHT,
-            width: ((self.note_box.bounds.end_beat - self.note_box.bounds.start_beat)
-                * BEAT_LENGTH_PX) as usize,
-            height: LINE_HEIGHT,
-        }
-    }
-
-    pub fn intersects_region(&self, region: &SelectionRegion) -> bool {
-        let our_region = self.get_selection_region();
-        // regions intersect if any point bounding our origin is contained in the other region
-        our_region.iter_points().any(|pt| region.contains_point(pt))
     }
 }
 
@@ -906,6 +882,8 @@ impl<S> NoteLines<S> {
         new_target_node_start
     }
 
+    // TODO: Convert to giving it beats directly rather than pixels.  We shouldn't know that pixels
+    // exist.
     pub fn iter_region<'a>(
         &'a self,
         region: &'a SelectionRegion,

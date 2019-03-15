@@ -1,7 +1,4 @@
-use super::{
-    super::views::midi_editor::{mk_midi_editor, state::State as MidiEditorState},
-    ViewContext,
-};
+use super::{super::views::midi_editor::mk_midi_editor, ViewContext};
 
 pub struct ViewContextEntry {
     pub context: Box<dyn ViewContext>,

@@ -10,11 +10,8 @@ pub const LINE_BORDER_WIDTH: usize = 1;
 pub const PADDED_LINE_HEIGHT: usize = LINE_HEIGHT + LINE_BORDER_WIDTH;
 pub const GRID_HEIGHT: usize = LINE_COUNT * PADDED_LINE_HEIGHT - 1;
 /// How long one beat is in pixels
-pub const BEAT_LENGTH_PX: f32 = 20.0;
 pub const MEASURE_COUNT: usize = 16;
 pub const BEATS_PER_MEASURE: usize = 4;
-pub const MEASURE_WIDTH_PX: f32 = BEATS_PER_MEASURE as f32 * BEAT_LENGTH_PX;
-pub const GRID_WIDTH: usize = MEASURE_COUNT * (MEASURE_WIDTH_PX as usize);
 
 pub const NOTE_SNAP_BEAT_INTERVAL: f32 = 0.5;
 

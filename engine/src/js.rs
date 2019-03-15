@@ -6,18 +6,18 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     pub fn render_quad(
         canvas_index: usize,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
         class: &str,
     ) -> usize;
     pub fn render_line(
         canvas_index: usize,
-        x1: f32,
-        y1: f32,
-        x2: f32,
-        y2: f32,
+        x1: usize,
+        y1: usize,
+        x2: usize,
+        y2: usize,
         class: &str,
     ) -> usize;
     pub fn get_active_attr(key: &str) -> Option<String>;

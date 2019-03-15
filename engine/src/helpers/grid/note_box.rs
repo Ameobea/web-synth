@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     fmt::{self, Debug, Formatter},
+    hash::{Hash, Hasher},
 };
 
 use std::f32;
@@ -118,4 +119,73 @@ impl<S> Ord for NoteBox<S> {
 pub struct NoteBoxData {
     pub width: usize,
     pub x: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SelectedNoteData {
+    pub line_ix: usize,
+    pub dom_id: usize,
+    pub start_beat: f32,
+    pub width: f32,
+}
+
+impl PartialEq for SelectedNoteData {
+    fn eq(&self, other: &Self) -> bool { self.dom_id == other.dom_id }
+}
+
+impl Eq for SelectedNoteData {}
+
+// Since `dom_id` is guarenteed to be unique, we can skip hashing the `line_ix` as an optimization.
+impl Hash for SelectedNoteData {
+    fn hash<H: Hasher>(&self, state: &mut H) { self.dom_id.hash(state) }
+}
+
+impl PartialOrd for SelectedNoteData {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let ix_ordering = self.line_ix.cmp(&other.line_ix);
+        let ordering = match ix_ordering {
+            Ordering::Equal => self.start_beat.partial_cmp(&other.start_beat).unwrap(),
+            _ => ix_ordering,
+        };
+        Some(ordering)
+    }
+}
+
+impl Ord for SelectedNoteData {
+    fn cmp(&self, other: &Self) -> Ordering { self.partial_cmp(&other).unwrap() }
+}
+
+impl SelectedNoteData {
+    pub fn from_note_box(line_ix: usize, note_box: &NoteBox<usize>) -> Self {
+        SelectedNoteData {
+            line_ix,
+            dom_id: note_box.data,
+            start_beat: note_box.bounds.start_beat,
+            width: note_box.bounds.width(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct NoteData<'a, S> {
+    pub line_ix: usize,
+    pub note_box: &'a NoteBox<S>,
+}
+
+impl<'a, S> NoteData<'a, S> {
+    pub fn get_selection_region(&self) -> SelectionRegion {
+        SelectionRegion {
+            x: (self.note_box.bounds.start_beat * BEAT_LENGTH_PX) as usize,
+            y: self.line_ix * PADDED_LINE_HEIGHT,
+            width: ((self.note_box.bounds.end_beat - self.note_box.bounds.start_beat)
+                * BEAT_LENGTH_PX) as usize,
+            height: LINE_HEIGHT,
+        }
+    }
+
+    pub fn intersects_region(&self, region: &SelectionRegion) -> bool {
+        let our_region = self.get_selection_region();
+        // regions intersect if any point bounding our origin is contained in the other region
+        our_region.iter_points().any(|pt| region.contains_point(pt))
+    }
 }
