@@ -5,6 +5,7 @@ pub use wasm_bindgen::prelude::*;
 
 pub use super::{
     constants::*,
+    helpers::grid::GridRendererUniqueIdentifier,
     js,
     synth::{self, PolySynth},
     util::{self, *},

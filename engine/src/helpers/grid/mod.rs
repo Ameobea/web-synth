@@ -39,6 +39,14 @@ pub trait GridRenderer {
     fn deselect_note(dom_id: DomId);
 
     fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId;
+    fn set_selection_box(
+        conf: &GridConf,
+        dom_id: DomId,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    );
     fn set_cursor_pos(x: usize);
 }
 
@@ -52,38 +60,46 @@ pub trait GridHandler<S, R: GridRenderer> {
 
     fn on_key_down(
         &mut self,
+        state: &mut GridState<S>,
         key: &str,
-        grid: &mut Grid<S, R, Self>,
         control_pressed: bool,
         shift_pressed: bool,
     );
 
+    fn on_key_up(
+        &mut self,
+        state: &mut GridState<S>,
+        key: &str,
+        control_pressed: bool,
+        shift_pressed: bool,
+    );
+
+    fn on_mouse_down(&mut self, state: &mut GridState<S>, x: usize, y: usize);
+
     fn on_selection_region_update(
         &mut self,
-        grid: &mut Grid<S, R, Self>,
+        grid: &mut GridState<S>,
         retained_region: &Option<SelectionRegion>,
         changed_region_1: &ChangedRegion,
         changed_region_2: &ChangedRegion,
     );
 
-    fn on_selection_box_deleted(&mut self, grid: &mut Grid<S, R, Self>);
+    fn on_selection_box_deleted(&mut self, grid: &mut GridState<S>);
 
     fn create_note(&mut self, line_ix: usize, start_beat: f32, dom_id: DomId) -> S;
+
+    fn on_note_move(
+        &mut self,
+        grid_state: &mut GridState<S>,
+        dom_id: DomId,
+        old_line_ix: usize,
+        old_start_beat: f32,
+        new_line_ix: usize,
+        new_start_beat: f32,
+    );
 }
 
-/// `Grid` is a view context that consists of a set of horizontal rows in which segments, currently
-/// called **Notes**, are rendered.  It handles the minutiae of rendering the grid, selecting/
-/// deselecting notes, drawing/deleting notes, and passing events down to an attached
-/// `GridHandler`.
-///
-/// The `GridHandler` has the job of implementing custom grid logic.  For the MIDI editor, this
-/// includes things like playing the synth when notes are drawn, allowing note movement between
-/// different levels, etc.  For the `ClipCompositor`, this includes switching the view to the
-/// MIDI editor for a specific track when it's double clicked.
-///
-/// Finally, it has a `GridRenderer` which is just a bunch of type-level functions that are used
-/// to render custom versions of the individual elements of the grid.
-pub struct Grid<S, R: GridRenderer, H: GridHandler<S, R>> {
+pub struct GridState<S> {
     pub conf: GridConf,
     pub data: NoteLines<S>,
     pub selected_notes: FnvHashSet<SelectedNoteData>,
@@ -105,30 +121,11 @@ pub struct Grid<S, R: GridRenderer, H: GridHandler<S, R>> {
     // TODO: Make this something better, like mapping dom_id to line index and start beat or sth.
     pub cursor_dom_id: usize,
     pub playback_active: bool,
-    pub handler: H,
-    renderer: PhantomData<R>,
 }
 
-pub struct GridConf {
-    pub row_count: usize,
-    pub row_height: usize,
-    pub gutter_height: usize,
-    pub beat_length_px: usize,
-    pub note_snap_beat_interval: f32,
-    pub cursor_gutter_height: usize,
-    pub line_border_width: usize,
-    pub line_height: usize,
-}
-
-impl GridConf {
-    pub fn padded_line_height(&self) -> usize { self.line_height + self.line_border_width }
-
-    pub fn grid_height(&self) -> usize { self.row_count * self.padded_line_height() }
-}
-
-impl<S, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
-    pub fn new(conf: GridConf, handler: H) -> Self {
-        Grid {
+impl<S> GridState<S> {
+    fn new(conf: GridConf) -> Self {
+        Self {
             conf,
             data: NoteLines::new(constants::NOTE_SKIP_LIST_LEVELS),
             selected_notes: FnvHashSet::default(),
@@ -148,6 +145,82 @@ impl<S, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
             selection_box_dom_id: None,
             cursor_dom_id: 0,
             playback_active: false,
+        }
+    }
+
+    pub fn get_sorted_selected_notes<'a>(
+        &'a self,
+        sort_reverse: bool,
+    ) -> Vec<&'a SelectedNoteData> {
+        let mut notes: Vec<&SelectedNoteData> = self.selected_notes.iter().collect::<Vec<_>>();
+
+        if sort_reverse {
+            notes.sort_unstable_by(|a, b| b.cmp(a));
+        } else {
+            notes.sort_unstable();
+        }
+
+        notes
+    }
+}
+
+/// `Grid` is a view context that consists of a set of horizontal rows in which segments, currently
+/// called **Notes**, are rendered.  It handles the minutiae of rendering the grid, selecting/
+/// deselecting notes, drawing/deleting notes, and passing events down to an attached
+/// `GridHandler`.
+///
+/// The `GridHandler` has the job of implementing custom grid logic.  For the MIDI editor, this
+/// includes things like playing the synth when notes are drawn, allowing note movement between
+/// different levels, etc.  For the `ClipCompositor`, this includes switching the view to the
+/// MIDI editor for a specific track when it's double clicked.
+///
+/// Finally, it has a `GridRenderer` which is just a bunch of type-level functions that are used
+/// to render custom versions of the individual elements of the grid.
+pub struct Grid<S, R: GridRenderer, H: GridHandler<S, R>> {
+    pub state: GridState<S>,
+    pub handler: H,
+    renderer: PhantomData<R>,
+}
+
+#[derive(Clone)]
+pub struct GridConf {
+    pub row_count: usize,
+    pub row_height: usize,
+    pub gutter_height: usize,
+    pub beat_length_px: usize,
+    pub note_snap_beat_interval: f32,
+    pub cursor_gutter_height: usize,
+    pub line_border_width: usize,
+    pub line_height: usize,
+    pub grid_width: usize,
+    pub measure_width_px: usize,
+}
+
+impl GridConf {
+    pub fn padded_line_height(&self) -> usize { self.line_height + self.line_border_width }
+
+    pub fn grid_height(&self) -> usize { self.row_count * self.padded_line_height() }
+
+    pub fn get_line_index(&self, y_px: usize) -> Option<usize> {
+        if y_px > self.cursor_gutter_height {
+            Some(
+                ((y_px - self.cursor_gutter_height) as f32 / (self.padded_line_height() as f32))
+                    .trunc() as usize,
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn px_to_beat(&self, px: usize) -> f32 { px as f32 / (self.beat_length_px as f32) }
+
+    pub fn beats_to_px(&self, beats: f32) -> usize { beats as usize * self.beat_length_px }
+}
+
+impl<S, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
+    pub fn new(conf: GridConf, handler: H) -> Self {
+        Grid {
+            state: GridState::new(conf),
             handler,
             renderer: PhantomData,
         }
@@ -165,14 +238,17 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
     fn cleanup(&mut self) { unimplemented!() }
 
     fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
-        self.control_pressed = control_pressed;
-        self.shift_pressed = shift_pressed;
+        self.state.control_pressed = control_pressed;
+        self.state.shift_pressed = shift_pressed;
 
         match key {
             // Delete all currently selected notes
             "Backspace" | "Delete" =>
-                for note_data in self.selected_notes.drain() {
-                    let removed_note = self.data.remove(note_data.line_ix, note_data.start_beat);
+                for note_data in self.state.selected_notes.drain() {
+                    let removed_note = self
+                        .state
+                        .data
+                        .remove(note_data.line_ix, note_data.start_beat);
                     debug_assert!(removed_note.is_some());
                     // TODO: Make renderer method
                     js::delete_element(note_data.dom_id);
@@ -185,19 +261,16 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
             "p" => self.copy_selected_notes(),
             _ => self
                 .handler
-                .on_key_down(key, &mut self, control_pressed, shift_pressed),
+                .on_key_down(&mut self.state, key, control_pressed, shift_pressed),
         }
     }
 
     fn handle_key_up(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
-        self.control_pressed = control_pressed;
-        self.shift_pressed = shift_pressed;
+        self.state.control_pressed = control_pressed;
+        self.state.shift_pressed = shift_pressed;
 
-        match key {
-            "z" | "x" => self.release_selected_notes(),
-            " " => synth::stop_playback(),
-            _ => (),
-        }
+        self.handler
+            .on_key_up(&mut self.state, key, control_pressed, shift_pressed);
     }
 
     fn handle_mouse_down(&mut self, x: usize, y: usize) {
@@ -207,54 +280,54 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 
         // Determine if the requested location intersects an existing note and if not, determine the
         // bounds on the note that will be drawn next.
-        let line_ix = match self.get_line_index(y) {
+        let line_ix = match self.state.conf.get_line_index(y) {
             Some(line_ix) => line_ix,
             None => {
                 // click must be in the cursor gutter
-                if self.shift_pressed {
+                if self.state.shift_pressed {
                     // TODO: make dedicated function in `render` probably
-                    self.selection_box_dom_id = Some(js::render_quad(
+                    self.state.selection_box_dom_id = Some(js::render_quad(
                         FG_CANVAS_IX,
                         0,
                         y as usize,
                         0,
-                        self.conf.grid_height(),
+                        self.state.conf.grid_height(),
                         "selection-box",
                     ))
                 } else {
-                    self.selection_box_dom_id = None;
+                    self.state.selection_box_dom_id = None;
                 }
 
-                let x = self.set_cursor_pos(self.px_to_beat(x)) as usize;
-                self.cursor_moving = true;
-                self.mouse_down = true;
-                self.mouse_down_x = x;
-                self.mouse_down_y = self.conf.grid_height() - 2;
+                let x = self.set_cursor_pos(self.state.conf.px_to_beat(x)) as usize;
+                self.state.cursor_moving = true;
+                self.state.mouse_down = true;
+                self.state.mouse_down_x = x;
+                self.state.mouse_down_y = self.state.conf.grid_height() - 2;
 
                 return;
             },
         };
-        let beat = self.px_to_beat(x);
-        let bounds = self.data.get_bounds(line_ix, beat);
+        let beat = self.state.conf.px_to_beat(x);
+        let bounds = self.state.data.get_bounds(line_ix, beat);
 
         match bounds {
-            skip_list::Bounds::Intersecting(note) => match self.cur_tool {
+            skip_list::Bounds::Intersecting(note) => match self.state.cur_tool {
                 Tool::DeleteNote => {
                     let dom_id = note.data.get_id();
                     R::deselect_note(dom_id);
                     js::delete_element(dom_id);
-                    self.data.remove(line_ix, note.bounds.start_beat);
+                    self.state.data.remove(line_ix, note.bounds.start_beat);
                 },
-                Tool::DrawNote if self.shift_pressed => self.init_selection_box(x, y),
-                Tool::DrawNote if self.control_pressed => {
+                Tool::DrawNote if self.state.shift_pressed => self.init_selection_box(x, y),
+                Tool::DrawNote if self.state.control_pressed => {
                     let selected_data = SelectedNoteData::from_note_box(line_ix, note);
 
-                    if self.selected_notes.contains(&selected_data) {
-                        self.selected_notes.remove(&selected_data);
+                    if self.state.selected_notes.contains(&selected_data) {
+                        self.state.selected_notes.remove(&selected_data);
                         R::deselect_note(note.data.get_id());
                     } else {
                         // Select the clicked note since it wasn't previously selected
-                        self.selected_notes.insert(selected_data);
+                        self.state.selected_notes.insert(selected_data);
                         R::select_note(note.data.get_id());
                     }
                 },
@@ -262,27 +335,32 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     let note_data = SelectedNoteData::from_note_box(line_ix, note);
                     dragging_note_data = Some((note.bounds.start_beat, note_data));
                     self.deselect_all_notes();
-                    self.selected_notes.insert(note_data);
+                    self.state.selected_notes.insert(note_data);
                     R::select_note(note.data.get_id());
                 },
             },
-            skip_list::Bounds::Bounded(lower, upper) => match self.cur_tool {
-                Tool::DrawNote if self.control_pressed => {}, // TODO
-                Tool::DrawNote if self.shift_pressed => self.init_selection_box(x, y),
+            skip_list::Bounds::Bounded(lower, upper) => match self.state.cur_tool {
+                Tool::DrawNote if self.state.control_pressed => {}, // TODO
+                Tool::DrawNote if self.state.shift_pressed => self.init_selection_box(x, y),
                 Tool::DrawNote => {
-                    let snapped_lower = self.snap_to_beat_interval(x, self.beats_to_px(lower));
+                    let snapped_lower =
+                        self.snap_to_beat_interval(x, self.state.conf.beats_to_px(lower));
                     let snapped_upper = (snapped_lower
-                        + self.beats_to_px(self.conf.note_snap_beat_interval))
-                    .min(self.beats_to_px(upper.unwrap_or(f32::INFINITY)));
+                        + self
+                            .state
+                            .conf
+                            .beats_to_px(self.state.conf.note_snap_beat_interval))
+                    .min(self.state.conf.beats_to_px(upper.unwrap_or(f32::INFINITY)));
                     let width = snapped_upper - snapped_lower;
-                    self.cur_note_bounds = (lower, upper);
+                    self.state.cur_note_bounds = (lower, upper);
 
                     // Draw the temporary/candidate note after storing its bounds
                     drawing_dom_id = Some(R::create_note(
                         snapped_lower,
-                        self.conf.cursor_gutter_height + self.conf.padded_line_height() * line_ix,
+                        self.state.conf.cursor_gutter_height
+                            + self.state.conf.padded_line_height() * line_ix,
                         width,
-                        self.conf.line_height,
+                        self.state.conf.line_height,
                     ));
                     x = snapped_lower as usize;
                 },
@@ -290,64 +368,62 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
             },
         };
 
-        if self.cur_tool == Tool::DrawNote && !self.shift_pressed {
-            self.synth.trigger_attack(self.midi_to_frequency(line_ix));
-        }
+        self.handler.on_mouse_down(&mut self.state, x, y);
 
-        self.mouse_down = true;
-        self.cursor_moving = false;
-        self.mouse_down_x = x;
-        self.mouse_down_y = y;
-        self.drawing_note_dom_id = drawing_dom_id;
-        self.selection_box_dom_id = selection_box_dom_id;
-        self.dragging_note_data = dragging_note_data;
+        self.state.mouse_down = true;
+        self.state.cursor_moving = false;
+        self.state.mouse_down_x = x;
+        self.state.mouse_down_y = y;
+        self.state.drawing_note_dom_id = drawing_dom_id;
+        self.state.selection_box_dom_id = selection_box_dom_id;
+        self.state.dragging_note_data = dragging_note_data;
     }
 
     fn handle_mouse_move(&mut self, x: usize, y: usize) {
-        let (last_x, last_y) = (self.mouse_x, self.mouse_y);
-        self.mouse_x = x;
-        self.mouse_y = y;
-        if !self.mouse_down {
+        let (last_x, last_y) = (self.state.mouse_x, self.state.mouse_y);
+        self.state.mouse_x = x;
+        self.state.mouse_y = y;
+        if !self.state.mouse_down {
             return;
         }
 
-        if self.cursor_moving {
-            self.mouse_y = 1;
-            if let Some(selection_box_dom_id) = self.selection_box_dom_id {
+        if self.state.cursor_moving {
+            self.state.mouse_y = 1;
+            if let Some(selection_box_dom_id) = self.state.selection_box_dom_id {
                 self.update_selection_box(selection_box_dom_id, last_x, last_y, x, 1);
             } else {
-                self.set_cursor_pos(self.px_to_beat(x));
+                self.set_cursor_pos(self.state.conf.px_to_beat(x));
             }
             return;
         }
 
-        match self.cur_tool {
-            Tool::DrawNote if self.shift_pressed => {
-                if let Some(selection_box_dom_id) = self.selection_box_dom_id {
+        match self.state.cur_tool {
+            Tool::DrawNote if self.state.shift_pressed => {
+                if let Some(selection_box_dom_id) = self.state.selection_box_dom_id {
                     self.update_selection_box(selection_box_dom_id, last_x, last_y, x, y);
                 }
             },
             Tool::DrawNote => {
-                if let Some(dom_id) = self.drawing_note_dom_id {
+                if let Some(dom_id) = self.state.drawing_note_dom_id {
                     let NoteBoxData { x, width } = self.compute_note_box_data(x);
                     js::set_attr(dom_id, "x", &x.to_string());
                     js::set_attr(dom_id, "width", &width.to_string());
                 } else if let Some((first_dragging_note_start_beat, ref mut dragging_note)) =
-                    self.dragging_note_data
+                    self.state.dragging_note_data
                 {
                     // Figure out if we've moved far enough to warrant a move
                     let original_line_ix = dragging_note.line_ix;
-                    let new_line_ix = self.get_line_index(y).unwrap();
+                    let new_line_ix = self.state.conf.get_line_index(y).unwrap();
 
-                    let horizontal_movement_diff_px = x - self.mouse_down_x;
+                    let horizontal_movement_diff_px = x - self.state.mouse_down_x;
                     let horizontal_movement_diff_beats =
-                        self.px_to_beat(horizontal_movement_diff_px);
+                        self.state.conf.px_to_beat(horizontal_movement_diff_px);
                     let horizontal_movement_intervals = (horizontal_movement_diff_beats
-                        / self.conf.note_snap_beat_interval)
+                        / self.state.conf.note_snap_beat_interval)
                         .round();
                     let original_start_beat = dragging_note.start_beat;
                     let new_start_beat = first_dragging_note_start_beat
-                        + (horizontal_movement_intervals * self.conf.note_snap_beat_interval);
+                        + (horizontal_movement_intervals * self.state.conf.note_snap_beat_interval);
 
                     if original_line_ix == new_line_ix && original_start_beat == new_start_beat {
                         return;
@@ -359,7 +435,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                         "Removing dragging note starting at {}",
                         dragging_note.start_beat
                     ));
-                    let original_note = self
+                    let note = self
+                        .state
                         .data
                         .remove(original_line_ix, dragging_note.start_beat)
                         .unwrap_or_else(|| {
@@ -369,13 +446,12 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                                 dragging_note.start_beat
                             )
                         });
-                    let note_width = original_note.bounds.width();
-                    let mut note = original_note.clone();
+                    let note_width = note.bounds.width();
 
                     let mut try_insert = |line_ix: usize, start_beat: f32| -> bool {
                         note.bounds.start_beat = start_beat;
                         note.bounds.end_beat = start_beat + note_width;
-                        let insertion_error = self.data.insert(line_ix, note.clone());
+                        let insertion_error = self.state.data.insert(line_ix, note);
                         if insertion_error.is_none() {
                             dragging_note.start_beat = start_beat;
                             dragging_note.line_ix = line_ix;
@@ -383,39 +459,52 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                         insertion_error.is_some()
                     };
 
+                    // We try to place the note in several positions around the new mouse position,
+                    // trying each subsequently until one works (or none work, in which case we
+                    // leave the note where it was).
                     let insertion_succeeded = !try_insert(new_line_ix, new_start_beat)
                         || (new_start_beat != original_start_beat
                             && !try_insert(original_line_ix, new_start_beat))
                         || (new_line_ix != original_line_ix
                             && !try_insert(new_line_ix, original_start_beat));
                     if !insertion_succeeded {
-                        let reinsertion_error = self.data.insert(original_line_ix, original_note);
+                        let reinsertion_error = self.state.data.insert(original_line_ix, note);
                         debug_assert!(reinsertion_error.is_none());
                         return;
                     }
 
-                    self.selected_notes.remove(dragging_note);
-                    self.selected_notes.insert(*dragging_note);
+                    // We have a custom `Hash` implementation for `SelectedNoteData` that uses its
+                    // `DomId` and ignores its position; that's why this works.
+                    self.state.selected_notes.remove(dragging_note);
+                    self.state.selected_notes.insert(*dragging_note);
 
                     if dragging_note.start_beat != original_start_beat {
+                        // TODO: move to renderer method
                         js::set_attr(
                             dragging_note.dom_id,
                             "x",
-                            &(self.beats_to_px(dragging_note.start_beat) as usize).to_string(),
+                            &(self.state.conf.beats_to_px(dragging_note.start_beat) as usize)
+                                .to_string(),
                         );
                     }
                     if dragging_note.line_ix != original_line_ix {
+                        // TODO: move to renderer method
                         js::set_attr(
                             dragging_note.dom_id,
                             "y",
-                            &((dragging_note.line_ix * self.conf.padded_line_height()
-                                + self.conf.cursor_gutter_height)
+                            &((dragging_note.line_ix * self.state.conf.padded_line_height()
+                                + self.state.conf.cursor_gutter_height)
                                 .to_string()),
                         );
-                        self.synth
-                            .trigger_release(self.midi_to_frequency(original_line_ix));
-                        self.synth
-                            .trigger_attack(self.midi_to_frequency(dragging_note.line_ix));
+
+                        self.handler.on_note_move(
+                            &mut self.state,
+                            dragging_note.dom_id,
+                            original_line_ix,
+                            dragging_note.start_beat,
+                            new_line_ix,
+                            dragging_note.start_beat,
+                        );
                     }
                 }
             },
@@ -425,40 +514,50 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 
     fn handle_mouse_up(&mut self, x: usize, y: usize) {
         // if `MOUSE_DOWN` is not set, the user tried to place an invalid note and we ignore it.
-        if !self.mouse_down {
+        if !self.state.mouse_down {
             return;
         }
-        self.mouse_down = false;
+        self.state.mouse_down = false;
 
+        // TODO: hoist to method
         let delete_selection_box = |selection_box_dom_id: usize| {
             js::delete_element(selection_box_dom_id);
 
-            self.handler.on_selection_box_deleted(&mut self);
+            self.handler.on_selection_box_deleted(&mut self.state);
         };
 
-        if self.cursor_moving {
-            if let Some(selection_box_dom_id) = self.selection_box_dom_id {
+        if self.state.cursor_moving {
+            if let Some(selection_box_dom_id) = self.state.selection_box_dom_id {
                 delete_selection_box(selection_box_dom_id);
             }
 
-            self.set_cursor_pos(self.px_to_beat(x));
+            self.set_cursor_pos(self.state.conf.px_to_beat(x));
             return;
         }
 
-        let down_line_ix = self.get_line_index(self.mouse_down_y).unwrap();
+        let down_line_ix = self
+            .state
+            .conf
+            .get_line_index(self.state.mouse_down_y)
+            .unwrap();
 
-        if let Some(selection_box_dom_id) = self.selection_box_dom_id {
+        if let Some(selection_box_dom_id) = self.state.selection_box_dom_id {
             delete_selection_box(selection_box_dom_id);
-        } else if let Some((_, dragging_note_data)) = self.dragging_note_data {
-            self.synth
-                .trigger_release(self.midi_to_frequency(dragging_note_data.line_ix));
-        } else {
-            self.synth
-                .trigger_release(self.midi_to_frequency(down_line_ix));
         }
+        // TODO
+        // else if let Some((_, dragging_note_data)) = self.state.dragging_note_data {
+        //     self.synth
+        //         .trigger_release(self.midi_to_frequency(dragging_note_data.line_ix));
+        // } else {
+        //     self.synth
+        //         .trigger_release(self.midi_to_frequency(down_line_ix));
+        // }
 
-        if self.cur_tool == Tool::DrawNote {
-            match (self.drawing_note_dom_id, self.selection_box_dom_id) {
+        if self.state.cur_tool == Tool::DrawNote {
+            match (
+                self.state.drawing_note_dom_id,
+                self.state.selection_box_dom_id,
+            ) {
                 (Some(note_dom_id), None) => {
                     let NoteBoxData { x, width } = self.compute_note_box_data(x);
                     if width == 0 {
@@ -466,18 +565,19 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     }
 
                     let x_px = x;
-                    let start_beat = self.px_to_beat(x_px);
+                    let start_beat = self.state.conf.px_to_beat(x_px);
                     let line_ix = down_line_ix;
+                    let note_data = self.handler.create_note(line_ix, start_beat, note_dom_id);
                     let note: NoteBox<S> = NoteBox {
-                        data: self.handler.create_note(line_ix, start_beat, note_dom_id),
+                        data: note_data,
                         bounds: NoteBoxBounds {
                             start_beat,
-                            end_beat: self.px_to_beat(x_px + width),
+                            end_beat: self.state.conf.px_to_beat(x_px + width),
                         },
                     };
 
                     self.deselect_all_notes();
-                    self.selected_notes.insert(SelectedNoteData {
+                    self.state.selected_notes.insert(SelectedNoteData {
                         line_ix,
                         dom_id: note_dom_id,
                         start_beat,
@@ -486,14 +586,14 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     R::select_note(note_dom_id);
 
                     // Actually insert the node into the skip list
-                    self.data.insert(line_ix, note);
+                    self.state.data.insert(line_ix, note);
                     if cfg!(debug_assertions) {
                         // common::log(format!("{:?}", self.data.lines[line_ix]));
                     }
                 },
                 (None, Some(_)) => (),
                 (Some(_), Some(_)) => common::error(
-                    "Both `note_dom_id` and `selection_box_dom_id` exist in `MOUSE_DOWN_DATA`!",
+                    "Both `note_dom_id` and `selection_box_dom_id` exist in grid state!",
                 ),
                 (None, None) => (),
             }
@@ -508,12 +608,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 }
 
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
-    pub fn px_to_beat(&self, px: usize) -> f32 { px as f32 / (self.conf.beat_length_px as f32) }
-
-    pub fn beats_to_px(&self, beats: f32) -> usize { beats as usize * self.conf.beat_length_px }
-
     pub fn copy_selected_notes(&mut self) {
-        let (earliest_start_beat, latest_end_beat) = self.selected_notes.iter().fold(
+        let (earliest_start_beat, latest_end_beat) = self.state.selected_notes.iter().fold(
             (f32::INFINITY, f32::NEG_INFINITY),
             |(cur_earliest_start, cur_latest_end_beat),
              SelectedNoteData {
@@ -529,21 +625,22 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
             return;
         }
 
-        let offset_beats = self.cursor_pos_beats - earliest_start_beat;
+        let offset_beats = self.state.cursor_pos_beats - earliest_start_beat;
         let mut new_selected_notes = FnvHashSet::default();
-        new_selected_notes.reserve(self.selected_notes.len());
+        new_selected_notes.reserve(self.state.selected_notes.len());
         for SelectedNoteData {
             start_beat,
             width,
             line_ix,
             dom_id,
-        } in self.selected_notes.iter()
+        } in self.state.selected_notes.iter()
         {
             R::deselect_note(*dom_id);
             let new_start_beat = start_beat + offset_beats;
             let new_end_beat = start_beat + width + offset_beats;
             // try to insert a note `offset_beats` away from the previous note on the same line
             if let skip_list::Bounds::Bounded(start_bound, end_bound_opt) = self
+                .state
                 .data
                 .get_bounds(*line_ix, new_start_beat + (width / 0.5))
             {
@@ -558,10 +655,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
             }
 
             let dom_id = R::create_note(
-                self.conf.cursor_gutter_height + self.conf.padded_line_height() * *line_ix,
-                self.beats_to_px(new_start_beat),
-                self.beats_to_px(*width),
-                self.conf.line_height,
+                self.state.conf.cursor_gutter_height
+                    + self.state.conf.padded_line_height() * line_ix,
+                self.state.conf.beats_to_px(new_start_beat),
+                self.state.conf.beats_to_px(*width),
+                self.state.conf.line_height,
             );
             let new_note = NoteBox {
                 bounds: NoteBoxBounds {
@@ -571,33 +669,38 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
                 data: self.handler.create_note(*line_ix, new_start_beat, dom_id),
             };
             new_selected_notes.insert(SelectedNoteData::from_note_box(*line_ix, &new_note));
-            let insertion_failed = self.data.insert(*line_ix, new_note);
+            let insertion_failed = self.state.data.insert(*line_ix, new_note);
             debug_assert!(!insertion_failed.is_none());
             R::select_note(dom_id);
         }
 
         // deselect the old notes and select the new ones
-        self.selected_notes = new_selected_notes;
+        self.state.selected_notes = new_selected_notes;
 
         // move the cursor forward
         let clipboard_end_beat = tern(
-            self.cursor_pos_beats < latest_end_beat,
+            self.state.cursor_pos_beats < latest_end_beat,
             latest_end_beat,
             earliest_start_beat + offset_beats.abs(),
         );
         let clipboard_width_beats = clipboard_end_beat - earliest_start_beat;
-        self.set_cursor_pos(self.cursor_pos_beats + clipboard_width_beats);
+        self.set_cursor_pos(self.state.cursor_pos_beats + clipboard_width_beats);
     }
 
     pub fn compute_note_box_data(&self, x: usize) -> NoteBoxData {
-        let start_x = self.mouse_down_x; // TODO
-        let (low_bound, high_bound) = self.cur_note_bounds;
-        let snap_interval_px = self.beats_to_px(self.conf.note_snap_beat_interval);
-        let snap_to_px = self.snap_to_beat_interval(x, self.beats_to_px(low_bound));
+        let start_x = self.state.mouse_down_x; // TODO
+        let (low_bound, high_bound) = self.state.cur_note_bounds;
+        let snap_interval_px = self
+            .state
+            .conf
+            .beats_to_px(self.state.conf.note_snap_beat_interval);
+        let snap_to_px = self.snap_to_beat_interval(x, self.state.conf.beats_to_px(low_bound));
         let (minx, maxx) = if x >= start_x {
-            let end = (snap_to_px + snap_interval_px)
-                .min(self.beats_to_px(high_bound.unwrap_or(f32::INFINITY)))
-                as usize;
+            let end = (snap_to_px + snap_interval_px).min(
+                self.state
+                    .conf
+                    .beats_to_px(high_bound.unwrap_or(f32::INFINITY)),
+            ) as usize;
             (start_x, end)
         } else {
             let end = snap_to_px as usize;
@@ -609,49 +712,31 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
     }
 
     pub fn snap_to_beat_interval(&self, px: usize, lower_bound_px: usize) -> usize {
-        let beat = self.px_to_beat(px);
-        let beats_to_shave = beat % self.conf.note_snap_beat_interval;
-        self.beats_to_px(beat - beats_to_shave).max(lower_bound_px)
+        let beat = self.state.conf.px_to_beat(px);
+        let beats_to_shave = beat % self.state.conf.note_snap_beat_interval;
+        self.state
+            .conf
+            .beats_to_px(beat - beats_to_shave)
+            .max(lower_bound_px)
     }
 
     pub fn set_cursor_pos(&self, x_beats: f32) -> usize {
-        let x_px = self.beats_to_px(x_beats);
-        let note_snap_beat_interval_px = self.beats_to_px(self.conf.note_snap_beat_interval);
+        let x_px = self.state.conf.beats_to_px(x_beats);
+        let note_snap_beat_interval_px = self
+            .state
+            .conf
+            .beats_to_px(self.state.conf.note_snap_beat_interval);
         let intervals = x_px / note_snap_beat_interval_px;
         let snapped_x_px = intervals * note_snap_beat_interval_px;
-        self.cursor_pos_beats = self.px_to_beat(snapped_x_px);
+        self.state.cursor_pos_beats = self.state.conf.px_to_beat(snapped_x_px);
         R::set_cursor_pos(snapped_x_px);
         snapped_x_px
     }
 
     pub fn deselect_all_notes(&mut self) {
-        for note_data in self.selected_notes.drain() {
+        for note_data in self.state.selected_notes.drain() {
             R::deselect_note(note_data.dom_id);
         }
-    }
-
-    pub fn get_line_index(&self, y: usize) -> Option<usize> {
-        if y > self.conf.cursor_gutter_height {
-            Some(
-                ((y - self.conf.cursor_gutter_height) as f32
-                    / (self.conf.padded_line_height() as f32))
-                    .trunc() as usize,
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn get_sorted_selected_notes(&self, sort_reverse: bool) -> Vec<&'static SelectedNoteData> {
-        let mut notes: Vec<&SelectedNoteData> = self.selected_notes.iter().collect::<Vec<_>>();
-
-        if sort_reverse {
-            notes.sort_unstable_by(|a, b| b.cmp(a));
-        } else {
-            notes.sort_unstable();
-        }
-
-        notes
     }
 
     pub fn try_load_saved_composition(&mut self) {
@@ -670,13 +755,17 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
                 start_beat,
                 width,
             } = raw_note;
+            // TODO: abstract to helper that takes a line ix, start_beat, and width
             let dom_id = R::create_note(
-                line_ix as usize,
-                self.beats_to_px(start_beat),
-                self.beats_to_px(width),
+                self.state.conf.beats_to_px(start_beat),
+                self.state.conf.cursor_gutter_height
+                    + self.state.conf.padded_line_height() * line_ix,
+                self.state.conf.beats_to_px(width),
+                self.state.conf.line_height,
             );
-            let insertion_error = self.data.lines[line_ix as usize].insert(NoteBox {
-                data: dom_id,
+            let note_state = self.handler.create_note(line_ix, start_beat, dom_id);
+            let insertion_error = self.state.data.lines[line_ix as usize].insert(NoteBox {
+                data: note_state,
                 bounds: NoteBoxBounds {
                     start_beat,
                     end_beat: start_beat + width,
@@ -706,25 +795,17 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
             changed_region_1,
             changed_region_2,
         } = SelectionBoxData::compute(
-            self.mouse_down_x,
-            self.mouse_down_y,
+            self.state.mouse_down_x,
+            self.state.mouse_down_y,
             x,
-            y.saturating_sub(self.conf.cursor_gutter_height),
+            y.saturating_sub(self.state.conf.cursor_gutter_height),
             last_x,
-            last_y.saturating_sub(self.conf.cursor_gutter_height),
+            last_y.saturating_sub(self.state.conf.cursor_gutter_height),
         );
-        // TODO: Make `GridRenderer` method
-        js::set_attr(selection_box_dom_id, "x", &x.to_string());
-        js::set_attr(
-            selection_box_dom_id,
-            "y",
-            &(y + self.conf.cursor_gutter_height).to_string(),
-        );
-        js::set_attr(selection_box_dom_id, "width", &width.to_string());
-        js::set_attr(selection_box_dom_id, "height", &height.to_string());
+        R::set_selection_box(&self.state.conf, selection_box_dom_id, x, y, width, height);
 
         self.handler.on_selection_region_update(
-            &mut self,
+            &mut self.state,
             &retained_region,
             &changed_region_1,
             &changed_region_2,
@@ -735,7 +816,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
         self.deselect_all_notes();
 
         // TODO: make dedicated function in `render` probably
-        self.selection_box_dom_id =
+        self.state.selection_box_dom_id =
             Some(js::render_quad(FG_CANVAS_IX, x, y, 0, 0, "selection-box"));
     }
 }

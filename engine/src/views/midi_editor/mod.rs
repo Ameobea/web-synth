@@ -2,7 +2,9 @@
 //! that correspond to individual notes.  It supports operations like dragging notes around,
 //! selecting/deleting notes, and playing the current composition.
 
-use super::super::{helpers::grid::prelude::*, prelude::*, view_context::ViewContext};
+use std::str;
+
+use super::super::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
 pub mod input_handlers;
@@ -49,6 +51,20 @@ impl GridRenderer for MidiEditorGridRenderer {
     fn set_cursor_pos(x: usize) {
         // TODO
     }
+
+    fn set_selection_box(
+        conf: &GridConf,
+        dom_id: DomId,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    ) {
+        js::set_attr(dom_id, "x", &x.to_string());
+        js::set_attr(dom_id, "y", &(y + conf.cursor_gutter_height).to_string());
+        js::set_attr(dom_id, "width", &width.to_string());
+        js::set_attr(dom_id, "height", &height.to_string());
+    }
 }
 
 impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
@@ -68,7 +84,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
 
     fn on_key_down(
         &mut self,
-        grid: &mut MidiGrid,
+        grid_state: &mut GridState<usize>,
         key: &str,
         control_pressed: bool,
         shift_pressed: bool,
@@ -80,24 +96,47 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         };
 
         match key {
-            "w" => self.move_notes_vertical(true, grid, line_diff_vertical),
-            "s" => self.move_notes_vertical(false, grid, line_diff_vertical),
+            "w" => self.move_notes_vertical(true, grid_state, line_diff_vertical),
+            "s" => self.move_notes_vertical(false, grid_state, line_diff_vertical),
             "ArrowLeft" | "a" =>
-                self.move_selected_notes_horizontal(grid, false, beat_diff_horizontal),
+                self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal),
             "ArrowRight" | "d" =>
-                self.move_selected_notes_horizontal(grid, true, beat_diff_horizontal),
-            "z" | "x" => self.play_selected_notes(),
+                self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal),
+            "z" | "x" => self.play_selected_notes(grid_state),
             " " => {
-                self.start_playback(grid);
-                self.serialize_and_save_composition(grid);
+                self.start_playback(grid_state);
+                self.serialize_and_save_composition(grid_state);
             },
             _ => (),
         }
     }
 
+    fn on_key_up(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        key: &str,
+        control_pressed: bool,
+        shift_pressed: bool,
+    ) {
+        match key {
+            "z" | "x" => self.release_selected_notes(grid_state),
+            " " => synth::stop_playback(),
+            _ => (),
+        }
+    }
+
+    fn on_mouse_down(&mut self, grid_state: &mut GridState<usize>, x: usize, y: usize) {
+        if let Some(line_ix) = grid_state.conf.get_line_index(y) {
+            if grid_state.cur_tool == Tool::DrawNote && !grid_state.shift_pressed {
+                self.synth
+                    .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+            }
+        }
+    }
+
     fn on_selection_region_update(
         &mut self,
-        grid: &mut MidiGrid,
+        grid_state: &mut GridState<usize>,
         retained_region: &Option<SelectionRegion>,
         changed_region_1: &ChangedRegion,
         changed_region_2: &ChangedRegion,
@@ -105,13 +144,19 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         // Look for all notes in the added/removed regions and add/remove them from the
         // selected notes set and select/deselect their UI representations
         for (was_added, region) in &[
-            (changed_region_1.was_added, changed_region_1.region),
-            (changed_region_2.was_added, changed_region_2.region),
+            (changed_region_1.was_added, &changed_region_1.region),
+            (changed_region_2.was_added, &changed_region_2.region),
         ] {
-            for note_data in grid.data.iter_region(region) {
+            let min_beat = grid_state.conf.px_to_beat(region.x);
+            let max_beat = grid_state.conf.px_to_beat(region.x + region.width);
+            for note_data in
+                grid_state
+                    .data
+                    .iter_region(region.y, region.height, min_beat, max_beat)
+            {
                 // Ignore notes that are also contained in the retained region
                 if let Some(retained_region) = retained_region.as_ref() {
-                    if note_data.intersects_region(&retained_region) {
+                    if note_data.intersects_region(&grid_state.conf, &retained_region) {
                         continue;
                     }
                 }
@@ -120,21 +165,25 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                 let selected_note_data: SelectedNoteData =
                     SelectedNoteData::from_note_box(note_data.line_ix, note_data.note_box);
                 let line_ix = selected_note_data.line_ix;
-                if *was_added && grid.selected_notes.insert(selected_note_data) {
-                    R::select_note(dom_id);
-                    self.synth.trigger_attack(self.midi_to_frequency(line_ix));
-                } else if !*was_added && self.selected_notes.remove(&selected_note_data) {
-                    R::deselect_note(dom_id);
-                    self.synth.trigger_release(self.midi_to_frequency(line_ix));
+                if *was_added && grid_state.selected_notes.insert(selected_note_data) {
+                    MidiEditorGridRenderer::select_note(dom_id);
+                    self.synth
+                        .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+                } else if !*was_added && grid_state.selected_notes.remove(&selected_note_data) {
+                    MidiEditorGridRenderer::deselect_note(dom_id);
+                    self.synth.trigger_release(
+                        self.midi_to_frequency(grid_state.conf.row_count, line_ix),
+                    );
                 }
             }
         }
     }
 
-    fn on_selection_box_deleted(&mut self, grid: &mut MidiGrid) {
-        for note_data in grid.selected_notes.iter() {
-            self.synth
-                .trigger_release(self.midi_to_frequency(note_data.line_ix));
+    fn on_selection_box_deleted(&mut self, grid_state: &mut GridState<usize>) {
+        for note_data in grid_state.selected_notes.iter() {
+            self.synth.trigger_release(
+                self.midi_to_frequency(grid_state.conf.row_count, note_data.line_ix),
+            );
         }
     }
 
@@ -143,12 +192,27 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         // position on the grid and line index, so we just use their `dom_id` as their state.
         dom_id
     }
+
+    fn on_note_move(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        dom_id: DomId,
+        old_line_ix: usize,
+        old_start_beat: f32,
+        new_line_ix: usize,
+        new_start_beat: f32,
+    ) {
+        self.synth
+            .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, old_line_ix));
+        self.synth
+            .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, new_line_ix));
+    }
 }
 
 impl MidiEditorGridHandler {
-    fn start_playback(&mut self, grid: &MidiGrid) {
+    fn start_playback(&mut self, grid_state: &GridState<usize>) {
         // Get an iterator of sorted attack/release events to process
-        let events = grid.data.iter_events(None);
+        let events = grid_state.data.iter_events(None);
 
         // Create a virtual poly synth to handle assigning the virtual notes to voices
         let mut voice_manager = PolySynth::new(false);
@@ -161,9 +225,10 @@ impl MidiEditorGridHandler {
         let mut frequencies: Vec<f32> = Vec::with_capacity(events.size_hint().0 / 2);
         let mut event_timings: Vec<f32> = Vec::with_capacity(events.size_hint().0);
         for event in events {
-            let frequency = self.midi_to_frequency(grid.conf.row_count, event.line_ix);
+            let frequency = self.midi_to_frequency(grid_state.conf.row_count, event.line_ix);
             scheduled_events.push(tern(event.is_start, 1, 0));
-            let event_time_seconds = ((event.beat / self.conf.bpm) * 60.0) / 4.0;
+            // TODO: make BPM configurable
+            let event_time_seconds = ((event.beat / 120.) * 60.0) / 4.0;
             event_timings.push(event_time_seconds);
 
             if event.is_start {
@@ -194,7 +259,7 @@ impl MidiEditorGridHandler {
     fn move_note_vertical(
         &self,
         up: bool,
-        grid: &mut MidiGrid,
+        grid_state: &mut GridState<usize>,
         notes_to_play: &mut Vec<f32>,
         mut note_data: SelectedNoteData,
         line_diff_vertical: usize,
@@ -202,7 +267,7 @@ impl MidiEditorGridHandler {
         let cond = tern(
             up,
             note_data.line_ix >= line_diff_vertical,
-            note_data.line_ix + line_diff_vertical < grid.conf.row_count,
+            note_data.line_ix + line_diff_vertical < grid_state.conf.row_count,
         );
         if !cond {
             return note_data;
@@ -213,18 +278,20 @@ impl MidiEditorGridHandler {
         } else {
             note_data.line_ix + line_diff_vertical
         };
-        notes_to_play.push(self.midi_to_frequency(grid.conf.row_count, dst_line_ix));
+        notes_to_play.push(self.midi_to_frequency(grid_state.conf.row_count, dst_line_ix));
 
-        let move_failed =
-            grid.data
-                .move_note_vertical(note_data.line_ix, dst_line_ix, note_data.start_beat);
+        let move_failed = grid_state.data.move_note_vertical(
+            note_data.line_ix,
+            dst_line_ix,
+            note_data.start_beat,
+        );
         if !move_failed {
             note_data.line_ix = dst_line_ix;
             js::set_attr(
                 note_data.dom_id,
                 "y",
-                &(note_data.line_ix * grid.conf.padded_line_height()
-                    + grid.conf.cursor_gutter_height)
+                &(note_data.line_ix * grid_state.conf.padded_line_height()
+                    + grid_state.conf.cursor_gutter_height)
                     .to_string(),
             );
         }
@@ -232,15 +299,26 @@ impl MidiEditorGridHandler {
         note_data
     }
 
-    fn move_notes_vertical(&mut self, up: bool, grid: &mut MidiGrid, line_diff_vertical: usize) {
-        let notes = grid.get_sorted_selected_notes(!up);
+    fn move_notes_vertical(
+        &mut self,
+        up: bool,
+        grid_state: &mut GridState<usize>,
+        line_diff_vertical: usize,
+    ) {
+        let notes = grid_state.get_sorted_selected_notes(!up);
         let mut notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
 
-        grid.selected_notes = notes
+        grid_state.selected_notes = notes
             .into_iter()
             .cloned()
             .map(|note_data| {
-                self.move_note_vertical(up, grid, &mut notes_to_play, note_data, line_diff_vertical)
+                self.move_note_vertical(
+                    up,
+                    grid_state,
+                    &mut notes_to_play,
+                    note_data,
+                    line_diff_vertical,
+                )
             })
             .collect();
         self.synth.trigger_attacks(&notes_to_play);
@@ -249,13 +327,14 @@ impl MidiEditorGridHandler {
 
     fn move_selected_notes_horizontal(
         &mut self,
-        grid: &mut MidiGrid,
+        grid_state: &mut GridState<usize>,
         right: bool,
         beat_diff_horizontal: f32,
     ) {
         let beats_to_move = beat_diff_horizontal * tern(right, 1.0, -1.0);
-        let move_note_horizontal = |mut note_data: SelectedNoteData| -> SelectedNoteData {
-            let new_start_beat = grid.data.move_note_horizontal(
+        let cloned_conf = grid_state.conf.clone();
+        let move_note_horizontal = move |mut note_data: SelectedNoteData| -> SelectedNoteData {
+            let new_start_beat = grid_state.data.move_note_horizontal(
                 note_data.line_ix,
                 note_data.start_beat,
                 beats_to_move,
@@ -264,43 +343,46 @@ impl MidiEditorGridHandler {
             js::set_attr(
                 note_data.dom_id,
                 "x",
-                &(grid.beats_to_px(new_start_beat)).to_string(),
+                &(cloned_conf.beats_to_px(new_start_beat)).to_string(),
             );
 
             note_data.start_beat = new_start_beat;
             note_data
         };
 
-        grid.selected_notes = grid
+        let new_selected_notes = grid_state
             .get_sorted_selected_notes(right)
             .into_iter()
             .cloned()
             .map(move_note_horizontal)
             .collect();
+        grid_state.selected_notes = new_selected_notes;
     }
 
-    pub fn play_selected_notes(&self) {
-        for SelectedNoteData { line_ix, .. } in self.selected_notes.iter() {
-            self.synth.trigger_attack(self.midi_to_frequency(*line_ix));
+    pub fn play_selected_notes(&mut self, grid_state: &GridState<usize>) {
+        for SelectedNoteData { line_ix, .. } in grid_state.selected_notes.iter() {
+            self.synth
+                .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, *line_ix));
         }
     }
 
-    pub fn release_selected_notes(&self) {
-        for SelectedNoteData { line_ix, .. } in self.selected_notes.iter() {
-            self.synth.trigger_release(self.midi_to_frequency(*line_ix));
+    pub fn release_selected_notes(&mut self, grid_state: &GridState<usize>) {
+        for SelectedNoteData { line_ix, .. } in grid_state.selected_notes.iter() {
+            self.synth
+                .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, *line_ix));
         }
     }
 
-    pub fn serialize_and_save_composition(&mut self, grid: &mut MidiGrid) {
+    pub fn serialize_and_save_composition(&mut self, grid_state: &mut GridState<usize>) {
         // Get a list of every note in the composition matched with its line index
-        let all_notes: Vec<RawNoteData> = self
+        let all_notes: Vec<RawNoteData> = grid_state
             .data
             .lines
             .iter()
             .enumerate()
             .flat_map(|(line_ix, line)| {
                 line.iter().map(move |note_box| RawNoteData {
-                    line_ix: line_ix as u32,
+                    line_ix,
                     start_beat: note_box.bounds.start_beat,
                     width: note_box.bounds.width(),
                 })
@@ -330,11 +412,13 @@ pub fn mk_midi_editor(config: &str) -> Box<dyn ViewContext> {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
         row_height: constants::LINE_HEIGHT,
         row_count: constants::LINE_COUNT,
-        beat_length_px: 20,
+        beat_length_px: constants::BEAT_LENGTH_PX,
         cursor_gutter_height: constants::CURSOR_GUTTER_HEIGHT,
         line_border_width: constants::LINE_BORDER_WIDTH,
         line_height: constants::LINE_HEIGHT,
         note_snap_beat_interval: constants::NOTE_SNAP_BEAT_INTERVAL,
+        grid_width: constants::GRID_WIDTH,
+        measure_width_px: constants::BEATS_PER_MEASURE * constants::BEAT_LENGTH_PX,
     };
 
     let view_context = MidiEditorGridHandler::default();

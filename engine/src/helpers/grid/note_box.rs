@@ -6,11 +6,11 @@ use std::{
 
 use std::f32;
 
-use super::selection_box::SelectionRegion;
+use crate::helpers::grid::prelude::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct RawNoteData {
-    pub line_ix: u32,
+    pub line_ix: usize,
     pub start_beat: f32,
     pub width: f32,
 }
@@ -158,7 +158,10 @@ impl Ord for SelectedNoteData {
 }
 
 impl SelectedNoteData {
-    pub fn from_note_box<S>(line_ix: usize, note_box: &NoteBox<S>) -> Self {
+    pub fn from_note_box<S: GridRendererUniqueIdentifier>(
+        line_ix: usize,
+        note_box: &NoteBox<S>,
+    ) -> Self {
         SelectedNoteData {
             line_ix,
             dom_id: note_box.data.get_id(),
@@ -175,18 +178,18 @@ pub struct NoteData<'a, S> {
 }
 
 impl<'a, S> NoteData<'a, S> {
-    pub fn get_selection_region(&self) -> SelectionRegion {
+    pub fn get_selection_region(&self, conf: &GridConf) -> SelectionRegion {
         SelectionRegion {
-            x: (self.note_box.bounds.start_beat * BEAT_LENGTH_PX) as usize,
-            y: self.line_ix * PADDED_LINE_HEIGHT,
+            x: (self.note_box.bounds.start_beat * conf.beat_length_px as f32) as usize,
+            y: self.line_ix * conf.padded_line_height(),
             width: ((self.note_box.bounds.end_beat - self.note_box.bounds.start_beat)
-                * BEAT_LENGTH_PX) as usize,
-            height: LINE_HEIGHT,
+                * conf.beat_length_px as f32) as usize,
+            height: conf.line_height,
         }
     }
 
-    pub fn intersects_region(&self, region: &SelectionRegion) -> bool {
-        let our_region = self.get_selection_region();
+    pub fn intersects_region(&self, conf: &GridConf, region: &SelectionRegion) -> bool {
+        let our_region = self.get_selection_region(conf);
         // regions intersect if any point bounding our origin is contained in the other region
         our_region.iter_points().any(|pt| region.contains_point(pt))
     }

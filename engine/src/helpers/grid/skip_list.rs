@@ -886,14 +886,15 @@ impl<S> NoteLines<S> {
     // exist.
     pub fn iter_region<'a>(
         &'a self,
-        region: &'a SelectionRegion,
+        y: usize,
+        height: usize,
+        min_beat: f32,
+        max_beat: f32,
     ) -> impl Iterator<Item = NoteData<'a, S>> + 'a {
-        let start_line_ix = (region.y - (region.y % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT;
-        let end_px_ix = region.y + region.height;
+        let start_line_ix = (y - (y % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT;
+        let end_px_ix = y + height;
         let end_line_ix = ((end_px_ix - (end_px_ix % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT)
             .min(LINE_COUNT - 1);
-        let min_beat = px_to_beat(region.x as f32);
-        let max_beat = px_to_beat((region.x + region.width) as f32);
 
         let mut iterator = NoteSkipListRegionIterator {
             start_line_ix,
