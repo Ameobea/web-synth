@@ -6,6 +6,8 @@ use std::{
 
 use std::f32;
 
+use super::selection_box::SelectionRegion;
+
 #[derive(Serialize, Deserialize)]
 pub struct RawNoteData {
     pub line_ix: u32,
@@ -156,10 +158,10 @@ impl Ord for SelectedNoteData {
 }
 
 impl SelectedNoteData {
-    pub fn from_note_box(line_ix: usize, note_box: &NoteBox<usize>) -> Self {
+    pub fn from_note_box<S>(line_ix: usize, note_box: &NoteBox<S>) -> Self {
         SelectedNoteData {
             line_ix,
-            dom_id: note_box.data,
+            dom_id: note_box.data.get_id(),
             start_beat: note_box.bounds.start_beat,
             width: note_box.bounds.width(),
         }

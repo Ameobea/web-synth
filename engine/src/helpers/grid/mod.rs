@@ -1,4 +1,4 @@
-use std::{f32, marker::PhantomData};
+use std::{f32, marker::PhantomData, str};
 
 use fnv::FnvHashSet;
 
@@ -12,10 +12,22 @@ pub mod skip_list;
 
 use self::{prelude::*, skip_list::NoteLines};
 
-type DomId = usize;
+pub type DomId = usize;
 
 pub trait GridRendererUniqueIdentifier {
     fn get_id(&self) -> DomId;
+}
+
+impl GridRendererUniqueIdentifier for usize {
+    fn get_id(&self) -> DomId { *self }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Tool {
+    /// A new note will be drawn starting at wherever the mouse is pressed
+    DrawNote,
+    /// Any note clicked on will be deleted
+    DeleteNote,
 }
 
 pub trait GridRenderer {
@@ -26,23 +38,37 @@ pub trait GridRenderer {
     /// Given a note's `DomId`, mark it as deselected in the visualization
     fn deselect_note(dom_id: DomId);
 
-    fn create_cursor() -> DomId;
+    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId;
     fn set_cursor_pos(x: usize);
 }
 
-pub trait GridHandler<S> {
+pub trait GridHandler<S, R: GridRenderer> {
     fn init(&mut self);
 
     fn on_note_select(&mut self, data: &S);
     fn on_note_double_click(&mut self, data: &S);
-}
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum Tool {
-    /// A new note will be drawn starting at wherever the mouse is pressed
-    DrawNote,
-    /// Any note clicked on will be deleted
-    DeleteNote,
+    fn on_note_deleted(&mut self, dom_id: DomId);
+
+    fn on_key_down(
+        &mut self,
+        key: &str,
+        grid: &mut Grid<S, R, Self>,
+        control_pressed: bool,
+        shift_pressed: bool,
+    );
+
+    fn on_selection_region_update(
+        &mut self,
+        grid: &mut Grid<S, R, Self>,
+        retained_region: &Option<SelectionRegion>,
+        changed_region_1: &ChangedRegion,
+        changed_region_2: &ChangedRegion,
+    );
+
+    fn on_selection_box_deleted(&mut self, grid: &mut Grid<S, R, Self>);
+
+    fn create_note(&mut self, line_ix: usize, start_beat: f32, dom_id: DomId) -> S;
 }
 
 /// `Grid` is a view context that consists of a set of horizontal rows in which segments, currently
@@ -57,7 +83,7 @@ pub enum Tool {
 ///
 /// Finally, it has a `GridRenderer` which is just a bunch of type-level functions that are used
 /// to render custom versions of the individual elements of the grid.
-pub struct Grid<S, R: GridRenderer, H: GridHandler<S>> {
+pub struct Grid<S, R: GridRenderer, H: GridHandler<S, R>> {
     pub conf: GridConf,
     pub data: NoteLines<S>,
     pub selected_notes: FnvHashSet<SelectedNoteData>,
@@ -79,7 +105,6 @@ pub struct Grid<S, R: GridRenderer, H: GridHandler<S>> {
     // TODO: Make this something better, like mapping dom_id to line index and start beat or sth.
     pub cursor_dom_id: usize,
     pub playback_active: bool,
-    pub synth: PolySynth,
     pub handler: H,
     renderer: PhantomData<R>,
 }
@@ -101,7 +126,7 @@ impl GridConf {
     pub fn grid_height(&self) -> usize { self.row_count * self.padded_line_height() }
 }
 
-impl<S, R: GridRenderer, H: GridHandler<S>> Grid<S, R, H> {
+impl<S, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
     pub fn new(conf: GridConf, handler: H) -> Self {
         Grid {
             conf,
@@ -121,7 +146,6 @@ impl<S, R: GridRenderer, H: GridHandler<S>> Grid<S, R, H> {
             drawing_note_dom_id: None,
             dragging_note_data: None,
             selection_box_dom_id: None,
-            synth: PolySynth::new(true),
             cursor_dom_id: 0,
             playback_active: false,
             handler,
@@ -133,7 +157,7 @@ impl<S, R: GridRenderer, H: GridHandler<S>> Grid<S, R, H> {
     fn init(&mut self) {}
 }
 
-impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewContext
+impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> ViewContext
     for Grid<S, R, H>
 {
     fn init(&mut self) { self.handler.init(); }
@@ -141,86 +165,6 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
     fn cleanup(&mut self) { unimplemented!() }
 
     fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
-        // TODO: Check for focus on the canvas either on the frontend or here
-
-        let (line_diff_vertical, beat_diff_horizontal) = match (control_pressed, shift_pressed) {
-            (true, false) | (false, true) => (3, 4.0),
-            (true, true) => (5, 16.0),
-            (false, false) => (1, 1.0),
-        };
-
-        let move_notes_vertical = |up: bool| {
-            let notes = self.get_sorted_selected_notes(!up);
-            let mut notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
-
-            let move_note_vertical = |mut note_data: SelectedNoteData| -> SelectedNoteData {
-                let cond = tern(
-                    up,
-                    note_data.line_ix >= line_diff_vertical,
-                    note_data.line_ix + line_diff_vertical < self.conf.row_count,
-                );
-                if !cond {
-                    return note_data;
-                }
-
-                let dst_line_ix = if up {
-                    note_data.line_ix - line_diff_vertical
-                } else {
-                    note_data.line_ix + line_diff_vertical
-                };
-                notes_to_play.push(self.midi_to_frequency(dst_line_ix));
-
-                let move_failed = self.data.move_note_vertical(
-                    note_data.line_ix,
-                    dst_line_ix,
-                    note_data.start_beat,
-                );
-                if !move_failed {
-                    note_data.line_ix = dst_line_ix;
-                    js::set_attr(
-                        note_data.dom_id,
-                        "y",
-                        &(note_data.line_ix * self.conf.padded_line_height()
-                            + self.conf.cursor_gutter_height)
-                            .to_string(),
-                    );
-                }
-
-                note_data
-            };
-
-            self.selected_notes = notes.into_iter().cloned().map(move_note_vertical).collect();
-            self.synth.trigger_attacks(&notes_to_play);
-            self.synth.trigger_releases(&notes_to_play);
-        };
-
-        let move_selected_notes_horizontal = |right: bool| {
-            let beats_to_move = beat_diff_horizontal * tern(right, 1.0, -1.0);
-            let move_note_horizontal = |mut note_data: SelectedNoteData| -> SelectedNoteData {
-                let new_start_beat = self.data.move_note_horizontal(
-                    note_data.line_ix,
-                    note_data.start_beat,
-                    beats_to_move,
-                );
-
-                js::set_attr(
-                    note_data.dom_id,
-                    "x",
-                    &(self.beats_to_px(new_start_beat)).to_string(),
-                );
-
-                note_data.start_beat = new_start_beat;
-                note_data
-            };
-
-            self.selected_notes = self
-                .get_sorted_selected_notes(right)
-                .into_iter()
-                .cloned()
-                .map(move_note_horizontal)
-                .collect();
-        };
-
         self.control_pressed = control_pressed;
         self.shift_pressed = shift_pressed;
 
@@ -230,23 +174,18 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                 for note_data in self.selected_notes.drain() {
                     let removed_note = self.data.remove(note_data.line_ix, note_data.start_beat);
                     debug_assert!(removed_note.is_some());
+                    // TODO: Make renderer method
                     js::delete_element(note_data.dom_id);
+                    self.handler.on_note_deleted(note_data.dom_id);
 
                     if cfg!(debug_assertions) {
-                        common::log(format!("{:?}", self.data.lines[note_data.line_ix]));
+                        // common::log(format!("{:?}", self.data.lines[note_data.line_ix]));
                     }
                 },
-            "ArrowUp" | "w" => move_notes_vertical(true),
-            "ArrowDown" | "s" => move_notes_vertical(false),
-            "ArrowRight" | "d" => move_selected_notes_horizontal(true),
-            "ArrowLeft" | "a" => move_selected_notes_horizontal(false),
             "p" => self.copy_selected_notes(),
-            "z" | "x" => self.play_selected_notes(),
-            " " => {
-                self.start_playback();
-                self.serialize_and_save_composition();
-            },
-            _ => (),
+            _ => self
+                .handler
+                .on_key_down(key, &mut self, control_pressed, shift_pressed),
         }
     }
 
@@ -298,36 +237,25 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
         let beat = self.px_to_beat(x);
         let bounds = self.data.get_bounds(line_ix, beat);
 
-        if self.cur_tool == Tool::DrawNote && !self.shift_pressed {
-            self.synth.trigger_attack(self.midi_to_frequency(line_ix));
-        }
-
-        let mut init_selection_box = || {
-            self.deselect_all_notes();
-
-            // TODO: make dedicated function in `render` probably
-            selection_box_dom_id = Some(js::render_quad(FG_CANVAS_IX, x, y, 0, 0, "selection-box"));
-        };
-
         match bounds {
             skip_list::Bounds::Intersecting(note) => match self.cur_tool {
                 Tool::DeleteNote => {
-                    let dom_id = note.data;
+                    let dom_id = note.data.get_id();
                     R::deselect_note(dom_id);
                     js::delete_element(dom_id);
                     self.data.remove(line_ix, note.bounds.start_beat);
                 },
-                Tool::DrawNote if self.shift_pressed => init_selection_box(),
+                Tool::DrawNote if self.shift_pressed => self.init_selection_box(x, y),
                 Tool::DrawNote if self.control_pressed => {
                     let selected_data = SelectedNoteData::from_note_box(line_ix, note);
 
                     if self.selected_notes.contains(&selected_data) {
                         self.selected_notes.remove(&selected_data);
-                        R::deselect_note(note.data);
+                        R::deselect_note(note.data.get_id());
                     } else {
                         // Select the clicked note since it wasn't previously selected
                         self.selected_notes.insert(selected_data);
-                        R::select_note(note.data);
+                        R::select_note(note.data.get_id());
                     }
                 },
                 Tool::DrawNote => {
@@ -335,12 +263,12 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                     dragging_note_data = Some((note.bounds.start_beat, note_data));
                     self.deselect_all_notes();
                     self.selected_notes.insert(note_data);
-                    R::select_note(note.data);
+                    R::select_note(note.data.get_id());
                 },
             },
             skip_list::Bounds::Bounded(lower, upper) => match self.cur_tool {
                 Tool::DrawNote if self.control_pressed => {}, // TODO
-                Tool::DrawNote if self.shift_pressed => init_selection_box(),
+                Tool::DrawNote if self.shift_pressed => self.init_selection_box(x, y),
                 Tool::DrawNote => {
                     let snapped_lower = self.snap_to_beat_interval(x, self.beats_to_px(lower));
                     let snapped_upper = (snapped_lower
@@ -350,12 +278,21 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                     self.cur_note_bounds = (lower, upper);
 
                     // Draw the temporary/candidate note after storing its bounds
-                    drawing_dom_id = Some(R::create_note(line_ix, snapped_lower, width));
+                    drawing_dom_id = Some(R::create_note(
+                        snapped_lower,
+                        self.conf.cursor_gutter_height + self.conf.padded_line_height() * line_ix,
+                        width,
+                        self.conf.line_height,
+                    ));
                     x = snapped_lower as usize;
                 },
                 _ => (),
             },
         };
+
+        if self.cur_tool == Tool::DrawNote && !self.shift_pressed {
+            self.synth.trigger_attack(self.midi_to_frequency(line_ix));
+        }
 
         self.mouse_down = true;
         self.cursor_moving = false;
@@ -379,7 +316,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
             if let Some(selection_box_dom_id) = self.selection_box_dom_id {
                 self.update_selection_box(selection_box_dom_id, last_x, last_y, x, 1);
             } else {
-                self.set_cursor_pos(self.px_to_beat(x as f32));
+                self.set_cursor_pos(self.px_to_beat(x));
             }
             return;
         }
@@ -471,7 +408,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                         js::set_attr(
                             dragging_note.dom_id,
                             "y",
-                            &((dragging_note.line_ix * self.conf.padded_line_height
+                            &((dragging_note.line_ix * self.conf.padded_line_height()
                                 + self.conf.cursor_gutter_height)
                                 .to_string()),
                         );
@@ -496,10 +433,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
         let delete_selection_box = |selection_box_dom_id: usize| {
             js::delete_element(selection_box_dom_id);
 
-            for note_data in self.selected_notes.iter() {
-                self.synth
-                    .trigger_release(self.midi_to_frequency(note_data.line_ix));
-            }
+            self.handler.on_selection_box_deleted(&mut self);
         };
 
         if self.cursor_moving {
@@ -507,7 +441,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                 delete_selection_box(selection_box_dom_id);
             }
 
-            self.set_cursor_pos(self.px_to_beat(x as f32));
+            self.set_cursor_pos(self.px_to_beat(x));
             return;
         }
 
@@ -534,8 +468,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                     let x_px = x;
                     let start_beat = self.px_to_beat(x_px);
                     let line_ix = down_line_ix;
-                    let note = NoteBox {
-                        data: note_dom_id,
+                    let note: NoteBox<S> = NoteBox {
+                        data: self.handler.create_note(line_ix, start_beat, note_dom_id),
                         bounds: NoteBoxBounds {
                             start_beat,
                             end_beat: self.px_to_beat(x_px + width),
@@ -554,7 +488,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
                     // Actually insert the node into the skip list
                     self.data.insert(line_ix, note);
                     if cfg!(debug_assertions) {
-                        common::log(format!("{:?}", self.data.lines[line_ix]));
+                        // common::log(format!("{:?}", self.data.lines[line_ix]));
                     }
                 },
                 (None, Some(_)) => (),
@@ -573,7 +507,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S>> ViewCo
     fn save(&self) -> String { unimplemented!() }
 }
 
-impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler> Grid<S, R, H> {
+impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
     pub fn px_to_beat(&self, px: usize) -> f32 { px as f32 / (self.conf.beat_length_px as f32) }
 
     pub fn beats_to_px(&self, beats: f32) -> usize { beats as usize * self.conf.beat_length_px }
@@ -622,22 +556,24 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler> Grid<S, R
                     continue;
                 }
             }
+
             let dom_id = R::create_note(
-                *line_ix,
+                self.conf.cursor_gutter_height + self.conf.padded_line_height() * *line_ix,
                 self.beats_to_px(new_start_beat),
                 self.beats_to_px(*width),
+                self.conf.line_height,
             );
             let new_note = NoteBox {
                 bounds: NoteBoxBounds {
                     start_beat: start_beat + offset_beats,
                     end_beat: start_beat + width + offset_beats,
                 },
-                data: dom_id,
+                data: self.handler.create_note(*line_ix, new_start_beat, dom_id),
             };
-            let insertion_failed = self.data.insert(*line_ix, new_note.clone());
+            new_selected_notes.insert(SelectedNoteData::from_note_box(*line_ix, &new_note));
+            let insertion_failed = self.data.insert(*line_ix, new_note);
             debug_assert!(!insertion_failed.is_none());
             R::select_note(dom_id);
-            new_selected_notes.insert(SelectedNoteData::from_note_box(*line_ix, &new_note));
         }
 
         // deselect the old notes and select the new ones
@@ -706,10 +642,6 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler> Grid<S, R
         }
     }
 
-    pub fn midi_to_frequency(&self, line_ix: usize) -> f32 {
-        27.5 * (2.0f32).powf(((self.conf.row_count - line_ix) as f32) / 12.0)
-    }
-
     pub fn get_sorted_selected_notes(&self, sort_reverse: bool) -> Vec<&'static SelectedNoteData> {
         let mut notes: Vec<&SelectedNoteData> = self.selected_notes.iter().collect::<Vec<_>>();
 
@@ -720,92 +652,6 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler> Grid<S, R
         }
 
         notes
-    }
-
-    pub fn play_selected_notes(&self) {
-        for SelectedNoteData { line_ix, .. } in self.selected_notes.iter() {
-            self.synth.trigger_attack(self.midi_to_frequency(*line_ix));
-        }
-    }
-
-    pub fn release_selected_notes(&self) {
-        for SelectedNoteData { line_ix, .. } in self.selected_notes.iter() {
-            self.synth.trigger_release(self.midi_to_frequency(*line_ix));
-        }
-    }
-
-    pub fn start_playback(&mut self) {
-        // Get an iterator of sorted attack/release events to process
-        let events = self.data.iter_events(None);
-
-        // Create a virtual poly synth to handle assigning the virtual notes to voices
-        let mut voice_manager = PolySynth::new(false);
-
-        // Trigger all of the events with a custom callback that records the voice index to use for
-        // each of them.
-        // `scheduled_events` is an array of `(is_attack, voice_ix)` pairs represented as bytes for
-        // efficient transfer across the FFI.
-        let mut scheduled_events: Vec<u8> = Vec::with_capacity(events.size_hint().0 * 2);
-        let mut frequencies: Vec<f32> = Vec::with_capacity(events.size_hint().0 / 2);
-        let mut event_timings: Vec<f32> = Vec::with_capacity(events.size_hint().0);
-        for event in events {
-            let frequency = self.midi_to_frequency(event.line_ix);
-            scheduled_events.push(tern(event.is_start, 1, 0));
-            let event_time_seconds = ((event.beat / BPM) * 60.0) / 4.0;
-            event_timings.push(event_time_seconds);
-
-            if event.is_start {
-                frequencies.push(frequency);
-                voice_manager.trigger_attack_cb(frequency, |_, voice_ix, _| {
-                    scheduled_events.push(voice_ix as u8);
-                });
-            } else {
-                voice_manager.trigger_release_cb(frequency, |_, voice_ix| {
-                    scheduled_events.push(voice_ix as u8);
-                });
-            }
-        }
-
-        // Ship all of these events over to be scheduled and played
-        synth::schedule_events(
-            self.synth.id,
-            &scheduled_events,
-            &frequencies,
-            &event_timings,
-        );
-    }
-
-    pub fn serialize_and_save_composition(&mut self) {
-        // Get a list of every note in the composition matched with its line index
-        let all_notes: Vec<RawNoteData> = self
-            .data
-            .lines
-            .iter()
-            .enumerate()
-            .flat_map(|(line_ix, line)| {
-                line.iter().map(move |note_box| RawNoteData {
-                    line_ix: line_ix as u32,
-                    start_beat: note_box.bounds.start_beat,
-                    width: note_box.bounds.width(),
-                })
-            })
-            .collect();
-
-        let mut base64_data = Vec::new();
-        {
-            let mut base64_encoder = base64::write::EncoderWriter::new(
-                &mut base64_data,
-                base64::Config::new(base64::CharacterSet::Standard, true),
-            );
-            bincode::serialize_into(&mut base64_encoder, &all_notes)
-                .expect("Error binary-encoding note data");
-            base64_encoder
-                .finish()
-                .expect("Error base64-encoding note data");
-        }
-        let base64_str = unsafe { str::from_utf8_unchecked(&base64_data) };
-
-        js::save_composition(base64_str);
     }
 
     pub fn try_load_saved_composition(&mut self) {
@@ -867,6 +713,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler> Grid<S, R
             last_x,
             last_y.saturating_sub(self.conf.cursor_gutter_height),
         );
+        // TODO: Make `GridRenderer` method
         js::set_attr(selection_box_dom_id, "x", &x.to_string());
         js::set_attr(
             selection_box_dom_id,
@@ -876,31 +723,19 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler> Grid<S, R
         js::set_attr(selection_box_dom_id, "width", &width.to_string());
         js::set_attr(selection_box_dom_id, "height", &height.to_string());
 
-        // Look for all notes in the added/removed regions and add/remove them from the
-        // selected notes set and select/deselect their UI representations
-        for (was_added, region) in &[
-            (changed_region_1.was_added, changed_region_1.region),
-            (changed_region_2.was_added, changed_region_2.region),
-        ] {
-            for note_data in self.data.iter_region(region) {
-                // Ignore notes that are also contained in the retained region
-                if let Some(retained_region) = retained_region.as_ref() {
-                    if note_data.intersects_region(&retained_region) {
-                        continue;
-                    }
-                }
+        self.handler.on_selection_region_update(
+            &mut self,
+            &retained_region,
+            &changed_region_1,
+            &changed_region_2,
+        );
+    }
 
-                let dom_id = note_data.note_box.data;
-                let selected_note_data: SelectedNoteData = note_data.into();
-                let line_ix = selected_note_data.line_ix;
-                if *was_added && self.selected_notes.insert(selected_note_data) {
-                    R::select_note(dom_id);
-                    self.synth.trigger_attack(self.midi_to_frequency(line_ix));
-                } else if !*was_added && self.selected_notes.remove(&selected_note_data) {
-                    R::deselect_note(dom_id);
-                    self.synth.trigger_release(self.midi_to_frequency(line_ix));
-                }
-            }
-        }
+    fn init_selection_box(&mut self, x: usize, y: usize) {
+        self.deselect_all_notes();
+
+        // TODO: make dedicated function in `render` probably
+        self.selection_box_dom_id =
+            Some(js::render_quad(FG_CANVAS_IX, x, y, 0, 0, "selection-box"));
     }
 }
