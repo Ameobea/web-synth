@@ -91,7 +91,10 @@ fn init_preceeding_links<S>(head_key: NodeSlabKey<S>) -> PreceedingLinks<S> {
     preceeding_links
 }
 
-pub fn debug_preceeding_links<S>(line: &NoteSkipList<S>, links: &PreceedingLinks<S>) -> String {
+pub fn debug_preceeding_links<S: GridRendererUniqueIdentifier>(
+    line: &NoteSkipList<S>,
+    links: &PreceedingLinks<S>,
+) -> String {
     format!(
         "{:?}",
         links
@@ -101,7 +104,10 @@ pub fn debug_preceeding_links<S>(line: &NoteSkipList<S>, links: &PreceedingLinks
     )
 }
 
-pub fn debug_links<S>(line: &NoteSkipList<S>, links: &LinkOpts<S>) -> String {
+pub fn debug_links<S: GridRendererUniqueIdentifier>(
+    line: &NoteSkipList<S>,
+    links: &LinkOpts<S>,
+) -> String {
     format!(
         "{:?}",
         links
@@ -137,12 +143,15 @@ pub fn blank_shortcuts<T>() -> [Option<T>; NOTE_SKIP_LIST_LEVELS] {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Bounds<'a, S> {
-    Intersecting(&'a NoteBox<S>),
+pub enum Bounds {
+    // As much as I'd love to just give a `&'a mut NoteBox<S>` here, that makes doing stuff like
+    // deleting the clicked note very difficult due to lifetime issues, since `Bounds` holds a
+    // reference to the whole `&mut self`.
+    Intersecting(SelectedNoteData),
     Bounded(f32, Option<f32>),
 }
 
-impl<'a, S> Bounds<'a, S> {
+impl Bounds {
     pub fn is_bounded(&self) -> bool {
         match self {
             Bounds::Bounded(..) => true,
@@ -171,7 +180,7 @@ pub enum FrontierNode<'a, S> {
     StartBeatConsumed(&'a NoteSkipList<S>, &'a NoteSkipListNode<S>),
 }
 
-impl<'a, S> FrontierNode<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> FrontierNode<'a, S> {
     pub fn beat(&'a self) -> f32 {
         match self {
             FrontierNode::NoneConsumed(list, node) => node.val.bounds.start_beat,
@@ -201,12 +210,12 @@ impl<'a, S> FrontierNode<'a, S> {
     }
 }
 
-pub struct NoteEventIterator<'a, S> {
+pub struct NoteEventIterator<'a, S: GridRendererUniqueIdentifier> {
     pub cur_beat: f32,
     pub frontier_nodes: [Option<FrontierNode<'a, S>>; LINE_COUNT],
 }
 
-impl<'a, S> Iterator for NoteEventIterator<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteEventIterator<'a, S> {
     type Item = NoteEvent;
 
     fn next(&mut self) -> Option<NoteEvent> {
@@ -244,7 +253,7 @@ impl<'a, S> Iterator for NoteEventIterator<'a, S> {
     }
 }
 
-impl<'a, S> NoteEventIterator<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> NoteEventIterator<'a, S> {
     pub fn new(note_lines: &'a NoteLines<S>, start_beat: f32) -> Self {
         let frontier_nodes = unsafe {
             let mut frontier_nodes: [Option<FrontierNode<'a, S>>; LINE_COUNT] =
@@ -269,7 +278,7 @@ impl<'a, S> NoteEventIterator<'a, S> {
     }
 }
 
-impl<S> NoteSkipListNode<S> {
+impl<S: GridRendererUniqueIdentifier> NoteSkipListNode<S> {
     /// Returns the slot index of the last node that has a value less than that of the target
     /// value.  If `target_val` is less than all other values in the collection, then `None`
     /// is returned.
@@ -355,12 +364,12 @@ impl Debug for NoteSkipList<usize> {
     }
 }
 
-pub struct NoteSkipListIterator<'a, S> {
+pub struct NoteSkipListIterator<'a, S: GridRendererUniqueIdentifier> {
     line: &'a NoteSkipList<S>,
     cur_node: Option<&'a NoteSkipListNode<S>>,
 }
 
-impl<'a, S> Iterator for NoteSkipListIterator<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteSkipListIterator<'a, S> {
     type Item = &'a NoteBox<S>;
 
     fn next(&mut self) -> Option<&'a NoteBox<S>> {
@@ -370,12 +379,12 @@ impl<'a, S> Iterator for NoteSkipListIterator<'a, S> {
     }
 }
 
-pub struct NoteSkipListNodeIterator<'a, S> {
+pub struct NoteSkipListNodeIterator<'a, S: GridRendererUniqueIdentifier> {
     line: &'a NoteSkipList<S>,
     cur_node: Option<&'a NoteSkipListNode<S>>,
 }
 
-impl<'a, S> Iterator for NoteSkipListNodeIterator<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteSkipListNodeIterator<'a, S> {
     type Item = &'a NoteSkipListNode<S>;
 
     fn next(&mut self) -> Option<&'a NoteSkipListNode<S>> {
@@ -385,7 +394,7 @@ impl<'a, S> Iterator for NoteSkipListNodeIterator<'a, S> {
     }
 }
 
-pub struct NoteSkipListRegionIterator<'a, S> {
+pub struct NoteSkipListRegionIterator<'a, S: GridRendererUniqueIdentifier> {
     pub start_line_ix: usize,
     pub end_line_ix: usize,
     pub min_beat: f32,
@@ -395,7 +404,7 @@ pub struct NoteSkipListRegionIterator<'a, S> {
     pub cur_node: Option<&'a NoteSkipListNode<S>>,
 }
 
-impl<'a, S> NoteSkipListRegionIterator<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> NoteSkipListRegionIterator<'a, S> {
     /// Moves this iterator to the next line in `NoteLines`.  Recursively calls itself until a
     /// valid starting node has been found or all lines in the search range are exhausted.
     /// Returns `None` if this iterator is exhausted.
@@ -447,7 +456,7 @@ impl<'a> Into<SelectedNoteData> for NoteData<'a, usize> {
     }
 }
 
-impl<'a, S> Iterator for NoteSkipListRegionIterator<'a, S> {
+impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteSkipListRegionIterator<'a, S> {
     type Item = NoteData<'a, S>;
 
     fn next(&mut self) -> Option<NoteData<'a, S>> {
@@ -486,7 +495,7 @@ impl<S> Default for NoteSkipList<S> {
     }
 }
 
-impl<S> NoteSkipList<S> {
+impl<S: GridRendererUniqueIdentifier> NoteSkipList<S> {
     pub fn get_node<'a>(&'a self, key: SlabKey<NoteSkipListNode<S>>) -> &'a NoteSkipListNode<S> {
         &self.nodes[key.key()]
     }
@@ -759,7 +768,7 @@ pub struct NoteLines<S> {
     pub lines: Vec<NoteSkipList<S>>,
 }
 
-impl<S> NoteLines<S> {
+impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
     pub fn new(line_count: usize) -> Self {
         let mut lines = Vec::with_capacity(line_count);
         for _ in 0..line_count {
@@ -769,7 +778,7 @@ impl<S> NoteLines<S> {
         NoteLines { lines }
     }
 
-    pub fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Bounds<S> {
+    pub fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Bounds {
         let line = &mut self.lines[line_ix];
         let head = match line.head_key {
             Some(node_key) => line.get_node(node_key),
@@ -782,7 +791,10 @@ impl<S> NoteLines<S> {
         // If the first value is already greater than the new note, we don't have to search and
         // simply bound it on the top side by the head's start beat.
         if head.val.contains_beat(beat) {
-            return Bounds::Intersecting(&line.head().unwrap().val);
+            return Bounds::Intersecting(SelectedNoteData::from_note_box(
+                line_ix,
+                &line.head().unwrap().val,
+            ));
         } else if head.val.bounds.start_beat > beat {
             return Bounds::Bounded(0.0, Some(head.val.bounds.start_beat));
         }
@@ -794,7 +806,10 @@ impl<S> NoteLines<S> {
             None => return Bounds::Bounded(preceeding_node.val.bounds.end_beat, None),
         };
         if line.get_node(following_node_key).val.contains_beat(beat) {
-            return Bounds::Intersecting(&line.get_node(following_node_key).val);
+            return Bounds::Intersecting(SelectedNoteData::from_note_box(
+                line_ix,
+                &line.get_node(following_node_key).val,
+            ));
         }
         Bounds::Bounded(
             preceeding_node.val.bounds.end_beat,

@@ -305,12 +305,17 @@ impl MidiEditorGridHandler {
         grid_state: &mut GridState<usize>,
         line_diff_vertical: usize,
     ) {
-        let notes = grid_state.get_sorted_selected_notes(!up);
-        let mut notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
+        let (mut notes_to_play, sorted_selected_notes): (Vec<f32>, Vec<SelectedNoteData>) = {
+            let notes = grid_state.get_sorted_selected_notes(!up);
+            let notes_to_play: Vec<f32> = Vec::with_capacity(notes.len());
 
-        grid_state.selected_notes = notes
+            // We have to `.collect()` these since the reference is retained in the iterator type.
+            // Very sad.
+            (notes_to_play, notes.into_iter().cloned().collect())
+        };
+
+        grid_state.selected_notes = sorted_selected_notes
             .into_iter()
-            .cloned()
             .map(|note_data| {
                 self.move_note_vertical(
                     up,
@@ -333,12 +338,18 @@ impl MidiEditorGridHandler {
     ) {
         let beats_to_move = beat_diff_horizontal * tern(right, 1.0, -1.0);
         let cloned_conf = grid_state.conf.clone();
-        let move_note_horizontal = move |mut note_data: SelectedNoteData| -> SelectedNoteData {
-            let new_start_beat = grid_state.data.move_note_horizontal(
-                note_data.line_ix,
-                note_data.start_beat,
-                beats_to_move,
-            );
+
+        let sorted_selected_notes: Vec<SelectedNoteData> = grid_state
+            .get_sorted_selected_notes(right)
+            .into_iter()
+            .cloned()
+            .collect();
+
+        let move_note_horizontal = move |data: &mut NoteLines<usize>,
+                                         mut note_data: SelectedNoteData|
+              -> SelectedNoteData {
+            let new_start_beat =
+                data.move_note_horizontal(note_data.line_ix, note_data.start_beat, beats_to_move);
 
             js::set_attr(
                 note_data.dom_id,
@@ -350,11 +361,9 @@ impl MidiEditorGridHandler {
             note_data
         };
 
-        let new_selected_notes = grid_state
-            .get_sorted_selected_notes(right)
+        let new_selected_notes = sorted_selected_notes
             .into_iter()
-            .cloned()
-            .map(move_note_horizontal)
+            .map(|note_data| move_note_horizontal(&mut grid_state.data, note_data))
             .collect();
         grid_state.selected_notes = new_selected_notes;
     }
