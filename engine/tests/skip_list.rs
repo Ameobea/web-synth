@@ -8,7 +8,7 @@ extern crate test;
 use std::num::NonZeroU32;
 
 use engine::{
-    helpers::grid::{note_box::NoteBox, selection_box::SelectionRegion, skip_list::*},
+    helpers::grid::{note_box::NoteBox, skip_list::*},
     views::midi_editor::prelude::{state::*, *},
 };
 use rand::prelude::*;
@@ -125,7 +125,7 @@ fn skiplist_bulk_insertion() {
     for i in 0..500 {
         notes.push(((i * 2) as f32, ((i * 2) + 1) as f32));
     }
-    state().rng.shuffle(&mut notes);
+    rng().shuffle(&mut notes);
 
     for (start_beat, end_beat) in notes {
         skip_list.insert(NoteBox {
@@ -297,12 +297,7 @@ fn skiplist_region_iter() {
     expected_results.sort_by(compare_notes);
 
     let mut actual_results = lines
-        .iter_region(&SelectionRegion {
-            x: beats_to_px(selection_start_beat) as usize,
-            y: LINE_HEIGHT / 2,
-            width: beats_to_px(selection_end_beat - selection_start_beat) as usize,
-            height: PADDED_LINE_HEIGHT * 5,
-        })
+        .iter_region(0, 0, selection_start_beat, selection_end_beat)
         .map(|note_data| {
             (
                 note_data.line_ix,

@@ -18,7 +18,7 @@ use std::{
 use rand::prelude::*;
 use slab::Slab;
 
-use super::{super::super::views::midi_editor::prelude::*, prelude::*}; // TODO: Remove
+use super::prelude::*;
 
 pub struct SlabKey<T>(NonZeroU32, PhantomData<T>);
 
@@ -36,8 +36,8 @@ impl<T> PartialEq for SlabKey<T> {
 
 pub type NodeSlabKey<S> = SlabKey<NoteSkipListNode<S>>;
 pub type NoteBoxSlabKey<S> = SlabKey<NoteBox<S>>;
-pub type PreceedingLinks<S> = [NodeSlabKey<S>; 5]; // TODO
-pub type LinkOpts<S> = [Option<NodeSlabKey<S>>; 5]; // TODO
+pub type PreceedingLinks<S> = [NodeSlabKey<S>; NOTE_SKIP_LIST_LEVELS];
+pub type LinkOpts<S> = [Option<NodeSlabKey<S>>; NOTE_SKIP_LIST_LEVELS];
 
 impl<T> Debug for SlabKey<T> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> { write!(fmt, "{}", self.key()) }
@@ -143,15 +143,19 @@ pub fn blank_shortcuts<T>() -> [Option<T>; NOTE_SKIP_LIST_LEVELS] {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Bounds {
+pub enum Bounds<S> {
     // As much as I'd love to just give a `&'a mut NoteBox<S>` here, that makes doing stuff like
     // deleting the clicked note very difficult due to lifetime issues, since `Bounds` holds a
     // reference to the whole `&mut self`.
-    Intersecting(SelectedNoteData),
+    Intersecting {
+        line_ix: usize,
+        node_slab_key: NodeSlabKey<S>,
+        selected_note_data: SelectedNoteData,
+    },
     Bounded(f32, Option<f32>),
 }
 
-impl Bounds {
+impl<S: GridRendererUniqueIdentifier> Bounds<S> {
     pub fn is_bounded(&self) -> bool {
         match self {
             Bounds::Bounded(..) => true,
@@ -183,8 +187,8 @@ pub enum FrontierNode<'a, S> {
 impl<'a, S: GridRendererUniqueIdentifier> FrontierNode<'a, S> {
     pub fn beat(&'a self) -> f32 {
         match self {
-            FrontierNode::NoneConsumed(list, node) => node.val.bounds.start_beat,
-            FrontierNode::StartBeatConsumed(list, node) => node.val.bounds.end_beat,
+            FrontierNode::NoneConsumed(_list, node) => node.val.bounds.start_beat,
+            FrontierNode::StartBeatConsumed(_list, node) => node.val.bounds.end_beat,
         }
     }
 
@@ -212,7 +216,7 @@ impl<'a, S: GridRendererUniqueIdentifier> FrontierNode<'a, S> {
 
 pub struct NoteEventIterator<'a, S: GridRendererUniqueIdentifier> {
     pub cur_beat: f32,
-    pub frontier_nodes: [Option<FrontierNode<'a, S>>; LINE_COUNT],
+    pub frontier_nodes: Vec<Option<FrontierNode<'a, S>>>,
 }
 
 impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteEventIterator<'a, S> {
@@ -255,21 +259,13 @@ impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteEventIterator<'a, S> 
 
 impl<'a, S: GridRendererUniqueIdentifier> NoteEventIterator<'a, S> {
     pub fn new(note_lines: &'a NoteLines<S>, start_beat: f32) -> Self {
-        let frontier_nodes = unsafe {
-            let mut frontier_nodes: [Option<FrontierNode<'a, S>>; LINE_COUNT] =
-                mem::uninitialized();
-            let frontier_nodes_ptr =
-                &mut frontier_nodes as *mut _ as *mut Option<FrontierNode<'a, S>>;
-            for i in 0..LINE_COUNT {
-                let line = note_lines.lines.get_unchecked(i);
-                ptr::write(
-                    frontier_nodes_ptr.add(i),
-                    line.head()
-                        .map(|head_node| FrontierNode::NoneConsumed(line, head_node)),
-                );
-            }
-            frontier_nodes
-        };
+        let mut frontier_nodes = Vec::with_capacity(note_lines.lines.len());
+        for line in &note_lines.lines {
+            let frontier_node = line
+                .head()
+                .map(|head_node| FrontierNode::NoneConsumed(line, head_node));
+            frontier_nodes.push(frontier_node);
+        }
 
         NoteEventIterator {
             cur_beat: start_beat,
@@ -778,7 +774,7 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
         NoteLines { lines }
     }
 
-    pub fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Bounds {
+    pub fn get_bounds(&mut self, line_ix: usize, beat: f32) -> Bounds<S> {
         let line = &mut self.lines[line_ix];
         let head = match line.head_key {
             Some(node_key) => line.get_node(node_key),
@@ -791,10 +787,14 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
         // If the first value is already greater than the new note, we don't have to search and
         // simply bound it on the top side by the head's start beat.
         if head.val.contains_beat(beat) {
-            return Bounds::Intersecting(SelectedNoteData::from_note_box(
+            let selected_note_data =
+                SelectedNoteData::from_note_box(line_ix, &line.head().unwrap().val);
+
+            return Bounds::Intersecting {
                 line_ix,
-                &line.head().unwrap().val,
-            ));
+                node_slab_key: line.head_key.unwrap(),
+                selected_note_data,
+            };
         } else if head.val.bounds.start_beat > beat {
             return Bounds::Bounded(0.0, Some(head.val.bounds.start_beat));
         }
@@ -806,10 +806,14 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
             None => return Bounds::Bounded(preceeding_node.val.bounds.end_beat, None),
         };
         if line.get_node(following_node_key).val.contains_beat(beat) {
-            return Bounds::Intersecting(SelectedNoteData::from_note_box(
+            let selected_note_data =
+                SelectedNoteData::from_note_box(line_ix, &line.get_node(following_node_key).val);
+
+            return Bounds::Intersecting {
+                node_slab_key: following_node_key,
                 line_ix,
-                &line.get_node(following_node_key).val,
-            ));
+                selected_note_data,
+            };
         }
         Bounds::Bounded(
             preceeding_node.val.bounds.end_beat,
@@ -897,20 +901,13 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
         new_target_node_start
     }
 
-    // TODO: Convert to giving it beats directly rather than pixels.  We shouldn't know that pixels
-    // exist.
     pub fn iter_region<'a>(
         &'a self,
-        y: usize,
-        height: usize,
+        start_line_ix: usize,
+        end_line_ix: usize,
         min_beat: f32,
         max_beat: f32,
     ) -> impl Iterator<Item = NoteData<'a, S>> + 'a {
-        let start_line_ix = (y - (y % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT;
-        let end_px_ix = y + height;
-        let end_line_ix = ((end_px_ix - (end_px_ix % PADDED_LINE_HEIGHT)) / PADDED_LINE_HEIGHT)
-            .min(LINE_COUNT - 1);
-
         let mut iterator = NoteSkipListRegionIterator {
             start_line_ix,
             end_line_ix,

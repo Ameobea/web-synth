@@ -23,6 +23,7 @@ extern crate serde_derive;
 
 use std::ptr;
 
+use rand_pcg::Pcg32;
 use wasm_bindgen::prelude::*;
 
 pub mod constants;
@@ -49,4 +50,12 @@ pub fn init() {
     vcm.add_view(view);
     vcm.init();
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
+
+    unsafe {
+        // slightly customized versions of the default seeds for the PCG32 PRNG
+        RNG = Box::into_raw(box Pcg32::new(
+            0x1ade_f00d_d15b_a5e5,
+            721_347_520_420_481_703,
+        ))
+    }
 }

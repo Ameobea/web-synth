@@ -54,6 +54,12 @@ pub trait GridHandler<S, R: GridRenderer> {
     fn init(&mut self);
 
     fn on_note_select(&mut self, data: &S);
+    fn on_note_click(
+        &mut self,
+        grid_state: &mut GridState<S>,
+        line_ix: usize,
+        clicked_note_key: NodeSlabKey<S>,
+    );
     fn on_note_double_click(&mut self, data: &S);
 
     fn on_note_deleted(&mut self, dom_id: DomId);
@@ -266,9 +272,6 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
             renderer: PhantomData,
         }
     }
-
-    // TODO
-    fn init(&mut self) {}
 }
 
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> ViewContext
@@ -316,7 +319,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 
     fn handle_mouse_down(&mut self, mut x: usize, y: usize) {
         let mut drawing_dom_id = None;
-        let mut selection_box_dom_id = None;
+        let selection_box_dom_id = None;
         let mut dragging_note_data = None;
 
         // Determine if the requested location intersects an existing note and if not, determine the
@@ -352,7 +355,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
         let bounds = self.state.data.get_bounds(line_ix, beat);
 
         match bounds {
-            skip_list::Bounds::Intersecting(selected_note_data) => match self.state.cur_tool {
+            skip_list::Bounds::Intersecting {
+                line_ix,
+                node_slab_key,
+                selected_note_data,
+            } => match self.state.cur_tool {
                 Tool::DeleteNote => {
                     R::deselect_note(selected_note_data.dom_id);
                     js::delete_element(selected_note_data.dom_id);
@@ -369,6 +376,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                         // Select the clicked note since it wasn't previously selected
                         self.state.selected_notes.insert(selected_note_data);
                         R::select_note(selected_note_data.dom_id);
+                        self.handler
+                            .on_note_click(&mut self.state, line_ix, node_slab_key);
                     }
                 },
                 Tool::DrawNote => {
@@ -407,8 +416,6 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
             },
         };
 
-        self.handler.on_mouse_down(&mut self.state, x, y);
-
         self.state.mouse_down = true;
         self.state.cursor_moving = false;
         self.state.mouse_down_x = x;
@@ -416,6 +423,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
         self.state.drawing_note_dom_id = drawing_dom_id;
         self.state.selection_box_dom_id = selection_box_dom_id;
         self.state.dragging_note_data = dragging_note_data;
+
+        self.handler.on_mouse_down(&mut self.state, x, y);
     }
 
     fn handle_mouse_move(&mut self, x: usize, y: usize) {
@@ -570,14 +579,14 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                 &mut self.state,
                 dragging_note_dom_id,
                 original_dragging_note_line_ix,
-                new_dragging_note_start_beat,
+                original_dragging_note_start_beat,
                 new_dragging_note_line_ix,
                 new_dragging_note_start_beat,
             );
         }
     }
 
-    fn handle_mouse_up(&mut self, x: usize, y: usize) {
+    fn handle_mouse_up(&mut self, x: usize, _y: usize) {
         // if `MOUSE_DOWN` is not set, the user tried to place an invalid note and we ignore it.
         if !self.state.mouse_down {
             return;
