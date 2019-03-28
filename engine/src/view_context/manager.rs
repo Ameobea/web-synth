@@ -30,6 +30,7 @@ impl Default for ViewContextManager {
 }
 
 impl ViewContextManager {
+    /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`
     pub fn add_view(&mut self, view: Box<dyn ViewContext>) {
         self.contexts.push(ViewContextEntry {
             context: view,
@@ -37,23 +38,27 @@ impl ViewContextManager {
         });
     }
 
+    /// Calls the `init()` function of all managed `ViewContext`s
     pub fn init(&mut self) { self.contexts[self.active_context_ix].context.init(); }
 
+    /// Retrieves the active `ViewContextManager`
     pub fn get_active_view(&self) -> &dyn ViewContext {
         &*self.contexts[self.active_context_ix].context
     }
 
+    /// Retrieves the active `ViewContextManager`
     pub fn get_active_view_mut(&mut self) -> &mut dyn ViewContext {
         &mut *self.contexts[self.active_context_ix].context
     }
 
+    /// Serializes all managed view contexts and saves them to persistent storage.
     pub fn save_all(&mut self) {
         for entry in &self.contexts {
             if !entry.touched {
                 continue;
             }
 
-            let serialized = entry.context.save();
+            let _serialized = entry.context.save();
             // TODO: save to localstorage or something
         }
     }

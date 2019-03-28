@@ -7,6 +7,7 @@ use super::super::prelude::*;
 pub mod constants;
 pub mod note_box;
 pub mod prelude;
+pub mod render;
 pub mod selection_box;
 pub mod skip_list;
 
@@ -38,7 +39,10 @@ pub trait GridRenderer {
     /// Given a note's `DomId`, mark it as deselected in the visualization
     fn deselect_note(dom_id: DomId);
 
+    /// Render the cursor and return its `DomId`
     fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId;
+
+    /// Set the position and size of the selection box
     fn set_selection_box(
         conf: &GridConf,
         dom_id: DomId,
@@ -47,7 +51,9 @@ pub trait GridRenderer {
         width: usize,
         height: usize,
     );
-    fn set_cursor_pos(x: usize);
+
+    /// Set the position of the cursor
+    fn set_cursor_pos(dom_id: DomId, x: usize);
 }
 
 pub trait GridHandler<S, R: GridRenderer> {
@@ -131,9 +137,11 @@ pub struct GridState<S> {
 
 impl<S: GridRendererUniqueIdentifier> GridState<S> {
     fn new(conf: GridConf) -> Self {
+        let row_count = conf.row_count;
+
         Self {
             conf,
-            data: NoteLines::new(constants::NOTE_SKIP_LIST_LEVELS),
+            data: NoteLines::new(row_count),
             selected_notes: FnvHashSet::default(),
             cursor_pos_beats: 0.0,
             mouse_down: false,
@@ -277,7 +285,10 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> ViewContext
     for Grid<S, R, H>
 {
-    fn init(&mut self) { self.handler.init(); }
+    fn init(&mut self) {
+        render::render_initial_grid(&self.state.conf);
+        self.handler.init();
+    }
 
     fn cleanup(&mut self) { unimplemented!() }
 
@@ -390,15 +401,22 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
             skip_list::Bounds::Bounded(lower, upper) => match self.state.cur_tool {
                 Tool::DrawNote if self.state.control_pressed => {}, // TODO
                 Tool::DrawNote if self.state.shift_pressed => self.init_selection_box(x, y),
+                // Determine the start location and width of the note to draw based on the
+                // preceeding note and measure intervals.
                 Tool::DrawNote => {
-                    let snapped_lower =
-                        self.snap_to_beat_interval(x, self.state.conf.beats_to_px(lower));
-                    let snapped_upper = (snapped_lower
-                        + self
-                            .state
-                            .conf
-                            .beats_to_px(self.state.conf.note_snap_beat_interval))
-                    .min(self.state.conf.beats_to_px(upper.unwrap_or(f32::INFINITY)));
+                    // The lower bound is the measure's start beat or preceeding note's end beat,
+                    // whichever comes last.
+                    let beat = self.state.conf.px_to_beat(x);
+                    let snap_intervals = beat / self.state.conf.note_snap_beat_interval;
+                    let interval_start_beat =
+                        snap_intervals.trunc() * self.state.conf.note_snap_beat_interval;
+                    let snapped_lower = self.state.conf.beats_to_px(interval_start_beat.max(lower));
+                    // The upper bound is the end of the measure or the following note's start
+                    // beat, whichever comes first.
+                    let snapped_upper_beat =
+                        snap_intervals.ceil().min(upper.unwrap_or(f32::INFINITY));
+                    let snapped_upper = self.state.conf.beats_to_px(snapped_upper_beat);
+
                     let width = snapped_upper - snapped_lower;
                     self.state.cur_note_bounds = (lower, upper);
 
@@ -667,7 +685,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
         }
     }
 
-    fn handle_mouse_wheel(&mut self, _ydiff: isize) { unimplemented!() }
+    fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
 
     fn load(&mut self, _serialized: &str) { unimplemented!() }
 
@@ -754,49 +772,43 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
         self.set_cursor_pos(self.state.cursor_pos_beats + clipboard_width_beats);
     }
 
+    /// Computes the `NoteBox` for the note that's currently being drawn given the current pixel
+    /// position of the mouse.  We respect both the beat bounds from `self.state.cur_note_bounds`
+    /// as well as snapping to the start/end of the current interval.
     pub fn compute_note_box_data(&self, x: usize) -> NoteBoxData {
-        let start_x = self.state.mouse_down_x; // TODO
         let (low_bound, high_bound) = self.state.cur_note_bounds;
-        let snap_interval_px = self
-            .state
-            .conf
-            .beats_to_px(self.state.conf.note_snap_beat_interval);
-        let snap_to_px = self.snap_to_beat_interval(x, self.state.conf.beats_to_px(low_bound));
-        let (minx, maxx) = if x >= start_x {
-            let end = (snap_to_px + snap_interval_px).min(
-                self.state
-                    .conf
-                    .beats_to_px(high_bound.unwrap_or(f32::INFINITY)),
-            ) as usize;
-            (start_x, end)
+
+        let source_beat = self.state.conf.px_to_beat(self.state.mouse_down_x);
+        let source_interval = source_beat / self.state.conf.note_snap_beat_interval;
+        let cur_beat = self.state.conf.px_to_beat(x);
+        let cur_interval = cur_beat / self.state.conf.note_snap_beat_interval;
+
+        let (start_interval, end_interval) = if source_interval > cur_interval {
+            (cur_interval, source_interval)
         } else {
-            let end = snap_to_px as usize;
-            (end, start_x)
+            (source_interval, cur_interval)
         };
-        let width = maxx - minx;
 
-        NoteBoxData { x: minx, width }
-    }
+        let start_beat =
+            (start_interval.trunc() * self.state.conf.note_snap_beat_interval).max(low_bound);
+        let end_beat = (end_interval.ceil() * self.state.conf.note_snap_beat_interval)
+            .min(high_bound.unwrap_or(f32::INFINITY));
+        let width_beats = end_beat - start_beat;
 
-    pub fn snap_to_beat_interval(&self, px: usize, lower_bound_px: usize) -> usize {
-        let beat = self.state.conf.px_to_beat(px);
-        let beats_to_shave = beat % self.state.conf.note_snap_beat_interval;
-        self.state
-            .conf
-            .beats_to_px(beat - beats_to_shave)
-            .max(lower_bound_px)
+        NoteBoxData {
+            x: self.state.conf.beats_to_px(start_beat),
+            width: self.state.conf.beats_to_px(width_beats),
+        }
     }
 
     pub fn set_cursor_pos(&mut self, x_beats: f32) -> usize {
-        let x_px = self.state.conf.beats_to_px(x_beats);
-        let note_snap_beat_interval_px = self
+        let intervals = x_beats / self.state.conf.note_snap_beat_interval;
+        let snapped_x_px = self
             .state
             .conf
-            .beats_to_px(self.state.conf.note_snap_beat_interval);
-        let intervals = x_px / note_snap_beat_interval_px;
-        let snapped_x_px = intervals * note_snap_beat_interval_px;
+            .beats_to_px(intervals * self.state.conf.note_snap_beat_interval);
         self.state.cursor_pos_beats = self.state.conf.px_to_beat(snapped_x_px);
-        R::set_cursor_pos(snapped_x_px);
+        R::set_cursor_pos(self.state.cursor_dom_id, snapped_x_px);
         snapped_x_px
     }
 

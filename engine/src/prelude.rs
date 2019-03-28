@@ -13,6 +13,7 @@ pub fn rng() -> &'static mut Pcg32 { unsafe { &mut *RNG } }
 
 pub use super::{
     constants::*,
+    get_vcm,
     helpers::grid::GridRendererUniqueIdentifier,
     js,
     synth::{self, PolySynth},

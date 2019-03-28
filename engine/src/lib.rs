@@ -36,7 +36,11 @@ pub mod view_context;
 pub mod views;
 use self::prelude::*;
 
+/// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
+
+/// Retrieves the global `ViewContextManager` for the application
+pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEXT_MANAGER } }
 
 /// Entrypoint for the application.  This function is called from the JS side as soon as the Wasm
 /// blob is loaded.  It handles setting up application state, rendering the initial UI, and loading
@@ -45,12 +49,14 @@ static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
 pub fn init() {
     common::set_panic_hook();
 
+    // Create the `ViewContextManager` and a `MidiEditor` and initialize them
     let view = view_context::manager::build_view("midi_editor", "TODO");
     let mut vcm = box ViewContextManager::default();
     vcm.add_view(view);
     vcm.init();
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
 
+    // Initialize the global PRNG
     unsafe {
         // slightly customized versions of the default seeds for the PCG32 PRNG
         RNG = Box::into_raw(box Pcg32::new(

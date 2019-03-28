@@ -9,7 +9,6 @@ use super::super::{helpers::grid::prelude::*, view_context::ViewContext};
 pub mod constants;
 pub mod input_handlers;
 pub mod prelude;
-pub mod render;
 pub mod state;
 
 impl Default for MidiEditorGridHandler {
@@ -29,7 +28,7 @@ struct MidiEditorGridRenderer;
 type MidiGrid = Grid<usize, MidiEditorGridRenderer, MidiEditorGridHandler>;
 
 impl GridRenderer for MidiEditorGridRenderer {
-    fn create_note(x: usize, y: usize, width: usize, height: usize) -> usize {
+    fn create_note(x: usize, y: usize, width: usize, height: usize) -> DomId {
         js::render_quad(FG_CANVAS_IX, x, y, width, height, "note")
     }
 
@@ -37,7 +36,7 @@ impl GridRenderer for MidiEditorGridRenderer {
 
     fn deselect_note(dom_id: usize) { js::remove_class(dom_id, "selected"); }
 
-    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> usize {
+    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId {
         js::render_line(
             FG_CANVAS_IX,
             cursor_pos_beats,
@@ -48,9 +47,7 @@ impl GridRenderer for MidiEditorGridRenderer {
         )
     }
 
-    fn set_cursor_pos(x: usize) {
-        // TODO
-    }
+    fn set_cursor_pos(dom_id: DomId, x: usize) { js::set_attr(dom_id, "x", &x.to_string()); }
 
     fn set_selection_box(
         conf: &GridConf,
@@ -125,7 +122,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         }
     }
 
-    fn on_mouse_down(&mut self, grid_state: &mut GridState<usize>, _x: usize, y: usize) {}
+    fn on_mouse_down(&mut self, _grid_state: &mut GridState<usize>, _x: usize, _y: usize) {}
 
     fn on_note_click(
         &mut self,
@@ -206,7 +203,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         }
     }
 
-    fn create_note(&mut self, line_ix: usize, start_beat: f32, dom_id: usize) -> DomId {
+    fn create_note(&mut self, _line_ix: usize, _start_beat: f32, dom_id: usize) -> DomId {
         // Right now, we don't have any additional data to store for notes outside of their actual
         // position on the grid and line index, so we just use their `dom_id` as their state.
         dom_id
@@ -435,7 +432,9 @@ impl MidiEditorGridHandler {
     }
 }
 
-pub fn mk_midi_editor(config: &str) -> Box<dyn ViewContext> {
+/// Return `MidiEditor` instance as a `ViewContext` given the provided config string.
+pub fn mk_midi_editor(_config: &str) -> Box<dyn ViewContext> {
+    // TODO: Parse the config and use that rather than the constants
     let conf = GridConf {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
         row_height: constants::LINE_HEIGHT,
