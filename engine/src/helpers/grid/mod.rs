@@ -251,12 +251,22 @@ fn try_insert<S: GridRendererUniqueIdentifier>(
     start_beat: f32,
     dragging_note: &mut SelectedNoteData,
 ) -> Option<NoteBox<S>> {
-    note.bounds.start_beat = start_beat;
     note.bounds.end_beat = start_beat + note.bounds.width();
+    note.bounds.start_beat = start_beat;
+    trace!(
+        "Trying to insert {:?} at line_ix: {}, start_beat: {}",
+        note,
+        line_ix,
+        start_beat
+    );
     let insertion_error = data.insert(line_ix, note);
     if insertion_error.is_none() {
+        trace!("success!");
+        trace!("{:?}", data.lines[line_ix]);
         dragging_note.start_beat = start_beat;
         dragging_note.line_ix = line_ix;
+    } else {
+        trace!("failed");
     }
     insertion_error
 }
@@ -322,9 +332,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     js::delete_element(note_data.dom_id);
                     self.handler.on_note_deleted(note_data.dom_id);
 
-                    if cfg!(debug_assertions) {
-                        // common::log(format!("{:?}", self.data.lines[note_data.line_ix]));
-                    }
+                    debug!("{:?}", self.state.data.lines[note_data.line_ix]);
                 },
             "p" => self.copy_selected_notes(),
             _ => self
@@ -413,15 +421,16 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     let snapped_upper_beat = interval_end_beat.min(upper.unwrap_or(f32::INFINITY));
                     let snapped_upper_px = self.state.conf.beats_to_px(snapped_upper_beat);
 
-                    common::log(&format!("upper: {:?}", upper));
-                    common::log(&format!(
+                    trace!(
                         "interval_start_beat: {}, interval_end_beat: {}",
-                        interval_start_beat, interval_end_beat
-                    ));
-                    common::log(&format!(
+                        interval_start_beat,
+                        interval_end_beat
+                    );
+                    trace!(
                         "snapped_lower_px: {}, snapped_upper_px: {}",
-                        snapped_lower_px, snapped_upper_px
-                    ));
+                        snapped_lower_px,
+                        snapped_upper_px
+                    );
 
                     let width = snapped_upper_px - snapped_lower_px;
                     self.state.cur_note_bounds = (lower, upper);
@@ -511,10 +520,10 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 
                     // Go with the simple solution: remove from the source line, try to add to the
                     // destination line, re-insert in source line if it's blocked.
-                    common::log(format!(
+                    trace!(
                         "Removing dragging note starting at {}",
                         dragging_note.start_beat
-                    ));
+                    );
                     let note = self
                         .state
                         .data
@@ -526,6 +535,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                                 dragging_note.start_beat
                             )
                         });
+                    trace!("Removed note: {:?}", note);
 
                     // We try to place the note in several positions around the new mouse position,
                     // trying each subsequently until one works (or none work, in which case we
@@ -545,11 +555,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                                 // We failed to move the note at all, so reset everything to its
                                 // original position and re-insert the note
                                 // where we found it.
-                                common::log(&format!(
+                                debug!(
                                     "Failed to move note; re-inserting at original start beat: \
                                      {}, line_ix: {}",
                                     original_start_beat, original_line_ix
-                                ));
+                                );
                                 failed_insertion_note.bounds.start_beat = original_start_beat;
                                 dragging_note.start_beat = original_start_beat;
                                 dragging_note.line_ix = original_line_ix;
@@ -564,10 +574,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                                 line_ix,
                                 start_beat,
                             } => {
-                                common::log(&format!(
+                                trace!(
                                     "Moved note to start_beat: {}, line_ix: {}",
-                                    start_beat, line_ix
-                                ));
+                                    start_beat,
+                                    line_ix
+                                );
                                 (line_ix, start_beat)
                             },
                         };
@@ -691,14 +702,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 
                     // Actually insert the node into the skip list
                     self.state.data.insert(line_ix, note);
-                    if cfg!(debug_assertions) {
-                        // common::log(format!("{:?}", self.data.lines[line_ix]));
-                    }
+                    debug!("{:?}", self.state.data.lines[line_ix]);
                 },
                 (None, Some(_)) => (),
-                (Some(_), Some(_)) => common::error(
-                    "Both `note_dom_id` and `selection_box_dom_id` exist in grid state!",
-                ),
+                (Some(_), Some(_)) =>
+                    error!("Both `note_dom_id` and `selection_box_dom_id` exist in grid state!",),
                 (None, None) => (),
             }
         }

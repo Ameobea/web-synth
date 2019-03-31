@@ -324,7 +324,10 @@ pub struct NoteSkipList<S> {
     pub head_key: Option<NodeSlabKey<S>>,
 }
 
-impl Debug for NoteSkipList<usize> {
+// NOTE: This current implementation is completely unsafe and assumes that `S` is always just
+// `usize`.  This is obviously not valid in the general case, and this will need to be updated
+// to account for that in the future.
+impl<S: GridRendererUniqueIdentifier> Debug for NoteSkipList<S> {
     /// We want the end result to look something like this:
     ///
     /// |1.0, 2.0|------------------------->|4.0, 5.0|->x
@@ -334,7 +337,7 @@ impl Debug for NoteSkipList<usize> {
         let mut node_debug_lines = Vec::new();
         // initialize the debug pointers with the head
         if let Some(head_key) = self.head_key {
-            init_node_dbg_ptrs(head_key);
+            init_node_dbg_ptrs(unsafe { mem::transmute(head_key) });
         }
 
         for node in self.iter_nodes() {
@@ -356,7 +359,7 @@ impl Debug for NoteSkipList<usize> {
             }
         }
 
-        write!(fmt, "{}", s)
+        write!(fmt, "\n{}", s)
     }
 }
 
@@ -536,6 +539,7 @@ impl<S: GridRendererUniqueIdentifier> NoteSkipList<S> {
     /// successfully and `Some(note)` returning the supplied note if there is an intersecting node
     /// blocking it from being inserted.
     pub fn insert(&mut self, note: NoteBox<S>) -> Option<NoteBox<S>> {
+        trace!("Trying to insert note: {:?}", note);
         let mut new_node = NoteSkipListNode {
             val: note,
             links: blank_shortcuts(),
@@ -943,20 +947,24 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
     }
 }
 
-impl NoteSkipList<usize> {
-    pub fn debug_node(&self, node: &NoteSkipListNode<usize>) -> String {
+impl<S: GridRendererUniqueIdentifier> NoteSkipList<S> {
+    pub fn debug_node(&self, node: &NoteSkipListNode<S>) -> String {
         let debug_ptrs = get_debug_ptrs();
         let next_node_key = &node.links[0];
 
         for (level, next_node_for_level) in node.links.iter().enumerate() {
             if next_node_for_level.is_some()
                 && debug_ptrs[level].is_some()
-                && node.val != self.get_node(debug_ptrs[level].unwrap()).val
+                && node.val
+                    != self
+                        .get_node(unsafe { mem::transmute(debug_ptrs[level].unwrap()) })
+                        .val
             {
                 // Make sure that the next node in the level is what we expect it to be,
                 // ensuring that none of our fast paths skip nodes in their level.
                 debug_assert_eq!(
-                    debug_ptrs[level].map(|p| self.get_node(p).val.bounds),
+                    debug_ptrs[level]
+                        .map(|p| self.get_node(unsafe { mem::transmute(p) }).val.bounds),
                     next_node_for_level.map(|p| self.get_node(p).val.bounds)
                 );
             }
@@ -983,10 +991,10 @@ impl NoteSkipList<usize> {
                 };
 
                 if next_valid_node_for_level
-                    .map(|p| self.get_node(p).val.bounds) == Some(node.val.bounds) {
+                    .map(|p| self.get_node(unsafe { mem::transmute(p)}).val.bounds) == Some(node.val.bounds) {
                     // If we are the node that was pointed to by the last node in this level,
                     // set the next valid node in the level to be the one we point to.
-                    debug_ptrs[level] = link_opt;
+                    debug_ptrs[level] = unsafe { mem::transmute(link_opt)};
                     let link_s = format!("{:?}", node.val);
                     let string_len = link_s.len();
                     if string_len > longest_link_s {

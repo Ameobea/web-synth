@@ -227,7 +227,7 @@ impl SelectionBoxData {
     ) -> Self {
         let region = SelectionRegion::from_points(mouse_down_x, mouse_down_y, x, y);
         let last_region = SelectionRegion::from_points(mouse_down_x, mouse_down_y, last_x, last_y);
-        // common::log(format!("{:?} -> {:?}", last_region, region));
+        trace!("{:?} -> {:?}", last_region, region);
         let (retained_region, changed_region_1, changed_region_2) =
             last_region.diff(mouse_down_x, mouse_down_y, &region);
 

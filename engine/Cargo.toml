@@ -17,8 +17,9 @@ base64 = "0.10.0"
 bincode = "1.0.1"
 serde = "1.0.80"
 serde_derive = "1.0.80"
-
-common = { git = "https://github.com/Ameobea/sketches.git" }
+wasm-logger = "0.1.2"
+log = "0.4"
+console_error_panic_hook = "0.1.6"
 
 [profile.dev]
 opt-level = 1

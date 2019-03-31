@@ -133,12 +133,10 @@ impl PolySynth {
         {
             Some(pos) => pos,
             None => {
-                if cfg!(debug_assertions) {
-                    common::warn(format!(
-                        "Attempted to release frequency {} but it isn't being played.",
-                        frequency
-                    ));
-                }
+                warn!(
+                    "Attempted to release frequency {} but it isn't being played.",
+                    frequency
+                );
                 return;
             },
         };

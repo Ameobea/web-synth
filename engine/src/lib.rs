@@ -10,7 +10,6 @@
 
 extern crate base64;
 extern crate bincode;
-extern crate common;
 extern crate fnv;
 extern crate rand;
 extern crate rand_pcg;
@@ -20,6 +19,8 @@ extern crate test;
 extern crate wasm_bindgen;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 use std::ptr;
 
@@ -47,7 +48,15 @@ pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEX
 /// the last saved composition from the user.
 #[wasm_bindgen]
 pub fn init() {
-    common::set_panic_hook();
+    console_error_panic_hook::set_once();
+
+    let log_level = if cfg!(debug_assertions) {
+        // log::Level::Debug
+        log::Level::Trace
+    } else {
+        log::Level::Info
+    };
+    wasm_logger::init(wasm_logger::Config::new(log_level));
 
     // Create the `ViewContextManager` and a `MidiEditor` and initialize them
     let view = view_context::manager::build_view("midi_editor", "TODO");
