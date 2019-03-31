@@ -210,6 +210,19 @@ pub struct GridConf {
     pub measure_width_px: usize,
 }
 
+/// Helper trait that allows converting pixel units to beats generically
+pub trait PxUnit {
+    fn to_f32(self) -> f32;
+}
+
+impl PxUnit for usize {
+    fn to_f32(self) -> f32 { self as f32 }
+}
+
+impl PxUnit for isize {
+    fn to_f32(self) -> f32 { self as f32 }
+}
+
 impl GridConf {
     pub fn padded_line_height(&self) -> usize { self.line_height + self.line_border_width }
 
@@ -226,9 +239,9 @@ impl GridConf {
         }
     }
 
-    pub fn px_to_beat(&self, px: usize) -> f32 { px as f32 / (self.beat_length_px as f32) }
+    pub fn px_to_beat<T: PxUnit>(&self, px: T) -> f32 { px.to_f32() / (self.beat_length_px as f32) }
 
-    pub fn beats_to_px(&self, beats: f32) -> usize { beats as usize * self.beat_length_px }
+    pub fn beats_to_px(&self, beats: f32) -> usize { (beats * self.beat_length_px as f32) as usize }
 }
 
 fn try_insert<S: GridRendererUniqueIdentifier>(
@@ -339,26 +352,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
             Some(line_ix) => line_ix,
             None => {
                 // click must be in the cursor gutter
-                if self.state.shift_pressed {
-                    // TODO: make dedicated function in `render` probably
-                    self.state.selection_box_dom_id = Some(js::render_quad(
-                        FG_CANVAS_IX,
-                        0,
-                        y as usize,
-                        0,
-                        self.state.conf.grid_height(),
-                        "selection-box",
-                    ))
-                } else {
-                    self.state.selection_box_dom_id = None;
-                }
-
-                let x = self.set_cursor_pos(self.state.conf.px_to_beat(x)) as usize;
-                self.state.cursor_moving = true;
-                self.state.mouse_down = true;
-                self.state.mouse_down_x = x;
-                self.state.mouse_down_y = self.state.conf.grid_height() - 2;
-
+                self.handle_cursor_gutter_click(x, y);
                 return;
             },
         };
@@ -410,25 +404,37 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     let snap_intervals = beat / self.state.conf.note_snap_beat_interval;
                     let interval_start_beat =
                         snap_intervals.trunc() * self.state.conf.note_snap_beat_interval;
-                    let snapped_lower = self.state.conf.beats_to_px(interval_start_beat.max(lower));
+                    let snapped_lower_px =
+                        self.state.conf.beats_to_px(interval_start_beat.max(lower));
                     // The upper bound is the end of the measure or the following note's start
                     // beat, whichever comes first.
-                    let snapped_upper_beat =
-                        snap_intervals.ceil().min(upper.unwrap_or(f32::INFINITY));
-                    let snapped_upper = self.state.conf.beats_to_px(snapped_upper_beat);
+                    let interval_end_beat =
+                        interval_start_beat + self.state.conf.note_snap_beat_interval;
+                    let snapped_upper_beat = interval_end_beat.min(upper.unwrap_or(f32::INFINITY));
+                    let snapped_upper_px = self.state.conf.beats_to_px(snapped_upper_beat);
 
-                    let width = snapped_upper - snapped_lower;
+                    common::log(&format!("upper: {:?}", upper));
+                    common::log(&format!(
+                        "interval_start_beat: {}, interval_end_beat: {}",
+                        interval_start_beat, interval_end_beat
+                    ));
+                    common::log(&format!(
+                        "snapped_lower_px: {}, snapped_upper_px: {}",
+                        snapped_lower_px, snapped_upper_px
+                    ));
+
+                    let width = snapped_upper_px - snapped_lower_px;
                     self.state.cur_note_bounds = (lower, upper);
 
                     // Draw the temporary/candidate note after storing its bounds
                     drawing_dom_id = Some(R::create_note(
-                        snapped_lower,
+                        snapped_lower_px,
                         self.state.conf.cursor_gutter_height
                             + self.state.conf.padded_line_height() * line_ix,
                         width,
                         self.state.conf.line_height,
                     ));
-                    x = snapped_lower as usize;
+                    x = snapped_lower_px as usize;
                 },
                 _ => (),
             },
@@ -489,7 +495,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                     let original_line_ix = dragging_note.line_ix;
                     let new_line_ix = self.state.conf.get_line_index(y).unwrap();
 
-                    let horizontal_movement_diff_px = x - self.state.mouse_down_x;
+                    let horizontal_movement_diff_px = x as isize - self.state.mouse_down_x as isize;
                     let horizontal_movement_diff_beats =
                         self.state.conf.px_to_beat(horizontal_movement_diff_px);
                     let horizontal_movement_intervals = (horizontal_movement_diff_beats
@@ -539,6 +545,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                                 // We failed to move the note at all, so reset everything to its
                                 // original position and re-insert the note
                                 // where we found it.
+                                common::log(&format!(
+                                    "Failed to move note; re-inserting at original start beat: \
+                                     {}, line_ix: {}",
+                                    original_start_beat, original_line_ix
+                                ));
                                 failed_insertion_note.bounds.start_beat = original_start_beat;
                                 dragging_note.start_beat = original_start_beat;
                                 dragging_note.line_ix = original_line_ix;
@@ -552,13 +563,21 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                             InsertionAttemptResult::Inserted {
                                 line_ix,
                                 start_beat,
-                            } => (line_ix, start_beat),
+                            } => {
+                                common::log(&format!(
+                                    "Moved note to start_beat: {}, line_ix: {}",
+                                    start_beat, line_ix
+                                ));
+                                (line_ix, start_beat)
+                            },
                         };
 
                     // We have a custom `Hash` implementation for `SelectedNoteData` that uses its
                     // `DomId` and ignores its position; that's why this works.
-                    self.state.selected_notes.remove(dragging_note);
-                    self.state.selected_notes.insert(*dragging_note);
+                    let was_removed = self.state.selected_notes.remove(dragging_note);
+                    debug_assert!(was_removed);
+                    let was_added = self.state.selected_notes.insert(*dragging_note);
+                    debug_assert!(was_added);
 
                     if dragging_note.start_beat != original_start_beat {
                         // TODO: move to renderer method
@@ -693,6 +712,32 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
 }
 
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
+    /// Handle a click in the cursor gutter, bulk-selecting notes if shift is pressed or moving
+    /// the cursor otherwise.
+    fn handle_cursor_gutter_click(&mut self, x: usize, y: usize) {
+        if self.state.shift_pressed {
+            // TODO: make dedicated function in `render` probably
+            self.state.selection_box_dom_id = Some(js::render_quad(
+                FG_CANVAS_IX,
+                0,
+                y as usize,
+                0,
+                self.state.conf.grid_height(),
+                "selection-box",
+            ))
+        } else {
+            self.state.selection_box_dom_id = None;
+        }
+
+        let x = self.set_cursor_pos(self.state.conf.px_to_beat(x)) as usize;
+        self.state.cursor_moving = true;
+        self.state.mouse_down = true;
+        self.state.mouse_down_x = x;
+        self.state.mouse_down_y = self.state.conf.grid_height() - 2;
+
+        return;
+    }
+
     pub fn copy_selected_notes(&mut self) {
         let (earliest_start_beat, latest_end_beat) = self.state.selected_notes.iter().fold(
             (f32::INFINITY, f32::NEG_INFINITY),
