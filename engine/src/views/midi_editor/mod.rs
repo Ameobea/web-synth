@@ -93,8 +93,8 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         };
 
         match key {
-            "w" => self.move_notes_vertical(true, grid_state, line_diff_vertical),
-            "s" => self.move_notes_vertical(false, grid_state, line_diff_vertical),
+            "ArrowUp" | "w" => self.move_notes_vertical(true, grid_state, line_diff_vertical),
+            "ArrowDown" | "s" => self.move_notes_vertical(false, grid_state, line_diff_vertical),
             "ArrowLeft" | "a" =>
                 self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal),
             "ArrowRight" | "d" =>
@@ -149,6 +149,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         changed_region_1: &ChangedRegion,
         changed_region_2: &ChangedRegion,
     ) {
+        trace!("on_selection_region_update");
         // Look for all notes in the added/removed regions and add/remove them from the
         // selected notes set and select/deselect their UI representations
         for (was_added, region) in &[
@@ -203,7 +204,16 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         }
     }
 
-    fn create_note(&mut self, _line_ix: usize, _start_beat: f32, dom_id: usize) -> DomId {
+    fn create_note(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        line_ix: usize,
+        _start_beat: f32,
+        dom_id: usize,
+    ) -> DomId {
+        self.synth
+            .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+
         // Right now, we don't have any additional data to store for notes outside of their actual
         // position on the grid and line index, so we just use their `dom_id` as their state.
         dom_id
@@ -218,10 +228,39 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         new_line_ix: usize,
         _new_start_beat: f32,
     ) {
+        if old_line_ix == new_line_ix {
+            return;
+        }
+
         self.synth
             .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, old_line_ix));
         self.synth
             .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, new_line_ix));
+    }
+
+    fn on_note_draw_start(&mut self, grid_state: &mut GridState<usize>, line_ix: usize) {
+        self.synth
+            .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+    }
+
+    fn on_note_drag_start(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        dragging_note_data: &(f32, SelectedNoteData),
+    ) {
+        self.synth.trigger_attack(
+            self.midi_to_frequency(grid_state.conf.row_count, dragging_note_data.1.line_ix),
+        );
+    }
+
+    fn on_note_drag_stop(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        dragging_note_data: &(f32, SelectedNoteData),
+    ) {
+        self.synth.trigger_release(
+            self.midi_to_frequency(grid_state.conf.row_count, dragging_note_data.1.line_ix),
+        );
     }
 }
 
