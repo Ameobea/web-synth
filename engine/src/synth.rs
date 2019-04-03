@@ -5,7 +5,7 @@ use std::{mem, ptr};
 
 use super::prelude::*;
 
-#[wasm_bindgen(module = "./synth")]
+#[wasm_bindgen(raw_module = "./synth")]
 extern "C" {
     /// Initializes a synth on the JavaScript side, returning its index in the gloabl synth array.
     pub fn init_synth(voice_count: usize) -> usize;

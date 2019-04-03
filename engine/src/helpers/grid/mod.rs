@@ -31,16 +31,29 @@ pub enum Tool {
     DeleteNote,
 }
 
-pub trait GridRenderer {
+pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
     /// Draws a note on the canvas and returns its DOM id.
-    fn create_note(x: usize, y: usize, width: usize, height: usize) -> DomId;
+    fn create_note(x: usize, y: usize, width: usize, height: usize) -> DomId {
+        js::render_quad(FG_CANVAS_IX, x, y, width, height, "note")
+    }
+
     /// Given a note's `DomId`, mark it as selected in the visualization
-    fn select_note(dom_id: DomId);
+    fn select_note(dom_id: usize) { js::add_class(dom_id, "selected"); }
+
     /// Given a note's `DomId`, mark it as deselected in the visualization
-    fn deselect_note(dom_id: DomId);
+    fn deselect_note(dom_id: usize) { js::remove_class(dom_id, "selected"); }
 
     /// Render the cursor and return its `DomId`
-    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId;
+    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId {
+        js::render_line(
+            FG_CANVAS_IX,
+            cursor_pos_beats,
+            0,
+            cursor_pos_beats,
+            conf.grid_height(),
+            "cursor",
+        )
+    }
 
     /// Set the position and size of the selection box
     fn set_selection_box(
@@ -50,53 +63,64 @@ pub trait GridRenderer {
         y: usize,
         width: usize,
         height: usize,
-    );
+    ) {
+        js::set_attr(dom_id, "x", &x.to_string());
+        js::set_attr(dom_id, "y", &(y + conf.cursor_gutter_height).to_string());
+        js::set_attr(dom_id, "width", &width.to_string());
+        js::set_attr(dom_id, "height", &height.to_string());
+    }
 
     /// Set the position of the cursor
-    fn set_cursor_pos(dom_id: DomId, x: usize);
+    fn set_cursor_pos(dom_id: DomId, x: usize) { js::set_attr(dom_id, "x", &x.to_string()); }
 }
 
-pub trait GridHandler<S, R: GridRenderer> {
-    fn init(&mut self);
+pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
+    fn init(&mut self) {}
 
-    fn on_note_select(&mut self, data: &S);
+    fn on_note_select(&mut self, _data: &S) {}
+
     fn on_note_click(
         &mut self,
-        grid_state: &mut GridState<S>,
-        line_ix: usize,
-        clicked_note_key: NodeSlabKey<S>,
-    );
-    fn on_note_double_click(&mut self, data: &S);
+        _grid_state: &mut GridState<S>,
+        _line_ix: usize,
+        _clicked_note_key: NodeSlabKey<S>,
+    ) {
+    }
 
-    fn on_note_deleted(&mut self, dom_id: DomId);
+    fn on_note_double_click(&mut self, _data: &S) {}
+
+    fn on_note_deleted(&mut self, _dom_id: DomId) {}
 
     fn on_key_down(
         &mut self,
-        state: &mut GridState<S>,
-        key: &str,
-        control_pressed: bool,
-        shift_pressed: bool,
-    );
+        _state: &mut GridState<S>,
+        _key: &str,
+        _control_pressed: bool,
+        _shift_pressed: bool,
+    ) {
+    }
 
     fn on_key_up(
         &mut self,
-        state: &mut GridState<S>,
-        key: &str,
-        control_pressed: bool,
-        shift_pressed: bool,
-    );
+        _state: &mut GridState<S>,
+        _key: &str,
+        _control_pressed: bool,
+        _shift_pressed: bool,
+    ) {
+    }
 
-    fn on_mouse_down(&mut self, state: &mut GridState<S>, x: usize, y: usize);
+    fn on_mouse_down(&mut self, _state: &mut GridState<S>, _x: usize, _y: usize) {}
 
     fn on_selection_region_update(
         &mut self,
-        grid: &mut GridState<S>,
-        retained_region: &Option<SelectionRegion>,
-        changed_region_1: &ChangedRegion,
-        changed_region_2: &ChangedRegion,
-    );
+        _grid: &mut GridState<S>,
+        _retained_region: &Option<SelectionRegion>,
+        _changed_region_1: &ChangedRegion,
+        _changed_region_2: &ChangedRegion,
+    ) {
+    }
 
-    fn on_selection_box_deleted(&mut self, grid: &mut GridState<S>);
+    fn on_selection_box_deleted(&mut self, _grid: &mut GridState<S>) {}
 
     fn create_note(
         &mut self,
@@ -108,27 +132,30 @@ pub trait GridHandler<S, R: GridRenderer> {
 
     fn on_note_move(
         &mut self,
-        grid_state: &mut GridState<S>,
-        dom_id: DomId,
-        old_line_ix: usize,
-        old_start_beat: f32,
-        new_line_ix: usize,
-        new_start_beat: f32,
-    );
+        _grid_state: &mut GridState<S>,
+        _dom_id: DomId,
+        _old_line_ix: usize,
+        _old_start_beat: f32,
+        _new_line_ix: usize,
+        _new_start_beat: f32,
+    ) {
+    }
 
-    fn on_note_draw_start(&mut self, grid_state: &mut GridState<S>, line_ix: usize);
+    fn on_note_draw_start(&mut self, _grid_state: &mut GridState<S>, _line_ix: usize) {}
 
     fn on_note_drag_start(
         &mut self,
-        grid_state: &mut GridState<S>,
-        dragging_note_data: &(f32, SelectedNoteData),
-    );
+        _grid_state: &mut GridState<S>,
+        _dragging_note_data: &(f32, SelectedNoteData),
+    ) {
+    }
 
     fn on_note_drag_stop(
         &mut self,
-        grid_state: &mut GridState<S>,
-        dragging_note_data: &(f32, SelectedNoteData),
-    );
+        _grid_state: &mut GridState<S>,
+        _dragging_note_data: &(f32, SelectedNoteData),
+    ) {
+    }
 }
 
 pub struct GridState<S> {
@@ -210,7 +237,7 @@ impl<S: GridRendererUniqueIdentifier> GridState<S> {
 ///
 /// Finally, it has a `GridRenderer` which is just a bunch of type-level functions that are used
 /// to render custom versions of the individual elements of the grid.
-pub struct Grid<S, R: GridRenderer, H: GridHandler<S, R>> {
+pub struct Grid<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> {
     pub state: GridState<S>,
     pub handler: H,
     renderer: PhantomData<R>,
@@ -315,7 +342,7 @@ fn try_insert_many<S: GridRendererUniqueIdentifier>(
     }
 }
 
-impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
+impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> Grid<S, R, H> {
     pub fn new(conf: GridConf, handler: H) -> Self {
         Grid {
             state: GridState::new(conf),
@@ -325,7 +352,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Gri
     }
 }
 
-impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> ViewContext
+impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> ViewContext
     for Grid<S, R, H>
 {
     fn init(&mut self) {
@@ -509,31 +536,31 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
             return;
         }
 
-        if let Some((
-            dragging_note_dom_id,
-            original_dragging_note_line_ix,
-            original_dragging_note_start_beat,
-            new_dragging_note_line_ix,
-            new_dragging_note_start_beat,
-        )) = match self.state.cur_tool {
+        let mut note_movement_data = None;
+
+        match self.state.cur_tool {
             Tool::DrawNote if self.state.shift_pressed => {
                 if let Some(selection_box_dom_id) = self.state.selection_box_dom_id {
                     self.update_selection_box(selection_box_dom_id, last_x, last_y, x, y);
                 }
-                None
             },
             Tool::DrawNote => {
                 if let Some(dom_id) = self.state.drawing_note_dom_id {
                     let NoteBoxData { x, width } = self.compute_note_box_data(x);
                     js::set_attr(dom_id, "x", &x.to_string());
                     js::set_attr(dom_id, "width", &width.to_string());
-                    None
                 } else if let Some((first_dragging_note_start_beat, ref mut dragging_note)) =
                     self.state.dragging_note_data
                 {
                     // Figure out if we've moved far enough to warrant a move
                     let original_line_ix = dragging_note.line_ix;
-                    let new_line_ix = self.state.conf.get_line_index(y).unwrap();
+                    let new_line_ix = match self.state.conf.get_line_index(y) {
+                        Some(line_ix) => line_ix,
+                        None => {
+                            // dragged onto the cursor gutter, probably
+                            return;
+                        },
+                    };
 
                     let horizontal_movement_diff_px = x as isize - self.state.mouse_down_x as isize;
                     let horizontal_movement_diff_beats =
@@ -641,19 +668,26 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
                         );
                     }
 
-                    Some((
+                    note_movement_data = Some((
                         dragging_note.dom_id,
                         original_line_ix,
                         original_start_beat,
                         new_dragging_note_line_ix,
                         new_dragging_note_start_beat,
                     ))
-                } else {
-                    None
                 }
             },
-            _ => None,
-        } {
+            _ => (),
+        }
+
+        if let Some((
+            dragging_note_dom_id,
+            original_dragging_note_line_ix,
+            original_dragging_note_start_beat,
+            new_dragging_note_line_ix,
+            new_dragging_note_start_beat,
+        )) = note_movement_data
+        {
             self.handler.on_note_move(
                 &mut self.state,
                 dragging_note_dom_id,
@@ -740,7 +774,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Vie
     fn save(&self) -> String { unimplemented!() }
 }
 
-impl<S: GridRendererUniqueIdentifier, R: GridRenderer, H: GridHandler<S, R>> Grid<S, R, H> {
+impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> Grid<S, R, H> {
     /// Handle a click in the cursor gutter, bulk-selecting notes if shift is pressed or moving
     /// the cursor otherwise.
     fn handle_cursor_gutter_click(&mut self, x: usize, y: usize) {

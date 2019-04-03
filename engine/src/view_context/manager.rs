@@ -1,4 +1,7 @@
-use super::{super::views::midi_editor::mk_midi_editor, ViewContext};
+use super::{
+    super::views::{clip_compositor::mk_clip_compositor, midi_editor::mk_midi_editor},
+    ViewContext,
+};
 
 pub struct ViewContextEntry {
     pub context: Box<dyn ViewContext>,
@@ -74,6 +77,7 @@ impl ViewContextManager {
 pub fn build_view(name: &str, definition: &str) -> Box<dyn ViewContext> {
     match name {
         "midi_editor" => mk_midi_editor(definition),
+        "clip_compositor" => mk_clip_compositor(definition),
         _ => unimplemented!(),
     }
 }

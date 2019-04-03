@@ -2,7 +2,7 @@
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(module = "./index")]
+#[wasm_bindgen(raw_module = "./index")]
 extern "C" {
     pub fn render_quad(
         canvas_index: usize,

@@ -4,12 +4,16 @@
 
 use std::str;
 
-use super::super::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
 pub mod input_handlers;
 pub mod prelude;
 pub mod state;
+
+pub struct MidiEditorGridHandler {
+    pub synth: PolySynth,
+}
 
 impl Default for MidiEditorGridHandler {
     fn default() -> Self {
@@ -19,64 +23,17 @@ impl Default for MidiEditorGridHandler {
     }
 }
 
-pub struct MidiEditorGridHandler {
-    pub synth: PolySynth,
-}
-
 struct MidiEditorGridRenderer;
 
 type MidiGrid = Grid<usize, MidiEditorGridRenderer, MidiEditorGridHandler>;
 
-impl GridRenderer for MidiEditorGridRenderer {
-    fn create_note(x: usize, y: usize, width: usize, height: usize) -> DomId {
-        js::render_quad(FG_CANVAS_IX, x, y, width, height, "note")
-    }
-
-    fn select_note(dom_id: usize) { js::add_class(dom_id, "selected"); }
-
-    fn deselect_note(dom_id: usize) { js::remove_class(dom_id, "selected"); }
-
-    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId {
-        js::render_line(
-            FG_CANVAS_IX,
-            cursor_pos_beats,
-            0,
-            cursor_pos_beats,
-            conf.grid_height(),
-            "cursor",
-        )
-    }
-
-    fn set_cursor_pos(dom_id: DomId, x: usize) { js::set_attr(dom_id, "x", &x.to_string()); }
-
-    fn set_selection_box(
-        conf: &GridConf,
-        dom_id: DomId,
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-    ) {
-        js::set_attr(dom_id, "x", &x.to_string());
-        js::set_attr(dom_id, "y", &(y + conf.cursor_gutter_height).to_string());
-        js::set_attr(dom_id, "width", &width.to_string());
-        js::set_attr(dom_id, "height", &height.to_string());
-    }
-}
+impl GridRenderer<usize> for MidiEditorGridRenderer {}
 
 impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
     fn init(&mut self) {
         unsafe {
             state::init_state();
         };
-    }
-
-    fn on_note_select(&mut self, _dom_id: &DomId) {}
-
-    fn on_note_double_click(&mut self, _dom_id: &DomId) {}
-
-    fn on_note_deleted(&mut self, _dom_id: DomId) {
-        // TODO
     }
 
     fn on_key_down(
@@ -121,8 +78,6 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             _ => (),
         }
     }
-
-    fn on_mouse_down(&mut self, _grid_state: &mut GridState<usize>, _x: usize, _y: usize) {}
 
     fn on_note_click(
         &mut self,
