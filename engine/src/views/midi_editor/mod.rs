@@ -431,7 +431,6 @@ pub fn mk_midi_editor(_config: &str) -> Box<dyn ViewContext> {
     // TODO: Parse the config and use that rather than the constants
     let conf = GridConf {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
-        row_height: constants::LINE_HEIGHT,
         row_count: constants::LINE_COUNT,
         beat_length_px: constants::BEAT_LENGTH_PX,
         cursor_gutter_height: constants::CURSOR_GUTTER_HEIGHT,

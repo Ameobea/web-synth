@@ -246,7 +246,6 @@ pub struct Grid<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHand
 #[derive(Clone)]
 pub struct GridConf {
     pub row_count: usize,
-    pub row_height: usize,
     pub gutter_height: usize,
     pub beat_length_px: usize,
     pub note_snap_beat_interval: f32,
@@ -273,7 +272,9 @@ impl PxUnit for isize {
 impl GridConf {
     pub fn padded_line_height(&self) -> usize { self.line_height + self.line_border_width }
 
-    pub fn grid_height(&self) -> usize { self.row_count * self.padded_line_height() }
+    pub fn grid_height(&self) -> usize {
+        self.row_count * self.padded_line_height() + self.cursor_gutter_height
+    }
 
     pub fn get_line_index(&self, y_px: usize) -> Option<usize> {
         if y_px > self.cursor_gutter_height {

@@ -31,3 +31,16 @@ extern "C" {
     pub fn save_composition(base64: &str);
     pub fn load_composition() -> Option<String>;
 }
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = localStorage)]
+    fn getItem(key: &str) -> Option<String>;
+
+    #[wasm_bindgen(js_namespace = localStorage)]
+    fn setItem(key: &str, val: &str);
+}
+
+pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
+
+pub fn set_localstorage_key(key: &str, val: &str) { setItem(key, val); }

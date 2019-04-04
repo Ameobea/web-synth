@@ -19,6 +19,7 @@ extern crate test;
 extern crate wasm_bindgen;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 #[macro_use]
 extern crate log;
 
@@ -58,10 +59,8 @@ pub fn init() {
     };
     wasm_logger::init(wasm_logger::Config::new(log_level));
 
-    // Create the `ViewContextManager` and a `MidiEditor` and initialize them
-    let view = view_context::manager::build_view("midi_editor", "TODO");
+    // Create the `ViewContextManager` and initialize it, then set it into the global
     let mut vcm = box ViewContextManager::default();
-    vcm.add_view(view);
     vcm.init();
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
 
