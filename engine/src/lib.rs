@@ -22,6 +22,7 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate log;
+extern crate uuid;
 
 use std::ptr;
 

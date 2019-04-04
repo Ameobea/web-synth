@@ -120,6 +120,7 @@ dependencies = [
  "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
  "slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-logger 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -428,6 +429,14 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "uuid"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "version_check"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -618,6 +627,7 @@ dependencies = [
 "checksum unicode-segmentation 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "aa6024fc12ddfd1c6dbc14a80fa2324d4568849869b779f6bd37e5e4c03344d1"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
 "checksum utf8-ranges 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "796f7e48bef87609f7ade7e06495a87d5cd06c7866e6a5cbfceffc558a243737"
+"checksum uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)" = "90dbc611eb48397705a6b0f6e917da23ae517e4d127123d2cf7674206627d32a"
 "checksum version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 "checksum wasm-bindgen 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)" = "9742fc4860f47bede1090a5e4b0cfc33afcd70cfdf45dd28f2cfb02d4662b0dd"
 "checksum wasm-bindgen-backend 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)" = "c6d7f35ecbb4180513cdb9b298543321bcb278670730415cbb3205ff2c66a477"
