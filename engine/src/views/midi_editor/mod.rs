@@ -34,6 +34,12 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         unsafe {
             state::init_state();
         };
+
+        js::init_midi_editor_ui();
+    }
+
+    fn cleanup(&mut self) {
+        js::cleanup_midi_editor_ui();
     }
 
     fn on_key_down(

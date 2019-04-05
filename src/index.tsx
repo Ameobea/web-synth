@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 const wasm = import('./engine');
 import App from './App';
 import { store } from './redux';
+import ViewContextSwitcher from './ViewContextSwitcher';
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
@@ -119,14 +120,30 @@ const deleteAllChildren = (node: HTMLElement) => {
   }
 };
 
-wasm.then(engine => {
-  engine.init();
+let engineHandle: typeof import('./engine');
+
+export const init_midi_editor_ui = () =>
   ReactDOM.render(
     <Provider store={store}>
-      <App engine={engine} />
+      <App engine={engineHandle} />
     </Provider>,
-    document.getElementById('root')
+    document.getElementById('root')!
   );
+
+const createViewContextSwitcher = (engine: typeof import('./engine')) =>
+  ReactDOM.render(
+    <ViewContextSwitcher engine={engine} />,
+    document.getElementById('view-context-switcher')
+  );
+
+export const cleanup_midi_editor_ui = () =>
+  ReactDOM.unmountComponentAtNode(document.getElementById('root')!);
+
+wasm.then(engine => {
+  engineHandle = engine;
+  engine.init();
+
+  createViewContextSwitcher(engine);
 
   const scrollOffset = () => Math.max(document.getElementById('canvases')!.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];

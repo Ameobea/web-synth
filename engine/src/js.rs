@@ -30,6 +30,9 @@ extern "C" {
     pub fn delete_element(id: usize);
     pub fn save_composition(base64: &str);
     pub fn load_composition() -> Option<String>;
+
+    pub fn init_midi_editor_ui();
+    pub fn cleanup_midi_editor_ui();
 }
 
 #[wasm_bindgen]
@@ -39,6 +42,13 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = localStorage)]
     fn setItem(key: &str, val: &str);
+}
+
+#[wasm_bindgen(raw_module = "./faustEditor")]
+extern "C" {
+    pub fn init_faust_editor(editor_text: &str);
+
+    pub fn cleanup_faust_editor();
 }
 
 pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }

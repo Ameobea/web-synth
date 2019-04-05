@@ -2,7 +2,10 @@ use serde_json;
 use uuid::Uuid;
 
 use super::{
-    super::views::{clip_compositor::mk_clip_compositor, midi_editor::mk_midi_editor},
+    super::views::{
+        clip_compositor::mk_clip_compositor, faust_editor::mk_faust_editor,
+        midi_editor::mk_midi_editor,
+    },
     ViewContext,
 };
 use crate::prelude::*;
@@ -77,19 +80,21 @@ struct ViewContextManagerState {
 }
 
 impl ViewContextManager {
-    /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`
+    /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
     pub fn add_view_context(
         &mut self,
         uuid: Uuid,
         name: String,
         view_context: Box<dyn ViewContext>,
-    ) {
+    ) -> usize {
         self.contexts.push(ViewContextEntry {
             uuid,
             name,
             context: view_context,
             touched: false,
         });
+
+        self.contexts.len() - 1
     }
 
     fn init_from_state_snapshot(&mut self, vcm_state: ViewContextManagerState) {
@@ -122,8 +127,8 @@ impl ViewContextManager {
 
     /// Initializes the VCM with the default view context and state from scratch
     fn init_default_state(&mut self) {
-        let view = build_view("clip_compositor", "TODO");
-        self.add_view_context(uuid_v4(), "clip_compositor".into(), view);
+        let view = build_view("faust_editor", "{\"editor_text\": \"\"}");
+        self.add_view_context(uuid_v4(), "faust_editor".into(), view);
     }
 
     /// Loads saved application state from the browser's `localstorage`.  Then calls the `init()`
@@ -205,6 +210,7 @@ pub fn build_view(name: &str, definition: &str) -> Box<dyn ViewContext> {
     match name {
         "midi_editor" => mk_midi_editor(definition),
         "clip_compositor" => mk_clip_compositor(definition),
-        _ => unimplemented!(),
+        "faust_editor" => mk_faust_editor(definition),
+        _ => panic!("No handler for view context with name {}", name),
     }
 }

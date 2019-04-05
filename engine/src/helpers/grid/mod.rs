@@ -77,6 +77,8 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
 pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
     fn init(&mut self) {}
 
+    fn cleanup(&mut self) {}
+
     fn on_note_select(&mut self, _data: &S) {}
 
     fn on_note_click(
@@ -362,7 +364,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         self.handler.init();
     }
 
-    fn cleanup(&mut self) { unimplemented!() }
+    fn cleanup(&mut self) { self.handler.cleanup(); }
 
     fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
         self.state.control_pressed = control_pressed;
@@ -769,8 +771,6 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     }
 
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
-
-    fn load(&mut self, _serialized: &str) { unimplemented!() }
 
     fn save(&self) -> String { unimplemented!() }
 }

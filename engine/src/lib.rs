@@ -38,6 +38,7 @@ pub mod util;
 pub mod view_context;
 pub mod views;
 use self::prelude::*;
+use self::view_context::manager::build_view;
 
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
@@ -73,4 +74,15 @@ pub fn init() {
             721_347_520_420_481_703,
         ))
     }
+}
+
+/// Creates a new view context from the provided name and sets it as the main view context.
+///
+/// TODO: Handle checking existing views and deleting old ones, etc.
+#[wasm_bindgen]
+pub fn switch_view_context(vc_name: &str) {
+    let view_context = build_view(vc_name, "{\"editor_text\": \"\"}");
+    let vcm = get_vcm();
+    let new_vc_ix = vcm.add_view_context(uuid_v4(), vc_name.into(), view_context);
+    vcm.set_active_view(new_vc_ix);
 }
