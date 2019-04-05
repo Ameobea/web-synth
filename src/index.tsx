@@ -120,6 +120,8 @@ const deleteAllChildren = (node: HTMLElement) => {
   }
 };
 
+export const clear_canvases = () => SVGS.forEach(deleteAllChildren);
+
 let engineHandle: typeof import('./engine');
 
 export const init_midi_editor_ui = () =>
@@ -142,6 +144,8 @@ export const cleanup_midi_editor_ui = () =>
 wasm.then(engine => {
   engineHandle = engine;
   engine.init();
+
+  window.addEventListener('beforeunload', engine.handle_window_close);
 
   createViewContextSwitcher(engine);
 

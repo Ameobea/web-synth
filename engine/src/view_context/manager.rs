@@ -59,7 +59,7 @@ struct ViewContextDefinition {
     pub conf: String,
 }
 
-impl<'a> Into<ViewContextDefinition> for &'a ViewContextEntry {
+impl<'a> Into<ViewContextDefinition> for &'a mut ViewContextEntry {
     fn into(self) -> ViewContextDefinition {
         ViewContextDefinition {
             uuid: self.uuid,
@@ -147,20 +147,31 @@ impl ViewContextManager {
         self.contexts[self.active_context_ix].context.init();
     }
 
-    /// Creates a snapshot of the current application state and saves it to `localstorage`.
-    pub fn save_state_snapshot(&self) {
+    /// Retrieves the active `ViewContextManager`
+    pub fn get_active_view(&self) -> &dyn ViewContext {
+        &*self.contexts[self.active_context_ix].context
+    }
+
+    /// Retrieves the active `ViewContextManager`
+    pub fn get_active_view_mut(&mut self) -> &mut dyn ViewContext {
+        &mut *self.contexts[self.active_context_ix].context
+    }
+
+    /// Serializes all managed view contexts and saves them to persistent storage.
+    pub fn save_all(&mut self) {
         // TODO: Periodically call this, probably from inside of the VCMs themselves, in order
         // to keep the state up to date.
         // TODO: Actually make use of the `touched` flag optimization here.
         let mut view_context_definitions = Vec::new();
         let mut view_context_ids = Vec::new();
 
-        for entry in &self.contexts {
+        for entry in &mut self.contexts {
             view_context_ids.push(entry.uuid);
             let view_context_definition: ViewContextDefinition = entry.into();
             js::set_localstorage_key(
                 &format!("vc_{}", view_context_definition.uuid),
-                &view_context_definition.conf,
+                &serde_json::to_string(&view_context_definition)
+                    .expect("Error while serializing `ViewContextDefinition`"),
             );
             view_context_definitions.push(view_context_definition);
         }
@@ -174,28 +185,6 @@ impl ViewContextManager {
             .expect("Error while serializing `ViewContextManagerState` to string");
 
         js::set_localstorage_key(VCM_STATE_KEY, &serialized_state);
-    }
-
-    /// Retrieves the active `ViewContextManager`
-    pub fn get_active_view(&self) -> &dyn ViewContext {
-        &*self.contexts[self.active_context_ix].context
-    }
-
-    /// Retrieves the active `ViewContextManager`
-    pub fn get_active_view_mut(&mut self) -> &mut dyn ViewContext {
-        &mut *self.contexts[self.active_context_ix].context
-    }
-
-    /// Serializes all managed view contexts and saves them to persistent storage.
-    pub fn save_all(&mut self) {
-        for entry in &self.contexts {
-            if !entry.touched {
-                continue;
-            }
-
-            let _serialized = entry.context.save();
-            // TODO: save to localstorage or something
-        }
     }
 
     pub fn set_active_view(&mut self, view_ix: usize) {

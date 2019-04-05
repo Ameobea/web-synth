@@ -17,7 +17,8 @@ impl ViewContext for FaustEditor {
 
     fn cleanup(&mut self) { js::cleanup_faust_editor(); }
 
-    fn save(&self) -> String {
+    fn save(&mut self) -> String {
+        self.editor_text = js::get_faust_editor_content();
         serde_json::to_string(self).expect("Error while serializing `FaustEditor`")
     }
 }

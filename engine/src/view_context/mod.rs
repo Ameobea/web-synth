@@ -17,5 +17,5 @@ pub trait ViewContext {
     fn handle_mouse_up(&mut self, _x: usize, _y: usize) {}
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
 
-    fn save(&self) -> String;
+    fn save(&mut self) -> String;
 }

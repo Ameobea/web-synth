@@ -364,7 +364,10 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         self.handler.init();
     }
 
-    fn cleanup(&mut self) { self.handler.cleanup(); }
+    fn cleanup(&mut self) {
+        js::clear_canvases();
+        self.handler.cleanup();
+    }
 
     fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
         self.state.control_pressed = control_pressed;
@@ -772,7 +775,9 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
 
-    fn save(&self) -> String { unimplemented!() }
+    fn save(&mut self) -> String {
+        "".into() // TODO
+    }
 }
 
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> Grid<S, R, H> {

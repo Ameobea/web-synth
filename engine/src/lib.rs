@@ -24,7 +24,7 @@ extern crate serde_json;
 extern crate log;
 extern crate uuid;
 
-use std::ptr;
+use std::{mem, ptr};
 
 use rand_pcg::Pcg32;
 use wasm_bindgen::prelude::*;
@@ -37,8 +37,7 @@ pub mod synth;
 pub mod util;
 pub mod view_context;
 pub mod views;
-use self::prelude::*;
-use self::view_context::manager::build_view;
+use self::{prelude::*, view_context::manager::build_view};
 
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
@@ -54,8 +53,8 @@ pub fn init() {
     console_error_panic_hook::set_once();
 
     let log_level = if cfg!(debug_assertions) {
-        // log::Level::Debug
-        log::Level::Trace
+        log::Level::Debug
+    // log::Level::Trace
     } else {
         log::Level::Info
     };
@@ -68,9 +67,10 @@ pub fn init() {
 
     // Initialize the global PRNG
     unsafe {
-        // slightly customized versions of the default seeds for the PCG32 PRNG
+        // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
+        // some actual RNG from JS so that things aren't deterministic.
         RNG = Box::into_raw(box Pcg32::new(
-            0x1ade_f00d_d15b_a5e5,
+            mem::transmute(js::js_random()),
             721_347_520_420_481_703,
         ))
     }
@@ -85,4 +85,10 @@ pub fn switch_view_context(vc_name: &str) {
     let vcm = get_vcm();
     let new_vc_ix = vcm.add_view_context(uuid_v4(), vc_name.into(), view_context);
     vcm.set_active_view(new_vc_ix);
+}
+
+#[wasm_bindgen]
+pub fn handle_window_close() {
+    let vcm = get_vcm();
+    vcm.save_all();
 }
