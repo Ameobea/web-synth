@@ -368,20 +368,22 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     /// This is called when re-initializing
     fn rerender_all_notes(&self) {
         for note_data in self.state.data.iter() {
-            // TODO: Abstract to helper function
-            R::create_note(
-                self.state
-                    .conf
-                    .beats_to_px(note_data.note_box.bounds.start_beat),
-                self.state.conf.cursor_gutter_height
-                    + self.state.conf.padded_line_height() * note_data.line_ix,
-                self.state
-                    .conf
-                    .beats_to_px(note_data.note_box.bounds.width()),
-                self.state.conf.line_height,
-                Some(note_data.note_box.data.get_id()),
+            self.create_note(
+                note_data.line_ix,
+                note_data.note_box.bounds.start_beat,
+                note_data.note_box.bounds.width(),
             );
         }
+    }
+
+    pub fn create_note(&self, line_ix: usize, start_beat: f32, width: f32) -> DomId {
+        R::create_note(
+            self.state.conf.beats_to_px(start_beat),
+            self.state.conf.cursor_gutter_height + self.state.conf.padded_line_height() * line_ix,
+            self.state.conf.beats_to_px(width),
+            self.state.conf.line_height,
+            None,
+        )
     }
 }
 
@@ -897,15 +899,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                 }
             }
 
-            // TODO: Abstract
-            let dom_id = R::create_note(
-                self.state.conf.cursor_gutter_height
-                    + self.state.conf.padded_line_height() * line_ix,
-                self.state.conf.beats_to_px(new_start_beat),
-                self.state.conf.beats_to_px(width),
-                self.state.conf.line_height,
-                None,
-            );
+            let dom_id = self.create_note(line_ix, new_start_beat, width);
             let new_note = NoteBox {
                 bounds: NoteBoxBounds {
                     start_beat: start_beat + offset_beats,
@@ -981,8 +975,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     }
 
     pub fn try_load_saved_composition(&mut self) {
-        let state_key = format!("grid_{}", self.uuid);
-        let base64_data: String = match js::get_localstorage_key(&state_key) {
+        let base64_data: String = match js::get_localstorage_key(&self.get_state_key()) {
             Some(data) => data,
             None => return,
         };
@@ -997,15 +990,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                 start_beat,
                 width,
             } = raw_note;
-            // TODO: abstract to helper that takes a line ix, start_beat, and width
-            let dom_id = R::create_note(
-                self.state.conf.beats_to_px(start_beat),
-                self.state.conf.cursor_gutter_height
-                    + self.state.conf.padded_line_height() * line_ix,
-                self.state.conf.beats_to_px(width),
-                self.state.conf.line_height,
-                None,
-            );
+            let dom_id = self.create_note(line_ix, start_beat, width);
             let note_state = self
                 .handler
                 .create_note(&mut self.state, line_ix, start_beat, dom_id);
@@ -1081,6 +1066,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         self.handler.on_selection_box_deleted(&mut self.state);
     }
 
+    fn get_state_key(&self) -> String { format!("grid_{}", self.uuid) }
+
     fn serialize_and_save(&mut self) {
         // Get a list of every note in the composition matched with its line index
         let all_notes: Vec<RawNoteData> = self
@@ -1112,7 +1099,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         }
         let base64_str = unsafe { str::from_utf8_unchecked(&base64_data) };
 
-        let state_key = format!("midiEditor_{}", self.uuid);
+        let state_key = self.get_state_key();
         js::set_localstorage_key(&state_key, base64_str);
     }
 }
