@@ -93,6 +93,11 @@ interface ViewContextSwitcherProps {
   viewContextManager: ViewContextManagerState;
 }
 
+/**
+ * Creates a list of tabs on the top of the screen that allow switching between the list of active
+ * VCs.  It is kept up to date via Redux, which is in turn updated automatically by the VCM on the
+ * backend every time there is a change.
+ */
 const ViewContextSwitcherInner = ({ engine, viewContextManager }: ViewContextSwitcherProps) => (
   <div style={styles.viewContextSwitcher}>
     {viewContextManager.activeViewContexts.map(({ name, uuid }, i) => (
