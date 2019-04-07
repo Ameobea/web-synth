@@ -17,7 +17,22 @@ use crate::prelude::*;
 /// It doesn't actually contain the data for the individual view contexts, but rather it contains
 /// the `localStorage` keys at which they can be retrieved.  This allows individual VCs to be
 /// updated without having to re-serialize all of the others as well.
-const VCM_STATE_KEY: &str = "vcmState";
+pub const VCM_STATE_KEY: &str = "vcmState";
+
+#[derive(Serialize)]
+struct MinimalViewContextDefinition {
+    pub name: String,
+    pub uuid: Uuid,
+}
+
+impl<'a> From<&'a ViewContextEntry> for MinimalViewContextDefinition {
+    fn from(other: &'a ViewContextEntry) -> Self {
+        MinimalViewContextDefinition {
+            name: other.name.clone(),
+            uuid: other.uuid,
+        }
+    }
+}
 
 pub struct ViewContextEntry {
     pub uuid: Uuid,
@@ -53,7 +68,7 @@ impl Default for ViewContextManager {
 }
 
 #[derive(Serialize, Deserialize)]
-struct ViewContextDefinition {
+pub struct ViewContextDefinition {
     pub uuid: Uuid,
     pub name: String,
     pub conf: String,
@@ -79,9 +94,11 @@ struct ViewContextManagerState {
     pub active_view_ix: usize,
 }
 
+fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
+
 impl ViewContextManager {
     /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
-    pub fn add_view_context(
+    fn add_view_context_inner(
         &mut self,
         uuid: Uuid,
         name: String,
@@ -95,6 +112,31 @@ impl ViewContextManager {
         });
 
         self.contexts.len() - 1
+    }
+
+    /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
+    pub fn add_view_context(
+        &mut self,
+        uuid: Uuid,
+        name: String,
+        view_context: Box<dyn ViewContext>,
+    ) -> usize {
+        let created_ix = self.add_view_context_inner(uuid, name, view_context);
+        self.commit();
+        created_ix
+    }
+
+    /// Given the UUID of a managed `ViewContext`, switches it to be the active view.
+    pub fn set_active_view_by_id(&mut self, id: Uuid) {
+        let ix = match self.get_vc_position(id) {
+            Some(ix) => ix,
+            None => {
+                error!("Tried to delete a VC with ID {} but it wasn't found.", id);
+                return;
+            },
+        };
+
+        self.set_active_view(ix);
     }
 
     fn init_from_state_snapshot(&mut self, vcm_state: ViewContextManagerState) {
@@ -118,8 +160,9 @@ impl ViewContextManager {
                 },
             };
 
-            let view_context = build_view(&definition.name, &definition.conf);
-            self.add_view_context(definition.uuid, definition.name, view_context);
+            let view_context =
+                build_view(&definition.name, Some(&definition.conf), definition.uuid);
+            self.add_view_context_inner(definition.uuid, definition.name, view_context);
         }
 
         self.active_context_ix = vcm_state.active_view_ix;
@@ -127,24 +170,34 @@ impl ViewContextManager {
 
     /// Initializes the VCM with the default view context and state from scratch
     fn init_default_state(&mut self) {
-        let view = build_view("faust_editor", "{\"editor_text\": \"\"}");
-        self.add_view_context(uuid_v4(), "faust_editor".into(), view);
+        let uuid = uuid_v4();
+        let view = build_view("midi_editor", None, uuid);
+        self.add_view_context_inner(uuid_v4(), "midi_editor".into(), view);
+    }
+
+    fn load_vcm_state() -> Option<ViewContextManagerState> {
+        let vcm_state_str_opt = js::get_localstorage_key(VCM_STATE_KEY);
+        vcm_state_str_opt.and_then(|vcm_state_str| match serde_json::from_str(&vcm_state_str) {
+            Ok(vcm_state) => Some(vcm_state),
+            Err(err) => {
+                error!("Error deserializing stored VCM state: {:?}", err);
+                None
+            },
+        })
     }
 
     /// Loads saved application state from the browser's `localstorage`.  Then calls the `init()`
     /// function of all managed `ViewContext`s.
     pub fn init(&mut self) {
-        let vcm_state_str_opt = js::get_localstorage_key(VCM_STATE_KEY);
-        if let Some(vcm_state_str) = vcm_state_str_opt {
-            match serde_json::from_str(&vcm_state_str) {
-                Ok(vcm_state) => self.init_from_state_snapshot(vcm_state),
-                Err(err) => error!("Error deserializing stored VCM state: {:?}", err),
-            };
+        if let Some(vcm_state) = Self::load_vcm_state() {
+            self.init_from_state_snapshot(vcm_state);
         } else {
             self.init_default_state();
         }
 
         self.contexts[self.active_context_ix].context.init();
+
+        self.commit();
     }
 
     /// Retrieves the active `ViewContextManager`
@@ -155,6 +208,54 @@ impl ViewContextManager {
     /// Retrieves the active `ViewContextManager`
     pub fn get_active_view_mut(&mut self) -> &mut dyn ViewContext {
         &mut *self.contexts[self.active_context_ix].context
+    }
+
+    /// Updates the UI with an up-to-date listing of active view contexts and persist the current
+    /// VCM state to `localStorage`.
+    fn commit(&mut self) {
+        let minimal_view_context_definitions: Vec<MinimalViewContextDefinition> = self
+            .contexts
+            .iter()
+            .map(|vc_entry| vc_entry.into())
+            .collect();
+        let definitions_str = serde_json::to_string(&minimal_view_context_definitions)
+            .expect("Error serializing `MinimalViewContextDefinition`s into JSON string");
+
+        js::update_active_view_contexts(self.active_context_ix, &definitions_str);
+
+        self.save_all()
+    }
+
+    pub fn get_vc_position(&self, id: Uuid) -> Option<usize> {
+        self.contexts
+            .iter()
+            .position(|vc_entry| vc_entry.uuid == id)
+    }
+
+    /// Removes the view context with the supplied ID, calling its `.cleanup()` function, deleting
+    /// its `localStorage` key, and updating the root `localStorage` key to no longer list it.
+    pub fn delete_vc_by_id(&mut self, id: Uuid) {
+        let ix = match self.get_vc_position(id) {
+            Some(ix) => ix,
+            None => {
+                error!("Tried to delete a VC with ID {} but it wasn't found.", id);
+                return;
+            },
+        };
+
+        let mut vc_entry = self.contexts.remove(ix);
+        vc_entry.context.cleanup();
+
+        // If the deleted VC was the active VC, pick the one before it to be the active VC.
+        if self.active_context_ix == ix {
+            self.active_context_ix = ix.saturating_sub(1);
+        }
+
+        if let Some(vc_entry) = self.contexts.get_mut(self.active_context_ix) {
+            vc_entry.context.init();
+        }
+
+        self.commit();
     }
 
     /// Serializes all managed view contexts and saves them to persistent storage.
@@ -169,7 +270,7 @@ impl ViewContextManager {
             view_context_ids.push(entry.uuid);
             let view_context_definition: ViewContextDefinition = entry.into();
             js::set_localstorage_key(
-                &format!("vc_{}", view_context_definition.uuid),
+                &get_vc_key(view_context_definition.uuid),
                 &serde_json::to_string(&view_context_definition)
                     .expect("Error while serializing `ViewContextDefinition`"),
             );
@@ -192,14 +293,37 @@ impl ViewContextManager {
         self.get_active_view_mut().cleanup();
         self.active_context_ix = view_ix;
         self.get_active_view_mut().init();
+        self.commit();
+    }
+
+    /// Resets the VCM to its initial state, deleting all existing VCs.
+    pub fn reset(&mut self) {
+        // clean-up the active VC first
+        self.get_active_view_mut().cleanup();
+
+        if let Some(vcm_state) = Self::load_vcm_state() {
+            // Delete all stored VCs
+            for vc_id in vcm_state.view_context_ids {
+                let key = get_vc_key(vc_id);
+                js::delete_localstorage_key(&key);
+            }
+        }
+
+        // Delete the VCM root state key itself
+        js::delete_localstorage_key(VCM_STATE_KEY);
+
+        // Re-initialize from scratch
+        self.contexts.clear();
+        self.active_context_ix = 0;
+        self.init();
     }
 }
 
-pub fn build_view(name: &str, definition: &str) -> Box<dyn ViewContext> {
+pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
     match name {
-        "midi_editor" => mk_midi_editor(definition),
-        "clip_compositor" => mk_clip_compositor(definition),
-        "faust_editor" => mk_faust_editor(definition),
+        "midi_editor" => mk_midi_editor(conf, uuid),
+        "clip_compositor" => mk_clip_compositor(conf, uuid),
+        "faust_editor" => mk_faust_editor(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

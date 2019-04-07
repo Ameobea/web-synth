@@ -4,6 +4,8 @@
 
 use std::str;
 
+use uuid::Uuid;
+
 use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
@@ -38,9 +40,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         js::init_midi_editor_ui();
     }
 
-    fn cleanup(&mut self) {
-        js::cleanup_midi_editor_ui();
-    }
+    fn cleanup(&mut self, _: &mut GridState<usize>) { js::cleanup_midi_editor_ui(); }
 
     fn on_key_down(
         &mut self,
@@ -63,10 +63,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             "ArrowRight" | "d" =>
                 self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal),
             "z" | "x" => self.play_selected_notes(grid_state),
-            " " => {
-                self.start_playback(grid_state);
-                self.serialize_and_save_composition(grid_state);
-            },
+            " " => self.start_playback(grid_state),
             _ => (),
         }
     }
@@ -397,43 +394,10 @@ impl MidiEditorGridHandler {
                 .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, *line_ix));
         }
     }
-
-    pub fn serialize_and_save_composition(&mut self, grid_state: &mut GridState<usize>) {
-        // Get a list of every note in the composition matched with its line index
-        let all_notes: Vec<RawNoteData> = grid_state
-            .data
-            .lines
-            .iter()
-            .enumerate()
-            .flat_map(|(line_ix, line)| {
-                line.iter().map(move |note_box| RawNoteData {
-                    line_ix,
-                    start_beat: note_box.bounds.start_beat,
-                    width: note_box.bounds.width(),
-                })
-            })
-            .collect();
-
-        let mut base64_data = Vec::new();
-        {
-            let mut base64_encoder = base64::write::EncoderWriter::new(
-                &mut base64_data,
-                base64::Config::new(base64::CharacterSet::Standard, true),
-            );
-            bincode::serialize_into(&mut base64_encoder, &all_notes)
-                .expect("Error binary-encoding note data");
-            base64_encoder
-                .finish()
-                .expect("Error base64-encoding note data");
-        }
-        let base64_str = unsafe { str::from_utf8_unchecked(&base64_data) };
-
-        js::save_composition(base64_str);
-    }
 }
 
 /// Return `MidiEditor` instance as a `ViewContext` given the provided config string.
-pub fn mk_midi_editor(_config: &str) -> Box<dyn ViewContext> {
+pub fn mk_midi_editor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
     // TODO: Parse the config and use that rather than the constants
     let conf = GridConf {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
@@ -448,7 +412,7 @@ pub fn mk_midi_editor(_config: &str) -> Box<dyn ViewContext> {
     };
 
     let view_context = MidiEditorGridHandler::default();
-    let grid: Box<MidiGrid> = box Grid::new(conf, view_context);
+    let grid: Box<MidiGrid> = box Grid::new(conf, view_context, uuid);
 
     grid
 }

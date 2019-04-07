@@ -6,7 +6,7 @@ import mkFaustEditor from './FaustEditor';
 let state: string;
 
 export const init_faust_editor = (editorContent: string) => {
-  state = editorContent;
+  state = editorContent || '';
 
   // Create the base dom node for the faust editor
   const faustEditorBase = document.createElement('div');
@@ -16,7 +16,7 @@ export const init_faust_editor = (editorContent: string) => {
     'z-index: 2; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0;'
   );
 
-  document.getElementsByTagName('body')[0]!.appendChild(faustEditorBase);
+  document.getElementById('content')!.appendChild(faustEditorBase);
 
   const FaustEditor = mkFaustEditor(editorContent);
   ReactDOM.render(
@@ -30,10 +30,11 @@ export const init_faust_editor = (editorContent: string) => {
   );
 };
 
-export const cleanup_faust_editor = () => {
+export const cleanup_faust_editor = (): string => {
   const faustEditorReactRootNode = document.getElementById('faust-editor-react-root')!;
   ReactDOM.unmountComponentAtNode(faustEditorReactRootNode);
   faustEditorReactRootNode.remove();
+  return state;
 };
 
 export const get_faust_editor_content = () => state;

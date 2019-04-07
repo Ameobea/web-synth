@@ -18,5 +18,5 @@ pub use super::{
     js,
     synth::{self, PolySynth},
     util::{self, *},
-    view_context::{self, ViewContext, ViewContextManager},
+    view_context::{self, manager::ViewContextDefinition, ViewContext, ViewContextManager},
 };

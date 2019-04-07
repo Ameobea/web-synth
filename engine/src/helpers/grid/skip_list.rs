@@ -930,6 +930,10 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
         iterator
     }
 
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = NoteData<'a, S>> + 'a {
+        self.iter_region(0, self.lines.len() - 1, 0.0, f32::INFINITY)
+    }
+
     pub fn find_first_node_in_range(
         &self,
         line_ix: usize,

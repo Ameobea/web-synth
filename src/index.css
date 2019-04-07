@@ -41,8 +41,15 @@ svg.notes {
   stroke: #661166;
 }
 
+main#content {
+  left: 0;
+  top: 40px;
+  position: absolute;
+}
+
 #canvases {
   height: 100vh;
+  width: 100vw;
   overflow-y: scroll;
   overflow-x: hidden;
 }
@@ -65,11 +72,19 @@ svg.notes {
   stroke: rgba(222, 222, 222, 0.8);
 }
 
+#view-context-manager {
+  position: absolute;
+  top: 85;
+  right: 0;
+  padding: 6px;
+  z-index: 6;
+}
+
 #view-context-switcher {
   position: absolute;
   top: 0;
-  right: 0;
-  padding: 6px;
+  left: 0;
+  height: 80px;
   z-index: 6;
 }
 

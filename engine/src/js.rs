@@ -11,6 +11,7 @@ extern "C" {
         width: usize,
         height: usize,
         class: &str,
+        dom_id: Option<usize>,
     ) -> usize;
     pub fn render_line(
         canvas_index: usize,
@@ -29,11 +30,11 @@ extern "C" {
     pub fn remove_class(id: usize, className: &str);
     pub fn delete_element(id: usize);
     pub fn clear_canvases();
-    pub fn save_composition(base64: &str);
-    pub fn load_composition() -> Option<String>;
 
     pub fn init_midi_editor_ui();
     pub fn cleanup_midi_editor_ui();
+
+    pub fn update_active_view_contexts(active_context_ix: usize, view_context_definitions: &str);
 }
 
 #[wasm_bindgen]
@@ -44,6 +45,9 @@ extern "C" {
     #[wasm_bindgen(js_namespace = localStorage)]
     fn setItem(key: &str, val: &str);
 
+    #[wasm_bindgen(js_namespace = localStorage)]
+    fn removeItem(key: &str);
+
     #[wasm_bindgen(js_namespace = Math)]
     fn random() -> f64;
 }
@@ -52,15 +56,15 @@ pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
 
 pub fn set_localstorage_key(key: &str, val: &str) { setItem(key, val); }
 
+pub fn delete_localstorage_key(key: &str) { removeItem(key); }
+
 pub fn js_random() -> f64 { random() }
 
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {
     pub fn init_faust_editor(editor_text: &str);
 
-    pub fn cleanup_faust_editor();
+    pub fn cleanup_faust_editor() -> String;
 
     pub fn get_faust_editor_content() -> String;
 }
-
-

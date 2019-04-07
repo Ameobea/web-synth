@@ -1,16 +1,21 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
+import * as R from 'ramda';
 
 const wasm = import('./engine');
 import App from './App';
 import { store } from './redux';
-import ViewContextSwitcher from './ViewContextSwitcher';
+import { actionCreators as viewContextManagerActionCreators } from './redux/reducers/viewContextManager';
+import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
 ) as any[];
 
+// The number of pixels from the top of the page that the main content (canvases, editor, etc.)
+// is rendered.
+const CONTENT_OFFSET_TOP: number = 40;
 let ACTIVE_SHAPE: SVGElement = null!;
 let ATTR_COUNTER: number = 0;
 const notes: SVGElement[] = [];
@@ -23,16 +28,23 @@ export const get_active_attr = (key: string): string | null => ACTIVE_SHAPE.getA
 export const set_active_attr = (key: string, val: string) => ACTIVE_SHAPE.setAttribute(key, val);
 
 const renderHelper = (
-  fn: (...args: any[]) => { name: string; attrs: { [key: string]: string } }
+  fn: (...args: any[]) => { name: string; attrs: { [key: string]: string }; idOverride?: number }
 ) => (canvasIndex: number, ...args: any[]): number => {
-  const svg = SVGS[canvasIndex];
-  const { name, attrs } = fn(...args);
+  const { name, attrs, idOverride } = fn(...args);
+
   const shape = document.createElementNS('http://www.w3.org/2000/svg', name);
-  const id = ATTR_COUNTER;
+  const id = idOverride || ATTR_COUNTER;
+
   Object.entries({ ...attrs, id: `e-${id}` }).forEach(([key, val]) => shape.setAttribute(key, val));
+
+  const svg = SVGS[canvasIndex];
   svg.appendChild(shape);
   ACTIVE_SHAPE = shape;
-  ATTR_COUNTER += 1;
+
+  if (R.isNil(idOverride)) {
+    ATTR_COUNTER += 1;
+  }
+
   return id;
 };
 
@@ -58,7 +70,14 @@ export const render_triangle = renderHelper(
 );
 
 export const render_quad = renderHelper(
-  (x: number, y: number, width: number, height: number, className: string) => ({
+  (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    className: string,
+    idOverride?: number
+  ) => ({
     name: 'rect',
     attrs: {
       x: x.toString(),
@@ -67,6 +86,7 @@ export const render_quad = renderHelper(
       height: height.toString(),
       class: className,
     },
+    idOverride,
   })
 );
 
@@ -109,11 +129,6 @@ export const push_note = (): number => {
   return notes.length - 1;
 };
 
-export const save_composition = (base64Data: string) =>
-  window.localStorage.setItem('composition', base64Data);
-
-export const load_composition = (): string | null => window.localStorage.getItem('composition');
-
 const deleteAllChildren = (node: HTMLElement) => {
   while (node.firstChild) {
     node.removeChild(node.firstChild);
@@ -132,14 +147,34 @@ export const init_midi_editor_ui = () =>
     document.getElementById('root')!
   );
 
-const createViewContextSwitcher = (engine: typeof import('./engine')) =>
+const createViewContextManager = (engine: typeof import('./engine')) => {
   ReactDOM.render(
-    <ViewContextSwitcher engine={engine} />,
+    <Provider store={store}>
+      <ViewContextManager engine={engine} />
+    </Provider>,
+    document.getElementById('view-context-manager')
+  );
+
+  ReactDOM.render(
+    <Provider store={store}>
+      <ViewContextSwitcher engine={engine} />
+    </Provider>,
     document.getElementById('view-context-switcher')
   );
+};
 
 export const cleanup_midi_editor_ui = () =>
   ReactDOM.unmountComponentAtNode(document.getElementById('root')!);
+
+export const update_active_view_contexts = (
+  activeViewContextIx: number,
+  activeVcsJson: string
+): void => {
+  const activeViewContexts: Array<{ name: string; uuid: string }> = JSON.parse(activeVcsJson);
+  store.dispatch(
+    viewContextManagerActionCreators.setState({ activeViewContextIx, activeViewContexts })
+  );
+};
 
 wasm.then(engine => {
   engineHandle = engine;
@@ -147,20 +182,21 @@ wasm.then(engine => {
 
   window.addEventListener('beforeunload', engine.handle_window_close);
 
-  createViewContextSwitcher(engine);
+  createViewContextManager(engine);
 
-  const scrollOffset = () => Math.max(document.getElementById('canvases')!.scrollTop - 2, 0);
+  const canvasesElement = document.getElementById('canvases')!;
+  const scrollOffset = () => Math.max(canvasesElement.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];
 
   foregroundCanvas.addEventListener('mousedown', evt => {
-    evt.preventDefault();
-    engine.handle_mouse_down(evt.pageX, evt.pageY + scrollOffset());
+    // evt.preventDefault();
+    engine.handle_mouse_down(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset());
   });
   foregroundCanvas.addEventListener('mouseup', evt =>
-    engine.handle_mouse_up(evt.pageX, evt.pageY + scrollOffset())
+    engine.handle_mouse_up(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
   );
   foregroundCanvas.addEventListener('mousemove', evt =>
-    engine.handle_mouse_move(evt.pageX, evt.pageY + scrollOffset())
+    engine.handle_mouse_move(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
   );
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());

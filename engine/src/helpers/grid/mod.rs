@@ -1,6 +1,7 @@
 use std::{f32, marker::PhantomData, str};
 
 use fnv::FnvHashSet;
+use uuid::Uuid;
 
 use super::super::prelude::*;
 
@@ -33,8 +34,14 @@ pub enum Tool {
 
 pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
     /// Draws a note on the canvas and returns its DOM id.
-    fn create_note(x: usize, y: usize, width: usize, height: usize) -> DomId {
-        js::render_quad(FG_CANVAS_IX, x, y, width, height, "note")
+    fn create_note(
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        dom_id: Option<DomId>,
+    ) -> DomId {
+        js::render_quad(FG_CANVAS_IX, x, y, width, height, "note", dom_id)
     }
 
     /// Given a note's `DomId`, mark it as selected in the visualization
@@ -77,7 +84,7 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
 pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
     fn init(&mut self) {}
 
-    fn cleanup(&mut self) {}
+    fn cleanup(&mut self, _grid_state: &mut GridState<S>) {}
 
     fn on_note_select(&mut self, _data: &S) {}
 
@@ -240,8 +247,10 @@ impl<S: GridRendererUniqueIdentifier> GridState<S> {
 /// Finally, it has a `GridRenderer` which is just a bunch of type-level functions that are used
 /// to render custom versions of the individual elements of the grid.
 pub struct Grid<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> {
+    pub uuid: Uuid,
     pub state: GridState<S>,
     pub handler: H,
+    pub loaded: bool,
     renderer: PhantomData<R>,
 }
 
@@ -346,11 +355,32 @@ fn try_insert_many<S: GridRendererUniqueIdentifier>(
 }
 
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> Grid<S, R, H> {
-    pub fn new(conf: GridConf, handler: H) -> Self {
+    pub fn new(conf: GridConf, handler: H, uuid: Uuid) -> Self {
         Grid {
+            uuid,
             state: GridState::new(conf),
             handler,
+            loaded: false,
             renderer: PhantomData,
+        }
+    }
+
+    /// This is called when re-initializing
+    fn rerender_all_notes(&self) {
+        for note_data in self.state.data.iter() {
+            // TODO: Abstract to helper function
+            R::create_note(
+                self.state
+                    .conf
+                    .beats_to_px(note_data.note_box.bounds.start_beat),
+                self.state.conf.cursor_gutter_height
+                    + self.state.conf.padded_line_height() * note_data.line_ix,
+                self.state
+                    .conf
+                    .beats_to_px(note_data.note_box.bounds.width()),
+                self.state.conf.line_height,
+                Some(note_data.note_box.data.get_id()),
+            );
         }
     }
 }
@@ -360,13 +390,20 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 {
     fn init(&mut self) {
         render::render_initial_grid(&self.state.conf);
-        self.try_load_saved_composition();
         self.handler.init();
+
+        if !self.loaded {
+            self.try_load_saved_composition();
+            self.loaded = true;
+        } else {
+            self.rerender_all_notes();
+        }
     }
 
     fn cleanup(&mut self) {
         js::clear_canvases();
-        self.handler.cleanup();
+        self.serialize_and_save();
+        self.handler.cleanup(&mut self.state);
     }
 
     fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
@@ -500,6 +537,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                             + self.state.conf.padded_line_height() * line_ix,
                         width,
                         self.state.conf.line_height,
+                        None,
                     ));
                     self.handler.on_note_draw_start(&mut self.state, line_ix);
                     x = snapped_lower_px as usize;
@@ -793,6 +831,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                 0,
                 self.state.conf.grid_height(),
                 "selection-box",
+                None,
             ))
         } else {
             self.state.selection_box_dom_id = None;
@@ -858,12 +897,14 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                 }
             }
 
+            // TODO: Abstract
             let dom_id = R::create_note(
                 self.state.conf.cursor_gutter_height
                     + self.state.conf.padded_line_height() * line_ix,
                 self.state.conf.beats_to_px(new_start_beat),
                 self.state.conf.beats_to_px(width),
                 self.state.conf.line_height,
+                None,
             );
             let new_note = NoteBox {
                 bounds: NoteBoxBounds {
@@ -940,7 +981,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     }
 
     pub fn try_load_saved_composition(&mut self) {
-        let base64_data: String = match js::load_composition() {
+        let state_key = format!("grid_{}", self.uuid);
+        let base64_data: String = match js::get_localstorage_key(&state_key) {
             Some(data) => data,
             None => return,
         };
@@ -962,10 +1004,15 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                     + self.state.conf.padded_line_height() * line_ix,
                 self.state.conf.beats_to_px(width),
                 self.state.conf.line_height,
+                None,
             );
             let note_state = self
                 .handler
                 .create_note(&mut self.state, line_ix, start_beat, dom_id);
+            debug!(
+                "Inserting note at line_ix: {}, start_beat: {}",
+                line_ix, start_beat
+            );
             let insertion_error = self.state.data.lines[line_ix as usize].insert(NoteBox {
                 data: note_state,
                 bounds: NoteBoxBounds {
@@ -1018,11 +1065,54 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         self.deselect_all_notes();
 
         // TODO: make dedicated function in `render` probably
-        Some(js::render_quad(FG_CANVAS_IX, x, y, 0, 0, "selection-box"))
+        Some(js::render_quad(
+            FG_CANVAS_IX,
+            x,
+            y,
+            0,
+            0,
+            "selection-box",
+            None,
+        ))
     }
 
     fn delete_selection_box(&mut self, selection_box_dom_id: usize) {
         js::delete_element(selection_box_dom_id);
         self.handler.on_selection_box_deleted(&mut self.state);
+    }
+
+    fn serialize_and_save(&mut self) {
+        // Get a list of every note in the composition matched with its line index
+        let all_notes: Vec<RawNoteData> = self
+            .state
+            .data
+            .lines
+            .iter()
+            .enumerate()
+            .flat_map(|(line_ix, line)| {
+                line.iter().map(move |note_box| RawNoteData {
+                    line_ix,
+                    start_beat: note_box.bounds.start_beat,
+                    width: note_box.bounds.width(),
+                })
+            })
+            .collect();
+
+        let mut base64_data = Vec::new();
+        {
+            let mut base64_encoder = base64::write::EncoderWriter::new(
+                &mut base64_data,
+                base64::Config::new(base64::CharacterSet::Standard, true),
+            );
+            bincode::serialize_into(&mut base64_encoder, &all_notes)
+                .expect("Error binary-encoding note data");
+            base64_encoder
+                .finish()
+                .expect("Error base64-encoding note data");
+        }
+        let base64_str = unsafe { str::from_utf8_unchecked(&base64_data) };
+
+        let state_key = format!("midiEditor_{}", self.uuid);
+        js::set_localstorage_key(&state_key, base64_str);
     }
 }

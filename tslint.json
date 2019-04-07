@@ -31,10 +31,11 @@
     "one-line": [true, "check-catch", "check-else", "check-open-brace", "check-whitespace"],
     "ordered-imports": false,
     "object-literal-sort-keys": false,
-    "quotemark": [true, "single"],
+    "quotemark": [true, "single", "avoid-escape"],
     "radix": true,
     "semicolon": [true, "always", "ignore-bound-class-methods"],
     "switch-default": true,
+    "jsx-no-lambda": false,
     "trailing-comma": [
       true,
       {

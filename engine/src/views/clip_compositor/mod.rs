@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 struct ClipCompositorNoteData {
@@ -51,12 +53,12 @@ fn get_default_clip_compositor_grid_conf() -> GridConf {
 type ClipCompositorGrid =
     Grid<ClipCompositorNoteData, ClipCompositorRenderer, ClipCompositorHandler>;
 
-pub fn mk_clip_compositor(_config: &str) -> Box<dyn ViewContext> {
+pub fn mk_clip_compositor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
     // TODO: Parse the config and use that rather than the constants
     let conf: GridConf = get_default_clip_compositor_grid_conf();
 
     let view_context = ClipCompositorHandler::default();
-    let grid: Box<ClipCompositorGrid> = box Grid::new(conf, view_context);
+    let grid: Box<ClipCompositorGrid> = box Grid::new(conf, view_context, uuid);
 
     grid
 }

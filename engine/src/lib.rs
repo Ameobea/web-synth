@@ -24,9 +24,11 @@ extern crate serde_json;
 extern crate log;
 extern crate uuid;
 
-use std::{mem, ptr};
+use std::{mem, ptr, str::FromStr};
 
+use rand::prelude::*;
 use rand_pcg::Pcg32;
+use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
 pub mod constants;
@@ -52,6 +54,20 @@ pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEX
 pub fn init() {
     console_error_panic_hook::set_once();
 
+    // Initialize the global PRNG
+    unsafe {
+        // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
+        // some actual RNG from JS so that things aren't deterministic.
+        RNG = Box::into_raw(box Pcg32::new(
+            mem::transmute(js::js_random()),
+            721_347_520_420_481_703,
+        ))
+    }
+
+    // Pump it a few times because it seems to generate a fully null output the first time
+    let _: usize = rng().gen();
+    let _: usize = rng().gen();
+
     let log_level = if cfg!(debug_assertions) {
         log::Level::Debug
     // log::Level::Trace
@@ -64,31 +80,37 @@ pub fn init() {
     let mut vcm = box ViewContextManager::default();
     vcm.init();
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
-
-    // Initialize the global PRNG
-    unsafe {
-        // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
-        // some actual RNG from JS so that things aren't deterministic.
-        RNG = Box::into_raw(box Pcg32::new(
-            mem::transmute(js::js_random()),
-            721_347_520_420_481_703,
-        ))
-    }
 }
 
 /// Creates a new view context from the provided name and sets it as the main view context.
-///
-/// TODO: Handle checking existing views and deleting old ones, etc.
 #[wasm_bindgen]
-pub fn switch_view_context(vc_name: &str) {
-    let view_context = build_view(vc_name, "{\"editor_text\": \"\"}");
+pub fn create_view_context(vc_name: String) {
+    let uuid = uuid_v4();
+    let view_context = build_view(&vc_name, None, uuid);
     let vcm = get_vcm();
-    let new_vc_ix = vcm.add_view_context(uuid_v4(), vc_name.into(), view_context);
+    let new_vc_ix = vcm.add_view_context(uuid_v4(), vc_name, view_context);
     vcm.set_active_view(new_vc_ix);
 }
 
 #[wasm_bindgen]
 pub fn handle_window_close() {
     let vcm = get_vcm();
+    vcm.get_active_view_mut().cleanup();
     vcm.save_all();
 }
+
+#[wasm_bindgen]
+pub fn delete_vc_by_id(id: &str) {
+    let uuid = Uuid::from_str(id).expect("Invalid UUID string passed to `delete_vc_by_id`!");
+    get_vcm().delete_vc_by_id(uuid);
+}
+
+#[wasm_bindgen]
+pub fn switch_view_context(uuid_str: &str) {
+    let uuid =
+        Uuid::from_str(uuid_str).expect("Invalid UUID string passed to `switch_view_context`!");
+    get_vcm().set_active_view_by_id(uuid);
+}
+
+#[wasm_bindgen]
+pub fn reset_vcm() { get_vcm().reset(); }

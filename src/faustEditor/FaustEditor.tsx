@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import ace from 'ace-builds';
+// tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
 ace.require('ace/theme/twilight');

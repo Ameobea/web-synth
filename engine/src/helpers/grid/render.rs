@@ -10,6 +10,7 @@ pub fn draw_grid_line(conf: &GridConf, y: usize) {
         conf.grid_width,
         conf.line_height,
         class,
+        None,
     );
 }
 
@@ -43,6 +44,7 @@ pub fn draw_cursor_gutter(conf: &GridConf) {
         conf.measure_width_px,
         conf.cursor_gutter_height,
         "cursor-gutter",
+        None,
     );
 }
 

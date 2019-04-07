@@ -40,6 +40,7 @@
     "recompose": "^0.30.0",
     "redux": "^4.0.1",
     "tonal": "^2.0.0",
-    "tone": "^0.12.80"
+    "tone": "^0.12.80",
+    "typesafe-actions": "^4.0.0"
   }
 }
