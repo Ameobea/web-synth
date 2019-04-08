@@ -1,5 +1,5 @@
 export interface State {
-  activeViewContexts: Array<{ name: string; uuid: string }>;
+  activeViewContexts: Array<{ name: string; uuid: string; title?: string }>;
   activeViewContextIx: number;
 }
 

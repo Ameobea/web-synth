@@ -45,7 +45,8 @@
           "functions": "never",
           "typeLiterals": "always"
         },
-        "singleline": "never"
+        "singleline": "never",
+        "esSpecCompliant": true
       }
     ],
     "triple-equals": [true, "allow-null-check"],

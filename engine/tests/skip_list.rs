@@ -243,8 +243,8 @@ fn skiplist_debug_fmt() {
     // state().nodes are pre-linked, so all we have to do is insert the head.
     skip_list.head_key = Some(head);
     let expected = "|1, 2|------------------------->x\n|1, 2|----------------->|4, 5|->x\n|1, \
-                    2|----------------->|4, 5|->x\n|1, 2|--------->|3, 4|->|4, 5|->x\n|1, 2|->|2, \
-                    3|->|3, 4|->|4, 5|->x";
+                    2|----------------->|4, 5|->x\n|1, 2|--------->|3, 4|->|4, 5|->x\n|1, 2|->|2,
+\                     3|->|3, 4|->|4, 5|->x";
     let actual = format!("{:?}", skip_list);
     println!("\nEXPECTED:\n{}", expected);
     println!("\nACTUAL:\n{}", actual);

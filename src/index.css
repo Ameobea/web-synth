@@ -71,34 +71,3 @@ main#content {
 .cursor {
   stroke: rgba(222, 222, 222, 0.8);
 }
-
-#view-context-manager {
-  position: absolute;
-  top: 85;
-  right: 0;
-  padding: 6px;
-  z-index: 6;
-}
-
-#view-context-switcher {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 80px;
-  z-index: 6;
-}
-
-.view-context-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  height: 32px;
-  width: 32px;
-  color: #aaa;
-  font-family: 'PT Sans';
-  text-align: center;
-  border: 1px solid #aaa;
-  cursor: pointer;
-  background-color: rgb(1, 94, 116);
-}

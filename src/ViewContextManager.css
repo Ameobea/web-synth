@@ -1,0 +1,56 @@
+#view-context-manager {
+  position: absolute;
+  top: 85;
+  right: 0;
+  padding: 6px;
+  z-index: 6;
+}
+
+#view-context-switcher {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 80px;
+  z-index: 6;
+}
+
+.view-context-icon {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin-bottom: 4px;
+  height: 32px;
+  width: 32px;
+  color: #aaa;
+  font-family: 'PT Sans';
+  border: 1px solid #aaa;
+  cursor: pointer;
+  background-color: rgb(1, 94, 116);
+  font-size: 13.5px;
+}
+
+input.view-context-switcher-tab-renamer {
+  width: 90%;
+  background-color: darkmagenta;
+  color: #efe;
+  margin-right: 5%;
+  margin-left: 5%;
+  border: 1px solid #ccc;
+  height: 70%;
+  margin-bottom: 5%;
+  margin-top: 5%;
+}
+
+.vc-close-tab-icon {
+  color: darkred;
+  font-size: 16px;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.vc-switcher-tab-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

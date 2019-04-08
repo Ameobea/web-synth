@@ -170,9 +170,17 @@ export const update_active_view_contexts = (
   activeViewContextIx: number,
   activeVcsJson: string
 ): void => {
-  const activeViewContexts: Array<{ name: string; uuid: string }> = JSON.parse(activeVcsJson);
+  const activeViewContexts: Array<{
+    minimal_def: { name: string; uuid: string; title?: string };
+  }> = JSON.parse(activeVcsJson);
   store.dispatch(
-    viewContextManagerActionCreators.setState({ activeViewContextIx, activeViewContexts })
+    viewContextManagerActionCreators.setState({
+      activeViewContextIx,
+      activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
+        ...minimal_def,
+        ...rest,
+      })),
+    })
   );
 };
 
@@ -203,7 +211,7 @@ wasm.then(engine => {
 
   document.addEventListener('keydown', evt => {
     if (evt.key === 'Backspace') {
-      evt.preventDefault();
+      // evt.preventDefault();
     }
 
     engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);

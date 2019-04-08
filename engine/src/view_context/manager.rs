@@ -19,38 +19,18 @@ use crate::prelude::*;
 /// updated without having to re-serialize all of the others as well.
 pub const VCM_STATE_KEY: &str = "vcmState";
 
-#[derive(Serialize)]
-struct MinimalViewContextDefinition {
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MinimalViewContextDefinition {
     pub name: String,
     pub uuid: Uuid,
-}
-
-impl<'a> From<&'a ViewContextEntry> for MinimalViewContextDefinition {
-    fn from(other: &'a ViewContextEntry) -> Self {
-        MinimalViewContextDefinition {
-            name: other.name.clone(),
-            uuid: other.uuid,
-        }
-    }
+    pub title: Option<String>,
 }
 
 pub struct ViewContextEntry {
-    pub uuid: Uuid,
-    pub name: String,
+    pub definition: MinimalViewContextDefinition,
     pub context: Box<dyn ViewContext>,
     /// A flag indicating if this entry has received any actions since it was last saved
     pub touched: bool,
-}
-
-impl ViewContextEntry {
-    pub fn new(uuid: Uuid, name: String, context: Box<dyn ViewContext>) -> Self {
-        ViewContextEntry {
-            uuid,
-            name,
-            context,
-            touched: false,
-        }
-    }
 }
 
 pub struct ViewContextManager {
@@ -69,16 +49,14 @@ impl Default for ViewContextManager {
 
 #[derive(Serialize, Deserialize)]
 pub struct ViewContextDefinition {
-    pub uuid: Uuid,
-    pub name: String,
+    pub minimal_def: MinimalViewContextDefinition,
     pub conf: String,
 }
 
 impl<'a> Into<ViewContextDefinition> for &'a mut ViewContextEntry {
     fn into(self) -> ViewContextDefinition {
         ViewContextDefinition {
-            uuid: self.uuid,
-            name: self.name.clone(),
+            minimal_def: self.definition.clone(),
             conf: self.context.save(),
         }
     }
@@ -100,13 +78,11 @@ impl ViewContextManager {
     /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
     fn add_view_context_inner(
         &mut self,
-        uuid: Uuid,
-        name: String,
+        definition: MinimalViewContextDefinition,
         view_context: Box<dyn ViewContext>,
     ) -> usize {
         self.contexts.push(ViewContextEntry {
-            uuid,
-            name,
+            definition,
             context: view_context,
             touched: false,
         });
@@ -121,9 +97,21 @@ impl ViewContextManager {
         name: String,
         view_context: Box<dyn ViewContext>,
     ) -> usize {
-        let created_ix = self.add_view_context_inner(uuid, name, view_context);
+        let created_ix = self.add_view_context_inner(
+            MinimalViewContextDefinition {
+                uuid,
+                name,
+                title: None,
+            },
+            view_context,
+        );
         self.commit();
         created_ix
+    }
+
+    pub fn get_vc_by_id_mut(&mut self, uuid: Uuid) -> Option<&mut ViewContextEntry> {
+        self.get_vc_position(uuid)
+            .map(move |ix| &mut self.contexts[ix])
     }
 
     /// Given the UUID of a managed `ViewContext`, switches it to be the active view.
@@ -160,9 +148,12 @@ impl ViewContextManager {
                 },
             };
 
-            let view_context =
-                build_view(&definition.name, Some(&definition.conf), definition.uuid);
-            self.add_view_context_inner(definition.uuid, definition.name, view_context);
+            let view_context = build_view(
+                &definition.minimal_def.name,
+                Some(&definition.conf),
+                definition.minimal_def.uuid,
+            );
+            self.add_view_context_inner(definition.minimal_def, view_context);
         }
 
         self.active_context_ix = vcm_state.active_view_ix;
@@ -171,8 +162,15 @@ impl ViewContextManager {
     /// Initializes the VCM with the default view context and state from scratch
     fn init_default_state(&mut self) {
         let uuid = uuid_v4();
-        let view = build_view("midi_editor", None, uuid);
-        self.add_view_context_inner(uuid_v4(), "midi_editor".into(), view);
+        let view_context = build_view("midi_editor", None, uuid);
+        self.add_view_context_inner(
+            MinimalViewContextDefinition {
+                uuid: uuid_v4(),
+                name: "midi_editor".into(),
+                title: None,
+            },
+            view_context,
+        );
     }
 
     fn load_vcm_state() -> Option<ViewContextManagerState> {
@@ -212,11 +210,11 @@ impl ViewContextManager {
 
     /// Updates the UI with an up-to-date listing of active view contexts and persist the current
     /// VCM state to `localStorage`.
-    fn commit(&mut self) {
+    pub fn commit(&mut self) {
         let minimal_view_context_definitions: Vec<MinimalViewContextDefinition> = self
             .contexts
             .iter()
-            .map(|vc_entry| vc_entry.into())
+            .map(|vc_entry| vc_entry.definition.clone())
             .collect();
         let definitions_str = serde_json::to_string(&minimal_view_context_definitions)
             .expect("Error serializing `MinimalViewContextDefinition`s into JSON string");
@@ -229,7 +227,7 @@ impl ViewContextManager {
     pub fn get_vc_position(&self, id: Uuid) -> Option<usize> {
         self.contexts
             .iter()
-            .position(|vc_entry| vc_entry.uuid == id)
+            .position(|vc_entry| vc_entry.definition.uuid == id)
     }
 
     /// Removes the view context with the supplied ID, calling its `.cleanup()` function, deleting
@@ -267,10 +265,10 @@ impl ViewContextManager {
         let mut view_context_ids = Vec::new();
 
         for entry in &mut self.contexts {
-            view_context_ids.push(entry.uuid);
+            view_context_ids.push(entry.definition.uuid);
             let view_context_definition: ViewContextDefinition = entry.into();
             js::set_localstorage_key(
-                &get_vc_key(view_context_definition.uuid),
+                &get_vc_key(view_context_definition.minimal_def.uuid),
                 &serde_json::to_string(&view_context_definition)
                     .expect("Error while serializing `ViewContextDefinition`"),
             );

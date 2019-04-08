@@ -114,3 +114,16 @@ pub fn switch_view_context(uuid_str: &str) {
 
 #[wasm_bindgen]
 pub fn reset_vcm() { get_vcm().reset(); }
+
+#[wasm_bindgen]
+pub fn set_vc_title(uuid_str: String, title: String) {
+    let uuid = Uuid::from_str(&uuid_str).expect("Invalid UUID string passed to `set_vc_title`!");
+    let vc = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
+        panic!(
+            "Attempted to set title of VC with ID {} but it wasn't found",
+            uuid
+        )
+    });
+    vc.definition.title = Some(title);
+    get_vcm().commit();
+}
