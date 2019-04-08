@@ -18,7 +18,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   viewContextTab: {
     marginRight: 4,
     height: 28,
-    width: 120,
+    width: 160,
   },
 };
 
@@ -132,7 +132,11 @@ const ViewContextTabRenamer = ({
   );
 };
 
-const VCTabCloseIcon = ({ onClick }: { onClick: () => void }) => (
+const VCTabCloseIcon = ({
+  onClick,
+}: {
+  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) => (
   <div onClick={onClick} className='vc-close-tab-icon'>
     x
   </div>
@@ -168,7 +172,12 @@ const ViewContextTab = ({ engine, name, uuid, title, active, i }: ViewContextTab
         />
       ) : (
         <Fragment>
-          <VCTabCloseIcon onClick={() => engine.delete_vc_by_id(uuid)} />
+          <VCTabCloseIcon
+            onClick={e => {
+              engine.delete_vc_by_id(uuid);
+              e.stopPropagation();
+            }}
+          />
           <span className='vc-switcher-tab-title'>{displayName}</span>
         </Fragment>
       )}

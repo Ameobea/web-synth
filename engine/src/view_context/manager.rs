@@ -1,3 +1,5 @@
+use std::mem;
+
 use serde_json;
 use uuid::Uuid;
 
@@ -119,7 +121,10 @@ impl ViewContextManager {
         let ix = match self.get_vc_position(id) {
             Some(ix) => ix,
             None => {
-                error!("Tried to delete a VC with ID {} but it wasn't found.", id);
+                error!(
+                    "Tried to switch the active VC to one with ID {} but it wasn't found.",
+                    id
+                );
                 return;
             },
         };
@@ -242,7 +247,12 @@ impl ViewContextManager {
         };
 
         let mut vc_entry = self.contexts.remove(ix);
+        // Unrender it
         vc_entry.context.cleanup();
+        // And clean up any of its attached resources of storage assets
+        vc_entry.context.dispose();
+        // Finally delete the VC entry for the VC itself
+        js::delete_localstorage_key(&get_vc_key(id));
 
         // If the deleted VC was the active VC, pick the one before it to be the active VC.
         if self.active_context_ix == ix {
@@ -299,19 +309,16 @@ impl ViewContextManager {
         // clean-up the active VC first
         self.get_active_view_mut().cleanup();
 
-        if let Some(vcm_state) = Self::load_vcm_state() {
-            // Delete all stored VCs
-            for vc_id in vcm_state.view_context_ids {
-                let key = get_vc_key(vc_id);
-                js::delete_localstorage_key(&key);
-            }
+        // Delete + dispose all stored VCs
+        let contexts_to_delete = mem::replace(&mut self.contexts, Vec::new());
+        for vcm_entry in contexts_to_delete {
+            self.delete_vc_by_id(vcm_entry.definition.uuid);
         }
 
         // Delete the VCM root state key itself
         js::delete_localstorage_key(VCM_STATE_KEY);
 
         // Re-initialize from scratch
-        self.contexts.clear();
         self.active_context_ix = 0;
         self.init();
     }

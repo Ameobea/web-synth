@@ -31,6 +31,8 @@ impl ViewContext for FaustEditor {
         js::set_localstorage_key(&get_state_key(self.uuid), &faust_editor_content)
     }
 
+    fn dispose(&mut self) { js::delete_localstorage_key(&get_state_key(self.uuid)); }
+
     fn save(&mut self) -> String {
         serde_json::to_string(self).expect("Error serializing `FaustEditor` to String")
     }

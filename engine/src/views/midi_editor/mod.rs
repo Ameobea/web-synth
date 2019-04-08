@@ -398,7 +398,6 @@ impl MidiEditorGridHandler {
 
 /// Return `MidiEditor` instance as a `ViewContext` given the provided config string.
 pub fn mk_midi_editor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    // TODO: Parse the config and use that rather than the constants
     let conf = GridConf {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
         row_count: constants::LINE_COUNT,

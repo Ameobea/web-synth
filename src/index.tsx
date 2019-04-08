@@ -196,10 +196,9 @@ wasm.then(engine => {
   const scrollOffset = () => Math.max(canvasesElement.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];
 
-  foregroundCanvas.addEventListener('mousedown', evt => {
-    // evt.preventDefault();
-    engine.handle_mouse_down(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset());
-  });
+  foregroundCanvas.addEventListener('mousedown', evt =>
+    engine.handle_mouse_down(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
+  );
   foregroundCanvas.addEventListener('mouseup', evt =>
     engine.handle_mouse_up(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
   );
@@ -209,13 +208,9 @@ wasm.then(engine => {
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());
 
-  document.addEventListener('keydown', evt => {
-    if (evt.key === 'Backspace') {
-      // evt.preventDefault();
-    }
-
-    engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);
-  });
+  document.addEventListener('keydown', evt =>
+    engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey)
+  );
   document.addEventListener('keyup', evt =>
     engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey)
   );

@@ -101,6 +101,7 @@ pub fn handle_window_close() {
 
 #[wasm_bindgen]
 pub fn delete_vc_by_id(id: &str) {
+    debug!("delete_vc_by_id(\"{}\")", id);
     let uuid = Uuid::from_str(id).expect("Invalid UUID string passed to `delete_vc_by_id`!");
     get_vcm().delete_vc_by_id(uuid);
 }

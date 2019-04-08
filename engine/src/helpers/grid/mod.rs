@@ -408,6 +408,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         self.handler.cleanup(&mut self.state);
     }
 
+    fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
+
     fn handle_key_down(&mut self, key: &str, control_pressed: bool, shift_pressed: bool) {
         self.state.control_pressed = control_pressed;
         self.state.shift_pressed = shift_pressed;
