@@ -8,19 +8,24 @@ import (
 	"os/exec"
 )
 
-func compile(tempFilePath string) (wasmOutput []byte, err error) {
-	out, err := exec.Command("faust", "-lang", "wasm", tempFilePath).Output()
+func compile(srcFilePath string, dstFilePath string) (err error) {
+	_, err = exec.Command("faust", "-lang", "wasm", "-o", dstFilePath, srcFilePath).Output()
 
 	if err != nil {
-		return []byte(""), err
+		return err
 	}
 
-	return out, nil
+	return nil
 }
 
 func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
+	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
+
 	if req.Method == "POST" {
 		req.ParseMultipartForm(10e8)
+	} else if req.Method == "HEAD" {
+		resWriter.WriteHeader(200)
+		return
 	} else {
 		resWriter.WriteHeader(405)
 		resWriter.Write([]byte("You must send a POST request."))
@@ -36,8 +41,16 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 
 	defer uploadedFile.Close()
 
-	// Create a temporary file
-	tmpfile, err := ioutil.TempFile("", "faust-code")
+	// Create a temporary file for the input source code
+	srctmpfile, err := ioutil.TempFile("", "faust-code")
+	if err != nil {
+		fmt.Println(err)
+		http.Error(resWriter, "Error creating temporary file", 500)
+		return
+	}
+
+	// Create a temporary file for the output Wasm file
+	dsttempfile, err := ioutil.TempFile("", "wasm-output")
 	if err != nil {
 		fmt.Println(err)
 		http.Error(resWriter, "Error creating temporary file", 500)
@@ -45,10 +58,10 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	}
 
 	// Copy the uploaded file to the tempfile
-	io.Copy(tmpfile, uploadedFile)
+	io.Copy(srctmpfile, uploadedFile)
 
 	// Compile the tempfile into WebAssembly
-	wasmFileContent, err := compile(tmpfile.Name())
+	err = compile(srctmpfile.Name(), dsttempfile.Name())
 
 	if err != nil {
 		resWriter.WriteHeader(400)
@@ -56,8 +69,8 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	resWriter.WriteHeader(200)
-	resWriter.Write(wasmFileContent)
+	// Send the file back to the user
+	http.ServeFile(resWriter, req, dsttempfile.Name())
 }
 
 func main() {

@@ -3,7 +3,7 @@
     "outDir": "dist",
     "module": "esnext",
     "target": "es5",
-    "lib": ["es2018", "dom"],
+    "lib": ["esnext", "dom"],
     "sourceMap": true,
     "allowJs": true,
     "moduleResolution": "node",
@@ -19,13 +19,14 @@
     "suppressImplicitAnyIndexErrors": true,
     "noUnusedLocals": false,
     "skipLibCheck": true,
-    "typeRoots": ["./node_modules/@types"],
+    "typeRoots": ["./node_modules/@types", "./node_modules/@types/webassembly-js-api"],
     "types": [],
     "jsx": "react",
     "baseUrl": ".",
     "paths": {
       "Tone": ["node_modules/tone/Tone"],
-      "*": ["./node_modules/@types/*", "*"]
+      "*": ["./node_modules/@types/*", "*"],
+      "WebAssembly": ["./node_modules/@types/webassembly-js-api/*"]
     }
   },
   "exclude": [
