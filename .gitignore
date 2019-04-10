@@ -2,3 +2,4 @@ dist/*
 src/engine*
 node_modules/
 *.wat
+*.log

@@ -2,12 +2,15 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import * as R from 'ramda';
+import Tone from 'tone';
 
 const wasm = import('./engine');
 import App from './App';
 import { store } from './redux';
 import { actionCreators as viewContextManagerActionCreators } from './redux/reducers/viewContextManager';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+
+(window as any).Tone = Tone;
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
