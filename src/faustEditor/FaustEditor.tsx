@@ -13,6 +13,11 @@ interface FaustEditorProps {
 
 const { WebAssembly } = window as any;
 
+const FAUST_COMPILER_ENDPOINT =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:4565/compile'
+    : 'https://faust.ameo.design/compile';
+
 // Stolen from Faust code
 const importObject = {
   env: {
@@ -86,100 +91,101 @@ const getMicrophoneStream = (): Promise<MediaStream> =>
     fulfill(navigator.mediaDevices.getUserMedia({ audio: true }));
   });
 
+const styles: { [key: string]: React.CSSProperties } = {
+  root: {
+    display: 'flex',
+    flexDirection: 'row',
+  },
+  codeEditor: {
+    display: 'flex',
+    flex: 1,
+  },
+  errorConsole: {
+    display: 'flex',
+    flex: 1,
+    color: '#eee',
+    marginLeft: 10,
+    fontFamily: "'Oxygen Mono'",
+    maxHeight: 600,
+  },
+};
+
 const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEditorProps) => {
   const [value, setValue] = useState(initialContent);
+  const [compileErrMsg, setCompileErrMsg] = useState('');
+
+  const handleCompileButtonClick = async () => {
+    const formData = new FormData();
+    formData.append('code.faust', new Blob([value], { type: 'text/plain' }));
+
+    const res = await fetch(FAUST_COMPILER_ENDPOINT, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errMsg = await res.text();
+      setCompileErrMsg(errMsg);
+      return;
+    }
+
+    // The JSON definition for the module is set as a HTTP header, which we must extract and parse.
+    const jsonModuleDefString = res.headers.get('X-Json-Module-Definition');
+    if (!jsonModuleDefString) {
+      setCompileErrMsg("The `X-Json-Module-Definition` header wasn't set on the response.");
+      return;
+    }
+    const dspDefProps = JSON.parse(jsonModuleDefString);
+
+    const arrayBuffer = await res.arrayBuffer();
+
+    const compiledModule = await WebAssembly.compile(arrayBuffer);
+    const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
+    console.log(wasmInstance);
+
+    // Create a `ScriptProcessorNode` from the Wasm module
+    const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
+      debug: false,
+    });
+    const audioContext = new AudioContext();
+    const faustInstance: FaustModuleInstance = await converterInstance.getNode(
+      wasmInstance,
+      audioContext,
+      1024
+    );
+
+    const microphoneStream = await getMicrophoneStream();
+    const source = audioContext.createMediaStreamSource(microphoneStream);
+
+    source.connect(faustInstance);
+    faustInstance.connect(audioContext.destination);
+
+    faustInstance.setParamValue('/rain/density', 1.4);
+    faustInstance.setParamValue('/rain/volume', 0.4);
+
+    console.log({ dspDefProps });
+  };
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
-      <ReactAce
-        theme='twilight'
-        mode='text'
-        showPrintMargin={false}
-        onChange={newValue => {
-          onChange(newValue);
-          setValue(newValue);
-        }}
-        name='ace-editor'
-        width='40vw'
-        value={value}
-      />
+      <div style={styles.root}>
+        <ReactAce
+          theme='twilight'
+          mode='text'
+          showPrintMargin={false}
+          onChange={newValue => {
+            onChange(newValue);
+            setValue(newValue);
+          }}
+          name='ace-editor'
+          width='40vw'
+          value={value}
+        />
 
-      <button
-        onClick={async () => {
-          const formData = new FormData();
-          formData.append('code.faust', new Blob([value], { type: 'text/plain' }));
+        <div style={styles.errorConsole}>{compileErrMsg}</div>
+      </div>
 
-          const res = await fetch('https://faust.ameo.design/compile', {
-            method: 'POST',
-            // headers: { 'Content-Type': 'multipart/form-data' },
-            body: formData,
-          });
-
-          const arrayBuffer = await res.arrayBuffer();
-
-          const compiledModule = await WebAssembly.compile(arrayBuffer);
-          const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
-          console.log(wasmInstance);
-
-          const dspDefProps = {
-            name: 'hello.faust',
-            filename: 'hello.faust',
-            version: '2.17.6',
-            compile_options: '-scal -ftz 0',
-            library_list: [
-              '/usr/local/share/faust/stdfaust.lib',
-              '/usr/local/share/faust/misceffects.lib',
-              '/usr/local/share/faust/maths.lib',
-              '/usr/local/share/faust/delays.lib',
-            ],
-            include_pathnames: [
-              '/usr/local/share/faust',
-              '/usr/local/share/faust',
-              '/usr/share/faust',
-              '.',
-              '/home/casey/web-synth/faust-compiler',
-            ],
-            size: '524304',
-            inputs: '1',
-            outputs: '1',
-            meta: [
-              { 'delays.lib/name': 'Faust Delay Library' },
-              { 'delays.lib/version': '0.1' },
-              { filename: 'hello.faust' },
-              { 'maths.lib/author': 'GRAME' },
-              { 'maths.lib/copyright': 'GRAME' },
-              { 'maths.lib/license': 'LGPL with exception' },
-              { 'maths.lib/name': 'Faust Math Library' },
-              { 'maths.lib/version': '2.1' },
-              { 'misceffects.lib/name': 'Faust Math Library' },
-              { 'misceffects.lib/version': '2.0' },
-              { name: 'hello.faust' },
-            ],
-            ui: [{ type: 'vgroup', label: 'hello.faust', items: [] }],
-          }; // TODO: Get this from the API as well
-
-          // Create a `ScriptProcessorNode` from the Wasm module
-          const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
-            debug: false,
-          });
-          const audioContext = new AudioContext();
-          const scriptNode: ScriptProcessorNode = await converterInstance.getNode(
-            wasmInstance,
-            audioContext,
-            1024
-          );
-          console.log('Created node: ', scriptNode);
-
-          const microphoneStream = await getMicrophoneStream();
-          const source = audioContext.createMediaStreamSource(microphoneStream);
-          console.log(source.connect);
-
-          source.connect(scriptNode);
-          scriptNode.connect(audioContext.destination);
-        }}
-      >
-        Compile
-      </button>
+      <button onClick={handleCompileButtonClick}>Compile</button>
     </Suspense>
   );
 };

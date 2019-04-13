@@ -1,30 +1,37 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
+	"regexp"
 )
 
-func compile(srcFilePath string, dstFilePath string) (err error) {
-	_, err = exec.Command("faust", "-lang", "wasm", "-o", dstFilePath, srcFilePath).Output()
+func compile(srcFilePath string, tmpFileBaseName string) (stderr bytes.Buffer, err error) {
+	// Compile the Faust code, producing an output wasm file as well as an output JS file
+	cmd := exec.Command("faust", "-lang", "wasm", "-o", fmt.Sprintf("%s.wasm", tmpFileBaseName), srcFilePath)
 
-	if err != nil {
-		return err
-	}
+	var outb, errb bytes.Buffer
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
 
-	return nil
+	err = cmd.Run()
+
+	return errb, err
 }
 
 func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
+	// Add CORS headers
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
+	resWriter.Header().Set("Access-Control-Expose-Headers", "X-Json-Module-Definition")
 
 	if req.Method == "POST" {
 		req.ParseMultipartForm(10e8)
 	} else if req.Method == "HEAD" {
-		resWriter.WriteHeader(200)
+		resWriter.WriteHeader(204)
 		return
 	} else {
 		resWriter.WriteHeader(405)
@@ -53,7 +60,9 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	dsttempfile, err := ioutil.TempFile("", "wasm-output")
 	if err != nil {
 		fmt.Println(err)
-		http.Error(resWriter, "Error creating temporary file", 500)
+		errMsg := "Error creating temporary file"
+		http.Error(resWriter, errMsg, 500)
+		resWriter.Write([]byte(errMsg))
 		return
 	}
 
@@ -61,16 +70,43 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	io.Copy(srctmpfile, uploadedFile)
 
 	// Compile the tempfile into WebAssembly
-	err = compile(srctmpfile.Name(), dsttempfile.Name())
+	stderr, err := compile(srctmpfile.Name(), dsttempfile.Name())
 
 	if err != nil {
 		resWriter.WriteHeader(400)
-		fmt.Println(err)
+		resWriter.Write(stderr.Bytes())
 		return
 	}
 
+	// Open the created JS file containing the JSON definition of the created Wasm module
+	jsfileContentBytes, err := ioutil.ReadFile(fmt.Sprintf("%s.js", dsttempfile.Name()))
+	if err != nil {
+		resWriter.WriteHeader(500)
+		fmt.Println("Error while opening output JS file", err)
+		resWriter.Write([]byte("Error while opening output JS file"))
+		return
+	}
+	jsFileContent := string(jsfileContentBytes)
+
+	// Extract the JSON definition from the JS file
+	pattern := regexp.MustCompile("return '(?P<Json>(?:.|\n)+)';")
+	match := pattern.FindStringSubmatch(jsFileContent)
+	if len(match) < 1 {
+		resWriter.WriteHeader(500)
+		errMsg := "Error while extracting JSON definition from output JS file; Regex didn't match capture group."
+		resWriter.Write([]byte(errMsg))
+		return
+	}
+
+	jsonDefinition := match[1]
+
+	// Append the JSON definition as a HTTP header of the response
+	resWriter.Header().Set("X-Json-Module-Definition", jsonDefinition)
+
 	// Send the file back to the user
-	http.ServeFile(resWriter, req, dsttempfile.Name())
+	http.ServeFile(resWriter, req, fmt.Sprintf("%s.wasm", dsttempfile.Name()))
+
+	// Clean up the tempfiles
 }
 
 func main() {
