@@ -1,5 +1,5 @@
 declare module 'tone';
-declare module 'tone/*/**';
+declare module 'tone/Tone/*';
 declare module 'react-control-panel';
 
 interface FaustModuleInstance extends ScriptProcessorNode {

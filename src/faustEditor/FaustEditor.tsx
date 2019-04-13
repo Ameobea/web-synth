@@ -1,5 +1,7 @@
 import React, { Suspense, useState } from 'react';
 import ace from 'ace-builds';
+import * as R from 'ramda';
+import ControlPanel from 'react-control-panel';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
@@ -110,9 +112,66 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
+interface BaseUiDef {
+  type: string;
+  label: string;
+  address: string;
+}
+
+type UiDefExtra = { min: number; max: number; step: number; init: number };
+
+type UiDef = BaseUiDef & UiDefExtra;
+
+type UiGroup = { items: UiDef[]; label: string; type: string };
+
+const buildControlPanelField = (def: UiDef): {} | null => {
+  const mapper = {
+    hslider: ({ address, min, max, init, step }: UiDef) => ({
+      type: 'range',
+      label: address,
+      min,
+      max,
+      initial: init,
+      step,
+    }),
+  }[def.type];
+
+  if (!mapper) {
+    console.warn(`Unable to build UI field of type ${def.type}`);
+    return null;
+  }
+
+  return mapper(def);
+};
+
+const mapUiGroupToControlPanelFields = (group: UiGroup): {}[] =>
+  group.items.map(buildControlPanelField).filter((group): group is {} => !!group);
+
+const buildControlPanel = (
+  uiDef: UiGroup[],
+  setParamValue: FaustModuleInstance['setParamValue']
+) => {
+  const controlPanelFieldDefinitions = uiDef.flatMap(mapUiGroupToControlPanelFields);
+
+  if (R.isEmpty(controlPanelFieldDefinitions)) {
+    return null;
+  }
+
+  return (
+    <ControlPanel
+      draggable
+      theme='dark'
+      position='top-right'
+      settings={controlPanelFieldDefinitions}
+      onChange={setParamValue}
+    />
+  );
+};
+
 const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEditorProps) => {
   const [value, setValue] = useState(initialContent);
   const [compileErrMsg, setCompileErrMsg] = useState('');
+  const [controlPanel, setControlPanel] = useState<React.ReactNode>(null);
 
   const handleCompileButtonClick = async () => {
     const formData = new FormData();
@@ -135,6 +194,8 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
       setCompileErrMsg("The `X-Json-Module-Definition` header wasn't set on the response.");
       return;
     }
+
+    setCompileErrMsg('');
     const dspDefProps = JSON.parse(jsonModuleDefString);
 
     const arrayBuffer = await res.arrayBuffer();
@@ -143,7 +204,7 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
     const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
     console.log(wasmInstance);
 
-    // Create a `ScriptProcessorNode` from the Wasm module
+    // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
     const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
       debug: false,
     });
@@ -160,8 +221,7 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
     source.connect(faustInstance);
     faustInstance.connect(audioContext.destination);
 
-    faustInstance.setParamValue('/rain/density', 1.4);
-    faustInstance.setParamValue('/rain/volume', 0.4);
+    setControlPanel(buildControlPanel(dspDefProps.ui, faustInstance.setParamValue));
 
     console.log({ dspDefProps });
   };
@@ -186,6 +246,7 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
       </div>
 
       <button onClick={handleCompileButtonClick}>Compile</button>
+      {controlPanel}
     </Suspense>
   );
 };
