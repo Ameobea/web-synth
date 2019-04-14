@@ -114,7 +114,15 @@ pub fn switch_view_context(uuid_str: &str) {
 }
 
 #[wasm_bindgen]
-pub fn reset_vcm() { get_vcm().reset(); }
+pub fn reset_vcm() {
+    info!("Resetting VCM...");
+    get_vcm().reset();
+    info!(
+        "Finished reset; current context count: {}, active_ix: {}",
+        get_vcm().contexts.len(),
+        get_vcm().active_context_ix
+    );
+}
 
 #[wasm_bindgen]
 pub fn set_vc_title(uuid_str: String, title: String) {

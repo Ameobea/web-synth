@@ -13,25 +13,26 @@ pub struct FaustEditor {
     pub uuid: Uuid,
 }
 
-fn get_state_key(uuid: Uuid) -> String { format!("faustEditor_{}", uuid) }
-
 impl FaustEditor {
     fn get_editor_text(&self) -> String {
-        js::get_localstorage_key(&get_state_key(self.uuid)).unwrap_or_else(|| "".into())
+        js::get_localstorage_key(&self.get_state_key()).unwrap_or_else(|| "".into())
     }
 
     pub fn new(uuid: Uuid) -> Self { FaustEditor { uuid } }
+
+    pub fn get_state_key(&self) -> String { format!("faustEditor_{}", self.uuid) }
 }
 
 impl ViewContext for FaustEditor {
+
     fn init(&mut self) { js::init_faust_editor(&self.get_editor_text()); }
 
     fn cleanup(&mut self) {
         let faust_editor_content = js::cleanup_faust_editor();
-        js::set_localstorage_key(&get_state_key(self.uuid), &faust_editor_content)
+        js::set_localstorage_key(&self.get_state_key(), &faust_editor_content)
     }
 
-    fn dispose(&mut self) { js::delete_localstorage_key(&get_state_key(self.uuid)); }
+    fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn save(&mut self) -> String {
         serde_json::to_string(self).expect("Error serializing `FaustEditor` to String")

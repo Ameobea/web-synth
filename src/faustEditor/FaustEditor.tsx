@@ -13,6 +13,17 @@ interface FaustEditorProps {
   onChange: (newState: string) => void;
 }
 
+interface FaustModuleInstance extends ScriptProcessorNode {
+  getParamValue: (path: string) => number;
+  setParamValue: (path: string, val: number) => void;
+}
+
+declare class FaustWasm2ScriptProcessor {
+  constructor(name: string, props: {}, options: {});
+
+  getNode(wasmInstance: any, audioContext: AudioContext, bufferSize: number): FaustModuleInstance;
+}
+
 const { WebAssembly } = window as any;
 
 const FAUST_COMPILER_ENDPOINT =
@@ -110,6 +121,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontFamily: "'Oxygen Mono'",
     maxHeight: 600,
   },
+  buttonsWrapper: {
+    display: 'flex',
+    flexDirection: 'row',
+    padding: 8,
+  },
+  editor: {
+    border: '1px solid #555',
+  },
 };
 
 interface BaseUiDef {
@@ -172,6 +191,7 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
   const [value, setValue] = useState(initialContent);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanel, setControlPanel] = useState<React.ReactNode>(null);
+  const [activeModule, setActiveModule] = useState<FaustModuleInstance | null>(null);
 
   const handleCompileButtonClick = async () => {
     const formData = new FormData();
@@ -204,26 +224,29 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
     const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
     console.log(wasmInstance);
 
+    // Disconnect the old instance if there is one
+    if (activeModule) {
+      activeModule.disconnect();
+    }
+
     // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
     const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
       debug: false,
     });
     const audioContext = new AudioContext();
-    const faustInstance: FaustModuleInstance = await converterInstance.getNode(
-      wasmInstance,
-      audioContext,
-      1024
-    );
+    const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 1024);
 
     const microphoneStream = await getMicrophoneStream();
     const source = audioContext.createMediaStreamSource(microphoneStream);
 
+    // Wire up the microphone to the module and then connect the module to the audo context's output (speakers)
     source.connect(faustInstance);
     faustInstance.connect(audioContext.destination);
 
+    // Construct a new control panel instance for the newly created module
     setControlPanel(buildControlPanel(dspDefProps.ui, faustInstance.setParamValue));
 
-    console.log({ dspDefProps });
+    setActiveModule(faustInstance);
   };
 
   return (
@@ -240,12 +263,26 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
           name='ace-editor'
           width='40vw'
           value={value}
+          style={styles.editor}
         />
 
         <div style={styles.errorConsole}>{compileErrMsg}</div>
       </div>
 
-      <button onClick={handleCompileButtonClick}>Compile</button>
+      <div style={styles.buttonsWrapper}>
+        <button onClick={handleCompileButtonClick}>Compile</button>
+        {activeModule ? (
+          <button
+            onClick={() => {
+              activeModule.disconnect();
+              setActiveModule(null);
+              setControlPanel(null);
+            }}
+          >
+            Stop
+          </button>
+        ) : null}
+      </div>
       {controlPanel}
     </Suspense>
   );

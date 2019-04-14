@@ -1,11 +1,10 @@
-use std::mem;
-
 use serde_json;
 use uuid::Uuid;
 
 use super::{
     super::views::{
-        clip_compositor::mk_clip_compositor, faust_editor::mk_faust_editor,
+        clip_compositor::mk_clip_compositor,
+        faust_editor::{mk_faust_editor, FaustEditor},
         midi_editor::mk_midi_editor,
     },
     ViewContext,
@@ -167,15 +166,39 @@ impl ViewContextManager {
     /// Initializes the VCM with the default view context and state from scratch
     fn init_default_state(&mut self) {
         let uuid = uuid_v4();
+        // Create a MIDI Editor view context
         let view_context = build_view("midi_editor", None, uuid);
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid: uuid_v4(),
+                uuid,
                 name: "midi_editor".into(),
                 title: None,
             },
             view_context,
         );
+
+        // Create a Faust Editor view context
+        let uuid = uuid_v4();
+        let faust_editor = FaustEditor { uuid };
+        let state_key = faust_editor.get_state_key();
+        let view_context = build_view(
+            "faust_editor",
+            Some(&serde_json::to_string(&faust_editor).unwrap()),
+            uuid,
+        );
+        self.add_view_context_inner(
+            MinimalViewContextDefinition {
+                uuid,
+                name: "faust_editor".into(),
+                title: None,
+            },
+            view_context,
+        );
+
+        let faust_editor_content = include_str!("../../static/rain.dsp");
+        js::set_localstorage_key(&state_key, faust_editor_content);
+
+        self.active_context_ix = 1;
     }
 
     fn load_vcm_state() -> Option<ViewContextManagerState> {
@@ -306,20 +329,21 @@ impl ViewContextManager {
 
     /// Resets the VCM to its initial state, deleting all existing VCs.
     pub fn reset(&mut self) {
-        // clean-up the active VC first
-        self.get_active_view_mut().cleanup();
-
         // Delete + dispose all stored VCs
-        let contexts_to_delete = mem::replace(&mut self.contexts, Vec::new());
-        for vcm_entry in contexts_to_delete {
-            self.delete_vc_by_id(vcm_entry.definition.uuid);
+        let contexts_to_delete: Vec<Uuid> = self
+            .contexts
+            .iter()
+            .map(|entry| entry.definition.uuid)
+            .collect();
+        for uuid in contexts_to_delete {
+            self.delete_vc_by_id(uuid);
         }
 
         // Delete the VCM root state key itself
         js::delete_localstorage_key(VCM_STATE_KEY);
 
         // Re-initialize from scratch
-        self.active_context_ix = 0;
+        self.contexts.clear();
         self.init();
     }
 }
