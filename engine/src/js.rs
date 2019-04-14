@@ -62,7 +62,7 @@ pub fn js_random() -> f64 { random() }
 
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {
-    pub fn init_faust_editor(editor_text: &str);
+    pub fn init_faust_editor(state_key: &str);
 
     pub fn cleanup_faust_editor() -> String;
 

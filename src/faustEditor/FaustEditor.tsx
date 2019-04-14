@@ -1,27 +1,25 @@
 import React, { Suspense, useState } from 'react';
+import { connect } from 'react-redux';
 import ace from 'ace-builds';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
+import { State as ReduxState } from '../redux';
+import { actionCreators } from '../redux/reducers/faustEditor';
+import buildControlPanel from './uiBuilder';
+import buildInstance from './buildInstance';
+
+const { setActiveInstance, clearActiveInstance, setEditorContent } = actionCreators;
+
 ace.require('ace/theme/twilight');
 
 const ReactAce = React.lazy(() => import('react-ace'));
 
-interface FaustEditorProps {
-  onChange: (newState: string) => void;
-}
-
-interface FaustModuleInstance extends ScriptProcessorNode {
+export interface FaustModuleInstance extends ScriptProcessorNode {
   getParamValue: (path: string) => number;
   setParamValue: (path: string, val: number) => void;
-}
-
-declare class FaustWasm2ScriptProcessor {
-  constructor(name: string, props: {}, options: {});
-
-  getNode(wasmInstance: any, audioContext: AudioContext, bufferSize: number): FaustModuleInstance;
 }
 
 const { WebAssembly } = window as any;
@@ -96,14 +94,6 @@ const importObject = {
   },
 };
 
-const getMicrophoneStream = (): Promise<MediaStream> =>
-  new Promise((fulfill, reject) => {
-    if (navigator.getUserMedia) {
-      navigator.getUserMedia({ audio: true }, fulfill, reject);
-    }
-    fulfill(navigator.mediaDevices.getUserMedia({ audio: true }));
-  });
-
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
     display: 'flex',
@@ -131,71 +121,40 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-interface BaseUiDef {
-  type: string;
-  label: string;
-  address: string;
-}
+type StateProps = Pick<ReduxState['faustEditor'], 'instance' | 'controlPanel' | 'editorContent'>;
 
-type UiDefExtra = { min: number; max: number; step: number; init: number };
+const mapDispatchToProps = { setActiveInstance, clearActiveInstance, setEditorContent };
 
-type UiDef = BaseUiDef & UiDefExtra;
+type DispatchProps = typeof mapDispatchToProps;
 
-type UiGroup = { items: UiDef[]; label: string; type: string };
+type FaustEditorProps = StateProps & DispatchProps & { children: undefined };
 
-const buildControlPanelField = (def: UiDef): {} | null => {
-  const mapper = {
-    hslider: ({ address, min, max, init, step }: UiDef) => ({
-      type: 'range',
-      label: address,
-      min,
-      max,
-      initial: init,
-      step,
-    }),
-  }[def.type];
+const mapStateToProps = ({ faustEditor }: ReduxState) => ({
+  instance: faustEditor.instance,
+  controlPanel: faustEditor.controlPanel,
+  editorContent: faustEditor.editorContent,
+});
 
-  if (!mapper) {
-    console.warn(`Unable to build UI field of type ${def.type}`);
-    return null;
-  }
+const enhance = connect<StateProps, DispatchProps, {}>(
+  mapStateToProps,
+  mapDispatchToProps
+);
 
-  return mapper(def);
-};
-
-const mapUiGroupToControlPanelFields = (group: UiGroup): {}[] =>
-  group.items.map(buildControlPanelField).filter((group): group is {} => !!group);
-
-const buildControlPanel = (
-  uiDef: UiGroup[],
-  setParamValue: FaustModuleInstance['setParamValue']
-) => {
-  const controlPanelFieldDefinitions = uiDef.flatMap(mapUiGroupToControlPanelFields);
-
-  if (R.isEmpty(controlPanelFieldDefinitions)) {
-    return null;
-  }
-
-  return (
-    <ControlPanel
-      draggable
-      theme='dark'
-      position='top-right'
-      settings={controlPanelFieldDefinitions}
-      onChange={setParamValue}
-    />
-  );
-};
-
-const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEditorProps) => {
-  const [value, setValue] = useState(initialContent);
+const FaustEditor: React.FunctionComponent<{}> = ({
+  instance,
+  controlPanel,
+  editorContent,
+  setActiveInstance,
+  clearActiveInstance,
+  setEditorContent,
+}: FaustEditorProps) => {
   const [compileErrMsg, setCompileErrMsg] = useState('');
-  const [controlPanel, setControlPanel] = useState<React.ReactNode>(null);
-  const [activeModule, setActiveModule] = useState<FaustModuleInstance | null>(null);
 
+  // TODO: Memoize/optimize.  Shouldn't have to re-build this whole thing every time the editor
+  // text changes.
   const handleCompileButtonClick = async () => {
     const formData = new FormData();
-    formData.append('code.faust', new Blob([value], { type: 'text/plain' }));
+    formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
 
     const res = await fetch(FAUST_COMPILER_ENDPOINT, {
       method: 'POST',
@@ -222,31 +181,9 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
 
     const compiledModule = await WebAssembly.compile(arrayBuffer);
     const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
-    console.log(wasmInstance);
 
-    // Disconnect the old instance if there is one
-    if (activeModule) {
-      activeModule.disconnect();
-    }
-
-    // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
-    const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
-      debug: false,
-    });
-    const audioContext = new AudioContext();
-    const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 1024);
-
-    const microphoneStream = await getMicrophoneStream();
-    const source = audioContext.createMediaStreamSource(microphoneStream);
-
-    // Wire up the microphone to the module and then connect the module to the audo context's output (speakers)
-    source.connect(faustInstance);
-    faustInstance.connect(audioContext.destination);
-
-    // Construct a new control panel instance for the newly created module
-    setControlPanel(buildControlPanel(dspDefProps.ui, faustInstance.setParamValue));
-
-    setActiveModule(faustInstance);
+    const faustInstance = await buildInstance(wasmInstance, dspDefProps);
+    setActiveInstance(faustInstance, dspDefProps);
   };
 
   return (
@@ -256,13 +193,10 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
           theme='twilight'
           mode='text'
           showPrintMargin={false}
-          onChange={newValue => {
-            onChange(newValue);
-            setValue(newValue);
-          }}
+          onChange={newValue => setEditorContent(newValue)}
           name='ace-editor'
           width='40vw'
-          value={value}
+          value={editorContent}
           style={styles.editor}
         />
 
@@ -271,21 +205,13 @@ const mkFaustEditor = (initialContent: string = '') => ({ onChange }: FaustEdito
 
       <div style={styles.buttonsWrapper}>
         <button onClick={handleCompileButtonClick}>Compile</button>
-        {activeModule ? (
-          <button
-            onClick={() => {
-              activeModule.disconnect();
-              setActiveModule(null);
-              setControlPanel(null);
-            }}
-          >
-            Stop
-          </button>
-        ) : null}
+        {instance ? <button onClick={clearActiveInstance}>Stop</button> : null}
       </div>
       {controlPanel}
     </Suspense>
   );
 };
 
-export default mkFaustEditor;
+const EnhancedFaustEditor = enhance(FaustEditor);
+
+export default EnhancedFaustEditor;

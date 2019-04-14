@@ -6,13 +6,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 )
 
-func compile(srcFilePath string, tmpFileBaseName string) (stderr bytes.Buffer, err error) {
+func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, err error) {
 	// Compile the Faust code, producing an output wasm file as well as an output JS file
-	cmd := exec.Command("faust", "-lang", "wasm", "-o", fmt.Sprintf("%s.wasm", tmpFileBaseName), srcFilePath)
+	cmd := exec.Command("faust", "-lang", "wasm", "-o", outWasmFileName, srcFilePath)
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
@@ -66,11 +67,15 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	tmpFileBaseName := dsttempfile.Name()
+	outWasmFileName := fmt.Sprintf("%s.wasm", tmpFileBaseName)
+	outJsFileName := fmt.Sprintf("%s.js", tmpFileBaseName)
+
 	// Copy the uploaded file to the tempfile
 	io.Copy(srctmpfile, uploadedFile)
 
 	// Compile the tempfile into WebAssembly
-	stderr, err := compile(srctmpfile.Name(), dsttempfile.Name())
+	stderr, err := compile(srctmpfile.Name(), outWasmFileName)
 
 	if err != nil {
 		resWriter.WriteHeader(400)
@@ -79,7 +84,7 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	}
 
 	// Open the created JS file containing the JSON definition of the created Wasm module
-	jsfileContentBytes, err := ioutil.ReadFile(fmt.Sprintf("%s.js", dsttempfile.Name()))
+	jsfileContentBytes, err := ioutil.ReadFile(outJsFileName)
 	if err != nil {
 		resWriter.WriteHeader(500)
 		fmt.Println("Error while opening output JS file", err)
@@ -104,9 +109,12 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	resWriter.Header().Set("X-Json-Module-Definition", jsonDefinition)
 
 	// Send the file back to the user
-	http.ServeFile(resWriter, req, fmt.Sprintf("%s.wasm", dsttempfile.Name()))
+	http.ServeFile(resWriter, req, outWasmFileName)
 
 	// Clean up the tempfiles
+	os.Remove(outWasmFileName)
+	os.Remove(outJsFileName)
+	os.Remove(tmpFileBaseName)
 }
 
 func main() {
