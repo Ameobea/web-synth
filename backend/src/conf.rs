@@ -9,7 +9,8 @@ impl Default for Conf {
         dotenv::dotenv().expect("Unable to parse .env file!");
 
         Conf {
-            db_url: dotenv::var("DB_URL").expect("The `DB_URL` environment variable must be supplied!")
+            db_url: dotenv::var("DATABASE_URL")
+                .expect("The `DATABASE_URL` environment variable must be supplied!"),
         }
     }
 }
