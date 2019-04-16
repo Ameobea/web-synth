@@ -1,15 +1,20 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useState, useCallback } from 'react';
 import { connect } from 'react-redux';
 import ace from 'ace-builds';
+import ControlPanel, { Button, Custom } from 'react-control-panel';
 import * as R from 'ramda';
-import ControlPanel from 'react-control-panel';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
 import { State as ReduxState } from '../redux';
 import { actionCreators } from '../redux/reducers/faustEditor';
+import { Effect } from '../redux/reducers/effects';
 import buildControlPanel from './uiBuilder';
 import buildInstance from './buildInstance';
+import importObject from './faustModuleImportObject';
+import { EffectPickerCustomInput } from '../controls/faustEditor';
+import { BACKEND_BASE_URL } from '../conf';
+import { Without } from '../types';
 
 const { setActiveInstance, clearActiveInstance, setEditorContent } = actionCreators;
 
@@ -22,77 +27,10 @@ export interface FaustModuleInstance extends ScriptProcessorNode {
   setParamValue: (path: string, val: number) => void;
 }
 
-const { WebAssembly } = window as any;
-
 const FAUST_COMPILER_ENDPOINT =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:4565/compile'
     : 'https://faust.ameo.design/compile';
-
-// Stolen from Faust code
-const importObject = {
-  env: {
-    memoryBase: 0,
-    tableBase: 0,
-    _abs: Math.abs,
-
-    // Float version
-    _acosf: Math.acos,
-    _asinf: Math.asin,
-    _atanf: Math.atan,
-    _atan2f: Math.atan2,
-    _ceilf: Math.ceil,
-    _cosf: Math.cos,
-    _expf: Math.exp,
-    _floorf: Math.floor,
-    _fmodf: (x: number, y: number) => x % y,
-    _logf: Math.log,
-    _log10f: Math.log10,
-    _max_f: Math.max,
-    _min_f: Math.min,
-    _remainderf: (x: number, y: number) => x - Math.round(x / y) * y,
-    _powf: Math.pow,
-    _roundf: Math.fround,
-    _sinf: Math.sin,
-    _sqrtf: Math.sqrt,
-    _tanf: Math.tan,
-    _acoshf: Math.acosh,
-    _asinhf: Math.asinh,
-    _atanhf: Math.atanh,
-    _coshf: Math.cosh,
-    _sinhf: Math.sinh,
-    _tanhf: Math.tanh,
-
-    // Double version
-    _acos: Math.acos,
-    _asin: Math.asin,
-    _atan: Math.atan,
-    _atan2: Math.atan2,
-    _ceil: Math.ceil,
-    _cos: Math.cos,
-    _exp: Math.exp,
-    _floor: Math.floor,
-    _fmod: (x: number, y: number) => x % y,
-    _log: Math.log,
-    _log10: Math.log10,
-    _max_: Math.max,
-    _min_: Math.min,
-    _remainder: (x: number, y: number) => x - Math.round(x / y) * y,
-    _pow: Math.pow,
-    _round: Math.fround,
-    _sin: Math.sin,
-    _sqrt: Math.sqrt,
-    _tan: Math.tan,
-    _acosh: Math.acosh,
-    _asinh: Math.asinh,
-    _atanh: Math.atanh,
-    _cosh: Math.cosh,
-    _sinh: Math.sinh,
-    _tanh: Math.tanh,
-
-    table: new WebAssembly.Table({ initial: 0, element: 'anyfunc' }),
-  },
-};
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -110,6 +48,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     marginLeft: 10,
     fontFamily: "'Oxygen Mono'",
     maxHeight: 600,
+    border: '1px solid #555',
+    backgroundColor: 'rgba(44,44,44,0.3)',
+    maxWidth: '40vw',
   },
   buttonsWrapper: {
     display: 'flex',
@@ -140,51 +81,140 @@ const enhance = connect<StateProps, DispatchProps, {}>(
   mapDispatchToProps
 );
 
+const createCompileButtonClickHandler = (
+  editorContent: string,
+  setCompileErrMsg: (errMsg: string) => void,
+  setActiveInstance: (faustInstance: FaustModuleInstance, dspDefProps: Object) => void
+) => async () => {
+  const formData = new FormData();
+  formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
+
+  const res = await fetch(FAUST_COMPILER_ENDPOINT, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errMsg = await res.text();
+    setCompileErrMsg(errMsg);
+    return;
+  }
+
+  // The JSON definition for the module is set as a HTTP header, which we must extract and parse.
+  const jsonModuleDefString = res.headers.get('X-Json-Module-Definition');
+  if (!jsonModuleDefString) {
+    setCompileErrMsg("The `X-Json-Module-Definition` header wasn't set on the response.");
+    return;
+  }
+
+  setCompileErrMsg('');
+  const dspDefProps = JSON.parse(jsonModuleDefString);
+
+  const arrayBuffer = await res.arrayBuffer();
+
+  const compiledModule = await WebAssembly.compile(arrayBuffer);
+  const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
+
+  const faustInstance = await buildInstance(wasmInstance, dspDefProps);
+  setActiveInstance(faustInstance, dspDefProps);
+};
+
+interface EffectsPickerPanelPassedProps {
+  state: Object;
+  setState: (newState: Object) => void;
+  loadEffect: (effect: Effect) => void;
+}
+
+interface EffectsPickerReduxProps {
+  effects: Effect[];
+}
+
+type EffectsPickerPannelProps = EffectsPickerPanelPassedProps & EffectsPickerReduxProps;
+
+/**
+ * Creates a control panel that contains controls for browsing + loading shared/saved effects
+ */
+const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanelPassedProps> = ({
+  state,
+  setState,
+  loadEffect,
+  effects,
+}: EffectsPickerPannelProps) => (
+  <ControlPanel
+    state={state}
+    onChange={(_label: string, _newValue: any, newState: Object) => setState(newState)}
+    position='bottom-right'
+    draggable
+  >
+    <Custom label='load effect' renderContainer Comp={EffectPickerCustomInput} />
+    <Button
+      label='Load'
+      action={() => loadEffect(effects.find(R.propEq('id', state['load effect']))!)}
+    />
+  </ControlPanel>
+);
+
+const EffectsPickerPanel = connect<
+  { effects: Effect[] },
+  {},
+  EffectsPickerPanelPassedProps,
+  ReduxState
+>(({ effects: { sharedEffects } }) => ({
+  effects: sharedEffects,
+}))(EffectsPickerPanelInner);
+
+const saveCode = async (effect: Without<Effect, 'id'>) => {
+  const res = await fetch(`${BACKEND_BASE_URL}/effects`, {
+    method: 'POST',
+    body: JSON.stringify(effect),
+  });
+  if (!res.ok) {
+    console.error(`Error saving code: ${await res.text()}`);
+  }
+};
+
+const SaveControls = ({ editorContent }: { editorContent: string }) => {
+  const [state, setState] = useState({ title: '', description: '' });
+
+  return (
+    <div>
+      <p>
+        Title{' '}
+        <input
+          type='text'
+          value={state.title}
+          onChange={evt => setState({ ...state, title: evt.target.value })}
+        />
+      </p>
+
+      <p>
+        Description{' '}
+        <textarea
+          value={state.description}
+          onChange={evt => setState({ ...state, description: evt.target.value })}
+        />
+      </p>
+
+      <button onClick={() => saveCode({ code: editorContent, ...state })}>Save</button>
+    </div>
+  );
+};
+
 const FaustEditor: React.FunctionComponent<{}> = ({
   instance,
-  controlPanel,
+  controlPanel: faustInstanceControlPanel,
   editorContent,
   setActiveInstance,
   clearActiveInstance,
   setEditorContent,
 }: FaustEditorProps) => {
   const [compileErrMsg, setCompileErrMsg] = useState('');
+  const [controlPanelState, setControlPanelState] = useState({});
 
-  // TODO: Memoize/optimize.  Shouldn't have to re-build this whole thing every time the editor
-  // text changes.
-  const handleCompileButtonClick = async () => {
-    const formData = new FormData();
-    formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
-
-    const res = await fetch(FAUST_COMPILER_ENDPOINT, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const errMsg = await res.text();
-      setCompileErrMsg(errMsg);
-      return;
-    }
-
-    // The JSON definition for the module is set as a HTTP header, which we must extract and parse.
-    const jsonModuleDefString = res.headers.get('X-Json-Module-Definition');
-    if (!jsonModuleDefString) {
-      setCompileErrMsg("The `X-Json-Module-Definition` header wasn't set on the response.");
-      return;
-    }
-
-    setCompileErrMsg('');
-    const dspDefProps = JSON.parse(jsonModuleDefString);
-
-    const arrayBuffer = await res.arrayBuffer();
-
-    const compiledModule = await WebAssembly.compile(arrayBuffer);
-    const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
-
-    const faustInstance = await buildInstance(wasmInstance, dspDefProps);
-    setActiveInstance(faustInstance, dspDefProps);
-  };
+  const handleCompileButtonClick = useCallback(
+    createCompileButtonClickHandler(editorContent, setCompileErrMsg, setActiveInstance),
+    [editorContent, setCompileErrMsg, setActiveInstance]
+  );
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
@@ -204,10 +234,21 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       </div>
 
       <div style={styles.buttonsWrapper}>
-        <button onClick={handleCompileButtonClick}>Compile</button>
+        <button onClick={handleCompileButtonClick} style={{ marginRight: 10 }}>
+          Compile
+        </button>
         {instance ? <button onClick={clearActiveInstance}>Stop</button> : null}
       </div>
-      {controlPanel}
+
+      <SaveControls editorContent={editorContent} />
+
+      {faustInstanceControlPanel}
+
+      <EffectsPickerPanel
+        state={controlPanelState}
+        setState={setControlPanelState}
+        loadEffect={(effect: Effect) => setEditorContent(effect.code)}
+      />
     </Suspense>
   );
 };

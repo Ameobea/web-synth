@@ -8,11 +8,13 @@ import { StateType, ActionType } from 'typesafe-actions';
 import synthsReducer from './reducers/synths';
 import viewContextManagerReducer from './reducers/viewContextManager';
 import faustEditorReducer from './reducers/faustEditor';
+import effectsReducer from './reducers/effects';
 
 const reducers = {
   synths: synthsReducer,
   viewContextManager: viewContextManagerReducer,
   faustEditor: faustEditorReducer,
+  effects: effectsReducer,
 };
 
 const composeEnhancers = (window as any).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;

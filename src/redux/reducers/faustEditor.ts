@@ -54,6 +54,11 @@ const reducer = (state = initialState, action: Action) => {
     }
 
     case CLEAR_ACTIVE_INSTANCE: {
+      // Disconnect the old instance if there is one
+      if (state.instance) {
+        state.instance.disconnect();
+      }
+
       return { ...state, controlPanel: null, instance: null };
     }
 

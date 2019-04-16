@@ -36,6 +36,7 @@
     "semicolon": [true, "always", "ignore-bound-class-methods"],
     "switch-default": true,
     "jsx-no-lambda": false,
+    "jsx-key": "warn",
     "trailing-comma": [
       true,
       {

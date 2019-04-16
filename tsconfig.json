@@ -29,6 +29,7 @@
       "WebAssembly": ["./node_modules/@types/webassembly-js-api/*"]
     }
   },
+  "include": ["./index.d.ts"],
   "exclude": [
     "node_modules",
     "build",
@@ -37,6 +38,9 @@
     "webpack",
     "jest",
     "src/setupTests.ts",
-    "deprecated"
+    "deprecated",
+    "backend",
+    "faust-compiler",
+    "engine"
   ]
 }

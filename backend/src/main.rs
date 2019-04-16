@@ -14,6 +14,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
+use rocket::fairing::{Fairing, Info, Kind};
+use rocket::{http::Method, Request, Response, http::Status};
+
 pub mod conf;
 pub mod models;
 pub mod routes;
@@ -28,6 +31,29 @@ lazy_static! {
 #[database("web_synth")]
 pub struct WebSynthDbConn(diesel::MysqlConnection);
 
+/// Roll-your-own CORS fairing
+struct CorsFairing;
+
+impl Fairing for CorsFairing {
+    fn on_response(&self, request: &Request, response: &mut Response) {
+        response.set_header(rocket::http::Header::new(
+            "Access-Control-Allow-Origin",
+            "*",
+        ));
+
+        if response.status() == Status::NotFound && request.method() == Method::Options {
+            response.set_status(Status::NoContent);
+        }
+    }
+
+    fn info(&self) -> Info {
+        Info {
+            name: "CORS Fairing",
+            kind: Kind::Response,
+        }
+    }
+}
+
 fn main() {
     rocket::ignite()
         .attach(WebSynthDbConn::fairing())
@@ -35,5 +61,6 @@ fn main() {
             "/",
             routes![routes::index, routes::create_effect, routes::list_effects],
         )
+        .attach(CorsFairing)
         .launch();
 }

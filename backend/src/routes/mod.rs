@@ -1,10 +1,10 @@
 use diesel::{self, prelude::*};
 
-use rocket_contrib::json::Json;
-use serde_json;
 use crate::models::effects::{Effect, InsertableEffect};
 use crate::schema;
 use crate::WebSynthDbConn;
+use rocket_contrib::json::Json;
+use serde_json;
 
 #[get("/")]
 pub fn index() -> &'static str {
