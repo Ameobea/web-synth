@@ -2,6 +2,7 @@ const FFT_SIZE = 2048;
 const BUFFER_SIZE = FFT_SIZE / 2;
 const WIDTH = 1200;
 const HEIGHT_MULTIPLIER = 4;
+const INTENSITY_MULTIPLIER = 1.2;
 
 const BUFFER = new Uint8Array(BUFFER_SIZE);
 const PIXEL_BUFFER = new Uint8ClampedArray(BUFFER_SIZE * 4); // RGBA pixel data
@@ -31,9 +32,10 @@ export const initializeSpectrumVisualization = (
 
     for (let i = 0; i < PIXEL_BUFFER.length / HEIGHT_MULTIPLIER; i += 4) {
       for (let j = 0; j < HEIGHT_MULTIPLIER; j++) {
-        PIXEL_BUFFER[i * HEIGHT_MULTIPLIER + j * 4] = BUFFER[i] * 2;
-        PIXEL_BUFFER[i * HEIGHT_MULTIPLIER + j * 4 + 1] = BUFFER[i] * 2;
-        PIXEL_BUFFER[i * HEIGHT_MULTIPLIER + j * 4 + 2] = BUFFER[i] * 2;
+        const value = BUFFER[i] * INTENSITY_MULTIPLIER;
+        PIXEL_BUFFER[i * HEIGHT_MULTIPLIER + j * 4] = value;
+        PIXEL_BUFFER[i * HEIGHT_MULTIPLIER + j * 4 + 1] = value;
+        PIXEL_BUFFER[i * HEIGHT_MULTIPLIER + j * 4 + 2] = value;
       }
     }
 

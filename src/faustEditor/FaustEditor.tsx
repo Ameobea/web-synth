@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useCallback } from 'react';
+import React, { Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { connect } from 'react-redux';
 import ace from 'ace-builds';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
@@ -7,14 +7,16 @@ import * as R from 'ramda';
 import 'ace-builds/webpack-resolver';
 
 import { State as ReduxState } from '../redux';
-import { actionCreators } from '../redux/reducers/faustEditor';
+import { actionCreators, audioContext } from '../redux/reducers/faustEditor';
 import { Effect } from '../redux/reducers/effects';
 import buildControlPanel from './uiBuilder';
-import buildInstance from './buildInstance';
+import buildInstance, { analyzerNode } from './buildInstance';
 import importObject from './faustModuleImportObject';
 import { EffectPickerCustomInput } from '../controls/faustEditor';
 import { BACKEND_BASE_URL } from '../conf';
 import { Without } from '../types';
+import { initializeSpectrumVisualization } from '../visualizations/spectrum';
+import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 
 const { setActiveInstance, clearActiveInstance, setEditorContent } = actionCreators;
 
@@ -155,6 +157,7 @@ const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanel
       label='Load'
       action={() => loadEffect(effects.find(R.propEq('id', state['load effect']))!)}
     />
+    <Custom label='load file' renderContainer={false} Comp={FileUploader} />
   </ControlPanel>
 );
 
@@ -205,6 +208,10 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   );
 };
 
+interface ControlPanelState {
+  'load file'?: FileUploaderValue;
+}
+
 const FaustEditor: React.FunctionComponent<{}> = ({
   instance,
   controlPanel: faustInstanceControlPanel,
@@ -213,13 +220,36 @@ const FaustEditor: React.FunctionComponent<{}> = ({
   clearActiveInstance,
   setEditorContent,
 }: FaustEditorProps) => {
+  const [
+    externalAudioBufferSource,
+    setExternalAudioBufferSource,
+  ] = useState<AudioBufferSourceNode | null>(null);
   const [compileErrMsg, setCompileErrMsg] = useState('');
-  const [controlPanelState, setControlPanelState] = useState({});
+  const [controlPanelState, setControlPanelState] = useState<ControlPanelState>({});
 
   const handleCompileButtonClick = useCallback(
     createCompileButtonClickHandler(editorContent, setCompileErrMsg, setActiveInstance),
     [editorContent, setCompileErrMsg, setActiveInstance]
   );
+
+  useEffect(() => {
+    console.log(controlPanelState);
+    const audioData = controlPanelState['load file'];
+    if (!audioData) {
+      return;
+    }
+
+    audioContext.decodeAudioData(
+      audioData.fileContent,
+      decodedAudioData => {
+        const audioBufferSource = audioContext.createBufferSource();
+        audioBufferSource.buffer = decodedAudioData;
+        audioBufferSource.connect(analyzerNode);
+        setExternalAudioBufferSource(audioBufferSource);
+      },
+      err => setCompileErrMsg(`Error decoding provided audio file: ${err}`)
+    );
+  }, [controlPanelState['load file']]);
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
@@ -243,6 +273,18 @@ const FaustEditor: React.FunctionComponent<{}> = ({
           Compile
         </button>
         {instance ? <button onClick={clearActiveInstance}>Stop</button> : null}
+        {externalAudioBufferSource ? (
+          <button
+            onClick={() => {
+              initializeSpectrumVisualization(analyzerNode, document.getElementById(
+                'spectrum-visualizer'
+              )! as HTMLCanvasElement);
+              externalAudioBufferSource.start(0);
+            }}
+          >
+            Start Audio File Playback
+          </button>
+        ) : null}
       </div>
 
       <SaveControls editorContent={editorContent} />

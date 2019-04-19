@@ -12,7 +12,8 @@ declare class FaustWasm2ScriptProcessor {
   ): FaustModuleInstance;
 }
 
-const { WebAssembly } = window as any;
+export const analyzerNode = audioContext.createAnalyser();
+analyzerNode.connect(audioContext.destination);
 
 const getMicrophoneStream = (): Promise<MediaStream> =>
   new Promise((fulfill, reject) => {
@@ -22,7 +23,7 @@ const getMicrophoneStream = (): Promise<MediaStream> =>
     fulfill(navigator.mediaDevices.getUserMedia({ audio: true }));
   });
 
-const buildInstance = async (wasmInstance: typeof WebAssembly.Instance, dspDefProps: {}) => {
+const buildInstance = async (wasmInstance: WebAssembly.Instance, dspDefProps: {}) => {
   // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
   const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
     debug: false,
@@ -34,14 +35,13 @@ const buildInstance = async (wasmInstance: typeof WebAssembly.Instance, dspDefPr
   const source = audioContext.createMediaStreamSource(microphoneStream);
 
   const canvas = document.getElementById('spectrum-visualizer')! as HTMLCanvasElement;
-  const analyzerNode = audioContext.createAnalyser();
+
   initializeSpectrumVisualization(analyzerNode, canvas);
 
   // Wire up the microphone to the module, connect the module to the analyzer node, and then
   // connect the analyzer node to the audo context's output (speakers)
   source.connect(faustInstance);
   faustInstance.connect(analyzerNode);
-  analyzerNode.connect(audioContext.destination);
 
   return faustInstance;
 };

@@ -6,9 +6,9 @@ import { actionCreators as effectsActionCreators, Effect } from '../redux/reduce
 import { useOnce } from '../hooks';
 import { BACKEND_BASE_URL } from '../conf';
 
-type StateProps = {
+interface StateProps {
   effects: Effect[];
-};
+}
 
 const mapDispatchToProps = {
   addEffects: effectsActionCreators.addEffects,
@@ -25,7 +25,7 @@ type EffectPickerProps = StateProps & DispatchProps & PassedProps;
 
 const fetchEffects = async (): Promise<Effect[]> => {
   const effects = await fetch(`${BACKEND_BASE_URL}/effects`);
-  return await effects.json();
+  return effects.json();
 };
 
 /**
