@@ -32,6 +32,7 @@
     "@types/react-redux": "^7.0.1",
     "@types/webassembly-js-api": "^0.0.3",
     "ace-builds": "^1.4.3",
+    "chroma-js": "^2.0.3",
     "ramda": "^0.25.0",
     "react": "^16.8.2",
     "react-ace": "^6.4.0",

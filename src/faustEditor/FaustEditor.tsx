@@ -15,7 +15,12 @@ import importObject from './faustModuleImportObject';
 import { EffectPickerCustomInput } from '../controls/faustEditor';
 import { BACKEND_BASE_URL } from '../conf';
 import { Without } from '../types';
-import { initializeSpectrumVisualization } from '../visualizations/spectrum';
+import {
+  SpectrumVisualization,
+  initializeSpectrumVisualization,
+  defaultSettingsState as defaultVizSettingsState,
+  SettingsState as VizSettingsState,
+} from '../visualizations/spectrum';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 
 const { setActiveInstance, clearActiveInstance, setEditorContent } = actionCreators;
@@ -212,6 +217,9 @@ interface ControlPanelState {
   'load file'?: FileUploaderValue;
 }
 
+// TODO: fix this bad thing here \/
+let updateVizSettings = null;
+
 const FaustEditor: React.FunctionComponent<{}> = ({
   instance,
   controlPanel: faustInstanceControlPanel,
@@ -226,6 +234,22 @@ const FaustEditor: React.FunctionComponent<{}> = ({
   ] = useState<AudioBufferSourceNode | null>(null);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<ControlPanelState>({});
+  const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState | null>(
+    defaultVizSettingsState
+  );
+  // const [updateVizSettings, setUpdateVizSettings] = useState<
+  //   (newSettings: VizSettingsState) => void
+  // >(null);
+  console.log({ updateVizSettings });
+
+  useEffect(() => {
+    if (!updateVizSettings || !vizSettingsState) {
+      return;
+    }
+
+    console.log('Updating viz settings: ', vizSettingsState);
+    updateVizSettings(vizSettingsState);
+  }, [updateVizSettings, vizSettingsState]);
 
   const handleCompileButtonClick = useCallback(
     createCompileButtonClickHandler(editorContent, setCompileErrMsg, setActiveInstance),
@@ -250,6 +274,8 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       err => setCompileErrMsg(`Error decoding provided audio file: ${err}`)
     );
   }, [controlPanelState['load file']]);
+
+  const canvas = document.getElementById('spectrum-visualizer');
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
@@ -276,9 +302,9 @@ const FaustEditor: React.FunctionComponent<{}> = ({
         {externalAudioBufferSource ? (
           <button
             onClick={() => {
-              initializeSpectrumVisualization(analyzerNode, document.getElementById(
-                'spectrum-visualizer'
-              )! as HTMLCanvasElement);
+              const canvas = document.getElementById('spectrum-visualizer')! as HTMLCanvasElement;
+              const settingsUpdater = initializeSpectrumVisualization(analyzerNode, canvas);
+              updateVizSettings = settingsUpdater;
               externalAudioBufferSource.start(0);
             }}
           >
@@ -288,6 +314,13 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       </div>
 
       <SaveControls editorContent={editorContent} />
+
+      {vizSettingsState ? (
+        <SpectrumVisualization
+          settingsState={vizSettingsState}
+          setSettingsState={setVizSettingsState}
+        />
+      ) : null}
 
       <canvas
         width={1200}
