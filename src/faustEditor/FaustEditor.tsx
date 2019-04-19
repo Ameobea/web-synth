@@ -60,6 +60,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   editor: {
     border: '1px solid #555',
   },
+  spectrumVizCanvas: {
+    backgroundColor: '#000',
+    imageRendering: 'crisp-edges',
+  },
 };
 
 type StateProps = Pick<ReduxState['faustEditor'], 'instance' | 'controlPanel' | 'editorContent'>;
@@ -84,7 +88,7 @@ const enhance = connect<StateProps, DispatchProps, {}>(
 const createCompileButtonClickHandler = (
   editorContent: string,
   setCompileErrMsg: (errMsg: string) => void,
-  setActiveInstance: (faustInstance: FaustModuleInstance, dspDefProps: Object) => void
+  setActiveInstance: (faustInstance: FaustModuleInstance, dspDefProps: object) => void
 ) => async () => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
@@ -120,8 +124,8 @@ const createCompileButtonClickHandler = (
 };
 
 interface EffectsPickerPanelPassedProps {
-  state: Object;
-  setState: (newState: Object) => void;
+  state: object;
+  setState: (newState: object) => void;
   loadEffect: (effect: Effect) => void;
 }
 
@@ -142,7 +146,7 @@ const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanel
 }: EffectsPickerPannelProps) => (
   <ControlPanel
     state={state}
-    onChange={(_label: string, _newValue: any, newState: Object) => setState(newState)}
+    onChange={(_label: string, _newValue: any, newState: object) => setState(newState)}
     position='bottom-right'
     draggable
   >
@@ -168,6 +172,7 @@ const saveCode = async (effect: Without<Effect, 'id'>) => {
     method: 'POST',
     body: JSON.stringify(effect),
   });
+
   if (!res.ok) {
     console.error(`Error saving code: ${await res.text()}`);
   }
@@ -241,6 +246,13 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       </div>
 
       <SaveControls editorContent={editorContent} />
+
+      <canvas
+        width={1200}
+        height={1024}
+        id='spectrum-visualizer'
+        style={styles.spectrumVizCanvas}
+      />
 
       {faustInstanceControlPanel}
 

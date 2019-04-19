@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 )
 
 func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, err error) {
@@ -104,6 +105,8 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	}
 
 	jsonDefinition := match[1]
+	// Clean up escaped single quotes since they're not valid
+	jsonDefinition = strings.ReplaceAll(jsonDefinition, "\\'", "'")
 
 	// Append the JSON definition as a HTTP header of the response
 	resWriter.Header().Set("X-Json-Module-Definition", jsonDefinition)

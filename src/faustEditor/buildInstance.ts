@@ -1,10 +1,15 @@
 import { audioContext } from '../redux/reducers/faustEditor';
+import { initializeSpectrumVisualization } from '../visualizations/spectrum';
 import { FaustModuleInstance } from './FaustEditor';
 
 declare class FaustWasm2ScriptProcessor {
   constructor(name: string, props: {}, options: {});
 
-  getNode(wasmInstance: any, audioContext: AudioContext, bufferSize: number): FaustModuleInstance;
+  public getNode(
+    wasmInstance: any,
+    audioContext: AudioContext,
+    bufferSize: number
+  ): FaustModuleInstance;
 }
 
 const { WebAssembly } = window as any;
@@ -28,9 +33,15 @@ const buildInstance = async (wasmInstance: typeof WebAssembly.Instance, dspDefPr
   const microphoneStream = await getMicrophoneStream();
   const source = audioContext.createMediaStreamSource(microphoneStream);
 
-  // Wire up the microphone to the module and then connect the module to the audo context's output (speakers)
+  const canvas = document.getElementById('spectrum-visualizer')! as HTMLCanvasElement;
+  const analyzerNode = audioContext.createAnalyser();
+  initializeSpectrumVisualization(analyzerNode, canvas);
+
+  // Wire up the microphone to the module, connect the module to the analyzer node, and then
+  // connect the analyzer node to the audo context's output (speakers)
   source.connect(faustInstance);
-  faustInstance.connect(audioContext.destination);
+  faustInstance.connect(analyzerNode);
+  analyzerNode.connect(audioContext.destination);
 
   return faustInstance;
 };
