@@ -15,7 +15,7 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::{http::Method, Request, Response, http::Status};
+use rocket::{http::Method, http::Status, Request, Response};
 
 pub mod conf;
 pub mod models;
