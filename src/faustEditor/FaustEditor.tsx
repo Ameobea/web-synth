@@ -153,7 +153,7 @@ const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanel
   <ControlPanel
     state={state}
     onChange={(_label: string, _newValue: any, newState: object) => setState(newState)}
-    position='bottom-right'
+    position={{ bottom: 60, right: 8 }}
     draggable
   >
     <Custom label='load effect' renderContainer Comp={EffectPickerCustomInput} />

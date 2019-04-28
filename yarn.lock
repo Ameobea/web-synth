@@ -4066,10 +4066,10 @@ react-ace@^6.4.0:
     lodash.isequal "^4.5.0"
     prop-types "^15.6.2"
 
-react-control-panel@>=0.4.5:
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.4.5.tgz#76fb5f8005d98d50f477c4ecb970c709baed3ef5"
-  integrity sha512-idK2gwKdFD2TxykAWsSpmvvYO9TOY+Lum4CZ06owA7AP30ojE/XI2M/igLSpMkM+XmG3pGXjcPliTgSRve//bA==
+react-control-panel@>=0.4.6:
+  version "0.4.6"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.4.6.tgz#a77227cc003a3d5c3b2dc379f8ec4ee4c70349ae"
+  integrity sha512-7wJwFnPPlOBHEBeUK0xA4ruAEyB4+IlFl/mKVKuaOy3qhK7GnaHqGz6w3dnY/24YtBaue+6MKWp1k933CG6LGg==
   dependencies:
     is-numeric "0.0.5"
     is-string "^1.0.4"

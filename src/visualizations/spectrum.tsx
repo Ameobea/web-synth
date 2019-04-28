@@ -3,10 +3,10 @@ import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 import chroma from 'chroma-js';
 
-const FFT_SIZE = 2048;
+const FFT_SIZE = Math.pow(2, 12);
 const BUFFER_SIZE = FFT_SIZE / 2;
 const WIDTH = 1200;
-const HEIGHT_MULTIPLIER = 4;
+const HEIGHT_MULTIPLIER = 2;
 
 const BUFFER = new Uint8Array(BUFFER_SIZE);
 const PIXEL_BUFFER = new Uint8ClampedArray(BUFFER_SIZE * 4); // RGBA pixel data
@@ -54,6 +54,8 @@ export const initializeSpectrumVisualization = (
   options: SettingsState = defaultSettingsState
 ) => {
   const state = { options };
+
+  analyzerNode.fftSize = FFT_SIZE;
 
   const ctx2d = canvas.getContext('2d')!;
 
@@ -122,7 +124,7 @@ export const SpectrumVisualization: React.FunctionComponent<SpectrumVisualizatio
         initial: defaultSettingsState.intensityMultiplier,
       },
     ]}
-    position='bottom-left'
+    position={{ bottom: 180, right: 8 }}
     draggable
   />
 );

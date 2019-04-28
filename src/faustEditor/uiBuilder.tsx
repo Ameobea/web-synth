@@ -62,7 +62,7 @@ const buildControlPanel = (
     <ControlPanel
       draggable
       theme='dark'
-      position='top-right'
+      position={{ top: -100, right: 0 }}
       settings={controlPanelFieldDefinitions}
       onChange={setParamValue}
     />
