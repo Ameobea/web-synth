@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { connect } from 'react-redux';
 
 import { State as ReduxState } from '../redux';
@@ -42,7 +42,6 @@ const EffectPicker: React.FunctionComponent<PassedProps> = ({
     addEffects(effects);
     onChange(effects[0].id);
   });
-  const selectedEffect = useState(null);
 
   return (
     <select value={value} onChange={evt => onChange(parseInt(evt.target.value, 10))}>

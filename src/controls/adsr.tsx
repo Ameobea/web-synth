@@ -43,7 +43,7 @@ interface HandleProps {
 const Handle = ({ x, y, onDrag, radius }: HandleProps) => {
   const setMousePos: (evt: MouseEvent) => void = evt => onDrag({ x: evt.clientX, y: evt.clientY });
 
-  const handleMouseDown: (evt: React.MouseEvent<SVGCircleElement, MouseEvent>) => void = evt => {
+  const handleMouseDown: (evt: React.MouseEvent<SVGCircleElement, MouseEvent>) => void = () => {
     window.addEventListener('mousemove', setMousePos);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', setMousePos), {
       once: true,
@@ -170,7 +170,7 @@ interface ControlPanelADSRProps {
   theme: { [key: string]: any };
 }
 
-export const ControlPanelADSR = ({ value, onChange, theme }: ControlPanelADSRProps) => (
+export const ControlPanelADSR = ({ value, onChange }: ControlPanelADSRProps) => (
   <Fragment>
     <span style={{ paddingTop: 4 }}>
       <Value text={formatAdsrValue(value)} width={225} />

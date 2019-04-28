@@ -3,7 +3,7 @@ import { initializeSpectrumVisualization } from '../visualizations/spectrum';
 import { FaustModuleInstance } from './FaustEditor';
 
 declare class FaustWasm2ScriptProcessor {
-  constructor(name: string, props: {}, options: {});
+  public constructor(name: string, props: {}, options: {});
 
   public getNode(
     wasmInstance: any,

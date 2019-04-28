@@ -9,16 +9,16 @@ const initialState = {
   sharedEffects: [],
 };
 
-type State = {
+interface State {
   sharedEffects: Effect[];
-};
+}
 
 export const ADD_EFFECTS = 'ADD_EFFECTS';
 
-type Action = {
+interface Action {
   type: typeof ADD_EFFECTS;
   effects: Effect[];
-};
+}
 
 export const actionCreators: { [name: string]: (...args: any[]) => Action } = {
   addEffects: (effects: Effect[]) => ({ type: ADD_EFFECTS, effects }),

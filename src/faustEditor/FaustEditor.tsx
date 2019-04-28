@@ -1,7 +1,7 @@
-import React, { Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { connect } from 'react-redux';
-import ace from 'ace-builds';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
+import ace from 'ace-builds';
 import * as R from 'ramda';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
@@ -9,7 +9,6 @@ import 'ace-builds/webpack-resolver';
 import { State as ReduxState } from '../redux';
 import { actionCreators, audioContext } from '../redux/reducers/faustEditor';
 import { Effect } from '../redux/reducers/effects';
-import buildControlPanel from './uiBuilder';
 import buildInstance, { analyzerNode } from './buildInstance';
 import importObject from './faustModuleImportObject';
 import { EffectPickerCustomInput } from '../controls/faustEditor';
@@ -275,7 +274,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
     );
   }, [controlPanelState['load file']]);
 
-  const canvas = document.getElementById('spectrum-visualizer');
+  // const canvas = document.getElementById('spectrum-visualizer');
 
   return (
     <Suspense fallback={<span>Loading...</span>}>

@@ -2,8 +2,8 @@
  * Initialize the Redux store + subreducers
  */
 
-import { applyMiddleware, createStore, combineReducers, compose } from 'redux';
-import { StateType, ActionType } from 'typesafe-actions';
+import { createStore, combineReducers, compose } from 'redux';
+import { StateType } from 'typesafe-actions';
 
 import synthsReducer from './reducers/synths';
 import viewContextManagerReducer from './reducers/viewContextManager';

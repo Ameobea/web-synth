@@ -18,9 +18,9 @@ const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
 
 // The number of pixels from the top of the page that the main content (canvases, editor, etc.)
 // is rendered.
-const CONTENT_OFFSET_TOP: number = 40;
+const CONTENT_OFFSET_TOP = 40;
 let ACTIVE_SHAPE: SVGElement = null!;
-let ATTR_COUNTER: number = 0;
+let ATTR_COUNTER = 0;
 const notes: SVGElement[] = [];
 
 export const get_active_attr = (key: string): string | null => ACTIVE_SHAPE.getAttribute(key);
@@ -142,13 +142,14 @@ export const clear_canvases = () => SVGS.forEach(deleteAllChildren);
 
 let engineHandle: typeof import('./engine');
 
-export const init_midi_editor_ui = () =>
+export const init_midi_editor_ui = () => {
   ReactDOM.render(
     <Provider store={store}>
       <App engine={engineHandle} />
     </Provider>,
     document.getElementById('root')!
   );
+};
 
 const createViewContextManager = (engine: typeof import('./engine')) => {
   ReactDOM.render(
@@ -173,9 +174,9 @@ export const update_active_view_contexts = (
   activeViewContextIx: number,
   activeVcsJson: string
 ): void => {
-  const activeViewContexts: Array<{
+  const activeViewContexts: {
     minimal_def: { name: string; uuid: string; title?: string };
-  }> = JSON.parse(activeVcsJson);
+  }[] = JSON.parse(activeVcsJson);
   store.dispatch(
     viewContextManagerActionCreators.setState({
       activeViewContextIx,

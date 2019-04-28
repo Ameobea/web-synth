@@ -1,5 +1,4 @@
 import React from 'react';
-import { Label } from 'react-control-panel';
 
 import { ControlPanelCustomComponentProps } from '../types';
 
@@ -32,7 +31,6 @@ const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Va
   });
 
 const FileUploader: React.FunctionComponent<ControlPanelCustomComponentProps<Value>> = ({
-  value,
   onChange,
 }) => (
   <div>

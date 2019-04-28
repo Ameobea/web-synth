@@ -1,20 +1,11 @@
 import React, { useMemo } from 'react';
-import * as R from 'ramda';
-import ControlPanel, { Range } from 'react-control-panel';
+import ControlPanel from 'react-control-panel';
 import BitCrusher from 'tone/Tone/effect/BitCrusher';
 
 import { PolySynth } from '../synth';
 import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
 
 export const mkBitcrusher = () => new BitCrusher(5).toMaster();
-
-const flatten = (obj: object, prefix = ''): object =>
-  Object.entries(obj).reduce((acc, [key, val]) => {
-    if (typeof val === 'object') {
-      return { ...acc, ...flatten(val, `${prefix}${prefix ? '.' : ''}${key}`) };
-    }
-    return { ...acc, [`${prefix}${prefix ? '.' : ''}${key}`]: val };
-  }, {});
 
 interface PolySynthProps {
   synth: PolySynth;

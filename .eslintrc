@@ -1,6 +1,6 @@
 {
   "rules": {
-    "indent": [2, 2, { "SwitchCase": 1 }],
+    "@typescript-eslint/indent": 0,
     "quotes": [2, "single", { "avoidEscape": true }],
     "linebreak-style": [2, "unix"],
     "semi": [2, "always"],
@@ -14,14 +14,19 @@
         "destructuring": "any",
         "ignoreReadBeforeAssign": false
       }
-    ]
+    ],
+    "@typescript-eslint/explicit-function-return-type": 0,
+    "@typescript-eslint/no-explicit-any": 0,
+    "@typescript-eslint/no-non-null-assertion": 0,
+    "@typescript-eslint/camelcase": 0,
+    "react/prop-types": 0
   },
   "env": {
     "es6": true,
     "browser": true
   },
-  "extends": ["eslint:recommended"],
-  "parser": "babel-eslint",
+  "extends": ["plugin:@typescript-eslint/recommended", "plugin:react/recommended", "prettier"],
+  "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "sourceType": "module",
     "ecmaFeatures": {
@@ -30,7 +35,7 @@
     },
     "ecmaVersion": 2017
   },
-  "plugins": [],
+  "plugins": ["@typescript-eslint", "react"],
   "globals": {
     "process": true,
     "ga": true,

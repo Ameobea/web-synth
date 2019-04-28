@@ -10,11 +10,20 @@ interface BaseUiDef {
   address: string;
 }
 
-type UiDefExtra = { min: number; max: number; step: number; init: number };
+interface UiDefExtra {
+  min: number;
+  max: number;
+  step: number;
+  init: number;
+}
 
 type UiDef = BaseUiDef & UiDefExtra;
 
-export type UiGroup = { items: UiDef[]; label: string; type: string };
+export interface UiGroup {
+  items: UiDef[];
+  label: string;
+  type: string;
+}
 
 const buildControlPanelField = (def: UiDef): {} | null => {
   const mapper = {

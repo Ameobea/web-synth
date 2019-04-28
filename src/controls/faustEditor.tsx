@@ -9,7 +9,7 @@ import EffectPicker from './EffectPicker';
  */
 export const EffectPickerCustomInput: React.FunctionComponent<
   ControlPanelCustomComponentProps<number>
-> = ({ value, onChange, theme }) => (
+> = ({ value, onChange }) => (
   <div style={{ marginBottom: 8, display: 'inline-block' }}>
     <EffectPicker value={value} onChange={onChange} />
   </div>

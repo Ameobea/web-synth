@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 import chroma from 'chroma-js';
@@ -7,7 +7,6 @@ const FFT_SIZE = 2048;
 const BUFFER_SIZE = FFT_SIZE / 2;
 const WIDTH = 1200;
 const HEIGHT_MULTIPLIER = 4;
-const INTENSITY_MULTIPLIER = 1.2;
 
 const BUFFER = new Uint8Array(BUFFER_SIZE);
 const PIXEL_BUFFER = new Uint8ClampedArray(BUFFER_SIZE * 4); // RGBA pixel data

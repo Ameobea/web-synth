@@ -37,9 +37,7 @@ interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> 
 }
 
 const ViewContextIcon = ({
-  name,
   displayName,
-  engine,
   style,
   onClick,
   children,
@@ -72,7 +70,7 @@ export const ViewContextManager = ({ engine }: ViewContextManagerProps) => (
     >
       X
     </ViewContextIcon>
-    {viewContexts.map(({ ...props }, i) => (
+    {viewContexts.map(({ ...props }) => (
       <ViewContextIcon
         engine={engine}
         {...props}
@@ -142,7 +140,7 @@ const VCTabCloseIcon = ({
   </div>
 );
 
-const ViewContextTab = ({ engine, name, uuid, title, active, i }: ViewContextTabProps) => {
+const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabProps) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renamingTitle, setRenamingTitle] = useState(title || '');
 

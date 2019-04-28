@@ -45,7 +45,7 @@ export class PolySynth {
    */
   public volume: typeof Volume;
 
-  constructor(voiceCount: number, volume: number = 10.0) {
+  public constructor(voiceCount: number, volume: number = 10.0) {
     this.volume = new Volume(volume).toMaster();
 
     this.voices = R.times(R.identity, voiceCount).map(() =>
@@ -70,8 +70,6 @@ export class PolySynth {
     });
   }
 }
-
-const x = 2;
 
 const getSynths = (): PolySynth[] => store.getState().synths.synths;
 
