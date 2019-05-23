@@ -13,6 +13,7 @@ declare class FaustWasm2ScriptProcessor {
 }
 
 export const analyzerNode = audioContext.createAnalyser();
+analyzerNode.smoothingTimeConstant = 0.2;
 analyzerNode.connect(audioContext.destination);
 
 const getMicrophoneStream = (): Promise<MediaStream> =>

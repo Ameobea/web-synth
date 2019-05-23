@@ -3,10 +3,10 @@ import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 import chroma from 'chroma-js';
 
-const FFT_SIZE = Math.pow(2, 12);
+const FFT_SIZE = Math.pow(2, 14);
 const BUFFER_SIZE = FFT_SIZE / 2;
 const WIDTH = 1200;
-const HEIGHT_MULTIPLIER = 2;
+const HEIGHT_MULTIPLIER = 1; // 2;
 
 const BUFFER = new Uint8Array(BUFFER_SIZE);
 const PIXEL_BUFFER = new Uint8ClampedArray(BUFFER_SIZE * 4); // RGBA pixel data
@@ -53,6 +53,7 @@ export const initializeSpectrumVisualization = (
   canvas: HTMLCanvasElement,
   options: SettingsState = defaultSettingsState
 ) => {
+  console.trace(options);
   const state = { options };
 
   analyzerNode.fftSize = FFT_SIZE;
@@ -90,7 +91,7 @@ export const initializeSpectrumVisualization = (
   updateVisualization();
 
   return newOptions => {
-    console.log(newOptions);
+    console.log({ newOptions });
     state.options = newOptions;
   };
 };
@@ -101,7 +102,10 @@ export const SpectrumVisualization: React.FunctionComponent<SpectrumVisualizatio
 }) => (
   <ControlPanel
     state={settingsState}
-    onChange={(_label: string, _value: any, newState) => setSettingsState(newState)}
+    onChange={(_label: string, _value: any, newState) => {
+      console.log({ newState });
+      setSettingsState(newState);
+    }}
     settings={[
       {
         type: 'select',
