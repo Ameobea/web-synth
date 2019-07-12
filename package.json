@@ -31,7 +31,7 @@
   },
   "scripts": {
     "start": "webpack-dev-server",
-    "build": "rm -rf dist/* && webpack --config webpack.prod.js && cp -r ./public/* ./dist",
+    "build": "rm -rf dist/* && BACKEND_BASE_URL=\"https://notes-backend.p.ameo.design\" webpack --config webpack.prod.js && cp -r ./public/* ./dist",
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\""
   },
   "dependencies": {

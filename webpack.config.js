@@ -1,5 +1,6 @@
 const path = require('path');
 
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
@@ -41,6 +42,7 @@ module.exports = {
       minify: true,
       template: 'index.hbs',
     }),
+    new webpack.EnvironmentPlugin(['BACKEND_BASE_URL']),
   ],
   devServer: {
     port: 9000,

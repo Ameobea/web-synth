@@ -55,6 +55,10 @@ impl Fairing for CorsFairing {
 }
 
 fn main() {
+    if let Err(_) = dotenv::dotenv() {
+        println!("Unable to parse .env file; continuing.");
+    }
+
     rocket::ignite()
         .attach(WebSynthDbConn::fairing())
         .mount(

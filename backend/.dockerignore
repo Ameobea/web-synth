@@ -2,3 +2,5 @@ target
 *.log
 README.md
 Dockerfile
+.env
+Justfile
