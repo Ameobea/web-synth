@@ -28,7 +28,7 @@ module.exports = {
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.tsx', '.js', '.jsx', '.wasm'],
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.wasm'],
     modules: [path.resolve('./node_modules'), path.resolve('.')],
     alias: {
       Tone: path.resolve('./node_modules/tone/Tone'),
@@ -42,4 +42,8 @@ module.exports = {
       template: 'index.hbs',
     }),
   ],
+  devServer: {
+    port: 9000,
+    contentBase: './public/',
+  },
 };

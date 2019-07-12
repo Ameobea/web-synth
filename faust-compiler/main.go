@@ -95,7 +95,7 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	jsFileContent := string(jsfileContentBytes)
 
 	// Extract the JSON definition from the JS file
-	pattern := regexp.MustCompile("return '(?P<Json>(?:.|\n)+)';")
+	pattern := regexp.MustCompile("return (?:'|\")(?P<Json>(?:.|\n)+)(?:'|\");")
 	match := pattern.FindStringSubmatch(jsFileContent)
 	if len(match) < 1 {
 		resWriter.WriteHeader(500)
@@ -123,5 +123,13 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 func main() {
 	http.HandleFunc("/compile", handleCompile)
 
-	http.ListenAndServe(":4565", nil)
+	var port = os.Getenv("PORT")
+	if len(port) == 0 {
+		port = "4565"
+	}
+
+	err := http.ListenAndServe(":"+port, nil)
+	if err != nil {
+		fmt.Println("Error listening on port", err)
+	}
 }

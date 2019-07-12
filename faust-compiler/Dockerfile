@@ -1,4 +1,5 @@
 FROM golang:1.12.3-stretch
+
 RUN apt update && apt install -y cmake build-essential git pkg-config
 
 RUN mkdir /build
@@ -11,6 +12,7 @@ RUN mkdir /faust
 WORKDIR /
 RUN git clone https://github.com/grame-cncm/faust.git
 WORKDIR /faust
+RUN git checkout 3743d55728b48194002f8360d1e632cb7a344f16
 RUN make
 RUN make install
 

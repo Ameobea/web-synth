@@ -34,9 +34,9 @@ export interface FaustModuleInstance extends ScriptProcessorNode {
 }
 
 const FAUST_COMPILER_ENDPOINT =
-  process.env.NODE_ENV === 'development'
+  process.env.NODE_ENV === 'development' && false
     ? 'http://localhost:4565/compile'
-    : 'https://faust.ameo.design/compile';
+    : 'https://faust.p.ameo.design/compile';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -111,14 +111,15 @@ const createCompileButtonClickHandler = (
   }
 
   // The JSON definition for the module is set as a HTTP header, which we must extract and parse.
-  const jsonModuleDefString = res.headers.get('X-Json-Module-Definition');
+  const jsonModuleDefString = res.headers.get('X-Json-Module-Definition'.toLowerCase());
   if (!jsonModuleDefString) {
     setCompileErrMsg("The `X-Json-Module-Definition` header wasn't set on the response.");
     return;
   }
 
   setCompileErrMsg('');
-  const dspDefProps = JSON.parse(jsonModuleDefString);
+  // It's double JSON-encoded because of reasons
+  const dspDefProps = JSON.parse(JSON.parse('"' + jsonModuleDefString + '"'));
 
   const arrayBuffer = await res.arrayBuffer();
 
