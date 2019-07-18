@@ -48,7 +48,6 @@ const reducer = (state = initialState, action: Action) => {
       }
 
       // Construct a new control panel instance for the newly created module
-      console.log(action);
       const controlPanel = buildControlPanel(action.dspDefProps.ui, action.instance.setParamValue);
 
       return { ...state, controlPanel, instance: action.instance };

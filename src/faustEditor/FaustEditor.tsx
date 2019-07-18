@@ -6,13 +6,13 @@ import * as R from 'ramda';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
-import { State as ReduxState } from '../redux';
+import { State as ReduxState, store } from '../redux';
 import { actionCreators, audioContext } from '../redux/reducers/faustEditor';
 import { Effect } from '../redux/reducers/effects';
 import buildInstance, { analyzerNode } from './buildInstance';
 import importObject from './faustModuleImportObject';
 import { EffectPickerCustomInput } from '../controls/faustEditor';
-import { BACKEND_BASE_URL } from '../conf';
+import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from '../conf';
 import { Without } from '../types';
 import {
   SpectrumVisualization,
@@ -32,11 +32,6 @@ export interface FaustModuleInstance extends ScriptProcessorNode {
   getParamValue: (path: string) => number;
   setParamValue: (path: string, val: number) => void;
 }
-
-const FAUST_COMPILER_ENDPOINT =
-  process.env.NODE_ENV === 'development' && false
-    ? 'http://localhost:4565/compile'
-    : 'https://faust.p.ameo.design/compile';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -74,27 +69,17 @@ const styles: { [key: string]: React.CSSProperties } = {
 
 type StateProps = Pick<ReduxState['faustEditor'], 'instance' | 'controlPanel' | 'editorContent'>;
 
-const mapDispatchToProps = { setActiveInstance, clearActiveInstance, setEditorContent };
-
-type DispatchProps = typeof mapDispatchToProps;
-
-type FaustEditorProps = StateProps & DispatchProps & { children: undefined };
-
 const mapStateToProps = ({ faustEditor }: ReduxState) => ({
   instance: faustEditor.instance,
   controlPanel: faustEditor.controlPanel,
   editorContent: faustEditor.editorContent,
 });
 
-const enhance = connect<StateProps, DispatchProps, {}>(
-  mapStateToProps,
-  mapDispatchToProps
-);
+const enhance = connect<StateProps, {}, {}>(mapStateToProps);
 
 const createCompileButtonClickHandler = (
   editorContent: string,
-  setCompileErrMsg: (errMsg: string) => void,
-  setActiveInstance: (faustInstance: FaustModuleInstance, dspDefProps: object) => void
+  setCompileErrMsg: (errMsg: string) => void
 ) => async () => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
@@ -127,7 +112,7 @@ const createCompileButtonClickHandler = (
   const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
 
   const faustInstance = await buildInstance(wasmInstance, dspDefProps);
-  setActiveInstance(faustInstance, dspDefProps);
+  store.dispatch(setActiveInstance(faustInstance, dspDefProps));
 };
 
 interface EffectsPickerPanelPassedProps {
@@ -221,10 +206,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
   instance,
   controlPanel: faustInstanceControlPanel,
   editorContent,
-  setActiveInstance,
-  clearActiveInstance,
-  setEditorContent,
-}: FaustEditorProps) => {
+}: StateProps & { children: undefined }) => {
   const [
     externalAudioBufferSource,
     setExternalAudioBufferSource,
@@ -247,8 +229,8 @@ const FaustEditor: React.FunctionComponent<{}> = ({
   console.log({ updateVizSettings });
 
   const handleCompileButtonClick = useCallback(
-    createCompileButtonClickHandler(editorContent, setCompileErrMsg, setActiveInstance),
-    [editorContent, setCompileErrMsg, setActiveInstance]
+    createCompileButtonClickHandler(editorContent, setCompileErrMsg),
+    [editorContent, setCompileErrMsg]
   );
 
   useEffect(() => {
@@ -290,7 +272,9 @@ const FaustEditor: React.FunctionComponent<{}> = ({
         <button onClick={handleCompileButtonClick} style={{ marginRight: 10 }}>
           Compile
         </button>
-        {instance ? <button onClick={clearActiveInstance}>Stop</button> : null}
+        {instance ? (
+          <button onClick={() => store.dispatch(clearActiveInstance())}>Stop</button>
+        ) : null}
         {externalAudioBufferSource ? (
           <button
             onClick={() => {
@@ -327,7 +311,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       <EffectsPickerPanel
         state={controlPanelState}
         setState={setControlPanelState}
-        loadEffect={(effect: Effect) => setEditorContent(effect.code)}
+        loadEffect={(effect: Effect) => store.dispatch(setEditorContent(effect.code))}
       />
     </Suspense>
   );

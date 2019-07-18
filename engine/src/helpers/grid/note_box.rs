@@ -6,14 +6,9 @@ use std::{
 
 use std::f32;
 
-use crate::helpers::grid::prelude::*;
+pub use common::RawNoteData;
 
-#[derive(Serialize, Deserialize)]
-pub struct RawNoteData {
-    pub line_ix: usize,
-    pub start_beat: f32,
-    pub width: f32,
-}
+use crate::helpers::grid::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NoteBoxBounds {

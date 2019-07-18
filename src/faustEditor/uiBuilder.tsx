@@ -52,7 +52,7 @@ const buildControlPanel = (
   uiDef: UiGroup[],
   setParamValue: FaustModuleInstance['setParamValue']
 ) => {
-  const controlPanelFieldDefinitions = uiDef.flatMap(mapUiGroupToControlPanelFields);
+  const controlPanelFieldDefinitions = R.flatten(uiDef.map(mapUiGroupToControlPanelFields));
 
   if (R.isEmpty(controlPanelFieldDefinitions)) {
     return null;
@@ -62,7 +62,7 @@ const buildControlPanel = (
     <ControlPanel
       draggable
       theme='dark'
-      position={{ top: -100, right: 0 }}
+      position={{ top: 0, right: 20 }}
       settings={controlPanelFieldDefinitions}
       onChange={setParamValue}
     />

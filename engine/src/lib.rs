@@ -10,6 +10,7 @@
 
 extern crate base64;
 extern crate bincode;
+extern crate common;
 extern crate fnv;
 extern crate rand;
 extern crate rand_pcg;
