@@ -165,6 +165,15 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
         _dragging_note_data: &(f32, SelectedNoteData),
     ) {
     }
+
+    fn handle_message(
+        &mut self,
+        _grid_state: &mut GridState<S>,
+        _key: &str,
+        _val: &str,
+    ) -> Option<Vec<u8>> {
+        None
+    }
 }
 
 pub struct GridState<S> {
@@ -231,6 +240,27 @@ impl<S: GridRendererUniqueIdentifier> GridState<S> {
         }
 
         notes
+    }
+
+    pub fn get_raw_note_data(&self) -> Vec<RawNoteData> {
+        self.data
+            .lines
+            .iter()
+            .enumerate()
+            .flat_map(|(line_ix, line)| {
+                line.iter().map(move |note_box| RawNoteData {
+                    line_ix,
+                    start_beat: note_box.bounds.start_beat,
+                    width: note_box.bounds.width(),
+                })
+            })
+            .collect()
+    }
+
+    pub fn serialize_to_binary(&self) -> Vec<u8> {
+        let all_notes: Vec<RawNoteData> = self.get_raw_note_data();
+
+        bincode::serialize(&all_notes).expect("Failed to serialize raw note data into binary")
     }
 }
 
@@ -817,6 +847,10 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
 
+    fn handle_message(&mut self, key: &str, val: &str) -> Option<Vec<u8>> {
+        self.handler.handle_message(&mut self.state, key, val)
+    }
+
     fn save(&mut self) -> String {
         "".into() // TODO
     }
@@ -1072,20 +1106,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 
     fn serialize_and_save(&mut self) {
         // Get a list of every note in the composition matched with its line index
-        let all_notes: Vec<RawNoteData> = self
-            .state
-            .data
-            .lines
-            .iter()
-            .enumerate()
-            .flat_map(|(line_ix, line)| {
-                line.iter().map(move |note_box| RawNoteData {
-                    line_ix,
-                    start_beat: note_box.bounds.start_beat,
-                    width: note_box.bounds.width(),
-                })
-            })
-            .collect();
+        let all_notes: Vec<RawNoteData> = self.state.get_raw_note_data();
 
         let mut base64_data = Vec::new();
         {

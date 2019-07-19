@@ -264,6 +264,11 @@
     lodash "^4.17.11"
     to-fast-properties "^2.0.0"
 
+"@types/downloadjs@^1.4.1":
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/@types/downloadjs/-/downloadjs-1.4.1.tgz#11a959c5fd09d3f1ca74c02ba17ae8f126ce57fd"
+  integrity sha512-Y7Ds+ne3AMvNY9TB055NCOoFewlmEpRpGGyNaPu1lw6a0reLHWESZ8KLVDBfdOvlwDUBWWQVcijkCJaoysDC4Q==
+
 "@types/eslint-visitor-keys@^1.0.0":
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/@types/eslint-visitor-keys/-/eslint-visitor-keys-1.0.0.tgz#1ee30d79544ca84d68d4b3cdb0af4f205663dd2d"
@@ -1663,6 +1668,11 @@ domutils@^1.5.1:
   dependencies:
     dom-serializer "0"
     domelementtype "1"
+
+downloadjs@^1.4.7:
+  version "1.4.7"
+  resolved "https://registry.yarnpkg.com/downloadjs/-/downloadjs-1.4.7.tgz#f69f96f940e0d0553dac291139865a3cd0101e3c"
+  integrity sha1-9p+W+UDg0FU9rCkROYZaPNAQHjw=
 
 duplexify@^3.4.2, duplexify@^3.6.0:
   version "3.7.1"

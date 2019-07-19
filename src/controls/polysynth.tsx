@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import BitCrusher from 'tone/Tone/effect/BitCrusher';
+import downloadjs from 'downloadjs';
 
 import { PolySynth } from '../synth';
 import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
@@ -9,9 +10,10 @@ export const mkBitcrusher = () => new BitCrusher(5).toMaster();
 
 interface PolySynthProps {
   synth: PolySynth;
+  engine: typeof import('../engine');
 }
 
-const PolySynthControls = ({ synth }: PolySynthProps) => {
+const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
   const onChange = useMemo<(key: string, val: any) => void>(
     () => (key, val) => {
       switch (key) {
@@ -61,6 +63,16 @@ const PolySynthControls = ({ synth }: PolySynthProps) => {
         },
         { type: 'checkbox', label: 'bitcrusher', initial: false },
         { type: 'custom', label: 'adsr', initial: defaultAdsrEnvelope, Comp: ControlPanelADSR },
+        {
+          type: 'button',
+          label: 'export midi',
+          action: async () => {
+            const midiModule = await import('../midi');
+            const noteData = engine.handle_message('export_midi', '');
+            const midiFileBytes = midiModule.write_to_midi('midi_export', noteData);
+            downloadjs(new Blob([midiFileBytes]), 'composition.midi', 'application/x-midi');
+          },
+        },
       ]}
     />
   );

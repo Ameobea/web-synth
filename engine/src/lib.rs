@@ -34,6 +34,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod constants;
 pub mod helpers;
+pub mod input_handlers;
 pub mod js;
 pub mod prelude;
 pub mod synth;

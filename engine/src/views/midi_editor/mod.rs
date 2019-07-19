@@ -9,7 +9,6 @@ use uuid::Uuid;
 use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
-pub mod input_handlers;
 pub mod prelude;
 pub mod state;
 
@@ -219,6 +218,18 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         self.synth.trigger_release(
             self.midi_to_frequency(grid_state.conf.row_count, dragging_note_data.1.line_ix),
         );
+    }
+
+    fn handle_message(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        key: &str,
+        _val: &str,
+    ) -> Option<Vec<u8>> {
+        match key {
+            "export_midi" => Some(grid_state.serialize_to_binary()),
+            _ => None,
+        }
     }
 }
 

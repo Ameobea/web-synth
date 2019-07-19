@@ -11,6 +11,8 @@ const fn beats_to_ticks(beats: f32) -> u64 { (beats * (TICKS_PER_BEAT as f32)) a
 
 #[wasm_bindgen]
 pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
+    console_error_panic_hook::set_once();
+
     let notes: Vec<RawNoteData> =
         bincode::deserialize(note_data).expect("Error deserializing note data");
 
@@ -30,7 +32,7 @@ pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
         ))
     }
     builder.add_static_track(midi_events.iter());
-    builder.set_name(1, name);
+    builder.set_name(0, name);
 
     let midi_file = builder.result();
 

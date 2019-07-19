@@ -10,3 +10,12 @@ build-all:
   cp ./engine/build/* ./src
   yarn build || npm build
   just opt
+
+run:
+  cd engine \
+    && ./build.sh \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/*.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./libs/midi/target/wasm32-unknown-unknown/debug/*.wasm --browser --remove-producers-section --out-dir ./build
+  cd -
+  cp ./engine/build/* ./src/
+  yarn start

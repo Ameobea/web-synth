@@ -33,4 +33,6 @@ pub trait ViewContext {
     fn handle_mouse_move(&mut self, _x: usize, _y: usize) {}
     fn handle_mouse_up(&mut self, _x: usize, _y: usize) {}
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
+
+    fn handle_message(&mut self, _key: &str, _val: &str) -> Option<Vec<u8>> { None }
 }
