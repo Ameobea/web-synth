@@ -12,5 +12,7 @@ bincode = "1.1.4"
 console_error_panic_hook = "0.1.6"
 rimd = { git = "https://github.com/Ameobea/rimd.git" }
 wasm-bindgen = "=0.2.47"
+wasm-logger = "0.1.2"
+log = "0.4"
 
 common = { path = "../common" }

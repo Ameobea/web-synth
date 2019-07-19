@@ -4,6 +4,7 @@ import BitCrusher from 'tone/Tone/effect/BitCrusher';
 import downloadjs from 'downloadjs';
 
 import { PolySynth } from '../synth';
+import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
 
 export const mkBitcrusher = () => new BitCrusher(5).toMaster();
@@ -15,7 +16,7 @@ interface PolySynthProps {
 
 const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
   const onChange = useMemo<(key: string, val: any) => void>(
-    () => (key, val) => {
+    () => async (key, val) => {
       switch (key) {
         case 'bitcrusher': {
           synth.volume.disconnect();
@@ -36,6 +37,15 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
         }
         case 'adsr': {
           synth.setEnvelope(val);
+          break;
+        }
+        case 'upload midi': {
+          const uploadedFile: FileUploaderValue = val;
+          console.log('loaded file: ', uploadedFile);
+          const bytes = new Uint8Array(uploadedFile.fileContent);
+          const midiModule = await import('../midi');
+          const rawNoteData = midiModule.load_midi_to_raw_note_bytes(bytes, 1);
+          console.log('Loaded raw note data: ', rawNoteData);
           break;
         }
         default: {
@@ -73,6 +83,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
             downloadjs(new Blob([midiFileBytes]), 'composition.midi', 'application/x-midi');
           },
         },
+        { type: 'custom', label: 'upload midi', renderContainer: false, Comp: FileUploader },
       ]}
     />
   );
