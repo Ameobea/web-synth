@@ -78,7 +78,10 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
     }
 
     /// Set the position of the cursor
-    fn set_cursor_pos(dom_id: DomId, x: usize) { js::set_attr(dom_id, "x", &x.to_string()); }
+    fn set_cursor_pos(dom_id: DomId, x: usize) {
+        js::set_attr(dom_id, "x1", &x.to_string());
+        js::set_attr(dom_id, "x2", &x.to_string());
+    }
 }
 
 pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
@@ -422,6 +425,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 {
     fn init(&mut self) {
         render::render_initial_grid(&self.state.conf);
+        self.state.cursor_dom_id = R::create_cursor(&self.state.conf, 4);
         self.handler.init();
 
         if !self.loaded {

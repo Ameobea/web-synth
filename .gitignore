@@ -4,3 +4,4 @@ node_modules/
 *.wat
 *.log
 src/midi*
+.env

@@ -42,7 +42,7 @@ module.exports = {
       minify: true,
       template: 'index.hbs',
     }),
-    new webpack.EnvironmentPlugin(['BACKEND_BASE_URL']),
+    new webpack.EnvironmentPlugin(['BACKEND_BASE_URL', 'FAUST_COMPILER_ENDPOINT']),
   ],
   devServer: {
     port: 9000,

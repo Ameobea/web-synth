@@ -165,7 +165,7 @@ dependencies = [
 [[package]]
 name = "rimd"
 version = "0.0.2"
-source = "git+https://github.com/Ameobea/rimd.git#3450474f6803e792dc3a173d0596e8319785ef7d"
+source = "git+https://github.com/Ameobea/rimd.git#9f3a21adc92cd128b959835c292add6c39a4d93e"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "encoding 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",

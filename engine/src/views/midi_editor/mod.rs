@@ -10,7 +10,6 @@ use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
 pub mod prelude;
-pub mod state;
 
 pub struct MidiEditorGridHandler {
     pub synth: PolySynth,
@@ -33,7 +32,8 @@ impl GridRenderer<usize> for MidiEditorGridRenderer {}
 impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
     fn init(&mut self) {
         unsafe {
-            state::init_state();
+            skip_list::SKIP_LIST_NODE_DEBUG_POINTERS =
+                Box::into_raw(Box::new(skip_list::blank_shortcuts()));
         };
 
         js::init_midi_editor_ui();
@@ -422,7 +422,7 @@ pub fn mk_midi_editor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext>
     };
 
     let view_context = MidiEditorGridHandler::default();
-    let grid: Box<MidiGrid> = box Grid::new(conf, view_context, uuid);
+    let grid: Box<MidiGrid> = Box::new(Grid::new(conf, view_context, uuid));
 
     grid
 }
