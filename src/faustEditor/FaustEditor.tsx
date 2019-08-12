@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, Suspense, useRef } from 'react';
-import { connect } from 'react-redux';
+import { connect, useDispatch } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import ace from 'ace-builds';
 import * as R from 'ramda';
@@ -156,23 +156,25 @@ const EffectsPickerPanel = connect<
   {},
   EffectsPickerPanelPassedProps,
   ReduxState
->(({ effects: { sharedEffects } }) => ({
-  effects: sharedEffects,
-}))(EffectsPickerPanelInner);
-
-const saveCode = async (effect: Without<Effect, 'id'>) => {
-  const res = await fetch(`${BACKEND_BASE_URL}/effects`, {
-    method: 'POST',
-    body: JSON.stringify(effect),
-  });
-
-  if (!res.ok) {
-    console.error(`Error saving code: ${await res.text()}`);
-  }
-};
+>(({ effects: { sharedEffects } }) => ({ effects: sharedEffects }))(EffectsPickerPanelInner);
 
 const SaveControls = ({ editorContent }: { editorContent: string }) => {
-  const [state, setState] = useState({ title: '', description: '' });
+  const initialState = { title: '', description: '', saveStatus: '' };
+  const [state, setState] = useState(initialState);
+
+  const saveCode = async (effect: Without<Effect, 'id'>) => {
+    const res = await fetch(`${BACKEND_BASE_URL}/effects`, {
+      method: 'POST',
+      body: JSON.stringify(effect),
+    });
+
+    if (!res.ok) {
+      console.error(`Error saving code: ${await res.text()}`);
+      return;
+    }
+
+    setState({ ...initialState, saveStatus: 'Successfully saved!' });
+  };
 
   return (
     <div>
@@ -194,6 +196,7 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
       </p>
 
       <button onClick={() => saveCode({ code: editorContent, ...state })}>Save</button>
+      {state.saveStatus}
     </div>
   );
 };
@@ -211,6 +214,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
     externalAudioBufferSource,
     setExternalAudioBufferSource,
   ] = useState<AudioBufferSourceNode | null>(null);
+  const dispatch = useDispatch();
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<ControlPanelState>({});
   const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState | null>(
@@ -223,10 +227,8 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       return;
     }
 
-    console.log('Updating viz settings: ', vizSettingsState);
     updateVizSettings.current(vizSettingsState);
   }, [vizSettingsState]);
-  console.log({ updateVizSettings });
 
   const handleCompileButtonClick = useCallback(
     createCompileButtonClickHandler(editorContent, setCompileErrMsg),
@@ -258,7 +260,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
           theme='twilight'
           mode='text'
           showPrintMargin={false}
-          onChange={newValue => setEditorContent(newValue)}
+          onChange={newValue => dispatch(setEditorContent(newValue))}
           name='ace-editor'
           width='40vw'
           value={editorContent}

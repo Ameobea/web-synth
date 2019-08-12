@@ -17,16 +17,11 @@ for (let i = 0; i < PIXEL_BUFFER.length; i++) {
 
 let curIx = 0;
 
-interface SpectrumVisualizationProps {
-  settingsState: SettingsState;
-  setSettingsState: (newSettings: SettingsState) => void;
-}
-
 type ScalerFunction = (val: number) => number;
 
 const ScalerFunctions = {
-  linear: R.identity,
-  exponential: n => Math.pow(n, 3) / 65025,
+  linear: (n: number) => n,
+  exponential: (n: number) => Math.pow(n, 3) / 65025,
 };
 
 const ColorFunctions = {
@@ -53,7 +48,6 @@ export const initializeSpectrumVisualization = (
   canvas: HTMLCanvasElement,
   options: SettingsState = defaultSettingsState
 ) => {
-  console.trace(options);
   const state = { options };
 
   analyzerNode.fftSize = FFT_SIZE;
@@ -91,19 +85,17 @@ export const initializeSpectrumVisualization = (
   updateVisualization();
 
   return newOptions => {
-    console.log({ newOptions });
     state.options = newOptions;
   };
 };
 
-export const SpectrumVisualization: React.FunctionComponent<SpectrumVisualizationProps> = ({
-  settingsState,
-  setSettingsState,
-}) => (
+export const SpectrumVisualization: React.FC<{
+  settingsState: SettingsState;
+  setSettingsState: (newSettings: SettingsState) => void;
+}> = ({ settingsState, setSettingsState }) => (
   <ControlPanel
     state={settingsState}
     onChange={(_label: string, _value: any, newState) => {
-      console.log({ newState });
       setSettingsState(newState);
     }}
     settings={[

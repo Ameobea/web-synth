@@ -25,7 +25,7 @@ export interface UiGroup {
   type: string;
 }
 
-const buildControlPanelField = (def: UiDef): {} | null => {
+const buildControlPanelField = (def: UiDef): {} | {}[] | null => {
   const mapper = {
     hslider: ({ address, min, max, init, step }: UiDef) => ({
       type: 'range',
@@ -35,6 +35,10 @@ const buildControlPanelField = (def: UiDef): {} | null => {
       initial: init,
       step,
     }),
+    // TODO: Add label once `react-control-panel` supports that
+    vgroup: ({ items }: { label: string; items: UiDef[] }) => items.map(buildControlPanelField),
+    // TODO: Add label once `react-control-panel` supports that
+    hgroup: ({ items }: { label: string; items: UiDef[] }) => items.map(buildControlPanelField),
   }[def.type];
 
   if (!mapper) {
@@ -46,7 +50,7 @@ const buildControlPanelField = (def: UiDef): {} | null => {
 };
 
 const mapUiGroupToControlPanelFields = (group: UiGroup): {}[] =>
-  group.items.map(buildControlPanelField).filter((group): group is {} => !!group);
+  R.flatten(group.items.map(buildControlPanelField)).filter((group): group is {} => !!group);
 
 const buildControlPanel = (
   uiDef: UiGroup[],
@@ -65,6 +69,7 @@ const buildControlPanel = (
       position={{ top: 0, right: 20 }}
       settings={controlPanelFieldDefinitions}
       onChange={setParamValue}
+      width={500}
     />
   );
 };
