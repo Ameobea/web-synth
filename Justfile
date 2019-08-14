@@ -24,9 +24,11 @@ run-frontend:
 deploy:
   cd backend && just docker-build
   docker tag ameo/notes-backend:latest $BACKEND_IMAGE_NAME
+  docker push $BACKEND_IMAGE_NAME
 
   cd faust-compiler && just docker-build
   docker tag ameo/faust-compiler-server:latest $FAUST_COMPILER_IMAGE_NAME
+  docker push $FAUST_COMPILER_IMAGE_NAME
 
   gcloud beta run deploy $BACKEND_SERVICE_NAME \
     --platform managed \
@@ -35,5 +37,4 @@ deploy:
 
   gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
     --platform managed \
-    --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES" \
     --image $FAUST_COMPILER_IMAGE_NAME
