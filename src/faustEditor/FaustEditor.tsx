@@ -29,6 +29,7 @@ ace.require('ace/theme/twilight');
 const ReactAce = React.lazy(() => import('react-ace'));
 
 export interface FaustModuleInstance extends ScriptProcessorNode {
+  json_object: object;
   getParamValue: (path: string) => number;
   setParamValue: (path: string, val: number) => void;
 }
@@ -95,24 +96,14 @@ const createCompileButtonClickHandler = (
     return;
   }
 
-  // The JSON definition for the module is set as a HTTP header, which we must extract and parse.
-  const jsonModuleDefString = res.headers.get('X-Json-Module-Definition'.toLowerCase());
-  if (!jsonModuleDefString) {
-    setCompileErrMsg("The `X-Json-Module-Definition` header wasn't set on the response.");
-    return;
-  }
-
   setCompileErrMsg('');
-  // It's double JSON-encoded because of reasons
-  const dspDefProps = JSON.parse(JSON.parse('"' + jsonModuleDefString + '"'));
 
   const arrayBuffer = await res.arrayBuffer();
-
   const compiledModule = await WebAssembly.compile(arrayBuffer);
   const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
 
-  const faustInstance = await buildInstance(wasmInstance, dspDefProps);
-  store.dispatch(setActiveInstance(faustInstance, dspDefProps));
+  const faustInstance = await buildInstance(wasmInstance);
+  store.dispatch(setActiveInstance(faustInstance, faustInstance.json_object));
 };
 
 interface EffectsPickerPanelPassedProps {

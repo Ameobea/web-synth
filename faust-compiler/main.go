@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"regexp"
-	"strings"
 )
 
 func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, err error) {
@@ -28,7 +26,6 @@ func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, e
 func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 	// Add CORS headers
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
-	resWriter.Header().Set("Access-Control-Expose-Headers", "X-Json-Module-Definition")
 
 	if req.Method == "POST" {
 		req.ParseMultipartForm(10e8)
@@ -70,7 +67,6 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 
 	tmpFileBaseName := dsttempfile.Name()
 	outWasmFileName := fmt.Sprintf("%s.wasm", tmpFileBaseName)
-	outJsFileName := fmt.Sprintf("%s.js", tmpFileBaseName)
 
 	// Copy the uploaded file to the tempfile
 	io.Copy(srctmpfile, uploadedFile)
@@ -84,39 +80,11 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Open the created JS file containing the JSON definition of the created Wasm module
-	jsfileContentBytes, err := ioutil.ReadFile(outJsFileName)
-	if err != nil {
-		resWriter.WriteHeader(500)
-		fmt.Println("Error while opening output JS file", err)
-		resWriter.Write([]byte("Error while opening output JS file"))
-		return
-	}
-	jsFileContent := string(jsfileContentBytes)
-
-	// Extract the JSON definition from the JS file
-	pattern := regexp.MustCompile("return (?:'|\")(?P<Json>(?:.|\n)+)(?:'|\");")
-	match := pattern.FindStringSubmatch(jsFileContent)
-	if len(match) < 1 {
-		resWriter.WriteHeader(500)
-		errMsg := "Error while extracting JSON definition from output JS file; Regex didn't match capture group."
-		resWriter.Write([]byte(errMsg))
-		return
-	}
-
-	jsonDefinition := match[1]
-	// Clean up escaped single quotes since they're not valid
-	jsonDefinition = strings.ReplaceAll(jsonDefinition, "\\'", "'")
-
-	// Append the JSON definition as a HTTP header of the response
-	resWriter.Header().Set("X-Json-Module-Definition", jsonDefinition)
-
 	// Send the file back to the user
 	http.ServeFile(resWriter, req, outWasmFileName)
 
 	// Clean up the tempfiles
 	os.Remove(outWasmFileName)
-	os.Remove(outJsFileName)
 	os.Remove(tmpFileBaseName)
 }
 

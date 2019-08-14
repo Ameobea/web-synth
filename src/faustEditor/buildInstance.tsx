@@ -24,11 +24,15 @@ const getMicrophoneStream = (): Promise<MediaStream> =>
     fulfill(navigator.mediaDevices.getUserMedia({ audio: true }));
   });
 
-const buildInstance = async (wasmInstance: WebAssembly.Instance, dspDefProps: {}) => {
+const buildInstance = async (wasmInstance: WebAssembly.Instance) => {
   // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
-  const converterInstance = new FaustWasm2ScriptProcessor('name', dspDefProps, {
-    debug: false,
-  });
+  const converterInstance = new FaustWasm2ScriptProcessor(
+    'name',
+    {},
+    {
+      debug: false,
+    }
+  );
 
   const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 1024);
 

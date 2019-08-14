@@ -73,6 +73,7 @@ class FaustWasm2ScriptProcessor {
       return null;
     }
 
+    sp.json_object = this.json_object;
     sp.output_handler = null;
     sp.ins = null;
     sp.outs = null;
