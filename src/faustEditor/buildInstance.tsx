@@ -24,7 +24,10 @@ const getMicrophoneStream = (): Promise<MediaStream> =>
     fulfill(navigator.mediaDevices.getUserMedia({ audio: true }));
   });
 
-const buildInstance = async (wasmInstance: WebAssembly.Instance) => {
+const buildInstance = async (
+  wasmInstance: WebAssembly.Instance,
+  externalSource?: AudioScheduledSourceNode
+) => {
   // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
   const converterInstance = new FaustWasm2ScriptProcessor(
     'name',
@@ -36,8 +39,8 @@ const buildInstance = async (wasmInstance: WebAssembly.Instance) => {
 
   const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 1024);
 
-  const microphoneStream = await getMicrophoneStream();
-  const source = audioContext.createMediaStreamSource(microphoneStream);
+  const source =
+    externalSource || audioContext.createMediaStreamSource(await getMicrophoneStream());
 
   const canvas = document.getElementById('spectrum-visualizer')! as HTMLCanvasElement;
 

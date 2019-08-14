@@ -80,8 +80,9 @@ const enhance = connect<StateProps, {}, {}>(mapStateToProps);
 
 const createCompileButtonClickHandler = (
   editorContent: string,
-  setCompileErrMsg: (errMsg: string) => void
-) => async () => {
+  setCompileErrMsg: (errMsg: string) => void,
+  mediaFileSourceNode?: AudioScheduledSourceNode | null
+) => async (useMediaFile: boolean) => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
 
@@ -102,7 +103,14 @@ const createCompileButtonClickHandler = (
   const compiledModule = await WebAssembly.compile(arrayBuffer);
   const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
 
-  const faustInstance = await buildInstance(wasmInstance);
+  const faustInstance = await buildInstance(
+    wasmInstance,
+    useMediaFile ? mediaFileSourceNode : undefined
+  );
+  // Start the audio file playback
+  if (useMediaFile && mediaFileSourceNode) {
+    mediaFileSourceNode.start(0);
+  }
   store.dispatch(setActiveInstance(faustInstance, faustInstance.json_object));
 };
 
@@ -221,11 +229,6 @@ const FaustEditor: React.FunctionComponent<{}> = ({
     updateVizSettings.current(vizSettingsState);
   }, [vizSettingsState]);
 
-  const handleCompileButtonClick = useCallback(
-    createCompileButtonClickHandler(editorContent, setCompileErrMsg),
-    [editorContent, setCompileErrMsg]
-  );
-
   useEffect(() => {
     const audioData = controlPanelState['load file'];
     if (!audioData) {
@@ -237,12 +240,16 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       decodedAudioData => {
         const audioBufferSource = audioContext.createBufferSource();
         audioBufferSource.buffer = decodedAudioData;
-        audioBufferSource.connect(analyzerNode);
         setExternalAudioBufferSource(audioBufferSource);
       },
       err => setCompileErrMsg(`Error decoding provided audio file: ${err}`)
     );
   }, [controlPanelState['load file']]);
+
+  const compile = useCallback(
+    createCompileButtonClickHandler(editorContent, setCompileErrMsg, externalAudioBufferSource),
+    [editorContent, setCompileErrMsg, externalAudioBufferSource]
+  );
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
@@ -262,7 +269,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       </div>
 
       <div style={styles.buttonsWrapper}>
-        <button onClick={handleCompileButtonClick} style={{ marginRight: 10 }}>
+        <button onClick={() => compile(false)} style={{ marginRight: 10 }}>
           Compile
         </button>
         {instance ? (
@@ -275,10 +282,16 @@ const FaustEditor: React.FunctionComponent<{}> = ({
               const settingsUpdater = initializeSpectrumVisualization(analyzerNode, canvas);
               updateVizSettings.current = settingsUpdater;
               settingsUpdater(vizSettingsState);
+              externalAudioBufferSource.connect(analyzerNode);
               externalAudioBufferSource.start(0);
             }}
           >
             Start Audio File Playback
+          </button>
+        ) : null}
+        {externalAudioBufferSource ? (
+          <button onClick={() => compile(true)} style={{ marginRight: 10 }}>
+            Compile + Play Audio File
           </button>
         ) : null}
       </div>
