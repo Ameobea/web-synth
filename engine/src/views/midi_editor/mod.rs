@@ -106,7 +106,6 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         changed_region_1: &ChangedRegion,
         changed_region_2: &ChangedRegion,
     ) {
-        trace!("on_selection_region_update");
         // Look for all notes in the added/removed regions and add/remove them from the
         // selected notes set and select/deselect their UI representations
         for (was_added, region) in &[

@@ -71,8 +71,7 @@ pub fn init() {
     let _: usize = rng().gen();
 
     let log_level = if cfg!(debug_assertions) {
-        log::Level::Debug
-    // log::Level::Trace
+        log::Level::Trace
     } else {
         log::Level::Info
     };

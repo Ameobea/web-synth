@@ -32,7 +32,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           break;
         }
         case 'volume': {
-          synth.volume.set('volume', parseFloat(val));
+          synth.volume.set('volume', +val);
           break;
         }
         case 'adsr': {
@@ -64,7 +64,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
       position='top-right'
       draggable
       settings={[
-        { type: 'range', label: 'volume', min: -20, max: 20, initial: 0, steps: 200 },
+        { type: 'range', label: 'volume', min: -30, max: 20, initial: -16, steps: 200 },
         {
           type: 'select',
           label: 'oscillator.type',

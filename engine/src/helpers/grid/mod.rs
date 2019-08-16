@@ -401,7 +401,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     /// This is called when re-initializing
     fn rerender_all_notes(&self) {
         for note_data in self.state.data.iter() {
-            self.create_note(
+            self.render_note(
                 note_data.line_ix,
                 note_data.note_box.bounds.start_beat,
                 note_data.note_box.bounds.width(),
@@ -409,7 +409,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         }
     }
 
-    pub fn create_note(&self, line_ix: usize, start_beat: f32, width: f32) -> DomId {
+    pub fn render_note(&self, line_ix: usize, start_beat: f32, width: f32) -> DomId {
         R::create_note(
             self.state.conf.beats_to_px(start_beat),
             self.state.conf.cursor_gutter_height + self.state.conf.padded_line_height() * line_ix,
@@ -450,7 +450,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 
         match key {
             // Delete all currently selected notes
-            "Backspace" | "Delete" =>
+            "Backspace" | "Delete" => {
                 for note_data in self.state.selected_notes.drain() {
                     let removed_note = self
                         .state
@@ -462,7 +462,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                     self.handler.on_note_deleted(note_data.dom_id);
 
                     debug!("{:?}", self.state.data.lines[note_data.line_ix]);
-                },
+                }
+            },
             "p" => self.copy_selected_notes(),
             _ => self
                 .handler
@@ -906,19 +907,21 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         }
 
         let offset_beats = self.state.cursor_pos_beats - earliest_start_beat;
+
+        let cur_selected_notes = self.state.selected_notes.drain().collect::<Vec<_>>();
         let mut new_selected_notes = FnvHashSet::default();
         new_selected_notes.reserve(self.state.selected_notes.len());
+
+        trace!(
+            "Copying {} selected notes...",
+            self.state.selected_notes.len()
+        );
         for SelectedNoteData {
             start_beat,
             width,
             line_ix,
             dom_id,
-        } in self
-            .state
-            .selected_notes
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>()
+        } in cur_selected_notes
         {
             R::deselect_note(dom_id);
             let new_start_beat = start_beat + offset_beats;
@@ -934,25 +937,45 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                         .map(|end_bound| end_bound < new_end_beat)
                         .unwrap_or(false))
                 {
-                    // unable to place note at this position
+                    trace!("Unable to place a note at this location due to collision");
                     continue;
                 }
             }
 
-            let dom_id = self.create_note(line_ix, new_start_beat, width);
+            let new_dom_id = self.render_note(line_ix, new_start_beat, width);
             let new_note = NoteBox {
                 bounds: NoteBoxBounds {
                     start_beat: start_beat + offset_beats,
                     end_beat: start_beat + width + offset_beats,
                 },
-                data: self
-                    .handler
-                    .create_note(&mut self.state, line_ix, new_start_beat, dom_id),
+                data: self.handler.create_note(
+                    &mut self.state,
+                    line_ix,
+                    new_start_beat,
+                    new_dom_id,
+                ),
             };
-            new_selected_notes.insert(SelectedNoteData::from_note_box(line_ix, &new_note));
-            let insertion_failed = self.state.data.insert(line_ix, new_note);
-            debug_assert!(!insertion_failed.is_none());
-            R::select_note(dom_id);
+
+            let selected_note_data = SelectedNoteData::from_note_box(line_ix, &new_note);
+            trace!(
+                "Attempting to insert copied note at: line_id: {}, span: {:?}",
+                line_ix,
+                new_note
+            );
+            match self.state.data.insert(line_ix, new_note) {
+                Some(conflicting_note) => {
+                    trace!(
+                        "Failed to create note while copying; an existing note intersects it: {:?}",
+                        conflicting_note
+                    );
+                    js::delete_element(new_dom_id);
+                },
+                None => {
+                    trace!("Success.  Rendering + selecting.");
+                    new_selected_notes.insert(selected_note_data);
+                    R::select_note(new_dom_id);
+                },
+            }
         }
 
         // deselect the old notes and select the new ones
@@ -1030,7 +1053,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                 start_beat,
                 width,
             } = raw_note;
-            let dom_id = self.create_note(line_ix, start_beat, width);
+            let dom_id = self.render_note(line_ix, start_beat, width);
             let note_state = self
                 .handler
                 .create_note(&mut self.state, line_ix, start_beat, dom_id);

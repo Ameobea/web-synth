@@ -75,6 +75,7 @@ const getSynths = (): PolySynth[] => store.getState().synths.synths;
 
 export const init_synth = (voiceCount: number): number => {
   const synth = new PolySynth(voiceCount);
+  synth.volume.set('volume', -16);
   const oldSynthCount = getSynths().length;
   store.dispatch(synthActionCreators.setSynth(synth));
   return oldSynthCount;
