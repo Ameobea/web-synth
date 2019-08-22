@@ -142,6 +142,14 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
         dom_id: DomId,
     ) -> S;
 
+    fn cancel_note_create(
+        &mut self,
+        _grid_state: &mut GridState<S>,
+        line_ix: usize,
+        note_dom_id: DomId,
+    ) {
+    }
+
     fn on_note_move(
         &mut self,
         _grid_state: &mut GridState<S>,
@@ -804,7 +812,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             .state
             .conf
             .get_line_index(self.state.mouse_down_y)
-            .unwrap();
+            .expect("Tried to handle a `mouse_up` event, but we have no `mouse_down_y`");
 
         if let Some(dragging_note_data) = self.state.dragging_note_data {
             self.handler
@@ -815,6 +823,9 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             if let Some(note_dom_id) = self.state.drawing_note_dom_id {
                 let NoteBoxData { x, width } = self.compute_note_box_data(x);
                 if width == 0 {
+                    self.handler
+                        .cancel_note_create(&mut self.state, down_line_ix, note_dom_id);
+                    js::delete_element(note_dom_id);
                     return;
                 }
 
@@ -846,7 +857,11 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                 // Actually insert the node into the skip list
                 self.state.data.insert(line_ix, note);
                 debug!("{:?}", self.state.data.lines[line_ix]);
+            } else {
+                return;
             }
+
+            self.state.drawing_note_dom_id = None;
         }
     }
 
@@ -996,6 +1011,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     /// as well as snapping to the start/end of the current interval.
     pub fn compute_note_box_data(&self, x: usize) -> NoteBoxData {
         let (low_bound, high_bound) = self.state.cur_note_bounds;
+        let high_bound = high_bound.unwrap_or(f32::INFINITY);
 
         let source_beat = self.state.conf.px_to_beat(self.state.mouse_down_x);
         let source_interval = source_beat / self.state.conf.note_snap_beat_interval;
@@ -1008,11 +1024,35 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             (source_interval, cur_interval)
         };
 
-        let start_beat =
-            (start_interval.trunc() * self.state.conf.note_snap_beat_interval).max(low_bound);
-        let end_beat = (end_interval.ceil() * self.state.conf.note_snap_beat_interval)
-            .min(high_bound.unwrap_or(f32::INFINITY));
-        let width_beats = end_beat - start_beat;
+        let mut start_beat = clamp(
+            start_interval.trunc() * self.state.conf.note_snap_beat_interval,
+            low_bound,
+            high_bound,
+        );
+        let mut end_beat = clamp(
+            (end_interval.ceil() * self.state.conf.note_snap_beat_interval),
+            low_bound,
+            high_bound,
+        );
+        let mut width_beats = end_beat - start_beat;
+
+        // If we're trying to draw a note immediately to the right of an existing note and are
+        // dragging it left causing its width to get set to zero, try to preserve at least one
+        // `note_snap_beat_interval` of size to the right if we have room for it.
+        if width_beats == 0. && cur_beat <= source_beat {
+            let start_interval = source_interval.trunc();
+            start_beat = clamp(
+                (start_interval * self.state.conf.note_snap_beat_interval),
+                low_bound,
+                high_bound,
+            );
+            end_beat = clamp(
+                start_beat + self.state.conf.note_snap_beat_interval,
+                low_bound,
+                high_bound,
+            );
+            width_beats = end_beat - start_beat
+        }
 
         NoteBoxData {
             x: self.state.conf.beats_to_px(start_beat),

@@ -93,6 +93,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         let SelectedNoteData { line_ix, .. } =
             SelectedNoteData::from_note_box(line_ix, clicked_note_box);
 
+        trace!("Triggering attack of line_ix {}", line_ix);
         if grid_state.cur_tool == Tool::DrawNote && !grid_state.shift_pressed {
             self.synth
                 .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
@@ -167,12 +168,24 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         _start_beat: f32,
         dom_id: usize,
     ) -> DomId {
+        trace!("Triggering release of note on line_ix {}", line_ix);
         self.synth
             .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
 
         // Right now, we don't have any additional data to store for notes outside of their actual
         // position on the grid and line index, so we just use their `dom_id` as their state.
         dom_id
+    }
+
+    fn cancel_note_create(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        line_ix: usize,
+        _note_dom_id: DomId,
+    ) {
+        trace!("Triggering release of note on line_ix {}", line_ix);
+        self.synth
+            .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
     }
 
     fn on_note_move(
@@ -195,6 +208,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
     }
 
     fn on_note_draw_start(&mut self, grid_state: &mut GridState<usize>, line_ix: usize) {
+        trace!("triggering attack on line_ix {}", line_ix);
         self.synth
             .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
     }
@@ -204,6 +218,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         grid_state: &mut GridState<usize>,
         dragging_note_data: &(f32, SelectedNoteData),
     ) {
+        trace!(
+            "Triggering attack on line_ix {}",
+            dragging_note_data.1.line_ix
+        );
         self.synth.trigger_attack(
             self.midi_to_frequency(grid_state.conf.row_count, dragging_note_data.1.line_ix),
         );
@@ -214,6 +232,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         grid_state: &mut GridState<usize>,
         dragging_note_data: &(f32, SelectedNoteData),
     ) {
+        trace!(
+            "Triggering release on line_ix {}",
+            dragging_note_data.1.line_ix
+        );
         self.synth.trigger_release(
             self.midi_to_frequency(grid_state.conf.row_count, dragging_note_data.1.line_ix),
         );
