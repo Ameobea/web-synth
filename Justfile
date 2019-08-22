@@ -21,6 +21,8 @@ run:
 run-frontend:
   yarn start
 
+bump := "patch"
+
 deploy:
   cd backend && just docker-build
   docker tag ameo/notes-backend:latest $BACKEND_IMAGE_NAME
@@ -30,6 +32,8 @@ deploy:
   docker tag ameo/faust-compiler-server:latest $FAUST_COMPILER_IMAGE_NAME
   docker push $FAUST_COMPILER_IMAGE_NAME
 
+  gcloud config set run/region $GCLOUD_REGION
+
   gcloud beta run deploy $BACKEND_SERVICE_NAME \
     --platform managed \
     --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES" \
@@ -38,3 +42,6 @@ deploy:
   gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
     --platform managed \
     --image $FAUST_COMPILER_IMAGE_NAME
+
+  just build-all
+  phost update notes {{bump}} ./dist
