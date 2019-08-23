@@ -5,6 +5,7 @@ import downloadjs from 'downloadjs';
 
 import { PolySynth } from '../synth';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
+import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
 import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
 
 export const mkBitcrusher = () => new BitCrusher(5).toMaster();
@@ -46,10 +47,10 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           const midiModule = await import('../midi');
           const rawNoteData: Uint8Array = await midiModule.load_midi_to_raw_note_bytes(
             bytes,
-            rawInfo => {
-              const info = JSON.parse(rawInfo);
-              console.log({ info });
-              return Promise.resolve(1);
+            (rawInfo: string): Promise<number> => {
+              const fileInfo: MidiFileInfo = JSON.parse(rawInfo);
+              // TODO: eventually we'll want to pass back a more complicated type than this
+              return getMidiImportSettings(fileInfo).then(settings => settings.track);
             }
           );
           console.log('Loaded raw note data: ', rawNoteData);
@@ -86,7 +87,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           label: 'export midi',
           action: async () => {
             const midiModule = await import('../midi');
-            const noteData = engine.handle_message('export_midi', '');
+            const noteData = engine.handle_message('export_midi', new Uint8Array());
             const midiFileBytes = midiModule.write_to_midi('midi_export', noteData);
             downloadjs(new Blob([midiFileBytes]), 'composition.midi', 'application/x-midi');
           },

@@ -1,0 +1,12 @@
+.midi-import-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  min-height: 400px;
+  margin: auto;
+
+  .track-input-item {
+    display: flex;
+    flex-direction: row;
+  }
+}

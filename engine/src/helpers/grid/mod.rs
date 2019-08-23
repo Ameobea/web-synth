@@ -1,4 +1,4 @@
-use std::{f32, marker::PhantomData, str};
+use std::{f32, marker::PhantomData, mem, str};
 
 use fnv::FnvHashSet;
 use uuid::Uuid;
@@ -883,6 +883,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
                     },
                 };
 
+                self.reset();
                 self.insert_raw_notes(raw_note_data);
                 return Some(vec![0]);
             },
@@ -1049,7 +1050,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             high_bound,
         );
         let mut end_beat = clamp(
-            (end_interval.ceil() * self.state.conf.note_snap_beat_interval),
+            end_interval.ceil() * self.state.conf.note_snap_beat_interval,
             low_bound,
             high_bound,
         );
@@ -1061,7 +1062,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         if width_beats == 0. && cur_beat <= source_beat {
             let start_interval = source_interval.trunc();
             start_beat = clamp(
-                (start_interval * self.state.conf.note_snap_beat_interval),
+                start_interval * self.state.conf.note_snap_beat_interval,
                 low_bound,
                 high_bound,
             );
@@ -1122,6 +1123,20 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             });
             debug_assert!(insertion_error.is_none());
         }
+    }
+
+    fn reset(&mut self) {
+        let new_state = GridState::new(self.state.conf.clone());
+        let old_state = mem::replace(&mut self.state, new_state);
+
+        // Remove all notes from the DOM
+        for note in old_state.data.iter() {
+            let dom_id = note.note_box.data.get_id();
+            js::delete_element(dom_id);
+        }
+
+        // Reset cursor to initial position
+        self.set_cursor_pos(0.);
     }
 
     pub fn try_load_saved_composition(&mut self) {

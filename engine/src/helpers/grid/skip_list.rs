@@ -319,7 +319,6 @@ impl<S: GridRendererUniqueIdentifier> NoteSkipListNode<S> {
 
 #[derive(Clone)]
 pub struct NoteSkipList<S> {
-    // pub notes: Slab<NoteBox<S>>,
     pub nodes: Slab<NoteSkipListNode<S>>,
     pub head_key: Option<NodeSlabKey<S>>,
 }
