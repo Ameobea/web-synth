@@ -108,73 +108,88 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], track_to_read: usize) -> V
     let mut notes: Vec<RawNoteData> = Vec::new();
     let mut on_notes: [u64; 255] = [NO_PLAYING_NOTE; 255];
 
-    // TODO: Convert this to context struct rather than all these args
-    let handle_note_off =
-        |cur_vtime: u64, on_notes: &mut [u64; 255], notes: &mut Vec<RawNoteData>, data: &[u8]| {
-            let note_id = data[1];
-            let velocity = data[2];
-            info!(
-                "Note off event; vtime: {}, note_id: {}, velocity: {}",
-                cur_vtime, note_id, velocity
-            );
+    struct NoteParseContext<'a> {
+        cur_vtime: u64,
+        on_notes: &'a mut [u64; 255],
+        notes: &'a mut Vec<RawNoteData>,
+        data: &'a [u8],
+    }
 
-            if on_notes[note_id as usize] == NO_PLAYING_NOTE {
-                warn!("Tried to turn off note id {} but it's not playing", note_id);
-                return;
-            }
+    let handle_note_off = |NoteParseContext {
+                               cur_vtime,
+                               on_notes,
+                               notes,
+                               data,
+                           }: &mut NoteParseContext| {
+        let note_id = data[1];
+        let velocity = data[2];
+        info!(
+            "Note off event; vtime: {}, note_id: {}, velocity: {}",
+            cur_vtime, note_id, velocity
+        );
 
-            let note_beats = ticks_to_beats(cur_vtime - on_notes[note_id as usize]);
-            let note_data = RawNoteData {
-                line_ix: note_id as usize, // TODO: Properly convert this once we know how
-                start_beat: ticks_to_beats(on_notes[note_id as usize]),
-                width: note_beats,
-            };
-            notes.push(note_data);
+        if on_notes[note_id as usize] == NO_PLAYING_NOTE {
+            warn!("Tried to turn off note id {} but it's not playing", note_id);
+            return;
+        }
 
-            on_notes[note_id as usize] = NO_PLAYING_NOTE;
+        let note_beats = ticks_to_beats(*cur_vtime - on_notes[note_id as usize]);
+        let note_data = RawNoteData {
+            line_ix: note_id as usize, // TODO: Properly convert this once we know how
+            start_beat: ticks_to_beats(on_notes[note_id as usize]),
+            width: note_beats,
         };
+        notes.push(note_data);
 
-    // TODO: Convert this to context struct rather than all these args
-    let handle_note_on =
-        |cur_vtime: u64, on_notes: &mut [u64; 255], notes: &mut Vec<RawNoteData>, data: &[u8]| {
-            let note_id = data[1];
-            let velocity = data[2];
-            info!(
-                "Note on event; vtime: {}, note_id: {}, velocity: {}",
-                cur_vtime, note_id, velocity
+        on_notes[note_id as usize] = NO_PLAYING_NOTE;
+    };
+
+    let handle_note_on = |context: &mut NoteParseContext| {
+        let note_id = context.data[1];
+        let velocity = context.data[2];
+        info!(
+            "Note on event; vtime: {}, note_id: {}, velocity: {}",
+            context.cur_vtime, note_id, velocity
+        );
+
+        if velocity == 0 {
+            info!("Velocity is zero; handling as note off event.");
+            handle_note_off(context);
+        }
+
+        if context.on_notes[note_id as usize] != NO_PLAYING_NOTE {
+            warn!(
+                "Tried to start note id {} but it's already playing",
+                note_id
             );
+            return;
+        }
 
-            if velocity == 0 {
-                info!("Velocity is zero; handling as note off event.");
-                handle_note_off(cur_vtime, on_notes, notes, data);
-            }
-
-            if on_notes[note_id as usize] != NO_PLAYING_NOTE {
-                warn!(
-                    "Tried to start note id {} but it's already playing",
-                    note_id
-                );
-                return;
-            }
-
-            on_notes[note_id as usize] = cur_vtime;
-        };
+        context.on_notes[note_id as usize] = context.cur_vtime;
+    };
 
     for TrackEvent { vtime, event } in &track.events {
         cur_vtime += vtime;
 
         match event {
             Event::Meta(meta_evt) => info!("Ignoring meta event: {:?}", meta_evt),
-            Event::Midi(midi_evt) => match midi_evt.status() {
-                Status::NoteOn =>
-                    handle_note_on(cur_vtime, &mut on_notes, &mut notes, &midi_evt.data),
-                Status::NoteOff =>
-                    handle_note_off(cur_vtime, &mut on_notes, &mut notes, &midi_evt.data),
-                _ => info!(
-                    "Unhandled MIDI event of type {:?}: {:?}",
-                    midi_evt.status(),
-                    midi_evt
-                ),
+            Event::Midi(midi_evt) => {
+                let mut context = NoteParseContext {
+                    cur_vtime,
+                    on_notes: &mut on_notes,
+                    notes: &mut notes,
+                    data: &midi_evt.data,
+                };
+
+                match midi_evt.status() {
+                    Status::NoteOn => handle_note_on(&mut context),
+                    Status::NoteOff => handle_note_off(&mut context),
+                    _ => info!(
+                        "Unhandled MIDI event of type {:?}: {:?}",
+                        midi_evt.status(),
+                        midi_evt
+                    ),
+                }
             },
         }
     }
