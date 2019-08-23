@@ -46,6 +46,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           const midiModule = await import('../midi');
           const rawNoteData = midiModule.load_midi_to_raw_note_bytes(bytes, 1);
           console.log('Loaded raw note data: ', rawNoteData);
+          engine.handle_message('set_raw_note_data', rawNoteData);
           break;
         }
         default: {

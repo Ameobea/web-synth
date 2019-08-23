@@ -3,7 +3,7 @@
 /// Height of one of the lines rendered in the grid
 pub const LINE_HEIGHT: usize = 12;
 pub const NOTES_PER_OCTAVE: usize = 12; // A,Bb,B,C,C#,D,Eb,E,F,F#,G,Ab
-pub const OCTAVES: usize = 5;
+pub const OCTAVES: usize = 8;
 pub const LINE_COUNT: usize = OCTAVES * NOTES_PER_OCTAVE;
 pub const CURSOR_GUTTER_HEIGHT: usize = 16;
 pub const LINE_BORDER_WIDTH: usize = 1;

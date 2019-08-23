@@ -180,10 +180,15 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
     fn handle_message(
         &mut self,
         _grid_state: &mut GridState<S>,
-        _key: &str,
-        _val: &str,
+        key: &str,
+        _val: &[u8],
     ) -> Option<Vec<u8>> {
-        None
+        match key {
+            _ => {
+                warn!("Ignoring unhandled message of type \"key\" in grid");
+                None
+            },
+        }
     }
 }
 
@@ -867,8 +872,22 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
 
-    fn handle_message(&mut self, key: &str, val: &str) -> Option<Vec<u8>> {
-        self.handler.handle_message(&mut self.state, key, val)
+    fn handle_message(&mut self, key: &str, val: &[u8]) -> Option<Vec<u8>> {
+        match key {
+            "set_raw_note_data" => {
+                let raw_note_data: Vec<RawNoteData> = match bincode::deserialize(val) {
+                    Ok(raw_note_data) => raw_note_data,
+                    Err(err) => {
+                        error!("Error decoding `RawNoteData`: {:?}", err);
+                        return Some(vec![1]);
+                    },
+                };
+
+                self.insert_raw_notes(raw_note_data);
+                return Some(vec![0]);
+            },
+            _ => self.handler.handle_message(&mut self.state, key, val),
+        }
     }
 
     fn save(&mut self) -> String {
@@ -1077,16 +1096,9 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         }
     }
 
-    pub fn try_load_saved_composition(&mut self) {
-        let base64_data: String = match js::get_localstorage_key(&self.get_state_key()) {
-            Some(data) => data,
-            None => return,
-        };
-
-        let decoded_bytes: Vec<u8> =
-            base64::decode(&base64_data).expect("Invalid base64 was saved.");
-        let raw_notes: Vec<RawNoteData> = bincode::deserialize(&decoded_bytes)
-            .expect("Unable to decode saved composition from raw bytes.");
+    /// Inserts all of the notes in the provided array of raw note data, rendering them
+    /// as they are inserted into the internal skip list data structure as well.
+    fn insert_raw_notes(&mut self, raw_notes: Vec<RawNoteData>) {
         for raw_note in raw_notes {
             let RawNoteData {
                 line_ix,
@@ -1110,6 +1122,20 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             });
             debug_assert!(insertion_error.is_none());
         }
+    }
+
+    pub fn try_load_saved_composition(&mut self) {
+        let base64_data: String = match js::get_localstorage_key(&self.get_state_key()) {
+            Some(data) => data,
+            None => return,
+        };
+
+        let decoded_bytes: Vec<u8> =
+            base64::decode(&base64_data).expect("Invalid base64 was saved.");
+        let raw_notes: Vec<RawNoteData> = bincode::deserialize(&decoded_bytes)
+            .expect("Unable to decode saved composition from raw bytes.");
+
+        self.insert_raw_notes(raw_notes);
     }
 
     pub fn update_selection_box(

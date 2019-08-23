@@ -34,5 +34,8 @@ pub trait ViewContext {
     fn handle_mouse_up(&mut self, _x: usize, _y: usize) {}
     fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
 
-    fn handle_message(&mut self, _key: &str, _val: &str) -> Option<Vec<u8>> { None }
+    /// A function that will be called with arbitrary messages containing binary data to be handled
+    /// in an arbitrary manner by the view context.  Each message includes a type which can be used
+    /// to identify it.
+    fn handle_message(&mut self, _key: &str, _val: &[u8]) -> Option<Vec<u8>> { None }
 }

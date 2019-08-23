@@ -245,7 +245,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         &mut self,
         grid_state: &mut GridState<usize>,
         key: &str,
-        _val: &str,
+        _val: &[u8],
     ) -> Option<Vec<u8>> {
         match key {
             "export_midi" => Some(grid_state.serialize_to_binary()),

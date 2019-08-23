@@ -9,7 +9,7 @@ use std::num::NonZeroU32;
 
 use engine::{
     helpers::grid::{note_box::NoteBox, skip_list::*},
-    views::midi_editor::prelude::{state::*, *},
+    views::midi_editor::prelude::*,
 };
 use rand::prelude::*;
 

@@ -60,10 +60,10 @@ pub fn init() {
     unsafe {
         // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
         // some actual RNG from JS so that things aren't deterministic.
-        RNG = Box::into_raw(box Pcg32::new(
+        RNG = Box::into_raw(Box::new(Pcg32::new(
             mem::transmute(js::js_random()),
             721_347_520_420_481_703,
-        ))
+        )))
     }
 
     // Pump it a few times because it seems to generate a fully null output the first time
@@ -78,7 +78,7 @@ pub fn init() {
     wasm_logger::init(wasm_logger::Config::new(log_level));
 
     // Create the `ViewContextManager` and initialize it, then set it into the global
-    let mut vcm = box ViewContextManager::default();
+    let mut vcm = Box::new(ViewContextManager::default());
     vcm.init();
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
 }
