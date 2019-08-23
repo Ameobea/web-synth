@@ -21,7 +21,7 @@ run:
 run-frontend:
   yarn start
 
-bump := "patch"
+#bump := "patch"
 
 deploy:
   cd backend && just docker-build
@@ -44,4 +44,4 @@ deploy:
     --image $FAUST_COMPILER_IMAGE_NAME
 
   just build-all
-  phost update notes {{bump}} ./dist
+  phost update notes patch ./dist

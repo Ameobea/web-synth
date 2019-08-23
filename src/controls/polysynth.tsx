@@ -44,7 +44,14 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           console.log('loaded file: ', uploadedFile);
           const bytes = new Uint8Array(uploadedFile.fileContent);
           const midiModule = await import('../midi');
-          const rawNoteData = midiModule.load_midi_to_raw_note_bytes(bytes, 1);
+          const rawNoteData: Uint8Array = await midiModule.load_midi_to_raw_note_bytes(
+            bytes,
+            rawInfo => {
+              const info = JSON.parse(rawInfo);
+              console.log({ info });
+              return Promise.resolve(1);
+            }
+          );
           console.log('Loaded raw note data: ', rawNoteData);
           engine.handle_message('set_raw_note_data', rawNoteData);
           break;
