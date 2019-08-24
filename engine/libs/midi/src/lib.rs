@@ -15,13 +15,7 @@ use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use common::RawNoteData;
 use rimd::{AbsoluteEvent, Event, MidiMessage, SMFWriter, Status, TrackEvent, SMF};
 
-const TICKS_PER_BEAT: u64 = 512;
-
 const NO_PLAYING_NOTE: u64 = u64::MAX;
-
-const fn beats_to_ticks(beats: f32) -> u64 { (beats * (TICKS_PER_BEAT as f32)) as u64 }
-
-const fn ticks_to_beats(ticks: u64) -> f32 { ticks as f32 / TICKS_PER_BEAT as f32 }
 
 static mut INITED: bool = false;
 
@@ -40,6 +34,7 @@ fn maybe_init() {
 
 #[wasm_bindgen]
 pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
+    let ticks_per_beat = 256.;
     maybe_init();
 
     let notes: Vec<RawNoteData> =
@@ -48,8 +43,8 @@ pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
     let mut builder = rimd::SMFBuilder::new();
     let mut midi_events = Vec::with_capacity(notes.len() * 2);
     for note in notes {
-        let start_ticks = beats_to_ticks(note.start_beat);
-        let end_ticks = start_ticks + beats_to_ticks(note.width);
+        let start_ticks = (note.start_beat * ticks_per_beat) as u64;
+        let end_ticks = start_ticks + (note.width * ticks_per_beat) as u64;
 
         midi_events.push(AbsoluteEvent::new_midi(
             start_ticks,
@@ -60,10 +55,12 @@ pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
             MidiMessage::note_off(note.line_ix as u8, 255, 0),
         ))
     }
+    midi_events.sort_unstable_by_key(|evt| evt.get_time());
     builder.add_static_track(midi_events.iter());
     builder.set_name(0, name);
 
-    let midi_file = builder.result();
+    let mut midi_file = builder.result();
+    midi_file.division = ticks_per_beat as i16;
 
     let mut output: Vec<u8> = Vec::new();
     SMFWriter::from_smf(midi_file)
@@ -82,6 +79,13 @@ pub struct MIDITrackInfo {
 pub struct MIDIFileInfo {
     pub tracks: Vec<MIDITrackInfo>,
     pub division: i16,
+}
+
+/// This settings object is returned from the JS side as the output of a form that tue user fills
+/// in when loading a track.
+#[derive(Deserialize)]
+pub struct MidiLoadSettings {
+    pub track_ix: usize,
 }
 
 impl From<&SMF> for MIDIFileInfo {
@@ -112,6 +116,12 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
 
     let mut reader = BufReader::new(file_bytes);
     let midi_file = SMF::from_reader(&mut reader).expect("Failed to parse supplied SMF file");
+    let ticks_per_beat = midi_file.division;
+    info!("ticks per beat: {}", ticks_per_beat);
+    if ticks_per_beat <= 0 {
+        panic!("Invalid `division` on MIDI file: {}", ticks_per_beat);
+    }
+    let ticks_per_beat = ticks_per_beat as f32;
     let track_titles_str = midi_file
         .tracks
         .iter()
@@ -192,9 +202,11 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
                                }: &mut NoteParseContext| {
             let note_id = data[1];
             let velocity = data[2];
-            info!(
+            trace!(
                 "Note off event; vtime: {}, note_id: {}, velocity: {}",
-                cur_vtime, note_id, velocity
+                cur_vtime,
+                note_id,
+                velocity
             );
 
             if on_notes[note_id as usize] == NO_PLAYING_NOTE {
@@ -202,11 +214,13 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
                 return;
             }
 
-            let note_beats = ticks_to_beats(*cur_vtime - on_notes[note_id as usize]);
+            let note_start_ticks = on_notes[note_id as usize];
+            let note_duration_beats = (*cur_vtime - note_start_ticks) as f32 / ticks_per_beat;
+            let note_start_beats = note_start_ticks as f32 / ticks_per_beat;
             let note_data = RawNoteData {
                 line_ix: note_id as usize, // TODO: Properly convert this once we know how
-                start_beat: ticks_to_beats(on_notes[note_id as usize]),
-                width: note_beats,
+                start_beat: note_start_beats,
+                width: note_duration_beats,
             };
             notes.push(note_data);
 
