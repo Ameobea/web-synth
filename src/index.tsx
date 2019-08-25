@@ -212,9 +212,13 @@ wasm.then(engine => {
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());
 
-  document.addEventListener('keydown', evt =>
-    engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey)
-  );
+  document.addEventListener('keydown', evt => {
+    engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);
+    // Prevent spacebar from scrolling down the page
+    if (evt.code === 'Space') {
+      evt.preventDefault();
+    }
+  });
   document.addEventListener('keyup', evt =>
     engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey)
   );

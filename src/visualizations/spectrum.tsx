@@ -1,6 +1,5 @@
 import React from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 import chroma from 'chroma-js';
 
 const FFT_SIZE = Math.pow(2, 14);
@@ -16,8 +15,6 @@ for (let i = 0; i < PIXEL_BUFFER.length; i++) {
 }
 
 let curIx = 0;
-
-type ScalerFunction = (val: number) => number;
 
 const ScalerFunctions = {
   linear: (n: number) => n,

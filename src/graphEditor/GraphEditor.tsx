@@ -4,27 +4,31 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-
 import { LiteGraph } from 'litegraph.js';
+import 'litegraph.js/css/litegraph.css';
+import ControlPanel, { Button } from 'react-control-panel';
+
+import './GraphEditor.scss';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
 /**
- * Mapping of `stateKey`s to functions that return the current state of that instance
+ * Mapping of `stateKey`s to the graph instances that that they manage
  */
-const instanceCbs: { [stateKey: string]: () => object } = {};
+const instaceMap: { [stateKey: string]: any } = {};
 
 export const saveStateForInstance = (stateKey: string) => {
-  const getInstanceState = instanceCbs[stateKey];
-  if (!getInstanceState) {
+  const instance = instaceMap[stateKey];
+  if (!instance) {
     console.error(`No entry in \`instanceCbs\` for instance with stateKey "${stateKey}"`);
     return;
   }
 
-  const state = getInstanceState();
+  const state = instance.serialize();
   localStorage.setItem(stateKey, JSON.stringify(state));
+  instance.stop();
 
-  delete instanceCbs[stateKey];
+  delete instaceMap[stateKey];
 };
 
 const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
@@ -65,7 +69,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     setLGraphInstance(graph);
 
     // Set an entry into the mapping so that we can get the current instance's state before unmounting
-    instanceCbs[stateKey] = () => graph.serialize();
+    instaceMap[stateKey] = graph;
   });
 
   const uiControls = useMemo(
@@ -80,15 +84,18 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   );
 
   return (
-    <div>
+    <div className='graph-editor-container'>
       <canvas
         ref={ref => (canvasRef.current = ref)}
         id='graph-editor'
         width={800}
         height={600}
       ></canvas>
-      <button onClick={uiControls.arrange}>Arrange</button>
-      <button onClick={uiControls.clear}>Clear</button>
+
+      <ControlPanel>
+        <Button label='arrange' action={uiControls.arrange} />
+        <Button label='clear' action={uiControls.clear} />
+      </ControlPanel>
     </div>
   );
 };
