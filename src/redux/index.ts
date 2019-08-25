@@ -23,4 +23,6 @@ const rootReducer = combineReducers(reducers);
 
 export const store = createStore(rootReducer, {}, composeEnhancers());
 
+(window as any).getState = () => store.getState();
+
 export type State = StateType<typeof rootReducer>;
