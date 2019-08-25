@@ -145,8 +145,8 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
     fn cancel_note_create(
         &mut self,
         _grid_state: &mut GridState<S>,
-        line_ix: usize,
-        note_dom_id: DomId,
+        _line_ix: usize,
+        _note_dom_id: DomId,
     ) {
     }
 

@@ -3608,6 +3608,11 @@ levn@^0.3.0, levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
+litegraph.js@^0.7.0:
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/litegraph.js/-/litegraph.js-0.7.0.tgz#cfe1e9dfcca1aa1c0f4ab1f35048531c2753b55b"
+  integrity sha512-IAFE+92moYuHlmmDjcJjC/orP/xfBuILKjSCImr5PlEcohdXUr5kj4rBgnmTviEZY8i6KUhgYO97kHmhxrvvlg==
+
 load-json-file@^1.0.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/load-json-file/-/load-json-file-1.1.0.tgz#956905708d58b4bab4c2261b04f59f31c99374c0"

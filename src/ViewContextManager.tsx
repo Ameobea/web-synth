@@ -26,6 +26,7 @@ const viewContexts = [
   { children: 'C', name: 'clip_compositor', displayName: 'Clip Compositor' },
   { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor' },
   { children: 'F', name: 'faust_editor', displayName: 'Faust Code Editor' },
+  { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },
 ];
 
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {

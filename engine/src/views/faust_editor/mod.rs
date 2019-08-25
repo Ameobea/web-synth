@@ -40,5 +40,5 @@ pub fn mk_faust_editor(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn View
             serde_json::from_str(definition).expect("Error while deserializing `FaustEditor`"),
         None => FaustEditor::new(uuid),
     };
-    box faust_editor
+    Box::new(faust_editor)
 }

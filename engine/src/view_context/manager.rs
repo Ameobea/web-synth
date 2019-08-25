@@ -5,6 +5,7 @@ use super::{
     super::views::{
         clip_compositor::mk_clip_compositor,
         faust_editor::{mk_faust_editor, FaustEditor},
+        graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
     },
     ViewContext,
@@ -353,6 +354,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "midi_editor" => mk_midi_editor(conf, uuid),
         "clip_compositor" => mk_clip_compositor(conf, uuid),
         "faust_editor" => mk_faust_editor(conf, uuid),
+        "graph_editor" => mk_graph_editor(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

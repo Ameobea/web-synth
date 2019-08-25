@@ -68,3 +68,12 @@ extern "C" {
 
     pub fn get_faust_editor_content() -> String;
 }
+
+#[wasm_bindgen(raw_module = "./graphEditor")]
+extern "C" {
+    pub fn init_graph_editor(state_key: &str);
+
+    pub fn cleanup_graph_editor() -> String;
+
+    pub fn get_graph_editor_content() -> String;
+}
