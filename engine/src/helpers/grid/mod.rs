@@ -451,6 +451,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 
     fn cleanup(&mut self) {
         js::clear_canvases();
+        js::cleanup_midi_editor();
         self.serialize_and_save();
         self.handler.cleanup(&mut self.state);
     }

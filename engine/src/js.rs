@@ -73,7 +73,12 @@ extern "C" {
 extern "C" {
     pub fn init_graph_editor(state_key: &str);
 
-    pub fn cleanup_graph_editor() -> String;
+    pub fn cleanup_graph_editor(state_key: &str);
+}
 
-    pub fn get_graph_editor_content() -> String;
+#[wasm_bindgen(raw_module = "./midiEditor")]
+extern "C" {
+    pub fn init_midi_editor();
+
+    pub fn cleanup_midi_editor();
 }

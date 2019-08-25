@@ -22,10 +22,7 @@ impl GraphEditor {
 impl ViewContext for GraphEditor {
     fn init(&mut self) { js::init_graph_editor(&self.get_state_key()); }
 
-    fn cleanup(&mut self) {
-        let graph_editor_content = js::cleanup_graph_editor();
-        js::set_localstorage_key(&self.get_state_key(), &graph_editor_content)
-    }
+    fn cleanup(&mut self) { js::cleanup_graph_editor(&self.get_state_key()); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
