@@ -8,10 +8,8 @@ import { LiteGraph } from 'litegraph.js';
 import 'litegraph.js/css/litegraph.css';
 import ControlPanel, { Button } from 'react-control-panel';
 
-import { store } from '../redux';
-import { registerFaustNode } from './nodes/Faust';
 import './GraphEditor.scss';
-import { fetchEffects } from '../controls/EffectPicker';
+import { registerAllCustomNodes } from './nodes';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
@@ -29,7 +27,7 @@ export const saveStateForInstance = (stateKey: string) => {
 
   const state = instance.serialize();
   localStorage.setItem(stateKey, JSON.stringify(state));
-  instance.stop();
+  // instance.stop();
 
   delete instaceMap[stateKey];
 };
@@ -46,22 +44,8 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     isInitialized.current = true;
 
     (async () => {
-      // Fetch the list of all available Faust modules if we don't have it loaded
-      let availableModules:
-        | {
-            id: number;
-            title: string;
-            description: string;
-            code: string;
-          }[]
-        | undefined = store.getState().effects.sharedEffects;
-
-      if (availableModules) {
-        availableModules = await fetchEffects();
-      }
-
       // Register custom node types
-      registerFaustNode(availableModules);
+      await registerAllCustomNodes();
 
       const graph = new LiteGraph.LGraph();
       new LiteGraph.LGraphCanvas('#graph-editor', graph);

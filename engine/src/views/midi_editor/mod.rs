@@ -15,10 +15,10 @@ pub struct MidiEditorGridHandler {
     pub synth: PolySynth,
 }
 
-impl Default for MidiEditorGridHandler {
-    fn default() -> Self {
+impl MidiEditorGridHandler {
+    fn new(uuid: Uuid) -> Self {
         Self {
-            synth: PolySynth::new(true),
+            synth: PolySynth::new(uuid, true),
         }
     }
 }
@@ -260,7 +260,7 @@ impl MidiEditorGridHandler {
         let events = grid_state.data.iter_events(None);
 
         // Create a virtual poly synth to handle assigning the virtual notes to voices
-        let mut voice_manager = PolySynth::new(false);
+        let mut voice_manager = PolySynth::new(uuid_v4(), false);
 
         // Trigger all of the events with a custom callback that records the voice index to use for
         // each of them.
@@ -442,7 +442,7 @@ pub fn mk_midi_editor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext>
         measure_width_px: constants::BEATS_PER_MEASURE * constants::BEAT_LENGTH_PX,
     };
 
-    let view_context = MidiEditorGridHandler::default();
+    let view_context = MidiEditorGridHandler::new(uuid);
     let grid: Box<MidiGrid> = Box::new(Grid::new(conf, view_context, uuid));
 
     grid

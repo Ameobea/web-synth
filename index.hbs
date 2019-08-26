@@ -5,6 +5,20 @@
     <title>{{ htmlWebpackPlugin.options.title }}</title>
     <!-- Modified version of https://raw.githubusercontent.com/grame-cncm/faust/master-dev/architecture/webaudio/webaudio-wasm-standalone-wrapper.js -->
     <script type="text/javascript" src="/faust2webaudio.js"></script>
+    <script type="text/javascript">
+      // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
+      // other, causing errors when connecting betwen different components.
+      //
+      // Here, we patch the global `AudioContext` instance so that constructing new instances of it just returns the same
+      // pre-constructed instance.
+      const OldAudioContext = globalThis.AudioContext;
+
+      const globalContext = new AudioContext();
+
+      globalThis.AudioContext = function SingletonAudioContext() {
+        return globalContext;
+      }
+    </script>
   </head>
 
   <body>

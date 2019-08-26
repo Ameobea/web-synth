@@ -1,0 +1,32 @@
+[
+  {
+    "id": 4,
+    "title": "Rain",
+    "description": "It sounds like lofi rain.",
+    "code": "// This code taken in full from here: https://github.com/grame-cncm/faust/blob/master-dev/examples/gameaudio/rain.dsp\n// Source code licensed under GNU GPLv2\n\n//----------------------`rain`--------------------------\n// A very simple rain simulator\n//\n// #### Usage\n//\n// ```\n//  rain(d,l) : _,_\n// ```\n//\n// Where:\n//\n// * `d`: is the density of the rain: between 0 and 1\n// * `l`: is the level (volume) of the rain: between 0 and 1\n//\n//----------------------------------------------------------\n\nimport(\"stdfaust.lib\");\n\nrain(density,level) = no.multinoise(2) : par(i, 2, drop) : par(i, 2, *(level))\n\twith {\n\t\tdrop = _ <: @(1), (abs < density) : *;\n\t};\n\nprocess  = \train (\n\t\t\t\thslider(\"v:rain/density\", 1, 0, 5, 0.1) / 1000,\n\t\t\t\thslider(\"v:rain/volume\", 0.2, 0, 1, 0.01)\n);\n"
+  },
+  {
+    "id": 7,
+    "title": "vcf with sliders",
+    "description": "moog",
+    "code": "\n\ndeclare name \"moogVCF\";\ndeclare description \"Exercise and compare three Moog VCF implementations\";\n\nimport(\"stdfaust.lib\");\n\nprocess = ve.moog_vcf(hslider(\"v:resonance\", 0, 0, 1, 0.1),hslider(\"v:freq\", 1, 0, 200000, 0.1)); \n"
+  },
+  {
+    "id": 9,
+    "title": "fdn_reverb_demo",
+    "description": "FDN reverb using the built-in Faust demo function, but with two of them in parallel each with independently adjustable params.",
+    "code": "import(\"effect.lib\");\n\nprocess = \n    hgroup(\"1\",fdnrev0_demo(8, 3, 10)),\n    hgroup(\"2\",fdnrev0_demo(8, 3, 10))\n        :> _;"
+  },
+  {
+    "id": 10,
+    "title": "fdn_reverb_demo_binaural",
+    "description": "Same as the first demo, but each of the two reverbs play out of separate channels.",
+    "code": "import(\"effect.lib\");\n\nprocess = \n    hgroup(\"1\",fdnrev0_demo(8, 3, 10)),\n    hgroup(\"2\",fdnrev0_demo(8, 3, 10));"
+  },
+  {
+    "id": 11,
+    "title": "ident",
+    "description": "",
+    "code": "process=_;"
+  }
+]

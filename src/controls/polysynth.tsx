@@ -27,7 +27,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
             // TODO: we have to store children somewhere so we can disconnect from them
             // explicitly and `.dispose()` of them properly.  Probably keep an array of children in
             // `PolySynth` and do that handling there.
-            synth.volume.toMaster();
+            // synth.volume.toMaster();
             // synth.volume.output.dispose();
           }
           break;

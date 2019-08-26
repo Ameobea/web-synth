@@ -42,7 +42,7 @@ const buildInstance = async (
     }
   );
 
-  const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 1024);
+  const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 256);
 
   const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
   if (canvas) {

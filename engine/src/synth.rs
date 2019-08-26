@@ -3,12 +3,14 @@
 
 use std::{mem, ptr};
 
+use uuid::Uuid;
+
 use super::prelude::*;
 
 #[wasm_bindgen(raw_module = "./synth")]
 extern "C" {
     /// Initializes a synth on the JavaScript side, returning its index in the gloabl synth array.
-    pub fn init_synth(voice_count: usize) -> usize;
+    pub fn init_synth(uuid: String, voice_count: usize) -> usize;
     pub fn trigger_attack(synth_ix: usize, voice_ix: usize, frequency: f32);
     pub fn trigger_release(synth_ix: usize, voice_ix: usize);
     pub fn trigger_attack_release(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32);
@@ -56,14 +58,14 @@ pub struct PolySynth {
 }
 
 impl PolySynth {
-    pub fn new(link: bool) -> Self {
+    pub fn new(uuid: Uuid, link: bool) -> Self {
         let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] = unsafe { mem::uninitialized() };
         let voices_ptr = &mut voices as *mut _ as *mut Voice;
         for i in 0..POLY_SYNTH_VOICE_COUNT {
             unsafe { ptr::write(voices_ptr.add(i), Voice::new(i)) };
         }
         let id = if link && cfg!(target_arch = "wasm32") {
-            init_synth(POLY_SYNTH_VOICE_COUNT)
+            init_synth(uuid.to_string(), POLY_SYNTH_VOICE_COUNT)
         } else {
             0
         };

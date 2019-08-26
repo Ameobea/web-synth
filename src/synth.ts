@@ -19,7 +19,7 @@ export interface ToneSynth {
   triggerRelease: (time?: number | string) => void;
   disconnect: () => void;
   toMaster: () => void;
-  connect: (connectTo: any) => void;
+  connect: (connectTo: AudioNode) => void;
   set: (key: string, val: any) => void;
 }
 
@@ -40,7 +40,7 @@ export class PolySynth {
    * applying effects to all of the individual voice synths, we chain the effects off of
    * `volume` to make them more efficient.
    */
-  public volume: typeof Volume;
+  public volume: AudioNode & { set: (key: string, val: any) => void };
 
   public constructor(voiceCount: number, volume: number = 10.0) {
     this.volume = new Volume(volume).toMaster();
@@ -66,27 +66,31 @@ export class PolySynth {
       envelope.release = release.pos;
     });
   }
+
+  public connect(to: AudioNode) {
+    this.volume.connect(to);
+  }
+
+  public disconnect() {
+    this.volume.disconnect();
+  }
 }
 
 const getSynths = (): PolySynth[] => store.getState().synths.synths;
 
-export const init_synth = (voiceCount: number): number => {
+export const init_synth = (uuid: string, voiceCount: number): number => {
   const synth = new PolySynth(voiceCount);
   synth.volume.set('volume', -16);
   const oldSynthCount = getSynths().length;
-  store.dispatch(synthActionCreators.setSynth(synth));
+  store.dispatch(synthActionCreators.setSynth(uuid, synth));
   return oldSynthCount;
 };
 
-export const trigger_attack = (synthIx: number, voiceIx: number, frequency: number) => {
-  const synths = getSynths();
-  synths[synthIx].voices[voiceIx].triggerAttack(frequency);
-};
+export const trigger_attack = (synthIx: number, voiceIx: number, frequency: number) =>
+  getSynths()[synthIx].voices[voiceIx].triggerAttack(frequency);
 
-export const trigger_release = (synthIx: number, voiceIx: number) => {
-  const synths = getSynths();
-  synths[synthIx].voices[voiceIx].triggerRelease();
-};
+export const trigger_release = (synthIx: number, voiceIx: number) =>
+  getSynths()[synthIx].voices[voiceIx].triggerRelease();
 
 export const schedule_events = (
   synthIx: number,
