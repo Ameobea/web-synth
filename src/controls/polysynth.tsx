@@ -22,7 +22,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
         case 'bitcrusher': {
           synth.volume.disconnect();
           if (val) {
-            synth.volume.connect(mkBitcrusher());
+            // synth.volume.connect(mkBitcrusher());
           } else {
             // TODO: we have to store children somewhere so we can disconnect from them
             // explicitly and `.dispose()` of them properly.  Probably keep an array of children in

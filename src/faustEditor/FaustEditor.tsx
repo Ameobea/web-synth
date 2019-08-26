@@ -78,13 +78,15 @@ const mapStateToProps = ({ faustEditor }: ReduxState) => ({
 
 const enhance = connect<StateProps, {}, {}>(mapStateToProps);
 
-const createCompileButtonClickHandler = (
-  editorContent: string,
-  setCompileErrMsg: (errMsg: string) => void,
-  mediaFileSourceNode?: AudioScheduledSourceNode | null
-) => async (useMediaFile: boolean) => {
+// TODO: This shouldn't do connecting and stuff internally; should be refactored to solely construct
+// the instance without connecting it to anything.
+export const compileFaustInstance = async (
+  faustCode: string,
+  mediaFileSourceNode?: AudioScheduledSourceNode | null,
+  connectSource = true
+) => {
   const formData = new FormData();
-  formData.append('code.faust', new Blob([editorContent], { type: 'text/plain' }));
+  formData.append('code.faust', new Blob([faustCode], { type: 'text/plain' }));
 
   const res = await fetch(FAUST_COMPILER_ENDPOINT, {
     method: 'POST',
@@ -93,20 +95,33 @@ const createCompileButtonClickHandler = (
 
   if (!res.ok) {
     const errMsg = await res.text();
-    setCompileErrMsg(errMsg);
-    return;
+    throw errMsg;
   }
-
-  setCompileErrMsg('');
 
   const arrayBuffer = await res.arrayBuffer();
   const compiledModule = await WebAssembly.compile(arrayBuffer);
   const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
 
-  const faustInstance = await buildInstance(
-    wasmInstance,
-    useMediaFile ? mediaFileSourceNode : undefined
-  );
+  return buildInstance(wasmInstance, mediaFileSourceNode, connectSource);
+};
+
+const createCompileButtonClickHandler = (
+  faustCode: string,
+  setErrMessage: (errMsg: string) => void,
+  mediaFileSourceNode?: AudioScheduledSourceNode | null
+) => async (useMediaFile: boolean) => {
+  let faustInstance;
+  try {
+    faustInstance = await compileFaustInstance(
+      faustCode,
+      useMediaFile ? mediaFileSourceNode : undefined
+    );
+  } catch (err) {
+    setErrMessage(err.toString());
+    return;
+  }
+  setErrMessage('');
+
   // Start the audio file playback
   if (useMediaFile && mediaFileSourceNode) {
     mediaFileSourceNode.start(0);

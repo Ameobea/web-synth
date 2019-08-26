@@ -6,10 +6,6 @@ import { store } from '../redux';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
 export const init_graph_editor = (stateKey: string) => {
-  // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
-  // const editorContent = localStorage.getItem(stateKey) || '';
-  // store.dispatch(actionCreators.setEditorContent(editorContent));
-
   // Create the base dom node for the faust editor
   const graphEditorBaseNode = document.createElement('div');
   graphEditorBaseNode.id = 'graph-editor-react-root';
@@ -32,7 +28,7 @@ export const cleanup_graph_editor = (stateKey: string) => {
   const graphEditorReactRootNode = document.getElementById('graph-editor-react-root')!;
   // Trigger the graph editor to save its state before its destruction.  `unmountComponentAtNode`
   // doesn't seem to trigger lifecycle methods/execute the return value of `useEffect` so we have
-  // to handle this on our own.
+  // to handle this explicitly.
   saveStateForInstance(stateKey);
   ReactDOM.unmountComponentAtNode(graphEditorReactRootNode);
   graphEditorReactRootNode.remove();

@@ -1,3 +1,5 @@
+import { LGAudio } from 'litegraph.js';
+
 import { FaustModuleInstance } from '../../faustEditor/FaustEditor';
 import buildControlPanel, { UiGroup } from '../../faustEditor/uiBuilder';
 
@@ -9,7 +11,7 @@ interface State {
   editorContent: string;
 }
 
-export const audioContext = new AudioContext();
+export const audioContext = LGAudio.getAudioContext();
 
 const initialState: State = {
   instance: null,

@@ -13,8 +13,12 @@ declare class FaustWasm2ScriptProcessor {
 }
 
 export const analyzerNode = audioContext.createAnalyser();
-analyzerNode.smoothingTimeConstant = 0.2;
-analyzerNode.connect(audioContext.destination);
+try {
+  analyzerNode.smoothingTimeConstant = 0.2;
+  analyzerNode.connect(audioContext.destination);
+} catch (err) {
+  console.error('Error connecting analyzer node to things: ', err);
+}
 
 const getMicrophoneStream = (): Promise<MediaStream> =>
   new Promise((fulfill, reject) => {
@@ -26,7 +30,8 @@ const getMicrophoneStream = (): Promise<MediaStream> =>
 
 const buildInstance = async (
   wasmInstance: WebAssembly.Instance,
-  externalSource?: AudioScheduledSourceNode
+  externalSource?: AudioScheduledSourceNode,
+  connectSource = true
 ) => {
   // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
   const converterInstance = new FaustWasm2ScriptProcessor(
@@ -39,17 +44,19 @@ const buildInstance = async (
 
   const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 1024);
 
-  const source =
-    externalSource || audioContext.createMediaStreamSource(await getMicrophoneStream());
+  const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
+  if (canvas) {
+    initializeSpectrumVisualization(analyzerNode, canvas);
+    faustInstance.connect(analyzerNode);
+  }
 
-  const canvas = document.getElementById('spectrum-visualizer')! as HTMLCanvasElement;
-
-  initializeSpectrumVisualization(analyzerNode, canvas);
-
-  // Wire up the microphone to the module, connect the module to the analyzer node, and then
-  // connect the analyzer node to the audo context's output (speakers)
-  source.connect(faustInstance);
-  faustInstance.connect(analyzerNode);
+  if (connectSource) {
+    // Wire up the microphone to the module, connect the module to the analyzer node, and then
+    // connect the analyzer node to the audo context's output (speakers)
+    const source =
+      externalSource || audioContext.createMediaStreamSource(await getMicrophoneStream());
+    source.connect(faustInstance);
+  }
 
   return faustInstance;
 };

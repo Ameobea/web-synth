@@ -2593,6 +2593,18 @@ functional-red-black-tree@^1.0.1:
   resolved "https://registry.yarnpkg.com/functional-red-black-tree/-/functional-red-black-tree-1.0.1.tgz#1b0ab3bd553b2a0d6399d29c0e3ea0b252078327"
   integrity sha1-GwqzvVU7Kg1jmdKcDj6gslIHgyc=
 
+funfix-core@^7.0.1:
+  version "7.0.1"
+  resolved "https://registry.yarnpkg.com/funfix-core/-/funfix-core-7.0.1.tgz#894a9f39ef582c5d6dcc9ef384381d12819e8094"
+  integrity sha1-iUqfOe9YLF1tzJ7zhDgdEoGegJQ=
+  dependencies:
+    funland "^0.1.4"
+
+funland@^0.1.4:
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/funland/-/funland-0.1.5.tgz#abbe0c6e8477be1aeac07a17005ca4ca18f8c1a8"
+  integrity sha512-rwAiqVgWEj3+OrIlARf0ebHwcuoAqukkiqfq3+FPf1FAa2/tbdvxr/FPjJD3FnljSuktwWM3f8jHNRS6ASJIsw==
+
 gauge@~2.7.3:
   version "2.7.4"
   resolved "https://registry.yarnpkg.com/gauge/-/gauge-2.7.4.tgz#2c03405c7538c39d7eb37b317022e325fb018bf7"

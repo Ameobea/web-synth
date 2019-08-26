@@ -23,7 +23,7 @@ interface PassedProps {
 
 type EffectPickerProps = StateProps & DispatchProps & PassedProps;
 
-const fetchEffects = async (): Promise<Effect[]> => {
+export const fetchEffects = async (): Promise<Effect[]> => {
   const effects = await fetch(`${BACKEND_BASE_URL}/effects`);
   return effects.json();
 };

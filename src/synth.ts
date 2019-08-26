@@ -2,9 +2,6 @@ import Synth from 'tone/Tone/instrument/Synth';
 import Volume from 'tone/Tone/component/Volume';
 import * as R from 'ramda';
 
-// import * as Tone from 'tone';
-// (window as any).Tone = Tone;
-
 import { ADSRValues, defaultAdsrEnvelope } from './controls/adsr';
 import { store } from './redux';
 import { actionCreators as synthActionCreators } from './redux/reducers/synths';

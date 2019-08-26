@@ -45,6 +45,7 @@
     "ace-builds": "^1.4.5",
     "chroma-js": "^2.0.4",
     "downloadjs": "^1.4.7",
+    "funfix-core": "^7.0.1",
     "litegraph.js": "^0.7.0",
     "ramda": "^0.26.1",
     "react": "^16.9.0",
