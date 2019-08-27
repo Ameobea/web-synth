@@ -3,6 +3,7 @@ authors = ["Casey Primozic <me@ameo.link>"]
 edition = "2018"
 name = "midi"
 version = "0.1.0"
+
 [dependencies]
 bincode = "1.1.4"
 console_error_panic_hook = { git = "https://github.com/Ameobea/console_error_panic_hook.git" }

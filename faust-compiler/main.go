@@ -44,8 +44,9 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 		fmt.Println(err)
 		return
 	}
-
 	defer uploadedFile.Close()
+
+	optimize := len(req.FormValue("optimize")) > 0
 
 	// Create a temporary file for the input source code
 	srctmpfile, err := ioutil.TempFile("", "faust-code")
@@ -54,6 +55,8 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 		http.Error(resWriter, "Error creating temporary file", 500)
 		return
 	}
+	srcFileName := srctmpfile.Name()
+	defer os.Remove(srcFileName)
 
 	// Create a temporary file for the output Wasm file
 	dsttempfile, err := ioutil.TempFile("", "wasm-output")
@@ -64,28 +67,34 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 		resWriter.Write([]byte(errMsg))
 		return
 	}
-
 	tmpFileBaseName := dsttempfile.Name()
-	outWasmFileName := fmt.Sprintf("%s.wasm", tmpFileBaseName)
+	defer os.Remove(tmpFileBaseName)
 
 	// Copy the uploaded file to the tempfile
 	io.Copy(srctmpfile, uploadedFile)
 
 	// Compile the tempfile into WebAssembly
-	stderr, err := compile(srctmpfile.Name(), outWasmFileName)
-
+	outWasmFileName := fmt.Sprintf("%s.wasm", tmpFileBaseName)
+	stderr, err := compile(srcFileName, outWasmFileName)
 	if err != nil {
 		resWriter.WriteHeader(400)
 		resWriter.Write(stderr.Bytes())
 		return
 	}
+	defer os.Remove(outWasmFileName)
+
+	// Optimize the generated Wasm file if the `optimize` flag was set in the request body
+	if optimize {
+		cmd := exec.Command("wasm-opt", outWasmFileName, "-O4", "-c", "-o", outWasmFileName)
+		optError := cmd.Run()
+		if optError != nil {
+			fmt.Println("Error while trying to optimize output Wasm file:")
+			fmt.Println(optError)
+		}
+	}
 
 	// Send the file back to the user
 	http.ServeFile(resWriter, req, outWasmFileName)
-
-	// Clean up the tempfiles
-	os.Remove(outWasmFileName)
-	os.Remove(tmpFileBaseName)
 }
 
 func main() {

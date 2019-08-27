@@ -4,7 +4,8 @@
     slice_patterns,
     thread_local,
     nll,
-    bind_by_move_pattern_guards
+    bind_by_move_pattern_guards,
+    option_flattening
 )]
 #![allow(clippy::float_cmp, clippy::needless_range_loop, clippy::manual_memcpy)]
 

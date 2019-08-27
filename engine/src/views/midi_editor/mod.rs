@@ -2,11 +2,15 @@
 //! that correspond to individual notes.  It supports operations like dragging notes around,
 //! selecting/deleting notes, and playing the current composition.
 
-use std::str;
+use std::{mem, str};
 
+use fnv::FnvHashSet;
 use uuid::Uuid;
 
-use crate::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{
+    helpers::grid::{prelude::*, skip_list::NoteSkipListNode},
+    view_context::ViewContext,
+};
 
 pub mod constants;
 pub mod prelude;
@@ -62,6 +66,15 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             "ArrowRight" | "d" =>
                 self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal),
             "z" | "x" => self.play_selected_notes(grid_state),
+            "q" | "w" | "e" | "r" => {
+                let direction_multiplier = tern(key == "q" || key == "e", -1., 1.);
+                let adjustment_amount = 0.25
+                    * tern(control_pressed, 2., 1.)
+                    * tern(shift_pressed, 2., 1.)
+                    * direction_multiplier;
+                let is_left = key == "q" || key == "w";
+                self.adjust_note_lengths(grid_state, is_left, adjustment_amount);
+            },
             " " => self.start_playback(grid_state),
             _ => (),
         }
@@ -411,6 +424,94 @@ impl MidiEditorGridHandler {
             .map(|note_data| move_note_horizontal(&mut grid_state.data, note_data))
             .collect();
         grid_state.selected_notes = new_selected_notes;
+    }
+
+    fn adjust_note_lengths(
+        &mut self,
+        grid_state: &mut GridState<usize>,
+        is_left: bool,
+        adjustment_amount_beats: f32,
+    ) {
+        let new_selected_notes: FnvHashSet<SelectedNoteData> = FnvHashSet::default();
+        let old_selected_notes = mem::replace(&mut grid_state.selected_notes, new_selected_notes);
+        let new_selected_notes = &mut grid_state.selected_notes;
+
+        // TODO: Need to sort
+        for selected_note_data in old_selected_notes {
+            // Compute where we're trying to set this note's new endpoints to
+            let new_note_start_beat = tern(
+                is_left,
+                selected_note_data.start_beat + adjustment_amount_beats,
+                selected_note_data.start_beat,
+            );
+            let new_note_end_beat = tern(
+                is_left,
+                selected_note_data.start_beat + selected_note_data.width,
+                (selected_note_data.start_beat + selected_note_data.width)
+                    + adjustment_amount_beats,
+            );
+            // Put them in order in case their direction has changed due to this adjustment
+            let (mut new_note_start_beat, mut new_note_end_beat) =
+                if new_note_start_beat < new_note_end_beat {
+                    (new_note_start_beat, new_note_end_beat)
+                } else {
+                    (new_note_end_beat, new_note_start_beat)
+                };
+
+            // If this adjustment would set the note to have a width of zero, just leave it as-is
+            if new_note_start_beat == new_note_end_beat {
+                new_selected_notes.insert(selected_note_data);
+            }
+
+            // Check to see if this adjustment is going to collide with any existing notes.
+            // This is done by picking the first note that comes before the note being adjusted
+            // and checking to see if it conflicts with the proposed range.  If it does, it will be
+            // used as a lower bound.
+            //
+            // Then, all notes that come after it (excluding the note being adjusted) are iterated
+            // through.  The first one that exists within the proposed new range is used as an upper
+            // bound.
+            let line = &mut grid_state.data.lines[selected_note_data.line_ix];
+            let first_note_before_proposed_new_note =
+                line.find_first_node_before_beat(new_note_start_beat);
+            let mut preceeding_node_opt: Option<&NoteSkipListNode<usize>> = None;
+            if let Some(preceeding_node_key) = first_note_before_proposed_new_note {
+                let preceeding_node = line.get_node(preceeding_node_key);
+
+                // Nothing to do if this was previously the first node before the new proposed start
+                // beat
+                if preceeding_node.val.data.get_id() != selected_note_data.dom_id {
+                    preceeding_node_opt = Some(preceeding_node);
+                    let lower_bound = preceeding_node.val.bounds.end_beat;
+                    new_note_start_beat = new_note_start_beat.max(lower_bound);
+                }
+            }
+
+            let next_node_opt = preceeding_node_opt
+                .map(|preceeding_node| line.next_node(preceeding_node))
+                .or_else(|| {
+                    // If we didn't have a node that exists before the proposed new start beat, see
+                    // if there are any (that aren't this node) before the
+                    // proposed new end beat
+                    line.find_first_node_before_beat(new_note_end_beat)
+                        .map(|node_key| line.get_node(node_key))
+                        .map(|node| {
+                            // if that node is this node, try the next one.
+                            if node.val.data.get_id() == selected_note_data.dom_id {
+                                line.next_node(node)
+                            } else {
+                                Some(node)
+                            }
+                        })
+                })
+                .flatten();
+
+            if let Some(next_node) = next_node_opt {
+                new_note_end_beat = new_note_end_beat.min(next_node.val.bounds.start_beat);
+            }
+
+            // TODO: Remove the old note, add the new one, and add to new selected notes list
+        }
     }
 
     pub fn play_selected_notes(&mut self, grid_state: &GridState<usize>) {

@@ -284,9 +284,6 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
         )))
     };
 
-    // let closure = Closure::wrap(Box::new(cb) as Box<dyn FnMut(JsValue)>);
-    // Some(promise.then(&closure))
-
     // Convert the JS Promise into a Rust/JS hybrid promise from that external crate
     let future_promise: JsFuture = JsFuture::from(promise);
     // Chain on the handling logic for after the user selects which track they want, convert it back
