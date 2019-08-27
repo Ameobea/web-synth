@@ -65,14 +65,14 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                 self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal),
             "ArrowRight" | "d" =>
                 self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal),
-            "z" | "x" => self.play_selected_notes(grid_state),
-            "q" | "w" | "e" | "r" => {
-                let direction_multiplier = tern(key == "q" || key == "e", -1., 1.);
+            "q" => self.play_selected_notes(grid_state),
+            "z" | "x" | "c" | "v" => {
+                let direction_multiplier = tern(key == "z" || key == "c", -1., 1.);
                 let adjustment_amount = 0.25
                     * tern(control_pressed, 2., 1.)
                     * tern(shift_pressed, 2., 1.)
                     * direction_multiplier;
-                let is_left = key == "q" || key == "w";
+                let is_left = key == "z" || key == "x";
                 self.adjust_note_lengths(grid_state, is_left, adjustment_amount);
             },
             " " => self.start_playback(grid_state),
@@ -432,11 +432,18 @@ impl MidiEditorGridHandler {
         is_left: bool,
         adjustment_amount_beats: f32,
     ) {
-        let new_selected_notes: FnvHashSet<SelectedNoteData> = FnvHashSet::default();
-        let old_selected_notes = mem::replace(&mut grid_state.selected_notes, new_selected_notes);
+        let mut old_selected_notes = grid_state.selected_notes.drain().collect::<Vec<_>>();
+        // We need to sort the selected notes so that those on the side towards which we are
+        // adjusting them are updated first, giving the maximum opportunity for movement.
+        let sort_reverse =
+            is_left && adjustment_amount_beats > 0. || !is_left && adjustment_amount_beats < 0.;
+        if sort_reverse {
+            old_selected_notes.sort_unstable_by(|a, b| b.cmp(a));
+        } else {
+            old_selected_notes.sort_unstable();
+        }
         let new_selected_notes = &mut grid_state.selected_notes;
 
-        // TODO: Need to sort
         for selected_note_data in old_selected_notes {
             // Compute where we're trying to set this note's new endpoints to
             let new_note_start_beat = tern(
@@ -461,6 +468,7 @@ impl MidiEditorGridHandler {
             // If this adjustment would set the note to have a width of zero, just leave it as-is
             if new_note_start_beat == new_note_end_beat {
                 new_selected_notes.insert(selected_note_data);
+                continue;
             }
 
             // Check to see if this adjustment is going to collide with any existing notes.
@@ -488,21 +496,17 @@ impl MidiEditorGridHandler {
             }
 
             let next_node_opt = preceeding_node_opt
-                .map(|preceeding_node| line.next_node(preceeding_node))
-                .or_else(|| {
-                    // If we didn't have a node that exists before the proposed new start beat, see
-                    // if there are any (that aren't this node) before the
-                    // proposed new end beat
-                    line.find_first_node_before_beat(new_note_end_beat)
-                        .map(|node_key| line.get_node(node_key))
-                        .map(|node| {
+                .map(|preceeding_node| {
+                    line.next_node(preceeding_node)
+                        .map(|next_node| {
                             // if that node is this node, try the next one.
-                            if node.val.data.get_id() == selected_note_data.dom_id {
-                                line.next_node(node)
+                            if next_node.val.data.get_id() == selected_note_data.dom_id {
+                                line.next_node(next_node)
                             } else {
-                                Some(node)
+                                Some(next_node)
                             }
                         })
+                        .flatten()
                 })
                 .flatten();
 
@@ -510,7 +514,36 @@ impl MidiEditorGridHandler {
                 new_note_end_beat = new_note_end_beat.min(next_node.val.bounds.start_beat);
             }
 
-            // TODO: Remove the old note, add the new one, and add to new selected notes list
+            let removed_note = line
+                .remove(selected_note_data.start_beat)
+                .expect("Tried removing existing note but it wasn't found");
+            let dom_id = removed_note.data.get_id();
+            debug_assert!(dom_id == selected_note_data.dom_id);
+            let new_note = NoteBox {
+                bounds: NoteBoxBounds {
+                    start_beat: new_note_start_beat,
+                    end_beat: new_note_end_beat,
+                },
+                data: removed_note.data,
+            };
+            new_selected_notes.insert(SelectedNoteData::from_note_box(
+                selected_note_data.line_ix,
+                &new_note,
+            ));
+            let new_note_width = new_note.bounds.width();
+            let insert_err = line.insert(new_note);
+            debug_assert!(insert_err.is_none());
+
+            js::set_attr(
+                dom_id,
+                "x",
+                &(grid_state.conf.beats_to_px(new_note_start_beat)).to_string(),
+            );
+            js::set_attr(
+                dom_id,
+                "width",
+                &(grid_state.conf.beats_to_px(new_note_width).to_string()),
+            )
         }
     }
 
