@@ -471,48 +471,27 @@ impl MidiEditorGridHandler {
                 continue;
             }
 
-            // Check to see if this adjustment is going to collide with any existing notes.
-            // This is done by picking the first note that comes before the note being adjusted
-            // and checking to see if it conflicts with the proposed range.  If it does, it will be
-            // used as a lower bound.
-            //
-            // Then, all notes that come after it (excluding the note being adjusted) are iterated
-            // through.  The first one that exists within the proposed new range is used as an upper
-            // bound.
-            let line = &mut grid_state.data.lines[selected_note_data.line_ix];
-            let first_note_before_proposed_new_note =
-                line.find_first_node_before_beat(new_note_start_beat);
-            let mut preceeding_node_opt: Option<&NoteSkipListNode<usize>> = None;
-            if let Some(preceeding_node_key) = first_note_before_proposed_new_note {
-                let preceeding_node = line.get_node(preceeding_node_key);
+            let mut is_before = true;
+            for note in grid_state.data.iter_region(
+                selected_note_data.line_ix,
+                selected_note_data.line_ix,
+                new_note_start_beat,
+                new_note_end_beat,
+            ) {
+                if note.note_box.data.get_id() == selected_note_data.dom_id {
+                    is_before = false;
+                    continue;
+                }
 
-                // Nothing to do if this was previously the first node before the new proposed start
-                // beat
-                if preceeding_node.val.data.get_id() != selected_note_data.dom_id {
-                    preceeding_node_opt = Some(preceeding_node);
-                    let lower_bound = preceeding_node.val.bounds.end_beat;
-                    new_note_start_beat = new_note_start_beat.max(lower_bound);
+                if is_before {
+                    new_note_start_beat = new_note_start_beat.max(note.note_box.bounds.end_beat);
+                } else {
+                    new_note_end_beat = new_note_end_beat.min(note.note_box.bounds.start_beat);
+                    break;
                 }
             }
 
-            let next_node_opt = preceeding_node_opt
-                .map(|preceeding_node| {
-                    line.next_node(preceeding_node)
-                        .map(|next_node| {
-                            // if that node is this node, try the next one.
-                            if next_node.val.data.get_id() == selected_note_data.dom_id {
-                                line.next_node(next_node)
-                            } else {
-                                Some(next_node)
-                            }
-                        })
-                        .flatten()
-                })
-                .flatten();
-
-            if let Some(next_node) = next_node_opt {
-                new_note_end_beat = new_note_end_beat.min(next_node.val.bounds.start_beat);
-            }
+            let line = &mut grid_state.data.lines[selected_note_data.line_ix];
 
             let removed_note = line
                 .remove(selected_note_data.start_beat)
