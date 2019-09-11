@@ -177,6 +177,7 @@ export const update_active_view_contexts = (
   const activeViewContexts: {
     minimal_def: { name: string; uuid: string; title?: string };
   }[] = JSON.parse(activeVcsJson);
+
   store.dispatch(
     viewContextManagerActionCreators.setState({
       activeViewContextIx,
@@ -200,17 +201,30 @@ wasm.then(engine => {
   const scrollOffset = () => Math.max(canvasesElement.scrollTop - 2, 0);
   const foregroundCanvas = SVGS[1];
 
-  foregroundCanvas.addEventListener('mousedown', evt =>
-    engine.handle_mouse_down(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
-  );
-  foregroundCanvas.addEventListener('mouseup', evt =>
-    engine.handle_mouse_up(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
-  );
+  let mouseDown = false;
+  foregroundCanvas.addEventListener('mousedown', evt => {
+    mouseDown = true;
+    engine.handle_mouse_down(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset());
+  });
+  foregroundCanvas.addEventListener('mouseup', evt => {
+    if (!mouseDown) {
+      return;
+    }
+    mouseDown = false;
+
+    engine.handle_mouse_up(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset());
+  });
   foregroundCanvas.addEventListener('mousemove', evt =>
     engine.handle_mouse_move(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
   );
   foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());
+
+  document.body.addEventListener('mouseleave', evt => {
+    if (mouseDown) {
+      engine.handle_mouse_up(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset());
+    }
+  });
 
   document.addEventListener('keydown', evt => {
     engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);
@@ -219,6 +233,7 @@ wasm.then(engine => {
       evt.preventDefault();
     }
   });
+
   document.addEventListener('keyup', evt =>
     engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey)
   );
