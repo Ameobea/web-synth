@@ -229,11 +229,15 @@ wasm.then(engine => {
   document.addEventListener('keydown', evt => {
     engine.handle_key_down(evt.key, evt.ctrlKey, evt.shiftKey);
     // Prevent spacebar from scrolling down the page
-    if (evt.code === 'Space') {
+    if (
+      ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace'].includes(
+        evt.code
+      ) &&
+      !(evt.target instanceof HTMLInputElement || evt.target instanceof HTMLTextAreaElement)
+    ) {
       evt.preventDefault();
     }
   });
-
   document.addEventListener('keyup', evt =>
     engine.handle_key_up(evt.key, evt.ctrlKey, evt.shiftKey)
   );

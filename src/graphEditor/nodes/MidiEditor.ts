@@ -16,7 +16,7 @@ const getMidiEditorVcs = () =>
   store.getState().viewContextManager.activeViewContexts.filter(R.propEq('name', 'midi_editor'));
 
 export const registerMidiEditorNode = () => {
-  function LGFaustModule() {
+  function LGMidiEditorModule() {
     // Create a placeholder `audionode` that prevents errors from getting thrown when the node is
     // first created, before it has compiled its code.
     const audioCtx: AudioContext = LGAudio.getAudioContext();
@@ -46,11 +46,11 @@ export const registerMidiEditorNode = () => {
     this.addOutput('out', 'audio');
   }
 
-  LGAudio.createAudioNodeWrapper(LGFaustModule);
+  LGAudio.createAudioNodeWrapper(LGMidiEditorModule);
 
-  LGFaustModule.title = 'MIDI Editor';
-  LGFaustModule.desc =
+  LGMidiEditorModule.title = 'MIDI Editor';
+  LGMidiEditorModule.desc =
     'A node that wraps a MIDI editor, passing through its output as an input into the audio graph';
 
-  LiteGraph.registerNodeType('audio/midiEditor', LGFaustModule);
+  LiteGraph.registerNodeType('audio/midiEditor', LGMidiEditorModule);
 };
