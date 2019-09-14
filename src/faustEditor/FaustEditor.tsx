@@ -10,7 +10,6 @@ import { State as ReduxState, store } from '../redux';
 import { actionCreators, audioContext } from '../redux/reducers/faustEditor';
 import { Effect } from '../redux/reducers/effects';
 import buildInstance, { analyzerNode } from './buildInstance';
-import importObject from './faustModuleImportObject';
 import { EffectPickerCustomInput } from '../controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from '../conf';
 import { Without } from '../types';
@@ -98,11 +97,8 @@ export const compileFaustInstance = async (
     throw errMsg;
   }
 
-  const arrayBuffer = await res.arrayBuffer();
-  const compiledModule = await WebAssembly.compile(arrayBuffer);
-  const wasmInstance = new WebAssembly.Instance(compiledModule, importObject);
-
-  return buildInstance(wasmInstance, mediaFileSourceNode, connectSource);
+  const wasmInstanceArrayBuffer = await res.arrayBuffer();
+  return buildInstance(wasmInstanceArrayBuffer, mediaFileSourceNode, connectSource);
 };
 
 const createCompileButtonClickHandler = (
@@ -117,6 +113,7 @@ const createCompileButtonClickHandler = (
       useMediaFile ? mediaFileSourceNode : undefined
     );
   } catch (err) {
+    console.error(err);
     setErrMessage(err.toString());
     return;
   }
@@ -126,7 +123,7 @@ const createCompileButtonClickHandler = (
   if (useMediaFile && mediaFileSourceNode) {
     mediaFileSourceNode.start(0);
   }
-  store.dispatch(setActiveInstance(faustInstance, faustInstance.json_object));
+  store.dispatch(setActiveInstance(faustInstance, { ui: faustInstance.ui }));
 };
 
 interface EffectsPickerPanelPassedProps {

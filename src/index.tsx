@@ -167,8 +167,10 @@ const createViewContextManager = (engine: typeof import('./engine')) => {
   );
 };
 
-export const cleanup_midi_editor_ui = () =>
+export const cleanup_midi_editor_ui = () => {
   ReactDOM.unmountComponentAtNode(document.getElementById('root')!);
+  ATTR_COUNTER = 0;
+};
 
 export const update_active_view_contexts = (
   activeViewContextIx: number,

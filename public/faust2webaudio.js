@@ -59,7 +59,7 @@ class FaustWasm2ScriptProcessor {
    */
   getNode(dspInstance, audioCtx, bufferSize) {
     // JSON is as offset 0
-    var HEAPU8 = new Uint8Array(dspInstance.exports.memory.buffer);
+    const HEAPU8 = new Uint8Array(dspInstance.exports.memory.buffer);
     this.json = this.heap2Str(HEAPU8);
     this.json_object = JSON.parse(this.json);
 
@@ -369,3 +369,5 @@ class FaustWasm2ScriptProcessor {
     console.error(str);
   }
 }
+
+window.FaustWasm2ScriptProcessor = FaustWasm2ScriptProcessor;

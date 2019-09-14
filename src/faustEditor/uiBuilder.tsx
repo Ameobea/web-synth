@@ -56,7 +56,7 @@ const buildControlPanel = (
   uiDef: UiGroup[],
   setParamValue: FaustModuleInstance['setParamValue']
 ) => {
-  const controlPanelFieldDefinitions = R.flatten(uiDef.map(mapUiGroupToControlPanelFields));
+  const controlPanelFieldDefinitions = []; // R.flatten(uiDef.map(mapUiGroupToControlPanelFields));
 
   if (R.isEmpty(controlPanelFieldDefinitions)) {
     return null;

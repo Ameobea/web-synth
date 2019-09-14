@@ -1,6 +1,7 @@
 import { audioContext } from '../redux/reducers/faustEditor';
 import { initializeSpectrumVisualization } from '../visualizations/spectrum';
 import { FaustModuleInstance } from './FaustEditor';
+import { buildFaustWorkletNode } from './FaustAudioWorklet';
 
 declare class FaustWasm2ScriptProcessor {
   public constructor(name: string, props: {}, options: {});
@@ -29,20 +30,22 @@ const getMicrophoneStream = (): Promise<MediaStream> =>
   });
 
 const buildInstance = async (
-  wasmInstance: WebAssembly.Instance,
+  wasmInstanceArrayBuffer: ArrayBuffer,
   externalSource?: AudioScheduledSourceNode,
   connectSource = true
 ) => {
   // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
-  const converterInstance = new FaustWasm2ScriptProcessor(
-    'name',
-    {},
-    {
-      debug: false,
-    }
-  );
+  // const converterInstance = new FaustWasm2ScriptProcessor(
+  //   'name',
+  //   {},
+  //   {
+  //     debug: false,
+  //   }
+  // );
 
-  const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 256);
+  // const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 256);
+
+  const faustInstance = await buildFaustWorkletNode(audioContext, wasmInstanceArrayBuffer);
 
   const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
   if (canvas) {

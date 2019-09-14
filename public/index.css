@@ -42,7 +42,6 @@ svg.notes {
 }
 
 #canvases {
-  height: 100vh;
   overflow-y: scroll;
   overflow-x: hidden;
 }
