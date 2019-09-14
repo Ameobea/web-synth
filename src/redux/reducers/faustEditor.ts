@@ -1,9 +1,5 @@
-import { LGAudio } from 'litegraph.js';
-
 import { FaustModuleInstance } from '../../faustEditor/FaustEditor';
 import buildControlPanel, { UiGroup } from '../../faustEditor/uiBuilder';
-
-const { WebAssembly } = window as any;
 
 interface State {
   instance: FaustModuleInstance | null;
@@ -11,7 +7,7 @@ interface State {
   editorContent: string;
 }
 
-export const audioContext = LGAudio.getAudioContext();
+export const audioContext = new AudioContext(); // Uses global singleton
 
 const initialState: State = {
   instance: null,
@@ -25,7 +21,7 @@ export const SET_EDITOR_CONTENT = 'SET_EDITOR_CONTENT';
 type Action =
   | {
       type: typeof SET_INSTANCE;
-      instance: typeof WebAssembly.Instance;
+      instance: any;
       dspDefProps: { ui: UiGroup[] };
     }
   | { type: typeof CLEAR_ACTIVE_INSTANCE }
@@ -50,7 +46,10 @@ const reducer = (state = initialState, action: Action) => {
       }
 
       // Construct a new control panel instance for the newly created module
-      const controlPanel = buildControlPanel(action.dspDefProps.ui, action.instance.setParamValue);
+      const controlPanel = buildControlPanel(
+        action.instance.jsonDef.ui,
+        action.instance.setParamValue
+      );
 
       return { ...state, controlPanel, instance: action.instance };
     }

@@ -62,7 +62,7 @@ const importObject = {
   },
 };
 
-const BUFFER_SIZE = 128;
+const BUFFER_SIZE = 128; // TODO: Figure out what the optimal value for this is
 const SAMPLE_RATE = 44100;
 const POINTER_SIZE = 4;
 const SAMPLE_SIZE = 4;
@@ -99,8 +99,8 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
       this.HEAP32 = new Int32Array(this.HEAP);
       this.HEAPF32 = new Float32Array(this.HEAP);
       this.audioHeapPtrInputs = this.audioHeapPtr;
-      this.audioHeapPointerOutputs = this.audioHeapPtrInputs + this.numberOfInputs * POINTER_SIZE;
-      this.audioHeapInputs = this.audioHeapPointerOutputs + this.numberOfOutputs * POINTER_SIZE;
+      this.audioHeapPtrOutputs = this.audioHeapPtrInputs + this.numberOfInputs * POINTER_SIZE;
+      this.audioHeapInputs = this.audioHeapPtrOutputs + this.numberOfOutputs * POINTER_SIZE;
       this.audioHeapOutputs =
         this.audioHeapInputs + this.numberOfInputs * this.bufferSize * SAMPLE_SIZE;
       this.init();
@@ -110,6 +110,8 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
       const compiledModule = await WebAssembly.compile(arrayBuffer);
       this.dspInstance = new WebAssembly.Instance(compiledModule, importObject);
     };
+
+    this.log = (...args) => this.port.postMessage({ log: args });
 
     this.init = () => {
       if (this.numberOfInputs > 0) {
@@ -133,13 +135,14 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
       }
 
       if (this.numberOfOutputs) {
-        this.outs = this.audioHeapPointerOutputs;
+        this.outs = this.audioHeapPtrOutputs;
 
         for (let i = 0; i < this.numberOfOutputs; i++) {
           this.HEAP32[(this.outs >> 2) + i] =
             this.audioHeapOutputs + this.bufferSize * SAMPLE_SIZE * i;
-        } // Prepare Out buffer tables
+        }
 
+        // Prepare Out buffer tables
         const dspOutChans = this.HEAP32.subarray(
           this.outs >> 2,
           (this.outs + this.numberOfOutputs * POINTER_SIZE) >> 2
@@ -151,7 +154,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
             (dspOutChans[i] + this.bufferSize * SAMPLE_SIZE) >> 2
           );
         }
-      } // Parse JSON UI part
+      }
 
       this.dspInstance.exports.init(this.dsp, SAMPLE_RATE);
     };
@@ -160,26 +163,33 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = async event => {
       await this.initWithModule(event.data);
-      this.port.postMessage(this.jsonDef.ui);
+      this.log('Initialized!!!');
+      this.port.postMessage({ jsonDef: this.jsonDef });
     };
   }
 
   process(inputs, outputs, _parameters) {
-    this.port.postMessage(inputs);
-
     for (let i = 0; i < this.numberOfInputs; i++) {
       // Copy inputs into the Wasm heap
       const inputChannel0 = inputs[i][0];
       const dspInput = this.dspInChannels[i];
-      dspInput.set(inputChannel0); // Compute on the Faust/Wasm side
+      dspInput.set(inputChannel0);
+    }
 
-      this.dspInstance.exports.compute(this.dsp, this.bufferSize); // Copy computed outputs from the Wasm heap into the WebAudio output buffer
+    // Compute on the Faust/Wasm side
+    this.dspInstance.exports.compute(
+      this.dsp,
+      this.bufferSize,
+      this.audioHeapPtrInputs,
+      this.audioHeapPtrOutputs
+    );
 
-      for (let i = 0; i < this.numberOfOutputs; i++) {
-        // Write outputs
-        const outputChannel0 = outputs[i][0];
-        const dspOutput = this.dspOutChannels[i];
-        outputChannel0.set(dspOutput);
+    // Copy computed outputs from the Wasm heap into the WebAudio output buffer
+    for (let i = 0; i < outputs.length; i++) {
+      const dspOutput = this.dspOutChannels[i];
+      for (let channelIx = 0; channelIx < outputs[i].length; channelIx++) {
+        const outputChannel = outputs[i][channelIx];
+        outputChannel.set(dspOutput);
       }
     }
 

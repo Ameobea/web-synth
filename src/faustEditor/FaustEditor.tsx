@@ -123,7 +123,7 @@ const createCompileButtonClickHandler = (
   if (useMediaFile && mediaFileSourceNode) {
     mediaFileSourceNode.start(0);
   }
-  store.dispatch(setActiveInstance(faustInstance, { ui: faustInstance.ui }));
+  store.dispatch(setActiveInstance(faustInstance));
 };
 
 interface EffectsPickerPanelPassedProps {

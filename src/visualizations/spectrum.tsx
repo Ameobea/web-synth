@@ -79,7 +79,7 @@ export const initializeSpectrumVisualization = (
     ctx2d.putImageData(imageData, curIx, 0, 0, 0, 1, BUFFER_SIZE);
   };
 
-  updateVisualization();
+  setTimeout(() => updateVisualization());
 
   return newOptions => {
     state.options = newOptions;

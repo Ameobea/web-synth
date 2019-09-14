@@ -11,11 +11,11 @@ class FaustWorkletNode extends AudioWorkletNode {
   private inputsItems: unknown[] = [];
   private outputsItems: unknown[] = [];
 
-  public ui: { [key: string]: any };
+  public jsonDef: { [key: string]: any };
 
-  public parseUi = ui => {
-    ui.forEach(group => this.parseUiGroup(group));
-    this.ui = ui;
+  public parseUi = jsonDef => {
+    jsonDef.ui.forEach(group => this.parseUiGroup(group));
+    this.jsonDef = jsonDef;
   };
 
   private parseUiGroup = group => (group.items ? this.parseUiItems(group.items) : null);
@@ -72,9 +72,16 @@ export const buildFaustWorkletNode = async (
   // Send the Wasm module over to the created worklet's thread via message passing so that it can instantiate it over
   // there and control it directly
   return await new Promise(resolve => {
+    console.log('b');
     node.port.onmessage = (msg: MessageEvent) => {
-      node.parseUi(msg.data);
-      resolve(node);
+      if (typeof msg.data === 'object') {
+        if (msg.data.jsonDef) {
+          node.parseUi(msg.data.jsonDef);
+          resolve(node);
+        } else if (msg.data.log) {
+          console.log(...msg.data.log);
+        }
+      }
     };
 
     node.port.postMessage(dspArrayBuffer);
