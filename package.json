@@ -47,6 +47,7 @@
     "chroma-js": "^2.0.6",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",
+    "jantix": "^0.2.0",
     "litegraph.js": "^0.7.0",
     "ramda": "^0.26.1",
     "react": "^16.9.0",
@@ -57,7 +58,6 @@
     "recompose": "^0.30.0",
     "redux": "^4.0.4",
     "tonal": "^2.2.2",
-    "tone": "^13.8.25",
-    "typesafe-actions": "^4.4.2"
+    "tone": "^13.8.25"
   }
 }

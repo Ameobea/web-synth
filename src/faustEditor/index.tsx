@@ -1,15 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { store } from '../redux';
-import { actionCreators } from '../redux/reducers/faustEditor';
+import { actionCreators, dispatch, store, getState } from '../redux';
 import FaustEditor from './FaustEditor';
 import { Provider } from 'react-redux';
 
 export const init_faust_editor = (stateKey: string) => {
   // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
   const editorContent = localStorage.getItem(stateKey) || '';
-  store.dispatch(actionCreators.setEditorContent(editorContent));
+  dispatch(actionCreators.faustEditor.SET_EDITOR_CONTENT(editorContent));
 
   // Create the base dom node for the faust editor
   const faustEditorBase = document.createElement('div');
@@ -29,7 +28,7 @@ export const init_faust_editor = (stateKey: string) => {
   );
 };
 
-export const get_faust_editor_content = () => store.getState().faustEditor.editorContent;
+export const get_faust_editor_content = () => getState().faustEditor.editorContent;
 
 export const cleanup_faust_editor = (): string => {
   const faustEditorReactRootNode = document.getElementById('faust-editor-react-root')!;

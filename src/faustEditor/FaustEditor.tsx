@@ -6,9 +6,8 @@ import * as R from 'ramda';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
-import { State as ReduxState, store } from '../redux';
-import { actionCreators, audioContext } from '../redux/reducers/faustEditor';
-import { Effect } from '../redux/reducers/effects';
+import { ReduxStore, dispatch, actionCreators } from '../redux';
+import { Effect } from '../redux/modules/effects';
 import buildInstance, { analyzerNode } from './buildInstance';
 import { EffectPickerCustomInput } from '../controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from '../conf';
@@ -21,14 +20,14 @@ import {
 } from '../visualizations/spectrum';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 
-const { setActiveInstance, clearActiveInstance, setEditorContent } = actionCreators;
-
 ace.require('ace/theme/twilight');
 
 const ReactAce = React.lazy(() => import('react-ace'));
 
+const audioContext = new AudioContext();
+
 export interface FaustModuleInstance extends ScriptProcessorNode {
-  json_object: object;
+  jsonDef: { [key: string]: any };
   getParamValue: (path: string) => number;
   setParamValue: (path: string, val: number) => void;
 }
@@ -67,9 +66,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-type StateProps = Pick<ReduxState['faustEditor'], 'instance' | 'controlPanel' | 'editorContent'>;
+type StateProps = Pick<ReduxStore['faustEditor'], 'instance' | 'controlPanel' | 'editorContent'>;
 
-const mapStateToProps = ({ faustEditor }: ReduxState) => ({
+const mapStateToProps = ({ faustEditor }: ReduxStore) => ({
   instance: faustEditor.instance,
   controlPanel: faustEditor.controlPanel,
   editorContent: faustEditor.editorContent,
@@ -123,7 +122,7 @@ const createCompileButtonClickHandler = (
   if (useMediaFile && mediaFileSourceNode) {
     mediaFileSourceNode.start(0);
   }
-  store.dispatch(setActiveInstance(faustInstance));
+  dispatch(actionCreators.faustEditor.SET_INSTANCE(faustInstance));
 };
 
 interface EffectsPickerPanelPassedProps {
@@ -162,12 +161,9 @@ const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanel
   </ControlPanel>
 );
 
-const EffectsPickerPanel = connect<
-  { effects: Effect[] },
-  {},
-  EffectsPickerPanelPassedProps,
-  ReduxState
->(({ effects: { sharedEffects } }) => ({ effects: sharedEffects }))(EffectsPickerPanelInner);
+const EffectsPickerPanel = connect(({ effects: { sharedEffects } }: ReduxStore) => ({
+  effects: sharedEffects,
+}))(EffectsPickerPanelInner);
 
 const SaveControls = ({ editorContent }: { editorContent: string }) => {
   const initialState = { title: '', description: '', saveStatus: '' };
@@ -270,7 +266,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
           theme='twilight'
           mode='text'
           showPrintMargin={false}
-          onChange={newValue => dispatch(setEditorContent(newValue))}
+          onChange={newValue => dispatch(actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue))}
           name='ace-editor'
           width='40vw'
           value={editorContent}
@@ -285,7 +281,9 @@ const FaustEditor: React.FunctionComponent<{}> = ({
           Compile
         </button>
         {instance ? (
-          <button onClick={() => store.dispatch(clearActiveInstance())}>Stop</button>
+          <button onClick={() => dispatch(actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE())}>
+            Stop
+          </button>
         ) : null}
         {externalAudioBufferSource ? (
           <button
@@ -329,7 +327,9 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       <EffectsPickerPanel
         state={controlPanelState}
         setState={setControlPanelState}
-        loadEffect={(effect: Effect) => store.dispatch(setEditorContent(effect.code))}
+        loadEffect={(effect: Effect) =>
+          dispatch(actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code))
+        }
       />
     </Suspense>
   );

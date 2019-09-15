@@ -1,28 +1,19 @@
-/**
- * Initialize the Redux store + subreducers
- */
+import { buildStore } from 'jantix';
 
-import { createStore, combineReducers, compose } from 'redux';
-import { StateType } from 'typesafe-actions';
+import synthsModule from './modules/synths';
+import viewContextManagerModule from './modules/viewContextManager';
+import faustEditorModule from './modules/faustEditor';
+import effectsModule from './modules/effects';
 
-import synthsReducer from './reducers/synths';
-import viewContextManagerReducer from './reducers/viewContextManager';
-import faustEditorReducer from './reducers/faustEditor';
-import effectsReducer from './reducers/effects';
-
-const reducers = {
-  synths: synthsReducer,
-  viewContextManager: viewContextManagerReducer,
-  faustEditor: faustEditorReducer,
-  effects: effectsReducer,
+const modules = {
+  synths: synthsModule,
+  viewContextManager: viewContextManagerModule,
+  faustEditor: faustEditorModule,
+  effects: effectsModule,
 };
 
-const composeEnhancers = (window as any).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+export const { store, getState, dispatch, actionCreators } = buildStore<typeof modules>(modules);
 
-const rootReducer = combineReducers(reducers);
+(window as any).getState = getState;
 
-export const store = createStore(rootReducer, {}, composeEnhancers());
-
-(window as any).getState = () => store.getState();
-
-export type State = StateType<typeof rootReducer>;
+export type ReduxStore = ReturnType<typeof getState>;

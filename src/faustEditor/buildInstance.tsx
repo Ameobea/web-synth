@@ -1,4 +1,3 @@
-import { audioContext } from '../redux/reducers/faustEditor';
 import { initializeSpectrumVisualization } from '../visualizations/spectrum';
 import { FaustModuleInstance } from './FaustEditor';
 import { buildFaustWorkletNode } from './FaustAudioWorklet';
@@ -12,6 +11,8 @@ declare class FaustWasm2ScriptProcessor {
     bufferSize: number
   ): FaustModuleInstance;
 }
+
+const audioContext = new AudioContext();
 
 export const analyzerNode = audioContext.createAnalyser();
 try {

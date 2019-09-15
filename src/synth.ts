@@ -3,8 +3,8 @@ import Volume from 'tone/Tone/component/Volume';
 import * as R from 'ramda';
 
 import { ADSRValues, defaultAdsrEnvelope } from './controls/adsr';
-import { store } from './redux';
-import { actionCreators as synthActionCreators } from './redux/reducers/synths';
+import { getState, dispatch } from './redux';
+import { actionCreators } from './redux';
 
 /**
  * These are manual type definitions for the ToneJS `Synth` class.
@@ -42,7 +42,7 @@ export class PolySynth {
    */
   public volume: AudioNode & { set: (key: string, val: any) => void };
 
-  public constructor(voiceCount: number, volume: number = 10.0) {
+  public constructor(voiceCount: number, volume = 10.0) {
     this.volume = new Volume(volume).toMaster();
 
     this.voices = R.times(R.identity, voiceCount).map(() =>
@@ -76,13 +76,13 @@ export class PolySynth {
   }
 }
 
-const getSynths = (): PolySynth[] => store.getState().synths.synths;
+const getSynths = (): PolySynth[] => getState().synths.synths;
 
 export const init_synth = (uuid: string, voiceCount: number): number => {
   const synth = new PolySynth(voiceCount);
   synth.volume.set('volume', -16);
   const oldSynthCount = getSynths().length;
-  store.dispatch(synthActionCreators.setSynth(uuid, synth));
+  dispatch(actionCreators.synths.SET_SYNTH(uuid, synth));
   return oldSynthCount;
 };
 

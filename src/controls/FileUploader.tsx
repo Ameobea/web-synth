@@ -44,9 +44,9 @@ export const parseUploadedFileAsText = (
         return;
       }
 
-      const value: Value = {
+      const value: Value<string> = {
         fileName: file.name,
-        fileContent: this.result as ArrayBuffer,
+        fileContent: this.result as string,
       };
 
       resolve(value);

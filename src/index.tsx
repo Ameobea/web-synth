@@ -6,8 +6,7 @@ import Tone from 'tone';
 
 const wasm = import('./engine');
 import App from './App';
-import { store } from './redux';
-import { actionCreators as viewContextManagerActionCreators } from './redux/reducers/viewContextManager';
+import { actionCreators, dispatch, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 
 (window as any).Tone = Tone;
@@ -180,8 +179,8 @@ export const update_active_view_contexts = (
     minimal_def: { name: string; uuid: string; title?: string };
   }[] = JSON.parse(activeVcsJson);
 
-  store.dispatch(
-    viewContextManagerActionCreators.setState({
+  dispatch(
+    actionCreators.viewContextManager.SET_VCM_STATE({
       activeViewContextIx,
       activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
         ...minimal_def,

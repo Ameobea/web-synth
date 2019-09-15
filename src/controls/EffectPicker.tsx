@@ -1,8 +1,8 @@
 import React from 'react';
 import { connect } from 'react-redux';
 
-import { State as ReduxState } from '../redux';
-import { actionCreators as effectsActionCreators, Effect } from '../redux/reducers/effects';
+import { actionCreators, dispatch, ReduxStore } from '../redux';
+import { Effect } from '../redux/modules/effects';
 import { useOnce } from '../hooks';
 import { BACKEND_BASE_URL } from '../conf';
 
@@ -10,18 +10,12 @@ interface StateProps {
   effects: Effect[];
 }
 
-const mapDispatchToProps = {
-  addEffects: effectsActionCreators.addEffects,
-};
-
-type DispatchProps = typeof mapDispatchToProps;
-
 interface PassedProps {
   onChange: (newId: number) => void;
   value: number;
 }
 
-type EffectPickerProps = StateProps & DispatchProps & PassedProps;
+type EffectPickerProps = StateProps & PassedProps;
 
 export const fetchEffects = async (): Promise<Effect[]> => {
   try {
@@ -40,11 +34,10 @@ const EffectPicker: React.FunctionComponent<PassedProps> = ({
   value,
   onChange,
   effects,
-  addEffects,
 }: EffectPickerProps) => {
   useOnce(async () => {
     const effects = await fetchEffects();
-    addEffects(effects);
+    dispatch(actionCreators.effects.ADD_EFFECTS(effects));
     onChange(effects[0].id);
   });
 
@@ -59,14 +52,11 @@ const EffectPicker: React.FunctionComponent<PassedProps> = ({
   );
 };
 
-const mapStateToProps: (reduxState: ReduxState) => StateProps = ({ effects }) => ({
+const mapStateToProps: (reduxState: ReduxStore) => StateProps = ({ effects }) => ({
   effects: effects.sharedEffects,
 });
 
-const enhance = connect<StateProps, DispatchProps, {}>(
-  mapStateToProps,
-  mapDispatchToProps
-);
+const enhance = connect(mapStateToProps);
 
 const EnhancedEffectPicker = enhance(EffectPicker);
 
