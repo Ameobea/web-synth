@@ -65,7 +65,7 @@ export const buildFaustWorkletNode = async (
   audioContext: AudioContext,
   dspArrayBuffer: ArrayBuffer
 ): Promise<FaustWorkletNode> => {
-  await audioContext.audioWorklet.addModule('http://localhost:9000/FaustAudioWorkletProcessor.js');
+  await audioContext.audioWorklet.addModule('./FaustAudioWorkletProcessor.js');
 
   const node = new FaustWorkletNode(audioContext);
 
