@@ -1,10 +1,11 @@
-import React, { Fragment, useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { connect } from 'react-redux';
 import * as R from 'ramda';
 
 import { State as ViewContextManagerState } from './redux/reducers/viewContextManager';
 import { State as ReduxState } from './redux';
 import './ViewContextManager.css';
+import GlobalMenuButton from './globalMenu/GlobalMenu';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -32,18 +33,17 @@ const viewContexts = [
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {
   name: string;
   displayName: string | undefined;
-  engine: typeof import('./engine');
   style?: React.CSSProperties;
   onClick: () => void;
 }
 
-const ViewContextIcon = ({
+const ViewContextIcon: React.FC<ViewContextIconProps> = ({
   displayName,
   style,
   onClick,
   children,
   ...rest
-}: ViewContextIconProps) => (
+}) => (
   <div
     role='button'
     title={displayName}
@@ -56,14 +56,12 @@ const ViewContextIcon = ({
   </div>
 );
 
-interface ViewContextManagerProps {
+export const ViewContextManager: React.FC<{
   engine: typeof import('./engine');
-}
-
-export const ViewContextManager = ({ engine }: ViewContextManagerProps) => (
+}> = ({ engine }) => (
   <div style={styles.root}>
+    <GlobalMenuButton engine={engine} />
     <ViewContextIcon
-      engine={engine}
       displayName='Reset View Context Manager'
       onClick={engine.reset_vcm}
       style={{ backgroundColor: 'red' }}
@@ -73,7 +71,6 @@ export const ViewContextManager = ({ engine }: ViewContextManagerProps) => (
     </ViewContextIcon>
     {viewContexts.map(({ ...props }) => (
       <ViewContextIcon
-        engine={engine}
         {...props}
         key={props.name}
         onClick={() => engine.create_view_context(props.name)}
@@ -85,11 +82,6 @@ export const ViewContextManager = ({ engine }: ViewContextManagerProps) => (
   </div>
 );
 
-interface ViewContextSwitcherProps {
-  engine: typeof import('./engine');
-  viewContextManager: ViewContextManagerState;
-}
-
 interface ViewContextTabProps {
   engine: typeof import('./engine');
   name: string;
@@ -99,15 +91,11 @@ interface ViewContextTabProps {
   i: number;
 }
 
-const ViewContextTabRenamer = ({
-  value,
-  setValue,
-  submit,
-}: {
+const ViewContextTabRenamer: React.FC<{
   value: string;
   setValue: (newValue: string) => void;
   submit: () => void;
-}) => {
+}> = ({ value, setValue, submit }) => {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (ref.current) {
@@ -131,11 +119,9 @@ const ViewContextTabRenamer = ({
   );
 };
 
-const VCTabCloseIcon = ({
-  onClick,
-}: {
+const VCTabCloseIcon: React.FC<{
   onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-}) => (
+}> = ({ onClick }) => (
   <div onClick={onClick} className='vc-close-tab-icon'>
     x
   </div>
@@ -149,7 +135,6 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
 
   return (
     <ViewContextIcon
-      engine={engine}
       name={name}
       displayName={displayName}
       key={uuid}
@@ -170,7 +155,7 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
           }}
         />
       ) : (
-        <Fragment>
+        <>
           <VCTabCloseIcon
             onClick={e => {
               engine.delete_vc_by_id(uuid);
@@ -178,7 +163,7 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
             }}
           />
           <span className='vc-switcher-tab-title'>{displayName}</span>
-        </Fragment>
+        </>
       )}
     </ViewContextIcon>
   );
@@ -189,7 +174,10 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
  * VCs.  It is kept up to date via Redux, which is in turn updated automatically by the VCM on the
  * backend every time there is a change.
  */
-const ViewContextSwitcherInner = ({ engine, viewContextManager }: ViewContextSwitcherProps) => (
+const ViewContextSwitcherInner: React.FC<{
+  engine: typeof import('./engine');
+  viewContextManager: ViewContextManagerState;
+}> = ({ engine, viewContextManager }) => (
   <div style={styles.viewContextSwitcher}>
     {viewContextManager.activeViewContexts.map(({ ...props }, i) => (
       <ViewContextTab

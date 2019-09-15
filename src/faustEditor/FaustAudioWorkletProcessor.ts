@@ -148,23 +148,27 @@ export default class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   process(
     inputs: Float32Array[][],
     outputs: Float32Array[][],
-    parameters: Map<string, Float32Array>
+    _parameters: Map<string, Float32Array>
   ) {
-    for (let i = 0; i < this.numberOfInputs; i++) {
+    if (!this.once) {
+      this.log(inputs, outputs);
+    }
+    for (let i = 0; i < inputs.length; i++) {
       // Copy inputs into the Wasm heap
       const inputChannel0 = inputs[i][0];
       const dspInput = this.dspInChannels[i];
       dspInput.set(inputChannel0);
+    }
 
-      // Compute on the Faust/Wasm side
-      this.dspInstance.exports.compute(this.dsp, this.bufferSize);
+    // Compute on the Faust/Wasm side
+    this.dspInstance.exports.compute(this.dsp, this.bufferSize);
 
-      // Copy computed outputs from the Wasm heap into the WebAudio output buffer
-      for (let i = 0; i < this.numberOfOutputs; i++) {
-        // Write outputs
-        const outputChannel0 = outputs[i][0];
-        const dspOutput = this.dspOutChannels[i];
-        outputChannel0.set(dspOutput);
+    // Copy computed outputs from the Wasm heap into the WebAudio output buffer
+    for (let i = 0; i < outputs.length; i++) {
+      const dspOutput = this.dspOutChannels[i];
+
+      for (let channelIx = 0; channelIx < outputs[i].length; channelIx++) {
+        outputs[i][channelIx].set(dspOutput);
       }
     }
 

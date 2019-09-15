@@ -169,7 +169,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, _parameters) {
-    for (let i = 0; i < this.numberOfInputs; i++) {
+    for (let i = 0; i < inputs.length; i++) {
       // Copy inputs into the Wasm heap
       const inputChannel0 = inputs[i][0];
       const dspInput = this.dspInChannels[i];
@@ -188,8 +188,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < outputs.length; i++) {
       const dspOutput = this.dspOutChannels[i];
       for (let channelIx = 0; channelIx < outputs[i].length; channelIx++) {
-        const outputChannel = outputs[i][channelIx];
-        outputChannel.set(dspOutput);
+        outputs[i][channelIx].set(dspOutput);
       }
     }
 

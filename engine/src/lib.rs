@@ -26,7 +26,7 @@ extern crate serde_json;
 extern crate log;
 extern crate uuid;
 
-use std::{mem, ptr, str::FromStr};
+use std::{mem, ptr, str::FromStr, sync::Once};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
@@ -47,36 +47,48 @@ use self::{prelude::*, view_context::manager::build_view};
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
 
+static ONCE: Once = Once::new();
+
 /// Retrieves the global `ViewContextManager` for the application
-pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEXT_MANAGER } }
+pub fn get_vcm() -> &'static mut ViewContextManager {
+    unsafe { &mut *VIEW_CONTEXT_MANAGER }
+}
 
 /// Entrypoint for the application.  This function is called from the JS side as soon as the Wasm
 /// blob is loaded.  It handles setting up application state, rendering the initial UI, and loading
 /// the last saved composition from the user.
 #[wasm_bindgen]
 pub fn init() {
-    console_error_panic_hook::set_once();
+    ONCE.call_once(|| {
+        console_error_panic_hook::set_once();
 
-    // Initialize the global PRNG
-    unsafe {
-        // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
-        // some actual RNG from JS so that things aren't deterministic.
-        RNG = Box::into_raw(Box::new(Pcg32::new(
-            mem::transmute(js::js_random()),
-            721_347_520_420_481_703,
-        )))
+        // Initialize the global PRNG
+        unsafe {
+            // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
+            // some actual RNG from JS so that things aren't deterministic.
+            RNG = Box::into_raw(Box::new(Pcg32::new(
+                mem::transmute(js::js_random()),
+                721_347_520_420_481_703,
+            )))
+        }
+
+        // Pump it a few times because it seems to generate a fully null output the first time
+        let _: usize = rng().gen();
+        let _: usize = rng().gen();
+
+        let log_level = if cfg!(debug_assertions) {
+            log::Level::Trace
+        } else {
+            log::Level::Info
+        };
+        wasm_logger::init(wasm_logger::Config::new(log_level));
+    });
+
+    // Check if we have an existing VCM and drop it if we do
+    if unsafe { !VIEW_CONTEXT_MANAGER.is_null() } {
+        let old_vcm = unsafe { Box::from_raw(VIEW_CONTEXT_MANAGER) };
+        drop(old_vcm);
     }
-
-    // Pump it a few times because it seems to generate a fully null output the first time
-    let _: usize = rng().gen();
-    let _: usize = rng().gen();
-
-    let log_level = if cfg!(debug_assertions) {
-        log::Level::Trace
-    } else {
-        log::Level::Info
-    };
-    wasm_logger::init(wasm_logger::Config::new(log_level));
 
     // Create the `ViewContextManager` and initialize it, then set it into the global
     let mut vcm = Box::new(ViewContextManager::default());

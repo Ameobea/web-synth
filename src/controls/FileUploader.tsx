@@ -2,9 +2,9 @@ import React from 'react';
 
 import { ControlPanelCustomComponentProps } from '../types';
 
-export interface Value {
+export interface Value<T = ArrayBuffer> {
   fileName: string;
-  fileContent: ArrayBuffer;
+  fileContent: T;
 }
 
 const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Value> =>
@@ -28,6 +28,31 @@ const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Va
     };
 
     reader.readAsArrayBuffer(file);
+  });
+
+export const parseUploadedFileAsText = (
+  evt: React.ChangeEvent<HTMLInputElement>
+): Promise<Value<string>> =>
+  new Promise((resolve, reject) => {
+    const file = evt.target.files![0]!;
+
+    const reader = new FileReader();
+
+    reader.onload = function() {
+      if (this.readyState !== FileReader.DONE) {
+        reject(new Error('Error converting uploaded file to `ArrayBuffer`'));
+        return;
+      }
+
+      const value: Value = {
+        fileName: file.name,
+        fileContent: this.result as ArrayBuffer,
+      };
+
+      resolve(value);
+    };
+
+    reader.readAsText(file);
   });
 
 const FileUploader: React.FunctionComponent<ControlPanelCustomComponentProps<Value>> = ({

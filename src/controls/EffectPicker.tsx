@@ -5,7 +5,6 @@ import { State as ReduxState } from '../redux';
 import { actionCreators as effectsActionCreators, Effect } from '../redux/reducers/effects';
 import { useOnce } from '../hooks';
 import { BACKEND_BASE_URL } from '../conf';
-import defaultEffects from './defaultEffects.json';
 
 interface StateProps {
   effects: Effect[];
@@ -30,7 +29,7 @@ export const fetchEffects = async (): Promise<Effect[]> => {
     return effects.json();
   } catch (err) {
     console.warn('Error fetching effects from server; using local effects file.');
-    return defaultEffects;
+    return [];
   }
 };
 

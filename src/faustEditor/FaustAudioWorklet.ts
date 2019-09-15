@@ -72,7 +72,7 @@ export const buildFaustWorkletNode = async (
   // Send the Wasm module over to the created worklet's thread via message passing so that it can instantiate it over
   // there and control it directly
   return await new Promise(resolve => {
-    console.log('b');
+    console.log('e');
     node.port.onmessage = (msg: MessageEvent) => {
       if (typeof msg.data === 'object') {
         if (msg.data.jsonDef) {
