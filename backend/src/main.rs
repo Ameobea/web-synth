@@ -13,6 +13,10 @@ extern crate serde_json;
 extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
+extern crate chrono;
+extern crate fern;
 
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::{http::Method, http::Status, Request, Response};
@@ -54,16 +58,45 @@ impl Fairing for CorsFairing {
     }
 }
 
+fn init_logger() -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d %H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .chain(std::io::stdout())
+        .apply()?;
+    Ok(())
+}
+
 fn main() {
     if let Err(_) = dotenv::dotenv() {
         println!("Unable to parse .env file; continuing.");
     }
 
+    init_logger()
+        .map_err(|err| -> ! {
+            panic!("Failed to initialize logger: {:?}", err);
+        })
+        .unwrap();
+
     rocket::ignite()
         .attach(WebSynthDbConn::fairing())
         .mount(
             "/",
-            routes![routes::index, routes::create_effect, routes::list_effects],
+            routes![
+                routes::index,
+                routes::create_effect,
+                routes::list_effects,
+                routes::save_composition,
+                routes::get_compositions
+            ],
         )
         .attach(CorsFairing)
         .launch();
