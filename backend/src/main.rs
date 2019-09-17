@@ -44,6 +44,10 @@ impl Fairing for CorsFairing {
             "Access-Control-Allow-Origin",
             "*",
         ));
+        response.set_header(rocket::http::Header::new(
+            "Access-Control-Allow-Headers",
+            "Content-Type",
+        ));
 
         if response.status() == Status::NotFound && request.method() == Method::Options {
             response.set_status(Status::NoContent);

@@ -62,7 +62,12 @@ const GlobalMenuButton: React.FC<{ engine: typeof import('../engine') }> = ({ en
 
   return (
     <>
-      <div role='button' onClick={() => setIsOpen(true)} className='global-menu-button'>
+      <div
+        title='Open Menu'
+        role='button'
+        onClick={() => setIsOpen(true)}
+        className='global-menu-button'
+      >
         ☰
       </div>
       {isOpen ? (

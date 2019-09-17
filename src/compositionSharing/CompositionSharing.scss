@@ -1,0 +1,22 @@
+.share-composition-form {
+  display: flex;
+  flex-direction: column;
+
+  button {
+    width: 100px;
+  }
+}
+
+.custom-field-renderer {
+  display: flex;
+  flex-direction: row;
+  padding-bottom: 12px;
+
+  label {
+    padding-right: 6px;
+  }
+
+  span {
+    padding-left: 6px;
+  }
+}

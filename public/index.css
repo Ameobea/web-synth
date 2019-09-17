@@ -4,62 +4,11 @@ body {
   padding: 0;
 }
 
-svg.notes {
-  background-color: transparent;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.grid-line-1 {
-  fill: rgb(39, 39, 39);
-}
-
-.grid-line-2 {
-  fill: rgb(62, 62, 62);
-}
-
-.measure-line {
-  stroke: #666;
-  stroke-width: 1px;
-  z-index: 4;
-}
-
-.beat-line {
-  stroke: rgba(150, 150, 150, 0.15);
-  stroke-width: 1px;
-  z-index: 4;
-}
-
-.note {
-  fill: rgb(116, 100, 225);
-}
-
-.note.selected {
-  fill: rgb(170, 100, 225);
-  stroke-width: 1px;
-  stroke: #661166;
-}
-
-#canvases {
-  overflow-y: scroll;
-  overflow-x: hidden;
-}
-
-#canvases-wrapper {
-  position: relative;
-}
-
-.selection-box {
-  stroke: #222;
-  stroke-width: 1;
-  fill: rgba(200, 200, 200, 0.2);
-}
-
-.cursor-gutter {
-  fill: #616;
-}
-
-.cursor {
-  stroke: rgba(222, 222, 222, 0.8);
+body,
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: 'PT Sans';
 }

@@ -82,3 +82,10 @@ extern "C" {
 
     pub fn cleanup_midi_editor();
 }
+
+#[wasm_bindgen(raw_module = "./compositionSharing")]
+extern "C" {
+    pub fn init_composition_sharing(state_key: &str);
+
+    pub fn cleanup_composition_sharing();
+}

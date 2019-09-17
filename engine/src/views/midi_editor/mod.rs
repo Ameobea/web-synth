@@ -2,15 +2,11 @@
 //! that correspond to individual notes.  It supports operations like dragging notes around,
 //! selecting/deleting notes, and playing the current composition.
 
-use std::{mem, str};
+use std::str;
 
-use fnv::FnvHashSet;
 use uuid::Uuid;
 
-use crate::{
-    helpers::grid::{prelude::*, skip_list::NoteSkipListNode},
-    view_context::ViewContext,
-};
+use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
 pub mod prelude;

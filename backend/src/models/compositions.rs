@@ -6,7 +6,7 @@ use crate::schema::compositions;
 pub struct NewCompositionRequest {
     pub title: String,
     pub description: String,
-    pub content: Vec<Map<String, Value>>,
+    pub content: Map<String, Value>,
 }
 
 #[table_name = "compositions"]

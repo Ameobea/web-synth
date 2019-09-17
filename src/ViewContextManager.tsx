@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { connect } from 'react-redux';
 import * as R from 'ramda';
 
-import { State as ViewContextManagerState } from './redux/reducers/viewContextManager';
-import { State as ReduxState } from './redux';
+import { ReduxStore } from './redux';
 import './ViewContextManager.css';
 import GlobalMenuButton from './globalMenu/GlobalMenu';
 
@@ -23,11 +22,12 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-const viewContexts = [
+const viewContexts: { children: string; name: string; displayName: string }[] = [
   { children: 'C', name: 'clip_compositor', displayName: 'Clip Compositor' },
   { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor' },
   { children: 'F', name: 'faust_editor', displayName: 'Faust Code Editor' },
   { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },
+  { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
 ];
 
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {
@@ -64,7 +64,7 @@ export const ViewContextManager: React.FC<{
     <ViewContextIcon
       displayName='Reset View Context Manager'
       onClick={engine.reset_vcm}
-      style={{ backgroundColor: 'red' }}
+      style={{ backgroundColor: '#730505' }}
       name='Delete'
     >
       X
@@ -176,7 +176,7 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
  */
 const ViewContextSwitcherInner: React.FC<{
   engine: typeof import('./engine');
-  viewContextManager: ViewContextManagerState;
+  viewContextManager: ReduxStore['viewContextManager'];
 }> = ({ engine, viewContextManager }) => (
   <div style={styles.viewContextSwitcher}>
     {viewContextManager.activeViewContexts.map(({ ...props }, i) => (
@@ -192,7 +192,7 @@ const ViewContextSwitcherInner: React.FC<{
 );
 
 const mapStateToProps: (
-  state: ReduxState
-) => { viewContextManager: ReduxState['viewContextManager'] } = R.pick(['viewContextManager']);
+  state: ReduxStore
+) => { viewContextManager: ReduxStore['viewContextManager'] } = R.pick(['viewContextManager']);
 
 export const ViewContextSwitcher = connect(mapStateToProps)(ViewContextSwitcherInner);
