@@ -9,3 +9,5 @@ docker-run:
   docker rm notes-backend || true
   docker run -p 7467:7467 -d --name notes-backend ameo/notes-backend:latest
 
+run:
+  cargo run

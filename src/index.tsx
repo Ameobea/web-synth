@@ -141,6 +141,8 @@ export const clear_canvases = () => SVGS.forEach(deleteAllChildren);
 
 let engineHandle: typeof import('./engine');
 
+export const getEngine = (): typeof import('./engine') | undefined => engineHandle;
+
 export const init_midi_editor_ui = () => {
   ReactDOM.render(
     <Provider store={store}>

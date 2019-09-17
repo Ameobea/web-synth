@@ -1,4 +1,4 @@
-//! Defines a view that creates a text editor and controls for compiling and running Faust scripts.
+//! Defines a view that creates an interface for sharing compositions + browsing shared compositions
 
 use serde_json;
 use uuid::Uuid;
@@ -32,10 +32,10 @@ impl ViewContext for CompositionSharing {
 }
 
 pub fn mk_composition_sharing(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let faust_editor: CompositionSharing = match definition_opt {
+    let composition_sharing: CompositionSharing = match definition_opt {
         Some(definition) => serde_json::from_str(definition)
             .expect("Error while deserializing `CompositionSharing`"),
         None => CompositionSharing::new(uuid),
     };
-    Box::new(faust_editor)
+    Box::new(composition_sharing)
 }

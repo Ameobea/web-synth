@@ -90,7 +90,7 @@ fn main() {
         })
         .unwrap();
 
-    rocket::ignite()
+    let launch_err = rocket::ignite()
         .attach(WebSynthDbConn::fairing())
         .mount(
             "/",
@@ -104,4 +104,6 @@ fn main() {
         )
         .attach(CorsFairing)
         .launch();
+
+    panic!("Error initializing Rocket: {:?}", launch_err);
 }

@@ -31,8 +31,13 @@ export const init_faust_editor = (stateKey: string) => {
 export const get_faust_editor_content = () => getState().faustEditor.editorContent;
 
 export const cleanup_faust_editor = (): string => {
-  const faustEditorReactRootNode = document.getElementById('faust-editor-react-root')!;
+  const editorContent = get_faust_editor_content();
+  const faustEditorReactRootNode = document.getElementById('faust-editor-react-root');
+  if (!faustEditorReactRootNode) {
+    return editorContent;
+  }
+
   ReactDOM.unmountComponentAtNode(faustEditorReactRootNode);
   faustEditorReactRootNode.remove();
-  return get_faust_editor_content();
+  return editorContent;
 };

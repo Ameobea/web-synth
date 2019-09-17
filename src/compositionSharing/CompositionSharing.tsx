@@ -1,22 +1,43 @@
-import React, { useState, LabelHTMLAttributes } from 'react';
+import React, { useState } from 'react';
+import { connect } from 'react-redux';
 import { Field, reduxForm, InjectedFormProps } from 'redux-form';
 import * as R from 'ramda';
 
 import { useOnce } from '../hooks';
 import { BACKEND_BASE_URL } from '../conf';
+import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
+import { loadComposition } from '../persistance';
+
+interface CompositionDefinition {
+  id: number;
+  title: string;
+  author: number;
+  description: string;
+  content: string;
+}
 
 const fetchAllSharedCompositions = () =>
   fetch(`${BACKEND_BASE_URL}/compositions`).then(res => res.json());
 
-const CompositionListing: React.FC<{}> = () => {
-  const [allSharedCompositions, setAllSharedCompositions] = useState<null | unknown[]>(null);
+const mapCompositionListingStateToProps = (state: ReduxStore) => ({
+  allViewContextIds: state.viewContextManager.activeViewContexts.map(R.prop('uuid')),
+});
+
+const CompositionListingInner: React.FC<
+  { engine: typeof import('../engine') } & ReturnType<typeof mapCompositionListingStateToProps>
+> = ({ engine, allViewContextIds }) => {
+  const [allSharedCompositions, setAllSharedCompositions] = useState<
+    null | CompositionDefinition[]
+  >(null);
   const [errorMessage, setErrorMessage] = useState<null | string>(null);
   useOnce(async () => {
     fetchAllSharedCompositions()
       .then(setAllSharedCompositions)
       .catch(err => setErrorMessage(`Failed to fetch shared compositions: ${err.message}`));
   });
+
+  console.log(allSharedCompositions);
 
   if (!allSharedCompositions) {
     if (errorMessage) {
@@ -27,14 +48,26 @@ const CompositionListing: React.FC<{}> = () => {
   }
 
   return (
-    <>
+    <div className='shared-composition-listing'>
       <h2>Browse Shared Compositions</h2>
       {allSharedCompositions.map(composition => (
-        <span key={composition.id}>{composition.name}</span>
+        <div className='composition-item'>
+          <span className='composition-title' key={composition.id}>
+            {composition.title}
+          </span>
+          <span className='composition-description' key={composition.id}>
+            {composition.description}
+          </span>
+          <button onClick={() => loadComposition(composition.content, engine, allViewContextIds)}>
+            Load
+          </button>
+        </div>
       ))}
-    </>
+    </div>
   );
 };
+
+const CompositionListing = connect(mapCompositionListingStateToProps)(CompositionListingInner);
 
 const FieldRenderer: React.FC<{
   input: { [key: string]: any };
@@ -116,10 +149,10 @@ const ShareComposition = reduxForm<{ title: string; description: string }>({
   },
 })(ShareCompositionInner);
 
-const CompositionSharing: React.FC<{}> = () => (
+const CompositionSharing: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => (
   <>
     <ShareComposition />
-    <CompositionListing />
+    <CompositionListing engine={engine} />
   </>
 );
 
