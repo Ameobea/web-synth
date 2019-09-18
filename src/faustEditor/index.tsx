@@ -1,9 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { Provider } from 'react-redux';
 
 import { actionCreators, dispatch, store, getState } from '../redux';
 import FaustEditor from './FaustEditor';
-import { Provider } from 'react-redux';
 
 export const init_faust_editor = (stateKey: string) => {
   // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux

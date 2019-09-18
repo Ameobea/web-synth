@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { connect } from 'react-redux';
 import { Field, reduxForm, InjectedFormProps } from 'redux-form';
 import * as R from 'ramda';
+import { Table } from 'react-virtualized';
 
 import { useOnce } from '../hooks';
 import { BACKEND_BASE_URL } from '../conf';
@@ -11,9 +12,9 @@ import { loadComposition } from '../persistance';
 
 interface CompositionDefinition {
   id: number;
-  title: string;
+  title: React.ReactNode;
   author: number;
-  description: string;
+  description: React.ReactNode;
   content: string;
 }
 
@@ -23,6 +24,31 @@ const fetchAllSharedCompositions = () =>
 const mapCompositionListingStateToProps = (state: ReduxStore) => ({
   allViewContextIds: state.viewContextManager.activeViewContexts.map(R.prop('uuid')),
 });
+
+const CompositionItem: React.FC<
+  {
+    composition: CompositionDefinition;
+    engine: typeof import('../engine');
+    allViewContextIds: string[];
+    showButton?: boolean;
+  } & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+> = ({ composition, engine, allViewContextIds, showButton = true, className, ...props }) => (
+  <div className={`composition-item${className ? ' ' + className : ''}`} {...props}>
+    <div className='composition-title' key={composition.id}>
+      {composition.title}
+    </div>
+    <div className='composition-description' key={composition.id}>
+      {composition.description}
+    </div>
+    {showButton ? (
+      <button onClick={() => loadComposition(composition.content, engine, allViewContextIds)}>
+        Load
+      </button>
+    ) : (
+      <div style={{ maxWidth: 60 }} />
+    )}
+  </div>
+);
 
 const CompositionListingInner: React.FC<
   { engine: typeof import('../engine') } & ReturnType<typeof mapCompositionListingStateToProps>
@@ -50,19 +76,40 @@ const CompositionListingInner: React.FC<
   return (
     <div className='shared-composition-listing'>
       <h2>Browse Shared Compositions</h2>
-      {allSharedCompositions.map(composition => (
-        <div className='composition-item'>
-          <span className='composition-title' key={composition.id}>
-            {composition.title}
-          </span>
-          <span className='composition-description' key={composition.id}>
-            {composition.description}
-          </span>
-          <button onClick={() => loadComposition(composition.content, engine, allViewContextIds)}>
-            Load
-          </button>
-        </div>
-      ))}
+      <Table
+        headerHeight={26}
+        height={600}
+        rowCount={allSharedCompositions.length}
+        rowGetter={({ index }) => allSharedCompositions[index]}
+        rowRenderer={({ className, style, rowData }) => (
+          <CompositionItem
+            composition={rowData}
+            engine={engine}
+            allViewContextIds={allViewContextIds}
+            className={className}
+            style={style}
+          />
+        )}
+        headerRowRenderer={({ className, style }) => (
+          <CompositionItem
+            showButton={false}
+            composition={{
+              id: -1,
+              content: '',
+              author: -1,
+              title: <b>Title</b>,
+              description: <b>Description</b>,
+            }}
+            engine={engine}
+            allViewContextIds={allViewContextIds}
+            className={className}
+            style={{ ...style, borderBottom: '1px solid #999', marginBottom: 6 }}
+          />
+        )}
+        rowHeight={26}
+        width={800}
+        row
+      />
     </div>
   );
 };
@@ -150,10 +197,10 @@ const ShareComposition = reduxForm<{ title: string; description: string }>({
 })(ShareCompositionInner);
 
 const CompositionSharing: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => (
-  <>
+  <div className='composition-sharing'>
     <ShareComposition />
     <CompositionListing engine={engine} />
-  </>
+  </div>
 );
 
 export default CompositionSharing;

@@ -1,6 +1,6 @@
 FROM golang:1.12.3-stretch
 
-RUN apt update && apt install -y cmake build-essential git pkg-config
+RUN apt update && apt install -y cmake build-essential git pkg-config python3
 
 RUN mkdir /build
 WORKDIR /build
