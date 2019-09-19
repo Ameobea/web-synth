@@ -36,6 +36,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   root: {
     display: 'flex',
     flexDirection: 'row',
+    overflowY: 'scroll',
   },
   codeEditor: {
     display: 'flex',
@@ -80,11 +81,16 @@ const enhance = connect<StateProps, {}, {}>(mapStateToProps);
 // the instance without connecting it to anything.
 export const compileFaustInstance = async (
   faustCode: string,
+  optimize: boolean,
   mediaFileSourceNode?: AudioScheduledSourceNode | null,
   connectSource = true
 ) => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([faustCode], { type: 'text/plain' }));
+  if (optimize) {
+    formData.append('optimize', 'true');
+  }
+  console.log({ optimize });
 
   const res = await fetch(FAUST_COMPILER_ENDPOINT, {
     method: 'POST',
@@ -102,6 +108,7 @@ export const compileFaustInstance = async (
 
 const createCompileButtonClickHandler = (
   faustCode: string,
+  optimize: boolean,
   setErrMessage: (errMsg: string) => void,
   mediaFileSourceNode?: AudioScheduledSourceNode | null
 ) => async (useMediaFile: boolean) => {
@@ -109,6 +116,7 @@ const createCompileButtonClickHandler = (
   try {
     faustInstance = await compileFaustInstance(
       faustCode,
+      optimize,
       useMediaFile ? mediaFileSourceNode : undefined
     );
   } catch (err) {
@@ -221,7 +229,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
     externalAudioBufferSource,
     setExternalAudioBufferSource,
   ] = useState<AudioBufferSourceNode | null>(null);
-  const dispatch = useDispatch();
+  const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<ControlPanelState>({});
   const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState | null>(
@@ -255,8 +263,13 @@ const FaustEditor: React.FunctionComponent<{}> = ({
   }, [controlPanelState['load file']]);
 
   const compile = useCallback(
-    createCompileButtonClickHandler(editorContent, setCompileErrMsg, externalAudioBufferSource),
-    [editorContent, setCompileErrMsg, externalAudioBufferSource]
+    createCompileButtonClickHandler(
+      editorContent,
+      optimize,
+      setCompileErrMsg,
+      externalAudioBufferSource
+    ),
+    [editorContent, setCompileErrMsg, externalAudioBufferSource, optimize]
   );
 
   return (
@@ -280,6 +293,8 @@ const FaustEditor: React.FunctionComponent<{}> = ({
         <button onClick={() => compile(false)} style={{ marginRight: 10 }}>
           Compile
         </button>
+        Optimize
+        <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
         {instance ? (
           <button onClick={() => dispatch(actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE())}>
             Stop

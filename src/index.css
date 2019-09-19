@@ -3,7 +3,7 @@ body {
   margin: 0;
   padding: 0;
   color: #ddd;
-  overflow-y: hidden;
+  height: 100vh;
 }
 
 svg.notes {
@@ -52,7 +52,6 @@ main#content {
 #canvases {
   height: 100vh;
   width: 100vw;
-  overflow-y: scroll;
   overflow-x: hidden;
 }
 

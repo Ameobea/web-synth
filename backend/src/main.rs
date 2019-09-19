@@ -74,6 +74,10 @@ fn init_logger() -> Result<(), fern::InitError> {
             ))
         })
         .level(log::LevelFilter::Debug)
+        .level_for("hyper", log::LevelFilter::Info)
+        .level_for("mio", log::LevelFilter::Info)
+        .level_for("tokio_core", log::LevelFilter::Info)
+        .level_for("tokio_reactor", log::LevelFilter::Info)
         .chain(std::io::stdout())
         .apply()?;
     Ok(())

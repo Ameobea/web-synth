@@ -10,6 +10,21 @@ import (
 	"os/exec"
 )
 
+func getFileSize(fileName string) (int64, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	fileStats, err := file.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	return fileStats.Size(), nil
+}
+
 func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, err error) {
 	// Compile the Faust code, producing an output wasm file as well as an output JS file
 	cmd := exec.Command("faust", "-lang", "wasm", "-o", outWasmFileName, srcFilePath)
@@ -85,11 +100,29 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 
 	// Optimize the generated Wasm file if the `optimize` flag was set in the request body
 	if optimize {
-		cmd := exec.Command("wasm-opt", outWasmFileName, "-O4", "-c", "-o", outWasmFileName)
+		fmt.Println("Executing `wasm-opt`...")
+
+		fileBeforeSize, err := getFileSize(outWasmFileName)
+		if err != nil {
+			resWriter.WriteHeader(400)
+			resWriter.Write([]byte("Failed to compute initial file size of output Wasm file"))
+			return
+		}
+
+		cmd := exec.Command("wasm-opt", outWasmFileName, "-O4", "-c", "--vacuum", "-o", outWasmFileName)
 		optError := cmd.Run()
 		if optError != nil {
 			fmt.Println("Error while trying to optimize output Wasm file:")
 			fmt.Println(optError)
+		} else {
+			fileAfterSize, err := getFileSize(outWasmFileName)
+			if err != nil {
+				resWriter.WriteHeader(400)
+				resWriter.Write([]byte("Failed to compute post-optimization file size of output Wasm file"))
+				return
+			}
+
+			fmt.Printf("Successfully optimized output Wasm file: %d bytes -> %d bytes", fileBeforeSize, fileAfterSize)
 		}
 	}
 
