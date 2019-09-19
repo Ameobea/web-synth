@@ -28,7 +28,7 @@ const audioContext = new AudioContext();
 
 export interface FaustModuleInstance extends ScriptProcessorNode {
   jsonDef: { [key: string]: any };
-  getParamValue: (path: string) => number;
+  // getParamValue: (path: string) => Promise<number>; // <- unimplemented
   setParamValue: (path: string, val: number) => void;
 }
 

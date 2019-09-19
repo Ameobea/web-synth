@@ -3,7 +3,7 @@ class FaustWorkletNode extends AudioWorkletNode {
     super(audioContext, 'faust-worklet-processor');
   }
 
-  private pathTable: unknown[] = [];
+  private pathTable: { [path: string]: number } = {};
   private fPitchwheelLabel: unknown[] = [];
   private fCtrlLabel: unknown[][] = new Array(128).fill(null).map(() => []);
 
@@ -16,6 +16,7 @@ class FaustWorkletNode extends AudioWorkletNode {
   public parseUi = jsonDef => {
     jsonDef.ui.forEach(group => this.parseUiGroup(group));
     this.jsonDef = jsonDef;
+    return this.pathTable;
   };
 
   private parseUiGroup = group => (group.items ? this.parseUiItems(group.items) : null);
@@ -59,6 +60,9 @@ class FaustWorkletNode extends AudioWorkletNode {
       });
     }
   };
+
+  public setParamValue = (path: string, val: number) =>
+    this.port.postMessage({ type: 'setParamValue', path, val });
 }
 
 export const buildFaustWorkletNode = async (
@@ -72,11 +76,11 @@ export const buildFaustWorkletNode = async (
   // Send the Wasm module over to the created worklet's thread via message passing so that it can instantiate it over
   // there and control it directly
   return await new Promise(resolve => {
-    console.log('e');
     node.port.onmessage = (msg: MessageEvent) => {
       if (typeof msg.data === 'object') {
         if (msg.data.jsonDef) {
-          node.parseUi(msg.data.jsonDef);
+          const pathTable = node.parseUi(msg.data.jsonDef);
+          node.port.postMessage({ type: 'setPathTable', pathTable });
           resolve(node);
         } else if (msg.data.log) {
           console.log(...msg.data.log);
@@ -84,6 +88,6 @@ export const buildFaustWorkletNode = async (
       }
     };
 
-    node.port.postMessage(dspArrayBuffer);
+    node.port.postMessage({ type: 'init', dspArrayBuffer });
   });
 };

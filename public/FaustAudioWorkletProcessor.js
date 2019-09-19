@@ -88,6 +88,8 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     this.dsp = 0;
     this.outs = null;
 
+    this.pathTable = [];
+
     this.initWithModule = async dspInstanceArrayBuffer => {
       await this.initDspInstance(dspInstanceArrayBuffer);
       this.HEAPU8 = new Uint8Array(this.dspInstance.exports.memory.buffer);
@@ -162,9 +164,30 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     this.bufferSize = BUFFER_SIZE;
 
     this.port.onmessage = async event => {
-      await this.initWithModule(event.data);
-      this.log('Initialized!!!');
-      this.port.postMessage({ jsonDef: this.jsonDef });
+      switch (event.data.type) {
+        case 'setParamValue': {
+          this.dspInstance.exports.setParamValue(
+            this.dsp,
+            this.pathTable[event.data.path],
+            event.data.val
+          );
+          break;
+        }
+        case 'setPathTable': {
+          this.pathTable = event.data.pathTable;
+          this.log({ pathTable: this.pathTable });
+          break;
+        }
+        case 'init': {
+          await this.initWithModule(event.data.dspArrayBuffer);
+          this.log('Initialized!!!');
+          this.port.postMessage({ jsonDef: this.jsonDef });
+          break;
+        }
+        default: {
+          this.log(`Unhandled message type: ${event.data.type}`);
+        }
+      }
     };
   }
 
