@@ -6,7 +6,6 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
   entry: {
     index: './src/index.tsx',
-    faustAudioWorkletProcessor: './src/faustEditor/FaustAudioWorkletProcessor.ts',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),

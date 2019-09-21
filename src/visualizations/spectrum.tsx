@@ -1,6 +1,7 @@
 import React from 'react';
 import ControlPanel from 'react-control-panel';
 import chroma from 'chroma-js';
+import * as R from 'ramda';
 
 const FFT_SIZE = Math.pow(2, 14);
 const BUFFER_SIZE = FFT_SIZE / 2;
@@ -22,7 +23,7 @@ const ScalerFunctions = {
 };
 
 const ColorFunctions = {
-  pink: chroma.scale(['black', 'pink']),
+  pink: R.memoizeWith(x => x.toString(), chroma.scale(['black', 'pink'])),
 };
 
 export interface SettingsState {
@@ -79,7 +80,7 @@ export const initializeSpectrumVisualization = (
     ctx2d.putImageData(imageData, curIx, 0, 0, 0, 1, BUFFER_SIZE);
   };
 
-  setTimeout(() => updateVisualization());
+  setTimeout(updateVisualization);
 
   return newOptions => {
     state.options = newOptions;

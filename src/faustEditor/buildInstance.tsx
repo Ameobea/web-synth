@@ -1,16 +1,5 @@
 import { initializeSpectrumVisualization } from '../visualizations/spectrum';
-import { FaustModuleInstance } from './FaustEditor';
 import { buildFaustWorkletNode } from './FaustAudioWorklet';
-
-declare class FaustWasm2ScriptProcessor {
-  public constructor(name: string, props: {}, options: {});
-
-  public getNode(
-    wasmInstance: any,
-    audioContext: AudioContext,
-    bufferSize: number
-  ): FaustModuleInstance;
-}
 
 const audioContext = new AudioContext();
 
@@ -35,17 +24,6 @@ const buildInstance = async (
   externalSource?: AudioScheduledSourceNode,
   connectSource = true
 ) => {
-  // Create a faust module instance (which extends `ScriptProcessorNode`) from the Wasm module
-  // const converterInstance = new FaustWasm2ScriptProcessor(
-  //   'name',
-  //   {},
-  //   {
-  //     debug: false,
-  //   }
-  // );
-
-  // const faustInstance = await converterInstance.getNode(wasmInstance, audioContext, 256);
-
   const faustInstance = await buildFaustWorkletNode(audioContext, wasmInstanceArrayBuffer);
 
   const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
