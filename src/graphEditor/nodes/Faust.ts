@@ -6,12 +6,12 @@
 import * as R from 'ramda';
 import { LiteGraph, LGAudio } from 'litegraph.js';
 
-import { compileFaustInstance } from '../../faustEditor/FaustEditor';
-import { Effect } from '../../redux/reducers/effects';
+import { compileFaustInstance } from 'src/faustEditor/FaustEditor';
+import { Effect } from 'src/redux/modules/effects';
 import { swapAudioNodes } from './util';
 
 export const registerFaustNode = (availableModules: Effect[]) => {
-  function LGFaustModule() {
+  function LGFaustModule(this: any) {
     // Create a placeholder `audionode` that prevents errors from getting thrown when the node is
     // first created, before it has compiled its code.
     const audioCtx: AudioContext = LGAudio.getAudioContext();
@@ -39,14 +39,14 @@ export const registerFaustNode = (availableModules: Effect[]) => {
       R.propEq('title', this.properties.faustModuleTitle)
     )!;
     console.log(`Compiling Faust instance with title "${title}"`);
-    const newAudioNode = await compileFaustInstance(code, undefined, false);
+    const newAudioNode = await compileFaustInstance(code, true);
 
     swapAudioNodes(this, newAudioNode);
 
     console.log('Done compiling');
   };
 
-  LGFaustModule.prototype.onPropertyChanged = function(name, value) {
+  LGFaustModule.prototype.onPropertyChanged = function(name: string, value: unknown) {
     switch (name) {
       case 'faustModuleTitle': {
         this.properties.faustModuleTitle = value;
@@ -60,21 +60,21 @@ export const registerFaustNode = (availableModules: Effect[]) => {
   };
 
   // idk what this does but I copy/pasted it from the script processor example
-  LGFaustModule.default_function = function() {
-    this.onaudioprocess = function(audioProcessingEvent) {
+  LGFaustModule.default_function = function(this: any) {
+    this.onaudioprocess = function(audioProcessingEvent: AudioProcessingEvent) {
       // The input buffer is the song we loaded earlier
-      var inputBuffer = audioProcessingEvent.inputBuffer;
+      const inputBuffer = audioProcessingEvent.inputBuffer;
 
       // The output buffer contains the samples that will be modified and played
-      var outputBuffer = audioProcessingEvent.outputBuffer;
+      const outputBuffer = audioProcessingEvent.outputBuffer;
 
       // Loop through the output channels (in this case there is only one)
-      for (var channel = 0; channel < outputBuffer.numberOfChannels; channel++) {
-        var inputData = inputBuffer.getChannelData(channel);
-        var outputData = outputBuffer.getChannelData(channel);
+      for (let channel = 0; channel < outputBuffer.numberOfChannels; channel++) {
+        const inputData = inputBuffer.getChannelData(channel);
+        const outputData = outputBuffer.getChannelData(channel);
 
         // Loop through the 4096 samples
-        for (var sample = 0; sample < inputBuffer.length; sample++) {
+        for (let sample = 0; sample < inputBuffer.length; sample++) {
           // make output equal to the same as the input
           outputData[sample] = inputData[sample];
         }

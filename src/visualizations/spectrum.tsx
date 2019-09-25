@@ -82,7 +82,7 @@ export const initializeSpectrumVisualization = (
 
   setTimeout(updateVisualization);
 
-  return newOptions => {
+  return (newOptions: SettingsState) => {
     state.options = newOptions;
   };
 };
@@ -93,7 +93,7 @@ export const SpectrumVisualization: React.FC<{
 }> = ({ settingsState, setSettingsState }) => (
   <ControlPanel
     state={settingsState}
-    onChange={(_label: string, _value: any, newState) => {
+    onChange={(_label: string, _value: any, newState: SettingsState) => {
       setSettingsState(newState);
     }}
     settings={[

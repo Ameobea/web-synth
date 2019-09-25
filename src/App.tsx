@@ -2,7 +2,6 @@ import React from 'react';
 import { connect } from 'react-redux';
 
 import PolySynthControls from './controls/polysynth';
-import { PolySynth } from './synth';
 import './index.css';
 import { ReduxStore } from './redux';
 

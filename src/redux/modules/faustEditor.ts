@@ -1,7 +1,7 @@
 import { buildActionGroup, buildModule } from 'jantix';
 
-import { FaustModuleInstance } from '../../faustEditor/FaustEditor';
-import buildControlPanel from '../../faustEditor/uiBuilder';
+import { FaustModuleInstance } from 'src/faustEditor/FaustEditor';
+import buildControlPanel from 'src/faustEditor/uiBuilder';
 
 interface FaustEditorState {
   instance: FaustModuleInstance | null;

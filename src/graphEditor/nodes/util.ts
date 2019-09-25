@@ -44,7 +44,7 @@ export const swapAudioNodes = (
     }
 
     outputNodesForSlot.forEach(({ audionode: outputAudioNode }) => {
-      if (!outputAudioNode) {
+      if (!outputAudioNode || !nodeInstance.audionode) {
         return;
       }
 

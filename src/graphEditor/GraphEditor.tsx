@@ -8,8 +8,8 @@ import { LiteGraph } from 'litegraph.js';
 import 'litegraph.js/css/litegraph.css';
 import ControlPanel, { Button } from 'react-control-panel';
 
-import './GraphEditor.scss';
 import { registerAllCustomNodes } from './nodes';
+import './GraphEditor.scss';
 
 (window as any).LGraph = LiteGraph.LGraph;
 

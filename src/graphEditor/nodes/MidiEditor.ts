@@ -6,17 +6,17 @@
 import * as R from 'ramda';
 import { LiteGraph, LGAudio } from 'litegraph.js';
 
-import { store } from '../../redux';
+import { getState } from 'src/redux';
 import { swapAudioNodes } from './util';
 
 /**
  * Returns the VC definitions of all MIDI editor VCs
  */
 const getMidiEditorVcs = () =>
-  store.getState().viewContextManager.activeViewContexts.filter(R.propEq('name', 'midi_editor'));
+  getState().viewContextManager.activeViewContexts.filter(R.propEq('name', 'midi_editor'));
 
 export const registerMidiEditorNode = () => {
-  function LGMidiEditorModule() {
+  function LGMidiEditorModule(this: any) {
     // Create a placeholder `audionode` that prevents errors from getting thrown when the node is
     // first created, before it has compiled its code.
     const audioCtx: AudioContext = LGAudio.getAudioContext();
@@ -37,7 +37,7 @@ export const registerMidiEditorNode = () => {
     });
 
     console.log('connecting initial MIDI editor to graph');
-    const instanceForCurrentEditor = store.getState().synths.synthsByVCId[midiEditorVCs[0].uuid];
+    const instanceForCurrentEditor = getState().synths.synthsByVCId[midiEditorVCs[0].uuid];
     if (!instanceForCurrentEditor) {
       throw new Error(`No MIDI editor set for VC with id ${midiEditorVCs[0].uuid}`);
     }

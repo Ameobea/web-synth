@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { connect } from 'react-redux';
 import * as R from 'ramda';
 
-import { serializeAndDownloadComposition, loadComposition } from '../persistance';
+import { serializeAndDownloadComposition, loadComposition } from 'src/persistance';
+import { parseUploadedFileAsText } from 'src/controls/FileUploader';
+import { ReduxStore } from 'src/redux';
 import './GlobalMenu.scss';
-import { parseUploadedFileAsText } from '../controls/FileUploader';
 
 const GlobalMenuItem: React.FC<{ onClick: () => void }> = ({ children, onClick }) => (
   <div className='global-menu-item' role='menuitem' onClick={onClick}>
@@ -12,7 +13,7 @@ const GlobalMenuItem: React.FC<{ onClick: () => void }> = ({ children, onClick }
   </div>
 );
 
-const mapGlobalMenuStateToProps = ({ viewContextManager }) => ({
+const mapGlobalMenuStateToProps = ({ viewContextManager }: ReduxStore) => ({
   allViewContextIds: viewContextManager.activeViewContexts.map(R.prop('uuid')),
 });
 
@@ -70,6 +71,7 @@ const GlobalMenuButton: React.FC<{ engine: typeof import('../engine') }> = ({ en
       >
         ☰
       </div>
+
       {isOpen ? (
         <>
           <div className='global-menu-backdrop' onClick={() => setIsOpen(false)} />

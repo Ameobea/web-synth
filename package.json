@@ -2,7 +2,7 @@
   "name": "sketch",
   "version": "0.1.0",
   "description": "A WebAssembly sketch",
-  "main": "src/index.ts",
+  "main": "src/index.tsx",
   "repository": "https://github.com/Ameobea/sketches",
   "author": "Casey Primozic <me@ameo.link>",
   "devDependencies": {
@@ -32,7 +32,7 @@
     "sass-loader": "^8.0.0",
     "style-loader": "^1.0.0",
     "ts-loader": "^6.0.4",
-    "typescript": "^3.6.2",
+    "typescript": "^3.6.3",
     "webpack": "^4.39.3",
     "webpack-cli": "^3.3.7",
     "webpack-dev-server": "^3.8.0"
@@ -48,6 +48,7 @@
     "@types/react-dom": "^16.9.0",
     "@types/react-redux": "^7.1.2",
     "ace-builds": "^1.4.5",
+    "ameo-utils": "^0.3.0",
     "chroma-js": "^2.0.6",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",

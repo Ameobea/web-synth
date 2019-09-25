@@ -7,15 +7,14 @@ export interface VCMState {
 
 const actionGroups = {
   SET_VCM_STATE: buildActionGroup({
-    actionCreator: (state: VCMState) => ({ type: 'SET_VCM_STATE', state }),
-    subReducer: (_state: VCMState, { state }) => state,
+    actionCreator: (newState: VCMState) => ({ type: 'SET_VCM_STATE', newState }),
+    subReducer: (_state: VCMState, { newState }) => newState,
   }),
 };
 
-export default buildModule<VCMState, typeof actionGroups>(
-  {
-    activeViewContexts: [],
-    activeViewContextIx: 0,
-  },
-  actionGroups
-);
+const initialState: VCMState = {
+  activeViewContexts: [],
+  activeViewContextIx: 0,
+};
+
+export default buildModule<VCMState, typeof actionGroups>(initialState, actionGroups);

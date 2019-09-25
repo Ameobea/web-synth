@@ -4,7 +4,7 @@
 
 import { buildActionGroup, buildModule } from 'jantix';
 
-import { PolySynth } from '../../synth';
+import { PolySynth } from 'src/synth';
 
 interface SynthsState {
   synths: PolySynth[];

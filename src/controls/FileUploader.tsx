@@ -55,9 +55,7 @@ export const parseUploadedFileAsText = (
     reader.readAsText(file);
   });
 
-const FileUploader: React.FunctionComponent<ControlPanelCustomComponentProps<Value>> = ({
-  onChange,
-}) => (
+const FileUploader: React.FC<ControlPanelCustomComponentProps<Value>> = ({ onChange }) => (
   <div>
     Upload file
     <input type='file' onChange={evt => parseUploadedFile(evt).then(onChange)} />

@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 
-import { store } from '../redux';
+import { store } from 'src/redux';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
 export const init_graph_editor = (stateKey: string) => {

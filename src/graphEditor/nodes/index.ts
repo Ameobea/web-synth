@@ -1,5 +1,5 @@
-import { store } from '../../redux';
-import { fetchEffects } from '../../controls/EffectPicker';
+import { getState } from 'src/redux';
+import { fetchEffects } from 'src/controls/EffectPicker';
 import { registerFaustNode } from './Faust';
 import { registerMidiEditorNode } from './MidiEditor';
 
@@ -15,7 +15,7 @@ export const registerAllCustomNodes = async () => {
         description: string;
         code: string;
       }[]
-    | undefined = store.getState().effects.sharedEffects;
+    | undefined = getState().effects.sharedEffects;
 
   if (availableModules) {
     availableModules = await fetchEffects();

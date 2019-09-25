@@ -8,6 +8,7 @@ use super::{
         faust_editor::{mk_faust_editor, FaustEditor},
         graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
+        synth_designer::mk_synth_designer,
     },
     ViewContext,
 };
@@ -357,6 +358,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "faust_editor" => mk_faust_editor(conf, uuid),
         "graph_editor" => mk_graph_editor(conf, uuid),
         "composition_sharing" => mk_composition_sharing(conf, uuid),
+        "synth_designer" => mk_synth_designer(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

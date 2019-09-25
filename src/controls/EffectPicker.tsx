@@ -1,40 +1,30 @@
 import React from 'react';
 import { connect } from 'react-redux';
+import { useOnce } from 'ameo-utils/dist/util/react';
 
-import { actionCreators, dispatch, ReduxStore } from '../redux';
-import { Effect } from '../redux/modules/effects';
-import { useOnce } from '../hooks';
-import { BACKEND_BASE_URL } from '../conf';
+import { actionCreators, dispatch, ReduxStore } from 'src/redux';
+import { Effect } from 'src/redux/modules/effects';
+import { BACKEND_BASE_URL } from 'src/conf';
 
-interface StateProps {
-  effects: Effect[];
-}
+export const fetchEffects = (): Promise<Effect[]> =>
+  fetch(`${BACKEND_BASE_URL}/effects`)
+    .then(res => res.json())
+    .catch(err => {
+      console.warn('Error fetching effects from server; using local effects file.', err);
+      return [];
+    });
 
-interface PassedProps {
-  onChange: (newId: number) => void;
-  value: number;
-}
-
-type EffectPickerProps = StateProps & PassedProps;
-
-export const fetchEffects = async (): Promise<Effect[]> => {
-  try {
-    const effects = await fetch(`${BACKEND_BASE_URL}/effects`);
-    return effects.json();
-  } catch (err) {
-    console.warn('Error fetching effects from server; using local effects file.');
-    return [];
-  }
-};
+const mapStateToProps = ({ effects }: ReduxStore) => ({ effects: effects.sharedEffects });
 
 /**
  * Creates an interface that can be used to select effects to use.
  */
-const EffectPicker: React.FunctionComponent<PassedProps> = ({
-  value,
-  onChange,
-  effects,
-}: EffectPickerProps) => {
+const EffectPicker: React.FC<
+  {
+    onChange: (newId: number) => void;
+    value: number;
+  } & ReturnType<typeof mapStateToProps>
+> = ({ value, onChange, effects }) => {
   useOnce(async () => {
     const effects = await fetchEffects();
     dispatch(actionCreators.effects.ADD_EFFECTS(effects));
@@ -52,12 +42,4 @@ const EffectPicker: React.FunctionComponent<PassedProps> = ({
   );
 };
 
-const mapStateToProps: (reduxState: ReduxStore) => StateProps = ({ effects }) => ({
-  effects: effects.sharedEffects,
-});
-
-const enhance = connect(mapStateToProps);
-
-const EnhancedEffectPicker = enhance(EffectPicker);
-
-export default EnhancedEffectPicker;
+export default connect(mapStateToProps)(EffectPicker);

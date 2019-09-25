@@ -11,17 +11,17 @@ class FaustWorkletNode extends AudioWorkletNode {
   private inputsItems: unknown[] = [];
   private outputsItems: unknown[] = [];
 
-  public jsonDef: { [key: string]: any };
+  public jsonDef!: { [key: string]: any };
 
-  public parseUi = jsonDef => {
-    jsonDef.ui.forEach(group => this.parseUiGroup(group));
+  public parseUi = (jsonDef: any) => {
+    jsonDef.ui.forEach((group: any) => this.parseUiGroup(group));
     this.jsonDef = jsonDef;
     return this.pathTable;
   };
 
-  private parseUiGroup = group => (group.items ? this.parseUiItems(group.items) : null);
-  private parseUiItems = items => items.forEach(item => this.parseUiItem(item));
-  private parseUiItem = item => {
+  private parseUiGroup = (group: any) => (group.items ? this.parseUiItems(group.items) : null);
+  private parseUiItems = (items: any) => items.forEach((item: any) => this.parseUiItem(item));
+  private parseUiItem = (item: any) => {
     if (item.type === 'vgroup' || item.type === 'hgroup' || item.type === 'tgroup') {
       this.parseUiItems(item.items);
     } else if (item.type === 'hbargraph' || item.type === 'vbargraph') {
@@ -42,10 +42,13 @@ class FaustWorkletNode extends AudioWorkletNode {
         return;
       }
 
-      item.meta.forEach(meta => {
+      item.meta.forEach((meta: any) => {
         const midi = meta.midi;
-        if (!midi) return;
+        if (!midi) {
+          return;
+        }
         const strMidi = midi.trim();
+
         if (strMidi === 'pitchwheel') {
           this.fPitchwheelLabel.push(item.address);
         } else {

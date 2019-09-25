@@ -89,3 +89,10 @@ extern "C" {
 
     pub fn cleanup_composition_sharing();
 }
+
+#[wasm_bindgen(raw_module = "./synthDesigner")]
+extern "C" {
+    pub fn init_synth_designer(state_key: &str);
+
+    pub fn cleanup_synth_designer(state_key: &str);
+}

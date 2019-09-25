@@ -1,24 +1,24 @@
 import React, { useState, useCallback, useEffect, Suspense, useRef } from 'react';
-import { connect, useDispatch } from 'react-redux';
+import { connect } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import ace from 'ace-builds';
 import * as R from 'ramda';
+import { Without } from 'ameo-utils';
 // tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
-import { ReduxStore, dispatch, actionCreators } from '../redux';
-import { Effect } from '../redux/modules/effects';
-import buildInstance, { analyzerNode } from './buildInstance';
-import { EffectPickerCustomInput } from '../controls/faustEditor';
-import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from '../conf';
-import { Without } from '../types';
+import { ReduxStore, dispatch, actionCreators } from 'src/redux';
+import { Effect } from 'src/redux/modules/effects';
+import { EffectPickerCustomInput } from 'src/controls/faustEditor';
+import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import {
   SpectrumVisualization,
   initializeSpectrumVisualization,
   defaultSettingsState as defaultVizSettingsState,
   SettingsState as VizSettingsState,
-} from '../visualizations/spectrum';
-import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
+} from 'src/visualizations/spectrum';
+import FileUploader from 'src/controls/FileUploader';
+import buildInstance, { analyzerNode } from './buildInstance';
 
 ace.require('ace/theme/twilight');
 
@@ -67,16 +67,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-type StateProps = Pick<ReduxStore['faustEditor'], 'instance' | 'controlPanel' | 'editorContent'>;
-
-const mapStateToProps = ({ faustEditor }: ReduxStore) => ({
-  instance: faustEditor.instance,
-  controlPanel: faustEditor.controlPanel,
-  editorContent: faustEditor.editorContent,
-});
-
-const enhance = connect<StateProps, {}, {}>(mapStateToProps);
-
 // TODO: This shouldn't do connecting and stuff internally; should be refactored to solely construct
 // the instance without connecting it to anything.
 export const compileFaustInstance = async (
@@ -103,7 +93,7 @@ export const compileFaustInstance = async (
   }
 
   const wasmInstanceArrayBuffer = await res.arrayBuffer();
-  return buildInstance(wasmInstanceArrayBuffer, mediaFileSourceNode, connectSource);
+  return buildInstance(wasmInstanceArrayBuffer, mediaFileSourceNode || undefined, connectSource);
 };
 
 const createCompileButtonClickHandler = (
@@ -133,27 +123,20 @@ const createCompileButtonClickHandler = (
   dispatch(actionCreators.faustEditor.SET_INSTANCE(faustInstance));
 };
 
-interface EffectsPickerPanelPassedProps {
-  state: object;
-  setState: (newState: object) => void;
-  loadEffect: (effect: Effect) => void;
-}
-
-interface EffectsPickerReduxProps {
-  effects: Effect[];
-}
-
-type EffectsPickerPannelProps = EffectsPickerPanelPassedProps & EffectsPickerReduxProps;
+const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: ReduxStore) => ({
+  effects: sharedEffects,
+});
 
 /**
  * Creates a control panel that contains controls for browsing + loading shared/saved effects
  */
-const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanelPassedProps> = ({
-  state,
-  setState,
-  loadEffect,
-  effects,
-}: EffectsPickerPannelProps) => (
+const EffectsPickerPanelInner: React.FC<
+  {
+    state: { [key: string]: any };
+    setState: (newState: object) => void;
+    loadEffect: (effect: Effect) => void;
+  } & ReturnType<typeof mapEffectsPickerPanelStateToProps>
+> = ({ state, setState, loadEffect, effects }) => (
   <ControlPanel
     state={state}
     onChange={(_label: string, _newValue: any, newState: object) => setState(newState)}
@@ -169,9 +152,7 @@ const EffectsPickerPanelInner: React.FunctionComponentFactory<EffectsPickerPanel
   </ControlPanel>
 );
 
-const EffectsPickerPanel = connect(({ effects: { sharedEffects } }: ReduxStore) => ({
-  effects: sharedEffects,
-}))(EffectsPickerPanelInner);
+const EffectsPickerPanel = connect(mapEffectsPickerPanelStateToProps)(EffectsPickerPanelInner);
 
 const SaveControls = ({ editorContent }: { editorContent: string }) => {
   const initialState = { title: '', description: '', saveStatus: '' };
@@ -216,22 +197,24 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   );
 };
 
-interface ControlPanelState {
-  'load file'?: FileUploaderValue;
-}
+const mapStateToProps = ({ faustEditor }: ReduxStore) => ({
+  instance: faustEditor.instance,
+  controlPanel: faustEditor.controlPanel,
+  editorContent: faustEditor.editorContent,
+});
 
-const FaustEditor: React.FunctionComponent<{}> = ({
+const FaustEditor: React.FC<{} & ReturnType<typeof mapStateToProps>> = ({
   instance,
   controlPanel: faustInstanceControlPanel,
   editorContent,
-}: StateProps & { children: undefined }) => {
+}) => {
   const [
     externalAudioBufferSource,
     setExternalAudioBufferSource,
   ] = useState<AudioBufferSourceNode | null>(null);
   const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
-  const [controlPanelState, setControlPanelState] = useState<ControlPanelState>({});
+  const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
   const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState | null>(
     defaultVizSettingsState
   );
@@ -245,8 +228,8 @@ const FaustEditor: React.FunctionComponent<{}> = ({
     updateVizSettings.current(vizSettingsState);
   }, [vizSettingsState]);
 
+  const audioData = controlPanelState['load file'];
   useEffect(() => {
-    const audioData = controlPanelState['load file'];
     if (!audioData) {
       return;
     }
@@ -260,7 +243,7 @@ const FaustEditor: React.FunctionComponent<{}> = ({
       },
       err => setCompileErrMsg(`Error decoding provided audio file: ${err}`)
     );
-  }, [controlPanelState['load file']]);
+  }, [audioData]);
 
   const compile = useCallback(
     createCompileButtonClickHandler(
@@ -350,6 +333,4 @@ const FaustEditor: React.FunctionComponent<{}> = ({
   );
 };
 
-const EnhancedFaustEditor = enhance(FaustEditor);
-
-export default EnhancedFaustEditor;
+export default connect(mapStateToProps)(FaustEditor);

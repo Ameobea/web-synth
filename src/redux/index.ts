@@ -5,12 +5,14 @@ import synthsModule from './modules/synths';
 import viewContextManagerModule from './modules/viewContextManager';
 import faustEditorModule from './modules/faustEditor';
 import effectsModule from './modules/effects';
+import synthDesignerModule from './modules/synthDesigner';
 
 const modules = {
   synths: synthsModule,
   viewContextManager: viewContextManagerModule,
   faustEditor: faustEditorModule,
   effects: effectsModule,
+  synthDesigner: synthDesignerModule,
 };
 
 export const { store, getState, dispatch, actionCreators } = buildStore<typeof modules>(

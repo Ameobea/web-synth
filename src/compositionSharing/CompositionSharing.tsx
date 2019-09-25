@@ -3,8 +3,8 @@ import { connect } from 'react-redux';
 import { Field, reduxForm, InjectedFormProps } from 'redux-form';
 import * as R from 'ramda';
 import { Table } from 'react-virtualized';
+import { useOnce } from 'ameo-utils/util/react';
 
-import { useOnce } from '../hooks';
 import { BACKEND_BASE_URL } from '../conf';
 import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
