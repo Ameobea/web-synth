@@ -16,17 +16,16 @@ pub struct SynthDesigner {
 impl SynthDesigner {
     pub fn new(uuid: Uuid) -> Self { SynthDesigner { uuid } }
 
-    pub fn get_state_key(&self) -> String { format!("synthDseigner{}", self.uuid) }
+    pub fn get_state_key(&self) -> String { format!("synthDesigner_{}", self.uuid) }
 }
 
 impl ViewContext for SynthDesigner {
     fn init(&mut self) { js::init_synth_designer(&self.get_state_key()); }
 
     fn cleanup(&mut self) {
-        js::set_localstorage_key(
-            &self.get_state_key(),
-            &js::cleanup_synth_designer(&self.get_state_key()),
-        )
+        let state_key = self.get_state_key();
+        let serialized_state = js::cleanup_synth_designer(&state_key);
+        js::set_localstorage_key(&state_key, &serialized_state)
     }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { connect } from 'react-redux';
 import { useOnce } from 'ameo-utils/util/react';
+import * as R from 'ramda';
 
 import { actionCreators, ReduxStore, dispatch } from 'src/redux';
 import { SynthDesignerState, Waveform, SynthModule } from 'src/redux/modules/synthDesigner';
@@ -9,7 +10,7 @@ import './SynthDesigner.scss';
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
   public lineThickness: number;
-  constructor(ctx: AudioContext, nodeId: string);
+  constructor(ctx: AudioContext, nodeId: string, updateIntervalMs?: number);
 }
 
 const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ index, synth }) => {
@@ -48,14 +49,20 @@ const SynthDesigner: React.FC<
   const wavyJonesInstance = useRef<WavyJones | null>(null);
 
   useEffect(() => {
-    if (!oscilloscopeNode.current || wavyJonesInstance.current) {
+    if (
+      !oscilloscopeNode.current ||
+      wavyJonesInstance.current ||
+      R.isEmpty(synthDesignerState.synths)
+    ) {
       return;
     }
 
-    wavyJonesInstance.current = new WavyJones(new AudioContext(), 'oscilloscope');
+    wavyJonesInstance.current = new WavyJones(new AudioContext(), 'oscilloscope', 40);
 
     wavyJonesInstance.current.lineColor = '#FFF';
     wavyJonesInstance.current.lineThickness = 1.2;
+
+    dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(wavyJonesInstance.current));
   });
 
   useOnce(() => {
@@ -78,6 +85,12 @@ const SynthDesigner: React.FC<
         </button>
       </div>
       <div id='oscilloscope' ref={oscilloscopeNode}></div>
+      <button
+        onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440))}
+        onMouseUp={() => dispatch(actionCreators.synthDesigner.UNGATE())}
+      >
+        Gate
+      </button>
     </>
   );
 };

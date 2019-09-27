@@ -8,6 +8,7 @@ import {
   SynthDesignerState,
   serializeSynthModule,
   deserializeSynthModule,
+  getInitialSynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
 
@@ -28,10 +29,8 @@ export const init_synth_designer = (stateKey: string) => {
       'Error deserializing synth designer state from JSON; clearing and defaulting to empty'
     );
     localStorage.removeItem(stateKey);
-    return null;
+    return getInitialSynthDesignerState(true);
   });
-
-  console.log(initialState);
 
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');
@@ -57,7 +56,6 @@ export const cleanup_synth_designer = (): string => {
     synths: synths.map(serializeSynthModule),
     ...synthDesignerState,
   });
-  console.log(designerState);
   const faustEditorReactRootNode = document.getElementById(ROOT_NODE_ID);
   if (!faustEditorReactRootNode) {
     return designerState;
