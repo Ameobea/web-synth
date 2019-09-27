@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
 
-import { Bitcrusher, Distortion, Reverb } from 'src/synthDesigner/effects';
+import { EffectNode } from 'src/synthDesigner/effects';
 
 export enum Waveform {
   Sine = 'sine',
@@ -12,16 +12,34 @@ export enum Waveform {
   Custom = 'custom',
 }
 
-export type Effect =
-  | { type: 'bitcrusher'; node: Bitcrusher }
-  | { type: 'distortion'; node: Distortion }
-  | { type: 'reverb'; node: Reverb };
+export enum EffectType {
+  Bitcrusher = 'bitcrusher',
+  Distortion = 'distortion',
+  Reverb = 'reverb',
+}
+
+export interface Effect {
+  type: EffectType;
+  node: EffectNode;
+}
+
+export interface EffectModule {
+  effect: Effect;
+  params: { [key: string]: number };
+  // If true, then the input will be passed through this effect unchanged.
+  isBypassed: boolean;
+  // A number from 0 to 1 that represents what percentage of the output will be from the effect and
+  // what percentage will be from the input passed through unchanged.
+  wetness: number;
+  effectGainNode: GainNode;
+  passthroughGainNode: GainNode;
+}
 
 export interface SynthModule {
   waveform: Waveform;
   detune: number;
   oscillators: OscillatorNode[];
-  effects: Effect[];
+  effects: EffectModule[];
   // The node that connects to all of the oscillators.  This is connected to either the effects
   // chain or directly to the output gain node.
   innerGainNode: GainNode;
@@ -110,6 +128,39 @@ const getSynth = (index: number, synths: SynthDesignerState['synths']) => {
   return targetSynth;
 };
 
+const getEffect = (synthIx: number, effectIx: number, synths: SynthDesignerState['synths']) => {
+  const targetSynth = getSynth(synthIx, synths);
+  const targetEffect = targetSynth.effects[effectIx];
+  if (!targetEffect) {
+    throw new Error(
+      `Tried to access effect index ${effectIx} on synth index ${synthIx} but it isn't set; only ${targetSynth.effects.length} effects exist`
+    );
+  }
+
+  return { targetSynth, targetEffect };
+};
+
+const setEffect = (
+  synthIx: number,
+  effectIx: number,
+  effect: EffectModule,
+  state: SynthDesignerState
+) => {
+  const targetSynth = getSynth(synthIx, state.synths);
+
+  return {
+    ...state,
+    synths: R.set(
+      R.lensIndex(synthIx),
+      {
+        ...targetSynth,
+        effects: R.set(R.lensIndex(effectIx), effect, targetSynth.effects),
+      },
+      state.synths
+    ),
+  };
+};
+
 const mkSetFreqForOsc = (frequency: number) => (osc: OscillatorNode) =>
   osc.frequency.setValueAtTime(frequency + Math.random() * 6, ctx.currentTime); // TODO: Remove
 
@@ -152,11 +203,17 @@ const actionGroups = {
     }),
   }),
   ADD_EFFECT: buildActionGroup({
-    actionCreator: (index: number, effect: Effect) => ({ type: 'ADD_EFFECT', index, effect }),
-    subReducer: (state: SynthDesignerState, { index, effect }) => {
+    actionCreator: (index: number, effect: Effect, params: { [key: string]: number }) => ({
+      type: 'ADD_EFFECT',
+      index,
+      effect,
+      params,
+    }),
+    subReducer: (state: SynthDesignerState, { index, effect, params }) => {
       const targetSynth = getSynth(index, state.synths);
 
       const synthOutput = Option.of(R.last(targetSynth.effects))
+        .map(R.prop('effect'))
         .map(R.prop('node'))
         .getOrElse(targetSynth.innerGainNode);
 
@@ -164,11 +221,25 @@ const actionGroups = {
       synthOutput.connect(effect.node);
       effect.node.connect(targetSynth.outerGainNode);
 
+      const effectGainNode = new GainNode(ctx);
+      effectGainNode.gain.setValueAtTime(1, ctx.currentTime);
+      const passthroughGainNode = new GainNode(ctx);
+      passthroughGainNode.gain.setValueAtTime(0, ctx.currentTime);
+
+      const effectModule: EffectModule = {
+        effect,
+        effectGainNode,
+        passthroughGainNode,
+        wetness: 1,
+        isBypassed: false,
+        params,
+      };
+
       return {
         ...state,
         synths: R.set(
           R.lensIndex(index),
-          { ...targetSynth, effects: [...targetSynth.effects, effect] },
+          { ...targetSynth, effects: [...targetSynth.effects, effectModule] },
           state.synths
         ),
       };
@@ -187,15 +258,17 @@ const actionGroups = {
         throw new Error(`No effect at index ${synthIndex} for synth index ${effectIndex}`);
       }
 
-      removedEffect.node.disconnect();
+      removedEffect.effect.node.disconnect();
       const newSrc = Option.of(targetSynth.effects[synthIndex - 1])
+        .map(R.prop('effect'))
         .map(R.prop('node'))
         .getOrElse(targetSynth.innerGainNode);
       const newDst = Option.of(targetSynth.effects[effectIndex + 1])
+        .map(R.prop('effect'))
         .map(R.prop('node'))
         .getOrElse(targetSynth.outerGainNode);
 
-      removedEffect.node.disconnect();
+      removedEffect.effect.node.disconnect();
       newSrc.disconnect();
       newSrc.connect(newDst);
 
@@ -295,6 +368,65 @@ const actionGroups = {
       instance.connect(ctx.destination);
 
       return { ...state, wavyJonesInstance: instance };
+    },
+  }),
+  SET_EFFECT_BYPASSED: buildActionGroup({
+    actionCreator: (synthIx: number, effectIx: number, isBypassed = true) => ({
+      type: 'SET_EFFECT_BYPASSED' as const,
+      isBypassed,
+      synthIx,
+      effectIx,
+    }),
+    subReducer: (
+      state: SynthDesignerState,
+      {
+        isBypassed,
+        synthIx,
+        effectIx,
+      }: { type: 'SET_EFFECT_BYPASSED'; isBypassed: boolean; synthIx: number; effectIx: number }
+    ): SynthDesignerState => {
+      const { targetEffect } = getEffect(synthIx, effectIx, state.synths);
+      return setEffect(synthIx, effectIx, { ...targetEffect, isBypassed }, state);
+    },
+  }),
+  SET_EFFECT_WETNESS: buildActionGroup({
+    actionCreator: (synthIx: number, effectIx: number, wetness: number) => ({
+      type: 'SET_EFFECT_WETNESS',
+      synthIx,
+      effectIx,
+      wetness,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, effectIx, wetness }) => {
+      const { targetEffect } = getEffect(synthIx, effectIx, state.synths);
+      if (wetness < 0 || wetness > 1) {
+        console.error(`Invalid wetness of ${wetness} provided`);
+        return state;
+      }
+
+      targetEffect.effectGainNode.gain.setValueAtTime(wetness, ctx.currentTime);
+      targetEffect.passthroughGainNode.gain.setValueAtTime(1 - wetness, ctx.currentTime);
+
+      return setEffect(synthIx, effectIx, { ...targetEffect, wetness }, state);
+    },
+  }),
+  SET_EFFECT_PARAM: buildActionGroup({
+    actionCreator: (synthIx: number, effectIx: number, key: string, val: number) => ({
+      type: 'SET_EFFECT_PARAM',
+      synthIx,
+      effectIx,
+      key,
+      val,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, effectIx, key, val }) => {
+      const { targetEffect } = getEffect(synthIx, effectIx, state.synths);
+      targetEffect.effect.node.setParam(key, val);
+
+      return setEffect(
+        synthIx,
+        effectIx,
+        { ...targetEffect, params: { ...targetEffect.params, [key]: val } },
+        state
+      );
     },
   }),
 };

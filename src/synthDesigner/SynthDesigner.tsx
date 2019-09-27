@@ -1,11 +1,18 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { connect } from 'react-redux';
 import { useOnce } from 'ameo-utils/util/react';
 import * as R from 'ramda';
+import ControlPanel from 'react-control-panel';
 
 import { actionCreators, ReduxStore, dispatch } from 'src/redux';
-import { SynthDesignerState, Waveform, SynthModule } from 'src/redux/modules/synthDesigner';
+import {
+  SynthDesignerState,
+  Waveform,
+  SynthModule,
+  EffectType,
+} from 'src/redux/modules/synthDesigner';
 import './SynthDesigner.scss';
+import { buildEffect } from 'src/synthDesigner/effects';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -22,18 +29,65 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ inde
       >
         X
       </div>
-      <select
-        value={synth.waveform}
-        onChange={evt =>
-          dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, evt.target.value as Waveform))
-        }
-      >
-        {Object.entries(Waveform).map(([key, value]) => (
-          <option key={value} value={value}>
-            {key}
-          </option>
-        ))}
-      </select>
+
+      <ControlPanel
+        settings={[
+          {
+            type: 'select',
+            label: 'oscillator.type',
+            options: Object.values(Waveform),
+            initial: Waveform.Sine,
+          },
+        ]}
+      />
+    </div>
+  );
+};
+
+const EffectModuleComp: React.FC<{
+  synthIx: number;
+  effectIx: number;
+  params: { [key: string]: any };
+  wetness: number;
+  isBypassed: boolean;
+  effectSettings: { [key: string]: any }[];
+}> = ({ params, synthIx, effectIx, wetness, isBypassed, effectSettings }) => {
+  const mergedState = useMemo(() => ({ ...params, wetness, isBypassed }), [
+    params,
+    wetness,
+    isBypassed,
+  ]);
+
+  const combinedSettings = useMemo(
+    () => [
+      { type: 'checkbox', label: 'bypass', initial: true },
+      { type: 'range', label: 'wetness', min: 0, max: 1, initial: 1, step: 0.01 },
+      ...effectSettings,
+    ],
+    [effectSettings]
+  );
+
+  return (
+    <div className='effect-module'>
+      <ControlPanel
+        settings={combinedSettings}
+        state={mergedState}
+        onChange={(key: string, val: any) => {
+          switch (key) {
+            case 'wetness': {
+              dispatch(actionCreators.synthDesigner.SET_EFFECT_WETNESS(synthIx, effectIx, val));
+              break;
+            }
+            case 'bypass': {
+              dispatch(actionCreators.synthDesigner.SET_EFFECT_BYPASSED(synthIx, effectIx, val));
+              break;
+            }
+            default: {
+              dispatch(actionCreators.synthDesigner.SET_EFFECT_PARAM(synthIx, effectIx, key, val));
+            }
+          }
+        }}
+      />
     </div>
   );
 };
@@ -47,6 +101,7 @@ const SynthDesigner: React.FC<
 > = ({ initialState, synthDesignerState }) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
+  const [selectedEffectType, setSelectedEffectType] = useState<EffectType>(EffectType.Bitcrusher);
 
   useEffect(() => {
     if (
@@ -75,8 +130,42 @@ const SynthDesigner: React.FC<
     <>
       <div className='synth-designer'>
         {synthDesignerState.synths.map((synth, i) => (
-          <SynthModuleComp key={i} synth={synth} index={i} />
+          <SynthModuleComp key={i} synth={synth} index={i}>
+            {synth.effects.map((effect, effectIx) => (
+              <EffectModuleComp
+                key={effectIx}
+                synthIx={i}
+                effectIx={effectIx}
+                wetness={effect.wetness}
+                isBypassed={effect.isBypassed}
+                params={effect.params}
+                effectSettings={effect.effect.node.getSettingDefs()}
+              />
+            ))}
+
+            <div className='add-effect'>
+              <select
+                value={selectedEffectType}
+                onChange={evt => setSelectedEffectType(evt.target.value as EffectType)}
+              >
+                {Object.entries(EffectType).map(([key, val]) => (
+                  <option key={val} value={val}>
+                    {key}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const { effect, params } = buildEffect(selectedEffectType);
+                  dispatch(actionCreators.synthDesigner.ADD_EFFECT(i, effect, params));
+                }}
+              >
+                Add Effect
+              </button>
+            </div>
+          </SynthModuleComp>
         ))}
+
         <button
           style={{ marginTop: 6 }}
           onClick={() => dispatch(actionCreators.synthDesigner.ADD_SYNTH_MODULE())}
@@ -84,7 +173,9 @@ const SynthDesigner: React.FC<
           Add Synth Module
         </button>
       </div>
+
       <div id='oscilloscope' ref={oscilloscopeNode}></div>
+
       <button
         onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440))}
         onMouseUp={() => dispatch(actionCreators.synthDesigner.UNGATE())}
