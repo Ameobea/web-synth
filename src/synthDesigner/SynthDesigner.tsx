@@ -34,11 +34,22 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ inde
         settings={[
           {
             type: 'select',
-            label: 'oscillator.type',
+            label: 'waveform',
             options: Object.values(Waveform),
             initial: Waveform.Sine,
           },
         ]}
+        onChange={(key: string, val: any) => {
+          switch (key) {
+            case 'waveform': {
+              dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val));
+              break;
+            }
+            default: {
+              console.warn('Unhandled key in synth control panel: ', key);
+            }
+          }
+        }}
       />
     </div>
   );
