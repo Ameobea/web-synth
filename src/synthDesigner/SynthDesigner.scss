@@ -3,3 +3,22 @@
   width: 400px;
   height: 200px;
 }
+
+.synth-module {
+  display: flex;
+  flex-direction: row;
+  height: 220px;
+  width: 100%;
+  border-bottom: 1px solid #555;
+
+  button,
+  select {
+    height: 20px;
+  }
+
+  .synth-remove-button {
+    color: #b22;
+    font-family: Hack, Oxygen Mono, monospace;
+    padding-right: 4px;
+  }
+}

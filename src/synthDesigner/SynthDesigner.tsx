@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { useOnce } from 'ameo-utils/util/react';
 
 import { actionCreators, ReduxStore, dispatch } from 'src/redux';
-import { SynthDesignerState, Waveform } from 'src/redux/modules/synthDesigner';
+import { SynthDesignerState, Waveform, SynthModule } from 'src/redux/modules/synthDesigner';
 import './SynthDesigner.scss';
 
 declare class WavyJones extends AnalyserNode {
@@ -11,6 +11,31 @@ declare class WavyJones extends AnalyserNode {
   public lineThickness: number;
   constructor(ctx: AudioContext, nodeId: string);
 }
+
+const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ index, synth }) => {
+  return (
+    <div className='synth-module'>
+      <div
+        className='synth-remove-button'
+        onClick={() => dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(index))}
+      >
+        X
+      </div>
+      <select
+        value={synth.waveform}
+        onChange={evt =>
+          dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, evt.target.value as Waveform))
+        }
+      >
+        {Object.entries(Waveform).map(([key, value]) => (
+          <option key={value} value={value}>
+            {key}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 
 const mapStateToProps = ({ synthDesigner }: ReduxStore) => ({ synthDesignerState: synthDesigner });
 
@@ -35,25 +60,22 @@ const SynthDesigner: React.FC<
 
   useOnce(() => {
     if (initialState) {
-      actionCreators.synthDesigner.SET_STATE(initialState);
+      dispatch(actionCreators.synthDesigner.SET_STATE(initialState));
     }
   });
 
   return (
     <>
       <div className='synth-designer'>
-        <select
-          value={synthDesignerState.waveform}
-          onChange={evt =>
-            dispatch(actionCreators.synthDesigner.SET_WAVEFORM(evt.target.value as Waveform))
-          }
+        {synthDesignerState.synths.map((synth, i) => (
+          <SynthModuleComp key={i} synth={synth} index={i} />
+        ))}
+        <button
+          style={{ marginTop: 6 }}
+          onClick={() => dispatch(actionCreators.synthDesigner.ADD_SYNTH_MODULE())}
         >
-          {Object.entries(Waveform).map(([key, value]) => (
-            <option key={value} value={value}>
-              {key}
-            </option>
-          ))}
-        </select>
+          Add Synth Module
+        </button>
       </div>
       <div id='oscilloscope' ref={oscilloscopeNode}></div>
     </>

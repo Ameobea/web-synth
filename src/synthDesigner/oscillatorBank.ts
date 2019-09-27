@@ -57,4 +57,20 @@ export default class OscillatorBank {
     this.usedOscillators[ix] = this.usedOscillatorsFreePtr;
     this.usedOscillatorsFreePtr = ix;
   };
+
+  public serialize = (): string =>
+    JSON.stringify({
+      usedOscillatorsFreePtr: this.usedOscillatorsFreePtr,
+      usedOscillators: this.usedOscillators.map(nodeOpt =>
+        nodeOpt !== null && typeof nodeOpt !== 'number' ? true : nodeOpt
+      ),
+    });
+
+  public deserialize = (serialized: string) => {
+    const { usedOscillatorsFreePtr, usedOscillators } = JSON.parse(serialized);
+    this.usedOscillatorsFreePtr = usedOscillatorsFreePtr;
+    this.usedOscillators = usedOscillators.map((osc: null | number | true) =>
+      osc === true ? this.freeOscillators.pop() : osc
+    );
+  };
 }

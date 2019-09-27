@@ -22,7 +22,12 @@ impl SynthDesigner {
 impl ViewContext for SynthDesigner {
     fn init(&mut self) { js::init_synth_designer(&self.get_state_key()); }
 
-    fn cleanup(&mut self) { js::cleanup_synth_designer(&self.get_state_key()); }
+    fn cleanup(&mut self) {
+        js::set_localstorage_key(
+            &self.get_state_key(),
+            &js::cleanup_synth_designer(&self.get_state_key()),
+        )
+    }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
@@ -32,10 +37,10 @@ impl ViewContext for SynthDesigner {
 }
 
 pub fn mk_synth_designer(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let synt_designer: SynthDesigner = match definition_opt {
+    let synth_designer: SynthDesigner = match definition_opt {
         Some(definition) =>
             serde_json::from_str(definition).expect("Error while deserializing `SynthDesigner`"),
         None => SynthDesigner::new(uuid),
     };
-    Box::new(synt_designer)
+    Box::new(synth_designer)
 }

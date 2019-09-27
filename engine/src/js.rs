@@ -94,5 +94,5 @@ extern "C" {
 extern "C" {
     pub fn init_synth_designer(state_key: &str);
 
-    pub fn cleanup_synth_designer(state_key: &str);
+    pub fn cleanup_synth_designer(state_key: &str) -> String;
 }

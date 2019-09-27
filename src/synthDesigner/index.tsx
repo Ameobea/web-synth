@@ -3,8 +3,12 @@ import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Try, Option } from 'funfix-core';
 
-import { store } from 'src/redux';
-import { SynthDesignerState } from 'src/redux/modules/synthDesigner';
+import { store, getState } from 'src/redux';
+import {
+  SynthDesignerState,
+  serializeSynthModule,
+  deserializeSynthModule,
+} from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
 
 const ROOT_NODE_ID = 'synth-designer-react-root' as const;
@@ -13,7 +17,11 @@ export const init_synth_designer = (stateKey: string) => {
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
   const initialState = Try.of(() =>
     Option.of(localStorage.getItem(stateKey))
-      .map(serializedState => JSON.parse(serializedState) as SynthDesignerState)
+      .map(serializedState => JSON.parse(serializedState))
+      .map(
+        ({ synths, ...rest }) =>
+          ({ synths: synths.map(deserializeSynthModule), ...rest } as SynthDesignerState)
+      )
       .orNull()
   ).getOrElseL(() => {
     console.warn(
@@ -22,6 +30,8 @@ export const init_synth_designer = (stateKey: string) => {
     localStorage.removeItem(stateKey);
     return null;
   });
+
+  console.log(initialState);
 
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');
@@ -42,7 +52,12 @@ export const init_synth_designer = (stateKey: string) => {
 };
 
 export const cleanup_synth_designer = (): string => {
-  const designerState = 'TODO';
+  const { synths, ...synthDesignerState } = getState().synthDesigner;
+  const designerState = JSON.stringify({
+    synths: synths.map(serializeSynthModule),
+    ...synthDesignerState,
+  });
+  console.log(designerState);
   const faustEditorReactRootNode = document.getElementById(ROOT_NODE_ID);
   if (!faustEditorReactRootNode) {
     return designerState;

@@ -1,12 +1,4 @@
-#![feature(
-    box_syntax,
-    test,
-    slice_patterns,
-    thread_local,
-    nll,
-    bind_by_move_pattern_guards,
-    option_flattening
-)]
+#![feature(box_syntax, test, slice_patterns, thread_local, nll, option_flattening)]
 #![allow(clippy::float_cmp, clippy::needless_range_loop, clippy::manual_memcpy)]
 
 extern crate base64;
@@ -50,9 +42,7 @@ static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
 static ONCE: Once = Once::new();
 
 /// Retrieves the global `ViewContextManager` for the application
-pub fn get_vcm() -> &'static mut ViewContextManager {
-    unsafe { &mut *VIEW_CONTEXT_MANAGER }
-}
+pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEXT_MANAGER } }
 
 /// Entrypoint for the application.  This function is called from the JS side as soon as the Wasm
 /// blob is loaded.  It handles setting up application state, rendering the initial UI, and loading
