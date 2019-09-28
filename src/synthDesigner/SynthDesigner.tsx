@@ -13,6 +13,7 @@ import {
 } from 'src/redux/modules/synthDesigner';
 import './SynthDesigner.scss';
 import { buildEffect } from 'src/synthDesigner/effects';
+import FilterModule from './Filter';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -51,6 +52,8 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ inde
           }
         }}
       />
+
+      <FilterModule node={synth.filter.node} params={synth.filter.params} />
     </div>
   );
 };

@@ -35,6 +35,27 @@ export interface EffectModule {
   passthroughGainNode: GainNode;
 }
 
+export enum FilterType {
+  Lowpass = 'lowpass',
+  Highpass = 'highpass',
+  Bandpass = 'bandpass',
+  Lowshelf = 'lowshelf',
+  Highshelf = 'highshelf',
+  Peaking = 'peaking',
+  Notch = 'notch',
+  Allpass = 'allpass',
+}
+
+export interface FilterParams {
+  type: FilterType;
+  frequency: number;
+}
+
+export interface FilterModule {
+  node: BiquadFilterNode;
+  params: FilterParams;
+}
+
 export interface SynthModule {
   waveform: Waveform;
   detune: number;
@@ -46,6 +67,7 @@ export interface SynthModule {
   // The node that is connected to whatever the synth module as a whole is connected to.  Its
   // source is either the end of the effects chain or the inner gain node.
   outerGainNode: GainNode;
+  filter: FilterModule;
 }
 
 const ctx = new AudioContext();
@@ -60,6 +82,18 @@ export interface SynthDesignerState {
   synths: SynthModule[];
   wavyJonesInstance: AnalyserNode | undefined;
 }
+
+const buildDefaultFilterModule = (): FilterModule => {
+  const node = new BiquadFilterNode(ctx);
+
+  return {
+    node,
+    params: {
+      type: FilterType.Highpass,
+      frequency: 4400,
+    },
+  };
+};
 
 const buildDefaultSynthModule = (): SynthModule => {
   const innerGainNode = new GainNode(ctx);
@@ -79,6 +113,7 @@ const buildDefaultSynthModule = (): SynthModule => {
     effects: [],
     innerGainNode,
     outerGainNode,
+    filter: buildDefaultFilterModule(),
   };
 };
 
@@ -427,6 +462,37 @@ const actionGroups = {
         { ...targetEffect, params: { ...targetEffect.params, [key]: val } },
         state
       );
+    },
+  }),
+  SET_FILTER_PARAM: buildActionGroup({
+    actionCreator<K extends keyof FilterParams>(synthIx: number, key: K, val: FilterParams[K]) {
+      return { type: 'SET_FILTER_PARAM', synthIx, key, val };
+    },
+    subReducer: (state: SynthDesignerState, { synthIx, key, val }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+
+      switch (key) {
+        case 'type': {
+          targetSynth.filter.node.type = val as FilterType;
+          break;
+        }
+        default: {
+          targetSynth.filter.node[key].setValueAtTime(val as number, ctx.currentTime);
+        }
+      }
+
+      // TODO
+      return {
+        ...state,
+        synths: R.set(
+          R.lensIndex(synthIx),
+          {
+            ...targetSynth,
+            filter: { ...targetSynth.filter, params: { ...targetSynth.filter.params, [key]: val } },
+          },
+          state.synths
+        ),
+      };
     },
   }),
 };
