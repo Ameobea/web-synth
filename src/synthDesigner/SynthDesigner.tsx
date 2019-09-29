@@ -34,10 +34,34 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ inde
       <ControlPanel
         settings={[
           {
+            type: 'range',
+            label: 'volume',
+            min: 0,
+            initial: 0.1,
+            max: 4,
+            step: 0.05,
+          },
+          {
             type: 'select',
             label: 'waveform',
             options: Object.values(Waveform),
             initial: Waveform.Sine,
+          },
+          {
+            type: 'range',
+            label: 'unison',
+            min: 1,
+            initial: 1,
+            max: 32,
+            step: 1,
+          },
+          {
+            type: 'range',
+            label: 'detune',
+            min: -300,
+            initial: 0,
+            max: 300,
+            step: 0.5,
           },
         ]}
         onChange={(key: string, val: any) => {
@@ -46,11 +70,32 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ inde
               dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val));
               break;
             }
+            case 'unison': {
+              dispatch(actionCreators.synthDesigner.SET_UNISON(index, val));
+              break;
+            }
+            case 'volume': {
+              dispatch(actionCreators.synthDesigner.SET_MASTER_GAIN(index, val));
+              break;
+            }
+            case 'detune': {
+              dispatch(actionCreators.synthDesigner.SET_DETUNE(index, val));
+              break;
+            }
             default: {
               console.warn('Unhandled key in synth control panel: ', key);
             }
           }
         }}
+        state={useMemo(
+          () => ({
+            waveform: synth.waveform,
+            volume: synth.masterGain,
+            unison: synth.oscillators.length,
+            detune: synth.detune,
+          }),
+          [synth.waveform, synth.oscillators.length, synth.masterGain, synth.detune]
+        )}
       />
 
       <FilterModule synthIx={index} params={synth.filter.params} />
