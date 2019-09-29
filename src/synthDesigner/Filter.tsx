@@ -17,17 +17,15 @@ const Filter: React.FC<{ params: FilterParams; synthIx: number }> = ({ params, s
   );
 
   return (
-    <div className='filter-module'>
-      <Panel
-        style={{ width: 400 }}
-        title='FILTER'
-        settings={settings}
-        state={params}
-        onChange={(key: keyof FilterParams, val: any) => {
-          dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key, val));
-        }}
-      />
-    </div>
+    <Panel
+      style={{ width: 400 }}
+      title='FILTER'
+      settings={settings}
+      state={params}
+      onChange={(key: keyof FilterParams, val: any) =>
+        dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key, val))
+      }
+    />
   );
 };
 

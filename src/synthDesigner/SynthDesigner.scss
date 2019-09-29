@@ -9,7 +9,7 @@
   flex-direction: row;
   height: 220px;
   width: 100%;
-  border-bottom: 1px solid #555;
+  padding-bottom: 10px;
 
   button,
   select {
@@ -19,11 +19,45 @@
   .synth-remove-button {
     color: #b22;
     font-family: Hack, Oxygen Mono, monospace;
+    cursor: pointer;
     padding-right: 4px;
+    margin-right: -17px;
+    z-index: 3;
+    margin-left: 5px;
+    height: 10px;
+  }
+
+  .effects {
+    display: flex;
+    flex-direction: row;
+
+    .add-effect {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
   }
 }
 
 .effect-module {
   display: flex;
   flex-direction: row;
+
+  .effect-module-connector-line-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    .effect-module-connector-line {
+      height: 0;
+      width: 16px;
+      border-bottom: 1px solid #ccc;
+    }
+  }
+}
+
+.remove-button {
+  color: #b22;
+  font-family: Hack, Oxygen Mono, monospace;
+  cursor: pointer;
 }

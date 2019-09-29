@@ -69,6 +69,7 @@ export interface SynthModule {
   outerGainNode: GainNode;
   filter: FilterModule;
   masterGain: number;
+  selectedEffectType: EffectType;
 }
 
 const ctx = new AudioContext();
@@ -161,6 +162,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   detune: synth.detune,
   filter: synth.filter.params,
   masterGain: synth.masterGain,
+  selectedEffectType: synth.selectedEffectType,
 });
 
 export interface SynthDesignerState {
@@ -200,6 +202,7 @@ const buildDefaultSynthModule = (): SynthModule => {
     outerGainNode,
     filter,
     masterGain: 0.4,
+    selectedEffectType: EffectType.Reverb,
   };
 };
 
@@ -209,12 +212,14 @@ export const deserializeSynthModule = ({
   detune,
   filter: filterParams,
   masterGain,
+  selectedEffectType,
 }: {
   waveform: Waveform;
   unison: number;
   detune: number;
   filter: FilterParams;
   masterGain: number;
+  selectedEffectType: EffectType;
 }): SynthModule => {
   const base = buildDefaultSynthModule();
   base.oscillators.forEach(osc => {
@@ -247,6 +252,7 @@ export const deserializeSynthModule = ({
     filter,
     effects: [], // TODO
     masterGain,
+    selectedEffectType,
   };
 };
 
@@ -278,25 +284,27 @@ const getEffect = (synthIx: number, effectIx: number, synths: SynthDesignerState
   return { targetSynth, targetEffect };
 };
 
+const setSynth = (
+  synthIx: number,
+  synth: SynthModule,
+  state: SynthDesignerState
+): SynthDesignerState => ({
+  ...state,
+  synths: R.set(R.lensIndex(synthIx), synth, state.synths),
+});
+
 const setEffect = (
   synthIx: number,
   effectIx: number,
   effect: EffectModule,
   state: SynthDesignerState
-) => {
+): SynthDesignerState => {
   const targetSynth = getSynth(synthIx, state.synths);
-
-  return {
-    ...state,
-    synths: R.set(
-      R.lensIndex(synthIx),
-      {
-        ...targetSynth,
-        effects: R.set(R.lensIndex(effectIx), effect, targetSynth.effects),
-      },
-      state.synths
-    ),
+  const newSynth = {
+    ...targetSynth,
+    effects: R.set(R.lensIndex(effectIx), effect, targetSynth.effects),
   };
+  return setSynth(synthIx, newSynth, state);
 };
 
 const mkSetFreqForOsc = (frequency: number) => (osc: OscillatorNode) =>
@@ -341,14 +349,14 @@ const actionGroups = {
     }),
   }),
   ADD_EFFECT: buildActionGroup({
-    actionCreator: (index: number, effect: Effect, params: { [key: string]: number }) => ({
+    actionCreator: (synthIx: number, effect: Effect, params: { [key: string]: number }) => ({
       type: 'ADD_EFFECT',
-      index,
+      synthIx,
       effect,
       params,
     }),
-    subReducer: (state: SynthDesignerState, { index, effect, params }) => {
-      const targetSynth = getSynth(index, state.synths);
+    subReducer: (state: SynthDesignerState, { synthIx, effect, params }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
 
       const synthOutput = Option.of(R.last(targetSynth.effects))
         .map(R.prop('effect'))
@@ -373,31 +381,28 @@ const actionGroups = {
         params,
       };
 
-      return {
-        ...state,
-        synths: R.set(
-          R.lensIndex(index),
-          { ...targetSynth, effects: [...targetSynth.effects, effectModule] },
-          state.synths
-        ),
-      };
+      return setSynth(
+        synthIx,
+        { ...targetSynth, effects: [...targetSynth.effects, effectModule] },
+        state
+      );
     },
   }),
   REMOVE_EFFECT: buildActionGroup({
-    actionCreator: (synthIndex: number, effectIndex: number) => ({
+    actionCreator: (synthIx: number, effectIndex: number) => ({
       type: 'REMOVE_EFFECT',
-      synthIndex,
+      synthIx,
       effectIndex,
     }),
-    subReducer: (state: SynthDesignerState, { synthIndex, effectIndex }) => {
-      const targetSynth = getSynth(synthIndex, state.synths);
+    subReducer: (state: SynthDesignerState, { synthIx, effectIndex }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
       const removedEffect = targetSynth.effects[effectIndex];
       if (!removedEffect) {
-        throw new Error(`No effect at index ${synthIndex} for synth index ${effectIndex}`);
+        throw new Error(`No effect at index ${synthIx} for synth index ${effectIndex}`);
       }
 
       removedEffect.effect.node.disconnect();
-      const newSrc = Option.of(targetSynth.effects[synthIndex - 1])
+      const newSrc = Option.of(targetSynth.effects[synthIx - 1])
         .map(R.prop('effect'))
         .map(R.prop('node'))
         .getOrElse(targetSynth.filter.node);
@@ -410,10 +415,11 @@ const actionGroups = {
       newSrc.disconnect();
       newSrc.connect(newDst);
 
-      return {
-        ...state,
-        synths: R.remove(effectIndex, 1, state.synths),
-      };
+      return setSynth(
+        synthIx,
+        { ...targetSynth, effects: R.remove(effectIndex, 1, targetSynth.effects) },
+        state
+      );
     },
   }),
   GATE: buildActionGroup({
@@ -492,10 +498,7 @@ const actionGroups = {
       const targetSynth = getSynth(synthIx, state.synths);
       targetSynth.oscillators.forEach(osc => osc.detune.setValueAtTime(detune, ctx.currentTime));
 
-      return {
-        ...state,
-        synths: R.set(R.lensIndex(synthIx), { ...targetSynth, detune }, state.synths),
-      };
+      return setSynth(synthIx, { ...targetSynth, detune }, state);
     },
   }),
   SET_WAVY_JONES_INSTANCE: buildActionGroup({
@@ -576,29 +579,34 @@ const actionGroups = {
 
       updateFilterNode(targetSynth.filter.node, key as keyof FilterParams, val);
 
-      return {
-        ...state,
-        synths: R.set(
-          R.lensIndex(synthIx),
-          {
-            ...targetSynth,
-            filter: { ...targetSynth.filter, params: { ...targetSynth.filter.params, [key]: val } },
-          },
-          state.synths
-        ),
+      const newSynth = {
+        ...targetSynth,
+        filter: { ...targetSynth.filter, params: { ...targetSynth.filter.params, [key]: val } },
       };
+      return setSynth(synthIx, newSynth, state);
     },
   }),
-  SET_MASTER_GAIN: buildActionGroup({
-    actionCreator: (synthIx: number, gain: number) => ({ type: 'SET_MASTER_GAIN', synthIx, gain }),
+  SET_SYNTH_MASTER_GAIN: buildActionGroup({
+    actionCreator: (synthIx: number, gain: number) => ({
+      type: 'SET_SYNTH_MASTER_GAIN',
+      synthIx,
+      gain,
+    }),
     subReducer: (state: SynthDesignerState, { synthIx, gain }) => {
       const targetSynth = getSynth(synthIx, state.synths);
       targetSynth.outerGainNode.gain.setValueAtTime(gain, ctx.currentTime);
-
-      return {
-        ...state,
-        synths: R.set(R.lensIndex(synthIx), { ...targetSynth, masterGain: gain }, state.synths),
-      };
+      return setSynth(synthIx, { ...targetSynth, masterGain: gain }, state);
+    },
+  }),
+  SET_SELECTED_EFFECT_TYPE: buildActionGroup({
+    actionCreator: (synthIx: number, effectType: EffectType) => ({
+      type: 'SET_SELECTED_EFFECT_TYPE',
+      synthIx,
+      effectType,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, effectType }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      return setSynth(synthIx, { ...targetSynth, selectedEffectType: effectType }, state);
     },
   }),
 };

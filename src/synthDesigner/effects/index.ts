@@ -7,46 +7,52 @@ export interface EffectNode extends AudioNode {
   getDefaultParams: () => { [key: string]: any };
 }
 
-export class Bitcrusher extends AudioNode {
+export class Bitcrusher extends AudioWorkletNode {
+  constructor(audioContext: AudioContext) {
+    super(audioContext, 'bitcrusher');
+  }
+
   public setParam = (key: string, val: number) => {
     throw new UnimplementedError();
   };
 
   public getSettingDefs = () => [{ type: 'range', label: 'bits', min: 1, max: 12, stepSize: 1 }];
 
-  getDefaultParams = () => ({ bits: 4 });
+  public getDefaultParams = () => ({ bits: 4 });
 }
 
-export class Distortion extends AudioNode {
+export class Distortion extends WaveShaperNode {
+  public setParam = (key: string, val: number) => {
+    throw new UnimplementedError();
+  };
+
+  public getSettingDefs = () => [] as { [key: string]: any }[];
+
+  public getDefaultParams = () => ({} as { [key: string]: any });
+}
+
+export class Reverb extends ConvolverNode {
   public setParam = (key: string, val: number) => {
     throw new UnimplementedError();
   };
 
   public getSettingDefs = () => [];
 
-  getDefaultParams = () => ({});
+  public getDefaultParams = () => ({} as { [key: string]: any });
 }
 
-export class Reverb extends AudioNode {
-  public setParam = (key: string, val: number) => {
-    throw new UnimplementedError();
-  };
+const ctx = new AudioContext();
 
-  public getSettingDefs = () => [];
-
-  getDefaultParams = () => ({});
-}
-
-const effectsMap: { [K in EffectType]: new () => EffectNode } = {
-  [EffectType.Bitcrusher]: Bitcrusher,
-  [EffectType.Distortion]: Distortion,
-  [EffectType.Reverb]: Reverb,
+const effectsMap: { [K in EffectType]: () => EffectNode } = {
+  [EffectType.Bitcrusher]: () => new Bitcrusher(ctx),
+  [EffectType.Distortion]: () => new Distortion(ctx),
+  [EffectType.Reverb]: () => new Reverb(ctx),
 };
 
 export const buildEffect = (
   type: EffectType
 ): { params: { [key: string]: any }; effect: Effect } => {
-  const node = new effectsMap[type]();
+  const node = effectsMap[type]();
   const params = node.getDefaultParams();
   return { params, effect: { type, node } };
 };
