@@ -49,6 +49,9 @@ export enum FilterType {
 export interface FilterParams {
   type: FilterType;
   frequency: number;
+  Q?: number;
+  gain: number;
+  detune: number;
 }
 
 export interface FilterModule {
@@ -61,9 +64,6 @@ export interface SynthModule {
   detune: number;
   oscillators: OscillatorNode[];
   effects: EffectModule[];
-  // The node that connects to all of the oscillators.  This is connected to either the effects
-  // chain or directly to the output gain node.
-  innerGainNode: GainNode;
   // The node that is connected to whatever the synth module as a whole is connected to.  Its
   // source is either the end of the effects chain or the inner gain node.
   outerGainNode: GainNode;
@@ -72,10 +72,77 @@ export interface SynthModule {
 
 const ctx = new AudioContext();
 
+const filterSettings = {
+  type: {
+    type: 'select',
+    label: 'type',
+    options: Object.values(FilterType),
+    initial: FilterType.Lowpass,
+  },
+  detune: { type: 'range', label: 'detune', min: -200, max: 200, initial: 0, stepSize: 5 },
+  frequency: { type: 'range', label: 'frequency', min: 5, max: 24000, initial: 4400, stepSize: 5 },
+  gain: {
+    type: 'range',
+    label: 'gain',
+    min: -20,
+    max: 40,
+    step: 0.2,
+    initial: 0,
+  },
+  q: {
+    type: 'range',
+    label: 'Q',
+    min: 0,
+    max: 100,
+    initial: 100,
+    step: 0.5,
+  },
+};
+
+export const getSettingsForFilterType = (filterType: FilterType) => [
+  filterSettings.type,
+  filterSettings.frequency,
+  filterSettings.detune,
+  ...{
+    [FilterType.Lowpass]: [filterSettings.q],
+    [FilterType.Highpass]: [filterSettings.q],
+    [FilterType.Bandpass]: [filterSettings.q],
+    [FilterType.Lowshelf]: [filterSettings.gain],
+    [FilterType.Highshelf]: [filterSettings.gain],
+    [FilterType.Peaking]: [filterSettings.gain, filterSettings.q],
+    [FilterType.Notch]: [filterSettings.q],
+    [FilterType.Allpass]: [filterSettings.q],
+  }[filterType],
+];
+
+export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
+  getSettingsForFilterType(filterType).reduce(
+    (acc, { label, initial }) => ({ ...acc, [label]: initial }),
+    {}
+  ) as FilterParams;
+
+function updateFilterNode<K extends keyof FilterParams>(
+  node: BiquadFilterNode,
+  key: K,
+  val: FilterParams[K]
+) {
+  switch (key) {
+    case 'type': {
+      node.type = val as FilterType;
+      break;
+    }
+    default: {
+      const param: AudioParam = node[key as Exclude<typeof key, 'type'>];
+      param.setValueAtTime(val as number, ctx.currentTime);
+    }
+  }
+}
+
 export const serializeSynthModule = (synth: SynthModule) => ({
   unison: synth.oscillators.length,
   waveform: synth.waveform,
   detune: synth.detune,
+  filter: synth.filter.params,
 });
 
 export interface SynthDesignerState {
@@ -89,19 +156,18 @@ const buildDefaultFilterModule = (): FilterModule => {
   return {
     node,
     params: {
-      type: FilterType.Highpass,
-      frequency: 4400,
+      type: FilterType.Lowpass,
+      ...getDefaultFilterParams(FilterType.Lowpass),
     },
   };
 };
 
 const buildDefaultSynthModule = (): SynthModule => {
-  const innerGainNode = new GainNode(ctx);
+  const filter = buildDefaultFilterModule();
   const outerGainNode = new GainNode(ctx);
   const oscillator = new OscillatorNode(ctx);
   oscillator.start();
-  innerGainNode.connect(outerGainNode);
-  innerGainNode.gain.setValueAtTime(0.4, ctx.currentTime);
+  filter.node.connect(outerGainNode);
   // TODO: Connect this somewhere else perhaps?  To a master gain?
   // outerGainNode.connect(ctx.destination);
   outerGainNode.gain.setValueAtTime(0.4, ctx.currentTime);
@@ -111,9 +177,8 @@ const buildDefaultSynthModule = (): SynthModule => {
     detune: 0,
     oscillators: [oscillator],
     effects: [],
-    innerGainNode,
     outerGainNode,
-    filter: buildDefaultFilterModule(),
+    filter,
   };
 };
 
@@ -121,16 +186,27 @@ export const deserializeSynthModule = ({
   waveform,
   unison,
   detune,
+  filter: filterParams,
 }: {
   waveform: Waveform;
   unison: number;
   detune: number;
+  filter: FilterParams;
 }): SynthModule => {
   const base = buildDefaultSynthModule();
   base.oscillators.forEach(osc => {
     osc.stop();
     osc.disconnect();
   });
+
+  const filter = {
+    params: filterParams,
+    node: new BiquadFilterNode(ctx),
+  };
+  filter.node.connect(base.outerGainNode);
+  Object.entries(filterParams).forEach(([key, val]: [keyof typeof filterParams, any]) =>
+    updateFilterNode(filter.node, key, val)
+  );
 
   return {
     ...base,
@@ -143,6 +219,7 @@ export const deserializeSynthModule = ({
     }),
     waveform,
     detune,
+    filter,
     effects: [], // TODO
   };
 };
@@ -197,7 +274,7 @@ const setEffect = (
 };
 
 const mkSetFreqForOsc = (frequency: number) => (osc: OscillatorNode) =>
-  osc.frequency.setValueAtTime(frequency + Math.random() * 6, ctx.currentTime); // TODO: Remove
+  osc.frequency.setValueAtTime(frequency, ctx.currentTime);
 
 const actionGroups = {
   SET_STATE: buildActionGroup({
@@ -250,7 +327,7 @@ const actionGroups = {
       const synthOutput = Option.of(R.last(targetSynth.effects))
         .map(R.prop('effect'))
         .map(R.prop('node'))
-        .getOrElse(targetSynth.innerGainNode);
+        .getOrElse(targetSynth.filter.node);
 
       synthOutput.disconnect();
       synthOutput.connect(effect.node);
@@ -297,7 +374,7 @@ const actionGroups = {
       const newSrc = Option.of(targetSynth.effects[synthIndex - 1])
         .map(R.prop('effect'))
         .map(R.prop('node'))
-        .getOrElse(targetSynth.innerGainNode);
+        .getOrElse(targetSynth.filter.node);
       const newDst = Option.of(targetSynth.effects[effectIndex + 1])
         .map(R.prop('effect'))
         .map(R.prop('node'))
@@ -319,17 +396,17 @@ const actionGroups = {
       const setFreqForOsc = mkSetFreqForOsc(frequency);
 
       if (R.isNil(synthIx)) {
-        state.synths.map(({ innerGainNode, oscillators }) =>
+        state.synths.map(({ filter, oscillators }) =>
           oscillators.forEach(osc => {
             setFreqForOsc(osc);
-            osc.connect(innerGainNode);
+            osc.connect(filter.node);
           })
         );
       } else {
         const synth = getSynth(synthIx, state.synths);
         synth.oscillators.forEach(osc => {
           setFreqForOsc(osc);
-          osc.connect(synth.innerGainNode);
+          osc.connect(synth.filter.node);
         });
       }
 
@@ -366,7 +443,7 @@ const actionGroups = {
 
       while (targetSynth.oscillators.length < unison) {
         const osc = new OscillatorNode(ctx);
-        osc.connect(targetSynth.innerGainNode);
+        osc.connect(targetSynth.filter.node);
         // TODO: Set detune and other params here once they are implemented and stored in state
         // TODO: Keep track of playing state for all synths and trigger oscillators if synth is playing
         osc.type = targetSynth.waveform;
@@ -471,17 +548,8 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, key, val }) => {
       const targetSynth = getSynth(synthIx, state.synths);
 
-      switch (key) {
-        case 'type': {
-          targetSynth.filter.node.type = val as FilterType;
-          break;
-        }
-        default: {
-          targetSynth.filter.node[key].setValueAtTime(val as number, ctx.currentTime);
-        }
-      }
+      updateFilterNode(targetSynth.filter.node, key as keyof FilterParams, val);
 
-      // TODO
       return {
         ...state,
         synths: R.set(

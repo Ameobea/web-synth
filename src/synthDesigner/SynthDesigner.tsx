@@ -53,7 +53,7 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({ inde
         }}
       />
 
-      <FilterModule node={synth.filter.node} params={synth.filter.params} />
+      <FilterModule synthIx={index} params={synth.filter.params} />
     </div>
   );
 };
@@ -138,6 +138,27 @@ const SynthDesigner: React.FC<
     if (initialState) {
       dispatch(actionCreators.synthDesigner.SET_STATE(initialState));
     }
+  });
+
+  useEffect(() => {
+    const downHandler = (evt: KeyboardEvent) => {
+      if (['z', 'x'].includes(evt.key)) {
+        dispatch(actionCreators.synthDesigner.GATE(440));
+      }
+    };
+    const upHandler = (evt: KeyboardEvent) => {
+      if (['z', 'x'].includes(evt.key)) {
+        dispatch(actionCreators.synthDesigner.UNGATE());
+      }
+    };
+
+    document.addEventListener('keydown', downHandler);
+    document.addEventListener('keyup', upHandler);
+
+    return () => {
+      document.removeEventListener('keydown', downHandler);
+      document.removeEventListener('keyup', upHandler);
+    };
   });
 
   return (
