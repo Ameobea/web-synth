@@ -9,6 +9,10 @@ import SynthModuleComp from './SynthModule';
 import EffectModuleComp from './effects/Effect';
 import './SynthDesigner.scss';
 import { buildEffect } from 'src/synthDesigner/effects';
+import {
+  SpectrumVisualization,
+  initializeSpectrumVisualization,
+} from 'src/visualizations/spectrum';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -23,6 +27,9 @@ const SynthDesigner: React.FC<
     initialState?: SynthDesignerState | null;
   } & ReturnType<typeof mapStateToProps>
 > = ({ initialState, synthDesignerState }) => {
+  const setSpectrumVizSettingsState = useRef<null | ReturnType<
+    typeof initializeSpectrumVisualization
+  >>(null);
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
 
@@ -39,6 +46,7 @@ const SynthDesigner: React.FC<
 
     wavyJonesInstance.current.lineColor = '#FFF';
     wavyJonesInstance.current.lineThickness = 1.2;
+    console.log(wavyJonesInstance.current);
 
     dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(wavyJonesInstance.current));
   });
@@ -124,14 +132,39 @@ const SynthDesigner: React.FC<
         </button>
       </div>
 
-      <div id='oscilloscope' ref={oscilloscopeNode}></div>
-
       <button
         onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440))}
         onMouseUp={() => dispatch(actionCreators.synthDesigner.UNGATE())}
       >
         Gate
       </button>
+
+      <div id='oscilloscope' ref={oscilloscopeNode}></div>
+
+      <SpectrumVisualization
+        settingsState={{
+          scalerFunction: 'linear',
+          colorFunction: 'pink',
+          intensityMultiplier: 2.2,
+        }}
+        setSettingsState={() => {
+          /* TODO */
+        }}
+      />
+      <canvas
+        ref={ref => {
+          if (!ref || synthDesignerState.spectrumNode) {
+            return;
+          }
+
+          const analyzerNode = new AnalyserNode(new AudioContext());
+          setSpectrumVizSettingsState.current = initializeSpectrumVisualization(analyzerNode, ref);
+
+          dispatch(actionCreators.synthDesigner.SET_SPECTRUM_NODE(analyzerNode));
+        }}
+        width={1200}
+        height={1024}
+      />
     </>
   );
 };

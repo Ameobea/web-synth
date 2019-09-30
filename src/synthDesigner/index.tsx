@@ -51,10 +51,9 @@ export const init_synth_designer = (stateKey: string) => {
 };
 
 export const cleanup_synth_designer = (): string => {
-  const { synths, ...synthDesignerState } = getState().synthDesigner;
+  const { synths } = getState().synthDesigner;
   const designerState = JSON.stringify({
     synths: synths.map(serializeSynthModule),
-    ...synthDesignerState,
   });
   const faustEditorReactRootNode = document.getElementById(ROOT_NODE_ID);
   if (!faustEditorReactRootNode) {

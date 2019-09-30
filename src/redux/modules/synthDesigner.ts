@@ -168,6 +168,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
 export interface SynthDesignerState {
   synths: SynthModule[];
   wavyJonesInstance: AnalyserNode | undefined;
+  spectrumNode: AnalyserNode | undefined;
 }
 
 const buildDefaultFilterModule = (): FilterModule => {
@@ -259,6 +260,7 @@ export const deserializeSynthModule = ({
 export const getInitialSynthDesignerState = (addInitialSynth?: boolean): SynthDesignerState => ({
   synths: addInitialSynth ? [buildDefaultSynthModule()] : [],
   wavyJonesInstance: undefined,
+  spectrumNode: undefined,
 });
 
 const getSynth = (index: number, synths: SynthDesignerState['synths']) => {
@@ -506,7 +508,10 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { instance }) => {
       state.synths.forEach(({ outerGainNode }) => outerGainNode.connect(instance));
 
-      instance.connect(ctx.destination);
+      if (state.spectrumNode) {
+        instance.connect(state.spectrumNode);
+        state.spectrumNode.connect(ctx.destination);
+      }
 
       return { ...state, wavyJonesInstance: instance };
     },
@@ -607,6 +612,20 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, effectType }) => {
       const targetSynth = getSynth(synthIx, state.synths);
       return setSynth(synthIx, { ...targetSynth, selectedEffectType: effectType }, state);
+    },
+  }),
+  SET_SPECTRUM_NODE: buildActionGroup({
+    actionCreator: (spectrumNode: AnalyserNode) => ({ type: 'SET_SPECTRUM_NODE', spectrumNode }),
+    subReducer: (state: SynthDesignerState, { spectrumNode }) => {
+      if (!state.wavyJonesInstance || !state.wavyJonesInstance) {
+        return { ...state, spectrumNode };
+      }
+
+      spectrumNode.disconnect();
+      state.wavyJonesInstance.connect(spectrumNode);
+      spectrumNode.connect(ctx.destination);
+
+      return { ...state, spectrumNode };
     },
   }),
 };
