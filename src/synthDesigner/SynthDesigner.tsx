@@ -13,6 +13,7 @@ import {
   SpectrumVisualization,
   initializeSpectrumVisualization,
 } from 'src/visualizations/spectrum';
+import MidiKeyboard from 'src/synthDesigner/MidiKeyboard';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -55,27 +56,6 @@ const SynthDesigner: React.FC<
     if (initialState) {
       dispatch(actionCreators.synthDesigner.SET_STATE(initialState));
     }
-  });
-
-  useEffect(() => {
-    const downHandler = (evt: KeyboardEvent) => {
-      if (['z', 'x'].includes(evt.key)) {
-        dispatch(actionCreators.synthDesigner.GATE(440));
-      }
-    };
-    const upHandler = (evt: KeyboardEvent) => {
-      if (['z', 'x'].includes(evt.key)) {
-        dispatch(actionCreators.synthDesigner.UNGATE());
-      }
-    };
-
-    document.addEventListener('keydown', downHandler);
-    document.addEventListener('keyup', upHandler);
-
-    return () => {
-      document.removeEventListener('keydown', downHandler);
-      document.removeEventListener('keyup', upHandler);
-    };
   });
 
   return (
@@ -164,6 +144,10 @@ const SynthDesigner: React.FC<
         }}
         width={1200}
         height={1024}
+      />
+      <MidiKeyboard
+        playNote={frequency => dispatch(actionCreators.synthDesigner.GATE(frequency))}
+        releaseNote={_frequency => dispatch(actionCreators.synthDesigner.UNGATE())}
       />
     </>
   );

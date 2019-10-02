@@ -10,3 +10,5 @@ export const roundTo = (num: number, decimals: number): number => {
   const multiplicand = Math.pow(10, decimals);
   return Math.round(num * multiplicand) / multiplicand;
 };
+
+export const midiToFrequency = (midiNote: number) => Math.pow(2, (midiNote - 69) / 12) * 440;
