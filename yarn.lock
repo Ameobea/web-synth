@@ -475,6 +475,11 @@
     "@types/react" "*"
     redux "^3.6.0 || ^4.0.0"
 
+"@types/webmidi@^2.0.3":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@types/webmidi/-/webmidi-2.0.3.tgz#2c04998688e4d0b558b2fa3b84af1a705c5a6ec3"
+  integrity sha512-ui4QxwMIf1I601Pw1FgWJqBOOitrWbeox8XENUIR/R7iQ2r3/BROXBpaYq8fKkk6AvGmBKN9oolURHC36KUI0Q==
+
 "@typescript-eslint/eslint-plugin@^2.0.0":
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/eslint-plugin/-/eslint-plugin-2.0.0.tgz#609a5d7b00ce21a6f94d7ef282eba9da57ca1e42"

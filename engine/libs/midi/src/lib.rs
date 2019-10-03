@@ -15,6 +15,8 @@ use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use common::RawNoteData;
 use rimd::{AbsoluteEvent, Event, MidiMessage, SMFWriter, Status, TrackEvent, SMF};
 
+pub mod streaming;
+
 const NO_PLAYING_NOTE: u64 = u64::MAX;
 
 static mut INITED: bool = false;
