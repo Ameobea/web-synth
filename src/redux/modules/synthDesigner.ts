@@ -495,8 +495,19 @@ const actionGroups = {
     },
   }),
   SET_DETUNE: buildActionGroup({
-    actionCreator: (synthIx: number, detune: number) => ({ type: 'SET_DETUNE', synthIx, detune }),
+    actionCreator: (detune: number, synthIx?: number) => ({ type: 'SET_DETUNE', synthIx, detune }),
     subReducer: (state: SynthDesignerState, { synthIx, detune }) => {
+      if (R.isNil(synthIx)) {
+        return {
+          ...state,
+          synths: state.synths.map(synth => {
+            synth.oscillators.forEach(osc => osc.detune.setValueAtTime(detune, ctx.currentTime));
+
+            return { ...synth, detune };
+          }, []),
+        };
+      }
+
       const targetSynth = getSynth(synthIx, state.synths);
       targetSynth.oscillators.forEach(osc => osc.detune.setValueAtTime(detune, ctx.currentTime));
 
@@ -583,6 +594,7 @@ const actionGroups = {
       const targetSynth = getSynth(synthIx, state.synths);
 
       updateFilterNode(targetSynth.filter.node, key as keyof FilterParams, val);
+      return state;
 
       const newSynth = {
         ...targetSynth,

@@ -148,6 +148,11 @@ const SynthDesigner: React.FC<
       <MidiKeyboard
         playNote={frequency => dispatch(actionCreators.synthDesigner.GATE(frequency))}
         releaseNote={_frequency => dispatch(actionCreators.synthDesigner.UNGATE())}
+        handlePitchBend={(lsb: number, msb: number) =>
+          dispatch(
+            actionCreators.synthDesigner.SET_FILTER_PARAM(0, 'frequency', Math.max(msb, 1) * 12)
+          )
+        }
       />
     </>
   );

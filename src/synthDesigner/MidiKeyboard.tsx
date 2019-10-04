@@ -34,7 +34,8 @@ const keyMap: { [key: string]: number } = keys.reduce(
 
 const tryInitMidi = async (
   playNote: (midiNumber: number, velocity: number) => void,
-  releaseNote: (midiNumber: number, velocity: number) => void
+  releaseNote: (midiNumber: number, velocity: number) => void,
+  handlePitchBend?: null | ((lsb: number, msb: number) => void)
 ) => {
   if (!navigator.requestMIDIAccess) {
     throw new Error(
@@ -51,7 +52,7 @@ const tryInitMidi = async (
 
     const midiModule = await import('../midi');
 
-    const ctxPtr = midiModule.create_msg_handler_context(playNote, releaseNote);
+    const ctxPtr = midiModule.create_msg_handler_context(playNote, releaseNote, handlePitchBend);
 
     input.addEventListener('midimessage', evt => midiModule.handle_midi_evt(evt.data, ctxPtr));
     break;
@@ -61,7 +62,8 @@ const tryInitMidi = async (
 const MidiKeyboard: React.FC<{
   playNote: (frequency: number) => void;
   releaseNote: (frequency: number) => void;
-}> = ({ playNote, releaseNote }) => {
+  handlePitchBend?: ((lsb: number, msb: number) => void) | null;
+}> = ({ playNote, releaseNote, handlePitchBend }) => {
   const midiAccess = useRef<MidiPermissionDescriptor | null | 'INITIALIZING' | 'INIT_FAILED'>(null);
 
   useEffect(() => {
@@ -69,7 +71,8 @@ const MidiKeyboard: React.FC<{
       midiAccess.current = 'INITIALIZING';
       tryInitMidi(
         (midiNumber: number, velocity: number) => playNote(midiToFrequency(midiNumber)),
-        (midiNumber: number, velocity: number) => releaseNote(midiToFrequency(midiNumber))
+        (midiNumber: number, velocity: number) => releaseNote(midiToFrequency(midiNumber)),
+        handlePitchBend
       )
         .then(access => {
           midiAccess.current = access;

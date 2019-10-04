@@ -7,15 +7,21 @@ use wasm_bindgen::prelude::*;
 pub struct MsgHandlerContext {
     pub play_note: Function,
     pub release_note: Function,
+    pub pitch_bend: Option<Function>,
     // TODO: Add handlers for other events
 }
 
 #[wasm_bindgen]
-pub fn create_msg_handler_context(play_note: Function, release_note: Function) -> usize {
+pub fn create_msg_handler_context(
+    play_note: Function,
+    release_note: Function,
+    pitch_bend: Option<Function>,
+) -> usize {
     crate::maybe_init();
     let ctx = Box::new(MsgHandlerContext {
         play_note,
         release_note,
+        pitch_bend,
     });
     Box::into_raw(ctx) as usize
 }
@@ -61,6 +67,20 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
                     &JsValue::from(velocity),
                 )
                 .map(|_| ())
+        },
+        Status::PitchBend => match &ctx.pitch_bend {
+            Some(pitch_bend) => {
+                let lsb = evt.data[1];
+                let msb = evt.data[2];
+
+                pitch_bend
+                    .call2(&JsValue::NULL, &JsValue::from(lsb), &JsValue::from(msb))
+                    .map(|_| ())
+            },
+            None => {
+                trace!("Ignoring pitch bend event since no pitch bend handler in context");
+                Ok(())
+            },
         },
         status => {
             trace!("Unhandled MIDI event of type {}", status);

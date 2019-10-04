@@ -70,7 +70,7 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
               break;
             }
             case 'detune': {
-              dispatch(actionCreators.synthDesigner.SET_DETUNE(index, val));
+              dispatch(actionCreators.synthDesigner.SET_DETUNE(val, index));
               break;
             }
             default: {
