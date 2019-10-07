@@ -16,6 +16,7 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate log;
+extern crate polysynth;
 extern crate uuid;
 
 use std::{mem, ptr, str::FromStr, sync::Once};
@@ -30,7 +31,6 @@ pub mod helpers;
 pub mod input_handlers;
 pub mod js;
 pub mod prelude;
-pub mod synth;
 pub mod util;
 pub mod view_context;
 pub mod views;

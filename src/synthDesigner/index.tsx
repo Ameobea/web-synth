@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
-import { Try, Option } from 'funfix-core';
+import { Try, Option, TryModule } from 'funfix-core';
 
 import { store, getState } from 'src/redux';
 import {
@@ -24,13 +24,21 @@ export const init_synth_designer = (stateKey: string) => {
           ({ synths: synths.map(deserializeSynthModule), ...rest } as SynthDesignerState)
       )
       .orNull()
-  ).getOrElseL(() => {
-    console.warn(
-      'Error deserializing synth designer state from JSON; clearing and defaulting to empty'
-    );
-    localStorage.removeItem(stateKey);
-    return getInitialSynthDesignerState(true);
-  });
+  )
+    .recoverWith(err => {
+      console.warn(
+        'Error deserializing synth designer state from JSON; clearing and defaulting to empty',
+        err
+      );
+
+      return Try.of(() => {
+        throw err;
+      });
+    })
+    .getOrElseL(() => {
+      localStorage.removeItem(stateKey);
+      return getInitialSynthDesignerState(true);
+    });
 
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');

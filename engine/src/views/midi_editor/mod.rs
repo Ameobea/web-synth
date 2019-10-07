@@ -4,6 +4,7 @@
 
 use std::str;
 
+use polysynth::{PolySynth, SynthCallbacks};
 use uuid::Uuid;
 
 use crate::{helpers::grid::prelude::*, view_context::ViewContext};
@@ -11,14 +12,46 @@ use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 pub mod constants;
 pub mod prelude;
 
-pub struct MidiEditorGridHandler {
-    pub synth: PolySynth,
+#[wasm_bindgen(raw_module = "./synth")]
+extern "C" {
+    /// Initializes a synth on the JavaScript side, returning its index in the gloabl synth array.
+    pub fn init_synth(uuid: String, voice_count: usize) -> usize;
+    pub fn trigger_attack(synth_ix: usize, voice_ix: usize, frequency: f32, velocity: u8);
+    pub fn trigger_release(synth_ix: usize, voice_ix: usize);
+    pub fn trigger_attack_release(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32);
+    pub fn schedule_events(synth_ix: usize, events: &[u8], frequencies: &[f32], timings: &[f32]);
 }
+
+pub struct MidiEditorGridHandler {
+    pub synth: PolySynth<
+        fn(uuid: String, voice_count: usize) -> usize,
+        fn(synth_ix: usize, voice_ix: usize, frequency: f32, velocity: u8),
+        fn(synth_ix: usize, voice_ix: usize),
+        fn(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32),
+        fn(synth_ix: usize, events: &[u8], frequencies: &[f32], timings: &[f32]),
+    >,
+}
+
+const DEFAULT_VELOCITY: u8 = 255;
+
+static SYNTH_CALLBACKS: SynthCallbacks<
+    fn(uuid: String, voice_count: usize) -> usize,
+    fn(synth_ix: usize, voice_ix: usize, frequency: f32, velocity: u8),
+    fn(synth_ix: usize, voice_ix: usize),
+    fn(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32),
+    fn(synth_ix: usize, events: &[u8], frequencies: &[f32], timings: &[f32]),
+> = SynthCallbacks {
+    init_synth,
+    trigger_attack,
+    trigger_release,
+    trigger_attack_release,
+    schedule_events,
+};
 
 impl MidiEditorGridHandler {
     fn new(uuid: Uuid) -> Self {
         Self {
-            synth: PolySynth::new(uuid, true),
+            synth: PolySynth::new(uuid, true, SYNTH_CALLBACKS.clone()),
         }
     }
 }
@@ -85,7 +118,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
     ) {
         match key {
             "z" | "x" => self.release_selected_notes(grid_state),
-            " " => synth::stop_playback(),
+            " " => (), // TODO // synth::stop_playback(),
             _ => (),
         }
     }
@@ -104,8 +137,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
 
         trace!("Triggering attack of line_ix {}", line_ix);
         if grid_state.cur_tool == Tool::DrawNote && !grid_state.shift_pressed {
-            self.synth
-                .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+            self.synth.trigger_attack(
+                self.midi_to_frequency(grid_state.conf.row_count, line_ix),
+                DEFAULT_VELOCITY,
+            );
         }
     }
 
@@ -150,8 +185,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                 let line_ix = selected_note_data.line_ix;
                 if *was_added && grid_state.selected_notes.insert(selected_note_data) {
                     MidiEditorGridRenderer::select_note(dom_id);
-                    self.synth
-                        .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+                    self.synth.trigger_attack(
+                        self.midi_to_frequency(grid_state.conf.row_count, line_ix),
+                        DEFAULT_VELOCITY,
+                    );
                 } else if !*was_added && grid_state.selected_notes.remove(&selected_note_data) {
                     MidiEditorGridRenderer::deselect_note(dom_id);
                     self.synth.trigger_release(
@@ -212,14 +249,18 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
 
         self.synth
             .trigger_release(self.midi_to_frequency(grid_state.conf.row_count, old_line_ix));
-        self.synth
-            .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, new_line_ix));
+        self.synth.trigger_attack(
+            self.midi_to_frequency(grid_state.conf.row_count, new_line_ix),
+            DEFAULT_VELOCITY,
+        );
     }
 
     fn on_note_draw_start(&mut self, grid_state: &mut GridState<usize>, line_ix: usize) {
         trace!("triggering attack on line_ix {}", line_ix);
-        self.synth
-            .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, line_ix));
+        self.synth.trigger_attack(
+            self.midi_to_frequency(grid_state.conf.row_count, line_ix),
+            DEFAULT_VELOCITY,
+        );
     }
 
     fn on_note_drag_start(
@@ -233,6 +274,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         );
         self.synth.trigger_attack(
             self.midi_to_frequency(grid_state.conf.row_count, dragging_note_data.1.line_ix),
+            DEFAULT_VELOCITY,
         );
     }
 
@@ -269,7 +311,7 @@ impl MidiEditorGridHandler {
         let events = grid_state.data.iter_events(None);
 
         // Create a virtual poly synth to handle assigning the virtual notes to voices
-        let mut voice_manager = PolySynth::new(uuid_v4(), false);
+        let mut voice_manager = PolySynth::new(uuid_v4(), false, SYNTH_CALLBACKS.clone());
 
         // Trigger all of the events with a custom callback that records the voice index to use for
         // each of them.
@@ -287,9 +329,13 @@ impl MidiEditorGridHandler {
 
             if event.is_start {
                 frequencies.push(frequency);
-                voice_manager.trigger_attack_cb(frequency, |_, voice_ix, _| {
-                    scheduled_events.push(voice_ix as u8);
-                });
+                voice_manager.trigger_attack_cb(
+                    frequency,
+                    DEFAULT_VELOCITY,
+                    |_, voice_ix, _, _| {
+                        scheduled_events.push(voice_ix as u8);
+                    },
+                );
             } else {
                 voice_manager.trigger_release_cb(frequency, |_, voice_ix| {
                     scheduled_events.push(voice_ix as u8);
@@ -298,7 +344,7 @@ impl MidiEditorGridHandler {
         }
 
         // Ship all of these events over to be scheduled and played
-        synth::schedule_events(
+        schedule_events(
             self.synth.id,
             &scheduled_events,
             &frequencies,
@@ -380,7 +426,7 @@ impl MidiEditorGridHandler {
                 )
             })
             .collect();
-        self.synth.trigger_attacks(&notes_to_play);
+        self.synth.trigger_attacks(&notes_to_play, DEFAULT_VELOCITY);
         self.synth.trigger_releases(&notes_to_play);
     }
 
@@ -524,8 +570,10 @@ impl MidiEditorGridHandler {
 
     pub fn play_selected_notes(&mut self, grid_state: &GridState<usize>) {
         for SelectedNoteData { line_ix, .. } in grid_state.selected_notes.iter() {
-            self.synth
-                .trigger_attack(self.midi_to_frequency(grid_state.conf.row_count, *line_ix));
+            self.synth.trigger_attack(
+                self.midi_to_frequency(grid_state.conf.row_count, *line_ix),
+                DEFAULT_VELOCITY,
+            );
         }
     }
 

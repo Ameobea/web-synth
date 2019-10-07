@@ -17,6 +17,8 @@ wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen.git", rev = "fb
 wasm-logger = { git = "https://gitlab.com/Ameobea/wasm-logger.git" }
 wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen.git", rev = "fb0bbc00" }
 
+polysynth = { path = "../polysynth" }
+
 [dependencies.common]
 path = "../common"
 

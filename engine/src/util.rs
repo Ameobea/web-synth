@@ -15,7 +15,3 @@ pub fn tern<T>(cond: bool, if_true: T, if_false: T) -> T {
 
 pub fn clamp(val: f32, min: f32, max: f32) -> f32 { val.max(min).min(max) }
 
-pub fn uuid_v4() -> Uuid {
-    let entropy: (u64, i64) = rng().gen();
-    unsafe { mem::transmute(entropy) }
-}

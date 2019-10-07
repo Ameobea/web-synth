@@ -1,0 +1,21 @@
+[package]
+name = "polysynth"
+version = "0.1.0"
+authors = ["Casey Primozic <me@ameo.link>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+log = "0.4"
+uuid = "0.7.4"
+
+[profile.dev]
+opt-level = 1
+debug-assertions = true
+
+[profile.release]
+opt-level = 3
+debug-assertions = false
+codegen-units = 1

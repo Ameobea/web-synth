@@ -146,8 +146,12 @@ const SynthDesigner: React.FC<
         height={1024}
       />
       <MidiKeyboard
-        playNote={frequency => dispatch(actionCreators.synthDesigner.GATE(frequency, 0))}
-        releaseNote={_frequency => dispatch(actionCreators.synthDesigner.UNGATE(0))}
+        playNote={(voiceIx, frequency, velocity) =>
+          dispatch(actionCreators.synthDesigner.GATE(frequency, voiceIx))
+        }
+        releaseNote={(voiceIx, _frequency, velocity) =>
+          dispatch(actionCreators.synthDesigner.UNGATE(voiceIx))
+        }
         handlePitchBend={(lsb: number, msb: number) =>
           dispatch(
             actionCreators.synthDesigner.SET_FILTER_PARAM(0, 'frequency', Math.max(msb, 1) * 12)

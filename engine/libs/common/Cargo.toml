@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 serde = "1.0.80"
 serde_derive = "1.0.80"
+uuid = { version = "0.7.4", features = ["serde"] }
+rand = "0.5.5"
+rand_pcg = "0.1.1"

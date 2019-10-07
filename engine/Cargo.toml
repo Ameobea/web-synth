@@ -24,6 +24,7 @@ console_error_panic_hook = { git = "https://github.com/Ameobea/console_error_pan
 uuid = { version = "0.7.4", features = ["serde"] }
 
 common = { path = "./libs/common" }
+polysynth = { path = "./libs/polysynth" }
 
 [profile.dev]
 opt-level = 1

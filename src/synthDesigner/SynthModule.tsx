@@ -11,8 +11,8 @@ const SYNTH_SETTINGS = [
     label: 'volume',
     min: 0,
     initial: 0.1,
-    max: 4,
-    step: 0.05,
+    max: 1,
+    step: 0.008,
   },
   {
     type: 'select',

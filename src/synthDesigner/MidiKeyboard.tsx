@@ -33,8 +33,8 @@ declare global {
 }
 
 const tryInitMidi = async (
-  playNote: (midiNumber: number, velocity: number) => void,
-  releaseNote: (midiNumber: number, velocity: number) => void,
+  playNote: (voiceIx: number, frequency: number, velocity: number) => void,
+  releaseNote: (voiceIx: number, frequency: number, velocity: number) => void,
   handlePitchBend?: null | ((lsb: number, msb: number) => void)
 ): Promise<MIDIAccess> => {
   if (!navigator.requestMIDIAccess) {
@@ -64,8 +64,8 @@ const tryInitMidi = async (
 };
 
 const MidiKeyboard: React.FC<{
-  playNote: (frequency: number) => void;
-  releaseNote: (frequency: number) => void;
+  playNote: (voiceIx: number, frequency: number, velocity: number) => void;
+  releaseNote: (voiceIx: number, frequency: number, velocity: number) => void;
   handlePitchBend?: ((lsb: number, msb: number) => void) | null;
 }> = ({ playNote, releaseNote, handlePitchBend }) => {
   const midiAccess = useRef<MIDIAccess | null | 'INITIALIZING' | 'INIT_FAILED'>(null);
@@ -73,11 +73,7 @@ const MidiKeyboard: React.FC<{
   useEffect(() => {
     if (!midiAccess.current) {
       midiAccess.current = 'INITIALIZING';
-      tryInitMidi(
-        (midiNumber: number, _velocity: number) => playNote(midiToFrequency(midiNumber)),
-        (midiNumber: number, _velocity: number) => releaseNote(midiToFrequency(midiNumber)),
-        handlePitchBend
-      )
+      tryInitMidi(playNote, releaseNote, handlePitchBend)
         .then(access => {
           midiAccess.current = access;
         })
@@ -93,7 +89,7 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      playNote(midiToFrequency(midiNumber));
+      playNote(0, midiToFrequency(midiNumber), 255);
     };
     const handleUp = (evt: KeyboardEvent) => {
       const midiNumber = keyMap[evt.key];
@@ -101,7 +97,7 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      releaseNote(midiToFrequency(midiNumber));
+      releaseNote(0, midiToFrequency(midiNumber), 255);
     };
 
     document.addEventListener('keydown', handleDown);

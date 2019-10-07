@@ -219,7 +219,8 @@ const buildDefaultFilterModule = (
 
 const buildDefaultSynthModule = (): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
-  const { filterParams } = buildDefaultFilterModule(filterCSNs);
+  const { filterParams, filterNode } = buildDefaultFilterModule(filterCSNs);
+  filterNode.disconnect();
 
   const masterGain = 0.4;
   const masterGainCSN = new ConstantSourceNode(ctx);
@@ -231,11 +232,11 @@ const buildDefaultSynthModule = (): SynthModule => {
     voices: R.range(0, VOICE_COUNT).map(() => {
       const { filterNode } = buildDefaultFilterModule(filterCSNs);
       const outerGainNode = new GainNode(ctx);
+      outerGainNode.gain.setValueAtTime(0, ctx.currentTime);
       masterGainCSN.connect(outerGainNode.gain);
       const oscillator = new OscillatorNode(ctx);
       oscillator.start();
       filterNode.connect(outerGainNode);
-      outerGainNode.gain.setValueAtTime(0.4, ctx.currentTime);
 
       return {
         oscillators: [oscillator],
@@ -255,6 +256,7 @@ const buildDefaultSynthModule = (): SynthModule => {
   // Connect up + start all the CSNs
   inst.voices.flatMap(R.prop('oscillators')).forEach(osc => inst.detuneCSN.connect(osc.detune));
   inst.detuneCSN.start();
+  inst.masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
   inst.masterGainCSN.start();
 
   inst.voices.forEach(voice => {
@@ -291,6 +293,7 @@ export const deserializeSynthModule = ({
       osc.stop();
       osc.disconnect();
     });
+    voice.filterNode.disconnect();
 
     const filterNode = new BiquadFilterNode(ctx);
     filterNode.connect(voice.outerGainNode);
@@ -298,14 +301,12 @@ export const deserializeSynthModule = ({
       updateFilterNode([filterNode], base.filterCSNs, key, val)
     );
 
-    voice.outerGainNode.gain.setValueAtTime(masterGain, ctx.currentTime);
-
     return {
       ...voice,
       oscillators: R.range(0, unison).map(() => {
         const osc = new OscillatorNode(ctx);
         osc.type = waveform;
-        osc.detune.setValueAtTime(detune, ctx.currentTime);
+        osc.detune.setValueAtTime(0, ctx.currentTime);
         voice.frequencyCSN.connect(osc.frequency);
         base.detuneCSN.connect(osc.detune);
         osc.start();
@@ -315,6 +316,9 @@ export const deserializeSynthModule = ({
       effects: [], // TODO
     };
   });
+
+  console.log({ masterGain });
+  base.masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
 
   return {
     ...base,
