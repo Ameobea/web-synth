@@ -12,31 +12,31 @@ const keyMap: { [key: string]: number } = keys.reduce(
   {}
 );
 
+declare interface MIDIInput extends EventTarget {
+  name: string;
+}
+
+declare type MIDIOutputMap = Iterable<[string, MIDIInput]>;
+
+declare interface MIDIAccess {
+  sysexEnabled: boolean;
+  outputs: MIDIOutputMap;
+  inputs: MIDIOutputMap;
+  onstatechange: null | ((evt: unknown) => void);
+}
+
 // // Add in missing WebMIDI types to global scope
-// declare global {
-//   interface Navigator {
-//     requestMIDIAccess: () => Promise<unknown>;
-//   }
-// }
-
-// declare interface MIDIInput {
-
-// }
-
-// declare interface MIDIOutputMap extends Iterable<MIDIInput> {}
-
-// declare interface MIDIAccess {
-//   sysexEnabled: boolean;
-//   outputs: MIDIOutputMap;
-//   inputs: MIDIOutputMap;
-//   onstatechange: null | ((evt: unknown) => void);
-// }
+declare global {
+  interface Navigator {
+    requestMIDIAccess: () => Promise<MIDIAccess>;
+  }
+}
 
 const tryInitMidi = async (
   playNote: (midiNumber: number, velocity: number) => void,
   releaseNote: (midiNumber: number, velocity: number) => void,
   handlePitchBend?: null | ((lsb: number, msb: number) => void)
-) => {
+): Promise<MIDIAccess> => {
   if (!navigator.requestMIDIAccess) {
     throw new Error(
       "Unable to initialize MIDI; no keyboard attached or browser doesn't support it"
@@ -45,7 +45,7 @@ const tryInitMidi = async (
 
   const access = await navigator.requestMIDIAccess();
 
-  for (const [_id, input] of access.inputs) {
+  for (const [, input] of access.inputs) {
     if (!input.name.includes('KeyStep')) {
       continue;
     }
@@ -54,9 +54,13 @@ const tryInitMidi = async (
 
     const ctxPtr = midiModule.create_msg_handler_context(playNote, releaseNote, handlePitchBend);
 
-    input.addEventListener('midimessage', evt => midiModule.handle_midi_evt(evt.data, ctxPtr));
+    input.addEventListener('midimessage', (evt: Event & { data: Uint8Array }) =>
+      midiModule.handle_midi_evt(evt.data, ctxPtr)
+    );
     break;
   }
+
+  return access;
 };
 
 const MidiKeyboard: React.FC<{
@@ -64,14 +68,14 @@ const MidiKeyboard: React.FC<{
   releaseNote: (frequency: number) => void;
   handlePitchBend?: ((lsb: number, msb: number) => void) | null;
 }> = ({ playNote, releaseNote, handlePitchBend }) => {
-  const midiAccess = useRef<MidiPermissionDescriptor | null | 'INITIALIZING' | 'INIT_FAILED'>(null);
+  const midiAccess = useRef<MIDIAccess | null | 'INITIALIZING' | 'INIT_FAILED'>(null);
 
   useEffect(() => {
     if (!midiAccess.current) {
       midiAccess.current = 'INITIALIZING';
       tryInitMidi(
-        (midiNumber: number, velocity: number) => playNote(midiToFrequency(midiNumber)),
-        (midiNumber: number, velocity: number) => releaseNote(midiToFrequency(midiNumber)),
+        (midiNumber: number, _velocity: number) => playNote(midiToFrequency(midiNumber)),
+        (midiNumber: number, _velocity: number) => releaseNote(midiToFrequency(midiNumber)),
         handlePitchBend
       )
         .then(access => {

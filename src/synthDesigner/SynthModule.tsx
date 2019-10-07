@@ -82,14 +82,15 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
           () => ({
             waveform: synth.waveform,
             volume: synth.masterGain,
-            unison: synth.oscillators.length,
+            unison: synth.voices[0].oscillators.length,
             detune: synth.detune,
           }),
-          [synth.waveform, synth.oscillators.length, synth.masterGain, synth.detune]
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          [synth.waveform, synth.voices[0].oscillators.length, synth.masterGain, synth.detune]
         )}
       />
 
-      <FilterModule synthIx={index} params={synth.filter.params} />
+      <FilterModule synthIx={index} params={synth.filterParams} />
 
       <div className='effects'>{children}</div>
     </div>

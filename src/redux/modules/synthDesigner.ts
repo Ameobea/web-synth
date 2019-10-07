@@ -54,25 +54,38 @@ export interface FilterParams {
   detune: number;
 }
 
-export interface FilterModule {
-  node: BiquadFilterNode;
-  params: FilterParams;
+export interface FilterCSNs {
+  frequency: ConstantSourceNode;
+  Q: ConstantSourceNode;
+  gain: ConstantSourceNode;
+  detune: ConstantSourceNode;
+}
+
+export interface Voice {
+  oscillators: OscillatorNode[];
+  frequencyCSN: ConstantSourceNode;
+  effects: EffectModule[];
+  // The node that is connected to whatever the synth module as a whole is connected to.  Its
+  // source is either the end of the effects chain or the inner gain node.
+  outerGainNode: GainNode;
+  filterNode: BiquadFilterNode;
 }
 
 export interface SynthModule {
   waveform: Waveform;
   detune: number;
-  oscillators: OscillatorNode[];
-  effects: EffectModule[];
-  // The node that is connected to whatever the synth module as a whole is connected to.  Its
-  // source is either the end of the effects chain or the inner gain node.
-  outerGainNode: GainNode;
-  filter: FilterModule;
+  detuneCSN: ConstantSourceNode;
+  voices: Voice[];
+  filterParams: FilterParams;
+  filterCSNs: FilterCSNs;
   masterGain: number;
+  masterGainCSN: ConstantSourceNode;
   selectedEffectType: EffectType;
 }
 
 const ctx = new AudioContext();
+
+const VOICE_COUNT = 16 as const;
 
 const filterSettings = {
   type: {
@@ -140,27 +153,30 @@ export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
   ) as FilterParams;
 
 function updateFilterNode<K extends keyof FilterParams>(
-  node: BiquadFilterNode,
+  nodes: BiquadFilterNode[],
+  csns: FilterCSNs,
   key: K,
   val: FilterParams[K]
 ) {
   switch (key) {
     case 'type': {
-      node.type = val as FilterType;
+      nodes.forEach(node => {
+        node.type = val as FilterType;
+      });
       break;
     }
     default: {
-      const param: AudioParam = node[key as Exclude<typeof key, 'type'>];
-      param.setValueAtTime(val as number, ctx.currentTime);
+      const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];
+      param.offset.setValueAtTime(val as number, ctx.currentTime);
     }
   }
 }
 
 export const serializeSynthModule = (synth: SynthModule) => ({
-  unison: synth.oscillators.length,
+  unison: synth.voices[0].oscillators.length,
   waveform: synth.waveform,
   detune: synth.detune,
-  filter: synth.filter.params,
+  filter: synth.filterParams,
   masterGain: synth.masterGain,
   selectedEffectType: synth.selectedEffectType,
 });
@@ -171,40 +187,87 @@ export interface SynthDesignerState {
   spectrumNode: AnalyserNode | undefined;
 }
 
-const buildDefaultFilterModule = (): FilterModule => {
-  const node = new BiquadFilterNode(ctx);
-  const params = {
+const buildDefaultFilterCSNs = (): FilterCSNs => ({
+  frequency: new ConstantSourceNode(ctx),
+  Q: new ConstantSourceNode(ctx),
+  gain: new ConstantSourceNode(ctx),
+  detune: new ConstantSourceNode(ctx),
+});
+
+const buildDefaultFilterModule = (
+  filterCSNs: FilterCSNs
+): {
+  filterParams: FilterParams;
+  filterNode: BiquadFilterNode;
+} => {
+  const filterNode = new BiquadFilterNode(ctx);
+  const filterParams = {
     type: FilterType.Lowpass,
     ...getDefaultFilterParams(FilterType.Lowpass),
   };
-  Object.entries(params).forEach(([key, val]) =>
-    updateFilterNode(node, key as keyof typeof params, val)
+  filterCSNs.frequency.connect(filterNode.frequency);
+  filterCSNs.Q.connect(filterNode.Q);
+  filterCSNs.gain.connect(filterNode.gain);
+  filterCSNs.detune.connect(filterNode.detune);
+
+  Object.entries(filterParams).forEach(([key, val]) =>
+    updateFilterNode([filterNode], filterCSNs, key as keyof typeof filterParams, val)
   );
 
-  return {
-    node,
-    params,
-  };
+  return { filterParams, filterNode };
 };
 
 const buildDefaultSynthModule = (): SynthModule => {
-  const filter = buildDefaultFilterModule();
-  const outerGainNode = new GainNode(ctx);
-  const oscillator = new OscillatorNode(ctx);
-  oscillator.start();
-  filter.node.connect(outerGainNode);
-  outerGainNode.gain.setValueAtTime(0.4, ctx.currentTime);
+  const filterCSNs = buildDefaultFilterCSNs();
+  const { filterParams } = buildDefaultFilterModule(filterCSNs);
 
-  return {
+  const masterGain = 0.4;
+  const masterGainCSN = new ConstantSourceNode(ctx);
+  masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
+  const inst: SynthModule = {
     waveform: Waveform.Sine,
     detune: 0,
-    oscillators: [oscillator],
-    effects: [],
-    outerGainNode,
-    filter,
-    masterGain: 0.4,
+    detuneCSN: new ConstantSourceNode(ctx),
+    voices: R.range(0, VOICE_COUNT).map(() => {
+      const { filterNode } = buildDefaultFilterModule(filterCSNs);
+      const outerGainNode = new GainNode(ctx);
+      masterGainCSN.connect(outerGainNode.gain);
+      const oscillator = new OscillatorNode(ctx);
+      oscillator.start();
+      filterNode.connect(outerGainNode);
+      outerGainNode.gain.setValueAtTime(0.4, ctx.currentTime);
+
+      return {
+        oscillators: [oscillator],
+        frequencyCSN: new ConstantSourceNode(ctx),
+        effects: [],
+        outerGainNode,
+        filterNode,
+      };
+    }),
+    filterParams,
+    filterCSNs,
+    masterGain,
+    masterGainCSN,
     selectedEffectType: EffectType.Reverb,
   };
+
+  // Connect up + start all the CSNs
+  inst.voices.flatMap(R.prop('oscillators')).forEach(osc => inst.detuneCSN.connect(osc.detune));
+  inst.detuneCSN.start();
+  inst.masterGainCSN.start();
+
+  inst.voices.forEach(voice => {
+    voice.oscillators.forEach(osc => voice.frequencyCSN.connect(osc.frequency));
+    voice.frequencyCSN.start();
+  });
+
+  filterCSNs.detune.start();
+  filterCSNs.frequency.start();
+  filterCSNs.gain.start();
+  filterCSNs.Q.start();
+
+  return inst;
 };
 
 export const deserializeSynthModule = ({
@@ -223,35 +286,41 @@ export const deserializeSynthModule = ({
   selectedEffectType: EffectType;
 }): SynthModule => {
   const base = buildDefaultSynthModule();
-  base.oscillators.forEach(osc => {
-    osc.stop();
-    osc.disconnect();
+  const voices = base.voices.map(voice => {
+    voice.oscillators.forEach(osc => {
+      osc.stop();
+      osc.disconnect();
+    });
+
+    const filterNode = new BiquadFilterNode(ctx);
+    filterNode.connect(voice.outerGainNode);
+    Object.entries(filterParams).forEach(([key, val]: [keyof typeof filterParams, any]) =>
+      updateFilterNode([filterNode], base.filterCSNs, key, val)
+    );
+
+    voice.outerGainNode.gain.setValueAtTime(masterGain, ctx.currentTime);
+
+    return {
+      ...voice,
+      oscillators: R.range(0, unison).map(() => {
+        const osc = new OscillatorNode(ctx);
+        osc.type = waveform;
+        osc.detune.setValueAtTime(detune, ctx.currentTime);
+        voice.frequencyCSN.connect(osc.frequency);
+        base.detuneCSN.connect(osc.detune);
+        osc.start();
+        return osc;
+      }),
+      filterNode,
+      effects: [], // TODO
+    };
   });
-
-  const filter = {
-    params: filterParams,
-    node: new BiquadFilterNode(ctx),
-  };
-  filter.node.connect(base.outerGainNode);
-  Object.entries(filterParams).forEach(([key, val]: [keyof typeof filterParams, any]) =>
-    updateFilterNode(filter.node, key, val)
-  );
-
-  base.outerGainNode.gain.setValueAtTime(masterGain, ctx.currentTime);
 
   return {
     ...base,
-    oscillators: R.range(0, unison).map(() => {
-      const osc = new OscillatorNode(ctx);
-      osc.type = waveform;
-      osc.detune.setValueAtTime(detune, ctx.currentTime);
-      osc.start();
-      return osc;
-    }),
     waveform,
     detune,
-    filter,
-    effects: [], // TODO
+    voices,
     masterGain,
     selectedEffectType,
   };
@@ -276,10 +345,10 @@ const getSynth = (index: number, synths: SynthDesignerState['synths']) => {
 
 const getEffect = (synthIx: number, effectIx: number, synths: SynthDesignerState['synths']) => {
   const targetSynth = getSynth(synthIx, synths);
-  const targetEffect = targetSynth.effects[effectIx];
+  const targetEffect = targetSynth.voices.map(({ effects }) => effects[effectIx]);
   if (!targetEffect) {
     throw new Error(
-      `Tried to access effect index ${effectIx} on synth index ${synthIx} but it isn't set; only ${targetSynth.effects.length} effects exist`
+      `Tried to access effect index ${effectIx} on synth index ${synthIx} but it isn't set; only ${targetSynth.voices[0].effects.length} effects exist`
     );
   }
 
@@ -298,13 +367,16 @@ const setSynth = (
 const setEffect = (
   synthIx: number,
   effectIx: number,
-  effect: EffectModule,
+  effect: EffectModule[],
   state: SynthDesignerState
 ): SynthDesignerState => {
   const targetSynth = getSynth(synthIx, state.synths);
   const newSynth = {
     ...targetSynth,
-    effects: R.set(R.lensIndex(effectIx), effect, targetSynth.effects),
+    voices: targetSynth.voices.map((voice, i) => ({
+      ...voice,
+      effects: R.set(R.lensIndex(effectIx), effect[i], voice.effects),
+    })),
   };
   return setSynth(synthIx, newSynth, state);
 };
@@ -325,7 +397,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { index, waveform }) => {
       const targetSynth = getSynth(index, state.synths);
-      targetSynth.oscillators.forEach(osc => (osc.type = waveform));
+      targetSynth.voices.flatMap(R.prop('oscillators')).forEach(osc => (osc.type = waveform));
       return R.set(R.lensPath(['synths', index, 'waveform']), waveform, state);
     },
   }),
@@ -333,9 +405,11 @@ const actionGroups = {
     actionCreator: () => ({ type: 'ADD_SYNTH_MODULE' }),
     subReducer: (state: SynthDesignerState) => {
       const newModule = buildDefaultSynthModule();
-      newModule.outerGainNode.connect(
-        Option.of(state.wavyJonesInstance).getOrElse(ctx.destination)
-      );
+      newModule.voices
+        .map(R.prop('outerGainNode'))
+        .forEach(outerGainNode =>
+          outerGainNode.connect(Option.of(state.wavyJonesInstance).getOrElse(ctx.destination))
+        );
 
       return {
         ...state,
@@ -347,7 +421,7 @@ const actionGroups = {
     actionCreator: (index: number) => ({ type: 'DELETE_SYNTH_MODULE', index }),
     subReducer: (state: SynthDesignerState, { index }) => ({
       ...state,
-      synths: R.remove(index, 1, state.synths),
+      synths: R.remove(index, 1, state.synths), // TODO: There's probably some disconnecting/freeing that has to happen here...
     }),
   }),
   ADD_EFFECT: buildActionGroup({
@@ -360,32 +434,40 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, effect, params }) => {
       const targetSynth = getSynth(synthIx, state.synths);
 
-      const synthOutput = Option.of(R.last(targetSynth.effects))
-        .map(R.prop('effect'))
-        .map(R.prop('node'))
-        .getOrElse(targetSynth.filter.node);
+      const effectModules: EffectModule[] = targetSynth.voices.map(voice => {
+        const synthOutput = Option.of(R.last(voice.effects))
+          .map(R.prop('effect'))
+          .map(R.prop('node'))
+          .getOrElse(voice.filterNode);
 
-      synthOutput.disconnect();
-      synthOutput.connect(effect.node);
-      effect.node.connect(targetSynth.outerGainNode);
+        synthOutput.disconnect();
+        synthOutput.connect(effect.node);
+        effect.node.connect(voice.outerGainNode);
 
-      const effectGainNode = new GainNode(ctx);
-      effectGainNode.gain.setValueAtTime(1, ctx.currentTime);
-      const passthroughGainNode = new GainNode(ctx);
-      passthroughGainNode.gain.setValueAtTime(0, ctx.currentTime);
+        const effectGainNode = new GainNode(ctx);
+        effectGainNode.gain.setValueAtTime(1, ctx.currentTime);
+        const passthroughGainNode = new GainNode(ctx);
+        passthroughGainNode.gain.setValueAtTime(0, ctx.currentTime);
 
-      const effectModule: EffectModule = {
-        effect,
-        effectGainNode,
-        passthroughGainNode,
-        wetness: 1,
-        isBypassed: false,
-        params,
-      };
+        return {
+          effect,
+          effectGainNode,
+          passthroughGainNode,
+          wetness: 1,
+          isBypassed: false,
+          params,
+        };
+      });
 
       return setSynth(
         synthIx,
-        { ...targetSynth, effects: [...targetSynth.effects, effectModule] },
+        {
+          ...targetSynth,
+          voices: targetSynth.voices.map((voice, i) => ({
+            ...voice,
+            effects: [...voice.effects, effectModules[i]],
+          })),
+        },
         state
       );
     },
@@ -398,49 +480,58 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { synthIx, effectIndex }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      const removedEffect = targetSynth.effects[effectIndex];
-      if (!removedEffect) {
-        throw new Error(`No effect at index ${synthIx} for synth index ${effectIndex}`);
-      }
 
-      removedEffect.effect.node.disconnect();
-      const newSrc = Option.of(targetSynth.effects[synthIx - 1])
-        .map(R.prop('effect'))
-        .map(R.prop('node'))
-        .getOrElse(targetSynth.filter.node);
-      const newDst = Option.of(targetSynth.effects[effectIndex + 1])
-        .map(R.prop('effect'))
-        .map(R.prop('node'))
-        .getOrElse(targetSynth.outerGainNode);
+      const newVoices: Voice[] = targetSynth.voices.map(voice => {
+        const removedEffect = voice.effects[effectIndex];
+        if (!removedEffect) {
+          throw new Error(`No effect at index ${synthIx} for synth index ${effectIndex}`);
+        }
 
-      removedEffect.effect.node.disconnect();
-      newSrc.disconnect();
-      newSrc.connect(newDst);
+        removedEffect.effect.node.disconnect();
+        const newSrc = Option.of(voice.effects[synthIx - 1])
+          .map(R.prop('effect'))
+          .map(R.prop('node'))
+          .getOrElse(voice.filterNode);
+        const newDst = Option.of(voice.effects[effectIndex + 1])
+          .map(R.prop('effect'))
+          .map(R.prop('node'))
+          .getOrElse(voice.outerGainNode);
 
-      return setSynth(
-        synthIx,
-        { ...targetSynth, effects: R.remove(effectIndex, 1, targetSynth.effects) },
-        state
-      );
+        removedEffect.effect.node.disconnect();
+        newSrc.disconnect();
+        newSrc.connect(newDst);
+
+        return { ...voice, effects: R.remove(effectIndex, 1, voice.effects) };
+      });
+
+      return setSynth(synthIx, { ...targetSynth, voices: newVoices }, state);
     },
   }),
   GATE: buildActionGroup({
-    actionCreator: (frequency: number, synthIx?: number) => ({ type: 'GATE', frequency, synthIx }),
-    subReducer: (state: SynthDesignerState, { frequency, synthIx }) => {
+    actionCreator: (frequency: number, voiceIx: number, synthIx?: number) => ({
+      type: 'GATE',
+      frequency,
+      voiceIx,
+      synthIx,
+    }),
+    subReducer: (state: SynthDesignerState, { frequency, voiceIx, synthIx }) => {
       const setFreqForOsc = mkSetFreqForOsc(frequency);
 
       if (R.isNil(synthIx)) {
-        state.synths.map(({ filter, oscillators }) =>
-          oscillators.forEach(osc => {
+        state.synths.forEach(synth => {
+          const targetVoice = synth.voices[voiceIx];
+          targetVoice.oscillators.forEach(osc => {
             setFreqForOsc(osc);
-            osc.connect(filter.node);
-          })
-        );
+            osc.connect(targetVoice.filterNode);
+          });
+        });
       } else {
-        const synth = getSynth(synthIx, state.synths);
-        synth.oscillators.forEach(osc => {
+        const targetSynth = getSynth(synthIx, state.synths);
+        const targetVoice = targetSynth.voices[voiceIx];
+
+        targetVoice.oscillators.forEach(osc => {
           setFreqForOsc(osc);
-          osc.connect(synth.filter.node);
+          osc.connect(targetVoice.filterNode);
         });
       }
 
@@ -448,12 +539,18 @@ const actionGroups = {
     },
   }),
   UNGATE: buildActionGroup({
-    actionCreator: (synthIx?: number) => ({ type: 'UNGATE', synthIx }),
-    subReducer: (state: SynthDesignerState, { synthIx }) => {
+    actionCreator: (voiceIx: number, synthIx?: number) => ({ type: 'UNGATE', voiceIx, synthIx }),
+    subReducer: (state: SynthDesignerState, { voiceIx, synthIx }) => {
       if (R.isNil(synthIx)) {
-        state.synths.flatMap(R.prop('oscillators')).forEach(osc => osc.disconnect());
+        state.synths
+          .map(({ voices }) => voices[voiceIx])
+          .flatMap(R.prop('oscillators'))
+          .forEach(osc => osc.disconnect());
       } else {
-        getSynth(synthIx, state.synths).oscillators.forEach(osc => osc.disconnect());
+        const targetSynth = getSynth(synthIx, state.synths);
+        const targetVoice = targetSynth.voices[voiceIx];
+
+        targetVoice.oscillators.forEach(osc => osc.disconnect());
       }
 
       return state;
@@ -469,26 +566,30 @@ const actionGroups = {
         return state;
       }
 
-      while (targetSynth.oscillators.length > unison) {
-        const osc = targetSynth.oscillators.pop()!;
-        osc.stop();
-        osc.disconnect();
-      }
+      const newVoices = targetSynth.voices.map(voice => {
+        while (voice.oscillators.length > unison) {
+          const osc = voice.oscillators.pop()!;
+          osc.stop();
+          osc.disconnect();
+        }
 
-      while (targetSynth.oscillators.length < unison) {
-        const osc = new OscillatorNode(ctx);
-        osc.connect(targetSynth.filter.node);
-        // TODO: Set detune and other params here once they are implemented and stored in state
-        // TODO: Keep track of playing state for all synths and trigger oscillators if synth is playing
-        osc.type = targetSynth.waveform;
-        targetSynth.oscillators.push(osc);
-      }
+        while (voice.oscillators.length < unison) {
+          const osc = new OscillatorNode(ctx);
+          // TODO: Set detune and other params here once they are implemented and stored in state
+          // TODO: Keep track of playing state for all synths and trigger oscillators if synth is playing
+          osc.type = targetSynth.waveform;
+          voice.oscillators.push(osc);
+          osc.start();
+        }
+
+        return { ...voice, oscillators: [...voice.oscillators] };
+      });
 
       return {
         ...state,
         synths: [
           ...state.synths.slice(0, synthIx),
-          { ...targetSynth, oscillators: [...targetSynth.oscillators] },
+          { ...targetSynth, voices: newVoices },
           ...state.synths.slice(synthIx + 1),
         ],
       };
@@ -501,15 +602,15 @@ const actionGroups = {
         return {
           ...state,
           synths: state.synths.map(synth => {
-            synth.oscillators.forEach(osc => osc.detune.setValueAtTime(detune, ctx.currentTime));
+            synth.detuneCSN.offset.setValueAtTime(detune, ctx.currentTime);
 
             return { ...synth, detune };
-          }, []),
+          }),
         };
       }
 
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.oscillators.forEach(osc => osc.detune.setValueAtTime(detune, ctx.currentTime));
+      targetSynth.detuneCSN.offset.setValueAtTime(detune, ctx.currentTime);
 
       return setSynth(synthIx, { ...targetSynth, detune }, state);
     },
@@ -517,7 +618,9 @@ const actionGroups = {
   SET_WAVY_JONES_INSTANCE: buildActionGroup({
     actionCreator: (instance: AnalyserNode) => ({ type: 'SET_WAVY_JONES_INSTANCE', instance }),
     subReducer: (state: SynthDesignerState, { instance }) => {
-      state.synths.forEach(({ outerGainNode }) => outerGainNode.connect(instance));
+      state.synths
+        .flatMap(R.prop('voices'))
+        .forEach(({ outerGainNode }) => outerGainNode.connect(instance));
 
       if (state.spectrumNode) {
         instance.connect(state.spectrumNode);
@@ -543,7 +646,13 @@ const actionGroups = {
       }: { type: 'SET_EFFECT_BYPASSED'; isBypassed: boolean; synthIx: number; effectIx: number }
     ): SynthDesignerState => {
       const { targetEffect } = getEffect(synthIx, effectIx, state.synths);
-      return setEffect(synthIx, effectIx, { ...targetEffect, isBypassed }, state);
+      // TODO: Actually bypass?
+      return setEffect(
+        synthIx,
+        effectIx,
+        targetEffect.map(targetEffect => ({ ...targetEffect, isBypassed })),
+        state
+      );
     },
   }),
   SET_EFFECT_WETNESS: buildActionGroup({
@@ -560,10 +669,15 @@ const actionGroups = {
         return state;
       }
 
-      targetEffect.effectGainNode.gain.setValueAtTime(wetness, ctx.currentTime);
-      targetEffect.passthroughGainNode.gain.setValueAtTime(1 - wetness, ctx.currentTime);
+      // TODO: Use a CSN for effects?
+      const newEffects = targetEffect.map(targetEffect => {
+        targetEffect.effectGainNode.gain.setValueAtTime(wetness, ctx.currentTime);
+        targetEffect.passthroughGainNode.gain.setValueAtTime(1 - wetness, ctx.currentTime);
 
-      return setEffect(synthIx, effectIx, { ...targetEffect, wetness }, state);
+        return { ...targetEffect, wetness };
+      });
+
+      return setEffect(synthIx, effectIx, newEffects, state);
     },
   }),
   SET_EFFECT_PARAM: buildActionGroup({
@@ -576,12 +690,15 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { synthIx, effectIx, key, val }) => {
       const { targetEffect } = getEffect(synthIx, effectIx, state.synths);
-      targetEffect.effect.node.setParam(key, val);
+      targetEffect.forEach(targetEffect => targetEffect.effect.node.setParam(key, val));
 
       return setEffect(
         synthIx,
         effectIx,
-        { ...targetEffect, params: { ...targetEffect.params, [key]: val } },
+        targetEffect.map(targetEffect => ({
+          ...targetEffect,
+          params: { ...targetEffect.params, [key]: val },
+        })),
         state
       );
     },
@@ -593,14 +710,19 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, key, val }) => {
       const targetSynth = getSynth(synthIx, state.synths);
 
-      updateFilterNode(targetSynth.filter.node, key as keyof FilterParams, val);
-      return state;
+      updateFilterNode(
+        targetSynth.voices.map(R.prop('filterNode')),
+        targetSynth.filterCSNs,
+        key as keyof FilterParams,
+        val
+      );
+      return state; // TODO: Update this or something
 
-      const newSynth = {
-        ...targetSynth,
-        filter: { ...targetSynth.filter, params: { ...targetSynth.filter.params, [key]: val } },
-      };
-      return setSynth(synthIx, newSynth, state);
+      // const newSynth = {
+      //   ...targetSynth,
+      //   filter: { ...targetSynth.filter, params: { ...targetSynth.filter.params, [key]: val } },
+      // };
+      // return setSynth(synthIx, newSynth, state);
     },
   }),
   SET_SYNTH_MASTER_GAIN: buildActionGroup({
@@ -611,7 +733,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { synthIx, gain }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.outerGainNode.gain.setValueAtTime(gain, ctx.currentTime);
+      targetSynth.masterGainCSN.offset.setValueAtTime(gain, ctx.currentTime);
       return setSynth(synthIx, { ...targetSynth, masterGain: gain }, state);
     },
   }),

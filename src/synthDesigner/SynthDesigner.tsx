@@ -63,7 +63,7 @@ const SynthDesigner: React.FC<
       <div className='synth-designer'>
         {synthDesignerState.synths.map((synth, i) => (
           <SynthModuleComp key={i} synth={synth} index={i}>
-            {synth.effects.map((effect, effectIx) => (
+            {synth.voices[0].effects.map((effect, effectIx) => (
               <EffectModuleComp
                 effectName={effect.effect.type}
                 key={effectIx}
@@ -113,8 +113,8 @@ const SynthDesigner: React.FC<
       </div>
 
       <button
-        onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440))}
-        onMouseUp={() => dispatch(actionCreators.synthDesigner.UNGATE())}
+        onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440, 0))}
+        onMouseUp={() => dispatch(actionCreators.synthDesigner.UNGATE(0))}
       >
         Gate
       </button>
@@ -146,8 +146,8 @@ const SynthDesigner: React.FC<
         height={1024}
       />
       <MidiKeyboard
-        playNote={frequency => dispatch(actionCreators.synthDesigner.GATE(frequency))}
-        releaseNote={_frequency => dispatch(actionCreators.synthDesigner.UNGATE())}
+        playNote={frequency => dispatch(actionCreators.synthDesigner.GATE(frequency, 0))}
+        releaseNote={_frequency => dispatch(actionCreators.synthDesigner.UNGATE(0))}
         handlePitchBend={(lsb: number, msb: number) =>
           dispatch(
             actionCreators.synthDesigner.SET_FILTER_PARAM(0, 'frequency', Math.max(msb, 1) * 12)
