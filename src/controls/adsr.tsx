@@ -40,7 +40,7 @@ interface HandleProps {
   radius: number;
 }
 
-const Handle = ({ x, y, onDrag, radius }: HandleProps) => {
+const Handle: React.FC<HandleProps> = ({ x, y, onDrag, radius }) => {
   const setMousePos: (evt: MouseEvent) => void = evt => onDrag({ x: evt.clientX, y: evt.clientY });
 
   const handleMouseDown: (evt: React.MouseEvent<SVGCircleElement, MouseEvent>) => void = () => {
@@ -90,14 +90,14 @@ const ADSRSegment = ({ x1, y1, x2, y2, height }: ADSRSegmentProps) => (
   </Fragment>
 );
 
-const ADSRControls = ({
+const ADSRControls: React.FC<ADSRControlPropTypes> = ({
   width,
   height,
   value,
   onChange,
   handleRadius = 6,
   style = {},
-}: ADSRControlPropTypes) => {
+}) => {
   const svgElement = useRef<null | SVGSVGElement>(null);
 
   return (
@@ -109,7 +109,7 @@ const ADSRControls = ({
         y2={(1 - value.attack.magnitude) * height}
         height={height}
       />
-      {['attack', 'decay', 'release'].map((key, i, keys) => {
+      {['attack' as const, 'decay' as const, 'release' as const].map((key, i, keys) => {
         const x = value[key].pos * width;
         const y = (1 - value[key].magnitude) * height;
         const onDrag: (pos: MousePos) => void = ({ x, y }) => {
@@ -125,9 +125,10 @@ const ADSRControls = ({
           const clampedPos = clamp(previousPos, nextPos, pos);
 
           // Lock the magnitudes of decay and release
-          const otherKey: string | undefined = {
-            decay: 'release',
-            release: 'decay',
+          const otherKey: 'release' | 'decay' | undefined = {
+            decay: 'release' as const,
+            release: 'decay' as const,
+            attack: undefined,
           }[key];
           const updatedValue = { pos: clampedPos, magnitude };
           const updatedValues = !!otherKey
@@ -170,13 +171,13 @@ interface ControlPanelADSRProps {
   theme: { [key: string]: any };
 }
 
-export const ControlPanelADSR = ({ value, onChange }: ControlPanelADSRProps) => (
-  <Fragment>
+export const ControlPanelADSR: React.FC<ControlPanelADSRProps> = ({ value, onChange }) => (
+  <>
     <span style={{ paddingTop: 4 }}>
       <Value text={formatAdsrValue(value)} width={225} />
     </span>
     <ADSRControls width={350} height={200} value={value} onChange={onChange} />
-  </Fragment>
+  </>
 );
 
 export default ADSRControls;

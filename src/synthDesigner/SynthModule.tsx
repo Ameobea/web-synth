@@ -4,6 +4,7 @@ import ControlPanel from 'react-control-panel';
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import { dispatch, actionCreators } from 'src/redux';
 import FilterModule from './Filter';
+import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 
 const SYNTH_SETTINGS = [
   {
@@ -36,6 +37,12 @@ const SYNTH_SETTINGS = [
     max: 300,
     step: 0.5,
   },
+  {
+    type: 'custom',
+    label: 'adsr',
+    initial: defaultAdsrEnvelope,
+    Comp: ControlPanelADSR,
+  },
 ];
 
 const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
@@ -43,6 +50,8 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
   synth,
   children,
 }) => {
+  const unison = synth.voices[0].oscillators.length;
+
   return (
     <div className='synth-module'>
       <div
@@ -73,6 +82,10 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
               dispatch(actionCreators.synthDesigner.SET_DETUNE(val, index));
               break;
             }
+            case 'adsr': {
+              dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, index));
+              break;
+            }
             default: {
               console.warn('Unhandled key in synth control panel: ', key);
             }
@@ -82,15 +95,21 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
           () => ({
             waveform: synth.waveform,
             volume: synth.masterGain,
-            unison: synth.voices[0].oscillators.length,
+            unison,
             detune: synth.detune,
+            adsr: synth.gainEnvelope,
           }),
           // eslint-disable-next-line react-hooks/exhaustive-deps
-          [synth.waveform, synth.voices[0].oscillators.length, synth.masterGain, synth.detune]
+          [synth.waveform, unison, synth.masterGain, synth.detune, synth.gainEnvelope]
         )}
+        style={{ width: 378 }}
       />
 
-      <FilterModule synthIx={index} params={synth.filterParams} />
+      <FilterModule
+        synthIx={index}
+        params={synth.filterParams}
+        filterEnvelope={synth.filterEnvelope}
+      />
 
       <div className='effects'>{children}</div>
     </div>

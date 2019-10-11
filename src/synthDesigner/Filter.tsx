@@ -3,8 +3,13 @@ import ControlPanel from 'react-control-panel';
 
 import { FilterParams, getSettingsForFilterType } from 'src/redux/modules/synthDesigner';
 import { dispatch, actionCreators } from 'src/redux';
+import { ADSRValues } from 'src/controls/adsr';
 
-const Filter: React.FC<{ params: FilterParams; synthIx: number }> = ({ params, synthIx }) => {
+const Filter: React.FC<{ params: FilterParams; synthIx: number; filterEnvelope: ADSRValues }> = ({
+  params,
+  synthIx,
+  filterEnvelope,
+}) => {
   const { Panel, settings } = useMemo(
     () => ({
       // Create a new component each time the type changes to force a re-render with the potentially new settings array
@@ -13,18 +18,25 @@ const Filter: React.FC<{ params: FilterParams; synthIx: number }> = ({ params, s
       },
       settings: getSettingsForFilterType(params.type),
     }),
-    [params.type]
+    [params]
   );
+
+  const state = useMemo(() => ({ ...params, adsr: filterEnvelope }), [params, filterEnvelope]);
 
   return (
     <Panel
       style={{ width: 400 }}
       title='FILTER'
       settings={settings}
-      state={params}
-      onChange={(key: keyof FilterParams, val: any) =>
-        dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key, val))
-      }
+      state={state}
+      onChange={(key: keyof typeof state, val: any) => {
+        if (key === 'adsr') {
+          dispatch(actionCreators.synthDesigner.SET_FILTER_ADSR(val, synthIx));
+          return;
+        }
+
+        dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key, val));
+      }}
     />
   );
 };

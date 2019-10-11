@@ -3,6 +3,8 @@ import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
 
 import { EffectNode } from 'src/synthDesigner/effects';
+import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
+import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 
 export enum Waveform {
   Sine = 'sine',
@@ -81,6 +83,12 @@ export interface SynthModule {
   masterGain: number;
   masterGainCSN: ConstantSourceNode;
   selectedEffectType: EffectType;
+  gainEnvelope: ADSRValues;
+  gainADSRLength: number;
+  gainADSRModule: ADSRModule;
+  filterEnvelope: ADSRValues;
+  filterADSRLength: number;
+  filterADSRModule: ADSRModule;
 }
 
 const ctx = new AudioContext();
@@ -128,6 +136,12 @@ const filterSettings = {
     steps: 100,
     scale: 'log',
   },
+  adsr: {
+    type: 'custom',
+    label: 'adsr',
+    initial: defaultAdsrEnvelope,
+    Comp: ControlPanelADSR,
+  },
 };
 
 export const getSettingsForFilterType = (filterType: FilterType) => [
@@ -144,6 +158,7 @@ export const getSettingsForFilterType = (filterType: FilterType) => [
     [FilterType.Notch]: [filterSettings.q],
     [FilterType.Allpass]: [filterSettings.q],
   }[filterType],
+  filterSettings.adsr,
 ];
 
 export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
@@ -165,6 +180,9 @@ function updateFilterNode<K extends keyof FilterParams>(
       });
       break;
     }
+    case 'adsr': {
+      break;
+    }
     default: {
       const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];
       param.offset.setValueAtTime(val as number, ctx.currentTime);
@@ -179,6 +197,10 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   filter: synth.filterParams,
   masterGain: synth.masterGain,
   selectedEffectType: synth.selectedEffectType,
+  gainEnvelope: synth.gainEnvelope,
+  gainADSRLength: synth.gainADSRLength,
+  filterEnvelope: synth.filterEnvelope,
+  filterADSRLength: synth.filterADSRLength,
 });
 
 export interface SynthDesignerState {
@@ -251,6 +273,12 @@ const buildDefaultSynthModule = (): SynthModule => {
     masterGain,
     masterGainCSN,
     selectedEffectType: EffectType.Reverb,
+    gainEnvelope: defaultAdsrEnvelope,
+    gainADSRLength: 1000,
+    gainADSRModule: new ADSRModule(ctx, { minValue: 0, maxValue: 2, lengthMs: 1000 }),
+    filterEnvelope: defaultAdsrEnvelope,
+    filterADSRLength: 1200,
+    filterADSRModule: new ADSRModule(ctx, { minValue: 0, maxValue: 10000, lengthMs: 2000 }),
   };
 
   // Connect up + start all the CSNs
@@ -269,6 +297,13 @@ const buildDefaultSynthModule = (): SynthModule => {
   filterCSNs.gain.start();
   filterCSNs.Q.start();
 
+  inst.gainADSRModule.start();
+  inst.filterADSRModule.start();
+
+  // Connect up gain and filter ADSRs to control the underlying gain and filter params
+  inst.gainADSRModule.connect(inst.masterGainCSN.offset);
+  inst.filterADSRModule.connect(inst.filterCSNs.frequency.offset);
+
   return inst;
 };
 
@@ -279,6 +314,10 @@ export const deserializeSynthModule = ({
   filter: filterParams,
   masterGain,
   selectedEffectType,
+  gainEnvelope,
+  gainADSRLength,
+  filterEnvelope,
+  filterADSRLength,
 }: {
   waveform: Waveform;
   unison: number;
@@ -286,6 +325,10 @@ export const deserializeSynthModule = ({
   filter: FilterParams;
   masterGain: number;
   selectedEffectType: EffectType;
+  gainEnvelope: ADSRValues;
+  gainADSRLength: number;
+  filterEnvelope: ADSRValues;
+  filterADSRLength: number;
 }): SynthModule => {
   const base = buildDefaultSynthModule();
   const voices = base.voices.map(voice => {
@@ -317,8 +360,12 @@ export const deserializeSynthModule = ({
     };
   });
 
-  console.log({ masterGain });
   base.masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
+
+  base.gainADSRModule.setEnvelope(gainEnvelope);
+  base.gainADSRModule.setLengthMs(gainADSRLength);
+  base.filterADSRModule.setEnvelope(filterEnvelope);
+  base.filterADSRModule.setLengthMs(filterADSRLength);
 
   return {
     ...base,
@@ -327,6 +374,10 @@ export const deserializeSynthModule = ({
     voices,
     masterGain,
     selectedEffectType,
+    gainEnvelope,
+    gainADSRLength,
+    filterEnvelope,
+    filterADSRLength,
   };
 };
 
@@ -521,9 +572,15 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { frequency, voiceIx, synthIx }) => {
       const setFreqForOsc = mkSetFreqForOsc(frequency);
 
+      // TODO: Dedup
       if (R.isNil(synthIx)) {
         state.synths.forEach(synth => {
+          // Trigger gain and filter ADSRs
+          synth.gainADSRModule.gate();
+          synth.filterADSRModule.gate();
+
           const targetVoice = synth.voices[voiceIx];
+
           targetVoice.oscillators.forEach(osc => {
             setFreqForOsc(osc);
             osc.connect(targetVoice.filterNode);
@@ -531,6 +588,11 @@ const actionGroups = {
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
+
+        // Trigger gain and filter ADSRs
+        targetSynth.gainADSRModule.gate();
+        targetSynth.filterADSRModule.gate();
+
         const targetVoice = targetSynth.voices[voiceIx];
 
         targetVoice.oscillators.forEach(osc => {
@@ -547,11 +609,22 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { voiceIx, synthIx }) => {
       if (R.isNil(synthIx)) {
         state.synths
-          .map(({ voices }) => voices[voiceIx])
+          .map(({ voices, gainADSRModule, filterADSRModule }) => {
+            // Trigger release of gain and filter ADSRs
+            gainADSRModule.ungate();
+            filterADSRModule.ungate();
+
+            return voices[voiceIx];
+          })
           .flatMap(R.prop('oscillators'))
           .forEach(osc => osc.disconnect());
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
+
+        // Trigger release of gain and filter ADSRs
+        targetSynth.gainADSRModule.ungate();
+        targetSynth.filterADSRModule.ungate();
+
         const targetVoice = targetSynth.voices[voiceIx];
 
         targetVoice.oscillators.forEach(osc => osc.disconnect());
@@ -617,6 +690,56 @@ const actionGroups = {
       targetSynth.detuneCSN.offset.setValueAtTime(detune, ctx.currentTime);
 
       return setSynth(synthIx, { ...targetSynth, detune }, state);
+    },
+  }),
+  SET_GAIN_ADSR: buildActionGroup({
+    actionCreator: (envelope: ADSRValues, synthIx: number) => ({
+      type: 'SET_GAIN_ADSR',
+      envelope,
+      synthIx,
+    }),
+    subReducer: (state: SynthDesignerState, { envelope, synthIx }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.gainADSRModule.setEnvelope(envelope);
+
+      return setSynth(synthIx, { ...targetSynth, gainEnvelope: envelope }, state);
+    },
+  }),
+  SET_GAIN_ADSR_LENGTH: buildActionGroup({
+    actionCreator: (length: number, synthIx: number) => ({
+      type: 'SET_GAIN_ADSR_LENGTH',
+      length,
+      synthIx,
+    }),
+    subReducer: (state: SynthDesignerState, { length, synthIx }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.gainADSRModule.setLengthMs(length);
+      return setSynth(synthIx, { ...targetSynth, gainADSRLength: length }, state);
+    },
+  }),
+  SET_FILTER_ADSR: buildActionGroup({
+    actionCreator: (envelope: ADSRValues, synthIx: number) => ({
+      type: 'SET_FILTER_ADSR',
+      envelope,
+      synthIx,
+    }),
+    subReducer: (state: SynthDesignerState, { envelope, synthIx }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.filterADSRModule.setEnvelope(envelope);
+
+      return setSynth(synthIx, { ...targetSynth, filterEnvelope: envelope }, state);
+    },
+  }),
+  SET_FILTER_ADSR_LENGTH: buildActionGroup({
+    actionCreator: (length: number, synthIx: number) => ({
+      type: 'SET_FILTER_ADSR_LENGTH',
+      length,
+      synthIx,
+    }),
+    subReducer: (state: SynthDesignerState, { length, synthIx }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.filterADSRModule.setLengthMs(length);
+      return setSynth(synthIx, { ...targetSynth, filterADSRLength: length }, state);
     },
   }),
   SET_WAVY_JONES_INSTANCE: buildActionGroup({
@@ -720,13 +843,12 @@ const actionGroups = {
         key as keyof FilterParams,
         val
       );
-      return state; // TODO: Update this or something
 
-      // const newSynth = {
-      //   ...targetSynth,
-      //   filter: { ...targetSynth.filter, params: { ...targetSynth.filter.params, [key]: val } },
-      // };
-      // return setSynth(synthIx, newSynth, state);
+      const newSynth = {
+        ...targetSynth,
+        filterParams: { ...targetSynth.filterParams, ...targetSynth.filterParams, [key]: val },
+      };
+      return setSynth(synthIx, newSynth, state);
     },
   }),
   SET_SYNTH_MASTER_GAIN: buildActionGroup({
