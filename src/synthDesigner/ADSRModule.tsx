@@ -21,6 +21,8 @@ export class ADSRModule extends ConstantSourceNode {
     this.minValue = minValue;
     this.maxValue = maxValue;
     this.lengthMs = lengthMs;
+
+    this.offset.setValueAtTime(this.minValue, ctx.currentTime);
   }
 
   public setLengthMs(newLengthMs: number) {
@@ -53,24 +55,15 @@ export class ADSRModule extends ConstantSourceNode {
 
     const { attack, decay } = this.envelope;
 
-    console.log(`now: ${this.ctx.currentTime}: ${this.minValue}`);
     // Ramp to the attack
     this.offset.linearRampToValueAtTime(
       this.minValue + attack.magnitude * range,
       this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
     );
-    console.log(
-      `attack: ${this.ctx.currentTime + attack.pos * (this.lengthMs / 1000.0)}: ${this.minValue +
-        attack.magnitude * range}`
-    );
     // Ramp to the decay and hold there
     this.offset.linearRampToValueAtTime(
       this.minValue + decay.magnitude * range,
       this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
-    );
-    console.log(
-      `decay: ${this.ctx.currentTime + decay.pos * (this.lengthMs / 1000.0)}: ${this.minValue +
-        decay.magnitude * range}`
     );
   }
 
