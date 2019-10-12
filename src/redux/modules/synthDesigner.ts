@@ -71,6 +71,8 @@ export interface Voice {
   // source is either the end of the effects chain or the inner gain node.
   outerGainNode: GainNode;
   filterNode: BiquadFilterNode;
+  gainADSRModule: ADSRModule;
+  filterADSRModule: ADSRModule;
 }
 
 export interface SynthModule {
@@ -85,10 +87,8 @@ export interface SynthModule {
   selectedEffectType: EffectType;
   gainEnvelope: ADSRValues;
   gainADSRLength: number;
-  gainADSRModule: ADSRModule;
   filterEnvelope: ADSRValues;
   filterADSRLength: number;
-  filterADSRModule: ADSRModule;
 }
 
 const ctx = new AudioContext();
@@ -252,13 +252,31 @@ const buildDefaultSynthModule = (): SynthModule => {
     detune: 0,
     detuneCSN: new ConstantSourceNode(ctx),
     voices: R.range(0, VOICE_COUNT).map(() => {
-      const { filterNode } = buildDefaultFilterModule(filterCSNs);
       const outerGainNode = new GainNode(ctx);
       outerGainNode.gain.setValueAtTime(0, ctx.currentTime);
-      masterGainCSN.connect(outerGainNode.gain);
+
       const oscillator = new OscillatorNode(ctx);
       oscillator.start();
+
+      const { filterNode } = buildDefaultFilterModule(filterCSNs);
       filterNode.connect(outerGainNode);
+
+      // Start the gain ADSR module and configure it to modulate the voice's gain node
+      const gainADSRModule = new ADSRModule(ctx, { minValue: 0, maxValue: 1.8, lengthMs: 1000 });
+      gainADSRModule.start();
+      gainADSRModule.connect(outerGainNode.gain);
+      // Start the filter ADSR module and configure it to modulate the voice's filter node's frequency
+      const filterADSRModule = new ADSRModule(ctx, {
+        minValue: 0,
+        maxValue: 10000,
+        lengthMs: 2000,
+      });
+      filterADSRModule.start();
+      filterADSRModule.connect(filterCSNs.frequency.offset);
+
+      // Connect the mast gain to the ADSR so that we can sum the offsets
+      // For whatever reason, you can't connect two CSNs to the same `AudioParam`; it just doesn't seem to work.
+      masterGainCSN.connect(gainADSRModule.offset);
 
       return {
         oscillators: [oscillator],
@@ -266,6 +284,8 @@ const buildDefaultSynthModule = (): SynthModule => {
         effects: [],
         outerGainNode,
         filterNode,
+        gainADSRModule,
+        filterADSRModule,
       };
     }),
     filterParams,
@@ -275,10 +295,8 @@ const buildDefaultSynthModule = (): SynthModule => {
     selectedEffectType: EffectType.Reverb,
     gainEnvelope: defaultAdsrEnvelope,
     gainADSRLength: 1000,
-    gainADSRModule: new ADSRModule(ctx, { minValue: 0, maxValue: 2, lengthMs: 1000 }),
     filterEnvelope: defaultAdsrEnvelope,
     filterADSRLength: 1200,
-    filterADSRModule: new ADSRModule(ctx, { minValue: 0, maxValue: 10000, lengthMs: 2000 }),
   };
 
   // Connect up + start all the CSNs
@@ -296,13 +314,6 @@ const buildDefaultSynthModule = (): SynthModule => {
   filterCSNs.frequency.start();
   filterCSNs.gain.start();
   filterCSNs.Q.start();
-
-  inst.gainADSRModule.start();
-  inst.filterADSRModule.start();
-
-  // Connect up gain and filter ADSRs to control the underlying gain and filter params
-  inst.gainADSRModule.connect(inst.masterGainCSN.offset);
-  inst.filterADSRModule.connect(inst.filterCSNs.frequency.offset);
 
   return inst;
 };
@@ -344,6 +355,13 @@ export const deserializeSynthModule = ({
       updateFilterNode([filterNode], base.filterCSNs, key, val)
     );
 
+    // TODO: the envelope should probably eventually be set via CSN...
+    voice.gainADSRModule.setEnvelope(gainEnvelope);
+    voice.gainADSRModule.setLengthMs(gainADSRLength);
+
+    voice.filterADSRModule.setEnvelope(filterEnvelope);
+    voice.filterADSRModule.setLengthMs(filterADSRLength);
+
     return {
       ...voice,
       oscillators: R.range(0, unison).map(() => {
@@ -361,11 +379,6 @@ export const deserializeSynthModule = ({
   });
 
   base.masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
-
-  base.gainADSRModule.setEnvelope(gainEnvelope);
-  base.gainADSRModule.setLengthMs(gainADSRLength);
-  base.filterADSRModule.setEnvelope(filterEnvelope);
-  base.filterADSRModule.setLengthMs(filterADSRLength);
 
   return {
     ...base,
@@ -575,11 +588,11 @@ const actionGroups = {
       // TODO: Dedup
       if (R.isNil(synthIx)) {
         state.synths.forEach(synth => {
-          // Trigger gain and filter ADSRs
-          synth.gainADSRModule.gate();
-          synth.filterADSRModule.gate();
-
           const targetVoice = synth.voices[voiceIx];
+
+          // Trigger gain and filter ADSRs
+          targetVoice.gainADSRModule.gate();
+          targetVoice.filterADSRModule.gate();
 
           targetVoice.oscillators.forEach(osc => {
             setFreqForOsc(osc);
@@ -588,12 +601,11 @@ const actionGroups = {
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
+        const targetVoice = targetSynth.voices[voiceIx];
 
         // Trigger gain and filter ADSRs
-        targetSynth.gainADSRModule.gate();
-        targetSynth.filterADSRModule.gate();
-
-        const targetVoice = targetSynth.voices[voiceIx];
+        targetVoice.gainADSRModule.gate();
+        targetVoice.filterADSRModule.gate();
 
         targetVoice.oscillators.forEach(osc => {
           setFreqForOsc(osc);
@@ -609,23 +621,24 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { voiceIx, synthIx }) => {
       if (R.isNil(synthIx)) {
         state.synths
-          .map(({ voices, gainADSRModule, filterADSRModule }) => {
-            // Trigger release of gain and filter ADSRs
-            gainADSRModule.ungate();
-            filterADSRModule.ungate();
+          .map(({ voices }) => {
+            const targetVoice = voices[voiceIx];
 
-            return voices[voiceIx];
+            // Trigger release of gain and filter ADSRs
+            targetVoice.gainADSRModule.ungate();
+            targetVoice.filterADSRModule.ungate();
+
+            return targetVoice;
           })
           .flatMap(R.prop('oscillators'))
           .forEach(osc => osc.disconnect());
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
+        const targetVoice = targetSynth.voices[voiceIx];
 
         // Trigger release of gain and filter ADSRs
-        targetSynth.gainADSRModule.ungate();
-        targetSynth.filterADSRModule.ungate();
-
-        const targetVoice = targetSynth.voices[voiceIx];
+        targetVoice.gainADSRModule.ungate();
+        targetVoice.filterADSRModule.ungate();
 
         targetVoice.oscillators.forEach(osc => osc.disconnect());
       }
@@ -700,7 +713,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { envelope, synthIx }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.gainADSRModule.setEnvelope(envelope);
+      targetSynth.voices.forEach(voice => voice.gainADSRModule.setEnvelope(envelope));
 
       return setSynth(synthIx, { ...targetSynth, gainEnvelope: envelope }, state);
     },
@@ -713,7 +726,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { length, synthIx }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.gainADSRModule.setLengthMs(length);
+      targetSynth.voices.forEach(voice => voice.gainADSRModule.setLengthMs(length));
       return setSynth(synthIx, { ...targetSynth, gainADSRLength: length }, state);
     },
   }),
@@ -725,7 +738,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { envelope, synthIx }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.filterADSRModule.setEnvelope(envelope);
+      targetSynth.voices.forEach(voice => voice.filterADSRModule.setEnvelope(envelope));
 
       return setSynth(synthIx, { ...targetSynth, filterEnvelope: envelope }, state);
     },
@@ -738,7 +751,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { length, synthIx }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.filterADSRModule.setLengthMs(length);
+      targetSynth.voices.forEach(voice => voice.filterADSRModule.setLengthMs(length));
       return setSynth(synthIx, { ...targetSynth, filterADSRLength: length }, state);
     },
   }),
