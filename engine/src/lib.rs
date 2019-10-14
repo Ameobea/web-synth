@@ -34,7 +34,7 @@ pub mod prelude;
 pub mod util;
 pub mod view_context;
 pub mod views;
-use self::{prelude::*, view_context::manager::build_view};
+use crate::{prelude::*, view_context::manager::build_view};
 
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
@@ -81,9 +81,13 @@ pub fn init() {
     }
 
     // Create the `ViewContextManager` and initialize it, then set it into the global
-    let mut vcm = Box::new(ViewContextManager::default());
-    vcm.init();
+    let vcm = Box::new(ViewContextManager::default());
+    // We have to store it in the pointer before initializing it since some initializing functions
+    // call into JS code which in turn calls back into Rust code which expects to be able to access
+    // the global VCM via that pointer.
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
+    let mut vcm = unsafe { Box::from_raw(VIEW_CONTEXT_MANAGER) };
+    vcm.init();
 }
 
 /// Creates a new view context from the provided name and sets it as the main view context.
@@ -139,4 +143,17 @@ pub fn set_vc_title(uuid_str: String, title: String) {
     });
     vc.definition.title = Some(title);
     get_vcm().commit();
+}
+
+#[wasm_bindgen]
+pub fn get_vc_connectables(vc_id: &str) -> JsValue {
+    let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `set_vc_title`!");
+    let vc = get_vcm().get_vc_by_id(uuid).unwrap_or_else(|| {
+        panic!(
+            "Attempted to get audio connectables of VC with ID {} but it wasn't found",
+            vc_id
+        )
+    });
+
+    vc.context.get_audio_connectables()
 }

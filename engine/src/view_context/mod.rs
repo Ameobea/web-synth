@@ -1,10 +1,19 @@
+use wasm_bindgen::prelude::*;
+
 pub mod manager;
 pub use self::manager::ViewContextManager;
+
+#[wasm_bindgen(raw_module = "./patchNetwork")]
+extern "C" {
+    fn create_empty_audio_connectables(vc_id: &str) -> JsValue;
+}
 
 pub trait ViewContext {
     /// Set up the view context to be the primary/active view of the application.  This may involve
     /// things like subscribing to/loading external data sources, creating DOM nodes, etc.
     fn init(&mut self) {}
+
+    fn get_id(&self) -> String;
 
     /// Clean up any external resources such as DOM elements that were created by the view context,
     /// making the application ready for the creation of a new one.  This does not mean that the
@@ -38,4 +47,9 @@ pub trait ViewContext {
     /// in an arbitrary manner by the view context.  Each message includes a type which can be used
     /// to identify it.
     fn handle_message(&mut self, _key: &str, _val: &[u8]) -> Option<Vec<u8>> { None }
+
+    /// Returns a JavaScript object that contains WebAudio constructs that can be used to connect
+    /// this `ViewContext` to other `ViewContext`s programatically.  This function should return
+    /// the same object throughout the life of the view context.
+    fn get_audio_connectables(&self) -> JsValue { create_empty_audio_connectables(&self.get_id()) }
 }

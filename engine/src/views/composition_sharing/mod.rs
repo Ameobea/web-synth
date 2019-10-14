@@ -22,6 +22,8 @@ impl CompositionSharing {
 impl ViewContext for CompositionSharing {
     fn init(&mut self) { js::init_composition_sharing(&self.get_state_key()); }
 
+    fn get_id(&self) -> String { self.uuid.to_string() }
+
     fn cleanup(&mut self) { js::cleanup_composition_sharing(); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }

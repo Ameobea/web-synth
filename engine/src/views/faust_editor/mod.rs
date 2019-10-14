@@ -27,6 +27,8 @@ impl ViewContext for FaustEditor {
         js::set_localstorage_key(&self.get_state_key(), &faust_editor_content)
     }
 
+    fn get_id(&self) -> String { self.uuid.to_string() }
+
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn save(&mut self) -> String {

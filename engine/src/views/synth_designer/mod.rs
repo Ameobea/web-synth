@@ -28,6 +28,8 @@ impl ViewContext for SynthDesigner {
         js::set_localstorage_key(&state_key, &serialized_state)
     }
 
+    fn get_id(&self) -> String { self.uuid.to_string() }
+
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn save(&mut self) -> String {

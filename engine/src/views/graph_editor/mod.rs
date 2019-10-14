@@ -24,6 +24,8 @@ impl ViewContext for GraphEditor {
 
     fn cleanup(&mut self) { js::cleanup_graph_editor(&self.get_state_key()); }
 
+    fn get_id(&self) -> String { self.uuid.to_string() }
+
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn save(&mut self) -> String {

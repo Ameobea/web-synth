@@ -23,7 +23,7 @@ use crate::prelude::*;
 /// updated without having to re-serialize all of the others as well.
 pub const VCM_STATE_KEY: &str = "vcmState";
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MinimalViewContextDefinition {
     pub name: String,
     pub uuid: Uuid,
@@ -35,6 +35,16 @@ pub struct ViewContextEntry {
     pub context: Box<dyn ViewContext>,
     /// A flag indicating if this entry has received any actions since it was last saved
     pub touched: bool,
+}
+
+impl ::std::fmt::Debug for ViewContextEntry {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        f.debug_struct("ViewContextEntry")
+            .field("definition", &self.definition)
+            .field("context", &"<opaque>")
+            .field("touched", &self.touched)
+            .finish()
+    }
 }
 
 pub struct ViewContextManager {
@@ -116,6 +126,10 @@ impl ViewContextManager {
     pub fn get_vc_by_id_mut(&mut self, uuid: Uuid) -> Option<&mut ViewContextEntry> {
         self.get_vc_position(uuid)
             .map(move |ix| &mut self.contexts[ix])
+    }
+
+    pub fn get_vc_by_id(&self, uuid: Uuid) -> Option<&ViewContextEntry> {
+        self.get_vc_position(uuid).map(move |ix| &self.contexts[ix])
     }
 
     /// Given the UUID of a managed `ViewContext`, switches it to be the active view.
