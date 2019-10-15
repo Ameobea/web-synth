@@ -88,6 +88,7 @@ pub fn init() {
     unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
     let mut vcm = unsafe { Box::from_raw(VIEW_CONTEXT_MANAGER) };
     vcm.init();
+    unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
 }
 
 /// Creates a new view context from the provided name and sets it as the main view context.
@@ -156,4 +157,18 @@ pub fn get_vc_connectables(vc_id: &str) -> JsValue {
     });
 
     vc.context.get_audio_connectables()
+}
+
+#[wasm_bindgen]
+pub fn set_connections(connections_json: &str) {
+    let connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)> =
+        match serde_json::from_str(connections_json) {
+            Ok(conns) => conns,
+            Err(err) => {
+                error!("Failed to deserialize provided connections JSON: {:?}", err);
+                return;
+            },
+        };
+
+    get_vcm().set_connections(connections);
 }

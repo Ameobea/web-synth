@@ -53,6 +53,7 @@
     "chroma-js": "^2.0.6",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",
+    "immutable": "^4.0.0-rc.12",
     "jantix": "^0.2.0",
     "litegraph.js": "^0.7.0",
     "ramda": "^0.26.1",

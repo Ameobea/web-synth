@@ -34,7 +34,11 @@ extern "C" {
     pub fn init_midi_editor_ui();
     pub fn cleanup_midi_editor_ui();
 
-    pub fn update_active_view_contexts(active_context_ix: usize, view_context_definitions: &str);
+    pub fn update_active_view_contexts(
+        active_context_ix: usize,
+        view_context_definitions: &str,
+        connections_json: &str,
+    );
 }
 
 #[wasm_bindgen]
@@ -52,13 +56,21 @@ extern "C" {
     fn random() -> f64;
 }
 
-pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
+pub fn get_localstorage_key(key: &str) -> Option<String> {
+    getItem(key)
+}
 
-pub fn set_localstorage_key(key: &str, val: &str) { setItem(key, val); }
+pub fn set_localstorage_key(key: &str, val: &str) {
+    setItem(key, val);
+}
 
-pub fn delete_localstorage_key(key: &str) { removeItem(key); }
+pub fn delete_localstorage_key(key: &str) {
+    removeItem(key);
+}
 
-pub fn js_random() -> f64 { random() }
+pub fn js_random() -> f64 {
+    random()
+}
 
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {
@@ -95,4 +107,9 @@ extern "C" {
     pub fn init_synth_designer(state_key: &str);
 
     pub fn cleanup_synth_designer(state_key: &str) -> String;
+}
+
+#[wasm_bindgen(raw_module = "./patchNetwork")]
+extern "C" {
+    pub fn get_patch_network_connections() -> String;
 }

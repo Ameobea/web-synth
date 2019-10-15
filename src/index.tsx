@@ -3,6 +3,7 @@ import * as ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import * as R from 'ramda';
 import Tone from 'tone';
+import { Try } from 'funfix-core';
 
 const wasm = import('./engine');
 import App from './App';
@@ -175,20 +176,32 @@ export const cleanup_midi_editor_ui = () => {
 
 export const update_active_view_contexts = (
   activeViewContextIx: number,
-  activeVcsJson: string
+  activeVcsJson: string,
+  connectionsJson: string
 ): void => {
   const activeViewContexts: {
     minimal_def: { name: string; uuid: string; title?: string };
-  }[] = JSON.parse(activeVcsJson);
+  }[] = Try.of(() => JSON.parse(activeVcsJson))
+    .recover(() =>
+      console.error('Failed to parse JSON of `activeViewContexts`; clearing all view contexts')
+    )
+    .getOrElse([]);
+
+  const connections = Try.of(() => JSON.parse(connectionsJson))
+    .recover(() => console.error('Failed to parse provided connections out of JSON'))
+    .getOrElse([]);
 
   dispatch(
-    actionCreators.viewContextManager.SET_VCM_STATE({
-      activeViewContextIx,
-      activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
-        ...minimal_def,
-        ...rest,
-      })),
-    })
+    actionCreators.viewContextManager.SET_VCM_STATE(
+      {
+        activeViewContextIx,
+        activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
+          ...minimal_def,
+          ...rest,
+        })),
+      },
+      connections
+    )
   );
 };
 

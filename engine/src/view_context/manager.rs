@@ -50,6 +50,7 @@ impl ::std::fmt::Debug for ViewContextEntry {
 pub struct ViewContextManager {
     pub active_context_ix: usize,
     pub contexts: Vec<ViewContextEntry>,
+    pub connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)>,
 }
 
 impl Default for ViewContextManager {
@@ -57,6 +58,7 @@ impl Default for ViewContextManager {
         ViewContextManager {
             active_context_ix: 0,
             contexts: Vec::new(),
+            connections: Vec::new(),
         }
     }
 }
@@ -76,6 +78,15 @@ impl<'a> Into<ViewContextDefinition> for &'a mut ViewContextEntry {
     }
 }
 
+/// Represents a connection between two `ViewContext`s.  It holds the ID of the src and dst VC along
+/// with the name of the input and output that are connected.
+#[derive(Serialize, Deserialize)]
+pub struct ConnectionDescriptor {
+    #[serde(rename = "vcId")]
+    pub vc_id: Uuid,
+    pub name: String,
+}
+
 /// Represents the state of the application in a form that can be serialized and deserialized into
 /// the browser's `localstorage` to refresh the state from scratch when the application reloads.
 #[derive(Serialize, Deserialize)]
@@ -84,6 +95,7 @@ struct ViewContextManagerState {
     /// them are found in separate `localStorage` entries.
     pub view_context_ids: Vec<Uuid>,
     pub active_view_ix: usize,
+    pub patch_network_connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)>,
 }
 
 fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
@@ -178,6 +190,7 @@ impl ViewContextManager {
         }
 
         self.active_context_ix = vcm_state.active_view_ix;
+        self.connections = vcm_state.patch_network_connections;
     }
 
     /// Initializes the VCM with the default view context and state from scratch
@@ -263,8 +276,14 @@ impl ViewContextManager {
             .collect();
         let definitions_str = serde_json::to_string(&minimal_view_context_definitions)
             .expect("Error serializing `MinimalViewContextDefinition`s into JSON string");
+        let connections_json = serde_json::to_string(&self.connections)
+            .expect("Failed to JSON serialize patch network connections");
 
-        js::update_active_view_contexts(self.active_context_ix, &definitions_str);
+        js::update_active_view_contexts(
+            self.active_context_ix,
+            &definitions_str,
+            &connections_json,
+        );
 
         self.save_all()
     }
@@ -325,9 +344,20 @@ impl ViewContextManager {
             view_context_definitions.push(view_context_definition);
         }
 
+        let raw_patch_network_connections: String = js::get_patch_network_connections();
+        let patch_network_connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)> =
+            match serde_json::from_str(&raw_patch_network_connections) {
+                Ok(deser) => deser,
+                Err(err) => panic!(
+                    "Error deserializing raw patch network connections: {:?}",
+                    err
+                ),
+            };
+
         let state = ViewContextManagerState {
             view_context_ids,
             active_view_ix: self.active_context_ix,
+            patch_network_connections,
         };
 
         let serialized_state: String = serde_json::to_string(&state)
@@ -342,6 +372,20 @@ impl ViewContextManager {
         self.active_context_ix = view_ix;
         self.get_active_view_mut().init();
         self.commit();
+    }
+
+    pub fn set_connections(
+        &mut self,
+        new_connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)>,
+    ) {
+        self.connections = new_connections;
+        self.save_all();
+        // We don't commit since all connection state lives on the frontend.  This is because
+        // connections intimitely deal with WebAudio nodes, and there's not really anything we
+        // can do with them here in Rust right now.
+        //
+        // We just read the connections out of JSON, send them to the frontend where they're
+        // deserialized and connected, and leave it at that.
     }
 
     /// Resets the VCM to its initial state, deleting all existing VCs.

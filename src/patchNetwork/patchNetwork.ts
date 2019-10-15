@@ -1,6 +1,8 @@
-import { VCMState } from 'src/redux/modules/viewContextManager';
+import { Map } from 'immutable';
+
+import { VCMState, getConnectedPair } from 'src/redux/modules/viewContextManager';
 import { getEngine } from 'src';
-import { actionCreators, dispatch } from 'src/redux';
+import { actionCreators, dispatch, getState } from 'src/redux';
 
 export interface AudioConnectables {
   vcId: string;
@@ -28,8 +30,8 @@ export const connect = (from: ConnectableDescriptor, to: ConnectableDescriptor) 
 export const disconnect = (from: ConnectableDescriptor, to: ConnectableDescriptor) =>
   dispatch(actionCreators.viewContextManager.DISCONNECT(from, to));
 
-export const addNode = (vcId: string, connectables: AudioConnectables, vcName: string) =>
-  dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(vcId, connectables, vcName));
+export const addNode = (vcId: string, connectables: AudioConnectables) =>
+  dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(vcId, connectables));
 
 export const removeNode = (vcId: string) =>
   dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(vcId));
@@ -37,16 +39,20 @@ export const removeNode = (vcId: string) =>
 export const updateConnectables = (vcId: string, newConnectables: AudioConnectables) =>
   dispatch(actionCreators.viewContextManager.UPDATE_CONNECTABLES(vcId, newConnectables));
 
+export const get_patch_network_connections = (): string =>
+  JSON.stringify(getState().viewContextManager.patchNetwork.connections);
+
 /**
  * Clear the state of the patch network, re-initializing it from scratch given the provided set of view contexts and
  * connections between them.
  */
 export const initPatchNetwork = (
   oldPatchNetwork: PatchNetwork,
-  viewContexts: VCMState['activeViewContexts']
+  viewContexts: VCMState['activeViewContexts'],
+  connections: VCMState['patchNetwork']['connections']
 ): PatchNetwork => {
   const oldConnectablesMap = oldPatchNetwork.connectables;
-  const newConnectablesMap = new Map();
+  const newConnectablesMap: Map<string, AudioConnectables> = Map();
 
   const engine = getEngine();
   if (!engine) {
@@ -93,15 +99,40 @@ export const initPatchNetwork = (
     return true;
   });
 
+  // Perform new connections
+  const addedConnections = connections.filter(([from, to]) => {
+    const connectedPair = getConnectedPair(newConnectablesMap, from, to);
+    if (!connectedPair) {
+      return false;
+    }
+
+    // Do nothing if this is already connected by the existing set of connections
+    if (
+      newConnections.find(
+        ([otherFrom, otherTo]) =>
+          otherFrom.name === from.name &&
+          otherFrom.vcId === from.vcId &&
+          otherTo.name === to.name &&
+          otherTo.vcId === to.vcId
+      )
+    ) {
+      return false;
+    }
+
+    // Perform the connection
+    connectedPair[0].connect(connectedPair[1]);
+    return true;
+  });
+
   // Disconnect any connections between nodes that have been removed
   return {
     connectables: newConnectablesMap,
-    connections: [...newConnections],
+    connections: [...newConnections, ...addedConnections],
   };
 };
 
 export const create_empty_audio_connectables = (vcId: string) => ({
   vcId,
-  inputs: new Map(),
-  outputs: new Map(),
+  inputs: Map(),
+  outputs: Map(),
 });
