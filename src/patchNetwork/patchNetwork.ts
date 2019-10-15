@@ -1,5 +1,6 @@
 import { VCMState } from 'src/redux/modules/viewContextManager';
 import { getEngine } from 'src';
+import { actionCreators, dispatch } from 'src/redux';
 
 export interface AudioConnectables {
   vcId: string;
@@ -17,9 +18,24 @@ export interface PatchNetwork {
   connections: [ConnectableDescriptor, ConnectableDescriptor][];
 }
 
-export const connectParam = (from: ConnectableDescriptor, to: ConnectableDescriptor) => {};
+// The below functions are the main interface for interacting with/modifying the patch network.  They directly dispatch
+// Redux actions which trigger conflict resolution, update the patch network state, perform actual connections/disconnections
+// on audio nodes and params as needed, and trigger re-renders of the patch network UI.
 
-export const connectNode = (from: ConnectableDescriptor, to: ConnectableDescriptor) => {};
+export const connect = (from: ConnectableDescriptor, to: ConnectableDescriptor) =>
+  dispatch(actionCreators.viewContextManager.CONNECT(from, to));
+
+export const disconnect = (from: ConnectableDescriptor, to: ConnectableDescriptor) =>
+  dispatch(actionCreators.viewContextManager.DISCONNECT(from, to));
+
+export const addNode = (vcId: string, connectables: AudioConnectables, vcName: string) =>
+  dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(vcId, connectables, vcName));
+
+export const removeNode = (vcId: string) =>
+  dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(vcId));
+
+export const updateConnectables = (vcId: string, newConnectables: AudioConnectables) =>
+  dispatch(actionCreators.viewContextManager.UPDATE_CONNECTABLES(vcId, newConnectables));
 
 /**
  * Clear the state of the patch network, re-initializing it from scratch given the provided set of view contexts and
