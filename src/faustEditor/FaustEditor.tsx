@@ -30,6 +30,7 @@ export interface FaustModuleInstance extends ScriptProcessorNode {
   jsonDef: { [key: string]: any };
   // getParamValue: (path: string) => Promise<number>; // <- unimplemented
   setParamValue: (path: string, val: number) => void;
+  pathTable: { [path: string]: any };
 }
 
 const styles: { [key: string]: React.CSSProperties } = {

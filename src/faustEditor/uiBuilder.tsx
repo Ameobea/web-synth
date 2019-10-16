@@ -2,6 +2,7 @@ import React from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
+import { Option } from 'funfix-core';
 
 import { FaustModuleInstance } from './FaustEditor';
 
@@ -55,7 +56,8 @@ const buildControlPanelField = (
   } = {
     [InputType.hslider]: ({ address, min, max, init, step }: UiInput) => ({
       type: 'range',
-      label: address,
+      // Paths are prefixed with a long randomly generated string which we cut off to make it easier to read the labels
+      label: R.tail(address.split('/').slice(1)).join(''),
       min,
       max,
       initial: init,
@@ -104,8 +106,15 @@ const mapUiGroupToControlPanelFields = (
 
 const buildControlPanel = (
   uiDef: UiGroup[],
+  pathTable: { [path: string]: any },
   setParamValue: FaustModuleInstance['setParamValue']
 ) => {
+  // Get the randomly generated path base so that we can accurately match when setting params
+  const pathBase = Option.of(Object.keys(pathTable))
+    .map(R.head)
+    .map(path => path.split('/').slice(0, 2)[1])
+    .getOrElse('');
+
   const controlPanelFieldDefinitions = R.flatten(
     uiDef.map(item => mapUiGroupToControlPanelFields(item, setParamValue))
   );
@@ -120,7 +129,7 @@ const buildControlPanel = (
       theme='dark'
       position={{ top: 0, right: 20 }}
       settings={controlPanelFieldDefinitions}
-      onChange={setParamValue}
+      onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
       width={500}
     />
   );

@@ -29,6 +29,7 @@ const actionGroups = {
       // Construct a new control panel instance for the newly created module
       const controlPanel = buildControlPanel(
         action.instance.jsonDef.ui,
+        action.instance.pathTable,
         action.instance.setParamValue
       );
 
