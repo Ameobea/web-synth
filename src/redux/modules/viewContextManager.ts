@@ -275,6 +275,8 @@ const actionGroups = {
         };
       }
 
+      // TODO: Disconnect all connections, delete connections that are no longer valid, and re-connect valid connections to
+      // the new connectables rather than leaving them connected to the old one
       const deletedInputNames: Set<string> = [...oldConnectables.inputs.keys()].reduce(
         (acc, key) => (newConnectables.inputs.get(key) ? acc : acc.add(key)),
         Set()

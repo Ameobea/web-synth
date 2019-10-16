@@ -10,6 +10,8 @@ import ControlPanel, { Button } from 'react-control-panel';
 
 import { registerAllCustomNodes } from './nodes';
 import './GraphEditor.scss';
+import { ReduxStore } from 'src/redux';
+import { connect } from 'react-redux';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
@@ -27,12 +29,18 @@ export const saveStateForInstance = (stateKey: string) => {
 
   const state = instance.serialize();
   localStorage.setItem(stateKey, JSON.stringify(state));
-  // instance.stop();
 
   delete instaceMap[stateKey];
 };
 
-const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+const mapStateToProps = (state: ReduxStore) => ({
+  patchNetwork: state.viewContextManager.patchNetwork,
+});
+
+const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToProps>> = ({
+  stateKey,
+  patchNetwork,
+}) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [lGraphInstance, setLGraphInstance] = useState<null | any>(null);
@@ -48,6 +56,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       await registerAllCustomNodes();
 
       const graph = new LiteGraph.LGraph();
+      console.log(graph);
       new LiteGraph.LGraphCanvas('#graph-editor', graph);
 
       const existingStateJson = localStorage.getItem(stateKey);
@@ -78,6 +87,17 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     })();
   });
 
+  const lastPatchNetwork = useRef<typeof patchNetwork | null>(null);
+  useEffect(() => {
+    if (lastPatchNetwork.current === patchNetwork) {
+      return;
+    }
+    lastPatchNetwork.current = patchNetwork;
+
+    // Patch network changed, so we have to update our state to match it
+    console.log('Patch network updated: ', patchNetwork);
+  }, [patchNetwork, lGraphInstance]);
+
   const uiControls = useMemo(
     () =>
       lGraphInstance
@@ -106,4 +126,4 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   );
 };
 
-export default GraphEditor;
+export default connect(mapStateToProps)(GraphEditor);
