@@ -4,7 +4,7 @@ import ControlPanel from 'react-control-panel';
 import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 
-import { FaustModuleInstance } from './FaustEditor';
+import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 
 interface BaseUiDef {
   label: string;
@@ -43,9 +43,11 @@ type TypeForInputType<K extends UiDef['type']> = Extract<
   { type: K extends InputType ? InputType : K extends GroupType ? GroupType : never }
 >;
 
+const getLabel = (address: string) => R.tail(address.split('/').slice(1)).join('');
+
 const buildControlPanelField = (
   def: UiDef,
-  setParamValue: FaustModuleInstance['setParamValue']
+  setParamValue: FaustWorkletNode['setParamValue']
 ): ({ [key: string]: any } | null)[] => {
   const mapperFunctions: {
     [K in UiDef['type']]: (
@@ -57,7 +59,7 @@ const buildControlPanelField = (
     [InputType.hslider]: ({ address, min, max, init, step }: UiInput) => ({
       type: 'range',
       // Paths are prefixed with a long randomly generated string which we cut off to make it easier to read the labels
-      label: R.tail(address.split('/').slice(1)).join(''),
+      label: getLabel(address),
       min,
       max,
       initial: init,
@@ -74,7 +76,7 @@ const buildControlPanelField = (
       R.flatten(items.map(item => buildControlPanelField(item, setParamValue))),
     [GroupType.button]: ({ address }) => ({
       type: 'button',
-      label: address,
+      label: getLabel(address),
       onmousedown: () => setParamValue(address, 1),
       onmouseup: () => setParamValue(address, 0),
     }),
@@ -100,14 +102,14 @@ const buildControlPanelField = (
 
 const mapUiGroupToControlPanelFields = (
   group: UiGroup,
-  setParamValue: FaustModuleInstance['setParamValue']
+  setParamValue: FaustWorkletNode['setParamValue']
 ): {}[] =>
   filterNils(R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue))));
 
 const buildControlPanel = (
   uiDef: UiGroup[],
   pathTable: { [path: string]: any },
-  setParamValue: FaustModuleInstance['setParamValue']
+  setParamValue: FaustWorkletNode['setParamValue']
 ) => {
   // Get the randomly generated path base so that we can accurately match when setting params
   const pathBase = Option.of(Object.keys(pathTable))

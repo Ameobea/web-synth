@@ -3485,10 +3485,10 @@ is-number@^7.0.0:
   resolved "https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz#7535345b896734d5f80c4d06c50955527a14f12b"
   integrity sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==
 
-is-numeric@0.0.5:
-  version "0.0.5"
-  resolved "https://registry.yarnpkg.com/is-numeric/-/is-numeric-0.0.5.tgz#5f26778b3385005334344b1b5985ee7ea63316e6"
-  integrity sha1-XyZ3izOFAFM0NEsbWYXufqYzFuY=
+is-numeric@0.0.9:
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/is-numeric/-/is-numeric-0.0.9.tgz#066b6327587622f8eafb6bcb24c0126785876500"
+  integrity sha512-Uw52EJz+uEnanfDFCf2TJSjJFjFQ2mL5HZOXFNBolJCvdxAhRBZ4qTbggQpaXQTGsB/tgtFBBTe5l2hSGw2RnQ==
 
 is-path-cwd@^2.0.0:
   version "2.2.0"
@@ -5075,17 +5075,17 @@ react-ace@^7.0.2:
     lodash.isequal "^4.5.0"
     prop-types "^15.7.2"
 
-react-control-panel@>=0.4.6:
-  version "0.4.6"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.4.6.tgz#a77227cc003a3d5c3b2dc379f8ec4ee4c70349ae"
-  integrity sha512-7wJwFnPPlOBHEBeUK0xA4ruAEyB4+IlFl/mKVKuaOy3qhK7GnaHqGz6w3dnY/24YtBaue+6MKWp1k933CG6LGg==
+react-control-panel@^0.5:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.5.0.tgz#ab64e616a450bfbf5dcad663f0e847b93b90c8e8"
+  integrity sha512-BOrxkKntH7qQXoxMXI/F4qVc7zotrADFXVwpue/+1RFfeQd5+LmXk1WOS1rFj9WgBuOn1e9s9y3oiIEY2ioGHw==
   dependencies:
-    is-numeric "0.0.5"
+    is-numeric "0.0.9"
     is-string "^1.0.4"
-    prop-types "^15.6.2"
+    prop-types "^15.7.2"
     react-css-component "^1.0.2"
     simple-color-picker "^0.1.2"
-    uuid "^3.3.2"
+    uuid "^3.3.3"
 
 react-css-component@^1.0.2:
   version "1.0.2"
@@ -6571,6 +6571,11 @@ uuid@^3.0.1, uuid@^3.3.2:
   version "3.3.2"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.2.tgz#1b4af4955eb3077c501c23872fc6513811587131"
   integrity sha512-yXJmeNaw3DnnKAOKJE51sL/ZaYfWJRl1pK9dr19YFCu0ObS231AB1/LbqTKRAQ5kw8A90rA6fr4riOUpTZvQZA==
+
+uuid@^3.3.3:
+  version "3.3.3"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.3.tgz#4568f0216e78760ee1dbf3a4d2cf53e224112866"
+  integrity sha512-pW0No1RGHgzlpHJO1nsVrHKpOEIxkGg1xB+v0ZmdNH5OAeAwzAVrCnI2/6Mtx+Uys6iaylxa+D3g4j63IKKjSQ==
 
 v8-compile-cache@2.0.3:
   version "2.0.3"

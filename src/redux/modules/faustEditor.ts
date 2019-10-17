@@ -1,10 +1,10 @@
 import { buildActionGroup, buildModule } from 'jantix';
 
-import { FaustModuleInstance } from 'src/faustEditor/FaustEditor';
 import buildControlPanel from 'src/faustEditor/uiBuilder';
+import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 
 interface FaustEditorState {
-  instance: FaustModuleInstance | null;
+  instance: FaustWorkletNode | null;
   controlPanel?: React.ReactNode;
   editorContent: string;
 }
@@ -16,7 +16,7 @@ const initialState: FaustEditorState = {
 
 const actionGroups = {
   SET_INSTANCE: buildActionGroup({
-    actionCreator: (instance: FaustModuleInstance) => ({
+    actionCreator: (instance: FaustWorkletNode) => ({
       type: 'SET_INSTANCE',
       instance,
     }),

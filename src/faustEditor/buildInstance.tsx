@@ -32,6 +32,7 @@ const buildInstance = async (
     faustInstance.connect(analyzerNode);
   }
 
+  console.log({ connectSource });
   if (connectSource) {
     // Wire up the microphone to the module, connect the module to the analyzer node, and then
     // connect the analyzer node to the audo context's output (speakers)

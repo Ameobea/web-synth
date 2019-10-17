@@ -1,9 +1,9 @@
-class FaustWorkletNode extends AudioWorkletNode {
+export class FaustWorkletNode extends AudioWorkletNode {
   constructor(audioContext: AudioContext) {
     super(audioContext, 'faust-worklet-processor');
   }
 
-  private pathTable: { [path: string]: number } = {};
+  public pathTable: { [path: string]: number } = {};
   private fPitchwheelLabel: unknown[] = [];
   private fCtrlLabel: unknown[][] = new Array(128).fill(null).map(() => []);
 

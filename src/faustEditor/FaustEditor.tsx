@@ -26,13 +26,6 @@ const ReactAce = React.lazy(() => import('react-ace'));
 
 const audioContext = new AudioContext();
 
-export interface FaustModuleInstance extends ScriptProcessorNode {
-  jsonDef: { [key: string]: any };
-  // getParamValue: (path: string) => Promise<number>; // <- unimplemented
-  setParamValue: (path: string, val: number) => void;
-  pathTable: { [path: string]: any };
-}
-
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
     display: 'flex',
@@ -81,12 +74,8 @@ export const compileFaustInstance = async (
   if (optimize) {
     formData.append('optimize', 'true');
   }
-  console.log({ optimize });
 
-  const res = await fetch(FAUST_COMPILER_ENDPOINT, {
-    method: 'POST',
-    body: formData,
-  });
+  const res = await fetch(FAUST_COMPILER_ENDPOINT, { method: 'POST', body: formData });
 
   if (!res.ok) {
     const errMsg = await res.text();
@@ -216,7 +205,7 @@ const FaustEditor: React.FC<{} & ReturnType<typeof mapStateToProps>> = ({
   const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
-  const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState | null>(
+  const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState>(
     defaultVizSettingsState
   );
   const updateVizSettings = useRef<((newSettings: VizSettingsState) => void) | null>(null);
