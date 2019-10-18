@@ -4,12 +4,15 @@
 
 import { LiteGraph } from 'litegraph.js';
 
-import { AudioConnectables } from 'src/patchNetwork';
+import { AudioConnectables, create_empty_audio_connectables } from 'src/patchNetwork';
 
 export const registerAudioConnectablesNode = () => {
   function LGAudioConnectables(this: any) {
     // Default Properties
     this.properties = {};
+
+    // Create empty placeholder connectables
+    this.connectables = create_empty_audio_connectables(this.id);
   }
 
   LGAudioConnectables.setConnectables = function(this: any, connectables: AudioConnectables) {

@@ -8,5 +8,3 @@ declare const process: {
     [key: string]: string;
   };
 };
-
-declare module 'litegraph.js';
