@@ -4,7 +4,17 @@
 
 import { LiteGraph } from 'litegraph.js';
 
-import { AudioConnectables, create_empty_audio_connectables } from 'src/patchNetwork';
+import {
+  AudioConnectables,
+  create_empty_audio_connectables,
+  ConnectableDescriptor,
+} from 'src/patchNetwork';
+import {
+  LiteGraphNodeInput,
+  LiteGraphLink,
+  LiteGraph as LiteGraphType,
+} from 'src/graphEditor/LiteGraphTypes';
+import { dispatch, actionCreators } from 'src/redux';
 
 export const registerAudioConnectablesNode = () => {
   function LGAudioConnectables(this: any) {
@@ -44,15 +54,47 @@ export const registerAudioConnectablesNode = () => {
     node.setValueAtTime(value, (this.ctx as AudioContext).currentTime);
   };
 
-  LGAudioConnectables.onConnectionsChange = function(connection, slot, connected, link_info) {
-    // TODO: Dispatch events to update the patch network with the new connection.  This will cause the actual audio nodes to get
-    // connected from within Redux.
-    console.log('Connections changed on audio connectables node: ', {
-      connection,
-      slot,
-      connected,
-      link_info,
-    });
+  LGAudioConnectables.onConnectionsChange = function(
+    this: { graph: LiteGraphType },
+    _connection: 1 | 2,
+    _slot: number,
+    isNowConnected: boolean,
+    linkInfo: LiteGraphLink,
+    _inputInfo: LiteGraphNodeInput
+  ) {
+    const srcNode = this.graph._nodes_by_id[linkInfo.origin_id];
+    if (!srcNode) {
+      console.error(`Cannot find node id ${linkInfo.origin_id}`, linkInfo);
+    }
+    const srcOutput = srcNode.outputs[linkInfo.origin_slot];
+    if (!srcOutput) {
+      console.error(
+        `No output with index ${linkInfo.origin_slot} on node with id ${linkInfo.origin_id}`,
+        linkInfo
+      );
+    }
+
+    const dstNode = this.graph._nodes_by_id[linkInfo.target_id];
+    if (!dstNode) {
+      console.error(`Cannot find node id ${linkInfo.target_id}`, linkInfo);
+    }
+    const dstInput = srcNode.inputs[linkInfo.target_slot];
+    if (!dstInput) {
+      console.error(
+        `No input with index ${linkInfo.target_slot} on node with id ${linkInfo.target_id}`,
+        linkInfo
+      );
+    }
+
+    const from: ConnectableDescriptor = { vcId: linkInfo.origin_id, name: srcOutput.name };
+    const to: ConnectableDescriptor = { vcId: linkInfo.target_id, name: dstInput.name };
+
+    // Dispatch a Redux action to trigger the patch network to be updated.  This will return a new Patch network and in turn
+    // cause litegraph to be updated as well later.
+    const actionCreator = isNowConnected
+      ? actionCreators.viewContextManager.CONNECT
+      : actionCreators.viewContextManager.DISCONNECT;
+    dispatch(actionCreator(from, to));
   };
 
   LiteGraph.registerNodeType('audio/audioConnectables', LGAudioConnectables);
