@@ -22,7 +22,6 @@ const createAudioConnectablesNode = (
     title,
     {}
   ) as LiteGraphConnectablesNode;
-  console.log('Creating new node: ', connectables);
   node.setConnectables(connectables);
   node.id = vcId;
   return node;
@@ -54,7 +53,7 @@ export const updateGraph = (
         return { ...acc, addedNodes: acc.addedNodes.add(key) };
       }
 
-      if ((pairNode as LiteGraphConnectablesNode).connectables === connectables) {
+      if (R.equals((pairNode as LiteGraphConnectablesNode).connectables, connectables)) {
         return { ...acc, untouchedNodes: acc.untouchedNodes.add(key) };
       }
 
@@ -106,7 +105,6 @@ export const updateGraph = (
       removedNode.id,
       title
     );
-    console.log({ newNode, title });
     newNode.id = id;
     graph.add(newNode);
   });
@@ -152,7 +150,7 @@ export const updateGraph = (
       )
       .getOrElse(false);
 
-    if (!linkExists) {
+    if (linkExists) {
       return;
     }
 

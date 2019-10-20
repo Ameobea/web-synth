@@ -54,3 +54,10 @@ export const swapAudioNodes = (
     slot += 1;
   }
 };
+
+export const createPassthroughNode = (): GainNode => {
+  const ctx = new AudioContext();
+  const node = new GainNode(ctx);
+  node.gain.setValueAtTime(1, ctx.currentTime);
+  return node;
+};

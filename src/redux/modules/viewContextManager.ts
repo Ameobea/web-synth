@@ -37,7 +37,7 @@ export const getConnectedPair = (
     console.error(`No connectables found for VC ID ${to.vcId}`);
     return null;
   }
-  const toNode = toConnectables.outputs.get(to.name);
+  const toNode = toConnectables.inputs.get(to.name);
   if (!toNode) {
     console.error(`No output of name ${to.name} found in connectables of VC ID ${to.vcId}`);
     return null;

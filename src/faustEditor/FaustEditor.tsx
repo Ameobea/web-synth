@@ -281,7 +281,15 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         Optimize
         <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
         {instance ? (
-          <button onClick={() => dispatch(actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE())}>
+          <button
+            onClick={() => {
+              dispatch(actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE());
+
+              // Create new audio connectables using a passthrough node
+              delete faustAudioNodesMap[vcId];
+              updateConnectables(vcId, get_faust_editor_connectables(vcId));
+            }}
+          >
             Stop
           </button>
         ) : null}
