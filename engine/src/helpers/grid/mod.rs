@@ -90,6 +90,9 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
 
     fn cleanup(&mut self, _grid_state: &mut GridState<S>) {}
 
+    fn hide(&mut self, _vc_id: &str) {}
+    fn unhide(&mut self, _vc_id: &str) {}
+
     fn on_note_select(&mut self, _data: &S) {}
 
     fn on_note_click(
@@ -453,6 +456,10 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             self.rerender_all_notes();
         }
     }
+
+    fn hide(&mut self) { self.handler.hide(&self.get_id()) }
+
+    fn unhide(&mut self) { self.handler.unhide(&self.get_id()) }
 
     fn cleanup(&mut self) {
         js::clear_canvases();

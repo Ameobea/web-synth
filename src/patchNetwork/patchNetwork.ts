@@ -59,19 +59,13 @@ export const initPatchNetwork = (
   // Diff the set of old VCs and new VCs to find which have been added and which have been removed
   const { oldConnectablesMap, newConnectablesMap } = viewContexts.reduce(
     ({ oldConnectablesMap, newConnectablesMap }, { uuid }) => {
-      const old = oldConnectablesMap.get(uuid);
-      if (old) {
-        oldPatchNetwork.connectables.set(uuid, old);
-        return { newConnectablesMap, oldConnectablesMap: oldConnectablesMap.delete(uuid) };
-      } else {
-        const newConnectables: AudioConnectables = engine.get_vc_connectables(uuid);
+      const newConnectables: AudioConnectables = engine.get_vc_connectables(uuid);
 
-        return {
-          oldConnectablesMap,
-          newConnectablesMap: newConnectablesMap.set(uuid, newConnectables),
-        };
-        // TODO: Deal with default connections?
-      }
+      return {
+        oldConnectablesMap,
+        newConnectablesMap: newConnectablesMap.set(uuid, newConnectables),
+      };
+      // TODO: Deal with default connections?
     },
     {
       newConnectablesMap: Map<string, AudioConnectables>(),
@@ -137,7 +131,7 @@ export const initPatchNetwork = (
   };
 };
 
-export const create_empty_audio_connectables = (vcId: string) => ({
+export const create_empty_audio_connectables = (vcId: string): AudioConnectables => ({
   vcId,
   inputs: Map(),
   outputs: Map(),

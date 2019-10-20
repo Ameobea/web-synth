@@ -19,6 +19,9 @@ import {
 } from 'src/visualizations/spectrum';
 import FileUploader from 'src/controls/FileUploader';
 import buildInstance, { analyzerNode } from './buildInstance';
+import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
+import { faustAudioNodesMap, get_faust_editor_connectables } from 'src/faustEditor';
+import { updateConnectables } from 'src/patchNetwork';
 
 ace.require('ace/theme/twilight');
 
@@ -68,7 +71,7 @@ export const compileFaustInstance = async (
   optimize: boolean,
   mediaFileSourceNode?: AudioScheduledSourceNode | null,
   connectSource = true
-) => {
+): Promise<FaustWorkletNode> => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([faustCode], { type: 'text/plain' }));
   if (optimize) {
@@ -90,6 +93,7 @@ const createCompileButtonClickHandler = (
   faustCode: string,
   optimize: boolean,
   setErrMessage: (errMsg: string) => void,
+  vcId: string,
   mediaFileSourceNode?: AudioScheduledSourceNode | null
 ) => async (useMediaFile: boolean) => {
   let faustInstance;
@@ -105,6 +109,12 @@ const createCompileButtonClickHandler = (
     return;
   }
   setErrMessage('');
+
+  faustAudioNodesMap[vcId] = faustInstance;
+  // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
+  const newConnectables = get_faust_editor_connectables(vcId);
+  console.log({ vcId, faustInstance, faustAudioNodesMap, newConnectables });
+  updateConnectables(vcId, newConnectables);
 
   // Start the audio file playback
   if (useMediaFile && mediaFileSourceNode) {
@@ -193,10 +203,11 @@ const mapStateToProps = ({ faustEditor }: ReduxStore) => ({
   editorContent: faustEditor.editorContent,
 });
 
-const FaustEditor: React.FC<{} & ReturnType<typeof mapStateToProps>> = ({
+const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps>> = ({
   instance,
   controlPanel: faustInstanceControlPanel,
   editorContent,
+  vcId,
 }) => {
   const [
     externalAudioBufferSource,
@@ -240,6 +251,7 @@ const FaustEditor: React.FC<{} & ReturnType<typeof mapStateToProps>> = ({
       editorContent,
       optimize,
       setCompileErrMsg,
+      vcId,
       externalAudioBufferSource
     ),
     [editorContent, setCompileErrMsg, externalAudioBufferSource, optimize]

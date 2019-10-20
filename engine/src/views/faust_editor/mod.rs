@@ -22,8 +22,12 @@ impl FaustEditor {
 impl ViewContext for FaustEditor {
     fn init(&mut self) { js::init_faust_editor(&self.get_state_key()); }
 
+    fn hide(&mut self) { js::hide_faust_editor(&self.get_id()); }
+
+    fn unhide(&mut self) { js::unhide_faust_editor(&self.get_id()); }
+
     fn cleanup(&mut self) {
-        let faust_editor_content = js::cleanup_faust_editor();
+        let faust_editor_content = js::cleanup_faust_editor(&self.get_id());
         js::set_localstorage_key(&self.get_state_key(), &faust_editor_content)
     }
 
@@ -33,6 +37,10 @@ impl ViewContext for FaustEditor {
 
     fn save(&mut self) -> String {
         serde_json::to_string(self).expect("Error serializing `FaustEditor` to String")
+    }
+
+    fn get_audio_connectables(&self) -> JsValue {
+        js::get_faust_editor_connectables(&self.get_id())
     }
 }
 

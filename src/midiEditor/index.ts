@@ -1,6 +1,8 @@
 import { Map } from 'immutable';
 
-import { AudioConnectables } from 'src/patchNetwork';
+import { AudioConnectables, create_empty_audio_connectables } from 'src/patchNetwork';
+import { getSynthsMap } from 'src/redux/modules/synths';
+import { MIDI_EDITOR_CONTROLS_ID } from 'src/App';
 
 export const init_midi_editor = () =>
   document.getElementById('canvases')!.setAttribute('style', '');
@@ -8,13 +10,27 @@ export const init_midi_editor = () =>
 export const cleanup_midi_editor = () =>
   document.getElementById('canvases')!.setAttribute('style', 'display: none;');
 
-export const create_midi_editor_audio_connectables = (vcId: string): AudioConnectables => {
-  const dummyNode = new AudioContext().createGain();
+export const hide_midi_editor = (_vcId: string) => {
+  document.getElementById('canvases')!.style.display = 'none';
+  document.getElementById(MIDI_EDITOR_CONTROLS_ID)!.style.display = 'none';
+};
 
-  // TODO: This needs to get actual audio nodes from the active MIDI editor instance
+export const unhide_midi_editor = (_vcId: string) => {
+  document.getElementById('canvases')!.style.display = 'block';
+  document.getElementById(MIDI_EDITOR_CONTROLS_ID)!.style.display = 'block';
+};
+
+export const create_midi_editor_audio_connectables = (vcId: string): AudioConnectables => {
+  const synth = getSynthsMap()[vcId];
+
+  if (!synth) {
+    console.error(`Tried to retrieve synth for vc id ${vcId} but it doesn't exist in the map`);
+    return create_empty_audio_connectables(vcId);
+  }
+
   return {
     vcId,
-    inputs: Map<string, AudioNode | AudioParam>().set('gain', dummyNode.gain),
-    outputs: Map<string, AudioNode>().set('output', dummyNode),
+    inputs: Map(),
+    outputs: Map<string, AudioNode>().set('synth', synth.volume),
   };
 };

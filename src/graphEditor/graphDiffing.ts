@@ -22,6 +22,7 @@ const createAudioConnectablesNode = (
     title,
     {}
   ) as LiteGraphConnectablesNode;
+  console.log('Creating new node: ', connectables);
   node.setConnectables(connectables);
   node.id = vcId;
   return node;
@@ -32,7 +33,7 @@ const getVcTitle = (
   id: string
 ): string =>
   Option.of(activeViewContexts.find(R.propEq('uuid', id)))
-    .flatMap(({ title }) => Option.of(title))
+    .flatMap(({ title, name }) => Option.of(title).orElse(Option.of(name)))
     .getOrElse('Untitled');
 
 /**
@@ -47,22 +48,22 @@ export const updateGraph = (
   const { untouchedNodes, addedNodes, modifiedNodes } = [
     ...patchNetwork.connectables.entries(),
   ].reduce(
-    (acc, [key, node]) => {
+    (acc, [key, connectables]) => {
       const pairNode = graph._nodes_by_id[key];
       if (R.isNil(pairNode)) {
         return { ...acc, addedNodes: acc.addedNodes.add(key) };
       }
 
-      if ((pairNode as LiteGraphConnectablesNode).connectables === node) {
+      if ((pairNode as LiteGraphConnectablesNode).connectables === connectables) {
         return { ...acc, untouchedNodes: acc.untouchedNodes.add(key) };
       }
 
       return { ...acc, modifiedNodes: acc.modifiedNodes.add(key) };
     },
     {
-      untouchedNodes: Set() as Set<string>,
-      addedNodes: Set() as Set<string>,
-      modifiedNodes: Set() as Set<string>,
+      untouchedNodes: Set<string>(),
+      addedNodes: Set<string>(),
+      modifiedNodes: Set<string>(),
     }
   );
 
@@ -100,8 +101,12 @@ export const updateGraph = (
 
     graph.remove(removedNode);
     const title = getVcTitle(activeViewContexts, removedNode.id);
-    console.log('Creating node: ', removedNode.connectables, removedNode.id, title);
-    const newNode = createAudioConnectablesNode(removedNode.connectables, removedNode.id, title);
+    const newNode = createAudioConnectablesNode(
+      patchNetwork.connectables.get(removedNode.id)!,
+      removedNode.id,
+      title
+    );
+    console.log({ newNode, title });
     newNode.id = id;
     graph.add(newNode);
   });

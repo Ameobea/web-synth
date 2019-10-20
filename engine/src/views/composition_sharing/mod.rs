@@ -26,6 +26,10 @@ impl ViewContext for CompositionSharing {
 
     fn cleanup(&mut self) { js::cleanup_composition_sharing(); }
 
+    fn hide(&mut self) { js::hide_composition_sharing(&self.get_id()); }
+
+    fn unhide(&mut self) { js::unhide_composition_sharing(&self.get_id()); }
+
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn save(&mut self) -> String {

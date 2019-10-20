@@ -26,6 +26,10 @@ impl ViewContext for GraphEditor {
 
     fn get_id(&self) -> String { self.uuid.to_string() }
 
+    fn hide(&mut self) { js::hide_graph_editor(&self.get_id()); }
+
+    fn unhide(&mut self) { js::unhide_graph_editor(&self.get_id()); }
+
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn save(&mut self) -> String {

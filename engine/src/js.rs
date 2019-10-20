@@ -67,13 +67,18 @@ pub fn js_random() -> f64 { random() }
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {
     pub fn init_faust_editor(state_key: &str);
-    pub fn cleanup_faust_editor() -> String;
-    pub fn get_faust_editor_content() -> String;
+    pub fn hide_faust_editor(vc_id: &str);
+    pub fn unhide_faust_editor(vc_id: &str);
+    pub fn cleanup_faust_editor(vc_id: &str) -> String;
+    pub fn get_faust_editor_content(vc_id: &str) -> String;
+    pub fn get_faust_editor_connectables(vc_id: &str) -> JsValue;
 }
 
 #[wasm_bindgen(raw_module = "./graphEditor")]
 extern "C" {
     pub fn init_graph_editor(state_key: &str);
+    pub fn hide_graph_editor(vc_id: &str);
+    pub fn unhide_graph_editor(vc_id: &str);
     pub fn cleanup_graph_editor(state_key: &str);
 }
 
@@ -81,18 +86,24 @@ extern "C" {
 extern "C" {
     pub fn init_midi_editor();
     pub fn cleanup_midi_editor();
+    pub fn hide_midi_editor(vc_id: &str);
+    pub fn unhide_midi_editor(vc_id: &str);
     pub fn create_midi_editor_audio_connectables(id: &str) -> JsValue;
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]
 extern "C" {
     pub fn init_composition_sharing(state_key: &str);
+    pub fn hide_composition_sharing(vc_id: &str);
+    pub fn unhide_composition_sharing(vc_id: &str);
     pub fn cleanup_composition_sharing();
 }
 
 #[wasm_bindgen(raw_module = "./synthDesigner")]
 extern "C" {
     pub fn init_synth_designer(state_key: &str);
+    pub fn hide_synth_designer(vc_id: &str);
+    pub fn unhide_synth_designer(vc_id: &str);
     pub fn cleanup_synth_designer(state_key: &str) -> String;
 }
 

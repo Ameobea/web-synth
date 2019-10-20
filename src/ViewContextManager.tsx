@@ -187,7 +187,7 @@ const ViewContextSwitcherInner: React.FC<
   } & ReturnType<typeof mapStateToProps>
 > = ({ engine, viewContextManager }) => (
   <div style={styles.viewContextSwitcher}>
-    {viewContextManager.activeViewContexts.map(({ ...props }, i) => (
+    {viewContextManager.activeViewContexts.map((props, i) => (
       <ViewContextTab
         engine={engine}
         {...props}

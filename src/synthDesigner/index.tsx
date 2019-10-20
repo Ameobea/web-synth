@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { Try, Option } from 'funfix-core';
 import { buildStore } from 'jantix';
 import { reducer as formReducer } from 'redux-form';
-import * as R from 'ramda';
+import { Map } from 'immutable';
 
 import {
   SynthDesignerState,
@@ -15,7 +15,6 @@ import {
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables } from 'src/patchNetwork';
 import synthDesignerModule from 'src/redux/modules/synthDesigner';
-import { mapObjToMap } from 'ameo-utils';
 
 const buildSynthDesignerRedux = () => {
   const modules = {
@@ -30,7 +29,7 @@ const ROOT_NODE_ID = 'synth-designer-react-root' as const;
 /**
  * Global map of state key to Redux infrastructure
  */
-const STATE_MAP: Map<string, ReturnType<typeof buildSynthDesignerRedux>> = new Map();
+let STATE_MAP: Map<string, ReturnType<typeof buildSynthDesignerRedux>> = Map();
 
 export const getDispatch = (stateKey: string) => {
   const reduxInfra = STATE_MAP.get(stateKey);
@@ -55,7 +54,7 @@ export const init_synth_designer = (stateKey: string) => {
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
   // everything in a big map.
   const reduxInfra = buildSynthDesignerRedux();
-  STATE_MAP.set(stateKey, reduxInfra);
+  STATE_MAP = STATE_MAP.set(stateKey, reduxInfra);
 
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
   const initialState = Try.of(() =>
@@ -100,18 +99,38 @@ export const init_synth_designer = (stateKey: string) => {
   );
 };
 
+export const hide_synth_designer = (vcId: string) => {
+  const rootNode = document.getElementById(ROOT_NODE_ID);
+  if (!rootNode) {
+    console.warn(`Tried to hide synth designer with id ${vcId} but it wasn't mounted`);
+    return;
+  }
+
+  rootNode.style.display = 'none';
+};
+
+export const unhide_synth_designer = (vcId: string) => {
+  const rootNode = document.getElementById(ROOT_NODE_ID);
+  if (!rootNode) {
+    console.warn(`Tried to unhide synth designer with id ${vcId} but it wasn't mounted`);
+    return;
+  }
+
+  rootNode.style.display = 'block';
+};
+
 export const cleanup_synth_designer = (stateKey: string): string => {
   const { synths } = getGetState(stateKey)().synthDesigner;
   const designerState = JSON.stringify({
     synths: synths.map(serializeSynthModule),
   });
-  const faustEditorReactRootNode = document.getElementById(ROOT_NODE_ID);
-  if (!faustEditorReactRootNode) {
+  const rootNode = document.getElementById(ROOT_NODE_ID);
+  if (!rootNode) {
     return designerState;
   }
 
-  ReactDOM.unmountComponentAtNode(faustEditorReactRootNode);
-  faustEditorReactRootNode.remove();
+  ReactDOM.unmountComponentAtNode(rootNode);
+  rootNode.remove();
   return designerState;
 };
 
@@ -120,19 +139,13 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
 
   return {
     vcId: stateKey.split('vc_')[1]!,
-    inputs: synths.reduce((acc, synth, i) => {
-      acc.set(`synth_${i}_detune`, synth.detuneCSN.offset);
+    inputs: synths.reduce(
       // TODO: Set the rest of these params once we know how to
-
-      return acc;
-    }, new Map()),
+      (acc, synth, i) => acc.set(`synth_${i}_detune`, synth.detuneCSN.offset),
+      Map<string, AudioParam | AudioNode>()
+    ),
     outputs: spectrumNode
-      ? mapObjToMap(
-          {
-            masterOutput: spectrumNode,
-          },
-          R.identity
-        )
-      : new Map(),
+      ? Map<string, AudioNode>().set('masterOutput', spectrumNode)
+      : Map<string, AudioNode>(),
   };
 };

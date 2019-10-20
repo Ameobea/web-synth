@@ -72,6 +72,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         js::init_midi_editor_ui();
     }
 
+    fn hide(&mut self, vc_id: &str) { js::hide_midi_editor(vc_id) }
+
+    fn unhide(&mut self, vc_id: &str) { js::unhide_midi_editor(vc_id) }
+
     fn cleanup(&mut self, _: &mut GridState<usize>) { js::cleanup_midi_editor_ui(); }
 
     fn on_key_down(

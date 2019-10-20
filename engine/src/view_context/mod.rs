@@ -24,6 +24,13 @@ pub trait ViewContext {
     /// never again be rendered and should dispose of all attached resources and storage.
     fn dispose(&mut self) {}
 
+    /// Hide the view context, removing any interfaces or UI elements from view.  All functionality
+    /// should be preserved, and it should continue operating normally.
+    fn hide(&mut self) {}
+    /// Unhide the view context, re-creating any UI elements and interfaces to allow the user to
+    /// interact with it.
+    fn unhide(&mut self) {}
+
     /// This is called to indicate that a `ViewContext` should serialize itself into a persistant
     /// format that can be called later to re-create it in its current state from scratch.
     ///

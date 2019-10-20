@@ -181,11 +181,16 @@ impl ViewContextManager {
                 },
             };
 
-            let view_context = build_view(
+            let mut view_context = build_view(
                 &definition.minimal_def.name,
                 Some(&definition.conf),
                 definition.minimal_def.uuid,
             );
+
+            view_context.init();
+            // TODO: pre-render the view contexts as hidden so this isn't necessary
+            view_context.hide();
+
             self.add_view_context_inner(definition.minimal_def, view_context);
         }
 
@@ -251,7 +256,7 @@ impl ViewContextManager {
             self.init_default_state();
         }
 
-        self.contexts[self.active_context_ix].context.init();
+        self.contexts[self.active_context_ix].context.unhide();
 
         self.commit();
     }
@@ -378,9 +383,9 @@ impl ViewContextManager {
 
     pub fn set_active_view(&mut self, view_ix: usize) {
         self.save_all();
-        self.get_active_view_mut().cleanup();
+        self.get_active_view_mut().hide();
         self.active_context_ix = view_ix;
-        self.get_active_view_mut().init();
+        self.get_active_view_mut().unhide();
         self.commit();
     }
 

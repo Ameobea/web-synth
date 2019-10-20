@@ -36,9 +36,32 @@ export const init_composition_sharing = (stateKey: string) => {
   );
 };
 
+export const hide_composition_sharing = (vcId: string) => {
+  const compositionSharingRootNode = document.getElementById(ROOT_NODE_ID);
+  if (!compositionSharingRootNode) {
+    console.warn(`Tried to hide composition sharing with id ${vcId} but it was already hidden`);
+    return;
+  }
+
+  compositionSharingRootNode.style.display = 'none';
+};
+
+export const unhide_composition_sharing = (vcId: string) => {
+  const compositionSharingRootNode = document.getElementById(ROOT_NODE_ID);
+  if (!compositionSharingRootNode) {
+    console.warn(`Tried to hide composition sharing with id ${vcId} but it was already hidden`);
+    return;
+  }
+
+  compositionSharingRootNode.style.display = 'block';
+};
+
 export const cleanup_composition_sharing = (): string => {
-  const compositionSharingRootNode = document.getElementById(ROOT_NODE_ID)!;
-  ReactDOM.unmountComponentAtNode(compositionSharingRootNode);
-  compositionSharingRootNode.remove();
+  const compositionSharingRootNode = document.getElementById(ROOT_NODE_ID);
+  if (compositionSharingRootNode) {
+    ReactDOM.unmountComponentAtNode(compositionSharingRootNode);
+    compositionSharingRootNode.remove();
+  }
+
   return '';
 };

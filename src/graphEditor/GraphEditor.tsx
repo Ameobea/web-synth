@@ -67,7 +67,6 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
 
       // Set an entry into the mapping so that we can get the current instance's state before unmounting
       instaceMap[stateKey] = graph;
-      console.log(instaceMap);
     })();
   });
 
@@ -79,9 +78,6 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
 
     updateGraph(lGraphInstance, patchNetwork, activeViewContexts);
     lastPatchNetwork.current = patchNetwork;
-
-    // Patch network changed, so we have to update our state to match it
-    console.log('Patch network updated: ', patchNetwork);
   }, [patchNetwork, lGraphInstance, activeViewContexts]);
 
   const uiControls = useMemo(
@@ -100,8 +96,8 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       <canvas
         ref={ref => (canvasRef.current = ref)}
         id='graph-editor'
-        width={800}
-        height={600}
+        width={1000}
+        height={800}
       ></canvas>
 
       <ControlPanel>

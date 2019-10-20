@@ -1,5 +1,5 @@
 import { initializeSpectrumVisualization } from '../visualizations/spectrum';
-import { buildFaustWorkletNode } from './FaustAudioWorklet';
+import { buildFaustWorkletNode, FaustWorkletNode } from './FaustAudioWorklet';
 
 const audioContext = new AudioContext();
 
@@ -23,7 +23,7 @@ const buildInstance = async (
   wasmInstanceArrayBuffer: ArrayBuffer,
   externalSource?: AudioScheduledSourceNode,
   connectSource = true
-) => {
+): Promise<FaustWorkletNode> => {
   const faustInstance = await buildFaustWorkletNode(audioContext, wasmInstanceArrayBuffer);
 
   const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
@@ -32,7 +32,6 @@ const buildInstance = async (
     faustInstance.connect(analyzerNode);
   }
 
-  console.log({ connectSource });
   if (connectSource) {
     // Wire up the microphone to the module, connect the module to the analyzer node, and then
     // connect the analyzer node to the audo context's output (speakers)
