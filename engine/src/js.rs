@@ -56,56 +56,43 @@ extern "C" {
     fn random() -> f64;
 }
 
-pub fn get_localstorage_key(key: &str) -> Option<String> {
-    getItem(key)
-}
+pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
 
-pub fn set_localstorage_key(key: &str, val: &str) {
-    setItem(key, val);
-}
+pub fn set_localstorage_key(key: &str, val: &str) { setItem(key, val); }
 
-pub fn delete_localstorage_key(key: &str) {
-    removeItem(key);
-}
+pub fn delete_localstorage_key(key: &str) { removeItem(key); }
 
-pub fn js_random() -> f64 {
-    random()
-}
+pub fn js_random() -> f64 { random() }
 
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {
     pub fn init_faust_editor(state_key: &str);
-
     pub fn cleanup_faust_editor() -> String;
-
     pub fn get_faust_editor_content() -> String;
 }
 
 #[wasm_bindgen(raw_module = "./graphEditor")]
 extern "C" {
     pub fn init_graph_editor(state_key: &str);
-
     pub fn cleanup_graph_editor(state_key: &str);
 }
 
 #[wasm_bindgen(raw_module = "./midiEditor")]
 extern "C" {
     pub fn init_midi_editor();
-
     pub fn cleanup_midi_editor();
+    pub fn create_midi_editor_audio_connectables(id: &str) -> JsValue;
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]
 extern "C" {
     pub fn init_composition_sharing(state_key: &str);
-
     pub fn cleanup_composition_sharing();
 }
 
 #[wasm_bindgen(raw_module = "./synthDesigner")]
 extern "C" {
     pub fn init_synth_designer(state_key: &str);
-
     pub fn cleanup_synth_designer(state_key: &str) -> String;
 }
 

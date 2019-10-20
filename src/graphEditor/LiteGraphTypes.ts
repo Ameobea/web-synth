@@ -39,10 +39,10 @@ export interface LiteGraphLink {
 }
 
 export interface LiteGraph {
-  links: LiteGraphLink[];
+  links: { [id: string]: LiteGraphLink };
   _nodes: LiteGraphNode[];
   _nodes_by_id: { [id: string]: LiteGraphNode };
-  createNode: (type: string, opts?: { [key: string]: any }) => LiteGraphNode;
   add: (node: LiteGraphNode) => void;
   remove: (node: LiteGraphNode) => void;
+  arrange: () => void;
 }

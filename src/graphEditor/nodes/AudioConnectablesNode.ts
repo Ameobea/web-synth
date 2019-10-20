@@ -25,7 +25,10 @@ export const registerAudioConnectablesNode = () => {
     this.connectables = create_empty_audio_connectables(this.id);
   }
 
-  LGAudioConnectables.setConnectables = function(this: any, connectables: AudioConnectables) {
+  LGAudioConnectables.prototype.setConnectables = function(
+    this: any,
+    connectables: AudioConnectables
+  ) {
     // Store the raw inputs and outputs for later direct access
     this.connectables = connectables;
 
@@ -38,6 +41,11 @@ export const registerAudioConnectablesNode = () => {
       } else {
         this.addInput(name, 'audio');
       }
+    });
+
+    [...connectables.outputs.entries()].forEach(([name, _output]) => {
+      // TODO: Look up this type dynamically?
+      this.addOutput(name, 'audio');
     });
   };
 
@@ -54,7 +62,7 @@ export const registerAudioConnectablesNode = () => {
     node.setValueAtTime(value, (this.ctx as AudioContext).currentTime);
   };
 
-  LGAudioConnectables.onConnectionsChange = function(
+  LGAudioConnectables.prototype.onConnectionsChange = function(
     this: { graph: LiteGraphType },
     _connection: 1 | 2,
     _slot: number,
@@ -78,7 +86,7 @@ export const registerAudioConnectablesNode = () => {
     if (!dstNode) {
       console.error(`Cannot find node id ${linkInfo.target_id}`, linkInfo);
     }
-    const dstInput = srcNode.inputs[linkInfo.target_slot];
+    const dstInput = dstNode.inputs[linkInfo.target_slot];
     if (!dstInput) {
       console.error(
         `No input with index ${linkInfo.target_slot} on node with id ${linkInfo.target_id}`,

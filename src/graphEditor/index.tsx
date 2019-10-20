@@ -25,11 +25,13 @@ export const init_graph_editor = (stateKey: string) => {
 };
 
 export const cleanup_graph_editor = (stateKey: string) => {
-  const graphEditorReactRootNode = document.getElementById('graph-editor-react-root')!;
+  const graphEditorReactRootNode = document.getElementById('graph-editor-react-root');
   // Trigger the graph editor to save its state before its destruction.  `unmountComponentAtNode`
   // doesn't seem to trigger lifecycle methods/execute the return value of `useEffect` so we have
   // to handle this explicitly.
   saveStateForInstance(stateKey);
-  ReactDOM.unmountComponentAtNode(graphEditorReactRootNode);
-  graphEditorReactRootNode.remove();
+  if (graphEditorReactRootNode) {
+    ReactDOM.unmountComponentAtNode(graphEditorReactRootNode);
+    graphEditorReactRootNode.remove();
+  }
 };

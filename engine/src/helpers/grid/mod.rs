@@ -4,6 +4,7 @@ use fnv::FnvHashSet;
 use uuid::Uuid;
 
 use super::super::prelude::*;
+use crate::view_context::create_empty_audio_connectables;
 
 pub mod constants;
 pub mod note_box;
@@ -189,6 +190,10 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
                 None
             },
         }
+    }
+
+    fn get_audio_connectables(&self, uuid: Uuid) -> JsValue {
+        create_empty_audio_connectables(&uuid.to_string())
     }
 }
 
@@ -897,6 +902,8 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     fn save(&mut self) -> String {
         "".into() // TODO
     }
+
+    fn get_audio_connectables(&self) -> JsValue { self.handler.get_audio_connectables(self.uuid) }
 }
 
 impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> Grid<S, R, H> {

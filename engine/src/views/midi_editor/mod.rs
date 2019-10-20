@@ -303,6 +303,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             _ => None,
         }
     }
+
+    fn get_audio_connectables(&self, uuid: Uuid) -> JsValue {
+        js::create_midi_editor_audio_connectables(&uuid.to_string())
+    }
 }
 
 impl MidiEditorGridHandler {

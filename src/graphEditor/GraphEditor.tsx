@@ -36,11 +36,13 @@ export const saveStateForInstance = (stateKey: string) => {
 
 const mapStateToProps = (state: ReduxStore) => ({
   patchNetwork: state.viewContextManager.patchNetwork,
+  activeViewContexts: state.viewContextManager.activeViewContexts,
 });
 
 const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToProps>> = ({
   stateKey,
   patchNetwork,
+  activeViewContexts,
 }) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -57,29 +59,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       await registerAllCustomNodes();
 
       const graph = new LiteGraph.LGraph();
-      console.log(graph);
       new LiteGraph.LGraphCanvas('#graph-editor', graph);
-
-      const existingStateJson = localStorage.getItem(stateKey);
-      if (existingStateJson) {
-        const configureError = graph.configure(JSON.parse(existingStateJson));
-        if (configureError) {
-          console.error('Error while `.configure()`ing graph with stored JSON state');
-        }
-      } else {
-        const node_const = LiteGraph.createNode('basic/const');
-        node_const.id = 'test';
-        node_const.pos = [200, 200];
-        graph.add(node_const);
-        node_const.setValue(4.5);
-
-        const node_watch = LiteGraph.createNode('basic/watch');
-        node_watch.id = 'test2';
-        node_watch.pos = [700, 200];
-        graph.add(node_watch);
-
-        node_const.connect(0, node_watch, 0);
-      }
 
       graph.start();
 
@@ -87,6 +67,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
 
       // Set an entry into the mapping so that we can get the current instance's state before unmounting
       instaceMap[stateKey] = graph;
+      console.log(instaceMap);
     })();
   });
 
@@ -96,12 +77,12 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       return;
     }
 
-    updateGraph(lGraphInstance, patchNetwork);
+    updateGraph(lGraphInstance, patchNetwork, activeViewContexts);
     lastPatchNetwork.current = patchNetwork;
 
     // Patch network changed, so we have to update our state to match it
     console.log('Patch network updated: ', patchNetwork);
-  }, [patchNetwork, lGraphInstance]);
+  }, [patchNetwork, lGraphInstance, activeViewContexts]);
 
   const uiControls = useMemo(
     () =>

@@ -51,27 +51,33 @@ export const initPatchNetwork = (
   viewContexts: VCMState['activeViewContexts'],
   connections: VCMState['patchNetwork']['connections']
 ): PatchNetwork => {
-  const oldConnectablesMap = oldPatchNetwork.connectables;
-  const newConnectablesMap: Map<string, AudioConnectables> = Map();
-
   const engine = getEngine();
   if (!engine) {
     throw new Error('Tried to init patch network before engine handle was set');
   }
 
   // Diff the set of old VCs and new VCs to find which have been added and which have been removed
-  console.log(viewContexts);
-  viewContexts.forEach(({ uuid }) => {
-    const old = oldConnectablesMap.get(uuid);
-    if (old) {
-      oldPatchNetwork.connectables.set(uuid, old);
-      oldConnectablesMap.delete(uuid);
-    } else {
-      const newConnectables: AudioConnectables = engine.get_vc_connectables(uuid);
-      newConnectablesMap.set(uuid, newConnectables);
-      // TODO: Deal with default connections?
+  const { oldConnectablesMap, newConnectablesMap } = viewContexts.reduce(
+    ({ oldConnectablesMap, newConnectablesMap }, { uuid }) => {
+      const old = oldConnectablesMap.get(uuid);
+      if (old) {
+        oldPatchNetwork.connectables.set(uuid, old);
+        return { newConnectablesMap, oldConnectablesMap: oldConnectablesMap.delete(uuid) };
+      } else {
+        const newConnectables: AudioConnectables = engine.get_vc_connectables(uuid);
+
+        return {
+          oldConnectablesMap,
+          newConnectablesMap: newConnectablesMap.set(uuid, newConnectables),
+        };
+        // TODO: Deal with default connections?
+      }
+    },
+    {
+      newConnectablesMap: Map<string, AudioConnectables>(),
+      oldConnectablesMap: oldPatchNetwork.connectables,
     }
-  });
+  );
 
   const newConnections = oldPatchNetwork.connections.filter(([from, to]) => {
     const fromConnectables = oldConnectablesMap.get(from.vcId);

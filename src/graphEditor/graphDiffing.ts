@@ -2,30 +2,48 @@ import { ArrayElementOf } from 'ameo-utils';
 import * as R from 'ramda';
 import { Map, Set } from 'immutable';
 import { Option } from 'funfix-core';
+import { LiteGraph } from 'litegraph.js';
 
 import {
-  LiteGraph,
+  LiteGraph as LiteGraphInstance,
   LiteGraphNode,
   LiteGraphConnectablesNode,
 } from 'src/graphEditor/LiteGraphTypes';
 import { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
+import { ReduxStore } from 'src/redux';
 
 const createAudioConnectablesNode = (
-  graph: LiteGraph,
   connectables: AudioConnectables,
-  vcId: string
+  vcId: string,
+  title: string
 ): LiteGraphNode => {
-  const node = graph.createNode('audio/audioConnectables') as LiteGraphConnectablesNode;
+  const node = LiteGraph.createNode(
+    'audio/audioConnectables',
+    title,
+    {}
+  ) as LiteGraphConnectablesNode;
   node.setConnectables(connectables);
   node.id = vcId;
   return node;
 };
 
+const getVcTitle = (
+  activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts'],
+  id: string
+): string =>
+  Option.of(activeViewContexts.find(R.propEq('uuid', id)))
+    .flatMap(({ title }) => Option.of(title))
+    .getOrElse('Untitled');
+
 /**
  * Updates the provided `LiteGraph` `graph` to match the state of the provided `PatchNetwork` `patchNetwork`.  Nodes are
  * added/removed and connections connected/disconnected in order to bring them in sync.
  */
-export const updateGraph = (graph: LiteGraph, patchNetwork: PatchNetwork) => {
+export const updateGraph = (
+  graph: LiteGraphInstance,
+  patchNetwork: PatchNetwork,
+  activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts']
+) => {
   const { untouchedNodes, addedNodes, modifiedNodes } = [
     ...patchNetwork.connectables.entries(),
   ].reduce(
@@ -59,8 +77,13 @@ export const updateGraph = (graph: LiteGraph, patchNetwork: PatchNetwork) => {
 
   // Create all new nodes, leaving them unconnected for now
   addedNodes.forEach(id => {
-    const newNode = graph.createNode('audio/audioConnectables') as LiteGraphConnectablesNode;
-    newNode.id = id;
+    // Time complexity sucks here
+    const connectables = patchNetwork.connectables.get(id)!;
+    const newNode = createAudioConnectablesNode(
+      connectables,
+      id,
+      getVcTitle(activeViewContexts, id)
+    );
     graph.add(newNode);
   });
 
@@ -76,7 +99,9 @@ export const updateGraph = (graph: LiteGraph, patchNetwork: PatchNetwork) => {
     }
 
     graph.remove(removedNode);
-    const newNode = createAudioConnectablesNode(graph, removedNode.connectables, removedNode.id);
+    const title = getVcTitle(activeViewContexts, removedNode.id);
+    console.log('Creating node: ', removedNode.connectables, removedNode.id, title);
+    const newNode = createAudioConnectablesNode(removedNode.connectables, removedNode.id, title);
     newNode.id = id;
     graph.add(newNode);
   });
@@ -106,7 +131,7 @@ export const updateGraph = (graph: LiteGraph, patchNetwork: PatchNetwork) => {
   };
 
   // Prune existing connections that shouldn't be connected
-  graph.links.forEach(({ origin_id, origin_slot, target_id, target_slot }) => {
+  Object.values(graph.links).forEach(({ origin_id, origin_slot, target_id, target_slot }) => {
     const linkExists = Option.of(connectionsByNode.get(origin_id))
       .flatMap(conns =>
         Option.of(
@@ -170,7 +195,7 @@ export const updateGraph = (graph: LiteGraph, patchNetwork: PatchNetwork) => {
       }
 
       // Time complexity is sub-optimal here but should be ok
-      const connectionExists = graph.links
+      const connectionExists = Object.values(graph.links)
         .filter(R.identity)
         .find(
           ({ origin_id, origin_slot, target_id, target_slot }) =>
@@ -186,4 +211,6 @@ export const updateGraph = (graph: LiteGraph, patchNetwork: PatchNetwork) => {
     },
     Map() as ConnectionsMap
   );
+
+  graph.arrange();
 };

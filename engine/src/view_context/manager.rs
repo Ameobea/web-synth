@@ -263,6 +263,13 @@ impl ViewContextManager {
 
     /// Retrieves the active `ViewContextManager`
     pub fn get_active_view_mut(&mut self) -> &mut dyn ViewContext {
+        if self.contexts.len() <= self.active_context_ix {
+            panic!(
+                "Invalid VCM state; we only have {} VCs managed but active_context_ix is {}",
+                self.contexts.len(),
+                self.active_context_ix
+            );
+        }
         &mut *self.contexts[self.active_context_ix].context
     }
 
@@ -313,9 +320,12 @@ impl ViewContextManager {
         // Finally delete the VC entry for the VC itself
         js::delete_localstorage_key(&get_vc_key(id));
 
-        // If the deleted VC was the active VC, pick the one before it to be the active VC.
         if self.active_context_ix == ix {
+            // If the deleted VC was the active VC, pick the one before it to be the active VC.
             self.active_context_ix = ix.saturating_sub(1);
+        } else if self.active_context_ix > ix {
+            // If the active view context is above the one that was removed, shift it one down
+            self.active_context_ix = self.active_context_ix - 1;
         }
 
         if let Some(vc_entry) = self.contexts.get_mut(self.active_context_ix) {

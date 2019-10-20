@@ -143,7 +143,11 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
         ...styles.viewContextTab,
         backgroundColor: active ? 'DarkOrchid' : undefined,
       }}
-      onClick={() => engine.switch_view_context(uuid)}
+      onClick={() => {
+        if (!active) {
+          engine.switch_view_context(uuid);
+        }
+      }}
       onDoubleClick={() => setIsRenaming(true)}
     >
       {isRenaming ? (
