@@ -38,6 +38,7 @@ extern "C" {
         active_context_ix: usize,
         view_context_definitions: &str,
         connections_json: &str,
+        foreign_connectables_json: &str,
     );
 }
 
@@ -105,9 +106,4 @@ extern "C" {
     pub fn hide_synth_designer(vc_id: &str);
     pub fn unhide_synth_designer(vc_id: &str);
     pub fn cleanup_synth_designer(state_key: &str) -> String;
-}
-
-#[wasm_bindgen(raw_module = "./patchNetwork")]
-extern "C" {
-    pub fn get_patch_network_connections() -> String;
 }

@@ -1,6 +1,7 @@
 import { Map, Set } from 'immutable';
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
+import { Option } from 'funfix-core';
 
 import {
   initPatchNetwork,
@@ -9,6 +10,7 @@ import {
   AudioConnectables,
 } from 'src/patchNetwork/patchNetwork';
 import { getEngine } from 'src';
+import { getForeignNodeType } from 'src/graphEditor/nodes/CustomAudio';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
@@ -23,7 +25,7 @@ export const getConnectedPair = (
 ) => {
   const fromConnectables = connectables.get(from.vcId);
   if (!fromConnectables) {
-    console.error(`No connectables found for VC ID ${from.vcId}`);
+    console.error(`No connectables found for VC ID ${from.vcId}`, connectables);
     return null;
   }
   const fromNode = fromConnectables.outputs.get(from.name);
@@ -34,7 +36,7 @@ export const getConnectedPair = (
 
   const toConnectables = connectables.get(to.vcId);
   if (!toConnectables) {
-    console.error(`No connectables found for VC ID ${to.vcId}`);
+    console.error(`No connectables found for VC ID ${to.vcId}`, connectables);
     return null;
   }
   const toNode = toConnectables.inputs.get(to.name);
@@ -46,10 +48,61 @@ export const getConnectedPair = (
   return [fromNode, toNode];
 };
 
+/**
+ * Checks to see if connections and/or foreign nodes have changed between two versions of the patch network.  If they have, trigger
+ * the Rust VCM state to be updated with the new state.
+ */
+const maybeUpdateVCM = (
+  engine: typeof import('src/engine'),
+  oldPatchNetwork: PatchNetwork,
+  newPatchNetwork: PatchNetwork
+) => {
+  const connectionsUnchanged =
+    oldPatchNetwork.connections.length === newPatchNetwork.connections.length &&
+    oldPatchNetwork.connections.every(conn =>
+      newPatchNetwork.connections.find(conn2 => R.equals(conn, conn2))
+    );
+
+  const oldForeignConnectables = oldPatchNetwork.connectables.filter(({ node }) => !!node);
+  const newForeignConnectables = newPatchNetwork.connectables.filter(({ node }) => !!node);
+  const foreignConnectablesUnchanged =
+    oldForeignConnectables.size === newForeignConnectables.size &&
+    oldForeignConnectables.every((connectables, key) =>
+      Option.of(newForeignConnectables.get(key))
+        .map(otherConnectables => R.equals(connectables, otherConnectables))
+        .getOrElse(false)
+    );
+
+  debugger;
+
+  if (connectionsUnchanged && foreignConnectablesUnchanged) {
+    return;
+  }
+
+  setTimeout(() => {
+    if (!connectionsUnchanged) {
+      engine.set_connections(JSON.stringify(newPatchNetwork.connections));
+    }
+
+    if (!foreignConnectablesUnchanged) {
+      engine.set_foreign_connectables(
+        JSON.stringify(
+          [...newForeignConnectables.values()].map(({ vcId, node }) => ({
+            id: vcId.toString(),
+            type: getForeignNodeType(node!),
+          }))
+        )
+      );
+    }
+  }, 0);
+};
+
 const actionGroups = {
   SET_VCM_STATE: buildActionGroup({
     actionCreator: (
-      newState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'>,
+      newState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'> & {
+        foreignConnectables: { type: string; id: string }[];
+      },
       connections: VCMState['patchNetwork']['connections']
     ) => ({
       type: 'SET_VCM_STATE',
@@ -71,10 +124,11 @@ const actionGroups = {
       const patchNetwork = initPatchNetwork(
         state.patchNetwork,
         newState.activeViewContexts,
+        newState.foreignConnectables,
         connections
       );
 
-      setTimeout(() => engine.set_connections(JSON.stringify(patchNetwork.connections)), 0);
+      maybeUpdateVCM(engine, state.patchNetwork, patchNetwork);
 
       return { ...newState, patchNetwork };
     },
@@ -113,7 +167,7 @@ const actionGroups = {
       const [fromNode, toNode] = connectedPair;
 
       // Perform the connection
-      fromNode.connect(toNode);
+      (fromNode as any).connect(toNode);
 
       const newConnections = [
         ...connections,
@@ -123,18 +177,17 @@ const actionGroups = {
       const engine = getEngine();
       if (!engine) {
         console.error('Engine handle was not set when trying to perform connection');
-      } else {
-        setTimeout(() => engine.set_connections(JSON.stringify(newConnections)), 0);
+        return state;
       }
 
-      // Add a connection to the list of connections
-      return {
-        ...state,
-        patchNetwork: {
-          ...state.patchNetwork,
-          connections: newConnections,
-        },
+      const newPatchNetwork = {
+        ...state.patchNetwork,
+        connections: newConnections,
       };
+
+      maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
+
+      return { ...state, patchNetwork: newPatchNetwork };
     },
   }),
   DISCONNECT: buildActionGroup({
@@ -171,7 +224,7 @@ const actionGroups = {
       const [fromNode, toNode] = connectedPair;
 
       // Perform the disconnection
-      fromNode.disconnect(toNode);
+      (fromNode as any).disconnect(toNode);
 
       const newConnections = [...connections].filter(
         ([from2, to2]) =>
@@ -184,18 +237,16 @@ const actionGroups = {
       const engine = getEngine();
       if (!engine) {
         console.error('Engine handle was not set when trying to perform disconnection');
-      } else {
-        setTimeout(() => engine.set_connections(JSON.stringify(newConnections)), 0);
+        return state;
       }
 
-      // Remove the connection from the list of connections
-      return {
-        ...state,
-        patchNetwork: {
-          ...state.patchNetwork,
-          connections: newConnections,
-        },
+      const newPatchNetwork = {
+        ...state.patchNetwork,
+        connections: newConnections,
       };
+      maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
+
+      return { ...state, patchNetwork: newPatchNetwork };
     },
   }),
   ADD_PATCH_NETWORK_NODE: buildActionGroup({
@@ -204,13 +255,21 @@ const actionGroups = {
       vcId,
       connectables,
     }),
-    subReducer: (state: VCMState, { vcId, connectables }) => ({
-      ...state,
-      patchNetwork: {
+    subReducer: (state: VCMState, { vcId, connectables }) => {
+      const engine = getEngine();
+      if (!engine) {
+        console.error('Engine handle was not set when trying to delete node');
+        return state;
+      }
+
+      const newPatchNetwork = {
         ...state.patchNetwork,
         connectables: state.patchNetwork.connectables.set(vcId, connectables),
-      },
-    }),
+      };
+      maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
+
+      return { ...state, patchNetwork: newPatchNetwork };
+    },
   }),
   REMOVE_PATCH_NETWORK_NODE: buildActionGroup({
     actionCreator: (vcId: string) => ({ type: 'REMOVE_PATCH_NETWORK_NODE', vcId }),
@@ -233,24 +292,23 @@ const actionGroups = {
         if (!connectedPair) {
           return false;
         }
-        connectedPair[0].disconnect(connectedPair[1]);
+        (connectedPair[0] as any).disconnect(connectedPair[1]);
         return false;
       });
 
       const engine = getEngine();
       if (!engine) {
         console.error('Engine handle was not set when trying to delete node');
-      } else {
-        setTimeout(() => engine.set_connections(JSON.stringify(newConnections)), 0);
+        return state;
       }
 
-      return {
-        ...state,
-        patchNetwork: {
-          connectables: connectables.remove(vcId),
-          connections: newConnections,
-        },
+      const newPatchNetwork = {
+        connectables: connectables.remove(vcId),
+        connections: newConnections,
       };
+      maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
+
+      return { ...state, patchNetwork: newPatchNetwork };
     },
   }),
   UPDATE_CONNECTABLES: buildActionGroup({
@@ -298,7 +356,7 @@ const actionGroups = {
           return false;
         }
 
-        connectedPair[0].disconnect(connectedPair[1]);
+        (connectedPair[0] as any).disconnect(connectedPair[1]);
         return false;
       });
 

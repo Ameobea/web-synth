@@ -1,13 +1,25 @@
 import { Map } from 'immutable';
+import { Option } from 'funfix-core';
 
 import { VCMState, getConnectedPair } from 'src/redux/modules/viewContextManager';
 import { getEngine } from 'src';
-import { actionCreators, dispatch, getState } from 'src/redux';
+import { actionCreators, dispatch } from 'src/redux';
+import {
+  audioNodeGetters,
+  buildConnectablesForNode,
+  ForeignNode,
+} from 'src/graphEditor/nodes/CustomAudio';
 
 export interface AudioConnectables {
   vcId: string;
   inputs: Map<string, AudioParam | AudioNode>;
   outputs: Map<string, AudioNode>;
+  /**
+   * This is used by custom audio nodes to re-use foreign audio nodes when re-initializing/updating the patch network.  Without this,
+   * we'd have to re-create the connectables from scratch using a new audio node, which would require creating a new audio node,
+   * disconnecting the old one, connecting the new one, which is inefficient.
+   */
+  node?: ForeignNode;
 }
 
 export interface ConnectableDescriptor {
@@ -39,9 +51,6 @@ export const removeNode = (vcId: string) =>
 export const updateConnectables = (vcId: string, newConnectables: AudioConnectables) =>
   dispatch(actionCreators.viewContextManager.UPDATE_CONNECTABLES(vcId, newConnectables));
 
-export const get_patch_network_connections = (): string =>
-  JSON.stringify(getState().viewContextManager.patchNetwork.connections);
-
 /**
  * Clear the state of the patch network, re-initializing it from scratch given the provided set of view contexts and
  * connections between them.
@@ -49,6 +58,7 @@ export const get_patch_network_connections = (): string =>
 export const initPatchNetwork = (
   oldPatchNetwork: PatchNetwork,
   viewContexts: VCMState['activeViewContexts'],
+  foreignConnectables: { type: string; id: string }[],
   connections: VCMState['patchNetwork']['connections']
 ): PatchNetwork => {
   const engine = getEngine();
@@ -56,26 +66,27 @@ export const initPatchNetwork = (
     throw new Error('Tried to init patch network before engine handle was set');
   }
 
-  // Diff the set of old VCs and new VCs to find which have been added and which have been removed
-  const { oldConnectablesMap, newConnectablesMap } = viewContexts.reduce(
-    ({ oldConnectablesMap, newConnectablesMap }, { uuid }) => {
-      const newConnectables: AudioConnectables = engine.get_vc_connectables(uuid);
-
-      return {
-        oldConnectablesMap,
-        newConnectablesMap: newConnectablesMap.set(uuid, newConnectables),
-      };
+  // Create connectables for all nodes
+  let newConnectablesMap = viewContexts.reduce(
+    (newConnectablesMap, { uuid }) =>
       // TODO: Deal with default connections?
-    },
-    {
-      newConnectablesMap: Map<string, AudioConnectables>(),
-      oldConnectablesMap: oldPatchNetwork.connectables,
-    }
+      newConnectablesMap.set(uuid, engine.get_vc_connectables(uuid)),
+    Map<string, AudioConnectables>()
   );
 
+  // Create connectables for foreign nodes
+  newConnectablesMap = foreignConnectables.reduce((newConnectablesMap, { type, id }) => {
+    // Re-use the `AudioNode` from the old connectables if possible, falling back to creating a fresh one
+    const node: ForeignNode = Option.of(oldPatchNetwork.connectables.get(id))
+      .flatMap(({ node }) => Option.of(node))
+      .getOrElseL(audioNodeGetters[type]!);
+
+    return newConnectablesMap.set(id, buildConnectablesForNode(node, id));
+  }, newConnectablesMap);
+
   const newConnections = oldPatchNetwork.connections.filter(([from, to]) => {
-    const fromConnectables = oldConnectablesMap.get(from.vcId);
-    const toConnectables = oldConnectablesMap.get(to.vcId);
+    const fromConnectables = oldPatchNetwork.connectables.get(from.vcId);
+    const toConnectables = oldPatchNetwork.connectables.get(to.vcId);
 
     if (fromConnectables || toConnectables) {
       const fromConnectablesReal: AudioConnectables = (fromConnectables ||
@@ -120,7 +131,7 @@ export const initPatchNetwork = (
     }
 
     // Perform the connection
-    connectedPair[0].connect(connectedPair[1]);
+    (connectedPair[0] as any).connect(connectedPair[1]);
     return true;
   });
 

@@ -177,7 +177,8 @@ export const cleanup_midi_editor_ui = () => {
 export const update_active_view_contexts = (
   activeViewContextIx: number,
   activeVcsJson: string,
-  connectionsJson: string
+  connectionsJson: string,
+  foreignConnectablesJson: string
 ): void => {
   const activeViewContexts: {
     minimal_def: { name: string; uuid: string; title?: string };
@@ -191,6 +192,16 @@ export const update_active_view_contexts = (
     .recover(() => console.error('Failed to parse provided connections out of JSON'))
     .getOrElse([]);
 
+  const foreignConnectables: { type: string; id: string }[] = Try.of(() =>
+    JSON.parse(foreignConnectablesJson)
+  )
+    .recover(() =>
+      console.error(
+        'Failed to parse foreign nodes JSON; using an empty list but that will probably create invalid connections.'
+      )
+    )
+    .getOrElse([]);
+
   dispatch(
     actionCreators.viewContextManager.SET_VCM_STATE(
       {
@@ -199,6 +210,7 @@ export const update_active_view_contexts = (
           ...minimal_def,
           ...rest,
         })),
+        foreignConnectables,
       },
       connections
     )

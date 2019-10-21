@@ -23,7 +23,7 @@ const createAudioConnectablesNode = (
     {}
   ) as LiteGraphConnectablesNode;
   node.setConnectables(connectables);
-  node.id = vcId;
+  node.id = vcId.toString();
   return node;
 };
 
@@ -99,13 +99,13 @@ export const updateGraph = (
     }
 
     graph.remove(removedNode);
-    const title = getVcTitle(activeViewContexts, removedNode.id);
+    const title = getVcTitle(activeViewContexts, removedNode.id.toString());
     const newNode = createAudioConnectablesNode(
-      patchNetwork.connectables.get(removedNode.id)!,
-      removedNode.id,
+      patchNetwork.connectables.get(removedNode.id.toString())!,
+      removedNode.id.toString(),
       title
     );
-    newNode.id = id;
+    newNode.id = id.toString();
     graph.add(newNode);
   });
 
@@ -124,6 +124,7 @@ export const updateGraph = (
 
   const getNode = (id: string) => {
     const node = graph._nodes_by_id[id];
+    console.log({ id, node, _nodes_by_id: graph._nodes_by_id });
     if (!node) {
       console.error(
         `Connection referenced node id ${id} which doesn't exist in litegraph but should at this point`

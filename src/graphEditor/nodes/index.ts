@@ -3,6 +3,7 @@ import { fetchEffects } from 'src/controls/EffectPicker';
 import { registerFaustNode } from './Faust';
 import { registerMidiEditorNode } from './MidiEditor';
 import { registerAudioConnectablesNode } from 'src/graphEditor/nodes/AudioConnectablesNode';
+import { registerCustomAudioNodes } from 'src/graphEditor/nodes/CustomAudio';
 
 /**
  * Registers all custom node types so that they can be used with the graph editor
@@ -25,4 +26,5 @@ export const registerAllCustomNodes = async () => {
   registerFaustNode(availableModules);
   registerMidiEditorNode();
   registerAudioConnectablesNode();
+  registerCustomAudioNodes();
 };

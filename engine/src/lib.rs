@@ -34,7 +34,10 @@ pub mod prelude;
 pub mod util;
 pub mod view_context;
 pub mod views;
-use crate::{prelude::*, view_context::manager::build_view};
+use crate::{
+    prelude::*,
+    view_context::manager::{build_view, ForeignConnectable},
+};
 
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
@@ -171,4 +174,21 @@ pub fn set_connections(connections_json: &str) {
         };
 
     get_vcm().set_connections(connections);
+}
+
+#[wasm_bindgen]
+pub fn set_foreign_connectables(foreign_connectables_json: &str) {
+    let foreign_connectables: Vec<ForeignConnectable> =
+        match serde_json::from_str(foreign_connectables_json) {
+            Ok(conns) => conns,
+            Err(err) => {
+                error!(
+                    "Failed to deserialize provided foreign connectables JSON: {:?}",
+                    err
+                );
+                return;
+            },
+        };
+
+    get_vcm().set_foreign_connectables(foreign_connectables);
 }

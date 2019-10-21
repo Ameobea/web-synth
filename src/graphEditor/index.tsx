@@ -8,7 +8,6 @@ import GraphEditor, { saveStateForInstance } from './GraphEditor';
 const ROOT_NODE_ID = 'graph-editor-react-root' as const;
 
 export const init_graph_editor = (stateKey: string) => {
-  console.log('initing graph editor');
   // Create the base dom node for the faust editor
   const graphEditorBaseNode = document.createElement('div');
   graphEditorBaseNode.id = ROOT_NODE_ID;
