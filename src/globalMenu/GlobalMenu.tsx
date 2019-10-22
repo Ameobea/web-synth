@@ -32,12 +32,9 @@ const GlobalMenuInner: React.FC<
       Save to File
     </GlobalMenuItem>
     <GlobalMenuItem
-      onClick={() => {
-        console.log('d');
-        document
-          .getElementById('load-composition-uploader')!
-          .dispatchEvent(new MouseEvent('click'));
-      }}
+      onClick={() =>
+        document.getElementById('load-composition-uploader')!.dispatchEvent(new MouseEvent('click'))
+      }
     >
       <>
         <input

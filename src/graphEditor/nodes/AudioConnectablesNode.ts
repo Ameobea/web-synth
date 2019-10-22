@@ -4,11 +4,7 @@
 
 import { LiteGraph } from 'litegraph.js';
 
-import {
-  AudioConnectables,
-  create_empty_audio_connectables,
-  ConnectableDescriptor,
-} from 'src/patchNetwork';
+import { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
 import {
   LiteGraphNodeInput,
   LiteGraphLink,
@@ -57,7 +53,9 @@ LGAudioConnectables.prototype.onPropertyChanged = function(name: string, value: 
     return;
   }
 
-  node.setValueAtTime(value, (this.ctx as AudioContext).currentTime);
+  // node.setValueAtTime(value, (this.ctx as AudioContext).currentTime);
+  node.value = value;
+  console.log(node);
 };
 
 LGAudioConnectables.prototype.onConnectionsChange = function(

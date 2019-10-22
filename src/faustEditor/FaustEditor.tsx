@@ -113,7 +113,6 @@ const createCompileButtonClickHandler = (
   faustAudioNodesMap[vcId] = faustInstance;
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
   const newConnectables = get_faust_editor_connectables(vcId);
-  console.log({ vcId, faustInstance, faustAudioNodesMap, newConnectables });
   updateConnectables(vcId, newConnectables);
 
   // Start the audio file playback

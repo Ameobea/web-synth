@@ -26,7 +26,6 @@ export const registerFaustNode = (availableModules: Effect[]) => {
       values: availableModules.map(R.prop('title')),
     });
 
-    console.log('compiling initial instance');
     this.compileActiveInstance();
 
     // TODO: Make this dynamic based off of Faust module definition or sth
@@ -35,15 +34,10 @@ export const registerFaustNode = (availableModules: Effect[]) => {
   }
 
   LGFaustModule.prototype.compileActiveInstance = async function() {
-    const { code, title } = availableModules.find(
-      R.propEq('title', this.properties.faustModuleTitle)
-    )!;
-    console.log(`Compiling Faust instance with title "${title}"`);
+    const { code } = availableModules.find(R.propEq('title', this.properties.faustModuleTitle))!;
     const newAudioNode = await compileFaustInstance(code, true);
 
     swapAudioNodes(this, newAudioNode);
-
-    console.log('Done compiling');
   };
 
   LGFaustModule.prototype.onPropertyChanged = function(name: string, value: unknown) {

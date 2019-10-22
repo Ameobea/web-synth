@@ -11,6 +11,7 @@ import {
 } from 'src/graphEditor/LiteGraphTypes';
 import { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
 import { ReduxStore } from 'src/redux';
+import { getForeignNodeType } from 'src/graphEditor/nodes/CustomAudio';
 
 const createAudioConnectablesNode = (
   connectables: AudioConnectables,
@@ -79,10 +80,11 @@ export const updateGraph = (
   addedNodes.forEach(id => {
     // Time complexity sucks here
     const connectables = patchNetwork.connectables.get(id)!;
+    const foreignAudioNode = patchNetwork.connectables.get(id)!.node;
     const newNode = createAudioConnectablesNode(
       connectables,
       id,
-      getVcTitle(activeViewContexts, id)
+      foreignAudioNode ? getForeignNodeType(foreignAudioNode) : getVcTitle(activeViewContexts, id)
     );
     graph.add(newNode);
   });
@@ -124,7 +126,6 @@ export const updateGraph = (
 
   const getNode = (id: string) => {
     const node = graph._nodes_by_id[id];
-    console.log({ id, node, _nodes_by_id: graph._nodes_by_id });
     if (!node) {
       console.error(
         `Connection referenced node id ${id} which doesn't exist in litegraph but should at this point`

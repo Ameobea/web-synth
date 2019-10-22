@@ -150,10 +150,10 @@ const SynthDesigner: React.FC<
         height={1024}
       />
       <MidiKeyboard
-        playNote={(voiceIx, frequency, velocity) =>
+        playNote={(voiceIx, frequency, _velocity) =>
           dispatch(actionCreators.synthDesigner.GATE(frequency, voiceIx))
         }
-        releaseNote={(voiceIx, _frequency, velocity) =>
+        releaseNote={(voiceIx, _frequency, _velocity) =>
           dispatch(actionCreators.synthDesigner.UNGATE(voiceIx))
         }
         handlePitchBend={(lsb: number, msb: number) =>

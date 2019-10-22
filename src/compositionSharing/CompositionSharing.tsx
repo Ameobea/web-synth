@@ -63,8 +63,6 @@ const CompositionListingInner: React.FC<
       .catch(err => setErrorMessage(`Failed to fetch shared compositions: ${err.message}`));
   });
 
-  console.log(allSharedCompositions);
-
   if (!allSharedCompositions) {
     if (errorMessage) {
       return <>{errorMessage}</>;

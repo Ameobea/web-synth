@@ -92,6 +92,16 @@ export const trigger_attack = (synthIx: number, voiceIx: number, frequency: numb
 export const trigger_release = (synthIx: number, voiceIx: number) =>
   getSynths()[synthIx].voices[voiceIx].triggerRelease();
 
+export const trigger_attack_release = (
+  synthIx: number,
+  voiceIx: number,
+  frequency: number,
+  _duration: number // TODO
+) => {
+  trigger_attack(synthIx, voiceIx, frequency);
+  trigger_release(synthIx, voiceIx);
+};
+
 export const schedule_events = (
   synthIx: number,
   scheduledEvents: Uint8ClampedArray,

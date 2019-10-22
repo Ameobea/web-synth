@@ -2,7 +2,7 @@ import { Map } from 'immutable';
 import { UnimplementedError } from 'ameo-utils';
 import { LiteGraph } from 'litegraph.js';
 
-import { AudioConnectables, updateConnectables, addNode } from 'src/patchNetwork';
+import { AudioConnectables, addNode } from 'src/patchNetwork';
 import { LGAudioConnectables } from './AudioConnectablesNode';
 
 /**
@@ -57,7 +57,11 @@ const ctx = new AudioContext();
 export const audioNodeGetters: { [type: string]: () => ForeignNode } = {
   'customAudio/gain': () => new GainNode(ctx),
   'customAudio/biquadFilter': () => new BiquadFilterNode(ctx),
-  'customAudio/constantSource': () => new ConstantSourceNode(ctx),
+  'customAudio/constantSource': () => {
+    const csn = new ConstantSourceNode(ctx);
+    csn.start();
+    return csn;
+  },
 };
 
 export const getForeignNodeType = (foreignNode: ForeignNode) => {

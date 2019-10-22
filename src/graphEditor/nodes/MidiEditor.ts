@@ -36,7 +36,6 @@ export const registerMidiEditorNode = () => {
       values: midiEditorVCs.map(R.prop('uuid')),
     });
 
-    console.log('connecting initial MIDI editor to graph');
     const instanceForCurrentEditor = getState().synths.synthsByVCId[midiEditorVCs[0].uuid];
     if (!instanceForCurrentEditor) {
       throw new Error(`No MIDI editor set for VC with id ${midiEditorVCs[0].uuid}`);

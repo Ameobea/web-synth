@@ -207,6 +207,7 @@ impl ViewContextManager {
 
         self.active_context_ix = vcm_state.active_view_ix;
         self.connections = vcm_state.patch_network_connections;
+        self.foreign_connectables = vcm_state.foreign_connectables;
     }
 
     /// Initializes the VCM with the default view context and state from scratch
