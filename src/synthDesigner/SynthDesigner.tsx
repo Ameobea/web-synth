@@ -3,7 +3,6 @@ import { connect } from 'react-redux';
 import { useOnce } from 'ameo-utils/util/react';
 import * as R from 'ramda';
 
-import { actionCreators, ReduxStore, dispatch } from 'src/redux';
 import { SynthDesignerState, EffectType } from 'src/redux/modules/synthDesigner';
 import SynthModuleComp from './SynthModule';
 import EffectModuleComp from './effects/Effect';
@@ -14,6 +13,7 @@ import {
   initializeSpectrumVisualization,
 } from 'src/visualizations/spectrum';
 import MidiKeyboard from 'src/synthDesigner/MidiKeyboard';
+import { SynthDesignerReduxStore, getReduxInfra } from 'src/synthDesigner';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -21,18 +21,23 @@ declare class WavyJones extends AnalyserNode {
   constructor(ctx: AudioContext, nodeId: string, updateIntervalMs?: number);
 }
 
-const mapStateToProps = ({ synthDesigner }: ReduxStore) => ({ synthDesignerState: synthDesigner });
+const mapStateToProps = ({ synthDesigner }: SynthDesignerReduxStore) => ({
+  synthDesignerState: synthDesigner,
+});
 
 const SynthDesigner: React.FC<
   {
     initialState?: SynthDesignerState | null;
+    stateKey: string;
   } & ReturnType<typeof mapStateToProps>
-> = ({ initialState, synthDesignerState }) => {
+> = ({ initialState, synthDesignerState, stateKey }) => {
   const setSpectrumVizSettingsState = useRef<null | ReturnType<
     typeof initializeSpectrumVisualization
   >>(null);
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
+
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   useEffect(() => {
     if (
@@ -47,7 +52,6 @@ const SynthDesigner: React.FC<
 
     wavyJonesInstance.current.lineColor = '#FFF';
     wavyJonesInstance.current.lineThickness = 1.2;
-    console.log(wavyJonesInstance.current);
 
     dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(wavyJonesInstance.current));
   });
@@ -62,7 +66,7 @@ const SynthDesigner: React.FC<
     <>
       <div className='synth-designer'>
         {synthDesignerState.synths.map((synth, i) => (
-          <SynthModuleComp key={i} synth={synth} index={i}>
+          <SynthModuleComp key={i} synth={synth} index={i} stateKey={stateKey}>
             {synth.voices[0].effects.map((effect, effectIx) => (
               <EffectModuleComp
                 effectName={effect.effect.type}

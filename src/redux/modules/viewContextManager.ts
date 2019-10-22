@@ -73,8 +73,6 @@ const maybeUpdateVCM = (
         .getOrElse(false)
     );
 
-  debugger;
-
   if (connectionsUnchanged && foreignConnectablesUnchanged) {
     return;
   }

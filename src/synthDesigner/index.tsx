@@ -24,6 +24,10 @@ const buildSynthDesignerRedux = () => {
   return buildStore<typeof modules>(modules, undefined, { form: formReducer });
 };
 
+export type SynthDesignerReduxStore = ReturnType<
+  ReturnType<typeof buildSynthDesignerRedux>['getState']
+>;
+
 const ROOT_NODE_ID = 'synth-designer-react-root' as const;
 
 /**
@@ -31,22 +35,13 @@ const ROOT_NODE_ID = 'synth-designer-react-root' as const;
  */
 let STATE_MAP: Map<string, ReturnType<typeof buildSynthDesignerRedux>> = Map();
 
-export const getDispatch = (stateKey: string) => {
+export const getReduxInfra = (stateKey: string) => {
   const reduxInfra = STATE_MAP.get(stateKey);
   if (!reduxInfra) {
     throw new Error(`No Redux state entry for state key "${stateKey}"`);
   }
 
-  return reduxInfra.dispatch;
-};
-
-export const getGetState = (stateKey: string) => {
-  const reduxInfra = STATE_MAP.get(stateKey);
-  if (!reduxInfra) {
-    throw new Error(`No Redux state entry for state key "${stateKey}"`);
-  }
-
-  return reduxInfra.getState;
+  return reduxInfra;
 };
 
 export const init_synth_designer = (stateKey: string) => {
@@ -93,7 +88,7 @@ export const init_synth_designer = (stateKey: string) => {
   document.getElementById('content')!.appendChild(synthDesignerBase);
   ReactDOM.render(
     <Provider store={reduxInfra.store}>
-      <SynthDesigner initialState={initialState} />
+      <SynthDesigner initialState={initialState} stateKey={stateKey} />
     </Provider>,
     synthDesignerBase
   );
@@ -120,7 +115,7 @@ export const unhide_synth_designer = (vcId: string) => {
 };
 
 export const cleanup_synth_designer = (stateKey: string): string => {
-  const { synths } = getGetState(stateKey)().synthDesigner;
+  const { synths } = getReduxInfra(stateKey).getState().synthDesigner;
   const designerState = JSON.stringify({
     synths: synths.map(serializeSynthModule),
   });
@@ -135,7 +130,7 @@ export const cleanup_synth_designer = (stateKey: string): string => {
 };
 
 export const get_synth_designer_audio_connectables = (stateKey: string): AudioConnectables => {
-  const { synths, spectrumNode } = getGetState(stateKey)().synthDesigner;
+  const { synths, spectrumNode } = getReduxInfra(stateKey).getState().synthDesigner;
 
   return {
     vcId: stateKey.split('vc_')[1]!,

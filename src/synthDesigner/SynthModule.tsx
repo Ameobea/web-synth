@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
-import { dispatch, actionCreators } from 'src/redux';
 import FilterModule from './Filter';
 import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
+import { getReduxInfra } from 'src/synthDesigner';
 
 const SYNTH_SETTINGS = [
   {
@@ -45,12 +45,15 @@ const SYNTH_SETTINGS = [
   },
 ];
 
-const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
+const SynthModuleComp: React.FC<{ index: number; synth: SynthModule; stateKey: string }> = ({
   index,
   synth,
+  stateKey,
   children,
 }) => {
   const unison = synth.voices[0].oscillators.length;
+
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return (
     <div className='synth-module'>
@@ -109,6 +112,7 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule }> = ({
         synthIx={index}
         params={synth.filterParams}
         filterEnvelope={synth.filterEnvelope}
+        stateKey={stateKey}
       />
 
       <div className='effects'>{children}</div>
