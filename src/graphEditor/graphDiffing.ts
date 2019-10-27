@@ -19,10 +19,11 @@ import {
 const createAudioConnectablesNode = (
   connectables: AudioConnectables,
   vcId: string,
-  title: string
+  title: string,
+  typeOverride?: string | null | undefined
 ): LiteGraphNode => {
   const node = LiteGraph.createNode(
-    'audio/audioConnectables',
+    typeOverride || 'audio/audioConnectables',
     title,
     {}
   ) as LiteGraphConnectablesNode;
@@ -89,7 +90,8 @@ export const updateGraph = (
       id,
       foreignAudioNode
         ? getDisplayNameByForeignNodeType(getForeignNodeType(foreignAudioNode))
-        : getVcTitle(activeViewContexts, id)
+        : getVcTitle(activeViewContexts, id),
+      foreignAudioNode ? getForeignNodeType(foreignAudioNode) : null
     );
     graph.add(newNode);
   });

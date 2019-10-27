@@ -54,13 +54,23 @@ export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioCo
 
 const ctx = new AudioContext();
 
-export const audioNodeGetters: { [type: string]: () => ForeignNode } = {
-  'customAudio/gain': () => new GainNode(ctx),
-  'customAudio/biquadFilter': () => new BiquadFilterNode(ctx),
-  'customAudio/constantSource': () => {
-    const csn = new ConstantSourceNode(ctx);
-    csn.start();
-    return csn;
+export const audioNodeGetters: {
+  [type: string]: { nodeGetter: () => ForeignNode; protoParams: { [key: string]: any } };
+} = {
+  'customAudio/gain': { nodeGetter: () => new GainNode(ctx), protoParams: {} },
+  'customAudio/biquadFilter': { nodeGetter: () => new BiquadFilterNode(ctx), protoParams: {} },
+  'customAudio/constantSource': {
+    nodeGetter: () => {
+      const csn = new ConstantSourceNode(ctx);
+      csn.start();
+      return csn;
+    },
+    protoParams: {
+      onDrawForeground: function(this: any, ctx: CanvasRenderingContext2D) {
+        ctx.strokeStyle = '#777';
+        ctx.strokeText(this.properties.offset, 72, 14);
+      },
+    },
   },
 };
 
@@ -91,25 +101,32 @@ export const getForeignNodeType = (foreignNode: ForeignNode) => {
   }
 };
 
-const registerCustomAudioNode = (type: string, nodeGetter: () => ForeignNode) => {
-  function CustomAudioNode(this: any) {
+const registerCustomAudioNode = (
+  type: string,
+  nodeGetter: () => ForeignNode,
+  protoParams: { [key: string]: any }
+) => {
+  function CustomAudioNode(this: any, title: string) {
     // Default Properties
     this.properties = {};
-    this.title = type;
+    this.title = title || type;
 
     this.ctx = new AudioContext();
 
-    const node = nodeGetter();
-    const connectables = buildConnectablesForNode(node, this.id);
+    // Avoid setting connectables if we already have some
+    if (this.connectables) {
+      return;
+    }
+
+    const connectables = buildConnectablesForNode(nodeGetter(), this.id);
 
     // Create empty placeholder connectables
     this.connectables = connectables;
 
     [...connectables.inputs.entries()].forEach(([name, input]) => {
       if (input instanceof AudioParam) {
-        console.log(name, input);
         this.addProperty(name, input.value, 'number');
-        this.addInput(name, 'number');
+        this.addInput(name, 'audio');
       } else {
         // TODO: Look up this type dynamically?
         this.addInput(name, 'audio');
@@ -129,11 +146,16 @@ const registerCustomAudioNode = (type: string, nodeGetter: () => ForeignNode) =>
 
   CustomAudioNode.prototype.onPropertyChanged = LGAudioConnectables.prototype.onPropertyChanged;
   CustomAudioNode.prototype.onConnectionsChange = LGAudioConnectables.prototype.onConnectionsChange;
+  CustomAudioNode.prototype.setConnectables = LGAudioConnectables.prototype.setConnectables;
+
+  Object.entries(protoParams).forEach(([key, val]) => {
+    CustomAudioNode.prototype[key] = val;
+  });
 
   LiteGraph.registerNodeType(type, CustomAudioNode);
 };
 
 export const registerCustomAudioNodes = () =>
-  Object.entries(audioNodeGetters).forEach(([type, nodeGetter]) =>
-    registerCustomAudioNode(type, nodeGetter)
+  Object.entries(audioNodeGetters).forEach(([type, { nodeGetter, protoParams }]) =>
+    registerCustomAudioNode(type, nodeGetter, protoParams)
   );

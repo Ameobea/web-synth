@@ -17,21 +17,23 @@ export function LGAudioConnectables(this: any) {
   this.properties = {};
 
   this.ctx = new AudioContext();
-
-  // Create empty placeholder connectables
-  // this.connectables = create_empty_audio_connectables(this.id.toString());
 }
 
 LGAudioConnectables.prototype.setConnectables = function(
   this: any,
   connectables: AudioConnectables
 ) {
+  if (this.connectables) {
+    return;
+  }
+
   // Store the raw inputs and outputs for later direct access
   this.connectables = connectables;
 
   [...connectables.inputs.entries()].forEach(([name, input]) => {
     if (input instanceof AudioParam) {
       this.addProperty(name, input.value, 'number');
+      this.addInput(name, 'audio');
     } else {
       this.addInput(name, 'audio');
     }
@@ -53,9 +55,7 @@ LGAudioConnectables.prototype.onPropertyChanged = function(name: string, value: 
     return;
   }
 
-  // node.setValueAtTime(value, (this.ctx as AudioContext).currentTime);
   node.value = value;
-  console.log(node);
 };
 
 LGAudioConnectables.prototype.onConnectionsChange = function(

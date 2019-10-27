@@ -79,7 +79,7 @@ export const initPatchNetwork = (
     // Re-use the `AudioNode` from the old connectables if possible, falling back to creating a fresh one
     const node: ForeignNode = Option.of(oldPatchNetwork.connectables.get(id))
       .flatMap(({ node }) => Option.of(node))
-      .getOrElseL(audioNodeGetters[type]!);
+      .getOrElseL(audioNodeGetters[type]!.nodeGetter);
 
     return newConnectablesMap.set(id, buildConnectablesForNode(node, id));
   }, newConnectablesMap);
