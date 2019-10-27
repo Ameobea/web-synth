@@ -4,7 +4,6 @@ import ControlPanel, { Button, Custom } from 'react-control-panel';
 import ace from 'ace-builds';
 import * as R from 'ramda';
 import { Without } from 'ameo-utils';
-// tslint:disable-next-line:no-submodule-imports
 import 'ace-builds/webpack-resolver';
 
 import { ReduxStore, dispatch, actionCreators } from 'src/redux';
@@ -13,13 +12,11 @@ import { EffectPickerCustomInput } from 'src/controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import {
   SpectrumVisualization,
-  initializeSpectrumVisualization,
   defaultSettingsState as defaultVizSettingsState,
   SettingsState as VizSettingsState,
+  initializeSpectrumVisualization,
 } from 'src/visualizations/spectrum';
-import FileUploader from 'src/controls/FileUploader';
-import buildInstance, { analyzerNode } from './buildInstance';
-import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
+import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustAudioNodesMap, get_faust_editor_connectables } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork';
 
@@ -27,7 +24,10 @@ ace.require('ace/theme/twilight');
 
 const ReactAce = React.lazy(() => import('react-ace'));
 
-const audioContext = new AudioContext();
+const ctx = new AudioContext();
+
+export const analyzerNode = ctx.createAnalyser();
+analyzerNode.smoothingTimeConstant = 0.2;
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -64,13 +64,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-// TODO: This shouldn't do connecting and stuff internally; should be refactored to solely construct
-// the instance without connecting it to anything.
 export const compileFaustInstance = async (
   faustCode: string,
-  optimize: boolean,
-  mediaFileSourceNode?: AudioScheduledSourceNode | null,
-  connectSource = true
+  optimize: boolean
 ): Promise<FaustWorkletNode> => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([faustCode], { type: 'text/plain' }));
@@ -86,23 +82,18 @@ export const compileFaustInstance = async (
   }
 
   const wasmInstanceArrayBuffer = await res.arrayBuffer();
-  return buildInstance(wasmInstanceArrayBuffer, mediaFileSourceNode || undefined, connectSource);
+  return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer);
 };
 
 const createCompileButtonClickHandler = (
   faustCode: string,
   optimize: boolean,
   setErrMessage: (errMsg: string) => void,
-  vcId: string,
-  mediaFileSourceNode?: AudioScheduledSourceNode | null
-) => async (useMediaFile: boolean) => {
+  vcId: string
+) => async () => {
   let faustInstance;
   try {
-    faustInstance = await compileFaustInstance(
-      faustCode,
-      optimize,
-      useMediaFile ? mediaFileSourceNode : undefined
-    );
+    faustInstance = await compileFaustInstance(faustCode, optimize);
   } catch (err) {
     console.error(err);
     setErrMessage(err.toString());
@@ -110,15 +101,17 @@ const createCompileButtonClickHandler = (
   }
   setErrMessage('');
 
+  const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
+  if (canvas) {
+    initializeSpectrumVisualization(analyzerNode, canvas);
+    faustInstance.connect(analyzerNode);
+  }
+
   faustAudioNodesMap[vcId] = faustInstance;
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
   const newConnectables = get_faust_editor_connectables(vcId);
   updateConnectables(vcId, newConnectables);
 
-  // Start the audio file playback
-  if (useMediaFile && mediaFileSourceNode) {
-    mediaFileSourceNode.start(0);
-  }
   dispatch(actionCreators.faustEditor.SET_INSTANCE(faustInstance));
 };
 
@@ -147,7 +140,6 @@ const EffectsPickerPanelInner: React.FC<
       label='Load'
       action={() => loadEffect(effects.find(R.propEq('id', state['load effect']))!)}
     />
-    <Custom label='load file' renderContainer={false} Comp={FileUploader} />
   </ControlPanel>
 );
 
@@ -208,10 +200,6 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   editorContent,
   vcId,
 }) => {
-  const [
-    externalAudioBufferSource,
-    setExternalAudioBufferSource,
-  ] = useState<AudioBufferSourceNode | null>(null);
   const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
@@ -228,32 +216,9 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
     updateVizSettings.current(vizSettingsState);
   }, [vizSettingsState]);
 
-  const audioData = controlPanelState['load file'];
-  useEffect(() => {
-    if (!audioData) {
-      return;
-    }
-
-    audioContext.decodeAudioData(
-      audioData.fileContent,
-      decodedAudioData => {
-        const audioBufferSource = audioContext.createBufferSource();
-        audioBufferSource.buffer = decodedAudioData;
-        setExternalAudioBufferSource(audioBufferSource);
-      },
-      err => setCompileErrMsg(`Error decoding provided audio file: ${err}`)
-    );
-  }, [audioData]);
-
   const compile = useCallback(
-    createCompileButtonClickHandler(
-      editorContent,
-      optimize,
-      setCompileErrMsg,
-      vcId,
-      externalAudioBufferSource
-    ),
-    [editorContent, setCompileErrMsg, externalAudioBufferSource, optimize]
+    createCompileButtonClickHandler(editorContent, optimize, setCompileErrMsg, vcId),
+    [editorContent, setCompileErrMsg, optimize]
   );
 
   return (
@@ -274,7 +239,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
       </div>
 
       <div style={styles.buttonsWrapper}>
-        <button onClick={() => compile(false)} style={{ marginRight: 10 }}>
+        <button onClick={compile} style={{ marginRight: 10 }}>
           Compile
         </button>
         Optimize
@@ -290,25 +255,6 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
             }}
           >
             Stop
-          </button>
-        ) : null}
-        {externalAudioBufferSource ? (
-          <button
-            onClick={() => {
-              const canvas = document.getElementById('spectrum-visualizer')! as HTMLCanvasElement;
-              const settingsUpdater = initializeSpectrumVisualization(analyzerNode, canvas);
-              updateVizSettings.current = settingsUpdater;
-              settingsUpdater(vizSettingsState);
-              externalAudioBufferSource.connect(analyzerNode);
-              externalAudioBufferSource.start(0);
-            }}
-          >
-            Start Audio File Playback
-          </button>
-        ) : null}
-        {externalAudioBufferSource ? (
-          <button onClick={() => compile(true)} style={{ marginRight: 10 }}>
-            Compile + Play Audio File
           </button>
         ) : null}
       </div>

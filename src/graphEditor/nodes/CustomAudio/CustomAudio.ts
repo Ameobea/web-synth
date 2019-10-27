@@ -3,7 +3,8 @@ import { UnimplementedError } from 'ameo-utils';
 import { LiteGraph } from 'litegraph.js';
 
 import { AudioConnectables, addNode } from 'src/patchNetwork';
-import { LGAudioConnectables } from './AudioConnectablesNode';
+import { LGAudioConnectables } from '../AudioConnectablesNode';
+import { micNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 
 /**
  * Registers custom versions of the LiteGraph audio nodes.  These are special because their inner `AudioNode`s and `AudioParam`s
@@ -11,12 +12,27 @@ import { LGAudioConnectables } from './AudioConnectablesNode';
  * at the patch network level.
  */
 
-export type ForeignNode = GainNode | ConstantSourceNode | BiquadFilterNode;
+export type ForeignNode =
+  | GainNode
+  | ConstantSourceNode
+  | BiquadFilterNode
+  | AudioBufferSourceNode
+  | AudioDestinationNode
+  | MediaStreamAudioSourceNode;
 
-export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioConnectables => {
-  if (node instanceof GainNode) {
-    return {
-      vcId: id,
+const connectablesBuilders: [
+  any,
+  (
+    node: AudioNode
+  ) => {
+    inputs: Map<string, AudioParam | AudioNode>;
+    outputs: Map<string, AudioNode>;
+    node: AudioNode;
+  }
+][] = [
+  [
+    GainNode,
+    (node: GainNode) => ({
       inputs: Map<string, AudioParam | AudioNode>(
         Object.entries({
           input: node,
@@ -25,17 +41,19 @@ export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioCo
       ),
       outputs: Map<string, AudioNode>().set('output', node),
       node,
-    };
-  } else if (node instanceof ConstantSourceNode) {
-    return {
-      vcId: id,
+    }),
+  ],
+  [
+    ConstantSourceNode,
+    (node: ConstantSourceNode) => ({
       inputs: Map<string, AudioParam | AudioNode>().set('offset', node.offset),
       outputs: Map<string, AudioNode>().set('offset', node),
       node,
-    };
-  } else if (node instanceof BiquadFilterNode) {
-    return {
-      vcId: id,
+    }),
+  ],
+  [
+    BiquadFilterNode,
+    (node: BiquadFilterNode) => ({
       inputs: Map<string, AudioParam | AudioNode>(
         Object.entries({
           frequency: node.frequency,
@@ -46,16 +64,49 @@ export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioCo
       ),
       outputs: Map<string, AudioNode>().set('output', node),
       node,
-    };
-  } else {
+    }),
+  ],
+  [
+    AudioBufferSourceNode,
+    (node: AudioBufferSourceNode) => ({
+      inputs: Map<string, AudioParam | AudioNode>(),
+      outputs: Map<string, AudioNode>().set('output', node),
+      node,
+    }),
+  ],
+  [
+    AudioDestinationNode,
+    (node: AudioDestinationNode) => ({
+      inputs: Map<string, AudioParam | AudioNode>().set('input', node),
+      outputs: Map<string, AudioNode>(),
+      node,
+    }),
+  ],
+  [
+    MediaStreamAudioSourceNode,
+    (node: MediaStreamAudioSourceNode) => ({
+      inputs: Map<string, AudioParam | AudioNode>(),
+      outputs: Map<string, AudioNode>().set('output', node),
+      node,
+    }),
+  ],
+];
+
+export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioConnectables => {
+  const builder = connectablesBuilders.find(([NodeClass]) => node instanceof NodeClass);
+  if (!builder) {
     throw new UnimplementedError(`Node not yet supported: ${node}`);
   }
+  return { ...(builder[1] as any)(node), vcId: id };
 };
 
 const ctx = new AudioContext();
 
 export const audioNodeGetters: {
-  [type: string]: { nodeGetter: () => ForeignNode; protoParams: { [key: string]: any } };
+  [type: string]: {
+    nodeGetter: () => ForeignNode;
+    protoParams: { [key: string]: any };
+  };
 } = {
   'customAudio/gain': { nodeGetter: () => new GainNode(ctx), protoParams: {} },
   'customAudio/biquadFilter': { nodeGetter: () => new BiquadFilterNode(ctx), protoParams: {} },
@@ -72,6 +123,22 @@ export const audioNodeGetters: {
       },
     },
   },
+  'customAudio/audioClip': {
+    nodeGetter: () => new AudioBufferSourceNode(ctx),
+    protoParams: {
+      onDropFile: function(...args: unknown[]) {
+        console.log('Dropped file: ', this, ...args);
+      },
+    },
+  },
+  'customAudio/destination': {
+    nodeGetter: () => ctx.destination,
+    protoParams: {},
+  },
+  'customAudio/microphone': {
+    nodeGetter: () => micNode,
+    protoParams: {},
+  },
 };
 
 export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string => {
@@ -79,6 +146,9 @@ export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string
     'customAudio/gain': 'Gain',
     'customAudio/biquadFilter': 'Biquad Filter',
     'customAudio/constantSource': 'Constant Source',
+    'customAudio/audioClip': 'Audio Clip',
+    'customAudio/destination': 'Destination',
+    'customAudio/microphone': 'Microphone',
   };
 
   const displayName = displayNameByForeignNodeType[foreignNodeType];
@@ -96,6 +166,12 @@ export const getForeignNodeType = (foreignNode: ForeignNode) => {
     return 'customAudio/biquadFilter';
   } else if (foreignNode instanceof ConstantSourceNode) {
     return 'customAudio/constantSource';
+  } else if (foreignNode instanceof AudioBufferSourceNode) {
+    return 'customAudio/audioClip';
+  } else if (foreignNode instanceof AudioDestinationNode) {
+    return 'customAudio/destination';
+  } else if (foreignNode instanceof MediaStreamAudioSourceNode) {
+    return 'customAudio/microphone';
   } else {
     throw new UnimplementedError(`Unable to get node type of unknown foreign node: ${foreignNode}`);
   }
