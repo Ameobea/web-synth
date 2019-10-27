@@ -64,6 +64,21 @@ export const audioNodeGetters: { [type: string]: () => ForeignNode } = {
   },
 };
 
+export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string => {
+  const displayNameByForeignNodeType: { [key: string]: string } = {
+    'customAudio/gain': 'Gain',
+    'customAudio/biquadFilter': 'Biquad Filter',
+    'customAudio/constantSource': 'Constant Source',
+  };
+
+  const displayName = displayNameByForeignNodeType[foreignNodeType];
+  if (!displayName) {
+    console.error(`No display name for foreign node of type ${foreignNodeType}`);
+    return 'Unknown';
+  }
+  return displayName;
+};
+
 export const getForeignNodeType = (foreignNode: ForeignNode) => {
   if (foreignNode instanceof GainNode) {
     return 'customAudio/gain';
@@ -92,7 +107,9 @@ const registerCustomAudioNode = (type: string, nodeGetter: () => ForeignNode) =>
 
     [...connectables.inputs.entries()].forEach(([name, input]) => {
       if (input instanceof AudioParam) {
+        console.log(name, input);
         this.addProperty(name, input.value, 'number');
+        this.addInput(name, 'number');
       } else {
         // TODO: Look up this type dynamically?
         this.addInput(name, 'audio');

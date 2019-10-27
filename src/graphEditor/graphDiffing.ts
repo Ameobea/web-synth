@@ -11,7 +11,10 @@ import {
 } from 'src/graphEditor/LiteGraphTypes';
 import { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
 import { ReduxStore } from 'src/redux';
-import { getForeignNodeType } from 'src/graphEditor/nodes/CustomAudio';
+import {
+  getForeignNodeType,
+  getDisplayNameByForeignNodeType,
+} from 'src/graphEditor/nodes/CustomAudio';
 
 const createAudioConnectablesNode = (
   connectables: AudioConnectables,
@@ -84,7 +87,9 @@ export const updateGraph = (
     const newNode = createAudioConnectablesNode(
       connectables,
       id,
-      foreignAudioNode ? getForeignNodeType(foreignAudioNode) : getVcTitle(activeViewContexts, id)
+      foreignAudioNode
+        ? getDisplayNameByForeignNodeType(getForeignNodeType(foreignAudioNode))
+        : getVcTitle(activeViewContexts, id)
     );
     graph.add(newNode);
   });
