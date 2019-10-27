@@ -2,7 +2,7 @@ import { Map } from 'immutable';
 import { UnimplementedError } from 'ameo-utils';
 import { LiteGraph } from 'litegraph.js';
 
-import { AudioConnectables, addNode } from 'src/patchNetwork';
+import { AudioConnectables, addNode, removeNode } from 'src/patchNetwork';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { micNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 
@@ -218,6 +218,10 @@ const registerCustomAudioNode = (
   CustomAudioNode.prototype.onAdded = function(this: any) {
     this.connectables.vcId = this.id.toString();
     addNode(this.id.toString(), this.connectables);
+  };
+
+  CustomAudioNode.prototype.onRemoved = function(this: any) {
+    removeNode(this.id.toString());
   };
 
   CustomAudioNode.prototype.onPropertyChanged = LGAudioConnectables.prototype.onPropertyChanged;
