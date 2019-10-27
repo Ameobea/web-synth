@@ -4,7 +4,7 @@ import { LiteGraph } from 'litegraph.js';
 
 import { AudioConnectables, addNode, removeNode } from 'src/patchNetwork';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
-import { micNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
+import { micNode, MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 
 /**
  * Registers custom versions of the LiteGraph audio nodes.  These are special because their inner `AudioNode`s and `AudioParam`s
@@ -30,6 +30,15 @@ const connectablesBuilders: [
     node: AudioNode;
   }
 ][] = [
+  [
+    // This must come before `GainNode` because it's also an instance of `GainNode`... >.>
+    MicNode,
+    (node: MicNode) => ({
+      inputs: Map<string, AudioParam | AudioNode>(),
+      outputs: Map<string, AudioNode>().set('output', node),
+      node,
+    }),
+  ],
   [
     GainNode,
     (node: GainNode) => ({
@@ -79,14 +88,6 @@ const connectablesBuilders: [
     (node: AudioDestinationNode) => ({
       inputs: Map<string, AudioParam | AudioNode>().set('input', node),
       outputs: Map<string, AudioNode>(),
-      node,
-    }),
-  ],
-  [
-    MediaStreamAudioSourceNode,
-    (node: MediaStreamAudioSourceNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>(),
-      outputs: Map<string, AudioNode>().set('output', node),
       node,
     }),
   ],
@@ -160,7 +161,10 @@ export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string
 };
 
 export const getForeignNodeType = (foreignNode: ForeignNode) => {
-  if (foreignNode instanceof GainNode) {
+  // This must come before `GainNode` because it's also an instance of `GainNode`... >.>
+  if (foreignNode instanceof MicNode) {
+    return 'customAudio/microphone';
+  } else if (foreignNode instanceof GainNode) {
     return 'customAudio/gain';
   } else if (foreignNode instanceof BiquadFilterNode) {
     return 'customAudio/biquadFilter';
@@ -170,8 +174,6 @@ export const getForeignNodeType = (foreignNode: ForeignNode) => {
     return 'customAudio/audioClip';
   } else if (foreignNode instanceof AudioDestinationNode) {
     return 'customAudio/destination';
-  } else if (foreignNode instanceof MediaStreamAudioSourceNode) {
-    return 'customAudio/microphone';
   } else {
     throw new UnimplementedError(`Unable to get node type of unknown foreign node: ${foreignNode}`);
   }
@@ -182,41 +184,41 @@ const registerCustomAudioNode = (
   nodeGetter: () => ForeignNode,
   protoParams: { [key: string]: any }
 ) => {
-  function CustomAudioNode(this: any, title: string) {
+  function CustomAudioNode(this: any) {
     // Default Properties
     this.properties = {};
-    this.title = title || type;
+    this.title = getDisplayNameByForeignNodeType(type);
 
     this.ctx = new AudioContext();
-
-    // Avoid setting connectables if we already have some
-    if (this.connectables) {
-      return;
-    }
-
-    const connectables = buildConnectablesForNode(nodeGetter(), this.id);
-
-    // Create empty placeholder connectables
-    this.connectables = connectables;
-
-    [...connectables.inputs.entries()].forEach(([name, input]) => {
-      if (input instanceof AudioParam) {
-        this.addProperty(name, input.value, 'number');
-        this.addInput(name, 'audio');
-      } else {
-        // TODO: Look up this type dynamically?
-        this.addInput(name, 'audio');
-      }
-    });
-
-    [...connectables.outputs.entries()].forEach(([name, _output]) => {
-      // TODO: Look up this type dynamically?
-      this.addOutput(name, 'audio');
-    });
   }
 
   CustomAudioNode.prototype.onAdded = function(this: any) {
-    this.connectables.vcId = this.id.toString();
+    if (this.connectables) {
+      this.connectables.vcId = this.id.toString();
+    } else {
+      const connectables = buildConnectablesForNode(nodeGetter(), this.id);
+
+      // Create empty placeholder connectables
+      this.connectables = connectables;
+
+      [...connectables.inputs.entries()].forEach(([name, input]) => {
+        if (input instanceof AudioParam) {
+          this.addProperty(name, input.value, 'number');
+          this.addInput(name, 'audio');
+        } else {
+          // TODO: Look up this type dynamically?
+          this.addInput(name, 'audio');
+        }
+      });
+
+      [...connectables.outputs.entries()].forEach(([name, _output]) => {
+        // TODO: Look up this type dynamically?
+        this.addOutput(name, 'audio');
+      });
+    }
+
+    console.log('adding node: ', this);
+
     addNode(this.id.toString(), this.connectables);
   };
 

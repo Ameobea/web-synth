@@ -72,6 +72,7 @@ export class PolySynth {
   }
 
   public disconnect() {
+    console.log('DISCONNECTING SYNTH');
     this.volume.disconnect();
   }
 }

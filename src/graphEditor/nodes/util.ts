@@ -19,6 +19,7 @@ export const swapAudioNodes = (
     oldAudioNode.disconnect();
   }
   nodeInstance.audionode = newAudioNode;
+  console.log({ nodeInstance });
 
   // connect all inputs to the newly created audio node
   let i = 0;
@@ -55,9 +56,11 @@ export const swapAudioNodes = (
   }
 };
 
-export const createPassthroughNode = (): GainNode => {
+export const createPassthroughNode = <T extends GainNode = GainNode>(
+  Constructor: new (ctx: AudioContext) => T
+): T => {
   const ctx = new AudioContext();
-  const node = new GainNode(ctx);
+  const node = new Constructor(ctx);
   node.gain.setValueAtTime(1, ctx.currentTime);
   return node;
 };

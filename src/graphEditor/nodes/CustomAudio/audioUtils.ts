@@ -24,8 +24,14 @@ export const getMicrophoneStream = (): Promise<MediaStream> =>
     }
   });
 
-export let micNode: MediaStreamAudioSourceNode;
+/**
+ * This is a custom node type that we use to facilitate initializing the patch network and everything else synchronously while also having
+ * to asynchronously initialize the mic stream due to user permissions dialog etc.
+ *
+ * This node will always exist staticly, and then we asynchronously initialize the mic media stream and connect it to this.
+ */
+export class MicNode extends GainNode {}
 
-getMicrophoneStream().then(stream => {
-  micNode = ctx.createMediaStreamSource(stream);
-});
+export const micNode = new MicNode(ctx);
+
+getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect(micNode));

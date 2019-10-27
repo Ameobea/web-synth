@@ -1,14 +1,11 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import BitCrusher from 'tone/Tone/effect/BitCrusher';
 import downloadjs from 'downloadjs';
 
 import { PolySynth } from '../synth';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
 import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
-
-export const mkBitcrusher = () => new BitCrusher(5).toMaster();
 
 interface PolySynthProps {
   synth: PolySynth;
@@ -19,19 +16,6 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
   const onChange = useMemo<(key: string, val: any) => void>(
     () => async (key, val) => {
       switch (key) {
-        case 'bitcrusher': {
-          synth.volume.disconnect();
-          if (val) {
-            // synth.volume.connect(mkBitcrusher());
-          } else {
-            // TODO: we have to store children somewhere so we can disconnect from them
-            // explicitly and `.dispose()` of them properly.  Probably keep an array of children in
-            // `PolySynth` and do that handling there.
-            // synth.volume.toMaster();
-            // synth.volume.output.dispose();
-          }
-          break;
-        }
         case 'volume': {
           synth.volume.set('volume', +val);
           break;
@@ -63,7 +47,7 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
         }
       }
     },
-    [synth]
+    [synth, engine]
   );
 
   return (

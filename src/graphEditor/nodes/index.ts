@@ -1,7 +1,6 @@
 import { getState } from 'src/redux';
 import { fetchEffects } from 'src/controls/EffectPicker';
 import { registerFaustNode } from './Faust';
-import { registerMidiEditorNode } from './MidiEditor';
 import { registerAudioConnectablesNode } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import { registerCustomAudioNodes } from 'src/graphEditor/nodes/CustomAudio';
 
@@ -24,7 +23,6 @@ export const registerAllCustomNodes = async () => {
   }
 
   registerFaustNode(availableModules);
-  registerMidiEditorNode();
   registerAudioConnectablesNode();
   registerCustomAudioNodes();
 };

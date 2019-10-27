@@ -27,8 +27,8 @@ const createAudioConnectablesNode = (
     title,
     {}
   ) as LiteGraphConnectablesNode;
-  node.setConnectables(connectables);
   node.id = vcId.toString();
+  node.setConnectables(connectables);
   return node;
 };
 
@@ -49,32 +49,21 @@ export const updateGraph = (
   patchNetwork: PatchNetwork,
   activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts']
 ) => {
-  const { untouchedNodes, addedNodes, modifiedNodes } = [
-    ...patchNetwork.connectables.entries(),
-  ].reduce(
-    (acc, [key, connectables]) => {
+  const { existingNodes, addedNodes } = [...patchNetwork.connectables.keys()].reduce(
+    (acc, key) => {
       const pairNode = graph._nodes_by_id[key];
       if (R.isNil(pairNode)) {
         return { ...acc, addedNodes: acc.addedNodes.add(key) };
       }
 
-      if (R.equals((pairNode as LiteGraphConnectablesNode).connectables, connectables)) {
-        return { ...acc, untouchedNodes: acc.untouchedNodes.add(key) };
-      }
-
-      return { ...acc, modifiedNodes: acc.modifiedNodes.add(key) };
+      return { ...acc, existingNodes: acc.existingNodes.add(key) };
     },
-    {
-      untouchedNodes: Set<string>(),
-      addedNodes: Set<string>(),
-      modifiedNodes: Set<string>(),
-    }
+    { existingNodes: Set<string>(), addedNodes: Set<string>() }
   );
 
   // Any node present in the map that hasn't been accounted for already has been deleted
   const deletedNodes: Set<string> = Object.keys(graph._nodes_by_id).reduce(
-    (acc, key) =>
-      ![untouchedNodes, addedNodes, modifiedNodes].find(set => set.has(key)) ? acc.add(key) : acc,
+    (acc, key) => (![existingNodes, addedNodes].find(set => set.has(key)) ? acc.add(key) : acc),
     Set() as Set<string>
   );
 
@@ -98,25 +87,6 @@ export const updateGraph = (
 
   // Delete any removed nodes.  This automatically handles disconnecting them internally.
   deletedNodes.forEach(id => graph.remove(graph._nodes_by_id[id]));
-
-  // Any connectables that are non-referentially-equal must be removed and re-created since we assume they have changed
-  modifiedNodes.forEach(id => {
-    const removedNode = graph._nodes_by_id[id] as LiteGraphConnectablesNode | undefined;
-    if (!removedNode) {
-      console.error(`Tried to replace audio node with id ${id} but it wasn't found somehow...`);
-      return;
-    }
-
-    graph.remove(removedNode);
-    const title = getVcTitle(activeViewContexts, removedNode.id.toString());
-    const newNode = createAudioConnectablesNode(
-      patchNetwork.connectables.get(removedNode.id.toString())!,
-      removedNode.id.toString(),
-      title
-    );
-    newNode.id = id.toString();
-    graph.add(newNode);
-  });
 
   // At this point, all nodes should be created/removed and have up-to-date `AudioConnectables`.  We must now run through the list
   // of connections and connect nodes in litegraph to reflect them
@@ -144,14 +114,14 @@ export const updateGraph = (
 
   // Prune existing connections that shouldn't be connected
   Object.values(graph.links).forEach(({ origin_id, origin_slot, target_id, target_slot }) => {
-    const linkExists = Option.of(connectionsByNode.get(origin_id))
+    const linkExists = Option.of(connectionsByNode.get(origin_id.toString()))
       .flatMap(conns =>
         Option.of(
           !!conns.find(conn => {
             const srcNode = getNode(conn[0].vcId)!;
             return (
               conn[0].name === srcNode.outputs[origin_slot].name &&
-              conn[1].vcId === target_id &&
+              conn[1].vcId === target_id.toString() &&
               conn[1].name === getNode(conn[1].vcId)!.inputs[target_slot].name
             );
           })
@@ -164,8 +134,8 @@ export const updateGraph = (
     }
 
     // Disconnect the link
-    const srcNode = getNode(origin_id)!;
-    const dstNode = getNode(target_id)!;
+    const srcNode = getNode(origin_id.toString())!;
+    const dstNode = getNode(target_id.toString())!;
 
     const disconnectionSuccessful = srcNode.disconnectOutput(origin_slot, dstNode);
     if (!disconnectionSuccessful) {
@@ -211,13 +181,14 @@ export const updateGraph = (
         .filter(R.identity)
         .find(
           ({ origin_id, origin_slot, target_id, target_slot }) =>
-            origin_id === connection[0].vcId &&
+            origin_id.toString() === connection[0].vcId &&
             origin_slot === srcSlotIx &&
-            target_id === connection[1].vcId &&
+            target_id.toString() === connection[1].vcId &&
             target_slot === dstSlotIx
         );
 
       if (!connectionExists) {
+        console.log('CONNECTING LITEGRAPH NODES DUE TO GRAPH DIFFING: ', srcNode, dstNode);
         srcNode.connect(srcSlotIx, dstNode, dstSlotIx);
       }
     },

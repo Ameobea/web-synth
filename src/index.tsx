@@ -2,15 +2,12 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import * as R from 'ramda';
-import Tone from 'tone';
 import { Try } from 'funfix-core';
 
 const wasm = import('./engine');
 import App from './App';
 import { actionCreators, dispatch, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
-
-(window as any).Tone = Tone;
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
@@ -174,7 +171,7 @@ export const cleanup_midi_editor_ui = () => {
   ATTR_COUNTER = 0;
 };
 
-export const update_active_view_contexts = (
+export const init_view_contexts = (
   activeViewContextIx: number,
   activeVcsJson: string,
   connectionsJson: string,
@@ -216,6 +213,22 @@ export const update_active_view_contexts = (
     )
   );
 };
+
+export const add_view_context = (id: string, name: string) => {
+  const engine = getEngine()!; // Must exist because this gets called *from the engine*.
+  dispatch(
+    actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, engine.get_vc_connectables(id))
+  );
+  dispatch(actionCreators.viewContextManager.ADD_VIEW_CONTEXT(id, name));
+};
+
+export const delete_view_context = (id: string) => {
+  dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(id));
+  dispatch(actionCreators.viewContextManager.DELETE_VIEW_CONTEXT(id));
+};
+
+export const set_active_vc_ix = (newActiveVxIx: number) =>
+  dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
 
 wasm.then(engine => {
   engineHandle = engine;

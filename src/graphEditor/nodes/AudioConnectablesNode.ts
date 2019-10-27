@@ -23,12 +23,9 @@ LGAudioConnectables.prototype.setConnectables = function(
   this: any,
   connectables: AudioConnectables
 ) {
-  if (this.connectables) {
-    return;
-  }
-
   // Store the raw inputs and outputs for later direct access
   this.connectables = connectables;
+  this.connectables.vcId = this.id.toString();
 
   [...connectables.inputs.entries()].forEach(([name, input]) => {
     if (input instanceof AudioParam) {

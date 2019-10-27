@@ -21,11 +21,6 @@ const actionGroups = {
       instance,
     }),
     subReducer: (state: FaustEditorState, action) => {
-      // Disconnect the old instance if there is one
-      if (state.instance) {
-        state.instance.disconnect();
-      }
-
       // Construct a new control panel instance for the newly created module
       const controlPanel = buildControlPanel(
         action.instance.jsonDef.ui,
@@ -38,14 +33,7 @@ const actionGroups = {
   }),
   CLEAR_ACTIVE_INSTANCE: buildActionGroup({
     actionCreator: () => ({ type: 'CLEAR_ACTIVE_INSTANCE' }),
-    subReducer: (state: FaustEditorState) => {
-      // Disconnect the old instance if there is one
-      if (state.instance) {
-        state.instance.disconnect();
-      }
-
-      return { ...state, controlPanel: null, instance: null };
-    },
+    subReducer: (state: FaustEditorState) => ({ ...state, controlPanel: null, instance: null }),
   }),
   SET_EDITOR_CONTENT: buildActionGroup({
     actionCreator: (content: string) => ({ type: 'SET_EDITOR_CONTENT', content }),

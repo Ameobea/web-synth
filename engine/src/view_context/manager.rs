@@ -109,7 +109,9 @@ struct ViewContextManagerState {
     pub foreign_connectables: Vec<ForeignConnectable>,
 }
 
-fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
+fn get_vc_key(uuid: Uuid) -> String {
+    format!("vc_{}", uuid)
+}
 
 impl ViewContextManager {
     /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
@@ -134,6 +136,8 @@ impl ViewContextManager {
         name: String,
         view_context: Box<dyn ViewContext>,
     ) -> usize {
+        js::add_view_context(&uuid.to_string(), &name);
+
         let created_ix = self.add_view_context_inner(
             MinimalViewContextDefinition {
                 uuid,
@@ -142,7 +146,8 @@ impl ViewContextManager {
             },
             view_context,
         );
-        self.commit();
+
+        self.save_all();
         created_ix
     }
 
@@ -165,7 +170,7 @@ impl ViewContextManager {
                     id
                 );
                 return;
-            },
+            }
         };
 
         self.set_active_view(ix);
@@ -182,14 +187,14 @@ impl ViewContextManager {
                         vc_id, VCM_STATE_KEY
                     );
                     continue;
-                },
+                }
             };
             let definition: ViewContextDefinition = match serde_json::from_str(&definition_str) {
                 Ok(definition) => definition,
                 Err(err) => {
                     error!("Error deserializing `ViewContextDefinition`: {:?}", err);
                     continue;
-                },
+                }
             };
 
             let mut view_context = build_view(
@@ -255,7 +260,7 @@ impl ViewContextManager {
             Err(err) => {
                 error!("Error deserializing stored VCM state: {:?}", err);
                 None
-            },
+            }
         })
     }
 
@@ -305,7 +310,7 @@ impl ViewContextManager {
         let foreign_connectables_json = serde_json::to_string(&self.foreign_connectables)
             .expect("Failed to JSON serialize foreign connectables");
 
-        js::update_active_view_contexts(
+        js::init_view_contexts(
             self.active_context_ix,
             &definitions_str,
             &connections_json,
@@ -329,7 +334,7 @@ impl ViewContextManager {
             None => {
                 error!("Tried to delete a VC with ID {} but it wasn't found.", id);
                 return;
-            },
+            }
         };
 
         let mut vc_entry = self.contexts.remove(ix);
@@ -340,6 +345,7 @@ impl ViewContextManager {
         // Finally delete the VC entry for the VC itself
         js::delete_localstorage_key(&get_vc_key(id));
 
+        let old_active_vc_ix = self.active_context_ix;
         if self.active_context_ix == ix {
             // If the deleted VC was the active VC, pick the one before it to be the active VC.
             self.active_context_ix = ix.saturating_sub(1);
@@ -352,7 +358,12 @@ impl ViewContextManager {
             vc_entry.context.init();
         }
 
-        self.commit();
+        js::delete_view_context(&id.to_string());
+        if old_active_vc_ix != self.active_context_ix {
+            js::set_active_vc_ix(self.active_context_ix);
+        }
+
+        self.save_all();
     }
 
     /// Serializes all managed view contexts and saves them to persistent storage.
@@ -392,7 +403,7 @@ impl ViewContextManager {
         self.get_active_view_mut().hide();
         self.active_context_ix = view_ix;
         self.get_active_view_mut().unhide();
-        self.commit();
+        js::set_active_vc_ix(view_ix);
     }
 
     pub fn set_connections(

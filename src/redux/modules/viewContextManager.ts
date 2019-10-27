@@ -222,6 +222,7 @@ const actionGroups = {
       const [fromNode, toNode] = connectedPair;
 
       // Perform the disconnection
+      console.log('DISCONNECTING DUE TO EXPLICIT ACTION: ', fromNode, toNode);
       (fromNode as any).disconnect(toNode);
 
       const newConnections = [...connections].filter(
@@ -290,6 +291,7 @@ const actionGroups = {
         if (!connectedPair) {
           return false;
         }
+        console.log('DISCONNECTING DUE TO DELETED PATCH NETWORK NODE: ', ...connectedPair);
         (connectedPair[0] as any).disconnect(connectedPair[1]);
         return false;
       });
@@ -315,7 +317,7 @@ const actionGroups = {
       vcId,
       newConnectables,
     }),
-    subReducer: (state: VCMState, { vcId, newConnectables }) => {
+    subReducer: (state: VCMState, { vcId, newConnectables: newConnectablesForNode }) => {
       const { connectables, connections } = state.patchNetwork;
 
       // All we have to do is disconnect any connections that are connected to inputs/outputs on the altered node that
@@ -326,46 +328,120 @@ const actionGroups = {
           ...state,
           patchNetwork: {
             ...state.patchNetwork,
-            connectables: connectables.set(vcId, newConnectables),
+            connectables: connectables.set(vcId, newConnectablesForNode),
           },
         };
       }
+      const newConnectables = connectables.set(vcId, newConnectablesForNode);
 
-      // TODO: Disconnect all connections, delete connections that are no longer valid, and re-connect valid connections to
-      // the new connectables rather than leaving them connected to the old one
+      // Inputs and outputs that aren't present on the new connectables must be disconnected and deleted completely
       const deletedInputNames: Set<string> = [...oldConnectables.inputs.keys()].reduce(
-        (acc, key) => (newConnectables.inputs.get(key) ? acc : acc.add(key)),
+        (acc, key) => (newConnectablesForNode.inputs.get(key) ? acc : acc.add(key)),
         Set()
       );
       const deletedOutputNames: Set<string> = [...oldConnectables.outputs.keys()].reduce(
-        (acc, key) => (newConnectables.outputs.get(key) ? acc : acc.add(key)),
+        (acc, key) => (newConnectablesForNode.outputs.get(key) ? acc : acc.add(key)),
         Set()
       );
 
       const newConnections = connections.filter(([from, to]) => {
         if (from.vcId !== vcId && to.vcId !== vcId) {
           return true;
-        } else if (deletedOutputNames.has(from.name) || deletedInputNames.has(to.name)) {
-          return true;
         }
 
-        const connectedPair = getConnectedPair(connectables, from, to);
-        if (!connectedPair) {
+        // If an underlying input or output has been deleted, the connection must be deleted as well.
+        if (deletedOutputNames.has(from.name) || deletedInputNames.has(to.name)) {
+          const connectedPair = getConnectedPair(connectables, from, to);
+          if (!connectedPair) {
+            return false;
+          }
+
+          console.log('DISCONNECTING: ', ...connectedPair);
+          (connectedPair[0] as any).disconnect(connectedPair[1]);
           return false;
         }
 
-        (connectedPair[0] as any).disconnect(connectedPair[1]);
-        return false;
+        // Inputs and outputs that exist on both the old connectables and the new ones must be checked.  If the underlying node or param
+        // is referrentially equal, we can keep it connected.  Otherwise, we must delete it and re-create.
+        const needsReconnect = (() => {
+          const weAreOutput = from.vcId === vcId;
+
+          if (weAreOutput) {
+            const oldOutputNode = oldConnectables.outputs.get(from.name);
+            if (oldOutputNode && oldOutputNode !== newConnectablesForNode.outputs.get(from.name)) {
+              return true;
+            }
+            return false;
+          } else {
+            const oldInputNode = oldConnectables.inputs.get(to.name);
+            if (oldInputNode && oldInputNode !== newConnectablesForNode.inputs.get(to.name)) {
+              return true;
+            }
+            return false;
+          }
+        })();
+
+        if (needsReconnect) {
+          const oldConnectedPair = getConnectedPair(connectables, from, to);
+          if (!oldConnectedPair) {
+            console.error(
+              "Tried to get connected pair to disconnect from old connectables but it wasn't found: ",
+              connectables,
+              from,
+              to
+            );
+            return;
+          }
+
+          console.log('DISCONNECTING FROM OLD CONNECTABLES: ', ...oldConnectedPair);
+          (oldConnectedPair[0] as any).disconnect(oldConnectedPair[1]);
+
+          const newConnectedPair = getConnectedPair(newConnectables, from, to);
+          if (!newConnectedPair) {
+            console.error(
+              "Tried to get connected pair to re-connect to new connectables but it wasn't found: ",
+              newConnectables,
+              from,
+              to
+            );
+            return;
+          }
+          console.log('RECONNECTING TO NEW CONNECTABLES: ');
+          (newConnectedPair[0] as any).connect(newConnectedPair[1]);
+        }
+
+        return true;
       });
 
       return {
         ...state,
         patchNetwork: {
-          connectables: connectables.set(vcId, newConnectables),
+          connectables: newConnectables,
           connections: newConnections,
         },
       };
     },
+  }),
+  ADD_VIEW_CONTEXT: buildActionGroup({
+    actionCreator: (uuid: string, name: string) => ({ type: 'ADD_VIEW_CONTEXT', uuid, name }),
+    subReducer: (state: VCMState, { uuid, name }) => ({
+      ...state,
+      activeViewContexts: [...state.activeViewContexts, { uuid, name }],
+    }),
+  }),
+  DELETE_VIEW_CONTEXT: buildActionGroup({
+    actionCreator: (uuid: string) => ({ type: 'DELETE_VIEW_CONTEXT', uuid }),
+    subReducer: (state: VCMState, { uuid }) => ({
+      ...state,
+      activeViewContexts: state.activeViewContexts.filter(entry => entry.uuid !== uuid),
+    }),
+  }),
+  SET_ACTIVE_VC_IX: buildActionGroup({
+    actionCreator: (newActiveVcIx: number) => ({ type: 'SET_ACTIVE_VC_IX', newActiveVcIx }),
+    subReducer: (state: VCMState, { newActiveVcIx }) => ({
+      ...state,
+      activeViewContextIx: newActiveVcIx,
+    }),
   }),
 };
 

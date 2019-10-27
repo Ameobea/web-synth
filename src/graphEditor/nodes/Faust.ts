@@ -12,6 +12,7 @@ import { swapAudioNodes } from './util';
 
 export const registerFaustNode = (availableModules: Effect[]) => {
   function LGFaustModule(this: any) {
+    console.log('Creating raw faust module node');
     // Create a placeholder `audionode` that prevents errors from getting thrown when the node is
     // first created, before it has compiled its code.
     const audioCtx: AudioContext = LGAudio.getAudioContext();

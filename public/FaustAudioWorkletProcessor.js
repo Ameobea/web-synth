@@ -180,7 +180,6 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
         }
         case 'init': {
           await this.initWithModule(event.data.dspArrayBuffer);
-          this.log('Initialized!!!');
           this.port.postMessage({ jsonDef: this.jsonDef });
           break;
         }

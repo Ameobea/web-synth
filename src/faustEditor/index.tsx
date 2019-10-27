@@ -82,7 +82,7 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     // Create passthrough audio node with the same interface as the `FaustAudioWorklet`-based ones that will be created later
     // once our Faust code is compiled.  This should cause any connections made before the faust module is started to be re-
     // connected to the real faust node once it is started.
-    const passthroughNode = createPassthroughNode();
+    const passthroughNode = createPassthroughNode(GainNode);
     return {
       vcId,
       inputs: Map<string, AudioParam | AudioNode>().set('input', passthroughNode),

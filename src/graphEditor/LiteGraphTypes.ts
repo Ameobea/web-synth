@@ -32,9 +32,9 @@ export interface LiteGraphConnectablesNode extends LiteGraphNode {
 }
 
 export interface LiteGraphLink {
-  origin_id: string;
+  origin_id: string | number;
   origin_slot: number;
-  target_id: string;
+  target_id: string | number;
   target_slot: number;
 }
 
