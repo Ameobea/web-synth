@@ -1,18 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { actionCreators, dispatch, store } from '../redux';
+import { store } from '../redux';
 import CompositionSharing from './CompositionSharing';
 import { Provider } from 'react-redux';
 import { getEngine } from '..';
 
 const ROOT_NODE_ID = 'composition-sharing-react-root' as const;
 
-export const init_composition_sharing = (stateKey: string) => {
-  // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
-  const editorContent = localStorage.getItem(stateKey) || '';
-  dispatch(actionCreators.faustEditor.SET_EDITOR_CONTENT(editorContent));
-
+export const init_composition_sharing = (_stateKey: string) => {
   // Create the base dom node for the faust editor
   const faustEditorBase = document.createElement('div');
   faustEditorBase.id = ROOT_NODE_ID;

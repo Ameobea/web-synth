@@ -1,4 +1,3 @@
-use serde;
 use serde_json;
 use uuid::Uuid;
 

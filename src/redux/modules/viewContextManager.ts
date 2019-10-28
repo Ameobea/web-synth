@@ -368,17 +368,23 @@ const actionGroups = {
           const weAreOutput = from.vcId === vcId;
 
           if (weAreOutput) {
-            const oldOutputNode = oldConnectables.outputs.get(from.name);
-            if (oldOutputNode && oldOutputNode !== newConnectablesForNode.outputs.get(from.name)) {
-              return true;
-            }
-            return false;
+            const oldOutputConnectable = oldConnectables.outputs.get(from.name);
+            return (
+              oldOutputConnectable &&
+              oldOutputConnectable.node !==
+                Option.of(newConnectablesForNode.outputs.get(from.name))
+                  .map(R.prop('node'))
+                  .orNull()
+            );
           } else {
-            const oldInputNode = oldConnectables.inputs.get(to.name);
-            if (oldInputNode && oldInputNode !== newConnectablesForNode.inputs.get(to.name)) {
-              return true;
-            }
-            return false;
+            const oldInputConnectable = oldConnectables.inputs.get(to.name);
+            return (
+              oldInputConnectable &&
+              oldInputConnectable.node !==
+                Option.of(newConnectablesForNode.inputs.get(to.name))
+                  .map(R.prop('node'))
+                  .orNull()
+            );
           }
         })();
 

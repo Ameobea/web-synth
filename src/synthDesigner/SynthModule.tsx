@@ -4,7 +4,8 @@ import ControlPanel from 'react-control-panel';
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
 import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
-import { getReduxInfra } from 'src/synthDesigner';
+import { getReduxInfra, get_synth_designer_audio_connectables } from 'src/synthDesigner';
+import { updateConnectables } from 'src/patchNetwork';
 
 const SYNTH_SETTINGS = [
   {
@@ -59,7 +60,12 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule; stateKey: s
     <div className='synth-module'>
       <div
         className='synth-remove-button'
-        onClick={() => dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(index))}
+        onClick={() => {
+          dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(index));
+          const vcId = stateKey.split('_')[1]!;
+          const newConnectables = get_synth_designer_audio_connectables(stateKey);
+          updateConnectables(vcId, newConnectables);
+        }}
       >
         X
       </div>

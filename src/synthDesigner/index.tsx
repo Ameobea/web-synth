@@ -137,12 +137,12 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
   return {
     vcId: stateKey.split('vc_')[1]!,
     inputs: synths.reduce(
-      // TODO: Set the rest of these params once we know how to
       (acc, synth, i) =>
         acc
           .set(`synth_${i}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
           .set(`synth_${i}_filter_frequency`, { node: synth.filterCSNs.frequency, type: 'number' })
-          .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' }),
+          .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' })
+          .set(`synth_${i}_filter_detune`, { node: synth.filterCSNs.detune, type: 'number' }),
       Map<string, { node: AudioParam | AudioNode; type: string }>()
     ),
     outputs: spectrumNode

@@ -117,4 +117,5 @@ extern "C" {
     pub fn hide_synth_designer(vc_id: &str);
     pub fn unhide_synth_designer(vc_id: &str);
     pub fn cleanup_synth_designer(state_key: &str) -> String;
+    pub fn get_synth_designer_audio_connectables(state_key: &str) -> JsValue;
 }

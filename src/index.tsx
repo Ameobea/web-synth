@@ -216,10 +216,10 @@ export const init_view_contexts = (
 
 export const add_view_context = (id: string, name: string) => {
   const engine = getEngine()!; // Must exist because this gets called *from the engine*.
+  dispatch(actionCreators.viewContextManager.ADD_VIEW_CONTEXT(id, name));
   dispatch(
     actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, engine.get_vc_connectables(id))
   );
-  dispatch(actionCreators.viewContextManager.ADD_VIEW_CONTEXT(id, name));
 };
 
 export const delete_view_context = (id: string) => {

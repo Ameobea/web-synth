@@ -1,3 +1,5 @@
+import * as R from 'ramda';
+
 import { getState } from 'src/redux';
 import { fetchEffects } from 'src/controls/EffectPicker';
 import { registerFaustNode } from './Faust';
@@ -7,7 +9,7 @@ import { registerCustomAudioNodes } from 'src/graphEditor/nodes/CustomAudio';
 /**
  * Registers all custom node types so that they can be used with the graph editor
  */
-export const registerAllCustomNodes = async () => {
+export const registerAllCustomNodes = R.once(async () => {
   // Fetch the list of all available Faust modules if we don't have it loaded
   let availableModules:
     | {
@@ -25,4 +27,4 @@ export const registerAllCustomNodes = async () => {
   registerFaustNode(availableModules);
   registerAudioConnectablesNode();
   registerCustomAudioNodes();
-};
+});

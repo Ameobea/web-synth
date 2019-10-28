@@ -13,7 +13,12 @@ import {
   initializeSpectrumVisualization,
 } from 'src/visualizations/spectrum';
 import MidiKeyboard from 'src/synthDesigner/MidiKeyboard';
-import { SynthDesignerReduxStore, getReduxInfra } from 'src/synthDesigner';
+import {
+  SynthDesignerReduxStore,
+  getReduxInfra,
+  get_synth_designer_audio_connectables,
+} from 'src/synthDesigner';
+import { updateConnectables } from 'src/patchNetwork';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -110,7 +115,12 @@ const SynthDesigner: React.FC<
 
         <button
           style={{ marginTop: 6 }}
-          onClick={() => dispatch(actionCreators.synthDesigner.ADD_SYNTH_MODULE())}
+          onClick={() => {
+            const vcId = stateKey.split('_')[1]!;
+            dispatch(actionCreators.synthDesigner.ADD_SYNTH_MODULE());
+            const newConnectables = get_synth_designer_audio_connectables(stateKey);
+            updateConnectables(vcId, newConnectables);
+          }}
         >
           Add Synth Module
         </button>

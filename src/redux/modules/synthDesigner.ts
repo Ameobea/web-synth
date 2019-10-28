@@ -478,11 +478,11 @@ const actionGroups = {
     actionCreator: () => ({ type: 'ADD_SYNTH_MODULE' }),
     subReducer: (state: SynthDesignerState) => {
       const newModule = buildDefaultSynthModule();
-      newModule.voices
-        .map(R.prop('outerGainNode'))
-        .forEach(outerGainNode =>
-          outerGainNode.connect(Option.of(state.wavyJonesInstance).getOrElse(ctx.destination))
-        );
+      if (state.wavyJonesInstance) {
+        newModule.voices
+          .map(R.prop('outerGainNode'))
+          .forEach(outerGainNode => outerGainNode.connect(state.wavyJonesInstance!));
+      }
 
       return {
         ...state,
@@ -756,7 +756,6 @@ const actionGroups = {
 
       if (state.spectrumNode) {
         instance.connect(state.spectrumNode);
-        state.spectrumNode.connect(ctx.destination);
       }
 
       return { ...state, wavyJonesInstance: instance };
@@ -888,7 +887,6 @@ const actionGroups = {
 
       spectrumNode.disconnect();
       state.wavyJonesInstance.connect(spectrumNode);
-      spectrumNode.connect(ctx.destination);
 
       return { ...state, spectrumNode };
     },
