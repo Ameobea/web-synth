@@ -188,7 +188,6 @@ export const updateGraph = (
         );
 
       if (!connectionExists) {
-        console.log('CONNECTING LITEGRAPH NODES DUE TO GRAPH DIFFING: ', srcNode, dstNode);
         srcNode.connect(srcSlotIx, dstNode, dstSlotIx);
       }
     },

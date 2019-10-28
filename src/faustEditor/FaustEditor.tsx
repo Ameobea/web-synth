@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useEffect, Suspense, useRef } from 'react';
-import { connect } from 'react-redux';
+import { connect, Provider } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import ace from 'ace-builds';
 import * as R from 'ramda';
-import { Without } from 'ameo-utils';
+import { Without, PropTypesOf } from 'ameo-utils';
 import 'ace-builds/webpack-resolver';
 
-import { ReduxStore, dispatch, actionCreators } from 'src/redux';
+import { faustReduxInfra } from 'src/faustEditor';
 import { Effect } from 'src/redux/modules/effects';
 import { EffectPickerCustomInput } from 'src/controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
@@ -19,8 +19,11 @@ import {
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustAudioNodesMap, get_faust_editor_connectables } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork';
+import { ReduxStore, store } from 'src/redux';
 
 ace.require('ace/theme/twilight');
+
+type FaustEditorReduxStore = typeof faustReduxInfra.__fullState;
 
 const ReactAce = React.lazy(() => import('react-ace'));
 
@@ -112,7 +115,7 @@ const createCompileButtonClickHandler = (
   const newConnectables = get_faust_editor_connectables(vcId);
   updateConnectables(vcId, newConnectables);
 
-  dispatch(actionCreators.faustEditor.SET_INSTANCE(faustInstance));
+  faustReduxInfra.dispatch(faustReduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustInstance));
 };
 
 const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: ReduxStore) => ({
@@ -122,7 +125,7 @@ const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: Redux
 /**
  * Creates a control panel that contains controls for browsing + loading shared/saved effects
  */
-const EffectsPickerPanelInner: React.FC<
+const EffectsPickerPanelInnerInner: React.FC<
   {
     state: { [key: string]: any };
     setState: (newState: object) => void;
@@ -143,7 +146,20 @@ const EffectsPickerPanelInner: React.FC<
   </ControlPanel>
 );
 
-const EffectsPickerPanel = connect(mapEffectsPickerPanelStateToProps)(EffectsPickerPanelInner);
+const EffectsPickerPanelInner = connect(mapEffectsPickerPanelStateToProps)(
+  EffectsPickerPanelInnerInner
+);
+
+const EffectsPickerPanel: React.FC<
+  Omit<
+    PropTypesOf<typeof EffectsPickerPanelInnerInner>,
+    keyof ReturnType<typeof mapEffectsPickerPanelStateToProps>
+  >
+> = ({ ...props }) => (
+  <Provider store={store}>
+    <EffectsPickerPanelInner {...props} />
+  </Provider>
+);
 
 const SaveControls = ({ editorContent }: { editorContent: string }) => {
   const initialState = { title: '', description: '', saveStatus: '' };
@@ -188,7 +204,7 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   );
 };
 
-const mapStateToProps = ({ faustEditor }: ReduxStore) => ({
+const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) => ({
   instance: faustEditor.instance,
   controlPanel: faustEditor.controlPanel,
   editorContent: faustEditor.editorContent,
@@ -228,7 +244,11 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
           theme='twilight'
           mode='text'
           showPrintMargin={false}
-          onChange={newValue => dispatch(actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue))}
+          onChange={newValue =>
+            faustReduxInfra.dispatch(
+              faustReduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue)
+            )
+          }
           name='ace-editor'
           width='40vw'
           value={editorContent}
@@ -247,7 +267,9 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         {instance ? (
           <button
             onClick={() => {
-              dispatch(actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE());
+              faustReduxInfra.dispatch(
+                faustReduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
+              );
 
               // Create new audio connectables using a passthrough node
               delete faustAudioNodesMap[vcId];
@@ -281,7 +303,9 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         state={controlPanelState}
         setState={setControlPanelState}
         loadEffect={(effect: Effect) =>
-          dispatch(actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code))
+          faustReduxInfra.dispatch(
+            faustReduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
+          )
         }
       />
     </Suspense>

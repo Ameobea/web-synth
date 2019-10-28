@@ -98,7 +98,6 @@ export const initPatchNetwork = (
       const dst = toConnectablesReal.inputs.get(to.name)!;
 
       // Make TypeScript happy
-      console.log('DISCONNECTING OLD CONNECTING WHILE INITING PATCH NETWORK: ', src, dst);
       if (dst instanceof AudioParam) {
         src.disconnect(dst);
       } else {
@@ -132,7 +131,6 @@ export const initPatchNetwork = (
     }
 
     // Perform the connection
-    console.log('CONNECTING DURING INITIALIZATION: ', ...connectedPair);
     (connectedPair[0] as any).connect(connectedPair[1]);
     return true;
   });

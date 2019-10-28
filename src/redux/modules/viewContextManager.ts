@@ -150,11 +150,6 @@ const actionGroups = {
             to2.vcId === to2.vcId
         )
       ) {
-        console.warn(
-          `A connection already exists between ${JSON.stringify(from)} and ${JSON.stringify(
-            to
-          )}; performing no action`
-        );
         return state;
       }
 
@@ -222,7 +217,6 @@ const actionGroups = {
       const [fromNode, toNode] = connectedPair;
 
       // Perform the disconnection
-      console.log('DISCONNECTING DUE TO EXPLICIT ACTION: ', fromNode, toNode);
       (fromNode as any).disconnect(toNode);
 
       const newConnections = [...connections].filter(
@@ -291,7 +285,6 @@ const actionGroups = {
         if (!connectedPair) {
           return false;
         }
-        console.log('DISCONNECTING DUE TO DELETED PATCH NETWORK NODE: ', ...connectedPair);
         (connectedPair[0] as any).disconnect(connectedPair[1]);
         return false;
       });
@@ -356,7 +349,6 @@ const actionGroups = {
             return false;
           }
 
-          console.log('DISCONNECTING: ', ...connectedPair);
           (connectedPair[0] as any).disconnect(connectedPair[1]);
           return false;
         }
@@ -393,7 +385,6 @@ const actionGroups = {
             return;
           }
 
-          console.log('DISCONNECTING FROM OLD CONNECTABLES: ', ...oldConnectedPair);
           (oldConnectedPair[0] as any).disconnect(oldConnectedPair[1]);
 
           const newConnectedPair = getConnectedPair(newConnectables, from, to);

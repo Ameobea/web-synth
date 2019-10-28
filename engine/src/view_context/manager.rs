@@ -136,16 +136,16 @@ impl ViewContextManager {
         name: String,
         view_context: Box<dyn ViewContext>,
     ) -> usize {
-        js::add_view_context(&uuid.to_string(), &name);
-
         let created_ix = self.add_view_context_inner(
             MinimalViewContextDefinition {
                 uuid,
-                name,
+                name: name.clone(),
                 title: None,
             },
             view_context,
         );
+
+        js::add_view_context(&uuid.to_string(), &name);
 
         self.save_all();
         created_ix
@@ -204,7 +204,6 @@ impl ViewContextManager {
             );
 
             view_context.init();
-            // TODO: pre-render the view contexts as hidden so this isn't necessary
             view_context.hide();
 
             self.add_view_context_inner(definition.minimal_def, view_context);

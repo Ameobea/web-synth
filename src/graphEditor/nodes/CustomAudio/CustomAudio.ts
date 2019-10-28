@@ -217,8 +217,6 @@ const registerCustomAudioNode = (
       });
     }
 
-    console.log('adding node: ', this);
-
     addNode(this.id.toString(), this.connectables);
   };
 
