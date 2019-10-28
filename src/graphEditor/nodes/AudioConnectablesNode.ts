@@ -28,31 +28,31 @@ LGAudioConnectables.prototype.setConnectables = function(
   this.connectables.vcId = this.id.toString();
 
   [...connectables.inputs.entries()].forEach(([name, input]) => {
-    if (input instanceof AudioParam) {
-      this.addProperty(name, input.value, 'number');
-      this.addInput(name, 'audio');
+    if (input.node instanceof AudioParam) {
+      this.addProperty(name, input.node.value, input.type);
+      this.addInput(name, input.type);
     } else {
-      this.addInput(name, 'audio');
+      this.addInput(name, input.type);
     }
   });
 
-  [...connectables.outputs.entries()].forEach(([name, _output]) => {
+  [...connectables.outputs.entries()].forEach(([name, output]) => {
     // TODO: Look up this type dynamically?
-    this.addOutput(name, 'audio');
+    this.addOutput(name, output.type);
   });
 };
 
 LGAudioConnectables.prototype.onPropertyChanged = function(name: string, value: any) {
-  const node = (this.connectables as AudioConnectables).inputs.get(name);
-  if (!node) {
+  const connectable = (this.connectables as AudioConnectables).inputs.get(name);
+  if (!connectable) {
     console.error(`No input named "${name}" found on connectables for node`);
     return;
-  } else if (!(node instanceof AudioParam)) {
+  } else if (!(connectable.node instanceof AudioParam)) {
     console.error(`Input named "${name}" is not an instance of \`AudioParam\``);
     return;
   }
 
-  node.value = value;
+  connectable.node.value = value;
 };
 
 LGAudioConnectables.prototype.onConnectionsChange = function(

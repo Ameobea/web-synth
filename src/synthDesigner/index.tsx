@@ -28,7 +28,7 @@ export type SynthDesignerReduxStore = ReturnType<
   ReturnType<typeof buildSynthDesignerRedux>['getState']
 >;
 
-const ROOT_NODE_ID = 'synth-designer-react-root' as const;
+const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 
 /**
  * Global map of state key to Redux infrastructure
@@ -78,7 +78,8 @@ export const init_synth_designer = (stateKey: string) => {
 
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');
-  synthDesignerBase.id = ROOT_NODE_ID;
+  const vcId = stateKey.split('_')[1]!;
+  synthDesignerBase.id = getRootNodeId(vcId);
   synthDesignerBase.setAttribute(
     'style',
     'z-index: 2; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0;'
@@ -95,7 +96,7 @@ export const init_synth_designer = (stateKey: string) => {
 };
 
 export const hide_synth_designer = (vcId: string) => {
-  const rootNode = document.getElementById(ROOT_NODE_ID);
+  const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
     console.warn(`Tried to hide synth designer with id ${vcId} but it wasn't mounted`);
     return;
@@ -105,7 +106,7 @@ export const hide_synth_designer = (vcId: string) => {
 };
 
 export const unhide_synth_designer = (vcId: string) => {
-  const rootNode = document.getElementById(ROOT_NODE_ID);
+  const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
     console.warn(`Tried to unhide synth designer with id ${vcId} but it wasn't mounted`);
     return;
@@ -119,7 +120,8 @@ export const cleanup_synth_designer = (stateKey: string): string => {
   const designerState = JSON.stringify({
     synths: synths.map(serializeSynthModule),
   });
-  const rootNode = document.getElementById(ROOT_NODE_ID);
+  const vcId = stateKey.split('_')[1]!;
+  const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
     return designerState;
   }
@@ -136,11 +138,18 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
     vcId: stateKey.split('vc_')[1]!,
     inputs: synths.reduce(
       // TODO: Set the rest of these params once we know how to
-      (acc, synth, i) => acc.set(`synth_${i}_detune`, synth.detuneCSN.offset),
-      Map<string, AudioParam | AudioNode>()
+      (acc, synth, i) =>
+        acc
+          .set(`synth_${i}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
+          .set(`synth_${i}_filter_frequency`, { node: synth.filterCSNs.frequency, type: 'number' })
+          .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' }),
+      Map<string, { node: AudioParam | AudioNode; type: string }>()
     ),
     outputs: spectrumNode
-      ? Map<string, AudioNode>().set('masterOutput', spectrumNode)
-      : Map<string, AudioNode>(),
+      ? Map<string, { node: AudioNode; type: string }>().set('masterOutput', {
+          node: spectrumNode,
+          type: 'customAudio',
+        })
+      : Map<string, { node: AudioNode; type: string }>(),
   };
 };

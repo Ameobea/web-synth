@@ -20,74 +20,86 @@ export type ForeignNode =
   | AudioDestinationNode
   | MediaStreamAudioSourceNode;
 
-const connectablesBuilders: [
-  any,
-  (
-    node: AudioNode
-  ) => {
-    inputs: Map<string, AudioParam | AudioNode>;
-    outputs: Map<string, AudioNode>;
-    node: AudioNode;
-  }
-][] = [
+const connectablesBuilders: [any, (node: AudioNode) => Omit<AudioConnectables, 'vcId'>][] = [
   [
     // This must come before `GainNode` because it's also an instance of `GainNode`... >.>
     MicNode,
     (node: MicNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>(),
-      outputs: Map<string, AudioNode>().set('output', node),
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(),
+      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+        node,
+        type: 'customAudio',
+      }),
       node,
     }),
   ],
   [
     GainNode,
     (node: GainNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>(
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(
         Object.entries({
-          input: node,
-          gain: node.gain,
+          input: { node: node, type: 'customAudio' },
+          gain: { node: node.gain, type: 'number' },
         })
       ),
-      outputs: Map<string, AudioNode>().set('output', node),
+      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+        node,
+        type: 'customAudio',
+      }),
       node,
     }),
   ],
   [
     ConstantSourceNode,
     (node: ConstantSourceNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>().set('offset', node.offset),
-      outputs: Map<string, AudioNode>().set('offset', node),
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('offset', {
+        node: node.offset,
+        type: 'number',
+      }),
+      outputs: Map<string, { node: AudioNode; type: string }>().set('offset', {
+        node,
+        type: 'number',
+      }),
       node,
     }),
   ],
   [
     BiquadFilterNode,
     (node: BiquadFilterNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>(
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(
         Object.entries({
-          frequency: node.frequency,
-          Q: node.Q,
-          detune: node.detune,
-          gain: node.gain,
+          frequency: { node: node.frequency, type: 'number' },
+          Q: { node: node.Q, type: 'number' },
+          detune: { node: node.detune, type: 'number' },
+          gain: { node: node.gain, type: 'number' },
         })
       ),
-      outputs: Map<string, AudioNode>().set('output', node),
+      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+        node,
+        type: 'customAudio',
+      }),
       node,
     }),
   ],
   [
     AudioBufferSourceNode,
     (node: AudioBufferSourceNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>(),
-      outputs: Map<string, AudioNode>().set('output', node),
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(),
+      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+        node,
+        type: 'customAudio',
+      }),
       node,
     }),
   ],
   [
     AudioDestinationNode,
     (node: AudioDestinationNode) => ({
-      inputs: Map<string, AudioParam | AudioNode>().set('input', node),
-      outputs: Map<string, AudioNode>(),
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
+        node,
+        type: 'customAudio',
+      }),
+      outputs: Map<string, { node: AudioNode; type: string }>(),
       node,
     }),
   ],
@@ -98,7 +110,7 @@ export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioCo
   if (!builder) {
     throw new UnimplementedError(`Node not yet supported: ${node}`);
   }
-  return { ...(builder[1] as any)(node), vcId: id };
+  return { ...builder[1](node), vcId: id };
 };
 
 const ctx = new AudioContext();
@@ -203,17 +215,15 @@ const registerCustomAudioNode = (
 
       [...connectables.inputs.entries()].forEach(([name, input]) => {
         if (input instanceof AudioParam) {
-          this.addProperty(name, input.value, 'number');
-          this.addInput(name, 'audio');
+          this.addProperty(name, input.node, input.type);
+          this.addInput(name, input.type);
         } else {
-          // TODO: Look up this type dynamically?
-          this.addInput(name, 'audio');
+          this.addInput(name, input.type);
         }
       });
 
-      [...connectables.outputs.entries()].forEach(([name, _output]) => {
-        // TODO: Look up this type dynamically?
-        this.addOutput(name, 'audio');
+      [...connectables.outputs.entries()].forEach(([name, output]) => {
+        this.addOutput(name, output.type);
       });
     }
 

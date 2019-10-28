@@ -12,8 +12,8 @@ import {
 
 export interface AudioConnectables {
   vcId: string;
-  inputs: Map<string, AudioParam | AudioNode>;
-  outputs: Map<string, AudioNode>;
+  inputs: Map<string, { node: AudioParam | AudioNode; type: string }>;
+  outputs: Map<string, { node: AudioNode; type: string }>;
   /**
    * This is used by custom audio nodes to re-use foreign audio nodes when re-initializing/updating the patch network.  Without this,
    * we'd have to re-create the connectables from scratch using a new audio node, which would require creating a new audio node,
@@ -98,10 +98,10 @@ export const initPatchNetwork = (
       const dst = toConnectablesReal.inputs.get(to.name)!;
 
       // Make TypeScript happy
-      if (dst instanceof AudioParam) {
-        src.disconnect(dst);
+      if (dst.node instanceof AudioParam) {
+        src.node.disconnect(dst.node);
       } else {
-        src.disconnect(dst);
+        src.node.disconnect(dst.node);
       }
 
       return false;
@@ -130,8 +130,17 @@ export const initPatchNetwork = (
       return false;
     }
 
+    if (connectedPair[0].type !== connectedPair[1].type) {
+      console.error(
+        'Invalid connection found when initializing patch network; mis-matched types: ',
+        { ...connectedPair[0], name: from.name, vcId: from.vcId },
+        { ...connectedPair[1], name: to.name, vcId: to.vcId }
+      );
+      return false;
+    }
+
     // Perform the connection
-    (connectedPair[0] as any).connect(connectedPair[1]);
+    (connectedPair[0].node as any).connect(connectedPair[1].node);
     return true;
   });
 

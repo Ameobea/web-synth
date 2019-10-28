@@ -31,6 +31,9 @@ export const create_midi_editor_audio_connectables = (vcId: string): AudioConnec
   return {
     vcId,
     inputs: Map(),
-    outputs: Map<string, AudioNode>().set('synth', synth.volume),
+    outputs: Map<string, { node: AudioNode; type: string }>().set('synth', {
+      node: synth.volume,
+      type: 'customAudio',
+    }),
   };
 };

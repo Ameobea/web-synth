@@ -92,14 +92,26 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     const passthroughNode = createPassthroughNode(GainNode);
     return {
       vcId,
-      inputs: Map<string, AudioParam | AudioNode>().set('input', passthroughNode),
-      outputs: Map<string, AudioNode>().set('output', passthroughNode),
+      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
+        node: passthroughNode,
+        type: 'customAudio',
+      }),
+      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+        node: passthroughNode,
+        type: 'customAudio',
+      }),
     };
   }
 
   return {
     vcId,
-    inputs: Map<string, AudioParam | AudioNode>().set('input', faustNode),
-    outputs: Map<string, AudioNode>().set('output', faustNode),
+    inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
+      node: faustNode,
+      type: 'customAudio',
+    }),
+    outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+      node: faustNode,
+      type: 'customAudio',
+    }),
   };
 };

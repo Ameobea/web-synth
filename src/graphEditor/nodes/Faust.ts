@@ -12,7 +12,6 @@ import { swapAudioNodes } from './util';
 
 export const registerFaustNode = (availableModules: Effect[]) => {
   function LGFaustModule(this: any) {
-    console.log('Creating raw faust module node');
     // Create a placeholder `audionode` that prevents errors from getting thrown when the node is
     // first created, before it has compiled its code.
     const audioCtx: AudioContext = LGAudio.getAudioContext();
@@ -30,8 +29,8 @@ export const registerFaustNode = (availableModules: Effect[]) => {
     this.compileActiveInstance();
 
     // TODO: Make this dynamic based off of Faust module definition or sth
-    this.addInput('in', 'audio');
-    this.addOutput('out', 'audio');
+    this.addInput('in', 'customAudio');
+    this.addOutput('out', 'customAudio');
   }
 
   LGFaustModule.prototype.compileActiveInstance = async function() {
@@ -54,7 +53,7 @@ export const registerFaustNode = (availableModules: Effect[]) => {
     }
   };
 
-  // idk what this does but I copy/pasted it from the script processor example
+  // This is copy/pasted from the script processor example
   LGFaustModule.default_function = function(this: any) {
     this.onaudioprocess = function(audioProcessingEvent: AudioProcessingEvent) {
       // The input buffer is the song we loaded earlier

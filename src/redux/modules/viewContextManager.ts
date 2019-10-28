@@ -157,10 +157,19 @@ const actionGroups = {
       if (!connectedPair) {
         return state;
       }
-      const [fromNode, toNode] = connectedPair;
+      const [fromConnectable, toConnectable] = connectedPair;
+
+      if (fromConnectable.type !== toConnectable.type) {
+        console.warn(
+          'Tried to connect two connectables of different types: ',
+          fromConnectable,
+          toConnectable
+        );
+        return state;
+      }
 
       // Perform the connection
-      (fromNode as any).connect(toNode);
+      (fromConnectable.node as any).connect(toConnectable.node);
 
       const newConnections = [
         ...connections,
@@ -214,10 +223,10 @@ const actionGroups = {
       if (!connectedPair) {
         return state;
       }
-      const [fromNode, toNode] = connectedPair;
+      const [fromConnectable, toConnectable] = connectedPair;
 
       // Perform the disconnection
-      (fromNode as any).disconnect(toNode);
+      (fromConnectable.node as any).disconnect(toConnectable.node);
 
       const newConnections = [...connections].filter(
         ([from2, to2]) =>
@@ -285,7 +294,7 @@ const actionGroups = {
         if (!connectedPair) {
           return false;
         }
-        (connectedPair[0] as any).disconnect(connectedPair[1]);
+        (connectedPair[0].node as any).disconnect(connectedPair[1].node);
         return false;
       });
 
@@ -349,7 +358,7 @@ const actionGroups = {
             return false;
           }
 
-          (connectedPair[0] as any).disconnect(connectedPair[1]);
+          (connectedPair[0].node as any).disconnect(connectedPair[1].node);
           return false;
         }
 
@@ -385,7 +394,7 @@ const actionGroups = {
             return;
           }
 
-          (oldConnectedPair[0] as any).disconnect(oldConnectedPair[1]);
+          (oldConnectedPair[0].node as any).disconnect(oldConnectedPair[1].node);
 
           const newConnectedPair = getConnectedPair(newConnectables, from, to);
           if (!newConnectedPair) {
@@ -397,8 +406,7 @@ const actionGroups = {
             );
             return;
           }
-          console.log('RECONNECTING TO NEW CONNECTABLES: ');
-          (newConnectedPair[0] as any).connect(newConnectedPair[1]);
+          (newConnectedPair[0].node as any).connect(newConnectedPair[1].node);
         }
 
         return true;

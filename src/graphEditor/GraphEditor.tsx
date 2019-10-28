@@ -81,13 +81,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
   }, [patchNetwork, lGraphInstance, activeViewContexts]);
 
   const uiControls = useMemo(
-    () =>
-      lGraphInstance
-        ? {
-            arrange: () => lGraphInstance.arrange(),
-            clear: () => lGraphInstance.clear(),
-          }
-        : {},
+    () => (lGraphInstance ? { arrange: () => lGraphInstance.arrange() } : {}),
     [lGraphInstance]
   );
 
@@ -102,7 +96,6 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
 
       <ControlPanel>
         <Button label='arrange' action={uiControls.arrange} />
-        <Button label='clear' action={uiControls.clear} />
       </ControlPanel>
     </div>
   );
