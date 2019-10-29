@@ -358,6 +358,7 @@ impl ViewContextManager {
 
         js::delete_view_context(&id.to_string());
         if old_active_vc_ix != self.active_context_ix {
+            self.get_active_view_mut().unhide();
             js::set_active_vc_ix(self.active_context_ix);
         }
 

@@ -117,9 +117,7 @@ export const unhide_synth_designer = (vcId: string) => {
 
 export const cleanup_synth_designer = (stateKey: string): string => {
   const { synths } = getReduxInfra(stateKey).getState().synthDesigner;
-  const designerState = JSON.stringify({
-    synths: synths.map(serializeSynthModule),
-  });
+  const designerState = JSON.stringify({ synths: synths.map(serializeSynthModule) });
   const vcId = stateKey.split('_')[1]!;
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
@@ -135,7 +133,7 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
   const { synths, spectrumNode } = getReduxInfra(stateKey).getState().synthDesigner;
 
   return {
-    vcId: stateKey.split('vc_')[1]!,
+    vcId: stateKey.split('_')[1]!,
     inputs: synths.reduce(
       (acc, synth, i) =>
         acc

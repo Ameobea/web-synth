@@ -38,7 +38,10 @@ const getVcTitle = (
 ): string =>
   Option.of(activeViewContexts.find(R.propEq('uuid', id)))
     .flatMap(({ title, name }) => Option.of(title).orElse(Option.of(name)))
-    .getOrElse('Untitled');
+    .getOrElseL(() => {
+      console.warn(`Unable to find view context with id "${id}"`);
+      return 'Untitled';
+    });
 
 /**
  * Updates the provided `LiteGraph` `graph` to match the state of the provided `PatchNetwork` `patchNetwork`.  Nodes are
@@ -49,28 +52,32 @@ export const updateGraph = (
   patchNetwork: PatchNetwork,
   activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts']
 ) => {
-  const { existingNodes, addedNodes } = [...patchNetwork.connectables.keys()].reduce(
-    (acc, key) => {
+  const { modifiedNodes, unchangedNodes, addedNodes } = [
+    ...patchNetwork.connectables.entries(),
+  ].reduce(
+    (acc, [key, connectables]) => {
       const pairNode = graph._nodes_by_id[key];
       if (R.isNil(pairNode)) {
         return { ...acc, addedNodes: acc.addedNodes.add(key) };
+      } else if (connectables !== pairNode.connectables) {
+        return { ...acc, modifiedNodes: acc.modifiedNodes.add(key) };
       }
 
-      return { ...acc, existingNodes: acc.existingNodes.add(key) };
+      return { ...acc, unchangedNodes: acc.unchangedNodes.add(key) };
     },
-    { existingNodes: Set<string>(), addedNodes: Set<string>() }
+    { modifiedNodes: Set<string>(), unchangedNodes: Set<string>(), addedNodes: Set<string>() }
   );
 
   // Any node present in the map that hasn't been accounted for already has been deleted
   const deletedNodes: Set<string> = Object.keys(graph._nodes_by_id).reduce(
-    (acc, key) => (![existingNodes, addedNodes].find(set => set.has(key)) ? acc.add(key) : acc),
+    (acc, key) =>
+      ![modifiedNodes, unchangedNodes, addedNodes].find(set => set.has(key)) ? acc.add(key) : acc,
     Set() as Set<string>
   );
 
   // Now, we just have to handle all of these computed diffs to synchronize the LiteGraph graph with the patch network
 
-  // Create all new nodes, leaving them unconnected for now
-  addedNodes.forEach(id => {
+  const createAndAddNode = (id: string, params?: { [key: string]: any }) => {
     // Time complexity sucks here
     const connectables = patchNetwork.connectables.get(id)!;
     const foreignAudioNode = patchNetwork.connectables.get(id)!.node;
@@ -82,11 +89,34 @@ export const updateGraph = (
         : getVcTitle(activeViewContexts, id),
       foreignAudioNode ? getForeignNodeType(foreignAudioNode) : null
     );
+
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        newNode[key] = val;
+      });
+    }
+
     graph.add(newNode);
-  });
+  };
+
+  // Create all new nodes, leaving them unconnected for now
+  addedNodes.forEach(id => createAndAddNode(id));
 
   // Delete any removed nodes.  This automatically handles disconnecting them internally.
   deletedNodes.forEach(id => graph.remove(graph._nodes_by_id[id]));
+
+  // Delete and re-create any modified nodes.  Connections will be resolved later.
+  modifiedNodes.forEach(key => {
+    const node = graph._nodes_by_id[key];
+    if (!node) {
+      throw new Error("Tried to remove a node that didn't exist");
+    }
+
+    // Don't trigger patch network actions since these changes are purely presentational
+    node.ignoreRemove = true;
+    graph.remove(node);
+    createAndAddNode(key, { ignoreAdd: true });
+  });
 
   // At this point, all nodes should be created/removed and have up-to-date `AudioConnectables`.  We must now run through the list
   // of connections and connect nodes in litegraph to reflect them

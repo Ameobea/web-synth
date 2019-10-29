@@ -227,11 +227,15 @@ const registerCustomAudioNode = (
       });
     }
 
-    addNode(this.id.toString(), this.connectables);
+    if (!this.ignoreAdd) {
+      addNode(this.id.toString(), this.connectables);
+    }
   };
 
   CustomAudioNode.prototype.onRemoved = function(this: any) {
-    removeNode(this.id.toString());
+    if (!this.ignoreRemove) {
+      removeNode(this.id.toString());
+    }
   };
 
   CustomAudioNode.prototype.onPropertyChanged = LGAudioConnectables.prototype.onPropertyChanged;

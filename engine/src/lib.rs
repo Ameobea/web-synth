@@ -98,9 +98,10 @@ pub fn init() {
 #[wasm_bindgen]
 pub fn create_view_context(vc_name: String) {
     let uuid = uuid_v4();
-    let view_context = build_view(&vc_name, None, uuid);
+    let mut view_context = build_view(&vc_name, None, uuid);
+    view_context.init();
     let vcm = get_vcm();
-    let new_vc_ix = vcm.add_view_context(uuid_v4(), vc_name, view_context);
+    let new_vc_ix = vcm.add_view_context(uuid, vc_name, view_context);
     vcm.set_active_view(new_vc_ix);
 }
 
