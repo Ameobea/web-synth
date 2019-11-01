@@ -19,7 +19,7 @@ export interface VCMState {
 }
 
 export const getConnectedPair = (
-  connectables: Map<string, AudioConnectables>,
+  connectables: Map<string, AudioConnectables | null>,
   from: ConnectableDescriptor,
   to: ConnectableDescriptor
 ) => {
@@ -252,12 +252,16 @@ const actionGroups = {
     },
   }),
   ADD_PATCH_NETWORK_NODE: buildActionGroup({
-    actionCreator: (vcId: string, connectables: AudioConnectables) => ({
+    actionCreator: (vcId: string, connectables: AudioConnectables | null) => ({
       type: 'ADD_PATCH_NETWORK_NODE',
       vcId,
       connectables,
     }),
     subReducer: (state: VCMState, { vcId, connectables }) => {
+      if (!connectables) {
+        return state;
+      }
+
       const engine = getEngine();
       if (!engine) {
         console.error('Engine handle was not set when trying to delete node');

@@ -58,5 +58,5 @@ pub trait ViewContext {
     /// Returns a JavaScript object that contains WebAudio constructs that can be used to connect
     /// this `ViewContext` to other `ViewContext`s programatically.  This function should return
     /// the same object throughout the life of the view context.
-    fn get_audio_connectables(&self) -> JsValue { create_empty_audio_connectables(&self.get_id()) }
+    fn get_audio_connectables(&self) -> JsValue { JsValue::null() }
 }

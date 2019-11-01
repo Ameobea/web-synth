@@ -5,6 +5,7 @@ import { LiteGraph } from 'litegraph.js';
 import { AudioConnectables, addNode, removeNode } from 'src/patchNetwork';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { micNode, MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
+import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
 
 /**
  * Registers custom versions of the LiteGraph audio nodes.  These are special because their inner `AudioNode`s and `AudioParam`s
@@ -18,9 +19,13 @@ export type ForeignNode =
   | BiquadFilterNode
   | AudioBufferSourceNode
   | AudioDestinationNode
-  | MediaStreamAudioSourceNode;
+  | MicNode
+  | MixerNode;
 
-const connectablesBuilders: [any, (node: AudioNode) => Omit<AudioConnectables, 'vcId'>][] = [
+const connectablesBuilders: [
+  any,
+  (node: ForeignNode, vcId: string) => Omit<AudioConnectables, 'vcId'>
+][] = [
   [
     // This must come before `GainNode` because it's also an instance of `GainNode`... >.>
     MicNode,
@@ -103,6 +108,7 @@ const connectablesBuilders: [any, (node: AudioNode) => Omit<AudioConnectables, '
       node,
     }),
   ],
+  [MixerNode, (node: MixerNode) => node.buildConnectables()],
 ];
 
 export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioConnectables => {
@@ -110,14 +116,14 @@ export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioCo
   if (!builder) {
     throw new UnimplementedError(`Node not yet supported: ${node}`);
   }
-  return { ...builder[1](node), vcId: id };
+  return { ...builder[1](node, id), vcId: id };
 };
 
 const ctx = new AudioContext();
 
 export const audioNodeGetters: {
   [type: string]: {
-    nodeGetter: () => ForeignNode;
+    nodeGetter: (vcId: string) => ForeignNode;
     protoParams: { [key: string]: any };
   };
 } = {
@@ -152,6 +158,14 @@ export const audioNodeGetters: {
     nodeGetter: () => micNode,
     protoParams: {},
   },
+  'customAudio/mixer': {
+    nodeGetter: (vcId: string) => new MixerNode(vcId),
+    protoParams: {
+      onDrawForeground: function(this: any, ctx: CanvasRenderingContext2D) {
+        // TODO
+      },
+    },
+  },
 };
 
 export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string => {
@@ -162,6 +176,7 @@ export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string
     'customAudio/audioClip': 'Audio Clip',
     'customAudio/destination': 'Destination',
     'customAudio/microphone': 'Microphone',
+    'customAudio/mixer': 'Mixer',
   };
 
   const displayName = displayNameByForeignNodeType[foreignNodeType];
@@ -186,6 +201,8 @@ export const getForeignNodeType = (foreignNode: ForeignNode) => {
     return 'customAudio/audioClip';
   } else if (foreignNode instanceof AudioDestinationNode) {
     return 'customAudio/destination';
+  } else if (foreignNode instanceof MixerNode) {
+    return 'customAudio/mixer';
   } else {
     throw new UnimplementedError(`Unable to get node type of unknown foreign node: ${foreignNode}`);
   }
@@ -193,7 +210,7 @@ export const getForeignNodeType = (foreignNode: ForeignNode) => {
 
 const registerCustomAudioNode = (
   type: string,
-  nodeGetter: () => ForeignNode,
+  nodeGetter: (vcId: string) => ForeignNode,
   protoParams: { [key: string]: any }
 ) => {
   function CustomAudioNode(this: any) {
@@ -205,10 +222,11 @@ const registerCustomAudioNode = (
   }
 
   CustomAudioNode.prototype.onAdded = function(this: any) {
+    const id = this.id.toString();
     if (this.connectables) {
-      this.connectables.vcId = this.id.toString();
+      this.connectables.vcId = id;
     } else {
-      const connectables = buildConnectablesForNode(nodeGetter(), this.id);
+      const connectables = buildConnectablesForNode(nodeGetter(id), this.id);
 
       // Create empty placeholder connectables
       this.connectables = connectables;

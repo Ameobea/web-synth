@@ -67,19 +67,18 @@ export const initPatchNetwork = (
   }
 
   // Create connectables for all nodes
-  let newConnectablesMap = viewContexts.reduce(
-    (newConnectablesMap, { uuid }) =>
-      // TODO: Deal with default connections?
-      newConnectablesMap.set(uuid, engine.get_vc_connectables(uuid)),
-    Map<string, AudioConnectables>()
-  );
+  let newConnectablesMap = viewContexts.reduce((newConnectablesMap, { uuid }) => {
+    // TODO: Deal with default connections?
+    const connectables = engine.get_vc_connectables(uuid);
+    return connectables ? newConnectablesMap.set(uuid, connectables) : newConnectablesMap;
+  }, Map<string, AudioConnectables>());
 
   // Create connectables for foreign nodes
   newConnectablesMap = foreignConnectables.reduce((newConnectablesMap, { type, id }) => {
     // Re-use the `AudioNode` from the old connectables if possible, falling back to creating a fresh one
     const node: ForeignNode = Option.of(oldPatchNetwork.connectables.get(id))
       .flatMap(({ node }) => Option.of(node))
-      .getOrElseL(audioNodeGetters[type]!.nodeGetter);
+      .getOrElseL(() => audioNodeGetters[type]!.nodeGetter(id));
 
     return newConnectablesMap.set(id, buildConnectablesForNode(node, id));
   }, newConnectablesMap);
@@ -93,6 +92,10 @@ export const initPatchNetwork = (
         newConnectablesMap.get(from.vcId))!;
       const toConnectablesReal: AudioConnectables = (toConnectables ||
         newConnectablesMap.get(to.vcId))!;
+
+      if (!fromConnectablesReal || !toConnectablesReal) {
+        return false;
+      }
 
       const src = fromConnectablesReal.outputs.get(from.name)!;
       const dst = toConnectablesReal.inputs.get(to.name)!;
