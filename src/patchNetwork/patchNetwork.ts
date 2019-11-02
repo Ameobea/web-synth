@@ -10,10 +10,24 @@ import {
   ForeignNode,
 } from 'src/graphEditor/nodes/CustomAudio';
 
+export interface MIDINode {
+  connect: (dst: MIDINode) => void;
+  disconnect: (dst?: MIDINode) => void;
+  /**
+   * Returns a function that, when called, triggers an input on this MIDI node.  Must return the exact same object
+   * each time it's called.
+   */
+  getInputCbs: () => {
+    onAttack: (note: number, voiceIx: number, velocity: number) => void;
+    onRelease: (note: number, voiceIx: number, velocity: number) => void;
+    onPitchBend: (bendAmount: number) => void;
+  };
+}
+
 export interface AudioConnectables {
   vcId: string;
-  inputs: Map<string, { node: AudioParam | AudioNode; type: string }>;
-  outputs: Map<string, { node: AudioNode; type: string }>;
+  inputs: Map<string, { node: AudioParam | AudioNode | MIDINode; type: string }>;
+  outputs: Map<string, { node: AudioNode | MIDINode; type: string }>;
   /**
    * This is used by custom audio nodes to re-use foreign audio nodes when re-initializing/updating the patch network.  Without this,
    * we'd have to re-create the connectables from scratch using a new audio node, which would require creating a new audio node,
@@ -48,8 +62,14 @@ export const addNode = (vcId: string, connectables: AudioConnectables) =>
 export const removeNode = (vcId: string) =>
   dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(vcId));
 
-export const updateConnectables = (vcId: string, newConnectables: AudioConnectables) =>
+export const updateConnectables = (vcId: string, newConnectables: AudioConnectables) => {
+  if (!newConnectables) {
+    console.trace(`Tried to update connectables for VC ${vcId} with nil connectables object`);
+    return;
+  }
+
   dispatch(actionCreators.viewContextManager.UPDATE_CONNECTABLES(vcId, newConnectables));
+};
 
 /**
  * Clear the state of the patch network, re-initializing it from scratch given the provided set of view contexts and
@@ -58,7 +78,11 @@ export const updateConnectables = (vcId: string, newConnectables: AudioConnectab
 export const initPatchNetwork = (
   oldPatchNetwork: PatchNetwork,
   viewContexts: VCMState['activeViewContexts'],
-  foreignConnectables: { type: string; id: string }[],
+  foreignConnectables: {
+    type: string;
+    id: string;
+    serializedState?: { [key: string]: any } | null;
+  }[],
   connections: VCMState['patchNetwork']['connections']
 ): PatchNetwork => {
   const engine = getEngine();
@@ -74,43 +98,41 @@ export const initPatchNetwork = (
   }, Map<string, AudioConnectables>());
 
   // Create connectables for foreign nodes
-  newConnectablesMap = foreignConnectables.reduce((newConnectablesMap, { type, id }) => {
-    // Re-use the `AudioNode` from the old connectables if possible, falling back to creating a fresh one
-    const node: ForeignNode = Option.of(oldPatchNetwork.connectables.get(id))
-      .flatMap(({ node }) => Option.of(node))
-      .getOrElseL(() => audioNodeGetters[type]!.nodeGetter(id));
+  newConnectablesMap = foreignConnectables.reduce(
+    (newConnectablesMap, { type, id, serializedState }) => {
+      // Re-use the `AudioNode` from the old connectables if possible, falling back to creating a fresh one
+      const node: ForeignNode = Option.of(oldPatchNetwork.connectables.get(id))
+        .flatMap(({ node }) => Option.of(node))
+        .getOrElseL(() => audioNodeGetters[type]!.nodeGetter(id, serializedState));
 
-    return newConnectablesMap.set(id, buildConnectablesForNode(node, id));
-  }, newConnectablesMap);
+      return newConnectablesMap.set(id, buildConnectablesForNode(node, id));
+    },
+    newConnectablesMap
+  );
 
   const newConnections = oldPatchNetwork.connections.filter(([from, to]) => {
     const fromConnectables = oldPatchNetwork.connectables.get(from.vcId);
     const toConnectables = oldPatchNetwork.connectables.get(to.vcId);
 
-    if (fromConnectables || toConnectables) {
-      const fromConnectablesReal: AudioConnectables = (fromConnectables ||
-        newConnectablesMap.get(from.vcId))!;
-      const toConnectablesReal: AudioConnectables = (toConnectables ||
-        newConnectablesMap.get(to.vcId))!;
+    if (!fromConnectables && !toConnectables) {
+      return true;
+    }
 
-      if (!fromConnectablesReal || !toConnectablesReal) {
-        return false;
-      }
+    const fromConnectablesReal: AudioConnectables = (fromConnectables ||
+      newConnectablesMap.get(from.vcId))!;
+    const toConnectablesReal: AudioConnectables = (toConnectables ||
+      newConnectablesMap.get(to.vcId))!;
 
-      const src = fromConnectablesReal.outputs.get(from.name)!;
-      const dst = toConnectablesReal.inputs.get(to.name)!;
-
-      // Make TypeScript happy
-      if (dst.node instanceof AudioParam) {
-        src.node.disconnect(dst.node);
-      } else {
-        src.node.disconnect(dst.node);
-      }
-
+    if (!fromConnectablesReal || !toConnectablesReal) {
       return false;
     }
 
-    return true;
+    const src = fromConnectablesReal.outputs.get(from.name)!;
+    const dst = toConnectablesReal.inputs.get(to.name)!;
+
+    (src.node as any).disconnect(dst.node);
+
+    return false;
   });
 
   // Perform new connections

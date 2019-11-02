@@ -9,8 +9,11 @@ export class MixerNode {
   private outputNode = new GainNode(ctx);
   private vcId: string;
 
-  constructor(vcId: string) {
+  public lgNode: any;
+
+  constructor(vcId: string, lgNode?: any) {
     this.vcId = vcId;
+    this.lgNode = lgNode;
   }
 
   public addInput() {
@@ -31,7 +34,7 @@ export class MixerNode {
     updateConnectables(this.vcId, this.buildConnectables());
   }
 
-  public buildConnectables(): AudioConnectables {
+  public buildConnectables(): AudioConnectables & { node: NonNullable<AudioConnectables['node']> } {
     return {
       inputs: this.gainNodes.reduce(
         (acc, gainNode, i) =>
@@ -48,6 +51,7 @@ export class MixerNode {
         type: 'customAudio',
       }),
       vcId: this.vcId,
+      node: this,
     };
   }
 }

@@ -49,8 +49,32 @@ export const getConnectedPair = (
 };
 
 /**
- * Checks to see if connections and/or foreign nodes have changed between two versions of the patch network.  If they have, trigger
- * the Rust VCM state to be updated with the new state.
+ * Commits the state of the provided `patchNetwork`'s foreign connectables to the Rust/Wasm engine,
+ * triggering their state to be serialized and saved to `localStorage` in the process.
+ */
+export const commitForeignConnectables = (
+  engine: typeof import('src/engine'),
+  foreignConnectables: Map<string, AudioConnectables>
+) =>
+  engine.set_foreign_connectables(
+    JSON.stringify(
+      [...foreignConnectables.values()].map(({ vcId, node }) => {
+        if (!node) {
+          throw new Error("Foreign connectables didn't have a `node`");
+        }
+
+        return {
+          id: vcId.toString(),
+          type: getForeignNodeType(node),
+          serializedState: node.serialize ? node.serialize() : null,
+        };
+      })
+    )
+  );
+
+/**
+ * Checks to see if connections and/or foreign nodes have changed between two versions of the patch network.
+ * If they have, trigger the Rust VCM state to be updated with the new state.
  */
 const maybeUpdateVCM = (
   engine: typeof import('src/engine'),
@@ -83,14 +107,7 @@ const maybeUpdateVCM = (
     }
 
     if (!foreignConnectablesUnchanged) {
-      engine.set_foreign_connectables(
-        JSON.stringify(
-          [...newForeignConnectables.values()].map(({ vcId, node }) => ({
-            id: vcId.toString(),
-            type: getForeignNodeType(node!),
-          }))
-        )
-      );
+      commitForeignConnectables(engine, newForeignConnectables);
     }
   }, 0);
 };
@@ -99,7 +116,7 @@ const actionGroups = {
   SET_VCM_STATE: buildActionGroup({
     actionCreator: (
       newState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'> & {
-        foreignConnectables: { type: string; id: string }[];
+        foreignConnectables: { type: string; id: string; params?: { [key: string]: any } | null }[];
       },
       connections: VCMState['patchNetwork']['connections']
     ) => ({

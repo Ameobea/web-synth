@@ -52,6 +52,8 @@ pub struct ForeignConnectable {
     #[serde(rename = "type")]
     pub _type: String,
     pub id: String,
+    #[serde(rename = "serializedState")]
+    pub serialized_state: Option<serde_json::Value>
 }
 
 pub struct ViewContextManager {

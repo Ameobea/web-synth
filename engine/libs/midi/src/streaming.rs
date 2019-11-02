@@ -89,6 +89,11 @@ pub fn create_msg_handler_context(
 }
 
 #[wasm_bindgen]
+pub fn drop_msg_handler_ctx(ctx_ptr: *mut MsgHandlerContext) {
+    drop(unsafe { Box::from_raw(ctx_ptr) })
+}
+
+#[wasm_bindgen]
 pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
     let mut ctx = unsafe { Box::from_raw(ctx_ptr) };
     let evt = MidiMessage::from_bytes(evt_bytes);

@@ -6,8 +6,9 @@ import { Try } from 'funfix-core';
 
 const wasm = import('./engine');
 import App from './App';
-import { actionCreators, dispatch, store } from './redux';
+import { actionCreators, dispatch, store, getState } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+import { commitForeignConnectables } from 'src/redux/modules/viewContextManager';
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
@@ -189,7 +190,7 @@ export const init_view_contexts = (
     .recover(() => console.error('Failed to parse provided connections out of JSON'))
     .getOrElse([]);
 
-  const foreignConnectables: { type: string; id: string }[] = Try.of(() =>
+  const foreignConnectables: { type: string; id: string; serializedState: string }[] = Try.of(() =>
     JSON.parse(foreignConnectablesJson)
   )
     .recover(() =>
@@ -234,7 +235,16 @@ wasm.then(engine => {
   engineHandle = engine;
   engine.init();
 
-  window.addEventListener('beforeunload', engine.handle_window_close);
+  window.addEventListener('beforeunload', () => {
+    // Commit the whole patch network's foreign connectables, serializing + saving their state in the process
+    commitForeignConnectables(
+      engine,
+      getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
+    );
+
+    // Cleanup all VCs and save their state
+    engine.handle_window_close();
+  });
 
   createViewContextManager(engine);
 
