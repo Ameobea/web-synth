@@ -11,6 +11,7 @@ import {
 } from 'src/graphEditor/nodes/CustomAudio';
 
 export interface MIDINode {
+  outputCbs: (ReturnType<MIDINode['getInputCbs']>)[];
   connect: (dst: MIDINode) => void;
   disconnect: (dst?: MIDINode) => void;
   /**

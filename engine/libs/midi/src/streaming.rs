@@ -14,15 +14,13 @@ pub struct MsgHandlerContext {
     pub pitch_bend: Option<Function>,
     pub voice_manager: PolySynth<
         Box<dyn Fn(String, usize) -> usize>,
-        Box<dyn Fn(usize, usize, f32, u8)>,
+        Box<dyn Fn(usize, usize, usize, u8)>,
         Box<dyn Fn(usize, usize)>,
         Box<dyn Fn(usize, usize, f32, f32)>,
-        Box<dyn Fn(usize, &[u8], &[f32], &[f32])>,
+        Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
     >,
     // TODO: Add handlers for other events
 }
-
-fn midi_to_frequency(note_ix: u8) -> f32 { (2.0f32).powf(((note_ix as f32) - 69.) / 12.) * 440. }
 
 #[wasm_bindgen]
 pub fn create_msg_handler_context(
@@ -40,10 +38,10 @@ pub fn create_msg_handler_context(
         // pointers to the boxed `Function`s
         voice_manager: PolySynth::new(uuid_v4(), true, SynthCallbacks {
             init_synth: Box::new(|_, _| 0usize),
-            schedule_events: Box::new(|_, _, _, _| panic!()),
             trigger_release: Box::new(|_, _| panic!()),
             trigger_attack: Box::new(|_, _, _, _: u8| panic!()),
             trigger_attack_release: Box::new(|_, _, _, _| panic!()),
+            schedule_events: Box::new(|_, _, _, _| panic!()),
         }),
     });
 
@@ -56,12 +54,12 @@ pub fn create_msg_handler_context(
     let synth_cbs = SynthCallbacks {
         init_synth: Box::new(move |_, _| 0usize) as Box<dyn Fn(String, usize) -> usize>, // No-op
         trigger_attack: Box::new(
-            move |_synth_ix: usize, voice_ix: usize, frequency: f32, velocity: u8| {
+            move |_synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8| {
                 unsafe {
                     match (&*play_note).call3(
                         &JsValue::NULL,
                         &JsValue::from(voice_ix as u32),
-                        &JsValue::from(frequency),
+                        &JsValue::from(note_id as u32),
                         &JsValue::from(velocity),
                     ) {
                         Ok(_) => (),
@@ -69,7 +67,7 @@ pub fn create_msg_handler_context(
                     }
                 };
             },
-        ) as Box<dyn Fn(usize, usize, f32, u8)>,
+        ) as Box<dyn Fn(usize, usize, usize, u8)>,
         trigger_release: Box::new(move |_synth_ix: usize, voice_ix: usize| {
             unsafe {
                 match (&*release_note).call1(&JsValue::NULL, &JsValue::from(voice_ix as u32)) {
@@ -78,10 +76,10 @@ pub fn create_msg_handler_context(
                 }
             };
         }) as Box<dyn Fn(usize, usize)>,
-        schedule_events: Box::new(move |_, _: &[u8], _: &[f32], _: &[f32]| unimplemented!())
-            as Box<dyn Fn(usize, &[u8], &[f32], &[f32])>,
         trigger_attack_release: Box::new(move |_: usize, _: usize, _: f32, _: f32| unimplemented!())
             as Box<dyn Fn(usize, usize, f32, f32)>,
+        schedule_events: Box::new(move |_, _: &[u8], _: &[usize], _: &[f32]| unimplemented!())
+            as Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
     };
     mem::replace(&mut ctx.voice_manager.synth_cbs, synth_cbs);
 
@@ -109,8 +107,7 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
                 velocity
             );
 
-            ctx.voice_manager
-                .trigger_attack(midi_to_frequency(note_id), velocity);
+            ctx.voice_manager.trigger_attack(note_id as usize, velocity);
             Ok(())
         },
         Status::NoteOff => {
@@ -123,8 +120,7 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
                 velocity
             );
 
-            ctx.voice_manager
-                .trigger_release(midi_to_frequency(note_id));
+            ctx.voice_manager.trigger_release(note_id as usize);
             Ok(())
         },
         Status::PitchBend => match &ctx.pitch_bend {

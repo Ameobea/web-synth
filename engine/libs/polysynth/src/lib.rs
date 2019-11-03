@@ -10,11 +10,16 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SynthCallbacks<
+    // uuid: String, voice_count: usize
     I: Fn(String, usize) -> usize,
-    TA: Fn(usize, usize, f32, u8),
+    // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
+    TA: Fn(usize, usize, usize, u8),
+    // synth_ix: usize, voice_ix: usize
     TR: Fn(usize, usize),
+    // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
     TAR: Fn(usize, usize, f32, f32),
-    SE: Fn(usize, &[u8], &[f32], &[f32]),
+    // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
+    SE: Fn(usize, &[u8], &[usize], &[f32]),
 > {
     pub init_synth: I,
     pub trigger_attack: TA,
@@ -28,7 +33,7 @@ pub const POLY_SYNTH_VOICE_COUNT: usize = 16; // TODO: Make this a configurable 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum VoicePlayingStatus {
     Tacent,
-    Playing(f32),
+    Playing(usize),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -51,11 +56,16 @@ impl Voice {
 }
 
 pub struct PolySynth<
+    // uuid: String, voice_count: usize
     I: Fn(String, usize) -> usize,
-    TA: Fn(usize, usize, f32, u8),
+    // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
+    TA: Fn(usize, usize, usize, u8),
+    // synth_ix: usize, voice_ix: usize
     TR: Fn(usize, usize),
+    // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
     TAR: Fn(usize, usize, f32, f32),
-    SE: Fn(usize, &[u8], &[f32], &[f32]),
+    // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
+    SE: Fn(usize, &[u8], &[usize], &[f32]),
 > {
     /// ID mapping this struct to the set of WebAudio voices on the JavaScript side
     pub id: usize,
@@ -72,11 +82,16 @@ pub struct PolySynth<
 }
 
 impl<
+        // uuid: String, voice_count: usize
         I: Fn(String, usize) -> usize,
-        TA: Fn(usize, usize, f32, u8),
+        // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
+        TA: Fn(usize, usize, usize, u8),
+        // synth_ix: usize, voice_ix: usize
         TR: Fn(usize, usize),
+        // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
         TAR: Fn(usize, usize, f32, f32),
-        SE: Fn(usize, &[u8], &[f32], &[f32]),
+        // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
+        SE: Fn(usize, &[u8], &[usize], &[f32]),
     > PolySynth<I, TA, TR, TAR, SE>
 {
     pub fn new(uuid: Uuid, link: bool, synth_cbs: SynthCallbacks<I, TA, TR, TAR, SE>) -> Self {
@@ -103,15 +118,15 @@ impl<
     /// Starts playing a given frequency on one of the voices of the synthesizer.  If all of the
     /// voices are occupied, one of the other voices will be stopped and used to play this
     /// frequency.
-    pub fn trigger_attack_cb<F: FnMut(usize, usize, f32, u8)>(
+    pub fn trigger_attack_cb<F: FnMut(usize, usize, usize, u8)>(
         &mut self,
-        frequency: f32,
+        note_id: usize,
         velocity: u8,
         mut cb: F,
-    ) -> (usize, usize, f32, u8) {
-        self.voices[self.first_idle_voice_ix].playing = VoicePlayingStatus::Playing(frequency);
+    ) -> (usize, usize, usize, u8) {
+        self.voices[self.first_idle_voice_ix].playing = VoicePlayingStatus::Playing(note_id);
         let played_voice_ix = self.voices[self.first_idle_voice_ix].src_ix;
-        cb(self.id, played_voice_ix, frequency, velocity);
+        cb(self.id, played_voice_ix, note_id, velocity);
 
         // bump the first idle index since we're adding a new active voice
         if self.first_idle_voice_ix == (POLY_SYNTH_VOICE_COUNT - 1) {
@@ -126,24 +141,24 @@ impl<
             self.first_active_voice_ix = self.first_idle_voice_ix;
         }
 
-        (self.id, played_voice_ix, frequency, velocity)
+        (self.id, played_voice_ix, note_id, velocity)
     }
 
-    pub fn trigger_attack(&mut self, frequency: f32, velocity: u8) {
-        let (synth_id, voice_ix, frequency, velocity) =
-            self.trigger_attack_cb(frequency, velocity, |_, _, _, _| ());
-        (self.synth_cbs.trigger_attack)(synth_id, voice_ix, frequency, velocity)
+    pub fn trigger_attack(&mut self, note_id: usize, velocity: u8) {
+        let (synth_id, voice_ix, note_id, velocity) =
+            self.trigger_attack_cb(note_id, velocity, |_, _, _, _| ());
+        (self.synth_cbs.trigger_attack)(synth_id, voice_ix, note_id, velocity)
     }
 
-    pub fn trigger_attacks(&mut self, frequencies: &[f32], velocity: u8) {
-        for frequency in frequencies {
-            self.trigger_attack(*frequency, velocity);
+    pub fn trigger_attacks(&mut self, note_ids: &[usize], velocity: u8) {
+        for note_id in note_ids {
+            self.trigger_attack(*note_id, velocity);
         }
     }
 
     pub fn trigger_release_cb<F: FnMut(usize, usize)>(
         &mut self,
-        frequency: f32,
+        note_id: usize,
         mut cb: F,
     ) -> Option<(usize, usize)> {
         // look for the index of the first voice that's playing the provided frequency
@@ -163,13 +178,13 @@ impl<
         let combined_search_range = search_range_1.chain(search_range_2);
         let (target_voice_ix, _) = match combined_search_range
             .map(|i| (i, unsafe { self.voices.get_unchecked(i) }))
-            .find(|(_, voice)| voice.playing == VoicePlayingStatus::Playing(frequency))
+            .find(|(_, voice)| voice.playing == VoicePlayingStatus::Playing(note_id))
         {
             Some(pos) => pos,
             None => {
                 warn!(
-                    "Attempted to release frequency {} but it isn't being played.",
-                    frequency
+                    "Attempted to release note id {} but it isn't being played.",
+                    note_id
                 );
                 return None;
             },
@@ -193,15 +208,15 @@ impl<
         Some((self.id, released_voice_ix))
     }
 
-    pub fn trigger_release(&mut self, frequency: f32) {
-        if let Some((synth_ix, voice_id)) = self.trigger_release_cb(frequency, |_, _| ()) {
+    pub fn trigger_release(&mut self, note_id: usize) {
+        if let Some((synth_ix, voice_id)) = self.trigger_release_cb(note_id, |_, _| ()) {
             (self.synth_cbs.trigger_release)(synth_ix, voice_id);
         }
     }
 
-    pub fn trigger_releases(&mut self, frequencies: &[f32]) {
-        for frequency in frequencies {
-            self.trigger_release(*frequency);
+    pub fn trigger_releases(&mut self, note_ids: &[usize]) {
+        for note_id in note_ids {
+            self.trigger_release(*note_id);
         }
     }
 }

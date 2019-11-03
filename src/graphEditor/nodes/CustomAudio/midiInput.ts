@@ -12,6 +12,39 @@ type IterableValueOf<I> = I extends Iterable<[any, infer V]> ? V : never;
 type MIDIAccess = PromiseResolveType<ReturnType<(typeof navigator)['requestMIDIAccess']>>;
 type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
+export const buildMIDINode = (getInputCbs: MIDINode['getInputCbs']): MIDINode => {
+  let outputCbs: (ReturnType<MIDINode['getInputCbs']>)[] = [];
+
+  return {
+    outputCbs,
+    connect: dst => {
+      const inputCbs = dst.getInputCbs();
+      // Make sure we're not already connected
+      if (outputCbs.find(R.equals(inputCbs))) {
+        console.warn('MIDI node already connected to destination');
+        return;
+      }
+
+      outputCbs.push(inputCbs);
+    },
+    disconnect: dst => {
+      if (!dst) {
+        outputCbs = [];
+        return;
+      }
+
+      const inputCbs = dst.getInputCbs();
+      const beforeCbCount = outputCbs.length;
+      outputCbs = outputCbs.filter(cbs => cbs !== inputCbs);
+
+      if (beforeCbCount === outputCbs.length) {
+        console.warn("Tried to disconnect two MIDI nodes but they weren't connected");
+      }
+    },
+    getInputCbs,
+  };
+};
+
 /**
  * Defines a custom audio node that processes MIDI events from some hardware MIDI device
  */
@@ -20,7 +53,6 @@ export class MIDIInputNode {
 
   private vcId: string;
   private selectedInputName: string | undefined;
-  private outputCbs: (ReturnType<MIDINode['getInputCbs']>)[] = [];
   private wasmMidiCtxPtr: number | undefined;
   private midiModule: typeof import('src/midi') | undefined;
   private midiInput: MIDIInput | undefined;
@@ -40,35 +72,9 @@ export class MIDIInputNode {
     }
   }
 
-  private midiNode: MIDINode = {
-    connect: dst => {
-      const inputCbs = dst.getInputCbs();
-      // Make sure we're not already connected
-      if (this.outputCbs.find(R.equals(inputCbs))) {
-        console.warn('MIDI node already connected to destination');
-        return;
-      }
-
-      this.outputCbs.push(inputCbs);
-    },
-    disconnect: dst => {
-      if (!dst) {
-        this.outputCbs = [];
-        return;
-      }
-
-      const inputCbs = dst.getInputCbs();
-      const beforeCbCount = this.outputCbs.length;
-      this.outputCbs = this.outputCbs.filter(cbs => cbs !== inputCbs);
-
-      if (beforeCbCount === this.outputCbs.length) {
-        console.warn("Tried to disconnect two MIDI nodes but they weren't connected");
-      }
-    },
-    getInputCbs: () => {
-      throw new Error("Tried to get input callbacks for `MIDIInput` but it doesn't accept inputs");
-    },
-  };
+  private midiNode: MIDINode = buildMIDINode(() => {
+    throw new Error("Tried to get input callbacks for `MIDIInput` but it doesn't accept inputs");
+  });
 
   private async initMIDI() {
     let access: PromiseResolveType<ReturnType<typeof navigator.requestMIDIAccess>>;
@@ -119,10 +125,11 @@ export class MIDIInputNode {
     // to be called appropriately.
     const ctxPtr = midiModule.create_msg_handler_context(
       (voiceIx: number, note: number, velocity: number) =>
-        this.outputCbs.forEach(({ onAttack }) => onAttack(note, voiceIx, velocity)),
+        this.midiNode.outputCbs.forEach(({ onAttack }) => onAttack(note, voiceIx, velocity)),
       (voiceIx: number, note: number, velocity: number) =>
-        this.outputCbs.forEach(({ onRelease }) => onRelease(note, voiceIx, velocity)),
-      (_lsb: number, msb: number) => this.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb))
+        this.midiNode.outputCbs.forEach(({ onRelease }) => onRelease(note, voiceIx, velocity)),
+      (_lsb: number, msb: number) =>
+        this.midiNode.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb))
     );
     this.wasmMidiCtxPtr = ctxPtr;
 

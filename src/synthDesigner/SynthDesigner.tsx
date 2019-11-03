@@ -12,7 +12,6 @@ import {
   SpectrumVisualization,
   initializeSpectrumVisualization,
 } from 'src/visualizations/spectrum';
-import MidiKeyboard from 'src/synthDesigner/MidiKeyboard';
 import {
   SynthDesignerReduxStore,
   getReduxInfra,
@@ -158,19 +157,6 @@ const SynthDesigner: React.FC<
         }}
         width={1200}
         height={1024}
-      />
-      <MidiKeyboard
-        playNote={(voiceIx, frequency, _velocity) =>
-          dispatch(actionCreators.synthDesigner.GATE(frequency, voiceIx))
-        }
-        releaseNote={(voiceIx, _frequency, _velocity) =>
-          dispatch(actionCreators.synthDesigner.UNGATE(voiceIx))
-        }
-        handlePitchBend={(lsb: number, msb: number) =>
-          dispatch(
-            actionCreators.synthDesigner.SET_FILTER_PARAM(0, 'frequency', Math.max(msb, 1) * 12)
-          )
-        }
       />
     </>
   );

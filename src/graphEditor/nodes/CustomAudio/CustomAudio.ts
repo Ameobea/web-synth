@@ -205,6 +205,15 @@ export const audioNodeGetters: {
       onAddedCustom: function(this: any) {
         this.connectables.node.updateInputs();
       },
+      onPropertyChanged: function(
+        this: { connectables: AudioConnectables },
+        name: string,
+        value: any
+      ) {
+        if (name === 'inputName') {
+          (this.connectables.node! as any).handleSelectedInputName(value);
+        }
+      },
     },
   },
 };

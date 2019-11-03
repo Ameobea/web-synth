@@ -13,8 +13,10 @@ import {
   getInitialSynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
-import { AudioConnectables } from 'src/patchNetwork';
+import { AudioConnectables, MIDINode } from 'src/patchNetwork';
 import synthDesignerModule from 'src/redux/modules/synthDesigner';
+import { buildMIDINode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
+import { midiToFrequency } from 'src/util';
 
 const buildSynthDesignerRedux = () => {
   const modules = {
@@ -129,6 +131,43 @@ export const cleanup_synth_designer = (stateKey: string): string => {
   return designerState;
 };
 
+type ArgumentsOf<F> = F extends (...args: infer Args) => any ? Args : never;
+
+function memoizeOne<F extends (...args: any[]) => any>(
+  fn: F
+): (...args: ArgumentsOf<F>) => ReturnType<F> {
+  let lastArgs: any[] | null = null;
+  let lastRes: ReturnType<F>;
+
+  const memoized = (...args: ArgumentsOf<F>): ReturnType<F> => {
+    if (
+      lastArgs !== null &&
+      args.length === lastArgs.length &&
+      args.forEach((arg, i) => arg === lastArgs![i])
+    ) {
+      return lastRes;
+    }
+
+    lastArgs = args;
+    lastRes = fn(...args);
+    return lastRes;
+  };
+
+  return memoized;
+}
+
+const memoizedGetMidiNode = memoizeOne((stateKey: string) => {
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+
+  return buildMIDINode(() => ({
+    onAttack: (note: number, voiceIx: number, _velocity: number) =>
+      dispatch(actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx)),
+    onRelease: (note: number, voiceIx: number, _velocity: number) =>
+      dispatch(actionCreators.synthDesigner.UNGATE(voiceIx)),
+    onPitchBend: () => {},
+  }));
+});
+
 export const get_synth_designer_audio_connectables = (stateKey: string): AudioConnectables => {
   const { synths, spectrumNode } = getReduxInfra(stateKey).getState().synthDesigner;
 
@@ -137,11 +176,12 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
     inputs: synths.reduce(
       (acc, synth, i) =>
         acc
+          .set('midi', { node: memoizedGetMidiNode(stateKey), type: 'midi' })
           .set(`synth_${i}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
           .set(`synth_${i}_filter_frequency`, { node: synth.filterCSNs.frequency, type: 'number' })
           .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' })
           .set(`synth_${i}_filter_detune`, { node: synth.filterCSNs.detune, type: 'number' }),
-      Map<string, { node: AudioParam | AudioNode; type: string }>()
+      Map<string, { node: AudioParam | AudioNode | MIDINode; type: string }>()
     ),
     outputs: spectrumNode
       ? Map<string, { node: AudioNode; type: string }>().set('masterOutput', {
