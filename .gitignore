@@ -4,5 +4,6 @@ node_modules/
 *.wat
 *.log
 src/midi*
+src/spectrum_viz*
 .env
 !src/midiEditor*
