@@ -17,7 +17,9 @@ export const faustReduxInfra = buildStore({ faustEditor: faustEditorModule });
 /**
  * Map holding references to Faust editor audio nodes for use in creating audio connectables
  */
-export const faustAudioNodesMap: { [vcId: string]: FaustWorkletNode } = {};
+export const faustAudioNodesMap: {
+  [vcId: string]: { analyzerNode: AnalyserNode; faustNode: FaustWorkletNode };
+} = {};
 
 export const init_faust_editor = (stateKey: string) => {
   // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
@@ -84,8 +86,7 @@ export const cleanup_faust_editor = (vcId: string): string => {
 };
 
 export const get_faust_editor_connectables = (vcId: string): AudioConnectables => {
-  const faustNode = faustAudioNodesMap[vcId];
-  if (!faustNode) {
+  if (!faustAudioNodesMap[vcId]) {
     // Create passthrough audio node with the same interface as the `FaustAudioWorklet`-based ones that will be created later
     // once our Faust code is compiled.  This should cause any connections made before the faust module is started to be re-
     // connected to the real faust node once it is started.
@@ -103,6 +104,7 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     };
   }
 
+  const { faustNode, analyzerNode } = faustAudioNodesMap[vcId];
   return {
     vcId,
     inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
@@ -110,7 +112,7 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
       type: 'customAudio',
     }),
     outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
-      node: faustNode,
+      node: analyzerNode,
       type: 'customAudio',
     }),
   };

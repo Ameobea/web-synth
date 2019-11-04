@@ -59,7 +59,11 @@ export const init_synth_designer = (stateKey: string) => {
       .map(serializedState => JSON.parse(serializedState))
       .map(
         ({ synths, ...rest }) =>
-          ({ synths: synths.map(deserializeSynthModule), ...rest } as SynthDesignerState)
+          ({
+            synths: synths.map(deserializeSynthModule),
+            spectrumNode: new AnalyserNode(new AudioContext()),
+            ...rest,
+          } as SynthDesignerState)
       )
       .orNull()
   )
@@ -78,6 +82,10 @@ export const init_synth_designer = (stateKey: string) => {
       return getInitialSynthDesignerState(true);
     });
 
+  if (initialState) {
+    reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_STATE(initialState));
+  }
+
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');
   const vcId = stateKey.split('_')[1]!;
@@ -91,7 +99,7 @@ export const init_synth_designer = (stateKey: string) => {
   document.getElementById('content')!.appendChild(synthDesignerBase);
   ReactDOM.render(
     <Provider store={reduxInfra.store}>
-      <SynthDesigner initialState={initialState} stateKey={stateKey} />
+      <SynthDesigner stateKey={stateKey} />
     </Provider>,
     synthDesignerBase
   );
@@ -183,11 +191,9 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
           .set(`synth_${i}_filter_detune`, { node: synth.filterCSNs.detune, type: 'number' }),
       Map<string, { node: AudioParam | AudioNode | MIDINode; type: string }>()
     ),
-    outputs: spectrumNode
-      ? Map<string, { node: AudioNode; type: string }>().set('masterOutput', {
-          node: spectrumNode,
-          type: 'customAudio',
-        })
-      : Map<string, { node: AudioNode; type: string }>(),
+    outputs: Map<string, { node: AudioNode; type: string }>().set('masterOutput', {
+      node: spectrumNode,
+      type: 'customAudio',
+    }),
   };
 };

@@ -1,25 +1,21 @@
-import React, { useState, useCallback, useEffect, Suspense, useRef } from 'react';
+import React, { useState, useCallback, Suspense, useRef } from 'react';
 import { connect, Provider } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import ace from 'ace-builds';
 import * as R from 'ramda';
-import { Without, PropTypesOf } from 'ameo-utils';
+import { Without, PropTypesOf, useOnce } from 'ameo-utils';
 import 'ace-builds/webpack-resolver';
 
 import { faustReduxInfra } from 'src/faustEditor';
 import { Effect } from 'src/redux/modules/effects';
 import { EffectPickerCustomInput } from 'src/controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
-import {
-  SpectrumVisualization,
-  defaultSettingsState as defaultVizSettingsState,
-  SettingsState as VizSettingsState,
-  initializeSpectrumVisualization,
-} from 'src/visualizations/spectrum';
+import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustAudioNodesMap, get_faust_editor_connectables } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork';
 import { ReduxStore, store } from 'src/redux';
+import Loading from 'src/misc/Loading';
 
 ace.require('ace/theme/twilight');
 
@@ -28,9 +24,6 @@ type FaustEditorReduxStore = typeof faustReduxInfra.__fullState;
 const ReactAce = React.lazy(() => import('react-ace'));
 
 const ctx = new AudioContext();
-
-export const analyzerNode = ctx.createAnalyser();
-analyzerNode.smoothingTimeConstant = 0.2;
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -61,10 +54,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   editor: {
     border: '1px solid #555',
   },
-  spectrumVizCanvas: {
-    backgroundColor: '#000',
-    imageRendering: 'crisp-edges',
-  },
 };
 
 export const compileFaustInstance = async (
@@ -92,11 +81,12 @@ const createCompileButtonClickHandler = (
   faustCode: string,
   optimize: boolean,
   setErrMessage: (errMsg: string) => void,
-  vcId: string
+  vcId: string,
+  analyzerNode: AnalyserNode
 ) => async () => {
-  let faustInstance;
+  let faustNode;
   try {
-    faustInstance = await compileFaustInstance(faustCode, optimize);
+    faustNode = await compileFaustInstance(faustCode, optimize);
   } catch (err) {
     console.error(err);
     setErrMessage(err.toString());
@@ -104,18 +94,13 @@ const createCompileButtonClickHandler = (
   }
   setErrMessage('');
 
-  const canvas = document.getElementById('spectrum-visualizer') as HTMLCanvasElement | undefined;
-  if (canvas) {
-    initializeSpectrumVisualization(analyzerNode, canvas);
-    faustInstance.connect(analyzerNode);
-  }
-
-  faustAudioNodesMap[vcId] = faustInstance;
+  faustNode.connect(analyzerNode);
+  faustAudioNodesMap[vcId] = { analyzerNode, faustNode };
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
   const newConnectables = get_faust_editor_connectables(vcId);
   updateConnectables(vcId, newConnectables);
 
-  faustReduxInfra.dispatch(faustReduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustInstance));
+  faustReduxInfra.dispatch(faustReduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustNode));
 };
 
 const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: ReduxStore) => ({
@@ -219,22 +204,25 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
-  const [vizSettingsState, setVizSettingsState] = useState<VizSettingsState>(
-    defaultVizSettingsState
-  );
-  const updateVizSettings = useRef<((newSettings: VizSettingsState) => void) | null>(null);
 
-  useEffect(() => {
-    if (!updateVizSettings.current || !vizSettingsState) {
-      return;
-    }
-
-    updateVizSettings.current(vizSettingsState);
-  }, [vizSettingsState]);
+  const analyzerNode = useRef<AnalyserNode | null>();
+  useOnce(() => {
+    const node = ctx.createAnalyser();
+    node.smoothingTimeConstant = 0.2;
+    analyzerNode.current = node;
+  });
 
   const compile = useCallback(
-    createCompileButtonClickHandler(editorContent, optimize, setCompileErrMsg, vcId),
-    [editorContent, setCompileErrMsg, optimize]
+    analyzerNode.current
+      ? createCompileButtonClickHandler(
+          editorContent,
+          optimize,
+          setCompileErrMsg,
+          vcId,
+          analyzerNode.current
+        )
+      : () => {},
+    [editorContent, setCompileErrMsg, optimize, analyzerNode.current]
   );
 
   return (
@@ -271,6 +259,10 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
                 faustReduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
               );
 
+              // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
+              const { faustNode, analyzerNode } = faustAudioNodesMap[vcId];
+              faustNode.disconnect(analyzerNode);
+
               // Create new audio connectables using a passthrough node
               delete faustAudioNodesMap[vcId];
               updateConnectables(vcId, get_faust_editor_connectables(vcId));
@@ -283,19 +275,12 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
 
       <SaveControls editorContent={editorContent} />
 
-      {vizSettingsState ? (
-        <SpectrumVisualization
-          settingsState={vizSettingsState}
-          setSettingsState={setVizSettingsState}
-        />
-      ) : null}
-
-      <canvas
-        width={1200}
-        height={1024}
-        id='spectrum-visualizer'
-        style={styles.spectrumVizCanvas}
-      />
+      {/* TODO: Persist these settings + init with `initialState` */}
+      {analyzerNode.current ? (
+        <SpectrumVisualization analyzerNode={analyzerNode.current} />
+      ) : (
+        <Loading />
+      )}
 
       {faustInstanceControlPanel}
 

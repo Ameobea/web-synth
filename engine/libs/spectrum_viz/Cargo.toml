@@ -11,3 +11,9 @@ crate-type = ["cdylib", "rlib"]
 lazy_static = "1.4.0"
 palette = "0.4.1"
 wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen.git", rev = "fb0bbc00" }
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_json = "1.0.39"
+wasm-logger = { git = "https://gitlab.com/Ameobea/wasm-logger.git" }
+log = "0.4"
+console_error_panic_hook = { git = "https://github.com/Ameobea/console_error_panic_hook.git" }

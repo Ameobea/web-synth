@@ -1,17 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { connect } from 'react-redux';
-import { useOnce } from 'ameo-utils/util/react';
 import * as R from 'ramda';
 
-import { SynthDesignerState, EffectType } from 'src/redux/modules/synthDesigner';
+import { EffectType } from 'src/redux/modules/synthDesigner';
 import SynthModuleComp from './SynthModule';
 import EffectModuleComp from './effects/Effect';
 import './SynthDesigner.scss';
 import { buildEffect } from 'src/synthDesigner/effects';
-import {
-  SpectrumVisualization,
-  initializeSpectrumVisualization,
-} from 'src/visualizations/spectrum';
+import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import {
   SynthDesignerReduxStore,
   getReduxInfra,
@@ -29,15 +25,10 @@ const mapStateToProps = ({ synthDesigner }: SynthDesignerReduxStore) => ({
   synthDesignerState: synthDesigner,
 });
 
-const SynthDesigner: React.FC<
-  {
-    initialState?: SynthDesignerState | null;
-    stateKey: string;
-  } & ReturnType<typeof mapStateToProps>
-> = ({ initialState, synthDesignerState, stateKey }) => {
-  const setSpectrumVizSettingsState = useRef<null | ReturnType<
-    typeof initializeSpectrumVisualization
-  >>(null);
+const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToProps>> = ({
+  synthDesignerState,
+  stateKey,
+}) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
 
@@ -58,12 +49,6 @@ const SynthDesigner: React.FC<
     wavyJonesInstance.current.lineThickness = 1.2;
 
     dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(wavyJonesInstance.current));
-  });
-
-  useOnce(() => {
-    if (initialState) {
-      dispatch(actionCreators.synthDesigner.SET_STATE(initialState));
-    }
   });
 
   return (
@@ -134,30 +119,9 @@ const SynthDesigner: React.FC<
 
       <div id='oscilloscope' ref={oscilloscopeNode}></div>
 
-      <SpectrumVisualization
-        settingsState={{
-          scalerFunction: 'linear',
-          colorFunction: 'pink',
-          intensityMultiplier: 2.2,
-        }}
-        setSettingsState={() => {
-          /* TODO */
-        }}
-      />
-      <canvas
-        ref={ref => {
-          if (!ref || synthDesignerState.spectrumNode) {
-            return;
-          }
-
-          const analyzerNode = new AnalyserNode(new AudioContext());
-          setSpectrumVizSettingsState.current = initializeSpectrumVisualization(analyzerNode, ref);
-
-          dispatch(actionCreators.synthDesigner.SET_SPECTRUM_NODE(analyzerNode));
-        }}
-        width={1200}
-        height={1024}
-      />
+      {synthDesignerState.spectrumNode ? (
+        <SpectrumVisualization analyzerNode={synthDesignerState.spectrumNode} />
+      ) : null}
     </>
   );
 };

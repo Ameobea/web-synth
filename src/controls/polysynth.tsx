@@ -72,6 +72,10 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           action: async () => {
             const midiModule = await import('../midi');
             const noteData = engine.handle_message('export_midi', new Uint8Array());
+            if (!noteData) {
+              console.error('MIDI Wasm module returned undefined when handling exported MIDI');
+              return;
+            }
             const midiFileBytes = midiModule.write_to_midi('midi_export', noteData);
             downloadjs(new Blob([midiFileBytes]), 'composition.midi', 'application/x-midi');
           },
