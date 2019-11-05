@@ -10,7 +10,6 @@ import {
   AudioConnectables,
 } from 'src/patchNetwork/patchNetwork';
 import { getEngine } from 'src';
-import { getForeignNodeType } from 'src/graphEditor/nodes/CustomAudio';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
@@ -65,7 +64,7 @@ export const commitForeignConnectables = (
 
         return {
           id: vcId.toString(),
-          type: getForeignNodeType(node),
+          type: node.nodeType,
           serializedState: node.serialize ? node.serialize() : null,
         };
       })

@@ -2,54 +2,24 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
-import { AudioConnectables, MIDINode } from 'src/patchNetwork';
+import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
+import {
+  MIDINode,
+  MIDIAccess,
+  buildMIDINode,
+  PromiseResolveType,
+  IterableValueOf,
+} from 'src/patchNetwork/midiNode';
 
-type PromiseResolveType<P> = P extends Promise<infer T> ? T : never;
-
-type IterableValueOf<I> = I extends Iterable<[any, infer V]> ? V : never;
-
-// hilarious
-type MIDIAccess = PromiseResolveType<ReturnType<(typeof navigator)['requestMIDIAccess']>>;
-type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
-
-export const buildMIDINode = (getInputCbs: MIDINode['getInputCbs']): MIDINode => {
-  let outputCbs: (ReturnType<MIDINode['getInputCbs']>)[] = [];
-
-  return {
-    outputCbs,
-    connect: dst => {
-      const inputCbs = dst.getInputCbs();
-      // Make sure we're not already connected
-      if (outputCbs.find(R.equals(inputCbs))) {
-        console.warn('MIDI node already connected to destination');
-        return;
-      }
-
-      outputCbs.push(inputCbs);
-    },
-    disconnect: dst => {
-      if (!dst) {
-        outputCbs = [];
-        return;
-      }
-
-      const inputCbs = dst.getInputCbs();
-      const beforeCbCount = outputCbs.length;
-      outputCbs = outputCbs.filter(cbs => cbs !== inputCbs);
-
-      if (beforeCbCount === outputCbs.length) {
-        console.warn("Tried to disconnect two MIDI nodes but they weren't connected");
-      }
-    },
-    getInputCbs,
-  };
-};
+export type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
 /**
  * Defines a custom audio node that processes MIDI events from some hardware MIDI device
  */
 export class MIDIInputNode {
   public lgNode?: any;
+  public nodeType = 'customAudio/MIDIInput';
+  public name = 'MIDI Input';
 
   private vcId: string;
   private selectedInputName: string | undefined;
@@ -141,7 +111,12 @@ export class MIDIInputNode {
     this.midiMsgHandlerCb = midiMsgHandlerCb;
   }
 
-  constructor(vcId: string, params: { [key: string]: any } | null = {}, lgNode?: any) {
+  constructor(
+    _ctx: AudioContext,
+    vcId: string,
+    params: { [key: string]: any } | null = {},
+    lgNode?: any
+  ) {
     this.vcId = vcId;
     this.lgNode = lgNode;
 
@@ -178,8 +153,8 @@ export class MIDIInputNode {
 
   public buildConnectables(): AudioConnectables & { node: NonNullable<AudioConnectables['node']> } {
     return {
-      inputs: Map<string, { node: AudioNode | AudioParam | MIDINode; type: string }>(),
-      outputs: Map<string, { node: AudioNode | MIDINode; type: string }>().set('midi_output', {
+      inputs: Map<string, ConnectableInput>(),
+      outputs: Map<string, ConnectableOutput>().set('midi_output', {
         node: this.midiNode,
         type: 'midi',
       }),

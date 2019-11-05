@@ -27,6 +27,10 @@ LGAudioConnectables.prototype.setConnectables = function(
   this.connectables = connectables;
   this.connectables.vcId = this.id.toString();
 
+  if (connectables.node) {
+    this.title = connectables.node.name;
+  }
+
   [...connectables.inputs.entries()].forEach(([name, input]) => {
     if (input.node instanceof AudioParam) {
       this.addProperty(name, input.node.value, input.type);

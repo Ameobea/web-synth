@@ -1,23 +1,52 @@
 import { Map } from 'immutable';
 
-import { AudioConnectables, updateConnectables } from 'src/patchNetwork';
-
-const ctx = new AudioContext();
+import {
+  AudioConnectables,
+  updateConnectables,
+  ConnectableInput,
+  ConnectableOutput,
+} from 'src/patchNetwork';
 
 export class MixerNode {
-  private gainNodes: GainNode[] = [new GainNode(ctx), new GainNode(ctx)];
-  private outputNode = new GainNode(ctx);
+  private gainNodes: GainNode[];
+  private outputNode: GainNode;
   private vcId: string;
+  private ctx: AudioContext;
 
-  public lgNode: any;
+  public nodeType = 'customAudio/mixer';
+  public name = 'Mixer';
+  public node: GainNode;
 
-  constructor(vcId: string, lgNode?: any) {
+  constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
+    this.ctx = ctx;
     this.vcId = vcId;
-    this.lgNode = lgNode;
+    this.gainNodes = [new GainNode(ctx), new GainNode(ctx)];
+    this.outputNode = new GainNode(ctx);
+    this.node = this.outputNode;
+
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (key === 'gains') {
+          if (!Array.isArray(val)) {
+            console.log('Invalid `params.gains` value supplied: ', val);
+            return;
+          }
+          const gains = val as number[];
+          while (this.gainNodes.length < gains.length) {
+            this.addInput();
+          }
+
+          gains.forEach((gain, i) => {
+            // TODO: Sync these to the LG node somehow?
+            this.gainNodes[i].gain.value = gain;
+          });
+        }
+      });
+    }
   }
 
   public addInput() {
-    const newGain = new GainNode(ctx);
+    const newGain = new GainNode(this.ctx);
     newGain.connect(this.outputNode);
     this.gainNodes.push(newGain);
     updateConnectables(this.vcId, this.buildConnectables());
@@ -41,17 +70,23 @@ export class MixerNode {
           acc
             .set(`Input ${i}`, { type: 'customAudio', node: gainNode })
             .set(`Input ${i} Gain`, { type: 'number', node: gainNode.gain }),
-        Map<string, { node: AudioNode | AudioParam; type: string }>().set('Master Gain', {
+        Map<string, ConnectableInput>().set('Master Gain', {
           node: this.outputNode.gain,
           type: 'number',
         })
       ),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+      outputs: Map<string, ConnectableOutput>().set('output', {
         node: this.outputNode,
         type: 'customAudio',
       }),
       vcId: this.vcId,
       node: this,
+    };
+  }
+
+  public serialize() {
+    return {
+      gains: this.gainNodes.map(node => node.gain.value),
     };
   }
 }

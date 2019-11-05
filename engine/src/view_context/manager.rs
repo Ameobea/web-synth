@@ -444,6 +444,8 @@ impl ViewContextManager {
 
         // Re-initialize from scratch
         self.contexts.clear();
+        self.connections.clear();
+        self.foreign_connectables.clear();
         self.init();
     }
 }

@@ -1,6 +1,10 @@
 import { Map } from 'immutable';
 
-import { AudioConnectables, create_empty_audio_connectables } from 'src/patchNetwork';
+import {
+  AudioConnectables,
+  create_empty_audio_connectables,
+  ConnectableOutput,
+} from 'src/patchNetwork';
 import { getSynthsMap } from 'src/redux/modules/synths';
 import { MIDI_EDITOR_CONTROLS_ID } from 'src/App';
 
@@ -31,7 +35,7 @@ export const create_midi_editor_audio_connectables = (vcId: string): AudioConnec
   return {
     vcId,
     inputs: Map(),
-    outputs: Map<string, { node: AudioNode; type: string }>().set('synth', {
+    outputs: Map<string, ConnectableOutput>().set('synth', {
       node: synth.volume,
       type: 'customAudio',
     }),

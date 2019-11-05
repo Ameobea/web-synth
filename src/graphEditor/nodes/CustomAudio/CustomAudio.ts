@@ -1,145 +1,202 @@
-import { Map } from 'immutable';
-import { UnimplementedError } from 'ameo-utils';
-import { LiteGraph } from 'litegraph.js';
-
-import { AudioConnectables, addNode, removeNode } from 'src/patchNetwork';
-import { LGAudioConnectables } from '../AudioConnectablesNode';
-import { micNode, MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
-import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
-import { MIDIInputNode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
-
 /**
  * Registers custom versions of the LiteGraph audio nodes.  These are special because their inner `AudioNode`s and `AudioParam`s
  * are managed outside of the mode - connecting them in LiteGraph is a no-op.  Connections between these nodes are managed
  * at the patch network level.
  */
 
-export type ForeignNode = {
+import { Map } from 'immutable';
+import { LiteGraph } from 'litegraph.js';
+import * as R from 'ramda';
+
+import {
+  AudioConnectables,
+  addNode,
+  removeNode,
+  ConnectableInput,
+  ConnectableOutput,
+} from 'src/patchNetwork';
+import { LGAudioConnectables } from '../AudioConnectablesNode';
+import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
+import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
+import { MIDIInputNode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
+import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
+
+const ctx = new AudioContext();
+
+export interface ForeignNode<T = any> {
   /**  A reference to the `LgNode` that is paired with this `ForeignNode`, if one exists.  This reference should only
    * be used for updating the LG node's presentational state; no state should ever be pulled out of the LG node.
    * The `ForeignNode` and its connectables by extension are the only things that are allowed to be stateful here.
    */
   lgNode?: any;
-  /** A function that returns a piece of serialized state that can be used to re-construct the node when passed to its
-   * `nodeGetter`.
-   *
-   * If no function is provided, this node is assumed to be stateless and will be re-initialized fresh when re-created.
+  /**
+   * The underlying `AudioNode` that powers this custom node, if applicable.
    */
-  serialize?: () => { [key: string]: any };
-} & (
-  | GainNode
-  | ConstantSourceNode
-  | BiquadFilterNode
-  | AudioBufferSourceNode
-  | AudioDestinationNode
-  | MicNode
-  | MixerNode
-  | MIDIInputNode);
+  node?: T;
+  serialize(): { [key: string]: any };
+  buildConnectables(): AudioConnectables & { node: ForeignNode };
+  nodeType: string;
+  name: string;
+}
 
-const connectablesBuilders: [
-  any,
-  (
-    node: ForeignNode,
-    vcId: string
-  ) => Omit<AudioConnectables, 'vcId'> & {
-    node: NonNullable<AudioConnectables['node']>;
-  }
-][] = [
-  [
-    // This must come before `GainNode` because it's also an instance of `GainNode`... >.>
-    MicNode,
-    (node: MicNode & { lgNode: any }) => ({
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
-        node,
-        type: 'customAudio',
-      }),
-      node,
-    }),
-  ],
-  [
-    GainNode,
-    (node: GainNode & { lgNode: any }) => ({
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(
-        Object.entries({
-          input: { node: node, type: 'customAudio' },
-          gain: { node: node.gain, type: 'number' },
-        })
-      ),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
-        node,
-        type: 'customAudio',
-      }),
-      node,
-    }),
-  ],
-  [
-    ConstantSourceNode,
-    (node: ConstantSourceNode & { lgNode: any }) => ({
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('offset', {
-        node: node.offset,
-        type: 'number',
-      }),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('offset', {
-        node,
-        type: 'number',
-      }),
-      node,
-    }),
-  ],
-  [
-    BiquadFilterNode,
-    (node: BiquadFilterNode & { lgNode: any }) => ({
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(
-        Object.entries({
-          frequency: { node: node.frequency, type: 'number' },
-          Q: { node: node.Q, type: 'number' },
-          detune: { node: node.detune, type: 'number' },
-          gain: { node: node.gain, type: 'number' },
-        })
-      ),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
-        node,
-        type: 'customAudio',
-      }),
-      node,
-    }),
-  ],
-  [
-    AudioBufferSourceNode,
-    (node: AudioBufferSourceNode & { lgNode: any }) => ({
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>(),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
-        node,
-        type: 'customAudio',
-      }),
-      node,
-    }),
-  ],
-  [
-    AudioDestinationNode,
-    (node: AudioDestinationNode & { lgNode: any }) => ({
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
-        node,
-        type: 'customAudio',
-      }),
-      outputs: Map<string, { node: AudioNode; type: string }>(),
-      node,
-    }),
-  ],
-  [MixerNode, (node: MixerNode) => node.buildConnectables()],
-  [MIDIInputNode, (node: MIDIInputNode) => node.buildConnectables()],
-];
+/**
+ * Wraps an `AudioNode`, creating a new class that can be used as a custom audio node in the patch network.  It generates
+ * a constructor that takes the provided `params` argument and attempts to set the value of all `AudioNode`s / `AudioParam`s
+ * within `T` that have keys matching those of the params and setting their values accordingly.
+ *
+ * It also generates a corresponding `serialize()` method that creates a matching `params` object accordingly.
+ */
+const enhanceAudioNode = <T>(
+  AudioNodeClass: new (ctx: AudioContext) => T,
+  nodeType: string,
+  name: string,
+  buildConnectables: (
+    foreignNode: ForeignNode<T> & { node: T }
+  ) => Omit<AudioConnectables, 'vcId'> & { node: ForeignNode<T> }
+): new (
+  ctx: AudioContext,
+  vcId: string,
+  params?: { [key: string]: any } | null,
+  lgNode?: any
+) => ForeignNode<T> => {
+  return class ForeignNodeClass implements ForeignNode<T> {
+    private paramKeys: string[];
 
-export const buildConnectablesForNode = (node: ForeignNode, id: string): AudioConnectables => {
-  const builder = connectablesBuilders.find(([NodeClass]) => node instanceof NodeClass);
-  if (!builder) {
-    throw new UnimplementedError(`Node not yet supported: ${node}`);
-  }
-  return { ...builder[1](node, id), vcId: id };
+    public vcId: string;
+    public nodeType = nodeType;
+    public name = name;
+    public node: T;
+    public lgNode?: any;
+
+    constructor(
+      ctx: AudioContext,
+      vcId: string,
+      params?: { [key: string]: any } | null,
+      lgNode?: any
+    ) {
+      this.node = new AudioNodeClass(ctx);
+      this.vcId = vcId;
+      this.lgNode = lgNode;
+
+      if (!params) {
+        this.paramKeys = [];
+        return;
+      }
+
+      // Assign all values from the params to any
+      const paramKeys: string[] = [];
+      Object.entries(params).forEach(([key, val]) => {
+        const valueContainerOpt = (this.node as any)[key];
+        if (valueContainerOpt && !R.isNil(valueContainerOpt.value)) {
+          valueContainerOpt.value = val;
+          paramKeys.push(key);
+        }
+      });
+
+      this.paramKeys = paramKeys;
+    }
+
+    public buildConnectables(): AudioConnectables & { node: ForeignNode<T> } {
+      return { ...buildConnectables(this), vcId: this.vcId };
+    }
+
+    public serialize() {
+      return this.paramKeys.reduce(
+        (acc, key) => ({ ...acc, [key]: (this.node as any)[key].value }),
+        {}
+      );
+    }
+  };
 };
 
-const ctx = new AudioContext();
+const CustomGainNode = enhanceAudioNode(
+  GainNode,
+  'customAudio/gain',
+  'Gain',
+  (node: ForeignNode<GainNode> & { node: GainNode }) => ({
+    inputs: Map<string, ConnectableInput>(
+      Object.entries({
+        input: { node: node.node, type: 'customAudio' },
+        gain: { node: node.node.gain, type: 'number' },
+      })
+    ),
+    outputs: Map<string, ConnectableOutput>().set('output', {
+      node: node.node,
+      type: 'customAudio',
+    }),
+    node,
+  })
+);
+
+const CustomConstantSourceNode = enhanceAudioNode(
+  ConstantSourceNode,
+  'customAudio/constantSource',
+  'Constant Source',
+  (foreignNode: ForeignNode<ConstantSourceNode> & { node: ConstantSourceNode }) => ({
+    inputs: Map<string, ConnectableInput>().set('offset', {
+      node: foreignNode.node.offset,
+      type: 'number',
+    }),
+    outputs: Map<string, ConnectableOutput>().set('offset', {
+      node: foreignNode.node,
+      type: 'number',
+    }),
+    node: foreignNode,
+  })
+);
+
+const CustomBiquadFilterNode = enhanceAudioNode(
+  BiquadFilterNode,
+  'customAudio/biquadFilter',
+  'Biquad Filter',
+  (foreignNode: ForeignNode<BiquadFilterNode> & { node: BiquadFilterNode }) => ({
+    inputs: Map<string, ConnectableInput>(
+      Object.entries({
+        frequency: { node: foreignNode.node.frequency, type: 'number' },
+        Q: { node: foreignNode.node.Q, type: 'number' },
+        detune: { node: foreignNode.node.detune, type: 'number' },
+        gain: { node: foreignNode.node.gain, type: 'number' },
+      })
+    ),
+    outputs: Map<string, ConnectableOutput>().set('output', {
+      node: foreignNode.node,
+      type: 'customAudio',
+    }),
+    node: foreignNode,
+  })
+);
+
+const CustomAudioBufferSourceNode = enhanceAudioNode(
+  AudioBufferSourceNode,
+  'customAudio/audioClip',
+  'Audio Clip',
+  (foreignNode: ForeignNode<AudioBufferSourceNode> & { node: AudioBufferSourceNode }) => ({
+    inputs: Map<string, ConnectableInput>(),
+    outputs: Map<string, ConnectableOutput>().set('output', {
+      node: foreignNode.node,
+      type: 'customAudio',
+    }),
+    node: foreignNode,
+  })
+);
+
+const CustomDestinationNode = enhanceAudioNode(
+  class CustomAudioDestinationNode {
+    constructor(ctx: AudioContext) {
+      return ctx.destination;
+    }
+  },
+  'customAudio/destination',
+  'Destination',
+  (foreignNode: ForeignNode<AudioDestinationNode> & { node: AudioDestinationNode }) => ({
+    inputs: Map<string, ConnectableInput>().set('input', {
+      node: foreignNode.node,
+      type: 'customAudio',
+    }),
+    outputs: Map<string, ConnectableOutput>(),
+    node: foreignNode,
+  })
+);
 
 /**
  * A map of functions that can be used to build a new `ForeignNode`.  The getter provides the VC ID of the foreign node
@@ -151,18 +208,18 @@ export const audioNodeGetters: {
     protoParams: { [key: string]: any };
   };
 } = {
-  'customAudio/gain': { nodeGetter: () => new GainNode(ctx), protoParams: {} },
-  'customAudio/biquadFilter': { nodeGetter: () => new BiquadFilterNode(ctx), protoParams: {} },
+  'customAudio/gain': {
+    nodeGetter: (vcId: string, params) => new CustomGainNode(ctx, vcId, params),
+    protoParams: {},
+  },
+  'customAudio/biquadFilter': {
+    nodeGetter: (vcId, params) => new CustomBiquadFilterNode(ctx, vcId, params),
+    protoParams: {},
+  },
   'customAudio/constantSource': {
-    nodeGetter: (_vcId: string, params?: { [key: string]: any } | null) => {
-      const csn: ForeignNode = new ConstantSourceNode(ctx);
-      if (params && typeof params.offset === 'number') {
-        csn.offset.value = params.offset;
-      }
-      csn.start();
-      csn.serialize = function(this: ConstantSourceNode) {
-        return { offset: this.offset.value };
-      };
+    nodeGetter: (vcId: string, params?: { [key: string]: any } | null) => {
+      const csn = new CustomConstantSourceNode(ctx, vcId, params);
+      csn.node!.start();
       return csn;
     },
     protoParams: {
@@ -173,7 +230,7 @@ export const audioNodeGetters: {
     },
   },
   'customAudio/audioClip': {
-    nodeGetter: () => new AudioBufferSourceNode(ctx),
+    nodeGetter: (vcId, params) => new CustomAudioBufferSourceNode(ctx, vcId, params),
     protoParams: {
       onDropFile: function(...args: unknown[]) {
         console.log('Dropped file: ', this, ...args);
@@ -181,15 +238,15 @@ export const audioNodeGetters: {
     },
   },
   'customAudio/destination': {
-    nodeGetter: () => ctx.destination,
+    nodeGetter: (vcId, params) => new CustomDestinationNode(ctx, vcId, params),
     protoParams: {},
   },
   'customAudio/microphone': {
-    nodeGetter: () => micNode,
+    nodeGetter: vcId => new MicNode(ctx, vcId),
     protoParams: {},
   },
   'customAudio/mixer': {
-    nodeGetter: (vcId: string) => new MixerNode(vcId),
+    nodeGetter: (vcId: string, params) => new MixerNode(ctx, vcId, params),
     protoParams: {
       onDrawForeground: function(this: any, _ctx: CanvasRenderingContext2D) {
         // TODO
@@ -197,7 +254,7 @@ export const audioNodeGetters: {
     },
   },
   'customAudio/MIDIInput': {
-    nodeGetter: (vcId: string, params) => new MIDIInputNode(vcId, params),
+    nodeGetter: (vcId: string, params) => new MIDIInputNode(ctx, vcId, params),
     protoParams: {
       onDrawForeground: function(this: MIDIInputNode, _ctx: CanvasRenderingContext2D) {
         // TODO: Render a button that, when clicked, updates the list of available MIDI editors
@@ -216,49 +273,10 @@ export const audioNodeGetters: {
       },
     },
   },
-};
-
-export const getDisplayNameByForeignNodeType = (foreignNodeType: string): string => {
-  const displayNameByForeignNodeType: { [key: string]: string } = {
-    'customAudio/gain': 'Gain',
-    'customAudio/biquadFilter': 'Biquad Filter',
-    'customAudio/constantSource': 'Constant Source',
-    'customAudio/audioClip': 'Audio Clip',
-    'customAudio/destination': 'Destination',
-    'customAudio/microphone': 'Microphone',
-    'customAudio/mixer': 'Mixer',
-    'customAudio/MIDIInput': 'MIDI Input',
-  };
-
-  const displayName = displayNameByForeignNodeType[foreignNodeType];
-  if (!displayName) {
-    console.error(`No display name for foreign node of type ${foreignNodeType}`);
-    return 'Unknown';
-  }
-  return displayName;
-};
-
-export const getForeignNodeType = (foreignNode: ForeignNode) => {
-  // This must come before `GainNode` because it's also an instance of `GainNode`... >.>
-  if (foreignNode instanceof MicNode) {
-    return 'customAudio/microphone';
-  } else if (foreignNode instanceof GainNode) {
-    return 'customAudio/gain';
-  } else if (foreignNode instanceof BiquadFilterNode) {
-    return 'customAudio/biquadFilter';
-  } else if (foreignNode instanceof ConstantSourceNode) {
-    return 'customAudio/constantSource';
-  } else if (foreignNode instanceof AudioBufferSourceNode) {
-    return 'customAudio/audioClip';
-  } else if (foreignNode instanceof AudioDestinationNode) {
-    return 'customAudio/destination';
-  } else if (foreignNode instanceof MixerNode) {
-    return 'customAudio/mixer';
-  } else if (foreignNode instanceof MIDIInputNode) {
-    return 'customAudio/MIDIInput';
-  } else {
-    throw new UnimplementedError(`Unable to get node type of unknown foreign node: ${foreignNode}`);
-  }
+  'customAudio/MIDIToFrequency': {
+    nodeGetter: (vcId, params) => new MIDIToFrequencyNode(vcId, params),
+    protoParams: {},
+  },
 };
 
 const registerCustomAudioNode = (
@@ -266,17 +284,20 @@ const registerCustomAudioNode = (
   nodeGetter: (vcId: string) => ForeignNode,
   protoParams: { [key: string]: any }
 ) => {
-  function CustomAudioNode(this: any) {
-    // Default Properties
-    this.properties = {};
-    this.title = getDisplayNameByForeignNodeType(type);
-
-    this.ctx = new AudioContext();
-  }
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  function CustomAudioNode(this: any) {}
 
   CustomAudioNode.prototype.onAdded = function(this: any) {
-    const id = this.id.toString();
+    if (R.isNil(this.id)) {
+      throw new Error('`id` was nil in `CustomAudioNode`');
+    }
+    const id: string = this.id.toString();
+
     if (this.connectables) {
+      this.title = this.connectables.node.name;
+      if (!this.connectables.node.name) {
+        console.error('Connectables had missing node name: ', this.connectables.node);
+      }
       this.connectables.vcId = id;
       if (!this.connectables.node) {
         throw new Error('`CustomAudioNode` had connectables that have no `node` set');
@@ -290,7 +311,8 @@ const registerCustomAudioNode = (
       const foreignNode = nodeGetter(id);
       // Set the same reference as above
       foreignNode.lgNode = this;
-      const connectables = buildConnectablesForNode(foreignNode, this.id);
+      this.title = foreignNode.name;
+      const connectables = foreignNode.buildConnectables();
 
       // Create empty placeholder connectables
       this.connectables = connectables;

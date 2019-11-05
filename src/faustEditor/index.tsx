@@ -5,7 +5,7 @@ import { Map } from 'immutable';
 import { buildStore } from 'jantix';
 
 import FaustEditor from './FaustEditor';
-import { AudioConnectables } from 'src/patchNetwork';
+import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { createPassthroughNode } from 'src/graphEditor/nodes/util';
 import faustEditorModule from 'src/redux/modules/faustEditor';
@@ -93,11 +93,11 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     const passthroughNode = createPassthroughNode(GainNode);
     return {
       vcId,
-      inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
+      inputs: Map<string, ConnectableInput>().set('input', {
         node: passthroughNode,
         type: 'customAudio',
       }),
-      outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+      outputs: Map<string, ConnectableOutput>().set('output', {
         node: passthroughNode,
         type: 'customAudio',
       }),
@@ -107,11 +107,8 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
   const { faustNode, analyzerNode } = faustAudioNodesMap[vcId];
   return {
     vcId,
-    inputs: Map<string, { node: AudioParam | AudioNode; type: string }>().set('input', {
-      node: faustNode,
-      type: 'customAudio',
-    }),
-    outputs: Map<string, { node: AudioNode; type: string }>().set('output', {
+    inputs: Map<string, ConnectableInput>().set('input', { node: faustNode, type: 'customAudio' }),
+    outputs: Map<string, ConnectableOutput>().set('output', {
       node: analyzerNode,
       type: 'customAudio',
     }),

@@ -108,7 +108,9 @@ pub fn create_view_context(vc_name: String) {
 #[wasm_bindgen]
 pub fn handle_window_close() {
     let vcm = get_vcm();
-    vcm.get_active_view_mut().cleanup();
+    for vc_entry in &mut vcm.contexts {
+        vc_entry.context.cleanup();
+    }
     vcm.save_all();
 }
 

@@ -1,3 +1,7 @@
+import { Map } from 'immutable';
+
+import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+
 const ctx = new AudioContext();
 
 export const decodeAudioData = (
@@ -24,14 +28,36 @@ export const getMicrophoneStream = (): Promise<MediaStream> =>
     }
   });
 
+const micNode = new GainNode(ctx);
+getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect(micNode));
+
 /**
  * This is a custom node type that we use to facilitate initializing the patch network and everything else synchronously while also having
  * to asynchronously initialize the mic stream due to user permissions dialog etc.
  *
  * This node will always exist staticly, and then we asynchronously initialize the mic media stream and connect it to this.
  */
-export class MicNode extends GainNode {}
+export class MicNode extends GainNode {
+  public nodeType = 'customAudio/microphone';
+  public name = 'Microphone';
+  public vcId: string;
 
-export const micNode = new MicNode(ctx);
+  public constructor(ctx: AudioContext, vcId: string) {
+    super(ctx);
+    this.vcId = vcId;
+    micNode.connect(this);
+  }
 
-getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect(micNode));
+  public serialize() {
+    return {};
+  }
+
+  public buildConnectables(): AudioConnectables & { node: MicNode } {
+    return {
+      vcId: this.vcId,
+      inputs: Map<string, ConnectableInput>(),
+      outputs: Map<string, ConnectableOutput>().set('output', { node: this, type: 'customAudio' }),
+      node: this,
+    };
+  }
+}

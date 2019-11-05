@@ -4,31 +4,23 @@ import { Option } from 'funfix-core';
 import { VCMState, getConnectedPair } from 'src/redux/modules/viewContextManager';
 import { getEngine } from 'src';
 import { actionCreators, dispatch } from 'src/redux';
-import {
-  audioNodeGetters,
-  buildConnectablesForNode,
-  ForeignNode,
-} from 'src/graphEditor/nodes/CustomAudio';
+import { audioNodeGetters, ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import { MIDINode } from './midiNode';
 
-export interface MIDINode {
-  outputCbs: (ReturnType<MIDINode['getInputCbs']>)[];
-  connect: (dst: MIDINode) => void;
-  disconnect: (dst?: MIDINode) => void;
-  /**
-   * Returns a function that, when called, triggers an input on this MIDI node.  Must return the exact same object
-   * each time it's called.
-   */
-  getInputCbs: () => {
-    onAttack: (note: number, voiceIx: number, velocity: number) => void;
-    onRelease: (note: number, voiceIx: number, velocity: number) => void;
-    onPitchBend: (bendAmount: number) => void;
-  };
+export type ConnectableType = 'midi' | 'number' | 'customAudio';
+export interface ConnectableInput {
+  node: AudioParam | AudioNode | MIDINode;
+  type: ConnectableType;
+}
+export interface ConnectableOutput {
+  node: AudioNode | MIDINode;
+  type: ConnectableType;
 }
 
 export interface AudioConnectables {
   vcId: string;
-  inputs: Map<string, { node: AudioParam | AudioNode | MIDINode; type: string }>;
-  outputs: Map<string, { node: AudioNode | MIDINode; type: string }>;
+  inputs: Map<string, ConnectableInput>;
+  outputs: Map<string, ConnectableOutput>;
   /**
    * This is used by custom audio nodes to re-use foreign audio nodes when re-initializing/updating the patch network.  Without this,
    * we'd have to re-create the connectables from scratch using a new audio node, which would require creating a new audio node,
@@ -106,7 +98,7 @@ export const initPatchNetwork = (
         .flatMap(({ node }) => Option.of(node))
         .getOrElseL(() => audioNodeGetters[type]!.nodeGetter(id, serializedState));
 
-      return newConnectablesMap.set(id, buildConnectablesForNode(node, id));
+      return newConnectablesMap.set(id, { ...node.buildConnectables(), vcId: id });
     },
     newConnectablesMap
   );
