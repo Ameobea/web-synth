@@ -31,7 +31,6 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
 }) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
-
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   useEffect(() => {
@@ -66,6 +65,7 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
                 isBypassed={effect.isBypassed}
                 params={effect.params}
                 effectSettings={effect.effect.node.getSettingDefs()}
+                stateKey={stateKey}
               />
             ))}
 

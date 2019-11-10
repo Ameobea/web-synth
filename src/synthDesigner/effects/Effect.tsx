@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import { getReduxInfra } from 'src/synthDesigner';
 
-import { dispatch, actionCreators } from 'src/redux';
-
-const EffectModuleComp: React.FC<{
+interface EffectModuleProps {
   synthIx: number;
   effectIx: number;
   params: { [key: string]: any };
@@ -11,7 +10,19 @@ const EffectModuleComp: React.FC<{
   isBypassed: boolean;
   effectSettings: { [key: string]: any }[];
   effectName: string;
-}> = ({ params, synthIx, effectIx, wetness, isBypassed, effectSettings, effectName }) => {
+  stateKey: string;
+}
+
+const EffectModuleComp: React.FC<EffectModuleProps> = ({
+  params,
+  synthIx,
+  effectIx,
+  wetness,
+  isBypassed,
+  effectSettings,
+  effectName,
+  stateKey,
+}) => {
   const mergedState = useMemo(() => ({ ...params, wetness, bypass: isBypassed }), [
     params,
     wetness,
@@ -26,6 +37,8 @@ const EffectModuleComp: React.FC<{
     ],
     [effectSettings]
   );
+
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return (
     <div className='effect-module'>

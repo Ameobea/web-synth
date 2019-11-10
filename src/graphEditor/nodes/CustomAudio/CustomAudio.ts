@@ -24,7 +24,8 @@ import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFre
 const ctx = new AudioContext();
 
 export interface ForeignNode<T = any> {
-  /**  A reference to the `LgNode` that is paired with this `ForeignNode`, if one exists.  This reference should only
+  /**
+   * A reference to the `LgNode` that is paired with this `ForeignNode`, if one exists.  This reference should only
    * be used for updating the LG node's presentational state; no state should ever be pulled out of the LG node.
    * The `ForeignNode` and its connectables by extension are the only things that are allowed to be stateful here.
    */

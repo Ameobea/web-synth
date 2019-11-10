@@ -40,7 +40,7 @@ pub trait ViewContext {
     /// and referenced by a `localStorage` key or something similar.  The reason for this is that
     /// these definitions are created, read, and transferred between WebAssembly and JavaScript
     /// regularly, and storing large data in them will cause that to become slow.
-    fn save(&mut self) -> String;
+    fn save(&mut self) -> String { "".into() }
 
     // input handlers
     fn handle_key_down(&mut self, _key: &str, _control_pressed: bool, _shift_pressed: bool) {}
