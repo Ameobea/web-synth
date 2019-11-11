@@ -48,7 +48,7 @@
     "@types/react-redux": "^7.1.2",
     "@types/webmidi": "^2.0.3",
     "ace-builds": "^1.4.5",
-    "ameo-utils": "^0.4.0",
+    "ameo-utils": "^0.4.3",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",
     "immutable": "^4.0.0-rc.12",
@@ -64,6 +64,7 @@
     "recompose": "^0.30.0",
     "redux": "^4.0.4",
     "redux-form": "^8.2.6",
+    "reselect": "^4.0.0",
     "tonal": "^2.2.2",
     "tone": "^13.8.25"
   }
