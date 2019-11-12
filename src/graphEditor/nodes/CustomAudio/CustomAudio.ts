@@ -20,6 +20,7 @@ import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
 import { MIDIInputNode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
+import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 
 const ctx = new AudioContext();
 
@@ -276,6 +277,10 @@ export const audioNodeGetters: {
   },
   'customAudio/MIDIToFrequency': {
     nodeGetter: (vcId, params) => new MIDIToFrequencyNode(vcId, params),
+    protoParams: {},
+  },
+  'customAudio/LFO': {
+    nodeGetter: (vcId, params) => new LFONode(ctx, vcId, params),
     protoParams: {},
   },
 };
