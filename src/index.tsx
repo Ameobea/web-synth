@@ -2,13 +2,14 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import * as R from 'ramda';
-import { Try } from 'funfix-core';
 
 const wasm = import('./engine');
 import App from './App';
 import { actionCreators, dispatch, store, getState } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import { commitForeignConnectables } from 'src/redux/modules/viewContextManager';
+import { tryParseJson } from 'src/util';
+import { ConnectableDescriptor } from 'src/patchNetwork';
 
 const SVGS: HTMLElement[] = ['background-svg', 'foreground-svg'].map(
   document.getElementById.bind(document)
@@ -178,28 +179,25 @@ export const init_view_contexts = (
   connectionsJson: string,
   foreignConnectablesJson: string
 ): void => {
-  const activeViewContexts: {
-    minimal_def: { name: string; uuid: string; title?: string };
-  }[] = Try.of(() => JSON.parse(activeVcsJson))
-    .recover(() =>
-      console.error('Failed to parse JSON of `activeViewContexts`; clearing all view contexts')
-    )
-    .getOrElse([]);
+  const activeViewContexts = tryParseJson<
+    {
+      minimal_def: { name: string; uuid: string; title?: string };
+    }[]
+  >(activeVcsJson, [], 'Failed to parse JSON of `activeViewContexts`; clearing all view contexts');
 
-  const connections = Try.of(() => JSON.parse(connectionsJson))
-    .recover(() => console.error('Failed to parse provided connections out of JSON'))
-    .getOrElse([]);
+  const connections = tryParseJson<[ConnectableDescriptor, ConnectableDescriptor][]>(
+    connectionsJson,
+    [],
+    'Failed to parse provided connections out of JSON'
+  );
 
-  const foreignConnectables: { type: string; id: string; serializedState: string }[] = Try.of(() =>
-    JSON.parse(foreignConnectablesJson)
-  )
-    .recover(() =>
-      console.error(
-        'Failed to parse foreign nodes JSON; using an empty list but that will probably create invalid connections.'
-      )
-    )
-    .getOrElse([]);
+  const foreignConnectables = tryParseJson<{ type: string; id: string; serializedState: string }[]>(
+    foreignConnectablesJson,
+    [],
+    'Failed to parse foreign nodes JSON; using an empty list but that will probably create invalid connections.'
+  );
 
+  dispatch(actionCreators.viewContextManager.SET_IS_LOADED(false));
   dispatch(
     actionCreators.viewContextManager.SET_VCM_STATE(
       {

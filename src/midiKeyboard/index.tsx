@@ -6,7 +6,6 @@
 import ReactDOM from 'react-dom';
 import { Map } from 'immutable';
 import { Provider } from 'react-redux';
-import { Try, Option } from 'funfix-core';
 
 import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
 import {
@@ -19,6 +18,7 @@ import React from 'react';
 import { MidiKeyboardVC } from 'src/midiKeyboard/MidiKeyboard';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
 import { MidiKeyboardStateItem } from 'src/redux/modules/midiKeyboard';
+import { tryParseJson } from 'src/util';
 
 export let midiNodesByStateKey: Map<string, MIDINode> = Map();
 
@@ -41,16 +41,11 @@ export const init_midi_keyboard = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  const initialState = Try.of(() =>
-    Option.of(localStorage.getItem(stateKey))
-      .map(val => JSON.parse(val) as MidiKeyboardStateItem)
-      .orUndefined()
-  ).getOrElseL(() => {
-    console.error(
-      `Failed to parse localStorage state for MIDI keyboard with stateKey ${stateKey}; reverting to initial state.`
-    );
-    return undefined;
-  });
+  const initialState = tryParseJson<MidiKeyboardStateItem, undefined>(
+    localStorage.getItem(stateKey)!,
+    undefined,
+    `Failed to parse localStorage state for MIDI keyboard with stateKey ${stateKey}; reverting to initial state.`
+  );
   dispatch(actionCreators.midiKeyboard.ADD_MIDI_KEYBOARD(stateKey, initialState));
 
   ReactDOM.render(

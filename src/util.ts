@@ -1,3 +1,5 @@
+import { Try } from 'funfix-core';
+
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
 
 /**
@@ -12,3 +14,16 @@ export const roundTo = (num: number, decimals: number): number => {
 };
 
 export const midiToFrequency = (midiNote: number) => Math.pow(2, (midiNote - 69) / 12) * 440;
+
+/**
+ * Tries to parse the provided string out of JSON.
+ **/
+export const tryParseJson = <T, D = T>(
+  serialized: string,
+  defaultValue: D,
+  errMsg?: string
+): T | D =>
+  Try.of(() => JSON.parse(serialized) as T).getOrElseL(() => {
+    console.warn(errMsg || 'Failed to parse JSON; falling back to default value.');
+    return defaultValue;
+  });

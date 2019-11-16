@@ -118,7 +118,7 @@ export const updateGraph = (
   // We start by looping through the list of connections and checking if they all exist.  If they do not, we perform the connection now.
   //
   // Keep track of connections so that we can efficiently go back and check for missing connections later.
-  type ConnectionsMap = Map<string, ArrayElementOf<(typeof patchNetwork)['connections']>[]>;
+  type ConnectionsMap = Map<string, ArrayElementOf<typeof patchNetwork['connections']>[]>;
   const connectionsByNode: ConnectionsMap = patchNetwork.connections.reduce(
     (acc, connection) =>
       acc.set(connection[0].vcId, [...(acc.get(connection[0].vcId) || []), connection]),
@@ -172,51 +172,46 @@ export const updateGraph = (
     }
   });
 
-  patchNetwork.connections.forEach(
-    connection => {
-      // Check to see if we have an actual existing connection between the two nodes/ports and create one if we don't
+  patchNetwork.connections.forEach(connection => {
+    // Check to see if we have an actual existing connection between the two nodes/ports and create one if we don't
 
-      const srcNode = getNode(connection[0].vcId);
-      if (!srcNode) {
-        return;
-      }
-      const srcSlotIx = srcNode.outputs.findIndex(R.propEq('name', connection[0].name));
-      if (srcSlotIx === -1) {
-        console.error(
-          `Expected to find output with name ${connection[0].name} on node id ${connection[0].vcId} but it wasn't found`
-        );
-        return;
-      }
+    const srcNode = getNode(connection[0].vcId);
+    if (!srcNode) {
+      return;
+    }
+    const srcSlotIx = srcNode.outputs.findIndex(R.propEq('name', connection[0].name));
+    if (srcSlotIx === -1) {
+      console.error(
+        `Expected to find output with name ${connection[0].name} on node id ${connection[0].vcId} but it wasn't found`
+      );
+      return;
+    }
 
-      const dstNode = getNode(connection[1].vcId);
-      if (!dstNode) {
-        return;
-      }
-      const dstSlotIx = dstNode.inputs.findIndex(R.propEq('name', connection[1].name));
-      if (dstSlotIx === -1) {
-        console.error(
-          `Expected to find output with name ${connection[1].name} on node id ${connection[1].vcId} but it wasn't found`
-        );
-        return;
-      }
+    const dstNode = getNode(connection[1].vcId);
+    if (!dstNode) {
+      return;
+    }
+    const dstSlotIx = dstNode.inputs.findIndex(R.propEq('name', connection[1].name));
+    if (dstSlotIx === -1) {
+      console.error(
+        `Expected to find output with name ${connection[1].name} on node id ${connection[1].vcId} but it wasn't found`
+      );
+      return;
+    }
 
-      // Time complexity is sub-optimal here but should be ok
-      const connectionExists = Object.values(graph.links)
-        .filter(R.identity)
-        .find(
-          ({ origin_id, origin_slot, target_id, target_slot }) =>
-            origin_id.toString() === connection[0].vcId &&
-            origin_slot === srcSlotIx &&
-            target_id.toString() === connection[1].vcId &&
-            target_slot === dstSlotIx
-        );
+    // Time complexity is sub-optimal here but should be ok
+    const connectionExists = Object.values(graph.links)
+      .filter(R.identity)
+      .find(
+        ({ origin_id, origin_slot, target_id, target_slot }) =>
+          origin_id.toString() === connection[0].vcId &&
+          origin_slot === srcSlotIx &&
+          target_id.toString() === connection[1].vcId &&
+          target_slot === dstSlotIx
+      );
 
-      if (!connectionExists) {
-        srcNode.connect(srcSlotIx, dstNode, dstSlotIx);
-      }
-    },
-    Map() as ConnectionsMap
-  );
-
-  graph.arrange();
+    if (!connectionExists) {
+      srcNode.connect(srcSlotIx, dstNode, dstSlotIx);
+    }
+  }, Map() as ConnectionsMap);
 };

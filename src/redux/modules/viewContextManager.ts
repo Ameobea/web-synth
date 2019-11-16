@@ -15,6 +15,10 @@ export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
   activeViewContextIx: number;
   patchNetwork: PatchNetwork;
+  /**
+   * If true, this indicates that the patch network has been populated from any persisted state
+   */
+  isLoaded: boolean;
 }
 
 export const getConnectedPair = (
@@ -112,6 +116,10 @@ const maybeUpdateVCM = (
 };
 
 const actionGroups = {
+  SET_IS_LOADED: buildActionGroup({
+    actionCreator: (isLoaded: boolean) => ({ type: 'SET_IS_LOADED', isLoaded }),
+    subReducer: (state: VCMState, { isLoaded }) => ({ ...state, isLoaded }),
+  }),
   SET_VCM_STATE: buildActionGroup({
     actionCreator: (
       newState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'> & {
@@ -144,7 +152,7 @@ const actionGroups = {
 
       maybeUpdateVCM(engine, state.patchNetwork, patchNetwork);
 
-      return { ...newState, patchNetwork };
+      return { ...newState, patchNetwork, isLoaded: true };
     },
   }),
   CONNECT: buildActionGroup({
@@ -477,6 +485,7 @@ const initialState: VCMState = {
     connectables: Map(),
     connections: [],
   },
+  isLoaded: false,
 };
 
 export default buildModule<VCMState, typeof actionGroups>(initialState, actionGroups);

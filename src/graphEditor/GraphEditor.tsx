@@ -13,6 +13,7 @@ import './GraphEditor.scss';
 import { ReduxStore } from 'src/redux';
 import { connect } from 'react-redux';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
+import { tryParseJson } from 'src/util';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
@@ -37,12 +38,14 @@ export const saveStateForInstance = (stateKey: string) => {
 const mapStateToProps = (state: ReduxStore) => ({
   patchNetwork: state.viewContextManager.patchNetwork,
   activeViewContexts: state.viewContextManager.activeViewContexts,
+  isLoaded: state.viewContextManager.isLoaded,
 });
 
 const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToProps>> = ({
   stateKey,
   patchNetwork,
   activeViewContexts,
+  isLoaded,
 }) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -80,6 +83,31 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
     lastPatchNetwork.current = patchNetwork;
   }, [patchNetwork, lGraphInstance, activeViewContexts]);
 
+  // Set node from serialized state when we first render
+  useEffect(() => {
+    if (!lGraphInstance || !isLoaded) {
+      return;
+    }
+    const state = tryParseJson<{ nodes: { id: string | number; pos: [number, number] }[] }, null>(
+      localStorage[stateKey],
+      null,
+      'Error parsing serialized LiteGraph state'
+    );
+    if (!state) {
+      return;
+    }
+
+    state.nodes.forEach(({ id, pos }) => {
+      const node = lGraphInstance._nodes_by_id[id];
+      if (!node) {
+        return;
+      }
+
+      node.pos = pos;
+    });
+    lGraphInstance.setDirtyCanvas(true, true);
+  }, [stateKey, lGraphInstance, isLoaded]);
+
   const uiControls = useMemo(
     () => (lGraphInstance ? { arrange: () => lGraphInstance.arrange() } : {}),
     [lGraphInstance]
@@ -90,7 +118,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       <canvas
         ref={ref => (canvasRef.current = ref)}
         id='graph-editor'
-        width={1000}
+        width={window.innerWidth - 400}
         height={800}
       ></canvas>
 

@@ -73,9 +73,7 @@ export const init_synth_designer = (stateKey: string) => {
         err
       );
 
-      return Try.of(() => {
-        throw err;
-      });
+      return Try.failure(err);
     })
     .getOrElseL(() => {
       localStorage.removeItem(stateKey);
