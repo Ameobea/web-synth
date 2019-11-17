@@ -17,7 +17,7 @@ extern "C" {
     /// Initializes a synth on the JavaScript side, returning its index in the gloabl synth array.
     pub fn init_synth(uuid: String, voice_count: usize) -> usize;
     pub fn trigger_attack(synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8);
-    pub fn trigger_release(synth_ix: usize, voice_ix: usize);
+    pub fn trigger_release(synth_ix: usize, voice_ix: usize, note_id: usize);
     pub fn trigger_attack_release(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32);
     pub fn schedule_events(synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]);
 }
@@ -26,7 +26,7 @@ pub struct MidiEditorGridHandler {
     pub synth: PolySynth<
         fn(uuid: String, voice_count: usize) -> usize,
         fn(synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8),
-        fn(synth_ix: usize, voice_ix: usize),
+        fn(synth_ix: usize, voice_ix: usize, note_id: usize),
         fn(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32),
         fn(synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]),
     >,
@@ -37,7 +37,7 @@ const DEFAULT_VELOCITY: u8 = 255;
 static SYNTH_CALLBACKS: SynthCallbacks<
     fn(uuid: String, voice_count: usize) -> usize,
     fn(synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8),
-    fn(synth_ix: usize, voice_ix: usize),
+    fn(synth_ix: usize, voice_ix: usize, note_id: usize),
     fn(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32),
     fn(synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]),
 > = SynthCallbacks {
@@ -330,7 +330,7 @@ impl MidiEditorGridHandler {
                     scheduled_events.push(voice_ix as u8);
                 });
             } else {
-                voice_manager.trigger_release_cb(note_id, |_, voice_ix| {
+                voice_manager.trigger_release_cb(note_id, |_, voice_ix, _note_id| {
                     scheduled_events.push(voice_ix as u8);
                 });
             }

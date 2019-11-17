@@ -6,5 +6,9 @@ node_modules/
 src/midi*
 !src/midiKeyboard
 src/spectrum_viz*
+src/polysynth.js
+src/polysynth_bg.d.ts
+src/polysynth_bg.wasm
 .env
 !src/midiEditor*
+polysynth.d.ts

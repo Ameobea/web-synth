@@ -1,6 +1,14 @@
 //! Synth state management.  Handles keeping track of what each voice of each polyphonic synth
 //! is playing and passing the correct commands through to the WebAudio synths.
 
+#[cfg(feature = "wasm-bindgen")]
+#[macro_use]
+extern crate wasm_bindgen;
+#[cfg(feature = "wasm-bindgen")]
+extern crate common;
+#[cfg(feature = "wasm-bindgen")]
+extern crate js_sys;
+
 #[macro_use]
 extern crate log;
 
@@ -14,8 +22,8 @@ pub struct SynthCallbacks<
     I: Fn(String, usize) -> usize,
     // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
     TA: Fn(usize, usize, usize, u8),
-    // synth_ix: usize, voice_ix: usize
-    TR: Fn(usize, usize),
+    // synth_ix: usize, voice_ix: usize, note_id: usize
+    TR: Fn(usize, usize, usize),
     // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
     TAR: Fn(usize, usize, f32, f32),
     // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
@@ -60,8 +68,8 @@ pub struct PolySynth<
     I: Fn(String, usize) -> usize,
     // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
     TA: Fn(usize, usize, usize, u8),
-    // synth_ix: usize, voice_ix: usize
-    TR: Fn(usize, usize),
+    // synth_ix: usize, voice_ix: usize, note_id: usize
+    TR: Fn(usize, usize, usize),
     // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
     TAR: Fn(usize, usize, f32, f32),
     // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
@@ -86,14 +94,36 @@ impl<
         I: Fn(String, usize) -> usize,
         // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
         TA: Fn(usize, usize, usize, u8),
-        // synth_ix: usize, voice_ix: usize
-        TR: Fn(usize, usize),
+        // synth_ix: usize, voice_ix: usize, note_id: usize
+        TR: Fn(usize, usize, usize),
         // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
         TAR: Fn(usize, usize, f32, f32),
         // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
         SE: Fn(usize, &[u8], &[usize], &[f32]),
     > PolySynth<I, TA, TR, TAR, SE>
 {
+    fn find_ix_of_voice_playing(&self, note_id: usize) -> Option<usize> {
+        // look for the index of the first voice that's playing the provided frequency
+        let (search_range_1, search_range_2) = if self.voices[self.first_idle_voice_ix].is_playing()
+        {
+            // all voices active; have to search the whole range
+            (0..POLY_SYNTH_VOICE_COUNT, 0..0)
+        } else if self.first_active_voice_ix > self.first_idle_voice_ix {
+            // range is split; idle range is in the middle
+            (
+                self.first_active_voice_ix..POLY_SYNTH_VOICE_COUNT,
+                0..self.first_idle_voice_ix,
+            )
+        } else {
+            (self.first_active_voice_ix..self.first_idle_voice_ix, 0..0)
+        };
+        let combined_search_range = search_range_1.chain(search_range_2);
+        combined_search_range
+            .map(|i| (i, unsafe { self.voices.get_unchecked(i) }))
+            .find(|(_, voice)| voice.playing == VoicePlayingStatus::Playing(note_id))
+            .map(|(ix, _voice)| ix)
+    }
+
     pub fn new(uuid: Uuid, link: bool, synth_cbs: SynthCallbacks<I, TA, TR, TAR, SE>) -> Self {
         let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] = unsafe { mem::uninitialized() };
         let voices_ptr = &mut voices as *mut _ as *mut Voice;
@@ -123,7 +153,14 @@ impl<
         note_id: usize,
         velocity: u8,
         mut cb: F,
-    ) -> (usize, usize, usize, u8) {
+    ) -> Option<(usize, usize, usize, u8)> {
+        // Ignore this event if we already have a note playing with the provided `note_id` on any
+        // voice.  This is necessary in order to prevent "ghost" notes that can't be
+        // released.
+        if self.find_ix_of_voice_playing(note_id).is_some() {
+            return None;
+        }
+
         self.voices[self.first_idle_voice_ix].playing = VoicePlayingStatus::Playing(note_id);
         let played_voice_ix = self.voices[self.first_idle_voice_ix].src_ix;
         cb(self.id, played_voice_ix, note_id, velocity);
@@ -141,13 +178,15 @@ impl<
             self.first_active_voice_ix = self.first_idle_voice_ix;
         }
 
-        (self.id, played_voice_ix, note_id, velocity)
+        Some((self.id, played_voice_ix, note_id, velocity))
     }
 
     pub fn trigger_attack(&mut self, note_id: usize, velocity: u8) {
-        let (synth_id, voice_ix, note_id, velocity) =
-            self.trigger_attack_cb(note_id, velocity, |_, _, _, _| ());
-        (self.synth_cbs.trigger_attack)(synth_id, voice_ix, note_id, velocity)
+        if let Some((synth_id, voice_ix, note_id, velocity)) =
+            self.trigger_attack_cb(note_id, velocity, |_, _, _, _| ())
+        {
+            (self.synth_cbs.trigger_attack)(synth_id, voice_ix, note_id, velocity);
+        }
     }
 
     pub fn trigger_attacks(&mut self, note_ids: &[usize], velocity: u8) {
@@ -156,31 +195,13 @@ impl<
         }
     }
 
-    pub fn trigger_release_cb<F: FnMut(usize, usize)>(
+    pub fn trigger_release_cb<F: FnMut(usize, usize, usize)>(
         &mut self,
         note_id: usize,
         mut cb: F,
     ) -> Option<(usize, usize)> {
-        // look for the index of the first voice that's playing the provided frequency
-        let (search_range_1, search_range_2) = if self.voices[self.first_idle_voice_ix].is_playing()
-        {
-            // all voices active; have to search the whole range
-            (0..POLY_SYNTH_VOICE_COUNT, 0..0)
-        } else if self.first_active_voice_ix > self.first_idle_voice_ix {
-            // range is split; idle range is in the middle
-            (
-                self.first_active_voice_ix..POLY_SYNTH_VOICE_COUNT,
-                0..self.first_idle_voice_ix,
-            )
-        } else {
-            (self.first_active_voice_ix..self.first_idle_voice_ix, 0..0)
-        };
-        let combined_search_range = search_range_1.chain(search_range_2);
-        let (target_voice_ix, _) = match combined_search_range
-            .map(|i| (i, unsafe { self.voices.get_unchecked(i) }))
-            .find(|(_, voice)| voice.playing == VoicePlayingStatus::Playing(note_id))
-        {
-            Some(pos) => pos,
+        let target_voice_ix = match self.find_ix_of_voice_playing(note_id) {
+            Some(target_voice_ix) => target_voice_ix,
             None => {
                 warn!(
                     "Attempted to release note id {} but it isn't being played.",
@@ -189,8 +210,9 @@ impl<
                 return None;
             },
         };
+
         let released_voice_ix = self.voices[target_voice_ix].src_ix;
-        cb(self.id, released_voice_ix);
+        cb(self.id, released_voice_ix, note_id);
         self.voices[target_voice_ix].playing = VoicePlayingStatus::Tacent;
         let old_first_active_voice_ix = self.first_active_voice_ix;
 
@@ -209,8 +231,8 @@ impl<
     }
 
     pub fn trigger_release(&mut self, note_id: usize) {
-        if let Some((synth_ix, voice_id)) = self.trigger_release_cb(note_id, |_, _| ()) {
-            (self.synth_cbs.trigger_release)(synth_ix, voice_id);
+        if let Some((synth_ix, voice_id)) = self.trigger_release_cb(note_id, |_, _, _| ()) {
+            (self.synth_cbs.trigger_release)(synth_ix, voice_id, note_id);
         }
     }
 
@@ -223,4 +245,80 @@ impl<
 
 pub fn stop_playback() {
     // TODO
+}
+
+#[cfg(feature = "wasm-bindgen")]
+pub mod exports {
+    use wasm_bindgen::prelude::*;
+
+    use crate::*;
+
+    pub struct PolySynthContext {
+        pub synth: PolySynth<
+            Box<dyn Fn(String, usize) -> usize>,
+            Box<dyn Fn(usize, usize, usize, u8)>,
+            Box<dyn Fn(usize, usize, usize)>,
+            Box<dyn Fn(usize, usize, f32, f32)>,
+            Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
+        >,
+    }
+
+    #[wasm_bindgen]
+    pub fn create_polysynth_context(
+        play_note: js_sys::Function,
+        release_note: js_sys::Function,
+    ) -> *mut PolySynthContext {
+        let context = PolySynthContext {
+            synth: PolySynth::new(common::uuid_v4(), true, SynthCallbacks {
+                init_synth: Box::new(|_, _| 0usize),
+                trigger_release: Box::new(
+                    move |_synth_ix: usize, voice_ix: usize, note_id: usize| match release_note
+                        .call2(
+                            &JsValue::NULL,
+                            &JsValue::from(voice_ix as u32),
+                            &JsValue::from(note_id as u32),
+                        ) {
+                        Ok(_) => (),
+                        Err(err) => error!("Error playing note: {:?}", err),
+                    },
+                ),
+                trigger_attack: Box::new(
+                    move |_synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8| {
+                        match play_note.call3(
+                            &JsValue::NULL,
+                            &JsValue::from(voice_ix as u32),
+                            &JsValue::from(note_id as u32),
+                            &JsValue::from(velocity),
+                        ) {
+                            Ok(_) => (),
+                            Err(err) => error!("Error playing note: {:?}", err),
+                        }
+                    },
+                ),
+                trigger_attack_release: Box::new(|_, _, _, _| unimplemented!()),
+                schedule_events: Box::new(|_, _, _, _| unimplemented!()),
+            }),
+        };
+
+        Box::into_raw(Box::new(context))
+    }
+
+    #[wasm_bindgen]
+    pub fn drop_polysynth_context(ctx: *mut PolySynthContext) {
+        unsafe { drop(Box::from_raw(ctx)) }
+    }
+
+    #[wasm_bindgen]
+    pub fn handle_note_down(ctx: *mut PolySynthContext, note_id: usize, velocity: Option<u8>) {
+        let mut ctx = unsafe { Box::from_raw(ctx) };
+        ctx.synth.trigger_attack(note_id, velocity.unwrap_or(255));
+        mem::forget(ctx);
+    }
+
+    #[wasm_bindgen]
+    pub fn handle_note_up(ctx: *mut PolySynthContext, note_id: usize) {
+        let mut ctx = unsafe { Box::from_raw(ctx) };
+        ctx.synth.trigger_release(note_id);
+        mem::forget(ctx);
+    }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
 
@@ -70,40 +70,62 @@ const MidiKeyboard: React.FC<{
   playNote: (voiceIx: number, note: number, velocity: number) => void;
   releaseNote: (voiceIx: number, note: number, velocity: number) => void;
   handlePitchBend?: ((lsb: number, msb: number) => void) | null;
-}> = ({ playNote, releaseNote, handlePitchBend }) => {
-  const midiAccess = useRef<MIDIAccess | null | 'INITIALIZING' | 'INIT_FAILED'>(null);
+}> = ({ playNote, releaseNote }) => {
+  const [polySynthMod, setPolySynthMod] = useState<typeof import('src/polysynth') | null>(null);
+  const [polySynthCtx, setPolySynthCtx] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!midiAccess.current) {
-      midiAccess.current = 'INITIALIZING';
-      tryInitMidi(playNote, releaseNote, handlePitchBend)
-        .then(access => {
-          midiAccess.current = access;
-        })
-        .catch(err => {
-          console.warn(err);
-          midiAccess.current = 'INIT_FAILED';
-        });
+    if (polySynthCtx !== null) {
+      return;
+    }
+
+    import('src/polysynth').then(mod => {
+      setPolySynthMod(mod);
+      setPolySynthCtx(
+        mod.create_polysynth_context(playNote, (voiceIx: number, noteId: number) =>
+          releaseNote(voiceIx, noteId, 0)
+        )
+      );
+    });
+
+    return () => {
+      if (polySynthCtx !== null) {
+        import('src/polysynth').then(mod => mod.drop_polysynth_context(polySynthCtx));
+      }
+    };
+  }, [playNote, releaseNote, polySynthCtx]);
+
+  useEffect(() => {
+    if (!polySynthMod || polySynthCtx === null) {
+      return;
     }
 
     const handleDown = (evt: KeyboardEvent) => {
+      // Discard keypresses while control key pressed
+      if (evt.ctrlKey) {
+        return;
+      }
+
+      // Discard duplicate events coming from holding the key down
       if (evt.repeat) {
         return;
       }
-      const midiNumber = keyMap[evt.key];
+      const midiNumber = keyMap[evt.key.toLowerCase()];
       if (R.isNil(midiNumber)) {
         return;
       }
 
-      playNote(0, midiNumber, 255);
+      polySynthMod.handle_note_down(polySynthCtx, midiNumber, 255);
     };
     const handleUp = (evt: KeyboardEvent) => {
-      const midiNumber = keyMap[evt.key];
+      // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event
+      // which causes ghost notes.
+      const midiNumber = keyMap[evt.key.toLowerCase()];
       if (R.isNil(midiNumber)) {
         return;
       }
 
-      releaseNote(0, midiNumber, 255);
+      polySynthMod.handle_note_up(polySynthCtx, midiNumber);
     };
 
     document.addEventListener('keydown', handleDown);

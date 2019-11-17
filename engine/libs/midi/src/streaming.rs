@@ -15,7 +15,7 @@ pub struct MsgHandlerContext {
     pub voice_manager: PolySynth<
         Box<dyn Fn(String, usize) -> usize>,
         Box<dyn Fn(usize, usize, usize, u8)>,
-        Box<dyn Fn(usize, usize)>,
+        Box<dyn Fn(usize, usize, usize)>,
         Box<dyn Fn(usize, usize, f32, f32)>,
         Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
     >,
@@ -38,7 +38,7 @@ pub fn create_msg_handler_context(
         // pointers to the boxed `Function`s
         voice_manager: PolySynth::new(uuid_v4(), true, SynthCallbacks {
             init_synth: Box::new(|_, _| 0usize),
-            trigger_release: Box::new(|_, _| panic!()),
+            trigger_release: Box::new(|_, _, _| panic!()),
             trigger_attack: Box::new(|_, _, _, _: u8| panic!()),
             trigger_attack_release: Box::new(|_, _, _, _| panic!()),
             schedule_events: Box::new(|_, _, _, _| panic!()),
@@ -68,14 +68,18 @@ pub fn create_msg_handler_context(
                 };
             },
         ) as Box<dyn Fn(usize, usize, usize, u8)>,
-        trigger_release: Box::new(move |_synth_ix: usize, voice_ix: usize| {
+        trigger_release: Box::new(move |_synth_ix: usize, voice_ix: usize, note_id: usize| {
             unsafe {
-                match (&*release_note).call1(&JsValue::NULL, &JsValue::from(voice_ix as u32)) {
+                match (&*release_note).call2(
+                    &JsValue::NULL,
+                    &JsValue::from(voice_ix as u32),
+                    &JsValue::from(note_id as u32),
+                ) {
                     Ok(_) => (),
                     Err(err) => error!("Error playing note: {:?}", err),
                 }
             };
-        }) as Box<dyn Fn(usize, usize)>,
+        }) as Box<dyn Fn(usize, usize, usize)>,
         trigger_attack_release: Box::new(move |_: usize, _: usize, _: f32, _: f32| unimplemented!())
             as Box<dyn Fn(usize, usize, f32, f32)>,
         schedule_events: Box::new(move |_, _: &[u8], _: &[usize], _: &[f32]| unimplemented!())

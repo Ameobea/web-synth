@@ -10,6 +10,14 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 log = "0.4"
 uuid = { version = "0.8", features = ["serde"] }
+wasm-bindgen = { version = "0.2.54", optional = true }
+wasm-logger = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4.4", optional = true }
+common = { path = "../common", optional = true }
+js-sys = "0.3.31"
+
+[features]
+wasm-bindgen-exports = ["wasm-bindgen", "wasm-logger", "wasm-bindgen-futures", "common"]
 
 [profile.dev]
 opt-level = 1

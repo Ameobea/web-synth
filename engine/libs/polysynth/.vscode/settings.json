@@ -1,0 +1,3 @@
+{
+  "rust.features": ["wasm-bindgen-exports"]
+}
