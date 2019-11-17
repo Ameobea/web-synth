@@ -5,17 +5,17 @@ name = "midi"
 version = "0.1.0"
 
 [dependencies]
-bincode = "1.1.4"
-console_error_panic_hook = { git = "https://github.com/Ameobea/console_error_panic_hook.git" }
-futures = "0.1.28"
+bincode = "1.2"
+console_error_panic_hook = "0.1.6"
+futures = "0.3"
 log = "0.4"
-serde = "1.0.80"
-serde_derive = "1.0.80"
-serde_json = "1.0.39"
-js-sys = { git = "https://github.com/rustwasm/wasm-bindgen.git", rev = "fb0bbc00" }
-wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen.git", rev = "fb0bbc00" }
-wasm-logger = { git = "https://gitlab.com/Ameobea/wasm-logger.git" }
-wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen.git", rev = "fb0bbc00" }
+serde = "1.0.102"
+serde_derive = "1.0.102"
+serde_json = "1.0.41"
+js-sys = "0.3.13"
+wasm-bindgen = "0.2.54"
+wasm-logger = "0.2"
+wasm-bindgen-futures = "0.4.4"
 
 polysynth = { path = "../polysynth" }
 

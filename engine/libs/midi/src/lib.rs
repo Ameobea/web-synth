@@ -170,12 +170,20 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
             },
         };
 
-    let cb = move |track_to_read: JsValue| -> JsValue {
+    let cb = move |res: Result<JsValue, JsValue>| -> Result<JsValue, JsValue> {
+        let track_to_read = match res {
+            Ok(track_to_read) => track_to_read,
+            Err(err) => {
+                error!("Got error from JS future: {:?}", err);
+                return Err(JsValue::null());
+            },
+        };
+
         let track_to_read: usize = match track_to_read.as_f64() {
             Some(track_to_read) => track_to_read as usize,
             None => {
                 error!("Error while trying to convert value passed to callback (exected usize)");
-                return JsValue::from(None as Option<Uint8Array>);
+                return Err(JsValue::from(None as Option<Uint8Array>));
             },
         };
 
@@ -279,11 +287,11 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
             }
         }
 
-        JsValue::from(Some(Uint8Array::from(
+        Ok(JsValue::from(Some(Uint8Array::from(
             bincode::serialize(&notes)
                 .expect("Error serializing raw note data vector")
                 .as_slice(),
-        )))
+        ))))
     };
 
     // Convert the JS Promise into a Rust/JS hybrid promise from that external crate
