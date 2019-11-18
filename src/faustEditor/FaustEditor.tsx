@@ -66,7 +66,7 @@ export const compileFaustInstance = async (
     formData.append('optimize', 'true');
   }
 
-  const res = await fetch(FAUST_COMPILER_ENDPOINT, { method: 'POST', body: formData });
+  const res = await fetch(`${FAUST_COMPILER_ENDPOINT}/compile`, { method: 'POST', body: formData });
 
   if (!res.ok) {
     const errMsg = await res.text();
@@ -110,13 +110,16 @@ const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: Redux
 /**
  * Creates a control panel that contains controls for browsing + loading shared/saved effects
  */
-const EffectsPickerPanelInnerInner: React.FC<
-  {
-    state: { [key: string]: any };
-    setState: (newState: object) => void;
-    loadEffect: (effect: Effect) => void;
-  } & ReturnType<typeof mapEffectsPickerPanelStateToProps>
-> = ({ state, setState, loadEffect, effects }) => (
+const EffectsPickerPanelInnerInner: React.FC<{
+  state: { [key: string]: any };
+  setState: (newState: object) => void;
+  loadEffect: (effect: Effect) => void;
+} & ReturnType<typeof mapEffectsPickerPanelStateToProps>> = ({
+  state,
+  setState,
+  loadEffect,
+  effects,
+}) => (
   <ControlPanel
     state={state}
     onChange={(_label: string, _newValue: any, newState: object) => setState(newState)}
@@ -135,12 +138,10 @@ const EffectsPickerPanelInner = connect(mapEffectsPickerPanelStateToProps)(
   EffectsPickerPanelInnerInner
 );
 
-const EffectsPickerPanel: React.FC<
-  Omit<
-    PropTypesOf<typeof EffectsPickerPanelInnerInner>,
-    keyof ReturnType<typeof mapEffectsPickerPanelStateToProps>
-  >
-> = ({ ...props }) => (
+const EffectsPickerPanel: React.FC<Omit<
+  PropTypesOf<typeof EffectsPickerPanelInnerInner>,
+  keyof ReturnType<typeof mapEffectsPickerPanelStateToProps>
+>> = ({ ...props }) => (
   <Provider store={store}>
     <EffectsPickerPanelInner {...props} />
   </Provider>

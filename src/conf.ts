@@ -3,5 +3,5 @@ export const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || 'http://localhos
 export const FAUST_COMPILER_ENDPOINT =
   process.env.FAUST_COMPILER_ENDPOINT ||
   (process.env.NODE_ENV === 'development'
-    ? 'http://localhost:4565/compile'
-    : 'https://faust.p.ameo.design/compile');
+    ? 'http://localhost:4565'
+    : 'https://faust.p.ameo.design');
