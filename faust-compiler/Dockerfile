@@ -33,7 +33,7 @@ COPY --from=builder /usr/local/share/faust/ /usr/local/share/faust/
 COPY --from=builder /build/faust-compiler-server /usr/local/bin/faust-compiler-server
 COPY --from=builder /usr/local/bin/wasm-opt /usr/local/bin/wasm-opt
 
-COPY ./FaustWorkletModuleTemplate.template /opt/faustWorkletTemplate.template
+COPY ./FaustWorkletModuleTemplate.template.js /opt/faustWorkletTemplate.template.js
 
 RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 

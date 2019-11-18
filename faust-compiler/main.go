@@ -181,7 +181,8 @@ const faustModuleIDHeaderName = "X-Faust-Module-ID"
 func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Request) {
 	// Add CORS headers
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
-	resWriter.Header().Set("Access-Control-Allow-Headers", faustModuleIDHeaderName)
+	resWriter.Header().Set("Access-Control-Expose-Headers", faustModuleIDHeaderName)
+	resWriter.Header().Set("Access-Control-Request-Method", "HEAD,GET,POST,PUT,PATCH,DELETE")
 
 	if req.Method == "POST" {
 		req.ParseMultipartForm(10e8)
@@ -308,13 +309,14 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 	http.ServeFile(resWriter, req, outWasmFileName)
 }
 
-func (ctx faustWorkletModuleHandler) buildFaustWorkletCode(jsonModuleDef []byte) ([]byte, error) {
+func (ctx faustWorkletModuleHandler) buildFaustWorkletCode(jsonModuleDef []byte, moduleID string) ([]byte, error) {
 	type TemplateArgs struct {
 		JSONModuleDef string
+		ModuleID      string
 	}
 
 	var buf bytes.Buffer
-	err := ctx.faustCodeTemplate.Execute(&buf, TemplateArgs{JSONModuleDef: string(jsonModuleDef)})
+	err := ctx.faustCodeTemplate.Execute(&buf, TemplateArgs{JSONModuleDef: string(jsonModuleDef), ModuleID: moduleID})
 	if err != nil {
 		log.Printf("Error while generating templated JS code: %s", err)
 		return nil, err
@@ -326,6 +328,13 @@ func (ctx faustWorkletModuleHandler) buildFaustWorkletCode(jsonModuleDef []byte)
 func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Request) {
 	// Add CORS headers
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
+	resWriter.Header().Set("Access-Control-Request-Method", "HEAD,GET,POST,PUT,PATCH,DELETE")
+
+	// Handle CORS preflight requests
+	if req.Method == "HEAD" {
+		resWriter.WriteHeader(204)
+		return
+	}
 
 	queryParams := req.URL.Query()
 	moduleID := queryParams.Get("id")
@@ -351,19 +360,18 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 	}
 
 	// Build the JavaScript code for the Faust Worklet Processor using the JSON module retrieved from the cache
-	jsCode, err := ctx.buildFaustWorkletCode(jsonModuleDef)
+	jsCode, err := ctx.buildFaustWorkletCode(jsonModuleDef, moduleID)
 	if err != nil {
 		http.Error(resWriter, "Error while building Faust worklet processor code via template", 500)
 		return
 	}
 
+	resWriter.Header().Set("Content-Type", "text/javascript")
 	_, err = resWriter.Write(jsCode)
 	if err != nil {
 		http.Error(resWriter, "Error writing Faust module code into response body", 500)
 		return
 	}
-
-	res.Header.Set("Content-Type", "text/javascript")
 }
 
 func main() {
@@ -402,7 +410,7 @@ func main() {
 		googleCloudStorageClient: client,
 		faustCodeTemplate:        faustCodeTemplate,
 	}
-	http.Handle("/FaustWorkletProcessor.js", faustWorkletModuleHandlerInst)
+	http.Handle("/FaustAudioWorkletProcessor.js", faustWorkletModuleHandlerInst)
 
 	port := os.Getenv("PORT")
 	if len(port) == 0 {

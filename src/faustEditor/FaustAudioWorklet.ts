@@ -1,6 +1,8 @@
+import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
+
 export class FaustWorkletNode extends AudioWorkletNode {
-  constructor(audioContext: AudioContext) {
-    super(audioContext, 'faust-worklet-processor-lol2');
+  constructor(audioContext: AudioContext, moduleId: string) {
+    super(audioContext, `faust-worklet-processor-${moduleId}`);
   }
 
   public pathTable: { [path: string]: number } = {};
@@ -70,12 +72,14 @@ export class FaustWorkletNode extends AudioWorkletNode {
 
 export const buildFaustWorkletNode = async (
   audioContext: AudioContext,
-  dspArrayBuffer: ArrayBuffer
+  dspArrayBuffer: ArrayBuffer,
+  moduleID: string
 ): Promise<FaustWorkletNode> => {
-  await audioContext.audioWorklet.addModule('./FaustAudioWorkletProcessor.js');
-  console.log('added module');
+  const faustModuleURL = `${FAUST_COMPILER_ENDPOINT}/FaustAudioWorkletProcessor.js?id=${moduleID}`;
+  console.log({ faustModuleURL });
+  await audioContext.audioWorklet.addModule(faustModuleURL);
 
-  const node = new FaustWorkletNode(audioContext);
+  const node = new FaustWorkletNode(audioContext, moduleID);
 
   // Send the Wasm module over to the created worklet's thread via message passing so that it can instantiate it over
   // there and control it directly

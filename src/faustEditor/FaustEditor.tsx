@@ -56,6 +56,8 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
+const moduleIdHeaderName = 'X-Faust-Module-ID';
+
 export const compileFaustInstance = async (
   faustCode: string,
   optimize: boolean
@@ -67,6 +69,10 @@ export const compileFaustInstance = async (
   }
 
   const res = await fetch(`${FAUST_COMPILER_ENDPOINT}/compile`, { method: 'POST', body: formData });
+  const moduleID = res.headers.get(moduleIdHeaderName);
+  if (!moduleID) {
+    throw new Error(`No \`${moduleIdHeaderName}\` header set in response from Faust compiler`);
+  }
 
   if (!res.ok) {
     const errMsg = await res.text();
@@ -74,7 +80,7 @@ export const compileFaustInstance = async (
   }
 
   const wasmInstanceArrayBuffer = await res.arrayBuffer();
-  return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer);
+  return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID);
 };
 
 const createCompileButtonClickHandler = (

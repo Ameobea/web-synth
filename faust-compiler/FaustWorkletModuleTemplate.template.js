@@ -1,3 +1,36 @@
+const jsonModuleDef = {{.JSONModuleDef}};
+
+const moduleId = "{{.ModuleID}}";
+
+const flattenUiGroups = (ui, pathPrefix = '') =>
+  ui.reduce(
+    (acc, item) =>
+      ['vgroup', 'hgroup'].includes(item.type)
+        ? [
+            ...acc,
+            ...flattenUiGroups(
+              item.items,
+              pathPrefix === '' ? `/${item.label}/` : `${pathPrefix}${item.label}/`
+            ),
+          ]
+        : [...acc, { ...item, label: `${pathPrefix}${item.label}` }],
+    []
+  );
+
+const convertUiToParamDescriptors = ui => {
+  const flattenedUiItems = flattenUiGroups(ui);
+  return flattenedUiItems.map(item => ({
+    name: item.label,
+    defaultValue: +(item.init || 0),
+    minValue: +(item.min || 0),
+    maxValue: +(item.max || 0),
+    // We use k-rate for all since these values are only read once for every `BUFFER_SIZE` frames anyway
+    automationRate: 'k-rate',
+  }));
+};
+
+const paramDescriptors = convertUiToParamDescriptors(jsonModuleDef.ui);
+
 const importObject = {
   env: {
     memoryBase: 0,
@@ -79,6 +112,10 @@ const heap2Str = buf => {
 };
 
 class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return paramDescriptors;
+  }
+
   constructor() {
     super();
 
@@ -190,7 +227,18 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     };
   }
 
-  process(inputs, outputs, _parameters) {
+  process(inputs, outputs, params) {
+    // Set all params into the Wasm memory from the latest values we have to our `AudioParam`s
+    paramDescriptors.forEach(param =>
+      this.dspInstance.exports.setParamValue(
+        this.dsp,
+        this.pathTable[param.name],
+        // We only support k-rate params since Faust processes all of the frames at once and only supports
+        // a single value for each param.
+        params[param.name][0]
+      )
+    );
+
     for (let i = 0; i < Math.min(inputs.length, this.dspInChannels.length); i++) {
       // Copy inputs into the Wasm heap
       const inputChannel0 = inputs[i][0];
@@ -218,14 +266,4 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 }
 
-const res = fetch('https://notes.ameo.design/d17224a9c53b6a003109.module.wasm', {
-  credentials: 'omit',
-  referrer: 'https://notes.ameo.design/',
-  referrerPolicy: 'no-referrer-when-downgrade',
-  body: null,
-  method: 'GET',
-  mode: 'cors',
-});
-WebAssembly.instantiateStreaming(res, importObject).then(() =>
-  registerProcessor('faust-worklet-processor', FaustAudioWorkletProcessor)
-);
+registerProcessor(`faust-worklet-processor-${moduleId}`, FaustAudioWorkletProcessor);

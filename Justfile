@@ -45,7 +45,7 @@ deploy:
 
   gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
     --platform managed \
-    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template" \
+    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js" \
     --image $FAUST_COMPILER_IMAGE_NAME
 
   just build-all

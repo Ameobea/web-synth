@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map } from 'immutable';
 import { buildStore } from 'jantix';
+import * as R from 'ramda';
 
 import FaustEditor from './FaustEditor';
 import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
@@ -105,9 +106,32 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
   }
 
   const { faustNode, analyzerNode } = faustAudioNodesMap[vcId];
+
+  const baseInputs = Map<string, ConnectableInput>().set('input', {
+    node: faustNode,
+    type: 'customAudio',
+  });
+  const parseUIItem = (item, pathPrefix = '') =>
+    ['vgroup', 'hgroup'].includes(item.type)
+      ? item.items.map(childItem =>
+          parseUIItem(
+            childItem,
+            pathPrefix === '' ? `/${item.label}/` : `${pathPrefix}${item.label}/`
+          )
+        )
+      : { ...item, label: `${pathPrefix}${item.label}` };
+  const flattenedUIItems = R.flatten(
+    faustNode.jsonDef.ui.map(item => parseUIItem(item, undefined))
+  );
+  const inputs = flattenedUIItems.reduce(
+    (acc: Map<string, ConnectableInput>, item: any) =>
+      acc.set(item.label, { node: faustNode.parameters.get(item.label as string), type: 'number' }),
+    baseInputs
+  );
+
   return {
     vcId,
-    inputs: Map<string, ConnectableInput>().set('input', { node: faustNode, type: 'customAudio' }),
+    inputs,
     outputs: Map<string, ConnectableOutput>().set('output', {
       node: analyzerNode,
       type: 'customAudio',
