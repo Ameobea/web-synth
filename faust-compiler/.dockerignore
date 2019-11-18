@@ -1,0 +1,9 @@
+Dockerfile
+.dockerignore
+Justfile
+.env
+README.md
+faust-compiler
+faust-compier-server
+.gitignore
+.git

@@ -21,7 +21,6 @@ import (
 type compileHandler struct {
 	ctx                      context.Context
 	googleCloudStorageClient *storage.Client
-	serverBaseURL            string
 }
 
 type faustWorkletModuleHandler struct {
@@ -177,20 +176,12 @@ func hashFaustCode(faustCode []byte) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func (ctx compileHandler) getFaustWorkletModuleURL(codeHash string, optimize bool) string {
-	moduleID := codeHash
-	if optimize {
-		moduleID += "_optimized"
-	}
-	return ctx.serverBaseURL + "/FaustWorkletProcessor.js?id=" + moduleID
-}
-
-const faustWorkletURLHeaderName = "X-Faust-Worklet-Module-URL"
+const faustModuleIDHeaderName = "X-Faust-Module-ID"
 
 func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Request) {
 	// Add CORS headers
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
-	resWriter.Header().Set("Access-Control-Allow-Headers", faustWorkletURLHeaderName)
+	resWriter.Header().Set("Access-Control-Allow-Headers", faustModuleIDHeaderName)
 
 	if req.Method == "POST" {
 		req.ParseMultipartForm(10e8)
@@ -205,6 +196,7 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 
 	uploadedFile, _, err := req.FormFile("code.faust")
 	if err != nil {
+		log.Printf("No file `code.faust` provided with request")
 		resWriter.WriteHeader(400)
 		log.Println(err)
 		return
@@ -229,8 +221,12 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 		return
 	}
 
-	// Add header containing the URL to load the Faust Worklet Processor code for the compiled module
-	resWriter.Header().Set(faustWorkletURLHeaderName, ctx.getFaustWorkletModuleURL(digest, optimize))
+	// Add header containing the module ID to load the Faust Worklet Processor code for the compiled module
+	moduleID := digest
+	if optimize {
+		moduleID += "_optimize"
+	}
+	resWriter.Header().Set(faustModuleIDHeaderName, moduleID)
 
 	if precompiledModule != nil {
 		log.Printf("Found pre-compiled entry for module %s; using that.", digest)
@@ -272,6 +268,7 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 	outWasmFileName := fmt.Sprintf("%s.wasm", tmpFileBaseName)
 	stderr, err := compile(srcFileName, outWasmFileName)
 	if err != nil {
+		log.Printf("Error while compiling Faust module: %s", err)
 		resWriter.WriteHeader(400)
 		resWriter.Write(stderr.Bytes())
 		return
@@ -310,8 +307,6 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 	// Send the file back to the user
 	http.ServeFile(resWriter, req, outWasmFileName)
 }
-
-const faustWorkletTemplateFileName = "FaustWorkletModuleTemplate.template"
 
 func (ctx faustWorkletModuleHandler) buildFaustWorkletCode(jsonModuleDef []byte) ([]byte, error) {
 	type TemplateArgs struct {
@@ -378,17 +373,16 @@ func main() {
 		log.Fatalf("Failed to create Google Cloud Storage client: %s", err)
 	}
 
-	serverBaseURL := os.Getenv("SERVER_BASE_URL")
-	if serverBaseURL == "" {
-		log.Fatalf("The `SERVER_BASE_URL` environment variable must be specified")
-	}
 	compileHandlerInst := compileHandler{
 		ctx:                      ctx,
 		googleCloudStorageClient: client,
-		serverBaseURL:            serverBaseURL,
 	}
 	http.Handle("/compile", compileHandlerInst)
 
+	faustWorkletTemplateFileName := os.Getenv("FAUST_WORKLET_TEMPLATE_FILE_NAME")
+	if faustWorkletTemplateFileName == "" {
+		log.Fatalf("Error: `FAUST_WORKLET_TEMPLATE_FILE_NAME` must be provided.")
+	}
 	fileHandle, err := os.Open(faustWorkletTemplateFileName)
 	if err != nil {
 		log.Fatalf("Error while opening Faust worklet template filename at %s: %s", faustWorkletTemplateFileName, err)
