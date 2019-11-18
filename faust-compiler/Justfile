@@ -10,4 +10,4 @@ docker-run:
   docker run -p 4565:4565 -d --name faust-compiler-server ameo/faust-compiler-server:latest
 
 run:
-  go build && ./faust-compiler
+  go build && ./faust-compiler-server
