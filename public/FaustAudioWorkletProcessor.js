@@ -218,4 +218,14 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('faust-worklet-processor', FaustAudioWorkletProcessor);
+const res = fetch('https://notes.ameo.design/d17224a9c53b6a003109.module.wasm', {
+  credentials: 'omit',
+  referrer: 'https://notes.ameo.design/',
+  referrerPolicy: 'no-referrer-when-downgrade',
+  body: null,
+  method: 'GET',
+  mode: 'cors',
+});
+WebAssembly.instantiateStreaming(res, importObject).then(() =>
+  registerProcessor('faust-worklet-processor-lol2', FaustAudioWorkletProcessor)
+);

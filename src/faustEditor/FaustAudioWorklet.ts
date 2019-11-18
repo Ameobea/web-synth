@@ -1,6 +1,6 @@
 export class FaustWorkletNode extends AudioWorkletNode {
   constructor(audioContext: AudioContext) {
-    super(audioContext, 'faust-worklet-processor');
+    super(audioContext, 'faust-worklet-processor-lol2');
   }
 
   public pathTable: { [path: string]: number } = {};
@@ -73,6 +73,7 @@ export const buildFaustWorkletNode = async (
   dspArrayBuffer: ArrayBuffer
 ): Promise<FaustWorkletNode> => {
   await audioContext.audioWorklet.addModule('./FaustAudioWorkletProcessor.js');
+  console.log('added module');
 
   const node = new FaustWorkletNode(audioContext);
 

@@ -2,13 +2,22 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
+
+	"cloud.google.com/go/storage"
 )
+
+type CompileHandler struct {
+	ctx                      context.Context
+	googleCloudStorageClient *storage.Client
+}
 
 func getFileSize(fileName string) (int64, error) {
 	file, err := os.Open(fileName)
@@ -38,7 +47,50 @@ func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, e
 	return errb, err
 }
 
-func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
+const compiledModuleBucketName = "web_synth-compiled_faust_modules_wasm"
+
+func getOjectName(codeHash string) string {
+	return codeHash + ".wasm"
+}
+
+func getModuleUrl(objectName string) string {
+	return "https://storage.googleapis.com/" + compiledModuleBucketName + "/" + objectName
+}
+
+func (ctx CompileHandler) addModuleToCache(moduleFileName string) error {
+	bkt := ctx.googleCloudStorageClient.Bucket(compiledModuleBucketName)
+	obj := bkt.Object(moduleFileName)
+	writer := obj.NewWriter(ctx.ctx)
+	defer writer.Close()
+
+	fileHandle, err := os.Open(moduleFileName)
+	if err != nil {
+		return err
+	}
+	defer fileHandle.Close()
+
+	if _, err := io.Copy(writer, fileHandle); err != nil {
+		log.Printf("Error uploading module to google cloud storage: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+// checkCacheForModule checks to see if there exists an entry for the provided `codeHash`.  If it does
+// exist, returns its URL.  If not, returns `("", nil)`
+func (ctx CompileHandler) checkCacheForModule(codeHash string) (string, error) {
+	url := getModuleUrl(getOjectName(codeHash))
+	res, err := http.Head(url)
+	if err != nil {
+		return "", err
+	}
+	if res.StatusCode == 404 {
+		return url, nil
+	}
+}
+
+func (ctx CompileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Request) {
 	// Add CORS headers
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -131,14 +183,24 @@ func handleCompile(resWriter http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/compile", handleCompile)
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Failed to create Google Cloud Storage client: %s", err)
+	}
+
+	compileHandler := CompileHandler{
+		ctx:                      ctx,
+		googleCloudStorageClient: client,
+	}
+	http.Handle("/compile", compileHandler)
 
 	var port = os.Getenv("PORT")
 	if len(port) == 0 {
 		port = "4565"
 	}
 
-	err := http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		fmt.Println("Error listening on port", err)
 	}
