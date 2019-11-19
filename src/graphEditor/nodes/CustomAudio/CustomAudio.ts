@@ -54,7 +54,8 @@ const enhanceAudioNode = <T>(
   name: string,
   buildConnectables: (
     foreignNode: ForeignNode<T> & { node: T }
-  ) => Omit<AudioConnectables, 'vcId'> & { node: ForeignNode<T> }
+  ) => Omit<AudioConnectables, 'vcId'> & { node: ForeignNode<T> },
+  paramKeys: string[]
 ): new (
   ctx: AudioContext,
   vcId: string,
@@ -62,8 +63,6 @@ const enhanceAudioNode = <T>(
   lgNode?: any
 ) => ForeignNode<T> => {
   return class ForeignNodeClass implements ForeignNode<T> {
-    private paramKeys: string[];
-
     public vcId: string;
     public nodeType = nodeType;
     public name = name;
@@ -81,21 +80,24 @@ const enhanceAudioNode = <T>(
       this.lgNode = lgNode;
 
       if (!params) {
-        this.paramKeys = [];
         return;
       }
 
       // Assign all values from the params to any
-      const paramKeys: string[] = [];
       Object.entries(params).forEach(([key, val]) => {
-        const valueContainerOpt = (this.node as any)[key];
-        if (valueContainerOpt && !R.isNil(valueContainerOpt.value)) {
-          valueContainerOpt.value = val;
-          paramKeys.push(key);
+        const valueContainer = (this.node as any)[key];
+        if (!valueContainer) {
+          console.error(`No property "${key}" of node named ${name}; not setting value.`);
+          return;
+        } else if (!(valueContainer instanceof AudioParam)) {
+          console.error(
+            `Property "${key}" of node named ${name} isn't an \`AudioParam\`; not setting value.`
+          );
+          return;
         }
-      });
 
-      this.paramKeys = paramKeys;
+        valueContainer.value = val;
+      });
     }
 
     public buildConnectables(): AudioConnectables & { node: ForeignNode<T> } {
@@ -103,10 +105,20 @@ const enhanceAudioNode = <T>(
     }
 
     public serialize() {
-      return this.paramKeys.reduce(
-        (acc, key) => ({ ...acc, [key]: (this.node as any)[key].value }),
-        {}
-      );
+      return paramKeys.reduce((acc, key) => {
+        const valueContainer = (this.node as any)[key];
+        if (!valueContainer) {
+          console.error(`No property "${key}" of node named ${name}; not setting value.`);
+          return acc;
+        } else if (!(valueContainer instanceof AudioParam)) {
+          console.error(
+            `Property "${key}" of node named ${name} isn't an \`AudioParam\`; not setting value.`
+          );
+          return acc;
+        }
+
+        return { ...acc, [key]: valueContainer.value };
+      }, {});
     }
   };
 };
@@ -127,7 +139,8 @@ const CustomGainNode = enhanceAudioNode(
       type: 'customAudio',
     }),
     node,
-  })
+  }),
+  ['gain']
 );
 
 const CustomConstantSourceNode = enhanceAudioNode(
@@ -144,7 +157,8 @@ const CustomConstantSourceNode = enhanceAudioNode(
       type: 'number',
     }),
     node: foreignNode,
-  })
+  }),
+  ['offset']
 );
 
 const CustomBiquadFilterNode = enhanceAudioNode(
@@ -165,7 +179,8 @@ const CustomBiquadFilterNode = enhanceAudioNode(
       type: 'customAudio',
     }),
     node: foreignNode,
-  })
+  }),
+  ['frequency', 'Q', 'detune', 'gain']
 );
 
 const CustomAudioBufferSourceNode = enhanceAudioNode(
@@ -179,7 +194,8 @@ const CustomAudioBufferSourceNode = enhanceAudioNode(
       type: 'customAudio',
     }),
     node: foreignNode,
-  })
+  }),
+  []
 );
 
 const CustomDestinationNode = enhanceAudioNode(
@@ -197,7 +213,8 @@ const CustomDestinationNode = enhanceAudioNode(
     }),
     outputs: Map<string, ConnectableOutput>(),
     node: foreignNode,
-  })
+  }),
+  []
 );
 
 /**
@@ -326,6 +343,10 @@ const registerCustomAudioNode = (
       [...connectables.inputs.entries()].forEach(([name, input]) => {
         if (input instanceof AudioParam) {
           this.addProperty(name, input.node, input.type);
+          const value = (connectables.node as any).node?.[name]?.value;
+          if (!R.isNil(value)) {
+            this.setProperty(name, value);
+          }
           this.addInput(name, input.type);
         } else {
           this.addInput(name, input.type);

@@ -3,6 +3,7 @@
  */
 
 import { LiteGraph } from 'litegraph.js';
+import * as R from 'ramda';
 
 import { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
 import {
@@ -34,6 +35,11 @@ LGAudioConnectables.prototype.setConnectables = function(
   [...connectables.inputs.entries()].forEach(([name, input]) => {
     if (input.node instanceof AudioParam) {
       this.addProperty(name, input.node.value, input.type);
+      this.addProperty(name, input.node, input.type);
+      const value = (connectables.node as any)?.node?.[name]?.value;
+      if (!R.isNil(value)) {
+        this.setProperty(name, value);
+      }
       this.addInput(name, input.type);
     } else {
       this.addInput(name, input.type);

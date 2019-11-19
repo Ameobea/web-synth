@@ -119,13 +119,16 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
             pathPrefix === '' ? `/${item.label}/` : `${pathPrefix}${item.label}/`
           )
         )
-      : { ...item, label: `${pathPrefix}${item.label}` };
+      : { ...item, label: `${pathPrefix}${item.label}`.replace(/\s/g, '_') };
   const flattenedUIItems = R.flatten(
     faustNode.jsonDef.ui.map(item => parseUIItem(item, undefined))
   );
   const inputs = flattenedUIItems.reduce(
     (acc: Map<string, ConnectableInput>, item: any) =>
-      acc.set(item.label, { node: faustNode.parameters.get(item.label as string), type: 'number' }),
+      acc.set(item.label, {
+        node: faustNode.parameters.get(item.label.replace(/\s/g, '_') as string),
+        type: 'number',
+      }),
     baseInputs
   );
 

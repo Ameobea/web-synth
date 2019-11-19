@@ -13,7 +13,7 @@ const flattenUiGroups = (ui, pathPrefix = '') =>
               pathPrefix === '' ? `/${item.label}/` : `${pathPrefix}${item.label}/`
             ),
           ]
-        : [...acc, { ...item, label: `${pathPrefix}${item.label}` }],
+        : [...acc, { ...item, label: `${pathPrefix}${item.label}`.replace(/\s/g, '_') }],
     []
   );
 
