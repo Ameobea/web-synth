@@ -10,6 +10,7 @@ import {
   PromiseResolveType,
   IterableValueOf,
 } from 'src/patchNetwork/midiNode';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
@@ -27,6 +28,13 @@ export class MIDIInputNode {
   private midiModule: typeof import('src/midi') | undefined;
   private midiInput: MIDIInput | undefined;
   private midiMsgHandlerCb: ((evt: Event & { data: Uint8Array }) => void) | undefined;
+
+  /**
+   * See the docs for `enhanceAudioNode`.
+   */
+  public paramOverrides: {
+    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+  } = {};
 
   public async updateInputs(providedAccess?: MIDIAccess) {
     const access = providedAccess || (await navigator.requestMIDIAccess());

@@ -1,6 +1,7 @@
 import { Map } from 'immutable';
 
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 const ctx = new AudioContext();
 
@@ -41,6 +42,13 @@ export class MicNode extends GainNode {
   public nodeType = 'customAudio/microphone';
   public name = 'Microphone';
   public vcId: string;
+
+  /**
+   * See the docs for `enhanceAudioNode`.
+   */
+  public paramOverrides: {
+    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+  } = {};
 
   public constructor(ctx: AudioContext, vcId: string) {
     super(ctx);

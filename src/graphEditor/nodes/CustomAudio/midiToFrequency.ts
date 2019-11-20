@@ -4,6 +4,7 @@ import { Map } from 'immutable';
 import { MIDINode, buildMIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { midiToFrequency } from 'src/util';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 const ctx = new AudioContext();
 
@@ -46,6 +47,13 @@ export class MIDIToFrequencyNode {
 
   public nodeType = 'customAudio/MIDIToFrequency';
   public name = 'MIDI to Frequency';
+
+  /**
+   * See the docs for `enhanceAudioNode`.
+   */
+  public paramOverrides: {
+    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+  } = {};
 
   constructor(vcId: string, _params?: { [key: string]: any } | null) {
     this.vcId = vcId;

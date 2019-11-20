@@ -3,6 +3,7 @@ import * as R from 'ramda';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export class LFONode implements ForeignNode {
   private vcId: string;
@@ -10,6 +11,16 @@ export class LFONode implements ForeignNode {
   public oscillatorNode: OscillatorNode;
   public nodeType = 'customAudio/LFO';
   public name = 'LFO';
+
+  private frequencyOverrideCSN: ConstantSourceNode;
+  private amplitudeOverrideCSN: ConstantSourceNode;
+
+  /**
+   * See the docs for `enhanceAudioNode`.
+   */
+  public paramOverrides: {
+    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+  };
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
@@ -21,24 +32,41 @@ export class LFONode implements ForeignNode {
     this.oscillatorNode.connect(this.gainNode);
     this.oscillatorNode.start();
 
-    console.log({ osc: this.oscillatorNode, gain: this.gainNode });
+    this.frequencyOverrideCSN = new ConstantSourceNode(ctx);
+    this.amplitudeOverrideCSN = new ConstantSourceNode(ctx);
+
+    this.paramOverrides = {
+      frequency: {
+        param: new OverridableAudioParam(
+          ctx,
+          this.oscillatorNode.frequency,
+          this.frequencyOverrideCSN,
+          true
+        ),
+        override: this.frequencyOverrideCSN,
+      },
+      amplitude: {
+        param: new OverridableAudioParam(ctx, this.gainNode.gain, this.amplitudeOverrideCSN, true),
+        override: this.amplitudeOverrideCSN,
+      },
+    };
 
     if (!params) {
       return;
     }
 
     if (!R.isNil(params.gain)) {
-      this.gainNode.gain.value = params.gain;
+      this.amplitudeOverrideCSN.offset.value = params.gain;
     }
     if (!R.isNil(params.frequency)) {
-      this.oscillatorNode.frequency.value = params.frequency;
+      this.frequencyOverrideCSN.offset.value = params.frequency;
     }
   }
 
   public serialize(): { [key: string]: any } {
     return {
-      gain: this.gainNode.gain.value,
-      frequency: this.oscillatorNode.frequency.value,
+      gain: this.paramOverrides.amplitude.override.offset.value,
+      frequency: this.paramOverrides.frequency.override.offset.value,
     };
   }
 
@@ -47,10 +75,10 @@ export class LFONode implements ForeignNode {
       vcId: this.vcId,
       inputs: Map<string, ConnectableInput>()
         .set('frequency', {
-          node: this.oscillatorNode.frequency,
+          node: this.paramOverrides.frequency.param,
           type: 'number',
         })
-        .set('amplitude', { node: this.gainNode.gain, type: 'number' }),
+        .set('amplitude', { node: this.paramOverrides.amplitude.param, type: 'number' }),
       outputs: Map<string, ConnectableOutput>().set('signal', {
         node: this.gainNode,
         type: 'number',

@@ -7,6 +7,7 @@
 import { Map } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
+import { Option } from 'funfix-core';
 
 import {
   AudioConnectables,
@@ -21,6 +22,12 @@ import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
 import { MIDIInputNode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import {
+  LiteGraphLink,
+  LiteGraphNodeInput,
+  LiteGraph as LiteGraphType,
+} from 'src/graphEditor/LiteGraphTypes';
 
 const ctx = new AudioContext();
 
@@ -39,6 +46,12 @@ export interface ForeignNode<T = any> {
   buildConnectables(): AudioConnectables & { node: ForeignNode };
   nodeType: string;
   name: string;
+  /**
+   * See the docs for `enhanceAudioNode`.
+   */
+  paramOverrides: {
+    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+  };
 }
 
 /**
@@ -47,6 +60,13 @@ export interface ForeignNode<T = any> {
  * within `T` that have keys matching those of the params and setting their values accordingly.
  *
  * It also generates a corresponding `serialize()` method that creates a matching `params` object accordingly.
+ *
+ * @param getOverridableParams Given the inner node being enhanced, returns a list of param descriptors that should be
+ * made overridable via `OverridableAudioParam` and register a listener for connection events that target them.  If
+ * anything is connected to one of these param in the patch network, the value of that connected node will be passed
+ * through.  Otherwise, the value of the node will be set internally from a `ConstantSourceNode`.  That
+ * `ConstantSourceNode` will have its value de/serialized + persisted in between refreshes and can be used to implement
+ * built-in UIs.
  */
 const enhanceAudioNode = <T>(
   AudioNodeClass: new (ctx: AudioContext) => T,
@@ -55,6 +75,7 @@ const enhanceAudioNode = <T>(
   buildConnectables: (
     foreignNode: ForeignNode<T> & { node: T }
   ) => Omit<AudioConnectables, 'vcId'> & { node: ForeignNode<T> },
+  getOverridableParams: (node: T) => { name: string; param: AudioParam }[],
   paramKeys: string[]
 ): new (
   ctx: AudioContext,
@@ -63,11 +84,24 @@ const enhanceAudioNode = <T>(
   lgNode?: any
 ) => ForeignNode<T> => {
   return class ForeignNodeClass implements ForeignNode<T> {
+    private ctx: AudioContext;
+
     public vcId: string;
     public nodeType = nodeType;
     public name = name;
     public node: T;
     public lgNode?: any;
+
+    public paramOverrides: {
+      [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+    };
+
+    private getValueContainer(key: string): AudioNode | AudioParam | null {
+      return Option.of(this.paramOverrides[key])
+        .map(R.prop('override'))
+        .orElse(Option.of((this.node as any)[key]))
+        .orNull();
+    }
 
     constructor(
       ctx: AudioContext,
@@ -78,14 +112,29 @@ const enhanceAudioNode = <T>(
       this.node = new AudioNodeClass(ctx);
       this.vcId = vcId;
       this.lgNode = lgNode;
+      this.ctx = ctx;
+
+      this.paramOverrides = getOverridableParams(this.node).reduce(
+        (acc, { name, param }) => {
+          const override = new ConstantSourceNode(this.ctx);
+          override.start();
+          const overridableParam = new OverridableAudioParam(this.ctx, param, override);
+
+          return { ...acc, [name]: { param: overridableParam, override } };
+        },
+        {} as {
+          [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+        }
+      );
 
       if (!params) {
         return;
       }
 
-      // Assign all values from the params to any
       Object.entries(params).forEach(([key, val]) => {
-        const valueContainer = (this.node as any)[key];
+        // Either use the overrideable param if it's available or try to find it directly on the wrapped node
+        const valueContainer = this.getValueContainer(key);
+
         if (!valueContainer) {
           console.error(`No property "${key}" of node named ${name}; not setting value.`);
           return;
@@ -106,7 +155,8 @@ const enhanceAudioNode = <T>(
 
     public serialize() {
       return paramKeys.reduce((acc, key) => {
-        const valueContainer = (this.node as any)[key];
+        const valueContainer = this.getValueContainer(key);
+
         if (!valueContainer) {
           console.error(`No property "${key}" of node named ${name}; not setting value.`);
           return acc;
@@ -140,6 +190,7 @@ const CustomGainNode = enhanceAudioNode(
     }),
     node,
   }),
+  (node: GainNode) => [{ name: 'gain', param: node.gain }],
   ['gain']
 );
 
@@ -158,6 +209,7 @@ const CustomConstantSourceNode = enhanceAudioNode(
     }),
     node: foreignNode,
   }),
+  (node: ConstantSourceNode) => [{ name: 'offset', param: node.offset }],
   ['offset']
 );
 
@@ -180,6 +232,12 @@ const CustomBiquadFilterNode = enhanceAudioNode(
     }),
     node: foreignNode,
   }),
+  (node: BiquadFilterNode) => [
+    { name: 'frequency', param: node.frequency },
+    { name: 'Q', param: node.Q },
+    { name: 'detune', param: node.detune },
+    { name: 'gain', param: node.gain },
+  ],
   ['frequency', 'Q', 'detune', 'gain']
 );
 
@@ -195,6 +253,7 @@ const CustomAudioBufferSourceNode = enhanceAudioNode(
     }),
     node: foreignNode,
   }),
+  () => [],
   []
 );
 
@@ -214,6 +273,7 @@ const CustomDestinationNode = enhanceAudioNode(
     outputs: Map<string, ConnectableOutput>(),
     node: foreignNode,
   }),
+  () => [],
   []
 );
 
@@ -378,7 +438,48 @@ const registerCustomAudioNode = (
   //
   // This way, the state is persisted in the node and so we hold no source of truth in the LG node.
   CustomAudioNode.prototype.onPropertyChanged = LGAudioConnectables.prototype.onPropertyChanged;
-  CustomAudioNode.prototype.onConnectionsChange = LGAudioConnectables.prototype.onConnectionsChange;
+  CustomAudioNode.prototype.onConnectionsChange = function(
+    this: { graph: LiteGraphType; connectables: AudioConnectables & { node: ForeignNode } },
+    connection: 1 | 2,
+    slot: number,
+    isNowConnected: boolean,
+    linkInfo: LiteGraphLink,
+    inputInfo: LiteGraphNodeInput
+  ) {
+    const thisNodeIsDestination = connection === 1;
+    if (thisNodeIsDestination) {
+      (() => {
+        const dstNode = this.graph._nodes_by_id[linkInfo.target_id];
+        if (!dstNode) {
+          return;
+        }
+        const dstInput = dstNode.inputs[linkInfo.target_slot];
+        if (!dstInput) {
+          return;
+        }
+
+        // Check to see if we dis/connected to/from an overridable param
+        const overrideDescriptor = this.connectables.node.paramOverrides[dstInput.name];
+        if (overrideDescriptor) {
+          console.log(
+            `Setting overridable param named ${dstInput.name} as ${
+              isNowConnected ? 'NOT ' : ''
+            }overridden.`
+          );
+          overrideDescriptor.param.setIsOverridden(!isNowConnected);
+        }
+      })();
+    }
+
+    LGAudioConnectables.prototype.onConnectionsChange.apply(
+      this,
+      connection,
+      slot,
+      isNowConnected,
+      linkInfo,
+      inputInfo
+    );
+  };
   CustomAudioNode.prototype.setConnectables = LGAudioConnectables.prototype.setConnectables;
 
   Object.entries(protoParams).forEach(([key, val]) => {
