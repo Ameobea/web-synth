@@ -1,9 +1,34 @@
+import React from 'react';
 import { Map } from 'immutable';
 import * as R from 'ramda';
+import ReactDOM from 'react-dom';
+import ControlPanel, { Range } from 'react-control-panel';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+
+const LFOSmallView: React.FC<{
+  onChange: (frequency: number, gain: number) => void;
+  initialState: { frequency: number; gain: number };
+}> = ({ onChange, initialState }) => (
+  <ControlPanel
+    initialState={initialState}
+    onChange={(
+      _key: string,
+      _val: number,
+      { frequency, gain }: { frequency: number | undefined; gain: number | undefined }
+    ) =>
+      onChange(
+        R.isNil(frequency) ? initialState.frequency : frequency,
+        R.isNil(gain) ? initialState.gain : gain
+      )
+    }
+  >
+    <Range label='frequency' min={0.001} max={10000} scale='log' steps={1000} />
+    <Range label='gain' min={0.001} max={10000} step={1} />
+  </ControlPanel>
+);
 
 export class LFONode implements ForeignNode {
   private vcId: string;
@@ -33,20 +58,21 @@ export class LFONode implements ForeignNode {
     this.oscillatorNode.start();
 
     this.frequencyOverrideCSN = new ConstantSourceNode(ctx);
+    this.frequencyOverrideCSN.start();
     this.amplitudeOverrideCSN = new ConstantSourceNode(ctx);
+    this.amplitudeOverrideCSN.start();
 
     this.paramOverrides = {
       frequency: {
         param: new OverridableAudioParam(
           ctx,
           this.oscillatorNode.frequency,
-          this.frequencyOverrideCSN,
-          true
+          this.frequencyOverrideCSN
         ),
         override: this.frequencyOverrideCSN,
       },
       amplitude: {
-        param: new OverridableAudioParam(ctx, this.gainNode.gain, this.amplitudeOverrideCSN, true),
+        param: new OverridableAudioParam(ctx, this.gainNode.gain, this.amplitudeOverrideCSN),
         override: this.amplitudeOverrideCSN,
       },
     };
@@ -65,8 +91,8 @@ export class LFONode implements ForeignNode {
 
   public serialize(): { [key: string]: any } {
     return {
-      gain: this.paramOverrides.amplitude.override.offset.value,
-      frequency: this.paramOverrides.frequency.override.offset.value,
+      gain: this.amplitudeOverrideCSN.offset.value,
+      frequency: this.frequencyOverrideCSN.offset.value,
     };
   }
 
@@ -85,5 +111,27 @@ export class LFONode implements ForeignNode {
       }),
       node: this,
     };
+  }
+
+  public renderSmallView(domId: string) {
+    console.log('rendering');
+    ReactDOM.render(
+      <LFOSmallView
+        onChange={(frequency: number, gain: number) => {
+          this.frequencyOverrideCSN.offset.value = frequency;
+          this.amplitudeOverrideCSN.offset.value = gain;
+        }}
+        initialState={{
+          frequency: this.frequencyOverrideCSN.offset.value,
+          gain: this.amplitudeOverrideCSN.offset.value,
+        }}
+      />,
+      document.getElementById(domId)!
+    );
+  }
+
+  public cleanupSmallView(domId: string) {
+    console.log('cleaning up');
+    ReactDOM.unmountComponentAtNode(document.getElementById(domId)!);
   }
 }

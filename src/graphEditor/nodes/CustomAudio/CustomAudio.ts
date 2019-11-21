@@ -96,9 +96,10 @@ const enhanceAudioNode = <T>(
       [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
     };
 
-    private getValueContainer(key: string): AudioNode | AudioParam | null {
+    private getValueContainer(key: string): AudioParam | null {
       return Option.of(this.paramOverrides[key])
         .map(R.prop('override'))
+        .map(R.prop('offset'))
         .orElse(Option.of((this.node as any)[key]))
         .orNull();
     }
@@ -471,7 +472,7 @@ const registerCustomAudioNode = (
       })();
     }
 
-    LGAudioConnectables.prototype.onConnectionsChange.apply(
+    LGAudioConnectables.prototype.onConnectionsChange.call(
       this,
       connection,
       slot,

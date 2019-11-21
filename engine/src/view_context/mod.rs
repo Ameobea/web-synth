@@ -59,4 +59,15 @@ pub trait ViewContext {
     /// this `ViewContext` to other `ViewContext`s programatically.  This function should return
     /// the same object throughout the life of the view context.
     fn get_audio_connectables(&self) -> JsValue { JsValue::null() }
+
+    /// Given the ID of a `<div>` element that exists in the DOM, this VC should render content into
+    /// it representing a summary or partial view of its current state along with basic controls for
+    /// interacting with it.
+    ///
+    /// This small view will be rendered into places like modals or sidebars.
+    fn render_small_view(&mut self, _target_div_id: &str) {}
+
+    /// Unrenders whatever was created by `render_small_view` in the `<div>` element with the
+    /// provided `id`\
+    fn cleanup_small_view(&mut self, _target_div_id: &str) {}
 }

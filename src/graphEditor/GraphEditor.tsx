@@ -14,6 +14,8 @@ import { ReduxStore } from 'src/redux';
 import { connect } from 'react-redux';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { tryParseJson } from 'src/util';
+import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
+import { getEngine } from 'src';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
@@ -41,6 +43,21 @@ const mapStateToProps = (state: ReduxStore) => ({
   isLoaded: state.viewContextManager.isLoaded,
 });
 
+const handleNodeSelectAction = (smallViewDOMId: string, lgNode: any, isNowSelected: boolean) => {
+  if (lgNode instanceof LGAudioConnectables) {
+    (isNowSelected ? getEngine()!.render_small_view : getEngine()!.cleanup_small_view)(
+      (lgNode as any).id,
+      smallViewDOMId
+    );
+  } else if (lgNode.type.startsWith('customAudio')) {
+    const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
+    if (!lgNode.connectables.node[functionKey]) {
+      return;
+    }
+    lgNode.connectables.node[functionKey](smallViewDOMId);
+  }
+};
+
 const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToProps>> = ({
   stateKey,
   patchNetwork,
@@ -50,6 +67,9 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [lGraphInstance, setLGraphInstance] = useState<null | any>(null);
+  const curSelectedNode = useRef<any>(null);
+
+  const smallViewDOMId = `small-view-dom-id_${stateKey}`;
 
   useEffect(() => {
     if (isInitialized.current || !canvasRef.current) {
@@ -62,7 +82,15 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       await registerAllCustomNodes();
 
       const graph = new LiteGraph.LGraph();
-      new LiteGraph.LGraphCanvas('#graph-editor', graph);
+      const canvas = new LiteGraph.LGraphCanvas('#graph-editor', graph);
+
+      canvas.onNodeSelected = node => {
+        if (curSelectedNode.current) {
+          handleNodeSelectAction(smallViewDOMId, curSelectedNode.current, false);
+        }
+        handleNodeSelectAction(smallViewDOMId, node, true);
+        curSelectedNode.current = node;
+      };
 
       graph.start();
 
@@ -122,9 +150,16 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
         height={800}
       ></canvas>
 
-      <ControlPanel>
-        <Button label='arrange' action={uiControls.arrange} />
-      </ControlPanel>
+      <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
+        <ControlPanel style={{ height: 120 }}>
+          <Button label='arrange' action={uiControls.arrange} />
+        </ControlPanel>
+
+        <div
+          style={{ display: 'flex', flex: 1, height: '100%', backgroundColor: '#111', width: 300 }}
+          id={smallViewDOMId}
+        />
+      </div>
     </div>
   );
 };

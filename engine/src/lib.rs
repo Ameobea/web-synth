@@ -142,27 +142,27 @@ pub fn reset_vcm() {
 #[wasm_bindgen]
 pub fn set_vc_title(uuid_str: String, title: String) {
     let uuid = Uuid::from_str(&uuid_str).expect("Invalid UUID string passed to `set_vc_title`!");
-    let vc = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
+    let vc_entry = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
         panic!(
             "Attempted to set title of VC with ID {} but it wasn't found",
             uuid
         )
     });
-    vc.definition.title = Some(title);
+    vc_entry.definition.title = Some(title);
     get_vcm().commit();
 }
 
 #[wasm_bindgen]
 pub fn get_vc_connectables(vc_id: &str) -> JsValue {
     let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `set_vc_title`!");
-    let vc = get_vcm().get_vc_by_id(uuid).unwrap_or_else(|| {
+    let vc_entry = get_vcm().get_vc_by_id(uuid).unwrap_or_else(|| {
         panic!(
             "Attempted to get audio connectables of VC with ID {} but it wasn't found",
             vc_id
         )
     });
 
-    vc.context.get_audio_connectables()
+    vc_entry.context.get_audio_connectables()
 }
 
 #[wasm_bindgen]
@@ -194,4 +194,30 @@ pub fn set_foreign_connectables(foreign_connectables_json: &str) {
         };
 
     get_vcm().set_foreign_connectables(foreign_connectables);
+}
+
+#[wasm_bindgen]
+pub fn render_small_view(vc_id: &str, target_dom_id: &str) {
+    let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `render_small_view`!");
+    let vc_entry = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
+        panic!(
+            "Attempted to get audio connectables of VC with ID {} but it wasn't found",
+            vc_id
+        )
+    });
+
+    vc_entry.context.render_small_view(target_dom_id);
+}
+
+#[wasm_bindgen]
+pub fn cleanup_small_view(vc_id: &str, target_dom_id: &str) {
+    let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `cleanup_small_view`!");
+    let vc_entry = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
+        panic!(
+            "Attempted to get audio connectables of VC with ID {} but it wasn't found",
+            vc_id
+        )
+    });
+
+    vc_entry.context.cleanup_small_view(target_dom_id);
 }

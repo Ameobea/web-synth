@@ -16,6 +16,9 @@ declare module 'litegraph.js' {
 
     export class LGraphCanvas {
       constructor(id: string, graph: LGraph);
+
+      onNodeSelected?: (node: any) => void | undefined;
+      onNodeDeselected?: (node: any) => void | undefined;
     }
   }
 

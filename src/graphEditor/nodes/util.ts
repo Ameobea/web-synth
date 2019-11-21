@@ -69,7 +69,7 @@ export const createPassthroughNode = <T extends GainNode = GainNode>(
  * Wraps an `AudioParm` with a switch that toggles between a `manualControl` input and everything connected to
  * the created `OverridableAudioParam` itself.
  */
-export class OverridableAudioParam extends ConstantSourceNode implements AudioNode {
+export class OverridableAudioParam extends GainNode implements AudioNode {
   /**
    * The `AudioParam` that we are handling inputs for.
    */
@@ -88,18 +88,17 @@ export class OverridableAudioParam extends ConstantSourceNode implements AudioNo
     ctx: AudioContext,
     wrappedParam: AudioParam,
     manualControl: AudioNode,
-    defaultOverridden = false
+    defaultOverridden = true
   ) {
     super(ctx);
-    this.start();
     // Operate as a pass-through node, passing on whatever values are input to the output if we are
     // not currently overridden.
-    this.offset.value = 0;
+    this.gain.value = 1;
 
     this.wrappedParam = wrappedParam;
     this.manualControl = manualControl;
 
-    this.isOverridden = true;
+    this.isOverridden = defaultOverridden;
     if (defaultOverridden) {
       manualControl.connect(wrappedParam);
     } else {
@@ -117,6 +116,7 @@ export class OverridableAudioParam extends ConstantSourceNode implements AudioNo
     if (isOverridden === this.isOverridden) {
       return;
     }
+    this.isOverridden = isOverridden;
 
     if (isOverridden) {
       this.disconnect(this.wrappedParam);
