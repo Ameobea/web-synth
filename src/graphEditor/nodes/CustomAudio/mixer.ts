@@ -100,10 +100,15 @@ export class MixerNode {
     return {
       inputs: this.gainNodes.reduce(
         (acc, gainNode, i) =>
-          acc.set(`Input ${i}`, { type: 'customAudio', node: gainNode }).set(`Input ${i} Gain`, {
-            type: 'number',
-            node: this.paramOverrides[`Input ${i} Gain`].param,
-          }),
+          acc
+            .set(`Input ${i}`, {
+              type: 'customAudio',
+              node: gainNode,
+            })
+            .set(`Input ${i} Gain`, {
+              type: 'number',
+              node: this.paramOverrides[`Input ${i} Gain`].param,
+            }),
         Map<string, ConnectableInput>().set('Master Gain', {
           node: this.outputNode.gain,
           type: 'number',

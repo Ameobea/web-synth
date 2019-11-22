@@ -1,4 +1,4 @@
-#![feature(const_fn, nll)]
+#![feature(nll)]
 
 #[macro_use]
 extern crate log;
@@ -21,6 +21,7 @@ const NO_PLAYING_NOTE: u64 = u64::MAX;
 
 static mut INITED: bool = false;
 
+#[cfg(debug_assertions)]
 fn maybe_init() {
     unsafe {
         if INITED {
@@ -33,6 +34,9 @@ fn maybe_init() {
     console_error_panic_hook::set_once();
     wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
 }
+
+#[cfg(not(debug_assertions))]
+fn maybe_init() {}
 
 #[wasm_bindgen]
 pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
@@ -118,7 +122,7 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
 
     let mut reader = BufReader::new(file_bytes);
     let midi_file = SMF::from_reader(&mut reader).expect("Failed to parse supplied SMF file");
-    let ticks_per_beat = midi_file.division;
+    let ticks_per_beat: i16 = midi_file.division;
     info!("ticks per beat: {}", ticks_per_beat);
     if ticks_per_beat <= 0 {
         panic!("Invalid `division` on MIDI file: {}", ticks_per_beat);
@@ -228,7 +232,7 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
             let note_duration_beats = (*cur_vtime - note_start_ticks) as f32 / ticks_per_beat;
             let note_start_beats = note_start_ticks as f32 / ticks_per_beat;
             let note_data = RawNoteData {
-                line_ix: note_id as usize, // TODO: Properly convert this once we know how
+                line_ix: note_id as usize,
                 start_beat: note_start_beats,
                 width: note_duration_beats,
             };

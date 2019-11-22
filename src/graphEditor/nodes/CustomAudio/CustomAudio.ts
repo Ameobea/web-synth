@@ -182,7 +182,7 @@ const CustomGainNode = enhanceAudioNode(
     inputs: Map<string, ConnectableInput>(
       Object.entries({
         input: { node: node.node, type: 'customAudio' },
-        gain: { node: node.node.gain, type: 'number' },
+        gain: { node: node.paramOverrides.gain.param, type: 'number' },
       })
     ),
     outputs: Map<string, ConnectableOutput>().set('output', {
@@ -201,7 +201,7 @@ const CustomConstantSourceNode = enhanceAudioNode(
   'Constant Source',
   (foreignNode: ForeignNode<ConstantSourceNode> & { node: ConstantSourceNode }) => ({
     inputs: Map<string, ConnectableInput>().set('offset', {
-      node: foreignNode.node.offset,
+      node: foreignNode.paramOverrides.offset.param,
       type: 'number',
     }),
     outputs: Map<string, ConnectableOutput>().set('offset', {
@@ -221,10 +221,11 @@ const CustomBiquadFilterNode = enhanceAudioNode(
   (foreignNode: ForeignNode<BiquadFilterNode> & { node: BiquadFilterNode }) => ({
     inputs: Map<string, ConnectableInput>(
       Object.entries({
-        frequency: { node: foreignNode.node.frequency, type: 'number' },
-        Q: { node: foreignNode.node.Q, type: 'number' },
-        detune: { node: foreignNode.node.detune, type: 'number' },
-        gain: { node: foreignNode.node.gain, type: 'number' },
+        input: { node: foreignNode.node, type: 'customAudio' },
+        frequency: { node: foreignNode.paramOverrides.frequency.param, type: 'number' },
+        Q: { node: foreignNode.paramOverrides.Q.param, type: 'number' },
+        detune: { node: foreignNode.paramOverrides.detune.param, type: 'number' },
+        gain: { node: foreignNode.paramOverrides.gain.param, type: 'number' },
       })
     ),
     outputs: Map<string, ConnectableOutput>().set('output', {

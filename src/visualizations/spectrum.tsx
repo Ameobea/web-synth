@@ -50,7 +50,7 @@ export const SpectrumVisualization: React.FC<{
       return;
     }
 
-    const ctxPtr = spectrumModule.current.new_context(JSON.stringify(conf));
+    const ctxPtr = spectrumModule.current.new_context(conf.color_fn, conf.scaler_fn);
     setCtxPtr(ctxPtr);
 
     let curIx = 0;
@@ -124,7 +124,7 @@ export const SpectrumVisualization: React.FC<{
           state={initialConf}
           onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
             const newConf = { color_fn: +color_fn, scaler_fn: +scaler_fn };
-            spectrumModule.current!.set_conf(ctxPtr, JSON.stringify(newConf));
+            spectrumModule.current!.set_conf(ctxPtr, newConf.color_fn, newConf.scaler_fn);
             setConf(newConf);
           }}
           settings={[

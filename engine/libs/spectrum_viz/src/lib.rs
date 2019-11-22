@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate serde_derive;
 
 use std::{
     mem::{self, MaybeUninit},
@@ -15,6 +13,8 @@ use palette::{
 };
 use wasm_bindgen::prelude::*;
 
+mod conf;
+
 const BUFFER_SIZE: usize = 8192;
 
 pub struct Context {
@@ -25,6 +25,10 @@ pub struct Context {
 }
 
 type ColorLUT = [[u8; 4]; 255];
+
+// Use `wee_alloc` as the global allocator.
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const SCALER_FN_COUNT: usize = 2;
 
@@ -151,27 +155,10 @@ lazy_static! {
     };
 }
 
-#[derive(Serialize)]
-pub struct SettingDefinition {
-    pub name: &'static str,
-    pub description: Option<&'static str>,
-    pub id: usize,
-}
-
-#[derive(Serialize)]
-pub struct ConfigDefinition {
-    pub scaler_functions: Vec<SettingDefinition>,
-    pub color_functions: Vec<SettingDefinition>,
-}
-
-#[derive(Deserialize)]
-pub struct Config {
-    pub color_fn: usize,
-    pub scaler_fn: usize,
-}
-
+#[cfg(not(debug_assertions))]
 static ONCE: Once = Once::new();
 
+#[cfg(not(debug_assertions))]
 fn maybe_init() {
     ONCE.call_once(|| {
         console_error_panic_hook::set_once();
@@ -185,67 +172,33 @@ fn maybe_init() {
     });
 }
 
+#[cfg(debug_assertions)]
+fn maybe_init() {}
+
 /// Returns a JSON-serialized array of scaler function definitions
 #[wasm_bindgen]
 pub fn get_config_definition() -> String {
     maybe_init();
-
-    let config = ConfigDefinition {
-        scaler_functions: vec![
-            SettingDefinition {
-                name: "Linear",
-                description: None,
-                id: 0,
-            },
-            SettingDefinition {
-                name: "Exponential",
-                description: None,
-                id: 1,
-            },
-        ],
-        color_functions: vec![
-            SettingDefinition {
-                name: "Pink",
-                description: None,
-                id: 0,
-            },
-            SettingDefinition {
-                name: "RdYlBu",
-                description: Some("Red-Yellow-Blue"),
-                id: 1,
-            },
-            SettingDefinition {
-                name: "Radar",
-                description: Some("Color scheme modeled after radar weather maps: https://www.ncl.ucar.edu/Document/Graphics/ColorTables/Images/radar_labelbar.png"),
-                id: 2,
-            }
-        ],
-    };
-
-    serde_json::to_string(&config).expect("Failed to serialize config to JSON")
+    String::from(crate::conf::CONFIG_JSON)
 }
 
 #[wasm_bindgen]
-pub fn new_context(conf_str: &str) -> *mut Context {
-    let conf: Config =
-        serde_json::from_str(conf_str).expect("Invalid conf string provided to `new_context`.");
+pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
+    maybe_init();
 
-    let ctx = Context {
+    Box::into_raw(Box::new(Context {
         byte_frequency_data: [255u8; BUFFER_SIZE],
         pixel_buffer: [255u8; BUFFER_SIZE * 4],
-        color_fn: conf.color_fn,
-        scaler_fn: conf.scaler_fn,
-    };
-    Box::into_raw(Box::new(ctx))
+        color_fn,
+        scaler_fn,
+    }))
 }
 
 #[wasm_bindgen]
-pub fn set_conf(ctx_ptr: *mut Context, conf_str: &str) {
+pub fn set_conf(ctx_ptr: *mut Context, color_fn: usize, scaler_fn: usize) {
     let mut ctx = unsafe { Box::from_raw(ctx_ptr) };
-    let conf: Config =
-        serde_json::from_str(conf_str).expect("Invalid conf string provided to `new_context`.");
-    ctx.color_fn = conf.color_fn;
-    ctx.scaler_fn = conf.scaler_fn;
+    ctx.color_fn = color_fn;
+    ctx.scaler_fn = scaler_fn;
     mem::forget(ctx);
 }
 

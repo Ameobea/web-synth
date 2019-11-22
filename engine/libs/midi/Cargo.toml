@@ -8,7 +8,8 @@ version = "0.1.0"
 bincode = "1.2"
 console_error_panic_hook = "0.1.6"
 futures = "0.3"
-log = "0.4"
+# Disable logging staticly in release, making all log calls into no-ops
+log = { version = "0.4", features = ["release_max_level_off"] }
 serde = "1.0.102"
 serde_derive = "1.0.102"
 serde_json = "1.0.41"
@@ -25,5 +26,20 @@ path = "../common"
 [dependencies.rimd]
 git = "https://github.com/Ameobea/rimd.git"
 
+[features]
+disable-logging = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[profile.dev]
+opt-level = 1
+debug-assertions = true
+debug = true
+
+[profile.release]
+opt-level = 3
+debug-assertions = false
+codegen-units = 1
+panic = "abort"
+debug = false
