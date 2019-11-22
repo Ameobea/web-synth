@@ -13,6 +13,7 @@ const LFOSmallView: React.FC<{
   initialState: { frequency: number; gain: number };
 }> = ({ onChange, initialState }) => (
   <ControlPanel
+    style={{ width: 500 }}
     initialState={initialState}
     onChange={(
       _key: string,
@@ -26,7 +27,7 @@ const LFOSmallView: React.FC<{
     }
   >
     <Range label='frequency' min={0.001} max={10000} scale='log' steps={1000} />
-    <Range label='gain' min={0.001} max={10000} step={1} />
+    <Range label='gain' min={0.001} max={100} steps={1000} scale='log' />
   </ControlPanel>
 );
 

@@ -146,17 +146,17 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       <canvas
         ref={ref => (canvasRef.current = ref)}
         id='graph-editor'
-        width={window.innerWidth - 400}
+        width={window.innerWidth - 600}
         height={800}
       ></canvas>
 
       <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
-        <ControlPanel style={{ height: 120 }}>
+        <ControlPanel style={{ height: 120, width: 500 }}>
           <Button label='arrange' action={uiControls.arrange} />
         </ControlPanel>
 
         <div
-          style={{ display: 'flex', flex: 1, height: '100%', backgroundColor: '#111', width: 300 }}
+          style={{ display: 'flex', flex: 1, height: '100%', backgroundColor: '#111', width: 500 }}
           id={smallViewDOMId}
         />
       </div>

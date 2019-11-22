@@ -2,25 +2,19 @@ const jsonModuleDef = {{.JSONModuleDef}};
 
 const moduleId = "{{.ModuleID}}";
 
-const flattenUiGroups = (ui, pathPrefix = '') =>
+const flattenUiGroups = ui =>
   ui.reduce(
     (acc, item) =>
       ['vgroup', 'hgroup'].includes(item.type)
-        ? [
-            ...acc,
-            ...flattenUiGroups(
-              item.items,
-              pathPrefix === '' ? `/${item.label}/` : `${pathPrefix}${item.label}/`
-            ),
-          ]
-        : [...acc, { ...item, label: `${pathPrefix}${item.label}`.replace(/\s/g, '_') }],
+        ? [...acc, ...flattenUiGroups(item.items)]
+        : [...acc, { ...item, address: item.address }],
     []
   );
 
 const convertUiToParamDescriptors = ui => {
   const flattenedUiItems = flattenUiGroups(ui);
   return flattenedUiItems.map(item => ({
-    name: item.label,
+    name: item.address,
     defaultValue: +(item.init || 0),
     minValue: +(item.min || 0),
     maxValue: +(item.max || 0),
