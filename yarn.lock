@@ -378,6 +378,11 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
+"@types/chartist@^0.9.46":
+  version "0.9.46"
+  resolved "https://registry.yarnpkg.com/@types/chartist/-/chartist-0.9.46.tgz#cb1a33f8062f117d3bc6c0b5dd373360c8e33da2"
+  integrity sha512-p29+DAkJRBVtuiTx5kObF6n/RipOWH0GeWVwYinljrwPMruy7BW+Ms6iHS4vIsHzb9c79x+opon3GJo75rlhcQ==
+
 "@types/downloadjs@^1.4.1":
   version "1.4.1"
   resolved "https://registry.yarnpkg.com/@types/downloadjs/-/downloadjs-1.4.1.tgz#11a959c5fd09d3f1ca74c02ba17ae8f126ce57fd"
@@ -1353,6 +1358,11 @@ chardet@^0.7.0:
   version "0.7.0"
   resolved "https://registry.yarnpkg.com/chardet/-/chardet-0.7.0.tgz#90094849f0937f2eedc2425d0d28a9e5f0cbad9e"
   integrity sha512-mT8iDcrh03qDGRRmoA2hmBJnxpllMR+0/0qlzjqZES6NdiWDcZkCNAk4rPFZ9Q85r27unkiNNg8ZOiwZXBHwcA==
+
+chartist@^0.11.4:
+  version "0.11.4"
+  resolved "https://registry.yarnpkg.com/chartist/-/chartist-0.11.4.tgz#e96e1c573d8b67478920a3a6ae52359d9fc8d8b7"
+  integrity sha512-H4AimxaUD738/u9Mq8t27J4lh6STsLi4BQHt65nOtpLk3xyrBPaLiLMrHw7/WV9CmsjGA02WihjuL5qpSagLYw==
 
 chokidar@^2.0.2:
   version "2.1.6"

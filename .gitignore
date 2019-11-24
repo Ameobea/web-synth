@@ -12,3 +12,4 @@ src/polysynth_bg.wasm
 .env
 !src/midiEditor*
 polysynth.d.ts
+litegraph.js

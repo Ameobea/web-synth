@@ -28,6 +28,7 @@ import {
   LiteGraphNodeInput,
   LiteGraph as LiteGraphType,
 } from 'src/graphEditor/LiteGraphTypes';
+import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
 
 const ctx = new AudioContext();
 
@@ -286,16 +287,14 @@ const CustomDestinationNode = enhanceAudioNode(
 export const audioNodeGetters: {
   [type: string]: {
     nodeGetter: (vcId: string, params?: { [key: string]: any } | null) => ForeignNode;
-    protoParams: { [key: string]: any };
+    protoParams?: { [key: string]: any };
   };
 } = {
   'customAudio/gain': {
     nodeGetter: (vcId: string, params) => new CustomGainNode(ctx, vcId, params),
-    protoParams: {},
   },
   'customAudio/biquadFilter': {
     nodeGetter: (vcId, params) => new CustomBiquadFilterNode(ctx, vcId, params),
-    protoParams: {},
   },
   'customAudio/constantSource': {
     nodeGetter: (vcId: string, params?: { [key: string]: any } | null) => {
@@ -320,11 +319,9 @@ export const audioNodeGetters: {
   },
   'customAudio/destination': {
     nodeGetter: (vcId, params) => new CustomDestinationNode(ctx, vcId, params),
-    protoParams: {},
   },
   'customAudio/microphone': {
     nodeGetter: vcId => new MicNode(ctx, vcId),
-    protoParams: {},
   },
   'customAudio/mixer': {
     nodeGetter: (vcId: string, params) => new MixerNode(ctx, vcId, params),
@@ -356,11 +353,12 @@ export const audioNodeGetters: {
   },
   'customAudio/MIDIToFrequency': {
     nodeGetter: (vcId, params) => new MIDIToFrequencyNode(vcId, params),
-    protoParams: {},
   },
   'customAudio/LFO': {
     nodeGetter: (vcId, params) => new LFONode(ctx, vcId, params),
-    protoParams: {},
+  },
+  'customAudio/statistics': {
+    nodeGetter: (vcId, params) => new StatisticsNode(ctx, vcId, params),
   },
 };
 
@@ -493,5 +491,5 @@ const registerCustomAudioNode = (
 
 export const registerCustomAudioNodes = () =>
   Object.entries(audioNodeGetters).forEach(([type, { nodeGetter, protoParams }]) =>
-    registerCustomAudioNode(type, nodeGetter, protoParams)
+    registerCustomAudioNode(type, nodeGetter, protoParams || {})
   );

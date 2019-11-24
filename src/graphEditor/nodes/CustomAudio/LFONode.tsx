@@ -78,10 +78,12 @@ export class LFONode implements ForeignNode {
       },
     };
 
-    if (!params) {
-      return;
+    if (params) {
+      this.deserialize(params);
     }
+  }
 
+  public deserialize(params: { [key: string]: any }) {
     if (!R.isNil(params.gain)) {
       this.amplitudeOverrideCSN.offset.value = params.gain;
     }

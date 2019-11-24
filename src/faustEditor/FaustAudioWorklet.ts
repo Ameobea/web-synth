@@ -76,7 +76,6 @@ export const buildFaustWorkletNode = async (
   moduleID: string
 ): Promise<FaustWorkletNode> => {
   const faustModuleURL = `${FAUST_COMPILER_ENDPOINT}/FaustAudioWorkletProcessor.js?id=${moduleID}`;
-  console.log({ faustModuleURL });
   await audioContext.audioWorklet.addModule(faustModuleURL);
 
   const node = new FaustWorkletNode(audioContext, moduleID);
