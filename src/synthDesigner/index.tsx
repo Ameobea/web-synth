@@ -126,7 +126,6 @@ export const unhide_synth_designer = (vcId: string) => {
 export const cleanup_synth_designer = (stateKey: string): string => {
   const { synths } = getReduxInfra(stateKey).getState().synthDesigner;
   const designerState = JSON.stringify({ synths: synths.map(serializeSynthModule) });
-  console.log({ designerState });
   const vcId = stateKey.split('_')[1]!;
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {

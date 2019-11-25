@@ -56,7 +56,7 @@ export class MixerNode {
       Object.entries(params).forEach(([key, val]) => {
         if (key === 'gains') {
           if (!Array.isArray(val)) {
-            console.log('Invalid `params.gains` value supplied: ', val);
+            console.error('Invalid `params.gains` value supplied: ', val);
             return;
           }
           const gains = val as number[];

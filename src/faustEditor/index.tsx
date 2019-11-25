@@ -86,6 +86,24 @@ export const cleanup_faust_editor = (vcId: string): string => {
   return editorContent;
 };
 
+/**
+ * One item from the json def's `ui` property.  Defines one UI component and optinally an array of child UI components
+ * if this UI component is a container.
+ */
+interface UIItem {
+  type: string;
+  address: string;
+  items?: UIItem[];
+}
+
+// Taken from https://stackoverflow.com/a/53710250/3833068
+type NestedArray<T> = (T | NestedArray<T>)[];
+
+const parseUIItem = (item: UIItem): NestedArray<string> =>
+  ['vgroup', 'hgroup'].includes(item.type)
+    ? item.items!.map(parseUIItem)
+    : [item.address.replace(/\s/g, '_')];
+
 export const get_faust_editor_connectables = (vcId: string): AudioConnectables => {
   if (!faustAudioNodesMap[vcId]) {
     // Create passthrough audio node with the same interface as the `FaustAudioWorklet`-based ones that will be created later
@@ -111,22 +129,14 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     node: faustNode,
     type: 'customAudio',
   });
-  const parseUIItem = (item, pathPrefix = '') =>
-    ['vgroup', 'hgroup'].includes(item.type)
-      ? item.items.map(childItem =>
-          parseUIItem(
-            childItem,
-            pathPrefix === '' ? `/${item.label}/` : `${pathPrefix}${item.label}/`
-          )
-        )
-      : { ...item, label: `${pathPrefix}${item.label}`.replace(/\s/g, '_') };
-  const flattenedUIItems = R.flatten(
-    faustNode.jsonDef.ui.map(item => parseUIItem(item, undefined))
-  );
+
+  const flattenedUIItems = (R.flatten(
+    (faustNode.jsonDef.ui as UIItem[]).map(item => parseUIItem(item))
+  ) as unknown) as string[];
   const inputs = flattenedUIItems.reduce(
-    (acc: Map<string, ConnectableInput>, item: any) =>
-      acc.set(item.label, {
-        node: faustNode.parameters.get(item.label.replace(/\s/g, '_') as string),
+    (acc: Map<string, ConnectableInput>, label: string) =>
+      acc.set(label, {
+        node: (faustNode.parameters as any).get(label),
         type: 'number',
       }),
     baseInputs

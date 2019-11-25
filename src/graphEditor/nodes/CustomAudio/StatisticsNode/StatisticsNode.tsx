@@ -17,16 +17,11 @@ export type Settings = {
   bucketCount: number;
 };
 export type StatisticsNodeState = {
-  settings: Settings;
   data: { min: number; max: number; buckets: number[] };
 };
 
 const createReduxInfra = (initialState: StatisticsNodeState) => {
   const actionGroups = {
-    SET_SETTINGS: buildActionGroup({
-      actionCreator: (settings: Settings) => ({ type: 'SET_SETTINGS', settings }),
-      subReducer: (state: StatisticsNodeState, { settings }) => ({ ...state, settings }),
-    }),
     SET_DATA: buildActionGroup({
       actionCreator: (data: StatisticsNodeState['data']) => ({ type: 'SET_DATA', data }),
       subReducer: (state: StatisticsNodeState, { data }) => ({ ...state, data }),
@@ -71,10 +66,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
       this.deserialize(params);
     }
 
-    this.reduxInfra = createReduxInfra({
-      settings: { framesToSample: this.framesToSample, bucketCount: this.bucketCount },
-      data: { min: 0, max: 0, buckets: [] },
-    });
+    this.reduxInfra = createReduxInfra({ data: { min: 0, max: 0, buckets: [] } });
 
     this.initWorklet();
   }
@@ -119,14 +111,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
 
     ReactDOM.render(
       <Provider store={this.reduxInfra.store}>
-        <StatisticsNodeUI
-          actionCreators={this.reduxInfra.actionCreators}
-          dispatch={this.reduxInfra.dispatch}
-          onChange={({ bucketCount, framesToSample }: Settings) => {
-            this.bucketCount = bucketCount;
-            this.framesToSample = framesToSample;
-          }}
-        />
+        <StatisticsNodeUI />
       </Provider>,
       node
     );

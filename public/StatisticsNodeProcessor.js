@@ -1,12 +1,6 @@
 const SAMPLES_PER_FRAME = 128;
 
 class StatisticsNodeProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super();
-
-    this.port.onmessage = event => this.updateSettings(event.data);
-  }
-
   static get parameterDescriptors() {
     return [
       {
@@ -46,18 +40,10 @@ class StatisticsNodeProcessor extends AudioWorkletProcessor {
    */
   framesSinceLastReport = 0;
 
-  updateSettings = settings => {
-    this.framesToSample = settings.framesToSample;
-    this.bucketCount = settings.bucketCount;
-
-    this.resetCounters();
-    this.samples = new Float32Array(this.framesToSample * SAMPLES_PER_FRAME);
-  };
-
   buildHistogram() {
     let range = this.maxSample - this.minSample;
     if (range === 0) {
-      range = this.minSample === 0 ? minSample : 1;
+      range = this.minSample === 0 ? this.minSample : 1;
     }
 
     const buckets = [];
@@ -102,7 +88,7 @@ class StatisticsNodeProcessor extends AudioWorkletProcessor {
         this.maxSample = sample;
       }
 
-      this.samples[this.framesSinceLastReport + i] = sample;
+      this.samples[this.sampleCount + i] = sample;
     }
     this.sampleCount += params.input.length;
 

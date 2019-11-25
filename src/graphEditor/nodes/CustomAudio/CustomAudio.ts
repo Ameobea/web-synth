@@ -4,6 +4,8 @@
  * at the patch network level.
  */
 
+import React from 'react';
+import ReactDOM from 'react-dom';
 import { Map } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
@@ -29,6 +31,7 @@ import {
   LiteGraph as LiteGraphType,
 } from 'src/graphEditor/LiteGraphTypes';
 import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
+import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
 
 const ctx = new AudioContext();
 
@@ -53,6 +56,29 @@ export interface ForeignNode<T = any> {
   paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   };
+  renderSmallView?: (domId: string) => void;
+  cleanupSmallView?: (domId: string) => void;
+}
+
+interface EnhanceAudioNodeParams<T> {
+  AudioNodeClass: new (ctx: AudioContext) => T;
+  nodeType: string;
+  name: string;
+  buildConnectables: (
+    foreignNode: ForeignNode<T> & {
+      node: T;
+    }
+  ) => Omit<AudioConnectables, 'vcId'> & {
+    node: ForeignNode<T>;
+  };
+  getOverridableParams: (
+    node: T
+  ) => {
+    name: string;
+    param: AudioParam;
+  }[];
+  paramKeys: string[];
+  SmallViewRenderer?: React.FC<{ node: ForeignNode<T> }>;
 }
 
 /**
@@ -69,24 +95,22 @@ export interface ForeignNode<T = any> {
  * `ConstantSourceNode` will have its value de/serialized + persisted in between refreshes and can be used to implement
  * built-in UIs.
  */
-const enhanceAudioNode = <T>(
-  AudioNodeClass: new (ctx: AudioContext) => T,
-  nodeType: string,
-  name: string,
-  buildConnectables: (
-    foreignNode: ForeignNode<T> & { node: T }
-  ) => Omit<AudioConnectables, 'vcId'> & { node: ForeignNode<T> },
-  getOverridableParams: (node: T) => { name: string; param: AudioParam }[],
-  paramKeys: string[]
-): new (
+const enhanceAudioNode = <T>({
+  AudioNodeClass,
+  nodeType,
+  name,
+  buildConnectables,
+  getOverridableParams,
+  paramKeys,
+  SmallViewRenderer,
+}: EnhanceAudioNodeParams<T>): new (
   ctx: AudioContext,
   vcId: string,
   params?: { [key: string]: any } | null,
   lgNode?: any
-) => ForeignNode<T> => {
-  return class ForeignNodeClass implements ForeignNode<T> {
+) => ForeignNode<T> =>
+  class ForeignNodeClass implements ForeignNode<T> {
     private ctx: AudioContext;
-
     public vcId: string;
     public nodeType = nodeType;
     public name = name;
@@ -94,7 +118,10 @@ const enhanceAudioNode = <T>(
     public lgNode?: any;
 
     public paramOverrides: {
-      [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+      [name: string]: {
+        param: OverridableAudioParam;
+        override: ConstantSourceNode;
+      };
     };
 
     private getValueContainer(key: string): AudioParam | null {
@@ -108,7 +135,9 @@ const enhanceAudioNode = <T>(
     constructor(
       ctx: AudioContext,
       vcId: string,
-      params?: { [key: string]: any } | null,
+      params?: {
+        [key: string]: any;
+      } | null,
       lgNode?: any
     ) {
       this.node = new AudioNodeClass(ctx);
@@ -125,7 +154,10 @@ const enhanceAudioNode = <T>(
           return { ...acc, [name]: { param: overridableParam, override } };
         },
         {} as {
-          [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+          [name: string]: {
+            param: OverridableAudioParam;
+            override: ConstantSourceNode;
+          };
         }
       );
 
@@ -149,9 +181,35 @@ const enhanceAudioNode = <T>(
 
         valueContainer.value = val;
       });
+
+      if (SmallViewRenderer) {
+        this.renderSmallView = (domId: string) => {
+          const node = document.getElementById(domId);
+          if (!node) {
+            console.error(
+              `No node with id ${domId} found when trying to render small view in \`CustomAudioNode\``
+            );
+            return;
+          }
+
+          ReactDOM.render(React.createElement(SmallViewRenderer, { node: this }), node);
+        };
+        this.cleanupSmallView = (domId: string) => {
+          const node = document.getElementById(domId);
+          if (!node) {
+            console.error(
+              `No node with id ${domId} found when trying to clean up small view in \`CustomAudioNode\``
+            );
+            return;
+          }
+          ReactDOM.unmountComponentAtNode(node);
+        };
+      }
     }
 
-    public buildConnectables(): AudioConnectables & { node: ForeignNode<T> } {
+    public buildConnectables(): AudioConnectables & {
+      node: ForeignNode<T>;
+    } {
       return { ...buildConnectables(this), vcId: this.vcId };
     }
 
@@ -172,14 +230,20 @@ const enhanceAudioNode = <T>(
         return { ...acc, [key]: valueContainer.value };
       }, {});
     }
-  };
-};
 
-const CustomGainNode = enhanceAudioNode(
-  GainNode,
-  'customAudio/gain',
-  'Gain',
-  (node: ForeignNode<GainNode> & { node: GainNode }) => ({
+    public renderSmallView: ForeignNode['renderSmallView'] = undefined;
+    public cleanupSmallView: ForeignNode['cleanupSmallView'] = undefined;
+  };
+
+const CustomGainNode = enhanceAudioNode({
+  AudioNodeClass: GainNode,
+  nodeType: 'customAudio/gain',
+  name: 'Gain',
+  buildConnectables: (
+    node: ForeignNode<GainNode> & {
+      node: GainNode;
+    }
+  ) => ({
     inputs: Map<string, ConnectableInput>(
       Object.entries({
         input: { node: node.node, type: 'customAudio' },
@@ -192,15 +256,19 @@ const CustomGainNode = enhanceAudioNode(
     }),
     node,
   }),
-  (node: GainNode) => [{ name: 'gain', param: node.gain }],
-  ['gain']
-);
+  getOverridableParams: (node: GainNode) => [{ name: 'gain', param: node.gain }],
+  paramKeys: ['gain'],
+});
 
-const CustomConstantSourceNode = enhanceAudioNode(
-  ConstantSourceNode,
-  'customAudio/constantSource',
-  'Constant Source',
-  (foreignNode: ForeignNode<ConstantSourceNode> & { node: ConstantSourceNode }) => ({
+const CustomConstantSourceNode = enhanceAudioNode({
+  AudioNodeClass: ConstantSourceNode,
+  nodeType: 'customAudio/constantSource',
+  name: 'Constant Source',
+  buildConnectables: (
+    foreignNode: ForeignNode<ConstantSourceNode> & {
+      node: ConstantSourceNode;
+    }
+  ) => ({
     inputs: Map<string, ConnectableInput>().set('offset', {
       node: foreignNode.paramOverrides.offset.param,
       type: 'number',
@@ -211,15 +279,20 @@ const CustomConstantSourceNode = enhanceAudioNode(
     }),
     node: foreignNode,
   }),
-  (node: ConstantSourceNode) => [{ name: 'offset', param: node.offset }],
-  ['offset']
-);
+  getOverridableParams: (node: ConstantSourceNode) => [{ name: 'offset', param: node.offset }],
+  paramKeys: ['offset'],
+  SmallViewRenderer: CSNSmallView,
+});
 
-const CustomBiquadFilterNode = enhanceAudioNode(
-  BiquadFilterNode,
-  'customAudio/biquadFilter',
-  'Biquad Filter',
-  (foreignNode: ForeignNode<BiquadFilterNode> & { node: BiquadFilterNode }) => ({
+const CustomBiquadFilterNode = enhanceAudioNode({
+  AudioNodeClass: BiquadFilterNode,
+  nodeType: 'customAudio/biquadFilter',
+  name: 'Biquad Filter',
+  buildConnectables: (
+    foreignNode: ForeignNode<BiquadFilterNode> & {
+      node: BiquadFilterNode;
+    }
+  ) => ({
     inputs: Map<string, ConnectableInput>(
       Object.entries({
         input: { node: foreignNode.node, type: 'customAudio' },
@@ -235,20 +308,24 @@ const CustomBiquadFilterNode = enhanceAudioNode(
     }),
     node: foreignNode,
   }),
-  (node: BiquadFilterNode) => [
+  getOverridableParams: (node: BiquadFilterNode) => [
     { name: 'frequency', param: node.frequency },
     { name: 'Q', param: node.Q },
     { name: 'detune', param: node.detune },
     { name: 'gain', param: node.gain },
   ],
-  ['frequency', 'Q', 'detune', 'gain']
-);
+  paramKeys: ['frequency', 'Q', 'detune', 'gain'],
+});
 
-const CustomAudioBufferSourceNode = enhanceAudioNode(
-  AudioBufferSourceNode,
-  'customAudio/audioClip',
-  'Audio Clip',
-  (foreignNode: ForeignNode<AudioBufferSourceNode> & { node: AudioBufferSourceNode }) => ({
+const CustomAudioBufferSourceNode = enhanceAudioNode({
+  AudioNodeClass: AudioBufferSourceNode,
+  nodeType: 'customAudio/audioClip',
+  name: 'Audio Clip',
+  buildConnectables: (
+    foreignNode: ForeignNode<AudioBufferSourceNode> & {
+      node: AudioBufferSourceNode;
+    }
+  ) => ({
     inputs: Map<string, ConnectableInput>(),
     outputs: Map<string, ConnectableOutput>().set('output', {
       node: foreignNode.node,
@@ -256,19 +333,23 @@ const CustomAudioBufferSourceNode = enhanceAudioNode(
     }),
     node: foreignNode,
   }),
-  () => [],
-  []
-);
+  getOverridableParams: () => [],
+  paramKeys: [],
+});
 
-const CustomDestinationNode = enhanceAudioNode(
-  class CustomAudioDestinationNode {
+const CustomDestinationNode = enhanceAudioNode({
+  AudioNodeClass: class CustomAudioDestinationNode {
     constructor(ctx: AudioContext) {
       return ctx.destination;
     }
   },
-  'customAudio/destination',
-  'Destination',
-  (foreignNode: ForeignNode<AudioDestinationNode> & { node: AudioDestinationNode }) => ({
+  nodeType: 'customAudio/destination',
+  name: 'Destination',
+  buildConnectables: (
+    foreignNode: ForeignNode<AudioDestinationNode> & {
+      node: AudioDestinationNode;
+    }
+  ) => ({
     inputs: Map<string, ConnectableInput>().set('input', {
       node: foreignNode.node,
       type: 'customAudio',
@@ -276,9 +357,9 @@ const CustomDestinationNode = enhanceAudioNode(
     outputs: Map<string, ConnectableOutput>(),
     node: foreignNode,
   }),
-  () => [],
-  []
-);
+  getOverridableParams: () => [],
+  paramKeys: [],
+});
 
 /**
  * A map of functions that can be used to build a new `ForeignNode`.  The getter provides the VC ID of the foreign node
@@ -301,12 +382,6 @@ export const audioNodeGetters: {
       const csn = new CustomConstantSourceNode(ctx, vcId, params);
       csn.node!.start();
       return csn;
-    },
-    protoParams: {
-      onDrawForeground: function(this: any, ctx: CanvasRenderingContext2D) {
-        ctx.strokeStyle = '#777';
-        ctx.strokeText(this.properties.offset, 72, 14);
-      },
     },
   },
   'customAudio/audioClip': {

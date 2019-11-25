@@ -9,8 +9,8 @@ import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patc
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 const LFOSmallView: React.FC<{
-  onChange: (frequency: number, gain: number) => void;
-  initialState: { frequency: number; gain: number };
+  onChange: (frequency: number, gain: number, offset: number) => void;
+  initialState: { frequency: number; gain: number; offset: number };
 }> = ({ onChange, initialState }) => (
   <ControlPanel
     style={{ width: 500 }}
@@ -18,28 +18,36 @@ const LFOSmallView: React.FC<{
     onChange={(
       _key: string,
       _val: number,
-      { frequency, gain }: { frequency: number | undefined; gain: number | undefined }
+      {
+        frequency,
+        gain,
+        offset,
+      }: { frequency: number | undefined; gain: number | undefined; offset: number | undefined }
     ) =>
       onChange(
         R.isNil(frequency) ? initialState.frequency : frequency,
-        R.isNil(gain) ? initialState.gain : gain
+        R.isNil(gain) ? initialState.gain : gain,
+        R.isNil(offset) ? initialState.offset : offset
       )
     }
   >
     <Range label='frequency' min={0.001} max={10000} scale='log' steps={1000} />
-    <Range label='gain' min={0.001} max={100} steps={1000} scale='log' />
+    <Range label='gain' min={-1} max={50000} steps={5000} />
+    <Range label='offset' min={-50000} max={50000} step={1} />
   </ControlPanel>
 );
 
 export class LFONode implements ForeignNode {
   private vcId: string;
   public gainNode: GainNode;
+  private offsetNode: ConstantSourceNode;
   public oscillatorNode: OscillatorNode;
   public nodeType = 'customAudio/LFO';
   public name = 'LFO';
 
   private frequencyOverrideCSN: ConstantSourceNode;
   private amplitudeOverrideCSN: ConstantSourceNode;
+  private offsetOverrideCSN: ConstantSourceNode;
 
   /**
    * See the docs for `enhanceAudioNode`.
@@ -51,17 +59,26 @@ export class LFONode implements ForeignNode {
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
     this.gainNode = new GainNode(ctx);
+    this.offsetNode = new ConstantSourceNode(ctx);
+    this.offsetNode.start();
     this.oscillatorNode = new OscillatorNode(ctx);
 
-    // These will always be connected, even if this node is disconnected.  So, if we ever want to garbage collect
-    // the inner `oscillatorNode` and `gainNode`, they will have to be disconnected explicitly.
+    // Oscillator -> Gain -> Offset -> Output
     this.oscillatorNode.connect(this.gainNode);
+    this.gainNode.connect(this.offsetNode.offset);
     this.oscillatorNode.start();
+    this.oscillatorNode.frequency.value = 0;
 
     this.frequencyOverrideCSN = new ConstantSourceNode(ctx);
     this.frequencyOverrideCSN.start();
     this.amplitudeOverrideCSN = new ConstantSourceNode(ctx);
     this.amplitudeOverrideCSN.start();
+    this.offsetOverrideCSN = new ConstantSourceNode(ctx);
+    this.offsetOverrideCSN.start();
+
+    if (params) {
+      this.deserialize(params);
+    }
 
     this.paramOverrides = {
       frequency: {
@@ -76,11 +93,11 @@ export class LFONode implements ForeignNode {
         param: new OverridableAudioParam(ctx, this.gainNode.gain, this.amplitudeOverrideCSN),
         override: this.amplitudeOverrideCSN,
       },
+      offset: {
+        param: new OverridableAudioParam(ctx, this.offsetNode.offset, this.offsetOverrideCSN),
+        override: this.offsetOverrideCSN,
+      },
     };
-
-    if (params) {
-      this.deserialize(params);
-    }
   }
 
   public deserialize(params: { [key: string]: any }) {
@@ -90,12 +107,16 @@ export class LFONode implements ForeignNode {
     if (!R.isNil(params.frequency)) {
       this.frequencyOverrideCSN.offset.value = params.frequency;
     }
+    if (!R.isNil(params.offset)) {
+      this.offsetOverrideCSN.offset.value = params.offset;
+    }
   }
 
   public serialize(): { [key: string]: any } {
     return {
       gain: this.amplitudeOverrideCSN.offset.value,
       frequency: this.frequencyOverrideCSN.offset.value,
+      offset: this.offsetOverrideCSN.offset.value,
     };
   }
 
@@ -107,9 +128,10 @@ export class LFONode implements ForeignNode {
           node: this.paramOverrides.frequency.param,
           type: 'number',
         })
-        .set('amplitude', { node: this.paramOverrides.amplitude.param, type: 'number' }),
+        .set('amplitude', { node: this.paramOverrides.amplitude.param, type: 'number' })
+        .set('offset', { node: this.paramOverrides.offset.param, type: 'number' }),
       outputs: Map<string, ConnectableOutput>().set('signal', {
-        node: this.gainNode,
+        node: this.offsetNode,
         type: 'number',
       }),
       node: this,
@@ -117,16 +139,17 @@ export class LFONode implements ForeignNode {
   }
 
   public renderSmallView(domId: string) {
-    console.log('rendering');
     ReactDOM.render(
       <LFOSmallView
-        onChange={(frequency: number, gain: number) => {
+        onChange={(frequency: number, gain: number, offset: number) => {
           this.frequencyOverrideCSN.offset.value = frequency;
           this.amplitudeOverrideCSN.offset.value = gain;
+          this.offsetOverrideCSN.offset.value = offset;
         }}
         initialState={{
           frequency: this.frequencyOverrideCSN.offset.value,
           gain: this.amplitudeOverrideCSN.offset.value,
+          offset: this.offsetOverrideCSN.offset.value,
         }}
       />,
       document.getElementById(domId)!
@@ -134,7 +157,6 @@ export class LFONode implements ForeignNode {
   }
 
   public cleanupSmallView(domId: string) {
-    console.log('cleaning up');
     ReactDOM.unmountComponentAtNode(document.getElementById(domId)!);
   }
 }
