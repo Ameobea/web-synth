@@ -10,7 +10,10 @@ build-all:
     && wasm-bindgen ./libs/polysynth/target/wasm32-unknown-unknown/release/*.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src
   yarn build || npm build
-  just opt
+
+  if `which wasm-opt`; then
+    just opt
+  fi
 
 run:
   cd engine \
@@ -24,8 +27,6 @@ run:
 
 run-frontend:
   yarn start
-
-#bump := "patch"
 
 deploy:
   cd backend && just docker-build
@@ -50,3 +51,10 @@ deploy:
 
   just build-all
   phost update notes patch ./dist
+
+build-docker-ci:
+  docker build -t $CI_BUILDER_DOCKER_IMAGE_NAME -f Dockerfile.CI .
+
+push-docker-ci:
+  docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
+  docker push $CI_BUILDER_DOCKER_IMAGE_NAME

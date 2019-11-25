@@ -1,0 +1,31 @@
+name: Cypress Tests
+
+on: [push]
+
+jobs:
+  # https://github.com/marketplace/actions/cypress-io
+  cypress-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: docker.pkg.github.com/ameobea/web-synth/ci-builder:latest
+      - name: Install `just`
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: just
+      - name: Install `wasm-bindgen-cli`
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: wasm-bindgen-cli -v 0.2.54
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '13.1'
+      - name: Build all wasm + javascript
+        run: just build-all
+      - name: Cypress Run
+        uses: cypress-io/github-action@v1.16.1
+        with:
+          browser: chrome

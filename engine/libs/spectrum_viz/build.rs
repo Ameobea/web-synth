@@ -1,10 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
 
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, Error, Write},
-};
+use std::{fs::File, io::Write};
 
 #[derive(Serialize)]
 pub struct SettingDefinition {

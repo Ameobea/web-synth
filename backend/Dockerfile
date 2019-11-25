@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y curl libmysqlclient-dev build-essential
 
 # Install rust
 RUN curl https://sh.rustup.rs/ -sSf | \
-  sh -s -- -y --default-toolchain nightly-2019-04-23
+  sh -s -- -y --default-toolchain nightly-2019-11-25
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
