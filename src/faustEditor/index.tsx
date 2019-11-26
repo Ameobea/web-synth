@@ -105,9 +105,9 @@ export const unhide_faust_editor = (vcId: string) => {
 };
 
 export const cleanup_faust_editor = (vcId: string): string => {
+  const editorContent = get_faust_editor_content(vcId);
   delete faustEditorContextMap[vcId];
 
-  const editorContent = get_faust_editor_content(vcId);
   const faustEditorReactRootNode = document.getElementById(buildRootNodeId(vcId));
   if (!faustEditorReactRootNode) {
     return editorContent;
@@ -199,7 +199,7 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     }
 
     return acc.set(label, {
-      node: context.overrideableParams[label]!,
+      node: context.overrideableParams[label],
       type: 'number',
     });
   }, baseInputs);

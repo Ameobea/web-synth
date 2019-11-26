@@ -105,6 +105,8 @@ const heap2Str = buf => {
   return str;
 };
 
+const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
+
 class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return paramDescriptors;
@@ -222,15 +224,20 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
 
   process(inputs, outputs, params) {
     // Set all params into the Wasm memory from the latest values we have to our `AudioParam`s
-    paramDescriptors.forEach(param =>
+    paramDescriptors.forEach(param => {
+      const paramValue = params[param.name][0];
+      if (paramValue === undefined) {
+        return;
+      }
+
       this.dspInstance.exports.setParamValue(
         this.dsp,
         this.pathTable[param.name],
         // We only support k-rate params since Faust processes all of the frames at once and only supports
         // a single value for each param.
-        params[param.name][0]
-      )
-    );
+        clamp(param.minValue, param.maxValue, paramValue)
+      );
+    });
 
     for (let i = 0; i < Math.min(inputs.length, this.dspInChannels.length); i++) {
       // Copy inputs into the Wasm heap

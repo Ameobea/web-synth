@@ -36,7 +36,8 @@ export const mkFaustEditorSmallView = (vcId: string) => {
           type: 'range',
           min: val.wrappedParam.minValue,
           max: val.wrappedParam.maxValue,
-          initial: val.manualControl.offset.value,
+          // Convert from offset from the default to absolute
+          initial: val.manualControl.offset.value + val.wrappedParam.defaultValue,
           manualControl: val.manualControl,
         })),
         overrideableParams: context.overrideableParams,
@@ -124,8 +125,10 @@ export const mkFaustEditorSmallView = (vcId: string) => {
               }
             }
 
-            // Actually update the manual override CSN's value to reflec the changed UI
-            targetParam.manualControl.offset.value = val;
+            // What we really want is offset from the default value.  The offset from the default set into the manual control CSN will be added to the
+            // default of the worklet `AudioParam` and equal the value that was actually chosen in the UI.
+            targetParam.manualControl.offset.value =
+              val - overrideableParams[label].wrappedParam.defaultValue;
           }}
         />
       </div>

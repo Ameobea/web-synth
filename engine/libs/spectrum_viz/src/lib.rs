@@ -1,10 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{
-    mem::{self, MaybeUninit},
-    sync::Once,
-};
+use std::mem::{self, MaybeUninit};
 
 use palette::{
     encoding::{linear::Linear, srgb::Srgb},
@@ -57,8 +54,12 @@ fn radar_colorizer(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
 const COLOR_FNS: &[fn(scaler_fn_ix: usize, val: u8) -> [u8; 4]] =
     &[pink_colorizer, rd_yl_bu_colorizer, radar_colorizer];
 
-fn linear_scaler(val: u8) -> f32 { (val as f32) / 255. }
-fn exponential_scaler(val: u8) -> f32 { ((val as f32).powf(3.) / 65025.) / 255. }
+fn linear_scaler(val: u8) -> f32 {
+    (val as f32) / 255.
+}
+fn exponential_scaler(val: u8) -> f32 {
+    ((val as f32).powf(3.) / 65025.) / 255.
+}
 
 const SCALER_FNS: [fn(val: u8) -> f32; SCALER_FN_COUNT] = [linear_scaler, exponential_scaler];
 
@@ -236,4 +237,6 @@ pub fn get_pixel_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE * 4]
 }
 
 #[wasm_bindgen]
-pub fn drop_context(ctx_ptr: *mut Context) { drop(unsafe { Box::from_raw(ctx_ptr) }) }
+pub fn drop_context(ctx_ptr: *mut Context) {
+    drop(unsafe { Box::from_raw(ctx_ptr) })
+}

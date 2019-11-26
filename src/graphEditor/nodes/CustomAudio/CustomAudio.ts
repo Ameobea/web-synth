@@ -27,6 +27,7 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
 import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import { getState } from 'src/redux';
 
 const ctx = new AudioContext();
 
@@ -421,8 +422,15 @@ const registerCustomAudioNode = (
   nodeGetter: (vcId: string) => ForeignNode,
   protoParams: { [key: string]: any }
 ) => {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  function CustomAudioNode(this: any) {}
+  function CustomAudioNode(this: any) {
+    if (R.isNil(this.id)) {
+      this.id =
+        [...getState().viewContextManager.patchNetwork.connectables.keys()]
+          .filter((id: string) => !Number.isNaN(+id))
+          .map(id => +id)
+          .reduce((acc, id) => Math.max(acc, id), 0) + 1;
+    }
+  }
 
   CustomAudioNode.prototype.onAdded = function(this: any) {
     if (R.isNil(this.id)) {

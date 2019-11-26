@@ -94,11 +94,11 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     super(ctx);
     // Operate as a pass-through node, passing on whatever values are input to the output if we are
     // not currently overridden.
-    this.gain.value = 1;
+    this.gain.value = 0;
     this.ctx = ctx;
 
     this.wrappedParam = wrappedParam;
-    this.manualControl = manualControl || this.buildManualControl(wrappedParam);
+    this.manualControl = manualControl || this.buildManualControl();
 
     this.isOverridden = defaultOverridden;
     if (defaultOverridden) {
@@ -108,9 +108,9 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     }
   }
 
-  private buildManualControl = (wrappedParam: AudioParam) => {
+  private buildManualControl = () => {
     const manualControl = new ConstantSourceNode(this.ctx);
-    manualControl.offset.value = wrappedParam.defaultValue;
+    manualControl.offset.value = 0;
     manualControl.start();
     return manualControl;
   };
