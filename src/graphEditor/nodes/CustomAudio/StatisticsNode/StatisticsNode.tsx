@@ -2,15 +2,13 @@
  * Analyzes the input signal and periodically samples it, recording statistics about the distribution of input signals.
  */
 
-import React from 'react';
-import ReactDOM from 'react-dom';
 import { Map } from 'immutable';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { Provider } from 'react-redux';
 import StatisticsNodeUI from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNodeUI';
+import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 
 export type Settings = {
   framesToSample: number;
@@ -46,7 +44,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
   private bucketCount = 128;
   private reduxInfra: ReduxInfra;
   private workletHandle: AudioWorkletNode | null = null;
-  private gn: GainNode;
+  private gainNode: GainNode;
   public name = 'Statistics Node';
   public nodeType = 'customAudio/statistics';
 
@@ -59,8 +57,8 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
 
     this.vcId = vcId;
     this.ctx = ctx;
-    this.gn = new GainNode(this.ctx);
-    this.gn.gain.value = 0;
+    this.gainNode = new GainNode(this.ctx);
+    this.gainNode.gain.value = 0;
 
     if (params) {
       this.deserialize(params);
@@ -69,13 +67,24 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
     this.reduxInfra = createReduxInfra({ data: { min: 0, max: 0, buckets: [] } });
 
     this.initWorklet();
+
+    this.renderSmallView = mkContainerRenderHelper({
+      Comp: StatisticsNodeUI,
+      store: this.reduxInfra.store,
+      predicate: () => this.gainNode.connect(this.ctx.destination),
+      props: {},
+    });
+
+    this.cleanupSmallView = mkContainerCleanupHelper({
+      predicate: () => this.gainNode.disconnect(this.ctx.destination),
+    });
   }
 
   private async initWorklet() {
     await this.ctx.audioWorklet.addModule('/StatisticsNodeProcessor.js');
     this.workletHandle = new AudioWorkletNode(this.ctx, 'statistics-node-processor');
     this.connect((this.workletHandle.parameters as any).get('input'));
-    this.workletHandle.connect(this.gn);
+    this.workletHandle.connect(this.gainNode);
 
     this.workletHandle.port.onmessage = (msg: MessageEvent) => this.updateData(msg.data);
   }
@@ -98,38 +107,8 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
     };
   }
 
-  public renderSmallView(domId: string) {
-    const node = document.getElementById(domId);
-    if (!node) {
-      console.error(
-        `Tried to render small view with id ${domId} but no element with that ID exists in the DOM`
-      );
-      return;
-    }
-
-    this.gn.connect(this.ctx.destination);
-
-    ReactDOM.render(
-      <Provider store={this.reduxInfra.store}>
-        <StatisticsNodeUI />
-      </Provider>,
-      node
-    );
-  }
-
-  public cleanupSmallView(domId: string) {
-    const node = document.getElementById(domId);
-    if (!node) {
-      console.error(
-        `Tried to clean up small view with id ${domId} but no element with that ID exists in the DOM`
-      );
-      return;
-    }
-
-    this.gn.disconnect(this.ctx.destination);
-
-    ReactDOM.unmountComponentAtNode(node);
-  }
+  public renderSmallView: ForeignNode['renderSmallView'] = undefined;
+  public cleanupSmallView: ForeignNode['cleanupSmallView'] = undefined;
 
   public buildConnectables() {
     return {

@@ -84,6 +84,8 @@ extern "C" {
     pub fn cleanup_faust_editor(vc_id: &str) -> String;
     pub fn get_faust_editor_content(vc_id: &str) -> String;
     pub fn get_faust_editor_connectables(vc_id: &str) -> JsValue;
+    pub fn render_faust_editor_small_view(vc_id: &str, target_dom_id: &str);
+    pub fn cleanup_faust_editor_small_view(vc_id: &str, target_dom_id: &str);
 }
 
 #[wasm_bindgen(raw_module = "./graphEditor")]

@@ -1,27 +1,33 @@
-import React, { useState, useCallback, Suspense, useRef } from 'react';
+import React, { useState, useCallback, Suspense, useMemo } from 'react';
 import { connect, Provider } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
-import ace from 'ace-builds';
 import * as R from 'ramda';
-import { Without, PropTypesOf, useOnce } from 'ameo-utils';
-import 'ace-builds/webpack-resolver';
+import { Without, PropTypesOf, ValueOf } from 'ameo-utils';
 
-import { faustReduxInfra } from 'src/faustEditor';
 import { Effect } from 'src/redux/modules/effects';
 import { EffectPickerCustomInput } from 'src/controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
-import { faustAudioNodesMap, get_faust_editor_connectables } from 'src/faustEditor';
+import {
+  faustEditorContextMap,
+  get_faust_editor_connectables,
+  FaustEditorReduxInfra,
+} from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork';
 import { ReduxStore, store } from 'src/redux';
-import Loading from 'src/misc/Loading';
 
-ace.require('ace/theme/twilight');
+type FaustEditorReduxStore = typeof faustEditorContextMap.key.reduxInfra.__fullState;
 
-type FaustEditorReduxStore = typeof faustReduxInfra.__fullState;
+// These must be loaded serially; they each depend on the on before it to exist before they can load.
+const ReactAce = React.lazy(async () => {
+  const ace = await import('ace-builds');
+  await import('ace-builds/webpack-resolver');
+  const reactAce = await import('react-ace');
 
-const ReactAce = React.lazy(() => import('react-ace'));
+  ace.require('ace/theme/twilight');
+  return reactAce;
+});
 
 const ctx = new AudioContext();
 
@@ -81,32 +87,6 @@ export const compileFaustInstance = async (
 
   const wasmInstanceArrayBuffer = await res.arrayBuffer();
   return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID);
-};
-
-const createCompileButtonClickHandler = (
-  faustCode: string,
-  optimize: boolean,
-  setErrMessage: (errMsg: string) => void,
-  vcId: string,
-  analyzerNode: AnalyserNode
-) => async () => {
-  let faustNode;
-  try {
-    faustNode = await compileFaustInstance(faustCode, optimize);
-  } catch (err) {
-    console.error(err);
-    setErrMessage(err.toString());
-    return;
-  }
-  setErrMessage('');
-
-  faustNode.connect(analyzerNode);
-  faustAudioNodesMap[vcId] = { analyzerNode, faustNode };
-  // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
-  const newConnectables = get_faust_editor_connectables(vcId);
-  updateConnectables(vcId, newConnectables);
-
-  faustReduxInfra.dispatch(faustReduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustNode));
 };
 
 const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: ReduxStore) => ({
@@ -202,6 +182,77 @@ const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) => ({
   editorContent: faustEditor.editorContent,
 });
 
+export const mkCompileButtonClickHandler = ({
+  faustCode,
+  optimize,
+  setErrMessage,
+  vcId,
+  analyzerNode,
+  noBuildControlPanel,
+}: {
+  faustCode: string;
+  optimize: boolean;
+  setErrMessage: (errMsg: string) => void;
+  vcId: string;
+  analyzerNode: AnalyserNode;
+  noBuildControlPanel?: boolean;
+}) => async () => {
+  let faustNode;
+  try {
+    faustNode = await compileFaustInstance(faustCode, optimize);
+  } catch (err) {
+    console.error(err);
+    setErrMessage(err.toString());
+    return;
+  }
+  setErrMessage('');
+
+  faustNode.connect(analyzerNode);
+
+  const context = faustEditorContextMap[vcId];
+  if (!context) {
+    throw new Error(`No context found for Faust editor vcId ${vcId}`);
+  }
+  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode };
+
+  // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
+  const newConnectables = get_faust_editor_connectables(vcId);
+  updateConnectables(vcId, newConnectables);
+
+  context.reduxInfra.dispatch(
+    context.reduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustNode, noBuildControlPanel)
+  );
+};
+
+/**
+ * Returns a function that stops the currently running Faust editor instance, setting Redux and `faustEditorContextMap`
+ * to reflect this new state;
+ */
+export const mkStopInstanceHandler = ({
+  reduxInfra,
+  vcId,
+  context,
+}: {
+  reduxInfra: FaustEditorReduxInfra;
+  vcId: string;
+  context: Pick<ValueOf<typeof faustEditorContextMap>, 'faustNode' | 'analyzerNode'>;
+}) => () => {
+  reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE());
+
+  // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
+  const { faustNode, analyzerNode } = context;
+  if (!faustNode) {
+    throw new Error(
+      `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
+    );
+  }
+  faustNode.disconnect(analyzerNode);
+
+  // Create new audio connectables using a passthrough node
+  delete faustEditorContextMap[vcId]!.faustNode;
+  updateConnectables(vcId, get_faust_editor_connectables(vcId));
+};
+
 const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps>> = ({
   instance,
   controlPanel: faustInstanceControlPanel,
@@ -212,25 +263,34 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
 
-  const analyzerNode = useRef<AnalyserNode | null>();
-  useOnce(() => {
-    const node = ctx.createAnalyser();
-    node.smoothingTimeConstant = 0.2;
-    analyzerNode.current = node;
-  });
+  const { reduxInfra, ...context } = useMemo(() => {
+    const context = faustEditorContextMap[vcId];
+    if (!context) {
+      throw new Error(
+        `Context should have been set already for Faust editor vcId ${vcId} but it has not`
+      );
+    }
+    return context;
+    // \/ We need this because of the dirty mutable state thing we have going with `faustEditorContextMap`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vcId, instance]);
 
   const compile = useCallback(
-    analyzerNode.current
-      ? createCompileButtonClickHandler(
-          editorContent,
-          optimize,
-          setCompileErrMsg,
-          vcId,
-          analyzerNode.current
-        )
-      : () => {},
-    [editorContent, setCompileErrMsg, optimize, analyzerNode.current]
+    mkCompileButtonClickHandler({
+      faustCode: editorContent,
+      optimize,
+      setErrMessage: setCompileErrMsg,
+      vcId,
+      analyzerNode: context.analyzerNode,
+    }),
+    [editorContent, setCompileErrMsg, optimize, context.analyzerNode]
   );
+
+  const stopInstance = useMemo(() => mkStopInstanceHandler({ reduxInfra, vcId, context }), [
+    context,
+    reduxInfra,
+    vcId,
+  ]);
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
@@ -240,9 +300,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
           mode='text'
           showPrintMargin={false}
           onChange={newValue =>
-            faustReduxInfra.dispatch(
-              faustReduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue)
-            )
+            reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue))
           }
           name='ace-editor'
           width='40vw'
@@ -259,35 +317,12 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         </button>
         Optimize
         <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
-        {instance ? (
-          <button
-            onClick={() => {
-              faustReduxInfra.dispatch(
-                faustReduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
-              );
-
-              // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
-              const { faustNode, analyzerNode } = faustAudioNodesMap[vcId];
-              faustNode.disconnect(analyzerNode);
-
-              // Create new audio connectables using a passthrough node
-              delete faustAudioNodesMap[vcId];
-              updateConnectables(vcId, get_faust_editor_connectables(vcId));
-            }}
-          >
-            Stop
-          </button>
-        ) : null}
+        {instance ? <button onClick={stopInstance}>Stop</button> : null}
       </div>
 
       <SaveControls editorContent={editorContent} />
 
-      {/* TODO: Persist these settings + init with `initialState` */}
-      {analyzerNode.current ? (
-        <SpectrumVisualization analyzerNode={analyzerNode.current} />
-      ) : (
-        <Loading />
-      )}
+      <SpectrumVisualization analyzerNode={context.analyzerNode} />
 
       {faustInstanceControlPanel}
 
@@ -295,9 +330,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         state={controlPanelState}
         setState={setControlPanelState}
         loadEffect={(effect: Effect) =>
-          faustReduxInfra.dispatch(
-            faustReduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
-          )
+          reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code))
         }
       />
     </Suspense>

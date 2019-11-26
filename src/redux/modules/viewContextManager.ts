@@ -8,8 +8,12 @@ import {
   PatchNetwork,
   ConnectableDescriptor,
   AudioConnectables,
+  ConnectableOutput,
+  ConnectableInput,
 } from 'src/patchNetwork/patchNetwork';
 import { getEngine } from 'src';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
@@ -25,7 +29,7 @@ export const getConnectedPair = (
   connectables: Map<string, AudioConnectables | null>,
   from: ConnectableDescriptor,
   to: ConnectableDescriptor
-) => {
+): [ConnectableOutput, ConnectableInput] | null => {
   const fromConnectables = connectables.get(from.vcId);
   if (!fromConnectables) {
     console.error(`No connectables found for VC ID ${from.vcId}`, connectables);
@@ -64,6 +68,8 @@ export const commitForeignConnectables = (
       [...foreignConnectables.values()].map(({ vcId, node }) => {
         if (!node) {
           throw new Error("Foreign connectables didn't have a `node`");
+        } else if (Number.isNaN(+vcId)) {
+          throw new Error(`Foreign connectable with non-numerator \`vcId\` found: "${vcId}"`);
         }
 
         return {
@@ -74,6 +80,27 @@ export const commitForeignConnectables = (
       })
     )
   );
+
+/**
+ * Helper function to handle connecting two nodes of various types together.
+ */
+const connectNodes = (src: AudioNode | MIDINode, dst: AudioNode | MIDINode | AudioParam) => {
+  // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
+  if (dst instanceof OverridableAudioParam) {
+    dst.setIsOverridden(false);
+  }
+
+  (src as any).connect(dst);
+};
+
+const disconnectNodes = (src: AudioNode | MIDINode, dst: AudioNode | MIDINode | AudioParam) => {
+  // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
+  if (dst instanceof OverridableAudioParam) {
+    dst.setIsOverridden(true);
+  }
+
+  (src as any).disconnect(dst);
+};
 
 /**
  * Checks to see if connections and/or foreign nodes have changed between two versions of the patch network.
@@ -192,8 +219,7 @@ const actionGroups = {
         return state;
       }
 
-      // Perform the connection
-      (fromConnectable.node as any).connect(toConnectable.node);
+      connectNodes(fromConnectable.node, toConnectable.node);
 
       const newConnections = [
         ...connections,
@@ -249,8 +275,7 @@ const actionGroups = {
       }
       const [fromConnectable, toConnectable] = connectedPair;
 
-      // Perform the disconnection
-      (fromConnectable.node as any).disconnect(toConnectable.node);
+      disconnectNodes(fromConnectable.node, toConnectable.node);
 
       const newConnections = [...connections].filter(
         ([from2, to2]) =>
@@ -322,7 +347,9 @@ const actionGroups = {
         if (!connectedPair) {
           return false;
         }
-        (connectedPair[0].node as any).disconnect(connectedPair[1].node);
+
+        disconnectNodes(connectedPair[0].node, connectedPair[1].node);
+
         return false;
       });
 
@@ -386,7 +413,7 @@ const actionGroups = {
             return false;
           }
 
-          (connectedPair[0].node as any).disconnect(connectedPair[1].node);
+          disconnectNodes(connectedPair[0].node, connectedPair[1].node);
           return false;
         }
 
@@ -428,7 +455,7 @@ const actionGroups = {
             return;
           }
 
-          (oldConnectedPair[0].node as any).disconnect(oldConnectedPair[1].node);
+          disconnectNodes(oldConnectedPair[0].node, oldConnectedPair[1].node);
 
           const newConnectedPair = getConnectedPair(newConnectables, from, to);
           if (!newConnectedPair) {
@@ -440,7 +467,8 @@ const actionGroups = {
             );
             return;
           }
-          (newConnectedPair[0].node as any).connect(newConnectedPair[1].node);
+
+          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node);
         }
 
         return true;

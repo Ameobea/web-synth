@@ -42,6 +42,14 @@ impl ViewContext for FaustEditor {
     fn get_audio_connectables(&self) -> JsValue {
         js::get_faust_editor_connectables(&self.get_id())
     }
+
+    fn render_small_view(&mut self, target_dom_id: &str) {
+        js::render_faust_editor_small_view(&self.get_id(), target_dom_id);
+    }
+
+    fn cleanup_small_view(&mut self, target_dom_id: &str) {
+        js::cleanup_faust_editor_small_view(&self.get_id(), target_dom_id);
+    }
 }
 
 pub fn mk_faust_editor(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {

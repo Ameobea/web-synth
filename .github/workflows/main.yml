@@ -10,12 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: docker.pkg.github.com/ameobea/web-synth/ci-builder:latest
+      - name: Cache cargo binaries
+        id: cache-cargo-binaries
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-registry-just-0.5.1-wasm-bindgen-cli-0.2.54
       - name: Install `just`
+        if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: just
+          args: just -v 0.5.1
       - name: Install `wasm-bindgen-cli`
+        if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
         uses: actions-rs/cargo@v1
         with:
           command: install

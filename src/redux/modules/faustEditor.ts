@@ -16,19 +16,28 @@ const initialState: FaustEditorState = {
 
 const actionGroups = {
   SET_INSTANCE: buildActionGroup({
-    actionCreator: (instance: FaustWorkletNode) => ({
+    actionCreator: (
+      instance: FaustWorkletNode,
+      // idiot typescript  \/
+      // eslint-disable-next-line @typescript-eslint/no-inferrable-types
+      noBuildControlPanel: boolean = false
+    ): { type: 'SET_INSTANCE'; instance: FaustWorkletNode; noBuildControlPanel: boolean } => ({
       type: 'SET_INSTANCE',
       instance,
+      noBuildControlPanel,
     }),
-    subReducer: (state: FaustEditorState, action) => {
-      // Construct a new control panel instance for the newly created module
-      const controlPanel = buildControlPanel(
-        action.instance.jsonDef.ui,
-        action.instance.pathTable,
-        action.instance.setParamValue
-      );
+    subReducer: (state: FaustEditorState, { instance, noBuildControlPanel }) => {
+      const newState = { ...state, instance };
+      if (!noBuildControlPanel) {
+        // Construct a new control panel instance for the newly created module
+        state.controlPanel = buildControlPanel(
+          instance.jsonDef.ui,
+          instance.pathTable,
+          instance.setParamValue
+        );
+      }
 
-      return { ...state, controlPanel, instance: action.instance };
+      return newState;
     },
   }),
   CLEAR_ACTIVE_INSTANCE: buildActionGroup({

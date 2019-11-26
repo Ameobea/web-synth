@@ -70,14 +70,15 @@ export const createPassthroughNode = <T extends GainNode = GainNode>(
  * the created `OverridableAudioParam` itself.
  */
 export class OverridableAudioParam extends GainNode implements AudioNode {
+  private ctx: AudioContext;
   /**
    * The `AudioParam` that we are handling inputs for.
    */
-  private wrappedParam: AudioParam;
+  public wrappedParam: AudioParam;
   /**
    * The `AudioNode` that is treated as the override for anything connected to this node.
    */
-  private manualControl: AudioNode;
+  public manualControl: ConstantSourceNode;
   /**
    * If `true`, then `manualControl` is connecte to `wrappedParam`.  If `false`, then anything connected to this
    * node itself is passed through to `wrappedParam`.
@@ -87,24 +88,32 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
   constructor(
     ctx: AudioContext,
     wrappedParam: AudioParam,
-    manualControl: AudioNode,
+    manualControl?: ConstantSourceNode,
     defaultOverridden = true
   ) {
     super(ctx);
     // Operate as a pass-through node, passing on whatever values are input to the output if we are
     // not currently overridden.
     this.gain.value = 1;
+    this.ctx = ctx;
 
     this.wrappedParam = wrappedParam;
-    this.manualControl = manualControl;
+    this.manualControl = manualControl || this.buildManualControl(wrappedParam);
 
     this.isOverridden = defaultOverridden;
     if (defaultOverridden) {
-      manualControl.connect(wrappedParam);
+      this.manualControl.connect(wrappedParam);
     } else {
       this.connect(wrappedParam);
     }
   }
+
+  private buildManualControl = (wrappedParam: AudioParam) => {
+    const manualControl = new ConstantSourceNode(this.ctx);
+    manualControl.offset.value = wrappedParam.defaultValue;
+    manualControl.start();
+    return manualControl;
+  };
 
   /**
    * Sets whether the output of `manualControl` or the inputs to this node itself are passed through to `wrappedParam`.
@@ -116,6 +125,7 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     if (isOverridden === this.isOverridden) {
       return;
     }
+
     this.isOverridden = isOverridden;
 
     if (isOverridden) {

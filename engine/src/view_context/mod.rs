@@ -65,9 +65,9 @@ pub trait ViewContext {
     /// interacting with it.
     ///
     /// This small view will be rendered into places like modals or sidebars.
-    fn render_small_view(&mut self, _target_div_id: &str) {}
+    fn render_small_view(&mut self, _target_dom_id: &str) {}
 
     /// Unrenders whatever was created by `render_small_view` in the `<div>` element with the
     /// provided `id`\
-    fn cleanup_small_view(&mut self, _target_div_id: &str) {}
+    fn cleanup_small_view(&mut self, _target_dom_id: &str) {}
 }

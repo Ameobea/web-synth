@@ -1,0 +1,15 @@
+node_modules
+.gitignore
+.github
+Dockerfile.CI
+.dockerignore
+README.md
+*.wat
+*.wasm
+.vscode
+.env
+.env.example
+.eslintrc
+.eslintignore
+.prettierrc
+yarn-error.log

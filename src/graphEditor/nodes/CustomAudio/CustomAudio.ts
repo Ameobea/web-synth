@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import ReactDOM from 'react-dom';
 import { Map } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
@@ -25,13 +24,9 @@ import { MIDIInputNode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import {
-  LiteGraphLink,
-  LiteGraphNodeInput,
-  LiteGraph as LiteGraphType,
-} from 'src/graphEditor/LiteGraphTypes';
 import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
 import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
+import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 
 const ctx = new AudioContext();
 
@@ -183,27 +178,11 @@ const enhanceAudioNode = <T>({
       });
 
       if (SmallViewRenderer) {
-        this.renderSmallView = (domId: string) => {
-          const node = document.getElementById(domId);
-          if (!node) {
-            console.error(
-              `No node with id ${domId} found when trying to render small view in \`CustomAudioNode\``
-            );
-            return;
-          }
-
-          ReactDOM.render(React.createElement(SmallViewRenderer, { node: this }), node);
-        };
-        this.cleanupSmallView = (domId: string) => {
-          const node = document.getElementById(domId);
-          if (!node) {
-            console.error(
-              `No node with id ${domId} found when trying to clean up small view in \`CustomAudioNode\``
-            );
-            return;
-          }
-          ReactDOM.unmountComponentAtNode(node);
-        };
+        this.renderSmallView = mkContainerRenderHelper({
+          Comp: SmallViewRenderer,
+          props: { node: this },
+        });
+        this.cleanupSmallView = mkContainerCleanupHelper();
       }
     }
 
@@ -449,7 +428,11 @@ const registerCustomAudioNode = (
     if (R.isNil(this.id)) {
       throw new Error('`id` was nil in `CustomAudioNode`');
     }
+
     const id: string = this.id.toString();
+    if (Number.isNaN(+id)) {
+      throw new Error(`\`CustomAudioNode\` was created with a non-numeric ID: "${id}"`);
+    }
 
     if (this.connectables) {
       this.title = this.connectables.node.name;
@@ -471,6 +454,12 @@ const registerCustomAudioNode = (
       foreignNode.lgNode = this;
       this.title = foreignNode.name;
       const connectables = foreignNode.buildConnectables();
+      if (connectables.vcId !== id) {
+        console.error(
+          `\`buildConnectables\` has a different vcId than the LG Node: ${connectables.vcId} vs ${id}`
+        );
+        connectables.vcId = id;
+      }
 
       // Create empty placeholder connectables
       this.connectables = connectables;
@@ -513,48 +502,7 @@ const registerCustomAudioNode = (
   //
   // This way, the state is persisted in the node and so we hold no source of truth in the LG node.
   CustomAudioNode.prototype.onPropertyChanged = LGAudioConnectables.prototype.onPropertyChanged;
-  CustomAudioNode.prototype.onConnectionsChange = function(
-    this: { graph: LiteGraphType; connectables: AudioConnectables & { node: ForeignNode } },
-    connection: 1 | 2,
-    slot: number,
-    isNowConnected: boolean,
-    linkInfo: LiteGraphLink,
-    inputInfo: LiteGraphNodeInput
-  ) {
-    const thisNodeIsDestination = connection === 1;
-    if (thisNodeIsDestination) {
-      (() => {
-        const dstNode = this.graph._nodes_by_id[linkInfo.target_id];
-        if (!dstNode) {
-          return;
-        }
-        const dstInput = dstNode.inputs[linkInfo.target_slot];
-        if (!dstInput) {
-          return;
-        }
-
-        // Check to see if we dis/connected to/from an overridable param
-        const overrideDescriptor = this.connectables.node.paramOverrides[dstInput.name];
-        if (overrideDescriptor) {
-          console.log(
-            `Setting overridable param named ${dstInput.name} as ${
-              isNowConnected ? 'NOT ' : ''
-            }overridden.`
-          );
-          overrideDescriptor.param.setIsOverridden(!isNowConnected);
-        }
-      })();
-    }
-
-    LGAudioConnectables.prototype.onConnectionsChange.call(
-      this,
-      connection,
-      slot,
-      isNowConnected,
-      linkInfo,
-      inputInfo
-    );
-  };
+  CustomAudioNode.prototype.onConnectionsChange = LGAudioConnectables.prototype.onConnectionsChange;
   CustomAudioNode.prototype.setConnectables = LGAudioConnectables.prototype.setConnectables;
 
   Object.entries(protoParams).forEach(([key, val]) => {

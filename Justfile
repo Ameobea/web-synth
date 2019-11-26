@@ -11,9 +11,7 @@ build-all:
   cp ./engine/build/* ./src
   yarn build || npm build
 
-  if `which wasm-opt`; then
-    just opt
-  fi
+  if `which wasm-opt`; then just opt; fi
 
 run:
   cd engine \

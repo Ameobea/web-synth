@@ -206,7 +206,6 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
         }
         case 'setPathTable': {
           this.pathTable = event.data.pathTable;
-          this.log({ pathTable: this.pathTable });
           break;
         }
         case 'init': {

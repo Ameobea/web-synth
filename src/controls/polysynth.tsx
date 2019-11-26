@@ -37,7 +37,6 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
               return getMidiImportSettings(fileInfo).then(settings => settings.track);
             }
           );
-          console.log('Loaded raw note data: ', rawNoteData);
           engine.handle_message('set_raw_note_data', rawNoteData);
           break;
         }

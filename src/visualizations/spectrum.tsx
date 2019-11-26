@@ -69,9 +69,7 @@ export const SpectrumVisualization: React.FC<{
           return canvasRef.current;
         }
 
-        return new Promise(resolve => {
-          setTimeout(() => getCanvas().then(resolve), 50);
-        });
+        return new Promise(resolve => setTimeout(() => getCanvas().then(resolve), 50));
       };
 
       return getCanvas();
