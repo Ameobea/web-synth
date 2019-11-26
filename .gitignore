@@ -13,3 +13,4 @@ src/polysynth_bg.wasm
 !src/midiEditor*
 polysynth.d.ts
 litegraph.js
+cypress/videos

@@ -3,8 +3,7 @@ name: Cypress Tests
 on: [push]
 
 jobs:
-  # https://github.com/marketplace/actions/cypress-io
-  cypress-test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -76,8 +75,35 @@ jobs:
         run: yarn
       - name: Build all wasm + javascript
         run: just build-all
+
+      - name: Upload built site as artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: dist
+          path: dist
+      - name: Upload node modules as artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: node_modules
+          path: node_modules
+
+  cypress-test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download built site artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: dist
+      - name: Download built site artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: node_modules
+
       # Run Cypress tests
-      # - name: Cypress Run
-      #   uses: cypress-io/github-action@v1.16.1
-      #   with:
-      #     browser: chrome
+      - name: Cypress Run
+        uses: cypress-io/github-action@v1.16.1
+        with:
+          browser: chrome
+          start: yarn cypress:serve
+          wait-on: 'http://localhost:8080'

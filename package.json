@@ -32,6 +32,7 @@
     "html-webpack-plugin": "^4.0.0-alpha",
     "node-sass": "^4.13.0",
     "sass-loader": "^8.0.0",
+    "serve": "^11.2.0",
     "style-loader": "^1.0.0",
     "ts-loader": "^6.2.1",
     "typescript": "^3.7.2",
@@ -44,7 +45,8 @@
     "build": "rm -rf dist/* && BACKEND_BASE_URL=\"https://notes-backend.p.ameo.design\" webpack --config webpack.prod.js && cp -r ./public/* ./dist",
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run --browser chrome"
+    "cypress:run": "cypress run --browser chrome",
+    "cypress:serve": "serve -p 9988 dist"
   },
   "dependencies": {
     "@types/ramda": "^0.26.36",
