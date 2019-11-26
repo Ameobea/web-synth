@@ -19,6 +19,7 @@ pub mod streaming;
 
 const NO_PLAYING_NOTE: u64 = u64::MAX;
 
+#[cfg(debug_assertions)]
 static mut INITED: bool = false;
 
 #[cfg(debug_assertions)]

@@ -2,6 +2,8 @@
 extern crate lazy_static;
 
 use std::mem::{self, MaybeUninit};
+#[cfg(debug_assertions)]
+use std::sync::Once;
 
 use palette::{
     encoding::{linear::Linear, srgb::Srgb},
@@ -156,10 +158,10 @@ lazy_static! {
     };
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(debug_assertions)]
 static ONCE: Once = Once::new();
 
-#[cfg(not(debug_assertions))]
+#[cfg(debug_assertions)]
 fn maybe_init() {
     ONCE.call_once(|| {
         console_error_panic_hook::set_once();
@@ -173,7 +175,7 @@ fn maybe_init() {
     });
 }
 
-#[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 fn maybe_init() {}
 
 /// Returns a JSON-serialized array of scaler function definitions
