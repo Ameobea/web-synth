@@ -63,13 +63,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: just -v 0.5.1
+          args: just --version 0.5.1
       - name: Install `wasm-bindgen-cli`
         if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: wasm-bindgen-cli -v 0.2.54
+          args: wasm-bindgen-cli --version 0.2.54
 
       # Build all Rust modules into Wasm, run `wasm-bindgen`, compile JavaScript, and link everything together
       - name: Install node modules
