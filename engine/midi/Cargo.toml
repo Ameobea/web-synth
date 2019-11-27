@@ -4,6 +4,9 @@ edition = "2018"
 name = "midi"
 version = "0.1.0"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 bincode = "1.2"
 console_error_panic_hook = "0.1.6"
@@ -29,17 +32,3 @@ git = "https://github.com/Ameobea/rimd.git"
 [features]
 disable-logging = []
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[profile.dev]
-opt-level = 1
-debug-assertions = true
-debug = true
-
-[profile.release]
-opt-level = 3
-debug-assertions = false
-codegen-units = 1
-panic = "abort"
-debug = false

@@ -19,15 +19,3 @@ js-sys = "0.3.31"
 
 [features]
 wasm-bindgen-exports = ["wasm-bindgen", "wasm-logger", "wasm-bindgen-futures", "common"]
-
-[profile.dev]
-opt-level = 1
-debug-assertions = true
-debug = true
-
-[profile.release]
-opt-level = 3
-debug-assertions = false
-codegen-units = 1
-panic = "abort"
-debug = false

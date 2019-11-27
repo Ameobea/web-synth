@@ -17,39 +17,25 @@ jobs:
           toolchain: nightly-2019-11-25
       - name: Use Rust nightly
         run: rustup default nightly-2019-11-25
+      - name: Install Rust Wasm support
+        run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v1
         with:
           node-version: '13.1'
-      - name: Install Rust Wasm support
-        run: rustup target add wasm32-unknown-unknown
 
       # Caching
-      - name: Cache cargo binaries
-        id: cache-cargo-binaries
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/bin
-          key: ${{ runner.os }}_nightly-2019-11-25_cargo-registry_just-0.5.1_wasm-bindgen-cli-0.2.54
-      - name: Cache `engine` lib build artifacts
+      # \/ Disabled due to (what sems to be) a bug in the `actions/cache` action (issue filed)
+      # - name: Cache cargo binaries
+      #   id: cache-cargo-binaries
+      #   uses: actions/cache@v1
+      #   with:
+      #     path: ~/.cargo/bin
+      #     key: ${{ runner.os }}_nightly-2019-11-25_cargo-registry_just-0.5.1_wasm-bindgen-cli-0.2.54
+      - name: Cache Rust lib build artifacts
         uses: actions/cache@v1
         with:
           path: ./engine/target
-          key: ${{ runner.os }}_nightly-2019-11-25_${{ hashFiles('engine/src/**') }}_${{ hashFiles('engine/Cargo.lock') }}
-      - name: Cache `midi` lib build artifacts
-        uses: actions/cache@v1
-        with:
-          path: ./engine/libs/midi/target
-          key: ${{ runner.os }}_nightly-2019-11-25_${{ hashFiles('engine/libs/midi/src/**') }}_${{ hashFiles('engine/libs/midi/Cargo.lock') }}
-      - name: Cache `polysynth` lib build artifacts
-        uses: actions/cache@v1
-        with:
-          path: ./engine/libs/polysynth/target
-          key: ${{ runner.os }}_nightly-2019-11-25_${{ hashFiles('engine/libs/polysynth/src/**') }}_${{ hashFiles('engine/libs/polysynth/Cargo.lock') }}
-      - name: Cache `spectrum_viz` lib build artifacts
-        uses: actions/cache@v1
-        with:
-          path: ./engine/libs/spectrum_viz/target
-          key: ${{ runner.os }}_nightly-2019-11-25_${{ hashFiles('engine/libs/spectrum_viz/src/**') }}_${{ hashFiles('engine/libs/spectrum_viz/Cargo.lock') }}
+          key: ${{ runner.os }}_nightly-2019-11-25_${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache node modules
         uses: actions/cache@v1
         with:
@@ -57,18 +43,28 @@ jobs:
           key: ${{ hashFiles('yarn.lock') }}
 
       # Install Cargo binaries used during the build process
+      # - name: Install `just`
+      #   if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: install
+      #     args: just --version 0.5.1
+      # - name: Install `wasm-bindgen-cli`
+      #   if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: install
+      #     args: wasm-bindgen-cli --version 0.2.54
+
+      # Temporary until the bug in the cache action is fixed
+      - name: Create custom binaries directory
+        run: mkdir ~/bin
       - name: Install `just`
-        if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: just --version 0.5.1
+        run: curl https://web-synth-ci-binaries.ameo.design/just -o ~/bin/just && chmod +x ~/bin/just
       - name: Install `wasm-bindgen-cli`
-        if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: wasm-bindgen-cli --version 0.2.54
+        run: curl https://web-synth-ci-binaries.ameo.design/wasm-bindgen-cli -o ~/bin/wasm-bindgen-cli && chmod +x ~/bin/wasm-bindgen-cli
+      - name: Add custom binaries directory to the PATH
+        run: export PATH="$HOME/bin:$PATH"
 
       # Build all Rust modules into Wasm, run `wasm-bindgen`, compile JavaScript, and link everything together
       - name: Install node modules

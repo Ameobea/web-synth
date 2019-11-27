@@ -4,10 +4,10 @@ opt:
 build-all:
   cd engine \
     && ./release.sh \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/*.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./libs/midi/target/wasm32-unknown-unknown/release/*.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./libs/spectrum_viz/target/wasm32-unknown-unknown/release/*.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./libs/polysynth/target/wasm32-unknown-unknown/release/*.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/engine.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/midi.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src
   yarn build || npm build
 
@@ -16,10 +16,10 @@ build-all:
 run:
   cd engine \
     && ./build.sh \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/*.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./libs/midi/target/wasm32-unknown-unknown/debug/*.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./libs/spectrum_viz/target/wasm32-unknown-unknown/debug/*.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./libs/polysynth/target/wasm32-unknown-unknown/debug/*.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/engine.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/midi.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/polysynth.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src/
   yarn start
 
