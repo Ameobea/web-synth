@@ -46,7 +46,7 @@
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --browser chrome",
-    "cypress:serve": "serve -p 9988 dist"
+    "cypress:serve": "serve -p 9000 dist"
   },
   "dependencies": {
     "@types/ramda": "^0.26.36",

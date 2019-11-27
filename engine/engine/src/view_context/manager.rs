@@ -111,7 +111,9 @@ struct ViewContextManagerState {
     pub foreign_connectables: Vec<ForeignConnectable>,
 }
 
-fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
+fn get_vc_key(uuid: Uuid) -> String {
+    format!("vc_{}", uuid)
+}
 
 impl ViewContextManager {
     /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
@@ -170,7 +172,7 @@ impl ViewContextManager {
                     id
                 );
                 return;
-            },
+            }
         };
 
         self.set_active_view(ix);
@@ -187,14 +189,14 @@ impl ViewContextManager {
                         vc_id, VCM_STATE_KEY
                     );
                     continue;
-                },
+                }
             };
             let definition: ViewContextDefinition = match serde_json::from_str(&definition_str) {
                 Ok(definition) => definition,
                 Err(err) => {
                     error!("Error deserializing `ViewContextDefinition`: {:?}", err);
                     continue;
-                },
+                }
             };
 
             let mut view_context = build_view(
@@ -218,7 +220,9 @@ impl ViewContextManager {
     fn init_default_state(&mut self) {
         let uuid = uuid_v4();
         // Create a MIDI Editor view context
-        let view_context = build_view("midi_editor", None, uuid);
+        let mut view_context = build_view("midi_editor", None, uuid);
+        view_context.init();
+        view_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
                 uuid,
@@ -232,11 +236,13 @@ impl ViewContextManager {
         let uuid = uuid_v4();
         let faust_editor = FaustEditor { uuid };
         let state_key = faust_editor.get_state_key();
-        let view_context = build_view(
+        let mut view_context = build_view(
             "faust_editor",
             Some(&serde_json::to_string(&faust_editor).unwrap()),
             uuid,
         );
+        view_context.init();
+        view_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
                 uuid,
@@ -259,7 +265,7 @@ impl ViewContextManager {
             Err(err) => {
                 error!("Error deserializing stored VCM state: {:?}", err);
                 None
-            },
+            }
         })
     }
 
@@ -333,7 +339,7 @@ impl ViewContextManager {
             None => {
                 error!("Tried to delete a VC with ID {} but it wasn't found.", id);
                 return;
-            },
+            }
         };
 
         let mut vc_entry = self.contexts.remove(ix);

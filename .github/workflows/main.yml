@@ -105,4 +105,4 @@ jobs:
         with:
           browser: chrome
           start: yarn cypress:serve
-          wait-on: 'http://localhost:9988'
+          wait-on: 'http://localhost:9000'
