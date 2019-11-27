@@ -1,4 +1,4 @@
-name: Cypress Tests
+name: Build, Test, and Deploy
 
 on: [push]
 
@@ -106,3 +106,23 @@ jobs:
           browser: chrome
           start: yarn cypress:serve
           wait-on: 'http://localhost:9000'
+
+  deploy-static-site:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Install `phost`
+        run: pip3 install --user setuptools wheel && pip3 install --user "git+https://github.com/Ameobea/phost.git#egg=phost&subdirectory=client"
+      - name: Add `phost` to the `PATH`
+        run: echo "::add-path::$HOME/.local/bin"
+      - name: Extract `phost` config from secrets
+        env: # Or as an environment variable
+          PHOST_CONFIG_BASE64: ${{ secrets.PHOST_CONFIG_BASE64 }}
+        run: mkdir ~/.phost; echo "$PHOST_CONFIG_BASE64" | base64 -d > ~/.phost/conf.toml
+      - name: Download built site artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: dist
+      - name: Deploy
+        run: phost update notes patch ./dist
