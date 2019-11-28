@@ -63,20 +63,20 @@ type MidiGrid = Grid<usize, MidiEditorGridRenderer, MidiEditorGridHandler>;
 impl GridRenderer<usize> for MidiEditorGridRenderer {}
 
 impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
-    fn init(&mut self) {
+    fn init(&mut self, vc_id: &str) {
         unsafe {
             skip_list::SKIP_LIST_NODE_DEBUG_POINTERS =
                 Box::into_raw(Box::new(skip_list::blank_shortcuts()));
         };
 
-        js::init_midi_editor_ui();
+        js::init_midi_editor_ui(vc_id);
     }
 
     fn hide(&mut self, vc_id: &str) { js::hide_midi_editor(vc_id) }
 
     fn unhide(&mut self, vc_id: &str) { js::unhide_midi_editor(vc_id) }
 
-    fn cleanup(&mut self, _: &mut GridState<usize>) { js::cleanup_midi_editor_ui(); }
+    fn cleanup(&mut self, _: &mut GridState<usize>, vc_id: &str) { js::cleanup_midi_editor_ui(vc_id); }
 
     fn on_key_down(
         &mut self,

@@ -4,6 +4,19 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(raw_module = "./index")]
 extern "C" {
+    pub fn init_view_contexts(
+        active_context_ix: usize,
+        view_context_definitions: &str,
+        connections_json: &str,
+        foreign_connectables_json: &str,
+    );
+    pub fn add_view_context(id: &str, name: &str);
+    pub fn delete_view_context(id: &str);
+    pub fn set_active_vc_ix(new_ix: usize);
+}
+
+#[wasm_bindgen(raw_module = "./grid")]
+extern "C" {
     pub fn render_quad(
         canvas_index: usize,
         x: usize,
@@ -29,20 +42,11 @@ extern "C" {
     pub fn add_class(id: usize, className: &str);
     pub fn remove_class(id: usize, className: &str);
     pub fn delete_element(id: usize);
-    pub fn clear_canvases();
 
-    pub fn init_midi_editor_ui();
-    pub fn cleanup_midi_editor_ui();
-
-    pub fn init_view_contexts(
-        active_context_ix: usize,
-        view_context_definitions: &str,
-        connections_json: &str,
-        foreign_connectables_json: &str,
-    );
-    pub fn add_view_context(id: &str, name: &str);
-    pub fn delete_view_context(id: &str);
-    pub fn set_active_vc_ix(new_ix: usize);
+    pub fn init_grid(vc_id: &str);
+    pub fn cleanup_grid(vc_id: &str);
+    pub fn hide_grid(vc_id: &str);
+    pub fn unhide_grid(vc_id: &str);
 }
 
 #[wasm_bindgen]
@@ -98,11 +102,12 @@ extern "C" {
 
 #[wasm_bindgen(raw_module = "./midiEditor")]
 extern "C" {
-    pub fn init_midi_editor();
-    pub fn cleanup_midi_editor();
     pub fn hide_midi_editor(vc_id: &str);
     pub fn unhide_midi_editor(vc_id: &str);
     pub fn create_midi_editor_audio_connectables(id: &str) -> JsValue;
+
+    pub fn init_midi_editor_ui(vc_id: &str);
+    pub fn cleanup_midi_editor_ui(vc_id: &str);
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]

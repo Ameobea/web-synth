@@ -360,7 +360,7 @@ impl ViewContextManager {
         }
 
         if let Some(vc_entry) = self.contexts.get_mut(self.active_context_ix) {
-            vc_entry.context.init();
+            vc_entry.context.unhide();
         }
 
         js::delete_view_context(&id.to_string());

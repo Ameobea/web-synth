@@ -17,7 +17,7 @@
         return globalContext;
       };
     </script>
-    <!-- WavyJones -->
+    <!-- WavyJones; this should eventually be lazy-loaded -->
     <script src="https://ameo.link/u/bin/6ky/rendered" type="text/javascript"></script>
     <link rel="stylesheet" href="./index.css" type="text/css" />
   </head>
@@ -25,14 +25,7 @@
   <body>
     <div id="view-context-manager"></div>
     <div id="view-context-switcher"></div>
-    <main id="content">
-      <div width="100vh" id="canvases" style="display: none;">
-        <div height="720" width="100vh" id="canvases-wrapper">
-          <svg class="notes" height="1400" width="4000" id="background-svg"></svg>
-          <svg class="notes" height="1400" width="4000" id="foreground-svg"></svg>
-        </div>
-      </div>
-    </main>
+    <main id="content"></main>
     <div id="root"></div>
   </body>
 </html>

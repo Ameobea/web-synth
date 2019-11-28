@@ -86,9 +86,9 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
 }
 
 pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
-    fn init(&mut self) {}
+    fn init(&mut self, _vc_id: &str) {}
 
-    fn cleanup(&mut self, _grid_state: &mut GridState<S>) {}
+    fn cleanup(&mut self, _grid_state: &mut GridState<S>, _vc_id: &str) {}
 
     fn hide(&mut self, _vc_id: &str) {}
     fn unhide(&mut self, _vc_id: &str) {}
@@ -445,9 +445,9 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     for Grid<S, R, H>
 {
     fn init(&mut self) {
-        render::render_initial_grid(&self.state.conf);
+        render::render_initial_grid(&self.state.conf, &self.get_id());
         self.state.cursor_dom_id = R::create_cursor(&self.state.conf, 4);
-        self.handler.init();
+        self.handler.init(&self.get_id());
 
         if !self.loaded {
             self.try_load_saved_composition();
@@ -457,15 +457,21 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         }
     }
 
-    fn hide(&mut self) { self.handler.hide(&self.get_id()) }
+    fn hide(&mut self) {
+        js::hide_grid(&self.get_id());
+        self.handler.hide(&self.get_id());
+    }
 
-    fn unhide(&mut self) { self.handler.unhide(&self.get_id()) }
+    fn unhide(&mut self) {
+        js::unhide_grid(&self.get_id());
+        self.handler.unhide(&self.get_id());
+    }
 
     fn cleanup(&mut self) {
-        js::clear_canvases();
-        js::cleanup_midi_editor();
+        js::cleanup_grid(&self.get_id());
         self.serialize_and_save();
-        self.handler.cleanup(&mut self.state);
+        let vc_id = self.get_id();
+        self.handler.cleanup(&mut self.state, &vc_id);
     }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }

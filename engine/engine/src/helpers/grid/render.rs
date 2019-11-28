@@ -49,8 +49,8 @@ pub fn draw_cursor_gutter(conf: &GridConf) {
 }
 
 /// Renders the initial grid with lines, measures, and the cursor gutter.
-pub fn render_initial_grid(conf: &GridConf) {
-    js::init_midi_editor();
+pub fn render_initial_grid(conf: &GridConf, vc_id: &str) {
+    js::init_grid(vc_id);
     draw_cursor_gutter(conf);
     draw_grid(conf);
     draw_measure_lines(conf);
