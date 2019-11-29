@@ -28,6 +28,8 @@ export class MIDIInputNode {
   private midiModule: typeof import('src/midi') | undefined;
   private midiInput: MIDIInput | undefined;
   private midiMsgHandlerCb: ((evt: Event & { data: Uint8Array }) => void) | undefined;
+  private pitchBendNode: ConstantSourceNode;
+  private modWheelNode: ConstantSourceNode;
 
   /**
    * See the docs for `enhanceAudioNode`.
@@ -106,8 +108,13 @@ export class MIDIInputNode {
         this.midiNode.outputCbs.forEach(({ onAttack }) => onAttack(note, voiceIx, velocity)),
       (voiceIx: number, note: number, velocity: number) =>
         this.midiNode.outputCbs.forEach(({ onRelease }) => onRelease(note, voiceIx, velocity)),
-      (_lsb: number, msb: number) =>
-        this.midiNode.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb))
+      (_lsb: number, msb: number) => {
+        this.pitchBendNode.offset.value = msb;
+        this.midiNode.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb));
+      },
+      (modWheelValue: number) => {
+        this.modWheelNode.offset.value = modWheelValue;
+      }
     );
     this.wasmMidiCtxPtr = ctxPtr;
 
@@ -120,13 +127,20 @@ export class MIDIInputNode {
   }
 
   constructor(
-    _ctx: AudioContext,
+    ctx: AudioContext,
     vcId: string,
     params: { [key: string]: any } | null = {},
     lgNode?: any
   ) {
     this.vcId = vcId;
     this.lgNode = lgNode;
+
+    this.pitchBendNode = new ConstantSourceNode(ctx);
+    this.pitchBendNode.offset.value = 0;
+    this.pitchBendNode.start();
+    this.modWheelNode = new ConstantSourceNode(ctx);
+    this.modWheelNode.offset.value = 0;
+    this.modWheelNode.start();
 
     if (params) {
       if (params.inputName !== undefined && typeof params.inputName !== 'string') {
@@ -138,6 +152,7 @@ export class MIDIInputNode {
 
     this.initMIDI(); // Maybe a side-effectful constructor isn't the best idea but w/e
   }
+
   public serialize() {
     return { inputName: this.selectedInputName };
   }
@@ -162,10 +177,19 @@ export class MIDIInputNode {
   public buildConnectables(): AudioConnectables & { node: NonNullable<AudioConnectables['node']> } {
     return {
       inputs: Map<string, ConnectableInput>(),
-      outputs: Map<string, ConnectableOutput>().set('midi_output', {
-        node: this.midiNode,
-        type: 'midi',
-      }),
+      outputs: Map<string, ConnectableOutput>()
+        .set('midi_output', {
+          node: this.midiNode,
+          type: 'midi',
+        })
+        .set('pitch_bend', {
+          node: this.pitchBendNode,
+          type: 'number',
+        })
+        .set('mod_wheel', {
+          node: this.modWheelNode,
+          type: 'number',
+        }),
       vcId: this.vcId,
       node: this,
     };

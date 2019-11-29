@@ -12,6 +12,7 @@ pub struct MsgHandlerContext {
     pub play_note: Function,
     pub release_note: Function,
     pub pitch_bend: Option<Function>,
+    pub mod_wheel: Option<Function>,
     pub voice_manager: PolySynth<
         Box<dyn Fn(String, usize) -> usize>,
         Box<dyn Fn(usize, usize, usize, u8)>,
@@ -19,7 +20,6 @@ pub struct MsgHandlerContext {
         Box<dyn Fn(usize, usize, f32, f32)>,
         Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
     >,
-    // TODO: Add handlers for other events
 }
 
 #[wasm_bindgen]
@@ -27,6 +27,7 @@ pub fn create_msg_handler_context(
     play_note: Function,
     release_note: Function,
     pitch_bend: Option<Function>,
+    mod_wheel: Option<Function>,
 ) -> usize {
     crate::maybe_init();
 
@@ -34,6 +35,7 @@ pub fn create_msg_handler_context(
         play_note,
         release_note,
         pitch_bend,
+        mod_wheel,
         // Insert temporary pointers for now that we will swap out once we have psueo-static
         // pointers to the boxed `Function`s
         voice_manager: PolySynth::new(uuid_v4(), true, SynthCallbacks {
@@ -48,8 +50,6 @@ pub fn create_msg_handler_context(
     // Replace the temporary synth cb pointers with real ones
     let play_note: *const Function = &ctx.play_note as *const Function;
     let release_note: *const Function = &ctx.release_note as *const Function;
-    let pitch_bend: Option<*const Function> =
-        ctx.pitch_bend.as_ref().map(|pb| pb as *const Function); // TODO: Use
 
     let synth_cbs = SynthCallbacks {
         init_synth: Box::new(move |_, _| 0usize) as Box<dyn Fn(String, usize) -> usize>, // No-op
@@ -100,7 +100,7 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
     let mut ctx = unsafe { Box::from_raw(ctx_ptr) };
     let evt = MidiMessage::from_bytes(evt_bytes);
 
-    let res = match evt.status() {
+    let res: Result<(), JsValue> = match evt.status() {
         Status::NoteOn => {
             let note_id = evt.data[1];
             let velocity = evt.data[2];
@@ -141,6 +141,16 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
                 Ok(())
             },
         },
+        // Mod Wheel
+        Status::ControlChange if evt.data[1] == 1 =>
+            if let Some(mod_wheel_handler) = &ctx.mod_wheel {
+                let value = evt.data[2];
+                mod_wheel_handler
+                    .call1(&JsValue::NULL, &JsValue::from(value))
+                    .map(|_| ())
+            } else {
+                Ok(())
+            },
         status => {
             trace!("Unhandled MIDI event of type {}", status);
             Ok(())
