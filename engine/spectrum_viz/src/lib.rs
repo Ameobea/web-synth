@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 #[cfg(debug_assertions)]
 use std::sync::Once;
 
@@ -23,45 +23,66 @@ pub struct Context {
     pub scaler_fn: usize,
 }
 
-type ColorLUT = [[u8; 4]; 255];
+type ColorLUT = [[u8; 4]; 256];
 
+// This is straight broken and causes insane low level buggy madness \/
 // Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+// #[global_allocator]
+// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const SCALER_FN_COUNT: usize = 2;
 
-fn pink_colorizer(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
-    *unsafe {
-        PINK_GRADIENT_LUTS
-            .get_unchecked(scaler_fn_ix)
-            .get_unchecked(val as usize)
+#[cfg(debug_assertions)]
+mod colorizers {
+    use crate::*;
+
+    pub fn pink(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
+        PINK_GRADIENT_LUTS[scaler_fn_ix][val as usize]
+    }
+
+    pub fn rd_yl_bu(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
+        RD_YL_BU_GRADIENT_LUTS[scaler_fn_ix][val as usize]
+    }
+
+    pub fn radar(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
+        RADAR_GRADIENT_LUTS[scaler_fn_ix][val as usize]
     }
 }
-fn rd_yl_bu_colorizer(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
-    *unsafe {
-        RD_YL_BU_GRADIENT_LUTS
-            .get_unchecked(scaler_fn_ix)
-            .get_unchecked(val as usize)
+
+#[cfg(not(debug_assertions))]
+mod colorizers {
+    use crate::*;
+
+    pub fn pink(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
+        *unsafe {
+            PINK_GRADIENT_LUTS
+                .get_unchecked(scaler_fn_ix)
+                .get_unchecked(val as usize)
+        }
     }
-}
-fn radar_colorizer(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
-    *unsafe {
-        RADAR_GRADIENT_LUTS
-            .get_unchecked(scaler_fn_ix)
-            .get_unchecked(val as usize)
+
+    pub fn rd_yl_bu(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
+        *unsafe {
+            RD_YL_BU_GRADIENT_LUTS
+                .get_unchecked(scaler_fn_ix)
+                .get_unchecked(val as usize)
+        }
+    }
+
+    pub fn radar(scaler_fn_ix: usize, val: u8) -> [u8; 4] {
+        *unsafe {
+            RADAR_GRADIENT_LUTS
+                .get_unchecked(scaler_fn_ix)
+                .get_unchecked(val as usize)
+        }
     }
 }
 
 const COLOR_FNS: &[fn(scaler_fn_ix: usize, val: u8) -> [u8; 4]] =
-    &[pink_colorizer, rd_yl_bu_colorizer, radar_colorizer];
+    &[colorizers::pink, colorizers::rd_yl_bu, colorizers::radar];
 
-fn linear_scaler(val: u8) -> f32 {
-    (val as f32) / 255.
-}
-fn exponential_scaler(val: u8) -> f32 {
-    ((val as f32).powf(3.) / 65025.) / 255.
-}
+fn linear_scaler(val: u8) -> f32 { (val as f32) / 255. }
+fn exponential_scaler(val: u8) -> f32 { ((val as f32).powf(3.) / 65025.) / 255. }
 
 const SCALER_FNS: [fn(val: u8) -> f32; SCALER_FN_COUNT] = [linear_scaler, exponential_scaler];
 
@@ -151,7 +172,6 @@ lazy_static! {
             [0x79, 0x00, 0x6d],
             [0x79, 0x30, 0xa1],
             [0xc4, 0xa4, 0xd5],
-            [0x00, 0x00, 0x00],
         ]);
 
         build_luts(&Gradient::with_domain(color_steps))
@@ -199,46 +219,38 @@ pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
 
 #[wasm_bindgen]
 pub fn set_conf(ctx_ptr: *mut Context, color_fn: usize, scaler_fn: usize) {
-    let mut ctx = unsafe { Box::from_raw(ctx_ptr) };
-    ctx.color_fn = color_fn;
-    ctx.scaler_fn = scaler_fn;
-    mem::forget(ctx);
+    unsafe {
+        (*ctx_ptr).color_fn = color_fn;
+        (*ctx_ptr).scaler_fn = scaler_fn;
+    }
 }
 
 #[wasm_bindgen]
-pub fn process_viz_data(ctx_ptr: *mut Context) {
-    let mut ctx = unsafe { Box::from_raw(ctx_ptr) };
+pub fn process_viz_data(ctx: *mut Context) {
+    let color_fn_ix = unsafe { (*ctx).color_fn };
     let color_fn = COLOR_FNS
-        .get(ctx.color_fn)
-        .unwrap_or_else(|| panic!("No color fn found with index {}", ctx.color_fn));
+        .get(color_fn_ix)
+        .unwrap_or_else(|| panic!("No color fn found with index {}", color_fn_ix));
 
-    for (i, val) in (&ctx.byte_frequency_data[..]).iter().enumerate() {
-        let [r, g, b, _] = color_fn(ctx.scaler_fn, *val);
-        ctx.pixel_buffer[i * 4] = r;
-        ctx.pixel_buffer[i * 4 + 1] = g;
-        ctx.pixel_buffer[i * 4 + 2] = b;
+    unsafe {
+        for (i, val) in (&((*ctx).byte_frequency_data)[..]).iter().enumerate() {
+            let [r, g, b, _] = color_fn((*ctx).scaler_fn, *val);
+            (*ctx).pixel_buffer[i * 4] = r;
+            (*ctx).pixel_buffer[i * 4 + 1] = g;
+            (*ctx).pixel_buffer[i * 4 + 2] = b;
+        }
     }
-
-    mem::forget(ctx);
 }
 
 #[wasm_bindgen]
 pub fn get_byte_frequency_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE] {
-    let ctx = unsafe { Box::from_raw(ctx_ptr) };
-    let byte_array_ptr = &ctx.byte_frequency_data as *const _;
-    mem::forget(ctx);
-    byte_array_ptr
+    unsafe { &(*ctx_ptr).byte_frequency_data as *const _ }
 }
 
 #[wasm_bindgen]
 pub fn get_pixel_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE * 4] {
-    let ctx = unsafe { Box::from_raw(ctx_ptr) };
-    let byte_array_ptr = &ctx.pixel_buffer as *const _;
-    mem::forget(ctx);
-    byte_array_ptr
+    unsafe { &(*ctx_ptr).pixel_buffer as *const _ }
 }
 
 #[wasm_bindgen]
-pub fn drop_context(ctx_ptr: *mut Context) {
-    drop(unsafe { Box::from_raw(ctx_ptr) })
-}
+pub fn drop_context(ctx_ptr: *mut Context) { drop(unsafe { Box::from_raw(ctx_ptr) }); }

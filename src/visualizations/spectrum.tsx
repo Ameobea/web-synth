@@ -8,11 +8,6 @@ export interface SpectrumVizSettings {
   scaler_fn: number;
 }
 
-export const DEFAULT_SPECTRUM_VIZ_CONF: SpectrumVizSettings = {
-  color_fn: 0,
-  scaler_fn: 0,
-};
-
 const FFT_SIZE = Math.pow(2, 14);
 const BUFFER_SIZE = FFT_SIZE / 2;
 const WIDTH = 1200;
@@ -32,7 +27,6 @@ export const SpectrumVisualization: React.FC<{
     color_functions: SettingDefinition[];
     scaler_functions: SettingDefinition[];
   } | null>(null);
-  const [conf, setConf] = useState(initialConf || DEFAULT_SPECTRUM_VIZ_CONF);
   const [ctxPtr, setCtxPtr] = useState<number | null>(null);
   const spectrumModule = useRef<typeof import('src/spectrum_viz') | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -50,7 +44,7 @@ export const SpectrumVisualization: React.FC<{
       return;
     }
 
-    const ctxPtr = spectrumModule.current.new_context(conf.color_fn, conf.scaler_fn);
+    const ctxPtr = spectrumModule.current.new_context(0, 0);
     setCtxPtr(ctxPtr);
 
     let curIx = 0;
@@ -120,11 +114,9 @@ export const SpectrumVisualization: React.FC<{
       ) : (
         <ControlPanel
           state={initialConf}
-          onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
-            const newConf = { color_fn: +color_fn, scaler_fn: +scaler_fn };
-            spectrumModule.current!.set_conf(ctxPtr, newConf.color_fn, newConf.scaler_fn);
-            setConf(newConf);
-          }}
+          onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) =>
+            spectrumModule.current!.set_conf(ctxPtr, +color_fn, +scaler_fn)
+          }
           settings={[
             {
               type: 'select',

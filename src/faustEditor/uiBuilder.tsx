@@ -112,8 +112,7 @@ const buildControlPanel = (
   setParamValue: FaustWorkletNode['setParamValue']
 ) => {
   // Get the randomly generated path base so that we can accurately match when setting params
-  const pathBase = Option.of(Object.keys(pathTable))
-    .map(R.head)
+  const pathBase = Option.of(R.head(Object.keys(pathTable)))
     .map(path => path.split('/').slice(0, 2)[1])
     .getOrElse('');
 
