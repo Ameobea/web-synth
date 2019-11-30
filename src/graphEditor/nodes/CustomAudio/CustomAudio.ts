@@ -28,6 +28,7 @@ import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/Sta
 import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { getState } from 'src/redux';
+import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
 
 const ctx = new AudioContext();
 
@@ -414,6 +415,9 @@ export const audioNodeGetters: {
   },
   'customAudio/statistics': {
     nodeGetter: (vcId, params) => new StatisticsNode(ctx, vcId, params),
+  },
+  'customAudio/scaleAndShift': {
+    nodeGetter: (vcId, params) => new ScaleAndShiftNode(ctx, vcId, params),
   },
 };
 

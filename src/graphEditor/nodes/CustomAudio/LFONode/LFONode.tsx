@@ -1,12 +1,11 @@
-import React from 'react';
 import { Map } from 'immutable';
 import * as R from 'ramda';
-import ReactDOM from 'react-dom';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import LFOSmallView from './LFONodeUI';
+import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 
 export class LFONode implements ForeignNode {
   private vcId: string;
@@ -30,7 +29,9 @@ export class LFONode implements ForeignNode {
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
     this.gainNode = new GainNode(ctx);
+    this.gainNode.gain.value = 0;
     this.offsetNode = new ConstantSourceNode(ctx);
+    this.offsetNode.offset.value = 0;
     this.offsetNode.start();
     this.oscillatorNode = new OscillatorNode(ctx);
 
@@ -69,6 +70,24 @@ export class LFONode implements ForeignNode {
         override: this.offsetOverrideCSN,
       },
     };
+
+    this.renderSmallView = mkContainerRenderHelper({
+      Comp: LFOSmallView,
+      props: {
+        onChange: (frequency: number, gain: number, offset: number) => {
+          this.frequencyOverrideCSN.offset.value = frequency;
+          this.amplitudeOverrideCSN.offset.value = gain;
+          this.offsetOverrideCSN.offset.value = offset;
+        },
+        initialState: {
+          frequency: this.frequencyOverrideCSN.offset.value,
+          gain: this.amplitudeOverrideCSN.offset.value,
+          offset: this.offsetOverrideCSN.offset.value,
+        },
+      },
+    });
+
+    this.cleanupSmallView = mkContainerCleanupHelper();
   }
 
   public deserialize(params: { [key: string]: any }) {
@@ -109,25 +128,6 @@ export class LFONode implements ForeignNode {
     };
   }
 
-  public renderSmallView(domId: string) {
-    ReactDOM.render(
-      <LFOSmallView
-        onChange={(frequency: number, gain: number, offset: number) => {
-          this.frequencyOverrideCSN.offset.value = frequency;
-          this.amplitudeOverrideCSN.offset.value = gain;
-          this.offsetOverrideCSN.offset.value = offset;
-        }}
-        initialState={{
-          frequency: this.frequencyOverrideCSN.offset.value,
-          gain: this.amplitudeOverrideCSN.offset.value,
-          offset: this.offsetOverrideCSN.offset.value,
-        }}
-      />,
-      document.getElementById(domId)!
-    );
-  }
-
-  public cleanupSmallView(domId: string) {
-    ReactDOM.unmountComponentAtNode(document.getElementById(domId)!);
-  }
+  public renderSmallView: ForeignNode['renderSmallView'];
+  public cleanupSmallView: ForeignNode['cleanupSmallView'];
 }
