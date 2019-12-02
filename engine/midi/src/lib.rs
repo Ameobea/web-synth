@@ -23,7 +23,7 @@ const NO_PLAYING_NOTE: u64 = u64::MAX;
 static mut INITED: bool = false;
 
 #[cfg(debug_assertions)]
-fn maybe_init() {
+pub(crate) fn maybe_init() {
     unsafe {
         if INITED {
             return;

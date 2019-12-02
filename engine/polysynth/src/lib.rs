@@ -241,6 +241,14 @@ impl<
             self.trigger_release(*note_id);
         }
     }
+
+    pub fn release_all(&mut self) {
+        for i in 0..POLY_SYNTH_VOICE_COUNT {
+            if let VoicePlayingStatus::Playing(note_id) = self.voices[i].playing {
+                self.trigger_release(note_id);
+            }
+        }
+    }
 }
 
 pub fn stop_playback() {
@@ -305,7 +313,9 @@ pub mod exports {
 
     #[wasm_bindgen]
     pub fn drop_polysynth_context(ctx: *mut PolySynthContext) {
-        unsafe { drop(Box::from_raw(ctx)) }
+        let mut ctx = unsafe { Box::from_raw(ctx) };
+        ctx.synth.release_all();
+        drop(ctx);
     }
 
     #[wasm_bindgen]

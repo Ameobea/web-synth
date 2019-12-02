@@ -8,7 +8,7 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2.54"
+wasm-bindgen = "=0.2.54"
 rand = "0.7.2"
 rand_pcg = "0.2.1"
 slab = "0.4"

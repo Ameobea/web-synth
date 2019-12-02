@@ -1,31 +1,34 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <title>{{ htmlWebpackPlugin.options.title }}</title>
-    <script type="text/javascript">
-      // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
-      // other, causing errors when connecting betwen different components.
-      //
-      // Here, we patch the global `AudioContext` instance so that constructing new instances of it just returns the same
-      // pre-constructed instance.
-      const OldAudioContext = globalThis.AudioContext;
 
-      const globalContext = new AudioContext();
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+  <title>{{ htmlWebpackPlugin.options.title }}</title>
+  <script type="text/javascript">
+    // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
+    // other, causing errors when connecting betwen different components.
+    //
+    // Here, we patch the global `AudioContext` instance so that constructing new instances of it just returns the same
+    // pre-constructed instance.
+    const OldAudioContext = globalThis.AudioContext;
 
-      globalThis.AudioContext = function SingletonAudioContext() {
-        return globalContext;
-      };
-    </script>
-    <!-- WavyJones; this should eventually be lazy-loaded -->
-    <script src="https://ameo.link/u/bin/6ky/rendered" type="text/javascript"></script>
-    <link rel="stylesheet" href="./index.css" type="text/css" />
-  </head>
+    const globalContext = new AudioContext();
 
-  <body>
-    <div id="view-context-manager"></div>
-    <div id="view-context-switcher"></div>
-    <main id="content"></main>
-    <div id="root"></div>
-  </body>
+    globalThis.AudioContext = function SingletonAudioContext() {
+      return globalContext;
+    };
+  </script>
+  <!-- WavyJones; this should eventually be lazy-loaded -->
+  <link href="https://fonts.googleapis.com/css?family=PT+Sans&display=swap" rel="stylesheet">
+  <script src="https://ameo.link/u/bin/6ky/rendered" type="text/javascript"></script>
+  <link rel="stylesheet" href="./index.css" type="text/css" />
+</head>
+
+<body>
+  <div id="view-context-manager"></div>
+  <div id="view-context-switcher"></div>
+  <main id="content"></main>
+  <div id="root"></div>
+</body>
+
 </html>

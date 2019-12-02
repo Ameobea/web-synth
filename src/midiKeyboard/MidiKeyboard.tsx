@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
 
 import Loading from 'src/misc/Loading';
 import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
+import { useOnce } from 'ameo-utils/dist/util/react';
 
 const START_NOTE = 33;
 
@@ -72,31 +73,32 @@ const MidiKeyboard: React.FC<{
   handlePitchBend?: ((lsb: number, msb: number) => void) | null;
 }> = ({ playNote, releaseNote }) => {
   const [polySynthMod, setPolySynthMod] = useState<typeof import('src/polysynth') | null>(null);
-  const [polySynthCtx, setPolySynthCtx] = useState<number | null>(null);
+  const polySynthCtx = useRef<number | null>(null);
+
+  useOnce(() => import('src/polysynth').then(setPolySynthMod));
 
   useEffect(() => {
-    if (polySynthCtx !== null) {
+    if (!polySynthMod) {
       return;
     }
 
-    import('src/polysynth').then(mod => {
-      setPolySynthMod(mod);
-      setPolySynthCtx(
-        mod.create_polysynth_context(playNote, (voiceIx: number, noteId: number) =>
-          releaseNote(voiceIx, noteId, 0)
-        )
-      );
-    });
+    polySynthCtx.current = polySynthMod.create_polysynth_context(
+      playNote,
+      (voiceIx: number, noteId: number) => releaseNote(voiceIx, noteId, 0)
+    );
+    console.log('setting ctx', polySynthCtx.current);
 
     return () => {
-      if (polySynthCtx !== null) {
-        import('src/polysynth').then(mod => mod.drop_polysynth_context(polySynthCtx));
+      console.log('Dropping ctx', polySynthCtx.current);
+
+      if (polySynthCtx.current !== null) {
+        polySynthMod.drop_polysynth_context(polySynthCtx.current);
       }
     };
-  }, [playNote, releaseNote, polySynthCtx]);
+  }, [polySynthMod, playNote, releaseNote, polySynthCtx]);
 
   useEffect(() => {
-    if (!polySynthMod || polySynthCtx === null) {
+    if (!polySynthMod || polySynthCtx.current === null) {
       return;
     }
 
@@ -115,7 +117,7 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      polySynthMod.handle_note_down(polySynthCtx, midiNumber, 255);
+      polySynthMod.handle_note_down(polySynthCtx.current, midiNumber, 255);
     };
     const handleUp = (evt: KeyboardEvent) => {
       // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event
@@ -125,7 +127,7 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      polySynthMod.handle_note_up(polySynthCtx, midiNumber);
+      polySynthMod.handle_note_up(polySynthCtx.current, midiNumber);
     };
 
     document.addEventListener('keydown', handleDown);
@@ -179,6 +181,8 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
   if (!midiNode) {
     return <Loading />;
   }
+
+  console.log(octaveOffset);
 
   return (
     <div>

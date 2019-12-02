@@ -92,7 +92,12 @@ pub fn create_msg_handler_context(
 
 #[wasm_bindgen]
 pub fn drop_msg_handler_ctx(ctx_ptr: *mut MsgHandlerContext) {
-    drop(unsafe { Box::from_raw(ctx_ptr) })
+    let mut ctx = unsafe { Box::from_raw(ctx_ptr) };
+
+    // Release all currently held notes
+    ctx.voice_manager.release_all();
+
+    drop(ctx)
 }
 
 #[wasm_bindgen]
