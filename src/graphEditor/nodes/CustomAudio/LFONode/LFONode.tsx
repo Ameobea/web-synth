@@ -4,8 +4,15 @@ import * as R from 'ramda';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import LFOSmallView from './LFONodeUI';
+import LFOSmallView, { ALL_WAVEFORMS } from './LFONodeUI';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+
+export interface LFOParams {
+  frequency: number;
+  gain: number;
+  offset: number;
+  waveform: OscillatorType;
+}
 
 export class LFONode implements ForeignNode {
   private vcId: string;
@@ -74,15 +81,17 @@ export class LFONode implements ForeignNode {
     this.renderSmallView = mkContainerRenderHelper({
       Comp: LFOSmallView,
       props: {
-        onChange: (frequency: number, gain: number, offset: number) => {
+        onChange: ({ frequency, gain, offset, waveform }: LFOParams) => {
           this.frequencyOverrideCSN.offset.value = frequency;
           this.amplitudeOverrideCSN.offset.value = gain;
           this.offsetOverrideCSN.offset.value = offset;
+          this.oscillatorNode.type = waveform;
         },
         initialState: {
           frequency: this.frequencyOverrideCSN.offset.value,
           gain: this.amplitudeOverrideCSN.offset.value,
           offset: this.offsetOverrideCSN.offset.value,
+          waveform: this.oscillatorNode.type,
         },
       },
     });
@@ -100,6 +109,9 @@ export class LFONode implements ForeignNode {
     if (!R.isNil(params.offset)) {
       this.offsetOverrideCSN.offset.value = params.offset;
     }
+    if (ALL_WAVEFORMS.includes(params.waveform)) {
+      this.oscillatorNode.type = params.waveform;
+    }
   }
 
   public serialize(): { [key: string]: any } {
@@ -107,6 +119,7 @@ export class LFONode implements ForeignNode {
       gain: this.amplitudeOverrideCSN.offset.value,
       frequency: this.frequencyOverrideCSN.offset.value,
       offset: this.offsetOverrideCSN.offset.value,
+      waveform: this.oscillatorNode.type,
     };
   }
 
