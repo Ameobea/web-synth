@@ -9,6 +9,10 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 use uuid::Uuid;
 
+mod init;
+
+pub use crate::init::*;
+
 #[derive(Serialize, Deserialize)]
 pub struct RawNoteData {
     pub line_ix: usize,

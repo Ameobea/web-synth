@@ -12,3 +12,7 @@ serde_derive = "1.0.102"
 uuid = { version = "0.8", features = ["serde"] }
 rand = "0.7.2"
 rand_pcg = "0.2.1"
+wasm-logger = "0.2.0"
+console_error_panic_hook = "0.1.6"
+# Disable logging staticly in release, making all log calls into no-ops
+log = { version = "0.4", features = ["release_max_level_off"] }

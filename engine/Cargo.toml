@@ -5,7 +5,7 @@ name = "web-synth-engine"
 version = "0.1.0"
 
 [workspace]
-members = ["engine", "common", "midi", "polysynth", "spectrum_viz"]
+members = ["engine", "common", "midi", "polysynth", "spectrum_viz", "wavetable"]
 
 [profile.dev]
 opt-level = 1

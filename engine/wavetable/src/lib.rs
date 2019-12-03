@@ -1,0 +1,190 @@
+#[macro_use]
+extern crate log;
+
+use std::mem::{self, transmute};
+
+use wasm_bindgen::prelude::*;
+
+pub struct WaveTableSettings {
+    /// Number of `f32` samples in a single waveform
+    pub waveform_length: usize,
+    /// Number of dimensions in the wave table that can be mixed
+    pub dimension_count: usize,
+    /// Number of waveforms in each dimension
+    pub waveforms_per_dimension: usize,
+    pub base_frequency: f32,
+}
+
+impl WaveTableSettings {
+    pub fn get_samples_per_dimension(&self) -> usize {
+        self.waveforms_per_dimension * self.waveform_length
+    }
+
+    /// Returns the total number of `f32` samples that will be stored by this wavetable in all
+    /// dimensions and waveforms
+    pub fn get_wavetable_size(&self) -> usize {
+        self.dimension_count * self.get_samples_per_dimension()
+    }
+}
+
+/// Length of the inner `Vec` is dimension_count *
+pub struct WaveTable {
+    pub settings: WaveTableSettings,
+    pub samples: Vec<f32>,
+}
+
+fn mix(mix_factor: f32, low: f32, high: f32) -> f32 {
+    ((1.0 - mix_factor) * low) + (mix_factor * high)
+}
+
+impl WaveTable {
+    pub fn new(settings: WaveTableSettings, samples: Vec<f32>) -> Self {
+        WaveTable { settings, samples }
+    }
+
+    fn sample_waveform(&self, dimension_ix: usize, waveform_ix: usize, sample_ix: f32) -> f32 {
+        let waveform_offset_samples = (dimension_ix * self.settings.get_samples_per_dimension())
+            + (waveform_ix * self.settings.waveform_length);
+
+        let sample_mix = sample_ix.fract();
+        let (sample_low_ix, sample_hi_ix) = (sample_ix.floor() as usize, sample_ix.ceil() as usize);
+        let (low_sample, high_sample) = (
+            self.samples[waveform_offset_samples + sample_low_ix],
+            self.samples[waveform_offset_samples + sample_hi_ix],
+        );
+
+        mix(sample_mix, low_sample, high_sample)
+    }
+
+    fn sample_dimension(&self, dimension_ix: usize, waveform_ix: f32, sample_ix: f32) -> f32 {
+        let waveform_mix = waveform_ix.fract();
+        let (waveform_low_ix, waveform_hi_ix) =
+            (waveform_ix.floor() as usize, waveform_ix.ceil() as usize);
+
+        let low_sample = self.sample_waveform(dimension_ix, waveform_low_ix, sample_ix);
+        let high_sample = self.sample_waveform(dimension_ix, waveform_hi_ix, sample_ix);
+
+        mix(waveform_mix, low_sample, high_sample)
+    }
+
+    pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
+        debug_assert!(sample_ix < self.settings.waveform_length as f32);
+
+        let waveform_ix = mixes[0] * (self.settings.waveforms_per_dimension as f32);
+        let base_sample = self.sample_dimension(0, waveform_ix, sample_ix);
+
+        // For each higher dimension, mix the base sample from the lowest dimension with the output
+        // of the next dimension until a final sample is produced
+        let mut sample = base_sample;
+        for dimension_ix in 1..mixes.len() {
+            let sample_for_dimension = self.sample_dimension(dimension_ix, waveform_ix, sample_ix);
+            sample = mix(mixes[dimension_ix], sample, sample_for_dimension);
+        }
+
+        sample
+    }
+}
+
+pub struct WaveTableHandle {
+    pub table: &'static mut WaveTable,
+    pub frequency: f32,
+    pub waveform_ix: f32,
+    pub mixes: Vec<f32>,
+    pub sample_buffer: Vec<f32>,
+}
+
+impl WaveTableHandle {
+    pub fn new(table: &'static mut WaveTable) -> Self {
+        let dimension_count = table.settings.dimension_count;
+
+        WaveTableHandle {
+            table,
+            frequency: 0.0,
+            waveform_ix: 0.0,
+            mixes: vec![0.0; dimension_count],
+            sample_buffer: vec![0.; 1024],
+        }
+    }
+
+    fn get_waveform_ix_offset(&self) -> f32 { self.frequency / self.table.settings.base_frequency }
+
+    pub fn get_sample(&mut self) -> f32 {
+        let sample = self.table.get_sample(self.waveform_ix, &self.mixes);
+
+        self.frequency += self.get_waveform_ix_offset();
+        if self.frequency > self.table.settings.waveform_length as f32 {
+            self.frequency %= self.table.settings.waveform_length as f32;
+        }
+
+        sample
+    }
+
+    pub fn sample_multi(&mut self, buf: &mut [f32]) {
+        for sample in buf {
+            *sample = self.get_sample();
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn init_wavetable(
+    waveforms_per_dimension: usize,
+    dimension_count: usize,
+    waveform_length: usize,
+    base_frequency: f32,
+    samples: Vec<f32>,
+) -> *mut WaveTable {
+    common::maybe_init();
+
+    let settings = WaveTableSettings {
+        waveforms_per_dimension,
+        dimension_count,
+        waveform_length,
+        base_frequency,
+    };
+
+    Box::into_raw(Box::new(WaveTable::new(settings, samples)))
+}
+
+#[wasm_bindgen]
+pub fn drop_wavetable(table: *mut WaveTable) { drop(unsafe { Box::from_raw(table) }) }
+
+#[wasm_bindgen]
+pub fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
+    let handle = Box::new(WaveTableHandle::new(unsafe { transmute(table) }));
+    Box::into_raw(handle)
+}
+
+#[wasm_bindgen]
+pub fn get_samples(
+    handle_ptr: *mut WaveTableHandle,
+    sample_count: usize,
+    mixes: &[f32],
+) -> *const f32 {
+    let mut handle = unsafe { Box::from_raw(handle_ptr) };
+    debug_assert_eq!(sample_count * handle.mixes.len(), mixes.len());
+
+    while handle.sample_buffer.len() < sample_count {
+        handle.sample_buffer.push(0.0);
+    }
+
+    for i in 0..sample_count {
+        for mix_ix in 0..handle.mixes.len() {
+            handle.mixes[mix_ix] = mixes[i * handle.mixes.len() + mix_ix];
+        }
+
+        let sample = handle.get_sample();
+        handle.sample_buffer[i] = sample;
+    }
+
+    let sample_buf_ptr = handle.sample_buffer.as_ptr();
+
+    mem::forget(handle);
+
+    sample_buf_ptr
+}
+
+#[wasm_bindgen]
+pub fn drop_wavetable_handle(handle_ptr: *mut WaveTableHandle) {
+    drop(unsafe { Box::from_raw(handle_ptr) })
+}

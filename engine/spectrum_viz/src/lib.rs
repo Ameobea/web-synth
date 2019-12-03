@@ -2,8 +2,6 @@
 extern crate lazy_static;
 
 use std::mem::MaybeUninit;
-#[cfg(debug_assertions)]
-use std::sync::Once;
 
 use palette::{
     encoding::{linear::Linear, srgb::Srgb},
@@ -178,36 +176,16 @@ lazy_static! {
     };
 }
 
-#[cfg(debug_assertions)]
-static ONCE: Once = Once::new();
-
-#[cfg(debug_assertions)]
-fn maybe_init() {
-    ONCE.call_once(|| {
-        console_error_panic_hook::set_once();
-
-        let log_level = if cfg!(debug_assertions) {
-            log::Level::Trace
-        } else {
-            log::Level::Info
-        };
-        wasm_logger::init(wasm_logger::Config::new(log_level));
-    });
-}
-
-#[cfg(not(debug_assertions))]
-fn maybe_init() {}
-
 /// Returns a JSON-serialized array of scaler function definitions
 #[wasm_bindgen]
 pub fn get_config_definition() -> String {
-    maybe_init();
+    common::maybe_init();
     String::from(crate::conf::CONFIG_JSON)
 }
 
 #[wasm_bindgen]
 pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
-    maybe_init();
+    common::maybe_init();
 
     Box::into_raw(Box::new(Context {
         byte_frequency_data: [255u8; BUFFER_SIZE],

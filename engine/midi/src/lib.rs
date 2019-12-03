@@ -19,30 +19,10 @@ pub mod streaming;
 
 const NO_PLAYING_NOTE: u64 = u64::MAX;
 
-#[cfg(debug_assertions)]
-static mut INITED: bool = false;
-
-#[cfg(debug_assertions)]
-pub(crate) fn maybe_init() {
-    unsafe {
-        if INITED {
-            return;
-        } else {
-            INITED = true;
-        }
-    }
-
-    console_error_panic_hook::set_once();
-    wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
-}
-
-#[cfg(not(debug_assertions))]
-fn maybe_init() {}
-
 #[wasm_bindgen]
 pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
     let ticks_per_beat = 256.;
-    maybe_init();
+    common::maybe_init();
 
     let notes: Vec<RawNoteData> =
         bincode::deserialize(note_data).expect("Error deserializing note data");
@@ -119,7 +99,7 @@ impl From<&SMF> for MIDIFileInfo {
 /// That promise should resolve to the track to be loaded.
 #[wasm_bindgen]
 pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Option<Promise> {
-    maybe_init();
+    common::maybe_init();
 
     let mut reader = BufReader::new(file_bytes);
     let midi_file = SMF::from_reader(&mut reader).expect("Failed to parse supplied SMF file");

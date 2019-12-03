@@ -29,7 +29,7 @@ pub fn create_msg_handler_context(
     pitch_bend: Option<Function>,
     mod_wheel: Option<Function>,
 ) -> usize {
-    crate::maybe_init();
+    common::maybe_init();
 
     let mut ctx = Box::new(MsgHandlerContext {
         play_note,
