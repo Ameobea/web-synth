@@ -9,6 +9,7 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src
+  cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
   yarn build || npm build
 
   if `which wasm-opt`; then just opt; fi
@@ -21,6 +22,7 @@ run:
     && wasm-bindgen ./target/wasm32-unknown-unknown/debug/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/debug/polysynth.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src/
+  cp ./engine/target/wasm32-unknown-unknown/debug/wavetable.wasm ./public
   yarn start
 
 run-frontend:

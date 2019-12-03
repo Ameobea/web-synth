@@ -29,6 +29,7 @@ import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { getState } from 'src/redux';
 import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
+import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 
 const ctx = new AudioContext();
 
@@ -418,6 +419,9 @@ export const audioNodeGetters: {
   },
   'customAudio/scaleAndShift': {
     nodeGetter: (vcId, params) => new ScaleAndShiftNode(ctx, vcId, params),
+  },
+  'customAudio/wavetable': {
+    nodeGetter: (vcId, params) => new WaveTable(ctx, vcId, params),
   },
 };
 

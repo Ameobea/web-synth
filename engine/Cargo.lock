@@ -863,12 +863,6 @@ dependencies = [
 [[package]]
 name = "wavetable"
 version = "0.1.0"
-dependencies = [
- "common 0.1.0",
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasm-bindgen 0.2.54 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "web-synth-engine"

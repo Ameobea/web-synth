@@ -1,9 +1,4 @@
-#[macro_use]
-extern crate log;
-
 use std::mem::{self, transmute};
-
-use wasm_bindgen::prelude::*;
 
 pub struct WaveTableSettings {
     /// Number of `f32` samples in a single waveform
@@ -126,7 +121,7 @@ impl WaveTableHandle {
     }
 }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn init_wavetable(
     waveforms_per_dimension: usize,
     dimension_count: usize,
@@ -134,7 +129,7 @@ pub fn init_wavetable(
     base_frequency: f32,
     samples: Vec<f32>,
 ) -> *mut WaveTable {
-    common::maybe_init();
+    // common::maybe_init();
 
     let settings = WaveTableSettings {
         waveforms_per_dimension,
@@ -146,23 +141,37 @@ pub fn init_wavetable(
     Box::into_raw(Box::new(WaveTable::new(settings, samples)))
 }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn drop_wavetable(table: *mut WaveTable) { drop(unsafe { Box::from_raw(table) }) }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
     let handle = Box::new(WaveTableHandle::new(unsafe { transmute(table) }));
     Box::into_raw(handle)
 }
 
-#[wasm_bindgen]
-pub fn get_samples(
-    handle_ptr: *mut WaveTableHandle,
-    sample_count: usize,
-    mixes: &[f32],
-) -> *const f32 {
+#[no_mangle]
+pub fn get_mixes_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
     let mut handle = unsafe { Box::from_raw(handle_ptr) };
-    debug_assert_eq!(sample_count * handle.mixes.len(), mixes.len());
+
+    while handle.sample_buffer.len() < sample_count {
+        handle.sample_buffer.push(0.0);
+    }
+
+    while handle.mixes.len() < sample_count * handle.table.settings.dimension_count {
+        handle.mixes.push(0.0);
+    }
+
+    let mixes_ptr = handle.mixes.as_mut_ptr();
+
+    mem::forget(handle);
+
+    mixes_ptr
+}
+
+#[no_mangle]
+pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *const f32 {
+    let mut handle = unsafe { Box::from_raw(handle_ptr) };
 
     while handle.sample_buffer.len() < sample_count {
         handle.sample_buffer.push(0.0);
@@ -170,7 +179,7 @@ pub fn get_samples(
 
     for i in 0..sample_count {
         for mix_ix in 0..handle.mixes.len() {
-            handle.mixes[mix_ix] = mixes[i * handle.mixes.len() + mix_ix];
+            handle.mixes[mix_ix] = handle.mixes[i * handle.mixes.len() + mix_ix];
         }
 
         let sample = handle.get_sample();
@@ -184,7 +193,7 @@ pub fn get_samples(
     sample_buf_ptr
 }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn drop_wavetable_handle(handle_ptr: *mut WaveTableHandle) {
     drop(unsafe { Box::from_raw(handle_ptr) })
 }

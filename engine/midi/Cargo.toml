@@ -28,7 +28,3 @@ path = "../common"
 
 [dependencies.rimd]
 git = "https://github.com/Ameobea/rimd.git"
-
-[features]
-disable-logging = []
-
