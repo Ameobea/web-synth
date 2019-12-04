@@ -71,6 +71,14 @@ export const ViewContextManager: React.FC<{
     >
       X
     </ViewContextIcon>
+    <ViewContextIcon
+      displayName='Start Audio'
+      onClick={() => new AudioContext().resume()}
+      style={{ backgroundColor: 'rgb(26, 130, 24)' }}
+      name='Start Audio'
+    >
+      …
+    </ViewContextIcon>
     {viewContexts.map(({ ...props }) => (
       <ViewContextIcon
         {...props}
@@ -182,11 +190,9 @@ const mapStateToProps = (state: ReduxStore) => R.pick(['viewContextManager'], st
  * VCs.  It is kept up to date via Redux, which is in turn updated automatically by the VCM on the
  * backend every time there is a change.
  */
-const ViewContextSwitcherInner: React.FC<
-  {
-    engine: typeof import('./engine');
-  } & ReturnType<typeof mapStateToProps>
-> = ({ engine, viewContextManager }) => (
+const ViewContextSwitcherInner: React.FC<{
+  engine: typeof import('./engine');
+} & ReturnType<typeof mapStateToProps>> = ({ engine, viewContextManager }) => (
   <div style={styles.viewContextSwitcher}>
     {viewContextManager.activeViewContexts.map((props, i) => (
       <ViewContextTab

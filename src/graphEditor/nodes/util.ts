@@ -94,7 +94,7 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     super(ctx);
     // Operate as a pass-through node, passing on whatever values are input to the output if we are
     // not currently overridden.
-    this.gain.value = 0;
+    this.gain.value = 1;
     this.ctx = ctx;
 
     this.wrappedParam = wrappedParam;

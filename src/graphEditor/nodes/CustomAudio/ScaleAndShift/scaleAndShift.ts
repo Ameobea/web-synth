@@ -50,13 +50,13 @@ export class ScaleAndShiftNode implements ForeignNode {
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: ScaleAndShiftSmallView,
-      props: {
+      getProps: () => ({
         initialState: this.uiState,
         onChange: newUIState => {
           this.uiState = newUIState;
           this.updateNodes();
         },
-      },
+      }),
     });
     this.cleanupSmallView = mkContainerCleanupHelper();
   }

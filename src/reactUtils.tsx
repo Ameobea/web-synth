@@ -19,7 +19,7 @@ interface ContainerRenderHelperArgs<P extends { [key: string]: any } = {}> {
   /**
    * The props to be passed to the rendered component
    */
-  props: P;
+  getProps: () => P;
 }
 
 /**
@@ -30,7 +30,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = {}>({
   Comp,
   store,
   predicate,
-  props,
+  getProps,
 }: ContainerRenderHelperArgs<P>) {
   return (domId: string) => {
     const node = document.getElementById(domId);
@@ -38,6 +38,8 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = {}>({
       console.error(`No node with id ${domId} found when trying to render up small view`);
       return;
     }
+
+    const props = getProps();
 
     const rendered = store ? (
       <Provider store={store}>

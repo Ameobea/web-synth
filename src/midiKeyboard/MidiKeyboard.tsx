@@ -86,11 +86,8 @@ const MidiKeyboard: React.FC<{
       playNote,
       (voiceIx: number, noteId: number) => releaseNote(voiceIx, noteId, 0)
     );
-    console.log('setting ctx', polySynthCtx.current);
 
     return () => {
-      console.log('Dropping ctx', polySynthCtx.current);
-
       if (polySynthCtx.current !== null) {
         polySynthMod.drop_polysynth_context(polySynthCtx.current);
       }
@@ -117,7 +114,7 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      polySynthMod.handle_note_down(polySynthCtx.current, midiNumber, 255);
+      polySynthMod.handle_note_down(polySynthCtx.current!, midiNumber, 255);
     };
     const handleUp = (evt: KeyboardEvent) => {
       // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event
@@ -127,7 +124,7 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      polySynthMod.handle_note_up(polySynthCtx.current, midiNumber);
+      polySynthMod.handle_note_up(polySynthCtx.current!, midiNumber);
     };
 
     document.addEventListener('keydown', handleDown);

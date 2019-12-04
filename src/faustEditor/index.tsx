@@ -144,7 +144,7 @@ export const render_faust_editor_small_view = (vcId: string, domId: string) => {
 
   mkContainerRenderHelper({
     Comp: mkFaustEditorSmallView(vcId),
-    props: {},
+    getProps: () => ({}),
     store: context.reduxInfra.store,
   })(domId);
 };

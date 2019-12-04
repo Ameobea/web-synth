@@ -57,6 +57,9 @@ export class LFONode implements ForeignNode {
 
     if (params) {
       this.deserialize(params);
+    } else {
+      this.frequencyOverrideCSN.offset.value = 1;
+      this.offsetOverrideCSN.offset.value = 0;
     }
 
     this.paramOverrides = {
@@ -80,7 +83,7 @@ export class LFONode implements ForeignNode {
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: LFOSmallView,
-      props: {
+      getProps: () => ({
         onChange: ({ frequency, gain, offset, waveform }: LFOParams) => {
           this.frequencyOverrideCSN.offset.value = frequency;
           this.amplitudeOverrideCSN.offset.value = gain;
@@ -93,7 +96,7 @@ export class LFONode implements ForeignNode {
           offset: this.offsetOverrideCSN.offset.value,
           waveform: this.oscillatorNode.type,
         },
-      },
+      }),
     });
 
     this.cleanupSmallView = mkContainerCleanupHelper();

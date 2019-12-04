@@ -72,7 +72,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
       Comp: StatisticsNodeUI,
       store: this.reduxInfra.store,
       predicate: () => this.gainNode.connect(this.ctx.destination),
-      props: {},
+      getProps: () => ({}),
     });
 
     this.cleanupSmallView = mkContainerCleanupHelper({

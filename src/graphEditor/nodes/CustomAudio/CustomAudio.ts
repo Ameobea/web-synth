@@ -183,7 +183,7 @@ const enhanceAudioNode = <T>({
       if (SmallViewRenderer) {
         this.renderSmallView = mkContainerRenderHelper({
           Comp: SmallViewRenderer,
-          props: { node: this },
+          getProps: () => ({ node: this }),
         });
         this.cleanupSmallView = mkContainerCleanupHelper();
       }
