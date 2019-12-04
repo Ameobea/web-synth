@@ -33,8 +33,12 @@ fn mix(mix_factor: f32, low: f32, high: f32) -> f32 {
 }
 
 impl WaveTable {
-    pub fn new(settings: WaveTableSettings, samples: Vec<f32>) -> Self {
-        WaveTable { settings, samples }
+    pub fn new(settings: WaveTableSettings) -> Self {
+        let wavetable_data_size = settings.get_wavetable_size();
+        WaveTable {
+            settings,
+            samples: vec![-1.0; wavetable_data_size],
+        }
     }
 
     fn sample_waveform(&self, dimension_ix: usize, waveform_ix: usize, sample_ix: f32) -> f32 {
@@ -65,13 +69,15 @@ impl WaveTable {
     pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
         debug_assert!(sample_ix < self.settings.waveform_length as f32);
 
-        let waveform_ix = mixes[0] * (self.settings.waveforms_per_dimension as f32);
+        let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
         let base_sample = self.sample_dimension(0, waveform_ix, sample_ix);
 
         // For each higher dimension, mix the base sample from the lowest dimension with the output
         // of the next dimension until a final sample is produced
         let mut sample = base_sample;
-        for dimension_ix in 1..mixes.len() {
+        for dimension_ix in 1..self.settings.dimension_count {
+            let waveform_ix =
+                mixes[dimension_ix] * ((self.settings.waveforms_per_dimension - 1) as f32);
             let sample_for_dimension = self.sample_dimension(dimension_ix, waveform_ix, sample_ix);
             sample = mix(mixes[dimension_ix], sample, sample_for_dimension);
         }
@@ -83,7 +89,7 @@ impl WaveTable {
 pub struct WaveTableHandle {
     pub table: &'static mut WaveTable,
     pub frequency: f32,
-    pub waveform_ix: f32,
+    pub sample_ix: f32,
     pub mixes: Vec<f32>,
     pub sample_buffer: Vec<f32>,
 }
@@ -94,21 +100,21 @@ impl WaveTableHandle {
 
         WaveTableHandle {
             table,
-            frequency: 0.0,
-            waveform_ix: 0.0,
+            frequency: 440.0,
+            sample_ix: 0.0,
             mixes: vec![0.0; dimension_count],
-            sample_buffer: vec![0.; 1024],
+            sample_buffer: vec![0.; 256],
         }
     }
 
-    fn get_waveform_ix_offset(&self) -> f32 { self.frequency / self.table.settings.base_frequency }
+    fn get_sample_ix_offset(&self) -> f32 { self.frequency / self.table.settings.base_frequency }
 
     pub fn get_sample(&mut self) -> f32 {
-        let sample = self.table.get_sample(self.waveform_ix, &self.mixes);
+        let sample = self.table.get_sample(self.sample_ix, &self.mixes);
 
-        self.frequency += self.get_waveform_ix_offset();
-        if self.frequency > self.table.settings.waveform_length as f32 {
-            self.frequency %= self.table.settings.waveform_length as f32;
+        self.sample_ix += self.get_sample_ix_offset();
+        if self.sample_ix >= self.table.settings.waveform_length as f32 {
+            self.sample_ix %= self.table.settings.waveform_length as f32;
         }
 
         sample
@@ -127,10 +133,7 @@ pub fn init_wavetable(
     dimension_count: usize,
     waveform_length: usize,
     base_frequency: f32,
-    samples: Vec<f32>,
 ) -> *mut WaveTable {
-    // common::maybe_init();
-
     let settings = WaveTableSettings {
         waveforms_per_dimension,
         dimension_count,
@@ -138,7 +141,12 @@ pub fn init_wavetable(
         base_frequency,
     };
 
-    Box::into_raw(Box::new(WaveTable::new(settings, samples)))
+    Box::into_raw(Box::new(WaveTable::new(settings)))
+}
+
+#[no_mangle]
+pub fn get_data_table_ptr(handle_ptr: *mut WaveTable) -> *mut f32 {
+    unsafe { (*handle_ptr).samples.as_mut_ptr() }
 }
 
 #[no_mangle]
@@ -178,8 +186,8 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
     }
 
     for i in 0..sample_count {
-        for mix_ix in 0..handle.mixes.len() {
-            handle.mixes[mix_ix] = handle.mixes[i * handle.mixes.len() + mix_ix];
+        for mix_ix in 0..handle.table.settings.dimension_count {
+            handle.mixes[mix_ix] = handle.mixes[i * handle.table.settings.dimension_count + mix_ix];
         }
 
         let sample = handle.get_sample();

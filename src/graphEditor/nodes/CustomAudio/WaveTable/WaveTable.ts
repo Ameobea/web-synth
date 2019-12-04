@@ -8,27 +8,30 @@ import {
   create_empty_audio_connectables,
   updateConnectables,
 } from 'src/patchNetwork';
-import { getEngine } from 'src';
-
-const bufs: Float32Array[] = R.times(() => new Float32Array(440), 4);
-
-const desiredPeriodSamples = 44100 / 440; // 440 hz
 
 // Manually generate some waveforms... for science
 
+const bufs: Float32Array[] = R.times(() => new Float32Array(440), 4);
+
+// How many samples we want to have in each period of the waveform
+const desiredPeriodSamples = 44100 / 440; // 440 hz
+
 // sine wave
-const period = 2 * Math.PI;
-const periodMultiplier = desiredPeriodSamples / period;
 for (let i = 0; i < 440; i++) {
-  bufs[0][i] = Math.sin((i / 44100) * periodMultiplier);
+  // What percentage of the current period we're at
+  const periodPercent = (i / desiredPeriodSamples) % 1;
+  // Normalize that to the period of the sine function (2π)
+  const normalizedXValue = periodPercent * (Math.PI * 2);
+
+  bufs[0][i] = Math.sin(normalizedXValue);
 }
 
 // triangle wave; goes from -1 to 1 for one half the period and 1 to -1 for the other half
 for (let i = 0; i < 440; i++) {
   // Number of half-periods of this wave that this sample lies on.
-  const halfPeriodIx = i / (desiredPeriodSamples * 2);
-  const isClimbing = Math.floor(halfPeriodIx) % 2 == 0;
-  let val = 2 * (halfPeriodIx % 1) - 1;
+  const periodIx = i / (desiredPeriodSamples / 2);
+  const isClimbing = Math.floor(periodIx) % 2 == 0;
+  let val = 2 * (periodIx % 1) - 1;
   if (!isClimbing) {
     val = -val;
   }
@@ -38,8 +41,8 @@ for (let i = 0; i < 440; i++) {
 
 // square wave; half a period -1, half a period 1
 for (let i = 0; i < 440; i++) {
-  const halfPeriodIx = i / (desiredPeriodSamples * 2);
-  const isFirstHalf = Math.floor(halfPeriodIx) % 2 == 0;
+  const periodIx = i / (desiredPeriodSamples / 2);
+  const isFirstHalf = Math.floor(periodIx) % 2 == 0;
 
   bufs[2][i] = isFirstHalf ? -1 : 1;
 }
@@ -50,6 +53,22 @@ for (let i = 0; i < 440; i++) {
 
   bufs[3][i] = periodIxFract * 2 - 1;
 }
+
+// print the generated waveforms to CSV for debugging purposes
+let buf = 'sine,triangle,square,sawtooth\n';
+
+for (let rowIx = 0; rowIx < 440; rowIx++) {
+  for (let waveformIx = 0; waveformIx < bufs.length; waveformIx++) {
+    buf += `${bufs[waveformIx][rowIx]}`;
+    if (waveformIx !== bufs.length - 1) {
+      buf += ',';
+    } else {
+      buf += '\n';
+    }
+  }
+}
+
+console.log(buf);
 
 export default class WaveTable implements ForeignNode {
   private ctx: AudioContext;
