@@ -7,6 +7,7 @@ pub struct WaveTableSettings {
     pub dimension_count: usize,
     /// Number of waveforms in each dimension
     pub waveforms_per_dimension: usize,
+    /// Frequency of the samples that are stored in the wavetable
     pub base_frequency: f32,
 }
 
@@ -22,7 +23,6 @@ impl WaveTableSettings {
     }
 }
 
-/// Length of the inner `Vec` is dimension_count *
 pub struct WaveTable {
     pub settings: WaveTableSettings,
     pub samples: Vec<f32>,
@@ -86,11 +86,16 @@ impl WaveTable {
     }
 }
 
+/// Represents a single voice playing out of an attached `WaveTable`
 pub struct WaveTableHandle {
     pub table: &'static mut WaveTable,
+    // TODO: Remove this and instead of a buffer of frequencies for each sample in the frame to allow this
+    // to change dynamically from sample to sample
     pub frequency: f32,
     pub sample_ix: f32,
+    // TODO: Adjust to have two mixes per dimension to support interdimensional mixing
     pub mixes: Vec<f32>,
+    /// The buffer into which the output from sampling the wavetable is written
     pub sample_buffer: Vec<f32>,
 }
 
