@@ -52,27 +52,16 @@ jobs:
           path: ./node_modules
           key: ${{ hashFiles('yarn.lock') }}
 
-      # Install Cargo binaries used during the build process
-      # - name: Install `just`
-      #   if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: install
-      #     args: just --version 0.5.1
-      # - name: Install `wasm-bindgen-cli`
-      #   if: steps.cache-cargo-binaries.outputs.cache-hit != 'true'
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: install
-      #     args: wasm-bindgen-cli --version 0.2.54
-
-      # Temporary until the bug in the cache action is fixed
       - name: Create custom binaries directory
         run: mkdir ~/bin
       - name: Install `just`
         run: curl https://web-synth-ci-binaries.ameo.design/just -o ~/bin/just && chmod +x ~/bin/just
       - name: Install `wasm-bindgen-cli`
         run: curl https://web-synth-ci-binaries.ameo.design/wasm-bindgen -o ~/bin/wasm-bindgen && chmod +x ~/bin/wasm-bindgen
+      - name: Install `wasm-opt`
+        run: curl https://web-synth-ci-binaries.ameo.design/wasm-opt -o ~/bin/wasm-opt && chmod +x ~/bin/wasm-opt
+      - name: Install `wasm-strip`
+        run: curl https://web-synth-ci-binaries.ameo.design/wasm-strip -o ~/bin/wasm-strip && chmod +x ~/bin/wasm-strip
       - name: Add custom binaries directory to the PATH
         run: echo "::add-path::$HOME/bin"
 

@@ -6,15 +6,26 @@ const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
 
 class WaveTableNodeProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
-    return Array(MAX_DIMENSION_COUNT)
-      .fill(null)
-      .map((_, i) => ({
-        name: `mix_${i}`,
-        defaultValue: 0.0,
-        minValue: 0.0,
-        maxValue: 1.0,
-        automationRate: 'a-rate',
-      }));
+    return [
+      ...Array(MAX_DIMENSION_COUNT)
+        .fill(null)
+        .map((_, i) => ({
+          name: `dimension_${i}_mix`,
+          defaultValue: 0.0,
+          minValue: 0.0,
+          maxValue: 1.0,
+          automationRate: 'a-rate',
+        })),
+      ...Array(MAX_DIMENSION_COUNT - 1)
+        .fill(null)
+        .map((_, i) => ({
+          name: `dimension_${i}x${i + 1}_mix`,
+          defaultValue: 0.0,
+          minValue: 0.0,
+          maxValue: 1.0,
+          automationRate: 'a-rate',
+        })),
+    ];
   }
 
   async initWasmInstance(data) {
@@ -80,14 +91,25 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       return;
     }
 
-    // Write the mixes for each sample in the frame into the Wasm memory
-    for (let sampleIx = 0; sampleIx < FRAME_SIZE; sampleIx++) {
-      for (let dimensionIx = 0; dimensionIx < this.dimensionCount; dimensionIx++) {
-        const ix = this.mixesArrayOffset + sampleIx * this.dimensionCount + dimensionIx;
-        const val =
-          params[`mix_${dimensionIx}`][Math.min(sampleIx, params[`mix_${dimensionIx}`].length - 1)];
+    // Write the mixes for each sample in the frame into the Wasm memory.  Mixes are a flattened 3D
+    // array of the form `mixes[dimensionIx][interOrIntraIndex][sampleIx]`
+    for (let dimensionIx = 0; dimensionIx < this.dimensionCount; dimensionIx++) {
+      const intraDimensionalMixVals = params[`dimension_${dimensionIx}_mix`];
+      const interDimensionalMixVals =
+        dimensionIx > 0 ? params[`dimension_${dimensionIx - 1}x${dimensionIx}_mix`] : null;
+
+      for (let sampleIx = 0; sampleIx < FRAME_SIZE; sampleIx++) {
+        const intraVal =
+          intraDimensionalMixVals[Math.min(sampleIx, intraDimensionalMixVals.length - 1)];
+        const interVal = interDimensionalMixVals
+          ? interDimensionalMixVals[Math.min(sampleIx, interDimensionalMixVals.length - 1)]
+          : 0;
+
+        const dstIntraValIx = this.mixesArrayOffset + dimensionIx * FRAME_SIZE * 2 + sampleIx;
+        const dstInterValIx = dstIntraValIx + FRAME_SIZE;
         // Apparently the `minValue` and `maxValue` params don't work, so we have to clamp manually to [0,1]
-        this.float32WasmMemory[ix] = clamp(0, 1, val);
+        this.float32WasmMemory[dstIntraValIx] = clamp(0, 1, intraVal);
+        this.float32WasmMemory[dstInterValIx] = clamp(0, 1, interVal);
       }
     }
 

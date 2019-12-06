@@ -77,9 +77,9 @@ impl WaveTable {
         let mut sample = base_sample;
         for dimension_ix in 1..self.settings.dimension_count {
             let waveform_ix =
-                mixes[dimension_ix] * ((self.settings.waveforms_per_dimension - 1) as f32);
+                mixes[dimension_ix * 2] * ((self.settings.waveforms_per_dimension - 1) as f32);
             let sample_for_dimension = self.sample_dimension(dimension_ix, waveform_ix, sample_ix);
-            sample = mix(mixes[dimension_ix], sample, sample_for_dimension);
+            sample = mix(mixes[dimension_ix * 2 + 1], sample, sample_for_dimension);
         }
 
         sample
@@ -95,6 +95,8 @@ pub struct WaveTableHandle {
     pub sample_ix: f32,
     // TODO: Adjust to have two mixes per dimension to support interdimensional mixing
     pub mixes: Vec<f32>,
+    // TODO: Document
+    pub mixes_for_sample: Vec<f32>,
     /// The buffer into which the output from sampling the wavetable is written
     pub sample_buffer: Vec<f32>,
 }
@@ -107,7 +109,8 @@ impl WaveTableHandle {
             table,
             frequency: 440.0,
             sample_ix: 0.0,
-            mixes: vec![0.0; dimension_count],
+            mixes: vec![0.0; dimension_count * 2 * 128],
+            mixes_for_sample: vec![0.0; dimension_count * 2],
             sample_buffer: vec![0.; 256],
         }
     }
@@ -115,7 +118,7 @@ impl WaveTableHandle {
     fn get_sample_ix_offset(&self) -> f32 { self.frequency / self.table.settings.base_frequency }
 
     pub fn get_sample(&mut self) -> f32 {
-        let sample = self.table.get_sample(self.sample_ix, &self.mixes);
+        let sample = self.table.get_sample(self.sample_ix, &self.mixes_for_sample);
 
         self.sample_ix += self.get_sample_ix_offset();
         if self.sample_ix >= (self.table.settings.waveform_length - 1) as f32 {
@@ -165,7 +168,7 @@ pub fn get_mixes_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *
         handle.sample_buffer.push(0.0);
     }
 
-    while handle.mixes.len() < sample_count * handle.table.settings.dimension_count {
+    while handle.mixes.len() < sample_count * handle.table.settings.dimension_count * 2 {
         handle.mixes.push(0.0);
     }
 
@@ -184,12 +187,13 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
         handle.sample_buffer.push(0.0);
     }
 
-    for i in 0..sample_count {
-        for mix_ix in 0..handle.table.settings.dimension_count {
-            handle.mixes[mix_ix] = handle.mixes[i * handle.table.settings.dimension_count + mix_ix];
+    for sample_ix in 0..sample_count {
+        for dimension_ix in 0..handle.table.settings.dimension_count {
+            handle.mixes_for_sample[dimension_ix * 2] = handle.mixes[(dimension_ix * 2 * sample_count) + sample_ix];
+            handle.mixes_for_sample[dimension_ix * 2 + 1] = handle.mixes[(dimension_ix * 2 * sample_count) + sample_count + sample_ix];
         }
 
-        handle.sample_buffer[i] = handle.get_sample();
+        handle.sample_buffer[sample_ix] = handle.get_sample();
     }
 
     let sample_buf_ptr = handle.sample_buffer.as_ptr();

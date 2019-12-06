@@ -147,14 +147,22 @@ export default class WaveTable implements ForeignNode {
 
     return {
       // TODO: get dimension count dynamically
-      inputs: R.range(0, 2).reduce(
-        (acc, i) =>
-          acc.set(`mix_${i}`, {
-            node: (this.workletHandle!.parameters as any).get(`mix_${i}`),
-            type: 'number',
-          }),
-        Map<string, ConnectableInput>()
-      ),
+      inputs: R.range(0, 2).reduce((acc, i) => {
+        const newAcc = acc.set(`dimension_${i}_mix`, {
+          node: (this.workletHandle!.parameters as any).get(`dimension_${i}_mix`),
+          type: 'number',
+        });
+
+        // The first dimension doesn't have any inter-dimensional mix param since it's the first one
+        if (i === 0) {
+          return newAcc;
+        }
+
+        return newAcc.set(`dimension_${i - 1}x${i}_mix`, {
+          node: (this.workletHandle!.parameters as any).get(`dimension_${i - 1}x${i}_mix`),
+          type: 'number',
+        });
+      }, Map<string, ConnectableInput>()),
       outputs: Map<string, ConnectableOutput>().set('output', {
         node: this.workletHandle,
         type: 'customAudio',

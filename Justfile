@@ -1,4 +1,5 @@
 opt:
+  wasm-strip ./dist/wavetable.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 -c -o ./dist/$file; done
 
 build-all:
@@ -12,7 +13,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
   yarn build || npm build
 
-  if `which wasm-opt`; then just opt; fi
+  just opt
 
 run:
   cd engine \
