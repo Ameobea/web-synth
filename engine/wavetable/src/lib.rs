@@ -67,7 +67,7 @@ impl WaveTable {
     }
 
     pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
-        debug_assert!(sample_ix < self.settings.waveform_length as f32);
+        debug_assert!(sample_ix < (self.settings.waveform_length - 1) as f32);
 
         let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
         let base_sample = self.sample_dimension(0, waveform_ix, sample_ix);
@@ -118,17 +118,11 @@ impl WaveTableHandle {
         let sample = self.table.get_sample(self.sample_ix, &self.mixes);
 
         self.sample_ix += self.get_sample_ix_offset();
-        if self.sample_ix >= self.table.settings.waveform_length as f32 {
-            self.sample_ix %= self.table.settings.waveform_length as f32;
+        if self.sample_ix >= (self.table.settings.waveform_length - 1) as f32 {
+            self.sample_ix %= (self.table.settings.waveform_length - 1) as f32;
         }
 
         sample
-    }
-
-    pub fn sample_multi(&mut self, buf: &mut [f32]) {
-        for sample in buf {
-            *sample = self.get_sample();
-        }
     }
 }
 
@@ -195,8 +189,7 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
             handle.mixes[mix_ix] = handle.mixes[i * handle.table.settings.dimension_count + mix_ix];
         }
 
-        let sample = handle.get_sample();
-        handle.sample_buffer[i] = sample;
+        handle.sample_buffer[i] = handle.get_sample();
     }
 
     let sample_buf_ptr = handle.sample_buffer.as_ptr();

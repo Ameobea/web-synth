@@ -57,9 +57,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     }
 
     // Write the table's data into the Wasm heap
-    for (let i = 0; i < data.tableSamples.length; i++) {
-      this.float32WasmMemory[wavetableDataArrayOffset + i] = data.tableSamples[i];
-    }
+    this.float32WasmMemory.set(data.tableSamples, wavetableDataArrayOffset);
 
     this.waveTableHandlePtr = this.wasmInstance.exports.init_wavetable_handle(this.waveTablePtr);
 
@@ -93,6 +91,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       }
     }
 
+    // TODO: No need to do this every frame; do once when handle is created and store ptr
     // Sample the wave table for each sample in the frame
     const generatedSamplesPtr = this.wasmInstance.exports.get_samples(
       this.waveTableHandlePtr,

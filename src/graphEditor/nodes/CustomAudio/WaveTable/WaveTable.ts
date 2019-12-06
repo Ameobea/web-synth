@@ -11,24 +11,24 @@ import {
 
 // Manually generate some waveforms... for science
 
-const bufs: Float32Array[] = R.times(() => new Float32Array(440), 4);
-
 const SAMPLE_RATE = 44100;
-const desiredFrequency = 30; // 30hz
+const baseFrequency = 30; // 30hz
 
-// How many samples we want to have in each period of the waveform
-const waveformSampleCount = SAMPLE_RATE / desiredFrequency;
+// Number of samples per waveform
+const waveformLength = SAMPLE_RATE / baseFrequency;
+
+const bufs: Float32Array[] = R.times(() => new Float32Array(waveformLength), 4);
 
 // sine wave.  The sine function has a period of 2π, and we need to scale that the range of
 // (sample_rage / desired_frequency)
-for (let x = 0; x < waveformSampleCount; x++) {
-  bufs[0][x] = Math.sin(x * ((Math.PI * 2) / (SAMPLE_RATE / desiredFrequency)));
+for (let x = 0; x < waveformLength; x++) {
+  bufs[0][x] = Math.sin(x * ((Math.PI * 2) / waveformLength));
 }
 
 // triangle wave; goes from -1 to 1 for one half the period and 1 to -1 for the other half
-for (let i = 0; i < waveformSampleCount; i++) {
+for (let i = 0; i < waveformLength; i++) {
   // Number of half-periods of this wave that this sample lies on.
-  const halfPeriodIx = i / (waveformSampleCount / 2);
+  const halfPeriodIx = i / (waveformLength / 2);
   const isClimbing = Math.floor(halfPeriodIx) % 2 == 0;
   let val = 2 * (halfPeriodIx % 1) - 1;
   if (!isClimbing) {
@@ -39,16 +39,16 @@ for (let i = 0; i < waveformSampleCount; i++) {
 }
 
 // square wave; half a period -1, half a period 1
-for (let i = 0; i < waveformSampleCount; i++) {
-  const halfPeriodIx = i / (waveformSampleCount / 2);
+for (let i = 0; i < waveformLength; i++) {
+  const halfPeriodIx = i / (waveformLength / 2);
   const isFirstHalf = Math.floor(halfPeriodIx) % 2 == 0;
 
   bufs[2][i] = isFirstHalf ? -1 : 1;
 }
 
 // sawtooth; climb from -1 to 1 over 1 period
-for (let i = 0; i < waveformSampleCount; i++) {
-  const periodIxFract = (i / waveformSampleCount) % 1;
+for (let i = 0; i < waveformLength; i++) {
+  const periodIxFract = (i / waveformLength) % 1;
 
   bufs[3][i] = periodIxFract * 2 - 1;
 }
@@ -56,7 +56,7 @@ for (let i = 0; i < waveformSampleCount; i++) {
 // print the generated waveforms to CSV for debugging purposes
 let buf = 'sine,triangle,square,sawtooth\n';
 
-for (let rowIx = 0; rowIx < waveformSampleCount; rowIx++) {
+for (let rowIx = 0; rowIx < waveformLength; rowIx++) {
   for (let waveformIx = 0; waveformIx < bufs.length; waveformIx++) {
     buf += `${bufs[waveformIx][rowIx]}`;
     if (waveformIx !== bufs.length - 1) {
@@ -107,9 +107,6 @@ export default class WaveTable implements ForeignNode {
 
     const dimensionCount = 2;
     const waveformsPerDimension = 2;
-    const waveformLength = waveformSampleCount; 
-    const baseFrequency = desiredFrequency;
-
     const samplesPerDimension = waveformLength * waveformsPerDimension;
 
     const tableSamples = new Float32Array(dimensionCount * waveformsPerDimension * waveformLength);
