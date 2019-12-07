@@ -63,7 +63,6 @@ export class ScaleAndShiftNode implements ForeignNode {
 
   private updateNodes() {
     const { firstOffset, multiplier, secondOffset } = computeScaleAndShift(this.uiState);
-    console.log({ firstOffset, multiplier, secondOffset });
     this.firstShifterNode.offset.value = firstOffset;
     this.scalerNode.gain.value = multiplier;
     this.secondShifterNode.offset.value = secondOffset;

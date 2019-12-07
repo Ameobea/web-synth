@@ -71,6 +71,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
     this.renderSmallView = mkContainerRenderHelper({
       Comp: StatisticsNodeUI,
       store: this.reduxInfra.store,
+      // TODO: Look into whether or not this is bad for performance?
       predicate: () => this.gainNode.connect(this.ctx.destination),
       getProps: () => ({}),
     });

@@ -53,3 +53,20 @@ input.view-context-switcher-tab-renamer {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Taken from https://stackoverflow.com/a/29888724 */
+.vertical-range-slider {
+  margin-top: 50px;
+  transform: rotate(270deg);
+}
+
+.global-volume-slider-container {
+  z-index: 10000000;
+  position: absolute;
+  right: 41px;
+  background-color: #181818;
+  height: 132px;
+  width: 44px;
+  padding-top: 20px;
+  padding-bottom: 9px;
+}

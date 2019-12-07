@@ -322,14 +322,14 @@ const CustomAudioBufferSourceNode = enhanceAudioNode({
 const CustomDestinationNode = enhanceAudioNode({
   AudioNodeClass: class CustomAudioDestinationNode {
     constructor(ctx: AudioContext) {
-      return ctx.destination;
+      return (ctx as any).globalVolume as GainNode;
     }
   },
   nodeType: 'customAudio/destination',
   name: 'Destination',
   buildConnectables: (
-    foreignNode: ForeignNode<AudioDestinationNode> & {
-      node: AudioDestinationNode;
+    foreignNode: ForeignNode<GainNode> & {
+      node: GainNode;
     }
   ) => ({
     inputs: Map<string, ConnectableInput>().set('input', {

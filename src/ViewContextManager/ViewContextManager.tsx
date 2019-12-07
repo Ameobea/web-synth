@@ -4,6 +4,7 @@ import * as R from 'ramda';
 
 import { ReduxStore } from 'src/redux';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
+import GlobalVolumeSlider from './GlobalVolumeSlider';
 import './ViewContextManager.css';
 
 const styles: { [key: string]: React.CSSProperties } = {
@@ -59,41 +60,58 @@ const ViewContextIcon: React.FC<ViewContextIconProps> = ({
 );
 
 export const ViewContextManager: React.FC<{
-  engine: typeof import('./engine');
-}> = ({ engine }) => (
-  <div style={styles.root}>
-    <GlobalMenuButton engine={engine} />
-    <ViewContextIcon
-      displayName='Reset View Context Manager'
-      onClick={engine.reset_vcm}
-      style={{ backgroundColor: '#730505' }}
-      name='Delete'
-    >
-      X
-    </ViewContextIcon>
-    <ViewContextIcon
-      displayName='Start Audio'
-      onClick={() => new AudioContext().resume()}
-      style={{ backgroundColor: 'rgb(26, 130, 24)' }}
-      name='Start Audio'
-    >
-      …
-    </ViewContextIcon>
-    {viewContexts.map(({ ...props }) => (
-      <ViewContextIcon
-        {...props}
-        key={props.name}
-        onClick={() => engine.create_view_context(props.name)}
-      />
-    ))}
+  engine: typeof import('src/engine');
+}> = ({ engine }) => {
+  const [volumeSliderOpen, setVolumeSliderOpen] = useState(false);
 
-    <br />
-    <br />
-  </div>
-);
+  return (
+    <div style={styles.root}>
+      <GlobalMenuButton engine={engine} />
+      <ViewContextIcon
+        displayName='Reset View Context Manager'
+        onClick={engine.reset_vcm}
+        style={{ backgroundColor: '#730505' }}
+        name='Delete'
+      >
+        X
+      </ViewContextIcon>
+      <ViewContextIcon
+        displayName='Start Audio'
+        onClick={() => new AudioContext().resume()}
+        style={{ backgroundColor: 'rgb(26, 130, 24)' }}
+        name='Start Audio'
+      >
+        …
+      </ViewContextIcon>
+      <ViewContextIcon
+        displayName='Start Audio'
+        onClick={() => setVolumeSliderOpen(true)}
+        style={{ backgroundColor: 'rgb(47, 77, 121)' }}
+        name='Start Audio'
+      >
+        <>
+          🔊
+          {volumeSliderOpen ? (
+            <GlobalVolumeSlider onClose={() => setVolumeSliderOpen(false)} />
+          ) : null}
+        </>
+      </ViewContextIcon>
+      {viewContexts.map(({ ...props }) => (
+        <ViewContextIcon
+          {...props}
+          key={props.name}
+          onClick={() => engine.create_view_context(props.name)}
+        />
+      ))}
+
+      <br />
+      <br />
+    </div>
+  );
+};
 
 interface ViewContextTabProps {
-  engine: typeof import('./engine');
+  engine: typeof import('src/engine');
   name: string;
   uuid: string;
   title?: string;
@@ -191,7 +209,7 @@ const mapStateToProps = (state: ReduxStore) => R.pick(['viewContextManager'], st
  * backend every time there is a change.
  */
 const ViewContextSwitcherInner: React.FC<{
-  engine: typeof import('./engine');
+  engine: typeof import('src/engine');
 } & ReturnType<typeof mapStateToProps>> = ({ engine, viewContextManager }) => (
   <div style={styles.viewContextSwitcher}>
     {viewContextManager.activeViewContexts.map((props, i) => (

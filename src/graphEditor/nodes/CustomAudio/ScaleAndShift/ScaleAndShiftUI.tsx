@@ -9,7 +9,6 @@ const RangeInput: React.FC<{
   theme: any;
 }> = ({ value, onChange }) => {
   const [errMsg, setErrMsg] = useState<string | null>(null);
-  console.log({ value });
   if (!value) {
     return null;
   }
