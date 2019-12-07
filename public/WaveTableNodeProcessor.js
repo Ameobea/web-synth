@@ -7,6 +7,11 @@ const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
 class WaveTableNodeProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
+      {
+        name: 'frequency',
+        defaultValue: 440,
+        automationRate: 'a-rate',
+      },
       ...Array(MAX_DIMENSION_COUNT)
         .fill(null)
         .map((_, i) => ({
@@ -86,9 +91,9 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     this.port.onmessage = event => this.initWasmInstance(event.data);
   }
 
-  process(inputs, outputs, params) {
+  process(_inputs, outputs, params) {
     if (!this.waveTableHandlePtr) {
-      return;
+      return true;
     }
 
     // Write the mixes for each sample in the frame into the Wasm memory.  Mixes are a flattened 3D
@@ -99,8 +104,12 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
         dimensionIx > 0 ? params[`dimension_${dimensionIx - 1}x${dimensionIx}_mix`] : null;
 
       for (let sampleIx = 0; sampleIx < FRAME_SIZE; sampleIx++) {
+        // We're not guarenteed to have a unique value for each of the `AudioParams` for every sample
+        // in the frame; if the value didn't change, we could have as few as one value.  In the case
+        // that we have less `AudioParam` values than samples, we re-use the last value.
         const intraVal =
           intraDimensionalMixVals[Math.min(sampleIx, intraDimensionalMixVals.length - 1)];
+        // Handle the case of the first dimension, which doesn't have any inter-dimensional mix
         const interVal = interDimensionalMixVals
           ? interDimensionalMixVals[Math.min(sampleIx, interDimensionalMixVals.length - 1)]
           : 0;
@@ -111,6 +120,23 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
         this.float32WasmMemory[dstIntraValIx] = clamp(0, 1, intraVal);
         this.float32WasmMemory[dstInterValIx] = clamp(0, 1, interVal);
       }
+    }
+
+    // Write the frequencies for each sample into Wasm memory
+    const frequencyBufPtr = this.wasmInstance.exports.get_frequencies_ptr(
+      this.waveTableHandlePtr,
+      FRAME_SIZE
+    );
+    if (frequencyBufPtr % 4 !== 0) {
+      throw new Error("Frequency buffer pointer isn't 4-byte aligned");
+    }
+    const frequencyBufArrayOffset = frequencyBufPtr / BYTES_PER_F32;
+    if (params.frequency.length === 1) {
+      for (let i = 0; i < FRAME_SIZE; i++) {
+        this.float32WasmMemory[frequencyBufArrayOffset + i] = params.frequency[0];
+      }
+    } else {
+      this.float32WasmMemory.set(params.frequency, frequencyBufArrayOffset);
     }
 
     // TODO: No need to do this every frame; do once when handle is created and store ptr
