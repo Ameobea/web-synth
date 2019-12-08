@@ -8,6 +8,7 @@ import {
   create_empty_audio_connectables,
   updateConnectables,
 } from 'src/patchNetwork';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 // Manually generate some waveforms... for science
 
@@ -77,25 +78,79 @@ export default class WaveTable implements ForeignNode {
   public name = 'Wave Table Synthesizer';
   public nodeType = 'customAudio/wavetable';
 
-  public paramOverrides = {}; // TODO
+  public paramOverrides: {
+    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
+  } = {};
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
 
-    if (params) {
-      this.deserialize(params);
-    }
+    this.initWorklet().then(workletHandle => {
+      this.paramOverrides = this.buildParamOverrides(workletHandle);
 
-    this.initWorklet();
+      if (params) {
+        this.deserialize(params);
+      }
+
+      updateConnectables(this.vcId, this.buildConnectables());
+    });
+  }
+
+  private buildParamOverrides(workletHandle: AudioWorkletNode): ForeignNode['paramOverrides'] {
+    // Work around incomplete TypeScript typings
+    const frequencyParam = (workletHandle.parameters as Map<string, AudioParam>).get('frequency')!;
+    const frequencyOverride = new OverridableAudioParam(this.ctx, frequencyParam);
+
+    const overrides: ForeignNode['paramOverrides'] = {
+      frequency: { param: frequencyOverride, override: frequencyOverride.manualControl },
+    };
+
+    // TODO: get dimension count dynamically
+    R.range(0, 2).forEach(i => {
+      const intraDimensionalMixKey = `dimension_${i}_mix`;
+      // Work around incomplete TypeScript typings
+      const param: AudioParam = (workletHandle.parameters as Map<string, AudioParam>).get(
+        intraDimensionalMixKey
+      )!;
+      const override = new OverridableAudioParam(this.ctx, param);
+
+      overrides[intraDimensionalMixKey] = {
+        param: override,
+        override: override.manualControl,
+      };
+
+      if (i > 0) {
+        const interDimensionalMixKey = `dimension_${i - 1}x${i}_mix`;
+        // Work around incomplete TypeScript typings
+        const param = (workletHandle.parameters as Map<string, AudioParam>).get(
+          interDimensionalMixKey
+        )!;
+        const override = new OverridableAudioParam(this.ctx, param);
+
+        overrides[interDimensionalMixKey] = {
+          param: override,
+          override: override.manualControl,
+        };
+      }
+    });
+
+    return overrides;
   }
 
   private deserialize(params: { [key: string]: any }) {
-    // TODO
+    Object.entries(params).forEach(([key, val]) => {
+      if (this.paramOverrides[key]) {
+        this.paramOverrides[key].override.offset.value = val;
+      }
+    });
   }
 
   public serialize() {
-    return {}; // TODO
+    return Object.entries(this.paramOverrides).reduce(
+      (acc, [key, val]) => ({ ...acc, [key]: val.override.offset.value }),
+      {} as { [key: string]: number }
+    );
   }
 
   private async initWaveTable() {
@@ -137,7 +192,7 @@ export default class WaveTable implements ForeignNode {
 
     await this.initWaveTable();
 
-    updateConnectables(this.vcId, this.buildConnectables());
+    return this.workletHandle;
   }
 
   public buildConnectables() {
@@ -162,7 +217,7 @@ export default class WaveTable implements ForeignNode {
           node: (this.workletHandle!.parameters as any).get(`dimension_${i - 1}x${i}_mix`),
           type: 'number',
         });
-      }, Map<string, ConnectableInput>()),
+      }, Map<string, ConnectableInput>().set('frequency', { node: this.paramOverrides.frequency.param, type: 'number' })),
       outputs: Map<string, ConnectableOutput>().set('output', {
         node: this.workletHandle,
         type: 'customAudio',

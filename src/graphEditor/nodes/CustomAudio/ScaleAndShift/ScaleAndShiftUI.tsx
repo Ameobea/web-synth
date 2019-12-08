@@ -8,17 +8,25 @@ const RangeInput: React.FC<{
   value: [number, number];
   theme: any;
 }> = ({ value, onChange }) => {
+  const [displayValue, setDisplayValue] = useState<[string, string]>(
+    value.map(n => n.toString()) as [string, string]
+  );
+
   const [errMsg, setErrMsg] = useState<string | null>(null);
   if (!value) {
     return null;
   }
 
-  const mkRangeInputInput = (ix: 0 | 1) => (evt: React.ChangeEvent<HTMLInputElement>) => {
+  const mkRangeInputOnChangeHandler = (ix: 0 | 1) => (evt: React.ChangeEvent<HTMLInputElement>) => {
+    const newDisplayValue = [...displayValue] as [string, string];
+    newDisplayValue[ix] = evt.target.value;
+    setDisplayValue(newDisplayValue);
+
     const newValue = +evt.target.value;
     if (Number.isNaN(newValue)) {
       setErrMsg('Non-numerical values entered');
       return;
-    } else if ((ix === 0 && value[1] < ix) || (ix === 1 && value[0] > ix)) {
+    } else if ((ix === 0 && value[1] < newValue) || (ix === 1 && value[0] > newValue)) {
       setErrMsg('Invalid range');
       return;
     }
@@ -26,12 +34,15 @@ const RangeInput: React.FC<{
     const newRange = [...value] as [number, number];
     newRange[ix] = newValue;
     onChange(newRange);
+    if (setErrMsg !== null) {
+      setErrMsg(null);
+    }
   };
 
   return (
     <div>
-      <input type='text' value={value[0]} onChange={mkRangeInputInput(0)} />
-      <input type='text' value={value[1]} onChange={mkRangeInputInput(1)} />
+      <input type='text' value={displayValue[0]} onChange={mkRangeInputOnChangeHandler(0)} />
+      <input type='text' value={displayValue[1]} onChange={mkRangeInputOnChangeHandler(1)} />
 
       {errMsg ? <ErrMsg msg={errMsg} /> : null}
     </div>
