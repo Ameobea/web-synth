@@ -24,26 +24,24 @@ export class MIDIToFrequencyNode {
     return midiToFrequency(note); // TODO: Make configurable somehow
   }
 
-  private getMIDIInputCbs(): MIDIInputCbs {
-    return {
-      onAttack: (note, _voiceIx, _velocity) => {
-        this.activeNotes.push(note);
-        this.frequencyCSN.offset.value = this.noteToFrequency(note);
-      },
-      onRelease: (note, _voiceIx, _velocity) => {
-        this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
-        if (R.isEmpty(this.activeNotes)) {
-          this.gainCSN.offset.value = 0;
-        } else {
-          this.frequencyCSN.offset.value = this.noteToFrequency(R.last(this.activeNotes));
-        }
-      },
-      onPitchBend: bendAmount => {
-        // TODO
-        console.log({ bendAmount });
-      },
-    };
-  }
+  private getMIDIInputCbs = (): MIDIInputCbs => ({
+    onAttack: (note, _voiceIx, _velocity) => {
+      this.activeNotes.push(note);
+      this.frequencyCSN.offset.value = this.noteToFrequency(note);
+    },
+    onRelease: (note, _voiceIx, _velocity) => {
+      this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
+      if (R.isEmpty(this.activeNotes)) {
+        this.gainCSN.offset.value = 0;
+      } else {
+        this.frequencyCSN.offset.value = this.noteToFrequency(R.last(this.activeNotes)!);
+      }
+    },
+    onPitchBend: bendAmount => {
+      // TODO
+      console.log({ bendAmount });
+    },
+  });
 
   public nodeType = 'customAudio/MIDIToFrequency';
   public name = 'MIDI to Frequency';
@@ -58,7 +56,9 @@ export class MIDIToFrequencyNode {
   constructor(vcId: string, _params?: { [key: string]: any } | null) {
     this.vcId = vcId;
     this.frequencyCSN = new ConstantSourceNode(ctx);
+    this.frequencyCSN.start();
     this.gainCSN = new ConstantSourceNode(ctx);
+    this.gainCSN.start();
 
     this.midiNode = buildMIDINode(this.getMIDIInputCbs);
   }
