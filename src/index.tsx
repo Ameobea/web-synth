@@ -8,6 +8,7 @@ import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import { commitForeignConnectables } from 'src/redux/modules/viewContextManager';
 import { tryParseJson } from 'src/util';
 import { ConnectableDescriptor } from 'src/patchNetwork';
+import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 
 let engineHandle: typeof import('./engine');
 
@@ -27,6 +28,15 @@ const createViewContextManager = (engine: typeof import('./engine')) => {
     </Provider>,
     document.getElementById('view-context-switcher')
   );
+};
+
+const createBrowserNotSupportedMessage = () => {
+  const body = document.getElementsByTagName('body')[0];
+  while (body.children.length > 0) {
+    body.children[0].remove();
+  }
+
+  ReactDOM.render(<BrowserNotSupported />, body);
 };
 
 // TODO: Figure out if this is actually used
@@ -86,20 +96,24 @@ export const delete_view_context = (id: string) => {
 export const set_active_vc_ix = (newActiveVxIx: number) =>
   dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
 
-wasm.then(engine => {
-  engineHandle = engine;
-  engine.init();
+if (typeof AudioWorkletNode === 'undefined') {
+  createBrowserNotSupportedMessage();
+} else {
+  wasm.then(engine => {
+    engineHandle = engine;
+    engine.init();
 
-  window.addEventListener('beforeunload', () => {
-    // Commit the whole patch network's foreign connectables, serializing + saving their state in the process
-    commitForeignConnectables(
-      engine,
-      getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
-    );
+    window.addEventListener('beforeunload', () => {
+      // Commit the whole patch network's foreign connectables, serializing + saving their state in the process
+      commitForeignConnectables(
+        engine,
+        getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
+      );
 
-    // Cleanup all VCs and save their state
-    engine.handle_window_close();
+      // Cleanup all VCs and save their state
+      engine.handle_window_close();
+    });
+
+    createViewContextManager(engine);
   });
-
-  createViewContextManager(engine);
-});
+}

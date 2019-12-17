@@ -72,3 +72,10 @@ main#content {
 .cursor {
   stroke: rgba(222, 222, 222, 0.8);
 }
+
+a {
+  color: #ff2e88;
+}
+a:visited {
+  color: #a89984;
+}
