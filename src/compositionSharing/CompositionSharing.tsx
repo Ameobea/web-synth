@@ -25,21 +25,22 @@ const mapCompositionListingStateToProps = (state: ReduxStore) => ({
   allViewContextIds: state.viewContextManager.activeViewContexts.map(R.prop('uuid')),
 });
 
-const CompositionItem: React.FC<
-  {
-    composition: CompositionDefinition;
-    engine: typeof import('../engine');
-    allViewContextIds: string[];
-    showButton?: boolean;
-  } & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
-> = ({ composition, engine, allViewContextIds, showButton = true, className, ...props }) => (
+const CompositionItem: React.FC<{
+  composition: CompositionDefinition;
+  engine: typeof import('../engine');
+  allViewContextIds: string[];
+  showButton?: boolean;
+} & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
+  composition,
+  engine,
+  allViewContextIds,
+  showButton = true,
+  className,
+  ...props
+}) => (
   <div className={`composition-item${className ? ' ' + className : ''}`} {...props}>
-    <div className='composition-title' key={composition.id}>
-      {composition.title}
-    </div>
-    <div className='composition-description' key={composition.id}>
-      {composition.description}
-    </div>
+    <div className='composition-title'>{composition.title}</div>
+    <div className='composition-description'>{composition.description}</div>
     {showButton ? (
       <button onClick={() => loadComposition(composition.content, engine, allViewContextIds)}>
         Load
@@ -50,9 +51,9 @@ const CompositionItem: React.FC<
   </div>
 );
 
-const CompositionListingInner: React.FC<
-  { engine: typeof import('../engine') } & ReturnType<typeof mapCompositionListingStateToProps>
-> = ({ engine, allViewContextIds }) => {
+const CompositionListingInner: React.FC<{ engine: typeof import('../engine') } & ReturnType<
+  typeof mapCompositionListingStateToProps
+>> = ({ engine, allViewContextIds }) => {
   const [allSharedCompositions, setAllSharedCompositions] = useState<
     null | CompositionDefinition[]
   >(null);
@@ -79,13 +80,14 @@ const CompositionListingInner: React.FC<
         height={600}
         rowCount={allSharedCompositions.length}
         rowGetter={({ index }) => allSharedCompositions[index]}
-        rowRenderer={({ className, style, rowData }) => (
+        rowRenderer={({ className, style, rowData, key }) => (
           <CompositionItem
             composition={rowData}
             engine={engine}
             allViewContextIds={allViewContextIds}
             className={className}
             style={style}
+            key={key}
           />
         )}
         headerRowRenderer={({ className, style }) => (
@@ -104,7 +106,7 @@ const CompositionListingInner: React.FC<
             style={{ ...style, borderBottom: '1px solid #999', marginBottom: 6 }}
           />
         )}
-        rowHeight={26}
+        rowHeight={120}
         width={800}
         row
       />
@@ -137,9 +139,10 @@ const FieldRenderer: React.FC<{
   </div>
 );
 
-const ShareCompositionInner: React.FC<
-  {} & InjectedFormProps<{ title: string; description: string }>
-> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => {
+const ShareCompositionInner: React.FC<{} & InjectedFormProps<{
+  title: string;
+  description: string;
+}>> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => {
   return (
     <>
       <form

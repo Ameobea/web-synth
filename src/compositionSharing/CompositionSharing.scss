@@ -32,7 +32,8 @@
       display: flex;
       flex-direction: row;
       justify-content: space-between;
-      height: 26px;
+      padding-bottom: 4px;
+      padding-top: 4px;
 
       > div {
         display: flex;

@@ -19,15 +19,7 @@ import { ReduxStore, store } from 'src/redux';
 
 type FaustEditorReduxStore = typeof faustEditorContextMap.key.reduxInfra.__fullState;
 
-// These must be loaded serially; they each depend on the on before it to exist before they can load.
-const ReactAce = React.lazy(async () => {
-  const ace = await import('ace-builds');
-  await import('ace-builds/webpack-resolver');
-  const reactAce = await import('react-ace');
-
-  ace.require('ace/theme/twilight');
-  return reactAce;
-});
+const CodeEditor = React.lazy(() => import('./CodeEditor'));
 
 const ctx = new AudioContext();
 
@@ -56,9 +48,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'row',
     padding: 8,
-  },
-  editor: {
-    border: '1px solid #555',
   },
 };
 
@@ -295,17 +284,11 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   return (
     <Suspense fallback={<span>Loading...</span>}>
       <div style={styles.root}>
-        <ReactAce
-          theme='twilight'
-          mode='text'
-          showPrintMargin={false}
+        <CodeEditor
           onChange={newValue =>
             reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue))
           }
-          name='ace-editor'
-          width='40vw'
           value={editorContent}
-          style={styles.editor}
         />
 
         <div style={styles.errorConsole}>{compileErrMsg}</div>
