@@ -23,6 +23,9 @@ export interface LiteGraphNode {
   getOutputNodes: (outputSlotIx: number) => LiteGraphNode[];
   connect: (srcSlotIx: number, dstNode: LiteGraphNode, dstSlotIx: number) => void;
   disconnectOutput: (srcSlot: number | string, dstNode: LiteGraphNode) => boolean;
+  pos: [number, number];
+  ignoreRemove?: boolean;
+  connectables?: AudioConnectables;
 }
 
 export interface LiteGraphConnectablesNode extends LiteGraphNode {

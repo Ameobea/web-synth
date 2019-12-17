@@ -53,6 +53,7 @@ export const updateGraph = (
   ].reduce(
     (acc, [key, connectables]) => {
       const pairNode = graph._nodes_by_id[key];
+
       if (R.isNil(pairNode)) {
         return { ...acc, addedNodes: acc.addedNodes.add(key) };
       } else if (connectables !== pairNode.connectables) {
@@ -86,7 +87,7 @@ export const updateGraph = (
 
     if (params) {
       Object.entries(params).forEach(([key, val]) => {
-        newNode[key] = val;
+        (newNode as any)[key] = val;
       });
     }
 
@@ -105,11 +106,12 @@ export const updateGraph = (
     if (!node) {
       throw new Error("Tried to remove a node that didn't exist");
     }
+    const { pos } = node;
 
     // Don't trigger patch network actions since these changes are purely presentational
     node.ignoreRemove = true;
     graph.remove(node);
-    createAndAddNode(key, { ignoreAdd: true });
+    createAndAddNode(key, { ignoreAdd: true, pos });
   });
 
   // At this point, all nodes should be created/removed and have up-to-date `AudioConnectables`.  We must now run through the list

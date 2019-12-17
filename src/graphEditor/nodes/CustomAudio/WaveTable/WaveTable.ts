@@ -2,13 +2,9 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import {
-  ConnectableInput,
-  ConnectableOutput,
-  create_empty_audio_connectables,
-  updateConnectables,
-} from 'src/patchNetwork';
+import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 // Manually generate some waveforms... for science
 
@@ -196,30 +192,38 @@ export default class WaveTable implements ForeignNode {
   }
 
   public buildConnectables() {
-    if (!this.workletHandle) {
-      return { ...create_empty_audio_connectables(this.vcId), node: this };
-    }
-
     return {
       // TODO: get dimension count dynamically
-      inputs: R.range(0, 2).reduce((acc, i) => {
-        const newAcc = acc.set(`dimension_${i}_mix`, {
-          node: (this.workletHandle!.parameters as any).get(`dimension_${i}_mix`),
-          type: 'number',
-        });
+      inputs: R.range(0, 2).reduce(
+        (acc, i) => {
+          const newAcc = acc.set(`dimension_${i}_mix`, {
+            node: this.workletHandle
+              ? (this.workletHandle.parameters as any).get(`dimension_${i}_mix`)
+              : new DummyNode(),
+            type: 'number',
+          });
 
-        // The first dimension doesn't have any inter-dimensional mix param since it's the first one
-        if (i === 0) {
-          return newAcc;
-        }
+          // The first dimension doesn't have any inter-dimensional mix param since it's the first one
+          if (i === 0) {
+            return newAcc;
+          }
 
-        return newAcc.set(`dimension_${i - 1}x${i}_mix`, {
-          node: (this.workletHandle!.parameters as any).get(`dimension_${i - 1}x${i}_mix`),
+          return newAcc.set(`dimension_${i - 1}x${i}_mix`, {
+            node: this.workletHandle
+              ? (this.workletHandle.parameters as any).get(`dimension_${i - 1}x${i}_mix`)
+              : new DummyNode(),
+            type: 'number',
+          });
+        },
+        Map<string, ConnectableInput>().set('frequency', {
+          node: this.paramOverrides.frequency
+            ? this.paramOverrides.frequency.param
+            : new DummyNode(),
           type: 'number',
-        });
-      }, Map<string, ConnectableInput>().set('frequency', { node: this.paramOverrides.frequency.param, type: 'number' })),
+        })
+      ),
       outputs: Map<string, ConnectableOutput>().set('output', {
-        node: this.workletHandle,
+        node: this.workletHandle ? this.workletHandle : new DummyNode(),
         type: 'customAudio',
       }),
       vcId: this.vcId,
