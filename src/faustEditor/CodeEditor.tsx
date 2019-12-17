@@ -14,9 +14,7 @@ const CodeEditor: React.FC<{
     name='ace-editor'
     width='40vw'
     value={value}
-    style={{
-      border: '1px solid #555',
-    }}
+    style={{ border: '1px solid #555' }}
   />
 );
 

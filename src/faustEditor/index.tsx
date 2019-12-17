@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { Map } from 'immutable';
 import { buildStore } from 'jantix';
 import * as R from 'ramda';
+import { Option } from 'funfix-core';
 
 import FaustEditor from './FaustEditor';
 import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
@@ -12,6 +13,7 @@ import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/no
 import faustEditorModule from 'src/redux/modules/faustEditor';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const ctx = new AudioContext();
 
@@ -28,6 +30,7 @@ export const faustEditorContextMap: {
     analyzerNode: AnalyserNode;
     faustNode?: FaustWorkletNode;
     overrideableParams: { [key: string]: OverridableAudioParam };
+    cachedInputNames: string[] | undefined;
   };
 } = {};
 
@@ -53,11 +56,27 @@ export const init_faust_editor = (stateKey: string) => {
   const analyzerNode = ctx.createAnalyser();
   analyzerNode.smoothingTimeConstant = 0.2;
 
+  const { cachedInputNames, editorContent } = Option.of(localStorage.getItem(stateKey))
+    .flatMap(val => {
+      try {
+        return Option.of(JSON.parse(val) as { cachedInputNames: string[]; editorContent: string });
+      } catch (err) {
+        console.error('Error parsing localstorage content for Faust editor; resetting to scratch.');
+        return Option.none();
+      }
+    })
+    .getOrElse({ cachedInputNames: undefined, editorContent: '' });
+
   const reduxInfra = buildFaustEditorReduxInfra();
-  faustEditorContextMap[vcId] = { reduxInfra, overrideableParams: {}, analyzerNode };
+  faustEditorContextMap[vcId] = {
+    reduxInfra,
+    overrideableParams: {},
+    analyzerNode,
+    cachedInputNames,
+  };
 
   // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
-  const editorContent = localStorage.getItem(stateKey) || '';
+
   reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(editorContent));
 
   // Create the base dom node for the faust editor
@@ -104,7 +123,11 @@ export const unhide_faust_editor = (vcId: string) => {
   rootNode.style.display = 'block';
 };
 
-export const cleanup_faust_editor = (vcId: string): string => {
+export const cleanup_faust_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+
+  const { cachedInputNames } = faustEditorContextMap[vcId];
+
   const editorContent = get_faust_editor_content(vcId);
   delete faustEditorContextMap[vcId];
 
@@ -115,7 +138,8 @@ export const cleanup_faust_editor = (vcId: string): string => {
 
   ReactDOM.unmountComponentAtNode(faustEditorReactRootNode);
   faustEditorReactRootNode.remove();
-  return editorContent;
+
+  localStorage.setItem(stateKey, JSON.stringify({ editorContent, cachedInputNames }));
 };
 
 /**
@@ -149,27 +173,40 @@ export const render_faust_editor_small_view = (vcId: string, domId: string) => {
   })(domId);
 };
 
-export const cleanup_faust_editor_small_view = (vcId: string, domId: string) =>
+export const cleanup_faust_editor_small_view = (_vcId: string, domId: string) =>
   mkContainerCleanupHelper()(domId);
 
 export const get_faust_editor_connectables = (vcId: string): AudioConnectables => {
   const context = faustEditorContextMap[vcId];
   if (!context || !context.analyzerNode || !context.faustNode) {
+    let cachedInputNames: string[] | undefined;
     if (context) {
       // Prevent these from leaking
       context.overrideableParams = {};
+
+      if (context.cachedInputNames) {
+        cachedInputNames = context.cachedInputNames;
+      }
+    }
+
+    const passthroughNode = createPassthroughNode(GainNode);
+    let inputs = Map<string, ConnectableInput>().set('input', {
+      node: passthroughNode,
+      type: 'customAudio',
+    });
+
+    if (cachedInputNames) {
+      cachedInputNames.forEach(
+        inputName => (inputs = inputs.set(inputName, { type: 'number', node: new DummyNode() }))
+      );
     }
 
     // Create passthrough audio node with the same interface as the `FaustAudioWorklet`-based ones that will be created later
     // once our Faust code is compiled.  This should cause any connections made before the faust module is started to be re-
     // connected to the real faust node once it is started.
-    const passthroughNode = createPassthroughNode(GainNode);
     return {
       vcId,
-      inputs: Map<string, ConnectableInput>().set('input', {
-        node: passthroughNode,
-        type: 'customAudio',
-      }),
+      inputs,
       outputs: Map<string, ConnectableOutput>().set('output', {
         node: passthroughNode,
         type: 'customAudio',

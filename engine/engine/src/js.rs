@@ -85,7 +85,7 @@ extern "C" {
     pub fn init_faust_editor(state_key: &str);
     pub fn hide_faust_editor(vc_id: &str);
     pub fn unhide_faust_editor(vc_id: &str);
-    pub fn cleanup_faust_editor(vc_id: &str) -> String;
+    pub fn cleanup_faust_editor(vc_id: &str);
     pub fn get_faust_editor_content(vc_id: &str) -> String;
     pub fn get_faust_editor_connectables(vc_id: &str) -> JsValue;
     pub fn render_faust_editor_small_view(vc_id: &str, target_dom_id: &str);

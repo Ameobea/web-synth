@@ -14,26 +14,39 @@ pub struct FaustEditor {
 }
 
 impl FaustEditor {
-    pub fn new(uuid: Uuid) -> Self { FaustEditor { uuid } }
+    pub fn new(uuid: Uuid) -> Self {
+        FaustEditor { uuid }
+    }
 
-    pub fn get_state_key(&self) -> String { format!("faustEditor_{}", self.uuid) }
+    pub fn get_state_key(&self) -> String {
+        format!("faustEditor_{}", self.uuid)
+    }
 }
 
 impl ViewContext for FaustEditor {
-    fn init(&mut self) { js::init_faust_editor(&self.get_state_key()); }
-
-    fn hide(&mut self) { js::hide_faust_editor(&self.get_id()); }
-
-    fn unhide(&mut self) { js::unhide_faust_editor(&self.get_id()); }
-
-    fn cleanup(&mut self) {
-        let faust_editor_content = js::cleanup_faust_editor(&self.get_id());
-        js::set_localstorage_key(&self.get_state_key(), &faust_editor_content)
+    fn init(&mut self) {
+        js::init_faust_editor(&self.get_state_key());
     }
 
-    fn get_id(&self) -> String { self.uuid.to_string() }
+    fn hide(&mut self) {
+        js::hide_faust_editor(&self.get_id());
+    }
 
-    fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
+    fn unhide(&mut self) {
+        js::unhide_faust_editor(&self.get_id());
+    }
+
+    fn cleanup(&mut self) {
+        js::cleanup_faust_editor(&self.get_state_key());
+    }
+
+    fn get_id(&self) -> String {
+        self.uuid.to_string()
+    }
+
+    fn dispose(&mut self) {
+        js::delete_localstorage_key(&self.get_state_key());
+    }
 
     fn save(&mut self) -> String {
         serde_json::to_string(self).expect("Error serializing `FaustEditor` to String")
@@ -54,8 +67,9 @@ impl ViewContext for FaustEditor {
 
 pub fn mk_faust_editor(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
     let faust_editor: FaustEditor = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `FaustEditor`"),
+        Some(definition) => {
+            serde_json::from_str(definition).expect("Error while deserializing `FaustEditor`")
+        }
         None => FaustEditor::new(uuid),
     };
     Box::new(faust_editor)

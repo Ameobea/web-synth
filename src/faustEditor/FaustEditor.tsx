@@ -186,7 +186,7 @@ export const mkCompileButtonClickHandler = ({
   analyzerNode: AnalyserNode;
   noBuildControlPanel?: boolean;
 }) => async () => {
-  let faustNode;
+  let faustNode: FaustWorkletNode;
   try {
     faustNode = await compileFaustInstance(faustCode, optimize);
   } catch (err) {
@@ -197,12 +197,13 @@ export const mkCompileButtonClickHandler = ({
   setErrMessage('');
 
   faustNode.connect(analyzerNode);
+  const cachedInputNames = [...(faustNode.parameters as Map<string, AudioParam>).keys()];
 
   const context = faustEditorContextMap[vcId];
   if (!context) {
     throw new Error(`No context found for Faust editor vcId ${vcId}`);
   }
-  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode };
+  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode, cachedInputNames };
 
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
   const newConnectables = get_faust_editor_connectables(vcId);
