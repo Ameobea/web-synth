@@ -10,6 +10,7 @@ use crate::{
         graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
         midi_keyboard::mk_midi_keyboard,
+        sequencer::mk_sequencer,
         synth_designer::mk_synth_designer,
     },
     ViewContext,
@@ -111,9 +112,7 @@ struct ViewContextManagerState {
     pub foreign_connectables: Vec<ForeignConnectable>,
 }
 
-fn get_vc_key(uuid: Uuid) -> String {
-    format!("vc_{}", uuid)
-}
+fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
 
 impl ViewContextManager {
     /// Adds a `ViewContext` instance to be managed by the `ViewContextManager`.  Returns its index.
@@ -172,7 +171,7 @@ impl ViewContextManager {
                     id
                 );
                 return;
-            }
+            },
         };
 
         self.set_active_view(ix);
@@ -189,14 +188,14 @@ impl ViewContextManager {
                         vc_id, VCM_STATE_KEY
                     );
                     continue;
-                }
+                },
             };
             let definition: ViewContextDefinition = match serde_json::from_str(&definition_str) {
                 Ok(definition) => definition,
                 Err(err) => {
                     error!("Error deserializing `ViewContextDefinition`: {:?}", err);
                     continue;
-                }
+                },
             };
 
             let mut view_context = build_view(
@@ -265,7 +264,7 @@ impl ViewContextManager {
             Err(err) => {
                 error!("Error deserializing stored VCM state: {:?}", err);
                 None
-            }
+            },
         })
     }
 
@@ -339,7 +338,7 @@ impl ViewContextManager {
             None => {
                 error!("Tried to delete a VC with ID {} but it wasn't found.", id);
                 return;
-            }
+            },
         };
 
         let mut vc_entry = self.contexts.remove(ix);
@@ -464,6 +463,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "composition_sharing" => mk_composition_sharing(conf, uuid),
         "synth_designer" => mk_synth_designer(conf, uuid),
         "midi_keyboard" => mk_midi_keyboard(conf, uuid),
+        "sequencer" => mk_sequencer(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

@@ -1,0 +1,23 @@
+.sequencer {
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  rect {
+    fill: #181818;
+    stroke: #ddd;
+  }
+
+  rect:hover {
+    fill: rgb(99, 116, 99);
+  }
+
+  rect.marked {
+    fill: rgb(85, 194, 85);
+  }
+
+  rect.marked:hover {
+    fill: rgb(120, 148, 120);
+  }
+}

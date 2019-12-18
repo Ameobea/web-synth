@@ -64,21 +64,13 @@ extern "C" {
     fn random() -> f64;
 }
 
-pub fn get_localstorage_key(key: &str) -> Option<String> {
-    getItem(key)
-}
+pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
 
-pub fn set_localstorage_key(key: &str, val: &str) {
-    setItem(key, val);
-}
+pub fn set_localstorage_key(key: &str, val: &str) { setItem(key, val); }
 
-pub fn delete_localstorage_key(key: &str) {
-    removeItem(key);
-}
+pub fn delete_localstorage_key(key: &str) { removeItem(key); }
 
-pub fn js_random() -> f64 {
-    random()
-}
+pub fn js_random() -> f64 { random() }
 
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {
@@ -134,4 +126,13 @@ extern "C" {
     pub fn unhide_midi_keyboard(state_key: &str);
     pub fn cleanup_midi_keyboard(state_key: &str) -> String;
     pub fn get_midi_keyboard_audio_connectables(state_key: &str) -> JsValue;
+}
+
+#[wasm_bindgen(raw_module = "./sequencer")]
+extern "C" {
+    pub fn init_sequencer(state_key: &str);
+    pub fn cleanup_sequencer(state_key: &str);
+    pub fn hide_sequencer(state_key: &str);
+    pub fn unhide_sequencer(state_key: &str);
+    pub fn get_sequencer_audio_connectables(state_key: &str) -> JsValue;
 }

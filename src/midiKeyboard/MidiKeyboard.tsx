@@ -36,37 +36,6 @@ declare global {
   }
 }
 
-const tryInitMidi = async (
-  playNote: (voiceIx: number, frequency: number, velocity: number) => void,
-  releaseNote: (voiceIx: number, frequency: number, velocity: number) => void,
-  handlePitchBend?: null | ((lsb: number, msb: number) => void)
-): Promise<MIDIAccess> => {
-  if (!navigator.requestMIDIAccess) {
-    throw new Error(
-      "Unable to initialize MIDI; no keyboard attached or browser doesn't support it"
-    );
-  }
-
-  const access = await navigator.requestMIDIAccess();
-
-  for (const [, input] of access.inputs) {
-    if (!input.name.includes('KeyStep')) {
-      continue;
-    }
-
-    const midiModule = await import('../midi');
-
-    const ctxPtr = midiModule.create_msg_handler_context(playNote, releaseNote, handlePitchBend);
-
-    input.addEventListener('midimessage', (evt: Event & { data: Uint8Array }) =>
-      midiModule.handle_midi_evt(evt.data, ctxPtr)
-    );
-    break;
-  }
-
-  return access;
-};
-
 const MidiKeyboard: React.FC<{
   playNote: (voiceIx: number, note: number, velocity: number) => void;
   releaseNote: (voiceIx: number, note: number, velocity: number) => void;

@@ -31,6 +31,7 @@ const viewContexts: { children: string; name: string; displayName: string }[] = 
   { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
   { children: 'D', name: 'synth_designer', displayName: 'Synth Designer' },
   { children: 'K', name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
+  { children: 'Q', name: 'sequencer', displayName: 'Sequencer' },
 ];
 
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {
