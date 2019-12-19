@@ -148,8 +148,6 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
     return <Loading />;
   }
 
-  console.log(octaveOffset);
-
   return (
     <div>
       <OctaveControl
