@@ -136,3 +136,11 @@ extern "C" {
     pub fn unhide_sequencer(state_key: &str);
     pub fn get_sequencer_audio_connectables(state_key: &str) -> JsValue;
 }
+
+#[wasm_bindgen(raw_module = "./sampleLibrary")]
+extern "C" {
+    pub fn init_sample_library(state_key: &str);
+    pub fn cleanup_sample_library(state_key: &str);
+    pub fn hide_sample_library(state_key: &str);
+    pub fn unhide_sample_library(state_key: &str);
+}

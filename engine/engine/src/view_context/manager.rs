@@ -10,6 +10,7 @@ use crate::{
         graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
         midi_keyboard::mk_midi_keyboard,
+        sample_library::mk_sample_library,
         sequencer::mk_sequencer,
         synth_designer::mk_synth_designer,
     },
@@ -464,6 +465,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "synth_designer" => mk_synth_designer(conf, uuid),
         "midi_keyboard" => mk_midi_keyboard(conf, uuid),
         "sequencer" => mk_sequencer(conf, uuid),
+        "sample_library" => mk_sample_library(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

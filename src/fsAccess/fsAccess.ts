@@ -16,7 +16,7 @@ const initDataDir = async (fsHandle: FSAccessDriver) => {
 };
 
 export const initFSDriver = async (driverName: string): Promise<FSAccessDriver> => {
-  const DriverClass = fsDriversByName[name];
+  const DriverClass = fsDriversByName[driverName];
   if (!DriverClass) {
     throw new Error(`No FS driver with name "${driverName}" found.`);
   }

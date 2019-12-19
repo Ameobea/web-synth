@@ -1,6 +1,8 @@
 import { getFSAccess } from 'src/fsAccess';
 import SampleManager from 'src/sampleLibrary/SampleManager';
 import { UnimplementedError } from 'ameo-utils';
+import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 
 export interface SampleDescriptor {
   isLocal: boolean;
@@ -61,4 +63,43 @@ export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuff
   }
 
   return descriptor.isLocal ? loadLocalSample(descriptor) : loadRemoteSample(descriptor);
+};
+
+export const init_sample_library = (stateKey: string) => {
+  const elem = document.createElement('div');
+  elem.id = stateKey;
+  elem.setAttribute(
+    'style',
+    'z-index: 2; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
+  );
+  document.getElementById('content')!.appendChild(elem);
+
+  mkContainerRenderHelper({
+    Comp: SampleLibraryUI,
+    getProps: () => ({}),
+  })(stateKey);
+};
+
+export const cleanup_sample_library = mkContainerCleanupHelper();
+
+export const hide_sample_library = (stateKey: string) => {
+  const elem = document.getElementById(stateKey);
+  if (!elem) {
+    const vcId = stateKey.split('_')[1]!;
+    console.error(`Unable to find DOM element for sample library with vcId ${vcId}; can't hide.`);
+    return;
+  }
+
+  elem.style.display = 'none';
+};
+
+export const unhide_sample_library = (stateKey: string) => {
+  const elem = document.getElementById(stateKey);
+  if (!elem) {
+    const vcId = stateKey.split('_')[1]!;
+    console.error(`Unable to find DOM element for sample library with vcId ${vcId}; can't unhide.`);
+    return;
+  }
+
+  elem.style.display = 'block';
 };
