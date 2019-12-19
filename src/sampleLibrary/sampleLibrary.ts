@@ -1,6 +1,7 @@
+import { UnimplementedError } from 'ameo-utils';
+
 import { getFSAccess } from 'src/fsAccess';
 import SampleManager from 'src/sampleLibrary/SampleManager';
-import { UnimplementedError } from 'ameo-utils';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 
@@ -47,10 +48,18 @@ const listRemoteSamples = async (): Promise<SampleDescriptor[]> => {
   return []; // TODO
 };
 
-export const listSamples = async (): Promise<SampleDescriptor[]> => {
+export interface ListSampleOpts {
+  includeLocal?: boolean;
+  includeRemote?: boolean;
+}
+
+export const listSamples = async ({
+  includeRemote,
+  includeLocal,
+}: ListSampleOpts = {}): Promise<SampleDescriptor[]> => {
   const [localSamples, remoteSamples] = await Promise.all([
-    listLocalSamples(),
-    listRemoteSamples(),
+    includeLocal ? listLocalSamples().catch(() => []) : [],
+    includeRemote ? listRemoteSamples() : [],
   ]);
 
   return [...localSamples, ...remoteSamples];

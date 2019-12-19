@@ -36,7 +36,9 @@ const mkMidiImportDialog: (
 ) => React.FC<{
   onSubmit: (settings: MidiImportSettings) => void;
 }> = fileInfo => {
-  const MidiImportDialog = ({ onSubmit }) => {
+  const MidiImportDialog: React.FC<{ onSubmit: (settings: MidiImportSettings) => void }> = ({
+    onSubmit,
+  }) => {
     const [selectedTrack, setSelectedTrack] = useState(0);
 
     return (

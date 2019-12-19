@@ -1,6 +1,8 @@
 import { FSAccessDriver } from 'src/fsAccess/driver';
 import { FileSystemDirectoryHandle, NativeFSShim, FileSystemFileHandle } from './NativeFSTypes';
 import { UnimplementedError } from 'ameo-utils';
+import { renderModalWithControls } from 'src/controls/Modal';
+import FSAccessDialog from 'src/fsAccess/drivers/nativeFS/FSAccessDialog';
 
 const patchedWindow: Window & NativeFSShim = window as any;
 
@@ -14,6 +16,8 @@ export default class NativeFSDriver implements FSAccessDriver {
   }
 
   public async init(): Promise<void> {
+    await renderModalWithControls(FSAccessDialog);
+
     const dataDirHandle = (await patchedWindow.chooseFileSystemEntries({
       type: 'openDirectory',
     })) as FileSystemDirectoryHandle;
