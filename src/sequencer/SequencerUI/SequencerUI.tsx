@@ -2,7 +2,7 @@
 import React from 'react';
 import { connect } from 'react-redux';
 
-import { SequencerReduxState, SequencerReduxInfra } from './redux';
+import { SequencerReduxState, SequencerReduxInfra } from '../redux';
 import './SequencerUI.scss';
 
 const CELL_SIZE_PX = 40 as const;

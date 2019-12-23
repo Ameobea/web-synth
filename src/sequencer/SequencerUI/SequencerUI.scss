@@ -22,3 +22,10 @@
     fill: rgb(120, 148, 120);
   }
 }
+
+.sequencer-input-select {
+  .voice-input {
+    display: flex;
+    flex-direction: row;
+  }
+}

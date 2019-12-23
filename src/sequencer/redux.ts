@@ -2,9 +2,11 @@ import * as R from 'ramda';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { UnimplementedError } from 'ameo-utils';
 
+import { SampleDescriptor } from 'src/sampleLibrary';
+
 export type VoiceTarget =
-  | { type: 'sample'; sampleIx: number }
-  | { type: 'midi'; synthIx: number; frequency: number };
+  | { type: 'sample'; sampleIx: number | null }
+  | { type: 'midi'; synthIx: number | null; frequency: number };
 
 export type PlayingStatus =
   | { type: 'NOT_PLAYING' }
@@ -14,7 +16,7 @@ const getIsPlaying = (playingStatus: PlayingStatus) => playingStatus.type === 'P
 
 export interface SequencerReduxState {
   voices: VoiceTarget[];
-  sampleBank: AudioBuffer[];
+  sampleBank: { descriptor: SampleDescriptor; buffer: AudioBuffer }[];
   /**
    * For each voice, an array of the indices of all marked cells for that voice/row
    */
@@ -82,6 +84,17 @@ const actionGroups = {
       }
     },
   }),
+  SET_VOICE_TARGET: buildActionGroup({
+    actionCreator: (voiceIx: number, newTarget: VoiceTarget) => ({
+      type: 'SET_VOICE_TARGET',
+      voiceIx,
+      newTarget,
+    }),
+    subReducer: (state: SequencerReduxState, { voiceIx, newTarget }) => ({
+      ...state,
+      voices: R.set(R.lensIndex(voiceIx), newTarget, state.voices),
+    }),
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -97,8 +110,8 @@ export type SequencerReduxInfra = ReturnType<typeof buildSequencerReduxInfra>;
 const DEFAULT_WIDTH = 16 as const;
 
 export const buildInitialState = (): SequencerReduxState => ({
-  voices: [{ type: 'sample', sampleIx: 0 }], // TODO
-  sampleBank: [new AudioBuffer({ length: 1024, sampleRate: 44100 })], // TODO
+  voices: [{ type: 'sample', sampleIx: null }], // TODO
+  sampleBank: [], // TODO
   marks: [R.times(() => false, DEFAULT_WIDTH)], // TODO
   bpm: 80,
   playingStatus: { type: 'NOT_PLAYING' as const },
