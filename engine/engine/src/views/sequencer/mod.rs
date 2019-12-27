@@ -27,7 +27,7 @@ impl ViewContext for Sequencer {
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
     fn get_audio_connectables(&self) -> JsValue {
-        js::get_sequencer_audio_connectables(&self.get_state_key())
+        js::get_sequencer_audio_connectables(&self.get_id())
     }
 }
 

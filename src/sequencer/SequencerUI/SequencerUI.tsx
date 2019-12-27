@@ -3,6 +3,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 
 import { SequencerReduxState, SequencerReduxInfra } from '../redux';
+import InputSelect from './InputSelect';
 import './SequencerUI.scss';
 
 const CELL_SIZE_PX = 40 as const;
@@ -56,12 +57,15 @@ const mapStateToProps = (state: { sequencer: SequencerReduxState }) => ({
 });
 
 const SequencerUI: React.FC<{
+  vcId: string;
   actionCreators: SequencerReduxInfra['actionCreators'];
   dispatch: SequencerReduxInfra['dispatch'];
-} & ReturnType<typeof mapStateToProps>> = ({ marks, dispatch, actionCreators }) => {
+} & ReturnType<typeof mapStateToProps>> = ({ vcId, marks, dispatch, actionCreators }) => {
   return (
     <div className='sequencer'>
       <SequencerGrid rowMarks={marks} dispatch={dispatch} actionCreators={actionCreators} />
+      <button onClick={() => dispatch(actionCreators.sequencer.ADD_VOICE())}>Add Voice</button>
+      <InputSelect vcId={vcId} actionCreators={actionCreators} />
     </div>
   );
 };

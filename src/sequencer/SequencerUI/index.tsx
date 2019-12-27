@@ -1,1 +1,3 @@
-export * from './SequencerUI';
+import SequencerUI from './SequencerUI';
+
+export default SequencerUI;

@@ -1,16 +1,23 @@
 import * as R from 'ramda';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
-import { UnimplementedError } from 'ameo-utils';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary';
+import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
 
 export type VoiceTarget =
   | { type: 'sample'; sampleIx: number | null }
-  | { type: 'midi'; synthIx: number | null; frequency: number };
+  | { type: 'midi'; synthIx: number | null; note: number };
 
 export type PlayingStatus =
   | { type: 'NOT_PLAYING' }
   | { type: 'PLAYING'; intervalHandle: number; curColIx: number };
+
+export enum SchedulerScheme {
+  Stable,
+  Swung,
+  Random,
+}
 
 const getIsPlaying = (playingStatus: PlayingStatus) => playingStatus.type === 'PLAYING';
 
@@ -24,6 +31,8 @@ export interface SequencerReduxState {
   bpm: number;
   playingStatus: PlayingStatus;
   outputGainNode: GainNode;
+  midiOutputs: MIDINode[];
+  schedulerScheme: SchedulerScheme;
 }
 
 const ctx = new AudioContext();
@@ -95,6 +104,45 @@ const actionGroups = {
       voices: R.set(R.lensIndex(voiceIx), newTarget, state.voices),
     }),
   }),
+  ADD_MIDI_OUTPUT: buildActionGroup({
+    actionCreator: () => ({ type: 'ADD_MIDI_OUTPUT' }),
+    subReducer: (state: SequencerReduxState) => ({
+      ...state,
+      midiOutputs: [
+        ...state.midiOutputs,
+        buildMIDINode(() => {
+          throw new UnreachableException('MIDI output of sequencer has no inputs');
+        }),
+      ],
+    }),
+  }),
+  REMOVE_MIDI_OUTPUT: buildActionGroup({
+    actionCreator: (index: number) => ({ type: 'REMOVE_MIDI_OUTPUT', index }),
+    subReducer: (state: SequencerReduxState, { index }) => {
+      const removed = state.midiOutputs[index];
+      if (!removed) {
+        return state;
+      }
+
+      // Disconnect any voices that were targeting this output
+      const updatedVoices = state.voices.map(voice => {
+        if (voice.type !== 'midi' || voice.synthIx !== index) {
+          return voice;
+        }
+
+        return { ...voice, synthIx: null };
+      });
+
+      removed.disconnect();
+      removed.getInputCbs().onClearAll();
+
+      return {
+        ...state,
+        voices: updatedVoices,
+        midiOutputs: R.init(state.midiOutputs),
+      };
+    },
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -116,4 +164,6 @@ export const buildInitialState = (): SequencerReduxState => ({
   bpm: 80,
   playingStatus: { type: 'NOT_PLAYING' as const },
   outputGainNode: new GainNode(ctx),
+  midiOutputs: [],
+  schedulerScheme: SchedulerScheme.Stable,
 });

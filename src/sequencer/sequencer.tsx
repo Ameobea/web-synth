@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { Map as ImmMap } from 'immutable';
+import * as R from 'ramda';
 
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import {
@@ -9,6 +10,7 @@ import {
   SequencerReduxState,
   VoiceTarget,
   PlayingStatus,
+  SchedulerScheme,
 } from './redux';
 import {
   create_empty_audio_connectables,
@@ -17,6 +19,8 @@ import {
   ConnectableOutput,
 } from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { buildMIDINode } from 'src/patchNetwork/midiNode';
 
 const ctx = new AudioContext();
 
@@ -30,6 +34,8 @@ interface SerializedSequencer {
   marks: boolean[][];
   bpm: number;
   playingStatus: PlayingStatus;
+  midiOutputCount: number;
+  schedulerScheme: SchedulerScheme;
 }
 
 const getSequencerDOMElementId = (vcId: string) => `sequencer-${vcId}`;
@@ -43,7 +49,14 @@ const serializeSequencer = (vcId: string): string => {
     return '';
   }
 
-  const { voices, marks, bpm, playingStatus } = reduxInfra.getState().sequencer;
+  const {
+    voices,
+    marks,
+    bpm,
+    playingStatus,
+    midiOutputs,
+    schedulerScheme,
+  } = reduxInfra.getState().sequencer;
 
   const serialized: SerializedSequencer = {
     voices,
@@ -51,6 +64,8 @@ const serializeSequencer = (vcId: string): string => {
     marks,
     bpm,
     playingStatus,
+    midiOutputCount: midiOutputs.length,
+    schedulerScheme,
   };
 
   return JSON.stringify(serialized);
@@ -63,6 +78,8 @@ const deserializeSequencer = (serialized: string): SequencerReduxState => {
     marks,
     bpm,
     playingStatus,
+    midiOutputCount,
+    schedulerScheme,
   }: SerializedSequencer = JSON.parse(serialized);
 
   // TODO: Start it if it's playing?
@@ -74,6 +91,14 @@ const deserializeSequencer = (serialized: string): SequencerReduxState => {
     bpm,
     playingStatus,
     outputGainNode: new GainNode(ctx),
+    midiOutputs: R.times(
+      () =>
+        buildMIDINode(() => {
+          throw new UnreachableException('MIDI output of sequencer has no inputs');
+        }),
+      midiOutputCount
+    ),
+    schedulerScheme,
   };
 };
 
@@ -93,7 +118,7 @@ const loadInitialState = (stateKey: string, vcId: string) => {
   }
 };
 
-const LazySequencerUI: React.FC<Pick<
+const LazySequencerUI: React.FC<{ vcId: string } & Pick<
   SequencerReduxInfra,
   'dispatch' | 'actionCreators'
 >> = props => (
@@ -125,7 +150,11 @@ export const init_sequencer = (stateKey: string) => {
   mkContainerRenderHelper({
     Comp: LazySequencerUI,
     store: reduxInfra.store,
-    getProps: () => ({ actionCreators: reduxInfra.actionCreators, dispatch: reduxInfra.dispatch }),
+    getProps: () => ({
+      vcId,
+      actionCreators: reduxInfra.actionCreators,
+      dispatch: reduxInfra.dispatch,
+    }),
   })(domId);
 };
 
@@ -160,9 +189,7 @@ export const unhide_sequencer = (stateKey: string) => {
   elem.style.display = 'block';
 };
 
-export const get_sequencer_audio_connectables = (stateKey: string): AudioConnectables => {
-  const vcId = stateKey.split('_')[1]!;
-
+export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
   const reduxInfra = reduxInfraMap.get(vcId);
   if (!reduxInfra) {
     console.error(
@@ -170,14 +197,41 @@ export const get_sequencer_audio_connectables = (stateKey: string): AudioConnect
     );
     return create_empty_audio_connectables(vcId);
   }
+  const reduxState = reduxInfra.getState();
+
+  let outputs = ImmMap<string, ConnectableOutput>().set('output', {
+    node: reduxInfra.getState().sequencer.outputGainNode,
+    type: 'customAudio',
+  });
+  outputs = reduxState.sequencer.midiOutputs.reduce(
+    (acc, csn, i) => acc.set(`midi_output_${i + 1}`, { node: csn, type: 'number' }),
+    outputs
+  );
 
   // TODO
   return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>(),
-    outputs: ImmMap<string, ConnectableOutput>().set('output', {
-      node: reduxInfra.getState().sequencer.outputGainNode,
-      type: 'customAudio',
-    }),
+    outputs,
   };
 };
+
+const schedulerFnBySchedulerScheme: {
+  [K in SchedulerScheme]: (bpm: number, startBeat: number, endBeat: number) => number[];
+} = {
+  [SchedulerScheme.Stable]: (bpm: number, startBeat: number, endBeat: number) =>
+    R.range(startBeat, endBeat + 1).map(beat => beat * (bpm / 60)),
+  [SchedulerScheme.Random]: (bpm: number, startBeat: number, endBeat: number) => {
+    throw new UnimplementedError();
+  },
+  [SchedulerScheme.Swung]: (bpm: number, startBeat: number, endBeat: number) => {
+    throw new UnimplementedError();
+  },
+};
+
+export const getBeatTimings = (
+  scheme: SchedulerScheme,
+  bpm: number,
+  startBeat: number,
+  endBeat: number
+): number[] => schedulerFnBySchedulerScheme[scheme](bpm, startBeat, endBeat);

@@ -4,9 +4,10 @@ import * as R from 'ramda';
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
  */
 export interface MIDIInputCbs {
-  onAttack: (note: number, voiceIx: number, velocity: number) => void;
-  onRelease: (note: number, voiceIx: number, velocity: number) => void;
-  onPitchBend: (bendAmount: number) => void;
+  onAttack: (note: number, voiceIx: number, velocity: number, offset?: number) => void;
+  onRelease: (note: number, voiceIx: number, velocity: number, offset?: number) => void;
+  onPitchBend: (bendAmount: number, offset?: number) => void;
+  onClearAll: () => void;
 }
 
 /**
@@ -14,7 +15,7 @@ export interface MIDIInputCbs {
  * in the patch network with a connection type of 'midi'.
  */
 export interface MIDINode {
-  outputCbs: (ReturnType<MIDINode['getInputCbs']>)[];
+  outputCbs: ReturnType<MIDINode['getInputCbs']>[];
   connect: (dst: MIDINode) => void;
   disconnect: (dst?: MIDINode) => void;
   /**
@@ -29,10 +30,10 @@ export type PromiseResolveType<P> = P extends Promise<infer T> ? T : never;
 export type IterableValueOf<I> = I extends Iterable<[any, infer V]> ? V : never;
 
 // hilarious
-export type MIDIAccess = PromiseResolveType<ReturnType<(typeof navigator)['requestMIDIAccess']>>;
+export type MIDIAccess = PromiseResolveType<ReturnType<typeof navigator['requestMIDIAccess']>>;
 
 export const buildMIDINode = (getInputCbs: MIDINode['getInputCbs']): MIDINode => {
-  let outputCbs: (ReturnType<MIDINode['getInputCbs']>)[] = [];
+  let outputCbs: ReturnType<MIDINode['getInputCbs']>[] = [];
 
   return {
     outputCbs,

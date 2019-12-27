@@ -1,3 +1,6 @@
+import * as R from 'ramda';
+import { Option } from 'funfix-core';
+
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
 
 export class ADSRModule extends ConstantSourceNode {
@@ -45,7 +48,7 @@ export class ADSRModule extends ConstantSourceNode {
    * Triggers the ADSR to implement the signal, triggering ramps to each of the levels defined by the envelope to the
    * underlying `ConstantSourceNode` and effecting all connected `AudioParam`s
    */
-  public gate() {
+  public gate(offset = 0) {
     // start out off at the minimum
     this.offset.cancelScheduledValues(0);
     this.offset.setValueAtTime(this.minValue, this.ctx.currentTime);
@@ -58,12 +61,12 @@ export class ADSRModule extends ConstantSourceNode {
     // Ramp to the attack
     this.offset.linearRampToValueAtTime(
       this.minValue + attack.magnitude * range,
-      this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
+      (this.ctx.currentTime + attack.pos * this.lengthMs + offset) / 1000.0
     );
     // Ramp to the decay and hold there
     this.offset.linearRampToValueAtTime(
       this.minValue + decay.magnitude * range,
-      this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
+      (this.ctx.currentTime + decay.pos * this.lengthMs + offset) / 1000.0
     );
   }
 
@@ -71,13 +74,18 @@ export class ADSRModule extends ConstantSourceNode {
    * Triggers the start of the release.  This will override all other envelope ramp events that are currently queued
    * and start ramping to zero immediately.
    */
-  public ungate() {
+  public ungate(offset?: number) {
     const { release } = this.envelope;
 
-    // Clear any queued ramp events
-    this.offset.cancelScheduledValues(0);
+    if (R.isNil(offset)) {
+      // Clear any queued ramp events
+      this.offset.cancelScheduledValues(0);
+    }
 
     const releaseDuration = ((1.0 - release.pos) * this.lengthMs) / 1000.0;
-    this.offset.linearRampToValueAtTime(this.minValue, this.ctx.currentTime + releaseDuration);
+    this.offset.linearRampToValueAtTime(
+      this.minValue,
+      this.ctx.currentTime + releaseDuration + Option.of(offset).getOrElse(0)
+    );
   }
 }

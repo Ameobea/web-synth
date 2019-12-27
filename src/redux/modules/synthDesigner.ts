@@ -581,13 +581,14 @@ const actionGroups = {
     },
   }),
   GATE: buildActionGroup({
-    actionCreator: (frequency: number, voiceIx: number, synthIx?: number) => ({
+    actionCreator: (frequency: number, voiceIx: number, synthIx?: number, offset?: number) => ({
       type: 'GATE',
       frequency,
       voiceIx,
       synthIx,
+      offset,
     }),
-    subReducer: (state: SynthDesignerState, { frequency, voiceIx, synthIx }) => {
+    subReducer: (state: SynthDesignerState, { frequency, voiceIx, synthIx, offset }) => {
       const setFreqForOsc = mkSetFreqForOsc(frequency);
 
       // TODO: Dedup
@@ -596,8 +597,8 @@ const actionGroups = {
           const targetVoice = synth.voices[voiceIx];
 
           // Trigger gain and filter ADSRs
-          targetVoice.gainADSRModule.gate();
-          targetVoice.filterADSRModule.gate();
+          targetVoice.gainADSRModule.gate(offset);
+          targetVoice.filterADSRModule.gate(offset);
 
           targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
         });
@@ -606,8 +607,8 @@ const actionGroups = {
         const targetVoice = targetSynth.voices[voiceIx];
 
         // Trigger gain and filter ADSRs
-        targetVoice.gainADSRModule.gate();
-        targetVoice.filterADSRModule.gate();
+        targetVoice.gainADSRModule.gate(offset);
+        targetVoice.filterADSRModule.gate(offset);
 
         targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
       }
@@ -616,23 +617,28 @@ const actionGroups = {
     },
   }),
   UNGATE: buildActionGroup({
-    actionCreator: (voiceIx: number, synthIx?: number) => ({ type: 'UNGATE', voiceIx, synthIx }),
-    subReducer: (state: SynthDesignerState, { voiceIx, synthIx }) => {
+    actionCreator: (voiceIx: number, synthIx?: number, offset?: number) => ({
+      type: 'UNGATE',
+      voiceIx,
+      synthIx,
+      offset,
+    }),
+    subReducer: (state: SynthDesignerState, { voiceIx, synthIx, offset }) => {
       if (R.isNil(synthIx)) {
         state.synths.forEach(({ voices }) => {
           const targetVoice = voices[voiceIx];
 
           // Trigger release of gain and filter ADSRs
-          targetVoice.gainADSRModule.ungate();
-          targetVoice.filterADSRModule.ungate();
+          targetVoice.gainADSRModule.ungate(offset);
+          targetVoice.filterADSRModule.ungate(offset);
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
         const targetVoice = targetSynth.voices[voiceIx];
 
         // Trigger release of gain and filter ADSRs
-        targetVoice.gainADSRModule.ungate();
-        targetVoice.filterADSRModule.ungate();
+        targetVoice.gainADSRModule.ungate(offset);
+        targetVoice.filterADSRModule.ungate(offset);
       }
 
       return state;
