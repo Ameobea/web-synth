@@ -1,9 +1,9 @@
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
+import { UnreachableException } from 'ameo-utils';
 
 import { SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
 import { getBeatTimings } from 'src/sequencer/sequencer';
-import { UnreachableException, UnimplementedError } from 'ameo-utils';
 
 const ctx = new AudioContext();
 
@@ -19,13 +19,13 @@ interface SchedulerState {
   scheduledBuffers: { time: number; node: AudioBufferSourceNode }[];
 }
 
-const BeatSchedulersBuilderByVoiceType: {
-  [K in VoiceTarget['type']]: (
-    state: SequencerReduxState,
-    schedulerState: SchedulerState,
-    voice: Extract<VoiceTarget, { type: K }>
-  ) => (beat: number) => void;
-} = {
+type BeatSchedulerBuilder<K extends string> = (
+  state: SequencerReduxState,
+  schedulerState: SchedulerState,
+  voice: Extract<VoiceTarget, { type: K }>
+) => (time: number) => void;
+
+const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedulerBuilder<K> } = {
   midi: (
     state: SequencerReduxState,
     _schedulerState: SchedulerState,
@@ -62,8 +62,45 @@ const BeatSchedulersBuilderByVoiceType: {
       const node = new AudioBufferSourceNode(ctx, { buffer });
       node.start(time);
       schedulerState.scheduledBuffers.push({ time, node });
-      // TODO: Connect node to internal bus node
-      throw new UnimplementedError();
+      node.connect(state.outputGainNode);
+    };
+  },
+  gate: (
+    state: SequencerReduxState,
+    _schedulerState: SchedulerState,
+    voice: Extract<VoiceTarget, { type: 'gate' }>
+  ) => {
+    if (R.isNil(voice.gateIx)) {
+      return R.identity;
+    }
+
+    if (voice.gateIx === 'RISING_EDGE_DETECTOR') {
+      return (time: number) => {
+        if (!state.risingEdgeDetector) {
+          return;
+        }
+
+        const param = (state.risingEdgeDetector.parameters as Map<string, AudioParam>).get(
+          'value'
+        )!;
+
+        param.setValueAtTime(time, 1.0);
+        param.setValueAtTime(time + 1 / (1000 * 10), 0.0);
+      };
+    }
+
+    return (time: number) => {
+      const dstGate = state.gateOutputs[voice.gateIx! as number];
+      if (!dstGate) {
+        throw new Error(`No gate ix ${voice.gateIx} in state, but voice has it`);
+      }
+
+      // TODO: Make the duration of the beat that the gate is activated for configurable
+      const beatDurationMS = (state.bpm * 1000) / 60;
+      const holdDurationMS = beatDurationMS * 0.72;
+
+      dstGate.offset.setValueAtTime(time, 1.0);
+      dstGate.offset.setValueAtTime(time + holdDurationMS / 1000, 0.0);
     };
   },
 };
@@ -121,14 +158,19 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
     state.voices.forEach(voice =>
       beatTimings.forEach(mkBeatScheduler(state, schedulerState, voice))
     );
+
+    // Schedule the beats on the rising edge detector
+    beatTimings.forEach(
+      mkBeatScheduler(state, schedulerState, { type: 'gate', gateIx: 'RISING_EDGE_DETECTOR' })
+    );
   }, RESCHEDULE_INTERVAL_MS);
 
+  console.log('Setting state for handle: ', handle);
   SchedulerStateMap.set(handle, schedulerState);
   return handle;
 };
 
 export const stopScheduler = (handle: SchedulerHandle, state: SequencerReduxState) => {
-  // TODO: Clear all scheduled events for all voices
   const schedulerState = SchedulerStateMap.get(handle);
   if (!schedulerState) {
     throw new UnreachableException(
@@ -149,6 +191,13 @@ export const stopScheduler = (handle: SchedulerHandle, state: SequencerReduxStat
         state.midiOutputs[synthIx!].outputCbs.forEach(({ onClearAll }) => onClearAll());
       }
     });
+
+  // Cancel all events on the rising edge detector
+  const valueParam = (state.risingEdgeDetector?.parameters as Map<string, AudioParam>).get('value');
+  if (valueParam) {
+    valueParam.cancelScheduledValues(0);
+    valueParam.setValueAtTime(0, ctx.currentTime);
+  }
 
   clearInterval(handle);
 };

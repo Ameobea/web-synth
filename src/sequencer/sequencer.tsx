@@ -20,7 +20,8 @@ import {
 } from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
-import { buildMIDINode } from 'src/patchNetwork/midiNode';
+import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
+import { initScheduler } from 'src/sequencer/scheduler';
 
 const ctx = new AudioContext();
 
@@ -35,6 +36,7 @@ interface SerializedSequencer {
   bpm: number;
   playingStatus: PlayingStatus;
   midiOutputCount: number;
+  gateOutputCount: number;
   schedulerScheme: SchedulerScheme;
 }
 
@@ -55,6 +57,7 @@ const serializeSequencer = (vcId: string): string => {
     bpm,
     playingStatus,
     midiOutputs,
+    gateOutputs,
     schedulerScheme,
   } = reduxInfra.getState().sequencer;
 
@@ -65,26 +68,34 @@ const serializeSequencer = (vcId: string): string => {
     bpm,
     playingStatus,
     midiOutputCount: midiOutputs.length,
+    gateOutputCount: gateOutputs.length,
     schedulerScheme,
   };
 
   return JSON.stringify(serialized);
 };
 
+export const buildGateOutput = (): ConstantSourceNode => {
+  const csn = new ConstantSourceNode(ctx);
+  csn.offset.value = 0;
+  csn.start();
+  return csn;
+};
+
 const deserializeSequencer = (serialized: string): SequencerReduxState => {
   const {
     voices,
-    sampleBank: _sampleBank,
+    sampleBank,
     marks,
     bpm,
     playingStatus,
     midiOutputCount,
+    gateOutputCount,
     schedulerScheme,
   }: SerializedSequencer = JSON.parse(serialized);
 
-  // TODO: Start it if it's playing?
-
-  return {
+  const state = {
+    activeBeat: 0,
     voices,
     sampleBank: [], // TODO: pull values out of the global sample store once we have that set up
     marks,
@@ -98,8 +109,18 @@ const deserializeSequencer = (serialized: string): SequencerReduxState => {
         }),
       midiOutputCount
     ),
+    gateOutputs: R.times(buildGateOutput, gateOutputCount),
     schedulerScheme,
+    risingEdgeDetector: undefined,
   };
+
+  // If the sequencer was playing when we saved, re-start it and set a new valid handle
+  if (state.playingStatus.type === 'PLAYING') {
+    const handle = initScheduler(state);
+    state.playingStatus = { type: 'PLAYING', intervalHandle: handle };
+  }
+
+  return state;
 };
 
 const loadInitialState = (stateKey: string, vcId: string) => {
@@ -127,6 +148,17 @@ const LazySequencerUI: React.FC<{ vcId: string } & Pick<
   </Suspense>
 );
 
+const buildRisingEdgeDetector = async (onDetected: () => void) => {
+  await ctx.audioWorklet.addModule('/RisingEdgeDetectorWorkletProcessor.js');
+  const workletHandle = new AudioWorkletNode(
+    ctx,
+    'rising-edge-detector-audio-worklet-node-processor'
+  );
+  workletHandle.connect(ctx.destination);
+  workletHandle.port.onmessage = onDetected;
+  return workletHandle;
+};
+
 export const init_sequencer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
@@ -146,6 +178,13 @@ export const init_sequencer = (stateKey: string) => {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);
   }
   reduxInfraMap.set(vcId, reduxInfra);
+
+  // Asynchronously init the rising edge detector and set it into the state once it's initialized
+  buildRisingEdgeDetector(() =>
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.INCREMENT_BEAT())
+  ).then(workletHandle =>
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_RISING_EDGE_DETECTOR(workletHandle))
+  );
 
   mkContainerRenderHelper({
     Comp: LazySequencerUI,
@@ -204,11 +243,11 @@ export const get_sequencer_audio_connectables = (vcId: string): AudioConnectable
     type: 'customAudio',
   });
   outputs = reduxState.sequencer.midiOutputs.reduce(
-    (acc, csn, i) => acc.set(`midi_output_${i + 1}`, { node: csn, type: 'number' }),
+    (acc: ImmMap<string, ConnectableOutput>, node: MIDINode, i: number) =>
+      acc.set(`midi_output_${i + 1}`, { node, type: 'number' }),
     outputs
   );
 
-  // TODO
   return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>(),
@@ -221,10 +260,10 @@ const schedulerFnBySchedulerScheme: {
 } = {
   [SchedulerScheme.Stable]: (bpm: number, startBeat: number, endBeat: number) =>
     R.range(startBeat, endBeat + 1).map(beat => beat * (bpm / 60)),
-  [SchedulerScheme.Random]: (bpm: number, startBeat: number, endBeat: number) => {
+  [SchedulerScheme.Random]: (_bpm: number, _startBeat: number, _endBeat: number) => {
     throw new UnimplementedError();
   },
-  [SchedulerScheme.Swung]: (bpm: number, startBeat: number, endBeat: number) => {
+  [SchedulerScheme.Swung]: (_bpm: number, _startBeat: number, _endBeat: number) => {
     throw new UnimplementedError();
   },
 };

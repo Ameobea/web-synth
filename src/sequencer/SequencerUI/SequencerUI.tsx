@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 
 import { SequencerReduxState, SequencerReduxInfra } from '../redux';
 import InputSelect from './InputSelect';
+import SequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
 
 const CELL_SIZE_PX = 40 as const;
@@ -65,6 +66,7 @@ const SequencerUI: React.FC<{
     <div className='sequencer'>
       <SequencerGrid rowMarks={marks} dispatch={dispatch} actionCreators={actionCreators} />
       <button onClick={() => dispatch(actionCreators.sequencer.ADD_VOICE())}>Add Voice</button>
+      <SequencerSettings actionCreators={actionCreators} />
       <InputSelect vcId={vcId} actionCreators={actionCreators} />
     </div>
   );

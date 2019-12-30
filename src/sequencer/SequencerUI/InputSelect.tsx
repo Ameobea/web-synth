@@ -101,13 +101,46 @@ const SampleInputInner: React.FC<InputCompCommonProps<'sample'> &
 
 const SampleInput = connect(mapSampleInputStateToProps)(SampleInputInner);
 
-const AllVoiceTargetTypes: VoiceTarget['type'][] = ['midi', 'sample'];
+const mapGateInputStateToProps = (state: { sequencer: SequencerReduxState }) => ({
+  gateOutputCount: state.sequencer.gateOutputs.length,
+});
+
+const GateInputInner: React.FC<{
+  actionCreators: SequencerReduxInfra['actionCreators'];
+  dispatch: SequencerReduxInfra['dispatch'];
+} & ReturnType<typeof mapGateInputStateToProps>> = ({
+  actionCreators,
+  dispatch,
+  gateOutputCount,
+}) => {
+  return (
+    <div>
+      <select>
+        <option value='none'>None</option>
+        {R.times(
+          i => (
+            <option key={i} value={i}>{`Gate Output ${i + 1}`}</option>
+          ),
+          gateOutputCount
+        )}
+      </select>
+      <button onClick={() => dispatch(actionCreators.sequencer.ADD_GATE_OUTPUT())}>
+        Add Gate Output
+      </button>
+    </div>
+  );
+};
+
+const GateInput = connect(mapGateInputStateToProps)(GateInputInner);
+
+const AllVoiceTargetTypes: VoiceTarget['type'][] = ['midi', 'sample', 'gate'];
 
 const GetDefaultVoiceTargetByTargetType: {
   [K in VoiceTarget['type']]: () => Extract<VoiceTarget, { type: K }>;
 } = {
   midi: () => ({ type: 'midi', synthIx: null, note: 40 }),
   sample: () => ({ type: 'sample', sampleIx: null }),
+  gate: () => ({ type: 'gate', gateIx: null }),
 };
 
 const InputCompByTargetType: {
@@ -115,6 +148,7 @@ const InputCompByTargetType: {
 } = {
   midi: SynthInput,
   sample: SampleInput,
+  gate: GateInput,
 };
 
 const VoiceInput: React.FC<{

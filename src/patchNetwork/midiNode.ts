@@ -1,4 +1,5 @@
 import * as R from 'ramda';
+import { PromiseResolveType } from 'ameo-utils';
 
 /**
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
@@ -24,10 +25,6 @@ export interface MIDINode {
    */
   getInputCbs: () => MIDIInputCbs;
 }
-
-export type PromiseResolveType<P> = P extends Promise<infer T> ? T : never;
-
-export type IterableValueOf<I> = I extends Iterable<[any, infer V]> ? V : never;
 
 // hilarious
 export type MIDIAccess = PromiseResolveType<ReturnType<typeof navigator['requestMIDIAccess']>>;

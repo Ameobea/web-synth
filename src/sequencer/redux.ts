@@ -1,17 +1,18 @@
 import * as R from 'ramda';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { UnreachableException } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary';
 import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
+import { buildGateOutput } from 'src/sequencer';
+import { initScheduler, stopScheduler } from 'src/sequencer/scheduler';
 
 export type VoiceTarget =
   | { type: 'sample'; sampleIx: number | null }
-  | { type: 'midi'; synthIx: number | null; note: number };
+  | { type: 'midi'; synthIx: number | null; note: number }
+  | { type: 'gate'; gateIx: number | null | 'RISING_EDGE_DETECTOR' };
 
-export type PlayingStatus =
-  | { type: 'NOT_PLAYING' }
-  | { type: 'PLAYING'; intervalHandle: number; curColIx: number };
+export type PlayingStatus = { type: 'NOT_PLAYING' } | { type: 'PLAYING'; intervalHandle: number };
 
 export enum SchedulerScheme {
   Stable,
@@ -22,6 +23,7 @@ export enum SchedulerScheme {
 const getIsPlaying = (playingStatus: PlayingStatus) => playingStatus.type === 'PLAYING';
 
 export interface SequencerReduxState {
+  activeBeat: number;
   voices: VoiceTarget[];
   sampleBank: { descriptor: SampleDescriptor; buffer: AudioBuffer }[];
   /**
@@ -32,7 +34,9 @@ export interface SequencerReduxState {
   playingStatus: PlayingStatus;
   outputGainNode: GainNode;
   midiOutputs: MIDINode[];
+  gateOutputs: ConstantSourceNode[];
   schedulerScheme: SchedulerScheme;
+  risingEdgeDetector: AudioWorkletNode | undefined;
 }
 
 const ctx = new AudioContext();
@@ -85,11 +89,17 @@ const actionGroups = {
       }
 
       if (isPlaying) {
-        // TODO
-        throw new UnimplementedError();
+        return {
+          ...state,
+          playingStatus: { type: 'PLAYING' as const, intervalHandle: initScheduler(state) },
+        };
       } else {
-        // TODO
-        throw new UnimplementedError();
+        if (state.playingStatus.type !== 'PLAYING') {
+          console.error("Tried to stop sequencer when it wasn't playing");
+          return state;
+        }
+        stopScheduler(state.playingStatus.intervalHandle, state);
+        return { ...state, playingStatus: { type: 'NOT_PLAYING' as const } };
       }
     },
   }),
@@ -143,6 +153,31 @@ const actionGroups = {
       };
     },
   }),
+  SET_BPM: buildActionGroup({
+    actionCreator: (bpm: number | string) => ({ type: 'SET_BPM', bpm }),
+    subReducer: (state: SequencerReduxState, { bpm }) => R.set(R.lensProp('bpm'), +bpm, state),
+  }),
+  ADD_GATE_OUTPUT: buildActionGroup({
+    actionCreator: () => ({ type: 'ADD_GATE_OUTPUT' }),
+    subReducer: (state: SequencerReduxState) => ({
+      ...state,
+      gateOutputs: [...state.gateOutputs, buildGateOutput()],
+    }),
+  }),
+  SET_RISING_EDGE_DETECTOR: buildActionGroup({
+    actionCreator: (detector: AudioWorkletNode) => ({ type: 'SET_RISING_EDGE_DETECTOR', detector }),
+    subReducer: (state: SequencerReduxState, { detector }) => ({
+      ...state,
+      risingEdgeDetector: detector,
+    }),
+  }),
+  INCREMENT_BEAT: buildActionGroup({
+    actionCreator: () => ({ type: 'INCREMENT_BEAT' }),
+    subReducer: (state: SequencerReduxState) => ({
+      ...state,
+      activeBeat: (state.activeBeat + 1) % state.marks[0]!.length,
+    }),
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -158,6 +193,7 @@ export type SequencerReduxInfra = ReturnType<typeof buildSequencerReduxInfra>;
 const DEFAULT_WIDTH = 16 as const;
 
 export const buildInitialState = (): SequencerReduxState => ({
+  activeBeat: 0,
   voices: [{ type: 'sample', sampleIx: null }], // TODO
   sampleBank: [], // TODO
   marks: [R.times(() => false, DEFAULT_WIDTH)], // TODO
@@ -165,5 +201,7 @@ export const buildInitialState = (): SequencerReduxState => ({
   playingStatus: { type: 'NOT_PLAYING' as const },
   outputGainNode: new GainNode(ctx),
   midiOutputs: [],
+  gateOutputs: [],
   schedulerScheme: SchedulerScheme.Stable,
+  risingEdgeDetector: undefined,
 });

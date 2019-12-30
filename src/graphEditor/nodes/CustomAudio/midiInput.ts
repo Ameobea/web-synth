@@ -1,15 +1,10 @@
 import { Map } from 'immutable';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
+import { IterableValueOf, PromiseResolveType } from 'ameo-utils';
 
 import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
-import {
-  MIDINode,
-  MIDIAccess,
-  buildMIDINode,
-  PromiseResolveType,
-  IterableValueOf,
-} from 'src/patchNetwork/midiNode';
+import { MIDINode, MIDIAccess, buildMIDINode } from 'src/patchNetwork/midiNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
