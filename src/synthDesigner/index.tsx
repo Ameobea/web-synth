@@ -166,11 +166,16 @@ const memoizedGetMidiNode = memoizeOne((stateKey: string) => {
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return buildMIDINode(() => ({
-    onAttack: (note: number, voiceIx: number, _velocity: number) =>
-      dispatch(actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx)),
-    onRelease: (_note: number, voiceIx: number, _velocity: number) =>
-      dispatch(actionCreators.synthDesigner.UNGATE(voiceIx)),
-    onPitchBend: () => {},
+    onAttack: (note: number, voiceIx: number, _velocity: number, offset?: number) =>
+      dispatch(
+        actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx, undefined, offset)
+      ),
+    onRelease: (_note: number, voiceIx: number, _velocity: number, offset?: number) =>
+      dispatch(actionCreators.synthDesigner.UNGATE(voiceIx, undefined, offset)),
+    onPitchBend: () => {
+      // No-op; TODO?
+    },
+    onClearAll: () => dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS()),
   }));
 });
 

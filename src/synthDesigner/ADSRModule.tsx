@@ -48,25 +48,35 @@ export class ADSRModule extends ConstantSourceNode {
    * Triggers the ADSR to implement the signal, triggering ramps to each of the levels defined by the envelope to the
    * underlying `ConstantSourceNode` and effecting all connected `AudioParam`s
    */
-  public gate(offset = 0) {
+  public gate(offset?: number) {
     // start out off at the minimum
-    this.offset.cancelScheduledValues(0);
-    this.offset.setValueAtTime(this.minValue, this.ctx.currentTime);
-    this.offset.linearRampToValueAtTime(this.minValue, this.ctx.currentTime + 0.0001);
+    if (R.isNil(offset)) {
+      this.offset.cancelScheduledValues(0);
+      this.offset.linearRampToValueAtTime(this.minValue, this.ctx.currentTime + 0.0001);
+    }
 
+    const realOffset = Option.of(offset).getOrElse(0);
     const range = this.maxValue - this.minValue;
-
     const { attack, decay } = this.envelope;
+
+    console.log(
+      'Attack: ',
+      this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0 + realOffset
+    );
+    console.log(
+      'Decay: ',
+      this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0 + realOffset
+    );
 
     // Ramp to the attack
     this.offset.linearRampToValueAtTime(
       this.minValue + attack.magnitude * range,
-      (this.ctx.currentTime + attack.pos * this.lengthMs + offset) / 1000.0
+      this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0 + realOffset
     );
     // Ramp to the decay and hold there
     this.offset.linearRampToValueAtTime(
       this.minValue + decay.magnitude * range,
-      (this.ctx.currentTime + decay.pos * this.lengthMs + offset) / 1000.0
+      this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0 + realOffset
     );
   }
 

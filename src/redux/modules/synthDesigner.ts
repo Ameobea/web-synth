@@ -454,8 +454,13 @@ const setEffect = (
   return setSynth(synthIx, newSynth, state);
 };
 
-const mkSetFreqForOsc = (frequency: number) => (osc: OscillatorNode) =>
-  osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+const mkSetFreqForOsc = (frequency: number, offset?: number) => (osc: OscillatorNode) =>
+  osc.frequency.setValueAtTime(
+    frequency,
+    Option.of(offset)
+      .map(offset => ctx.currentTime + offset)
+      .getOrElse(ctx.currentTime)
+  );
 
 const actionGroups = {
   SET_STATE: buildActionGroup({
@@ -589,7 +594,7 @@ const actionGroups = {
       offset,
     }),
     subReducer: (state: SynthDesignerState, { frequency, voiceIx, synthIx, offset }) => {
-      const setFreqForOsc = mkSetFreqForOsc(frequency);
+      const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
 
       // TODO: Dedup
       if (R.isNil(synthIx)) {
@@ -597,6 +602,7 @@ const actionGroups = {
           const targetVoice = synth.voices[voiceIx];
 
           // Trigger gain and filter ADSRs
+          console.log('Gating at: ', ctx.currentTime + offset);
           targetVoice.gainADSRModule.gate(offset);
           targetVoice.filterADSRModule.gate(offset);
 
@@ -629,6 +635,7 @@ const actionGroups = {
           const targetVoice = voices[voiceIx];
 
           // Trigger release of gain and filter ADSRs
+          console.log('Ungating at', ctx.currentTime + offset);
           targetVoice.gainADSRModule.ungate(offset);
           targetVoice.filterADSRModule.ungate(offset);
         });
@@ -882,6 +889,21 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, effectType }) => {
       const targetSynth = getSynth(synthIx, state.synths);
       return setSynth(synthIx, { ...targetSynth, selectedEffectType: effectType }, state);
+    },
+  }),
+  CLEAR_ALL_SCHEDULED_MIDI_EVENTS: buildActionGroup({
+    actionCreator: () => ({ type: 'CLEAR_ALL_SCHEDULED_MIDI_EVENTS' }),
+    subReducer: (state: SynthDesignerState) => {
+      state.synths.forEach(synth =>
+        synth.voices.forEach(voice => {
+          voice.gainADSRModule.offset.setValueAtTime(0, ctx.currentTime);
+          voice.gainADSRModule.offset.cancelScheduledValues(0);
+          voice.filterADSRModule.offset.setValueAtTime(0, ctx.currentTime);
+          voice.filterADSRModule.offset.cancelScheduledValues(0);
+        })
+      );
+
+      return state;
     },
   }),
 };

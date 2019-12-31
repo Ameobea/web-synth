@@ -81,12 +81,10 @@ const actionGroups = {
       marks: R.set(R.lensPath([rowIx, colIx]), false, state.marks),
     }),
   }),
-  SET_IS_PLAYING: buildActionGroup({
-    actionCreator: (isPlaying: boolean) => ({ type: 'SET_IS_PLAYING', isPlaying }),
-    subReducer: (state: SequencerReduxState, { isPlaying }) => {
-      if (isPlaying === getIsPlaying(state.playingStatus)) {
-        return state;
-      }
+  TOGGLE_IS_PLAYING: buildActionGroup({
+    actionCreator: () => ({ type: 'TOGGLE_IS_PLAYING' }),
+    subReducer: (state: SequencerReduxState) => {
+      const isPlaying = !getIsPlaying(state.playingStatus);
 
       if (isPlaying) {
         return {

@@ -42,6 +42,7 @@ const SynthInputInner: React.FC<InputCompCommonProps<'midi'> &
           })
         )
       }
+      value={Option.of(voiceTarget.synthIx).getOrElse('none')}
     >
       {R.times(
         i =>
@@ -50,7 +51,7 @@ const SynthInputInner: React.FC<InputCompCommonProps<'midi'> &
               None
             </option>
           ) : (
-            <option key={i} value={i}>
+            <option key={i} value={i - 1}>
               {i}
             </option>
           ),

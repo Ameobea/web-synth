@@ -9,7 +9,7 @@ const ctx = new AudioContext();
 
 export type SchedulerHandle = number;
 
-const RESCHEDULE_INTERVAL_MS = 1000;
+const RESCHEDULE_INTERVAL_MS = 3200;
 
 interface SchedulerState {
   /**
@@ -35,13 +35,19 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
       return R.identity;
     }
 
+    const midiOutput = state.midiOutputs[voice.synthIx!];
+    if (!midiOutput) {
+      throw new Error(`No MIDI output at index ${voice.synthIx} found in sequencer state`);
+    }
+
     return (beat: number) => {
-      state.midiOutputs[voice.synthIx!].outputCbs.forEach(({ onAttack, onRelease }) => {
+      midiOutput.outputCbs.forEach(({ onAttack, onRelease }) => {
         const curTime = ctx.currentTime;
         // TODO: Make per-voice config of what percentage of the window to hold the note for
         const beatDurationMS = (state.bpm * 1000) / 60;
         const holdDurationMS = beatDurationMS * 0.72;
 
+        // TODO: Use a polyphonic voice manager here somewhere?
         onAttack(voice.note, 0, 255, beat - curTime);
         onRelease(voice.note, 0, 255, beat + holdDurationMS / 1000 - curTime);
       });
@@ -81,7 +87,7 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
         }
 
         const param = (state.risingEdgeDetector.parameters as Map<string, AudioParam>).get(
-          'value'
+          'input'
         )!;
 
         param.setValueAtTime(time, 1.0);
@@ -114,8 +120,8 @@ const mkBeatScheduler = (
 const SchedulerStateMap: Map<SchedulerHandle, SchedulerState> = new Map();
 
 export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
-  let lastScheduledTime = ctx.currentTime - RESCHEDULE_INTERVAL_MS / 1000;
-  let lastScheduledBeat = -1;
+  let endOfLastSchedulingWindow = ctx.currentTime;
+  let lastScheduledBeatIndex = -1;
 
   const schedulerState: SchedulerState = {
     scheduledBuffers: [],
@@ -123,8 +129,9 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
 
   const handle = setInterval(() => {
     const curTime = ctx.currentTime;
-    const endOfCurSchedWindow = lastScheduledTime + RESCHEDULE_INTERVAL_MS / 1000;
-    lastScheduledTime = curTime;
+    const startOfCurSchedWindow = Math.max(curTime, endOfLastSchedulingWindow);
+    const endOfCurSchedWindow = ctx.currentTime + (RESCHEDULE_INTERVAL_MS / 1000) * 3;
+    endOfLastSchedulingWindow = endOfCurSchedWindow;
 
     // Drop references to all samples that have already been started
     schedulerState.scheduledBuffers = schedulerState.scheduledBuffers.filter(
@@ -135,8 +142,8 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
     let beatTimings = getBeatTimings(
       state.schedulerScheme,
       state.bpm,
-      lastScheduledBeat + 1,
-      lastScheduledBeat + beatCountEstimate + 1
+      lastScheduledBeatIndex + 1,
+      lastScheduledBeatIndex + beatCountEstimate + 1
     );
 
     // make sure that we have timings for all necessary beats
@@ -146,14 +153,17 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
         ...getBeatTimings(
           state.schedulerScheme,
           state.bpm,
-          lastScheduledBeat + 1 + beatTimings.length,
-          lastScheduledBeat + beatCountEstimate + 1 + beatTimings.length
+          lastScheduledBeatIndex + 1 + beatTimings.length,
+          lastScheduledBeatIndex + beatCountEstimate + 1 + beatTimings.length
         ),
       ];
     }
 
-    beatTimings = beatTimings.filter(beat => beat > curTime && beat < endOfCurSchedWindow);
-    lastScheduledBeat = Option.of(R.last(beatTimings)).getOrElse(lastScheduledBeat);
+    beatTimings = beatTimings.filter(
+      beat => beat > startOfCurSchedWindow && beat < endOfCurSchedWindow
+    );
+    lastScheduledBeatIndex = lastScheduledBeatIndex + beatTimings.length;
+    console.log('Scheduling beats: ', beatTimings);
 
     state.voices.forEach(voice =>
       beatTimings.forEach(mkBeatScheduler(state, schedulerState, voice))

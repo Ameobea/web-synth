@@ -244,7 +244,7 @@ export const get_sequencer_audio_connectables = (vcId: string): AudioConnectable
   });
   outputs = reduxState.sequencer.midiOutputs.reduce(
     (acc: ImmMap<string, ConnectableOutput>, node: MIDINode, i: number) =>
-      acc.set(`midi_output_${i + 1}`, { node, type: 'number' }),
+      acc.set(`midi_output_${i + 1}`, { node, type: 'midi' }),
     outputs
   );
 
@@ -259,7 +259,7 @@ const schedulerFnBySchedulerScheme: {
   [K in SchedulerScheme]: (bpm: number, startBeat: number, endBeat: number) => number[];
 } = {
   [SchedulerScheme.Stable]: (bpm: number, startBeat: number, endBeat: number) =>
-    R.range(startBeat, endBeat + 1).map(beat => beat * (bpm / 60)),
+    R.range(startBeat, endBeat + 1).map(beat => beat / (bpm / 60)),
   [SchedulerScheme.Random]: (_bpm: number, _startBeat: number, _endBeat: number) => {
     throw new UnimplementedError();
   },

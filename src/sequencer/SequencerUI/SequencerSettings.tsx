@@ -45,7 +45,7 @@ const SequencerSettings: React.FC<{
       {
         type: 'button',
         label: isPlaying ? 'stop' : 'start',
-        action: () => dispatch(actionCreators.sequencer.SET_IS_PLAYING(!isPlaying)),
+        action: () => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING()),
       },
     ],
     [isPlaying, actionCreators, dispatch]

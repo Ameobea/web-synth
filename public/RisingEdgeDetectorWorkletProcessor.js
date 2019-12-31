@@ -12,7 +12,7 @@ class RisingEdgeDetectorWorkletProcessor extends AudioWorkletProcessor {
   isGated = false;
 
   sendMarkMessage() {
-    this.port.postMessage();
+    this.port.postMessage(undefined);
   }
 
   process(_inputs, _outputs, params) {
