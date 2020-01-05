@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { connect } from 'react-redux';
 import * as R from 'ramda';
+import ControlPanel from 'react-control-panel';
 
 import { EffectType } from 'src/redux/modules/synthDesigner';
 import SynthModuleComp from './SynthModule';
@@ -14,12 +15,21 @@ import {
   get_synth_designer_audio_connectables,
 } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
+import { BACKEND_BASE_URL } from 'src/conf';
+import { SynthPreset, SynthPresetEntry, SynthVoicePresetEntry } from 'src/synthDesigner/preset';
+import { useOnce } from 'ameo-utils/dist/util/react';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
   public lineThickness: number;
   constructor(ctx: AudioContext, nodeId: string, updateIntervalMs?: number);
 }
+
+const fetchSynthPresets = async (): Promise<SynthPresetEntry[]> =>
+  fetch(`${BACKEND_BASE_URL}/synth_presets`).then(res => res.json());
+
+const fetchSynthVoicePresets = async (): Promise<SynthVoicePresetEntry[]> =>
+  fetch(`${BACKEND_BASE_URL}/synth_voice_presets`).then(res => res.json());
 
 const mapStateToProps = ({ synthDesigner }: SynthDesignerReduxStore) => ({
   synthDesignerState: synthDesigner,
@@ -32,6 +42,45 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
+  const [presets, setPresets] = useState([] as SynthPresetEntry[]);
+  const [voicePresets, setVoicePresets] = useState([] as SynthVoicePresetEntry[]);
+  const controlPanelContext = useRef<{ [label: string]: any } | undefined>();
+  useOnce(async () => {
+    for (let i = 0; i < 3; i++) {
+      try {
+        const presets = await fetchSynthPresets();
+        setPresets(presets);
+        return;
+      } catch (err) {
+        console.warn(`Failed to fetch synth presets; attempts: ${i + 1}`);
+      }
+    }
+    console.error('Failed to fetch synth presets in 3 attempts');
+  });
+
+  const presetIds: { [id: number]: string } = useMemo(
+    () => Object.entries(presets).reduce((acc, [id, val]) => ({ ...acc, [val.title]: id }), {}),
+    [presets]
+  );
+
+  useOnce(async () => {
+    for (let i = 0; i < 3; i++) {
+      try {
+        const voicePresets = await fetchSynthVoicePresets();
+        setVoicePresets(voicePresets);
+        return;
+      } catch (err) {
+        console.warn(`Failed to fetch synth voice presets; attempts: ${i + 1}`);
+      }
+    }
+    console.error('Failed to fetch synth voice presets in 3 attempts');
+  });
+
+  const voicePresetIds: { [id: number]: string } = useMemo(
+    () =>
+      Object.entries(voicePresets).reduce((acc, [id, val]) => ({ ...acc, [val.title]: id }), {}),
+    [presets]
+  );
 
   useEffect(() => {
     if (
@@ -74,8 +123,10 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
                 value={synth.selectedEffectType}
                 onChange={evt =>
                   dispatch(
-                    actionCreators.synthDesigner.SET_SELECTED_EFFECT_TYPE(i, evt.target
-                      .value as EffectType)
+                    actionCreators.synthDesigner.SET_SELECTED_EFFECT_TYPE(
+                      i,
+                      evt.target.value as EffectType
+                    )
                   )
                 }
               >
@@ -97,17 +148,37 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
           </SynthModuleComp>
         ))}
 
-        <button
-          style={{ marginTop: 6 }}
-          onClick={() => {
-            const vcId = stateKey.split('_')[1]!;
-            dispatch(actionCreators.synthDesigner.ADD_SYNTH_MODULE());
-            const newConnectables = get_synth_designer_audio_connectables(stateKey);
-            updateConnectables(vcId, newConnectables);
+        <ControlPanel
+          contextCb={(ctx: { [label: string]: any }) => {
+            controlPanelContext.current = ctx;
           }}
-        >
-          Add Synth Module
-        </button>
+          settings={[
+            {
+              label: 'preset',
+              type: 'select',
+              options: { blank: 'blank', ...presetIds },
+              initial: 'blank',
+            },
+            {
+              label: 'add synth module',
+              type: 'button',
+              action: () => {
+                if (!controlPanelContext.current) {
+                  throw new Error('Control panel context not set!');
+                }
+
+                const selectedVoicePresetId: number = controlPanelContext.current['preset'];
+                const selectedVoicePreset = voicePresets[selectedVoicePresetId];
+                // TODO
+
+                const vcId = stateKey.split('_')[1]!;
+                dispatch(actionCreators.synthDesigner.ADD_SYNTH_MODULE());
+                const newConnectables = get_synth_designer_audio_connectables(stateKey);
+                updateConnectables(vcId, newConnectables);
+              },
+            },
+          ]}
+        />
       </div>
 
       <button

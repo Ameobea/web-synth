@@ -39,6 +39,14 @@ CREATE TABLE compositions (
   PRIMARY KEY (id)
 );
 
+CREATE TABLE voice_presets (
+  id BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  body TEXT NOT NULL,
+  PRIMARY KEY (id)
+);
+
 CREATE TABLE synth_presets (
   id BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
   title TEXT NOT NULL,

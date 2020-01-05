@@ -50,6 +50,15 @@ table! {
     }
 }
 
+table! {
+    voice_presets (id) {
+        id -> Bigint,
+        title -> Text,
+        description -> Text,
+        body -> Text,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     compositions,
     composition_tags,
@@ -57,4 +66,5 @@ allow_tables_to_appear_in_same_query!(
     effects,
     synth_presets,
     users,
+    voice_presets,
 );
