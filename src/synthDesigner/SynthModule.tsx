@@ -1,11 +1,15 @@
 import React, { useMemo } from 'react';
+import { connect, Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
+import { PropTypesOf } from 'ameo-utils';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
 import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import { getReduxInfra, get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
+import { ReduxStore, store } from 'src/redux';
+import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 
 const SYNTH_SETTINGS = [
   {
@@ -46,11 +50,20 @@ const SYNTH_SETTINGS = [
   },
 ];
 
-const SynthModuleComp: React.FC<{ index: number; synth: SynthModule; stateKey: string }> = ({
+const mapStateToProps = (state: ReduxStore) => ({
+  voicePresetIds: voicePresetIdsSelector(state),
+});
+
+const SynthModuleCompInner: React.FC<{
+  index: number;
+  synth: SynthModule;
+  stateKey: string;
+} & ReturnType<typeof mapStateToProps>> = ({
   index,
   synth,
   stateKey,
-  children,
+  children = null,
+  voicePresetIds,
 }) => {
   const unison = synth.voices[0].oscillators.length;
 
@@ -122,8 +135,45 @@ const SynthModuleComp: React.FC<{ index: number; synth: SynthModule; stateKey: s
       />
 
       <div className='effects'>{children}</div>
+
+      <div className='presets'>
+        <ControlPanel
+          style={{ height: 97 }}
+          settings={[
+            {
+              label: 'preset',
+              type: 'select',
+              options: { blank: 'blank', ...voicePresetIds },
+              initial: 'blank',
+            },
+            {
+              label: 'load preset',
+              type: 'button',
+              action: () => {
+                // TODO
+              },
+            },
+            {
+              label: 'save preset',
+              type: 'button',
+              action: () => {
+                // TODO
+              },
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 };
 
+const SynthModuleUnwrapped = connect(mapStateToProps)(SynthModuleCompInner);
+const SynthModuleComp: React.FC<Omit<
+  PropTypesOf<typeof SynthModuleUnwrapped>,
+  keyof ReturnType<typeof mapStateToProps>
+>> = ({ ...props }) => (
+  <Provider store={store}>
+    <SynthModuleUnwrapped {...props} />
+  </Provider>
+);
 export default SynthModuleComp;

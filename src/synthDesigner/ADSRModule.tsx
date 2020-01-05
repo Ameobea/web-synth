@@ -59,15 +59,6 @@ export class ADSRModule extends ConstantSourceNode {
     const range = this.maxValue - this.minValue;
     const { attack, decay } = this.envelope;
 
-    console.log(
-      'Attack: ',
-      this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0 + realOffset
-    );
-    console.log(
-      'Decay: ',
-      this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0 + realOffset
-    );
-
     // Ramp to the attack
     this.offset.linearRampToValueAtTime(
       this.minValue + attack.magnitude * range,

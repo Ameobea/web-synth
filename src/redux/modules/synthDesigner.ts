@@ -602,7 +602,6 @@ const actionGroups = {
           const targetVoice = synth.voices[voiceIx];
 
           // Trigger gain and filter ADSRs
-          console.log('Gating at: ', ctx.currentTime + offset);
           targetVoice.gainADSRModule.gate(offset);
           targetVoice.filterADSRModule.gate(offset);
 
@@ -635,7 +634,6 @@ const actionGroups = {
           const targetVoice = voices[voiceIx];
 
           // Trigger release of gain and filter ADSRs
-          console.log('Ungating at', ctx.currentTime + offset);
           targetVoice.gainADSRModule.ungate(offset);
           targetVoice.filterADSRModule.ungate(offset);
         });

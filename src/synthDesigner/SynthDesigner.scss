@@ -37,6 +37,12 @@
       justify-content: center;
     }
   }
+
+  .presets {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 
 .effect-module {

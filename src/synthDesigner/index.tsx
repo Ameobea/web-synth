@@ -26,6 +26,8 @@ const buildSynthDesignerRedux = () => {
   return buildStore<typeof modules>(modules, undefined, { form: formReducer });
 };
 
+export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
+
 export type SynthDesignerReduxStore = ReturnType<
   ReturnType<typeof buildSynthDesignerRedux>['getState']
 >;
