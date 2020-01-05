@@ -1,4 +1,3 @@
--- Your SQL goes here
 CREATE TABLE effects (
   id BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
   title VARCHAR(255) NOT NULL,
@@ -37,5 +36,13 @@ CREATE TABLE compositions (
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   content TEXT NOT NULL,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE synth_presets (
+  id BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  body TEXT NOT NULL,
   PRIMARY KEY (id)
 );

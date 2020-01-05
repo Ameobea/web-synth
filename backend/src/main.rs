@@ -18,8 +18,11 @@ extern crate log;
 extern crate chrono;
 extern crate fern;
 
-use rocket::fairing::{Fairing, Info, Kind};
-use rocket::{http::Method, http::Status, Request, Response};
+use rocket::{
+    fairing::{Fairing, Info, Kind},
+    http::{Method, Status},
+    Request, Response,
+};
 
 pub mod conf;
 pub mod models;
@@ -96,16 +99,15 @@ fn main() {
 
     let launch_err = rocket::ignite()
         .attach(WebSynthDbConn::fairing())
-        .mount(
-            "/",
-            routes![
-                routes::index,
-                routes::create_effect,
-                routes::list_effects,
-                routes::save_composition,
-                routes::get_compositions
-            ],
-        )
+        .mount("/", routes![
+            routes::index,
+            routes::create_effect,
+            routes::list_effects,
+            routes::save_composition,
+            routes::get_compositions,
+            routes::get_synth_presets,
+            routes::create_synth_preset,
+        ])
         .attach(CorsFairing)
         .launch();
 

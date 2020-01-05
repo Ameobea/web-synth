@@ -33,6 +33,15 @@ table! {
 }
 
 table! {
+    synth_presets (id) {
+        id -> Bigint,
+        title -> Text,
+        description -> Text,
+        body -> Text,
+    }
+}
+
+table! {
     users (id) {
         id -> Bigint,
         username -> Text,
@@ -46,5 +55,6 @@ allow_tables_to_appear_in_same_query!(
     composition_tags,
     composition_tags_join,
     effects,
+    synth_presets,
     users,
 );

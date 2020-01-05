@@ -41,6 +41,10 @@ export class MIDIToFrequencyNode {
       // TODO
       console.log({ bendAmount });
     },
+    onClearAll: () => {
+      this.gainCSN.offset.value = 0;
+      this.activeNotes = [];
+    },
   });
 
   public nodeType = 'customAudio/MIDIToFrequency';
