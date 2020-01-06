@@ -6,7 +6,7 @@ const buildSampleKey = ({ isLocal, name }: SampleDescriptor): string =>
 export default class SampleManager {
   private samples: Map<string, AudioBuffer> = new Map();
 
-  public setSamples(descriptor: SampleDescriptor, buffer: AudioBuffer) {
+  public setSample(descriptor: SampleDescriptor, buffer: AudioBuffer) {
     this.samples.set(buildSampleKey(descriptor), buffer);
   }
 

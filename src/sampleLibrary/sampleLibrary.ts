@@ -1,9 +1,11 @@
+import * as R from 'ramda';
 import { UnimplementedError } from 'ameo-utils';
 
 import { getFSAccess } from 'src/fsAccess';
 import SampleManager from 'src/sampleLibrary/SampleManager';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
+import { cacheSample, getCachedSample } from 'src/sampleLibrary/sampleCache';
 
 export interface SampleDescriptor {
   isLocal: boolean;
@@ -31,16 +33,14 @@ const listLocalSamples = async (): Promise<SampleDescriptor[]> => {
   return descriptors;
 };
 
-const loadLocalSample = async (descriptor: SampleDescriptor): Promise<AudioBuffer> => {
+const loadLocalSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffer> => {
   const fsAccess = await getFSAccess();
   const sampleFile = await fsAccess.getFile('samples', descriptor.name);
   // TS doesn't like the `.arrayBuffer()` method on `File`/`Blob` for whatever reason
-  const sampleData = await ((sampleFile as any).arrayBuffer() as Promise<ArrayBuffer>);
-
-  return ctx.decodeAudioData(sampleData);
+  return (sampleFile as any).arrayBuffer() as Promise<ArrayBuffer>;
 };
 
-const loadRemoteSample = async (descriptor: SampleDescriptor): Promise<AudioBuffer> => {
+const loadRemoteSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffer> => {
   throw new UnimplementedError(); // TODO
 };
 
@@ -66,12 +66,32 @@ export const listSamples = async ({
 };
 
 export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuffer> => {
+  // First we check the highest level of cache, the in-memory sample manager
   const cachedSample = GLOBAL_SAMPLE_MANAGER.getSample(descriptor);
   if (cachedSample) {
     return cachedSample;
   }
 
-  return descriptor.isLocal ? loadLocalSample(descriptor) : loadRemoteSample(descriptor);
+  // Then we check the second level of cache, the on-disk IndexedDB cache to see if we have the desired sample available
+  const diskCachedSample = await getCachedSample(descriptor);
+  if (!R.isNil(diskCachedSample)) {
+    const buf = await ctx.decodeAudioData(diskCachedSample);
+    // Add it to the top level cache
+    GLOBAL_SAMPLE_MANAGER.setSample(descriptor, buf);
+    return buf;
+  }
+
+  // We don't have the sample available, so we load it from its original source
+  const sampleData = await (descriptor.isLocal
+    ? loadLocalSample(descriptor)
+    : loadRemoteSample(descriptor));
+  const buf = await ctx.decodeAudioData(sampleData);
+
+  // Add it to both levels of cache
+  cacheSample(descriptor, sampleData);
+  GLOBAL_SAMPLE_MANAGER.setSample(descriptor, buf);
+
+  return buf;
 };
 
 export const init_sample_library = (stateKey: string) => {

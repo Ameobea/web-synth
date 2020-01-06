@@ -3,6 +3,7 @@
  * connected to MIDI modules.
  */
 
+import React from 'react';
 import ReactDOM from 'react-dom';
 import { Map } from 'immutable';
 import { Provider } from 'react-redux';
@@ -14,7 +15,6 @@ import {
   ConnectableInput,
   ConnectableOutput,
 } from 'src/patchNetwork';
-import React from 'react';
 import { MidiKeyboardVC } from 'src/midiKeyboard/MidiKeyboard';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
 import { MidiKeyboardStateItem } from 'src/redux/modules/midiKeyboard';
