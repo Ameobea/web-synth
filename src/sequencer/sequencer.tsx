@@ -1,8 +1,19 @@
 import React, { Suspense } from 'react';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import {
+  create_empty_audio_connectables,
+  AudioConnectables,
+  ConnectableInput,
+  ConnectableOutput,
+} from 'src/patchNetwork';
+import Loading from 'src/misc/Loading';
+import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
+import { initScheduler } from 'src/sequencer/scheduler';
+import { SampleDescriptor, getSample } from 'src/sampleLibrary';
 import {
   buildSequencerReduxInfra,
   buildInitialState,
@@ -12,16 +23,6 @@ import {
   PlayingStatus,
   SchedulerScheme,
 } from './redux';
-import {
-  create_empty_audio_connectables,
-  AudioConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-} from 'src/patchNetwork';
-import Loading from 'src/misc/Loading';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
-import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
-import { initScheduler } from 'src/sequencer/scheduler';
 
 const ctx = new AudioContext();
 
@@ -31,7 +32,7 @@ const reduxInfraMap: Map<string, SequencerReduxInfra> = new Map();
 
 interface SerializedSequencer {
   voices: VoiceTarget[];
-  sampleBank: unknown[];
+  sampleBank: { [voiceIx: number]: SampleDescriptor };
   marks: boolean[][];
   bpm: number;
   playingStatus: PlayingStatus;
@@ -82,7 +83,7 @@ export const buildGateOutput = (): ConstantSourceNode => {
   return csn;
 };
 
-const deserializeSequencer = (serialized: string): SequencerReduxState => {
+const deserializeSequencer = async (serialized: string): Promise<SequencerReduxState> => {
   const {
     voices,
     sampleBank,
@@ -97,7 +98,24 @@ const deserializeSequencer = (serialized: string): SequencerReduxState => {
   const state = {
     activeBeat: 0,
     voices,
-    sampleBank: [], // TODO: pull values out of the global sample store once we have that set up
+    sampleBank: await (
+      await Promise.all(
+        Object.entries(sampleBank).map(async ([voiceIx, descriptor]) => {
+          try {
+            const buffer = await getSample(descriptor);
+            return [+voiceIx, { descriptor, buffer }] as const;
+          } catch (err) {
+            // Unable to load the referenced sample for whatever reason
+            return [+voiceIx, null] as const;
+          }
+        })
+      )
+    ).reduce(
+      (acc, [voiceIx, val]) => acc.then(acc => ({ ...acc, [voiceIx]: val })),
+      Promise.resolve({}) as Promise<{
+        [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null;
+      }>
+    ),
     marks,
     bpm,
     playingStatus,
@@ -123,7 +141,7 @@ const deserializeSequencer = (serialized: string): SequencerReduxState => {
   return state;
 };
 
-const loadInitialState = (stateKey: string, vcId: string) => {
+const loadInitialState = async (stateKey: string, vcId: string) => {
   const serializedState = localStorage.getItem(stateKey);
   if (!serializedState) {
     return buildInitialState();
@@ -159,7 +177,7 @@ const buildRisingEdgeDetector = async (onDetected: () => void) => {
   return workletHandle;
 };
 
-export const init_sequencer = (stateKey: string) => {
+export const init_sequencer = async (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const domId = getSequencerDOMElementId(vcId);
@@ -171,8 +189,7 @@ export const init_sequencer = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  const initialState = loadInitialState(stateKey, vcId);
-
+  const initialState = await loadInitialState(stateKey, vcId);
   const reduxInfra = buildSequencerReduxInfra(initialState);
   if (!!reduxInfraMap.get(vcId)) {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);

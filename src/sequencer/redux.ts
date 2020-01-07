@@ -25,7 +25,7 @@ const getIsPlaying = (playingStatus: PlayingStatus) => playingStatus.type === 'P
 export interface SequencerReduxState {
   activeBeat: number;
   voices: VoiceTarget[];
-  sampleBank: { descriptor: SampleDescriptor; buffer: AudioBuffer }[];
+  sampleBank: { [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null };
   /**
    * For each voice, an array of the indices of all marked cells for that voice/row
    */
@@ -193,7 +193,7 @@ const DEFAULT_WIDTH = 16 as const;
 export const buildInitialState = (): SequencerReduxState => ({
   activeBeat: 0,
   voices: [{ type: 'sample', sampleIx: null }], // TODO
-  sampleBank: [], // TODO
+  sampleBank: {}, // TODO
   marks: [R.times(() => false, DEFAULT_WIDTH)], // TODO
   bpm: 80,
   playingStatus: { type: 'NOT_PLAYING' as const },

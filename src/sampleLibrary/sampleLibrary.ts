@@ -5,12 +5,15 @@ import { getFSAccess } from 'src/fsAccess';
 import SampleManager from 'src/sampleLibrary/SampleManager';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
-import { cacheSample, getCachedSample } from 'src/sampleLibrary/sampleCache';
+import { cacheSample, getCachedSample, getAllCachedSamples } from 'src/sampleLibrary/sampleCache';
 
 export interface SampleDescriptor {
   isLocal: boolean;
   name: string;
 }
+
+export const hashSampleDescriptor = ({ isLocal, name }: SampleDescriptor): string =>
+  `${isLocal}-${name}`;
 
 const GLOBAL_SAMPLE_MANAGER = new SampleManager();
 
@@ -57,12 +60,19 @@ export const listSamples = async ({
   includeRemote,
   includeLocal,
 }: ListSampleOpts = {}): Promise<SampleDescriptor[]> => {
-  const [localSamples, remoteSamples] = await Promise.all([
+  const [cachedSamples, localSamples, remoteSamples] = await Promise.all([
+    getAllCachedSamples(),
     includeLocal ? listLocalSamples().catch(() => []) : [],
     includeRemote ? listRemoteSamples() : [],
   ]);
 
-  return [...localSamples, ...remoteSamples];
+  // De-dup samples, only retaining unique descriptors
+  const allSamples: Map<string, SampleDescriptor> = new Map();
+  [...cachedSamples, ...localSamples, ...remoteSamples].forEach(descriptor =>
+    allSamples.set(hashSampleDescriptor(descriptor), descriptor)
+  );
+
+  return [...allSamples.values()];
 };
 
 export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuffer> => {
@@ -85,7 +95,7 @@ export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuff
   const sampleData = await (descriptor.isLocal
     ? loadLocalSample(descriptor)
     : loadRemoteSample(descriptor));
-  const buf = await ctx.decodeAudioData(sampleData);
+  const buf = await ctx.decodeAudioData(sampleData.slice(0));
 
   // Add it to both levels of cache
   cacheSample(descriptor, sampleData);

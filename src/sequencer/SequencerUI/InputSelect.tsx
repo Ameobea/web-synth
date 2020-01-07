@@ -2,7 +2,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { UnimplementedError } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary';
 import { updateConnectables } from 'src/patchNetwork';
@@ -92,7 +92,7 @@ const SampleInputInner: React.FC<InputCompCommonProps<'sample'> &
     <button
       onClick={async () => {
         const descriptor = await selectSample();
-        throw new UnreachableException(); // TODO
+        throw new UnimplementedError(); // TODO
       }}
     >
       Pick Sample

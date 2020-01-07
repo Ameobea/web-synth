@@ -16,7 +16,15 @@ dbClient.version(1).stores({
   samples: '[isLocal+name], lastAccessed, sizeBytes',
 });
 
-const samplesTable = dbClient.table('samples');
+interface SampleRow {
+  name: string;
+  isLocal: string;
+  sizeBytes: number;
+  lastAccessed: Date;
+  sampleData: ArrayBuffer;
+}
+
+const samplesTable = (dbClient as any).samples as Dexie.Table<SampleRow, any>;
 
 const buildWhereClause = (descriptor: SampleDescriptor) => ({
   ...descriptor,
@@ -30,7 +38,7 @@ const buildDescriptor = (row: any): SampleDescriptor => ({
 
 const getTotalUsedCacheSpace = async () => {
   let totalBytesUsed = 0;
-  await samplesTable.where({}).each(row => {
+  await samplesTable.each(row => {
     totalBytesUsed += row.sizeBytes;
   });
   return totalBytesUsed;
@@ -99,4 +107,9 @@ export const getCachedSample = async (
   }
 
   return row.sampleData;
+};
+
+export const getAllCachedSamples = async (): Promise<SampleDescriptor[]> => {
+  const allSamples = await samplesTable.toArray();
+  return allSamples.map(buildDescriptor);
 };
