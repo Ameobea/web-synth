@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import * as R from 'ramda';
-import { List } from 'react-virtualized';
+import { List, ListRowRenderer } from 'react-virtualized';
 
-import { SampleDescriptor, listSamples, getSample } from 'src/sampleLibrary/sampleLibrary';
+import { SampleDescriptor, getSample } from 'src/sampleLibrary/sampleLibrary';
 import Loading from 'src/misc/Loading';
+import useAllSamples from './useAllSamples';
 import './SampleLibraryUI.scss';
 
 const ctx = new AudioContext();
@@ -17,13 +18,22 @@ const PlaySampleIcon: React.FC<{
   </div>
 );
 
-const SampleRow: React.FC<{
+interface SampleRowProps {
   isPlaying: boolean;
   togglePlaying: () => void;
   descriptor: SampleDescriptor;
   style?: React.CSSProperties;
-}> = ({ descriptor, style, togglePlaying, isPlaying }) => (
-  <div className='sample-row' style={style}>
+}
+
+export const SampleRow: React.FC<SampleRowProps &
+  React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
+  descriptor,
+  style,
+  togglePlaying,
+  isPlaying,
+  ...rest
+}) => (
+  <div className='sample-row' {...rest} style={style}>
     <PlaySampleIcon isPlaying={isPlaying} onClick={togglePlaying} />
     {descriptor.name}
   </div>
@@ -39,31 +49,78 @@ const playSample = async (descriptor: SampleDescriptor): Promise<AudioBufferSour
   return bufSrc;
 };
 
-const SampleListing: React.FC<{
+export interface MkDefaultSampleListingRowRendererArgs {
   sampleDescriptors: SampleDescriptor[];
-}> = ({ sampleDescriptors }) => {
+  playingSample: {
+    name: string;
+    bufSrc: Promise<AudioBufferSourceNode>;
+  } | null;
+  togglePlaying: (descriptor: SampleDescriptor) => void;
+}
+
+const mkDefaultSampleListingRowRenderer = ({
+  sampleDescriptors,
+  playingSample,
+  togglePlaying,
+}: MkDefaultSampleListingRowRendererArgs): ListRowRenderer => ({ style, index, key }) => (
+  <SampleRow
+    togglePlaying={() => togglePlaying(sampleDescriptors[index])}
+    isPlaying={sampleDescriptors[index].name === playingSample?.name}
+    descriptor={sampleDescriptors[index]}
+    key={key}
+    style={style}
+  />
+);
+
+export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: any } = {}>({
+  sampleDescriptors,
+  mkRowRenderer = mkDefaultSampleListingRowRenderer,
+  extraMkRowRendererArgs,
+}: {
+  sampleDescriptors: SampleDescriptor[];
+  mkRowRenderer?: ({
+    sampleDescriptors,
+    playingSample,
+    togglePlaying,
+  }: MkDefaultSampleListingRowRendererArgs & ExtraMkRowRendererArgs) => ListRowRenderer;
+  extraMkRowRendererArgs: ExtraMkRowRendererArgs;
+}) {
   const [playingSample, setPlayingSample] = useState<{
     name: string;
     bufSrc: Promise<AudioBufferSourceNode>;
   } | null>(null);
 
+  const togglePlaying = useMemo(
+    () => (descriptor: SampleDescriptor) => {
+      if (playingSample?.name === descriptor.name) {
+        if (playingSample) {
+          playingSample.bufSrc.then(bufSrc => bufSrc.stop());
+        }
+        setPlayingSample(null);
+      } else {
+        if (playingSample !== null) {
+          playingSample.bufSrc.then(bufSrc => bufSrc.stop());
+        }
+        setPlayingSample({ name, bufSrc: playSample(descriptor) });
+      }
+    },
+    [playingSample, setPlayingSample]
+  );
+
+  const RowRenderer = useMemo(() => {
+    const mkRowRendererArgs: MkDefaultSampleListingRowRendererArgs & ExtraMkRowRendererArgs = {
+      sampleDescriptors,
+      playingSample,
+      togglePlaying,
+      ...(extraMkRowRendererArgs || {}),
+    };
+
+    return mkRowRenderer(mkRowRendererArgs);
+  }, [sampleDescriptors, playingSample, togglePlaying, mkRowRenderer, extraMkRowRendererArgs]);
+
   if (R.isEmpty(sampleDescriptors)) {
     return <>No available samples; no local or remote samples were found.</>;
   }
-
-  const togglePlaying = (descriptor: SampleDescriptor) => {
-    if (playingSample?.name === descriptor.name) {
-      if (playingSample) {
-        playingSample.bufSrc.then(bufSrc => bufSrc.stop());
-      }
-      setPlayingSample(null);
-    } else {
-      if (playingSample !== null) {
-        playingSample.bufSrc.then(bufSrc => bufSrc.stop());
-      }
-      setPlayingSample({ name, bufSrc: playSample(descriptor) });
-    }
-  };
 
   return (
     <List
@@ -71,46 +128,13 @@ const SampleListing: React.FC<{
       rowHeight={20}
       rowCount={sampleDescriptors.length}
       width={500}
-      rowRenderer={({ style, index, key }) => (
-        <SampleRow
-          togglePlaying={() => togglePlaying(sampleDescriptors[index])}
-          isPlaying={sampleDescriptors[index].name === playingSample?.name}
-          descriptor={sampleDescriptors[index]}
-          key={key}
-          style={style}
-        />
-      )}
+      rowRenderer={RowRenderer}
     />
   );
-};
+}
 
 const SampleLibraryUI: React.FC<{}> = () => {
-  const [allSamples, setAllSamples] = useState<
-    SampleDescriptor[] | null | 'FETCHING' | 'FETCH_ERROR'
-  >(null);
-  const [includeLocalSamples, setIncludeLocalSamples] = useState(false);
-
-  const lastIncludeLocalSamples = useRef(false);
-  useEffect(() => {
-    if ((['FETCHING', 'FETCH_ERROR'] as typeof allSamples[]).includes(allSamples)) {
-      return;
-    } else if (
-      Array.isArray(allSamples) &&
-      lastIncludeLocalSamples.current === includeLocalSamples
-    ) {
-      return;
-    }
-
-    lastIncludeLocalSamples.current = includeLocalSamples;
-
-    setAllSamples('FETCHING');
-    listSamples({ includeLocal: includeLocalSamples, includeRemote: true })
-      .then(setAllSamples)
-      .catch(err => {
-        console.error('Failed to list all samples: ', err);
-        setAllSamples('FETCH_ERROR');
-      });
-  }, [includeLocalSamples, allSamples]);
+  const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
 
   if (!Array.isArray(allSamples)) {
     return (
@@ -131,7 +155,7 @@ const SampleLibraryUI: React.FC<{}> = () => {
         </button>
       ) : null}
 
-      <SampleListing sampleDescriptors={allSamples} />
+      <SampleListing extraMkRowRendererArgs={{}} sampleDescriptors={allSamples} />
     </div>
   );
 };

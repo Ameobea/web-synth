@@ -8,6 +8,8 @@ import { SampleDescriptor } from 'src/sampleLibrary';
 import { updateConnectables } from 'src/patchNetwork';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
 import { SequencerReduxState, VoiceTarget, SequencerReduxInfra } from '../redux';
+import { renderModalWithControls } from 'src/controls/Modal';
+import SampleSelectDialog from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 
 const mapSynthInputStateToProps = (state: { sequencer: SequencerReduxState }) => ({
   midiOutputCount: state.sequencer.midiOutputs.length,
@@ -81,9 +83,7 @@ const mapSampleInputStateToProps = (
   ),
 });
 
-const selectSample = (): Promise<SampleDescriptor> => {
-  throw new UnimplementedError(); // TODO
-};
+const selectSample = (): Promise<SampleDescriptor> => renderModalWithControls(SampleSelectDialog);
 
 const SampleInputInner: React.FC<InputCompCommonProps<'sample'> &
   ReturnType<typeof mapSampleInputStateToProps>> = ({ voiceTarget: { sampleIx }, sampleOpt }) => (
@@ -92,6 +92,7 @@ const SampleInputInner: React.FC<InputCompCommonProps<'sample'> &
     <button
       onClick={async () => {
         const descriptor = await selectSample();
+        console.log({ descriptor });
         throw new UnimplementedError(); // TODO
       }}
     >
