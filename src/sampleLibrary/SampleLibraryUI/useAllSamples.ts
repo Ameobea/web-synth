@@ -21,6 +21,7 @@ export const useAllSamples = () => {
 
     lastIncludeLocalSamples.current = includeLocalSamples;
 
+    console.log('fetching', includeLocalSamples);
     setAllSamples('FETCHING');
     listSamples({ includeLocal: includeLocalSamples, includeRemote: true })
       .then(setAllSamples)

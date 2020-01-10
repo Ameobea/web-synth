@@ -29,3 +29,25 @@
     flex-direction: row;
   }
 }
+
+.editing-voice-selector {
+  height: 16px;
+  width: 16px;
+  background-color: #43a;
+  margin: 12px;
+  cursor: pointer;
+}
+
+.editing-voice-selector.selected {
+  background-color: #96f;
+}
+
+.sequencer-grid-wrapper {
+  display: flex;
+  flex-direction: row;
+}
+
+.editing-voice-selectors {
+  display: flex;
+  flex-direction: column;
+}

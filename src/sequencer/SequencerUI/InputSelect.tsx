@@ -200,32 +200,34 @@ const VoiceInput: React.FC<{
 };
 
 const mapStateToProps = (state: { sequencer: SequencerReduxState }) => ({
-  voices: state.sequencer.voices,
+  currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
+  voice: state.sequencer.voices[state.sequencer.currentEditingVoiceIx],
 });
 
 const InputSelect: React.FC<{
   vcId: string;
   actionCreators: SequencerReduxInfra['actionCreators'];
   dispatch: SequencerReduxInfra['dispatch'];
-} & ReturnType<typeof mapStateToProps>> = ({ vcId, dispatch, actionCreators, voices }) => {
-  return (
-    <div className='sequencer-input-select'>
-      <h2>Input Mapping</h2>
+} & ReturnType<typeof mapStateToProps>> = ({
+  vcId,
+  dispatch,
+  actionCreators,
+  voice,
+  currentEditingVoiceIx,
+}) => (
+  <div className='sequencer-input-select'>
+    <h2>Input Mapping</h2>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {voices.map((voice, i) => (
-          <VoiceInput
-            key={i}
-            vcId={vcId}
-            dispatch={dispatch}
-            actionCreators={actionCreators}
-            voiceIx={i}
-            voiceTarget={voice}
-          />
-        ))}
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <VoiceInput
+        vcId={vcId}
+        dispatch={dispatch}
+        actionCreators={actionCreators}
+        voiceIx={currentEditingVoiceIx}
+        voiceTarget={voice}
+      />
     </div>
-  );
-};
+  </div>
+);
 
 export default connect(mapStateToProps)(InputSelect);

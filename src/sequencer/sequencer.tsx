@@ -33,8 +33,9 @@ const SequencerUI = React.lazy(() => import('./SequencerUI'));
 const reduxInfraMap: Map<string, SequencerReduxInfra> = new Map();
 
 interface SerializedSequencer {
+  currentEditingVoiceIx: number;
   voices: VoiceTarget[];
-  sampleBank: { [voiceIx: number]: SampleDescriptor };
+  sampleBank: { [voiceIx: number]: SampleDescriptor | null };
   marks: boolean[][];
   bpm: number;
   playingStatus: PlayingStatus;
@@ -55,6 +56,7 @@ const serializeSequencer = (vcId: string): string => {
   }
 
   const {
+    currentEditingVoiceIx,
     voices,
     marks,
     bpm,
@@ -62,11 +64,13 @@ const serializeSequencer = (vcId: string): string => {
     midiOutputs,
     gateOutputs,
     schedulerScheme,
+    sampleBank,
   } = reduxInfra.getState().sequencer;
 
   const serialized: SerializedSequencer = {
+    currentEditingVoiceIx,
     voices,
-    sampleBank: [], // TODO
+    sampleBank: Object.values(sampleBank).map(item => (item ? item.descriptor : item)),
     marks,
     bpm,
     playingStatus,
@@ -87,6 +91,7 @@ export const buildGateOutput = (): ConstantSourceNode => {
 
 const deserializeSequencer = async (serialized: string): Promise<SequencerReduxState> => {
   const {
+    currentEditingVoiceIx,
     voices,
     sampleBank,
     marks,
@@ -98,15 +103,21 @@ const deserializeSequencer = async (serialized: string): Promise<SequencerReduxS
   }: SerializedSequencer = JSON.parse(serialized);
 
   const state = {
+    currentEditingVoiceIx,
     activeBeat: 0,
     voices,
     sampleBank: await (
       await Promise.all(
         Object.entries(sampleBank).map(async ([voiceIx, descriptor]) => {
+          if (!descriptor) {
+            return [+voiceIx, null] as const;
+          }
+
           try {
             const buffer = await getSample(descriptor);
             return [+voiceIx, { descriptor, buffer }] as const;
           } catch (err) {
+            console.warn(`Unable to load sample named "${descriptor.name}": `, err);
             // Unable to load the referenced sample for whatever reason
             return [+voiceIx, null] as const;
           }

@@ -5,7 +5,7 @@ import { UnreachableException } from 'ameo-utils';
 import { SampleDescriptor } from 'src/sampleLibrary';
 import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
 import { buildGateOutput } from 'src/sequencer';
-import { initScheduler, stopScheduler } from 'src/sequencer/scheduler';
+import { initScheduler, stopScheduler, mkBeatScheduler } from 'src/sequencer/scheduler';
 
 export type VoiceTarget =
   | { type: 'sample' }
@@ -24,6 +24,7 @@ export const getIsSequencerPlaying = (playingStatus: PlayingStatus) =>
   playingStatus.type === 'PLAYING';
 
 export interface SequencerReduxState {
+  currentEditingVoiceIx: number;
   activeBeat: number;
   voices: VoiceTarget[];
   sampleBank: { [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null };
@@ -52,6 +53,7 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState) => ({
       ...state,
       marks: [...state.marks, R.times(() => false, state.marks[0]!.length)],
+      voices: [...state.voices, { type: 'sample' as const }],
     }),
   }),
   REMOVE_VOICE: buildActionGroup({
@@ -184,11 +186,30 @@ const actionGroups = {
       descriptor,
       sampleData,
     }),
-    subReducer: (state: SequencerReduxState, { voiceIx, descriptor, sampleData }) =>
-      console.log({ voiceIx, descriptor, sampleData }) || {
+    subReducer: (state: SequencerReduxState, { voiceIx, descriptor, sampleData }) => ({
+      ...state,
+      sampleBank: { ...state.sampleBank, [voiceIx]: { descriptor, buffer: sampleData } },
+    }),
+  }),
+  SET_CURRENTLY_EDITING_VOICE_IX: buildActionGroup({
+    actionCreator: (voiceIx: number) => ({ type: 'SET_CURRENTLY_EDITING_VOICE_IX', voiceIx }),
+    subReducer: (state: SequencerReduxState, { voiceIx }) => {
+      // Play a single beat of the voice now if the sequencer isn't currently playing
+      if (!getIsSequencerPlaying(state.playingStatus)) {
+        console.log('playing s');
+        mkBeatScheduler(
+          state,
+          { scheduledBuffers: [] },
+          voiceIx,
+          state.voices[voiceIx]
+        )(ctx.currentTime);
+      }
+
+      return {
         ...state,
-        sampleBank: { ...state.sampleBank, [voiceIx]: { descriptor, buffer: sampleData } },
-      },
+        currentEditingVoiceIx: voiceIx,
+      };
+    },
   }),
 };
 
@@ -205,10 +226,11 @@ export type SequencerReduxInfra = ReturnType<typeof buildSequencerReduxInfra>;
 const DEFAULT_WIDTH = 16 as const;
 
 export const buildInitialState = (): SequencerReduxState => ({
+  currentEditingVoiceIx: 0,
   activeBeat: 0,
-  voices: [{ type: 'sample' }], // TODO
-  sampleBank: {}, // TODO
-  marks: [R.times(() => false, DEFAULT_WIDTH)], // TODO
+  voices: [{ type: 'sample' as const }],
+  sampleBank: {},
+  marks: [R.times(() => false, DEFAULT_WIDTH)],
   bpm: 80,
   playingStatus: { type: 'NOT_PLAYING' as const },
   outputGainNode: new GainNode(ctx),

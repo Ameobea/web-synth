@@ -61,7 +61,6 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
     _voice: Extract<VoiceTarget, { type: 'sample' }>
   ) => {
     const sample = state.sampleBank[voiceIx];
-    console.log(sample);
     if (R.isNil(sample)) {
       return R.identity;
     }
@@ -116,7 +115,7 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
   },
 };
 
-const mkBeatScheduler = (
+export const mkBeatScheduler = (
   state: SequencerReduxState,
   schedulerState: SchedulerState,
   voiceIx: number,
@@ -128,6 +127,7 @@ const SchedulerStateMap: Map<SchedulerHandle, SchedulerState> = new Map();
 export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
   let endOfLastSchedulingWindow = ctx.currentTime;
   let lastScheduledBeatIndex = -1;
+  let totalProcessedBeats = 0;
 
   const schedulerState: SchedulerState = {
     scheduledBuffers: [],
@@ -168,12 +168,16 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
     beatTimings = beatTimings.filter(
       beat => beat > startOfCurSchedWindow && beat < endOfCurSchedWindow
     );
-    lastScheduledBeatIndex = lastScheduledBeatIndex + beatTimings.length;
-    console.log('Scheduling beats: ', beatTimings);
 
+    lastScheduledBeatIndex = lastScheduledBeatIndex + beatTimings.length;
+
+    const sequencerLength = state.marks[0].length;
     state.voices.forEach((voice, voiceIx) =>
-      beatTimings.forEach(mkBeatScheduler(state, schedulerState, voiceIx, voice))
+      beatTimings
+        .filter((_, i) => state.marks[voiceIx][(totalProcessedBeats + i) % sequencerLength])
+        .forEach(mkBeatScheduler(state, schedulerState, voiceIx, voice))
     );
+    totalProcessedBeats += beatTimings.length;
 
     // Schedule the beats on the rising edge detector
     beatTimings.forEach(
@@ -181,7 +185,6 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
     );
   }, RESCHEDULE_INTERVAL_MS);
 
-  console.log('Setting state for handle: ', handle);
   SchedulerStateMap.set(handle, schedulerState);
   return handle;
 };

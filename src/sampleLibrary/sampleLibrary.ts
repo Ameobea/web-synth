@@ -62,7 +62,12 @@ export const listSamples = async ({
 }: ListSampleOpts = {}): Promise<SampleDescriptor[]> => {
   const [cachedSamples, localSamples, remoteSamples] = await Promise.all([
     getAllCachedSamples(),
-    includeLocal ? listLocalSamples().catch(() => []) : [],
+    includeLocal
+      ? listLocalSamples().catch(err => {
+          console.warn(err);
+          return [];
+        })
+      : [],
     includeRemote ? listRemoteSamples() : [],
   ]);
 

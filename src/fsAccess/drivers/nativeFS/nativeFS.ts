@@ -11,6 +11,7 @@ export default class NativeFSDriver implements FSAccessDriver {
 
   constructor() {
     if (!patchedWindow.chooseFileSystemEntries) {
+      alert('No native filesystem API support in current browser');
       throw new Error('No native filesystem API support in current browser');
     }
   }
