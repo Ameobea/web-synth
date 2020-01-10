@@ -22,6 +22,7 @@ export interface FileSystemDirectoryHandle {
     name: string,
     options?: { create?: boolean }
   ) => Promise<FileSystemDirectoryHandle>;
+  removeEntry: (name: string, options?: unknown) => Promise<void>;
 }
 
 export interface ChooseFileSystemEntriesArgs {

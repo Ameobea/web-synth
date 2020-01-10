@@ -6,6 +6,7 @@ import SampleManager from 'src/sampleLibrary/SampleManager';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 import { cacheSample, getCachedSample, getAllCachedSamples } from 'src/sampleLibrary/sampleCache';
+import { FileSystemDirectoryHandle } from 'src/fsAccess/drivers/nativeFS/NativeFSTypes';
 
 export interface SampleDescriptor {
   isLocal: boolean;
@@ -19,21 +20,34 @@ const GLOBAL_SAMPLE_MANAGER = new SampleManager();
 
 const ctx = new AudioContext();
 
-const listLocalSamples = async (): Promise<SampleDescriptor[]> => {
-  const fsAccess = await getFSAccess();
-  const samplesDirHandle = await fsAccess.getDirectory('samples');
-  const dirEntries = await samplesDirHandle.getEntries();
-
+const traverseDir = async (
+  dirHandle: FileSystemDirectoryHandle,
+  prefix = ''
+): Promise<SampleDescriptor[]> => {
+  const entries = await dirHandle.getEntries();
   const descriptors: SampleDescriptor[] = [];
-  for await (const entry of dirEntries) {
+
+  const childDirs: Promise<SampleDescriptor[]>[] = [];
+
+  for await (const entry of entries) {
     if (entry.isDirectory) {
+      childDirs.push(traverseDir(entry, entry.name + '/'));
       continue;
     }
 
-    descriptors.push({ isLocal: true, name: entry.name });
+    descriptors.push({ isLocal: true, name: `${prefix}${entry.name}` });
   }
 
-  return descriptors;
+  const childDescriptors = await Promise.all(childDirs);
+  const flattenedChildDescriptors: SampleDescriptor[] = R.unnest(childDescriptors);
+
+  return [...descriptors, ...flattenedChildDescriptors];
+};
+
+const listLocalSamples = async (): Promise<SampleDescriptor[]> => {
+  const fsAccess = await getFSAccess();
+  const samplesDirHandle = await fsAccess.getDirectory('samples');
+  return traverseDir(samplesDirHandle);
 };
 
 const loadLocalSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffer> => {

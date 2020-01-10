@@ -1,5 +1,6 @@
 import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
+import { Option } from 'funfix-core';
 
 import { SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
 import { getBeatTimings } from 'src/sequencer/sequencer';
@@ -12,10 +13,16 @@ const RESCHEDULE_INTERVAL_MS = 3200;
 
 interface SchedulerState {
   /**
+   * The list of all timings that have been scheduled so far.  This includes timings that have no
+   * notes played due to no marks.
+   */
+  curScheduledTimings: number[];
+  /**
    * Samples that have been scheduled to be played.  We hold onto them until the next scheduler
    * quantum in case they need to be canceled due to the sequencer being stopped.
    */
   scheduledBuffers: { time: number; node: AudioBufferSourceNode }[];
+  totalProcessedBeats: number;
 }
 
 type BeatSchedulerBuilder<K extends string> = (
@@ -124,16 +131,21 @@ export const mkBeatScheduler = (
 
 const SchedulerStateMap: Map<SchedulerHandle, SchedulerState> = new Map();
 
-export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
-  let endOfLastSchedulingWindow = ctx.currentTime;
+export const initScheduler = (
+  state: SequencerReduxState,
+  firstBeatStartTime?: number,
+  totalProcessedBeatsOffset = 0
+): SchedulerHandle => {
+  let endOfLastSchedulingWindow = Option.of(firstBeatStartTime).getOrElse(ctx.currentTime);
   let lastScheduledBeatIndex = -1;
-  let totalProcessedBeats = 0;
 
   const schedulerState: SchedulerState = {
+    curScheduledTimings: [],
     scheduledBuffers: [],
+    totalProcessedBeats: totalProcessedBeatsOffset,
   };
 
-  const handle = setInterval(() => {
+  const schedule = () => {
     const curTime = ctx.currentTime;
     const startOfCurSchedWindow = Math.max(curTime, endOfLastSchedulingWindow);
     const endOfCurSchedWindow = ctx.currentTime + (RESCHEDULE_INTERVAL_MS / 1000) * 3;
@@ -168,28 +180,41 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
     beatTimings = beatTimings.filter(
       beat => beat > startOfCurSchedWindow && beat < endOfCurSchedWindow
     );
+    schedulerState.curScheduledTimings = [
+      ...schedulerState.curScheduledTimings.filter(timing => timing > ctx.currentTime),
+      ...beatTimings,
+    ];
 
     lastScheduledBeatIndex = lastScheduledBeatIndex + beatTimings.length;
 
     const sequencerLength = state.marks[0].length;
     state.voices.forEach((voice, voiceIx) =>
       beatTimings
-        .filter((_, i) => state.marks[voiceIx][(totalProcessedBeats + i) % sequencerLength])
+        .filter(
+          (_, i) => state.marks[voiceIx][(schedulerState.totalProcessedBeats + i) % sequencerLength]
+        )
         .forEach(mkBeatScheduler(state, schedulerState, voiceIx, voice))
     );
-    totalProcessedBeats += beatTimings.length;
+    schedulerState.totalProcessedBeats += beatTimings.length;
 
     // Schedule the beats on the rising edge detector
     beatTimings.forEach(
       mkBeatScheduler(state, schedulerState, -1, { type: 'gate', gateIx: 'RISING_EDGE_DETECTOR' })
     );
-  }, RESCHEDULE_INTERVAL_MS);
+  };
+
+  const handle = setInterval(schedule, RESCHEDULE_INTERVAL_MS);
+  // Run once immediately
+  schedule();
 
   SchedulerStateMap.set(handle, schedulerState);
   return handle;
 };
 
-export const stopScheduler = (handle: SchedulerHandle, state: SequencerReduxState) => {
+export const stopScheduler = (
+  handle: SchedulerHandle,
+  state: SequencerReduxState
+): SchedulerState => {
   const schedulerState = SchedulerStateMap.get(handle);
   if (!schedulerState) {
     throw new UnreachableException(
@@ -199,7 +224,9 @@ export const stopScheduler = (handle: SchedulerHandle, state: SequencerReduxStat
   SchedulerStateMap.delete(handle);
 
   // Cancel all pending samples
-  schedulerState.scheduledBuffers.forEach(({ node }) => node.stop());
+  schedulerState.scheduledBuffers
+    .filter(({ time }) => time > ctx.currentTime)
+    .forEach(({ node }) => node.stop());
 
   // Cancel all pending MIDI events
   state.voices
@@ -219,4 +246,6 @@ export const stopScheduler = (handle: SchedulerHandle, state: SequencerReduxStat
   }
 
   clearInterval(handle);
+
+  return schedulerState;
 };

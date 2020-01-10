@@ -43,6 +43,34 @@ export interface SequencerReduxState {
 
 const ctx = new AudioContext();
 
+const reschedule = (state: SequencerReduxState) => {
+  if (state.playingStatus.type !== 'PLAYING') {
+    console.warn("Tried to re-schedule when sequencer wasn't playing; taking on action.");
+    return state;
+  }
+
+  const schedulerHandle = state.playingStatus.intervalHandle;
+  const oldSchedulerState = stopScheduler(schedulerHandle, state);
+  const nextScheduledBeat = oldSchedulerState.curScheduledTimings.find(
+    timing => timing > ctx.currentTime
+  );
+  if (R.isNil(nextScheduledBeat)) {
+    console.warn('No scheduled beats for the most recently scheduled quantum');
+  }
+
+  const newSchedulerHandle = initScheduler(
+    state,
+    nextScheduledBeat,
+    oldSchedulerState.totalProcessedBeats -
+      oldSchedulerState.curScheduledTimings.filter(timing => timing > ctx.currentTime).length
+  );
+
+  return {
+    ...state,
+    playingStatus: { type: 'PLAYING' as const, intervalHandle: newSchedulerHandle },
+  };
+};
+
 const actionGroups = {
   SET_STATE: buildActionGroup({
     actionCreator: (newState: SequencerReduxState) => ({ type: 'SET_STATE', newState }),
@@ -104,6 +132,10 @@ const actionGroups = {
       }
     },
   }),
+  RESCHEDULE: buildActionGroup({
+    actionCreator: () => ({ type: 'RESCHEDULE' }),
+    subReducer: reschedule,
+  }),
   SET_VOICE_TARGET: buildActionGroup({
     actionCreator: (voiceIx: number, newTarget: VoiceTarget) => ({
       type: 'SET_VOICE_TARGET',
@@ -156,7 +188,8 @@ const actionGroups = {
   }),
   SET_BPM: buildActionGroup({
     actionCreator: (bpm: number | string) => ({ type: 'SET_BPM', bpm }),
-    subReducer: (state: SequencerReduxState, { bpm }) => R.set(R.lensProp('bpm'), +bpm, state),
+    subReducer: (state: SequencerReduxState, { bpm }) =>
+      reschedule(R.set(R.lensProp('bpm'), +bpm, state)),
   }),
   ADD_GATE_OUTPUT: buildActionGroup({
     actionCreator: () => ({ type: 'ADD_GATE_OUTPUT' }),
@@ -196,10 +229,9 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState, { voiceIx }) => {
       // Play a single beat of the voice now if the sequencer isn't currently playing
       if (!getIsSequencerPlaying(state.playingStatus)) {
-        console.log('playing s');
         mkBeatScheduler(
           state,
-          { scheduledBuffers: [] },
+          { scheduledBuffers: [], curScheduledTimings: [], totalProcessedBeats: 0 },
           voiceIx,
           state.voices[voiceIx]
         )(ctx.currentTime);
