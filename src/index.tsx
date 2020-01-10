@@ -39,7 +39,6 @@ const createBrowserNotSupportedMessage = () => {
   ReactDOM.render(<BrowserNotSupported />, body);
 };
 
-// TODO: Figure out if this is actually used
 export const init_view_contexts = (
   activeViewContextIx: number,
   activeVcsJson: string,

@@ -8,7 +8,7 @@ import { buildGateOutput } from 'src/sequencer';
 import { initScheduler, stopScheduler } from 'src/sequencer/scheduler';
 
 export type VoiceTarget =
-  | { type: 'sample'; sampleIx: number | null }
+  | { type: 'sample' }
   | { type: 'midi'; synthIx: number | null; note: number }
   | { type: 'gate'; gateIx: number | null | 'RISING_EDGE_DETECTOR' };
 
@@ -20,7 +20,8 @@ export enum SchedulerScheme {
   Random,
 }
 
-const getIsPlaying = (playingStatus: PlayingStatus) => playingStatus.type === 'PLAYING';
+export const getIsSequencerPlaying = (playingStatus: PlayingStatus) =>
+  playingStatus.type === 'PLAYING';
 
 export interface SequencerReduxState {
   activeBeat: number;
@@ -84,7 +85,7 @@ const actionGroups = {
   TOGGLE_IS_PLAYING: buildActionGroup({
     actionCreator: () => ({ type: 'TOGGLE_IS_PLAYING' }),
     subReducer: (state: SequencerReduxState) => {
-      const isPlaying = !getIsPlaying(state.playingStatus);
+      const isPlaying = !getIsSequencerPlaying(state.playingStatus);
 
       if (isPlaying) {
         return {
@@ -176,6 +177,19 @@ const actionGroups = {
       activeBeat: (state.activeBeat + 1) % state.marks[0]!.length,
     }),
   }),
+  ADD_SAMPLE: buildActionGroup({
+    actionCreator: (voiceIx: number, descriptor: SampleDescriptor, sampleData: AudioBuffer) => ({
+      type: 'ADD_SAMPLE',
+      voiceIx,
+      descriptor,
+      sampleData,
+    }),
+    subReducer: (state: SequencerReduxState, { voiceIx, descriptor, sampleData }) =>
+      console.log({ voiceIx, descriptor, sampleData }) || {
+        ...state,
+        sampleBank: { ...state.sampleBank, [voiceIx]: { descriptor, buffer: sampleData } },
+      },
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -192,7 +206,7 @@ const DEFAULT_WIDTH = 16 as const;
 
 export const buildInitialState = (): SequencerReduxState => ({
   activeBeat: 0,
-  voices: [{ type: 'sample', sampleIx: null }], // TODO
+  voices: [{ type: 'sample' }], // TODO
   sampleBank: {}, // TODO
   marks: [R.times(() => false, DEFAULT_WIDTH)], // TODO
   bpm: 80,

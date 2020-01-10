@@ -6,8 +6,15 @@ import React, { useState } from 'react';
 import { ListRowRenderer } from 'react-virtualized';
 
 import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
-import { SampleListing, MkDefaultSampleListingRowRendererArgs, SampleRow } from './SampleLibraryUI';
+import BasicModal from 'src/misc/BasicModal';
+import {
+  SampleListing,
+  MkDefaultSampleListingRowRendererArgs,
+  SampleRow,
+  LoadSamplesButtons,
+} from './SampleLibraryUI';
 import useAllSamples from './useAllSamples';
+import { UnimplementedError } from 'ameo-utils';
 
 const mkSampleListingRowRenderer = ({
   sampleDescriptors,
@@ -27,6 +34,8 @@ const mkSampleListingRowRenderer = ({
     style={{
       ...(style || {}),
       ...(selectedSample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
+      cursor: 'pointer',
+      userSelect: 'none',
     }}
     onClick={() =>
       setSelectedSample(
@@ -40,14 +49,27 @@ const SelectSample: React.FC<{
   selectedSample: SampleDescriptor | null;
   setSelectedSample: (newSelectedSample: SampleDescriptor | null) => void;
 }> = ({ selectedSample, setSelectedSample }) => {
-  const { allSamples } = useAllSamples();
+  const { allSamples, includeLocalSamples, setIncludeLocalSamples } = useAllSamples();
 
   return (
-    <SampleListing
-      extraMkRowRendererArgs={{ selectedSample, setSelectedSample }}
-      mkRowRenderer={mkSampleListingRowRenderer}
-      sampleDescriptors={typeof allSamples === 'string' ? [] : allSamples || []}
-    />
+    <>
+      <LoadSamplesButtons
+        localSamplesLoaded={includeLocalSamples}
+        loadLocalSamples={() => setIncludeLocalSamples(true)}
+        remoteSamplesLoaded={false}
+        loadRemoteSamples={() => {
+          throw new UnimplementedError();
+        }}
+      />
+
+      <SampleListing
+        extraMkRowRendererArgs={{ selectedSample, setSelectedSample }}
+        mkRowRenderer={mkSampleListingRowRenderer}
+        sampleDescriptors={typeof allSamples === 'string' ? [] : allSamples || []}
+        height={600}
+        width={400}
+      />
+    </>
   );
 };
 
@@ -58,14 +80,14 @@ const SampleSelectDialog: React.FC<{
   const [selectedSample, setSelectedSample] = useState<SampleDescriptor | null>(null);
 
   return (
-    <div>
+    <BasicModal>
       <SelectSample selectedSample={selectedSample} setSelectedSample={setSelectedSample} />
 
       <button disabled={!selectedSample} onClick={() => onSubmit(selectedSample!)}>
         Submit
       </button>
       {onCancel ? <button onClick={onCancel}>Cancel</button> : null}
-    </div>
+    </BasicModal>
   );
 };
 

@@ -5,10 +5,10 @@ import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import {
-  create_empty_audio_connectables,
   AudioConnectables,
   ConnectableInput,
   ConnectableOutput,
+  updateConnectables,
 } from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
 import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
@@ -22,7 +22,9 @@ import {
   VoiceTarget,
   PlayingStatus,
   SchedulerScheme,
+  getIsSequencerPlaying,
 } from './redux';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const ctx = new AudioContext();
 
@@ -177,6 +179,39 @@ const buildRisingEdgeDetector = async (onDetected: () => void) => {
   return workletHandle;
 };
 
+export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
+  const reduxInfra = reduxInfraMap.get(vcId);
+
+  // Initialization is async, so we may not yet have a valid Redux state handle at this point.
+  if (!reduxInfra) {
+    return {
+      vcId,
+      inputs: ImmMap<string, ConnectableInput>(),
+      outputs: ImmMap<string, ConnectableOutput>().set('output', {
+        node: new DummyNode(),
+        type: 'customAudio',
+      }),
+    };
+  }
+  const reduxState = reduxInfra.getState();
+
+  let outputs = ImmMap<string, ConnectableOutput>().set('output', {
+    node: reduxInfra.getState().sequencer.outputGainNode,
+    type: 'customAudio',
+  });
+  outputs = reduxState.sequencer.midiOutputs.reduce(
+    (acc: ImmMap<string, ConnectableOutput>, node: MIDINode, i: number) =>
+      acc.set(`midi_output_${i + 1}`, { node, type: 'midi' }),
+    outputs
+  );
+
+  return {
+    vcId,
+    inputs: ImmMap<string, ConnectableInput>(),
+    outputs,
+  };
+};
+
 export const init_sequencer = async (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
@@ -203,6 +238,9 @@ export const init_sequencer = async (stateKey: string) => {
     reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_RISING_EDGE_DETECTOR(workletHandle))
   );
 
+  // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
+  updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
+
   mkContainerRenderHelper({
     Comp: LazySequencerUI,
     store: reduxInfra.store,
@@ -216,6 +254,15 @@ export const init_sequencer = async (stateKey: string) => {
 
 export const cleanup_sequencer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
+
+  // Stop it if it is playing
+  const reduxInfra = reduxInfraMap.get(vcId)!;
+  if (!reduxInfra) {
+    throw new Error(`No sequencer Redux infra map entry for sequencer with vcId ${vcId}`);
+  }
+  if (getIsSequencerPlaying(reduxInfra.getState().sequencer.playingStatus)) {
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING());
+  }
 
   const serialized = serializeSequencer(vcId);
   localStorage.setItem(stateKey, serialized);
@@ -243,33 +290,6 @@ export const unhide_sequencer = (stateKey: string) => {
   }
 
   elem.style.display = 'block';
-};
-
-export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
-  const reduxInfra = reduxInfraMap.get(vcId);
-  if (!reduxInfra) {
-    console.error(
-      `No entry in redux infra map for sequencer with id ${vcId}; can't return connectables`
-    );
-    return create_empty_audio_connectables(vcId);
-  }
-  const reduxState = reduxInfra.getState();
-
-  let outputs = ImmMap<string, ConnectableOutput>().set('output', {
-    node: reduxInfra.getState().sequencer.outputGainNode,
-    type: 'customAudio',
-  });
-  outputs = reduxState.sequencer.midiOutputs.reduce(
-    (acc: ImmMap<string, ConnectableOutput>, node: MIDINode, i: number) =>
-      acc.set(`midi_output_${i + 1}`, { node, type: 'midi' }),
-    outputs
-  );
-
-  return {
-    vcId,
-    inputs: ImmMap<string, ConnectableInput>(),
-    outputs,
-  };
 };
 
 const schedulerFnBySchedulerScheme: {

@@ -1,5 +1,4 @@
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
 import { UnreachableException } from 'ameo-utils';
 
 import { SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
@@ -22,6 +21,7 @@ interface SchedulerState {
 type BeatSchedulerBuilder<K extends string> = (
   state: SequencerReduxState,
   schedulerState: SchedulerState,
+  voiceIx: number,
   voice: Extract<VoiceTarget, { type: K }>
 ) => (time: number) => void;
 
@@ -29,6 +29,7 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
   midi: (
     state: SequencerReduxState,
     _schedulerState: SchedulerState,
+    _voiceIx: number,
     voice: Extract<VoiceTarget, { type: 'midi' }>
   ) => {
     if (R.isNil(voice.synthIx)) {
@@ -56,13 +57,16 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
   sample: (
     state: SequencerReduxState,
     schedulerState: SchedulerState,
-    voice: Extract<VoiceTarget, { type: 'sample' }>
+    voiceIx: number,
+    _voice: Extract<VoiceTarget, { type: 'sample' }>
   ) => {
-    if (R.isNil(voice.sampleIx)) {
+    const sample = state.sampleBank[voiceIx];
+    console.log(sample);
+    if (R.isNil(sample)) {
       return R.identity;
     }
 
-    const buffer = state.sampleBank[voice.sampleIx!].buffer;
+    const buffer = sample.buffer;
 
     return (time: number) => {
       const node = new AudioBufferSourceNode(ctx, { buffer });
@@ -74,6 +78,7 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
   gate: (
     state: SequencerReduxState,
     _schedulerState: SchedulerState,
+    _voiceIx: number,
     voice: Extract<VoiceTarget, { type: 'gate' }>
   ) => {
     if (R.isNil(voice.gateIx)) {
@@ -114,8 +119,9 @@ const BeatSchedulersBuilderByVoiceType: { [K in VoiceTarget['type']]: BeatSchedu
 const mkBeatScheduler = (
   state: SequencerReduxState,
   schedulerState: SchedulerState,
+  voiceIx: number,
   voice: VoiceTarget
-) => BeatSchedulersBuilderByVoiceType[voice.type](state, schedulerState, voice as any);
+) => BeatSchedulersBuilderByVoiceType[voice.type](state, schedulerState, voiceIx, voice as any);
 
 const SchedulerStateMap: Map<SchedulerHandle, SchedulerState> = new Map();
 
@@ -165,13 +171,13 @@ export const initScheduler = (state: SequencerReduxState): SchedulerHandle => {
     lastScheduledBeatIndex = lastScheduledBeatIndex + beatTimings.length;
     console.log('Scheduling beats: ', beatTimings);
 
-    state.voices.forEach(voice =>
-      beatTimings.forEach(mkBeatScheduler(state, schedulerState, voice))
+    state.voices.forEach((voice, voiceIx) =>
+      beatTimings.forEach(mkBeatScheduler(state, schedulerState, voiceIx, voice))
     );
 
     // Schedule the beats on the rising edge detector
     beatTimings.forEach(
-      mkBeatScheduler(state, schedulerState, { type: 'gate', gateIx: 'RISING_EDGE_DETECTOR' })
+      mkBeatScheduler(state, schedulerState, -1, { type: 'gate', gateIx: 'RISING_EDGE_DETECTOR' })
     );
   }, RESCHEDULE_INTERVAL_MS);
 

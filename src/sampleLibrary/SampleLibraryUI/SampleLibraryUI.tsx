@@ -6,6 +6,7 @@ import { SampleDescriptor, getSample } from 'src/sampleLibrary/sampleLibrary';
 import Loading from 'src/misc/Loading';
 import useAllSamples from './useAllSamples';
 import './SampleLibraryUI.scss';
+import { UnimplementedError } from 'ameo-utils';
 
 const ctx = new AudioContext();
 
@@ -76,6 +77,8 @@ export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: an
   sampleDescriptors,
   mkRowRenderer = mkDefaultSampleListingRowRenderer,
   extraMkRowRendererArgs,
+  height = 800,
+  width = 500,
 }: {
   sampleDescriptors: SampleDescriptor[];
   mkRowRenderer?: ({
@@ -84,6 +87,8 @@ export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: an
     togglePlaying,
   }: MkDefaultSampleListingRowRendererArgs & ExtraMkRowRendererArgs) => ListRowRenderer;
   extraMkRowRendererArgs: ExtraMkRowRendererArgs;
+  height?: number;
+  width?: number;
 }) {
   const [playingSample, setPlayingSample] = useState<{
     name: string;
@@ -124,14 +129,40 @@ export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: an
 
   return (
     <List
-      height={800}
+      height={height}
       rowHeight={20}
       rowCount={sampleDescriptors.length}
-      width={500}
+      width={width}
       rowRenderer={RowRenderer}
     />
   );
 }
+
+export const LoadSamplesButtons: React.FC<{
+  localSamplesLoaded: boolean;
+  loadLocalSamples: () => void;
+  remoteSamplesLoaded: boolean;
+  loadRemoteSamples: () => void;
+} & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
+  localSamplesLoaded,
+  loadLocalSamples,
+  remoteSamplesLoaded,
+  loadRemoteSamples,
+  ...rest
+}) => (
+  <div className='load-samples-buttons' {...rest}>
+    {!localSamplesLoaded ? (
+      <button style={{ width: 120 }} onClick={loadLocalSamples}>
+        Load Local Samples
+      </button>
+    ) : null}
+    {!remoteSamplesLoaded ? (
+      <button style={{ width: 120 }} onClick={loadRemoteSamples}>
+        Load Remote Samples
+      </button>
+    ) : null}
+  </div>
+);
 
 const SampleLibraryUI: React.FC<{}> = () => {
   const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
@@ -149,11 +180,14 @@ const SampleLibraryUI: React.FC<{}> = () => {
     <div className='sample-library'>
       <h1>Sample Library</h1>
 
-      {!includeLocalSamples ? (
-        <button style={{ width: 120 }} onClick={() => setIncludeLocalSamples(true)}>
-          Load Local Samples
-        </button>
-      ) : null}
+      <LoadSamplesButtons
+        localSamplesLoaded={includeLocalSamples}
+        loadLocalSamples={() => setIncludeLocalSamples(true)}
+        remoteSamplesLoaded={false}
+        loadRemoteSamples={() => {
+          throw new UnimplementedError();
+        }}
+      />
 
       <SampleListing extraMkRowRendererArgs={{}} sampleDescriptors={allSamples} />
     </div>

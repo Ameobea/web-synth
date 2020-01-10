@@ -4,7 +4,7 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 import { UnimplementedError } from 'ameo-utils';
 
-import { SampleDescriptor } from 'src/sampleLibrary';
+import { SampleDescriptor, getSample } from 'src/sampleLibrary';
 import { updateConnectables } from 'src/patchNetwork';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
 import { SequencerReduxState, VoiceTarget, SequencerReduxInfra } from '../redux';
@@ -76,24 +76,28 @@ const SynthInput = connect(mapSynthInputStateToProps)(SynthInputInner);
 
 const mapSampleInputStateToProps = (
   state: { sequencer: SequencerReduxState },
-  { voiceTarget: { sampleIx } }: { voiceTarget: Extract<VoiceTarget, { type: 'sample' }> }
+  { voiceIx }: { voiceIx: number }
 ) => ({
-  sampleOpt: Option.of(sampleIx).flatMap(sampleIx =>
-    Option.of(state.sequencer.sampleBank[sampleIx])
-  ),
+  sampleOpt: Option.of(state.sequencer.sampleBank[voiceIx]),
 });
 
 const selectSample = (): Promise<SampleDescriptor> => renderModalWithControls(SampleSelectDialog);
 
 const SampleInputInner: React.FC<InputCompCommonProps<'sample'> &
-  ReturnType<typeof mapSampleInputStateToProps>> = ({ voiceTarget: { sampleIx }, sampleOpt }) => (
+  ReturnType<typeof mapSampleInputStateToProps>> = ({
+  sampleOpt,
+  voiceIx,
+  dispatch,
+  actionCreators,
+}) => (
   <div>
     Selected Sample: {sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None')}
     <button
       onClick={async () => {
         const descriptor = await selectSample();
-        console.log({ descriptor });
-        throw new UnimplementedError(); // TODO
+        const sampleData = await getSample(descriptor);
+        dispatch(actionCreators.sequencer.ADD_SAMPLE(voiceIx, descriptor, sampleData));
+        dispatch(actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, { type: 'sample' }));
       }}
     >
       Pick Sample
