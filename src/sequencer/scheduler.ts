@@ -137,7 +137,7 @@ export const initScheduler = (
   totalProcessedBeatsOffset = 0
 ): SchedulerHandle => {
   let endOfLastSchedulingWindow = Option.of(firstBeatStartTime).getOrElse(ctx.currentTime);
-  let lastScheduledBeatIndex = -1;
+  let lastScheduledBeatIndex = -1 + totalProcessedBeatsOffset;
 
   const schedulerState: SchedulerState = {
     curScheduledTimings: [],

@@ -100,17 +100,19 @@ const actionGroups = {
   }),
   MARK: buildActionGroup({
     actionCreator: (rowIx: number, colIx: number) => ({ type: 'MARK', rowIx, colIx }),
-    subReducer: (state: SequencerReduxState, { rowIx, colIx }) => ({
-      ...state,
-      marks: R.set(R.lensPath([rowIx, colIx]), true, state.marks),
-    }),
+    subReducer: (state: SequencerReduxState, { rowIx, colIx }) =>
+      reschedule({
+        ...state,
+        marks: R.set(R.lensPath([rowIx, colIx]), true, state.marks),
+      }),
   }),
   UNMARK: buildActionGroup({
     actionCreator: (rowIx: number, colIx: number) => ({ type: 'UNMARK', rowIx, colIx }),
-    subReducer: (state: SequencerReduxState, { rowIx, colIx }) => ({
-      ...state,
-      marks: R.set(R.lensPath([rowIx, colIx]), false, state.marks),
-    }),
+    subReducer: (state: SequencerReduxState, { rowIx, colIx }) =>
+      reschedule({
+        ...state,
+        marks: R.set(R.lensPath([rowIx, colIx]), false, state.marks),
+      }),
   }),
   TOGGLE_IS_PLAYING: buildActionGroup({
     actionCreator: () => ({ type: 'TOGGLE_IS_PLAYING' }),

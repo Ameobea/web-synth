@@ -38,7 +38,7 @@ const SequencerSettings: React.FC<{
         type: 'range',
         label: 'bpm',
         min: 0,
-        max: 600,
+        max: 4000,
         initial: 120,
         steps: 200,
       },
