@@ -50,22 +50,6 @@ for (let i = 0; i < waveformLength; i++) {
   bufs[3][i] = periodIxFract * 2 - 1;
 }
 
-// // print the generated waveforms to CSV for debugging purposes
-// let buf = 'sine,triangle,square,sawtooth\n';
-
-// for (let rowIx = 0; rowIx < waveformLength; rowIx++) {
-//   for (let waveformIx = 0; waveformIx < bufs.length; waveformIx++) {
-//     buf += `${bufs[waveformIx][rowIx]}`;
-//     if (waveformIx !== bufs.length - 1) {
-//       buf += ',';
-//     } else {
-//       buf += '\n';
-//     }
-//   }
-// }
-
-// console.log(buf);
-
 export default class WaveTable implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string;

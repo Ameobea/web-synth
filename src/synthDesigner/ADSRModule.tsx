@@ -53,6 +53,8 @@ export class ADSRModule extends ConstantSourceNode {
     if (R.isNil(offset)) {
       this.offset.cancelScheduledValues(0);
       this.offset.linearRampToValueAtTime(this.minValue, this.ctx.currentTime + 0.0001);
+    } else {
+      this.offset.setValueAtTime(0, this.ctx.currentTime + offset);
     }
 
     const realOffset = Option.of(offset).getOrElse(0);

@@ -14,16 +14,17 @@ extern crate log;
 
 use std::{mem, ptr};
 
+use js_sys::Array;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SynthCallbacks<
     // uuid: String, voice_count: usize
     I: Fn(String, usize) -> usize,
-    // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
-    TA: Fn(usize, usize, usize, u8),
-    // synth_ix: usize, voice_ix: usize, note_id: usize
-    TR: Fn(usize, usize, usize),
+    // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>
+    TA: Fn(usize, usize, usize, u8, Option<f32>),
+    // synth_ix: usize, voice_ix: usize, note_id: usize, offset: Option<f32>
+    TR: Fn(usize, usize, usize, Option<f32>),
     // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
     TAR: Fn(usize, usize, f32, f32),
     // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
@@ -60,16 +61,18 @@ impl Voice {
         }
     }
 
-    pub fn is_playing(&self) -> bool { !(self.playing == VoicePlayingStatus::Tacent) }
+    pub fn is_playing(&self) -> bool {
+        !(self.playing == VoicePlayingStatus::Tacent)
+    }
 }
 
 pub struct PolySynth<
     // uuid: String, voice_count: usize
     I: Fn(String, usize) -> usize,
-    // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
-    TA: Fn(usize, usize, usize, u8),
-    // synth_ix: usize, voice_ix: usize, note_id: usize
-    TR: Fn(usize, usize, usize),
+    // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>
+    TA: Fn(usize, usize, usize, u8, Option<f32>),
+    // synth_ix: usize, voice_ix: usize, note_id: usize, offset: Option<f32>
+    TR: Fn(usize, usize, usize, Option<f32>),
     // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
     TAR: Fn(usize, usize, f32, f32),
     // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
@@ -92,10 +95,10 @@ pub struct PolySynth<
 impl<
         // uuid: String, voice_count: usize
         I: Fn(String, usize) -> usize,
-        // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8
-        TA: Fn(usize, usize, usize, u8),
-        // synth_ix: usize, voice_ix: usize, note_id: usize
-        TR: Fn(usize, usize, usize),
+        // synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>
+        TA: Fn(usize, usize, usize, u8, Option<f32>),
+        // synth_ix: usize, voice_ix: usize, note_id: usize, offset: Option<f32>
+        TR: Fn(usize, usize, usize, Option<f32>),
         // synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32
         TAR: Fn(usize, usize, f32, f32),
         // synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]
@@ -181,17 +184,17 @@ impl<
         Some((self.id, played_voice_ix, note_id, velocity))
     }
 
-    pub fn trigger_attack(&mut self, note_id: usize, velocity: u8) {
+    pub fn trigger_attack(&mut self, note_id: usize, velocity: u8, offset: Option<f32>) {
         if let Some((synth_id, voice_ix, note_id, velocity)) =
             self.trigger_attack_cb(note_id, velocity, |_, _, _, _| ())
         {
-            (self.synth_cbs.trigger_attack)(synth_id, voice_ix, note_id, velocity);
+            (self.synth_cbs.trigger_attack)(synth_id, voice_ix, note_id, velocity, offset);
         }
     }
 
     pub fn trigger_attacks(&mut self, note_ids: &[usize], velocity: u8) {
         for note_id in note_ids {
-            self.trigger_attack(*note_id, velocity);
+            self.trigger_attack(*note_id, velocity, None);
         }
     }
 
@@ -208,7 +211,7 @@ impl<
                     note_id
                 );
                 return None;
-            },
+            }
         };
 
         let released_voice_ix = self.voices[target_voice_ix].src_ix;
@@ -230,22 +233,22 @@ impl<
         Some((self.id, released_voice_ix))
     }
 
-    pub fn trigger_release(&mut self, note_id: usize) {
+    pub fn trigger_release(&mut self, note_id: usize, offset: Option<f32>) {
         if let Some((synth_ix, voice_id)) = self.trigger_release_cb(note_id, |_, _, _| ()) {
-            (self.synth_cbs.trigger_release)(synth_ix, voice_id, note_id);
+            (self.synth_cbs.trigger_release)(synth_ix, voice_id, note_id, offset);
         }
     }
 
     pub fn trigger_releases(&mut self, note_ids: &[usize]) {
         for note_id in note_ids {
-            self.trigger_release(*note_id);
+            self.trigger_release(*note_id, None);
         }
     }
 
     pub fn release_all(&mut self) {
         for i in 0..POLY_SYNTH_VOICE_COUNT {
             if let VoicePlayingStatus::Playing(note_id) = self.voices[i].playing {
-                self.trigger_release(note_id);
+                self.trigger_release(note_id, None);
             }
         }
     }
@@ -264,8 +267,8 @@ pub mod exports {
     pub struct PolySynthContext {
         pub synth: PolySynth<
             Box<dyn Fn(String, usize) -> usize>,
-            Box<dyn Fn(usize, usize, usize, u8)>,
-            Box<dyn Fn(usize, usize, usize)>,
+            Box<dyn Fn(usize, usize, usize, u8, Option<f32>)>,
+            Box<dyn Fn(usize, usize, usize, Option<f32>)>,
             Box<dyn Fn(usize, usize, f32, f32)>,
             Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
         >,
@@ -277,35 +280,49 @@ pub mod exports {
         release_note: js_sys::Function,
     ) -> *mut PolySynthContext {
         let context = PolySynthContext {
-            synth: PolySynth::new(common::uuid_v4(), true, SynthCallbacks {
-                init_synth: Box::new(|_, _| 0usize),
-                trigger_release: Box::new(
-                    move |_synth_ix: usize, voice_ix: usize, note_id: usize| match release_note
-                        .call2(
+            synth: PolySynth::new(
+                common::uuid_v4(),
+                true,
+                SynthCallbacks {
+                    init_synth: Box::new(|_, _| 0usize),
+                    trigger_release: Box::new(
+                        move |_synth_ix: usize,
+                              voice_ix: usize,
+                              note_id: usize,
+                              offset: Option<f32>| match release_note.call3(
                             &JsValue::NULL,
                             &JsValue::from(voice_ix as u32),
                             &JsValue::from(note_id as u32),
-                        ) {
-                        Ok(_) => (),
-                        Err(err) => error!("Error playing note: {:?}", err),
-                    },
-                ),
-                trigger_attack: Box::new(
-                    move |_synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8| {
-                        match play_note.call3(
-                            &JsValue::NULL,
-                            &JsValue::from(voice_ix as u32),
-                            &JsValue::from(note_id as u32),
-                            &JsValue::from(velocity),
+                            &JsValue::from(offset),
                         ) {
                             Ok(_) => (),
                             Err(err) => error!("Error playing note: {:?}", err),
-                        }
-                    },
-                ),
-                trigger_attack_release: Box::new(|_, _, _, _| unimplemented!()),
-                schedule_events: Box::new(|_, _, _, _| unimplemented!()),
-            }),
+                        },
+                    ),
+                    trigger_attack: Box::new(
+                        move |_synth_ix: usize,
+                              voice_ix: usize,
+                              note_id: usize,
+                              velocity: u8,
+                              offset: Option<f32>| {
+                            match play_note.apply(
+                                &JsValue::NULL,
+                                &Array::of4(
+                                    &JsValue::from(voice_ix as u32),
+                                    &JsValue::from(note_id as u32),
+                                    &JsValue::from(velocity),
+                                    &JsValue::from(offset),
+                                ),
+                            ) {
+                                Ok(_) => (),
+                                Err(err) => error!("Error playing note: {:?}", err),
+                            }
+                        },
+                    ),
+                    trigger_attack_release: Box::new(|_, _, _, _| unimplemented!()),
+                    schedule_events: Box::new(|_, _, _, _| unimplemented!()),
+                },
+            ),
         };
 
         Box::into_raw(Box::new(context))
@@ -319,16 +336,22 @@ pub mod exports {
     }
 
     #[wasm_bindgen]
-    pub fn handle_note_down(ctx: *mut PolySynthContext, note_id: usize, velocity: Option<u8>) {
+    pub fn handle_note_down(
+        ctx: *mut PolySynthContext,
+        note_id: usize,
+        velocity: Option<u8>,
+        offset: Option<f32>,
+    ) {
         let mut ctx = unsafe { Box::from_raw(ctx) };
-        ctx.synth.trigger_attack(note_id, velocity.unwrap_or(255));
+        ctx.synth
+            .trigger_attack(note_id, velocity.unwrap_or(255), offset);
         mem::forget(ctx);
     }
 
     #[wasm_bindgen]
-    pub fn handle_note_up(ctx: *mut PolySynthContext, note_id: usize) {
+    pub fn handle_note_up(ctx: *mut PolySynthContext, note_id: usize, offset: Option<f32>) {
         let mut ctx = unsafe { Box::from_raw(ctx) };
-        ctx.synth.trigger_release(note_id);
+        ctx.synth.trigger_release(note_id, offset);
         mem::forget(ctx);
     }
 }

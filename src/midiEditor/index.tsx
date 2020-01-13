@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
+import { UnreachableException } from 'ameo-utils';
 
 import {
   AudioConnectables,
@@ -12,11 +13,11 @@ import MIDIEditorUI, { buildMIDIEditorUIDomId } from 'src/midiEditor/MIDIEditorU
 import { getEngine } from 'src';
 import { store } from 'src/redux';
 import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
-import { UnreachableException } from 'ameo-utils';
+import { VoiceManagerWrapper, mkVoiceManagerWrapper } from 'src/patchNetwork/voiceManagerWrapper';
 
 export interface MIDIEditorState {
   midiNode: MIDINode;
-  voiceManager: typeof import('src/polysynth');
+  voiceManager: VoiceManagerWrapper;
 }
 
 export const MIDIEditorStateMap: Map<string, MIDIEditorState> = new Map();
@@ -57,7 +58,10 @@ export const init_midi_editor_ui = (vcId: string) => {
   const midiNode = buildMIDINode(() => {
     throw new UnreachableException("MIDI editor MIDI node doesn't accept input");
   });
-  const midiEditorState: MIDIEditorState = { midiNode };
+  const midiEditorState: MIDIEditorState = {
+    midiNode,
+    voiceManager: mkVoiceManagerWrapper(midiNode),
+  };
   if (!!MIDIEditorStateMap.get(vcId)) {
     console.warn(`Existing entry in MIDI editor state map for vcId "${vcId}"; overwriting...`);
   }

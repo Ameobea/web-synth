@@ -1,8 +1,6 @@
-import { UnimplementedError } from 'ameo-utils';
-
 import { MIDIEditorStateMap } from './';
 
-const getMIDINode = (vcId: string) => {
+const getVoiceManager = (vcId: string) => {
   const state = MIDIEditorStateMap.get(vcId);
   if (!state) {
     console.error(
@@ -11,26 +9,25 @@ const getMIDINode = (vcId: string) => {
     return null;
   }
 
-  return state.midiNode;
+  return state.voiceManager;
 };
 
 export const midi_editor_trigger_attack = (vcId: string, noteId: number, offset?: number) => {
-  const node = getMIDINode(vcId);
-  if (!node) {
+  const voiceManager = getVoiceManager(vcId);
+  if (!voiceManager) {
     return;
   }
 
-  node.outputCbs.forEach(output => output.onAttack(noteId));
-  throw new UnimplementedError();
+  voiceManager.onAttack(noteId, undefined, offset);
 };
 
 export const midi_editor_trigger_release = (vcId: string, noteId: number, offset?: number) => {
-  const node = getMIDINode(vcId);
-  if (!node) {
+  const voiceManager = getVoiceManager(vcId);
+  if (!voiceManager) {
     return;
   }
 
-  throw new UnimplementedError();
+  voiceManager.onRelease(noteId, offset);
 };
 
 export const midi_editor_trigger_attack_release = (
@@ -40,15 +37,19 @@ export const midi_editor_trigger_attack_release = (
 ) => {
   midi_editor_trigger_attack(vcId, noteId);
   midi_editor_trigger_release(vcId, noteId, duration);
-  throw new UnimplementedError();
 };
 
 export const midi_editor_schedule_events = (
   vcId: string,
   isAttackFlags: number[],
-  noteIds: number,
+  noteIds: number[],
   timings: number[]
 ) => {
-  console.log({ isAttackFlags, noteIds, timings });
-  throw new UnimplementedError();
+  for (let i = 0; i < isAttackFlags.length; i++) {
+    if (isAttackFlags[i]) {
+      midi_editor_trigger_attack(vcId, noteIds[i], timings[i]);
+    } else {
+      midi_editor_trigger_release(vcId, noteIds[i], timings[i]);
+    }
+  }
 };
