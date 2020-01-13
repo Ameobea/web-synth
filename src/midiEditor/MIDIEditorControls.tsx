@@ -2,28 +2,13 @@ import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import downloadjs from 'downloadjs';
 
-import { PolySynth } from '../synth';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
-import { ControlPanelADSR, defaultAdsrEnvelope } from './adsr';
 
-interface PolySynthProps {
-  synth: PolySynth;
-  engine: typeof import('../engine');
-}
-
-const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
+const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
   const onChange = useMemo<(key: string, val: any) => void>(
     () => async (key, val) => {
       switch (key) {
-        case 'volume': {
-          synth.volume.set('volume', +val);
-          break;
-        }
-        case 'adsr': {
-          synth.setEnvelope(val);
-          break;
-        }
         case 'upload midi': {
           const uploadedFile: FileUploaderValue = val;
           console.log('loaded file: ', uploadedFile);
@@ -41,12 +26,11 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
           break;
         }
         default: {
-          const parsed = parseFloat(val);
-          synth.voices.forEach(voice => voice.set(key, isNaN(parsed) ? val : parsed));
+          console.error(`Unhandled state key in MIDI editor controls: ${key}`);
         }
       }
     },
-    [synth, engine]
+    [engine]
   );
 
   return (
@@ -56,15 +40,6 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
       position='top-right'
       draggable
       settings={[
-        { type: 'range', label: 'volume', min: -30, max: 20, initial: -16, steps: 200 },
-        {
-          type: 'select',
-          label: 'oscillator.type',
-          options: ['sine', 'square', 'triangle', 'sawtooth'],
-          initial: 'sine',
-        },
-        { type: 'checkbox', label: 'bitcrusher', initial: false },
-        { type: 'custom', label: 'adsr', initial: defaultAdsrEnvelope, Comp: ControlPanelADSR },
         {
           type: 'button',
           label: 'export midi',
@@ -85,4 +60,4 @@ const PolySynthControls = ({ synth, engine }: PolySynthProps) => {
   );
 };
 
-export default PolySynthControls;
+export default MIDIEditorControls;

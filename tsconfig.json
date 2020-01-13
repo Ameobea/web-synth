@@ -22,7 +22,6 @@
     "jsx": "react",
     "baseUrl": ".",
     "paths": {
-      "Tone": ["node_modules/tone/Tone"],
       "*": ["./node_modules/@types/*", "*"]
     }
   },

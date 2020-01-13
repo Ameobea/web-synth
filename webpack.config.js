@@ -47,9 +47,7 @@ module.exports = {
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.wasm'],
     modules: [path.resolve('./node_modules'), path.resolve('.')],
-    alias: {
-      Tone: path.resolve('./node_modules/tone/Tone'),
-    },
+    alias: {},
   },
   plugins: [
     new HtmlWebpackPlugin({

@@ -1,6 +1,6 @@
 # Web Synth and Digial Audio Workstation
 
-This is a web-based DAW (Digital Audio Workstation) written in Rust/WebAssembly and TypeScript. Its goal is to provide users with the tools they need to create unique sounds and audio compositions within the context of the web browser. It makes use of the WebAudio APIs along with the [Tone.JS](https://tonejs.github.io/) library to create sounds and transform them in unique ways.
+This is a web-based DAW (Digital Audio Workstation) written in Rust/WebAssembly and TypeScript. Its goal is to provide users with the tools they need to create unique sounds and audio compositions within the context of the web browser. It makes use of the WebAudio API.
 
 This project is still in its early stages. At the time of writing this, it really can't be used for any kind of meaningful work. However, the pieces are there and all it really requires right now is some cohesion between them as well as quality-of-life features.
 

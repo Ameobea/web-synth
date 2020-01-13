@@ -73,8 +73,6 @@
     "recompose": "^0.30.0",
     "redux": "^4.0.4",
     "redux-form": "^8.2.6",
-    "reselect": "^4.0.0",
-    "tonal": "^2.2.2",
-    "tone": "^13.8.25"
+    "reselect": "^4.0.0"
   }
 }

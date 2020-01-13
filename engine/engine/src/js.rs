@@ -102,6 +102,19 @@ extern "C" {
     pub fn cleanup_midi_editor_ui(vc_id: &str);
 }
 
+#[wasm_bindgen(raw_module = "./midiEditor/synthCbs")]
+extern "C" {
+    pub fn midi_editor_trigger_attack(vc_id: &str, note_id: usize);
+    pub fn midi_editor_trigger_release(vc_id: &str, note_id: usize);
+    pub fn midi_editor_trigger_attack_release(vc_id: &str, note_id: usize, duration: f32);
+    pub fn midi_editor_schedule_events(
+        vc_id: &str,
+        events: &[u8],
+        note_ids: &[usize],
+        timings: &[f32],
+    );
+}
+
 #[wasm_bindgen(raw_module = "./compositionSharing")]
 extern "C" {
     pub fn init_composition_sharing(state_key: &str);

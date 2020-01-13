@@ -1,14 +1,12 @@
 import { buildStore } from 'jantix';
 import { reducer as formReducer } from 'redux-form';
 
-import synthsModule from './modules/synths';
 import viewContextManagerModule from './modules/viewContextManager';
 import midiKeyboardModule from './modules/midiKeyboard';
 import effectsModule from './modules/effects';
 import presetsModule, { fetchSynthPresets, fetchSynthVoicePresets } from './modules/presets';
 
 const modules = {
-  synths: synthsModule,
   viewContextManager: viewContextManagerModule,
   midiKeyboard: midiKeyboardModule,
   effects: effectsModule,

@@ -4,7 +4,6 @@
 
 use std::str;
 
-use polysynth::{PolySynth, SynthCallbacks};
 use uuid::Uuid;
 
 use crate::{helpers::grid::prelude::*, view_context::ViewContext};
@@ -12,46 +11,14 @@ use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 pub mod constants;
 pub mod prelude;
 
-#[wasm_bindgen(raw_module = "./synth")]
-extern "C" {
-    /// Initializes a synth on the JavaScript side, returning its index in the gloabl synth array.
-    pub fn init_synth(uuid: String, voice_count: usize) -> usize;
-    pub fn trigger_attack(synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8);
-    pub fn trigger_release(synth_ix: usize, voice_ix: usize, note_id: usize);
-    pub fn trigger_attack_release(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32);
-    pub fn schedule_events(synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]);
-}
-
 pub struct MidiEditorGridHandler {
-    pub synth: PolySynth<
-        fn(uuid: String, voice_count: usize) -> usize,
-        fn(synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8),
-        fn(synth_ix: usize, voice_ix: usize, note_id: usize),
-        fn(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32),
-        fn(synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]),
-    >,
+    pub vc_id: String,
 }
-
-const DEFAULT_VELOCITY: u8 = 255;
-
-static SYNTH_CALLBACKS: SynthCallbacks<
-    fn(uuid: String, voice_count: usize) -> usize,
-    fn(synth_ix: usize, voice_ix: usize, note_id: usize, velocity: u8),
-    fn(synth_ix: usize, voice_ix: usize, note_id: usize),
-    fn(synth_ix: usize, voice_ix: usize, frequency: f32, duration: f32),
-    fn(synth_ix: usize, events: &[u8], note_ids: &[usize], timings: &[f32]),
-> = SynthCallbacks {
-    init_synth,
-    trigger_attack,
-    trigger_release,
-    trigger_attack_release,
-    schedule_events,
-};
 
 impl MidiEditorGridHandler {
-    fn new(uuid: Uuid) -> Self {
-        Self {
-            synth: PolySynth::new(uuid, true, SYNTH_CALLBACKS.clone()),
+    fn new(vc_id: Uuid) -> Self {
+        MidiEditorGridHandler {
+            vc_id: vc_id.to_string(),
         }
     }
 }
@@ -76,7 +43,9 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
 
     fn unhide(&mut self, vc_id: &str) { js::unhide_midi_editor(vc_id) }
 
-    fn cleanup(&mut self, _: &mut GridState<usize>, vc_id: &str) { js::cleanup_midi_editor_ui(vc_id); }
+    fn cleanup(&mut self, _: &mut GridState<usize>, vc_id: &str) {
+        js::cleanup_midi_editor_ui(vc_id);
+    }
 
     fn on_key_down(
         &mut self,
@@ -141,8 +110,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
 
         trace!("Triggering attack of line_ix {}", line_ix);
         if grid_state.cur_tool == Tool::DrawNote && !grid_state.shift_pressed {
-            self.synth
-                .trigger_attack(grid_state.conf.row_count - line_ix, DEFAULT_VELOCITY);
+            js::midi_editor_trigger_attack(&self.vc_id, grid_state.conf.row_count - line_ix);
         }
     }
 
@@ -187,12 +155,16 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                 let line_ix = selected_note_data.line_ix;
                 if *was_added && grid_state.selected_notes.insert(selected_note_data) {
                     MidiEditorGridRenderer::select_note(dom_id);
-                    self.synth
-                        .trigger_attack(grid_state.conf.row_count - line_ix, DEFAULT_VELOCITY);
+                    js::midi_editor_trigger_attack(
+                        &self.vc_id,
+                        grid_state.conf.row_count - line_ix,
+                    );
                 } else if !*was_added && grid_state.selected_notes.remove(&selected_note_data) {
                     MidiEditorGridRenderer::deselect_note(dom_id);
-                    self.synth
-                        .trigger_release(grid_state.conf.row_count - line_ix);
+                    js::midi_editor_trigger_release(
+                        &self.vc_id,
+                        grid_state.conf.row_count - line_ix,
+                    );
                 }
             }
         }
@@ -200,8 +172,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
 
     fn on_selection_box_deleted(&mut self, grid_state: &mut GridState<usize>) {
         for note_data in grid_state.selected_notes.iter() {
-            self.synth
-                .trigger_release(grid_state.conf.row_count - note_data.line_ix);
+            js::midi_editor_trigger_release(
+                &self.vc_id,
+                grid_state.conf.row_count - note_data.line_ix,
+            );
         }
     }
 
@@ -213,8 +187,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         dom_id: usize,
     ) -> DomId {
         trace!("Triggering release of note on line_ix {}", line_ix);
-        self.synth
-            .trigger_release(grid_state.conf.row_count - line_ix);
+        js::midi_editor_trigger_release(&self.vc_id, grid_state.conf.row_count - line_ix);
 
         // Right now, we don't have any additional data to store for notes outside of their actual
         // position on the grid and line index, so we just use their `dom_id` as their state.
@@ -228,8 +201,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         _note_dom_id: DomId,
     ) {
         trace!("Triggering release of note on line_ix {}", line_ix);
-        self.synth
-            .trigger_release(grid_state.conf.row_count - line_ix);
+        js::midi_editor_trigger_release(&self.vc_id, grid_state.conf.row_count - line_ix);
     }
 
     fn on_note_move(
@@ -245,16 +217,13 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             return;
         }
 
-        self.synth
-            .trigger_release(grid_state.conf.row_count - old_line_ix);
-        self.synth
-            .trigger_attack(grid_state.conf.row_count - new_line_ix, DEFAULT_VELOCITY);
+        js::midi_editor_trigger_release(&self.vc_id, grid_state.conf.row_count - old_line_ix);
+        js::midi_editor_trigger_attack(&self.vc_id, grid_state.conf.row_count - new_line_ix);
     }
 
     fn on_note_draw_start(&mut self, grid_state: &mut GridState<usize>, line_ix: usize) {
         trace!("triggering attack on line_ix {}", line_ix);
-        self.synth
-            .trigger_attack(grid_state.conf.row_count - line_ix, DEFAULT_VELOCITY);
+        js::midi_editor_trigger_attack(&self.vc_id, grid_state.conf.row_count - line_ix);
     }
 
     fn on_note_drag_start(
@@ -266,9 +235,9 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             "Triggering attack on line_ix {}",
             dragging_note_data.1.line_ix
         );
-        self.synth.trigger_attack(
+        js::midi_editor_trigger_attack(
+            &self.vc_id,
             grid_state.conf.row_count - dragging_note_data.1.line_ix,
-            DEFAULT_VELOCITY,
         );
     }
 
@@ -281,8 +250,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             "Triggering release on line_ix {}",
             dragging_note_data.1.line_ix
         );
-        self.synth
-            .trigger_release(grid_state.conf.row_count - dragging_note_data.1.line_ix);
+        js::midi_editor_trigger_release(
+            &self.vc_id,
+            grid_state.conf.row_count - dragging_note_data.1.line_ix,
+        );
     }
 
     fn handle_message(
@@ -307,37 +278,25 @@ impl MidiEditorGridHandler {
         // Get an iterator of sorted attack/release events to process
         let events = grid_state.data.iter_events(None);
 
-        // Create a virtual poly synth to handle assigning the virtual notes to voices
-        let mut voice_manager = PolySynth::new(uuid_v4(), false, SYNTH_CALLBACKS.clone());
-
         // Trigger all of the events with a custom callback that records the voice index to use for
         // each of them.
-        // `scheduled_events` is an array of `(is_attack, voice_ix)` pairs represented as bytes for
-        // efficient transfer across the FFI.
-        let mut scheduled_events: Vec<u8> = Vec::with_capacity(events.size_hint().0 * 2);
+        //
+        // `scheduled_events` is an array of `is_attack` flags represented as bytes for transfer
+        // across the FFI.
+        let mut is_attack_flags: Vec<u8> = Vec::with_capacity(events.size_hint().0 * 2);
         let mut note_ids: Vec<usize> = Vec::with_capacity(events.size_hint().0 / 2);
         let mut event_timings: Vec<f32> = Vec::with_capacity(events.size_hint().0);
         for event in events {
             let note_id = grid_state.conf.row_count - event.line_ix;
-            scheduled_events.push(tern(event.is_start, 1, 0));
+            note_ids.push(note_id);
+            is_attack_flags.push(tern(event.is_start, 1, 0));
             // TODO: make BPM configurable
             let event_time_seconds = ((event.beat / 120.) * 60.0) / 4.0;
             event_timings.push(event_time_seconds);
-
-            if event.is_start {
-                note_ids.push(note_id);
-                voice_manager.trigger_attack_cb(note_id, DEFAULT_VELOCITY, |_, voice_ix, _, _| {
-                    scheduled_events.push(voice_ix as u8);
-                });
-            } else {
-                voice_manager.trigger_release_cb(note_id, |_, voice_ix, _note_id| {
-                    scheduled_events.push(voice_ix as u8);
-                });
-            }
         }
 
         // Ship all of these events over to be scheduled and played
-        schedule_events(self.synth.id, &scheduled_events, &note_ids, &event_timings);
+        js::midi_editor_schedule_events(&self.vc_id, &is_attack_flags, &note_ids, &event_timings);
     }
 
     fn midi_to_frequency(&self, row_count: usize, line_ix: usize) -> f32 {
@@ -414,8 +373,10 @@ impl MidiEditorGridHandler {
                 )
             })
             .collect();
-        self.synth.trigger_attacks(&notes_to_play, DEFAULT_VELOCITY);
-        self.synth.trigger_releases(&notes_to_play);
+
+        for note_id in notes_to_play {
+            js::midi_editor_trigger_attack_release(&self.vc_id, note_id, 0.08);
+        }
     }
 
     fn move_selected_notes_horizontal(
@@ -558,15 +519,13 @@ impl MidiEditorGridHandler {
 
     pub fn play_selected_notes(&mut self, grid_state: &GridState<usize>) {
         for SelectedNoteData { line_ix, .. } in grid_state.selected_notes.iter() {
-            self.synth
-                .trigger_attack(grid_state.conf.row_count - *line_ix, DEFAULT_VELOCITY);
+            js::midi_editor_trigger_attack(&self.vc_id, grid_state.conf.row_count - *line_ix);
         }
     }
 
     pub fn release_selected_notes(&mut self, grid_state: &GridState<usize>) {
         for SelectedNoteData { line_ix, .. } in grid_state.selected_notes.iter() {
-            self.synth
-                .trigger_release(grid_state.conf.row_count - *line_ix);
+            js::midi_editor_trigger_release(&self.vc_id, grid_state.conf.row_count - *line_ix);
         }
     }
 }
