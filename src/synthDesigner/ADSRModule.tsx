@@ -78,11 +78,18 @@ export class ADSRModule extends ConstantSourceNode {
    * and start ramping to zero immediately.
    */
   public ungate(offset?: number) {
-    const { release } = this.envelope;
+    const range = this.maxValue - this.minValue;
+    const { release, decay } = this.envelope;
 
     if (R.isNil(offset)) {
       // Clear any queued ramp events
       this.offset.cancelScheduledValues(0);
+    } else {
+      this.offset.cancelScheduledValues(this.ctx.currentTime + offset);
+      this.offset.linearRampToValueAtTime(
+        this.minValue + decay.magnitude * range,
+        this.ctx.currentTime + offset
+      );
     }
 
     const releaseDuration = ((1.0 - release.pos) * this.lengthMs) / 1000.0;

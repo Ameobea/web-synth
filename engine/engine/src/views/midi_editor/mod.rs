@@ -13,12 +13,14 @@ pub mod prelude;
 
 pub struct MidiEditorGridHandler {
     pub vc_id: String,
+    pub bpm: f32,
 }
 
 impl MidiEditorGridHandler {
-    fn new(vc_id: Uuid) -> Self {
+    fn new(vc_id: Uuid, bpm: f32) -> Self {
         MidiEditorGridHandler {
             vc_id: vc_id.to_string(),
+            bpm,
         }
     }
 }
@@ -39,9 +41,13 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         js::init_midi_editor_ui(vc_id);
     }
 
-    fn hide(&mut self, vc_id: &str) { js::hide_midi_editor(vc_id) }
+    fn hide(&mut self, vc_id: &str) {
+        js::hide_midi_editor(vc_id)
+    }
 
-    fn unhide(&mut self, vc_id: &str) { js::unhide_midi_editor(vc_id) }
+    fn unhide(&mut self, vc_id: &str) {
+        js::unhide_midi_editor(vc_id)
+    }
 
     fn cleanup(&mut self, _: &mut GridState<usize>, vc_id: &str) {
         js::cleanup_midi_editor_ui(vc_id);
@@ -63,10 +69,12 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         match key {
             "ArrowUp" | "w" => self.move_notes_vertical(true, grid_state, line_diff_vertical),
             "ArrowDown" | "s" => self.move_notes_vertical(false, grid_state, line_diff_vertical),
-            "ArrowLeft" | "a" =>
-                self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal),
-            "ArrowRight" | "d" =>
-                self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal),
+            "ArrowLeft" | "a" => {
+                self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal)
+            }
+            "ArrowRight" | "d" => {
+                self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal)
+            }
             "q" => self.play_selected_notes(grid_state),
             "z" | "x" | "c" | "v" => {
                 let direction_multiplier = tern(key == "z" || key == "c", -1., 1.);
@@ -76,7 +84,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                     * direction_multiplier;
                 let is_left = key == "z" || key == "x";
                 self.adjust_note_lengths(grid_state, is_left, adjustment_amount);
-            },
+            }
             " " => self.start_playback(grid_state),
             _ => (),
         }
@@ -260,10 +268,23 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         &mut self,
         grid_state: &mut GridState<usize>,
         key: &str,
-        _val: &[u8],
+        val: &[u8],
     ) -> Option<Vec<u8>> {
         match key {
             "export_midi" => Some(grid_state.serialize_to_binary()),
+            "set_bpm" => {
+                assert_eq!(
+                    val.len(),
+                    4,
+                    "Message for \"set_bpm\" must be a 4-byte `f32`"
+                );
+                let val: f32 = unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
+                self.bpm = val;
+
+                // TODO: Cancel scheduled notes and re-schedule with updated BPM, taking care to preserve current spot
+
+                None
+            }
             _ => None,
         }
     }
@@ -290,8 +311,7 @@ impl MidiEditorGridHandler {
             let note_id = grid_state.conf.row_count - event.line_ix;
             note_ids.push(note_id);
             is_attack_flags.push(tern(event.is_start, 1, 0));
-            // TODO: make BPM configurable
-            let event_time_seconds = ((event.beat / 120.) * 60.0) / 4.0;
+            let event_time_seconds = ((event.beat / self.bpm) * 60.0) / 4.0;
             event_timings.push(event_time_seconds);
         }
 
@@ -530,8 +550,13 @@ impl MidiEditorGridHandler {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct MIDIEditorConf {
+    pub bpm: f32,
+}
+
 /// Return `MidiEditor` instance as a `ViewContext` given the provided config string.
-pub fn mk_midi_editor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
+pub fn mk_midi_editor(config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
     let conf = GridConf {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
         row_count: constants::LINE_COUNT,
@@ -544,7 +569,19 @@ pub fn mk_midi_editor(_config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext>
         measure_width_px: constants::BEATS_PER_MEASURE * constants::BEAT_LENGTH_PX,
     };
 
-    let view_context = MidiEditorGridHandler::new(uuid);
+    let bpm = if let Some(config) = config {
+        match serde_json::from_str(config) {
+            Ok(MIDIEditorConf { bpm }) => bpm,
+            Err(err) => {
+                error!("Error deserializing MIDI editor conf: {:?}", err);
+                120.0
+            }
+        }
+    } else {
+        120.0
+    };
+
+    let view_context = MidiEditorGridHandler::new(uuid, bpm);
     let grid: Box<MidiGrid> = Box::new(Grid::new(conf, view_context, uuid));
 
     grid

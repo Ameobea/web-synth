@@ -25,6 +25,12 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
           engine.handle_message('set_raw_note_data', rawNoteData);
           break;
         }
+        case 'bpm': {
+          const buf = new Float32Array(1);
+          buf[0] = val;
+          engine.handle_message('set_bpm', new Uint8Array(buf.buffer));
+          break;
+        }
         default: {
           console.error(`Unhandled state key in MIDI editor controls: ${key}`);
         }
@@ -40,6 +46,7 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
       position='top-right'
       draggable
       settings={[
+        { type: 'range', label: 'bpm', min: 20, max: 400 },
         {
           type: 'button',
           label: 'export midi',
