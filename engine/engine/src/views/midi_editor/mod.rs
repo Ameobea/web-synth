@@ -10,6 +10,9 @@ use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
 pub mod prelude;
+mod scheduler;
+
+use self::scheduler::SchedulerStateHandle;
 
 fn render_loop_mark(conf: &GridConf, class_name: &str, measure: usize) -> DomId {
     let px = conf.beats_to_px(measure as f32);
@@ -21,11 +24,12 @@ pub struct LoopMarkDescriptor {
     pub dom_id: DomId,
 }
 
-pub struct MidiEditorGridHandler {
+pub struct MIDIEditorGridHandler {
     pub vc_id: String,
     pub bpm: f32,
     pub loop_start_mark_measure: Option<LoopMarkDescriptor>,
     pub loop_end_mark_measure: Option<LoopMarkDescriptor>,
+    pub loop_handle: Option<SchedulerStateHandle>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -45,9 +49,9 @@ impl Default for MIDIEditorConf {
     }
 }
 
-impl MidiEditorGridHandler {
+impl MIDIEditorGridHandler {
     fn new(grid_conf: &GridConf, vc_id: Uuid, conf: MIDIEditorConf) -> Self {
-        MidiEditorGridHandler {
+        MIDIEditorGridHandler {
             vc_id: vc_id.to_string(),
             bpm: conf.bpm,
             loop_start_mark_measure: conf.loop_start_mark_measure.map(|measure| {
@@ -62,6 +66,7 @@ impl MidiEditorGridHandler {
                     measure,
                     dom_id: render_loop_mark(grid_conf, "loop-end-marker", measure),
                 }),
+            loop_handle: None,
         }
     }
 }
@@ -93,7 +98,7 @@ fn update_loop_descriptor(
     }
 }
 
-impl MidiEditorGridHandler {
+impl MIDIEditorGridHandler {
     fn set_loop_start(&mut self, grid_state: &GridState<usize>) {
         let new_measure = grid_state.cursor_pos_beats.round() as usize;
         if let Some(LoopMarkDescriptor { measure, .. }) = &self.loop_end_mark_measure {
@@ -133,11 +138,11 @@ impl MidiEditorGridHandler {
 
 struct MidiEditorGridRenderer;
 
-type MidiGrid = Grid<usize, MidiEditorGridRenderer, MidiEditorGridHandler>;
+type MidiGrid = Grid<usize, MidiEditorGridRenderer, MIDIEditorGridHandler>;
 
 impl GridRenderer<usize> for MidiEditorGridRenderer {}
 
-impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
+impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
     fn init(&mut self, vc_id: &str) {
         unsafe {
             skip_list::SKIP_LIST_NODE_DEBUG_POINTERS =
@@ -377,14 +382,42 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
             "set_bpm" => {
                 assert_eq!(
                     val.len(),
-                    4,
-                    "Message for \"set_bpm\" must be a 4-byte `f32`"
+                    8,
+                    "Message for \"set_bpm\" must be a 8-byte `(f32, f32)` of `(bpm, cur_time)`"
                 );
-                let val: f32 = unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
-                self.bpm = val;
+                let bpm: f32 = unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
+                let cur_time: f32 =
+                    unsafe { std::mem::transmute((val[4], val[5], val[6], val[7])) };
+                self.bpm = bpm;
 
-                // TODO: Cancel scheduled notes and re-schedule with updated BPM, taking care to
-                // preserve current spot
+                if let Some(loop_handle) = self.loop_handle {
+                    scheduler::reschedule(cur_time, loop_handle);
+                }
+
+                None
+            },
+            "toggle_loop" => {
+                assert_eq!(
+                    val.len(),
+                    8,
+                    "Message for \"toggle_loop\" must be a 8-byte `(f32, f32)` of `(cursor_pos, \
+                     cur_time)`"
+                );
+                let cursor_pos: f32 =
+                    unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
+                let cur_time: f32 =
+                    unsafe { std::mem::transmute((val[4], val[5], val[6], val[7])) };
+
+                match self.loop_handle {
+                    Some(loop_handle) => scheduler::cancel_loop(loop_handle),
+                    None =>
+                        self.loop_handle = Some(scheduler::init_scheduler_loop(
+                            cur_time,
+                            cursor_pos,
+                            &self,
+                            &grid_state,
+                        )),
+                };
 
                 None
             },
@@ -397,7 +430,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
     }
 }
 
-impl MidiEditorGridHandler {
+impl MIDIEditorGridHandler {
     fn start_playback(&mut self, grid_state: &GridState<usize>) {
         // Get an iterator of sorted attack/release events to process
         let events = grid_state.data.iter_events(None);
@@ -679,7 +712,7 @@ pub fn mk_midi_editor(config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> 
         MIDIEditorConf::default()
     };
 
-    let view_context = MidiEditorGridHandler::new(&grid_conf, uuid, conf);
+    let view_context = MIDIEditorGridHandler::new(&grid_conf, uuid, conf);
     let grid: Box<MidiGrid> = Box::new(Grid::new(grid_conf, view_context, uuid));
 
     grid

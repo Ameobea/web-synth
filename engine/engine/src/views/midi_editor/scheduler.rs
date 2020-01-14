@@ -1,0 +1,134 @@
+//! Scheduler for notes of the MIDI editor.  Allows for a composition to be played through or for
+//! part of it to be looped continuously.
+
+use super::{LoopMarkDescriptor, MIDIEditorGridHandler};
+use crate::helpers::grid::prelude::*;
+
+pub type SchedulerStateHandle = *mut SchedulerState;
+type SchedulerLoopHandle = usize;
+
+#[wasm_bindgen]
+extern "C" {
+    fn setInterval(closure: &Closure<dyn FnMut()>, millis: u32) -> SchedulerLoopHandle;
+    fn cancelInterval(handle: SchedulerLoopHandle);
+}
+
+pub struct SchedulerState {
+    pub start_time: f32,
+    pub interval_handle: SchedulerLoopHandle,
+    pub end_beat_of_last_scheduling_period: f32,
+    pub state: &'static MIDIEditorGridHandler,
+    pub grid_state: &'static GridState<usize>,
+}
+
+const RESCHEDULE_INTERVAL_MS: usize = 500;
+
+pub fn run_midi_editor_loop_scheduler(scheduler_state_handle: SchedulerStateHandle) {
+    let mut scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
+    run_scheduler(&mut scheduler_state);
+    std::mem::forget(scheduler_state);
+}
+
+fn init_scheduler_interval(scheduler_state: SchedulerState) -> SchedulerStateHandle {
+    let state_handle: SchedulerStateHandle = Box::into_raw(Box::new(scheduler_state));
+    let interval_handle = setInterval(
+        &Closure::new(box move || run_midi_editor_loop_scheduler(state_handle)),
+        RESCHEDULE_INTERVAL_MS as u32,
+    );
+    unsafe { (*state_handle).interval_handle = interval_handle };
+    state_handle
+}
+
+pub fn cancel_loop(scheduler_state_handle: SchedulerStateHandle) {
+    drop(unsafe { Box::from_raw(scheduler_state_handle) });
+    unimplemented!() // TODO: Cancel the interval
+}
+
+pub fn init_scheduler_loop(
+    start_time: f32,
+    start_beat: f32,
+    state: &MIDIEditorGridHandler,
+    grid_state: &GridState<usize>,
+) -> SchedulerStateHandle {
+    let scheduler_state = SchedulerState {
+        start_time,
+        interval_handle: 0,
+        end_beat_of_last_scheduling_period: state
+            .loop_start_mark_measure
+            .as_ref()
+            .map(|descriptor| descriptor.measure as f32)
+            .unwrap_or(0.0),
+        state: unsafe { std::mem::transmute(state) },
+        grid_state: unsafe { std::mem::transmute(grid_state) },
+    };
+    let handle = init_scheduler_interval(scheduler_state);
+    // Schedule once immediately
+    run_midi_editor_loop_scheduler(handle);
+    handle
+}
+
+/// Clears all pending events and re-schedules starting at the current time
+pub fn reschedule(cur_time: f32, handle: SchedulerStateHandle) {
+    unimplemented!() // TODO
+}
+
+fn run_scheduler(scheduler_state: &mut SchedulerState) {
+    let start_mark_pos_beats: f32 = scheduler_state
+        .state
+        .loop_end_mark_measure
+        .as_ref()
+        .map(|descriptor| descriptor.measure as f32)
+        .unwrap_or(0.);
+    let mut absolute_start_time = scheduler_state.end_beat_of_last_scheduling_period;
+    let end_mark_pos_beats = match scheduler_state.state.loop_end_mark_measure {
+        Some(LoopMarkDescriptor { measure, .. }) => measure as f32,
+        None => {
+            warn!("Tried to schedule a loop without a loop end mark being set");
+            return;
+        },
+    };
+    let loop_length_beats = end_mark_pos_beats - start_mark_pos_beats;
+    let mut relative_start_time = absolute_start_time % loop_length_beats;
+    let absolute_end_time = (absolute_start_time - relative_start_time) + end_mark_pos_beats;
+
+    let beats_per_second = scheduler_state.state.bpm / 60.;
+    let seconds_to_schedule = (RESCHEDULE_INTERVAL_MS as f32) / 1000.;
+    let beats_to_schedule = beats_per_second * seconds_to_schedule;
+
+    // Schedule the loop repeatedly at increasing offsets until all necessary beats have been
+    // covered
+    let mut total_scheduled_beats = 0.0;
+    let mut is_attack_flags: Vec<u8> = Vec::new();
+    let mut note_ids: Vec<usize> = Vec::new();
+    let mut event_timings: Vec<f32> = Vec::new();
+    while total_scheduled_beats < beats_to_schedule {
+        let relative_end_time = if absolute_end_time - absolute_start_time > loop_length_beats {
+            end_mark_pos_beats
+        } else {
+            relative_start_time + (absolute_end_time - absolute_start_time)
+        };
+        let offset = absolute_start_time - relative_start_time;
+        let events = scheduler_state
+            .grid_state
+            .data
+            .iter_events(Some(relative_start_time))
+            .take_while(|event| event.beat < relative_end_time);
+
+        for event in events {
+            let note_id = scheduler_state.grid_state.conf.row_count - event.line_ix;
+            note_ids.push(note_id);
+            is_attack_flags.push(tern(event.is_start, 1, 0));
+            let event_time_seconds =
+                (((offset + event.beat) / scheduler_state.state.bpm) * 60.0) / 4.0;
+            event_timings.push(event_time_seconds);
+        }
+
+        let scheduled_beats = relative_end_time - relative_start_time;
+        total_scheduled_beats += scheduled_beats;
+        relative_start_time = start_mark_pos_beats;
+        // We will always have markers at even measures, and this prevents any floating-point issues
+        absolute_start_time = (absolute_start_time + scheduled_beats).round();
+    }
+
+    scheduler_state.end_beat_of_last_scheduling_period += total_scheduled_beats;
+}
