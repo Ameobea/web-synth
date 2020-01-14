@@ -52,15 +52,9 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
     fn deselect_note(dom_id: usize) { js::remove_class(dom_id, "selected"); }
 
     /// Render the cursor and return its `DomId`
-    fn create_cursor(conf: &GridConf, cursor_pos_beats: usize) -> DomId {
-        js::render_line(
-            FG_CANVAS_IX,
-            cursor_pos_beats,
-            0,
-            cursor_pos_beats,
-            conf.grid_height(),
-            "cursor",
-        )
+    fn create_cursor(conf: &GridConf, cursor_pos_beats: f32) -> DomId {
+        let px = conf.beats_to_px(cursor_pos_beats);
+        js::render_line(FG_CANVAS_IX, px, 0, px, conf.grid_height(), "cursor")
     }
 
     /// Set the position and size of the selection box
@@ -446,7 +440,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
 {
     fn init(&mut self) {
         render::render_initial_grid(&self.state.conf, &self.get_id());
-        self.state.cursor_dom_id = R::create_cursor(&self.state.conf, 4);
+        self.state.cursor_dom_id = R::create_cursor(&self.state.conf, 4.);
         self.handler.init(&self.get_id());
 
         if !self.loaded {

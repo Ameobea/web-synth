@@ -11,17 +11,123 @@ use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 pub mod constants;
 pub mod prelude;
 
+fn render_loop_mark(conf: &GridConf, class_name: &str, measure: usize) -> DomId {
+    let px = conf.beats_to_px(measure as f32);
+    js::render_line(FG_CANVAS_IX, px, 0, px, conf.grid_height(), class_name)
+}
+
+pub struct LoopMarkDescriptor {
+    pub measure: usize,
+    pub dom_id: DomId,
+}
+
 pub struct MidiEditorGridHandler {
     pub vc_id: String,
     pub bpm: f32,
+    pub loop_start_mark_measure: Option<LoopMarkDescriptor>,
+    pub loop_end_mark_measure: Option<LoopMarkDescriptor>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MIDIEditorConf {
+    pub bpm: f32,
+    pub loop_start_mark_measure: Option<usize>,
+    pub loop_end_mark_measure: Option<usize>,
+}
+
+impl Default for MIDIEditorConf {
+    fn default() -> Self {
+        MIDIEditorConf {
+            bpm: 120.0,
+            loop_start_mark_measure: None,
+            loop_end_mark_measure: None,
+        }
+    }
 }
 
 impl MidiEditorGridHandler {
-    fn new(vc_id: Uuid, bpm: f32) -> Self {
+    fn new(grid_conf: &GridConf, vc_id: Uuid, conf: MIDIEditorConf) -> Self {
         MidiEditorGridHandler {
             vc_id: vc_id.to_string(),
-            bpm,
+            bpm: conf.bpm,
+            loop_start_mark_measure: conf.loop_start_mark_measure.map(|measure| {
+                LoopMarkDescriptor {
+                    measure,
+                    dom_id: render_loop_mark(grid_conf, "loop-start-marker", measure),
+                }
+            }),
+            loop_end_mark_measure: conf
+                .loop_end_mark_measure
+                .map(|measure| LoopMarkDescriptor {
+                    measure,
+                    dom_id: render_loop_mark(grid_conf, "loop-end-marker", measure),
+                }),
         }
+    }
+}
+
+fn update_loop_descriptor(
+    cursor_pos: f32,
+    old_descriptor_opt: Option<LoopMarkDescriptor>,
+    grid_conf: &GridConf,
+    class_name: &str,
+) -> LoopMarkDescriptor {
+    let new_pos_f32 = cursor_pos.round();
+    let new_pos = new_pos_f32 as usize;
+
+    match old_descriptor_opt {
+        Some(LoopMarkDescriptor { dom_id, .. }) => {
+            let px_str = grid_conf.beats_to_px(new_pos_f32).to_string();
+            js::set_attr(dom_id, "x1", &px_str);
+            js::set_attr(dom_id, "x2", &px_str);
+
+            LoopMarkDescriptor {
+                measure: new_pos,
+                dom_id,
+            }
+        },
+        None => LoopMarkDescriptor {
+            measure: new_pos,
+            dom_id: render_loop_mark(grid_conf, class_name, new_pos),
+        },
+    }
+}
+
+impl MidiEditorGridHandler {
+    fn set_loop_start(&mut self, grid_state: &GridState<usize>) {
+        let new_measure = grid_state.cursor_pos_beats.round() as usize;
+        if let Some(LoopMarkDescriptor { measure, .. }) = &self.loop_end_mark_measure {
+            // Prevent start mark from being placed on or after end mark
+            if new_measure >= *measure {
+                return;
+            }
+        }
+
+        let old_descriptor_opt = std::mem::replace(&mut self.loop_start_mark_measure, None);
+        self.loop_start_mark_measure = Some(update_loop_descriptor(
+            grid_state.cursor_pos_beats,
+            old_descriptor_opt,
+            &grid_state.conf,
+            "loop-start-marker",
+        ))
+    }
+
+    fn set_loop_end(&mut self, grid_state: &GridState<usize>) {
+        let new_measure = grid_state.cursor_pos_beats.round() as usize;
+        if let Some(LoopMarkDescriptor { measure, .. }) = &self.loop_start_mark_measure {
+            // Prevent end mark from being placed on or before end mark
+            if new_measure <= *measure {
+                return;
+            }
+        }
+
+        let old_descriptor_opt = std::mem::replace(&mut self.loop_end_mark_measure, None);
+        self.loop_end_mark_measure = Some(update_loop_descriptor(
+            grid_state.cursor_pos_beats,
+            old_descriptor_opt,
+            &grid_state.conf,
+            "loop-end-marker",
+        ))
     }
 }
 
@@ -41,13 +147,9 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         js::init_midi_editor_ui(vc_id);
     }
 
-    fn hide(&mut self, vc_id: &str) {
-        js::hide_midi_editor(vc_id)
-    }
+    fn hide(&mut self, vc_id: &str) { js::hide_midi_editor(vc_id) }
 
-    fn unhide(&mut self, vc_id: &str) {
-        js::unhide_midi_editor(vc_id)
-    }
+    fn unhide(&mut self, vc_id: &str) { js::unhide_midi_editor(vc_id) }
 
     fn cleanup(&mut self, _: &mut GridState<usize>, vc_id: &str) {
         js::cleanup_midi_editor_ui(vc_id);
@@ -69,12 +171,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
         match key {
             "ArrowUp" | "w" => self.move_notes_vertical(true, grid_state, line_diff_vertical),
             "ArrowDown" | "s" => self.move_notes_vertical(false, grid_state, line_diff_vertical),
-            "ArrowLeft" | "a" => {
-                self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal)
-            }
-            "ArrowRight" | "d" => {
-                self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal)
-            }
+            "ArrowLeft" | "a" =>
+                self.move_selected_notes_horizontal(grid_state, false, beat_diff_horizontal),
+            "ArrowRight" | "d" =>
+                self.move_selected_notes_horizontal(grid_state, true, beat_diff_horizontal),
             "q" => self.play_selected_notes(grid_state),
             "z" | "x" | "c" | "v" => {
                 let direction_multiplier = tern(key == "z" || key == "c", -1., 1.);
@@ -84,7 +184,9 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                     * direction_multiplier;
                 let is_left = key == "z" || key == "x";
                 self.adjust_note_lengths(grid_state, is_left, adjustment_amount);
-            }
+            },
+            "1" => self.set_loop_start(&*grid_state),
+            "2" => self.set_loop_end(&*grid_state),
             " " => self.start_playback(grid_state),
             _ => (),
         }
@@ -281,10 +383,11 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MidiEditorGridHandler {
                 let val: f32 = unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
                 self.bpm = val;
 
-                // TODO: Cancel scheduled notes and re-schedule with updated BPM, taking care to preserve current spot
+                // TODO: Cancel scheduled notes and re-schedule with updated BPM, taking care to
+                // preserve current spot
 
                 None
-            }
+            },
             _ => None,
         }
     }
@@ -550,14 +653,9 @@ impl MidiEditorGridHandler {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct MIDIEditorConf {
-    pub bpm: f32,
-}
-
 /// Return `MidiEditor` instance as a `ViewContext` given the provided config string.
 pub fn mk_midi_editor(config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let conf = GridConf {
+    let grid_conf = GridConf {
         gutter_height: constants::CURSOR_GUTTER_HEIGHT,
         row_count: constants::LINE_COUNT,
         beat_length_px: constants::BEAT_LENGTH_PX,
@@ -569,20 +667,20 @@ pub fn mk_midi_editor(config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> 
         measure_width_px: constants::BEATS_PER_MEASURE * constants::BEAT_LENGTH_PX,
     };
 
-    let bpm = if let Some(config) = config {
+    let conf = if let Some(config) = config {
         match serde_json::from_str(config) {
-            Ok(MIDIEditorConf { bpm }) => bpm,
+            Ok(conf) => conf,
             Err(err) => {
                 error!("Error deserializing MIDI editor conf: {:?}", err);
-                120.0
-            }
+                MIDIEditorConf::default()
+            },
         }
     } else {
-        120.0
+        MIDIEditorConf::default()
     };
 
-    let view_context = MidiEditorGridHandler::new(uuid, bpm);
-    let grid: Box<MidiGrid> = Box::new(Grid::new(conf, view_context, uuid));
+    let view_context = MidiEditorGridHandler::new(&grid_conf, uuid, conf);
+    let grid: Box<MidiGrid> = Box::new(Grid::new(grid_conf, view_context, uuid));
 
     grid
 }
