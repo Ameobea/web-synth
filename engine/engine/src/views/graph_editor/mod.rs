@@ -43,5 +43,5 @@ pub fn mk_graph_editor(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn View
             serde_json::from_str(definition).expect("Error while deserializing `GraphEditor`"),
         None => GraphEditor::new(uuid),
     };
-    Box::new(graph_editor)
+    box graph_editor
 }

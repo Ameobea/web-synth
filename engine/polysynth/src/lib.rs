@@ -1,6 +1,8 @@
 //! Synth state management.  Handles keeping track of what each voice of each polyphonic synth
 //! is playing and passing the correct commands through to the WebAudio synths.
 
+#![feature(nll, box_syntax)]
+
 #[cfg(feature = "wasm-bindgen")]
 #[macro_use]
 extern crate wasm_bindgen;
@@ -14,6 +16,7 @@ extern crate log;
 
 use std::{mem, ptr};
 
+#[cfg(feature = "wasm-bindgen")]
 use js_sys::Array;
 use uuid::Uuid;
 
@@ -61,9 +64,7 @@ impl Voice {
         }
     }
 
-    pub fn is_playing(&self) -> bool {
-        !(self.playing == VoicePlayingStatus::Tacent)
-    }
+    pub fn is_playing(&self) -> bool { !(self.playing == VoicePlayingStatus::Tacent) }
 }
 
 pub struct PolySynth<
@@ -211,7 +212,7 @@ impl<
                     note_id
                 );
                 return None;
-            }
+            },
         };
 
         let released_voice_ix = self.voices[target_voice_ix].src_ix;
@@ -280,52 +281,45 @@ pub mod exports {
         release_note: js_sys::Function,
     ) -> *mut PolySynthContext {
         let context = PolySynthContext {
-            synth: PolySynth::new(
-                common::uuid_v4(),
-                true,
-                SynthCallbacks {
-                    init_synth: Box::new(|_, _| 0usize),
-                    trigger_release: Box::new(
-                        move |_synth_ix: usize,
+            synth: PolySynth::new(common::uuid_v4(), true, SynthCallbacks {
+                init_synth: box |_, _| 0usize,
+                trigger_release:
+                    box move |_synth_ix: usize,
                               voice_ix: usize,
                               note_id: usize,
                               offset: Option<f32>| match release_note.call3(
-                            &JsValue::NULL,
+                        &JsValue::NULL,
+                        &JsValue::from(voice_ix as u32),
+                        &JsValue::from(note_id as u32),
+                        &JsValue::from(offset),
+                    ) {
+                        Ok(_) => (),
+                        Err(err) => error!("Error playing note: {:?}", err),
+                    },
+                trigger_attack: box move |_synth_ix: usize,
+                                          voice_ix: usize,
+                                          note_id: usize,
+                                          velocity: u8,
+                                          offset: Option<f32>| {
+                    match play_note.apply(
+                        &JsValue::NULL,
+                        &Array::of4(
                             &JsValue::from(voice_ix as u32),
                             &JsValue::from(note_id as u32),
+                            &JsValue::from(velocity),
                             &JsValue::from(offset),
-                        ) {
-                            Ok(_) => (),
-                            Err(err) => error!("Error playing note: {:?}", err),
-                        },
-                    ),
-                    trigger_attack: Box::new(
-                        move |_synth_ix: usize,
-                              voice_ix: usize,
-                              note_id: usize,
-                              velocity: u8,
-                              offset: Option<f32>| {
-                            match play_note.apply(
-                                &JsValue::NULL,
-                                &Array::of4(
-                                    &JsValue::from(voice_ix as u32),
-                                    &JsValue::from(note_id as u32),
-                                    &JsValue::from(velocity),
-                                    &JsValue::from(offset),
-                                ),
-                            ) {
-                                Ok(_) => (),
-                                Err(err) => error!("Error playing note: {:?}", err),
-                            }
-                        },
-                    ),
-                    trigger_attack_release: Box::new(|_, _, _, _| unimplemented!()),
-                    schedule_events: Box::new(|_, _, _, _| unimplemented!()),
+                        ),
+                    ) {
+                        Ok(_) => (),
+                        Err(err) => error!("Error playing note: {:?}", err),
+                    }
                 },
-            ),
+                trigger_attack_release: box move |_, _, _, _| unimplemented!(),
+                schedule_events: box move |_, _, _, _| unimplemented!(),
+            }),
         };
 
-        Box::into_raw(Box::new(context))
+        Box::into_raw(box context)
     }
 
     #[wasm_bindgen]

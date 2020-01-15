@@ -59,10 +59,10 @@ pub fn init() {
         unsafe {
             // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
             // some actual RNG from JS so that things aren't deterministic.
-            RNG = Box::into_raw(Box::new(Pcg32::new(
+            RNG = Box::into_raw(box Pcg32::new(
                 mem::transmute(js::js_random()),
                 721_347_520_420_481_703,
-            )))
+            ))
         }
 
         // Pump it a few times because it seems to generate a fully null output the first time
@@ -84,7 +84,7 @@ pub fn init() {
     }
 
     // Create the `ViewContextManager` and initialize it, then set it into the global
-    let vcm = Box::new(ViewContextManager::default());
+    let vcm = box ViewContextManager::default();
     // We have to store it in the pointer before initializing it since some initializing functions
     // call into JS code which in turn calls back into Rust code which expects to be able to access
     // the global VCM via that pointer.

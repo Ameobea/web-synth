@@ -1,4 +1,4 @@
-#![feature(nll)]
+#![feature(nll, box_syntax)]
 
 #[macro_use]
 extern crate log;

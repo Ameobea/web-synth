@@ -57,9 +57,9 @@ export const midi_editor_schedule_events = (
 ) => {
   for (let i = 0; i < isAttackFlags.length; i++) {
     if (isAttackFlags[i]) {
-      midi_editor_trigger_attack(vcId, noteIds[i], timings[i]);
+      midi_editor_trigger_attack(vcId, noteIds[i], timings[i] - ctx.currentTime);
     } else {
-      midi_editor_trigger_release(vcId, noteIds[i], timings[i]);
+      midi_editor_trigger_release(vcId, noteIds[i], timings[i] - ctx.currentTime);
     }
   }
 };

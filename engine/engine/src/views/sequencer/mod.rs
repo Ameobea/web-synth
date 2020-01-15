@@ -32,5 +32,5 @@ impl ViewContext for Sequencer {
 }
 
 pub fn mk_sequencer(_definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    Box::new(Sequencer { uuid })
+    box Sequencer { uuid }
 }

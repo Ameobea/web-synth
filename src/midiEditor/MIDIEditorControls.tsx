@@ -28,7 +28,7 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
           break;
         }
         case 'bpm': {
-          const buf = new Float32Array(1);
+          const buf = new Float64Array(1);
           buf[0] = val;
           engine.handle_message('set_bpm', new Uint8Array(buf.buffer));
           break;
@@ -53,7 +53,7 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
           type: 'button',
           label: 'toggle loop',
           action: () => {
-            const vals = new Float32Array(1);
+            const vals = new Float64Array(1);
             vals[0] = ctx.currentTime;
             engine.handle_message('toggle_loop', new Uint8Array(vals.buffer));
           },

@@ -113,16 +113,16 @@ extern "C" {
         vc_id: &str,
         events: &[u8],
         note_ids: &[usize],
-        timings: &[f32],
+        timings: &[f64],
     );
     pub fn midi_editor_cancel_all_events(vc_id: &str);
     pub fn register_midi_editor_loop_interval(
-        cb: &Closure<dyn FnMut(f32)>,
+        cb: &Closure<dyn FnMut(f64)>,
         inteval_ms: usize,
     ) -> SchedulerLoopHandle;
     pub fn cancel_midi_editor_loop_interval(handle: SchedulerLoopHandle);
     pub fn midi_editor_register_animation_frame(
-        cb: &Closure<dyn FnMut(f32)>,
+        cb: &Closure<dyn FnMut(f64)>,
     ) -> SchedulerLoopHandle;
     pub fn midi_editor_cancel_animation_frame(handle: SchedulerLoopHandle);
 }

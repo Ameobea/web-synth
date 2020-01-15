@@ -43,5 +43,5 @@ pub fn mk_composition_sharing(definition_opt: Option<&str>, uuid: Uuid) -> Box<d
             .expect("Error while deserializing `CompositionSharing`"),
         None => CompositionSharing::new(uuid),
     };
-    Box::new(composition_sharing)
+    box composition_sharing
 }

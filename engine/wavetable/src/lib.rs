@@ -1,3 +1,5 @@
+#![feature(nll, box_syntax)]
+
 use std::mem::{self, transmute};
 
 pub struct WaveTableSettings {
@@ -148,7 +150,7 @@ pub fn init_wavetable(
         base_frequency,
     };
 
-    Box::into_raw(Box::new(WaveTable::new(settings)))
+    Box::into_raw(box WaveTable::new(settings))
 }
 
 #[no_mangle]
@@ -161,8 +163,7 @@ pub fn drop_wavetable(table: *mut WaveTable) { drop(unsafe { Box::from_raw(table
 
 #[no_mangle]
 pub fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
-    let handle = Box::new(WaveTableHandle::new(unsafe { transmute(table) }));
-    Box::into_raw(handle)
+    Box::into_raw(box WaveTableHandle::new(unsafe { transmute(table) }))
 }
 
 #[no_mangle]

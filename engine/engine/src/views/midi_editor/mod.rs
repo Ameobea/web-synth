@@ -26,7 +26,7 @@ pub struct LoopMarkDescriptor {
 
 pub struct MIDIEditorGridHandler {
     pub vc_id: String,
-    pub bpm: f32,
+    pub bpm: f64,
     pub loop_start_mark_measure: Option<LoopMarkDescriptor>,
     pub loop_end_mark_measure: Option<LoopMarkDescriptor>,
     pub loop_handle: Option<SchedulerStateHandle>,
@@ -34,7 +34,7 @@ pub struct MIDIEditorGridHandler {
 
 #[derive(Serialize, Deserialize)]
 pub struct MIDIEditorConf {
-    pub bpm: f32,
+    pub bpm: f64,
     pub loop_start_mark_measure: Option<usize>,
     pub loop_end_mark_measure: Option<usize>,
 }
@@ -146,7 +146,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
     fn init(&mut self, vc_id: &str) {
         unsafe {
             skip_list::SKIP_LIST_NODE_DEBUG_POINTERS =
-                Box::into_raw(Box::new(skip_list::blank_shortcuts()));
+                Box::into_raw(box skip_list::blank_shortcuts());
         };
 
         js::init_midi_editor_ui(vc_id);
@@ -382,12 +382,19 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
             "set_bpm" => {
                 assert_eq!(
                     val.len(),
-                    8,
-                    "Message for \"set_bpm\" must be a 8-byte `(f32, f32)` of `(bpm, cur_time)`"
+                    16,
+                    "Message for \"set_bpm\" must be a 16-byte `(f64, f64)` of `(bpm, cur_time)`"
                 );
-                let bpm: f32 = unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
-                let cur_time: f32 =
-                    unsafe { std::mem::transmute((val[4], val[5], val[6], val[7])) };
+                let bpm: f64 = unsafe {
+                    std::mem::transmute((
+                        val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
+                    ))
+                };
+                let cur_time: f64 = unsafe {
+                    std::mem::transmute((
+                        val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15],
+                    ))
+                };
                 self.bpm = bpm;
 
                 if let Some(loop_handle) = self.loop_handle {
@@ -399,18 +406,21 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
             "toggle_loop" => {
                 assert_eq!(
                     val.len(),
-                    4,
-                    "Message for \"toggle_loop\" must be a 4-byte `f32` of `cur_time`"
+                    8,
+                    "Message for \"toggle_loop\" must be an 8-byte `f64` of `cur_time`"
                 );
-                let cur_time: f32 =
-                    unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
+                let cur_time: f64 = unsafe {
+                    std::mem::transmute((
+                        val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
+                    ))
+                };
 
                 match self.loop_handle {
                     Some(loop_handle) => scheduler::cancel_loop(loop_handle),
                     None =>
                         self.loop_handle = scheduler::init_scheduler_loop(
                             cur_time,
-                            grid_state.cursor_pos_beats,
+                            grid_state.cursor_pos_beats as f64,
                             self,
                             grid_state,
                         ),
@@ -439,21 +449,18 @@ impl MIDIEditorGridHandler {
         // across the FFI.
         let mut is_attack_flags: Vec<u8> = Vec::with_capacity(events.size_hint().0 * 2);
         let mut note_ids: Vec<usize> = Vec::with_capacity(events.size_hint().0 / 2);
-        let mut event_timings: Vec<f32> = Vec::with_capacity(events.size_hint().0);
+        let mut event_timings: Vec<f64> = Vec::with_capacity(events.size_hint().0);
         for event in events {
             let note_id = grid_state.conf.row_count - event.line_ix;
             note_ids.push(note_id);
             is_attack_flags.push(tern(event.is_start, 1, 0));
-            let event_time_seconds = ((event.beat / self.bpm) * 60.0) / 4.0;
+
+            let event_time_seconds = ((event.beat as f64 / self.bpm) * 60.0) / 4.0;
             event_timings.push(event_time_seconds);
         }
 
         // Ship all of these events over to be scheduled and played
         js::midi_editor_schedule_events(&self.vc_id, &is_attack_flags, &note_ids, &event_timings);
-    }
-
-    fn midi_to_frequency(&self, row_count: usize, line_ix: usize) -> f32 {
-        27.5 * (2.0f32).powf(((row_count - line_ix) as f32) / 12.0)
     }
 
     fn move_note_vertical(
@@ -682,9 +689,14 @@ impl MIDIEditorGridHandler {
         }
     }
 
-    pub fn time_to_beats(&self, time_seconds: f32) -> f32 {
+    pub fn time_to_beats(&self, time_seconds: f64) -> f64 {
         let time_minutes = time_seconds / 60.;
         time_minutes * self.bpm
+    }
+
+    pub fn beats_to_seconds(&self, beats: f64) -> f64 {
+        let beats_per_second = self.bpm / 60.;
+        beats / beats_per_second
     }
 }
 
@@ -715,7 +727,7 @@ pub fn mk_midi_editor(config: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> 
     };
 
     let view_context = MIDIEditorGridHandler::new(&grid_conf, uuid, conf);
-    let grid: Box<MidiGrid> = Box::new(Grid::new(grid_conf, view_context, uuid));
+    let grid: Box<MidiGrid> = box Grid::new(grid_conf, view_context, uuid);
 
     grid
 }
