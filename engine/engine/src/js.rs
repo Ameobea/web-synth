@@ -113,6 +113,7 @@ extern "C" {
         note_ids: &[usize],
         timings: &[f32],
     );
+    pub fn midi_editor_cancel_all_events(vc_id: &str);
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]

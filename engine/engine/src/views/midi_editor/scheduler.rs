@@ -10,7 +10,7 @@ type SchedulerLoopHandle = usize;
 #[wasm_bindgen]
 extern "C" {
     fn setInterval(closure: &Closure<dyn FnMut()>, millis: u32) -> SchedulerLoopHandle;
-    fn cancelInterval(handle: SchedulerLoopHandle);
+    fn clearInterval(handle: SchedulerLoopHandle);
 }
 
 pub struct SchedulerState {
@@ -19,6 +19,7 @@ pub struct SchedulerState {
     pub end_beat_of_last_scheduling_period: f32,
     pub state: &'static MIDIEditorGridHandler,
     pub grid_state: &'static GridState<usize>,
+    pub cb: Closure<(dyn std::ops::FnMut() + 'static)>,
 }
 
 const RESCHEDULE_INTERVAL_MS: usize = 500;
@@ -31,17 +32,21 @@ pub fn run_midi_editor_loop_scheduler(scheduler_state_handle: SchedulerStateHand
 
 fn init_scheduler_interval(scheduler_state: SchedulerState) -> SchedulerStateHandle {
     let state_handle: SchedulerStateHandle = Box::into_raw(Box::new(scheduler_state));
-    let interval_handle = setInterval(
-        &Closure::new(box move || run_midi_editor_loop_scheduler(state_handle)),
-        RESCHEDULE_INTERVAL_MS as u32,
+    let cb = Closure::wrap(
+        Box::new(move || run_midi_editor_loop_scheduler(state_handle)) as Box<dyn FnMut()>,
     );
-    unsafe { (*state_handle).interval_handle = interval_handle };
+    let interval_handle = setInterval(&cb, RESCHEDULE_INTERVAL_MS as u32);
+    unsafe {
+        (*state_handle).interval_handle = interval_handle;
+        (*state_handle).cb = cb;
+    };
     state_handle
 }
 
 pub fn cancel_loop(scheduler_state_handle: SchedulerStateHandle) {
-    drop(unsafe { Box::from_raw(scheduler_state_handle) });
-    unimplemented!() // TODO: Cancel the interval
+    let scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
+    clearInterval(scheduler_state.interval_handle);
+    drop(scheduler_state);
 }
 
 pub fn init_scheduler_loop(
@@ -51,13 +56,15 @@ pub fn init_scheduler_loop(
     grid_state: &GridState<usize>,
 ) -> SchedulerStateHandle {
     let scheduler_state = SchedulerState {
+        cb: Closure::new(box || {}),
         start_time,
         interval_handle: 0,
         end_beat_of_last_scheduling_period: state
             .loop_start_mark_measure
             .as_ref()
             .map(|descriptor| descriptor.measure as f32)
-            .unwrap_or(0.0),
+            .unwrap_or(0.0)
+            + start_beat,
         state: unsafe { std::mem::transmute(state) },
         grid_state: unsafe { std::mem::transmute(grid_state) },
     };
@@ -75,7 +82,7 @@ pub fn reschedule(cur_time: f32, handle: SchedulerStateHandle) {
 fn run_scheduler(scheduler_state: &mut SchedulerState) {
     let start_mark_pos_beats: f32 = scheduler_state
         .state
-        .loop_end_mark_measure
+        .loop_start_mark_measure
         .as_ref()
         .map(|descriptor| descriptor.measure as f32)
         .unwrap_or(0.);
@@ -88,6 +95,10 @@ fn run_scheduler(scheduler_state: &mut SchedulerState) {
         },
     };
     let loop_length_beats = end_mark_pos_beats - start_mark_pos_beats;
+    info!(
+        "start_mark_pos_beats: {}, end_mark_pos_beats: {}, loop_length_beats: {}",
+        start_mark_pos_beats, end_mark_pos_beats, loop_length_beats
+    );
     let mut relative_start_time = absolute_start_time % loop_length_beats;
     let absolute_end_time = (absolute_start_time - relative_start_time) + end_mark_pos_beats;
 
@@ -107,12 +118,17 @@ fn run_scheduler(scheduler_state: &mut SchedulerState) {
         } else {
             relative_start_time + (absolute_end_time - absolute_start_time)
         };
+        info!(
+            "absolute_start_time: {}, relative_start_time: {}, absolute_end_time: {}, \
+             relative_end_time: {}",
+            absolute_start_time, relative_start_time, absolute_end_time, relative_end_time
+        );
         let offset = absolute_start_time - relative_start_time;
         let events = scheduler_state
             .grid_state
             .data
             .iter_events(Some(relative_start_time))
-            .take_while(|event| event.beat < relative_end_time);
+            .filter(|event| !(event.is_start && event.beat >= relative_end_time));
 
         for event in events {
             let note_id = scheduler_state.grid_state.conf.row_count - event.line_ix;
@@ -122,6 +138,12 @@ fn run_scheduler(scheduler_state: &mut SchedulerState) {
                 (((offset + event.beat) / scheduler_state.state.bpm) * 60.0) / 4.0;
             event_timings.push(event_time_seconds);
         }
+        js::midi_editor_schedule_events(
+            &scheduler_state.state.vc_id,
+            &is_attack_flags,
+            &note_ids,
+            &event_timings,
+        );
 
         let scheduled_beats = relative_end_time - relative_start_time;
         total_scheduled_beats += scheduled_beats;

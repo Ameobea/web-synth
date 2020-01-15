@@ -399,21 +399,18 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
             "toggle_loop" => {
                 assert_eq!(
                     val.len(),
-                    8,
-                    "Message for \"toggle_loop\" must be a 8-byte `(f32, f32)` of `(cursor_pos, \
-                     cur_time)`"
+                    4,
+                    "Message for \"toggle_loop\" must be a 4-byte `f32` of `cur_time`"
                 );
-                let cursor_pos: f32 =
-                    unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
                 let cur_time: f32 =
-                    unsafe { std::mem::transmute((val[4], val[5], val[6], val[7])) };
+                    unsafe { std::mem::transmute((val[0], val[1], val[2], val[3])) };
 
                 match self.loop_handle {
                     Some(loop_handle) => scheduler::cancel_loop(loop_handle),
                     None =>
                         self.loop_handle = Some(scheduler::init_scheduler_loop(
                             cur_time,
-                            cursor_pos,
+                            grid_state.cursor_pos_beats,
                             &self,
                             &grid_state,
                         )),

@@ -5,6 +5,8 @@ import downloadjs from 'downloadjs';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
 
+const ctx = new AudioContext();
+
 const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
   const onChange = useMemo<(key: string, val: any) => void>(
     () => async (key, val) => {
@@ -47,6 +49,15 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
       draggable
       settings={[
         { type: 'range', label: 'bpm', min: 20, max: 400 },
+        {
+          type: 'button',
+          label: 'toggle loop',
+          action: () => {
+            const vals = new Float32Array(1);
+            vals[0] = ctx.currentTime;
+            engine.handle_message('toggle_loop', new Uint8Array(vals.buffer));
+          },
+        },
         {
           type: 'button',
           label: 'export midi',
