@@ -10,7 +10,7 @@ use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
 pub mod prelude;
-mod scheduler;
+pub mod scheduler;
 
 use self::scheduler::SchedulerStateHandle;
 
@@ -136,7 +136,7 @@ impl MIDIEditorGridHandler {
     }
 }
 
-struct MidiEditorGridRenderer;
+pub struct MidiEditorGridRenderer;
 
 type MidiGrid = Grid<usize, MidiEditorGridRenderer, MIDIEditorGridHandler>;
 
@@ -408,12 +408,12 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
                 match self.loop_handle {
                     Some(loop_handle) => scheduler::cancel_loop(loop_handle),
                     None =>
-                        self.loop_handle = Some(scheduler::init_scheduler_loop(
+                        self.loop_handle = scheduler::init_scheduler_loop(
                             cur_time,
                             grid_state.cursor_pos_beats,
-                            &self,
-                            &grid_state,
-                        )),
+                            self,
+                            grid_state,
+                        ),
                 };
 
                 None
@@ -680,6 +680,11 @@ impl MIDIEditorGridHandler {
         for SelectedNoteData { line_ix, .. } in grid_state.selected_notes.iter() {
             js::midi_editor_trigger_release(&self.vc_id, grid_state.conf.row_count - *line_ix);
         }
+    }
+
+    pub fn time_to_beats(&self, time_seconds: f32) -> f32 {
+        let time_minutes = time_seconds / 60.;
+        time_minutes * self.bpm
     }
 }
 

@@ -2,6 +2,8 @@
 
 use wasm_bindgen::prelude::*;
 
+use crate::views::midi_editor::scheduler::SchedulerLoopHandle;
+
 #[wasm_bindgen(raw_module = "./index")]
 extern "C" {
     pub fn init_view_contexts(
@@ -114,6 +116,15 @@ extern "C" {
         timings: &[f32],
     );
     pub fn midi_editor_cancel_all_events(vc_id: &str);
+    pub fn register_midi_editor_loop_interval(
+        cb: &Closure<dyn FnMut(f32)>,
+        inteval_ms: usize,
+    ) -> SchedulerLoopHandle;
+    pub fn cancel_midi_editor_loop_interval(handle: SchedulerLoopHandle);
+    pub fn midi_editor_register_animation_frame(
+        cb: &Closure<dyn FnMut(f32)>,
+    ) -> SchedulerLoopHandle;
+    pub fn midi_editor_cancel_animation_frame(handle: SchedulerLoopHandle);
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]
