@@ -416,7 +416,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
                 };
 
                 match self.loop_handle {
-                    Some(loop_handle) => scheduler::cancel_loop(loop_handle),
+                    Some(loop_handle) => {
+                        scheduler::cancel_loop(loop_handle);
+                        self.loop_handle = None;
+                    },
                     None =>
                         self.loop_handle = scheduler::init_scheduler_loop(
                             cur_time,

@@ -61,19 +61,16 @@ fn animate_cursor(scheduler_state_handle: SchedulerStateHandle, cur_time: f64) {
     let time_since_start = cur_time - scheduler_state.start_time;
     let beats_since_start = scheduler_state.state.time_to_beats(time_since_start);
     let loops_since_start = beats_since_start / loop_length_beats;
-    let cur_loop_percentage_finished = loops_since_start % loop_length_beats;
+    let cur_loop_percentage_finished = loops_since_start.fract();
     let cur_loop_beats_from_start = cur_loop_percentage_finished * loop_length_beats;
     let cursor_pos_beats = start_mark_pos_beats + cur_loop_beats_from_start;
-
-    let intervals =
-        (cursor_pos_beats as f32) / scheduler_state.grid_state.conf.note_snap_beat_interval;
-    let snapped_x_px = scheduler_state
+    let cursor_pos_px = scheduler_state
         .grid_state
         .conf
-        .beats_to_px(intervals * scheduler_state.grid_state.conf.note_snap_beat_interval);
-    scheduler_state.grid_state.cursor_pos_beats =
-        scheduler_state.grid_state.conf.px_to_beat(snapped_x_px);
-    MidiEditorGridRenderer::set_cursor_pos(scheduler_state.grid_state.cursor_dom_id, snapped_x_px);
+        .beats_to_px(cursor_pos_beats as f32);
+
+    scheduler_state.grid_state.cursor_pos_beats = cursor_pos_beats as f32;
+    MidiEditorGridRenderer::set_cursor_pos(scheduler_state.grid_state.cursor_dom_id, cursor_pos_px);
 
     std::mem::forget(scheduler_state);
 }
@@ -86,6 +83,7 @@ fn init_cursor_animation_interval(scheduler_state_handle: SchedulerStateHandle) 
     );
     let animation_frame_handle = js::midi_editor_register_animation_frame(&cb);
     scheduler_state.cursor_animation_frame_handle = animation_frame_handle;
+    scheduler_state.cursor_animation_cb = cb;
     std::mem::forget(scheduler_state);
 }
 

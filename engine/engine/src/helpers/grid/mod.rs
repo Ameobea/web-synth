@@ -1127,9 +1127,10 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
             let note_state = self
                 .handler
                 .create_note(&mut self.state, line_ix, start_beat, dom_id);
-            debug!(
+            trace!(
                 "Inserting note at line_ix: {}, start_beat: {}",
-                line_ix, start_beat
+                line_ix,
+                start_beat
             );
             let insertion_error = self.state.data.lines[line_ix as usize].insert(NoteBox {
                 data: note_state,
