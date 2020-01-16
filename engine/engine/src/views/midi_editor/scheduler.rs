@@ -136,7 +136,7 @@ pub fn init_scheduler_loop(
     let scheduler_state = SchedulerState {
         cb: Closure::new(box |_: f64| {}),
         cursor_animation_cb: Closure::new(box |_: f64| {}),
-        start_time,
+        start_time: start_time - time_to_skip,
         interval_handle: 0,
         cursor_animation_frame_handle: 0,
         end_time_of_last_scheduling_period: start_time + time_to_skip,
@@ -152,11 +152,14 @@ pub fn init_scheduler_loop(
 }
 
 /// Clears all pending events and re-schedules starting at the current time
-pub fn reschedule(cur_time: f64, scheduler_state_handle: SchedulerStateHandle) {
+pub fn reschedule(cur_time: f64, scheduler_state_handle: SchedulerStateHandle, old_bpm: f64) {
     let scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
 
     // Find where the cursor is the instant that we're rescheduling
+    let new_bpm = scheduler_state.state.bpm;
+    scheduler_state.state.bpm = old_bpm;
     let cur_cursor_pos_beats = scheduler_state.get_cur_cursor_pos_beats(cur_time);
+    scheduler_state.state.bpm = new_bpm;
 
     // Delightfully unsafe
     let grid_state: &'static mut GridState<usize> =

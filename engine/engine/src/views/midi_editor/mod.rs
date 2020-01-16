@@ -70,9 +70,9 @@ impl MIDIEditorGridHandler {
         }
     }
 
-    fn maybe_reschedule_loop(&mut self, cur_time: f64) {
+    fn maybe_reschedule_loop(&mut self, cur_time: f64, old_bpm: f64) {
         if let Some(loop_handle) = self.loop_handle {
-            scheduler::reschedule(cur_time, loop_handle);
+            scheduler::reschedule(cur_time, loop_handle, old_bpm);
         }
     }
 }
@@ -195,11 +195,11 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
             },
             "1" => {
                 self.set_loop_start(&*grid_state);
-                self.maybe_reschedule_loop(js::get_cur_audio_ctx_time());
+                self.maybe_reschedule_loop(js::get_cur_audio_ctx_time(), self.bpm);
             },
             "2" => {
                 self.set_loop_end(&*grid_state);
-                self.maybe_reschedule_loop(js::get_cur_audio_ctx_time());
+                self.maybe_reschedule_loop(js::get_cur_audio_ctx_time(), self.bpm);
             },
             " " => self.start_playback(grid_state),
             _ => (),
@@ -403,9 +403,10 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
                         val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15],
                     ))
                 };
+                let old_bpm = self.bpm;
                 self.bpm = bpm;
 
-                self.maybe_reschedule_loop(cur_time);
+                self.maybe_reschedule_loop(cur_time, old_bpm);
 
                 None
             },
@@ -610,13 +611,15 @@ impl MIDIEditorGridHandler {
                 is_left,
                 selected_note_data.start_beat + adjustment_amount_beats,
                 selected_note_data.start_beat,
-            );
+            )
+            .max(0.);
             let new_note_end_beat = tern(
                 is_left,
                 selected_note_data.start_beat + selected_note_data.width,
                 (selected_note_data.start_beat + selected_note_data.width)
                     + adjustment_amount_beats,
-            );
+            )
+            .max(0.);
             // Put them in order in case their direction has changed due to this adjustment
             let (mut new_note_start_beat, mut new_note_end_beat) =
                 if new_note_start_beat < new_note_end_beat {

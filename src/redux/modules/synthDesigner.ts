@@ -897,13 +897,15 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { stopPlayingNotes }) => {
       state.synths.forEach(synth =>
         synth.voices.forEach(voice => {
+          voice.gainADSRModule.offset.cancelScheduledValues(0);
+          voice.filterADSRModule.offset.cancelScheduledValues(0);
+
           if (stopPlayingNotes) {
             voice.gainADSRModule.offset.linearRampToValueAtTime(0, ctx.currentTime + 1.5 / 1000);
             voice.filterADSRModule.offset.linearRampToValueAtTime(0, ctx.currentTime + 1.5 / 1000);
           }
 
-          voice.gainADSRModule.offset.cancelScheduledValues(0);
-          voice.filterADSRModule.offset.cancelScheduledValues(0);
+          voice.oscillators.forEach(osc => osc.frequency.cancelScheduledValues(0));
         })
       );
 
