@@ -69,6 +69,12 @@ impl MIDIEditorGridHandler {
             loop_handle: None,
         }
     }
+
+    fn maybe_reschedule_loop(&mut self, cur_time: f64) {
+        if let Some(loop_handle) = self.loop_handle {
+            scheduler::reschedule(cur_time, loop_handle);
+        }
+    }
 }
 
 fn update_loop_descriptor(
@@ -190,8 +196,14 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
                 let is_left = key == "z" || key == "x";
                 self.adjust_note_lengths(grid_state, is_left, adjustment_amount);
             },
-            "1" => self.set_loop_start(&*grid_state),
-            "2" => self.set_loop_end(&*grid_state),
+            "1" => {
+                self.set_loop_start(&*grid_state);
+                self.maybe_reschedule_loop(js::get_cur_audio_ctx_time());
+            },
+            "2" => {
+                self.set_loop_end(&*grid_state);
+                self.maybe_reschedule_loop(js::get_cur_audio_ctx_time());
+            },
             " " => self.start_playback(grid_state),
             _ => (),
         }
@@ -206,7 +218,6 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
     ) {
         match key {
             "z" | "x" => self.release_selected_notes(grid_state),
-            " " => (), // TODO // synth::stop_playback(),
             _ => (),
         }
     }
@@ -397,9 +408,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
                 };
                 self.bpm = bpm;
 
-                if let Some(loop_handle) = self.loop_handle {
-                    scheduler::reschedule(cur_time, loop_handle);
-                }
+                self.maybe_reschedule_loop(cur_time);
 
                 None
             },
@@ -417,7 +426,7 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
 
                 match self.loop_handle {
                     Some(loop_handle) => {
-                        scheduler::cancel_loop(loop_handle);
+                        scheduler::cancel_loop(loop_handle, true);
                         self.loop_handle = None;
                     },
                     None =>

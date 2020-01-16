@@ -28,8 +28,9 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
           break;
         }
         case 'bpm': {
-          const buf = new Float64Array(1);
+          const buf = new Float64Array(2);
           buf[0] = val;
+          buf[1] = ctx.currentTime;
           engine.handle_message('set_bpm', new Uint8Array(buf.buffer));
           break;
         }

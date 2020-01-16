@@ -179,7 +179,7 @@ const actionGroups = {
       });
 
       removed.disconnect();
-      removed.getInputCbs().onClearAll();
+      removed.getInputCbs().onClearAll(true);
 
       return {
         ...state,

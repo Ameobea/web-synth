@@ -115,7 +115,7 @@ extern "C" {
         note_ids: &[usize],
         timings: &[f64],
     );
-    pub fn midi_editor_cancel_all_events(vc_id: &str);
+    pub fn midi_editor_cancel_all_events(vc_id: &str, stop_playing_notes: bool);
     pub fn register_midi_editor_loop_interval(
         cb: &Closure<dyn FnMut(f64)>,
         inteval_ms: usize,
@@ -125,6 +125,7 @@ extern "C" {
         cb: &Closure<dyn FnMut(f64)>,
     ) -> SchedulerLoopHandle;
     pub fn midi_editor_cancel_animation_frame(handle: SchedulerLoopHandle);
+    pub fn get_cur_audio_ctx_time() -> f64;
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]

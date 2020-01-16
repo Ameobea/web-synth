@@ -177,7 +177,8 @@ const memoizedGetMidiNode = memoizeOne((stateKey: string) => {
     onPitchBend: () => {
       // No-op; TODO?
     },
-    onClearAll: () => dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS()),
+    onClearAll: (stopPlayingNotes: boolean) =>
+      dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS(stopPlayingNotes)),
   }));
 });
 

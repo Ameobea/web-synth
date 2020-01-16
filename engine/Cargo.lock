@@ -865,10 +865,6 @@ name = "wavetable"
 version = "0.1.0"
 
 [[package]]
-name = "web-synth-engine"
-version = "0.1.0"
-
-[[package]]
 name = "web-sys"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"

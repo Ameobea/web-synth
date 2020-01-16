@@ -64,13 +64,13 @@ export const midi_editor_schedule_events = (
   }
 };
 
-export const midi_editor_cancel_all_events = (vcId: string) => {
+export const midi_editor_cancel_all_events = (vcId: string, stopPlayingNotes: boolean) => {
   const state = getState(vcId);
   if (!state) {
     return;
   }
 
-  state.midiNode.outputCbs.forEach(output => output.onClearAll());
+  state.midiNode.outputCbs.forEach(output => output.onClearAll(stopPlayingNotes));
 };
 
 let registeredAnimationFrameCount = 0;
@@ -108,3 +108,5 @@ export const midi_editor_cancel_animation_frame = (handle: number) => {
   RegisteredAnimationFrames.delete(handle);
   cancelAnimationFrame(innerHandle);
 };
+
+export const get_cur_audio_ctx_time = (): number => ctx.currentTime;

@@ -8,7 +8,7 @@ export interface MIDIInputCbs {
   onAttack: (note: number, voiceIx: number, velocity: number, offset?: number) => void;
   onRelease: (note: number, voiceIx: number, velocity: number, offset?: number) => void;
   onPitchBend: (bendAmount: number, offset?: number) => void;
-  onClearAll: () => void;
+  onClearAll: (stopPlayingNotes: boolean) => void;
 }
 
 /**

@@ -890,14 +890,20 @@ const actionGroups = {
     },
   }),
   CLEAR_ALL_SCHEDULED_MIDI_EVENTS: buildActionGroup({
-    actionCreator: () => ({ type: 'CLEAR_ALL_SCHEDULED_MIDI_EVENTS' }),
-    subReducer: (state: SynthDesignerState) => {
+    actionCreator: (stopPlayingNotes: boolean) => ({
+      type: 'CLEAR_ALL_SCHEDULED_MIDI_EVENTS',
+      stopPlayingNotes,
+    }),
+    subReducer: (state: SynthDesignerState, { stopPlayingNotes }) => {
       state.synths.forEach(synth =>
         synth.voices.forEach(voice => {
+          if (stopPlayingNotes) {
+            voice.gainADSRModule.offset.linearRampToValueAtTime(0, ctx.currentTime + 1.5 / 1000);
+            voice.filterADSRModule.offset.linearRampToValueAtTime(0, ctx.currentTime + 1.5 / 1000);
+          }
+
           voice.gainADSRModule.offset.cancelScheduledValues(0);
-          voice.gainADSRModule.offset.linearRampToValueAtTime(0, ctx.currentTime + 1.5 / 1000);
           voice.filterADSRModule.offset.cancelScheduledValues(0);
-          voice.filterADSRModule.offset.linearRampToValueAtTime(0, ctx.currentTime + 1.5 / 1000);
         })
       );
 

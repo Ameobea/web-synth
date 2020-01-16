@@ -234,7 +234,7 @@ export const stopScheduler = (
     .forEach(midiVoice => {
       const synthIx = (midiVoice as Extract<VoiceTarget, { type: 'midi' }>).synthIx;
       if (!R.isNil(synthIx)) {
-        state.midiOutputs[synthIx!].outputCbs.forEach(({ onClearAll }) => onClearAll());
+        state.midiOutputs[synthIx!].outputCbs.forEach(({ onClearAll }) => onClearAll(true));
       }
     });
 

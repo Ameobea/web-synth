@@ -9,7 +9,7 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: '[name].js',
+    filename: '[name].[contenthash].js',
   },
   mode: 'development',
   devtool: 'inline-source-map',
@@ -52,7 +52,7 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       alwaysWriteToDisk: true,
-      title: 'Chords',
+      title: 'Web Synth',
       minify: true,
       template: 'index.hbs',
     }),

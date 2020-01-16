@@ -41,7 +41,7 @@ export class MIDIToFrequencyNode {
       // TODO
       console.log({ bendAmount });
     },
-    onClearAll: () => {
+    onClearAll: (_stopPlayingNotes: boolean) => {
       this.gainCSN.offset.value = 0;
       this.activeNotes = [];
     },
