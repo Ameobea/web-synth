@@ -47,6 +47,26 @@ static ONCE: Once = Once::new();
 /// Retrieves the global `ViewContextManager` for the application
 pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEXT_MANAGER } }
 
+pub fn init_rng() {
+    // Initialize the global PRNG
+    unsafe {
+        // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
+        // some actual RNG from JS so that things aren't deterministic.
+        RNG = Box::into_raw(box Pcg32::new(
+            if cfg!(target_os = "wasm32") {
+                mem::transmute(js::js_random())
+            } else {
+                0xcafef00dd15ea5e5
+            },
+            721_347_520_420_481_703,
+        ))
+    }
+
+    // Pump it a few times because it seems to generate a fully null output the first time
+    let _: usize = rng().gen();
+    let _: usize = rng().gen();
+}
+
 /// Entrypoint for the application.  This function is called from the JS side as soon as the Wasm
 /// blob is loaded.  It handles setting up application state, rendering the initial UI, and loading
 /// the last saved composition from the user.
@@ -54,20 +74,7 @@ pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEX
 pub fn init() {
     ONCE.call_once(|| {
         console_error_panic_hook::set_once();
-
-        // Initialize the global PRNG
-        unsafe {
-            // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
-            // some actual RNG from JS so that things aren't deterministic.
-            RNG = Box::into_raw(box Pcg32::new(
-                mem::transmute(js::js_random()),
-                721_347_520_420_481_703,
-            ))
-        }
-
-        // Pump it a few times because it seems to generate a fully null output the first time
-        let _: usize = rng().gen();
-        let _: usize = rng().gen();
+        init_rng();
 
         let log_level = if cfg!(debug_assertions) {
             log::Level::Trace

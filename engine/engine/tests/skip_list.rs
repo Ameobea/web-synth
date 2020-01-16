@@ -11,10 +11,9 @@ use engine::{
     helpers::grid::{note_box::NoteBox, skip_list::*},
     views::midi_editor::prelude::*,
 };
-use rand::prelude::*;
+use rand::seq::SliceRandom;
 
 fn mklines(notes: &[(f32, f32)]) -> NoteLines<usize> {
-    unsafe { init_state() };
     let mut lines = NoteLines::new(1);
     let mut mkbox = |start_beat: f32, end_beat: f32| {
         lines.insert(0, NoteBox {
@@ -35,6 +34,7 @@ fn mklines(notes: &[(f32, f32)]) -> NoteLines<usize> {
 
 #[test]
 fn note_lines_bounds() {
+    engine::init_rng();
     let mut lines = mklines(&[
         (2.0, 10.0),
         (10.0, 12.0),
@@ -54,6 +54,7 @@ fn note_lines_bounds() {
 
 #[test]
 fn note_lines_bounds_2() {
+    engine::init_rng();
     let mut lines = mklines(&[(4.65, 7.35), (16.5, 18.8)]);
 
     assert_eq!(lines.get_bounds(0, 30.0).bounds(), Some((18.8, None)));
@@ -65,24 +66,20 @@ fn note_lines_bounds_2() {
 
 #[test]
 fn note_lines_bounds_3() {
+    engine::init_rng();
     let mut lines = mklines(&[(5.0, 10.0)]);
 
     assert_eq!(lines.get_bounds(0, 20.0).bounds(), Some((10.0, None)));
 }
-
-// TODO: This test causes a segfault...
-// #[bench]
-// fn bench_add_two(b: &mut test::Bencher) {
-//     extern crate rand_pcg;
-//     state().rng = rand_pcg::Pcg32::from_seed(unsafe { mem::transmute(9228u128) });
-//     b.iter(get_skip_list_level)
-// }
 
 /// Make sure that our `SlabKey` abstraction really is zero-cost in terms of memory for options,
 /// meaning that the null pointer optimization did indeed apply.
 #[test]
 fn slab_key_size() {
     use std::mem;
+
+    engine::init_rng();
+
     let (s1, s2, s3) = (
         mem::size_of::<NonZeroU32>(),
         mem::size_of::<SlabKey<(u64, u64)>>(),
@@ -94,8 +91,7 @@ fn slab_key_size() {
 
 #[test]
 fn skiplist_construction_iteration() {
-    unsafe { init_state() };
-
+    engine::init_rng();
     let mut skip_list = NoteSkipList::default();
     let mut notes: Vec<NoteBox<usize>> = vec![(1.0, 2.0), (5.0, 10.0), (3.0, 4.0)]
         .into_iter()
@@ -106,7 +102,7 @@ fn skiplist_construction_iteration() {
             },
             data: 0,
         })
-        .collect();;
+        .collect();
     for note in &notes {
         skip_list.insert(note.clone());
     }
@@ -118,14 +114,14 @@ fn skiplist_construction_iteration() {
 
 #[test]
 fn skiplist_bulk_insertion() {
-    unsafe { init_state() };
+    engine::init_rng();
     let mut skip_list = NoteSkipList::default();
 
     let mut notes = Vec::with_capacity(1000 / 2);
     for i in 0..500 {
         notes.push(((i * 2) as f32, ((i * 2) + 1) as f32));
     }
-    rng().shuffle(&mut notes);
+    notes.shuffle(rng());
 
     for (start_beat, end_beat) in notes {
         skip_list.insert(NoteBox {
@@ -135,18 +131,18 @@ fn skiplist_bulk_insertion() {
             },
             data: 0,
         });
-        println!("{:?}\n", skip_list);
     }
 }
 
 #[bench]
 fn skiplist_level_generation(b: &mut test::Bencher) {
-    unsafe { init_state() };
+    engine::init_rng();
     b.iter(get_skip_list_level)
 }
 
 #[test]
 fn skiplist_node_debug() {
+    engine::init_rng();
     let mut line = NoteSkipList::default();
 
     let next_node_ptr: SlabKey<NoteSkipListNode<usize>> = line
@@ -176,10 +172,11 @@ fn skiplist_node_debug() {
     let node_key: SlabKey<NoteSkipListNode<usize>> = line.nodes.insert(node).into();
     let node: &NoteSkipListNode<usize> = line.get_node(node_key);
     // pretend that we're inside of a full `SkipList` and initialize the global debug pointers
+    skip_list::create_skip_list_dbg_ptrs();
     init_node_dbg_ptrs(node_key);
 
     let expected = "|0, 10|--\n|0, 10|--\n|0, 10|--\n|0, 10|->\n|0, 10|->";
-    let actual = format!("{:?}", line.debug_node(node));
+    let actual = format!("{}", line.debug_node(node));
     println!("\nEXPECTED:\n{}", expected);
     println!("\nACTUAL:\n{}", actual);
     assert_eq!(expected, &actual);
@@ -187,6 +184,7 @@ fn skiplist_node_debug() {
 
 #[test]
 fn skiplist_debug_fmt() {
+    engine::init_rng();
     let mut skip_list = NoteSkipList::default();
 
     let notes = &[(1., 2.), (4., 5.), (3., 4.), (2., 3.)]
@@ -235,6 +233,8 @@ fn skiplist_debug_fmt() {
         Some(node_4_5),
         None,
     ]);
+    skip_list::create_skip_list_dbg_ptrs();
+    init_node_dbg_ptrs(head);
     println!(
         "head: \n{:?}",
         skip_list.debug_node(&skip_list.get_node(head))
@@ -253,8 +253,7 @@ fn skiplist_debug_fmt() {
 
 #[test]
 fn skiplist_region_iter() {
-    unsafe { init_state() };
-
+    engine::init_rng();
     let mut lines = NoteLines::new(6);
     let notes = &[
         (0, (1.0, 2.0)),
@@ -297,7 +296,7 @@ fn skiplist_region_iter() {
     expected_results.sort_by(compare_notes);
 
     let mut actual_results = lines
-        .iter_region(0, 0, selection_start_beat, selection_end_beat)
+        .iter_region(0, 5, selection_start_beat, selection_end_beat)
         .map(|note_data| {
             (
                 note_data.line_ix,

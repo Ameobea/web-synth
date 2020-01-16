@@ -73,6 +73,12 @@ pub struct NoteSkipListNode<S> {
 #[thread_local]
 pub static mut SKIP_LIST_NODE_DEBUG_POINTERS: *mut LinkOpts<usize> = ptr::null_mut();
 
+pub fn create_skip_list_dbg_ptrs() {
+    unsafe {
+        skip_list::SKIP_LIST_NODE_DEBUG_POINTERS = Box::into_raw(box skip_list::blank_shortcuts());
+    };
+}
+
 pub fn init_node_dbg_ptrs(head_key: NodeSlabKey<usize>) {
     for p in get_debug_ptrs() {
         *p = Some(head_key);
@@ -358,7 +364,7 @@ impl<S: GridRendererUniqueIdentifier> Debug for NoteSkipList<S> {
             }
         }
 
-        write!(fmt, "\n{}", s)
+        write!(fmt, "{}", s)
     }
 }
 

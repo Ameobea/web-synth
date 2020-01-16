@@ -150,10 +150,7 @@ impl GridRenderer<usize> for MidiEditorGridRenderer {}
 
 impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
     fn init(&mut self, vc_id: &str) {
-        unsafe {
-            skip_list::SKIP_LIST_NODE_DEBUG_POINTERS =
-                Box::into_raw(box skip_list::blank_shortcuts());
-        };
+        skip_list::create_skip_list_dbg_ptrs();
 
         js::init_midi_editor_ui(vc_id);
     }
