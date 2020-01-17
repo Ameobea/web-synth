@@ -5,8 +5,8 @@ import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
 
 export class ADSRModule extends ConstantSourceNode {
   private ctx: AudioContext;
-  private minValue: number;
-  private maxValue: number;
+  public minValue: number;
+  public maxValue: number;
   private lengthMs: number;
   private envelope: ADSRValues = defaultAdsrEnvelope;
 
@@ -54,7 +54,7 @@ export class ADSRModule extends ConstantSourceNode {
       this.offset.cancelScheduledValues(0);
       this.offset.linearRampToValueAtTime(this.minValue, this.ctx.currentTime + 0.0001);
     } else {
-      this.offset.setValueAtTime(0, this.ctx.currentTime + offset);
+      this.offset.setValueAtTime(this.minValue, this.ctx.currentTime + offset);
     }
 
     const realOffset = Option.of(offset).getOrElse(0);

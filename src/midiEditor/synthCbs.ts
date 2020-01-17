@@ -55,11 +55,13 @@ export const midi_editor_schedule_events = (
   noteIds: number[],
   timings: number[]
 ) => {
+  const curTime = ctx.currentTime;
   for (let i = 0; i < isAttackFlags.length; i++) {
+    const offset = timings[i] - curTime;
     if (isAttackFlags[i]) {
-      midi_editor_trigger_attack(vcId, noteIds[i], timings[i] - ctx.currentTime);
+      midi_editor_trigger_attack(vcId, noteIds[i], offset);
     } else {
-      midi_editor_trigger_release(vcId, noteIds[i], timings[i] - ctx.currentTime);
+      midi_editor_trigger_release(vcId, noteIds[i], offset);
     }
   }
 };
@@ -70,6 +72,7 @@ export const midi_editor_cancel_all_events = (vcId: string, stopPlayingNotes: bo
     return;
   }
 
+  state.voiceManager.reset();
   state.midiNode.outputCbs.forEach(output => output.onClearAll(stopPlayingNotes));
 };
 

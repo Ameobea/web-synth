@@ -348,4 +348,11 @@ pub mod exports {
         ctx.synth.trigger_release(note_id, offset);
         mem::forget(ctx);
     }
+
+    #[wasm_bindgen]
+    pub fn release_all(ctx: *mut PolySynthContext) {
+        let mut ctx = unsafe { Box::from_raw(ctx) };
+        ctx.synth.release_all();
+        mem::forget(ctx);
+    }
 }

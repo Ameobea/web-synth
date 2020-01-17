@@ -13,6 +13,7 @@ pub struct SchedulerState {
     pub cursor_animation_frame_handle: SchedulerLoopHandle,
     pub end_time_of_last_scheduling_period: f64,
     pub total_previously_scheduled_beats: f64,
+    pub schedule_offset_seconds: f64,
     pub state: &'static mut MIDIEditorGridHandler,
     pub grid_state: &'static mut GridState<usize>,
     pub cb: Closure<(dyn std::ops::FnMut(f64) + 'static)>,
@@ -137,6 +138,7 @@ pub fn init_scheduler_loop(
         cb: Closure::new(box |_: f64| {}),
         cursor_animation_cb: Closure::new(box |_: f64| {}),
         start_time: start_time - time_to_skip,
+        schedule_offset_seconds: time_to_skip,
         interval_handle: 0,
         cursor_animation_frame_handle: 0,
         end_time_of_last_scheduling_period: start_time + time_to_skip,
@@ -169,13 +171,13 @@ pub fn reschedule(cur_time: f64, scheduler_state_handle: SchedulerStateHandle, o
     std::mem::forget(scheduler_state);
 
     // Cancel the current scheduler and initialize a new one, freshly updated with the current state
-    cancel_loop(scheduler_state_handle, false);
+    cancel_loop(scheduler_state_handle, true);
     let new_loop_handle = init_scheduler_loop(cur_time, cur_cursor_pos_beats, state, grid_state);
     state.loop_handle = new_loop_handle;
 }
 
 fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
-    debug!("SCHED ENTER");
+    trace!("SCHED ENTER");
     let start_mark_pos_beats: f64 = scheduler_state
         .state
         .loop_start_mark_measure
@@ -203,7 +205,7 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
         .state
         .time_to_beats(cur_sched_period_length_seconds);
     let beats_to_schedule = cur_sched_period_length_beats;
-    debug!("beats_to_schedule: {}", beats_to_schedule);
+    trace!("beats_to_schedule: {}", beats_to_schedule);
 
     // Schedule the loop repeatedly at increasing offsets until all necessary beats have been
     // covered
@@ -222,9 +224,10 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
         relative_start_beat + beats_remaining_in_cur_loop
     };
 
-    debug!(
+    trace!(
         "Scheduling from relative beats {} to {}",
-        relative_start_beat, relative_end_beat
+        relative_start_beat,
+        relative_end_beat
     );
     let events = scheduler_state
         .grid_state
@@ -251,16 +254,17 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
 
     let scheduled_beats = relative_end_beat - relative_start_beat;
     scheduler_state.total_previously_scheduled_beats += scheduled_beats;
-    debug!(
+    trace!(
         "scheduled_beats: {}, total_previously_scheduled_beats: {}",
-        scheduled_beats, scheduler_state.total_previously_scheduled_beats
+        scheduled_beats,
+        scheduler_state.total_previously_scheduled_beats
     );
     // We finished scheduling a full loop, but we still have more beats to schedule.  Queue up
     // another (potentially partial) loop to be scheduled
     if scheduled_beats < beats_to_schedule {
         scheduler_state.end_time_of_last_scheduling_period +=
             scheduler_state.state.beats_to_seconds(scheduled_beats);
-        debug!(
+        trace!(
             "Need to schedule another (potentially partial) loop; \
              end_time_of_last_scheduling_period: {}",
             scheduler_state.end_time_of_last_scheduling_period
@@ -269,7 +273,7 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
     }
 
     scheduler_state.end_time_of_last_scheduling_period = end_time_of_cur_sched_window;
-    debug!(
+    trace!(
         "SCHED EXIT; scheduled through time {}",
         end_time_of_cur_sched_window
     );
