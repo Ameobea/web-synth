@@ -1,12 +1,16 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
+import { UnimplementedError } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
-import { SynthVoicePresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
-import { UnimplementedError } from 'ameo-utils';
+import { SynthVoicePreset } from 'src/redux/modules/presets';
+
+const disposeSynthModule = (synthModule: SynthModule) => {
+  synthModule.voices.forEach(voice => voice.outerGainNode.disconnect());
+};
 
 export enum Waveform {
   Sine = 'sine',
@@ -499,10 +503,19 @@ const actionGroups = {
   }),
   DELETE_SYNTH_MODULE: buildActionGroup({
     actionCreator: (index: number) => ({ type: 'DELETE_SYNTH_MODULE', index }),
-    subReducer: (state: SynthDesignerState, { index }) => ({
-      ...state,
-      synths: R.remove(index, 1, state.synths), // TODO: There's probably some disconnecting/freeing that has to happen here...
-    }),
+    subReducer: (state: SynthDesignerState, { index }) => {
+      const removedModule = state.synths[index];
+      if (!index) {
+        console.error(`Tried to remove synth ix ${index} but we only have ${state.synths.length}`);
+      }
+
+      disposeSynthModule(removedModule);
+
+      return {
+        ...state,
+        synths: R.remove(index, 1, state.synths),
+      };
+    },
   }),
   ADD_EFFECT: buildActionGroup({
     actionCreator: (synthIx: number, effect: Effect, params: { [key: string]: number }) => ({
@@ -921,17 +934,35 @@ const actionGroups = {
     },
   }),
   SET_VOICE_STATE: buildActionGroup({
-    actionCreator: (voiceIx: number, preset: SynthVoicePreset) => ({
+    actionCreator: (voiceIx: number, preset: SynthVoicePreset | null) => ({
       type: 'SET_VOICE_STATE',
       voiceIx,
       preset,
     }),
     subReducer: (state: SynthDesignerState, { voiceIx, preset }) => {
-      if (preset.type !== 'standard') {
+      if (preset && preset.type !== 'standard') {
         throw new UnimplementedError();
       }
 
-      const builtVoice: SynthModule = deserializeSynthModule(preset);
+      const oldSynthModule = state.synths[voiceIx];
+      if (!oldSynthModule) {
+        console.error(
+          `Tried to replace synth index ${voiceIx} but only ${state.synths.length} exist`
+        );
+        return state;
+      }
+      disposeSynthModule(oldSynthModule);
+
+      const builtVoice: SynthModule = preset
+        ? deserializeSynthModule(preset)
+        : buildDefaultSynthModule();
+      if (state.wavyJonesInstance) {
+        builtVoice.voices
+          .map(R.prop('outerGainNode'))
+          .forEach(outerGainNode => outerGainNode.connect(state.wavyJonesInstance!));
+      }
+
+      // TODO: Probably have to disconnect/dispose the old voice...
       return { ...state, synths: R.set(R.lensIndex(voiceIx), builtVoice, state.synths) };
     },
   }),

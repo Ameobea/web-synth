@@ -73,7 +73,7 @@ const SynthModuleCompInner: React.FC<{
   children = null,
   voicePresetIds,
 }) => {
-  const controlPanelContext = useRef<{ preset: number } | null>(null);
+  const controlPanelContext = useRef<{ preset: string } | null>(null);
   const unison = synth.voices[0].oscillators.length;
 
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
@@ -148,7 +148,7 @@ const SynthModuleCompInner: React.FC<{
       <div className='presets'>
         <ControlPanel
           proxy
-          contextCb={(ctx: { preset: number }) => {
+          contextCb={(ctx: { preset: string }) => {
             controlPanelContext.current = ctx;
           }}
           style={{ height: 97 }}
@@ -175,16 +175,18 @@ const SynthModuleCompInner: React.FC<{
                   return;
                 }
 
-                console.log({ allVoicePresets, presetId });
-                const preset = allVoicePresets.find(R.propEq('id', +presetId));
-                if (R.isNil(preset)) {
+                const preset =
+                  presetId === 'blank' ? null : allVoicePresets.find(R.propEq('id', +presetId));
+                if (preset === undefined) {
                   console.error(
                     `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
                   );
                   return;
                 }
 
-                dispatch(actionCreators.synthDesigner.SET_VOICE_STATE(index, preset.body));
+                dispatch(
+                  actionCreators.synthDesigner.SET_VOICE_STATE(index, preset ? preset.body : null)
+                );
               },
             },
             {
