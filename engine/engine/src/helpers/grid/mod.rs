@@ -80,7 +80,7 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
 }
 
 pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
-    fn init(&mut self, _vc_id: &str) {}
+    fn init(&mut self, _vc_id: &str, grid_conf: &GridConf) {}
 
     fn cleanup(&mut self, _grid_state: &mut GridState<S>, _vc_id: &str) {}
 
@@ -192,6 +192,8 @@ pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
     fn get_audio_connectables(&self, uuid: Uuid) -> JsValue {
         create_empty_audio_connectables(&uuid.to_string())
     }
+
+    fn save(&self) -> String { "".into() }
 }
 
 pub struct GridState<S> {
@@ -441,7 +443,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
     fn init(&mut self) {
         render::render_initial_grid(&self.state.conf, &self.get_id());
         self.state.cursor_dom_id = R::create_cursor(&self.state.conf, 4.);
-        self.handler.init(&self.get_id());
+        self.handler.init(&self.get_id(), &self.state.conf);
 
         if !self.loaded {
             self.try_load_saved_composition();
@@ -906,9 +908,7 @@ impl<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHandler<S, R>> 
         }
     }
 
-    fn save(&mut self) -> String {
-        "".into() // TODO
-    }
+    fn save(&mut self) -> String { self.handler.save() }
 
     fn get_audio_connectables(&self) -> JsValue { self.handler.get_audio_connectables(self.uuid) }
 }

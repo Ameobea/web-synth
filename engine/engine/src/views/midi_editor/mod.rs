@@ -57,14 +57,14 @@ impl MIDIEditorGridHandler {
             loop_start_mark_measure: conf.loop_start_mark_measure.map(|measure| {
                 LoopMarkDescriptor {
                     measure,
-                    dom_id: render_loop_mark(grid_conf, "loop-start-marker", measure),
+                    dom_id: 0, // Will be filled in later once things are initialized
                 }
             }),
             loop_end_mark_measure: conf
                 .loop_end_mark_measure
                 .map(|measure| LoopMarkDescriptor {
                     measure,
-                    dom_id: render_loop_mark(grid_conf, "loop-end-marker", measure),
+                    dom_id: 0, // Will be filled in later once things are initialized
                 }),
             loop_handle: None,
         }
@@ -149,10 +149,18 @@ type MidiGrid = Grid<usize, MidiEditorGridRenderer, MIDIEditorGridHandler>;
 impl GridRenderer<usize> for MidiEditorGridRenderer {}
 
 impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
-    fn init(&mut self, vc_id: &str) {
+    fn init(&mut self, vc_id: &str, grid_conf: &GridConf) {
         skip_list::create_skip_list_dbg_ptrs();
 
         js::init_midi_editor_ui(vc_id);
+
+        // Render loop marks
+        if let Some(descriptor) = &mut self.loop_start_mark_measure {
+            descriptor.dom_id = render_loop_mark(grid_conf, "loop-start-marker", descriptor.measure)
+        }
+        if let Some(descriptor) = &mut self.loop_end_mark_measure {
+            descriptor.dom_id = render_loop_mark(grid_conf, "loop-end-marker", descriptor.measure)
+        }
     }
 
     fn hide(&mut self, vc_id: &str) { js::hide_midi_editor(vc_id) }
@@ -161,6 +169,21 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
 
     fn cleanup(&mut self, _: &mut GridState<usize>, vc_id: &str) {
         js::cleanup_midi_editor_ui(vc_id);
+    }
+
+    fn save(&self) -> String {
+        let state = MIDIEditorConf {
+            bpm: self.bpm,
+            loop_start_mark_measure: self
+                .loop_start_mark_measure
+                .as_ref()
+                .map(|descriptor| descriptor.measure),
+            loop_end_mark_measure: self
+                .loop_end_mark_measure
+                .as_ref()
+                .map(|descriptor| descriptor.measure),
+        };
+        serde_json::to_string(&state).expect("Failed to serialize `MIDIEditorConf`")
     }
 
     fn on_key_down(
