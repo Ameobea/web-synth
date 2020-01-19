@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import * as R from 'ramda';
+import React, { useMemo, useRef } from 'react';
 import { connect, Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { PropTypesOf } from 'ameo-utils';
@@ -6,10 +7,17 @@ import { PropTypesOf } from 'ameo-utils';
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
 import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
-import { getReduxInfra, get_synth_designer_audio_connectables } from 'src/synthDesigner';
+import {
+  getReduxInfra,
+  get_synth_designer_audio_connectables,
+  getVoicePreset,
+} from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
-import { ReduxStore, store } from 'src/redux';
+import { ReduxStore, store, getState } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
+import { renderModalWithControls } from 'src/controls/Modal';
+import SaveVoicePresetModal from './SaveVoicePresetModal';
+import { saveSynthVoicePreset } from 'src/api';
 
 const SYNTH_SETTINGS = [
   {
@@ -65,6 +73,7 @@ const SynthModuleCompInner: React.FC<{
   children = null,
   voicePresetIds,
 }) => {
+  const controlPanelContext = useRef<{ preset: number } | null>(null);
   const unison = synth.voices[0].oscillators.length;
 
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
@@ -138,6 +147,10 @@ const SynthModuleCompInner: React.FC<{
 
       <div className='presets'>
         <ControlPanel
+          proxy
+          contextCb={(ctx: { preset: number }) => {
+            controlPanelContext.current = ctx;
+          }}
           style={{ height: 97 }}
           settings={[
             {
@@ -150,14 +163,37 @@ const SynthModuleCompInner: React.FC<{
               label: 'load preset',
               type: 'button',
               action: () => {
-                // TODO
+                if (!controlPanelContext.current) {
+                  console.error('Control panel context never set!');
+                  return;
+                }
+
+                const presetId = controlPanelContext.current.preset;
+                const allVoicePresets = getState().presets.voicePresets;
+                if (typeof allVoicePresets === 'string') {
+                  console.error("Somehow voice presets aren't loaded at this point...");
+                  return;
+                }
+
+                console.log({ allVoicePresets, presetId });
+                const preset = allVoicePresets.find(R.propEq('id', +presetId));
+                if (R.isNil(preset)) {
+                  console.error(
+                    `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
+                  );
+                  return;
+                }
+
+                dispatch(actionCreators.synthDesigner.SET_VOICE_STATE(index, preset.body));
               },
             },
             {
               label: 'save preset',
               type: 'button',
-              action: () => {
-                // TODO
+              action: async () => {
+                const { title, description } = await renderModalWithControls(SaveVoicePresetModal);
+                const presetBody = getVoicePreset(stateKey, index);
+                await saveSynthVoicePreset({ title, description, body: presetBody });
               },
             },
           ]}

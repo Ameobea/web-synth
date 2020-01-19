@@ -5,6 +5,8 @@ import { Option } from 'funfix-core';
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
+import { SynthVoicePresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
+import { UnimplementedError } from 'ameo-utils';
 
 export enum Waveform {
   Sine = 'sine',
@@ -916,6 +918,21 @@ const actionGroups = {
       );
 
       return state;
+    },
+  }),
+  SET_VOICE_STATE: buildActionGroup({
+    actionCreator: (voiceIx: number, preset: SynthVoicePreset) => ({
+      type: 'SET_VOICE_STATE',
+      voiceIx,
+      preset,
+    }),
+    subReducer: (state: SynthDesignerState, { voiceIx, preset }) => {
+      if (preset.type !== 'standard') {
+        throw new UnimplementedError();
+      }
+
+      const builtVoice: SynthModule = deserializeSynthModule(preset);
+      return { ...state, synths: R.set(R.lensIndex(voiceIx), builtVoice, state.synths) };
     },
   }),
 };

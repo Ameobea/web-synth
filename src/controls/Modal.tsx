@@ -3,13 +3,18 @@ import * as ReactDOM from 'react-dom';
 
 import './Modal.scss';
 
+export interface ModalCompProps<T> {
+  onSubmit: (val: T) => void;
+  onCancel?: () => void;
+}
+
 /**
  * Creates a transitive modal that takes over the current page and renders the provided component
  * into a modal.  Once the callback passed to the component is called, the modal will be torn down
  * and the returned value will be passed back to the caller.
  */
 export function renderModalWithControls<T>(
-  Comp: React.ComponentType<{ onSubmit: (val: T) => void; onCancel?: () => void }>
+  Comp: React.ComponentType<ModalCompProps<T>>
 ): Promise<T> {
   const bodyNode = document.getElementsByTagName('body')[0]!;
   const modalNode = document.createElement('div');

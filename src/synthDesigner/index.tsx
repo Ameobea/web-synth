@@ -182,6 +182,12 @@ const memoizedGetMidiNode = memoizeOne((stateKey: string) => {
   }));
 });
 
+export const getVoicePreset = (stateKey: string, synthIx: number) => {
+  const voiceState = getReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];
+  // TODO: Handle wavetable bodies as well
+  return { type: 'standard', ...serializeSynthModule(voiceState) };
+};
+
 export const get_synth_designer_audio_connectables = (stateKey: string): AudioConnectables => {
   const { synths, spectrumNode } = getReduxInfra(stateKey).getState().synthDesigner;
 

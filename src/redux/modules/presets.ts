@@ -3,6 +3,7 @@ import { buildActionGroup, buildModule } from 'jantix';
 import { BACKEND_BASE_URL } from 'src/conf';
 import { dispatch, actionCreators, ReduxStore } from 'src/redux';
 import { createSelector } from 'reselect';
+import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 
 export interface SynthPresetEntry {
   id: number;
@@ -13,7 +14,16 @@ export interface SynthPresetEntry {
 
 export interface SynthPreset {}
 
-export interface SynthVoicePreset {}
+export interface StandardSynthVoicePreset extends ReturnType<typeof serializeSynthModule> {
+  type: 'standard';
+}
+
+export interface WaveTableSynthVoicePreset {
+  type: 'wavetable';
+  // TODO
+}
+
+export type SynthVoicePreset = StandardSynthVoicePreset | WaveTableSynthVoicePreset;
 
 export interface SynthVoicePresetEntry {
   id: number;
@@ -85,8 +95,8 @@ export const fetchSynthVoicePresets = async () => {
 
 export const voicePresetIdsSelector = createSelector(
   (state: ReduxStore) => state.presets.voicePresets,
-  voicePresets =>
+  (voicePresets): { [title: string]: number } =>
     typeof voicePresets === 'string'
       ? {}
-      : Object.entries(voicePresets).reduce((acc, [id, val]) => ({ ...acc, [val.title]: id }), {})
+      : voicePresets.reduce((acc, { id, title }) => ({ ...acc, [title]: id }), {})
 );

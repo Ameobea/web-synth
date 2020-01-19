@@ -9,7 +9,7 @@ use crate::{
         synth_preset::{
             InlineSynthPreset, InlineSynthPresetEntry, NewSynthPresetEntry,
             NewSynthVoicePresetEntry, SynthPreset, SynthPresetEntry, SynthVoicePresetEntry,
-            VoiceDefinition, VoiceDefinitionItem,
+            UserProvidedNewSynthVoicePreset, VoiceDefinition, VoiceDefinitionItem,
         },
     },
     schema, WebSynthDbConn,
@@ -279,11 +279,11 @@ pub fn get_synth_voice_presets(
 #[post("/synth_voice_presets", data = "<voice_preset>")]
 pub fn create_synth_voice_preset(
     conn: WebSynthDbConn,
-    voice_preset: Json<SynthVoicePresetEntry>,
+    voice_preset: Json<UserProvidedNewSynthVoicePreset>,
 ) -> Result<(), String> {
     use crate::schema::voice_presets::dsl::*;
 
-    let body_: String = serde_json::to_string(&voice_preset.body).map_err(|err| -> String {
+    let body_: String = serde_json::to_string(&voice_preset.0.body).map_err(|err| -> String {
         let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
         error!("{}", err_msg);
         err_msg
