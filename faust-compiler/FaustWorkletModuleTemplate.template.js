@@ -17,7 +17,7 @@ const convertUiToParamDescriptors = ui => {
     name: item.address,
     defaultValue: +(item.init || 0),
     minValue: +(item.min || 0),
-    maxValue: +(item.max || 0),
+    maxValue: item.type === 'button' ? 1 : (+(item.max || 0)),
     // We use k-rate for all since these values are only read once for every `BUFFER_SIZE` frames anyway
     automationRate: 'k-rate',
   }));

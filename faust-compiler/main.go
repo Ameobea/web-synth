@@ -336,6 +336,9 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 		return
 	}
 
+	// Add correct `Content-Type` header so that it's correctly loaded
+	resWriter.Header().Set("Content-Type", "application/javascript")
+
 	queryParams := req.URL.Query()
 	moduleID := queryParams.Get("id")
 	if moduleID == "" {

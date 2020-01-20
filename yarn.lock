@@ -3868,10 +3868,10 @@ is-stream@^1.0.1, is-stream@^1.1.0:
   resolved "https://registry.yarnpkg.com/is-stream/-/is-stream-1.1.0.tgz#12d4a3dd4e68e0b79ceb8dbc84173ae80d91ca44"
   integrity sha1-EtSj3U5o4Lec6428hBc66A2RykQ=
 
-is-string@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/is-string/-/is-string-1.0.4.tgz#cc3a9b69857d621e963725a24caeec873b826e64"
-  integrity sha1-zDqbaYV9Yh6WNyWiTK7shzuCbmQ=
+is-string@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/is-string/-/is-string-1.0.5.tgz#40493ed198ef3ff477b8c7f92f644ec82a5cd3a6"
+  integrity sha512-buY6VNRjhQMiF1qWDouloZlQbRhDPCebwxSjxMjxgemYT46YMd2NR0/H+fBhEfWX4A/w9TBJ+ol+okqJKFE6vQ==
 
 is-symbol@^1.0.2:
   version "1.0.3"
@@ -5508,17 +5508,17 @@ react-ace@^8.0.0:
     lodash.isequal "^4.5.0"
     prop-types "^15.7.2"
 
-react-control-panel@^0.5:
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.5.0.tgz#ab64e616a450bfbf5dcad663f0e847b93b90c8e8"
-  integrity sha512-BOrxkKntH7qQXoxMXI/F4qVc7zotrADFXVwpue/+1RFfeQd5+LmXk1WOS1rFj9WgBuOn1e9s9y3oiIEY2ioGHw==
+react-control-panel@^0.6:
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.6.0.tgz#2ea414219d3a7c985196fda75abf8bc36f351ac5"
+  integrity sha512-1PDDZf9/qsLoslkBlTIkh5m1QTF/DdmdLK47k78knVQ73/yspZTL2hKgKubgSAuQlejbZnxjaK5GA+ezBANgJQ==
   dependencies:
     is-numeric "0.0.9"
-    is-string "^1.0.4"
+    is-string "^1.0.5"
     prop-types "^15.7.2"
     react-css-component "^1.0.2"
     simple-color-picker "^0.1.2"
-    uuid "^3.3.3"
+    uuid "^3.4.0"
 
 react-css-component@^1.0.2:
   version "1.0.2"
@@ -7015,10 +7015,15 @@ utils-merge@1.0.1:
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
   integrity sha1-n5VxD1CiZ5R7LMwSR0HBAoQn5xM=
 
-uuid@^3.0.1, uuid@^3.3.2, uuid@^3.3.3:
+uuid@^3.0.1, uuid@^3.3.2:
   version "3.3.3"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.3.tgz#4568f0216e78760ee1dbf3a4d2cf53e224112866"
   integrity sha512-pW0No1RGHgzlpHJO1nsVrHKpOEIxkGg1xB+v0ZmdNH5OAeAwzAVrCnI2/6Mtx+Uys6iaylxa+D3g4j63IKKjSQ==
+
+uuid@^3.4.0:
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
+  integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
 
 v8-compile-cache@2.0.3:
   version "2.0.3"

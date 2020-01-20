@@ -14,12 +14,13 @@ interface BaseUiDef {
 enum InputType {
   hslider = 'hslider',
   range = 'range',
+  button = 'button',
+  nentry = 'nentry',
 }
 
 enum GroupType {
   vgroup = 'vgroup',
   hgroup = 'hgroup',
-  button = 'button',
 }
 
 interface UiInput extends BaseUiDef {
@@ -68,18 +69,28 @@ const buildControlPanelField = (
     [InputType.range]: () => {
       throw new UnimplementedError();
     },
+    [InputType.button]: ({ address }) => ({
+      type: 'button',
+      label: getLabel(address),
+      onmousedown: () => setParamValue(address, 1),
+      onmouseup: () => setParamValue(address, 0),
+    }),
+    // TODO: Use real number-entry input once that's implement on the react-control-panel side
+    [InputType.nentry]: ({ address, min, max, init, step }: UiInput) => ({
+      type: 'range',
+      // Paths are prefixed with a long randomly generated string which we cut off to make it easier to read the labels
+      label: getLabel(address),
+      min,
+      max,
+      initial: init,
+      step,
+    }),
     // TODO: Add label once `react-control-panel` supports that
     [GroupType.vgroup]: ({ items }: { label: string; items: UiDef[] }) =>
       R.flatten(items.map(item => buildControlPanelField(item, setParamValue))),
     // TODO: Add label once `react-control-panel` supports that
     [GroupType.hgroup]: ({ items }: { label: string; items: UiDef[] }) =>
       R.flatten(items.map(item => buildControlPanelField(item, setParamValue))),
-    [GroupType.button]: ({ address }) => ({
-      type: 'button',
-      label: getLabel(address),
-      onmousedown: () => setParamValue(address, 1),
-      onmouseup: () => setParamValue(address, 0),
-    }),
   };
 
   const mapper = mapperFunctions[def.type] as

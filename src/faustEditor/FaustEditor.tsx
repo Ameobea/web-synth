@@ -177,14 +177,12 @@ export const mkCompileButtonClickHandler = ({
   setErrMessage,
   vcId,
   analyzerNode,
-  noBuildControlPanel,
 }: {
   faustCode: string;
   optimize: boolean;
   setErrMessage: (errMsg: string) => void;
   vcId: string;
   analyzerNode: AnalyserNode;
-  noBuildControlPanel?: boolean;
 }) => async () => {
   let faustNode: FaustWorkletNode;
   try {
@@ -210,7 +208,7 @@ export const mkCompileButtonClickHandler = ({
   updateConnectables(vcId, newConnectables);
 
   context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustNode, noBuildControlPanel)
+    context.reduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustNode, vcId)
   );
 };
 

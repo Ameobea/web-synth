@@ -11,23 +11,12 @@ const Filter: React.FC<{
   filterEnvelope: ADSRValues;
   stateKey: string;
 }> = ({ params, synthIx, filterEnvelope, stateKey }) => {
-  const { Panel, settings } = useMemo(
-    () => ({
-      // Create a new component each time the type changes to force a re-render with the potentially new settings array
-      Panel({ ...props }) {
-        return <ControlPanel {...props} />;
-      },
-      settings: getSettingsForFilterType(params.type),
-    }),
-    [params]
-  );
-
+  const settings = useMemo(() => getSettingsForFilterType(params.type), [params.type]);
   const state = useMemo(() => ({ ...params, adsr: filterEnvelope }), [params, filterEnvelope]);
-
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return (
-    <Panel
+    <ControlPanel
       style={{ width: 400 }}
       title='FILTER'
       settings={settings}
