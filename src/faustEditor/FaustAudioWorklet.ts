@@ -65,9 +65,6 @@ export class FaustWorkletNode extends AudioWorkletNode {
       });
     }
   };
-
-  public setParamValue = (path: string, val: number) =>
-    this.port.postMessage({ type: 'setParamValue', path, val });
 }
 
 export const buildFaustWorkletNode = async (

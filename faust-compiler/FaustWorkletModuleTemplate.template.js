@@ -198,14 +198,6 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = async event => {
       switch (event.data.type) {
-        case 'setParamValue': {
-          this.dspInstance.exports.setParamValue(
-            this.dsp,
-            this.pathTable[event.data.path],
-            event.data.val
-          );
-          break;
-        }
         case 'setPathTable': {
           this.pathTable = event.data.pathTable;
           break;

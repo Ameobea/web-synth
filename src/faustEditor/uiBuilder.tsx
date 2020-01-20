@@ -4,8 +4,6 @@ import ControlPanel from 'react-control-panel';
 import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 
-import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
-
 interface BaseUiDef {
   label: string;
   address: string;
@@ -48,7 +46,7 @@ const getLabel = (address: string) => R.tail(address.split('/').slice(1)).join('
 
 const buildControlPanelField = (
   def: UiDef,
-  setParamValue: FaustWorkletNode['setParamValue']
+  setParamValue: (path: string, val: number) => void
 ): ({ [key: string]: any } | null)[] => {
   const mapperFunctions: {
     [K in UiDef['type']]: (
@@ -113,14 +111,14 @@ const buildControlPanelField = (
 
 const mapUiGroupToControlPanelFields = (
   group: UiGroup,
-  setParamValue: FaustWorkletNode['setParamValue']
+  setParamValue: (path: string, val: number) => void
 ): {}[] =>
   filterNils(R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue))));
 
 const buildControlPanel = (
   uiDef: UiGroup[],
   pathTable: { [path: string]: any },
-  setParamValue: FaustWorkletNode['setParamValue']
+  setParamValue: (path: string, val: number) => void
 ) => {
   // Get the randomly generated path base so that we can accurately match when setting params
   const pathBase = Option.of(R.head(Object.keys(pathTable)))

@@ -13,7 +13,7 @@ export class MIDIToFrequencyNode {
 
   private midiNode: MIDINode;
   private frequencyCSN: ConstantSourceNode;
-  private gainCSN: ConstantSourceNode;
+  private gateCSN: ConstantSourceNode;
   /**
    * List of note IDs that are currently pressed down.  We're always emitting the frequency of the last note in this array
    * and we're always gated if this array is non-empty.
@@ -24,17 +24,37 @@ export class MIDIToFrequencyNode {
     return midiToFrequency(note); // TODO: Make configurable somehow
   }
 
+  private gate(offset = 0) {
+    this.gateCSN.offset.setValueAtTime(1, ctx.currentTime + offset);
+  }
+
+  private unGate(offset = 0) {
+    this.gateCSN.offset.setValueAtTime(0, ctx.currentTime + offset);
+  }
+
   private getMIDIInputCbs = (): MIDIInputCbs => ({
-    onAttack: (note, _voiceIx, _velocity) => {
-      this.activeNotes.push(note);
-      this.frequencyCSN.offset.value = this.noteToFrequency(note);
+    onAttack: (note, _voiceIx, _velocity, offset?: number) => {
+      this.gate(offset);
+      this.frequencyCSN.offset.setValueAtTime(
+        this.noteToFrequency(note),
+        ctx.currentTime + (offset || 0)
+      );
+
+      if (R.isNil(offset)) {
+        // Don't even try to do any kind of scheduling when offsets are involved; just set frequency and
+        // gate at the offset.
+        this.activeNotes.push(note);
+      }
     },
-    onRelease: (note, _voiceIx, _velocity) => {
-      this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
-      if (R.isEmpty(this.activeNotes)) {
-        this.gainCSN.offset.value = 0;
-      } else {
-        this.frequencyCSN.offset.value = this.noteToFrequency(R.last(this.activeNotes)!);
+    onRelease: (note, _voiceIx, _velocity, offset?: number) => {
+      this.unGate(offset);
+
+      if (R.isNil(offset)) {
+        this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
+
+        if (!R.isEmpty(this.activeNotes)) {
+          this.frequencyCSN.offset.value = this.noteToFrequency(R.last(this.activeNotes)!);
+        }
       }
     },
     onPitchBend: bendAmount => {
@@ -42,7 +62,9 @@ export class MIDIToFrequencyNode {
       console.log({ bendAmount });
     },
     onClearAll: (_stopPlayingNotes: boolean) => {
-      this.gainCSN.offset.value = 0;
+      this.gateCSN.offset.cancelScheduledValues(0);
+      this.gateCSN.offset.value = 0;
+      this.frequencyCSN.offset.cancelScheduledValues(0);
       this.activeNotes = [];
     },
   });
@@ -61,8 +83,9 @@ export class MIDIToFrequencyNode {
     this.vcId = vcId;
     this.frequencyCSN = new ConstantSourceNode(ctx);
     this.frequencyCSN.start();
-    this.gainCSN = new ConstantSourceNode(ctx);
-    this.gainCSN.start();
+    this.gateCSN = new ConstantSourceNode(ctx);
+    this.gateCSN.offset.value = 0;
+    this.gateCSN.start();
 
     this.midiNode = buildMIDINode(this.getMIDIInputCbs);
   }
@@ -71,10 +94,12 @@ export class MIDIToFrequencyNode {
     return {
       vcId: this.vcId,
       inputs: Map<string, ConnectableInput>().set('midi', { node: this.midiNode, type: 'midi' }),
-      outputs: Map<string, ConnectableOutput>().set('frequency', {
-        node: this.frequencyCSN,
-        type: 'number',
-      }),
+      outputs: Map<string, ConnectableOutput>()
+        .set('frequency', {
+          node: this.frequencyCSN,
+          type: 'number',
+        })
+        .set('gate', { node: this.gateCSN, type: 'number' }),
       node: this,
     };
   }
