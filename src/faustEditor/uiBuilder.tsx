@@ -125,20 +125,25 @@ const buildControlPanel = (
     .map(path => path.split('/').slice(0, 2)[1])
     .getOrElse('');
 
-  const controlPanelFieldDefinitions = R.flatten(
+  const settings = R.flatten(
     uiDef.map(item => mapUiGroupToControlPanelFields(item, setParamValue))
   );
 
-  if (R.isEmpty(controlPanelFieldDefinitions)) {
+  if (R.isEmpty(settings)) {
     return null;
   }
+
+  // Set the initial values for the audio params
+  settings.forEach((setting: any) =>
+    setParamValue(`/${pathBase}/${setting.label}`, setting.initial || 0)
+  );
 
   return (
     <ControlPanel
       draggable
       theme='dark'
       position={{ top: 0, right: 20 }}
-      settings={controlPanelFieldDefinitions}
+      settings={settings}
       onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
       width={500}
     />
