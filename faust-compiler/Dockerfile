@@ -1,8 +1,6 @@
-FROM golang:1.12.3-stretch as builder
+FROM golang:1.14beta1-buster as builder
 
 RUN apt update && apt install -y cmake build-essential git pkg-config python3
-
-
 
 RUN mkdir /faust
 WORKDIR /
@@ -25,7 +23,7 @@ ADD . /build
 RUN go build -o faust-compiler-server .
 RUN cp faust-compiler-server /usr/local/bin/
 
-FROM buildpack-deps:stretch-scm
+FROM buildpack-deps:buster-scm
 COPY --from=builder /usr/local/bin/faust /usr/local/bin/faust
 COPY --from=builder /usr/local/bin/faust2wasm /usr/local/bin/faust2wasm
 COPY --from=builder /usr/local/lib/libOSCFaust.a /usr/local/lib/libOSCFaust.a
