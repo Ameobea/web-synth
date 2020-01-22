@@ -1,13 +1,19 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import downloadjs from 'downloadjs';
 
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
+import { MIDIEditorStateMap } from 'src/midiEditor';
 
 const ctx = new AudioContext();
 
-const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
+const MIDIEditorControls: React.FC<{
+  engine: typeof import('../engine');
+  vcId: string;
+}> = ({ engine, vcId }) => {
+  const [isRecordingMIDI, setIsRecordingMIDI] = useState(false);
+
   const onChange = useMemo<(key: string, val: any) => void>(
     () => async (key, val) => {
       switch (key) {
@@ -74,6 +80,33 @@ const MIDIEditorControls: React.FC<{ engine: typeof import('../engine') }> = ({ 
           },
         },
         { type: 'custom', label: 'upload midi', renderContainer: false, Comp: FileUploader },
+        {
+          type: 'button',
+          label: isRecordingMIDI ? 'start recording' : 'stop recording',
+          action: () => {
+            setIsRecordingMIDI(!isRecordingMIDI);
+
+            const state = MIDIEditorStateMap.get(vcId);
+            if (!state) {
+              console.error(`No midi editor state map entry for vcId "${vcId}"`);
+              return;
+            }
+
+            if (state.isRecordingMIDI !== isRecordingMIDI) {
+              console.error(
+                'State mismatch between MIDI editor state and UI hook state regarding MIDI recording status'
+              );
+            } else {
+              state.isRecordingMIDI = !state.isRecordingMIDI;
+            }
+
+            if (isRecordingMIDI) {
+              engine.midi_editor_stop_recording_midi(ctx.currentTime);
+            } else {
+              engine.midi_editor_start_recording_midi(ctx.currentTime);
+            }
+          },
+        },
       ]}
     />
   );

@@ -2,12 +2,13 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
-import { UnreachableException } from 'ameo-utils';
+import { UnreachableException, UnimplementedError } from 'ameo-utils';
 
 import {
   AudioConnectables,
   create_empty_audio_connectables,
   ConnectableOutput,
+  ConnectableInput,
 } from 'src/patchNetwork';
 import MIDIEditorUI, { buildMIDIEditorUIDomId } from 'src/midiEditor/MIDIEditorUI';
 import { getEngine } from 'src';
@@ -16,6 +17,8 @@ import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
 import { VoiceManagerWrapper, mkVoiceManagerWrapper } from 'src/patchNetwork/voiceManagerWrapper';
 
 export interface MIDIEditorState {
+  isRecordingMIDI: boolean;
+  inputMIDINode: MIDINode;
   midiNode: MIDINode;
   voiceManager: VoiceManagerWrapper;
 }
@@ -41,7 +44,10 @@ export const create_midi_editor_audio_connectables = (vcId: string): AudioConnec
 
   return {
     vcId,
-    inputs: ImmMap(),
+    inputs: ImmMap<string, ConnectableInput>().set('midi_input', {
+      node: state.inputMIDINode,
+      type: 'midi',
+    }),
     outputs: ImmMap<string, ConnectableOutput>().set('midi_output', {
       node: state.midiNode,
       type: 'midi',
@@ -58,10 +64,43 @@ export const init_midi_editor_ui = (vcId: string) => {
   const midiNode = buildMIDINode(() => {
     throw new UnreachableException("MIDI editor MIDI node doesn't accept input");
   });
+
   const midiEditorState: MIDIEditorState = {
+    isRecordingMIDI: false,
+    inputMIDINode: null as any,
     midiNode,
     voiceManager: mkVoiceManagerWrapper(midiNode),
   };
+
+  // And build one for accepting MIDI input when recording
+  const inputMIDINode = buildMIDINode(() => ({
+    onAttack: (...args) => {
+      if (midiEditorState.isRecordingMIDI) {
+        throw new UnimplementedError();
+      } else {
+        midiNode.outputCbs.forEach(outputCbs => outputCbs.onAttack(...args));
+      }
+    },
+    onRelease: (...args) => {
+      if (midiEditorState.isRecordingMIDI) {
+        throw new UnimplementedError();
+      } else {
+        midiNode.outputCbs.forEach(outputCbs => outputCbs.onRelease(...args));
+      }
+    },
+    onClearAll: (...args) => {
+      if (midiEditorState.isRecordingMIDI) {
+        throw new UnimplementedError();
+      } else {
+        midiNode.outputCbs.forEach(outputCbs => outputCbs.onClearAll(...args));
+      }
+    },
+    onPitchBend: (..._args) => {
+      throw new UnimplementedError();
+    },
+  }));
+  midiEditorState.inputMIDINode = inputMIDINode;
+
   if (!!MIDIEditorStateMap.get(vcId)) {
     console.warn(`Existing entry in MIDI editor state map for vcId "${vcId}"; overwriting...`);
   }

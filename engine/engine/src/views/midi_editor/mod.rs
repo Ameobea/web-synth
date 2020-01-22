@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{helpers::grid::prelude::*, view_context::ViewContext};
 
 pub mod constants;
+pub mod midi_recording;
 pub mod prelude;
 pub mod scheduler;
 
@@ -30,6 +31,7 @@ pub struct MIDIEditorGridHandler {
     pub loop_start_mark_measure: Option<LoopMarkDescriptor>,
     pub loop_end_mark_measure: Option<LoopMarkDescriptor>,
     pub loop_handle: Option<SchedulerStateHandle>,
+    pub midi_recording_ctx: Option<*mut midi_recording::MIDIRecordingContext>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -67,6 +69,7 @@ impl MIDIEditorGridHandler {
                     dom_id: 0, // Will be filled in later once things are initialized
                 }),
             loop_handle: None,
+            midi_recording_ctx: None,
         }
     }
 
@@ -460,6 +463,33 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
                 };
 
                 None
+            },
+            "toggle_recording_midi" => {
+                assert_eq!(
+                    val.len(),
+                    8,
+                    "Message for \"toggle_recording_midi\" must be an 8-byte `f64` of `cur_time`"
+                );
+                let cur_time: f64 = unsafe {
+                    std::mem::transmute((
+                        val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
+                    ))
+                };
+
+                match self.midi_recording_ctx {
+                    Some(ctx) => {
+                        midi_recording::stop_recording_midi(self, grid_state, ctx, cur_time);
+                        None
+                    },
+                    None => {
+                        let recording_ctx_ptr =
+                            midi_recording::start_recording_midi(self, grid_state, cur_time);
+                        self.midi_recording_ctx = Some(recording_ctx_ptr);
+                        let ctx_ptr_bytes: [u8; 4] =
+                            unsafe { std::mem::transmute(recording_ctx_ptr) };
+                        Some(ctx_ptr_bytes.to_vec())
+                    },
+                }
             },
             _ => None,
         }

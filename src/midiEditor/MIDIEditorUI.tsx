@@ -10,7 +10,7 @@ const MIDIEditorUI: React.FC<{
   vcId: string;
 }> = ({ engine, vcId }) => (
   <div id={buildMIDIEditorUIDomId(vcId)}>
-    <MIDIEditorControls engine={engine} />
+    <MIDIEditorControls engine={engine} vcId={vcId} />
   </div>
 );
 
