@@ -80,7 +80,7 @@ pub trait GridRenderer<S: GridRendererUniqueIdentifier> {
 }
 
 pub trait GridHandler<S: GridRendererUniqueIdentifier, R: GridRenderer<S>> {
-    fn init(&mut self, _vc_id: &str, grid_conf: &GridConf) {}
+    fn init(&mut self, _vc_id: &str, _grid_conf: &GridConf) {}
 
     fn cleanup(&mut self, _grid_state: &mut GridState<S>, _vc_id: &str) {}
 

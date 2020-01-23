@@ -1,6 +1,8 @@
+import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import downloadjs from 'downloadjs';
+import { Option } from 'funfix-core';
 
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
@@ -92,18 +94,40 @@ const MIDIEditorControls: React.FC<{
               return;
             }
 
-            if (state.isRecordingMIDI !== isRecordingMIDI) {
+            if (state.midiRecordingCtxPtr.isEmpty() === isRecordingMIDI) {
               console.error(
                 'State mismatch between MIDI editor state and UI hook state regarding MIDI recording status'
               );
-            } else {
-              state.isRecordingMIDI = !state.isRecordingMIDI;
             }
 
+            const curTimeBytes = new Uint8Array(new Float64Array(ctx.currentTime).buffer);
             if (isRecordingMIDI) {
-              engine.midi_editor_stop_recording_midi(ctx.currentTime);
+              const ctxPtrBytes = engine.handle_message('toggle_recording_midi', curTimeBytes);
+
+              if (R.isNil(ctxPtrBytes)) {
+                console.error(
+                  'Got empty response from handling toggle message; we were supposed to be starting recording'
+                );
+                return;
+              } else if (ctxPtrBytes.length !== 4) {
+                console.error(
+                  `Expected a 32-bit pointer from Wasm; got ${ctxPtrBytes.length} bytes instead`
+                );
+                return;
+              }
+
+              const ctxPtr = new Int32Array(ctxPtrBytes.buffer)[0]!;
+              state.midiRecordingCtxPtr = Option.of(ctxPtr);
             } else {
-              engine.midi_editor_start_recording_midi(ctx.currentTime);
+              const res = engine.handle_message('toggle_recording_midi', curTimeBytes);
+              if (!R.isNil(res)) {
+                console.error(
+                  'Got bytes back from engine when trying to stop MIDI recording; expected none.',
+                  [...res]
+                );
+              }
+
+              state.midiRecordingCtxPtr = Option.none();
             }
           },
         },

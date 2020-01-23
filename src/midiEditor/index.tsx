@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
+import { Option } from 'funfix-core';
 import { UnreachableException, UnimplementedError } from 'ameo-utils';
 
 import {
@@ -17,11 +18,13 @@ import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
 import { VoiceManagerWrapper, mkVoiceManagerWrapper } from 'src/patchNetwork/voiceManagerWrapper';
 
 export interface MIDIEditorState {
-  isRecordingMIDI: boolean;
+  midiRecordingCtxPtr: Option<number>;
   inputMIDINode: MIDINode;
   midiNode: MIDINode;
   voiceManager: VoiceManagerWrapper;
 }
+
+const ctx = new AudioContext();
 
 export const MIDIEditorStateMap: Map<string, MIDIEditorState> = new Map();
 
@@ -66,7 +69,7 @@ export const init_midi_editor_ui = (vcId: string) => {
   });
 
   const midiEditorState: MIDIEditorState = {
-    isRecordingMIDI: false,
+    midiRecordingCtxPtr: Option.none(),
     inputMIDINode: null as any,
     midiNode,
     voiceManager: mkVoiceManagerWrapper(midiNode),
@@ -74,26 +77,30 @@ export const init_midi_editor_ui = (vcId: string) => {
 
   // And build one for accepting MIDI input when recording
   const inputMIDINode = buildMIDINode(() => ({
-    onAttack: (...args) => {
-      if (midiEditorState.isRecordingMIDI) {
-        throw new UnimplementedError();
-      } else {
-        midiNode.outputCbs.forEach(outputCbs => outputCbs.onAttack(...args));
-      }
+    onAttack: (noteId: number, voiceIx: number, velocity: number, offset?: number | undefined) => {
+      midiEditorState.midiRecordingCtxPtr.forEach(ptr =>
+        getEngine()!.midi_editor_record_note_down(ptr, ctx.currentTime, noteId)
+      );
+
+      midiNode.outputCbs.forEach(outputCbs =>
+        outputCbs.onAttack(noteId, voiceIx, velocity, offset)
+      );
     },
-    onRelease: (...args) => {
-      if (midiEditorState.isRecordingMIDI) {
-        throw new UnimplementedError();
-      } else {
-        midiNode.outputCbs.forEach(outputCbs => outputCbs.onRelease(...args));
-      }
+    onRelease: (noteId: number, voiceIx: number, velocity: number, offset?: number | undefined) => {
+      midiEditorState.midiRecordingCtxPtr.forEach(ptr =>
+        getEngine()!.midi_editor_record_note_up(ptr, ctx.currentTime, noteId)
+      );
+
+      midiNode.outputCbs.forEach(outputCbs =>
+        outputCbs.onRelease(noteId, voiceIx, velocity, offset)
+      );
     },
     onClearAll: (...args) => {
-      if (midiEditorState.isRecordingMIDI) {
+      midiEditorState.midiRecordingCtxPtr.forEach(_ptr => {
         throw new UnimplementedError();
-      } else {
-        midiNode.outputCbs.forEach(outputCbs => outputCbs.onClearAll(...args));
-      }
+      });
+
+      midiNode.outputCbs.forEach(outputCbs => outputCbs.onClearAll(...args));
     },
     onPitchBend: (..._args) => {
       throw new UnimplementedError();

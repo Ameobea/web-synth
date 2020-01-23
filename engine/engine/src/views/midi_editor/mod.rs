@@ -52,7 +52,7 @@ impl Default for MIDIEditorConf {
 }
 
 impl MIDIEditorGridHandler {
-    fn new(grid_conf: &GridConf, vc_id: Uuid, conf: MIDIEditorConf) -> Self {
+    fn new(_grid_conf: &GridConf, vc_id: Uuid, conf: MIDIEditorConf) -> Self {
         MIDIEditorGridHandler {
             vc_id: vc_id.to_string(),
             bpm: conf.bpm,
@@ -478,15 +478,16 @@ impl GridHandler<usize, MidiEditorGridRenderer> for MIDIEditorGridHandler {
 
                 match self.midi_recording_ctx {
                     Some(ctx) => {
-                        midi_recording::stop_recording_midi(self, grid_state, ctx, cur_time);
+                        midi_recording::stop_recording_midi(ctx, cur_time);
                         None
                     },
                     None => {
                         let recording_ctx_ptr =
                             midi_recording::start_recording_midi(self, grid_state, cur_time);
                         self.midi_recording_ctx = Some(recording_ctx_ptr);
-                        let ctx_ptr_bytes: [u8; 4] =
-                            unsafe { std::mem::transmute(recording_ctx_ptr) };
+                        let ctx_ptr_bytes: [u8; std::mem::size_of::<
+                            *mut midi_recording::MIDIRecordingContext,
+                        >()] = unsafe { std::mem::transmute(recording_ctx_ptr) };
                         Some(ctx_ptr_bytes.to_vec())
                     },
                 }
