@@ -84,7 +84,7 @@ const MIDIEditorControls: React.FC<{
         { type: 'custom', label: 'upload midi', renderContainer: false, Comp: FileUploader },
         {
           type: 'button',
-          label: isRecordingMIDI ? 'start recording' : 'stop recording',
+          label: isRecordingMIDI ? 'stop recording' : 'start recording',
           action: () => {
             setIsRecordingMIDI(!isRecordingMIDI);
 
@@ -100,8 +100,18 @@ const MIDIEditorControls: React.FC<{
               );
             }
 
-            const curTimeBytes = new Uint8Array(new Float64Array(ctx.currentTime).buffer);
+            const curTimeBytes = new Uint8Array(new Float64Array([ctx.currentTime]).buffer);
             if (isRecordingMIDI) {
+              const res = engine.handle_message('toggle_recording_midi', curTimeBytes);
+              if (!R.isNil(res)) {
+                console.error(
+                  'Got bytes back from engine when trying to stop MIDI recording; expected none.',
+                  [...res]
+                );
+              }
+
+              state.midiRecordingCtxPtr = Option.none();
+            } else {
               const ctxPtrBytes = engine.handle_message('toggle_recording_midi', curTimeBytes);
 
               if (R.isNil(ctxPtrBytes)) {
@@ -118,16 +128,6 @@ const MIDIEditorControls: React.FC<{
 
               const ctxPtr = new Int32Array(ctxPtrBytes.buffer)[0]!;
               state.midiRecordingCtxPtr = Option.of(ctxPtr);
-            } else {
-              const res = engine.handle_message('toggle_recording_midi', curTimeBytes);
-              if (!R.isNil(res)) {
-                console.error(
-                  'Got bytes back from engine when trying to stop MIDI recording; expected none.',
-                  [...res]
-                );
-              }
-
-              state.midiRecordingCtxPtr = Option.none();
             }
           },
         },

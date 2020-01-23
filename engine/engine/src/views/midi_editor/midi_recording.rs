@@ -152,7 +152,10 @@ pub fn midi_editor_record_note_down(
 
         if let Some(first_empty_ix) = first_empty_ix {
             // TODO: Support time offsets for input delay
-            let start_beat = recording_ctx.state.time_to_beats(cur_time);
+            let start_beat = recording_ctx
+                .state
+                .time_to_beats(cur_time - recording_ctx.start_time_seconds)
+                + recording_ctx.initial_cursor_pos_beats;
             let line_ix = recording_ctx.grid_state.conf.row_count - note_id;
 
             let dom_id = MidiEditorGridRenderer::create_note(
@@ -206,18 +209,19 @@ pub fn midi_editor_record_note_up(
             std::mem::replace(&mut recording_ctx.active_voices[voice_entry_ix], None).unwrap();
         // Commit this new note to the skip list and render it officially so that the grid knows
         // about it and can delete/move it etc.
+        let note_start_beat = recording_ctx
+            .state
+            .time_to_beats(entry.playing_start_time_seconds - recording_ctx.start_time_seconds)
+            + recording_ctx.initial_cursor_pos_beats;
+        let note_length_seconds = cur_time - entry.playing_start_time_seconds;
+        let note_length_beats = recording_ctx.state.time_to_beats(note_length_seconds);
+
         let note: NoteBox<usize> = NoteBox {
             data: entry.dom_id,
             bounds: NoteBoxBounds {
-                start_beat: (recording_ctx
-                    .state
-                    .time_to_beats(cur_time - entry.playing_start_time_seconds)
-                    + recording_ctx.initial_cursor_pos_beats) as f32,
+                start_beat: note_start_beat as f32,
                 // TODO: snap to beat
-                end_beat: recording_ctx
-                    .state
-                    .time_to_beats(cur_time - entry.playing_start_time_seconds)
-                    as f32,
+                end_beat: (note_start_beat + note_length_beats) as f32,
             },
         };
         MidiEditorGridRenderer::deselect_note(entry.dom_id);
