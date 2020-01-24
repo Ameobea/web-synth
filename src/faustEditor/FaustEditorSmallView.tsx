@@ -76,10 +76,15 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       );
     }
 
+    const { ControlPanelComponent } = instanceContext.reduxInfra.getState().faustEditor;
+    if (!ControlPanelComponent) {
+      return null;
+    }
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
         <button onClick={stop}>Stop</button>
-        {instanceContext.reduxInfra.getState().faustEditor.controlPanel}
+        <ControlPanelComponent />
       </div>
     );
   };

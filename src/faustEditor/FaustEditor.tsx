@@ -167,7 +167,7 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
 
 const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) => ({
   instance: faustEditor.instance,
-  controlPanel: faustEditor.controlPanel,
+  ControlPanelComponent: faustEditor.ControlPanelComponent,
   editorContent: faustEditor.editorContent,
 });
 
@@ -243,7 +243,7 @@ export const mkStopInstanceHandler = ({
 
 const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps>> = ({
   instance,
-  controlPanel: faustInstanceControlPanel,
+  ControlPanelComponent: FaustInstanceControlPanelComponent,
   editorContent,
   vcId,
 }) => {
@@ -306,7 +306,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
 
       <SpectrumVisualization analyzerNode={context.analyzerNode} />
 
-      {faustInstanceControlPanel}
+      {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
 
       <EffectsPickerPanel
         state={controlPanelState}

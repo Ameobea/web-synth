@@ -1,18 +1,34 @@
 import { buildActionGroup, buildModule } from 'jantix';
 
-import buildControlPanel from 'src/faustEditor/uiBuilder';
+import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap } from 'src/faustEditor';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 interface FaustEditorState {
   instance: FaustWorkletNode | null;
-  controlPanel?: React.ReactNode;
+  ControlPanelComponent?: React.ComponentType<{}>;
   editorContent: string;
 }
 
 const initialState: FaustEditorState = {
   instance: null,
   editorContent: '',
+};
+
+const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam | undefined => {
+  const context = faustEditorContextMap[vcId];
+  if (!context) {
+    console.error(`No Faust Editor context found for vcId "${vcId}"`);
+    return;
+  }
+
+  const dstParam = context.overrideableParams[path];
+  if (!dstParam) {
+    console.error(`No param exists at path ${path} for Faust editor vcId "${vcId}"`);
+  }
+
+  return dstParam;
 };
 
 const actionGroups = {
@@ -27,27 +43,28 @@ const actionGroups = {
     }),
     subReducer: (state: FaustEditorState, { instance, vcId }) => {
       // Construct a new control panel instance for the newly created module
-      const controlPanel = buildControlPanel(
+      const ControlPanelComponent = buildControlPanelComponent(
         instance.jsonDef.ui,
         instance.pathTable,
         (path: string, val: number) => {
-          const context = faustEditorContextMap[vcId];
-          if (!context) {
-            console.error(`No Faust Editor context found for vcId "${vcId}"`);
-            return state;
-          }
-
-          const dstParam = context.overrideableParams[path];
+          const dstParam = getFaustModuleParam(vcId, path);
           if (!dstParam) {
-            console.error(`No param exists at path ${path} for Faust editor vcId "${vcId}"`);
             return;
           }
 
           dstParam.manualControl.offset.value = val;
+        },
+        (path: string) => {
+          const dstParam = getFaustModuleParam(vcId, path);
+          if (!dstParam) {
+            return;
+          }
+
+          return dstParam.manualControl.offset.value;
         }
       );
 
-      return { ...state, instance, controlPanel };
+      return { ...state, instance, ControlPanelComponent };
     },
   }),
   CLEAR_ACTIVE_INSTANCE: buildActionGroup({

@@ -115,22 +115,23 @@ const mapUiGroupToControlPanelFields = (
 ): {}[] =>
   filterNils(R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue))));
 
-const buildControlPanel = (
+const buildControlPanelComponent = (
   uiDef: UiGroup[],
   pathTable: { [path: string]: any },
-  setParamValue: (path: string, val: number) => void
-) => {
+  setParamValue: (path: string, val: number) => void,
+  getParamValue: (path: string) => number | null | undefined
+): React.FC<{}> => {
   // Get the randomly generated path base so that we can accurately match when setting params
   const pathBase = Option.of(R.head(Object.keys(pathTable)))
     .map(path => path.split('/').slice(0, 2)[1])
     .getOrElse('');
 
-  const settings = R.flatten(
+  const settings: any[] = R.flatten(
     uiDef.map(item => mapUiGroupToControlPanelFields(item, setParamValue))
   );
 
   if (R.isEmpty(settings)) {
-    return null;
+    return () => null;
   }
 
   // Set the initial values for the audio params
@@ -138,16 +139,24 @@ const buildControlPanel = (
     setParamValue(`/${pathBase}/${setting.label}`, setting.initial || 0)
   );
 
-  return (
+  const FaustEditorControlPanel = () => (
     <ControlPanel
       draggable
       theme='dark'
       position={{ top: 0, right: 20 }}
-      settings={settings}
+      settings={settings.map(setting => {
+        const val = getParamValue(`/${pathBase}/${setting.label}`);
+        if (R.isNil(val)) {
+          return setting;
+        }
+
+        return { ...setting, initial: val };
+      })}
       onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
       width={500}
     />
   );
+  return FaustEditorControlPanel;
 };
 
-export default buildControlPanel;
+export default buildControlPanelComponent;
