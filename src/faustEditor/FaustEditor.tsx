@@ -169,6 +169,7 @@ const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) => ({
   instance: faustEditor.instance,
   ControlPanelComponent: faustEditor.ControlPanelComponent,
   editorContent: faustEditor.editorContent,
+  isHidden: faustEditor.isHidden,
 });
 
 export const mkCompileButtonClickHandler = ({
@@ -246,6 +247,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   ControlPanelComponent: FaustInstanceControlPanelComponent,
   editorContent,
   vcId,
+  isHidden,
 }) => {
   const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
@@ -304,7 +306,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
 
       <SaveControls editorContent={editorContent} />
 
-      <SpectrumVisualization analyzerNode={context.analyzerNode} />
+      <SpectrumVisualization paused={isHidden} analyzerNode={context.analyzerNode} />
 
       {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
 

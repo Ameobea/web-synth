@@ -186,7 +186,10 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
       <div id='oscilloscope' ref={oscilloscopeNode}></div>
 
       {synthDesignerState.spectrumNode ? (
-        <SpectrumVisualization analyzerNode={synthDesignerState.spectrumNode} />
+        <SpectrumVisualization
+          paused={synthDesignerState.isHidden}
+          analyzerNode={synthDesignerState.spectrumNode}
+        />
       ) : null}
     </>
   );

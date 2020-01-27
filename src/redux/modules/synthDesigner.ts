@@ -213,6 +213,7 @@ export interface SynthDesignerState {
   synths: SynthModule[];
   wavyJonesInstance: AnalyserNode | undefined;
   spectrumNode: AnalyserNode;
+  isHidden: boolean;
 }
 
 const buildDefaultFilterCSNs = (): FilterCSNs => ({
@@ -409,6 +410,7 @@ export const getInitialSynthDesignerState = (addInitialSynth?: boolean): SynthDe
   synths: addInitialSynth ? [buildDefaultSynthModule()] : [],
   wavyJonesInstance: undefined,
   spectrumNode: new AnalyserNode(new AudioContext()),
+  isHidden: false,
 });
 
 const getSynth = (index: number, synths: SynthDesignerState['synths']) => {
@@ -965,6 +967,10 @@ const actionGroups = {
       // TODO: Probably have to disconnect/dispose the old voice...
       return { ...state, synths: R.set(R.lensIndex(voiceIx), builtVoice, state.synths) };
     },
+  }),
+  SET_SYNTH_DESIGNER_IS_HIDDEN: buildActionGroup({
+    actionCreator: (isHidden: boolean) => ({ type: 'SET_SYNTH_DESIGNER_IS_HIDDEN', isHidden }),
+    subReducer: (state: SynthDesignerState, { isHidden }) => ({ ...state, isHidden }),
   }),
 };
 

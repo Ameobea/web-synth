@@ -65,6 +65,7 @@ export const init_synth_designer = (stateKey: string) => {
             synths: synths.map(deserializeSynthModule),
             spectrumNode: new AnalyserNode(new AudioContext()),
             ...rest,
+            isHidden: false,
           } as SynthDesignerState)
       )
       .orNull()
@@ -105,7 +106,11 @@ export const init_synth_designer = (stateKey: string) => {
   );
 };
 
-export const hide_synth_designer = (vcId: string) => {
+export const hide_synth_designer = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  const reduxInfra = getReduxInfra(stateKey);
+  reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_SYNTH_DESIGNER_IS_HIDDEN(true));
+
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
     console.warn(`Tried to hide synth designer with id ${vcId} but it wasn't mounted`);
@@ -115,7 +120,11 @@ export const hide_synth_designer = (vcId: string) => {
   rootNode.style.display = 'none';
 };
 
-export const unhide_synth_designer = (vcId: string) => {
+export const unhide_synth_designer = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  const reduxInfra = getReduxInfra(stateKey);
+  reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_SYNTH_DESIGNER_IS_HIDDEN(false));
+
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
     console.warn(`Tried to unhide synth designer with id ${vcId} but it wasn't mounted`);

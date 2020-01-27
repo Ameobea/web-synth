@@ -31,6 +31,7 @@ export const faustEditorContextMap: {
     faustNode?: FaustWorkletNode;
     overrideableParams: { [key: string]: OverridableAudioParam };
     cachedInputNames: string[] | undefined;
+    isHidden: boolean;
   };
 } = {};
 
@@ -73,6 +74,7 @@ export const init_faust_editor = (stateKey: string) => {
     overrideableParams: {},
     analyzerNode,
     cachedInputNames,
+    isHidden: false,
   };
 
   // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
@@ -104,6 +106,15 @@ export const get_faust_editor_content = (vcId: string) => {
 };
 
 export const hide_faust_editor = (vcId: string) => {
+  const ctx = faustEditorContextMap[vcId];
+  if (ctx) {
+    ctx.reduxInfra.dispatch(ctx.reduxInfra.actionCreators.faustEditor.SET_IS_HIDDEN(true));
+  } else {
+    console.error(
+      `Tried to hide Faust editor with vcId ${vcId} but no entry exists in the context map for it`
+    );
+  }
+
   const rootNode = document.getElementById(buildRootNodeId(vcId));
   if (!rootNode) {
     console.warn(`Tried to hide faust editor with id ${vcId} but it wasn't mounted`);
@@ -114,6 +125,15 @@ export const hide_faust_editor = (vcId: string) => {
 };
 
 export const unhide_faust_editor = (vcId: string) => {
+  const ctx = faustEditorContextMap[vcId];
+  if (ctx) {
+    ctx.reduxInfra.dispatch(ctx.reduxInfra.actionCreators.faustEditor.SET_IS_HIDDEN(false));
+  } else {
+    console.error(
+      `Tried to un-hide Faust editor with vcId ${vcId} but no entry exists in the context map for it`
+    );
+  }
+
   const rootNode = document.getElementById(buildRootNodeId(vcId));
   if (!rootNode) {
     console.warn(`Tried to unhide faust editor with id ${vcId} but it wasn't mounted`);

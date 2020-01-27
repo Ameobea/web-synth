@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ControlPanel from 'react-control-panel';
 import { useOnce } from 'ameo-utils';
 import Loading from 'src/misc/Loading';
@@ -22,14 +22,29 @@ export const SpectrumVisualization: React.FC<{
   initialConf?: SpectrumVizSettings;
   canvasStyle?: React.CSSProperties;
   analyzerNode: AnalyserNode;
-}> = ({ initialConf, canvasStyle, analyzerNode }) => {
+  paused?: boolean;
+}> = ({ initialConf, canvasStyle, analyzerNode, paused = false }) => {
   const [spectrumSettingsDefinition, setSpectrumSettingsDefinition] = useState<{
     color_functions: SettingDefinition[];
     scaler_functions: SettingDefinition[];
   } | null>(null);
   const [ctxPtr, setCtxPtr] = useState<number | null>(null);
   const spectrumModule = useRef<typeof import('src/spectrum_viz') | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [canvasRef, setCanvasRef] = useState<null | HTMLCanvasElement>(null);
+  const [mkUpdateViz, setMkUpdateViz] = useState<
+    ((ctx2D: CanvasRenderingContext2D) => () => void) | null
+  >(null);
+  const animationFrameHandle = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (paused && animationFrameHandle.current !== null) {
+      cancelAnimationFrame(animationFrameHandle.current);
+      animationFrameHandle.current = null;
+    } else if (!paused && mkUpdateViz && canvasRef && animationFrameHandle.current === null) {
+      const ctx2d = canvasRef.getContext('2d')!;
+      animationFrameHandle.current = requestAnimationFrame(mkUpdateViz(ctx2d));
+    }
+  }, [mkUpdateViz, canvasRef, paused]);
 
   useOnce(async () => {
     const [spectrumVizRawModule, spectrumVizModule] = await Promise.all([
@@ -57,54 +72,49 @@ export const SpectrumVisualization: React.FC<{
       pixelDataPtr: spectrumVizModule.get_pixel_data_ptr(ctxPtr),
     };
 
-    const canvas = await (async () => {
-      const getCanvas = async (): Promise<HTMLCanvasElement> => {
-        if (canvasRef.current) {
-          return canvasRef.current;
-        }
-
-        return new Promise(resolve => setTimeout(() => getCanvas().then(resolve), 50));
-      };
-
-      return getCanvas();
-    })();
-    const ctx2d = canvas.getContext('2d')!;
-
     analyzerNode.fftSize = FFT_SIZE;
 
-    const updateVisualization = () => {
-      if (ctx === null) {
-        requestAnimationFrame(updateVisualization);
-        return;
-      }
+    const mkUpdateVisualization = (ctx2D: CanvasRenderingContext2D) => {
+      const updateViz = () => {
+        console.log('v');
+        if (ctx === null) {
+          animationFrameHandle.current = requestAnimationFrame(updateViz);
+          return;
+        }
 
-      curIx += 1;
-      if (curIx >= WIDTH) {
-        curIx = 0;
-      }
+        curIx += 1;
+        if (curIx >= WIDTH) {
+          curIx = 0;
+        }
 
-      analyzerNode.getByteFrequencyData(ctx.byteFrequencyData);
-      ctx.spectrumViz.process_viz_data(ctxPtr);
-      for (let i = 0; i < ctx.byteFrequencyData.length; i++) {
-        ctx.wasmMemory![ctx.byteFrequencyDataPtr + i] = ctx.byteFrequencyData[i];
-      }
+        analyzerNode.getByteFrequencyData(ctx.byteFrequencyData);
+        ctx.spectrumViz.process_viz_data(ctxPtr);
+        for (let i = 0; i < ctx.byteFrequencyData.length; i++) {
+          ctx.wasmMemory![ctx.byteFrequencyDataPtr + i] = ctx.byteFrequencyData[i];
+        }
 
-      const imageData = new ImageData(
-        new Uint8ClampedArray(
-          ctx.rawSpectrumViz.memory.buffer.slice(
-            ctx.pixelDataPtr,
-            ctx.pixelDataPtr + BUFFER_SIZE * 4
-          )
-        ),
-        1,
-        BUFFER_SIZE
-      );
-      ctx2d.putImageData(imageData, curIx, 0, 0, 0, 1, BUFFER_SIZE);
+        const imageData = new ImageData(
+          new Uint8ClampedArray(
+            ctx.rawSpectrumViz.memory.buffer.slice(
+              ctx.pixelDataPtr,
+              ctx.pixelDataPtr + BUFFER_SIZE * 4
+            )
+          ),
+          1,
+          BUFFER_SIZE
+        );
+        ctx2D.putImageData(imageData, curIx, 0, 0, 0, 1, BUFFER_SIZE);
 
-      requestAnimationFrame(updateVisualization);
+        animationFrameHandle.current = requestAnimationFrame(updateViz);
+      };
+
+      return updateViz;
     };
 
-    setTimeout(updateVisualization);
+    // If the state being set is a function, it is called to produce the new state value.
+    // Since we actually want to store the function as state, we use this wrapper function
+    // in order to prevent our function from getting called rather than set.
+    setMkUpdateViz(() => mkUpdateVisualization);
   });
 
   return (
@@ -143,7 +153,7 @@ export const SpectrumVisualization: React.FC<{
       )}
 
       <canvas
-        ref={canvasRef}
+        ref={ref => setCanvasRef(ref)}
         width={1200}
         height={1024}
         id='spectrum-visualizer'

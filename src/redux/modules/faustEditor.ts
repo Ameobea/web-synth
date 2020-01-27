@@ -9,11 +9,13 @@ interface FaustEditorState {
   instance: FaustWorkletNode | null;
   ControlPanelComponent?: React.ComponentType<{}>;
   editorContent: string;
+  isHidden: boolean;
 }
 
 const initialState: FaustEditorState = {
   instance: null,
   editorContent: '',
+  isHidden: false,
 };
 
 const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam | undefined => {
@@ -74,6 +76,10 @@ const actionGroups = {
   SET_EDITOR_CONTENT: buildActionGroup({
     actionCreator: (content: string) => ({ type: 'SET_EDITOR_CONTENT', content }),
     subReducer: (state: FaustEditorState, { content }) => ({ ...state, editorContent: content }),
+  }),
+  SET_IS_HIDDEN: buildActionGroup({
+    actionCreator: (isHidden: boolean) => ({ type: 'SET_IS_HIDDEN', isHidden }),
+    subReducer: (state: FaustEditorState, { isHidden }) => ({ ...state, isHidden }),
   }),
 };
 
