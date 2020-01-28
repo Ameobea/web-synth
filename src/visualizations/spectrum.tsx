@@ -76,7 +76,6 @@ export const SpectrumVisualization: React.FC<{
 
     const mkUpdateVisualization = (ctx2D: CanvasRenderingContext2D) => {
       const updateViz = () => {
-        console.log('v');
         if (ctx === null) {
           animationFrameHandle.current = requestAnimationFrame(updateViz);
           return;

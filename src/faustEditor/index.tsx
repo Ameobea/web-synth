@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map } from 'immutable';
-import { buildStore } from 'jantix';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
@@ -10,7 +9,11 @@ import FaustEditor from './FaustEditor';
 import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import faustEditorModule from 'src/redux/modules/faustEditor';
+import {
+  SerializedFaustEditor,
+  buildDefaultFaustEditorPolyphonyState,
+  buildFaustEditorReduxInfra,
+} from 'src/redux/modules/faustEditor';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -19,9 +22,6 @@ const ctx = new AudioContext();
 
 const buildRootNodeId = (vcId: string) => `faust-editor-react-root_${vcId}`;
 
-const faustEditorStoreModules = { faustEditor: faustEditorModule } as const;
-const buildFaustEditorReduxInfra = () =>
-  buildStore<typeof faustEditorStoreModules>(faustEditorStoreModules);
 export type FaustEditorReduxInfra = ReturnType<typeof buildFaustEditorReduxInfra>;
 
 export const faustEditorContextMap: {
@@ -30,7 +30,6 @@ export const faustEditorContextMap: {
     analyzerNode: AnalyserNode;
     faustNode?: FaustWorkletNode;
     overrideableParams: { [key: string]: OverridableAudioParam };
-    cachedInputNames: string[] | undefined;
     isHidden: boolean;
   };
 } = {};
@@ -57,29 +56,33 @@ export const init_faust_editor = (stateKey: string) => {
   const analyzerNode = ctx.createAnalyser();
   analyzerNode.smoothingTimeConstant = 0.2;
 
-  const { cachedInputNames, editorContent } = Option.of(localStorage.getItem(stateKey))
+  const serializedEditor: SerializedFaustEditor = Option.of(localStorage.getItem(stateKey))
     .flatMap(val => {
       try {
-        return Option.of(JSON.parse(val) as { cachedInputNames: string[]; editorContent: string });
+        const parsed = JSON.parse(val) as SerializedFaustEditor;
+        // Backwards compat to when that field didn't exist
+        if (!parsed.polyphonyState) {
+          parsed.polyphonyState = buildDefaultFaustEditorPolyphonyState();
+        }
+        return Option.of(parsed);
       } catch (err) {
         console.error('Error parsing localstorage content for Faust editor; resetting to scratch.');
         return Option.none();
       }
     })
-    .getOrElse({ cachedInputNames: undefined, editorContent: '' });
+    .getOrElse({
+      cachedInputNames: undefined,
+      editorContent: '',
+      polyphonyState: buildDefaultFaustEditorPolyphonyState(),
+    });
 
-  const reduxInfra = buildFaustEditorReduxInfra();
+  const reduxInfra = buildFaustEditorReduxInfra(serializedEditor);
   faustEditorContextMap[vcId] = {
     reduxInfra,
     overrideableParams: {},
     analyzerNode,
-    cachedInputNames,
     isHidden: false,
   };
-
-  // Retrieve the initial editor content from `localStorage` (if it's set) and set it into Redux
-
-  reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(editorContent));
 
   // Create the base dom node for the faust editor
   const faustEditorBase = document.createElement('div');
@@ -146,7 +149,9 @@ export const unhide_faust_editor = (vcId: string) => {
 export const cleanup_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
-  const { cachedInputNames } = faustEditorContextMap[vcId];
+  const { cachedInputNames, polyphonyState } = faustEditorContextMap[
+    vcId
+  ].reduxInfra.getState().faustEditor;
 
   const editorContent = get_faust_editor_content(vcId);
   delete faustEditorContextMap[vcId];
@@ -159,7 +164,12 @@ export const cleanup_faust_editor = (stateKey: string) => {
   ReactDOM.unmountComponentAtNode(faustEditorReactRootNode);
   faustEditorReactRootNode.remove();
 
-  localStorage.setItem(stateKey, JSON.stringify({ editorContent, cachedInputNames }));
+  const serializedState: SerializedFaustEditor = {
+    editorContent,
+    cachedInputNames,
+    polyphonyState,
+  };
+  localStorage.setItem(stateKey, JSON.stringify(serializedState));
 };
 
 /**
@@ -204,9 +214,7 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
       // Prevent these from leaking
       context.overrideableParams = {};
 
-      if (context.cachedInputNames) {
-        cachedInputNames = context.cachedInputNames;
-      }
+      cachedInputNames = context.reduxInfra.getState().faustEditor.cachedInputNames;
     }
 
     const passthroughNode = createPassthroughNode(GainNode);
@@ -216,8 +224,9 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     });
 
     if (cachedInputNames) {
-      cachedInputNames.forEach(
-        inputName => (inputs = inputs.set(inputName, { type: 'number', node: new DummyNode() }))
+      inputs = cachedInputNames.reduce(
+        (acc, inputName) => acc.set(inputName, { type: 'number', node: new DummyNode() }),
+        inputs
       );
     }
 

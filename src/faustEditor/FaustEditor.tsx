@@ -16,6 +16,8 @@ import {
 } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork';
 import { ReduxStore, store } from 'src/redux';
+import PolyphonyControls from './PolyphonyControls';
+import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
 
 type FaustEditorReduxStore = typeof faustEditorContextMap.key.reduxInfra.__fullState;
 
@@ -165,12 +167,11 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   );
 };
 
-const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) => ({
-  instance: faustEditor.instance,
-  ControlPanelComponent: faustEditor.ControlPanelComponent,
-  editorContent: faustEditor.editorContent,
-  isHidden: faustEditor.isHidden,
-});
+const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) =>
+  R.pick(
+    ['instance', 'ControlPanelComponent', 'editorContent', 'isHidden', 'polyphonyState'],
+    faustEditor
+  );
 
 export const mkCompileButtonClickHandler = ({
   faustCode,
@@ -202,7 +203,10 @@ export const mkCompileButtonClickHandler = ({
   if (!context) {
     throw new Error(`No context found for Faust editor vcId ${vcId}`);
   }
-  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode, cachedInputNames };
+  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode };
+  context.reduxInfra.dispatch(
+    context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(cachedInputNames)
+  );
 
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
   const newConnectables = get_faust_editor_connectables(vcId);
@@ -248,6 +252,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   editorContent,
   vcId,
   isHidden,
+  polyphonyState,
 }) => {
   const [optimize, setOptimize] = useState(false);
   const [compileErrMsg, setCompileErrMsg] = useState('');
@@ -303,6 +308,13 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
         {instance ? <button onClick={stopInstance}>Stop</button> : null}
       </div>
+
+      <PolyphonyControls
+        state={polyphonyState}
+        setState={(newState: FaustEditorPolyphonyState) =>
+          reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_POLYPHONY_STATE(newState))
+        }
+      />
 
       <SaveControls editorContent={editorContent} />
 

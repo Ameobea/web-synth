@@ -1,22 +1,49 @@
-import { buildActionGroup, buildModule } from 'jantix';
+import { buildActionGroup, buildModule, buildStore as buildJantixStore } from 'jantix';
 
 import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap } from 'src/faustEditor';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
-interface FaustEditorState {
+/**
+ * Structure of the JSON stored in `localStorage` for the Faust editor.
+ */
+export interface SerializedFaustEditor {
+  cachedInputNames: string[] | undefined;
+  editorContent: string;
+  polyphonyState: FaustEditorPolyphonyState;
+}
+
+export interface FaustEditorPolyphonyState {
+  polyphonyEnabled: boolean;
+  frequencyInputName: string | null;
+  gateInputName: string | null;
+  voiceCount: number;
+}
+
+export const buildDefaultFaustEditorPolyphonyState = (): FaustEditorPolyphonyState => ({
+  polyphonyEnabled: false,
+  frequencyInputName: null,
+  gateInputName: null,
+  voiceCount: 8,
+});
+
+export interface FaustEditorState {
   instance: FaustWorkletNode | null;
   ControlPanelComponent?: React.ComponentType<{}>;
   editorContent: string;
   isHidden: boolean;
+  polyphonyState: FaustEditorPolyphonyState;
+  cachedInputNames: string[] | undefined;
 }
 
-const initialState: FaustEditorState = {
+const buildInitialState = (): FaustEditorState => ({
   instance: null,
   editorContent: '',
   isHidden: false,
-};
+  polyphonyState: buildDefaultFaustEditorPolyphonyState(),
+  cachedInputNames: undefined,
+});
 
 const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam | undefined => {
   const context = faustEditorContextMap[vcId];
@@ -81,6 +108,30 @@ const actionGroups = {
     actionCreator: (isHidden: boolean) => ({ type: 'SET_IS_HIDDEN', isHidden }),
     subReducer: (state: FaustEditorState, { isHidden }) => ({ ...state, isHidden }),
   }),
+  SET_POLYPHONY_STATE: buildActionGroup({
+    actionCreator: (newState: FaustEditorPolyphonyState) => ({
+      type: 'SET_POLYPHONY_STATE',
+      newState,
+    }),
+    subReducer: (state: FaustEditorState, { newState }) => ({ ...state, polyphonyState: newState }),
+  }),
+  SET_CACHED_INPUT_NAMES: buildActionGroup({
+    actionCreator: (cachedInputNames: string[] | undefined) => ({
+      type: 'SET_CACHED_INPUT_NAMES',
+      cachedInputNames,
+    }),
+    subReducer: (state: FaustEditorState, { cachedInputNames }) => ({ ...state, cachedInputNames }),
+  }),
 };
 
-export default buildModule<FaustEditorState, typeof actionGroups>(initialState, actionGroups);
+export const buildFaustEditorReduxInfra = (serialized: SerializedFaustEditor) => {
+  const initialState = { ...buildInitialState(), ...serialized };
+
+  const faustEditorModule = buildModule<FaustEditorState, typeof actionGroups>(
+    initialState,
+    actionGroups
+  );
+  const modules = { faustEditor: faustEditorModule };
+
+  return buildJantixStore<typeof modules>(modules);
+};
