@@ -8,7 +8,7 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = { version = "=0.2.58", features = ["nightly"] }
+wasm-bindgen = { version = "=0.2.59", features = ["nightly"] }
 rand = "0.7.3"
 rand_pcg = "0.2.1"
 slab = "0.4"
@@ -17,7 +17,7 @@ base64 = "0.11.0"
 bincode = "1.2"
 serde = "1.0.104"
 serde_derive = "1.0.104"
-serde_json = "1.0.45"
+serde_json = "1.0.48"
 wasm-logger = "0.2.0"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
