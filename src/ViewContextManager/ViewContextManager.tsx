@@ -72,7 +72,7 @@ export const ViewContextManager: React.FC<{
       <ViewContextIcon
         displayName='Reset View Context Manager'
         onClick={engine.reset_vcm}
-        style={{ backgroundColor: '#730505' }}
+        style={{ backgroundColor: '#730505', justifyContent: 'space-around' }}
         name='Delete'
       >
         X
@@ -80,7 +80,7 @@ export const ViewContextManager: React.FC<{
       <ViewContextIcon
         displayName='Start Audio'
         onClick={() => new AudioContext().resume()}
-        style={{ backgroundColor: 'rgb(26, 130, 24)' }}
+        style={{ backgroundColor: 'rgb(26, 130, 24)', justifyContent: 'space-around' }}
         name='Start Audio'
       >
         …
@@ -88,7 +88,7 @@ export const ViewContextManager: React.FC<{
       <ViewContextIcon
         displayName='Start Audio'
         onClick={() => setVolumeSliderOpen(true)}
-        style={{ backgroundColor: 'rgb(47, 77, 121)' }}
+        style={{ backgroundColor: 'rgb(47, 77, 121)', justifyContent: 'space-around' }}
         name='Start Audio'
       >
         <>
@@ -103,6 +103,7 @@ export const ViewContextManager: React.FC<{
           {...props}
           key={props.name}
           onClick={() => engine.create_view_context(props.name)}
+          style={{ justifyContent: 'space-around' }}
         />
       ))}
 
@@ -170,7 +171,7 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
       key={uuid}
       style={{
         ...styles.viewContextTab,
-        backgroundColor: active ? 'DarkOrchid' : undefined,
+        backgroundColor: active ? 'rgb(86, 30, 86)' : undefined,
       }}
       onClick={() => {
         if (!active) {

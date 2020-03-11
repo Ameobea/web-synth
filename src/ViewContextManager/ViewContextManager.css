@@ -16,35 +16,38 @@
 .view-context-icon {
   display: flex;
   align-items: center;
-  justify-content: space-around;
   margin-bottom: 4px;
   height: 32px;
   width: 32px;
   color: #bababa;
-  border: 1px solid #aaa;
+  border: 1px solid #7e7e7e;
   cursor: pointer;
-  background-color: rgb(1, 94, 116);
+  background-color: #283538;
   font-size: 13.5px;
 }
 
 input.view-context-switcher-tab-renamer {
   width: 90%;
-  background-color: darkmagenta;
+  background-color: #3d273d;
   color: #efe;
   margin-right: 5%;
   margin-left: 5%;
-  border: 1px solid #ccc;
+  border: 1px solid #7e7e7e;
   height: 70%;
   margin-bottom: 5%;
   margin-top: 5%;
 }
 
 .vc-close-tab-icon {
-  color: darkred;
+  color: #971010;
   font-size: 20px;
-  font-family: 'Oxygen Mono';
+  font-family: 'Hack', 'Oxygen Mono', monospace;
   margin-right: 4px;
   margin-left: 3px;
+}
+
+.vc-close-tab-icon:hover {
+  font-weight: bolder;
 }
 
 .vc-switcher-tab-title {
@@ -52,6 +55,8 @@ input.view-context-switcher-tab-renamer {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  text-align: center;
 }
 
 /* Taken from https://stackoverflow.com/a/29888724 */

@@ -1,4 +1,4 @@
-#![feature(box_syntax, test, slice_patterns, thread_local, nll)]
+#![feature(box_syntax, test, thread_local, nll)]
 #![allow(clippy::float_cmp, clippy::needless_range_loop, clippy::manual_memcpy)]
 
 extern crate base64;

@@ -16,6 +16,7 @@ import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { tryParseJson } from 'src/util';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import { getEngine } from 'src';
+import FlatButton from 'src/misc/FlatButton';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
@@ -43,18 +44,30 @@ const mapStateToProps = (state: ReduxStore) => ({
   isLoaded: state.viewContextManager.isLoaded,
 });
 
-const handleNodeSelectAction = (smallViewDOMId: string, lgNode: any, isNowSelected: boolean) => {
+const handleNodeSelectAction = ({
+  smallViewDOMId,
+  lgNode,
+  setSelectedNodeVCID,
+  isNowSelected,
+}: {
+  smallViewDOMId: string;
+  lgNode: any;
+  setSelectedNodeVCID: (id: string | null) => void;
+  isNowSelected: boolean;
+}) => {
   if (lgNode instanceof LGAudioConnectables) {
     (isNowSelected ? getEngine()!.render_small_view : getEngine()!.cleanup_small_view)(
       (lgNode as any).id,
       smallViewDOMId
     );
+    setSelectedNodeVCID((lgNode as any).id);
   } else if (lgNode.type.startsWith('customAudio')) {
     const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
     if (!lgNode.connectables.node[functionKey]) {
       return;
     }
     lgNode.connectables.node[functionKey](smallViewDOMId);
+    setSelectedNodeVCID(null);
   }
 };
 
@@ -67,6 +80,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [lGraphInstance, setLGraphInstance] = useState<null | any>(null);
+  const [selectedNodeVCID, setSelectedNodeVCID] = useState<string | null>(null);
   const curSelectedNode = useRef<any>(null);
 
   const smallViewDOMId = `small-view-dom-id_${stateKey}`;
@@ -86,9 +100,19 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
 
       canvas.onNodeSelected = node => {
         if (curSelectedNode.current) {
-          handleNodeSelectAction(smallViewDOMId, curSelectedNode.current, false);
+          handleNodeSelectAction({
+            smallViewDOMId,
+            lgNode: curSelectedNode.current,
+            setSelectedNodeVCID,
+            isNowSelected: false,
+          });
         }
-        handleNodeSelectAction(smallViewDOMId, node, true);
+        handleNodeSelectAction({
+          smallViewDOMId,
+          lgNode: node,
+          setSelectedNodeVCID,
+          isNowSelected: true,
+        });
         curSelectedNode.current = node;
       };
 
@@ -155,6 +179,11 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
           <Button label='arrange' action={uiControls.arrange} />
         </ControlPanel>
 
+        {selectedNodeVCID ? (
+          <FlatButton onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}>
+            Show Full UI
+          </FlatButton>
+        ) : null}
         <div
           style={{ display: 'flex', flex: 1, height: '100%', backgroundColor: '#111', width: 500 }}
           id={smallViewDOMId}

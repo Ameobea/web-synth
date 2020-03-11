@@ -87,3 +87,11 @@ a {
 a:visited {
   color: #a89984;
 }
+
+button {
+  background-color: rgb(54, 54, 54);
+  color: rgb(161, 161, 161);
+  border: none;
+  outline: 1px transparent;
+  font-family: 'Hack', monspace;
+}
