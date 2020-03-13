@@ -94,4 +94,5 @@ button {
   border: none;
   outline: 1px transparent;
   font-family: 'Hack', monspace;
+  cursor: pointer;
 }

@@ -1,4 +1,4 @@
-#![feature(thread_local)]
+#![feature(box_syntax, thread_local)]
 
 use std::{mem, ptr};
 

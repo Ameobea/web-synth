@@ -1,28 +1,14 @@
 #![feature(box_syntax, test, thread_local, nll)]
 #![allow(clippy::float_cmp, clippy::needless_range_loop, clippy::manual_memcpy)]
 
-extern crate base64;
-extern crate bincode;
-extern crate common;
-extern crate fnv;
-extern crate rand;
-extern crate rand_pcg;
-extern crate serde;
-extern crate slab;
-extern crate test;
 extern crate wasm_bindgen;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 #[macro_use]
 extern crate log;
-extern crate polysynth;
-extern crate uuid;
 
-use std::{mem, ptr, str::FromStr, sync::Once};
+use std::{ptr, str::FromStr};
 
-use rand::prelude::*;
-use rand_pcg::Pcg32;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
@@ -42,47 +28,15 @@ use crate::{
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
 
-static ONCE: Once = Once::new();
-
 /// Retrieves the global `ViewContextManager` for the application
 pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEXT_MANAGER } }
-
-pub fn init_rng() {
-    // Initialize the global PRNG
-    unsafe {
-        // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
-        // some actual RNG from JS so that things aren't deterministic.
-        RNG = Box::into_raw(box Pcg32::new(
-            if cfg!(target_os = "wasm32") {
-                mem::transmute(js::js_random())
-            } else {
-                0xcafef00dd15ea5e5
-            },
-            721_347_520_420_481_703,
-        ))
-    }
-
-    // Pump it a few times because it seems to generate a fully null output the first time
-    let _: usize = rng().gen();
-    let _: usize = rng().gen();
-}
 
 /// Entrypoint for the application.  This function is called from the JS side as soon as the Wasm
 /// blob is loaded.  It handles setting up application state, rendering the initial UI, and loading
 /// the last saved composition from the user.
 #[wasm_bindgen]
 pub fn init() {
-    ONCE.call_once(|| {
-        console_error_panic_hook::set_once();
-        init_rng();
-
-        let log_level = if cfg!(debug_assertions) {
-            log::Level::Trace
-        } else {
-            log::Level::Info
-        };
-        wasm_logger::init(wasm_logger::Config::new(log_level));
-    });
+    common::maybe_init();
 
     // Check if we have an existing VCM and drop it if we do
     if unsafe { !VIEW_CONTEXT_MANAGER.is_null() } {
@@ -105,6 +59,7 @@ pub fn init() {
 #[wasm_bindgen]
 pub fn create_view_context(vc_name: String) {
     let uuid = uuid_v4();
+    debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
     let mut view_context = build_view(&vc_name, None, uuid);
     view_context.init();
     let vcm = get_vcm();
