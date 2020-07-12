@@ -11,9 +11,9 @@ crate-type = ["cdylib", "rlib"]
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
 uuid = { version = "0.8", features = ["serde"] }
-wasm-bindgen = { version = "=0.2.59", optional = true }
+wasm-bindgen = { version = "=0.2.64", optional = true }
 wasm-logger = "0.2"
-wasm-bindgen-futures = { version = "0.4.9", optional = true }
+wasm-bindgen-futures = { version = "0.4.14", optional = true }
 common = { path = "../common", optional = true }
 console_error_panic_hook = "0.1.6"
 js-sys = "^0.3.36"

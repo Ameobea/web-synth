@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 lazy_static = "1.4.0"
 palette = "0.5"
-wasm-bindgen = "=0.2.59"
+wasm-bindgen = "=0.2.64"
 wasm-logger = "0.2.0"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
@@ -20,6 +20,6 @@ console_error_panic_hook = "0.1.6"
 common = { path = "../common" }
 
 [build-dependencies]
-serde = "1.0.102"
-serde_derive = "1.0.102"
-serde_json = "1.0.41"
+serde = "1.0.114"
+serde_derive = "1.0.114"
+serde_json = "1.0.56"

@@ -8,18 +8,18 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bincode = "1.2"
+bincode = "1.3"
 console_error_panic_hook = "0.1.6"
 futures = "0.3"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-serde = "1.0.104"
-serde_derive = "1.0.104"
-serde_json = "1.0.48"
-js-sys = "0.3.36"
-wasm-bindgen = "=0.2.59"
+serde = "1.0.114"
+serde_derive = "1.0.114"
+serde_json = "1.0.56"
+js-sys = "0.3.41"
+wasm-bindgen = "=0.2.64"
 wasm-logger = "0.2"
-wasm-bindgen-futures = "0.4.9"
+wasm-bindgen-futures = "0.4.14"
 
 polysynth = { path = "../polysynth" }
 
