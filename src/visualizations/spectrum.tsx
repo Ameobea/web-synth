@@ -48,7 +48,7 @@ export const SpectrumVisualization: React.FC<{
 
   useOnce(async () => {
     const [spectrumVizRawModule, spectrumVizModule] = await Promise.all([
-      import('src/spectrum_viz_bg'),
+      import('src/spectrum_viz_bg.wasm' as any) as Promise<{ memory: WebAssembly.Memory }>,
       import('src/spectrum_viz'),
     ] as const);
     spectrumModule.current = spectrumVizModule;

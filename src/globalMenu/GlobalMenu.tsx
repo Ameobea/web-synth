@@ -17,11 +17,10 @@ const mapGlobalMenuStateToProps = ({ viewContextManager }: ReduxStore) => ({
   allViewContextIds: viewContextManager.activeViewContexts.map(R.prop('uuid')),
 });
 
-const GlobalMenuInner: React.FC<
-  { closeMenu: () => void; engine: typeof import('../engine') } & ReturnType<
-    typeof mapGlobalMenuStateToProps
-  >
-> = ({ closeMenu, engine, allViewContextIds }) => (
+const GlobalMenuInner: React.FC<{
+  closeMenu: () => void;
+  engine: typeof import('../engine');
+} & ReturnType<typeof mapGlobalMenuStateToProps>> = ({ closeMenu, engine, allViewContextIds }) => (
   <div className='global-menu' role='menu'>
     <GlobalMenuItem
       onClick={() => {

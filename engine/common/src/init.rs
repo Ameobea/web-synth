@@ -21,7 +21,7 @@ pub fn init_rng() {
         // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
         // some actual RNG from JS so that things aren't deterministic.
         RNG = Box::into_raw(box Pcg32::new(
-            if cfg!(target_os = "wasm32") {
+            if cfg!(target_arch = "wasm32") {
                 mem::transmute(random())
             } else {
                 0xcafef00dd15ea5e5

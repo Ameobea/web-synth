@@ -23,7 +23,7 @@ const SYNTH_SETTINGS = [
   {
     type: 'range',
     label: 'volume',
-    min: 0,
+    min: -1,
     initial: 0.1,
     max: 1,
     step: 0.008,

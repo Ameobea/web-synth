@@ -23,7 +23,7 @@ export interface ADSRValues {
 }
 
 export const defaultAdsrEnvelope: ADSRValues = {
-  attack: { pos: 0.04, magnitude: 0.8 },
+  attack: { pos: 0.04, magnitude: 0.35 },
   decay: { pos: 0.14, magnitude: 0.35 },
   release: { pos: 0.9, magnitude: 0.35 },
 };

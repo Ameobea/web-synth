@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { connect, Provider } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
+import { PropTypesOf } from 'ameo-utils';
 
 import { EffectType } from 'src/redux/modules/synthDesigner';
 import { buildEffect } from 'src/synthDesigner/effects';
@@ -12,13 +13,12 @@ import {
   get_synth_designer_audio_connectables,
   SynthDesignerReduxInfra,
 } from 'src/synthDesigner';
+import { ReduxStore, store } from 'src/redux';
+import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { updateConnectables } from 'src/patchNetwork';
 import SynthModuleComp from './SynthModule';
 import EffectModuleComp from './effects/Effect';
 import './SynthDesigner.scss';
-import { ReduxStore, store } from 'src/redux';
-import { PropTypesOf } from 'ameo-utils';
-import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;

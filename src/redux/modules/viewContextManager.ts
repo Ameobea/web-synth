@@ -225,6 +225,7 @@ const actionGroups = {
         ...connections,
         [from, to] as [ConnectableDescriptor, ConnectableDescriptor],
       ];
+      console.log({ connections, newConnections });
 
       const engine = getEngine();
       if (!engine) {
@@ -436,9 +437,7 @@ const actionGroups = {
             return (
               oldInputConnectable &&
               oldInputConnectable.node !==
-                Option.of(newConnectablesForNode.inputs.get(to.name))
-                  .map(R.prop('node'))
-                  .orNull()
+                Option.of(newConnectablesForNode.inputs.get(to.name)).map(R.prop('node')).orNull()
             );
           }
         })();

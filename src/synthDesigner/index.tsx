@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { Try, Option } from 'funfix-core';
 import { buildStore } from 'jantix';
 import { reducer as formReducer } from 'redux-form';
-import { Map } from 'immutable';
+import { Map as ImmMap } from 'immutable';
 
 import {
   SynthDesignerState,
@@ -15,7 +15,7 @@ import {
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import synthDesignerModule from 'src/redux/modules/synthDesigner';
-import { buildMIDINode } from 'src/patchNetwork/midiNode';
+import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
 import { midiToFrequency } from 'src/util';
 
 const buildSynthDesignerRedux = () => {
@@ -37,7 +37,7 @@ const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 /**
  * Global map of state key to Redux infrastructure
  */
-let STATE_MAP: Map<string, ReturnType<typeof buildSynthDesignerRedux>> = Map();
+let STATE_MAP: ImmMap<string, ReturnType<typeof buildSynthDesignerRedux>> = ImmMap();
 
 export const getReduxInfra = (stateKey: string) => {
   const reduxInfra = STATE_MAP.get(stateKey);
@@ -148,32 +148,9 @@ export const cleanup_synth_designer = (stateKey: string): string => {
   return designerState;
 };
 
-type ArgumentsOf<F> = F extends (...args: infer Args) => any ? Args : never;
+const midiNodeCache: Map<string, MIDINode> = new Map();
 
-function memoizeOne<F extends (...args: any[]) => any>(
-  fn: F
-): (...args: ArgumentsOf<F>) => ReturnType<F> {
-  let lastArgs: any[] | null = null;
-  let lastRes: ReturnType<F>;
-
-  const memoized = (...args: ArgumentsOf<F>): ReturnType<F> => {
-    if (
-      lastArgs !== null &&
-      args.length === lastArgs.length &&
-      args.forEach((arg, i) => arg === lastArgs![i])
-    ) {
-      return lastRes;
-    }
-
-    lastArgs = args;
-    lastRes = fn(...args);
-    return lastRes;
-  };
-
-  return memoized;
-}
-
-const memoizedGetMidiNode = memoizeOne((stateKey: string) => {
+const getMidiNodeInner = (stateKey: string): MIDINode => {
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return buildMIDINode(() => ({
@@ -189,7 +166,18 @@ const memoizedGetMidiNode = memoizeOne((stateKey: string) => {
     onClearAll: (stopPlayingNotes: boolean) =>
       dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS(stopPlayingNotes)),
   }));
-});
+};
+
+const getMidiNode = (stateKey: string) => {
+  const cached = midiNodeCache.get(stateKey);
+  if (cached) {
+    return cached;
+  }
+
+  const node = getMidiNodeInner(stateKey);
+  midiNodeCache.set(stateKey, node);
+  return node;
+};
 
 export const getVoicePreset = (stateKey: string, synthIx: number) => {
   const voiceState = getReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];
@@ -216,10 +204,10 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
               node: synth.filterCSNs.detune.offset,
               type: 'number',
             }),
-        Map<string, ConnectableInput>()
+        ImmMap<string, ConnectableInput>()
       )
-      .set('midi', { node: memoizedGetMidiNode(stateKey), type: 'midi' }),
-    outputs: Map<string, ConnectableOutput>().set('masterOutput', {
+      .set('midi', { node: getMidiNode(stateKey), type: 'midi' }),
+    outputs: ImmMap<string, ConnectableOutput>().set('masterOutput', {
       node: spectrumNode,
       type: 'customAudio',
     }),

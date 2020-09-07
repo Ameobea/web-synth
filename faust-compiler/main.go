@@ -420,6 +420,8 @@ func main() {
 		port = "4565"
 	}
 
+	println("Listening on port", port)
+
 	err = http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatalf("Error listening on port: %s", err)

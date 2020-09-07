@@ -10,7 +10,7 @@ import ControlPanel, { Button } from 'react-control-panel';
 
 import { registerAllCustomNodes } from './nodes';
 import './GraphEditor.scss';
-import { ReduxStore } from 'src/redux';
+import { getState, ReduxStore } from 'src/redux';
 import { connect } from 'react-redux';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { tryParseJson } from 'src/util';
@@ -56,17 +56,30 @@ const handleNodeSelectAction = ({
   isNowSelected: boolean;
 }) => {
   if (lgNode instanceof LGAudioConnectables) {
+    const node = getState().viewContextManager.activeViewContexts.find(
+      vc => vc.uuid === (lgNode as any).id
+    );
+    if (!node) {
+      return;
+    }
+
     (isNowSelected ? getEngine()!.render_small_view : getEngine()!.cleanup_small_view)(
       (lgNode as any).id,
       smallViewDOMId
     );
     setSelectedNodeVCID((lgNode as any).id);
   } else if (lgNode.type.startsWith('customAudio')) {
-    const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
-    if (!lgNode.connectables.node[functionKey]) {
-      return;
+    const node = getState().viewContextManager.activeViewContexts.find(
+      vc => vc.uuid === (lgNode as any).id
+    );
+    if (node) {
+      const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
+      if (!lgNode.connectables.node[functionKey]) {
+        return;
+      }
+      lgNode.connectables.node[functionKey](smallViewDOMId);
     }
-    lgNode.connectables.node[functionKey](smallViewDOMId);
+
     setSelectedNodeVCID(null);
   }
 };
@@ -140,11 +153,14 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
     if (!lGraphInstance || !isLoaded) {
       return;
     }
-    const state = tryParseJson<{ nodes: { id: string | number; pos: [number, number] }[] }, null>(
-      localStorage[stateKey],
-      null,
-      'Error parsing serialized LiteGraph state'
-    );
+    const state =
+      localStorage[stateKey] && localStorage[stateKey].length > 0
+        ? tryParseJson<{ nodes: { id: string | number; pos: [number, number] }[] }, null>(
+            localStorage[stateKey],
+            null,
+            'Error parsing serialized LiteGraph state'
+          )
+        : null;
     if (!state) {
       return;
     }
