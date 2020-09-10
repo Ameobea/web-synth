@@ -225,7 +225,6 @@ const actionGroups = {
         ...connections,
         [from, to] as [ConnectableDescriptor, ConnectableDescriptor],
       ];
-      console.log({ connections, newConnections });
 
       const engine = getEngine();
       if (!engine) {

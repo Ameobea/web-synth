@@ -144,6 +144,7 @@ export class LFONode implements ForeignNode {
     };
   }
 
+  // These are set dynamically at initialization time in the constructor
   public renderSmallView: ForeignNode['renderSmallView'];
   public cleanupSmallView: ForeignNode['cleanupSmallView'];
 }

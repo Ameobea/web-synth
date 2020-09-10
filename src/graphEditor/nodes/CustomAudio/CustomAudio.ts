@@ -30,6 +30,7 @@ import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtil
 import { getState } from 'src/redux';
 import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
 import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
+import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 
 const ctx = new AudioContext();
 
@@ -369,7 +370,7 @@ export const audioNodeGetters: {
   'customAudio/audioClip': {
     nodeGetter: (vcId, params) => new CustomAudioBufferSourceNode(ctx, vcId, params),
     protoParams: {
-      onDropFile: function(...args: unknown[]) {
+      onDropFile: function (...args: unknown[]) {
         console.log('Dropped file: ', this, ...args);
       },
     },
@@ -383,7 +384,7 @@ export const audioNodeGetters: {
   'customAudio/mixer': {
     nodeGetter: (vcId: string, params) => new MixerNode(ctx, vcId, params),
     protoParams: {
-      onDrawForeground: function(this: any, _ctx: CanvasRenderingContext2D) {
+      onDrawForeground: function (this: any, _ctx: CanvasRenderingContext2D) {
         // TODO
       },
     },
@@ -391,13 +392,13 @@ export const audioNodeGetters: {
   'customAudio/MIDIInput': {
     nodeGetter: (vcId: string, params) => new MIDIInputNode(ctx, vcId, params),
     protoParams: {
-      onDrawForeground: function(this: MIDIInputNode, _ctx: CanvasRenderingContext2D) {
+      onDrawForeground: function (this: MIDIInputNode, _ctx: CanvasRenderingContext2D) {
         // TODO: Render a button that, when clicked, updates the list of available MIDI editors
       },
-      onAddedCustom: function(this: any) {
+      onAddedCustom: function (this: any) {
         this.connectables.node.updateInputs();
       },
-      onPropertyChanged: function(
+      onPropertyChanged: function (
         this: { connectables: AudioConnectables },
         name: string,
         value: any
@@ -423,6 +424,9 @@ export const audioNodeGetters: {
   'customAudio/wavetable': {
     nodeGetter: (vcId, params) => new WaveTable(ctx, vcId, params),
   },
+  'customAudio/envelopeGenerator': {
+    nodeGetter: (vcId, params) => new EnvelopeGenerator(ctx, vcId, params),
+  },
 };
 
 const registerCustomAudioNode = (
@@ -440,7 +444,7 @@ const registerCustomAudioNode = (
     }
   }
 
-  CustomAudioNode.prototype.onAdded = function(this: any) {
+  CustomAudioNode.prototype.onAdded = function (this: any) {
     if (R.isNil(this.id)) {
       throw new Error('`id` was nil in `CustomAudioNode`');
     }
@@ -507,7 +511,7 @@ const registerCustomAudioNode = (
     }
   };
 
-  CustomAudioNode.prototype.onRemoved = function(this: any) {
+  CustomAudioNode.prototype.onRemoved = function (this: any) {
     if (!this.ignoreRemove) {
       removeNode(this.id.toString());
     }

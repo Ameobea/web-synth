@@ -20,7 +20,7 @@ export function LGAudioConnectables(this: any) {
   this.ctx = new AudioContext();
 }
 
-LGAudioConnectables.prototype.setConnectables = function(
+LGAudioConnectables.prototype.setConnectables = function (
   this: any,
   connectables: AudioConnectables
 ) {
@@ -52,7 +52,7 @@ LGAudioConnectables.prototype.setConnectables = function(
   });
 };
 
-LGAudioConnectables.prototype.onPropertyChanged = function(name: string, value: any) {
+LGAudioConnectables.prototype.onPropertyChanged = function (name: string, value: any) {
   const connectable = (this.connectables as AudioConnectables).inputs.get(name);
   if (!connectable) {
     console.error(`No input named "${name}" found on connectables for node`);
@@ -65,7 +65,7 @@ LGAudioConnectables.prototype.onPropertyChanged = function(name: string, value: 
   connectable.node.value = value;
 };
 
-LGAudioConnectables.prototype.onConnectionsChange = function(
+LGAudioConnectables.prototype.onConnectionsChange = function (
   this: { graph: LiteGraphType },
   _connection: 1 | 2,
   _slot: number,

@@ -69,14 +69,15 @@ const handleNodeSelectAction = ({
     );
     setSelectedNodeVCID((lgNode as any).id);
   } else if (lgNode.type.startsWith('customAudio')) {
-    const node = getState().viewContextManager.activeViewContexts.find(
-      vc => vc.uuid === (lgNode as any).id
+    const node = getState().viewContextManager.patchNetwork.connectables.find(
+      connectable => connectable.vcId === (lgNode as any).id
     );
     if (node) {
       const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
       if (!lgNode.connectables.node[functionKey]) {
         return;
       }
+
       lgNode.connectables.node[functionKey](smallViewDOMId);
     }
 

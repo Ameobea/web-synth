@@ -15,7 +15,7 @@ import {
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import synthDesignerModule from 'src/redux/modules/synthDesigner';
-import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
+import { buildMIDINode, MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { midiToFrequency } from 'src/util';
 
 const buildSynthDesignerRedux = () => {
@@ -148,36 +148,33 @@ export const cleanup_synth_designer = (stateKey: string): string => {
   return designerState;
 };
 
-const midiNodeCache: Map<string, MIDINode> = new Map();
+const midiInputCbCache: Map<string, MIDIInputCbs> = new Map();
 
-const getMidiNodeInner = (stateKey: string): MIDINode => {
-  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+const getMidiNode = (stateKey: string): MIDINode =>
+  buildMIDINode(() => {
+    const cached = midiInputCbCache.get(stateKey);
+    if (cached) {
+      return cached;
+    }
 
-  return buildMIDINode(() => ({
-    onAttack: (note: number, voiceIx: number, _velocity: number, offset?: number) =>
-      dispatch(
-        actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx, undefined, offset)
-      ),
-    onRelease: (_note: number, voiceIx: number, _velocity: number, offset?: number) =>
-      dispatch(actionCreators.synthDesigner.UNGATE(voiceIx, undefined, offset)),
-    onPitchBend: () => {
-      // No-op; TODO?
-    },
-    onClearAll: (stopPlayingNotes: boolean) =>
-      dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS(stopPlayingNotes)),
-  }));
-};
+    const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
-const getMidiNode = (stateKey: string) => {
-  const cached = midiNodeCache.get(stateKey);
-  if (cached) {
-    return cached;
-  }
-
-  const node = getMidiNodeInner(stateKey);
-  midiNodeCache.set(stateKey, node);
-  return node;
-};
+    const inner = {
+      onAttack: (note: number, voiceIx: number, _velocity: number, offset?: number) =>
+        dispatch(
+          actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx, undefined, offset)
+        ),
+      onRelease: (_note: number, voiceIx: number, _velocity: number, offset?: number) =>
+        dispatch(actionCreators.synthDesigner.UNGATE(voiceIx, undefined, offset)),
+      onPitchBend: () => {
+        // No-op; TODO?
+      },
+      onClearAll: (stopPlayingNotes: boolean) =>
+        dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS(stopPlayingNotes)),
+    };
+    midiInputCbCache.set(stateKey, inner);
+    return inner;
+  });
 
 export const getVoicePreset = (stateKey: string, synthIx: number) => {
   const voiceState = getReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];

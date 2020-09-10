@@ -8,7 +8,7 @@ export class ADSRModule extends ConstantSourceNode {
   public minValue: number;
   public maxValue: number;
   private lengthMs: number;
-  private envelope: ADSRValues = defaultAdsrEnvelope;
+  public envelope: ADSRValues = defaultAdsrEnvelope;
 
   constructor(
     ctx: AudioContext,
