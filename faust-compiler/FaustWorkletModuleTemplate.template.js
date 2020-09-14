@@ -235,7 +235,9 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
       // Copy inputs into the Wasm heap
       const inputChannel0 = inputs[i][0];
       const dspInput = this.dspInChannels[i];
-      dspInput.set(inputChannel0);
+      if (inputChannel0) {
+        dspInput.set(inputChannel0);
+      }
     }
 
     // Compute on the Faust/Wasm side

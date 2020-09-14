@@ -4,6 +4,7 @@ import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap } from 'src/faustEditor';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { updateConnectables } from 'src/patchNetwork';
 
 /**
  * Structure of the JSON stored in `localStorage` for the Faust editor.
@@ -30,7 +31,7 @@ export const buildDefaultFaustEditorPolyphonyState = (): FaustEditorPolyphonySta
 
 export interface FaustEditorState {
   instance: FaustWorkletNode | null;
-  ControlPanelComponent?: React.ComponentType<{}>;
+  ControlPanelComponent?: React.ComponentType;
   editorContent: string;
   isHidden: boolean;
   polyphonyState: FaustEditorPolyphonyState;

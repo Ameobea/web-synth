@@ -219,6 +219,19 @@ impl ViewContextManager {
     /// Initializes the VCM with the default view context and state from scratch
     fn init_default_state(&mut self) {
         let uuid = uuid_v4();
+        let mut graph_editor_view_context = build_view("graph_editor", None, uuid);
+        graph_editor_view_context.init();
+        graph_editor_view_context.hide();
+        self.add_view_context_inner(
+            MinimalViewContextDefinition {
+                uuid,
+                name: "graph_editor".into(),
+                title: Some("Graph Editor".into()),
+            },
+            graph_editor_view_context,
+        );
+
+        let uuid = uuid_v4();
         // Create a MIDI Editor view context
         let mut view_context = build_view("midi_editor", None, uuid);
         view_context.init();
@@ -227,9 +240,22 @@ impl ViewContextManager {
             MinimalViewContextDefinition {
                 uuid,
                 name: "midi_editor".into(),
-                title: None,
+                title: Some("MIDI Editor".into()),
             },
             view_context,
+        );
+
+        let uuid = uuid_v4();
+        let mut synth_designer_context = build_view("synth_designer", None, uuid);
+        synth_designer_context.init();
+        synth_designer_context.hide();
+        self.add_view_context_inner(
+            MinimalViewContextDefinition {
+                uuid,
+                name: "synth_designer".into(),
+                title: Some("Synth Designer".into()),
+            },
+            synth_designer_context,
         );
 
         // Create a Faust Editor view context
@@ -247,15 +273,58 @@ impl ViewContextManager {
             MinimalViewContextDefinition {
                 uuid,
                 name: "faust_editor".into(),
-                title: None,
+                title: Some("Faust Editor".into()),
             },
             view_context,
         );
-
         let faust_editor_content = include_str!("../../static/rain.dsp");
         js::set_localstorage_key(&state_key, faust_editor_content);
 
-        self.active_context_ix = 1;
+        let destination_id = 1;
+        self.foreign_connectables.push(ForeignConnectable {
+            _type: "customAudio/destination".into(),
+            id: destination_id.to_string(),
+            serialized_state: None,
+        });
+
+        // Connect the MIDI editor to the Synth Designer and the Synth Designer to the Faust Editor
+        let (midi_id, synth_id, faust_id) = (
+            self.contexts[1].definition.uuid,
+            self.contexts[2].definition.uuid,
+            self.contexts[3].definition.uuid,
+        );
+        self.connections.push((
+            ConnectionDescriptor {
+                vc_id: midi_id.to_string(),
+                name: "midi_output".into(),
+            },
+            ConnectionDescriptor {
+                vc_id: synth_id.to_string(),
+                name: "midi".into(),
+            },
+        ));
+        self.connections.push((
+            ConnectionDescriptor {
+                vc_id: synth_id.to_string(),
+                name: "masterOutput".into(),
+            },
+            ConnectionDescriptor {
+                vc_id: faust_id.to_string(),
+                name: "input".into(),
+            },
+        ));
+        self.connections.push((
+            ConnectionDescriptor {
+                vc_id: faust_id.to_string(),
+                name: "output".into(),
+            },
+            ConnectionDescriptor {
+                vc_id: destination_id.to_string(),
+                name: "input".into(),
+            },
+        ));
+
+        self.active_context_ix = 0;
     }
 
     fn load_vcm_state() -> Option<ViewContextManagerState> {

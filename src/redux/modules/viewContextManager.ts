@@ -69,7 +69,7 @@ export const commitForeignConnectables = (
         if (!node) {
           throw new Error("Foreign connectables didn't have a `node`");
         } else if (Number.isNaN(+vcId)) {
-          throw new Error(`Foreign connectable with non-numerator \`vcId\` found: "${vcId}"`);
+          throw new Error(`Foreign connectable with non-numeric \`vcId\` found: "${vcId}"`);
         }
 
         return {

@@ -103,7 +103,7 @@ export const init_midi_editor_ui = (vcId: string) => {
       midiNode.outputCbs.forEach(outputCbs => outputCbs.onClearAll(...args));
     },
     onPitchBend: (..._args) => {
-      throw new UnimplementedError();
+      // throw new UnimplementedError();
     },
   }));
   midiEditorState.inputMIDINode = inputMIDINode;

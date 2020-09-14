@@ -87,19 +87,16 @@ const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: Redux
 /**
  * Creates a control panel that contains controls for browsing + loading shared/saved effects
  */
-const EffectsPickerPanelInnerInner: React.FC<{
-  state: { [key: string]: any };
-  setState: (newState: object) => void;
-  loadEffect: (effect: Effect) => void;
-} & ReturnType<typeof mapEffectsPickerPanelStateToProps>> = ({
-  state,
-  setState,
-  loadEffect,
-  effects,
-}) => (
+const EffectsPickerPanelInnerInner: React.FC<
+  {
+    state: { [key: string]: any };
+    setState: (newState: any) => void;
+    loadEffect: (effect: Effect) => void;
+  } & ReturnType<typeof mapEffectsPickerPanelStateToProps>
+> = ({ state, setState, loadEffect, effects }) => (
   <ControlPanel
     state={state}
-    onChange={(_label: string, _newValue: any, newState: object) => setState(newState)}
+    onChange={(_label: string, _newValue: any, newState: any) => setState(newState)}
     position={{ bottom: 60, right: 8 }}
     draggable
   >
@@ -197,7 +194,7 @@ export const mkCompileButtonClickHandler = ({
   setErrMessage('');
 
   faustNode.connect(analyzerNode);
-  const cachedInputNames = [...(faustNode.parameters as Map<string, AudioParam>).keys()];
+  const inputNames = [...(faustNode.parameters as Map<string, AudioParam>).keys()];
 
   const context = faustEditorContextMap[vcId];
   if (!context) {
@@ -205,7 +202,7 @@ export const mkCompileButtonClickHandler = ({
   }
   faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode };
   context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(cachedInputNames)
+    context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(inputNames)
   );
 
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created

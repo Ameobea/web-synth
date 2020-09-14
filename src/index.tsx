@@ -14,7 +14,7 @@ let engineHandle: typeof import('./engine');
 
 export const getEngine = (): typeof import('./engine') | undefined => engineHandle;
 
-const createViewContextManager = (engine: typeof import('./engine')) => {
+const createViewContextManagerUI = (engine: typeof import('./engine')) => {
   ReactDOM.render(
     <Provider store={store}>
       <ViewContextManager engine={engine} />
@@ -113,6 +113,6 @@ if (typeof AudioWorkletNode === 'undefined') {
       engine.handle_window_close();
     });
 
-    createViewContextManager(engine);
+    createViewContextManagerUI(engine);
   });
 }
