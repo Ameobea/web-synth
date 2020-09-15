@@ -9,7 +9,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     return [
       {
         name: 'frequency',
-        defaultValue: 440,
+        defaultValue: 0,
         automationRate: 'a-rate',
       },
       ...Array(MAX_DIMENSION_COUNT)
@@ -92,7 +92,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
   }
 
   process(_inputs, outputs, params) {
-    if (!this.waveTableHandlePtr) {
+    if (!this.waveTableHandlePtr || params.frequency.every(f => f === 0)) {
       return true;
     }
 

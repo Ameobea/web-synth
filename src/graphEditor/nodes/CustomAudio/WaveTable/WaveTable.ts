@@ -5,6 +5,7 @@ import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 // Manually generate some waveforms... for science
 
@@ -50,10 +51,48 @@ for (let i = 0; i < waveformLength; i++) {
   bufs[3][i] = periodIxFract * 2 - 1;
 }
 
+export const getDefaultWavetableDef = () => [
+  [bufs[0], bufs[1]],
+  [bufs[2], bufs[3]],
+];
+
+let wavetableWasmBytes: ArrayBuffer | null = null;
+
+const getWavetableWasmBytes = async () => {
+  if (wavetableWasmBytes) {
+    return wavetableWasmBytes;
+  }
+
+  const bytes = await fetch('./wavetable.wasm').then(res => res.arrayBuffer());
+  wavetableWasmBytes = bytes;
+  return bytes;
+};
+
+let wavetableWasmInstance: WebAssembly.Instance | null;
+export const getWavetableWasmInstance = async () => {
+  if (wavetableWasmInstance) {
+    return wavetableWasmInstance;
+  }
+
+  const bytes = await getWavetableWasmBytes();
+  const mod = await WebAssembly.compile(bytes);
+  const inst = await WebAssembly.instantiate(mod);
+  wavetableWasmInstance = inst;
+  return wavetableWasmInstance;
+};
+export const getWavetableWasmInstancePreloaded = () => {
+  if (!wavetableWasmInstance) {
+    throw new UnreachableException('Tried to access wavetable Wasm instance before it was loaded');
+  }
+  return wavetableWasmInstance;
+};
+
 export default class WaveTable implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string;
-  private workletHandle: AudioWorkletNode | undefined;
+  public workletHandle: AudioWorkletNode | undefined;
+  private wavetableDef: Float32Array[][] = getDefaultWavetableDef();
+  private onInitialized?: (inst: WaveTable) => void;
 
   public name = 'Wave Table Synthesizer';
   public nodeType = 'customAudio/wavetable';
@@ -66,6 +105,15 @@ export default class WaveTable implements ForeignNode {
     this.ctx = ctx;
     this.vcId = vcId;
 
+    if (params?.wavetableDef) {
+      this.wavetableDef = params.wavetableDef;
+    } else if (params?.encodedWavetableDef) {
+      throw new UnimplementedError();
+    }
+    if (params?.onInitialized) {
+      this.onInitialized = params.onInitialized;
+    }
+
     this.initWorklet().then(workletHandle => {
       this.paramOverrides = this.buildParamOverrides(workletHandle);
 
@@ -73,7 +121,13 @@ export default class WaveTable implements ForeignNode {
         this.deserialize(params);
       }
 
-      updateConnectables(this.vcId, this.buildConnectables());
+      if (this.vcId.length > 0) {
+        updateConnectables(this.vcId, this.buildConnectables());
+      }
+
+      if (this.onInitialized) {
+        this.onInitialized(this);
+      }
     });
   }
 
@@ -134,30 +188,23 @@ export default class WaveTable implements ForeignNode {
   }
 
   private async initWaveTable() {
-    // TODO: Retrieve all of this from UI or inputs or whatever.
-    const wavetableDef = [
-      [bufs[0], bufs[1]],
-      [bufs[2], bufs[3]],
-    ];
-
-    const dimensionCount = 2;
-    const waveformsPerDimension = 2;
+    const dimensionCount = this.wavetableDef.length;
+    const waveformsPerDimension = this.wavetableDef[0].length;
     const samplesPerDimension = waveformLength * waveformsPerDimension;
 
     const tableSamples = new Float32Array(dimensionCount * waveformsPerDimension * waveformLength);
     for (let dimensionIx = 0; dimensionIx < dimensionCount; dimensionIx++) {
       for (let waveformIx = 0; waveformIx < waveformsPerDimension; waveformIx++) {
         for (let sampleIx = 0; sampleIx < waveformLength; sampleIx++) {
-          tableSamples[samplesPerDimension * dimensionIx + waveformLength * waveformIx + sampleIx] =
-            wavetableDef[dimensionIx][waveformIx][sampleIx];
+          tableSamples[
+            samplesPerDimension * dimensionIx + waveformLength * waveformIx + sampleIx
+          ] = this.wavetableDef[dimensionIx][waveformIx][sampleIx];
         }
       }
     }
 
-    const moduleBytes = await fetch('./wavetable.wasm').then(res => res.arrayBuffer());
-
     this.workletHandle!.port.postMessage({
-      arrayBuffer: moduleBytes,
+      arrayBuffer: await getWavetableWasmBytes(),
       waveformsPerDimension,
       dimensionCount,
       waveformLength,

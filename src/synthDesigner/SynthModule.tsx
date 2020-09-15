@@ -62,17 +62,13 @@ const mapStateToProps = (state: ReduxStore) => ({
   voicePresetIds: voicePresetIdsSelector(state),
 });
 
-const SynthModuleCompInner: React.FC<{
-  index: number;
-  synth: SynthModule;
-  stateKey: string;
-} & ReturnType<typeof mapStateToProps>> = ({
-  index,
-  synth,
-  stateKey,
-  children = null,
-  voicePresetIds,
-}) => {
+const SynthModuleCompInner: React.FC<
+  {
+    index: number;
+    synth: SynthModule;
+    stateKey: string;
+  } & ReturnType<typeof mapStateToProps>
+> = ({ index, synth, stateKey, children = null, voicePresetIds }) => {
   const controlPanelContext = useRef<{ preset: string } | null>(null);
   const unison = synth.voices[0].oscillators.length;
 
@@ -98,7 +94,7 @@ const SynthModuleCompInner: React.FC<{
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'waveform': {
-              dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val));
+              dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val, dispatch));
               break;
             }
             case 'unison': {
@@ -185,7 +181,11 @@ const SynthModuleCompInner: React.FC<{
                 }
 
                 dispatch(
-                  actionCreators.synthDesigner.SET_VOICE_STATE(index, preset ? preset.body : null)
+                  actionCreators.synthDesigner.SET_VOICE_STATE(
+                    index,
+                    preset ? preset.body : null,
+                    dispatch
+                  )
                 );
               },
             },

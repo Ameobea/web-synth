@@ -18,6 +18,7 @@ export default class DummyNode extends GainNode implements AudioNode, MIDINode {
     onAttack: noop,
     onRelease: noop,
     onPitchBend: noop,
+    onClearAll: noop,
   });
 
   public connect(destinationNode: any) {

@@ -14,9 +14,9 @@ export interface SynthPresetEntry {
 
 export interface SynthPreset {}
 
-export interface StandardSynthVoicePreset extends ReturnType<typeof serializeSynthModule> {
+export type StandardSynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
   type: 'standard';
-}
+};
 
 export interface WaveTableSynthVoicePreset {
   type: 'wavetable';
