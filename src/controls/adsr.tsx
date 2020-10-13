@@ -101,7 +101,11 @@ const ADSRControls: React.FC<ADSRControlPropTypes> = ({
   const svgElement = useRef<null | SVGSVGElement>(null);
 
   return (
-    <svg style={{ backgroundColor: '#222', width, height, ...style }} ref={svgElement}>
+    <svg
+      className='adsr-viz'
+      style={{ backgroundColor: '#222', width, height, ...style }}
+      ref={svgElement}
+    >
       <ADSRSegment
         x1={0}
         y1={height}
