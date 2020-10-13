@@ -70,6 +70,8 @@ jobs:
         run: yarn
       - name: Build all wasm + javascript
         run: just build-all
+        env:
+          FAUST_COMPILER_ENDPOINT: 'https://faust.p.ameo.design'
 
       - name: Upload built site as artifacts
         uses: actions/upload-artifact@v1

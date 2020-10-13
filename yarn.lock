@@ -5387,10 +5387,10 @@ jake@^10.6.1:
     filelist "^1.0.1"
     minimatch "^3.0.4"
 
-jantix@^0.2.0:
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/jantix/-/jantix-0.2.0.tgz#6e2f41dc1c29c3c3f772ff9e0d1430c3bfbc6c95"
-  integrity sha512-nz+LG/6slgkF0TJF731oDz7cYWbclMj1sGCKGm1SyDsSmPyowrTWKjYd5Vpo/n/DAnjK1SJ9glt3LM0Ie4RLdw==
+jantix@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/jantix/-/jantix-0.3.0.tgz#376bd7bf1a2b3fa636fac8678035c70bacde6d08"
+  integrity sha512-cm8yNNZ+1BPWvrtIi5qPekemRJMsJxZW60wNmOKQwmrTxGmE70a4WUMpLrzqsNNmpVMJNRIW7Jq0YchfYSyc1w==
 
 jest-worker@^26.5.0:
   version "26.5.0"
