@@ -21,7 +21,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v1
         with:
-          node-version: '13.1'
+          node-version: '14.5'
 
       # Caching
       # \/ Disabled due to (what sems to be) a bug in the `actions/cache` action (issue filed)
