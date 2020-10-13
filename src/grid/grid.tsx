@@ -65,7 +65,9 @@ export const init_grid = (vcId: string) => {
   foregroundCanvas.addEventListener('mousemove', evt =>
     engine.handle_mouse_move(evt.pageX, evt.pageY - CONTENT_OFFSET_TOP + scrollOffset())
   );
-  foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX));
+  foregroundCanvas.addEventListener('wheel', evt => engine.handle_mouse_wheel(evt.deltaX), {
+    passive: true,
+  });
   foregroundCanvas.addEventListener('contextmenu', evt => evt.preventDefault());
 
   document.body.addEventListener('mouseleave', evt => {

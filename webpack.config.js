@@ -62,4 +62,7 @@ module.exports = {
     port: 9000,
     contentBase: './public/',
   },
+  experiments: {
+    syncWebAssembly: true,
+  },
 };

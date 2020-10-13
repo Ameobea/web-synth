@@ -31,6 +31,7 @@ export type MIDIAccess = PromiseResolveType<ReturnType<typeof navigator['request
 
 export const buildMIDINode = (getInputCbs: MIDINode['getInputCbs']): MIDINode => {
   let outputCbs: ReturnType<MIDINode['getInputCbs']>[] = [];
+  let cachedInputCbs: ReturnType<typeof getInputCbs> | null = null;
 
   return {
     outputCbs,
@@ -58,6 +59,12 @@ export const buildMIDINode = (getInputCbs: MIDINode['getInputCbs']): MIDINode =>
         console.warn("Tried to disconnect two MIDI nodes but they weren't connected");
       }
     },
-    getInputCbs,
+    getInputCbs: () => {
+      if (!cachedInputCbs) {
+        cachedInputCbs = getInputCbs();
+      }
+
+      return cachedInputCbs;
+    },
   };
 };
