@@ -62,7 +62,9 @@ export const init_synth_designer = (stateKey: string) => {
       .map(
         ({ synths, ...rest }) =>
           ({
-            synths: synths.map(deserializeSynthModule),
+            synths: (synths as any[]).map((synth, i) =>
+              deserializeSynthModule(synth, reduxInfra.dispatch, i)
+            ),
             spectrumNode: new AnalyserNode(new AudioContext()),
             ...rest,
             isHidden: false,

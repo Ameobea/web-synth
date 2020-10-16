@@ -9,8 +9,9 @@ import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { SynthVoicePreset } from 'src/redux/modules/presets';
 import WaveTable, {
   getDefaultWavetableDef,
-  getWavetableWasmInstancePreloaded,
+  getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
+import { base64ArrayBuffer } from 'src/util';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
   synthModule.voices.forEach(voice => voice.outerGainNode.disconnect());
@@ -209,9 +210,19 @@ const packWavetableDefs = (
   samplesPerWaveform: number;
   packed: Float32Array;
 } => {
-  const packed = new Float32Array();
+  const totalSize = wavetableDefs.reduce(
+    (acc, dim) => dim.reduce((acc, waveform) => acc + waveform.length, acc),
+    0
+  );
+  const packed = new Float32Array(totalSize);
 
-  wavetableDefs.forEach(dim => dim.forEach(waveform => packed.set(waveform, packed.length)));
+  let totalSet = 0;
+  wavetableDefs.forEach(dim =>
+    dim.forEach(waveform => {
+      packed.set(waveform, totalSet);
+      totalSet += waveform.length;
+    })
+  );
 
   return {
     dimensionCount: wavetableDefs.length,
@@ -232,15 +243,10 @@ export const serializeSynthModule = (synth: SynthModule) => ({
         packed,
       } = packWavetableDefs(wavetableDefs);
 
-      console.log(getWavetableWasmInstancePreloaded().exports);
-      return {
-        encodedWavetableDef: getWavetableWasmInstancePreloaded().exports.encode_wavetable_def(
-          dimensionCount,
-          waveformsPerDimension,
-          samplesPerWaveform,
-          packed
-        ),
-      };
+      const encodedWavetableDef = `${dimensionCount}_${waveformsPerDimension}_${samplesPerWaveform}_${base64ArrayBuffer(
+        packed.buffer
+      )}`;
+      return { encodedWavetableDef };
     })
     .orNull(),
   waveform: synth.waveform,
@@ -413,6 +419,9 @@ export const deserializeSynthModule = (
     ...buildDefaultWavetableConfig(),
     ...baseWavetableConfig,
   };
+  if (baseWavetableConfig?.encodedWavetableDef) {
+    delete wavetableConf.wavetableDef;
+  }
 
   const voices = base.voices.map((voice, voiceIx) => {
     voice.oscillators.forEach(osc => {
@@ -555,6 +564,9 @@ const actionGroups = {
       dispatch,
     }),
     subReducer: (state: SynthDesignerState, { index, waveform, dispatch }): SynthDesignerState => {
+      // We need to make sure this is loaded for later when we save
+      getWavetableWasmInstance().then(console.log);
+
       const targetSynth = getSynth(index, state.synths);
 
       if (targetSynth.waveform === waveform) {

@@ -6,6 +6,7 @@ import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/pat
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { base64ToArrayBuffer } from 'src/util';
 
 // Manually generate some waveforms... for science
 
@@ -58,17 +59,29 @@ export const getDefaultWavetableDef = () => [
 
 let wavetableWasmBytes: ArrayBuffer | null = null;
 
+let getBytesPromise: Promise<ArrayBuffer> | null = null;
 const getWavetableWasmBytes = async () => {
   if (wavetableWasmBytes) {
     return wavetableWasmBytes;
+  } else if (getBytesPromise) {
+    return getBytesPromise;
   }
 
-  const bytes = await fetch('./wavetable.wasm').then(res => res.arrayBuffer());
+  getBytesPromise = fetch('./wavetable.wasm').then(res => res.arrayBuffer());
+
+  const bytes = await getBytesPromise;
   wavetableWasmBytes = bytes;
+
+  // Lazily initialize the wavetable instance as well
+  if (wavetableWasmInstance === undefined) {
+    wavetableWasmInstance = null;
+    setTimeout(getWavetableWasmInstance);
+  }
+
   return bytes;
 };
 
-let wavetableWasmInstance: WebAssembly.Instance | null;
+let wavetableWasmInstance: WebAssembly.Instance | undefined | null;
 export const getWavetableWasmInstance = async () => {
   if (wavetableWasmInstance) {
     return wavetableWasmInstance;
@@ -108,7 +121,86 @@ export default class WaveTable implements ForeignNode {
     if (params?.wavetableDef) {
       this.wavetableDef = params.wavetableDef;
     } else if (params?.encodedWavetableDef) {
-      throw new UnimplementedError();
+      enum ParsingState {
+        DimCount,
+        WaveformsPerDimension,
+        SamplesPerWaveform,
+        Done,
+      }
+
+      let dimensionCount = '';
+      let waveformsPerDimension = '';
+      let samplesPerWaveform = '';
+      let curIx = 0;
+      let curParsingState = ParsingState.DimCount;
+
+      while (true) {
+        const char: string = params.encodedWavetableDef[curIx];
+        curIx += 1;
+        if (char === '_') {
+          switch (curParsingState) {
+            case ParsingState.DimCount:
+              curParsingState = ParsingState.WaveformsPerDimension;
+              break;
+            case ParsingState.WaveformsPerDimension:
+              curParsingState = ParsingState.SamplesPerWaveform;
+              break;
+            case ParsingState.SamplesPerWaveform:
+              curParsingState = ParsingState.Done;
+              break;
+            default:
+              throw new UnreachableException();
+          }
+          if (curParsingState === ParsingState.Done) {
+            break;
+          }
+          continue;
+        }
+
+        switch (curParsingState) {
+          case ParsingState.DimCount:
+            dimensionCount += char;
+            break;
+          case ParsingState.WaveformsPerDimension:
+            waveformsPerDimension += char;
+            break;
+          case ParsingState.SamplesPerWaveform:
+            samplesPerWaveform += char;
+            break;
+          default:
+            throw new UnreachableException();
+        }
+      }
+
+      const dimensionCountNum = +dimensionCount;
+      const waveformsPerDimensionNum = +waveformsPerDimension;
+      const samplesPerWaveformNum = +samplesPerWaveform;
+
+      if (
+        Number.isNaN(dimensionCountNum) ||
+        Number.isNaN(waveformsPerDimensionNum) ||
+        Number.isNaN(samplesPerWaveformNum)
+      ) {
+        throw new Error('Invalid/Corrupt encoded wavetable data');
+      }
+
+      const encodedPacked = params.encodedWavetableDef.slice(curIx);
+      const packed = new Float32Array(base64ToArrayBuffer(encodedPacked));
+      const samplesPerDimension = +waveformsPerDimension * +samplesPerWaveform;
+
+      const wavetableDef: Float32Array[][] = [];
+      for (let dimIx = 0; dimIx < +dimensionCount; dimIx++) {
+        wavetableDef.push([]);
+        for (let waveformIx = 0; waveformIx < waveformsPerDimensionNum; waveformIx++) {
+          wavetableDef[dimIx].push(new Float32Array(samplesPerWaveformNum));
+          for (let sampleIx = 0; sampleIx < samplesPerWaveformNum; sampleIx++) {
+            wavetableDef[dimIx][waveformIx][sampleIx] =
+              packed[dimIx * samplesPerDimension + waveformIx * samplesPerWaveformNum + sampleIx];
+          }
+        }
+      }
+
+      this.wavetableDef = wavetableDef;
     }
     if (params?.onInitialized) {
       this.onInitialized = params.onInitialized;

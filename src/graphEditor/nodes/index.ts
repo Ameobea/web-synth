@@ -21,7 +21,10 @@ export const registerAllCustomNodes = R.once(async () => {
     | undefined = getState().effects.sharedEffects;
 
   if (availableModules) {
-    availableModules = await fetchEffects();
+    availableModules = await fetchEffects().catch(error => {
+      console.error('Error fetching effects: ', error);
+      return [];
+    });
   }
 
   registerFaustNode(availableModules);

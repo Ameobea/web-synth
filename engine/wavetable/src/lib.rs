@@ -226,8 +226,3 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
 
     sample_buf_ptr
 }
-
-#[no_mangle]
-pub fn drop_wavetable_handle(handle_ptr: *mut WaveTableHandle) {
-    drop(unsafe { Box::from_raw(handle_ptr) })
-}
