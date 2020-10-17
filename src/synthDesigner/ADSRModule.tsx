@@ -9,6 +9,7 @@ export class ADSRModule extends ConstantSourceNode {
   public maxValue: number;
   private lengthMs: number;
   public envelope: ADSRValues = defaultAdsrEnvelope;
+  private mostRecentGateTime: number | null = null;
 
   constructor(
     ctx: AudioContext,
@@ -49,6 +50,7 @@ export class ADSRModule extends ConstantSourceNode {
    * underlying `ConstantSourceNode` and effecting all connected `AudioParam`s
    */
   public gate(offset?: number) {
+    this.mostRecentGateTime = this.ctx.currentTime;
     // start out off at the minimum
     if (R.isNil(offset)) {
       this.offset.cancelScheduledValues(0);
@@ -77,7 +79,7 @@ export class ADSRModule extends ConstantSourceNode {
    * Triggers the start of the release.  This will override all other envelope ramp events that are currently queued
    * and start ramping to zero immediately.
    */
-  public ungate(offset?: number) {
+  public ungate(offset?: number, onReleaseFinished?: () => void) {
     const range = this.maxValue - this.minValue;
     const { release, decay } = this.envelope;
 
@@ -97,5 +99,19 @@ export class ADSRModule extends ConstantSourceNode {
       this.minValue,
       this.ctx.currentTime + releaseDuration + Option.of(offset).getOrElse(0)
     );
+
+    if (onReleaseFinished) {
+      const prevMostRecentGateTime = this.mostRecentGateTime;
+      setTimeout(() => {
+        // If a new attack has been triggered before the previous release finished, don't call
+        // the onReleaseFinished cb
+        if (this.mostRecentGateTime !== prevMostRecentGateTime) {
+          return;
+        }
+
+        onReleaseFinished();
+        // Add some extra time to avoid imprecision caused by settimeout
+      }, (releaseDuration + Option.of(offset).getOrElse(0)) * 1000 + 2500);
+    }
   }
 }

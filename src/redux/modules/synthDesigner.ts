@@ -8,6 +8,7 @@ import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { SynthVoicePreset } from 'src/redux/modules/presets';
 import WaveTable, {
+  decodeWavetableDef,
   getDefaultWavetableDef,
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
@@ -245,6 +246,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
         } = packWavetableDefs(wavetableDefs);
 
         const encodedWavetableDef = base64ArrayBuffer(packed.buffer);
+
         return {
           encodedWavetableDef,
           dimensionCount: dimensionCount,
@@ -437,7 +439,7 @@ export const deserializeSynthModule = (
     ...baseWavetableConfig,
   };
   if (baseWavetableConfig?.encodedWavetableDef) {
-    delete wavetableConf.wavetableDef;
+    baseWavetableConfig.wavetableDef = decodeWavetableDef(baseWavetableConfig as any);
   }
 
   const voices = base.voices.map((voice, voiceIx) => {
@@ -582,7 +584,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { index, waveform, dispatch }): SynthDesignerState => {
       // We need to make sure this is loaded for later when we save
-      getWavetableWasmInstance().then(console.log);
+      getWavetableWasmInstance();
 
       const targetSynth = getSynth(index, state.synths);
 
@@ -616,6 +618,8 @@ const actionGroups = {
                 frequency: 0,
               }!
             );
+          } else {
+            setTimeout(() => dispatch({ type: 'CONNECT_WAVETABLE', synthIx: index, voiceIx }));
           }
         });
 
@@ -831,10 +835,26 @@ const actionGroups = {
           const targetVoice = voices[voiceIx];
 
           // Trigger release of gain and filter ADSRs
-          targetVoice.gainADSRModule.ungate(offset);
+          targetVoice.gainADSRModule.ungate(offset, () => {
+            // Setting the frequency to 0 is an optimization that causes the worklet to avoid having to do
+            // any processing when the synth is not playing
+            targetVoice.wavetable?.paramOverrides.frequency.override.offset.setValueAtTime(
+              0,
+              Option.of(offset)
+                .map(offset => ctx.currentTime + offset)
+                .getOrElse(ctx.currentTime)
+            );
+          });
           targetVoice.filterADSRModule.ungate(offset);
+        });
+      } else {
+        const targetSynth = getSynth(synthIx, state.synths);
+        const targetVoice = targetSynth.voices[voiceIx];
 
-          // TODO: Do this more gracefully
+        // Trigger release of gain and filter ADSRs
+        targetVoice.gainADSRModule.ungate(offset, () => {
+          // Setting the frequency to 0 is an optimization that causes the worklet to avoid having to do
+          // any processing when the synth is not playing
           targetVoice.wavetable?.paramOverrides.frequency.override.offset.setValueAtTime(
             0,
             Option.of(offset)
@@ -842,21 +862,7 @@ const actionGroups = {
               .getOrElse(ctx.currentTime)
           );
         });
-      } else {
-        const targetSynth = getSynth(synthIx, state.synths);
-        const targetVoice = targetSynth.voices[voiceIx];
-
-        // Trigger release of gain and filter ADSRs
-        targetVoice.gainADSRModule.ungate(offset);
         targetVoice.filterADSRModule.ungate(offset);
-
-        // TODO: Do this more gracefully
-        targetVoice.wavetable?.paramOverrides.frequency.override.offset.setValueAtTime(
-          0,
-          Option.of(offset)
-            .map(offset => ctx.currentTime + offset)
-            .getOrElse(ctx.currentTime)
-        );
       }
 
       return state;
