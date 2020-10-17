@@ -4,7 +4,6 @@
  */
 
 import React, { useRef, Fragment, SVGAttributes } from 'react';
-
 import { Value } from 'react-control-panel';
 
 import { clamp, roundTo } from '../util';
@@ -80,14 +79,14 @@ interface ADSRSegmentProps {
 }
 
 const ADSRSegment = ({ x1, y1, x2, y2, height }: ADSRSegmentProps) => (
-  <Fragment>
+  <>
     <path
       d={`M${x1} ${height} L${x1} ${y1} L${x2} ${y2} L${x2} ${height} Z`}
       fill='#498'
       stroke='rgba(100,200,150,124)'
     />
     <line x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: '#ccc' }} />
-  </Fragment>
+  </>
 );
 
 const ADSRControls: React.FC<ADSRControlPropTypes> = ({

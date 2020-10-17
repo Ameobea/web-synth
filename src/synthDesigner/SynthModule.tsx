@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useMemo, useRef } from 'react';
 import { connect, Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
-import { PropTypesOf } from 'ameo-utils';
+import { PropTypesOf, UnreachableException } from 'ameo-utils';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
@@ -73,6 +73,20 @@ const SynthModuleCompInner: React.FC<
   const unison = synth.voices[0].oscillators.length;
 
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
+  const wavetableUIState = useMemo(() => {
+    if (!synth.wavetableConf) {
+      return null;
+    }
+
+    const acc = synth.wavetableConf.intraDimMixes.reduce((acc, mix, dimIx) => {
+      acc[`intra_dim_${dimIx}_mix`] = mix;
+      return acc;
+    }, {} as { [key: string]: number });
+    return synth.wavetableConf.interDimMixes.reduce((acc, mix, dimIx) => {
+      acc[`inter_dim_${dimIx}_mix`] = mix;
+      return acc;
+    }, acc);
+  }, [synth.wavetableConf]);
 
   return (
     <div className='synth-module'>
@@ -131,6 +145,45 @@ const SynthModuleCompInner: React.FC<
         )}
         style={{ width: 378 }}
       />
+
+      {synth.waveform === 'wavetable' ? (
+        <ControlPanel
+          title='WAVETABLE'
+          settings={[
+            ...synth.wavetableConf!.intraDimMixes.map((_mix, dimIx) => ({
+              type: 'range',
+              min: 0,
+              max: 1,
+              label: `intra_dim_${dimIx}_mix`,
+            })),
+            ...synth.wavetableConf!.interDimMixes.map((_mix, dimIx) => ({
+              type: 'range',
+              min: 0,
+              max: 1,
+              label: `inter_dim_${dimIx}_mix`,
+            })),
+          ]}
+          onChange={(key: string, val: any) => {
+            if (key.startsWith('intra_dim_')) {
+              const dimIx = +key.split('intra_dim_')[1].split('_mix')[0];
+              dispatch({ type: 'SET_WAVETABLE_INTRA_DIM_MIX', synthIx: index, dimIx, mix: val });
+              return;
+            } else if (key.startsWith('inter_dim_')) {
+              const baseDimIx = +key.split('inter_dim_')[1].split('_mix')[0];
+              dispatch({
+                type: 'SET_WAVETABLE_INTER_DIM_MIX',
+                synthIx: index,
+                baseDimIx,
+                mix: val,
+              });
+              return;
+            }
+
+            throw new UnreachableException(`Unhandled wavetable key: ${key}`);
+          }}
+          state={wavetableUIState}
+        />
+      ) : null}
 
       <FilterModule
         synthIx={index}

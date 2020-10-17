@@ -235,19 +235,26 @@ const packWavetableDefs = (
 export const serializeSynthModule = (synth: SynthModule) => ({
   unison: synth.voices[0].oscillators.length,
   wavetableConfig: Option.of(synth.wavetableConf?.wavetableDef)
-    .map(wavetableDefs => {
-      const {
-        dimensionCount,
-        waveformsPerDimension,
-        samplesPerWaveform,
-        packed,
-      } = packWavetableDefs(wavetableDefs);
+    .map(
+      (wavetableDefs): Omit<WavetableConfig, 'onInitialized'> => {
+        const {
+          dimensionCount,
+          waveformsPerDimension,
+          samplesPerWaveform,
+          packed,
+        } = packWavetableDefs(wavetableDefs);
 
-      const encodedWavetableDef = `${dimensionCount}_${waveformsPerDimension}_${samplesPerWaveform}_${base64ArrayBuffer(
-        packed.buffer
-      )}`;
-      return { encodedWavetableDef };
-    })
+        const encodedWavetableDef = base64ArrayBuffer(packed.buffer);
+        return {
+          encodedWavetableDef,
+          dimensionCount: dimensionCount,
+          waveformsPerDimension,
+          samplesPerWaveform,
+          intraDimMixes: synth.wavetableConf!.intraDimMixes,
+          interDimMixes: synth.wavetableConf!.interDimMixes,
+        };
+      }
+    )
     .orNull(),
   waveform: synth.waveform,
   detune: synth.detune,
@@ -379,10 +386,20 @@ interface WavetableConfig {
   wavetableDef?: Float32Array[][];
   // This is a Base64-encoded representation of the wavetable's constituent waveforms.  It can be decoded using a Wasm function.
   encodedWavetableDef?: string;
+  dimensionCount: number;
+  waveformsPerDimension: number;
+  samplesPerWaveform: number;
+  intraDimMixes: number[];
+  interDimMixes: number[];
 }
 
 const buildDefaultWavetableConfig = (): WavetableConfig => ({
+  dimensionCount: 2,
+  waveformsPerDimension: 2,
+  samplesPerWaveform: 1470,
   wavetableDef: getDefaultWavetableDef(),
+  intraDimMixes: [0, 0],
+  interDimMixes: [0],
 });
 
 export const deserializeSynthModule = (
@@ -1195,6 +1212,59 @@ const actionGroups = {
       }
 
       return state;
+    },
+  }),
+  SET_WAVETABLE_INTRA_DIM_MIX: buildActionGroup({
+    actionCreator: (synthIx: number, dimIx: number, mix: number) => ({
+      type: 'SET_WAVETABLE_INTRA_DIM_MIX',
+      synthIx,
+      dimIx,
+      mix,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, dimIx, mix }) => {
+      const synth = getSynth(synthIx, state.synths);
+      synth.voices.forEach(voice => {
+        if (!voice.wavetable) {
+          console.error('Tried to set wavetable dim mix for voice without wavetable');
+          return;
+        }
+
+        const mixParam = voice.wavetable.paramOverrides[`dimension_${dimIx}_mix`];
+        mixParam.override.offset.setValueAtTime(mix, ctx.currentTime);
+      });
+
+      return setSynth(
+        synthIx,
+        R.set(R.lensPath(['wavetableConf', 'intraDimMixes', dimIx]), mix, synth),
+        state
+      );
+    },
+  }),
+  SET_WAVETABLE_INTER_DIM_MIX: buildActionGroup({
+    actionCreator: (synthIx: number, baseDimIx: number, mix: number) => ({
+      type: 'SET_WAVETABLE_INTER_DIM_MIX',
+      synthIx,
+      baseDimIx,
+      mix,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, baseDimIx, mix }) => {
+      const synth = getSynth(synthIx, state.synths);
+      synth.voices.forEach(voice => {
+        if (!voice.wavetable) {
+          console.error('Tried to set wavetable dim mix for voice without wavetable');
+          return;
+        }
+
+        const mixParam =
+          voice.wavetable.paramOverrides[`dimension_${baseDimIx}x${baseDimIx + 1}_mix`];
+        mixParam.override.offset.setValueAtTime(mix, ctx.currentTime);
+      });
+
+      return setSynth(
+        synthIx,
+        R.set(R.lensPath(['wavetableConf', 'interDimMixes', baseDimIx]), mix, synth),
+        state
+      );
     },
   }),
 };

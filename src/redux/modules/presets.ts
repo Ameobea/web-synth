@@ -18,10 +18,10 @@ export type StandardSynthVoicePreset = ReturnType<typeof serializeSynthModule> &
   type: 'standard';
 };
 
-export interface WaveTableSynthVoicePreset {
+export type WaveTableSynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
   type: 'wavetable';
   // TODO
-}
+};
 
 export type SynthVoicePreset = StandardSynthVoicePreset | WaveTableSynthVoicePreset;
 

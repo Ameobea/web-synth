@@ -5,7 +5,7 @@ import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { UnreachableException } from 'ameo-utils';
 import { base64ToArrayBuffer } from 'src/util';
 
 // Manually generate some waveforms... for science
@@ -121,60 +121,9 @@ export default class WaveTable implements ForeignNode {
     if (params?.wavetableDef) {
       this.wavetableDef = params.wavetableDef;
     } else if (params?.encodedWavetableDef) {
-      enum ParsingState {
-        DimCount,
-        WaveformsPerDimension,
-        SamplesPerWaveform,
-        Done,
-      }
-
-      let dimensionCount = '';
-      let waveformsPerDimension = '';
-      let samplesPerWaveform = '';
-      let curIx = 0;
-      let curParsingState = ParsingState.DimCount;
-
-      while (true) {
-        const char: string = params.encodedWavetableDef[curIx];
-        curIx += 1;
-        if (char === '_') {
-          switch (curParsingState) {
-            case ParsingState.DimCount:
-              curParsingState = ParsingState.WaveformsPerDimension;
-              break;
-            case ParsingState.WaveformsPerDimension:
-              curParsingState = ParsingState.SamplesPerWaveform;
-              break;
-            case ParsingState.SamplesPerWaveform:
-              curParsingState = ParsingState.Done;
-              break;
-            default:
-              throw new UnreachableException();
-          }
-          if (curParsingState === ParsingState.Done) {
-            break;
-          }
-          continue;
-        }
-
-        switch (curParsingState) {
-          case ParsingState.DimCount:
-            dimensionCount += char;
-            break;
-          case ParsingState.WaveformsPerDimension:
-            waveformsPerDimension += char;
-            break;
-          case ParsingState.SamplesPerWaveform:
-            samplesPerWaveform += char;
-            break;
-          default:
-            throw new UnreachableException();
-        }
-      }
-
-      const dimensionCountNum = +dimensionCount;
-      const waveformsPerDimensionNum = +waveformsPerDimension;
-      const samplesPerWaveformNum = +samplesPerWaveform;
+      const dimensionCountNum = +params.dimensionCount;
+      const waveformsPerDimensionNum = +params.waveformsPerDimension;
+      const samplesPerWaveformNum = +params.samplesPerWaveform;
 
       if (
         Number.isNaN(dimensionCountNum) ||
@@ -184,12 +133,11 @@ export default class WaveTable implements ForeignNode {
         throw new Error('Invalid/Corrupt encoded wavetable data');
       }
 
-      const encodedPacked = params.encodedWavetableDef.slice(curIx);
-      const packed = new Float32Array(base64ToArrayBuffer(encodedPacked));
-      const samplesPerDimension = +waveformsPerDimension * +samplesPerWaveform;
+      const packed = new Float32Array(base64ToArrayBuffer(params.encodedWavetableDef));
+      const samplesPerDimension = waveformsPerDimensionNum * samplesPerWaveformNum;
 
       const wavetableDef: Float32Array[][] = [];
-      for (let dimIx = 0; dimIx < +dimensionCount; dimIx++) {
+      for (let dimIx = 0; dimIx < dimensionCountNum; dimIx++) {
         wavetableDef.push([]);
         for (let waveformIx = 0; waveformIx < waveformsPerDimensionNum; waveformIx++) {
           wavetableDef[dimIx].push(new Float32Array(samplesPerWaveformNum));
@@ -202,6 +150,7 @@ export default class WaveTable implements ForeignNode {
 
       this.wavetableDef = wavetableDef;
     }
+
     if (params?.onInitialized) {
       this.onInitialized = params.onInitialized;
     }
@@ -270,6 +219,24 @@ export default class WaveTable implements ForeignNode {
         this.paramOverrides[key].override.offset.value = val;
       }
     });
+
+    if (params.intraDimMixes) {
+      (params.intraDimMixes as number[]).forEach((mix, dimIx) => {
+        this.paramOverrides[`dimension_${dimIx}_mix`].override.offset.setValueAtTime(
+          mix,
+          this.ctx.currentTime
+        );
+      });
+    }
+
+    if (params.interDimMixes) {
+      (params.interDimMixes as number[]).forEach((mix, i) => {
+        this.paramOverrides[`dimension_${i}x${i + 1}_mix`].override.offset.setValueAtTime(
+          mix,
+          this.ctx.currentTime
+        );
+      });
+    }
   }
 
   public serialize() {
