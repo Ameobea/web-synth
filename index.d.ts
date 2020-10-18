@@ -33,3 +33,5 @@ declare const process: {
     [key: string]: string;
   };
 };
+
+declare function dbg<T>(arg: T): T;

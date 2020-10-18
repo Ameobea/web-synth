@@ -1,6 +1,11 @@
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
+(window as any).dbg = <T>(arg: T) => {
+  console.log(arg);
+  return arg;
+};
+
 /**
  * Swaps out the auido node for an instance with a new one.  Disconnects the old one from all inputs and outputs and
  * then connects the new one in the same way.  If the node passes through inputs or the override can be set by the
@@ -75,19 +80,20 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
    * The `AudioParam` that we are handling inputs for.
    */
   public wrappedParam: AudioParam;
+  public outputCSN: ConstantSourceNode | null = null;
   /**
    * The `AudioNode` that is treated as the override for anything connected to this node.
    */
   public manualControl: ConstantSourceNode;
   /**
-   * If `true`, then `manualControl` is connecte to `wrappedParam`.  If `false`, then anything connected to this
+   * If `true`, then `manualControl` is connected to `wrappedParam`.  If `false`, then anything connected to this
    * node itself is passed through to `wrappedParam`.
    */
   private isOverridden: boolean;
 
   constructor(
     ctx: AudioContext,
-    wrappedParam: AudioParam,
+    wrappedParam?: AudioParam,
     manualControl?: ConstantSourceNode,
     defaultOverridden = true
   ) {
@@ -97,14 +103,14 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     this.gain.value = 1;
     this.ctx = ctx;
 
-    this.wrappedParam = wrappedParam;
+    this.wrappedParam = wrappedParam || this.buildWrappedParam();
     this.manualControl = manualControl || this.buildManualControl();
 
     this.isOverridden = defaultOverridden;
     if (defaultOverridden) {
-      this.manualControl.connect(wrappedParam);
+      this.manualControl.connect(this.wrappedParam);
     } else {
-      this.connect(wrappedParam);
+      this.connect(this.wrappedParam);
     }
   }
 
@@ -115,8 +121,18 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     return manualControl;
   };
 
+  private buildWrappedParam = () => {
+    const node = new ConstantSourceNode(this.ctx);
+    node.offset.value = 0;
+    node.start();
+    this.outputCSN = node;
+    return node.offset;
+  };
+
   /**
    * Sets whether the output of `manualControl` or the inputs to this node itself are passed through to `wrappedParam`.
+   *
+   * This is called automatically by the VCM when dis/connecting `OverridableAudioParam`s that are managed by it.
    *
    * @param isOverridden If `true`, then the output of `manualControl` will be passed through to `wrappedParam`.  If
    * `false`, then whatever is connected to this node itself will be passed through to `wrappedParam`.
@@ -134,6 +150,16 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     } else {
       this.manualControl.disconnect(this.wrappedParam);
       this.connect(this.wrappedParam);
+    }
+  }
+
+  public dispose() {
+    this.disconnect();
+    if (this.isOverridden) {
+      this.manualControl.disconnect(this.wrappedParam);
+    }
+    if (this.outputCSN) {
+      this.outputCSN.disconnect();
     }
   }
 }

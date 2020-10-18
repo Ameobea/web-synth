@@ -108,7 +108,14 @@ const SynthModuleCompInner: React.FC<
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'waveform': {
-              dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val, dispatch));
+              dispatch(
+                actionCreators.synthDesigner.SET_WAVEFORM(
+                  index,
+                  val,
+                  dispatch,
+                  stateKey.split('_')[1]
+                )
+              );
               break;
             }
             case 'unison': {

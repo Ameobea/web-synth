@@ -57,9 +57,8 @@ export class MIDIToFrequencyNode {
         }
       }
     },
-    onPitchBend: bendAmount => {
-      // TODO
-      console.log({ bendAmount });
+    onPitchBend: _bendAmount => {
+      // no-op
     },
     onClearAll: (_stopPlayingNotes: boolean) => {
       this.gateCSN.offset.cancelScheduledValues(0);

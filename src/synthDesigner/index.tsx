@@ -11,6 +11,7 @@ import {
   serializeSynthModule,
   deserializeSynthModule,
   getInitialSynthDesignerState,
+  Waveform,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -190,21 +191,33 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
   return {
     vcId: stateKey.split('_')[1]!,
     inputs: synths
-      .reduce(
-        (acc, synth, i) =>
-          acc
-            .set(`synth_${i}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
-            .set(`synth_${i}_filter_frequency`, {
-              node: synth.filterCSNs.frequency.offset,
-              type: 'number',
-            })
-            .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q.offset, type: 'number' })
-            .set(`synth_${i}_filter_detune`, {
-              node: synth.filterCSNs.detune.offset,
-              type: 'number',
-            }),
-        ImmMap<string, ConnectableInput>()
-      )
+      .reduce((acc, synth, i) => {
+        const inputsForSynth = acc
+          .set(`synth_${i}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
+          .set(`synth_${i}_filter_frequency`, {
+            node: synth.filterCSNs.frequency.offset,
+            type: 'number',
+          })
+          .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q.offset, type: 'number' })
+          .set(`synth_${i}_filter_detune`, {
+            node: synth.filterCSNs.detune.offset,
+            type: 'number',
+          });
+
+        if (synth.waveform !== Waveform.Wavetable) {
+          return inputsForSynth;
+        }
+
+        const withIntraMixInputs = synth.wavetableInputControls!.intraDimMixes.reduce(
+          (acc, param, dimIx) => acc.set(`dim_${dimIx}_mix`, { node: param, type: 'number' }),
+          inputsForSynth
+        );
+        return synth.wavetableInputControls!.interDimMixes.reduce(
+          (acc, param, dimIx) =>
+            acc.set(`dim_${dimIx}x${dimIx + 1}_mix`, { node: param, type: 'number' }),
+          withIntraMixInputs
+        );
+      }, ImmMap<string, ConnectableInput>())
       .set('midi', { node: getMidiNode(stateKey), type: 'midi' }),
     outputs: ImmMap<string, ConnectableOutput>().set('masterOutput', {
       node: spectrumNode,
