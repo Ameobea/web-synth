@@ -165,3 +165,12 @@ extern "C" {
     pub fn hide_sample_library(state_key: &str);
     pub fn unhide_sample_library(state_key: &str);
 }
+
+#[wasm_bindgen(raw_module = "./controlPanel")]
+extern "C" {
+    pub fn init_control_panel(state_key: &str);
+    pub fn cleanup_control_panel(state_key: &str);
+    pub fn hide_control_panel(state_key: &str);
+    pub fn unhide_control_panel(state_key: &str);
+    pub fn get_control_panel_audio_connectables(state_key: &str) -> JsValue;
+}

@@ -14,6 +14,7 @@ import {
 import { getEngine } from 'src';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { PlaceholderInput } from 'src/controlPanel';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
@@ -84,13 +85,17 @@ export const commitForeignConnectables = (
 /**
  * Helper function to handle connecting two nodes of various types together.
  */
-const connectNodes = (src: AudioNode | MIDINode, dst: AudioNode | MIDINode | AudioParam) => {
+const connectNodes = (
+  src: AudioNode | MIDINode,
+  dst: AudioNode | MIDINode | AudioParam,
+  dstName: string
+) => {
   // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
   if (dst instanceof OverridableAudioParam) {
     dst.setIsOverridden(false);
   }
 
-  (src as any).connect(dst);
+  (src as any).connect(dst, src instanceof PlaceholderInput ? dstName : undefined);
 };
 
 const disconnectNodes = (src: AudioNode | MIDINode, dst: AudioNode | MIDINode | AudioParam) => {
@@ -219,7 +224,7 @@ const actionGroups = {
         return state;
       }
 
-      connectNodes(fromConnectable.node, toConnectable.node);
+      connectNodes(fromConnectable.node, toConnectable.node, to.name);
 
       const newConnections = [
         ...connections,
@@ -466,7 +471,7 @@ const actionGroups = {
             return;
           }
 
-          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node);
+          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node, to.name);
         }
 
         return true;

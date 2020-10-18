@@ -6,6 +6,7 @@ use crate::{
     views::{
         clip_compositor::mk_clip_compositor,
         composition_sharing::mk_composition_sharing,
+        control_panel::mk_control_panel,
         faust_editor::{mk_faust_editor, FaustEditor},
         graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
@@ -535,6 +536,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "midi_keyboard" => mk_midi_keyboard(conf, uuid),
         "sequencer" => mk_sequencer(conf, uuid),
         "sample_library" => mk_sample_library(conf, uuid),
+        "control_panel" => mk_control_panel(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

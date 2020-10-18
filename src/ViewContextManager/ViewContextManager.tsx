@@ -33,6 +33,7 @@ const viewContexts: { children: string; name: string; displayName: string }[] = 
   { children: 'K', name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
   { children: 'Q', name: 'sequencer', displayName: 'Sequencer' },
   { children: 'L', name: 'sample_library', displayName: 'Sample Library' },
+  { children: 'P', name: 'control_panel', displayName: 'Control Panel' },
 ];
 
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {
@@ -211,9 +212,11 @@ const mapStateToProps = (state: ReduxStore) => R.pick(['viewContextManager'], st
  * VCs.  It is kept up to date via Redux, which is in turn updated automatically by the VCM on the
  * backend every time there is a change.
  */
-const ViewContextSwitcherInner: React.FC<{
-  engine: typeof import('src/engine');
-} & ReturnType<typeof mapStateToProps>> = ({ engine, viewContextManager }) => (
+const ViewContextSwitcherInner: React.FC<
+  {
+    engine: typeof import('src/engine');
+  } & ReturnType<typeof mapStateToProps>
+> = ({ engine, viewContextManager }) => (
   <div style={styles.viewContextSwitcher}>
     {viewContextManager.activeViewContexts.map((props, i) => (
       <ViewContextTab
