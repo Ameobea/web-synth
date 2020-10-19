@@ -14,7 +14,7 @@ import {
 import { getEngine } from 'src';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { PlaceholderInput } from 'src/controlPanel';
+import { ControlPanelInput, PlaceholderInput } from 'src/controlPanel';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
@@ -85,26 +85,36 @@ export const commitForeignConnectables = (
 /**
  * Helper function to handle connecting two nodes of various types together.
  */
-const connectNodes = (
+export const connectNodes = (
   src: AudioNode | MIDINode,
   dst: AudioNode | MIDINode | AudioParam,
-  dstName: string
+  dstDescriptor: ConnectableDescriptor
 ) => {
   // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
   if (dst instanceof OverridableAudioParam) {
     dst.setIsOverridden(false);
   }
 
-  (src as any).connect(dst, src instanceof PlaceholderInput ? dstName : undefined);
+  (src as any).connect(
+    dst,
+    src instanceof PlaceholderInput || src instanceof ControlPanelInput ? dstDescriptor : undefined
+  );
 };
 
-const disconnectNodes = (src: AudioNode | MIDINode, dst: AudioNode | MIDINode | AudioParam) => {
+export const disconnectNodes = (
+  src: AudioNode | MIDINode,
+  dst: AudioNode | MIDINode | AudioParam,
+  dstDescriptor: ConnectableDescriptor
+) => {
   // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
   if (dst instanceof OverridableAudioParam) {
     dst.setIsOverridden(true);
   }
 
-  (src as any).disconnect(dst);
+  (src as any).disconnect(
+    dst,
+    src instanceof PlaceholderInput || src instanceof ControlPanelInput ? dstDescriptor : undefined
+  );
 };
 
 /**
@@ -157,13 +167,13 @@ const actionGroups = {
       newState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'> & {
         foreignConnectables: { type: string; id: string; params?: { [key: string]: any } | null }[];
       },
-      connections: VCMState['patchNetwork']['connections']
+      getPatchNetworkReturnVal: PatchNetwork
     ) => ({
       type: 'SET_VCM_STATE',
       newState,
-      connections,
+      patchNetwork: getPatchNetworkReturnVal,
     }),
-    subReducer: (state: VCMState, { connections, newState }) => {
+    subReducer: (state: VCMState, { patchNetwork, newState }) => {
       const engine = getEngine();
       if (!engine) {
         console.error('Tried to init patch betwork before engine was initialized');
@@ -173,14 +183,6 @@ const actionGroups = {
           'Tried to init patch network with an empty list of active VCs; probably called too soon'
         );
       }
-
-      // Trigger a side effect of updating the patch network with the new state
-      const patchNetwork = initPatchNetwork(
-        state.patchNetwork,
-        newState.activeViewContexts,
-        newState.foreignConnectables,
-        connections
-      );
 
       maybeUpdateVCM(engine, state.patchNetwork, patchNetwork);
 
@@ -224,7 +226,7 @@ const actionGroups = {
         return state;
       }
 
-      connectNodes(fromConnectable.node, toConnectable.node, to.name);
+      connectNodes(fromConnectable.node, toConnectable.node, to);
 
       const newConnections = [
         ...connections,
@@ -280,7 +282,7 @@ const actionGroups = {
       }
       const [fromConnectable, toConnectable] = connectedPair;
 
-      disconnectNodes(fromConnectable.node, toConnectable.node);
+      disconnectNodes(fromConnectable.node, toConnectable.node, to);
 
       const newConnections = [...connections].filter(
         ([from2, to2]) =>
@@ -353,7 +355,7 @@ const actionGroups = {
           return false;
         }
 
-        disconnectNodes(connectedPair[0].node, connectedPair[1].node);
+        disconnectNodes(connectedPair[0].node, connectedPair[1].node, to);
 
         return false;
       });
@@ -418,7 +420,7 @@ const actionGroups = {
             return false;
           }
 
-          disconnectNodes(connectedPair[0].node, connectedPair[1].node);
+          disconnectNodes(connectedPair[0].node, connectedPair[1].node, to);
           return false;
         }
 
@@ -458,7 +460,7 @@ const actionGroups = {
             return;
           }
 
-          disconnectNodes(oldConnectedPair[0].node, oldConnectedPair[1].node);
+          disconnectNodes(oldConnectedPair[0].node, oldConnectedPair[1].node, to);
 
           const newConnectedPair = getConnectedPair(newConnectables, from, to);
           if (!newConnectedPair) {
@@ -471,7 +473,7 @@ const actionGroups = {
             return;
           }
 
-          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node, to.name);
+          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node, to);
         }
 
         return true;

@@ -5,9 +5,9 @@ import { Provider } from 'react-redux';
 const wasm = import('./engine');
 import { actionCreators, dispatch, store, getState } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
-import { commitForeignConnectables } from 'src/redux/modules/viewContextManager';
+import { commitForeignConnectables, VCMState } from 'src/redux/modules/viewContextManager';
 import { tryParseJson } from 'src/util';
-import { ConnectableDescriptor } from 'src/patchNetwork';
+import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 
 let engineHandle: typeof import('./engine');
@@ -64,19 +64,26 @@ export const init_view_contexts = (
   );
 
   dispatch(actionCreators.viewContextManager.SET_IS_LOADED(false));
-  dispatch(
-    actionCreators.viewContextManager.SET_VCM_STATE(
-      {
-        activeViewContextIx,
-        activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
-          ...minimal_def,
-          ...rest,
-        })),
-        foreignConnectables,
-      },
-      connections
-    )
+
+  const newVCMState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'> & {
+    foreignConnectables: { type: string; id: string; params?: { [key: string]: any } | null }[];
+  } = {
+    activeViewContextIx,
+    activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
+      ...minimal_def,
+      ...rest,
+    })),
+    foreignConnectables,
+  };
+
+  // Trigger a side effect of updating the patch network with the new state
+  const patchNetwork = initPatchNetwork(
+    getState().viewContextManager.patchNetwork,
+    newVCMState.activeViewContexts,
+    newVCMState.foreignConnectables,
+    connections
   );
+  dispatch(actionCreators.viewContextManager.SET_VCM_STATE(newVCMState, patchNetwork));
 };
 
 export const add_view_context = (id: string, name: string) => {

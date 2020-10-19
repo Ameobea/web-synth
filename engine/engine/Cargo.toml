@@ -9,10 +9,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = { version = "=0.2.64", features = ["nightly"] }
-rand = "0.7.3"
+rand = "0.7"
 rand_pcg = "0.2.1"
 slab = "0.4"
-fnv = "1.0.7"
+fnv = "1.0"
 base64 = "0.12"
 bincode = "1.3"
 serde = "1.0.114"

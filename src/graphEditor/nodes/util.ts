@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
 (window as any).dbg = <T>(arg: T) => {
-  console.log(arg);
+  console.trace(arg);
   return arg;
 };
 

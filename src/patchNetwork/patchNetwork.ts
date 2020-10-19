@@ -1,11 +1,17 @@
 import { Map } from 'immutable';
 import { Option } from 'funfix-core';
 
-import { VCMState, getConnectedPair } from 'src/redux/modules/viewContextManager';
+import {
+  VCMState,
+  getConnectedPair,
+  connectNodes,
+  disconnectNodes,
+} from 'src/redux/modules/viewContextManager';
 import { getEngine } from 'src';
 import { actionCreators, dispatch } from 'src/redux';
 import { audioNodeGetters, ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { MIDINode } from './midiNode';
+import { ControlPanelInput, PlaceholderInput } from 'src/controlPanel';
 
 export type ConnectableType = 'midi' | 'number' | 'customAudio';
 export interface ConnectableInput {
@@ -123,7 +129,7 @@ export const initPatchNetwork = (
     const src = fromConnectablesReal.outputs.get(from.name)!;
     const dst = toConnectablesReal.inputs.get(to.name)!;
 
-    (src.node as any).disconnect(dst.node);
+    disconnectNodes(src.node, dst.node, to);
 
     return false;
   });
@@ -158,7 +164,14 @@ export const initPatchNetwork = (
     }
 
     // Perform the connection
-    (connectedPair[0].node as any).connect(connectedPair[1].node);
+    (connectedPair[0].node as any).connect(
+      connectedPair[1].node,
+      connectedPair[0].node instanceof ControlPanelInput ||
+        connectedPair[0].node instanceof PlaceholderInput
+        ? to
+        : undefined
+    );
+    connectNodes(connectedPair[0].node, connectedPair[1].node, to);
     return true;
   });
 

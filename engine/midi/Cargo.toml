@@ -13,13 +13,13 @@ console_error_panic_hook = "0.1.6"
 futures = "0.3"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-serde = "1.0.114"
-serde_derive = "1.0.114"
-serde_json = "1.0.56"
-js-sys = "0.3.41"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+js-sys = "0.3"
 wasm-bindgen = "=0.2.64"
 wasm-logger = "0.2"
-wasm-bindgen-futures = "0.4.14"
+wasm-bindgen-futures = "0.4"
 
 polysynth = { path = "../polysynth" }
 
