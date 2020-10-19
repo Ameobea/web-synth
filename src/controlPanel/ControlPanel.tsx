@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
+import * as R from 'ramda';
 
 import { actionCreators, dispatch, getState, store } from 'src/redux';
 import ControlPanelUI from 'src/controlPanel/ControlPanelUI';
@@ -26,7 +27,13 @@ const BASE_ROOT_NODE_ID = 'control-panel-root-node';
 const getRootNodeID = (vcId: string) => `${BASE_ROOT_NODE_ID}${vcId}`;
 
 const saveStateForInstance = (stateKey: string) => {
-  // TODO
+  const vcId = stateKey.split('_')[1];
+  const instanceState = getState().controlPanel.stateByPanelInstance[vcId];
+  const serializableConnections = instanceState.connections.map(conn =>
+    R.omit(['node' as const], conn)
+  );
+  const serializedConnections = JSON.stringify(serializableConnections);
+  localStorage.setItem(stateKey, serializedConnections);
 };
 
 export const init_control_panel = (stateKey: string) => {
@@ -97,14 +104,6 @@ export const cleanup_control_panel = (stateKey: string) => {
     ReactDOM.unmountComponentAtNode(rootNode);
     rootNode.remove();
   }
-
-  const serialized = JSON.stringify(
-    getState().controlPanel.stateByPanelInstance[vcId].connections.map(conn => ({
-      vcId: conn.vcId,
-      name: conn.name,
-    }))
-  );
-  localStorage.setItem(stateKey, serialized);
 
   dispatch(actionCreators.controlPanel.REMOVE_INSTANCE(vcId));
 };

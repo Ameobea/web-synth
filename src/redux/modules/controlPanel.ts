@@ -1,4 +1,5 @@
 import { buildActionGroup, buildModule } from 'jantix';
+import { Option } from 'funfix-core';
 
 import { ControlPanelInput } from 'src/controlPanel';
 
@@ -22,7 +23,7 @@ export const buildDefaultControlState = (): ControlInfo => ({
 export const buildDefaultControl = (name: string): Control => ({
   data: buildDefaultControlState(),
   label: name,
-  color: '#fff',
+  color: '#361',
   position: { x: 0, y: 0 },
 });
 
@@ -47,6 +48,46 @@ export interface ControlPanelInstanceState {
 const initialState: ControlPanelState = { stateByPanelInstance: {} };
 
 const ctx = new AudioContext();
+
+const setInstance = (
+  instanceVcId: string,
+  newInstance: ControlPanelInstanceState,
+  state: ControlPanelState
+): ControlPanelState => ({
+  stateByPanelInstance: { ...state.stateByPanelInstance, [instanceVcId]: newInstance },
+});
+
+const setConnection = (
+  instanceVcId: string,
+  vcId: string,
+  name: string,
+  connection: ControlPanelConnection,
+  state: ControlPanelState
+): ControlPanelState => mapConnection(instanceVcId, vcId, name, () => connection, state);
+
+const mapConnection = (
+  instanceVcId: string,
+  vcId: string,
+  name: string,
+  mapper: (conn: ControlPanelConnection) => ControlPanelConnection,
+  state: ControlPanelState
+): ControlPanelState => {
+  const instance = state.stateByPanelInstance[instanceVcId];
+
+  return setInstance(
+    instanceVcId,
+    {
+      ...instance,
+      connections: instance.connections.map(conn => {
+        if (conn.vcId === vcId && conn.name === name) {
+          return mapper(conn);
+        }
+        return conn;
+      }),
+    },
+    state
+  );
+};
 
 const actionGroups = {
   ADD_INSTANCE: buildActionGroup({
@@ -110,18 +151,63 @@ const actionGroups = {
       vcId,
       name,
     }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name }) => ({
-      ...state,
-      stateByPanelInstance: {
-        ...state.stateByPanelInstance,
-        [controlPanelVcId]: {
-          ...state.stateByPanelInstance[controlPanelVcId],
-          connections: state.stateByPanelInstance[controlPanelVcId].connections.filter(
-            conn => conn.vcId !== vcId && conn.name !== name
-          ),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name }) => {
+      const instance = state.stateByPanelInstance[controlPanelVcId];
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: {
+            ...instance,
+            connections: instance.connections.filter(
+              conn => conn.vcId !== vcId && conn.name !== name
+            ),
+          },
         },
-      },
+      };
+    },
+  }),
+  SET_CONTROL_POSITION: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      vcId: string,
+      name: string,
+      position: { left?: number; top?: number }
+    ) => ({ type: 'SET_CONTROL_POSITION', controlPanelVcId, vcId, name, position }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, position }) =>
+      mapConnection(
+        controlPanelVcId,
+        vcId,
+        name,
+        conn => ({
+          ...conn,
+          control: {
+            ...conn.control,
+            position: {
+              x: Option.of(position.left).getOrElse(10),
+              y: Option.of(position.top).getOrElse(10),
+            },
+          },
+        }),
+        state
+      ),
+  }),
+  SET_CONTROL_LABEL: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, vcId: string, name: string, label: string) => ({
+      type: 'SET_CONTROL_LABEL',
+      controlPanelVcId,
+      vcId,
+      name,
+      label,
     }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, label }) =>
+      mapConnection(
+        controlPanelVcId,
+        vcId,
+        name,
+        (conn: ControlPanelConnection) => ({ ...conn, control: { ...conn.control, label } }),
+        state
+      ),
   }),
 };
 
