@@ -14,7 +14,12 @@ import {
 } from 'src/patchNetwork';
 import './ControlPanel.scss';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { ControlPanelInstanceState } from 'src/redux/modules/controlPanel';
+import {
+  ControlPanelInstanceState,
+  ControlPanelConnection,
+  Control,
+  buildDefaultControl,
+} from 'src/redux/modules/controlPanel';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
@@ -31,12 +36,20 @@ export const init_control_panel = (stateKey: string) => {
   rootNode.id = getRootNodeID(vcId);
   document.getElementById('content')!.append(rootNode);
 
-  const serialized: { name: string; vcId: string }[] | undefined = Option.of(
-    localStorage.getItem(stateKey)
-  )
+  const serialized: ControlPanelConnection[] | undefined = Option.of(localStorage.getItem(stateKey))
     .flatMap(serialized => {
       try {
-        return Option.some(JSON.parse(serialized));
+        const parsed: (ControlPanelConnection & { control: Control | undefined })[] = JSON.parse(
+          serialized
+        );
+        return Option.some(
+          parsed.map(conn => {
+            if (!conn.control) {
+              conn.control = buildDefaultControl(conn.name);
+            }
+            return conn as ControlPanelConnection;
+          })
+        );
       } catch (err) {
         console.warn('Failed to parse serialized control panel state; defaulting.');
         return Option.none();
