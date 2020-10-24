@@ -12,6 +12,11 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
         defaultValue: 0,
         automationRate: 'a-rate',
       },
+      {
+        name: 'detune',
+        defaultValue: 0,
+        automationRate: 'a-rate',
+      },
       ...Array(MAX_DIMENSION_COUNT)
         .fill(null)
         .map((_, i) => ({
@@ -133,10 +138,12 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     const frequencyBufArrayOffset = frequencyBufPtr / BYTES_PER_F32;
     if (params.frequency.length === 1) {
       for (let i = 0; i < FRAME_SIZE; i++) {
-        this.float32WasmMemory[frequencyBufArrayOffset + i] = params.frequency[0];
+        this.float32WasmMemory[frequencyBufArrayOffset + i] = params.frequency[0] + params.detune[0];
       }
     } else {
-      this.float32WasmMemory.set(params.frequency, frequencyBufArrayOffset);
+      for (let i = 0; i < params.frequency.length; i++) {
+        this.float32WasmMemory[frequencyBufArrayOffset + i] = params.frequency[i] + params.detune[i];
+      }
     }
 
     // TODO: No need to do this every frame; do once when handle is created and store ptr

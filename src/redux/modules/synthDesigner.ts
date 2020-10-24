@@ -531,6 +531,7 @@ export const deserializeSynthModule = (
               ...wavetableConf,
               onInitialized: () => dispatch({ type: 'CONNECT_WAVETABLE', synthIx, voiceIx }),
               frequency: 0,
+              detune: 0,
             })
           : null,
       effects: [], // TODO
@@ -1291,6 +1292,8 @@ const actionGroups = {
           console.error('Error disconnecting oscillator and filter: ', err);
         }
       });
+
+      targetSynth.detuneCSN.connect(targetVoice.wavetable.paramOverrides.detune.param);
 
       try {
         targetVoice.wavetable.workletHandle.connect(targetVoice.filterNode);

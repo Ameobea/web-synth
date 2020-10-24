@@ -147,9 +147,12 @@ export default class WaveTable implements ForeignNode {
     // Work around incomplete TypeScript typings
     const frequencyParam = (workletHandle.parameters as Map<string, AudioParam>).get('frequency')!;
     const frequencyOverride = new OverridableAudioParam(this.ctx, frequencyParam);
+    const detuneParam = (workletHandle.parameters as Map<string, AudioParam>).get('detune');
+    const detuneOverride = new OverridableAudioParam(this.ctx, detuneParam, undefined, false);
 
     const overrides: ForeignNode['paramOverrides'] = {
       frequency: { param: frequencyOverride, override: frequencyOverride.manualControl },
+      detune: { param: detuneOverride, override: detuneOverride.manualControl },
     };
 
     // TODO: get dimension count dynamically
@@ -276,12 +279,17 @@ export default class WaveTable implements ForeignNode {
             type: 'number',
           });
         },
-        Map<string, ConnectableInput>().set('frequency', {
-          node: this.paramOverrides.frequency
-            ? this.paramOverrides.frequency.param
-            : new DummyNode(),
-          type: 'number',
-        })
+        Map<string, ConnectableInput>()
+          .set('frequency', {
+            node: this.paramOverrides.frequency
+              ? this.paramOverrides.frequency.param
+              : new DummyNode(),
+            type: 'number',
+          })
+          .set('detune', {
+            node: this.paramOverrides.detune ? this.paramOverrides.detune.param : new DummyNode(),
+            type: 'number',
+          })
       ),
       outputs: Map<string, ConnectableOutput>().set('output', {
         node: this.workletHandle ? this.workletHandle : new DummyNode(),
