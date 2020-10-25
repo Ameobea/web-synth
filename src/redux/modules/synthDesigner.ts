@@ -109,6 +109,7 @@ export interface SynthModule {
   gainADSRLength: number;
   filterEnvelope: ADSRValues;
   filterADSRLength: number;
+  pitchMultiplier: number;
 }
 
 const ctx = new AudioContext();
@@ -274,6 +275,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   gainADSRLength: synth.gainADSRLength,
   filterEnvelope: synth.filterEnvelope,
   filterADSRLength: synth.filterADSRLength,
+  pitchMultiplier: synth.pitchMultiplier,
 });
 
 const connectWavetableInputControls = (
@@ -289,7 +291,7 @@ const connectWavetableInputControls = (
     });
   });
   inputControls.interDimMixes.forEach((param, i) => {
-    voices.forEach((voice, i) => {
+    voices.forEach(voice => {
       const voiceParam = voice.wavetable!.paramOverrides[`dimension_${i}x${i + 1}_mix`];
       param.outputCSN!.connect(voiceParam.param);
       // Never overridden because we handle that control above the voice level
@@ -424,6 +426,7 @@ const buildDefaultSynthModule = (): SynthModule => {
     gainADSRLength: 1000,
     filterEnvelope: defaultAdsrEnvelope,
     filterADSRLength: 1200,
+    pitchMultiplier: 1,
   };
 
   // Connect up + start all the CSNs
@@ -473,6 +476,7 @@ export const deserializeSynthModule = (
     gainADSRLength,
     filterEnvelope,
     filterADSRLength,
+    pitchMultiplier,
   }: {
     waveform: Waveform;
     wavetableConfig: Omit<WavetableConfig, 'onInitialized'> | null;
@@ -485,6 +489,7 @@ export const deserializeSynthModule = (
     gainADSRLength: number;
     filterEnvelope: ADSRValues;
     filterADSRLength: number;
+    pitchMultiplier: number;
   },
   dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void,
   synthIx: number
@@ -558,6 +563,7 @@ export const deserializeSynthModule = (
     filterEnvelope,
     filterADSRLength,
     filterParams,
+    pitchMultiplier,
   };
 };
 
@@ -854,12 +860,15 @@ const actionGroups = {
       synthIx,
       offset,
     }),
-    subReducer: (state: SynthDesignerState, { frequency, voiceIx, synthIx, offset }) => {
-      const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
-
+    subReducer: (
+      state: SynthDesignerState,
+      { frequency: baseFrequency, voiceIx, synthIx, offset }
+    ) => {
       // TODO: Dedup
       if (R.isNil(synthIx)) {
         state.synths.forEach(synth => {
+          const frequency = baseFrequency * synth.pitchMultiplier;
+          const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
           const targetVoice = synth.voices[voiceIx];
 
           // Trigger gain and filter ADSRs
@@ -880,6 +889,8 @@ const actionGroups = {
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
         const targetVoice = targetSynth.voices[voiceIx];
+        const frequency = baseFrequency * targetSynth.pitchMultiplier;
+        const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
 
         // Trigger gain and filter ADSRs
         targetVoice.gainADSRModule.gate(offset);
@@ -1344,6 +1355,18 @@ const actionGroups = {
         R.set(R.lensPath(['wavetableConf', 'interDimMixes', baseDimIx]), mix, synth),
         state
       );
+    },
+  }),
+  SET_PITCH_MULTIPLIER: buildActionGroup({
+    actionCreator: (synthIx: number, pitchMultiplier: number) => ({
+      type: 'SET_PITCH_MULTIPLIER',
+      synthIx,
+      pitchMultiplier,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, pitchMultiplier }) => {
+      console.log(pitchMultiplier);
+      const synth = getSynth(synthIx, state.synths);
+      return setSynth(synthIx, { ...synth, pitchMultiplier }, state);
     },
   }),
 };

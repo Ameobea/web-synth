@@ -100,6 +100,8 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     if (!this.waveTableHandlePtr || params.frequency.every(f => f === 0)) {
       return true;
     }
+    this.i = this.i||0;
+    this.i += 1;
 
     // Write the mixes for each sample in the frame into the Wasm memory.  Mixes are a flattened 3D
     // array of the form `mixes[dimensionIx][interOrIntraIndex][sampleIx]`
@@ -136,14 +138,12 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       throw new Error("Frequency buffer pointer isn't 4-byte aligned");
     }
     const frequencyBufArrayOffset = frequencyBufPtr / BYTES_PER_F32;
-    if (params.frequency.length === 1) {
-      for (let i = 0; i < FRAME_SIZE; i++) {
-        this.float32WasmMemory[frequencyBufArrayOffset + i] = params.frequency[0] + params.detune[0];
-      }
-    } else {
-      for (let i = 0; i < params.frequency.length; i++) {
-        this.float32WasmMemory[frequencyBufArrayOffset + i] = params.frequency[i] + params.detune[i];
-      }
+    if (this.i === 100) {
+      console.log(params.detune);
+    }
+    for (let i = 0; i < FRAME_SIZE; i++) {
+      this.float32WasmMemory[frequencyBufArrayOffset + i] =
+        params.frequency[Math.min(params.frequency.length - 1, i)] + params.detune[Math.min(params.detune.length - 1, i)];
     }
 
     // TODO: No need to do this every frame; do once when handle is created and store ptr

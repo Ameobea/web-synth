@@ -70,10 +70,9 @@ export interface ListSampleOpts {
   includeRemote?: boolean;
 }
 
-export const listSamples = async ({
-  includeRemote,
-  includeLocal,
-}: ListSampleOpts = {}): Promise<SampleDescriptor[]> => {
+export const listSamples = async ({ includeRemote, includeLocal }: ListSampleOpts = {}): Promise<
+  SampleDescriptor[]
+> => {
   const [cachedSamples, localSamples, remoteSamples] = await Promise.all([
     getAllCachedSamples(),
     includeLocal
@@ -128,7 +127,7 @@ export const init_sample_library = (stateKey: string) => {
   elem.id = stateKey;
   elem.setAttribute(
     'style',
-    'z-index: 2; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
+    'z-index: 2; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
   );
   document.getElementById('content')!.appendChild(elem);
 

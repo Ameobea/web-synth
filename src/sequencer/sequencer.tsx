@@ -170,10 +170,9 @@ const loadInitialState = async (stateKey: string, vcId: string) => {
   }
 };
 
-const LazySequencerUI: React.FC<{ vcId: string } & Pick<
-  SequencerReduxInfra,
-  'dispatch' | 'actionCreators'
->> = props => (
+const LazySequencerUI: React.FC<
+  { vcId: string } & Pick<SequencerReduxInfra, 'dispatch' | 'actionCreators'>
+> = props => (
   <Suspense fallback={<Loading />}>
     <SequencerUI {...props} />
   </Suspense>
@@ -231,7 +230,7 @@ export const init_sequencer = async (stateKey: string) => {
   elem.id = domId;
   elem.setAttribute(
     'style',
-    'z-index: 2; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
+    'z-index: 2; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
   );
   document.getElementById('content')!.appendChild(elem);
 

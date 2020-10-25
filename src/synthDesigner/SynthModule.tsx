@@ -1,8 +1,9 @@
 import * as R from 'ramda';
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { connect, Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
+import { Option } from 'funfix-core';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
@@ -51,6 +52,11 @@ const SYNTH_SETTINGS = [
     step: 0.5,
   },
   {
+    type: 'text',
+    label: 'pitch multiplier',
+    initial: '1',
+  },
+  {
     type: 'custom',
     label: 'adsr',
     initial: defaultAdsrEnvelope,
@@ -71,6 +77,7 @@ const SynthModuleCompInner: React.FC<
 > = ({ index, synth, stateKey, children = null, voicePresetIds }) => {
   const controlPanelContext = useRef<{ preset: string } | null>(null);
   const unison = synth.voices[0].oscillators.length;
+  const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
 
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
   const wavetableUIState = useMemo(() => {
@@ -116,23 +123,32 @@ const SynthModuleCompInner: React.FC<
                   stateKey.split('_')[1]
                 )
               );
-              break;
+              return;
             }
             case 'unison': {
               dispatch(actionCreators.synthDesigner.SET_UNISON(index, val));
-              break;
+              return;
             }
             case 'volume': {
               dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(index, val));
-              break;
+              return;
             }
             case 'detune': {
               dispatch(actionCreators.synthDesigner.SET_DETUNE(val, index));
-              break;
+              return;
             }
             case 'adsr': {
               dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, index));
-              break;
+              return;
+            }
+            case 'pitch multiplier': {
+              setLocalPitchMultiplier(val);
+              const value = Number.parseFloat(val);
+              if (Number.isNaN(value)) {
+                return;
+              }
+              dispatch(actionCreators.synthDesigner.SET_PITCH_MULTIPLIER(index, value));
+              return;
             }
             default: {
               console.warn('Unhandled key in synth control panel: ', key);
@@ -146,9 +162,19 @@ const SynthModuleCompInner: React.FC<
             unison,
             detune: synth.detune,
             adsr: synth.gainEnvelope,
+            'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(() =>
+              synth.pitchMultiplier.toString()
+            ),
           }),
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          [synth.waveform, unison, synth.masterGain, synth.detune, synth.gainEnvelope]
+          [
+            synth.waveform,
+            unison,
+            synth.masterGain,
+            synth.detune,
+            synth.gainEnvelope,
+            synth.pitchMultiplier,
+            localPitchMultiplier,
+          ]
         )}
         style={{ width: 378 }}
       />

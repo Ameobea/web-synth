@@ -14,7 +14,7 @@ export const init_composition_sharing = (_stateKey: string) => {
   faustEditorBase.id = ROOT_NODE_ID;
   faustEditorBase.setAttribute(
     'style',
-    'z-index: 2; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0;'
+    'z-index: 2; height: 100vh; position: absolute; top: 0; left: 0;'
   );
 
   // Mount the newly created Faust editor and all of its accompanying components to the DOM

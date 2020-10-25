@@ -13,7 +13,7 @@ export const init_graph_editor = (stateKey: string) => {
   graphEditorBaseNode.id = ROOT_NODE_ID;
   graphEditorBaseNode.setAttribute(
     'style',
-    'z-index: 2; width: 100vw; height: calc(100vh - 40px); position: absolute; top: 0; left: 0;'
+    'z-index: 2; height: calc(100vh - 40px); position: absolute; top: 0; left: 0;'
   );
 
   // Mount the newly created graph editor and all of its accompanying components to the DOM
