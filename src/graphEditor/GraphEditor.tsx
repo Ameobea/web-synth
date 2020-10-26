@@ -55,22 +55,21 @@ const handleNodeSelectAction = ({
   setSelectedNodeVCID: (id: string | null) => void;
   isNowSelected: boolean;
 }) => {
+  const nodeID: string = (lgNode as any).id.toString();
   if (lgNode instanceof LGAudioConnectables) {
-    const node = getState().viewContextManager.activeViewContexts.find(
-      vc => vc.uuid === (lgNode as any).id
-    );
+    const node = getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === nodeID);
     if (!node) {
       return;
     }
 
     (isNowSelected ? getEngine()!.render_small_view : getEngine()!.cleanup_small_view)(
-      (lgNode as any).id,
+      nodeID,
       smallViewDOMId
     );
-    setSelectedNodeVCID((lgNode as any).id);
+    setSelectedNodeVCID(nodeID);
   } else if (lgNode.type.startsWith('customAudio')) {
     const node = getState().viewContextManager.patchNetwork.connectables.find(
-      connectable => connectable.vcId === (lgNode as any).id
+      connectable => connectable.vcId === nodeID
     );
     if (node) {
       const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
@@ -189,7 +188,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
         id='graph-editor'
         width={window.innerWidth - 600}
         height={800}
-      ></canvas>
+      />
 
       <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
         <ControlPanel style={{ height: 120, width: 500 }}>

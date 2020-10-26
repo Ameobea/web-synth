@@ -1,8 +1,8 @@
 import { buildActionGroup, buildModule } from 'jantix';
+import { createSelector } from 'reselect';
 
 import { BACKEND_BASE_URL } from 'src/conf';
 import { dispatch, actionCreators, ReduxStore } from 'src/redux';
-import { createSelector } from 'reselect';
 import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 
 export interface SynthPresetEntry {
