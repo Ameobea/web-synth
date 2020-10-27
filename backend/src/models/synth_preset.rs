@@ -105,6 +105,8 @@ pub struct ADSRValues {
     pub release: ADSRValue,
 }
 
+fn default_pitch_multiplier() -> f32 { 1. }
+
 // {
 //   type: FilterType;
 //   frequency: number;
@@ -132,27 +134,28 @@ pub enum VoiceDefinition {
     //     gainADSRLength: number;
     //     filterEnvelope: ADSRValues;
     //     filterADSRLength: number;
+    //     pitchMultiplier: number;
     // }
     #[serde(rename = "standard")]
+    #[serde(rename_all = "camelCase")]
     Standard {
         unison: usize,
         waveform: SynthType,
         detune: f32,
         filter: FilterParams,
-        #[serde(rename = "masterGain")]
-        master_gaim: f32,
-        #[serde(rename = "selectedEffectType")]
+        master_gain: f32,
         selected_effect_type: EffectType,
-        #[serde(rename = "gainEnvelope")]
         gain_envelope: ADSRValues,
         #[serde(rename = "gainADSRLength")]
         gain_adsr_length: f32,
-        #[serde(rename = "filterEnvelope")]
         filter_envelope: ADSRValues,
         #[serde(rename = "filterADSRLength")]
         filter_adsr_length: f32,
+        #[serde(default = "default_pitch_multiplier")]
+        pitch_multiplier: f32,
     },
     #[serde(rename = "wavetable")]
+    #[serde(rename_all = "camelCase")]
     Wavetable {
         settings: WavetableSettings,
         dimensions: Vec<Waveform>,

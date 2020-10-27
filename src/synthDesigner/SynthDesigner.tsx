@@ -99,11 +99,11 @@ const FullPresetControls: React.FC<{
   actionCreators: SynthDesignerReduxInfra['actionCreators'];
   stateKey: string;
   getState: SynthDesignerReduxInfra['getState'];
-}> = ({ actionCreators, stateKey, getState }) => {
+  dispatch: SynthDesignerReduxInfra['dispatch'];
+}> = ({ actionCreators, stateKey, getState, dispatch }) => {
   const { synthPresets } = useSelector((state: ReduxStore) => ({
     synthPresets: state.presets.synthPresets,
   }));
-  const dispatch = useDispatch();
   const [state, setState] = useState<{ preset: number | undefined | null }>({ preset: undefined });
   useEffect(() => {
     if (typeof synthPresets !== 'string' && !state.preset && synthPresets.length > 0) {
@@ -120,17 +120,29 @@ const FullPresetControls: React.FC<{
       {
         label: 'preset',
         type: 'select',
-        options: Object.fromEntries(
-          Object.entries(synthPresets).map(([key, val]) => [key, val.id])
-        ),
+        options: Object.fromEntries(synthPresets.map(preset => [preset.title, preset.id])),
         initial: synthPresets[0]?.id,
       },
       {
         type: 'button',
         label: 'load full preset',
         action: () => {
-          if (!state.preset) {
+          if (R.isNil(state.preset)) {
             return;
+          }
+
+          const synths = getState().synthDesigner.synths;
+          if (synths.length > 0) {
+            const proceed = confirm(
+              'Are you sure you want to overwrite the current synth designer?'
+            );
+            if (!proceed) {
+              return;
+            }
+
+            for (let i = 0; i < synths.length; i++) {
+              dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(synths.length - 1 - i));
+            }
           }
 
           dispatch(
@@ -150,7 +162,7 @@ const FullPresetControls: React.FC<{
         action: async () => {
           const { title, description } = await renderModalWithControls(SavePresetModal);
           const presetBody = getState().synthDesigner.synths.map(serializeSynthModule);
-          await saveSynthPreset({ title, description, body: presetBody });
+          await saveSynthPreset({ title, description, body: { voices: presetBody } });
         },
       },
     ];
@@ -191,6 +203,7 @@ const AddAndPresetControls: React.FC<Omit<
       actionCreators={props.synthDesignerActionCreators}
       stateKey={props.stateKey}
       getState={props.synthDesignerGetState}
+      dispatch={props.synthDesignerDispatch}
     />
   </Provider>
 );

@@ -276,7 +276,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   filterEnvelope: synth.filterEnvelope,
   filterADSRLength: synth.filterADSRLength,
   pitchMultiplier: synth.pitchMultiplier,
-  type: synth.waveform === Waveform.Wavetable ? 'wavetable' : 'standard',
+  type: synth.waveform === Waveform.Wavetable ? ('wavetable' as const) : ('standard' as const),
 });
 
 const connectWavetableInputControls = (
@@ -1383,7 +1383,7 @@ const actionGroups = {
         );
       }
 
-      const synths = preset.body.map((def, i) => deserializeSynthModule(def, dispatch, i));
+      const synths = preset.body.voices.map((def, i) => deserializeSynthModule(def, dispatch, i));
       return { ...state, synths };
     },
   }),
