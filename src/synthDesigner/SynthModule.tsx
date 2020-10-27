@@ -17,7 +17,7 @@ import { updateConnectables } from 'src/patchNetwork';
 import { ReduxStore, store, getState } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { renderModalWithControls } from 'src/controls/Modal';
-import SaveVoicePresetModal from './SaveVoicePresetModal';
+import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 
 const SYNTH_SETTINGS = [
@@ -279,7 +279,7 @@ const SynthModuleCompInner: React.FC<
               label: 'save preset',
               type: 'button',
               action: async () => {
-                const { title, description } = await renderModalWithControls(SaveVoicePresetModal);
+                const { title, description } = await renderModalWithControls(SavePresetModal);
                 const presetBody = getVoicePreset(stateKey, index);
                 await saveSynthVoicePreset({ title, description, body: presetBody });
               },

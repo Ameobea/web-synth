@@ -16,3 +16,17 @@ export const saveSynthVoicePreset = (preset: {
       throw new Error(`Got bad status code ${res.status} when performing API request`);
     }
   });
+
+export const saveSynthPreset = (preset: {
+  title: string;
+  description: string;
+  body: ReturnType<typeof serializeSynthModule>[];
+}) =>
+  fetch(buildURL('/synth_presets'), {
+    method: 'POST',
+    body: JSON.stringify({ ...preset, body: { voices: preset.body } }),
+  }).then(res => {
+    if (!res.ok) {
+      throw new Error(`Got bad status code ${res.status} when performing API request`);
+    }
+  });

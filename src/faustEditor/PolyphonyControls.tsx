@@ -8,10 +8,12 @@ const mapStateToProps = (state: { faustEditor: FaustEditorState }) => ({
   cachedInputNames: state.faustEditor.cachedInputNames,
 });
 
-const PolyphonyControlsInnerInner: React.FC<{
-  state: FaustEditorPolyphonyState;
-  setState: (newState: FaustEditorPolyphonyState) => void;
-} & ReturnType<typeof mapStateToProps>> = ({ state, setState, cachedInputNames }) => {
+const PolyphonyControlsInnerInner: React.FC<
+  {
+    state: FaustEditorPolyphonyState;
+    setState: (newState: FaustEditorPolyphonyState) => void;
+  } & ReturnType<typeof mapStateToProps>
+> = ({ state, setState, cachedInputNames }) => {
   const cpState = useMemo(
     () => ({
       voices: state.voiceCount,

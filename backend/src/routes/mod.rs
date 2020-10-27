@@ -8,8 +8,8 @@ use crate::{
         effects::{Effect, InsertableEffect},
         synth_preset::{
             InlineSynthPreset, InlineSynthPresetEntry, NewSynthPresetEntry,
-            NewSynthVoicePresetEntry, SynthPreset, SynthPresetEntry, SynthVoicePresetEntry,
-            UserProvidedNewSynthVoicePreset, VoiceDefinition, VoiceDefinitionItem,
+            NewSynthVoicePresetEntry, ReceivedSynthPresetEntry, SynthPreset, SynthVoicePresetEntry,
+            UserProvidedNewSynthVoicePreset, VoiceDefinition,
         },
     },
     schema, WebSynthDbConn,
@@ -178,27 +178,7 @@ pub fn get_synth_presets(
                                 "Invalid synth preset body provided".into()
                             })?;
                         let inlined_body = InlineSynthPreset {
-                            voices: body_
-                                .voices
-                                .into_iter()
-                                .filter_map(|voice| match voice {
-                                    VoiceDefinitionItem::Anonymous(def) => Some(def),
-                                    VoiceDefinitionItem::External { id: ref id_ } => {
-                                        let def = voice_presets_by_id.remove(id_);
-                                        match def {
-                                            Some(def) => Some(def.body),
-                                            None => {
-                                                error!(
-                                                    "No voice definition exists with id {}; \
-                                                     referenced by synth preset id {}",
-                                                    id_, synth_preset_id
-                                                );
-                                                None
-                                            },
-                                        }
-                                    },
-                                })
-                                .collect(),
+                            voices: body_.voices,
                         };
                         Ok(InlineSynthPresetEntry {
                             id: synth_preset_id,
@@ -216,7 +196,7 @@ pub fn get_synth_presets(
 #[post("/synth_presets", data = "<preset>")]
 pub fn create_synth_preset(
     conn: WebSynthDbConn,
-    preset: Json<SynthPresetEntry>,
+    preset: Json<ReceivedSynthPresetEntry>,
 ) -> Result<(), String> {
     use crate::schema::synth_presets::dsl::*;
 

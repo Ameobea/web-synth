@@ -6,7 +6,7 @@ import { UnimplementedError } from 'ameo-utils';
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
-import { SynthVoicePreset } from 'src/redux/modules/presets';
+import { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import WaveTable, {
   decodeWavetableDef,
   getDefaultWavetableDef,
@@ -276,6 +276,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   filterEnvelope: synth.filterEnvelope,
   filterADSRLength: synth.filterADSRLength,
   pitchMultiplier: synth.pitchMultiplier,
+  type: synth.waveform === Waveform.Wavetable ? 'wavetable' : 'standard',
 });
 
 const connectWavetableInputControls = (
@@ -1243,6 +1244,7 @@ const actionGroups = {
         throw new UnimplementedError();
       }
 
+      synthIx = synthIx === -1 ? state.synths.length - 1 : synthIx;
       const oldSynthModule = state.synths[synthIx];
       if (!oldSynthModule) {
         console.error(
@@ -1367,6 +1369,22 @@ const actionGroups = {
       console.log(pitchMultiplier);
       const synth = getSynth(synthIx, state.synths);
       return setSynth(synthIx, { ...synth, pitchMultiplier }, state);
+    },
+  }),
+  SET_SYNTH_PRESET: buildActionGroup({
+    actionCreator: (
+      preset: SynthPresetEntry,
+      dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void
+    ) => ({ type: 'SET_SYNTH_PRESET', preset, dispatch }),
+    subReducer: (state: SynthDesignerState, { preset, dispatch }) => {
+      if (state.synths.length !== 0) {
+        throw new Error(
+          'Expected that all synths would be removed before dispatching `SET_SYNTY_PRESET`'
+        );
+      }
+
+      const synths = preset.body.map((def, i) => deserializeSynthModule(def, dispatch, i));
+      return { ...state, synths };
     },
   }),
 };

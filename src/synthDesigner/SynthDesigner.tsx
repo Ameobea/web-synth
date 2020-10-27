@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { connect, Provider } from 'react-redux';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { connect, Provider, useDispatch, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
-import { PropTypesOf } from 'ameo-utils';
+import { PropTypesOf, UnreachableException } from 'ameo-utils';
 
-import { EffectType } from 'src/redux/modules/synthDesigner';
+import { EffectType, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { buildEffect } from 'src/synthDesigner/effects';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import {
@@ -19,6 +19,9 @@ import { updateConnectables } from 'src/patchNetwork';
 import SynthModuleComp from './SynthModule';
 import EffectModuleComp from './effects/Effect';
 import './SynthDesigner.scss';
+import { renderModalWithControls } from 'src/controls/Modal';
+import SavePresetModal from 'src/synthDesigner/SavePresetModal';
+import { saveSynthPreset } from 'src/api';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;
@@ -31,11 +34,14 @@ const mapAddModuleControlsStateToProps = (state: ReduxStore) => ({
   voicePresetIds: voicePresetIdsSelector(state),
 });
 
-const AddModuleControlsInner: React.FC<{
-  stateKey: string;
-  synthDesignerActionCreators: SynthDesignerReduxInfra['actionCreators'];
-  synthDesignerDispatch: SynthDesignerReduxInfra['dispatch'];
-} & ReturnType<typeof mapAddModuleControlsStateToProps>> = ({
+const AddModuleControlsInner: React.FC<
+  {
+    stateKey: string;
+    synthDesignerActionCreators: SynthDesignerReduxInfra['actionCreators'];
+    synthDesignerDispatch: SynthDesignerReduxInfra['dispatch'];
+    synthDesignerGetState: SynthDesignerReduxInfra['getState'];
+  } & ReturnType<typeof mapAddModuleControlsStateToProps>
+> = ({
   stateKey,
   voicePresets,
   voicePresetIds,
@@ -43,6 +49,10 @@ const AddModuleControlsInner: React.FC<{
   synthDesignerDispatch,
 }) => {
   const controlPanelContext = useRef<{ [label: string]: any } | undefined>();
+
+  if (typeof voicePresets === 'string') {
+    return <>Loading...</>;
+  }
 
   return (
     <ControlPanel
@@ -66,10 +76,16 @@ const AddModuleControlsInner: React.FC<{
 
             const selectedVoicePresetId: number = controlPanelContext.current['preset'];
             const selectedVoicePreset = voicePresets[selectedVoicePresetId];
-            // TODO
 
             const vcId = stateKey.split('_')[1]!;
             synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
+            synthDesignerDispatch(
+              synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(
+                -1,
+                selectedVoicePreset.body,
+                synthDesignerDispatch
+              )
+            );
             const newConnectables = get_synth_designer_audio_connectables(stateKey);
             updateConnectables(vcId, newConnectables);
           },
@@ -79,15 +95,103 @@ const AddModuleControlsInner: React.FC<{
   );
 };
 
+const FullPresetControls: React.FC<{
+  actionCreators: SynthDesignerReduxInfra['actionCreators'];
+  stateKey: string;
+  getState: SynthDesignerReduxInfra['getState'];
+}> = ({ actionCreators, stateKey, getState }) => {
+  const { synthPresets } = useSelector((state: ReduxStore) => ({
+    synthPresets: state.presets.synthPresets,
+  }));
+  const dispatch = useDispatch();
+  const [state, setState] = useState<{ preset: number | undefined | null }>({ preset: undefined });
+  useEffect(() => {
+    if (typeof synthPresets !== 'string' && !state.preset && synthPresets.length > 0) {
+      setState({ preset: synthPresets[0]?.id });
+    }
+  }, [synthPresets, state]);
+
+  const settings = useMemo(() => {
+    if (typeof synthPresets === 'string') {
+      return null;
+    }
+
+    return [
+      {
+        label: 'preset',
+        type: 'select',
+        options: Object.fromEntries(
+          Object.entries(synthPresets).map(([key, val]) => [key, val.id])
+        ),
+        initial: synthPresets[0]?.id,
+      },
+      {
+        type: 'button',
+        label: 'load full preset',
+        action: () => {
+          if (!state.preset) {
+            return;
+          }
+
+          dispatch(
+            actionCreators.synthDesigner.SET_SYNTH_PRESET(
+              synthPresets.find(preset => preset.id === state.preset)!,
+              dispatch
+            )
+          );
+          const newConnectables = get_synth_designer_audio_connectables(stateKey);
+          const vcId = stateKey.split('_')[1]!;
+          updateConnectables(vcId, newConnectables);
+        },
+      },
+      {
+        type: 'button',
+        label: 'save full preset',
+        action: async () => {
+          const { title, description } = await renderModalWithControls(SavePresetModal);
+          const presetBody = getState().synthDesigner.synths.map(serializeSynthModule);
+          await saveSynthPreset({ title, description, body: presetBody });
+        },
+      },
+    ];
+  }, [synthPresets, state.preset, dispatch, actionCreators.synthDesigner, stateKey, getState]);
+
+  if (typeof synthPresets === 'string') {
+    return <>Loading...</>;
+  }
+
+  return (
+    <ControlPanel
+      state={state}
+      settings={settings}
+      onChange={(key: string, val: any, _state: any) => {
+        if (key === 'preset') {
+          setState({ preset: val });
+          return;
+        }
+
+        throw new UnreachableException();
+      }}
+    />
+  );
+};
+
 const AddModuleControlsUnwrapped = connect(mapAddModuleControlsStateToProps)(
   AddModuleControlsInner
 );
-const AddModuleControls: React.FC<Omit<
-  PropTypesOf<typeof AddModuleControlsInner>,
+const AddAndPresetControls: React.FC<Omit<
+  PropTypesOf<typeof AddModuleControlsInner> & {
+    synthDesignerGetState: SynthDesignerReduxInfra['getState'];
+  },
   keyof ReturnType<typeof mapAddModuleControlsStateToProps>
 >> = ({ ...props }) => (
   <Provider store={store}>
     <AddModuleControlsUnwrapped {...props} />
+    <FullPresetControls
+      actionCreators={props.synthDesignerActionCreators}
+      stateKey={props.stateKey}
+      getState={props.synthDesignerGetState}
+    />
   </Provider>
 );
 
@@ -101,7 +205,7 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
 }) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const wavyJonesInstance = useRef<WavyJones | null>(null);
-  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+  const { dispatch, actionCreators, getState } = getReduxInfra(stateKey);
 
   useEffect(() => {
     if (
@@ -169,10 +273,11 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
           </SynthModuleComp>
         ))}
 
-        <AddModuleControls
+        <AddAndPresetControls
           stateKey={stateKey}
           synthDesignerActionCreators={actionCreators}
           synthDesignerDispatch={dispatch}
+          synthDesignerGetState={getState}
         />
       </div>
 

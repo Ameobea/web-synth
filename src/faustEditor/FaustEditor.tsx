@@ -19,7 +19,7 @@ import { ReduxStore, store } from 'src/redux';
 import PolyphonyControls from './PolyphonyControls';
 import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
 
-type FaustEditorReduxStore = typeof faustEditorContextMap.key.reduxInfra.__fullState;
+type FaustEditorReduxStore = ReturnType<typeof faustEditorContextMap.key.reduxInfra.getState>;
 
 const CodeEditor = React.lazy(() => import('./CodeEditor'));
 
@@ -49,6 +49,11 @@ const styles: { [key: string]: React.CSSProperties } = {
   buttonsWrapper: {
     display: 'flex',
     flexDirection: 'row',
+    padding: 8,
+  },
+  bottomContent: {
+    display: 'flex',
+    flexDirection: 'column',
     padding: 8,
   },
 };
@@ -221,7 +226,7 @@ export const mkCompileButtonClickHandler = ({
 export const mkStopInstanceHandler = ({
   reduxInfra,
   vcId,
-  context,
+  context: { faustNode, analyzerNode },
 }: {
   reduxInfra: FaustEditorReduxInfra;
   vcId: string;
@@ -230,7 +235,6 @@ export const mkStopInstanceHandler = ({
   reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE());
 
   // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
-  const { faustNode, analyzerNode } = context;
   if (!faustNode) {
     throw new Error(
       `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
@@ -275,7 +279,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
       vcId,
       analyzerNode: context.analyzerNode,
     }),
-    [editorContent, setCompileErrMsg, optimize, context.analyzerNode]
+    [editorContent, setCompileErrMsg, optimize, context.analyzerNode, vcId]
   );
 
   const stopInstance = useMemo(() => mkStopInstanceHandler({ reduxInfra, vcId, context }), [
@@ -296,7 +300,6 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
 
         <div style={styles.errorConsole}>{compileErrMsg}</div>
       </div>
-
       <div style={styles.buttonsWrapper}>
         <button onClick={compile} style={{ marginRight: 10 }}>
           Compile
@@ -305,27 +308,30 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
         {instance ? <button onClick={stopInstance}>Stop</button> : null}
       </div>
+      <div style={styles.bottomContent}>
+        <PolyphonyControls
+          state={polyphonyState}
+          setState={(newState: FaustEditorPolyphonyState) =>
+            reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_POLYPHONY_STATE(newState))
+          }
+        />
 
-      <PolyphonyControls
-        state={polyphonyState}
-        setState={(newState: FaustEditorPolyphonyState) =>
-          reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_POLYPHONY_STATE(newState))
-        }
-      />
+        <SaveControls editorContent={editorContent} />
 
-      <SaveControls editorContent={editorContent} />
+        {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
+
+        <EffectsPickerPanel
+          state={controlPanelState}
+          setState={setControlPanelState}
+          loadEffect={(effect: Effect) =>
+            reduxInfra.dispatch(
+              reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
+            )
+          }
+        />
+      </div>
 
       <SpectrumVisualization paused={isHidden} analyzerNode={context.analyzerNode} />
-
-      {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
-
-      <EffectsPickerPanel
-        state={controlPanelState}
-        setState={setControlPanelState}
-        loadEffect={(effect: Effect) =>
-          reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code))
-        }
-      />
     </Suspense>
   );
 };

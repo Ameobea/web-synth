@@ -7,18 +7,12 @@ use crate::{
 
 #[derive(Serialize, Deserialize)]
 pub struct SynthPreset {
-    pub voices: Vec<VoiceDefinitionItem>,
+    pub voices: Vec<VoiceDefinition>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct InlineSynthPreset {
     pub voices: Vec<VoiceDefinition>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum VoiceDefinitionItem {
-    External { id: i64 },
-    Anonymous(VoiceDefinition),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -183,7 +177,7 @@ pub enum Effect {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct SynthPresetEntry {
     pub id: i64,
     pub title: String,
@@ -191,12 +185,19 @@ pub struct SynthPresetEntry {
     pub body: SynthPreset,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct InlineSynthPresetEntry {
     pub id: i64,
     pub title: String,
     pub description: String,
     pub body: InlineSynthPreset,
+}
+
+#[derive(Deserialize)]
+pub struct ReceivedSynthPresetEntry {
+    pub title: String,
+    pub description: String,
+    pub body: SynthPreset,
 }
 
 #[derive(Insertable)]
