@@ -75,14 +75,14 @@ const AddModuleControlsInner: React.FC<
             }
 
             const selectedVoicePresetId: number = controlPanelContext.current['preset'];
-            const selectedVoicePreset = voicePresets[selectedVoicePresetId];
+            const selectedVoicePreset = voicePresets?.[selectedVoicePresetId]?.body;
 
             const vcId = stateKey.split('_')[1]!;
             synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
             synthDesignerDispatch(
               synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(
                 -1,
-                selectedVoicePreset.body,
+                selectedVoicePreset,
                 synthDesignerDispatch
               )
             );

@@ -1366,7 +1366,6 @@ const actionGroups = {
       pitchMultiplier,
     }),
     subReducer: (state: SynthDesignerState, { synthIx, pitchMultiplier }) => {
-      console.log(pitchMultiplier);
       const synth = getSynth(synthIx, state.synths);
       return setSynth(synthIx, { ...synth, pitchMultiplier }, state);
     },
@@ -1379,7 +1378,7 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { preset, dispatch }) => {
       if (state.synths.length !== 0) {
         throw new Error(
-          'Expected that all synths would be removed before dispatching `SET_SYNTY_PRESET`'
+          'Expected that all synths would be removed before dispatching `SET_SYNTH_PRESET`'
         );
       }
 
