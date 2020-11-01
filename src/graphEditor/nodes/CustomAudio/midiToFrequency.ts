@@ -13,6 +13,7 @@ export class MIDIToFrequencyNode {
 
   private midiNode: MIDINode;
   private frequencyCSN: ConstantSourceNode;
+  private detuneCSN: ConstantSourceNode;
   private gateCSN: ConstantSourceNode;
   /**
    * List of note IDs that are currently pressed down.  We're always emitting the frequency of the last note in this array
@@ -87,6 +88,10 @@ export class MIDIToFrequencyNode {
     this.gateCSN = new ConstantSourceNode(ctx);
     this.gateCSN.offset.value = 0;
     this.gateCSN.start();
+    this.detuneCSN = new ConstantSourceNode(ctx);
+    this.detuneCSN.start();
+    this.detuneCSN.offset.value = 0;
+    this.frequencyCSN.connect(this.detuneCSN.offset);
 
     this.midiNode = buildMIDINode(this.getMIDIInputCbs);
   }
@@ -94,10 +99,15 @@ export class MIDIToFrequencyNode {
   public buildConnectables(): AudioConnectables & { node: MIDIToFrequencyNode } {
     return {
       vcId: this.vcId,
-      inputs: Map<string, ConnectableInput>().set('midi', { node: this.midiNode, type: 'midi' }),
+      inputs: Map<string, ConnectableInput>()
+        .set('detune', {
+          node: this.detuneCSN.offset,
+          type: 'number',
+        })
+        .set('midi', { node: this.midiNode, type: 'midi' }),
       outputs: Map<string, ConnectableOutput>()
         .set('frequency', {
-          node: this.frequencyCSN,
+          node: this.detuneCSN,
           type: 'number',
         })
         .set('gate', { node: this.gateCSN, type: 'number' }),
