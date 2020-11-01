@@ -55,7 +55,7 @@ const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam 
 
   const dstParam = context.overrideableParams[path];
   if (!dstParam) {
-    console.error(`No param exists at path ${path} for Faust editor vcId "${vcId}"`);
+    // console.error(`No param exists at path ${path} for Faust editor vcId "${vcId}"`);
   }
 
   return dstParam;

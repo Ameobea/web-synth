@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"text/template"
 
 	"cloud.google.com/go/storage"
@@ -70,7 +71,7 @@ func getObjectName(codeHash string, optimized bool, ext string) string {
 }
 
 func getModuleJSONObjectURL(id string) string {
-	return "https://storage.googleapis.com/" + compiledModuleBucketName + "/" + id + ".json"
+	return "https://storage.googleapis.com/" + compiledModuleBucketName + "/" + strings.Split(id, "_optimize")[0] + ".json"
 }
 
 func getModuleURL(codeHash string, optimized bool) string {
@@ -232,6 +233,8 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 	if precompiledModule != nil {
 		log.Printf("Found pre-compiled entry for module %s; using that.", digest)
 		// We have an existing pre-compiled module so we just use that.
+		resWriter.Header().Set("Content-Type", "application/wasm")
+		resWriter.WriteHeader(200)
 		_, err = resWriter.Write(precompiledModule)
 		if err != nil {
 			log.Printf("Error while writing pre-compiled module to response: %s", err)
@@ -306,6 +309,7 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 	go ctx.addModuleToCache(outWasmFileName, digest, optimize)
 
 	// Send the file back to the user
+	resWriter.Header().Set("Content-Type", "application/javascript")
 	http.ServeFile(resWriter, req, outWasmFileName)
 }
 
@@ -352,7 +356,8 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 		http.Error(resWriter, "Failed to fetch JSON module from compilation cache", 500)
 		return
 	} else if res.StatusCode != 200 {
-		http.Error(resWriter, "Got non-200 status code while retrieving JSON module definition; status code %d", res.StatusCode)
+		log.Printf("Got non-200 status code while retrieving JSON module definition; status code %d", res.StatusCode)
+		http.Error(resWriter, fmt.Sprintf("Got non-200 status code while retrieving JSON module definition; status code %d", res.StatusCode), res.StatusCode)
 		return
 	}
 

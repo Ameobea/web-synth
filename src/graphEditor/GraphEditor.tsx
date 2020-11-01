@@ -109,6 +109,14 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       await registerAllCustomNodes();
 
       const graph = new LiteGraph.LGraph();
+      Object.keys((LiteGraph as any).registered_node_types)
+        .filter(
+          nodeType =>
+            !nodeType.startsWith('customAudio') &&
+            !nodeType.includes('faust') &&
+            !nodeType.includes('audioConnectables')
+        )
+        .forEach(nodeType => (LiteGraph as any).unregisterNodeType(nodeType));
       const canvas = new LiteGraph.LGraphCanvas('#graph-editor', graph);
 
       canvas.onNodeSelected = node => {
