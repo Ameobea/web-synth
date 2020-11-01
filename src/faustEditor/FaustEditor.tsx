@@ -29,7 +29,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   root: {
     display: 'flex',
     flexDirection: 'row',
-    overflowY: 'scroll',
+    overflowY: 'auto',
   },
   codeEditor: {
     display: 'flex',
@@ -102,7 +102,7 @@ const EffectsPickerPanelInnerInner: React.FC<
   <ControlPanel
     state={state}
     onChange={(_label: string, _newValue: any, newState: any) => setState(newState)}
-    position={{ bottom: 60, right: 8 }}
+    position={{ bottom: 60, right: 44 }}
     draggable
   >
     <Custom label='load effect' renderContainer Comp={EffectPickerCustomInput} />

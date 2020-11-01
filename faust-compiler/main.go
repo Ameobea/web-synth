@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strings"
 	"text/template"
+	"time"
 
 	"cloud.google.com/go/storage"
 	wasm "github.com/akupila/go-wasm"
@@ -71,7 +71,7 @@ func getObjectName(codeHash string, optimized bool, ext string) string {
 }
 
 func getModuleJSONObjectURL(id string) string {
-	return "https://storage.googleapis.com/" + compiledModuleBucketName + "/" + strings.Split(id, "_optimize")[0] + ".json"
+	return "https://storage.googleapis.com/" + compiledModuleBucketName + "/" + id + ".json"
 }
 
 func getModuleURL(codeHash string, optimized bool) string {
@@ -226,7 +226,7 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 	// Add header containing the module ID to load the Faust Worklet Processor code for the compiled module
 	moduleID := digest
 	if optimize {
-		moduleID += "_optimize"
+		moduleID += "_optimized"
 	}
 	resWriter.Header().Set(faustModuleIDHeaderName, moduleID)
 
@@ -334,35 +334,48 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 	resWriter.Header().Set("Access-Control-Allow-Origin", "*")
 	resWriter.Header().Set("Access-Control-Request-Method", "HEAD,GET,POST,PUT,PATCH,DELETE")
 
+	// Add correct `Content-Type` header so that it's correctly loaded
+	resWriter.Header().Set("Content-Type", "application/javascript")
+
 	// Handle CORS preflight requests
 	if req.Method == "HEAD" {
 		resWriter.WriteHeader(204)
 		return
 	}
 
-	// Add correct `Content-Type` header so that it's correctly loaded
-	resWriter.Header().Set("Content-Type", "application/javascript")
-
 	queryParams := req.URL.Query()
 	moduleID := queryParams.Get("id")
 	if moduleID == "" {
+		log.Printf("Invalid `id` param provided to JS endpoint")
 		http.Error(resWriter, "You must supply an `id` query param containing ID of the Faust module to fetch.", 500)
 		return
 	}
 
 	url := getModuleJSONObjectURL(moduleID)
-	res, err := http.Get(url)
-	if err != nil {
-		http.Error(resWriter, "Failed to fetch JSON module from compilation cache", 500)
-		return
-	} else if res.StatusCode != 200 {
-		log.Printf("Got non-200 status code while retrieving JSON module definition; status code %d", res.StatusCode)
-		http.Error(resWriter, fmt.Sprintf("Got non-200 status code while retrieving JSON module definition; status code %d", res.StatusCode), res.StatusCode)
+
+	var resBody io.ReadCloser = nil
+	for i := 0; i < 5; i++ {
+		res, err := http.Get(url)
+		if err != nil {
+			log.Printf("Failed to retrieve JSON module definition id %s; status code %d", moduleID, res.StatusCode)
+		} else if res.StatusCode != 200 {
+			log.Printf("Got non-200 status code while retrieving JSON module definition id %s; status code %d", moduleID, res.StatusCode)
+		} else {
+			resBody = res.Body
+			break
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+	if resBody == nil {
+		log.Printf("Failed to fetch module in 5 attempts")
+		http.Error(resWriter, "Failed to fetch the module in 5 attempts", 500)
 		return
 	}
 
-	jsonModuleDef, err := ioutil.ReadAll(res.Body)
+	jsonModuleDef, err := ioutil.ReadAll(resBody)
 	if err != nil {
+		log.Printf("Error reading JSON module def into buffer: %v", err)
 		http.Error(resWriter, "Error reading JSON module def into buffer", 500)
 		return
 	}
@@ -370,6 +383,7 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 	// Build the JavaScript code for the Faust Worklet Processor using the JSON module retrieved from the cache
 	jsCode, err := ctx.buildFaustWorkletCode(jsonModuleDef, moduleID)
 	if err != nil {
+		log.Printf("Error building Faust workler module processor code via template: %v", err)
 		http.Error(resWriter, "Error while building Faust worklet processor code via template", 500)
 		return
 	}
@@ -377,6 +391,7 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 	resWriter.Header().Set("Content-Type", "text/javascript")
 	_, err = resWriter.Write(jsCode)
 	if err != nil {
+		log.Printf("Error writing Faust module code into response body: %v", err)
 		http.Error(resWriter, "Error writing Faust module code into response body", 500)
 		return
 	}

@@ -90,7 +90,7 @@ export const init_faust_editor = (stateKey: string) => {
   faustEditorBase.id = buildRootNodeId(vcId);
   faustEditorBase.setAttribute(
     'style',
-    'z-index: 2; height: 100vh; position: absolute; top: 0; left: 0; display: none'
+    'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; display: none'
   );
 
   // Mount the newly created Faust editor and all of its accompanying components to the DOM

@@ -143,7 +143,7 @@ const buildControlPanelComponent = (
     <ControlPanel
       draggable
       theme='dark'
-      position={{ top: 0, right: 20 }}
+      position={{ top: 0, right: 44 }}
       settings={settings.map(setting => {
         const val = getParamValue(`/${pathBase}/${setting.label}`);
         if (R.isNil(val)) {
