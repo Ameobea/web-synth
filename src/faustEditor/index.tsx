@@ -17,6 +17,7 @@ import {
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { getFaustParamBasePath } from 'src/faustEditor/uiBuilder';
 
 const ctx = new AudioContext();
 
@@ -264,7 +265,9 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
       context.overrideableParams[label] = overridableParam;
     }
 
-    return acc.set(label, {
+    const trimmedLabel = label.split('/').slice(2).join('/');
+
+    return acc.set(trimmedLabel, {
       node: context.overrideableParams[label],
       type: 'number',
     });

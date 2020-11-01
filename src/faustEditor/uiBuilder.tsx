@@ -112,18 +112,19 @@ const buildControlPanelField = (
 const mapUiGroupToControlPanelFields = (
   group: UiGroup,
   setParamValue: (path: string, val: number) => void
-): {}[] =>
-  filterNils(R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue))));
+) => filterNils(R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue))));
+
+const getFaustParamBasePath = (fullPath: string): string => fullPath.split('/').slice(0, 2)[1];
 
 const buildControlPanelComponent = (
   uiDef: UiGroup[],
   pathTable: { [path: string]: any },
   setParamValue: (path: string, val: number) => void,
   getParamValue: (path: string) => number | null | undefined
-): React.FC<{}> => {
+): React.FC => {
   // Get the randomly generated path base so that we can accurately match when setting params
   const pathBase = Option.of(R.head(Object.keys(pathTable)))
-    .map(path => path.split('/').slice(0, 2)[1])
+    .map(getFaustParamBasePath)
     .getOrElse('');
 
   const settings: any[] = R.flatten(

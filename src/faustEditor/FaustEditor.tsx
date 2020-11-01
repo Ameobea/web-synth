@@ -199,7 +199,9 @@ export const mkCompileButtonClickHandler = ({
   setErrMessage('');
 
   faustNode.connect(analyzerNode);
-  const inputNames = [...(faustNode.parameters as Map<string, AudioParam>).keys()];
+  const inputNames = [...(faustNode.parameters as Map<string, AudioParam>).keys()].map(label =>
+    label.split('/').slice(2).join('/')
+  );
 
   const context = faustEditorContextMap[vcId];
   if (!context) {
