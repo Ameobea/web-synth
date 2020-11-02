@@ -4,7 +4,6 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
 import {
-  initPatchNetwork,
   PatchNetwork,
   ConnectableDescriptor,
   AudioConnectables,
@@ -14,7 +13,7 @@ import {
 import { getEngine } from 'src';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { ControlPanelInput, PlaceholderInput } from 'src/controlPanel';
+import { PlaceholderInput } from 'src/controlPanel';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];
@@ -95,10 +94,7 @@ export const connectNodes = (
     dst.setIsOverridden(false);
   }
 
-  (src as any).connect(
-    dst,
-    src instanceof PlaceholderInput || src instanceof ControlPanelInput ? dstDescriptor : undefined
-  );
+  (src as any).connect(dst, src instanceof PlaceholderInput ? dstDescriptor : undefined);
 };
 
 export const disconnectNodes = (
@@ -111,10 +107,7 @@ export const disconnectNodes = (
     dst.setIsOverridden(true);
   }
 
-  (src as any).disconnect(
-    dst,
-    src instanceof PlaceholderInput || src instanceof ControlPanelInput ? dstDescriptor : undefined
-  );
+  (src as any).disconnect(dst, src instanceof PlaceholderInput ? dstDescriptor : undefined);
 };
 
 /**
@@ -268,11 +261,11 @@ const actionGroups = {
             to2.vcId === to.vcId
         )
       ) {
-        // console.warn(
-        //   `A connection doesn't exist between ${JSON.stringify(from)} and ${JSON.stringify(
-        //     to
-        //   )}; performing no action`
-        // );
+        console.warn(
+          `A connection doesn't exist between ${JSON.stringify(from)} and ${JSON.stringify(
+            to
+          )}; performing no action`
+        );
         return state;
       }
 

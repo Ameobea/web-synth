@@ -4,12 +4,12 @@ import ControlPanel from 'react-control-panel';
 import { UnreachableException } from 'ameo-utils';
 
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
-import { Control, ControlInfo, ControlPanelConnection } from 'src/redux/modules/controlPanel';
+import { ControlInfo, ControlPanelConnection } from 'src/redux/modules/controlPanel';
 
-const SettingLabel: React.FC<{ label: string; onChange: (newLabel: string) => void }> = ({
-  label,
-  onChange,
-}) => {
+const SettingLabel: React.FC<{
+  label: string;
+  onChange: (newLabel: string) => void;
+}> = ({ label, onChange }) => {
   const [editingValue, setEditingValue] = useState<string | null>(null);
 
   if (editingValue === null) {
@@ -38,6 +38,21 @@ const SettingLabel: React.FC<{ label: string; onChange: (newLabel: string) => vo
   );
 };
 
+const mkLabelComponent = (
+  controlPanelVcId: string,
+  vcId: string,
+  name: string
+): React.FC<{ label: string }> => ({ label }) => (
+  <SettingLabel
+    label={label}
+    onChange={(newLabel: string) =>
+      dispatch(
+        actionCreators.controlPanel.SET_CONTROL_LABEL(controlPanelVcId, vcId, name, newLabel)
+      )
+    }
+  />
+);
+
 const buildSettingForControl = (
   info: ControlInfo,
   labelValue: string,
@@ -45,16 +60,7 @@ const buildSettingForControl = (
   vcId: string,
   name: string
 ) => {
-  const label = (
-    <SettingLabel
-      label={labelValue}
-      onChange={(newLabel: string) =>
-        dispatch(
-          actionCreators.controlPanel.SET_CONTROL_LABEL(controlPanelVcId, vcId, name, newLabel)
-        )
-      }
-    />
-  );
+  const LabelComponent = mkLabelComponent(controlPanelVcId, vcId, name);
 
   switch (info.type) {
     case 'range': {
@@ -62,16 +68,20 @@ const buildSettingForControl = (
         type: 'range',
         min: info.min,
         max: info.max,
-        label,
+        label: labelValue,
+        LabelComponent,
       };
     }
     case 'gate': {
       return {
         type: 'button',
-        action: () => {
-          // TODO
-        },
-        label,
+        action: () =>
+          dispatch(
+            // TODO: Make gate value configurable
+            actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(controlPanelVcId, vcId, name, 1.0)
+          ),
+        label: labelValue,
+        LabelComponent,
       };
     }
     default:
@@ -95,10 +105,12 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
       <ControlPanel
         position={{ top: y, left: x }}
         draggable
-        state={{ label: data.value }}
-        onChange={(_key: string, value: any) => {
-          console.log(label, value); // TODO
-        }}
+        state={{ [label]: data.value }}
+        onChange={(_key: string, value: any) =>
+          dispatch(
+            actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(controlPanelVcId, vcId, name, value)
+          )
+        }
         onDrag={(newPosition: { top?: number; left?: number }) =>
           dispatch(
             actionCreators.controlPanel.SET_CONTROL_POSITION(

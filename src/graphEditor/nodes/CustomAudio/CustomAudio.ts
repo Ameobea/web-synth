@@ -512,7 +512,7 @@ const registerCustomAudioNode = (
   };
 
   CustomAudioNode.prototype.onRemoved = function (this: any) {
-    if (!this.ignoreRemove) {
+    if (!this.ignore_remove) {
       removeNode(this.id.toString());
     }
   };

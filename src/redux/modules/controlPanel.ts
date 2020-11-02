@@ -1,7 +1,6 @@
 import { buildActionGroup, buildModule } from 'jantix';
 import { Option } from 'funfix-core';
-
-import { ControlPanelInput } from 'src/controlPanel';
+import { UnimplementedError } from 'ameo-utils';
 
 export interface ControlPanelState {
   stateByPanelInstance: {
@@ -15,8 +14,8 @@ export type ControlInfo =
 
 export const buildDefaultControlState = (): ControlInfo => ({
   type: 'range',
-  min: 0,
-  max: 100,
+  min: -1000,
+  max: 1000,
   value: 0,
 });
 
@@ -37,7 +36,7 @@ export interface Control {
 export interface ControlPanelConnection {
   vcId: string;
   name: string;
-  node: ControlPanelInput;
+  node: ConstantSourceNode;
   control: Control;
 }
 
@@ -56,14 +55,6 @@ const setInstance = (
 ): ControlPanelState => ({
   stateByPanelInstance: { ...state.stateByPanelInstance, [instanceVcId]: newInstance },
 });
-
-const setConnection = (
-  instanceVcId: string,
-  vcId: string,
-  name: string,
-  connection: ControlPanelConnection,
-  state: ControlPanelState
-): ControlPanelState => mapConnection(instanceVcId, vcId, name, () => connection, state);
 
 const mapConnection = (
   instanceVcId: string,
@@ -89,6 +80,19 @@ const mapConnection = (
   );
 };
 
+const updateControlData = (data: ControlInfo, newValue: number): ControlInfo => {
+  switch (data.type) {
+    case 'gate': {
+      return { type: 'gate', value: newValue, isPressed: newValue !== 0 };
+    }
+    case 'range': {
+      return { ...data, value: newValue };
+    }
+    default:
+      throw new UnimplementedError(`Unhandled input type: ${(data as any).type}`);
+  }
+};
+
 const actionGroups = {
   ADD_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string, initialConnections?: Omit<ControlPanelConnection, 'node'>[]) => ({
@@ -98,7 +102,13 @@ const actionGroups = {
     }),
     subReducer: (state: ControlPanelState, { vcId, initialConnections }) => {
       const connections = initialConnections
-        ? initialConnections.map(conn => ({ ...conn, node: new ControlPanelInput(ctx, vcId) }))
+        ? initialConnections.map(conn => {
+            const node = new ConstantSourceNode(ctx);
+            node.offset.value = conn.control.data.value;
+            node.start();
+
+            return { ...conn, node };
+          })
         : [];
 
       return {
@@ -125,24 +135,30 @@ const actionGroups = {
       vcId,
       name,
     }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name }) => ({
-      ...state,
-      stateByPanelInstance: {
-        ...state.stateByPanelInstance,
-        [controlPanelVcId]: {
-          ...state.stateByPanelInstance[controlPanelVcId],
-          connections: [
-            ...state.stateByPanelInstance[controlPanelVcId].connections,
-            {
-              vcId,
-              name,
-              node: new ControlPanelInput(ctx, controlPanelVcId),
-              control: buildDefaultControl(name),
-            },
-          ],
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name }) => {
+      const node = new ConstantSourceNode(ctx);
+      node.offset.value = 0;
+      node.start();
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: {
+            ...state.stateByPanelInstance[controlPanelVcId],
+            connections: [
+              ...state.stateByPanelInstance[controlPanelVcId].connections,
+              {
+                vcId,
+                name,
+                node,
+                control: buildDefaultControl(name),
+              },
+            ],
+          },
         },
-      },
-    }),
+      };
+    },
   }),
   REMOVE_CONNECTION: buildActionGroup({
     actionCreator: (controlPanelVcId: string, vcId: string, name: string) => ({
@@ -206,6 +222,31 @@ const actionGroups = {
         vcId,
         name,
         (conn: ControlPanelConnection) => ({ ...conn, control: { ...conn.control, label } }),
+        state
+      ),
+  }),
+  SET_CONTROL_PANEL_VALUE: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, vcId: string, name: string, value: number) => ({
+      type: 'SET_CONTROL_PANEL_VALUE',
+      controlPanelVcId,
+      vcId,
+      name,
+      value,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, value }) =>
+      mapConnection(
+        controlPanelVcId,
+        vcId,
+        name,
+        (conn: ControlPanelConnection) => {
+          const newData = updateControlData(conn.control.data, value);
+          conn.node.offset.setValueAtTime(newData.value, ctx.currentTime);
+
+          return {
+            ...conn,
+            control: { ...conn.control, data: newData },
+          };
+        },
         state
       ),
   }),

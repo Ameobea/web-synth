@@ -108,61 +108,6 @@ export const cleanup_control_panel = (stateKey: string) => {
   dispatch(actionCreators.controlPanel.REMOVE_INSTANCE(vcId));
 };
 
-export class ControlPanelInput extends ConstantSourceNode {
-  private controlPanelVcId: string;
-
-  constructor(ctx: AudioContext, controlPanelVcId: string) {
-    super(ctx);
-    this.controlPanelVcId = controlPanelVcId;
-    this.start();
-  }
-
-  disconnect(
-    destinationNode?: AudioNode | AudioParam | ConnectableDescriptor | void | number,
-    outputNumOrDescriptor?: number | ConnectableDescriptor
-  ) {
-    const dstDescriptor = Option.of(
-      !!destinationNode &&
-        typeof destinationNode !== 'number' &&
-        !(destinationNode instanceof AudioParam) &&
-        !(destinationNode instanceof AudioNode)
-        ? destinationNode
-        : null
-    )
-      .orElseL(() =>
-        Option.of(
-          !!outputNumOrDescriptor &&
-            typeof outputNumOrDescriptor !== 'number' &&
-            !(outputNumOrDescriptor instanceof AudioParam) &&
-            !(outputNumOrDescriptor instanceof AudioNode)
-            ? outputNumOrDescriptor
-            : null
-        )
-      )
-      .orNull();
-
-    if (!dstDescriptor) {
-      throw new Error(
-        'One of the arguments to `disconnect` on `PlaceholderInput` must be a `ConnectableDescriptor`'
-      );
-    }
-
-    setTimeout(() => {
-      dispatch(
-        actionCreators.controlPanel.REMOVE_CONNECTION(
-          this.controlPanelVcId,
-          dstDescriptor.vcId,
-          dstDescriptor.name
-        )
-      );
-      updateConnectables(
-        this.controlPanelVcId,
-        get_control_panel_audio_connectables(`controlPanel_${this.controlPanelVcId}`)
-      );
-    });
-  }
-}
-
 export class PlaceholderInput extends GainNode implements AudioNode {
   private controlPanelVcId: string;
 
