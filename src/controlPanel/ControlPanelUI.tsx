@@ -1,22 +1,139 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
-import { UnreachableException } from 'ameo-utils';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import { ControlInfo, ControlPanelConnection } from 'src/redux/modules/controlPanel';
+import BasicModal from 'src/misc/BasicModal';
+import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+
+const ConfigureInputInner: React.FC<{
+  info: ControlInfo;
+  registerOnSubmit: (onSubmit: () => ControlInfo) => void;
+}> = ({ info, registerOnSubmit }) => {
+  switch (info.type) {
+    case 'gate':
+      return <>TODO</>;
+    case 'range':
+      return (
+        <ControlPanel
+          contextCb={(context: any) => {
+            const onSubmit = () => ({
+              ...info,
+              min: Number.isNaN(+context.min) ? info.min : context.min,
+              max: Number.isNaN(+context.max) ? info.max : context.max,
+            });
+
+            registerOnSubmit(onSubmit);
+          }}
+          settings={[
+            {
+              type: 'text',
+              label: 'min',
+              initial: info.min.toString(),
+            },
+            {
+              type: 'text',
+              label: 'max',
+              initial: info.max.toString(),
+            },
+          ]}
+        />
+      );
+    default:
+      throw new UnimplementedError(`Unhandled input type: ${(info as any).type}`);
+  }
+};
+
+const mkConfigureInput = (
+  config: ControlInfo
+): React.FC<{
+  onSubmit: (val: ControlInfo) => void;
+  onCancel?: () => void;
+}> => {
+  const ConfigureInput: React.FC<ModalCompProps<ControlInfo>> = ({ onSubmit, onCancel }) => {
+    const handleSave = useRef<(() => ControlInfo) | null>(null);
+
+    return (
+      <BasicModal>
+        <div className='control-panel-input-configurator'>
+          <ConfigureInputInner
+            info={config}
+            registerOnSubmit={(onSubmit: () => ControlInfo) => {
+              handleSave.current = onSubmit;
+            }}
+          />
+
+          <div className='buttons'>
+            <button
+              onClick={() => {
+                if (!handleSave.current) {
+                  console.warn(
+                    'Submitted control panel input configurator, but no inner submit handler was registered'
+                  );
+                  return;
+                }
+                onSubmit(handleSave.current());
+              }}
+            >
+              Save
+            </button>
+            <button onClick={onCancel}>Close</button>
+          </div>
+        </div>
+      </BasicModal>
+    );
+  };
+  return ConfigureInput;
+};
+
+const ConfigureInputButton: React.FC<{
+  controlPanelVcId: string;
+  vcId: string;
+  name: string;
+  config: ControlInfo;
+}> = ({ controlPanelVcId, vcId, name, config }) => (
+  <div
+    className='configure-input-button'
+    onClick={async () => {
+      try {
+        const newInfo = await renderModalWithControls(mkConfigureInput(config));
+        dispatch(
+          actionCreators.controlPanel.SET_CONTROL_PANEL_INFO(controlPanelVcId, vcId, name, newInfo)
+        );
+      } catch (_err) {
+        // pass
+      }
+    }}
+  >
+    ⚙️
+  </div>
+);
 
 const SettingLabel: React.FC<{
   label: string;
   onChange: (newLabel: string) => void;
-}> = ({ label, onChange }) => {
+  controlPanelVcId: string;
+  vcId: string;
+  name: string;
+  config: ControlInfo;
+}> = ({ label, onChange, controlPanelVcId, vcId, name, config }) => {
   const [editingValue, setEditingValue] = useState<string | null>(null);
 
   if (editingValue === null) {
     return (
-      <span style={{ cursor: 'text' }} onDoubleClick={() => setEditingValue(label)}>
-        {label}
-      </span>
+      <>
+        <ConfigureInputButton
+          controlPanelVcId={controlPanelVcId}
+          vcId={vcId}
+          name={name}
+          config={config}
+        />
+        <span style={{ cursor: 'text' }} onDoubleClick={() => setEditingValue(label)}>
+          {label}
+        </span>
+      </>
     );
   }
 
@@ -41,17 +158,25 @@ const SettingLabel: React.FC<{
 const mkLabelComponent = (
   controlPanelVcId: string,
   vcId: string,
-  name: string
-): React.FC<{ label: string }> => ({ label }) => (
-  <SettingLabel
-    label={label}
-    onChange={(newLabel: string) =>
-      dispatch(
-        actionCreators.controlPanel.SET_CONTROL_LABEL(controlPanelVcId, vcId, name, newLabel)
-      )
-    }
-  />
-);
+  name: string,
+  config: ControlInfo
+) => {
+  const LabelComponent: React.FC<{ label: string }> = ({ label }) => (
+    <SettingLabel
+      label={label}
+      onChange={(newLabel: string) =>
+        dispatch(
+          actionCreators.controlPanel.SET_CONTROL_LABEL(controlPanelVcId, vcId, name, newLabel)
+        )
+      }
+      controlPanelVcId={controlPanelVcId}
+      vcId={vcId}
+      name={name}
+      config={config}
+    />
+  );
+  return LabelComponent;
+};
 
 const buildSettingForControl = (
   info: ControlInfo,
@@ -60,7 +185,7 @@ const buildSettingForControl = (
   vcId: string,
   name: string
 ) => {
-  const LabelComponent = mkLabelComponent(controlPanelVcId, vcId, name);
+  const LabelComponent = mkLabelComponent(controlPanelVcId, vcId, name, info);
 
   switch (info.type) {
     case 'range': {
@@ -130,6 +255,7 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
           text1: 'rgb(235,235,235)',
           text2: 'rgb(161,161,161)',
         }}
+        width={500}
       />
     </div>
   </div>

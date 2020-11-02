@@ -250,6 +250,22 @@ const actionGroups = {
         state
       ),
   }),
+  SET_CONTROL_PANEL_INFO: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      vcId: string,
+      name: string,
+      newInfo: ControlInfo
+    ) => ({ type: 'SET_CONTROL_PANEL_INFO', controlPanelVcId, vcId, name, newInfo }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, newInfo }) =>
+      mapConnection(
+        controlPanelVcId,
+        vcId,
+        name,
+        conn => ({ ...conn, control: { ...conn.control, data: newInfo } }),
+        state
+      ),
+  }),
 };
 
 export default buildModule<ControlPanelState, typeof actionGroups>(initialState, actionGroups);

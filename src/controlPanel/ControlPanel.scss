@@ -1,4 +1,26 @@
 .control-panel-root-node {
   .control {
+    .control-panel .configure-input-button {
+      position: absolute;
+      top: -11px;
+      left: -12px;
+      cursor: pointer;
+    }
+  }
+}
+
+.control-panel-input-configurator {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+
+  .buttons {
+    display: flex;
+    flex-direction: column;
+
+    button {
+      margin-top: 6px;
+    }
   }
 }
