@@ -12,15 +12,26 @@ export type ControlInfo =
   | { type: 'range'; min: number; max: number; value: number }
   | { type: 'gate'; value: number; isPressed: boolean };
 
-export const buildDefaultControlState = (): ControlInfo => ({
-  type: 'range',
-  min: -1000,
-  max: 1000,
-  value: 0,
-});
+export const buildDefaultControlPanelInfo = (type: ControlInfo['type'] = 'range'): ControlInfo => {
+  switch (type) {
+    case 'range':
+      return {
+        type: 'range',
+        min: -1000,
+        max: 1000,
+        value: 0,
+      };
+    case 'gate':
+      return {
+        type: 'gate',
+        value: 1.0,
+        isPressed: false,
+      };
+  }
+};
 
 export const buildDefaultControl = (name: string): Control => ({
-  data: buildDefaultControlState(),
+  data: buildDefaultControlPanelInfo(),
   label: name,
   color: '#361',
   position: { x: 0, y: 0 },

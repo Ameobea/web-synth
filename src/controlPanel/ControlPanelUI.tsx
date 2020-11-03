@@ -4,29 +4,51 @@ import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
-import { ControlInfo, ControlPanelConnection } from 'src/redux/modules/controlPanel';
+import {
+  buildDefaultControlPanelInfo,
+  ControlInfo,
+  ControlPanelConnection,
+} from 'src/redux/modules/controlPanel';
 import BasicModal from 'src/misc/BasicModal';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 
 const ConfigureInputInner: React.FC<{
   info: ControlInfo;
-  registerOnSubmit: (onSubmit: () => ControlInfo) => void;
-}> = ({ info, registerOnSubmit }) => {
+  onChange: (newInfo: ControlInfo) => void;
+}> = ({ info, onChange }) => {
   switch (info.type) {
     case 'gate':
-      return <>TODO</>;
+      return (
+        <ControlPanel
+          state={info}
+          onChange={(_key: string, _val: any, state: any) =>
+            onChange({
+              type: 'gate',
+              value: Number.isNaN(state.value) ? info.value : +state.value,
+              isPressed: info.isPressed,
+            })
+          }
+          settings={[
+            {
+              type: 'text',
+              label: 'value',
+              initial: info.value.toString(),
+            },
+          ]}
+        />
+      );
     case 'range':
       return (
         <ControlPanel
-          contextCb={(context: any) => {
-            const onSubmit = () => ({
-              ...info,
-              min: Number.isNaN(+context.min) ? info.min : context.min,
-              max: Number.isNaN(+context.max) ? info.max : context.max,
-            });
-
-            registerOnSubmit(onSubmit);
-          }}
+          state={info}
+          onChange={(_key: string, _val: any, state: any) =>
+            onChange({
+              type: 'range',
+              min: Number.isNaN(state.min) ? info.min : +state.min,
+              max: Number.isNaN(state.max) ? info.max : +state.max,
+              value: Number.isNaN(state.value) ? info.value : +state.value,
+            })
+          }
           settings={[
             {
               type: 'text',
@@ -47,38 +69,38 @@ const ConfigureInputInner: React.FC<{
 };
 
 const mkConfigureInput = (
-  config: ControlInfo
+  providedConfig: ControlInfo
 ): React.FC<{
   onSubmit: (val: ControlInfo) => void;
   onCancel?: () => void;
 }> => {
   const ConfigureInput: React.FC<ModalCompProps<ControlInfo>> = ({ onSubmit, onCancel }) => {
-    const handleSave = useRef<(() => ControlInfo) | null>(null);
+    const [config, setConfig] = useState(providedConfig);
 
     return (
       <BasicModal>
         <div className='control-panel-input-configurator'>
-          <ConfigureInputInner
-            info={config}
-            registerOnSubmit={(onSubmit: () => ControlInfo) => {
-              handleSave.current = onSubmit;
+          <ControlPanel
+            settings={[
+              {
+                type: 'select',
+                label: 'input type',
+                options: ['gate', 'range'],
+                initial: config.type,
+              },
+            ]}
+            onChange={(_key: string, val: ControlInfo['type']) => {
+              if (val === config.type) {
+                return;
+              }
+
+              setConfig(buildDefaultControlPanelInfo(val));
             }}
           />
+          <ConfigureInputInner info={config} onChange={setConfig} />
 
           <div className='buttons'>
-            <button
-              onClick={() => {
-                if (!handleSave.current) {
-                  console.warn(
-                    'Submitted control panel input configurator, but no inner submit handler was registered'
-                  );
-                  return;
-                }
-                onSubmit(handleSave.current());
-              }}
-            >
-              Save
-            </button>
+            <button onClick={() => onSubmit(config)}>Save</button>
             <button onClick={onCancel}>Close</button>
           </div>
         </div>
