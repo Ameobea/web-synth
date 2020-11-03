@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
@@ -24,15 +24,18 @@ const ConfigureInputInner: React.FC<{
           onChange={(_key: string, _val: any, state: any) =>
             onChange({
               type: 'gate',
-              value: Number.isNaN(state.value) ? info.value : +state.value,
-              isPressed: info.isPressed,
+              gateValue: Number.isNaN(+state.gateValue) ? info.gateValue : +state.gateValue,
+              offValue: Number.isNaN(+state.offValue) ? info.offValue : +state.offValue,
             })
           }
           settings={[
             {
               type: 'text',
-              label: 'value',
-              initial: info.value.toString(),
+              label: 'gateValue',
+            },
+            {
+              type: 'text',
+              label: 'offValue',
             },
           ]}
         />
@@ -44,21 +47,18 @@ const ConfigureInputInner: React.FC<{
           onChange={(_key: string, _val: any, state: any) =>
             onChange({
               type: 'range',
-              min: Number.isNaN(state.min) ? info.min : +state.min,
-              max: Number.isNaN(state.max) ? info.max : +state.max,
-              value: Number.isNaN(state.value) ? info.value : +state.value,
+              min: Number.isNaN(+state.min) ? info.min : +state.min,
+              max: Number.isNaN(+state.max) ? info.max : +state.max,
             })
           }
           settings={[
             {
               type: 'text',
               label: 'min',
-              initial: info.min.toString(),
             },
             {
               type: 'text',
               label: 'max',
-              initial: info.max.toString(),
             },
           ]}
         />
@@ -136,26 +136,14 @@ const ConfigureInputButton: React.FC<{
 const SettingLabel: React.FC<{
   label: string;
   onChange: (newLabel: string) => void;
-  controlPanelVcId: string;
-  vcId: string;
-  name: string;
-  config: ControlInfo;
-}> = ({ label, onChange, controlPanelVcId, vcId, name, config }) => {
+}> = ({ label, onChange }) => {
   const [editingValue, setEditingValue] = useState<string | null>(null);
 
   if (editingValue === null) {
     return (
-      <>
-        <ConfigureInputButton
-          controlPanelVcId={controlPanelVcId}
-          vcId={vcId}
-          name={name}
-          config={config}
-        />
-        <span style={{ cursor: 'text' }} onDoubleClick={() => setEditingValue(label)}>
-          {label}
-        </span>
-      </>
+      <span style={{ cursor: 'text' }} onDoubleClick={() => setEditingValue(label)}>
+        {label}
+      </span>
     );
   }
 
@@ -177,12 +165,7 @@ const SettingLabel: React.FC<{
   );
 };
 
-const mkLabelComponent = (
-  controlPanelVcId: string,
-  vcId: string,
-  name: string,
-  config: ControlInfo
-) => {
+const mkLabelComponent = (controlPanelVcId: string, vcId: string, name: string) => {
   const LabelComponent: React.FC<{ label: string }> = ({ label }) => (
     <SettingLabel
       label={label}
@@ -191,10 +174,6 @@ const mkLabelComponent = (
           actionCreators.controlPanel.SET_CONTROL_LABEL(controlPanelVcId, vcId, name, newLabel)
         )
       }
-      controlPanelVcId={controlPanelVcId}
-      vcId={vcId}
-      name={name}
-      config={config}
     />
   );
   return LabelComponent;
@@ -207,7 +186,7 @@ const buildSettingForControl = (
   vcId: string,
   name: string
 ) => {
-  const LabelComponent = mkLabelComponent(controlPanelVcId, vcId, name, info);
+  const LabelComponent = mkLabelComponent(controlPanelVcId, vcId, name);
 
   switch (info.type) {
     case 'range': {
@@ -222,10 +201,23 @@ const buildSettingForControl = (
     case 'gate': {
       return {
         type: 'button',
-        action: () =>
+        onmousedown: () =>
           dispatch(
-            // TODO: Make gate value configurable
-            actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(controlPanelVcId, vcId, name, 1.0)
+            actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(
+              controlPanelVcId,
+              vcId,
+              name,
+              info.gateValue
+            )
+          ),
+        onmouseup: () =>
+          dispatch(
+            actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(
+              controlPanelVcId,
+              vcId,
+              name,
+              info.offValue
+            )
           ),
         label: labelValue,
         LabelComponent,
@@ -245,40 +237,55 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
     label,
     color,
     position: { x, y },
+    value,
   },
 }) => (
   <div className='control'>
     <div className='label' style={{ color }}>
-      <ControlPanel
-        position={{ top: y, left: x }}
-        draggable
-        state={{ [label]: data.value }}
-        onChange={(_key: string, value: any) =>
-          dispatch(
-            actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(controlPanelVcId, vcId, name, value)
-          )
-        }
-        onDrag={(newPosition: { top?: number; left?: number }) =>
-          dispatch(
-            actionCreators.controlPanel.SET_CONTROL_POSITION(
-              controlPanelVcId,
-              vcId,
-              name,
-              newPosition
+      <>
+        <ControlPanel
+          position={{ top: y, left: x }}
+          draggable
+          state={{ [label]: value }}
+          onChange={(_key: string, value: any) =>
+            dispatch(
+              actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(
+                controlPanelVcId,
+                vcId,
+                name,
+                value
+              )
             )
-          )
-        }
-        settings={[buildSettingForControl(data, label, controlPanelVcId, vcId, name)]}
-        theme={{
-          background1: color,
-          background2: 'rgb(54,54,54)',
-          background2hover: 'rgb(58,58,58)',
-          foreground1: 'rgb(112,112,112)',
-          text1: 'rgb(235,235,235)',
-          text2: 'rgb(161,161,161)',
-        }}
-        width={500}
-      />
+          }
+          onDrag={(newPosition: { top?: number; left?: number }) =>
+            dispatch(
+              actionCreators.controlPanel.SET_CONTROL_POSITION(
+                controlPanelVcId,
+                vcId,
+                name,
+                newPosition
+              )
+            )
+          }
+          settings={[buildSettingForControl(data, label, controlPanelVcId, vcId, name)]}
+          theme={{
+            background1: color,
+            background2: 'rgb(54,54,54)',
+            background2hover: 'rgb(58,58,58)',
+            foreground1: 'rgb(112,112,112)',
+            text1: 'rgb(235,235,235)',
+            text2: 'rgb(161,161,161)',
+          }}
+          width={500}
+        >
+          <ConfigureInputButton
+            controlPanelVcId={controlPanelVcId}
+            vcId={vcId}
+            name={name}
+            config={data}
+          />
+        </ControlPanel>
+      </>
     </div>
   </div>
 );

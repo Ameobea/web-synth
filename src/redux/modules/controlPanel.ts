@@ -1,6 +1,5 @@
 import { buildActionGroup, buildModule } from 'jantix';
 import { Option } from 'funfix-core';
-import { UnimplementedError } from 'ameo-utils';
 
 export interface ControlPanelState {
   stateByPanelInstance: {
@@ -9,8 +8,8 @@ export interface ControlPanelState {
 }
 
 export type ControlInfo =
-  | { type: 'range'; min: number; max: number; value: number }
-  | { type: 'gate'; value: number; isPressed: boolean };
+  | { type: 'range'; min: number; max: number }
+  | { type: 'gate'; offValue: number; gateValue: number };
 
 export const buildDefaultControlPanelInfo = (type: ControlInfo['type'] = 'range'): ControlInfo => {
   switch (type) {
@@ -19,19 +18,19 @@ export const buildDefaultControlPanelInfo = (type: ControlInfo['type'] = 'range'
         type: 'range',
         min: -1000,
         max: 1000,
-        value: 0,
       };
     case 'gate':
       return {
         type: 'gate',
-        value: 1.0,
-        isPressed: false,
+        offValue: 0.0,
+        gateValue: 1.0,
       };
   }
 };
 
 export const buildDefaultControl = (name: string): Control => ({
   data: buildDefaultControlPanelInfo(),
+  value: 0,
   label: name,
   color: '#361',
   position: { x: 0, y: 0 },
@@ -39,6 +38,7 @@ export const buildDefaultControl = (name: string): Control => ({
 
 export interface Control {
   data: ControlInfo;
+  value: number;
   label: string;
   color: string;
   position: { x: number; y: number };
@@ -91,19 +91,6 @@ const mapConnection = (
   );
 };
 
-const updateControlData = (data: ControlInfo, newValue: number): ControlInfo => {
-  switch (data.type) {
-    case 'gate': {
-      return { type: 'gate', value: newValue, isPressed: newValue !== 0 };
-    }
-    case 'range': {
-      return { ...data, value: newValue };
-    }
-    default:
-      throw new UnimplementedError(`Unhandled input type: ${(data as any).type}`);
-  }
-};
-
 const actionGroups = {
   ADD_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string, initialConnections?: Omit<ControlPanelConnection, 'node'>[]) => ({
@@ -115,7 +102,7 @@ const actionGroups = {
       const connections = initialConnections
         ? initialConnections.map(conn => {
             const node = new ConstantSourceNode(ctx);
-            node.offset.value = conn.control.data.value;
+            node.offset.value = conn.control.value;
             node.start();
 
             return { ...conn, node };
@@ -250,12 +237,11 @@ const actionGroups = {
         vcId,
         name,
         (conn: ControlPanelConnection) => {
-          const newData = updateControlData(conn.control.data, value);
-          conn.node.offset.setValueAtTime(newData.value, ctx.currentTime);
+          conn.node.offset.setValueAtTime(value, ctx.currentTime);
 
           return {
             ...conn,
-            control: { ...conn.control, data: newData },
+            control: { ...conn.control, value },
           };
         },
         state
