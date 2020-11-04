@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
+import { Option } from 'funfix-core';
 
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import {
@@ -120,32 +121,46 @@ const mkConfigureInput = (
   return ConfigureInput;
 };
 
-const ConfigureInputButton: React.FC<{
+const ConfigureInputButtons: React.FC<{
   controlPanelVcId: string;
   vcId: string;
   name: string;
   control: Control;
 }> = ({ controlPanelVcId, vcId, name, control }) => (
-  <div
-    className='configure-input-button'
-    onClick={async () => {
-      try {
-        const newControl = await renderModalWithControls(mkConfigureInput(control));
-        dispatch(
-          actionCreators.controlPanel.SET_CONTROL_PANEL_CONTROL(
-            controlPanelVcId,
-            vcId,
-            name,
-            newControl
-          )
-        );
-      } catch (_err) {
-        // pass
-      }
-    }}
-  >
-    ⚙️
-  </div>
+  <>
+    <div
+      className='configure-input-button'
+      onClick={async () => {
+        try {
+          const newControl = await renderModalWithControls(mkConfigureInput(control));
+          dispatch(
+            actionCreators.controlPanel.SET_CONTROL_PANEL_CONTROL(
+              controlPanelVcId,
+              vcId,
+              name,
+              newControl
+            )
+          );
+        } catch (_err) {
+          // pass
+        }
+      }}
+    >
+      ⚙️
+    </div>
+    <div
+      className='delete-input-button'
+      onClick={async () => {
+        const shouldDelete = confirm(`Really delete this control named "${name}"?`);
+        if (!shouldDelete) {
+          return;
+        }
+        dispatch(actionCreators.controlPanel.REMOVE_CONNECTION(controlPanelVcId, vcId, name));
+      }}
+    >
+      🗑️
+    </div>
+  </>
 );
 
 const SettingLabel: React.FC<{
@@ -289,7 +304,7 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
           }}
           width={500}
         >
-          <ConfigureInputButton
+          <ConfigureInputButtons
             controlPanelVcId={controlPanelVcId}
             vcId={vcId}
             name={name}
@@ -324,6 +339,26 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           }
           const presetName = panelCtx.current.preset || presets[0].name;
           dispatch(actionCreators.controlPanel.LOAD_PRESET(vcId, presetName));
+        },
+      },
+      {
+        type: 'button',
+        label: 'delete preset',
+        action: () => {
+          if (!panelCtx.current) {
+            console.error("Tried to delete preset, but panel context isn't set");
+            return;
+          }
+          if (R.isEmpty(presets)) {
+            alert('No preset to delete!');
+            return;
+          }
+          const presetName = Option.of(panelCtx.current.preset).getOrElse(presets[0].name);
+          const shouldDelete = confirm(`Really delete the preset named "${presetName}"?`);
+          if (!shouldDelete) {
+            return;
+          }
+          dispatch(actionCreators.controlPanel.DELETE_PRESET(vcId, presetName));
         },
       },
       { type: 'text', label: 'preset name' },

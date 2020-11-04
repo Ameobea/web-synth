@@ -334,6 +334,25 @@ const actionGroups = {
       };
     },
   }),
+  DELETE_PRESET: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, name: string) => ({
+      type: 'DELETE_PRESET',
+      controlPanelVcId,
+      name,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, name }) => ({
+      ...state,
+      stateByPanelInstance: {
+        ...state.stateByPanelInstance,
+        [controlPanelVcId]: {
+          ...state.stateByPanelInstance[controlPanelVcId],
+          presets: state.stateByPanelInstance[controlPanelVcId].presets.filter(
+            preset => preset.name !== name
+          ),
+        },
+      },
+    }),
+  }),
 };
 
 export default buildModule<ControlPanelState, typeof actionGroups>(initialState, actionGroups);
