@@ -29,10 +29,13 @@ const getRootNodeID = (vcId: string) => `${BASE_ROOT_NODE_ID}${vcId}`;
 const saveStateForInstance = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
   const instanceState = getState().controlPanel.stateByPanelInstance[vcId];
-  const serializableConnections = instanceState.connections.map(conn =>
+  const serializableConnections = instanceState.controls.map(conn =>
     R.omit(['node' as const], conn)
   );
-  const serializedConnections = JSON.stringify(serializableConnections);
+  const serializedConnections = JSON.stringify({
+    connections: serializableConnections,
+    presets: instanceState.presets,
+  });
   localStorage.setItem(stateKey, serializedConnections);
 };
 
@@ -43,27 +46,40 @@ export const init_control_panel = (stateKey: string) => {
   rootNode.id = getRootNodeID(vcId);
   document.getElementById('content')!.append(rootNode);
 
-  const serialized: ControlPanelConnection[] | undefined = Option.of(localStorage.getItem(stateKey))
+  const serialized:
+    | { connections: ControlPanelConnection[]; presets: ControlPanelInstanceState['presets'] }
+    | undefined = Option.of(localStorage.getItem(stateKey))
     .flatMap(serialized => {
       try {
-        const parsed: (ControlPanelConnection & { control: Control | undefined })[] = JSON.parse(
-          serialized
-        );
-        return Option.some(
-          parsed.map(conn => {
+        const {
+          connections,
+          presets,
+        }: {
+          connections: (ControlPanelConnection & { control: Control | undefined })[];
+          presets: ControlPanelInstanceState['presets'];
+        } = JSON.parse(serialized);
+        return Option.some({
+          connections: connections.map(conn => {
             if (!conn.control) {
               conn.control = buildDefaultControl(conn.name);
             }
             return conn as ControlPanelConnection;
-          })
-        );
+          }),
+          presets,
+        });
       } catch (err) {
         console.warn('Failed to parse serialized control panel state; defaulting.');
         return Option.none();
       }
     })
     .orUndefined();
-  dispatch(actionCreators.controlPanel.ADD_INSTANCE(vcId, serialized));
+  dispatch(
+    actionCreators.controlPanel.ADD_INSTANCE(
+      vcId,
+      serialized?.connections || undefined,
+      serialized?.presets || undefined
+    )
+  );
 
   ReactDOM.render(
     <Provider store={store}>
@@ -171,7 +187,7 @@ export const buildControlPanelAudioConnectables = (
   vcId: string,
   instState: ControlPanelInstanceState
 ): AudioConnectables => {
-  const existingConnections = instState.connections.reduce(
+  const existingConnections = instState.controls.reduce(
     (acc, conn) => acc.set(conn.name, { type: 'number', node: conn.node }),
     ImmMap() as ImmMap<string, ConnectableOutput>
   );

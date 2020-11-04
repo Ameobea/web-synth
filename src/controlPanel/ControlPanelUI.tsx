@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
 
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import {
   buildDefaultControlPanelInfo,
   ControlInfo,
+  Control,
   ControlPanelConnection,
 } from 'src/redux/modules/controlPanel';
 import BasicModal from 'src/misc/BasicModal';
@@ -69,13 +71,13 @@ const ConfigureInputInner: React.FC<{
 };
 
 const mkConfigureInput = (
-  providedConfig: ControlInfo
+  providedControl: Control
 ): React.FC<{
-  onSubmit: (val: ControlInfo) => void;
+  onSubmit: (val: Control) => void;
   onCancel?: () => void;
 }> => {
-  const ConfigureInput: React.FC<ModalCompProps<ControlInfo>> = ({ onSubmit, onCancel }) => {
-    const [config, setConfig] = useState(providedConfig);
+  const ConfigureInput: React.FC<ModalCompProps<Control>> = ({ onSubmit, onCancel }) => {
+    const [control, setControl] = useState(providedControl);
 
     return (
       <BasicModal>
@@ -86,21 +88,29 @@ const mkConfigureInput = (
                 type: 'select',
                 label: 'input type',
                 options: ['gate', 'range'],
-                initial: config.type,
+                initial: control.data.type,
+              },
+              {
+                type: 'color',
+                label: 'color',
+                initial: control.data,
               },
             ]}
             onChange={(_key: string, val: ControlInfo['type']) => {
-              if (val === config.type) {
+              if (val === control.data.type) {
                 return;
               }
 
-              setConfig(buildDefaultControlPanelInfo(val));
+              setControl({ ...control, data: buildDefaultControlPanelInfo(val) });
             }}
           />
-          <ConfigureInputInner info={config} onChange={setConfig} />
+          <ConfigureInputInner
+            info={control.data}
+            onChange={newData => setControl({ ...control, data: newData })}
+          />
 
           <div className='buttons'>
-            <button onClick={() => onSubmit(config)}>Save</button>
+            <button onClick={() => onSubmit(control)}>Save</button>
             <button onClick={onCancel}>Close</button>
           </div>
         </div>
@@ -114,15 +124,20 @@ const ConfigureInputButton: React.FC<{
   controlPanelVcId: string;
   vcId: string;
   name: string;
-  config: ControlInfo;
-}> = ({ controlPanelVcId, vcId, name, config }) => (
+  control: Control;
+}> = ({ controlPanelVcId, vcId, name, control }) => (
   <div
     className='configure-input-button'
     onClick={async () => {
       try {
-        const newInfo = await renderModalWithControls(mkConfigureInput(config));
+        const newControl = await renderModalWithControls(mkConfigureInput(control));
         dispatch(
-          actionCreators.controlPanel.SET_CONTROL_PANEL_INFO(controlPanelVcId, vcId, name, newInfo)
+          actionCreators.controlPanel.SET_CONTROL_PANEL_CONTROL(
+            controlPanelVcId,
+            vcId,
+            name,
+            newControl
+          )
         );
       } catch (_err) {
         // pass
@@ -232,21 +247,15 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
   controlPanelVcId,
   vcId,
   name,
-  control: {
-    data,
-    label,
-    color,
-    position: { x, y },
-    value,
-  },
+  control,
 }) => (
   <div className='control'>
-    <div className='label' style={{ color }}>
+    <div className='label' style={{ color: control.color }}>
       <>
         <ControlPanel
-          position={{ top: y, left: x }}
+          position={{ top: control.position.y, left: control.position.x }}
           draggable
-          state={{ [label]: value }}
+          state={{ [control.label]: control.value }}
           onChange={(_key: string, value: any) =>
             dispatch(
               actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(
@@ -267,9 +276,11 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
               )
             )
           }
-          settings={[buildSettingForControl(data, label, controlPanelVcId, vcId, name)]}
+          settings={[
+            buildSettingForControl(control.data, control.label, controlPanelVcId, vcId, name),
+          ]}
           theme={{
-            background1: color,
+            background1: control.color,
             background2: 'rgb(54,54,54)',
             background2hover: 'rgb(58,58,58)',
             foreground1: 'rgb(112,112,112)',
@@ -282,7 +293,7 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
             controlPanelVcId={controlPanelVcId}
             vcId={vcId}
             name={name}
-            config={data}
+            control={control}
           />
         </ControlPanel>
       </>
@@ -292,13 +303,61 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
 
 const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const vcId = stateKey.split('_')[1];
-  const connections = useSelector(
-    (state: ReduxStore) => state.controlPanel.stateByPanelInstance[vcId].connections
+  const { controls, presets } = useSelector(
+    (state: ReduxStore) => state.controlPanel.stateByPanelInstance[vcId]
+  );
+  const panelCtx = useRef<any>(null);
+  const presetPanelSettings = useMemo(
+    () => [
+      { type: 'select', label: 'preset', options: presets.map(R.prop('name')) },
+      {
+        type: 'button',
+        label: 'load preset',
+        action: () => {
+          if (!panelCtx.current) {
+            console.error("Tried to load preset, but panel context isn't set");
+            return;
+          }
+          if (R.isEmpty(presets)) {
+            alert('No preset to load!');
+            return;
+          }
+          const presetName = panelCtx.current.preset || presets[0].name;
+          dispatch(actionCreators.controlPanel.LOAD_PRESET(vcId, presetName));
+        },
+      },
+      { type: 'text', label: 'preset name' },
+      {
+        type: 'button',
+        label: 'save preset',
+        action: () => {
+          if (!panelCtx.current) {
+            console.error("Tried to save preset, but panel context isn't set");
+            return;
+          }
+          const presetName = panelCtx.current['preset name'];
+          if (presets.find(R.propEq('name' as const, presetName))) {
+            alert('A preset already exists with that name; choose a unique name');
+            return;
+          }
+          dispatch(actionCreators.controlPanel.SAVE_PRESET(vcId, presetName));
+        },
+      },
+    ],
+    [presets, vcId]
   );
 
   return (
     <div>
-      {connections.map(conn => (
+      <ControlPanel
+        position='top-left'
+        draggable
+        settings={presetPanelSettings}
+        contextCb={(ctx: any) => {
+          panelCtx.current = ctx;
+        }}
+      />
+      {controls.map(conn => (
         <ControlComp key={`${conn.vcId}${conn.name}`} {...conn} controlPanelVcId={vcId} />
       ))}
     </div>
