@@ -94,15 +94,28 @@ const mkConfigureInput = (
               {
                 type: 'color',
                 label: 'color',
-                initial: control.data,
+                initial: control.color,
+                format: 'hex',
               },
             ]}
-            onChange={(_key: string, val: ControlInfo['type']) => {
-              if (val === control.data.type) {
-                return;
-              }
+            onChange={(key: string, val: ControlInfo['type']) => {
+              switch (key) {
+                case 'input type': {
+                  if (val === control.data.type) {
+                    return;
+                  }
 
-              setControl({ ...control, data: buildDefaultControlPanelInfo(val) });
+                  setControl({ ...control, data: buildDefaultControlPanelInfo(val) });
+                  break;
+                }
+                case 'color': {
+                  setControl({ ...control, color: val });
+                  break;
+                }
+                default: {
+                  throw new UnreachableException(`Unhandled key in control panel: ${key}`);
+                }
+              }
             }}
           />
           <ConfigureInputInner

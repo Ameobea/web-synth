@@ -153,6 +153,24 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     }
   }
 
+  /**
+   * Replaces the currently wrapped param with the new one provided, disconnecting the old one and re-connecting the new
+   * one in its place.
+   */
+  public replaceParam(newParam: AudioParam) {
+    if (this.isOverridden) {
+      this.manualControl.disconnect(this.wrappedParam);
+    } else {
+      this.disconnect(this.wrappedParam);
+    }
+    this.wrappedParam = newParam;
+    if (this.isOverridden) {
+      this.manualControl.connect(this.wrappedParam);
+    } else {
+      this.connect(this.wrappedParam);
+    }
+  }
+
   public dispose() {
     this.disconnect();
     if (this.isOverridden) {

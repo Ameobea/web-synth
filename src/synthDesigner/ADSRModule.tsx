@@ -2,12 +2,14 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
+import { createValueRecorder, ValueRecorder } from 'src/graphEditor/nodes/ValueRecorderNode';
 
 export class ADSRModule extends ConstantSourceNode {
   private ctx: AudioContext;
   public minValue: number;
   public maxValue: number;
-  private lengthMs: number;
+  public lengthMs: ValueRecorder | null = null;
+  private onLengthValueRecordedInitialzedCbs: ((recorder: ValueRecorder) => void)[] = [];
   public envelope: ADSRValues = defaultAdsrEnvelope;
   private mostRecentGateTime: number | null = null;
 
@@ -24,13 +26,32 @@ export class ADSRModule extends ConstantSourceNode {
     this.ctx = ctx;
     this.minValue = minValue;
     this.maxValue = maxValue;
-    this.lengthMs = lengthMs;
 
     this.offset.setValueAtTime(this.minValue, ctx.currentTime);
+
+    createValueRecorder(ctx, lengthMs).then(valueRecorder => {
+      this.lengthMs = valueRecorder;
+      this.lengthMs.value = lengthMs;
+
+      this.onLengthValueRecordedInitialzedCbs.forEach(cb => cb(valueRecorder));
+      this.onLengthValueRecordedInitialzedCbs = [];
+    });
+  }
+
+  public onLengthValueRecordedInitialzed(cb: (recorder: ValueRecorder) => void) {
+    if (this.lengthMs) {
+      cb(this.lengthMs);
+      return;
+    }
+    this.onLengthValueRecordedInitialzedCbs.push(cb);
   }
 
   public setLengthMs(newLengthMs: number) {
-    this.lengthMs = newLengthMs;
+    if (!this.lengthMs) {
+      console.warn('Tried to set ADSR length before value recorder initialized');
+      return;
+    }
+    this.lengthMs.value = newLengthMs;
   }
 
   public setMinValue(newMinValue: number) {
@@ -50,6 +71,11 @@ export class ADSRModule extends ConstantSourceNode {
    * underlying `ConstantSourceNode` and effecting all connected `AudioParam`s
    */
   public gate(offset?: number) {
+    if (!this.lengthMs) {
+      console.warn('Tried to gate ADSR before value recorder initialized');
+      return;
+    }
+
     this.mostRecentGateTime = this.ctx.currentTime;
     // start out off at the minimum
     if (R.isNil(offset)) {
@@ -66,12 +92,12 @@ export class ADSRModule extends ConstantSourceNode {
     // Ramp to the attack
     this.offset.linearRampToValueAtTime(
       this.minValue + attack.magnitude * range,
-      this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0 + realOffset
+      this.ctx.currentTime + (attack.pos * this.lengthMs.lastValue) / 1000.0 + realOffset
     );
     // Ramp to the decay and hold there
     this.offset.linearRampToValueAtTime(
       this.minValue + decay.magnitude * range,
-      this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0 + realOffset
+      this.ctx.currentTime + (decay.pos * this.lengthMs.lastValue) / 1000.0 + realOffset
     );
   }
 
@@ -80,6 +106,11 @@ export class ADSRModule extends ConstantSourceNode {
    * and start ramping to zero immediately.
    */
   public ungate(offset?: number, onReleaseFinished?: () => void) {
+    if (!this.lengthMs) {
+      console.warn('Tried to ungate ADSR before value recorder initialized');
+      return;
+    }
+
     const range = this.maxValue - this.minValue;
     const { release, decay } = this.envelope;
 
@@ -94,7 +125,7 @@ export class ADSRModule extends ConstantSourceNode {
       );
     }
 
-    const releaseDuration = ((1.0 - release.pos) * this.lengthMs) / 1000.0;
+    const releaseDuration = ((1.0 - release.pos) * this.lengthMs.lastValue) / 1000.0;
     this.offset.linearRampToValueAtTime(
       this.minValue,
       this.ctx.currentTime + releaseDuration + Option.of(offset).getOrElse(0)
