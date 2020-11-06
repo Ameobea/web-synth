@@ -17,10 +17,17 @@ export class EnvelopeGenerator implements ForeignNode {
   public nodeType = 'customAudio/envelopeGenerator';
   public name = 'Envelope Generator';
 
+  private heldNotes: number[] = [];
   private gateMIDINodeInputCBs: MIDIInputCbs = {
-    onAttack: (_note, _voiceIx, _velocity, offset) => this.adsrModule.gate(offset),
-    onRelease: (_note, _voiceIx, _velocity, offset) => {
-      this.adsrModule.ungate(offset);
+    onAttack: (note, _voiceIx, _velocity, offset) => {
+      this.heldNotes.push(note);
+      this.adsrModule.gate(offset);
+    },
+    onRelease: (note, _voiceIx, _velocity, offset) => {
+      if (R.last(this.heldNotes) === note) {
+        this.adsrModule.ungate(offset);
+      }
+      this.heldNotes = this.heldNotes.filter(oNote => note !== oNote);
     },
     onPitchBend: () => {
       /* no-op */
