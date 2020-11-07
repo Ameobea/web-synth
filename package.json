@@ -46,7 +46,7 @@
     "build": "rm -rf dist/* && BACKEND_BASE_URL=\"https://notes-backend.p.ameo.design\" webpack --config webpack.prod.js && cp -r ./public/* ./dist",
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run --browser chrome",
+    "cypress:run": "cypress run --browser chrome --record --key 58905cf6-d1cb-43de-b6cd-b55954039c1a",
     "cypress:serve": "serve -p 9000 dist"
   },
   "dependencies": {
