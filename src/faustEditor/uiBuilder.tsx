@@ -11,9 +11,11 @@ interface BaseUiDef {
 
 enum InputType {
   hslider = 'hslider',
+  vslider = 'vslider',
   range = 'range',
   button = 'button',
   nentry = 'nentry',
+  checkbox = 'checkbox',
 }
 
 enum GroupType {
@@ -42,7 +44,7 @@ type TypeForInputType<K extends UiDef['type']> = Extract<
   { type: K extends InputType ? InputType : K extends GroupType ? GroupType : never }
 >;
 
-const getLabel = (address: string) => R.tail(address.split('/').slice(1)).join('');
+const getLabel = (address: string) => R.tail(address.split('/').slice(1)).join('/');
 
 const buildControlPanelField = (
   def: UiDef,
@@ -56,6 +58,15 @@ const buildControlPanelField = (
       | ArrayElementOf<ReturnType<typeof buildControlPanelField>>;
   } = {
     [InputType.hslider]: ({ address, min, max, init, step }: UiInput) => ({
+      type: 'range',
+      // Paths are prefixed with a long randomly generated string which we cut off to make it easier to read the labels
+      label: getLabel(address),
+      min,
+      max,
+      initial: init,
+      step,
+    }),
+    [InputType.vslider]: ({ address, min, max, init, step }: UiInput) => ({
       type: 'range',
       // Paths are prefixed with a long randomly generated string which we cut off to make it easier to read the labels
       label: getLabel(address),
@@ -82,6 +93,11 @@ const buildControlPanelField = (
       max,
       initial: init,
       step,
+    }),
+    [InputType.checkbox]: ({ address }) => ({
+      type: 'checkbox',
+      label: getLabel(address),
+      initial: false,
     }),
     // TODO: Add label once `react-control-panel` supports that
     [GroupType.vgroup]: ({ items }: { label: string; items: UiDef[] }) =>

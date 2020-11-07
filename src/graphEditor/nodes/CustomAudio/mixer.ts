@@ -1,5 +1,4 @@
 import { Map } from 'immutable';
-import * as R from 'ramda';
 
 import {
   AudioConnectables,

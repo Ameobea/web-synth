@@ -54,9 +54,6 @@ const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam 
   }
 
   const dstParam = context.overrideableParams[path];
-  if (!dstParam) {
-    // console.error(`No param exists at path ${path} for Faust editor vcId "${vcId}"`);
-  }
 
   return dstParam;
 };
@@ -79,10 +76,12 @@ const actionGroups = {
         (path: string, val: number) => {
           const dstParam = getFaustModuleParam(vcId, path);
           if (!dstParam) {
+            console.warn(`Param doesn't exist: "${path}"`);
             return;
           }
 
-          dstParam.manualControl.offset.value = val;
+          console.log(dstParam.manualControl, +val);
+          dstParam.manualControl.offset.value = +val;
         },
         (path: string) => {
           const dstParam = getFaustModuleParam(vcId, path);
