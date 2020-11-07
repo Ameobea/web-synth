@@ -6,6 +6,7 @@ import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtil
 import ScaleAndShiftSmallView, {
   ScaleAndShiftUIState,
 } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 const computeScaleAndShift = ({
   input_range: inputRange,
@@ -25,8 +26,9 @@ export class ScaleAndShiftNode implements ForeignNode {
   public nodeType = 'customAudio/scaleAndShift';
 
   private vcId: string;
-  private firstShifterNode: ConstantSourceNode;
-  private scalerNode: GainNode;
+  private firstShifter: OverridableAudioParam;
+  private scaler: OverridableAudioParam;
+  private secondShifter: OverridableAudioParam;
   private secondShifterNode: ConstantSourceNode;
   private uiState: ScaleAndShiftUIState;
 
@@ -34,19 +36,22 @@ export class ScaleAndShiftNode implements ForeignNode {
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
-    this.scalerNode = new GainNode(ctx);
-    this.scalerNode.gain.value = 0;
-    this.firstShifterNode = new ConstantSourceNode(ctx);
-    this.firstShifterNode.offset.value = 0;
-    this.firstShifterNode.start();
+    const scalerNode = new GainNode(ctx);
+    scalerNode.gain.value = 0;
+    this.scaler = new OverridableAudioParam(ctx, scalerNode.gain);
+    const firstShifterNode = new ConstantSourceNode(ctx);
+    firstShifterNode.offset.value = 0;
+    firstShifterNode.start();
+    this.firstShifter = new OverridableAudioParam(ctx, firstShifterNode.offset);
     this.secondShifterNode = new ConstantSourceNode(ctx);
     this.secondShifterNode.offset.value = 0;
     this.secondShifterNode.start();
+    this.secondShifter = new OverridableAudioParam(ctx, this.secondShifterNode.offset);
 
     this.uiState = this.maybeDeserialize(params);
     this.updateNodes();
 
-    this.firstShifterNode.connect(this.scalerNode).connect(this.secondShifterNode.offset);
+    firstShifterNode.connect(scalerNode).connect(this.secondShifterNode.offset);
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: ScaleAndShiftSmallView,
@@ -63,9 +68,9 @@ export class ScaleAndShiftNode implements ForeignNode {
 
   private updateNodes() {
     const { firstOffset, multiplier, secondOffset } = computeScaleAndShift(this.uiState);
-    this.firstShifterNode.offset.value = firstOffset;
-    this.scalerNode.gain.value = multiplier;
-    this.secondShifterNode.offset.value = secondOffset;
+    this.firstShifter.manualControl.offset.value = firstOffset;
+    this.scaler.manualControl.offset.value = multiplier;
+    this.secondShifter.manualControl.offset.value = secondOffset;
   }
 
   private maybeDeserialize(
@@ -105,10 +110,18 @@ export class ScaleAndShiftNode implements ForeignNode {
 
   public buildConnectables() {
     return {
-      inputs: Map<string, ConnectableInput>().set('input', {
-        node: this.firstShifterNode.offset,
-        type: 'number',
-      }),
+      inputs: Map<string, ConnectableInput>()
+        .set('input', {
+          // We expose the param here directly to bypass the overriding.  That's stupidly confusing.
+          //
+          // Basically, we need to add the input and either the first scaler input or the first scaler
+          // manual control.  The Overridable param handles the second part, and we handle the first here.
+          node: this.firstShifter.wrappedParam,
+          type: 'number',
+        })
+        .set('scale', { node: this.scaler, type: 'number' })
+        .set('pre_scale_shift', { type: 'number', node: this.firstShifter })
+        .set('post_scale_shift', { type: 'number', node: this.secondShifter }),
       outputs: Map<string, ConnectableOutput>().set('output', {
         node: this.secondShifterNode,
         type: 'number',
