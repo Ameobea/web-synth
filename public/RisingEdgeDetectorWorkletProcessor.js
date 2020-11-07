@@ -25,7 +25,7 @@ class RisingEdgeDetectorWorkletProcessor extends AudioWorkletProcessor {
       }
     }
 
-    return true;
+    return false;
   }
 }
 

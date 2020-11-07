@@ -243,6 +243,7 @@ export const mkStopInstanceHandler = ({
     );
   }
   faustNode.disconnect(analyzerNode);
+  faustNode.shutdown();
 
   // Create new audio connectables using a passthrough node
   delete faustEditorContextMap[vcId]!.faustNode;
@@ -257,7 +258,7 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   isHidden,
   polyphonyState,
 }) => {
-  const [optimize, setOptimize] = useState(false);
+  const [optimize, setOptimize] = useState(true);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
 

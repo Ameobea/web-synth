@@ -4,17 +4,17 @@ import { connect } from 'react-redux';
 import { faustEditorContextMap, FaustEditorReduxInfra } from 'src/faustEditor';
 import { mkStopInstanceHandler, mkCompileButtonClickHandler } from 'src/faustEditor/FaustEditor';
 
-const mapSmallViewCompStateToProps = (state: FaustEditorReduxInfra['__fullState']) => ({
+const mapSmallViewCompStateToProps = (state: ReturnType<FaustEditorReduxInfra['getState']>) => ({
   instance: state.faustEditor.instance,
   faustCode: state.faustEditor.editorContent,
 });
 
 export const mkFaustEditorSmallView = (vcId: string) => {
-  const SmallViewCompInner: React.FC<{} & ReturnType<typeof mapSmallViewCompStateToProps>> = ({
+  const SmallViewCompInner: React.FC<ReturnType<typeof mapSmallViewCompStateToProps>> = ({
     instance,
     faustCode,
   }) => {
-    const [optimize, setOptimize] = useState(false);
+    const [optimize, setOptimize] = useState(true);
     const [compileErr, setCompileErr] = useState(false);
 
     const instanceContext = faustEditorContextMap[vcId];
@@ -54,7 +54,10 @@ export const mkFaustEditorSmallView = (vcId: string) => {
     if (!instance) {
       return (
         <div>
-          <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
+          <div>
+            Optimize{' '}
+            <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
+          </div>
           <button
             onClick={() => {
               setCompileErr(false);

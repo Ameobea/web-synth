@@ -17,6 +17,7 @@ import { tryParseJson } from 'src/util';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import { getEngine } from 'src';
 import FlatButton from 'src/misc/FlatButton';
+import { LGraphHandlesByVcId } from 'src/graphEditor';
 
 (window as any).LGraph = LiteGraph.LGraph;
 
@@ -97,6 +98,18 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
   const curSelectedNode = useRef<any>(null);
 
   const smallViewDOMId = `small-view-dom-id_${stateKey}`;
+
+  useEffect(() => {
+    const vcId = stateKey.split('_')[1];
+    if (lGraphInstance) {
+      LGraphHandlesByVcId.set(vcId, lGraphInstance);
+      return () => {
+        LGraphHandlesByVcId.delete(vcId);
+      };
+    } else {
+      LGraphHandlesByVcId.delete(vcId);
+    }
+  }, [lGraphInstance, stateKey]);
 
   useEffect(() => {
     if (isInitialized.current || !canvasRef.current) {

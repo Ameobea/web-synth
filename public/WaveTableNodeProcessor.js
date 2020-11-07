@@ -93,14 +93,24 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
 
-    this.port.onmessage = event => this.initWasmInstance(event.data);
+    this.isShutdown = false;
+    this.port.onmessage = event => {
+      if (event.data === 'shutdown') {
+        this.isShutdown = true;
+        return;
+      }
+
+      this.initWasmInstance(event.data);
+    };
   }
 
   process(_inputs, outputs, params) {
-    if (!this.waveTableHandlePtr || params.frequency.every(f => f === 0)) {
+    if (this.isShutdown) {
+      return false;
+    } else if (!this.waveTableHandlePtr || params.frequency.every(f => f === 0)) {
       return true;
     }
-    this.i = this.i||0;
+    this.i = this.i || 0;
     this.i += 1;
 
     // Write the mixes for each sample in the frame into the Wasm memory.  Mixes are a flattened 3D
@@ -143,7 +153,8 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     }
     for (let i = 0; i < FRAME_SIZE; i++) {
       this.float32WasmMemory[frequencyBufArrayOffset + i] =
-        params.frequency[Math.min(params.frequency.length - 1, i)] + params.detune[Math.min(params.detune.length - 1, i)];
+        params.frequency[Math.min(params.frequency.length - 1, i)] +
+        params.detune[Math.min(params.detune.length - 1, i)];
     }
 
     // TODO: No need to do this every frame; do once when handle is created and store ptr

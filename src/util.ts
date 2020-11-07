@@ -1,3 +1,4 @@
+import { UnreachableException } from 'ameo-utils';
 import { Try } from 'funfix-core';
 
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
@@ -91,3 +92,26 @@ export function base64ToArrayBuffer(base64: string) {
   }
   return bytes.buffer;
 }
+
+export const delay = (delayMs: number) => new Promise(resolve => setTimeout(resolve, delayMs));
+
+export const retryAsync = async <T>(
+  fn: () => Promise<T>,
+  attempts = 3,
+  delayMs = 50
+): Promise<T> => {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fn();
+      return res;
+    } catch (err) {
+      if (i === attempts - 1) {
+        // Out of attempts
+        throw err;
+      }
+
+      await delay(delayMs);
+    }
+  }
+  throw new UnreachableException();
+};

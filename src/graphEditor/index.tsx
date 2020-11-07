@@ -3,9 +3,12 @@ import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 
 import { store } from 'src/redux';
+import { retryAsync } from 'src/util';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
 const ROOT_NODE_ID = 'graph-editor-react-root' as const;
+
+export const LGraphHandlesByVcId: Map<string, any> = new Map();
 
 export const init_graph_editor = (stateKey: string) => {
   // Create the base dom node for the faust editor
@@ -56,4 +59,17 @@ export const cleanup_graph_editor = (stateKey: string) => {
     ReactDOM.unmountComponentAtNode(graphEditorReactRootNode);
     graphEditorReactRootNode.remove();
   }
+};
+
+export const arrange_graph_editor = (vcId: string) => {
+  const inner = async () => {
+    const instance = LGraphHandlesByVcId.get(vcId);
+    if (!instance) {
+      throw `Tried to arrange lgraph with vcId=${vcId} but no entry is registered`;
+    }
+    instance.arrange();
+  };
+  // It takes a little bit of time for the graph editor to initialize and the instance to be registered after
+  // committing from the VCM, so we account for that here.
+  retryAsync(inner, 10, 100);
 };

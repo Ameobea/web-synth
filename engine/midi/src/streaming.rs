@@ -58,7 +58,7 @@ pub fn create_msg_handler_context(
                                    note_id: usize,
                                    velocity: u8,
                                    offset: Option<f32>| {
-            if (cfg!(debug_assertions) && offset.is_some()) {
+            if cfg!(debug_assertions) && offset.is_some() {
                 warn!(
                     "Offset provided to streaming synth attack CB, but it doesn't support \
                      offsets; ignoring"
@@ -81,7 +81,7 @@ pub fn create_msg_handler_context(
                                     voice_ix: usize,
                                     note_id: usize,
                                     offset: Option<f32>| {
-            if (cfg!(debug_assertions) && offset.is_some()) {
+            if cfg!(debug_assertions) && offset.is_some() {
                 warn!(
                     "Offset provided to streaming synth release CB, but it doesn't support \
                      offsets; ignoring"

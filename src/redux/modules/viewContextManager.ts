@@ -261,11 +261,11 @@ const actionGroups = {
             to2.vcId === to.vcId
         )
       ) {
-        console.warn(
-          `A connection doesn't exist between ${JSON.stringify(from)} and ${JSON.stringify(
-            to
-          )}; performing no action`
-        );
+        // console.warn(
+        //   `A connection doesn't exist between ${JSON.stringify(from)} and ${JSON.stringify(
+        //     to
+        //   )}; performing no action`
+        // );
         return state;
       }
 

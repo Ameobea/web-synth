@@ -65,6 +65,10 @@ export class FaustWorkletNode extends AudioWorkletNode {
       });
     }
   };
+
+  public shutdown() {
+    this.port.postMessage({ type: 'shutdown' });
+  }
 }
 
 export const buildFaustWorkletNode = async (

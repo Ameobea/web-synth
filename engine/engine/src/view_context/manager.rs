@@ -217,15 +217,16 @@ impl ViewContextManager {
         self.foreign_connectables = vcm_state.foreign_connectables;
     }
 
-    /// Initializes the VCM with the default view context and state from scratch
-    fn init_default_state(&mut self) {
-        let uuid = uuid_v4();
-        let mut graph_editor_view_context = build_view("graph_editor", None, uuid);
+    /// Initializes the VCM with the default view context and state from scratch.  Returns the UUID
+    /// of the graph editor that is created.
+    fn init_default_state(&mut self) -> Uuid {
+        let graph_editor_vc_id = uuid_v4();
+        let mut graph_editor_view_context = build_view("graph_editor", None, graph_editor_vc_id);
         graph_editor_view_context.init();
         graph_editor_view_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid,
+                uuid: graph_editor_vc_id,
                 name: "graph_editor".into(),
                 title: Some("Graph Editor".into()),
             },
@@ -326,6 +327,7 @@ impl ViewContextManager {
         ));
 
         self.active_context_ix = 0;
+        graph_editor_vc_id
     }
 
     fn load_vcm_state() -> Option<ViewContextManagerState> {
@@ -342,15 +344,20 @@ impl ViewContextManager {
     /// Loads saved application state from the browser's `localstorage`.  Then calls the `init()`
     /// function of all managed `ViewContext`s.
     pub fn init(&mut self) {
-        if let Some(vcm_state) = Self::load_vcm_state() {
+        let graph_editor_vc_id = if let Some(vcm_state) = Self::load_vcm_state() {
             self.init_from_state_snapshot(vcm_state);
+            None
         } else {
-            self.init_default_state();
-        }
+            let graph_editor_vc_id = self.init_default_state();
+            Some(graph_editor_vc_id)
+        };
 
         self.contexts[self.active_context_ix].context.unhide();
 
         self.commit();
+        if let Some(graph_editor_vc_id) = graph_editor_vc_id {
+            js::arrange_graph_editor(&graph_editor_vc_id.to_string());
+        }
     }
 
     /// Retrieves the active `ViewContextManager`

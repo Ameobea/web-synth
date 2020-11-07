@@ -299,6 +299,10 @@ export default class WaveTable implements ForeignNode {
       node: this,
     };
   }
+
+  public shutdown() {
+    this.workletHandle!.port.postMessage('shutdown');
+  }
 }
 
 export const decodeWavetableDef = ({

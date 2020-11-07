@@ -98,7 +98,7 @@ class StatisticsNodeProcessor extends AudioWorkletProcessor {
       this.resetCounters();
     }
 
-    return true;
+    return false;
   }
 }
 

@@ -18,7 +18,12 @@ import { updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
-  synthModule.voices.forEach(voice => voice.outerGainNode.disconnect());
+  synthModule.voices.forEach(voice => {
+    voice.outerGainNode.disconnect();
+    if (voice.wavetable) {
+      voice.wavetable.shutdown();
+    }
+  });
 };
 
 export enum Waveform {
@@ -758,8 +763,9 @@ const actionGroups = {
     actionCreator: (index: number) => ({ type: 'DELETE_SYNTH_MODULE', index }),
     subReducer: (state: SynthDesignerState, { index }) => {
       const removedModule = state.synths[index];
-      if (!index) {
+      if (!removedModule) {
         console.error(`Tried to remove synth ix ${index} but we only have ${state.synths.length}`);
+        return state;
       }
 
       disposeSynthModule(removedModule);
@@ -1389,7 +1395,7 @@ const actionGroups = {
 };
 
 const SynthDesignerReduxInfra = buildModule<SynthDesignerState, typeof actionGroups>(
-  getInitialSynthDesignerState(),
+  getInitialSynthDesignerState(true),
   actionGroups
 );
 

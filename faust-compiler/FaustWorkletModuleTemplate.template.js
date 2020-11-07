@@ -120,6 +120,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
 
     this.dsp = 0;
     this.outs = null;
+    this.isShutdown = false;
 
     this.pathTable = [];
 
@@ -207,6 +208,10 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ jsonDef: this.jsonDef });
           break;
         }
+        case 'shutdown': {
+          this.isShutdown = true;
+          break;
+        }
         default: {
           this.log(`Unhandled message type: ${event.data.type}`);
         }
@@ -215,8 +220,10 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, params) {
-    if (!this.dspInstance) {
-      return;
+    if (this.isShutdown) {
+      return false;
+    } else if (!this.dspInstance) {
+      return true;
     }
 
     // Set all params into the Wasm memory from the latest values we have to our `AudioParam`s

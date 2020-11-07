@@ -423,6 +423,11 @@ export const audioNodeGetters: {
   },
   'customAudio/wavetable': {
     nodeGetter: (vcId, params) => new WaveTable(ctx, vcId, params),
+    protoParams: {
+      onRemovedCustom: function (this: WaveTable) {
+        this.shutdown();
+      },
+    },
   },
   'customAudio/envelopeGenerator': {
     nodeGetter: (vcId, params) => new EnvelopeGenerator(ctx, vcId, params),
@@ -514,6 +519,10 @@ const registerCustomAudioNode = (
   CustomAudioNode.prototype.onRemoved = function (this: any) {
     if (!this.ignore_remove) {
       removeNode(this.id.toString());
+    }
+
+    if (this.onRemovedCustom) {
+      this.onRemovedCustom();
     }
   };
 

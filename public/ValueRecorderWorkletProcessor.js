@@ -17,7 +17,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
 
   process(_inputs, _outputs, params) {
     if (params.input.length === 0) {
-      return true;
+      return false;
     }
 
     const sampleCount = params.input.length;
@@ -27,7 +27,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
       this.recordValue(value);
     }
 
-    return true;
+    return false;
   }
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { connect, Provider, useDispatch, useSelector } from 'react-redux';
+import { connect, Provider, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';

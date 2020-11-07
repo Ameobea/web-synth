@@ -47,11 +47,9 @@ export class ADSRModule extends ConstantSourceNode {
   }
 
   public setLengthMs(newLengthMs: number) {
-    if (!this.lengthMs) {
-      console.warn('Tried to set ADSR length before value recorder initialized');
-      return;
-    }
-    this.lengthMs.value = newLengthMs;
+    this.onLengthValueRecordedInitialzed(lengthMs => {
+      lengthMs.value = newLengthMs;
+    });
   }
 
   public setMinValue(newMinValue: number) {
