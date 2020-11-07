@@ -92,11 +92,18 @@ jobs:
 
       # Run Cypress tests
       - name: Cypress Run
-        uses: cypress-io/github-action@v1.16.1
+        uses: cypress-io/github-action@v2
         with:
           browser: chrome
           start: yarn cypress:serve
           wait-on: 'http://localhost:9000'
+          record: true
+      - name: Upload recorded video as an artifact
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: cypress_recordings
+          path: cypress/videos
 
   deploy-static-site:
     runs-on: ubuntu-latest

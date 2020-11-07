@@ -80,7 +80,6 @@ const actionGroups = {
             return;
           }
 
-          console.log(dstParam.manualControl, +val);
           dstParam.manualControl.offset.value = +val;
         },
         (path: string) => {
