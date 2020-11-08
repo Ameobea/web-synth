@@ -1,4 +1,4 @@
-import React, { useState, useCallback, Suspense, useMemo } from 'react';
+import React, { useState, Suspense, useMemo } from 'react';
 import { connect, Provider } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import * as R from 'ramda';
@@ -274,14 +274,15 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vcId, instance]);
 
-  const compile = useCallback(
-    mkCompileButtonClickHandler({
-      faustCode: editorContent,
-      optimize,
-      setErrMessage: setCompileErrMsg,
-      vcId,
-      analyzerNode: context.analyzerNode,
-    }),
+  const compile = useMemo(
+    () =>
+      mkCompileButtonClickHandler({
+        faustCode: editorContent,
+        optimize,
+        setErrMessage: setCompileErrMsg,
+        vcId,
+        analyzerNode: context.analyzerNode,
+      }),
     [editorContent, setCompileErrMsg, optimize, context.analyzerNode, vcId]
   );
 

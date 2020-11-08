@@ -1,0 +1,24 @@
+$eq-background-color: #262626;
+$eq-knob-color: #02bddb;
+
+svg.equalizer {
+  background-color: #242424;
+  border: 1px solid #999;
+
+  .equalizer-knob {
+    stroke: #040404;
+    stroke-width: 1px;
+    fill: $eq-knob-color;
+  }
+
+  .eq-knob-label {
+    font-size: 12px;
+    stroke: #222;
+    pointer-events: none;
+  }
+
+  .eq-line {
+    stroke: #ddd;
+    fill: none;
+  }
+}

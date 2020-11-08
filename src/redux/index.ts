@@ -6,6 +6,7 @@ import midiKeyboardModule from './modules/midiKeyboard';
 import effectsModule from './modules/effects';
 import presetsModule, { fetchSynthPresets, fetchSynthVoicePresets } from './modules/presets';
 import controlPanelModule from './modules/controlPanel';
+import equalizerModule from 'src/redux/modules/equalizer';
 
 const modules = {
   viewContextManager: viewContextManagerModule,
@@ -13,6 +14,7 @@ const modules = {
   effects: effectsModule,
   presets: presetsModule,
   controlPanel: controlPanelModule,
+  equalizer: equalizerModule,
 };
 
 export const { store, getState, dispatch, actionCreators, useSelector } = buildStore<

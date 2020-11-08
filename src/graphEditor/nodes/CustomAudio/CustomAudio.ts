@@ -31,6 +31,7 @@ import { getState } from 'src/redux';
 import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
 import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
+import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 
 const ctx = new AudioContext();
 
@@ -431,6 +432,9 @@ export const audioNodeGetters: {
   },
   'customAudio/envelopeGenerator': {
     nodeGetter: (vcId, params) => new EnvelopeGenerator(ctx, vcId, params),
+  },
+  'customAudio/Equalizer': {
+    nodeGetter: (vcId, params) => new Equalizer(ctx, vcId, params),
   },
 };
 
