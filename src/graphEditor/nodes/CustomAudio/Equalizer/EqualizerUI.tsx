@@ -14,7 +14,7 @@ const EqualizerLine: React.FC<{
     () =>
       'M ' +
       points
-        .map(({ x, y }) => `${x * width} ${y * height}, ${x * width} ${y * height}`)
+        .map(({ x, y }) => `${x * width} ${(1 - y) * height}, ${x * width} ${(1 - y) * height}`)
         .join(' S '),
     [points, width, height]
   );
@@ -35,7 +35,7 @@ const EqualizerKnob: React.FC<{
     <circle
       className='equalizer-knob'
       cx={x * width}
-      cy={y * height}
+      cy={(1 - y) * height}
       r='10'
       onMouseDown={evt => {
         if (evt.button !== 0) {
@@ -46,8 +46,8 @@ const EqualizerKnob: React.FC<{
         const startClientY = evt.clientY;
 
         const moveHandler = (evt: MouseEvent) => {
-          const xDiff = evt.clientX - startClientX;
-          const yDiff = evt.clientY - startClientY;
+          const xDiff = -(evt.clientX - startClientX);
+          const yDiff = -(evt.clientY - startClientY);
 
           dispatch(
             actionCreators.equalizer.UPDATE_POINT(vcId, index, {
@@ -72,7 +72,7 @@ const EqualizerKnob: React.FC<{
         evt.preventDefault();
       }}
     />
-    <text className='eq-knob-label' x={x * width - 4} y={y * height + 5}>
+    <text className='eq-knob-label' x={x * width - 4} y={(1 - y) * height + 5}>
       {index + 1}
     </text>
   </>
@@ -101,7 +101,7 @@ const EqualizerViz: React.FC<{
         const svgClientRect = svgRef.current!.getBoundingClientRect();
         const x = (evt.clientX - svgClientRect.x) / width;
         const y = (evt.clientY - svgClientRect.y) / height;
-        dispatch(actionCreators.equalizer.ADD_POINT(vcId, x, y));
+        dispatch(actionCreators.equalizer.ADD_POINT(vcId, x, 1 - y));
       }}
     >
       <EqualizerLine points={state.points} width={width} height={height} />

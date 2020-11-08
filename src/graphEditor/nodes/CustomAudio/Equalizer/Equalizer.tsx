@@ -13,6 +13,21 @@ const DEFAULT_POINTS: EqualizerPoint[] = [
   { x: 1, y: 0.6 },
 ];
 
+let equalizerIsRegistered: boolean | Promise<void> = false;
+const registerEqualizer = async (ctx: AudioContext) => {
+  if (equalizerIsRegistered === true) {
+    return;
+  } else if (equalizerIsRegistered !== false) {
+    await equalizerIsRegistered;
+    return;
+  }
+
+  const prom = ctx.audioWorklet.addModule('/EqualizerWorkletProcessor.js');
+  equalizerIsRegistered = prom;
+  await prom;
+  equalizerIsRegistered = true;
+};
+
 export class Equalizer implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string;
@@ -33,7 +48,7 @@ export class Equalizer implements ForeignNode {
     if (params) {
       this.deserialize(params);
     } else {
-      dispatch(actionCreators.equalizer.ADD_INSTANCE(vcId, { points: DEFAULT_POINTS }));
+      dispatch(actionCreators.equalizer.ADD_INSTANCE(vcId, DEFAULT_POINTS));
     }
 
     this.renderSmallView = mkContainerRenderHelper({
@@ -42,10 +57,15 @@ export class Equalizer implements ForeignNode {
     });
 
     this.cleanupSmallView = mkContainerCleanupHelper();
+
+    registerEqualizer(ctx).then(() => {
+      const workletHandle = new AudioWorkletNode(ctx, 'equalizer-audio-worklet-node-processor');
+      dispatch(actionCreators.equalizer.REGISTER_NODE(vcId, workletHandle));
+    });
   }
 
   public deserialize(params: { [key: string]: any }) {
-    dispatch(actionCreators.equalizer.ADD_INSTANCE(this.vcId, { points: params.points || [] }));
+    dispatch(actionCreators.equalizer.ADD_INSTANCE(this.vcId, params.points || []));
   }
 
   public serialize(): { [key: string]: any } {
