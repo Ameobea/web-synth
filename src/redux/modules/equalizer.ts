@@ -4,15 +4,14 @@ import * as R from 'ramda';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export interface EqualizerPoint {
+  index: number;
   x: number;
   y: number;
 }
 
 export interface EqualizerInstanceState {
-  points: (EqualizerPoint & {
-    xControl?: OverridableAudioParam;
-    yControl: OverridableAudioParam;
-  })[];
+  points: EqualizerPoint[];
+  csns: { xControl?: OverridableAudioParam; yControl: OverridableAudioParam }[];
   equalizerNode: AudioWorkletNode | null;
 }
 
@@ -24,20 +23,22 @@ const ctx = new AudioContext();
 
 const MAX_EQUALIZER_KNOBS = 16;
 
-const refreshPointConnections = (
-  node: AudioWorkletNode,
-  point: ArrayElementOf<EqualizerInstanceState['points']>,
-  index: number
+const updateParams = (
+  { xControl, yControl }: ArrayElementOf<EqualizerInstanceState['csns']>,
+  pt?: EqualizerPoint
 ) => {
-  const newXParam = (node.parameters as any).get(`knob_${index}_x`);
-  if (newXParam) {
-    point.xControl?.replaceParam(newXParam);
-  } else {
-    point.xControl = undefined;
+  if (!pt) {
+    if (xControl) {
+      xControl.manualControl.offset.value = -1;
+    }
+    yControl.manualControl.offset.value = -1;
+    return;
   }
 
-  const newYParam = (node.parameters as any).get(`knob_${index}_y`);
-  point.yControl.replaceParam(newYParam);
+  if (xControl) {
+    xControl.manualControl.offset.value = pt.x;
+  }
+  yControl.manualControl.offset.value = pt.y;
 };
 
 const actionGroups = {
@@ -50,20 +51,12 @@ const actionGroups = {
     subReducer: (state: EqualizerState, { vcId, points }): EqualizerState => ({
       ...state,
       [vcId]: {
-        points: points.map((pt, i) => {
-          const xControl = i === 0 ? undefined : new OverridableAudioParam(ctx);
-          if (xControl) {
-            xControl.manualControl.offset.value = pt.x + 1;
-          }
-          const yControl = new OverridableAudioParam(ctx);
-          yControl.manualControl.offset.value = pt.y + 1;
-
-          return {
-            ...pt,
-            xControl,
-            yControl,
-          };
-        }),
+        points,
+        csns: new Array(MAX_EQUALIZER_KNOBS).fill(null).map((_, i) => ({
+          xControl:
+            i !== 0 && i !== MAX_EQUALIZER_KNOBS - 1 ? new OverridableAudioParam(ctx) : undefined,
+          yControl: new OverridableAudioParam(ctx),
+        })),
         equalizerNode: null,
       },
     }),
@@ -77,7 +70,7 @@ const actionGroups = {
     subReducer: (state: EqualizerState, { vcId, node }) => {
       const instanceState = state[vcId];
       // We update the overridable params to swap in params from the actual equalizer instance
-      instanceState.points.forEach(({ xControl, yControl }, i) => {
+      instanceState.csns.forEach(({ xControl, yControl }, i) => {
         if (xControl) {
           const param = (node.parameters as any).get(`knob_${i}_x`);
           xControl.replaceParam(param);
@@ -85,6 +78,7 @@ const actionGroups = {
         const param = (node.parameters as any).get(`knob_${i}_y`);
         yControl.replaceParam(param);
       });
+      instanceState.csns.forEach((csns, i) => updateParams(csns, instanceState.points[i]));
 
       return { ...state, [vcId]: { ...instanceState, equalizerNode: node } };
     },
@@ -101,21 +95,15 @@ const actionGroups = {
         return state;
       }
 
-      const newPoints = [
-        ...instanceState.points,
-        {
-          x,
-          y,
-          xControl: new OverridableAudioParam(ctx),
-          yControl: new OverridableAudioParam(ctx),
-        },
-      ];
+      const index = instanceState.points.reduce((acc, pt) => Math.max(acc, pt.index), 0) + 1;
+      const newPoint = {
+        index,
+        x,
+        y,
+      };
+      const newPoints = [...instanceState.points, newPoint];
       newPoints.sort((a, b) => 1 - a.x - (1 - b.x));
-      if (instanceState.equalizerNode) {
-        newPoints
-          .slice(1)
-          .forEach((pt, i) => refreshPointConnections(instanceState.equalizerNode!, pt, i));
-      }
+      instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
 
       return {
         ...state,
@@ -127,17 +115,12 @@ const actionGroups = {
     actionCreator: (vcId: string, index: number) => ({ type: 'REMOVE_POINT', vcId, index }),
     subReducer: (state: EqualizerState, { vcId, index }) => {
       const instanceState = state[vcId];
-      instanceState.points[index].xControl?.dispose();
-      instanceState.points[index].yControl.dispose();
-
-      const newPoints = R.remove(index, 1, instanceState.points);
-      // Since the indices of all points after the removed point changed, we need to re-connect them to the
-      // proper params on on the AWN
-      if (instanceState.equalizerNode) {
-        newPoints
-          .slice(index)
-          .forEach((pt, i) => refreshPointConnections(instanceState.equalizerNode!, pt, i));
-      }
+      const newPoints = instanceState.points.filter(R.propEq('index', index));
+      const removedIx = instanceState.points.findIndex(pt => pt.index === index)!;
+      const controls = instanceState.csns[removedIx];
+      controls.xControl?.dispose();
+      controls.yControl.dispose();
+      instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
 
       return {
         ...state,
@@ -146,34 +129,30 @@ const actionGroups = {
     },
   }),
   UPDATE_POINT: buildActionGroup({
-    actionCreator: (vcId: string, index: number, newPoint: EqualizerPoint) => ({
+    actionCreator: (vcId: string, newPoint: EqualizerPoint) => ({
       type: 'UPDATE_POINT',
       vcId,
-      index,
       newPoint,
     }),
-    subReducer: (state: EqualizerState, { vcId, index, newPoint }) => {
+    subReducer: (state: EqualizerState, { vcId, newPoint }) => {
       const instanceState = state[vcId];
-      const [leftNeighborX, rightNeighborX] = [
-        index === instanceState.points.length - 1 ? 1 : instanceState.points[index - 1]?.x ?? 0,
-        index === 0 ? 0 : instanceState.points[index + 1]?.x ?? 1,
-      ];
-      const x = R.clamp(leftNeighborX, rightNeighborX, newPoint.x);
-      const y = R.clamp(0, 1, newPoint.y);
-      if (instanceState.points[index].xControl) {
-        instanceState.points[index].xControl!.manualControl.offset.value = x + 1;
+      const targetPointIx = instanceState.points.findIndex(pt => pt.index === newPoint.index);
+      const newPoints = [...instanceState.points];
+      newPoints[targetPointIx] = { ...newPoints[targetPointIx], ...newPoint };
+      newPoints.sort((a, b) => a.x - b.x);
+      if (newPoints[0].x !== 0) {
+        newPoints[0].x = 0;
       }
-      instanceState.points[index].yControl!.manualControl.offset.value = y + 1;
+      if (newPoints[newPoints.length - 1].x !== 1) {
+        newPoints[newPoints.length - 1].x = 1;
+      }
+      instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
 
       return {
         ...state,
         [vcId]: {
           ...instanceState,
-          points: R.set(
-            R.lensIndex(index),
-            { ...state[vcId].points[index], x, y },
-            state[vcId].points
-          ),
+          points: newPoints,
         },
       };
     },

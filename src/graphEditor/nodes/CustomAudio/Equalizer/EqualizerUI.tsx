@@ -46,11 +46,12 @@ const EqualizerKnob: React.FC<{
         const startClientY = evt.clientY;
 
         const moveHandler = (evt: MouseEvent) => {
-          const xDiff = -(evt.clientX - startClientX);
+          const xDiff = evt.clientX - startClientX;
           const yDiff = -(evt.clientY - startClientY);
 
           dispatch(
-            actionCreators.equalizer.UPDATE_POINT(vcId, index, {
+            actionCreators.equalizer.UPDATE_POINT(vcId, {
+              index,
               x: (x * width + xDiff) / width,
               y: (y * height + yDiff) / height,
             })
@@ -105,13 +106,13 @@ const EqualizerViz: React.FC<{
       }}
     >
       <EqualizerLine points={state.points} width={width} height={height} />
-      {state.points.map(({ x, y }, i) => (
+      {state.points.map(({ x, y, index }) => (
         // eslint-disable-next-line react/jsx-key
         <EqualizerKnob
           vcId={vcId}
           x={x}
           y={y}
-          index={i}
+          index={index}
           width={width}
           height={height}
           pointCount={state.points.length}

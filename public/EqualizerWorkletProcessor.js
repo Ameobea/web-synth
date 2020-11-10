@@ -1,4 +1,4 @@
-const KNOB_COUNT = 8;
+const KNOB_COUNT = 16;
 const LEVEL_COUNT = 12;
 /**
  * Defines the y level percentage at which the equalizer will be +0.
@@ -21,13 +21,13 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
       if (i !== 0 && i !== KNOB_COUNT - 1) {
         descriptors.push({
           name: `knob_${i}_x`,
-          defaultValue: -1,
+          defaultValue: 0,
           automationRate: 'k-rate',
         });
       }
       descriptors.push({
         name: `knob_${i}_y`,
-        defaultValue: -1,
+        defaultValue: 0,
         automationRate: 'k-rate',
       });
     }
@@ -67,6 +67,7 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
 
   process(_inputs, _outputs, params) {
     this.computeLevels(params);
+    return true;
   }
 }
 

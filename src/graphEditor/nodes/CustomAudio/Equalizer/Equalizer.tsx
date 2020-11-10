@@ -9,8 +9,8 @@ import { actionCreators, dispatch, getState } from 'src/redux';
 import { EqualizerPoint } from 'src/redux/modules/equalizer';
 
 const DEFAULT_POINTS: EqualizerPoint[] = [
-  { x: 0, y: 0.6 },
-  { x: 1, y: 0.6 },
+  { x: 0, y: 0.6, index: 0 },
+  { x: 1, y: 0.6, index: 1 },
 ];
 
 let equalizerIsRegistered: boolean | Promise<void> = false;
