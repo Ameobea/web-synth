@@ -521,7 +521,7 @@ const registerCustomAudioNode = (
   };
 
   CustomAudioNode.prototype.onRemoved = function (this: any) {
-    if (!this.ignore_remove) {
+    if (!this.ignoreRemove) {
       removeNode(this.id.toString());
     }
 

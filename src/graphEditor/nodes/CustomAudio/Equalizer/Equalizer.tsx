@@ -4,33 +4,35 @@ import EqualizerSmallView from './EqualizerUI';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import {
+  AudioConnectables,
+  ConnectableInput,
+  ConnectableOutput,
+  updateConnectables,
+} from 'src/patchNetwork';
 import { actionCreators, dispatch, getState } from 'src/redux';
 import { EqualizerPoint } from 'src/redux/modules/equalizer';
+import { AsyncOnce } from 'src/util';
+import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const DEFAULT_POINTS: EqualizerPoint[] = [
-  { x: 0, y: 0.6, index: 0 },
-  { x: 1, y: 0.6, index: 1 },
+  { x: 0, y: 0.65, index: 0 },
+  { x: 1, y: 0.65, index: 1 },
 ];
 
-let equalizerIsRegistered: boolean | Promise<void> = false;
-const registerEqualizer = async (ctx: AudioContext) => {
-  if (equalizerIsRegistered === true) {
-    return;
-  } else if (equalizerIsRegistered !== false) {
-    await equalizerIsRegistered;
-    return;
-  }
+const ctx = new AudioContext();
+const EqualizerRegistered = new AsyncOnce(() =>
+  ctx.audioWorklet.addModule('/EqualizerWorkletProcessor.js')
+);
 
-  const prom = ctx.audioWorklet.addModule('/EqualizerWorkletProcessor.js');
-  equalizerIsRegistered = prom;
-  await prom;
-  equalizerIsRegistered = true;
-};
+const EqualizerWasm = new AsyncOnce(() =>
+  fetch('https://ameo.link/u/8k3.wasm').then(res => res.arrayBuffer())
+);
 
 export class Equalizer implements ForeignNode {
-  private ctx: AudioContext;
   private vcId: string;
+  private workletHandle: FaustWorkletNode | null = null;
   public nodeType = 'customAudio/Equalizer';
   public name = 'Equalizer';
 
@@ -42,7 +44,6 @@ export class Equalizer implements ForeignNode {
   } = {};
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
-    this.ctx = ctx;
     this.vcId = vcId;
 
     if (params) {
@@ -58,9 +59,13 @@ export class Equalizer implements ForeignNode {
 
     this.cleanupSmallView = mkContainerCleanupHelper();
 
-    registerEqualizer(ctx).then(() => {
-      const workletHandle = new AudioWorkletNode(ctx, 'equalizer-audio-worklet-node-processor');
-      dispatch(actionCreators.equalizer.REGISTER_NODE(vcId, workletHandle));
+    EqualizerRegistered.get().then(async () => {
+      this.workletHandle = new FaustWorkletNode(ctx, '', 'equalizer-audio-worklet-node-processor');
+      const dspArrayBuffer = await EqualizerWasm.get();
+      await this.workletHandle!.init(dspArrayBuffer);
+
+      dispatch(actionCreators.equalizer.REGISTER_NODE(vcId, this.workletHandle));
+      updateConnectables(this.vcId, dbg(this.buildConnectables()));
     });
   }
 
@@ -78,8 +83,14 @@ export class Equalizer implements ForeignNode {
   public buildConnectables(): AudioConnectables & { node: ForeignNode } {
     return {
       vcId: this.vcId,
-      inputs: Map<string, ConnectableInput>(), // TODO
-      outputs: Map<string, ConnectableOutput>(), // TODO
+      inputs: Map<string, ConnectableInput>().set('input', {
+        type: 'customAudio',
+        node: this.workletHandle || new DummyNode(),
+      }), // TODO
+      outputs: Map<string, ConnectableOutput>().set('output', {
+        type: 'customAudio',
+        node: this.workletHandle || new DummyNode(),
+      }), // TODO
       node: this,
     };
   }

@@ -1,8 +1,11 @@
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 
 export class FaustWorkletNode extends AudioWorkletNode {
-  constructor(audioContext: AudioContext, moduleId: string) {
-    super(audioContext, `faust-worklet-processor-${moduleId}`);
+  constructor(audioContext: AudioContext, moduleId: string, workletNameOverride?: string) {
+    super(
+      audioContext,
+      workletNameOverride ? workletNameOverride : `faust-worklet-processor-${moduleId}`
+    );
   }
 
   public pathTable: { [path: string]: number } = {};
@@ -66,6 +69,24 @@ export class FaustWorkletNode extends AudioWorkletNode {
     }
   };
 
+  public init(dspArrayBuffer: ArrayBuffer): Promise<FaustWorkletNode> {
+    return new Promise(resolve => {
+      this.port.onmessage = (msg: MessageEvent) => {
+        if (typeof msg.data === 'object') {
+          if (msg.data.jsonDef) {
+            const pathTable = this.parseUi(msg.data.jsonDef);
+            this.port.postMessage({ type: 'setPathTable', pathTable });
+            resolve(this);
+          } else if (msg.data.log) {
+            console.log(...msg.data.log);
+          }
+        }
+      };
+
+      this.port.postMessage({ type: 'init', dspArrayBuffer });
+    });
+  }
+
   public shutdown() {
     this.port.postMessage({ type: 'shutdown' });
   }
@@ -83,19 +104,5 @@ export const buildFaustWorkletNode = async (
 
   // Send the Wasm module over to the created worklet's thread via message passing so that it can instantiate it over
   // there and control it directly
-  return await new Promise(resolve => {
-    node.port.onmessage = (msg: MessageEvent) => {
-      if (typeof msg.data === 'object') {
-        if (msg.data.jsonDef) {
-          const pathTable = node.parseUi(msg.data.jsonDef);
-          node.port.postMessage({ type: 'setPathTable', pathTable });
-          resolve(node);
-        } else if (msg.data.log) {
-          console.log(...msg.data.log);
-        }
-      }
-    };
-
-    node.port.postMessage({ type: 'init', dspArrayBuffer });
-  });
+  return node.init(dspArrayBuffer);
 };

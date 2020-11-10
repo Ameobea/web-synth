@@ -1,5 +1,5 @@
 import { UnreachableException } from 'ameo-utils';
-import { Try } from 'funfix-core';
+import { Option, Try } from 'funfix-core';
 
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
 
@@ -115,3 +115,31 @@ export const retryAsync = async <T>(
   }
   throw new UnreachableException();
 };
+
+export class AsyncOnce<T> {
+  private getter: () => Promise<T>;
+  private pending: Promise<T> | null = null;
+  private res: Option<T> = Option.none();
+
+  constructor(getter: () => Promise<T>) {
+    this.getter = getter;
+  }
+
+  public async get(): Promise<T> {
+    if (this.res.nonEmpty()) {
+      return this.res.get();
+    }
+    if (this.pending) {
+      return this.pending;
+    }
+
+    this.pending = new Promise(resolve =>
+      this.getter().then(res => {
+        this.res = Option.some(res);
+        this.pending = null;
+        resolve(res);
+      })
+    );
+    return this.pending!;
+  }
+}

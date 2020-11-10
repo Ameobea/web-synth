@@ -102,7 +102,7 @@ const actionGroups = {
         y,
       };
       const newPoints = [...instanceState.points, newPoint];
-      newPoints.sort((a, b) => 1 - a.x - (1 - b.x));
+      newPoints.sort((a, b) => a.x - b.x);
       instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
 
       return {
@@ -115,7 +115,7 @@ const actionGroups = {
     actionCreator: (vcId: string, index: number) => ({ type: 'REMOVE_POINT', vcId, index }),
     subReducer: (state: EqualizerState, { vcId, index }) => {
       const instanceState = state[vcId];
-      const newPoints = instanceState.points.filter(R.propEq('index', index));
+      const newPoints = instanceState.points.filter(o => o.index !== index);
       const removedIx = instanceState.points.findIndex(pt => pt.index === index)!;
       const controls = instanceState.csns[removedIx];
       controls.xControl?.dispose();
