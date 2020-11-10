@@ -238,8 +238,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
         this.pathTable[param.name],
         // We only support k-rate params since Faust processes all of the frames at once and only supports
         // a single value for each param.
-        // clamp(param.minValue, param.maxValue, paramValue)
-        Math.random() * 20 - 10
+        clamp(param.minValue, param.maxValue, paramValue)
       );
     });
 

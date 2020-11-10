@@ -16,9 +16,11 @@ import { AsyncOnce } from 'src/util';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
+export const NEGATIVE_VALUE_DIVIDER_INTERVAL = 0.65;
+
 const DEFAULT_POINTS: EqualizerPoint[] = [
-  { x: 0, y: 0.65, index: 0 },
-  { x: 1, y: 0.65, index: 1 },
+  { x: 0, y: NEGATIVE_VALUE_DIVIDER_INTERVAL, index: 0 },
+  { x: 1, y: NEGATIVE_VALUE_DIVIDER_INTERVAL, index: 1 },
 ];
 
 const ctx = new AudioContext();
@@ -61,11 +63,17 @@ export class Equalizer implements ForeignNode {
 
     EqualizerRegistered.get().then(async () => {
       this.workletHandle = new FaustWorkletNode(ctx, '', 'equalizer-audio-worklet-node-processor');
+      updateConnectables(this.vcId, dbg(this.buildConnectables()));
       const dspArrayBuffer = await EqualizerWasm.get();
-      await this.workletHandle!.init(dspArrayBuffer);
+      await this.workletHandle!.init(dspArrayBuffer, {
+        customMessageHandler: (msg: MessageEvent) => {
+          if (msg.data.levels) {
+            dispatch(actionCreators.equalizer.SET_LEVELS(vcId, msg.data.levels));
+          }
+        },
+      });
 
       dispatch(actionCreators.equalizer.REGISTER_NODE(vcId, this.workletHandle));
-      updateConnectables(this.vcId, dbg(this.buildConnectables()));
     });
   }
 

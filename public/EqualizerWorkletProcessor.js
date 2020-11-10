@@ -219,33 +219,43 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     };
   }
 
-  levels = new Array(LEVEL_COUNT).fill(0);
+  levelsBackbuffer = new Float32Array(LEVEL_COUNT).fill(0.0);
+  levels = new Float32Array(LEVEL_COUNT).fill(0.0);
+
+  sendLevels() {
+    this.port.postMessage({ levels: this.levels });
+  }
 
   computeLevels(params) {
+    const temp = this.levels;
+    this.levels = this.levelsBackbuffer;
+    this.levelsBackbuffer = temp;
+
     let curStartIx = 0;
 
+    let levelsDiffer = false;
     for (let i = 0; i < LEVEL_COUNT; i++) {
       let endX = params[`knob_${curStartIx + 1}_x`]?.[0] ?? 1;
-      // if (endX === -1) {
-      //   break;
-      // }
 
-      const levelPos = (i + 1) / LEVEL_COUNT;
-      if (levelPos > endX) {
+      const levelPos = (i + 1) / LEVEL_COUNT - 1 / LEVEL_COUNT / 2;
+      while (levelPos > endX) {
         curStartIx += 1;
         endX = params[`knob_${curStartIx + 1}_x`]?.[0] ?? 1;
-        // if (endX === -1) {
-        //   break;
-        // }
       }
 
       // Compute the slope of the line between the start point and the end point
       const startX = params[`knob_${curStartIx}_x`]?.[0] ?? 0;
       const startY = params[`knob_${curStartIx}_y`][0];
-      const slope = (params[`knob_${curStartIx + 1}_y`][0] - startY) / (endX - startX);
+      const endY = params[`knob_${curStartIx + 1}_y`][0];
+      const slope = (endY - startY) / (endX - startX);
       const intercept = startY - slope * startX;
       const level = slope * levelPos + intercept;
       this.levels[i] = valueToDb(level);
+      levelsDiffer = levelsDiffer || this.levels[i] !== this.levelsBackbuffer[i];
+    }
+
+    if (levelsDiffer) {
+      this.sendLevels();
     }
   }
 
@@ -263,7 +273,7 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
       this.dspInstance.exports.setParamValue(
         this.dsp,
         this.pathTable[`/faust-code962287396/Band${i < 10 ? '_' : ''}${i + 1}`],
-        Number.isNaN(level) ? 0 : level
+        clamp(-50, 20, Number.isNaN(level) ? 0 : level)
       )
     );
     this.dspInstance.exports.setParamValue(this.dsp, 0, 0);

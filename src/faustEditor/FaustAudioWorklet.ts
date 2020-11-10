@@ -69,7 +69,10 @@ export class FaustWorkletNode extends AudioWorkletNode {
     }
   };
 
-  public init(dspArrayBuffer: ArrayBuffer): Promise<FaustWorkletNode> {
+  public init(
+    dspArrayBuffer: ArrayBuffer,
+    { customMessageHandler }: { customMessageHandler?: (msg: MessageEvent) => void } = {}
+  ): Promise<FaustWorkletNode> {
     return new Promise(resolve => {
       this.port.onmessage = (msg: MessageEvent) => {
         if (typeof msg.data === 'object') {
@@ -79,6 +82,8 @@ export class FaustWorkletNode extends AudioWorkletNode {
             resolve(this);
           } else if (msg.data.log) {
             console.log(...msg.data.log);
+          } else if (customMessageHandler) {
+            customMessageHandler(msg);
           }
         }
       };

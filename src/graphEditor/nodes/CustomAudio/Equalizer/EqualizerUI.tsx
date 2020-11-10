@@ -1,8 +1,10 @@
 import React, { useMemo, useRef } from 'react';
 import { Provider, useSelector } from 'react-redux';
-import { actionCreators, dispatch, ReduxStore, store } from 'src/redux';
+import * as R from 'ramda';
 
-import { EqualizerPoint } from 'src/redux/modules/equalizer';
+import { NEGATIVE_VALUE_DIVIDER_INTERVAL } from 'src/graphEditor/nodes/CustomAudio/Equalizer/Equalizer';
+import { actionCreators, dispatch, ReduxStore, store } from 'src/redux';
+import { EqualizerPoint, EQUALIZER_LEVEL_COUNT } from 'src/redux/modules/equalizer';
 import './Equalizer.scss';
 
 const EqualizerLine: React.FC<{
@@ -53,7 +55,7 @@ const EqualizerKnob: React.FC<{
             actionCreators.equalizer.UPDATE_POINT(vcId, {
               index,
               x: (x * width + xDiff) / width,
-              y: (y * height + yDiff) / height,
+              y: R.clamp(0, 1, (y * height + yDiff) / height),
             })
           );
         };
@@ -73,11 +75,62 @@ const EqualizerKnob: React.FC<{
         evt.preventDefault();
       }}
     />
-    <text className='eq-knob-label' x={x * width - 4} y={(1 - y) * height + 5}>
+    <text
+      onContextMenu={evt => evt.preventDefault()}
+      className='eq-knob-label'
+      x={x * width - (index < 9 ? 4 : 6)}
+      y={(1 - y) * height + 5}
+    >
       {index + 1}
     </text>
   </>
 );
+
+const EqualizerBackgroundInner: React.FC<{
+  width: number;
+  height: number;
+}> = ({ width, height }) => (
+  <>
+    {/* bar indicating positive and negative values */}
+    <line
+      x1={0}
+      x2={width}
+      y1={(1 - NEGATIVE_VALUE_DIVIDER_INTERVAL) * height}
+      y2={(1 - NEGATIVE_VALUE_DIVIDER_INTERVAL) * height}
+      className='negative-value-divider-line'
+    />
+    {/* Divider lines between the underlying equalizer faders */}
+    {R.range(0, 19).map(i => {
+      const x = (width / 20) * (i + 1);
+      return <line key={i} x1={x} x2={x} y1={0} y2={height} className='fader-divider-line' />;
+    })}
+  </>
+);
+
+const EqualizerBackground = React.memo(EqualizerBackgroundInner);
+
+const dbToPercent = (db: number) => (db + 0.65 * 70) / 70;
+
+const EqualizerLevelsInner: React.FC<{
+  width: number;
+  height: number;
+  levels: Float32Array;
+}> = ({ width, height, levels }) => (
+  <>
+    {R.range(0, levels.length).map(i => (
+      <rect
+        key={i}
+        x={(i / EQUALIZER_LEVEL_COUNT) * width}
+        y={height - dbToPercent(levels[i]) * height}
+        width={width / EQUALIZER_LEVEL_COUNT}
+        height={dbToPercent(levels[i]) * height}
+        className='eq-level'
+      />
+    ))}
+  </>
+);
+
+const EqualizerLevels = React.memo(EqualizerLevelsInner);
 
 const EqualizerViz: React.FC<{
   vcId: string;
@@ -105,6 +158,8 @@ const EqualizerViz: React.FC<{
         dispatch(actionCreators.equalizer.ADD_POINT(vcId, x, 1 - y));
       }}
     >
+      <EqualizerBackground width={width} height={height} />
+      <EqualizerLevels width={width} height={height} levels={state.levels} />
       <EqualizerLine points={state.points} width={width} height={height} />
       {state.points.map(({ x, y, index }) => (
         // eslint-disable-next-line react/jsx-key

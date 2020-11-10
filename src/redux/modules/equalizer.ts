@@ -13,6 +13,7 @@ export interface EqualizerInstanceState {
   points: EqualizerPoint[];
   csns: { xControl?: OverridableAudioParam; yControl: OverridableAudioParam }[];
   equalizerNode: AudioWorkletNode | null;
+  levels: Float32Array;
 }
 
 interface EqualizerState {
@@ -22,6 +23,7 @@ interface EqualizerState {
 const ctx = new AudioContext();
 
 const MAX_EQUALIZER_KNOBS = 16;
+export const EQUALIZER_LEVEL_COUNT = 20;
 
 const updateParams = (
   { xControl, yControl }: ArrayElementOf<EqualizerInstanceState['csns']>,
@@ -58,6 +60,7 @@ const actionGroups = {
           yControl: new OverridableAudioParam(ctx),
         })),
         equalizerNode: null,
+        levels: new Float32Array(EQUALIZER_LEVEL_COUNT).fill(0),
       },
     }),
   }),
@@ -116,10 +119,6 @@ const actionGroups = {
     subReducer: (state: EqualizerState, { vcId, index }) => {
       const instanceState = state[vcId];
       const newPoints = instanceState.points.filter(o => o.index !== index);
-      const removedIx = instanceState.points.findIndex(pt => pt.index === index)!;
-      const controls = instanceState.csns[removedIx];
-      controls.xControl?.dispose();
-      controls.yControl.dispose();
       instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
 
       return {
@@ -156,6 +155,13 @@ const actionGroups = {
         },
       };
     },
+  }),
+  SET_LEVELS: buildActionGroup({
+    actionCreator: (vcId: string, levels: Float32Array) => ({ type: 'SET_LEVELS', vcId, levels }),
+    subReducer: (state: EqualizerState, { vcId, levels }) => ({
+      ...state,
+      [vcId]: { ...state[vcId], levels },
+    }),
   }),
 };
 
