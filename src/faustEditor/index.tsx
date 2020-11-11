@@ -17,7 +17,6 @@ import {
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { getFaustParamBasePath } from 'src/faustEditor/uiBuilder';
 
 const ctx = new AudioContext();
 

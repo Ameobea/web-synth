@@ -100,16 +100,16 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     ];
 
     for (let i = 0; i < KNOB_COUNT; i++) {
-      if (i !== 0 && i !== KNOB_COUNT - 1) {
+      if (i !== 0) {
         descriptors.push({
           name: `knob_${i}_x`,
-          defaultValue: 0,
+          defaultValue: -0.00001,
           automationRate: 'k-rate',
         });
       }
       descriptors.push({
         name: `knob_${i}_y`,
-        defaultValue: 0,
+        defaultValue: -0.00001,
         automationRate: 'k-rate',
       });
     }
@@ -128,6 +128,11 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     this.isShutdown = false;
 
     this.pathTable = [];
+
+    this.sortedParams = new Array(KNOB_COUNT);
+    for (let i = 0; i < KNOB_COUNT; i++) {
+      this.sortedParams[i] = { x: -1, y: -1 };
+    }
 
     this.initWithModule = async dspInstanceArrayBuffer => {
       await this.initDspInstance(dspInstanceArrayBuffer);
@@ -231,22 +236,50 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     this.levels = this.levelsBackbuffer;
     this.levelsBackbuffer = temp;
 
-    let curStartIx = 0;
+    for (let i = 0; i < KNOB_COUNT; i++) {
+      const x = params[`knob_${i}_x`]?.[0] ?? 0;
+      if (x < 0) {
+        // Value less than zero means that this knob isn't connected
+        this.sortedParams[i].x = -1;
+        this.sortedParams[i].y = -1;
+        continue;
+      }
 
+      this.sortedParams[i].x = x;
+      this.sortedParams[i].y = params[`knob_${i}_y`][0];
+    }
+    // ""...It is expected to return a negative value if first argument is less than second argument"
+    this.sortedParams.sort((a, b) => {
+      if (b.x < 0) {
+        return -1;
+      } else if (a.x < 0) {
+        return 1;
+      }
+      return a.x - b.x;
+    });
+
+    let curStartIx = 0;
     let levelsDiffer = false;
     for (let i = 0; i < LEVEL_COUNT; i++) {
-      let endX = params[`knob_${curStartIx + 1}_x`]?.[0] ?? 1;
+      let endX = this.sortedParams[curStartIx + 1].x;
 
       const levelPos = (i + 1) / LEVEL_COUNT - 1 / LEVEL_COUNT / 2;
       while (levelPos > endX) {
+        if (curStartIx >= KNOB_COUNT - 2) {
+          break;
+        }
         curStartIx += 1;
-        endX = params[`knob_${curStartIx + 1}_x`]?.[0] ?? 1;
+
+        endX = this.sortedParams[curStartIx + 1]?.x ?? 1.0;
+        if (endX < 0) {
+          break;
+        }
       }
 
       // Compute the slope of the line between the start point and the end point
-      const startX = params[`knob_${curStartIx}_x`]?.[0] ?? 0;
-      const startY = params[`knob_${curStartIx}_y`][0];
-      const endY = params[`knob_${curStartIx + 1}_y`][0];
+      const startX = this.sortedParams[curStartIx].x;
+      const startY = this.sortedParams[curStartIx].y;
+      const endY = this.sortedParams[curStartIx + 1].y;
       const slope = (endY - startY) / (endX - startX);
       const intercept = startY - slope * startX;
       const level = slope * levelPos + intercept;

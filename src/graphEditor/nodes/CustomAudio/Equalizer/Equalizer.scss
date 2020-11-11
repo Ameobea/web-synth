@@ -11,6 +11,10 @@ svg.equalizer {
     fill: $eq-knob-color;
   }
 
+  .equalizer-knob.equalizer-knob-disabled {
+    fill: #888;
+  }
+
   .eq-knob-label {
     font-size: 12px;
     stroke: #222;

@@ -1,7 +1,7 @@
-import { ArrayElementOf } from 'ameo-utils';
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { actionCreators, dispatch } from 'src/redux';
 
 export interface EqualizerPoint {
   index: number;
@@ -10,8 +10,11 @@ export interface EqualizerPoint {
 }
 
 export interface EqualizerInstanceState {
-  points: EqualizerPoint[];
-  csns: { xControl?: OverridableAudioParam; yControl: OverridableAudioParam }[];
+  points: (EqualizerPoint & {
+    xControl?: OverridableAudioParam;
+    yControl: OverridableAudioParam;
+    isManuallyControlled: boolean;
+  })[];
   equalizerNode: AudioWorkletNode | null;
   levels: Float32Array;
 }
@@ -25,24 +28,6 @@ const ctx = new AudioContext();
 const MAX_EQUALIZER_KNOBS = 16;
 export const EQUALIZER_LEVEL_COUNT = 20;
 
-const updateParams = (
-  { xControl, yControl }: ArrayElementOf<EqualizerInstanceState['csns']>,
-  pt?: EqualizerPoint
-) => {
-  if (!pt) {
-    if (xControl) {
-      xControl.manualControl.offset.value = -1;
-    }
-    yControl.manualControl.offset.value = -1;
-    return;
-  }
-
-  if (xControl) {
-    xControl.manualControl.offset.value = pt.x;
-  }
-  yControl.manualControl.offset.value = pt.y;
-};
-
 const actionGroups = {
   ADD_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string, points: EqualizerPoint[]) => ({
@@ -53,12 +38,32 @@ const actionGroups = {
     subReducer: (state: EqualizerState, { vcId, points }): EqualizerState => ({
       ...state,
       [vcId]: {
-        points,
-        csns: new Array(MAX_EQUALIZER_KNOBS).fill(null).map((_, i) => ({
-          xControl:
-            i !== 0 && i !== MAX_EQUALIZER_KNOBS - 1 ? new OverridableAudioParam(ctx) : undefined,
-          yControl: new OverridableAudioParam(ctx),
-        })),
+        points: points.map((pt, i) => {
+          const xControl = i !== 0 ? new OverridableAudioParam(ctx) : undefined;
+          if (xControl) {
+            xControl!.manualControl.offset.value = pt.x;
+            xControl.onOverrideStatusChange(isManualControl =>
+              setTimeout(() =>
+                dispatch(
+                  actionCreators.equalizer.SET_KNOB_IS_MANUALLY_CONTROLLED(
+                    vcId,
+                    pt.index,
+                    isManualControl
+                  )
+                )
+              )
+            );
+          }
+          const yControl = new OverridableAudioParam(ctx);
+          yControl.manualControl.offset.value = pt.y;
+
+          return {
+            ...pt,
+            xControl,
+            yControl,
+            isManuallyControlled: false,
+          };
+        }),
         equalizerNode: null,
         levels: new Float32Array(EQUALIZER_LEVEL_COUNT).fill(0),
       },
@@ -73,15 +78,16 @@ const actionGroups = {
     subReducer: (state: EqualizerState, { vcId, node }) => {
       const instanceState = state[vcId];
       // We update the overridable params to swap in params from the actual equalizer instance
-      instanceState.csns.forEach(({ xControl, yControl }, i) => {
+      instanceState.points.forEach(({ x, y, xControl, yControl }, i) => {
         if (xControl) {
           const param = (node.parameters as any).get(`knob_${i}_x`);
           xControl.replaceParam(param);
+          xControl.manualControl.offset.value = x;
         }
         const param = (node.parameters as any).get(`knob_${i}_y`);
         yControl.replaceParam(param);
+        yControl.manualControl.offset.value = y;
       });
-      instanceState.csns.forEach((csns, i) => updateParams(csns, instanceState.points[i]));
 
       return { ...state, [vcId]: { ...instanceState, equalizerNode: node } };
     },
@@ -99,14 +105,26 @@ const actionGroups = {
       }
 
       const index = instanceState.points.reduce((acc, pt) => Math.max(acc, pt.index), 0) + 1;
+      const i = instanceState.points.length + 1;
       const newPoint = {
         index,
         x,
         y,
+        xControl: new OverridableAudioParam(
+          ctx,
+          (instanceState.equalizerNode?.parameters as any)?.get(`knob_${i}_x`)
+        ),
+        yControl: new OverridableAudioParam(
+          ctx,
+          (instanceState.equalizerNode?.parameters as any)?.get(`knob_${i}_y`)
+        ),
+        isManuallyControlled: false,
       };
+      newPoint.xControl.manualControl.offset.value = x;
+      newPoint.yControl.manualControl.offset.value = y;
       const newPoints = [...instanceState.points, newPoint];
       newPoints.sort((a, b) => a.x - b.x);
-      instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
+      // TODO: Trigger connectables update
 
       return {
         ...state,
@@ -118,8 +136,19 @@ const actionGroups = {
     actionCreator: (vcId: string, index: number) => ({ type: 'REMOVE_POINT', vcId, index }),
     subReducer: (state: EqualizerState, { vcId, index }) => {
       const instanceState = state[vcId];
+      const removedPoint = instanceState.points.find(R.propEq('index', index));
+      if (!removedPoint) {
+        console.error(`Tried to remove point index ${index} but it is not found`);
+        return state;
+      }
+      if (removedPoint.x === 0 || removedPoint.x === 1) {
+        // Can't remove the border points
+        return state;
+      }
+      removedPoint.xControl?.dispose();
+      removedPoint.yControl.dispose();
       const newPoints = instanceState.points.filter(o => o.index !== index);
-      instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
+      // TODO: Trigger connectables update
 
       return {
         ...state,
@@ -134,10 +163,28 @@ const actionGroups = {
       newPoint,
     }),
     subReducer: (state: EqualizerState, { vcId, newPoint }) => {
+      newPoint.x = R.clamp(0, 1, newPoint.x);
+      newPoint.y = R.clamp(0, 1, newPoint.y);
+
       const instanceState = state[vcId];
       const targetPointIx = instanceState.points.findIndex(pt => pt.index === newPoint.index);
       const newPoints = [...instanceState.points];
-      newPoints[targetPointIx] = { ...newPoints[targetPointIx], ...newPoint };
+      const oldPoint = newPoints[targetPointIx];
+      // Prevent users from moving the border points off the borders
+      if (newPoint.x === 0 && oldPoint.x !== 0) {
+        newPoint.x = 0.005;
+      } else if (newPoint.x === 1 && oldPoint.x !== 1) {
+        newPoint.x = 0.996;
+      } else if (oldPoint.x === 0 || oldPoint.x === 1) {
+        newPoint.x = oldPoint.x;
+      }
+
+      newPoints[targetPointIx] = { ...oldPoint, ...newPoint };
+      if (newPoints[targetPointIx].xControl) {
+        newPoints[targetPointIx].xControl!.manualControl.offset.value = newPoint.x;
+      }
+      newPoints[targetPointIx].yControl.manualControl.offset.value = newPoint.y;
+
       newPoints.sort((a, b) => a.x - b.x);
       if (newPoints[0].x !== 0) {
         newPoints[0].x = 0;
@@ -145,7 +192,6 @@ const actionGroups = {
       if (newPoints[newPoints.length - 1].x !== 1) {
         newPoints[newPoints.length - 1].x = 1;
       }
-      instanceState.csns.forEach((csns, i) => updateParams(csns, newPoints[i]));
 
       return {
         ...state,
@@ -162,6 +208,35 @@ const actionGroups = {
       ...state,
       [vcId]: { ...state[vcId], levels },
     }),
+  }),
+  SET_KNOB_IS_MANUALLY_CONTROLLED: buildActionGroup({
+    actionCreator: (vcId: string, knobIx: number, isManuallyControlled: boolean) => ({
+      type: 'SET_KNOB_IS_MANUALLY_CONTROLLED',
+      vcId,
+      knobIx,
+      isManuallyControlled,
+    }),
+    subReducer: (state: EqualizerState, { vcId, knobIx, isManuallyControlled }) => {
+      const arrayIx = state[vcId].points.findIndex(pt => pt.index === knobIx);
+      if (arrayIx === -1) {
+        console.error(
+          `Tried to set knob with index ${knobIx} as manually controlled, but wasn't found`
+        );
+        return state;
+      }
+
+      return {
+        ...state,
+        [vcId]: {
+          ...state[vcId],
+          points: R.set(
+            R.lensIndex(arrayIx),
+            { ...state[vcId].points[arrayIx], isManuallyControlled },
+            state[vcId].points
+          ),
+        },
+      };
+    },
   }),
 };
 

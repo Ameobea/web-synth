@@ -32,48 +32,57 @@ const EqualizerKnob: React.FC<{
   pointCount: number;
   width: number;
   height: number;
-}> = ({ vcId, x, y, index, width, height, pointCount }) => (
+  isManuallyControlled: boolean;
+}> = ({ vcId, x, y, index, width, height, pointCount, isManuallyControlled }) => (
   <>
     <circle
-      className='equalizer-knob'
+      className={`equalizer-knob${isManuallyControlled ? ' equalizer-knob-disabled' : ''}`}
       cx={x * width}
       cy={(1 - y) * height}
       r='10'
-      onMouseDown={evt => {
-        if (evt.button !== 0) {
-          return;
-        }
+      onMouseDown={
+        isManuallyControlled
+          ? undefined
+          : evt => {
+              if (evt.button !== 0) {
+                return;
+              }
 
-        const startClientX = evt.clientX;
-        const startClientY = evt.clientY;
+              const startClientX = evt.clientX;
+              const startClientY = evt.clientY;
 
-        const moveHandler = (evt: MouseEvent) => {
-          const xDiff = evt.clientX - startClientX;
-          const yDiff = -(evt.clientY - startClientY);
+              const moveHandler = (evt: MouseEvent) => {
+                const xDiff = evt.clientX - startClientX;
+                const yDiff = -(evt.clientY - startClientY);
 
-          dispatch(
-            actionCreators.equalizer.UPDATE_POINT(vcId, {
-              index,
-              x: (x * width + xDiff) / width,
-              y: R.clamp(0, 1, (y * height + yDiff) / height),
-            })
-          );
-        };
-        document.addEventListener('mousemove', moveHandler);
-        // Register an event listener so we know when the drag stops
-        document.addEventListener('mouseup', () =>
-          document.removeEventListener('mousemove', moveHandler)
-        );
-      }}
-      onContextMenu={evt => {
-        if (index === 0 || index === pointCount - 1) {
-          // Can't delete the end points
-          return;
-        }
+                dispatch(
+                  actionCreators.equalizer.UPDATE_POINT(vcId, {
+                    index,
+                    x: (x * width + xDiff) / width,
+                    y: R.clamp(0, 1, (y * height + yDiff) / height),
+                  })
+                );
+              };
+              document.addEventListener('mousemove', moveHandler);
+              // Register an event listener so we know when the drag stops
+              document.addEventListener('mouseup', () =>
+                document.removeEventListener('mousemove', moveHandler)
+              );
+            }
+      }
+      onContextMenu={
+        isManuallyControlled
+          ? undefined
+          : evt => {
+              if (index === 0 || index === pointCount - 1) {
+                // Can't delete the end points
+                return;
+              }
 
-        dispatch(actionCreators.equalizer.REMOVE_POINT(vcId, index));
-        evt.preventDefault();
-      }}
+              dispatch(actionCreators.equalizer.REMOVE_POINT(vcId, index));
+              evt.preventDefault();
+            }
+      }
     />
     <text
       onContextMenu={evt => evt.preventDefault()}
@@ -161,12 +170,13 @@ const EqualizerViz: React.FC<{
       <EqualizerBackground width={width} height={height} />
       <EqualizerLevels width={width} height={height} levels={state.levels} />
       <EqualizerLine points={state.points} width={width} height={height} />
-      {state.points.map(({ x, y, index }) => (
-        // eslint-disable-next-line react/jsx-key
+      {state.points.map(({ x, y, index, isManuallyControlled }) => (
         <EqualizerKnob
+          key={index}
           vcId={vcId}
           x={x}
           y={y}
+          isManuallyControlled={isManuallyControlled}
           index={index}
           width={width}
           height={height}

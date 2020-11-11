@@ -89,16 +89,28 @@ export class Equalizer implements ForeignNode {
   }
 
   public buildConnectables(): AudioConnectables & { node: ForeignNode } {
-    return {
-      vcId: this.vcId,
-      inputs: Map<string, ConnectableInput>().set('input', {
+    const { points: knobs } = getState().equalizer[this.vcId];
+    const inputs = knobs.reduce(
+      (acc, knob) => {
+        const withY = acc.set(`${knob.index + 1}_y`, { type: 'number', node: knob.yControl });
+        if (knob.x === 0 || knob.x === 1 || !knob.xControl) {
+          return withY;
+        }
+        return withY.set(`${knob.index + 1}_x`, { type: 'number', node: knob.xControl });
+      },
+      Map<string, ConnectableInput>().set('input', {
         type: 'customAudio',
         node: this.workletHandle || new DummyNode(),
-      }), // TODO
+      })
+    );
+
+    return {
+      vcId: this.vcId,
+      inputs,
       outputs: Map<string, ConnectableOutput>().set('output', {
         type: 'customAudio',
         node: this.workletHandle || new DummyNode(),
-      }), // TODO
+      }),
       node: this,
     };
   }
