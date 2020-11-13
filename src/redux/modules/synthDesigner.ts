@@ -931,16 +931,7 @@ const actionGroups = {
           const targetVoice = voices[voiceIx];
 
           // Trigger release of gain and filter ADSRs
-          targetVoice.gainADSRModule.ungate(offset, () => {
-            // Setting the frequency to 0 is an optimization that causes the worklet to avoid having to do
-            // any processing when the synth is not playing
-            targetVoice.wavetable?.paramOverrides.frequency.override.offset.setValueAtTime(
-              0,
-              Option.of(offset)
-                .map(offset => ctx.currentTime + offset)
-                .getOrElse(ctx.currentTime)
-            );
-          });
+          targetVoice.gainADSRModule.ungate(offset);
           targetVoice.filterADSRModule.ungate(offset);
         });
       } else {
@@ -948,16 +939,7 @@ const actionGroups = {
         const targetVoice = targetSynth.voices[voiceIx];
 
         // Trigger release of gain and filter ADSRs
-        targetVoice.gainADSRModule.ungate(offset, () => {
-          // Setting the frequency to 0 is an optimization that causes the worklet to avoid having to do
-          // any processing when the synth is not playing
-          targetVoice.wavetable?.paramOverrides.frequency.override.offset.setValueAtTime(
-            0,
-            Option.of(offset)
-              .map(offset => ctx.currentTime + offset)
-              .getOrElse(ctx.currentTime)
-          );
-        });
+        targetVoice.gainADSRModule.ungate(offset);
         targetVoice.filterADSRModule.ungate(offset);
       }
 

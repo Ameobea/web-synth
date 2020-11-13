@@ -129,7 +129,8 @@ impl<
     }
 
     pub fn new(uuid: Uuid, link: bool, synth_cbs: SynthCallbacks<I, TA, TR, TAR, SE>) -> Self {
-        let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] = unsafe { mem::uninitialized() };
+        let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] =
+            unsafe { mem::MaybeUninit::uninit().assume_init() };
         let voices_ptr = &mut voices as *mut _ as *mut Voice;
         for i in 0..POLY_SYNTH_VOICE_COUNT {
             unsafe { ptr::write(voices_ptr.add(i), Voice::new(i)) };
@@ -287,14 +288,16 @@ pub mod exports {
                     box move |_synth_ix: usize,
                               voice_ix: usize,
                               note_id: usize,
-                              offset: Option<f32>| match release_note.call3(
-                        &JsValue::NULL,
-                        &JsValue::from(voice_ix as u32),
-                        &JsValue::from(note_id as u32),
-                        &JsValue::from(offset),
-                    ) {
-                        Ok(_) => (),
-                        Err(err) => error!("Error playing note: {:?}", err),
+                              offset: Option<f32>| {
+                        match release_note.call3(
+                            &JsValue::NULL,
+                            &JsValue::from(voice_ix as u32),
+                            &JsValue::from(note_id as u32),
+                            &JsValue::from(offset),
+                        ) {
+                            Ok(_) => (),
+                            Err(err) => error!("Error playing note: {:?}", err),
+                        }
                     },
                 trigger_attack: box move |_synth_ix: usize,
                                           voice_ix: usize,

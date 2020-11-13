@@ -117,6 +117,10 @@ export class Equalizer implements ForeignNode {
     };
   }
 
+  public shutdown() {
+    this.workletHandle?.port.postMessage({ type: 'shutdown' });
+  }
+
   // These are set dynamically at initialization time in the constructor
   public renderSmallView: ForeignNode['renderSmallView'];
   public cleanupSmallView: ForeignNode['cleanupSmallView'];

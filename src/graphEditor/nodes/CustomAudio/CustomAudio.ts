@@ -435,6 +435,11 @@ export const audioNodeGetters: {
   },
   'customAudio/Equalizer': {
     nodeGetter: (vcId, params) => new Equalizer(ctx, vcId, params),
+    protoParams: {
+      onRemovedCustom: function (this: WaveTable) {
+        this.shutdown();
+      },
+    },
   },
 };
 

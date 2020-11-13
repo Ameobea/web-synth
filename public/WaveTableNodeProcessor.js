@@ -1,8 +1,8 @@
 const FRAME_SIZE = 128;
-const MAX_DIMENSION_COUNT = 16;
+const MAX_DIMENSION_COUNT = 2;
 const BYTES_PER_F32 = 32 / 8;
 
-const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
+// const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
 
 class WaveTableNodeProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -39,14 +39,9 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
   }
 
   async initWasmInstance(data) {
-    const debug = (id, ...args) => console.log(`[${id}]: ${args.join(' ')}`);
+    // const debug = (id, ...args) => console.log(`[${id}]: ${args.join(' ')}`);
     const importObject = {
-      env: {
-        debug1_: debug,
-        debug2_: debug,
-        debug3_: debug,
-        debug4_: debug,
-      },
+      env: {},
     };
 
     const compiledModule = await WebAssembly.compile(data.arrayBuffer);
@@ -88,6 +83,15 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       throw new Error("Mixes array pointer isn't 4-byte aligned");
     }
     this.mixesArrayOffset = mixesPtr / BYTES_PER_F32;
+
+    const frequencyBufPtr = this.wasmInstance.exports.get_frequencies_ptr(
+      this.waveTableHandlePtr,
+      FRAME_SIZE
+    );
+    if (frequencyBufPtr % 4 !== 0) {
+      throw new Error("Frequency buffer pointer isn't 4-byte aligned");
+    }
+    this.frequencyBufArrayOffset = frequencyBufPtr / BYTES_PER_F32;
   }
 
   constructor() {
@@ -107,11 +111,9 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
   process(_inputs, outputs, params) {
     if (this.isShutdown) {
       return false;
-    } else if (!this.waveTableHandlePtr || params.frequency.every(f => f === 0)) {
+    } else if (!this.waveTableHandlePtr) {
       return true;
     }
-    this.i = this.i || 0;
-    this.i += 1;
 
     // Write the mixes for each sample in the frame into the Wasm memory.  Mixes are a flattened 3D
     // array of the form `mixes[dimensionIx][interOrIntraIndex][sampleIx]`
@@ -120,41 +122,55 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       const interDimensionalMixVals =
         dimensionIx > 0 ? params[`dimension_${dimensionIx - 1}x${dimensionIx}_mix`] : null;
 
-      for (let sampleIx = 0; sampleIx < FRAME_SIZE; sampleIx++) {
-        // We're not guarenteed to have a unique value for each of the `AudioParams` for every sample
-        // in the frame; if the value didn't change, we could have as few as one value.  In the case
-        // that we have less `AudioParam` values than samples, we re-use the last value.
-        const intraVal =
-          intraDimensionalMixVals[Math.min(sampleIx, intraDimensionalMixVals.length - 1)];
-        // Handle the case of the first dimension, which doesn't have any inter-dimensional mix
-        const interVal = interDimensionalMixVals
-          ? interDimensionalMixVals[Math.min(sampleIx, interDimensionalMixVals.length - 1)]
-          : 0;
+      const dstIntraValBaseIx = this.mixesArrayOffset + dimensionIx * FRAME_SIZE * 2;
+      if (intraDimensionalMixVals.length === 1) {
+        this.float32WasmMemory.fill(
+          intraDimensionalMixVals[0],
+          dstIntraValBaseIx,
+          dstIntraValBaseIx + FRAME_SIZE
+        );
+      } else if (intraDimensionalMixVals.length === FRAME_SIZE) {
+        this.float32WasmMemory.set(intraDimensionalMixVals, dstIntraValBaseIx);
+      } else {
+        throw new Error(
+          'Unexpected size of mix intra dim mix buffer: ',
+          intraDimensionalMixVals.length
+        );
+      }
 
-        const dstIntraValIx = this.mixesArrayOffset + dimensionIx * FRAME_SIZE * 2 + sampleIx;
-        const dstInterValIx = dstIntraValIx + FRAME_SIZE;
-        // Apparently the `minValue` and `maxValue` params don't work, so we have to clamp manually to [0,1]
-        this.float32WasmMemory[dstIntraValIx] = clamp(0, 1, intraVal);
-        this.float32WasmMemory[dstInterValIx] = clamp(0, 1, interVal);
+      if (interDimensionalMixVals !== null) {
+        const dstInterValBaseIx = dstIntraValBaseIx + FRAME_SIZE;
+        if (interDimensionalMixVals.length === 1) {
+          this.float32WasmMemory.fill(
+            interDimensionalMixVals[0],
+            dstInterValBaseIx,
+            dstInterValBaseIx + FRAME_SIZE
+          );
+        } else if (interDimensionalMixVals.length === FRAME_SIZE) {
+          this.float32WasmMemory.set(interDimensionalMixVals, dstInterValBaseIx);
+        } else {
+          throw new Error(
+            'Unexpected size of mix inter dim mix buffer: ',
+            interDimensionalMixVals.length
+          );
+        }
       }
     }
 
     // Write the frequencies for each sample into Wasm memory
-    const frequencyBufPtr = this.wasmInstance.exports.get_frequencies_ptr(
-      this.waveTableHandlePtr,
-      FRAME_SIZE
-    );
-    if (frequencyBufPtr % 4 !== 0) {
-      throw new Error("Frequency buffer pointer isn't 4-byte aligned");
-    }
-    const frequencyBufArrayOffset = frequencyBufPtr / BYTES_PER_F32;
-    if (this.i === 100) {
-      console.log(params.detune);
-    }
-    for (let i = 0; i < FRAME_SIZE; i++) {
-      this.float32WasmMemory[frequencyBufArrayOffset + i] =
-        params.frequency[Math.min(params.frequency.length - 1, i)] +
-        params.detune[Math.min(params.detune.length - 1, i)];
+    if (params.frequency.length === 1 && params.detune.length === 1) {
+      const realFreq = params.frequency[0] + params.detune[0];
+      this.float32WasmMemory.fill(
+        realFreq,
+        this.frequencyBufArrayOffset,
+        this.frequencyBufArrayOffset + FRAME_SIZE
+      );
+    } else {
+      for (let i = 0; i < FRAME_SIZE; i++) {
+        this.float32WasmMemory[this.frequencyBufArrayOffset + i] =
+          params.frequency[Math.min(params.frequency.length - 1, i)] +
+          params.detune[Math.min(params.detune.length - 1, i)];
+      }
     }
 
     // TODO: No need to do this every frame; do once when handle is created and store ptr
@@ -163,18 +179,17 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       this.waveTableHandlePtr,
       FRAME_SIZE
     );
-    if (generatedSamplesPtr % 4 !== 0) {
-      throw new Error("Generated samples pointer isn't 4-byte aligned");
-    }
+
     const generatedSamplesArrayOffset = generatedSamplesPtr / BYTES_PER_F32;
+    const samplesSlice = this.float32WasmMemory.subarray(
+      generatedSamplesArrayOffset,
+      generatedSamplesArrayOffset + FRAME_SIZE
+    );
 
     // Copy the generated samples out of Wasm memory into all output buffers
     for (let outputIx = 0; outputIx < outputs.length; outputIx++) {
       for (let channelIx = 0; channelIx < outputs[outputIx].length; channelIx++) {
-        for (let sampleIx = 0; sampleIx < FRAME_SIZE; sampleIx++) {
-          const sample = this.float32WasmMemory[generatedSamplesArrayOffset + sampleIx];
-          outputs[outputIx][channelIx][sampleIx] = sample;
-        }
+        outputs[outputIx][channelIx].set(samplesSlice);
       }
     }
 

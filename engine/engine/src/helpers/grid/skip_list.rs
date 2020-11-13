@@ -90,7 +90,8 @@ fn get_debug_ptrs() -> &'static mut LinkOpts<usize> {
 }
 
 fn init_preceeding_links<S>(head_key: NodeSlabKey<S>) -> PreceedingLinks<S> {
-    let mut preceeding_links: PreceedingLinks<S> = unsafe { mem::uninitialized() };
+    let mut preceeding_links: PreceedingLinks<S> =
+        unsafe { mem::MaybeUninit::uninit().assume_init() };
     for link in &mut preceeding_links {
         *link = head_key;
     }
@@ -141,7 +142,8 @@ pub fn get_skip_list_level() -> usize {
 
 #[inline]
 pub fn blank_shortcuts<T>() -> [Option<T>; NOTE_SKIP_LIST_LEVELS] {
-    let mut shortcuts: [Option<T>; NOTE_SKIP_LIST_LEVELS] = unsafe { mem::uninitialized() };
+    let mut shortcuts: [Option<T>; NOTE_SKIP_LIST_LEVELS] =
+        unsafe { mem::MaybeUninit::uninit().assume_init() };
     for link in &mut shortcuts[..] {
         unsafe { ptr::write(link, None) };
     }
@@ -488,7 +490,7 @@ impl<S> Default for NoteSkipList<S> {
 
         // Insert a placeholder since we can't use index 0 due to the `NonZeroU32` optimization
         nodes.insert(NoteSkipListNode {
-            val: unsafe { mem::uninitialized() },
+            val: unsafe { mem::MaybeUninit::uninit().assume_init() },
             links: blank_shortcuts(),
         });
 
@@ -789,7 +791,8 @@ impl<S: GridRendererUniqueIdentifier> NoteLines<S> {
             Some(node_key) => line.get_node(node_key),
             None => return Bounds::Bounded(0.0, None),
         };
-        let mut preceeding_links: PreceedingLinks<S> = unsafe { mem::uninitialized() };
+        let mut preceeding_links: PreceedingLinks<S> =
+            unsafe { mem::MaybeUninit::uninit().assume_init() };
         for link in &mut preceeding_links {
             unsafe { ptr::write(link, line.head_key.unwrap()) };
         }
