@@ -436,8 +436,8 @@ export const audioNodeGetters: {
   'customAudio/Equalizer': {
     nodeGetter: (vcId, params) => new Equalizer(ctx, vcId, params),
     protoParams: {
-      onRemovedCustom: function (this: WaveTable) {
-        this.shutdown();
+      onRemovedCustom: function (this: any) {
+        this.connectables.node.shutdown();
       },
     },
   },
@@ -528,10 +528,9 @@ const registerCustomAudioNode = (
   CustomAudioNode.prototype.onRemoved = function (this: any) {
     if (!this.ignoreRemove) {
       removeNode(this.id.toString());
-    }
-
-    if (this.onRemovedCustom) {
-      this.onRemovedCustom();
+      if (this.onRemovedCustom) {
+        this.onRemovedCustom();
+      }
     }
   };
 

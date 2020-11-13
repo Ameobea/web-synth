@@ -57,6 +57,13 @@ const SYNTH_SETTINGS = [
     initial: '1',
   },
   {
+    type: 'range',
+    label: 'adsr length ms',
+    min: 50,
+    max: 10000,
+    initial: 1000,
+  },
+  {
     type: 'custom',
     label: 'adsr',
     initial: defaultAdsrEnvelope,
@@ -249,6 +256,10 @@ const SynthModuleCompInner: React.FC<{
               dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, index));
               return;
             }
+            case 'adsr length ms': {
+              dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(index, val));
+              return;
+            }
             case 'pitch multiplier': {
               setLocalPitchMultiplier(val);
               const value = Number.parseFloat(val);
@@ -269,6 +280,7 @@ const SynthModuleCompInner: React.FC<{
             volume: synth.masterGain,
             unison,
             detune: synth.detune,
+            'adsr length ms': synth.gainADSRLength,
             adsr: synth.gainEnvelope,
             'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(() =>
               synth.pitchMultiplier.toString()
@@ -282,6 +294,7 @@ const SynthModuleCompInner: React.FC<{
             synth.gainEnvelope,
             synth.pitchMultiplier,
             localPitchMultiplier,
+            synth.gainADSRLength,
           ]
         )}
         style={{ width: 378 }}

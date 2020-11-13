@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { UnimplementedError } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
@@ -109,7 +109,6 @@ export interface SynthModule {
   filterParams: FilterParams;
   filterCSNs: FilterCSNs;
   masterGain: number;
-  masterGainCSN: ConstantSourceNode;
   selectedEffectType: EffectType;
   gainEnvelope: ADSRValues;
   gainADSRLength: number;
@@ -293,20 +292,17 @@ export const serializeSynthModule = (synth: SynthModule) => ({
 });
 
 const connectWavetableInputControls = (
-  wavetableConfig: WavetableConfig,
   inputControls: NonNullable<SynthModule['wavetableInputControls']>,
   voice: Voice
 ) => {
   inputControls.intraDimMixes.forEach((param, dimIx) => {
     const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}_mix`];
-    param.manualControl.offset.value = wavetableConfig.intraDimMixes[dimIx];
     param.outputCSN!.connect(voiceParam.param);
     // Never overridden because we handle that control above the voice level
     voiceParam.param.setIsOverridden(false);
   });
   inputControls.interDimMixes.forEach((param, dimIx) => {
     const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}x${dimIx + 1}_mix`];
-    param.manualControl.offset.value = wavetableConfig.interDimMixes[dimIx];
     param.outputCSN!.connect(voiceParam.param);
     // Never overridden because we handle that control above the voice level
     voiceParam.param.setIsOverridden(false);
@@ -319,12 +315,12 @@ const buildWavetableInputControls = (
   const inputControls = {
     intraDimMixes: wavetableConf.intraDimMixes.map(mix => {
       const param = new OverridableAudioParam(ctx, undefined, undefined, true);
-      param.manualControl.offset.setValueAtTime(0, mix);
+      param.manualControl.offset.value = mix;
       return param;
     }),
     interDimMixes: wavetableConf.interDimMixes.map(mix => {
       const param = new OverridableAudioParam(ctx, undefined, undefined, true);
-      param.manualControl.offset.setValueAtTime(0, mix);
+      param.manualControl.offset.value = mix;
       return param;
     }),
   };
@@ -383,8 +379,6 @@ const buildDefaultSynthModule = (): SynthModule => {
   filterNode.disconnect();
 
   const masterGain = 0.0;
-  const masterGainCSN = new ConstantSourceNode(ctx);
-  masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
   const inst: SynthModule = {
     waveform: Waveform.Sine,
     detune: 0,
@@ -411,13 +405,9 @@ const buildDefaultSynthModule = (): SynthModule => {
       osc.connect(outerGainNode);
 
       // Start the gain ADSR module and configure it to modulate the voice's gain node
-      const gainADSRModule = new ADSRModule(ctx, { minValue: 0, maxValue: 1.8, lengthMs: 1000 });
+      const gainADSRModule = new ADSRModule(ctx, { minValue: 0, maxValue: 1.0, lengthMs: 1000 });
       gainADSRModule.start();
       gainADSRModule.connect(outerGainNode.gain);
-
-      // Connect the mast gain to the ADSR so that we can sum the offsets
-      // For whatever reason, you can't connect two CSNs to the same `AudioParam`; it just doesn't seem to work.
-      masterGainCSN.connect(gainADSRModule.offset);
 
       return {
         oscillators: [osc],
@@ -434,20 +424,17 @@ const buildDefaultSynthModule = (): SynthModule => {
     filterCSNs,
     wavetableInputControls: null,
     masterGain,
-    masterGainCSN,
     selectedEffectType: EffectType.Reverb,
     gainEnvelope: defaultAdsrEnvelope,
     gainADSRLength: 1000,
     filterEnvelope: defaultAdsrEnvelope,
-    filterADSRLength: 1200,
+    filterADSRLength: 1000,
     pitchMultiplier: 1,
   };
 
   // Connect up + start all the CSNs
   inst.voices.flatMap(R.prop('oscillators')).forEach(osc => inst.detuneCSN.connect(osc.detune));
   inst.detuneCSN.start();
-  inst.masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
-  inst.masterGainCSN.start();
 
   filterCSNs.detune.start();
   filterCSNs.frequency.start();
@@ -527,7 +514,6 @@ export const deserializeSynthModule = (
       updateFilterNode([voice.filterNode], base.filterCSNs, key, val)
     );
 
-    // TODO: the envelope should probably eventually be set via CSN...
     voice.gainADSRModule.setEnvelope(gainEnvelope);
     voice.gainADSRModule.setLengthMs(gainADSRLength);
 
@@ -558,8 +544,6 @@ export const deserializeSynthModule = (
       effects: [], // TODO
     };
   });
-
-  base.masterGainCSN.offset.setValueAtTime(masterGain, ctx.currentTime);
 
   if (baseWavetableConfig?.encodedWavetableDef) {
     wavetableConf.wavetableDef = decodeWavetableDef(baseWavetableConfig as any);
@@ -736,7 +720,11 @@ const actionGroups = {
           }
 
           try {
-            workletHandle.disconnect();
+            workletHandle.disconnect(
+              targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode
+            );
+            voice.wavetable!.shutdown();
+            voice.wavetable = null;
           } catch (err) {
             console.error('Error disconnecting wavetable worklet from filter: ', err);
           }
@@ -1032,18 +1020,6 @@ const actionGroups = {
       return setSynth(synthIx, { ...targetSynth, gainEnvelope: envelope }, state);
     },
   }),
-  SET_GAIN_ADSR_LENGTH: buildActionGroup({
-    actionCreator: (length: number, synthIx: number) => ({
-      type: 'SET_GAIN_ADSR_LENGTH',
-      length,
-      synthIx,
-    }),
-    subReducer: (state: SynthDesignerState, { length, synthIx }) => {
-      const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.voices.forEach(voice => voice.gainADSRModule.setLengthMs(length));
-      return setSynth(synthIx, { ...targetSynth, gainADSRLength: length }, state);
-    },
-  }),
   SET_FILTER_ADSR: buildActionGroup({
     actionCreator: (envelope: ADSRValues, synthIx: number) => ({
       type: 'SET_FILTER_ADSR',
@@ -1055,18 +1031,6 @@ const actionGroups = {
       targetSynth.voices.forEach(voice => voice.filterADSRModule.setEnvelope(envelope));
 
       return setSynth(synthIx, { ...targetSynth, filterEnvelope: envelope }, state);
-    },
-  }),
-  SET_FILTER_ADSR_LENGTH: buildActionGroup({
-    actionCreator: (length: number, synthIx: number) => ({
-      type: 'SET_FILTER_ADSR_LENGTH',
-      length,
-      synthIx,
-    }),
-    subReducer: (state: SynthDesignerState, { length, synthIx }) => {
-      const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.voices.forEach(voice => voice.filterADSRModule.setLengthMs(length));
-      return setSynth(synthIx, { ...targetSynth, filterADSRLength: length }, state);
     },
   }),
   SET_WAVY_JONES_INSTANCE: buildActionGroup({
@@ -1185,7 +1149,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { synthIx, gain }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.masterGainCSN.offset.setValueAtTime(gain, ctx.currentTime);
+      targetSynth.voices.forEach(voice => voice.gainADSRModule.setMaxValue(1 + gain));
       return setSynth(synthIx, { ...targetSynth, masterGain: gain }, state);
     },
   }),
@@ -1264,7 +1228,6 @@ const actionGroups = {
           .forEach(outerGainNode => outerGainNode.connect(state.wavyJonesInstance!));
       }
 
-      // TODO: Probably have to disconnect/dispose the old voice...
       return { ...state, synths: R.set(R.lensIndex(synthIx), builtVoice, state.synths) };
     },
   }),
@@ -1293,11 +1256,7 @@ const actionGroups = {
         console.error('Connecting wavetable but no `wavetableConf` present');
         return state;
       }
-      connectWavetableInputControls(
-        targetSynth.wavetableConf,
-        targetSynth.wavetableInputControls!,
-        targetVoice
-      );
+      connectWavetableInputControls(targetSynth.wavetableInputControls!, targetVoice);
 
       if (!targetVoice.wavetable) {
         console.warn('No `wavetable` but waveform was `wavetable`');
@@ -1427,6 +1386,30 @@ const actionGroups = {
       });
 
       return setSynth(synthIx, { ...targetSynth, filterBypassed }, state);
+    },
+  }),
+  SET_GAIN_ADSR_LENGTH: buildActionGroup({
+    actionCreator: (synthIx: number, lengthMs: number) => ({
+      type: 'SET_GAIN_ADSR_LENGTH',
+      synthIx,
+      lengthMs,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, lengthMs }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.voices.forEach(voice => voice.gainADSRModule.setLengthMs(lengthMs));
+      return setSynth(synthIx, { ...targetSynth, gainADSRLength: lengthMs }, state);
+    },
+  }),
+  SET_FILTER_ADSR_LENGTH: buildActionGroup({
+    actionCreator: (synthIx: number, lengthMs: number) => ({
+      type: 'SET_FILTER_ADSR_LENGTH',
+      synthIx,
+      lengthMs,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, lengthMs }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.voices.forEach(voice => voice.filterADSRModule.setLengthMs(lengthMs));
+      return setSynth(synthIx, { ...targetSynth, filterADSRLength: lengthMs }, state);
     },
   }),
 };

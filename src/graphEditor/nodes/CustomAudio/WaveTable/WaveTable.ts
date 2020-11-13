@@ -301,7 +301,7 @@ export default class WaveTable implements ForeignNode {
   }
 
   public shutdown() {
-    this.workletHandle!.port.postMessage('shutdown');
+    this.workletHandle?.port.postMessage('shutdown');
   }
 }
 

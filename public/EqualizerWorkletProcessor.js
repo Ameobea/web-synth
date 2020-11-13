@@ -212,6 +212,17 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
       this.dspInstance.exports.init(this.dsp, SAMPLE_RATE);
     };
 
+    this.bandParamOffsersByIx = new Uint32Array(LEVEL_COUNT);
+    this.knobXParamNames = new Array(LEVEL_COUNT).fill('');
+    this.knobYParamNames = new Array(LEVEL_COUNT).fill('');
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      this.bandParamOffsersByIx[i] = this.pathTable[
+        `/faust-code404805250/Band${i < 10 ? '_' : ''}${i + 1}`
+      ];
+      this.knobXParamNames[i] = `knob_${i}_x`;
+      this.knobYParamNames[i] = `knob_${i}_y`;
+    }
+
     this.port.onmessage = async event => {
       switch (event.data.type) {
         case 'setPathTable': {
@@ -239,11 +250,7 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
 
   lastSentLevelsIx = 0;
   sendLevels() {
-    this.lastSentLevelsIx += 1;
-    if (this.lastSentLevelsIx >= 16) {
-      this.lastSentLevelsIx = 0;
-      this.port.postMessage({ levels: this.levels });
-    }
+    this.port.postMessage({ levels: this.levels });
   }
 
   computeLevels(params) {
@@ -252,7 +259,7 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     this.levelsBackbuffer = temp;
 
     for (let i = 0; i < KNOB_COUNT; i++) {
-      const x = params[`knob_${i}_x`]?.[0] ?? 0;
+      const x = params[this.knobXParamNames[i]]?.[0] ?? 0;
       if (x < 0) {
         // Value less than zero means that this knob isn't connected
         this.sortedParams[i].x = -1;
@@ -261,7 +268,7 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
       }
 
       this.sortedParams[i].x = x;
-      this.sortedParams[i].y = params[`knob_${i}_y`][0];
+      this.sortedParams[i].y = params[this.knobYParamNames[i]][0];
     }
     // ""...It is expected to return a negative value if first argument is less than second argument"
     this.sortedParams.sort((a, b) => {
@@ -302,7 +309,9 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
       levelsDiffer = levelsDiffer || this.levels[i] !== this.levelsBackbuffer[i];
     }
 
-    if (levelsDiffer) {
+    this.lastSentLevelsIx += 1;
+    if ((levelsDiffer && this.lastSentLevelsIx >= 16) || this.lastSentLevelsIx >= 128) {
+      this.lastSentLevelsIx = 0;
       this.sendLevels();
     }
   }
@@ -320,7 +329,7 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     this.levels.forEach((level, i) =>
       this.dspInstance.exports.setParamValue(
         this.dsp,
-        this.pathTable[`/faust-code404805250/Band${i < 10 ? '_' : ''}${i + 1}`],
+        this.bandParamOffsersByIx[i],
         clamp(-50, 20, Number.isNaN(level) ? 0 : level)
       )
     );

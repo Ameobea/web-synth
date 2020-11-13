@@ -48,6 +48,7 @@ export class ADSRModule extends ConstantSourceNode {
 
   public setLengthMs(newLengthMs: number) {
     this.onLengthValueRecordedInitialzed(lengthMs => {
+      lengthMs.lastValue = newLengthMs;
       lengthMs.value = newLengthMs;
     });
   }

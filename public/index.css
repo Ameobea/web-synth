@@ -12,3 +12,11 @@ h4,
 h5 {
   font-family: 'PT Sans';
 }
+
+.control-panel .container input {
+  margin-top: 0;
+}
+
+.control-panel .container input[type='text'] {
+  height: 18px !important;
+}
