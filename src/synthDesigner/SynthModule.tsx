@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import React, { useMemo, useRef, useState } from 'react';
-import { connect, Provider } from 'react-redux';
+import { Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
@@ -14,7 +14,7 @@ import {
   getVoicePreset,
 } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
-import { ReduxStore, store, getState } from 'src/redux';
+import { store, getState, useSelector } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
@@ -64,22 +64,11 @@ const SYNTH_SETTINGS = [
   },
 ];
 
-const mapStateToProps = (state: ReduxStore) => ({
-  voicePresetIds: voicePresetIdsSelector(state),
-});
-
-const SynthModuleCompInner: React.FC<
-  {
-    index: number;
-    synth: SynthModule;
-    stateKey: string;
-  } & ReturnType<typeof mapStateToProps>
-> = ({ index, synth, stateKey, children = null, voicePresetIds }) => {
-  const controlPanelContext = useRef<{ preset: string } | null>(null);
-  const unison = synth.voices[0].oscillators.length;
-  const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
-
-  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+const WavetableControlPanel: React.FC<{
+  synth: SynthModule;
+  dispatch: ReturnType<typeof getReduxInfra>['dispatch'];
+  index: number;
+}> = ({ synth, dispatch, index }) => {
   const wavetableUIState = useMemo(() => {
     if (!synth.wavetableConf) {
       return null;
@@ -94,6 +83,125 @@ const SynthModuleCompInner: React.FC<
       return acc;
     }, acc);
   }, [synth.wavetableConf]);
+
+  return (
+    <ControlPanel
+      title='WAVETABLE'
+      settings={[
+        ...synth.wavetableConf!.intraDimMixes.map((_mix, dimIx) => ({
+          type: 'range',
+          min: 0,
+          max: 1,
+          label: `intra_dim_${dimIx}_mix`,
+        })),
+        ...synth.wavetableConf!.interDimMixes.map((_mix, dimIx) => ({
+          type: 'range',
+          min: 0,
+          max: 1,
+          label: `inter_dim_${dimIx}_mix`,
+        })),
+      ]}
+      onChange={(key: string, val: any) => {
+        if (key.startsWith('intra_dim_')) {
+          const dimIx = +key.split('intra_dim_')[1].split('_mix')[0];
+          dispatch({ type: 'SET_WAVETABLE_INTRA_DIM_MIX', synthIx: index, dimIx, mix: val });
+          return;
+        } else if (key.startsWith('inter_dim_')) {
+          const baseDimIx = +key.split('inter_dim_')[1].split('_mix')[0];
+          dispatch({
+            type: 'SET_WAVETABLE_INTER_DIM_MIX',
+            synthIx: index,
+            baseDimIx,
+            mix: val,
+          });
+          return;
+        }
+
+        throw new UnreachableException(`Unhandled wavetable key: ${key}`);
+      }}
+      state={wavetableUIState}
+    />
+  );
+};
+
+const PresetsControlPanel: React.FC<{
+  index: number;
+  stateKey: string;
+}> = ({ index, stateKey }) => {
+  const controlPanelContext = useRef<{ preset: string } | null>(null);
+  const voicePresetIds = useSelector(voicePresetIdsSelector);
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+
+  return (
+    <ControlPanel
+      proxy
+      contextCb={(ctx: { preset: string }) => {
+        controlPanelContext.current = ctx;
+      }}
+      style={{ height: 97 }}
+      settings={[
+        {
+          label: 'preset',
+          type: 'select',
+          options: { blank: 'blank', ...voicePresetIds },
+          initial: 'blank',
+        },
+        {
+          label: 'load preset',
+          type: 'button',
+          action: () => {
+            if (!controlPanelContext.current) {
+              console.error('Control panel context never set!');
+              return;
+            }
+
+            const presetId = controlPanelContext.current.preset;
+            const allVoicePresets = getState().presets.voicePresets;
+            if (typeof allVoicePresets === 'string') {
+              console.error("Somehow voice presets aren't loaded at this point...");
+              return;
+            }
+
+            const preset =
+              presetId === 'blank' ? null : allVoicePresets.find(R.propEq('id', +presetId));
+            if (preset === undefined) {
+              console.error(
+                `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
+              );
+              return;
+            }
+
+            dispatch(
+              actionCreators.synthDesigner.SET_VOICE_STATE(
+                index,
+                preset ? preset.body : null,
+                dispatch
+              )
+            );
+          },
+        },
+        {
+          label: 'save preset',
+          type: 'button',
+          action: async () => {
+            const { title, description } = await renderModalWithControls(SavePresetModal);
+            const presetBody = getVoicePreset(stateKey, index);
+            await saveSynthVoicePreset({ title, description, body: presetBody });
+          },
+        },
+      ]}
+    />
+  );
+};
+
+const SynthModuleCompInner: React.FC<{
+  index: number;
+  synth: SynthModule;
+  stateKey: string;
+}> = ({ index, synth, stateKey, children = null }) => {
+  const unison = synth.voices[0].oscillators.length;
+  const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return (
     <div className='synth-module'>
@@ -180,42 +288,7 @@ const SynthModuleCompInner: React.FC<
       />
 
       {synth.waveform === 'wavetable' ? (
-        <ControlPanel
-          title='WAVETABLE'
-          settings={[
-            ...synth.wavetableConf!.intraDimMixes.map((_mix, dimIx) => ({
-              type: 'range',
-              min: 0,
-              max: 1,
-              label: `intra_dim_${dimIx}_mix`,
-            })),
-            ...synth.wavetableConf!.interDimMixes.map((_mix, dimIx) => ({
-              type: 'range',
-              min: 0,
-              max: 1,
-              label: `inter_dim_${dimIx}_mix`,
-            })),
-          ]}
-          onChange={(key: string, val: any) => {
-            if (key.startsWith('intra_dim_')) {
-              const dimIx = +key.split('intra_dim_')[1].split('_mix')[0];
-              dispatch({ type: 'SET_WAVETABLE_INTRA_DIM_MIX', synthIx: index, dimIx, mix: val });
-              return;
-            } else if (key.startsWith('inter_dim_')) {
-              const baseDimIx = +key.split('inter_dim_')[1].split('_mix')[0];
-              dispatch({
-                type: 'SET_WAVETABLE_INTER_DIM_MIX',
-                synthIx: index,
-                baseDimIx,
-                mix: val,
-              });
-              return;
-            }
-
-            throw new UnreachableException(`Unhandled wavetable key: ${key}`);
-          }}
-          state={wavetableUIState}
-        />
+        <WavetableControlPanel synth={synth} dispatch={dispatch} index={index} />
       ) : null}
 
       <FilterModule
@@ -223,81 +296,21 @@ const SynthModuleCompInner: React.FC<
         params={synth.filterParams}
         filterEnvelope={synth.filterEnvelope}
         stateKey={stateKey}
+        bypass={synth.filterBypassed}
       />
 
       <div className='effects'>{children}</div>
 
       <div className='presets'>
-        <ControlPanel
-          proxy
-          contextCb={(ctx: { preset: string }) => {
-            controlPanelContext.current = ctx;
-          }}
-          style={{ height: 97 }}
-          settings={[
-            {
-              label: 'preset',
-              type: 'select',
-              options: { blank: 'blank', ...voicePresetIds },
-              initial: 'blank',
-            },
-            {
-              label: 'load preset',
-              type: 'button',
-              action: () => {
-                if (!controlPanelContext.current) {
-                  console.error('Control panel context never set!');
-                  return;
-                }
-
-                const presetId = controlPanelContext.current.preset;
-                const allVoicePresets = getState().presets.voicePresets;
-                if (typeof allVoicePresets === 'string') {
-                  console.error("Somehow voice presets aren't loaded at this point...");
-                  return;
-                }
-
-                const preset =
-                  presetId === 'blank' ? null : allVoicePresets.find(R.propEq('id', +presetId));
-                if (preset === undefined) {
-                  console.error(
-                    `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
-                  );
-                  return;
-                }
-
-                dispatch(
-                  actionCreators.synthDesigner.SET_VOICE_STATE(
-                    index,
-                    preset ? preset.body : null,
-                    dispatch
-                  )
-                );
-              },
-            },
-            {
-              label: 'save preset',
-              type: 'button',
-              action: async () => {
-                const { title, description } = await renderModalWithControls(SavePresetModal);
-                const presetBody = getVoicePreset(stateKey, index);
-                await saveSynthVoicePreset({ title, description, body: presetBody });
-              },
-            },
-          ]}
-        />
+        <PresetsControlPanel index={index} stateKey={stateKey} />
       </div>
     </div>
   );
 };
 
-const SynthModuleUnwrapped = connect(mapStateToProps)(SynthModuleCompInner);
-const SynthModuleComp: React.FC<Omit<
-  PropTypesOf<typeof SynthModuleUnwrapped>,
-  keyof ReturnType<typeof mapStateToProps>
->> = ({ ...props }) => (
+const SynthModuleComp: React.FC<PropTypesOf<typeof SynthModuleCompInner>> = ({ ...props }) => (
   <Provider store={store}>
-    <SynthModuleUnwrapped {...props} />
+    <SynthModuleCompInner {...props} />
   </Provider>
 );
 export default SynthModuleComp;

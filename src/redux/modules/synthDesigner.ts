@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import { UnimplementedError } from 'ameo-utils';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
@@ -99,6 +99,7 @@ export interface SynthModule {
   waveform: Waveform;
   detune: number;
   detuneCSN: ConstantSourceNode;
+  filterBypassed: boolean;
   voices: Voice[];
   wavetableConf: WavetableConfig | null;
   wavetableInputControls: {
@@ -122,6 +123,11 @@ const ctx = new AudioContext();
 const VOICE_COUNT = 16 as const;
 
 const filterSettings = {
+  bypass: {
+    label: 'bypass',
+    type: 'checkbox',
+    initial: true,
+  },
   type: {
     type: 'select',
     label: 'type',
@@ -171,6 +177,7 @@ const filterSettings = {
 };
 
 export const getSettingsForFilterType = (filterType: FilterType) => [
+  filterSettings.bypass,
   filterSettings.type,
   filterSettings.frequency,
   filterSettings.detune,
@@ -206,9 +213,9 @@ function updateFilterNode<K extends keyof FilterParams>(
       });
       break;
     }
-    case 'adsr': {
+    case 'adsr':
+    case 'bypass':
       break;
-    }
     default: {
       const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];
       param.offset.setValueAtTime(val as number, ctx.currentTime);
@@ -282,27 +289,27 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   filterADSRLength: synth.filterADSRLength,
   pitchMultiplier: synth.pitchMultiplier,
   type: synth.waveform === Waveform.Wavetable ? ('wavetable' as const) : ('standard' as const),
+  filterBypassed: synth.filterBypassed,
 });
 
 const connectWavetableInputControls = (
+  wavetableConfig: WavetableConfig,
   inputControls: NonNullable<SynthModule['wavetableInputControls']>,
-  voices: Voice[]
+  voice: Voice
 ) => {
   inputControls.intraDimMixes.forEach((param, dimIx) => {
-    voices.forEach(voice => {
-      const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}_mix`];
-      param.outputCSN!.connect(voiceParam.param);
-      // Never overridden because we handle that control above the voice level
-      voiceParam.param.setIsOverridden(false);
-    });
+    const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}_mix`];
+    param.manualControl.offset.value = wavetableConfig.intraDimMixes[dimIx];
+    param.outputCSN!.connect(voiceParam.param);
+    // Never overridden because we handle that control above the voice level
+    voiceParam.param.setIsOverridden(false);
   });
-  inputControls.interDimMixes.forEach((param, i) => {
-    voices.forEach(voice => {
-      const voiceParam = voice.wavetable!.paramOverrides[`dimension_${i}x${i + 1}_mix`];
-      param.outputCSN!.connect(voiceParam.param);
-      // Never overridden because we handle that control above the voice level
-      voiceParam.param.setIsOverridden(false);
-    });
+  inputControls.interDimMixes.forEach((param, dimIx) => {
+    const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}x${dimIx + 1}_mix`];
+    param.manualControl.offset.value = wavetableConfig.interDimMixes[dimIx];
+    param.outputCSN!.connect(voiceParam.param);
+    // Never overridden because we handle that control above the voice level
+    voiceParam.param.setIsOverridden(false);
   });
 };
 
@@ -382,6 +389,7 @@ const buildDefaultSynthModule = (): SynthModule => {
     waveform: Waveform.Sine,
     detune: 0,
     detuneCSN: new ConstantSourceNode(ctx),
+    filterBypassed: true,
     voices: R.range(0, VOICE_COUNT).map(() => {
       const outerGainNode = new GainNode(ctx);
       outerGainNode.gain.setValueAtTime(0, ctx.currentTime);
@@ -400,7 +408,7 @@ const buildDefaultSynthModule = (): SynthModule => {
 
       const osc = new OscillatorNode(ctx);
       osc.start();
-      osc.connect(filterNode);
+      osc.connect(outerGainNode);
 
       // Start the gain ADSR module and configure it to modulate the voice's gain node
       const gainADSRModule = new ADSRModule(ctx, { minValue: 0, maxValue: 1.8, lengthMs: 1000 });
@@ -483,6 +491,7 @@ export const deserializeSynthModule = (
     filterEnvelope,
     filterADSRLength,
     pitchMultiplier,
+    filterBypassed = true,
   }: {
     waveform: Waveform;
     wavetableConfig: Omit<WavetableConfig, 'onInitialized'> | null;
@@ -496,6 +505,7 @@ export const deserializeSynthModule = (
     filterEnvelope: ADSRValues;
     filterADSRLength: number;
     pitchMultiplier: number;
+    filterBypassed?: boolean;
   },
   dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void,
   synthIx: number
@@ -533,7 +543,7 @@ export const deserializeSynthModule = (
         osc.detune.setValueAtTime(0, ctx.currentTime);
         base.detuneCSN.connect(osc.detune);
         osc.start();
-        osc.connect(voice.filterNode);
+        osc.connect(filterBypassed ? voice.outerGainNode : voice.filterNode);
         return osc;
       }),
       wavetable:
@@ -560,6 +570,7 @@ export const deserializeSynthModule = (
     ...base,
     waveform,
     detune,
+    filterBypassed,
     voices,
     wavetableConf,
     masterGain,
@@ -711,7 +722,7 @@ const actionGroups = {
         targetSynth.voices.forEach(voice => {
           voice.oscillators.forEach(osc => {
             try {
-              osc.connect(voice.filterNode);
+              osc.connect(targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode);
             } catch (err) {
               console.error('Error connecting oscillator and filter: ', err);
             }
@@ -790,6 +801,7 @@ const actionGroups = {
         const synthOutput = Option.of(R.last(voice.effects))
           .map(R.prop('effect'))
           .map(R.prop('node'))
+          // TODO: Should work with filter bypassing and probably go after the filter in that case.
           .getOrElse(voice.filterNode);
 
         synthOutput.disconnect();
@@ -843,6 +855,7 @@ const actionGroups = {
         const newSrc = Option.of(voice.effects[synthIx - 1])
           .map(R.prop('effect'))
           .map(R.prop('node'))
+          // TODO: Should work with filter bypassing and probably go after the filter in that case.
           .getOrElse(voice.filterNode);
         const newDst = Option.of(voice.effects[effectIndex + 1])
           .map(R.prop('effect'))
@@ -1276,7 +1289,15 @@ const actionGroups = {
 
       // Connect the master wavetable control inputs to this newly initialized voice
       const targetVoice = targetSynth.voices[voiceIx];
-      connectWavetableInputControls(targetSynth.wavetableInputControls!, [targetVoice]);
+      if (!targetSynth.wavetableConf) {
+        console.error('Connecting wavetable but no `wavetableConf` present');
+        return state;
+      }
+      connectWavetableInputControls(
+        targetSynth.wavetableConf,
+        targetSynth.wavetableInputControls!,
+        targetVoice
+      );
 
       if (!targetVoice.wavetable) {
         console.warn('No `wavetable` but waveform was `wavetable`');
@@ -1297,7 +1318,9 @@ const actionGroups = {
       targetSynth.detuneCSN.connect(targetVoice.wavetable.paramOverrides.detune.param);
 
       try {
-        targetVoice.wavetable.workletHandle.connect(targetVoice.filterNode);
+        targetVoice.wavetable.workletHandle.connect(
+          targetSynth.filterBypassed ? targetVoice.outerGainNode : targetVoice.filterNode
+        );
       } catch (err) {
         console.error('Error connecting wavetable to `filterNode`: ', err);
       }
@@ -1372,6 +1395,38 @@ const actionGroups = {
 
       const synths = preset.body.voices.map((def, i) => deserializeSynthModule(def, dispatch, i));
       return { ...state, synths };
+    },
+  }),
+  SET_FILTER_IS_BYPASSED: buildActionGroup({
+    actionCreator: (synthIx: number, filterBypassed: boolean) => ({
+      type: 'SET_FILTER_IS_BYPASSED',
+      synthIx,
+      filterBypassed,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, filterBypassed }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      if (targetSynth.filterBypassed === filterBypassed) {
+        return state;
+      }
+
+      targetSynth.voices.forEach(voice => {
+        if (targetSynth.waveform === Waveform.Wavetable) {
+          voice.wavetable?.workletHandle?.disconnect(
+            filterBypassed ? voice.filterNode : voice.outerGainNode
+          );
+          voice.wavetable?.workletHandle?.connect(
+            filterBypassed ? voice.outerGainNode : voice.filterNode
+          );
+          return;
+        }
+
+        voice.oscillators.forEach(osc => {
+          osc.disconnect(filterBypassed ? voice.filterNode : voice.outerGainNode);
+          osc.connect(filterBypassed ? voice.outerGainNode : voice.filterNode);
+        });
+      });
+
+      return setSynth(synthIx, { ...targetSynth, filterBypassed }, state);
     },
   }),
 };
