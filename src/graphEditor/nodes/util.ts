@@ -155,6 +155,10 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     this.onOverrideStatusChangeCbs.forEach(cb => cb(isOverridden));
   }
 
+  public getIsOverridden(): boolean {
+    return this.isOverridden;
+  }
+
   private onOverrideStatusChangeCbs: ((isOverridden: boolean) => void)[] = [];
   public onOverrideStatusChange(cb: (isOverridden: boolean) => void) {
     this.onOverrideStatusChangeCbs.push(cb);

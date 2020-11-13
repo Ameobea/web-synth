@@ -1,7 +1,9 @@
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
+
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { actionCreators, dispatch } from 'src/redux';
+import { actionCreators, dispatch, getState } from 'src/redux';
+import { updateConnectables } from 'src/patchNetwork';
 
 export interface EqualizerPoint {
   index: number;
@@ -17,6 +19,10 @@ export interface EqualizerInstanceState {
   })[];
   equalizerNode: AudioWorkletNode | null;
   levels: Float32Array;
+  isBypassed: boolean;
+  bypassCsn: OverridableAudioParam;
+  smoothFactor: number;
+  smoothFactorCsn: OverridableAudioParam;
 }
 
 interface EqualizerState {
@@ -28,6 +34,17 @@ const ctx = new AudioContext();
 const MAX_EQUALIZER_KNOBS = 16;
 export const EQUALIZER_LEVEL_COUNT = 20;
 
+const updateEqualizerConnectablesOnNextTick = (vcId: string) =>
+  setTimeout(() => {
+    const node = getState().viewContextManager.patchNetwork.connectables.get(vcId)?.node;
+    if (!node) {
+      console.warn('Equalizer not found in patch network to update connectables');
+      return;
+    }
+    const newConnectables = node.buildConnectables();
+    updateConnectables(vcId, newConnectables);
+  });
+
 const actionGroups = {
   ADD_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string, points: EqualizerPoint[]) => ({
@@ -35,39 +52,43 @@ const actionGroups = {
       vcId,
       points,
     }),
-    subReducer: (state: EqualizerState, { vcId, points }): EqualizerState => ({
-      ...state,
-      [vcId]: {
-        points: points.map((pt, i) => {
-          const xControl = i !== 0 ? new OverridableAudioParam(ctx) : undefined;
-          if (xControl) {
-            xControl!.manualControl.offset.value = pt.x;
-            xControl.onOverrideStatusChange(isManualControl =>
-              setTimeout(() =>
-                dispatch(
-                  actionCreators.equalizer.SET_KNOB_IS_MANUALLY_CONTROLLED(
-                    vcId,
-                    pt.index,
-                    isManualControl
-                  )
-                )
-              )
-            );
-          }
-          const yControl = new OverridableAudioParam(ctx);
-          yControl.manualControl.offset.value = pt.y;
+    subReducer: (state: EqualizerState, { vcId, points }): EqualizerState => {
+      const smoothFactorCsn = new OverridableAudioParam(ctx);
+      const smoothFactor = 0.9;
+      smoothFactorCsn.manualControl.offset.value = smoothFactor;
 
-          return {
-            ...pt,
-            xControl,
-            yControl,
-            isManuallyControlled: false,
-          };
-        }),
-        equalizerNode: null,
-        levels: new Float32Array(EQUALIZER_LEVEL_COUNT).fill(0),
-      },
-    }),
+      return {
+        ...state,
+        [vcId]: {
+          points: points.map((pt, i) => {
+            const xControl = i !== 0 ? new OverridableAudioParam(ctx) : undefined;
+            if (xControl) {
+              xControl!.manualControl.offset.value = pt.x;
+              xControl.onOverrideStatusChange(() =>
+                setTimeout(() =>
+                  dispatch(actionCreators.equalizer.SET_KNOB_IS_MANUALLY_CONTROLLED(vcId, pt.index))
+                )
+              );
+            }
+            const yControl = new OverridableAudioParam(ctx);
+            yControl.manualControl.offset.value = pt.y;
+
+            return {
+              ...pt,
+              xControl,
+              yControl,
+              isManuallyControlled: false,
+            };
+          }),
+          equalizerNode: null,
+          levels: new Float32Array(EQUALIZER_LEVEL_COUNT).fill(0),
+          bypassCsn: new OverridableAudioParam(ctx),
+          isBypassed: false,
+          smoothFactorCsn,
+          smoothFactor,
+        },
+      };
+    },
   }),
   REGISTER_NODE: buildActionGroup({
     actionCreator: (vcId: string, node: AudioWorkletNode) => ({
@@ -88,8 +109,21 @@ const actionGroups = {
         yControl.replaceParam(param);
         yControl.manualControl.offset.value = y;
       });
+      instanceState.smoothFactorCsn.replaceParam((node.parameters as any).get('smooth factor'));
+      instanceState.bypassCsn.replaceParam((node.parameters as any).get('bypass'));
 
-      return { ...state, [vcId]: { ...instanceState, equalizerNode: node } };
+      return {
+        ...state,
+        [vcId]: {
+          ...instanceState,
+          equalizerNode: node,
+          points: instanceState.points.map(pt => ({
+            ...pt,
+            isManuallyControlled:
+              (pt.xControl?.getIsOverridden() ?? true) && pt.yControl.getIsOverridden(),
+          })),
+        },
+      };
     },
   }),
   REMOVE_INSTANCE: buildActionGroup({
@@ -118,13 +152,14 @@ const actionGroups = {
           ctx,
           (instanceState.equalizerNode?.parameters as any)?.get(`knob_${i}_y`)
         ),
-        isManuallyControlled: false,
+        isManuallyControlled: true,
       };
       newPoint.xControl.manualControl.offset.value = x;
       newPoint.yControl.manualControl.offset.value = y;
       const newPoints = [...instanceState.points, newPoint];
       newPoints.sort((a, b) => a.x - b.x);
-      // TODO: Trigger connectables update
+
+      updateEqualizerConnectablesOnNextTick(vcId);
 
       return {
         ...state,
@@ -148,7 +183,8 @@ const actionGroups = {
       removedPoint.xControl?.dispose();
       removedPoint.yControl.dispose();
       const newPoints = instanceState.points.filter(o => o.index !== index);
-      // TODO: Trigger connectables update
+
+      updateEqualizerConnectablesOnNextTick(vcId);
 
       return {
         ...state,
@@ -210,13 +246,12 @@ const actionGroups = {
     }),
   }),
   SET_KNOB_IS_MANUALLY_CONTROLLED: buildActionGroup({
-    actionCreator: (vcId: string, knobIx: number, isManuallyControlled: boolean) => ({
+    actionCreator: (vcId: string, knobIx: number) => ({
       type: 'SET_KNOB_IS_MANUALLY_CONTROLLED',
       vcId,
       knobIx,
-      isManuallyControlled,
     }),
-    subReducer: (state: EqualizerState, { vcId, knobIx, isManuallyControlled }) => {
+    subReducer: (state: EqualizerState, { vcId, knobIx }) => {
       const arrayIx = state[vcId].points.findIndex(pt => pt.index === knobIx);
       if (arrayIx === -1) {
         console.error(
@@ -224,6 +259,7 @@ const actionGroups = {
         );
         return state;
       }
+      const point = state[vcId].points[arrayIx];
 
       return {
         ...state,
@@ -231,11 +267,38 @@ const actionGroups = {
           ...state[vcId],
           points: R.set(
             R.lensIndex(arrayIx),
-            { ...state[vcId].points[arrayIx], isManuallyControlled },
+            {
+              ...point,
+              isManuallyControlled:
+                (point.xControl?.getIsOverridden() ?? true) && point.yControl.getIsOverridden(),
+            },
             state[vcId].points
           ),
         },
       };
+    },
+  }),
+  SET_IS_BYPASSED: buildActionGroup({
+    actionCreator: (vcId: string, isBypassed: boolean) => ({
+      type: 'SET_IS_BYPASSED',
+      vcId,
+      isBypassed,
+    }),
+    subReducer: (state: EqualizerState, { vcId, isBypassed }) => {
+      state[vcId].bypassCsn.manualControl.offset.value = isBypassed ? 1 : 0;
+      return { ...state, [vcId]: { ...state[vcId], isBypassed } };
+    },
+  }),
+  SET_SMOOTH_FACTOR: buildActionGroup({
+    actionCreator: (vcId: string, smoothFactor: number) => ({
+      type: 'SET_SMOOTH_FACTOR',
+      vcId,
+      smoothFactor,
+    }),
+    subReducer: (state: EqualizerState, { vcId, smoothFactor }) => {
+      const clampedSmoothFactor = R.clamp(0, 1, smoothFactor);
+      state[vcId].smoothFactorCsn.manualControl.offset.value = clampedSmoothFactor;
+      return { ...state, [vcId]: { ...state[vcId], smoothFactor: clampedSmoothFactor } };
     },
   }),
 };

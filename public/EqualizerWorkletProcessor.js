@@ -97,6 +97,16 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
         defaultValue: 0,
         automationRate: 'a-rate',
       },
+      {
+        name: 'bypass',
+        deafultValue: 0,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'smooth factor',
+        defaultValue: 0.0,
+        automationRate: 'k-rate',
+      },
     ];
 
     for (let i = 0; i < KNOB_COUNT; i++) {
@@ -227,8 +237,13 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
   levelsBackbuffer = new Float32Array(LEVEL_COUNT).fill(0.0);
   levels = new Float32Array(LEVEL_COUNT).fill(0.0);
 
+  lastSentLevelsIx = 0;
   sendLevels() {
-    this.port.postMessage({ levels: this.levels });
+    this.lastSentLevelsIx += 1;
+    if (this.lastSentLevelsIx >= 16) {
+      this.lastSentLevelsIx = 0;
+      this.port.postMessage({ levels: this.levels });
+    }
   }
 
   computeLevels(params) {
@@ -305,11 +320,14 @@ class EqualizerWorkletProcessor extends AudioWorkletProcessor {
     this.levels.forEach((level, i) =>
       this.dspInstance.exports.setParamValue(
         this.dsp,
-        this.pathTable[`/faust-code962287396/Band${i < 10 ? '_' : ''}${i + 1}`],
+        this.pathTable[`/faust-code404805250/Band${i < 10 ? '_' : ''}${i + 1}`],
         clamp(-50, 20, Number.isNaN(level) ? 0 : level)
       )
     );
-    this.dspInstance.exports.setParamValue(this.dsp, 0, 0);
+    // Bypass
+    this.dspInstance.exports.setParamValue(this.dsp, 0, params.bypass[0]);
+    // Smooth Factor
+    this.dspInstance.exports.setParamValue(this.dsp, 832, params['smooth factor'][0]);
 
     for (let i = 0; i < Math.min(inputs.length, this.dspInChannels.length); i++) {
       // Copy inputs into the Wasm heap

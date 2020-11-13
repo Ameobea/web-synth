@@ -1,11 +1,13 @@
 import React, { useMemo, useRef } from 'react';
 import { Provider, useSelector } from 'react-redux';
 import * as R from 'ramda';
+import ControlPanel from 'react-control-panel';
 
 import { NEGATIVE_VALUE_DIVIDER_INTERVAL } from 'src/graphEditor/nodes/CustomAudio/Equalizer/Equalizer';
 import { actionCreators, dispatch, ReduxStore, store } from 'src/redux';
 import { EqualizerPoint, EQUALIZER_LEVEL_COUNT } from 'src/redux/modules/equalizer';
 import './Equalizer.scss';
+import { UnreachableException } from 'ameo-utils';
 
 const EqualizerLine: React.FC<{
   points: EqualizerPoint[];
@@ -36,44 +38,39 @@ const EqualizerKnob: React.FC<{
 }> = ({ vcId, x, y, index, width, height, pointCount, isManuallyControlled }) => (
   <>
     <circle
-      className={`equalizer-knob${isManuallyControlled ? ' equalizer-knob-disabled' : ''}`}
+      className={`equalizer-knob${isManuallyControlled ? '' : ' equalizer-knob-disabled'}`}
       cx={x * width}
       cy={(1 - y) * height}
       r='10'
-      onMouseDown={
-        isManuallyControlled
-          ? undefined
-          : evt => {
-              if (evt.button !== 0) {
-                return;
-              }
+      onMouseDown={evt => {
+        if (evt.button !== 0) {
+          return;
+        }
 
-              const startClientX = evt.clientX;
-              const startClientY = evt.clientY;
+        const startClientX = evt.clientX;
+        const startClientY = evt.clientY;
 
-              const moveHandler = (evt: MouseEvent) => {
-                const xDiff = evt.clientX - startClientX;
-                const yDiff = -(evt.clientY - startClientY);
+        const moveHandler = (evt: MouseEvent) => {
+          const xDiff = evt.clientX - startClientX;
+          const yDiff = -(evt.clientY - startClientY);
 
-                dispatch(
-                  actionCreators.equalizer.UPDATE_POINT(vcId, {
-                    index,
-                    x: (x * width + xDiff) / width,
-                    y: R.clamp(0, 1, (y * height + yDiff) / height),
-                  })
-                );
-              };
-              document.addEventListener('mousemove', moveHandler);
-              // Register an event listener so we know when the drag stops
-              document.addEventListener('mouseup', () =>
-                document.removeEventListener('mousemove', moveHandler)
-              );
-            }
-      }
+          dispatch(
+            actionCreators.equalizer.UPDATE_POINT(vcId, {
+              index,
+              x: (x * width + xDiff) / width,
+              y: R.clamp(0, 1, (y * height + yDiff) / height),
+            })
+          );
+        };
+        document.addEventListener('mousemove', moveHandler);
+        // Register an event listener so we know when the drag stops
+        document.addEventListener('mouseup', () =>
+          document.removeEventListener('mousemove', moveHandler)
+        );
+      }}
       onContextMenu={
         isManuallyControlled
-          ? undefined
-          : evt => {
+          ? evt => {
               if (index === 0 || index === pointCount - 1) {
                 // Can't delete the end points
                 return;
@@ -82,6 +79,7 @@ const EqualizerKnob: React.FC<{
               dispatch(actionCreators.equalizer.REMOVE_POINT(vcId, index));
               evt.preventDefault();
             }
+          : undefined
       }
     />
     <text
@@ -187,12 +185,45 @@ const EqualizerViz: React.FC<{
   );
 };
 
+const EqualizerControlPanel: React.FC<{ vcId: string }> = ({ vcId }) => {
+  const { smoothFactor, isBypassed } = useSelector((state: ReduxStore) => state.equalizer[vcId]);
+
+  return (
+    <ControlPanel
+      settings={[
+        { label: 'smooth factor', type: 'range', min: 0.8, max: 1 },
+        { label: 'bypass', type: 'checkbox' },
+      ]}
+      style={{ width: '100%' }}
+      state={{ 'smooth factor': smoothFactor, bypass: isBypassed }}
+      onChange={(label: string, val: any, _state: any) => {
+        switch (label) {
+          case 'smooth factor': {
+            dispatch(actionCreators.equalizer.SET_SMOOTH_FACTOR(vcId, val));
+            break;
+          }
+          case 'bypass': {
+            dispatch(actionCreators.equalizer.SET_IS_BYPASSED(vcId, val));
+            break;
+          }
+          default: {
+            throw new UnreachableException(
+              `Unhandled equalizer small view control panel label: ${label}`
+            );
+          }
+        }
+      }}
+    />
+  );
+};
+
 const EqualizerSmallView: React.FC<{
   vcId: string;
 }> = ({ vcId }) => (
   <div>
     <Provider store={store}>
       <EqualizerViz vcId={vcId} width={500} height={300} />
+      <EqualizerControlPanel vcId={vcId} />
     </Provider>
   </div>
 );

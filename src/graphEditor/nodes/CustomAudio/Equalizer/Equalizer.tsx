@@ -29,7 +29,9 @@ const EqualizerRegistered = new AsyncOnce(() =>
 );
 
 const EqualizerWasm = new AsyncOnce(() =>
-  fetch('https://ameo.link/u/8k3.wasm').then(res => res.arrayBuffer())
+  fetch(
+    'https://storage.googleapis.com/web_synth-compiled_faust_modules_wasm/0f26ef8a4b554909c851c0e658674cbd439b023a_optimized.wasm'
+  ).then(res => res.arrayBuffer())
 );
 
 export class Equalizer implements ForeignNode {
@@ -63,7 +65,7 @@ export class Equalizer implements ForeignNode {
 
     EqualizerRegistered.get().then(async () => {
       this.workletHandle = new FaustWorkletNode(ctx, '', 'equalizer-audio-worklet-node-processor');
-      updateConnectables(this.vcId, dbg(this.buildConnectables()));
+      updateConnectables(this.vcId, this.buildConnectables());
       const dspArrayBuffer = await EqualizerWasm.get();
       await this.workletHandle!.init(dspArrayBuffer, {
         customMessageHandler: (msg: MessageEvent) => {
