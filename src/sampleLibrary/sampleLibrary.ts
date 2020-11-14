@@ -3,7 +3,12 @@ import { UnimplementedError } from 'ameo-utils';
 
 import { getFSAccess } from 'src/fsAccess';
 import SampleManager from 'src/sampleLibrary/SampleManager';
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import {
+  mkContainerRenderHelper,
+  mkContainerCleanupHelper,
+  mkContainerHider,
+  mkContainerUnhider,
+} from 'src/reactUtils';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 import { cacheSample, getCachedSample, getAllCachedSamples } from 'src/sampleLibrary/sampleCache';
 import { FileSystemDirectoryHandle } from 'src/fsAccess/drivers/nativeFS/NativeFSTypes';
@@ -139,24 +144,6 @@ export const init_sample_library = (stateKey: string) => {
 
 export const cleanup_sample_library = mkContainerCleanupHelper();
 
-export const hide_sample_library = (stateKey: string) => {
-  const elem = document.getElementById(stateKey);
-  if (!elem) {
-    const vcId = stateKey.split('_')[1]!;
-    console.error(`Unable to find DOM element for sample library with vcId ${vcId}; can't hide.`);
-    return;
-  }
+export const hide_sample_library = mkContainerHider((vcId: string) => `SampleLibrary_${vcId}`);
 
-  elem.style.display = 'none';
-};
-
-export const unhide_sample_library = (stateKey: string) => {
-  const elem = document.getElementById(stateKey);
-  if (!elem) {
-    const vcId = stateKey.split('_')[1]!;
-    console.error(`Unable to find DOM element for sample library with vcId ${vcId}; can't unhide.`);
-    return;
-  }
-
-  elem.style.display = 'block';
-};
+export const unhide_sample_library = mkContainerUnhider((vcId: string) => `SampleLibrary_${vcId}`);

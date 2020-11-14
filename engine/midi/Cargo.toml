@@ -1,5 +1,5 @@
 [package]
-authors = ["Casey Primozic <me@ameo.link>"]
+authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2018"
 name = "midi"
 version = "0.1.0"

@@ -770,6 +770,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "waveform_renderer"
+version = "0.1.0"
+dependencies = [
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "wavetable"
 version = "0.1.0"
 

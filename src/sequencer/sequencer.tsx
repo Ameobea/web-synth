@@ -3,7 +3,12 @@ import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import {
+  mkContainerRenderHelper,
+  mkContainerCleanupHelper,
+  mkContainerHider,
+  mkContainerUnhider,
+} from 'src/reactUtils';
 import {
   AudioConnectables,
   ConnectableInput,
@@ -280,27 +285,9 @@ export const cleanup_sequencer = (stateKey: string) => {
   mkContainerCleanupHelper()(getSequencerDOMElementId(vcId));
 };
 
-export const hide_sequencer = (stateKey: string) => {
-  const vcId = stateKey.split('_')[1]!;
-  const elem = document.getElementById(getSequencerDOMElementId(vcId));
-  if (!elem) {
-    console.error(`Unable to find DOM element for sequencer with vcId ${vcId}; can't hide.`);
-    return;
-  }
+export const hide_sequencer = mkContainerHider(getSequencerDOMElementId);
 
-  elem.style.display = 'none';
-};
-
-export const unhide_sequencer = (stateKey: string) => {
-  const vcId = stateKey.split('_')[1]!;
-  const elem = document.getElementById(getSequencerDOMElementId(vcId));
-  if (!elem) {
-    console.error(`Unable to find DOM element for sequencer with vcId ${vcId}; can't unhide.`);
-    return;
-  }
-
-  elem.style.display = 'block';
-};
+export const unhide_sequencer = mkContainerUnhider(getSequencerDOMElementId);
 
 const schedulerFnBySchedulerScheme: {
   [K in SchedulerScheme]: (bpm: number, startBeat: number, endBeat: number) => number[];

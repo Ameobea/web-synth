@@ -1,2 +1,2 @@
 [workspace]
-members = ["engine", "common", "midi", "polysynth", "spectrum_viz", "wavetable"]
+members = ["engine", "common", "midi", "polysynth", "spectrum_viz", "wavetable", "waveform_renderer"]

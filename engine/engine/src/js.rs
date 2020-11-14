@@ -175,3 +175,12 @@ extern "C" {
     pub fn unhide_control_panel(state_key: &str);
     pub fn get_control_panel_audio_connectables(state_key: &str) -> JsValue;
 }
+
+#[wasm_bindgen(raw_module = "./granulator")]
+extern "C" {
+    pub fn init_granulator(state_key: &str);
+    pub fn cleanup_granulator(state_key: &str);
+    pub fn hide_granulator(state_key: &str);
+    pub fn unhide_granulator(state_key: &str);
+    pub fn get_granulator_audio_connectables(state_key: &str) -> JsValue;
+}

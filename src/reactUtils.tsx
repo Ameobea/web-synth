@@ -71,3 +71,31 @@ export const mkContainerCleanupHelper = ({}: {
 
   ReactDOM.unmountComponentAtNode(node);
 };
+
+export const mkContainerHider = (getContainerID: (vcId: string) => string) => (
+  stateKey: string
+) => {
+  const vcId = stateKey.split('_')[1]!;
+  const elemID = getContainerID(vcId);
+  const elem = document.getElementById(elemID);
+  if (!elem) {
+    console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
+    return;
+  }
+
+  elem.style.display = 'none';
+};
+
+export const mkContainerUnhider = (getContainerID: (vcId: string) => string, display = 'block') => (
+  stateKey: string
+) => {
+  const vcId = stateKey.split('_')[1]!;
+  const elemID = getContainerID(vcId);
+  const elem = document.getElementById(elemID);
+  if (!elem) {
+    console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
+    return;
+  }
+
+  elem.style.display = display;
+};

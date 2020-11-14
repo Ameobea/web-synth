@@ -2,14 +2,12 @@ import React from 'react';
 import { connect } from 'react-redux';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
-import { UnimplementedError } from 'ameo-utils';
 
-import { SampleDescriptor, getSample } from 'src/sampleLibrary';
+import { getSample } from 'src/sampleLibrary';
 import { updateConnectables } from 'src/patchNetwork';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
 import { SequencerReduxState, VoiceTarget, SequencerReduxInfra } from '../redux';
-import { renderModalWithControls } from 'src/controls/Modal';
-import SampleSelectDialog from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
+import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 
 const mapSynthInputStateToProps = (state: { sequencer: SequencerReduxState }) => ({
   midiOutputCount: state.sequencer.midiOutputs.length,
@@ -23,15 +21,9 @@ interface InputCompCommonProps<T> {
   dispatch: SequencerReduxInfra['dispatch'];
 }
 
-const SynthInputInner: React.FC<InputCompCommonProps<'midi'> &
-  ReturnType<typeof mapSynthInputStateToProps>> = ({
-  voiceIx,
-  voiceTarget,
-  vcId,
-  dispatch,
-  actionCreators,
-  midiOutputCount,
-}) => (
+const SynthInputInner: React.FC<
+  InputCompCommonProps<'midi'> & ReturnType<typeof mapSynthInputStateToProps>
+> = ({ voiceIx, voiceTarget, vcId, dispatch, actionCreators, midiOutputCount }) => (
   <div>
     <select
       onChange={evt =>
@@ -81,15 +73,9 @@ const mapSampleInputStateToProps = (
   sampleOpt: Option.of(state.sequencer.sampleBank[voiceIx]),
 });
 
-const selectSample = (): Promise<SampleDescriptor> => renderModalWithControls(SampleSelectDialog);
-
-const SampleInputInner: React.FC<InputCompCommonProps<'sample'> &
-  ReturnType<typeof mapSampleInputStateToProps>> = ({
-  sampleOpt,
-  voiceIx,
-  dispatch,
-  actionCreators,
-}) => (
+const SampleInputInner: React.FC<
+  InputCompCommonProps<'sample'> & ReturnType<typeof mapSampleInputStateToProps>
+> = ({ sampleOpt, voiceIx, dispatch, actionCreators }) => (
   <div>
     Selected Sample: {sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None')}
     <button
@@ -111,14 +97,12 @@ const mapGateInputStateToProps = (state: { sequencer: SequencerReduxState }) => 
   gateOutputCount: state.sequencer.gateOutputs.length,
 });
 
-const GateInputInner: React.FC<{
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
-} & ReturnType<typeof mapGateInputStateToProps>> = ({
-  actionCreators,
-  dispatch,
-  gateOutputCount,
-}) => {
+const GateInputInner: React.FC<
+  {
+    actionCreators: SequencerReduxInfra['actionCreators'];
+    dispatch: SequencerReduxInfra['dispatch'];
+  } & ReturnType<typeof mapGateInputStateToProps>
+> = ({ actionCreators, dispatch, gateOutputCount }) => {
   return (
     <div>
       <select>
@@ -199,35 +183,29 @@ const VoiceInput: React.FC<{
   );
 };
 
-const mapStateToProps = (state: { sequencer: SequencerReduxState }) => ({
-  currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
-  voice: state.sequencer.voices[state.sequencer.currentEditingVoiceIx],
-});
+const InputSelect: React.FC<
+  { vcId: string } & Pick<SequencerReduxInfra, 'actionCreators' | 'dispatch' | 'useSelector'>
+> = ({ vcId, dispatch, actionCreators, useSelector }) => {
+  const { voice, currentEditingVoiceIx } = useSelector(state => ({
+    currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
+    voice: state.sequencer.voices[state.sequencer.currentEditingVoiceIx],
+  }));
 
-const InputSelect: React.FC<{
-  vcId: string;
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
-} & ReturnType<typeof mapStateToProps>> = ({
-  vcId,
-  dispatch,
-  actionCreators,
-  voice,
-  currentEditingVoiceIx,
-}) => (
-  <div className='sequencer-input-select'>
-    <h2>Input Mapping</h2>
+  return (
+    <div className='sequencer-input-select'>
+      <h2>Input Mapping</h2>
 
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <VoiceInput
-        vcId={vcId}
-        dispatch={dispatch}
-        actionCreators={actionCreators}
-        voiceIx={currentEditingVoiceIx}
-        voiceTarget={voice}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <VoiceInput
+          vcId={vcId}
+          dispatch={dispatch}
+          actionCreators={actionCreators}
+          voiceIx={currentEditingVoiceIx}
+          voiceTarget={voice}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
-export default connect(mapStateToProps)(InputSelect);
+export default InputSelect;

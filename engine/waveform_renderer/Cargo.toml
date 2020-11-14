@@ -1,5 +1,5 @@
 [package]
-name = "wavetable"
+name = "waveform_renderer"
 version = "0.1.0"
 authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2018"
@@ -8,3 +8,4 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+wasm-bindgen = "=0.2.64"

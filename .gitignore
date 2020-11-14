@@ -10,6 +10,7 @@ src/polysynth.js
 src/polysynth_bg.js
 src/polysynth_bg.d.ts
 src/polysynth_bg.wasm
+src/waveform_renderer*
 .env
 !src/midiEditor*
 polysynth.d.ts

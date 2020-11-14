@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { ListRowRenderer } from 'react-virtualized';
+import { UnimplementedError } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import BasicModal from 'src/misc/BasicModal';
@@ -14,7 +15,7 @@ import {
   LoadSamplesButtons,
 } from './SampleLibraryUI';
 import useAllSamples from './useAllSamples';
-import { UnimplementedError } from 'ameo-utils';
+import { renderModalWithControls } from 'src/controls/Modal';
 
 const mkSampleListingRowRenderer = ({
   sampleDescriptors,
@@ -25,25 +26,32 @@ const mkSampleListingRowRenderer = ({
 }: MkDefaultSampleListingRowRendererArgs & {
   selectedSample: SampleDescriptor | null;
   setSelectedSample: (newSelectedSample: SampleDescriptor | null) => void;
-}): ListRowRenderer => ({ style, index, key }) => (
-  <SampleRow
-    togglePlaying={() => togglePlaying(sampleDescriptors[index])}
-    isPlaying={sampleDescriptors[index].name === playingSample?.name}
-    descriptor={sampleDescriptors[index]}
-    key={key}
-    style={{
-      ...(style || {}),
-      ...(selectedSample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
-      cursor: 'pointer',
-      userSelect: 'none',
-    }}
-    onClick={() =>
-      setSelectedSample(
-        selectedSample === sampleDescriptors[index] ? null : sampleDescriptors[index]
-      )
-    }
-  />
-);
+}): ListRowRenderer => {
+  const SampleListingRowRenderer: React.FC<{
+    style?: any;
+    index: number;
+    key: string;
+  }> = ({ style, index, key }) => (
+    <SampleRow
+      togglePlaying={() => togglePlaying(sampleDescriptors[index])}
+      isPlaying={sampleDescriptors[index].name === playingSample?.name}
+      descriptor={sampleDescriptors[index]}
+      key={key}
+      style={{
+        ...(style || {}),
+        ...(selectedSample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
+        cursor: 'pointer',
+        userSelect: 'none',
+      }}
+      onClick={() =>
+        setSelectedSample(
+          selectedSample === sampleDescriptors[index] ? null : sampleDescriptors[index]
+        )
+      }
+    />
+  );
+  return SampleListingRowRenderer;
+};
 
 const SelectSample: React.FC<{
   selectedSample: SampleDescriptor | null;
@@ -90,5 +98,8 @@ const SampleSelectDialog: React.FC<{
     </BasicModal>
   );
 };
+
+export const selectSample = (): Promise<SampleDescriptor> =>
+  renderModalWithControls(SampleSelectDialog);
 
 export default SampleSelectDialog;

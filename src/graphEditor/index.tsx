@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
+import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 
 import { store } from 'src/redux';
 import { retryAsync } from 'src/util';
@@ -29,25 +30,9 @@ export const init_graph_editor = (stateKey: string) => {
   );
 };
 
-export const hide_graph_editor = (vcId: string) => {
-  const rootNode = document.getElementById(ROOT_NODE_ID);
-  if (!rootNode) {
-    console.warn(`Tried to hide graph editor with id ${vcId} but it wasn't mounted`);
-    return;
-  }
+export const hide_graph_editor = mkContainerHider(() => ROOT_NODE_ID);
 
-  rootNode.style.display = 'none';
-};
-
-export const unhide_graph_editor = (vcId: string) => {
-  const rootNode = document.getElementById(ROOT_NODE_ID);
-  if (!rootNode) {
-    console.warn(`Tried to unhide graph editor with id ${vcId} but it wasn't mounted`);
-    return;
-  }
-
-  rootNode.style.display = 'block';
-};
+export const unhide_graph_editor = mkContainerUnhider(() => ROOT_NODE_ID);
 
 export const cleanup_graph_editor = (stateKey: string) => {
   const graphEditorReactRootNode = document.getElementById(ROOT_NODE_ID);

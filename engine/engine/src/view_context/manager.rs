@@ -8,6 +8,7 @@ use crate::{
         composition_sharing::mk_composition_sharing,
         control_panel::mk_control_panel,
         faust_editor::{mk_faust_editor, FaustEditor},
+        granulator::mk_granulator,
         graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
         midi_keyboard::mk_midi_keyboard,
@@ -544,6 +545,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "sequencer" => mk_sequencer(conf, uuid),
         "sample_library" => mk_sample_library(conf, uuid),
         "control_panel" => mk_control_panel(conf, uuid),
+        "granulator" => mk_granulator(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

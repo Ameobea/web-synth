@@ -21,6 +21,7 @@ import {
   Control,
   buildDefaultControl,
 } from 'src/redux/modules/controlPanel';
+import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
@@ -89,27 +90,9 @@ export const init_control_panel = (stateKey: string) => {
   );
 };
 
-export const hide_control_panel = (stateKey: string) => {
-  const vcId = stateKey.split('_')[1];
-  const rootNode = document.getElementById(getRootNodeID(vcId));
-  if (!rootNode) {
-    console.warn(`Tried to hide control panel with id ${vcId} but it wasn't mounted`);
-    return;
-  }
+export const hide_control_panel = mkContainerHider(getRootNodeID);
 
-  rootNode.style.display = 'none';
-};
-
-export const unhide_control_panel = (stateKey: string) => {
-  const vcId = stateKey.split('_')[1];
-  const rootNode = document.getElementById(getRootNodeID(vcId));
-  if (!rootNode) {
-    console.warn(`Tried to unhide control panel with id ${vcId} but it wasn't mounted`);
-    return;
-  }
-
-  rootNode.style.display = 'block';
-};
+export const unhide_control_panel = mkContainerUnhider(getRootNodeID);
 
 export const cleanup_control_panel = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
