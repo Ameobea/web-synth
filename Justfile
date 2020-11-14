@@ -61,3 +61,7 @@ build-docker-ci:
 push-docker-ci:
   docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
   docker push $CI_BUILDER_DOCKER_IMAGE_NAME
+
+build-waveform-renderer:
+  cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
+    wasm-bindgen ../target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ../../src

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
@@ -11,6 +11,15 @@ const GranulatorUI: React.FC<{ vcId: string }> = ({ vcId }) => {
     sampleData: AudioBuffer;
   } | null>(null);
 
+  // Debug
+  useEffect(() => {
+    (async () => {
+      const descriptor: SampleDescriptor = { name: 'cold - crash.wav', isLocal: true };
+      const sampleData = await getSample(descriptor);
+      setActiveSample({ descriptor, sampleData });
+    })();
+  }, []);
+
   return (
     <div className='granulator'>
       <div style={{ display: 'flex', flexDirection: 'row' }}>
@@ -18,6 +27,7 @@ const GranulatorUI: React.FC<{ vcId: string }> = ({ vcId }) => {
           Selected sample: <b>{activeSample?.descriptor.name ?? 'None'}</b>
         </div>
         <button
+          style={{ marginLeft: 20 }}
           onClick={async () => {
             const descriptor = await selectSample();
             const sampleData = await getSample(descriptor);

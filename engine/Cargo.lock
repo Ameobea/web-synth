@@ -773,6 +773,8 @@ dependencies = [
 name = "waveform_renderer"
 version = "0.1.0"
 dependencies = [
+ "common",
+ "log",
  "wasm-bindgen",
 ]
 

@@ -17,7 +17,7 @@ const ctx = new AudioContext();
 
 const GranulatorUI = React.lazy(() => import('./GranulatorUI'));
 
-const getGranulatorDOMElementId = (vcId: string) => `sequencer-${vcId}`;
+const getGranulatorDOMElementId = (vcId: string) => `granulator-${vcId}`;
 
 const serializeGranulator = (vcId: string): string => {
   return JSON.stringify({}); // TODO
