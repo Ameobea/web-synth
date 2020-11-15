@@ -1,3 +1,7 @@
+.granulator-wrapper {
+  margin-top: 20px;
+}
+
 .granulator {
   margin-left: 10px;
   margin-right: 10px;
@@ -5,4 +9,27 @@
 
 .waveform-renderer {
   background-color: #000;
+}
+
+.granulator-start-bar {
+  stroke: greenyellow;
+  stroke-width: 4px;
+}
+.granulator-end-bar {
+  stroke: rgb(168, 0, 28);
+  stroke-width: 4px;
+}
+
+.granulator-overlay {
+  position: absolute;
+  left: 10px;
+  z-index: 2;
+
+  > * {
+    z-index: 2;
+  }
+}
+
+.granulator-selection-indicator {
+  fill: rgba(22, 140, 200, 0.2);
 }
