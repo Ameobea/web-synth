@@ -1,7 +1,7 @@
 #![feature(box_syntax)]
 
-#[macro_use]
-extern crate log;
+// #[macro_use]
+// extern crate log;
 
 use wasm_bindgen::prelude::*;
 
@@ -64,7 +64,7 @@ fn sample_to_y_val(sample: f32, half_height: f32, max_distance_from_0: f32) -> u
 pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32) -> *const u8 {
     let ctx = unsafe { &mut *ctx };
 
-    assert_eq!(
+    debug_assert_eq!(
         ctx.image_data_buf.len() % 8,
         0,
         "Image size byte length must be divisible by 8"
@@ -82,11 +82,11 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32
     let start_sample_ix =
         ms_to_samples(ctx.sample_rate, start_ms).min(ctx.waveform_buf.len() as u32);
     let end_sample_ix = ms_to_samples(ctx.sample_rate, end_ms).min(ctx.waveform_buf.len() as u32);
-    assert!(end_sample_ix > start_sample_ix);
+    debug_assert!(end_sample_ix > start_sample_ix);
 
     let len_samples = end_sample_ix - start_sample_ix;
     let samples_per_px = (len_samples / ctx.width_px).max(1);
-    assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
+    debug_assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
 
     let max_distance_from_0 = ctx.waveform_buf[start_sample_ix as usize..end_sample_ix as usize]
         .iter()
@@ -119,6 +119,3 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32
 
     ctx.image_data_buf.as_mut_ptr()
 }
-
-#[wasm_bindgen]
-pub fn x() {}

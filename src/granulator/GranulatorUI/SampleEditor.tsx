@@ -14,6 +14,16 @@ const WaveformRendererInstance = new AsyncOnce(() =>
   }))
 );
 
+type WaveformInstance =
+  | {
+      type: 'loaded';
+      instance: typeof import('src/waveform_renderer');
+      memory: typeof import('src/waveform_renderer_bg').memory;
+    }
+  | { type: 'loading' }
+  | { type: 'notInitialized' }
+  | { type: 'error'; error: string };
+
 const renderWaveform = (
   instance: typeof import('src/waveform_renderer'),
   memory: typeof import('src/waveform_renderer_bg').memory,
@@ -35,22 +45,17 @@ const renderWaveform = (
 const SampleEditor: React.FC<{ sample: AudioBuffer }> = ({ sample }) => {
   const { width, height } = { width: 1400, height: 240 }; // TODO: Store as state somewhere serializable
 
-  const [{ startMs, endMs }, setBounds] = useState({
-    startMs: 0,
-    endMs: Math.trunc((sample.length / sample.sampleRate) * 1000),
-  });
+  const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
+  const bounds = useRef({ startMs: 0, endMs: sampleLengthMs });
   const waveformRendererCanvasCtx = useRef<CanvasRenderingContext2D | null>(null);
   const waveformRendererCtxPtr = useRef<number | null>(null);
-  const [waveformRendererInstance, setWaveformRendererInstance] = useState<
-    | {
-        type: 'loaded';
-        instance: typeof import('src/waveform_renderer');
-        memory: typeof import('src/waveform_renderer_bg').memory;
-      }
-    | { type: 'loading' }
-    | { type: 'notInitialized' }
-    | { type: 'error'; error: string }
-  >({ type: 'notInitialized' });
+  const [waveformRendererInstance, setWaveformRendererInstance] = useState<WaveformInstance>({
+    type: 'notInitialized',
+  });
+  const middleMouseButtonDown = useRef<{
+    clientX: number;
+    clientY: number;
+  } | null>(null);
 
   // Async-initialize a Wasm instance for the waveform renderer if it hasn't been done yet
   useEffect(() => {
@@ -107,8 +112,8 @@ const SampleEditor: React.FC<{ sample: AudioBuffer }> = ({ sample }) => {
       waveformRendererInstance.instance,
       waveformRendererInstance.memory,
       waveformRendererCtxPtr.current,
-      startMs,
-      endMs,
+      bounds.current.startMs,
+      bounds.current.endMs,
       width,
       height,
       waveformRendererCanvasCtx.current!
@@ -132,33 +137,110 @@ const SampleEditor: React.FC<{ sample: AudioBuffer }> = ({ sample }) => {
       waveformRendererInstance.instance,
       waveformRendererInstance.memory,
       waveformRendererCtxPtr.current,
-      startMs,
-      endMs,
+      bounds.current.startMs,
+      bounds.current.endMs,
       width,
       height,
       waveformRendererCanvasCtx.current!
     );
-  }, [startMs, endMs, waveformRendererInstance, width, height]);
+  }, [waveformRendererInstance, width, height]);
 
   const handleCanvasScroll = (evt: WheelEvent) => {
-    const bounds = (evt.target as HTMLCanvasElement).getBoundingClientRect();
-    const xPercent = (evt.clientX - bounds.left) / width;
+    const objectBounds = (evt.target as HTMLCanvasElement).getBoundingClientRect();
+    const xPercent = (evt.clientX - objectBounds.left) / width;
 
     // Zoom in 20%, taking pixels away from the left and right side according to where the user zoomed
-    const widthMs = endMs - startMs;
+    const widthMs = bounds.current.endMs - bounds.current.startMs;
     const leftMsToAdd = xPercent * 0.2 * widthMs * (evt.deltaY > 0 ? -1 : 1);
     const rightMsToAdd = (1 - xPercent) * 0.2 * widthMs * (evt.deltaY > 0 ? 1 : -1);
-    const newStartMs = Math.max(startMs + leftMsToAdd, 0);
-    const newEndMs = R.clamp(
-      newStartMs + 10,
-      Math.trunc((sample.length / sample.sampleRate) * 1000),
-      endMs + rightMsToAdd
-    );
-    setBounds({ startMs: newStartMs, endMs: newEndMs });
+    const newStartMs = R.clamp(0, sampleLengthMs - 10, bounds.current.startMs + leftMsToAdd);
+    const newEndMs = R.clamp(newStartMs + 10, sampleLengthMs, bounds.current.endMs + rightMsToAdd);
+    bounds.current = { startMs: newStartMs, endMs: newEndMs };
+
+    if (waveformRendererInstance.type === 'loaded' && waveformRendererCtxPtr.current !== null) {
+      renderWaveform(
+        waveformRendererInstance.instance,
+        waveformRendererInstance.memory,
+        waveformRendererCtxPtr.current,
+        bounds.current.startMs,
+        bounds.current.endMs,
+        width,
+        height,
+        waveformRendererCanvasCtx.current!
+      );
+    }
 
     evt.preventDefault();
     evt.stopPropagation();
   };
+
+  // Install mouse move handler if mouse button is down
+  useEffect(() => {
+    const handler = (evt: MouseEvent) => {
+      if (!middleMouseButtonDown.current) {
+        return;
+      }
+
+      const diffX = middleMouseButtonDown.current!.clientX - evt.clientX;
+      if (diffX === 0) {
+        return;
+      }
+
+      const msPerPx = (bounds.current.endMs - bounds.current.startMs) / width;
+      const diffMs = diffX * msPerPx;
+
+      let newStartMs: number, newEndMs: number;
+      if (diffX > 0) {
+        newEndMs = R.clamp(10, sampleLengthMs, bounds.current.endMs + diffMs);
+        newStartMs = R.clamp(
+          0,
+          sampleLengthMs - 10,
+          newEndMs - (bounds.current.endMs - bounds.current.startMs)
+        );
+      } else {
+        newStartMs = R.clamp(0, sampleLengthMs - 10, bounds.current.startMs + diffMs);
+        newEndMs = R.clamp(
+          10,
+          sampleLengthMs,
+          newStartMs + (bounds.current.endMs - bounds.current.startMs)
+        );
+      }
+
+      bounds.current = {
+        startMs: newStartMs,
+        endMs: newEndMs,
+      };
+      if (waveformRendererInstance.type === 'loaded' && waveformRendererCtxPtr.current !== null) {
+        renderWaveform(
+          waveformRendererInstance.instance,
+          waveformRendererInstance.memory,
+          waveformRendererCtxPtr.current,
+          bounds.current.startMs,
+          bounds.current.endMs,
+          width,
+          height,
+          waveformRendererCanvasCtx.current!
+        );
+      }
+
+      middleMouseButtonDown.current = { clientX: evt.clientX, clientY: evt.clientY };
+    };
+    document.addEventListener('mousemove', handler);
+
+    return () => document.removeEventListener('mousemove', handler);
+  }, [height, middleMouseButtonDown, sampleLengthMs, waveformRendererInstance, width]);
+
+  // Install scroll handler
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    if (!canvasRef.current) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    canvas.addEventListener('wheel', handleCanvasScroll, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleCanvasScroll);
+  });
 
   if (waveformRendererInstance.type === 'error') {
     return <span style={{ color: 'red' }}>{waveformRendererInstance.error}</span>;
@@ -166,20 +248,33 @@ const SampleEditor: React.FC<{ sample: AudioBuffer }> = ({ sample }) => {
     return <Loading />;
   }
 
+  const handleMouseDown = (evt: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (evt.button !== 1) {
+      return;
+    }
+
+    middleMouseButtonDown.current = { clientX: evt.clientX, clientY: evt.clientY };
+  };
+  const handleMouseUp = (evt: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (evt.button !== 1) {
+      return;
+    }
+
+    middleMouseButtonDown.current = null;
+  };
+
   return (
     <>
       <canvas
         className='waveform-renderer'
         ref={canvas => {
           waveformRendererCanvasCtx.current = canvas?.getContext('2d') || null;
-          if (!canvas) {
-            return;
-          }
-
-          canvas.addEventListener('wheel', handleCanvasScroll, { passive: false, once: true });
+          canvasRef.current = canvas;
         }}
         width={width}
         height={height}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
       />
     </>
   );

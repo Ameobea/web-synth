@@ -1,12 +1,10 @@
-use std::{mem, sync::Once};
+use std::mem;
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
 use wasm_bindgen::prelude::*;
 
 use super::{rng, RNG};
-
-static ONCE: Once = Once::new();
 
 #[wasm_bindgen]
 extern "C" {
@@ -35,25 +33,33 @@ pub fn init_rng() {
     let _: usize = rng().gen();
 }
 
+static mut IS_INITIALIZED: bool = false;
+
 #[cfg(debug_assertions)]
 pub fn maybe_init() {
-    ONCE.call_once(|| {
-        console_error_panic_hook::set_once();
+    if unsafe { IS_INITIALIZED } {
+        return;
+    }
+    unsafe { IS_INITIALIZED = true };
 
-        let log_level = if cfg!(debug_assertions) {
-            log::Level::Trace
-        } else {
-            log::Level::Info
-        };
-        wasm_logger::init(wasm_logger::Config::new(log_level));
+    console_error_panic_hook::set_once();
 
-        init_rng();
-    });
+    let log_level = if cfg!(debug_assertions) {
+        log::Level::Trace
+    } else {
+        log::Level::Info
+    };
+    wasm_logger::init(wasm_logger::Config::new(log_level));
+
+    init_rng();
 }
 
 #[cfg(not(debug_assertions))]
 pub fn maybe_init() {
-    ONCE.call_once(|| {
-        init_rng();
-    });
+    if unsafe { IS_INITIALIZED } {
+        return;
+    }
+    unsafe { IS_INITIALIZED = true };
+
+    init_rng();
 }
