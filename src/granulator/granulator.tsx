@@ -7,13 +7,30 @@ import {
   mkContainerHider,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import { AudioConnectables, ConnectableInput, updateConnectables } from 'src/patchNetwork';
+import {
+  AudioConnectables,
+  ConnectableInput,
+  ConnectableOutput,
+  updateConnectables,
+} from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
 import { store } from 'src/redux';
+import { AsyncOnce } from 'src/util';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 interface GranulatorState {}
 
 const ctx = new AudioContext();
+
+const GranulatorRegistered = new AsyncOnce(() =>
+  ctx.audioWorklet.addModule('/GranulatorWorkletProcessor.js')
+);
+
+export const GranulatorInstancesById = new Map<
+  string,
+  { node: AudioWorkletNode; startSample: OverridableAudioParam; endSample: OverridableAudioParam }
+>();
 
 const GranulatorUI = React.lazy(() => import('./GranulatorUI'));
 
@@ -34,11 +51,29 @@ const LazyGranulatorUI: React.FC<{ vcId: string }> = props => (
 );
 
 export const get_granulator_audio_connectables = (vcId: string): AudioConnectables => {
-  // TODO
+  const inst = GranulatorInstancesById.get(vcId);
+  if (!inst) {
+    return {
+      vcId,
+      inputs: ImmMap<string, ConnectableInput>()
+        .set('start_sample', { type: 'number', node: new DummyNode() })
+        .set('end sample', { type: 'number', node: new DummyNode() }),
+      outputs: ImmMap<string, ConnectableOutput>().set('output', {
+        type: 'customAudio',
+        node: new DummyNode(),
+      }),
+    };
+  }
+
   return {
     vcId,
-    inputs: ImmMap<string, ConnectableInput>(),
-    outputs: ImmMap(),
+    inputs: ImmMap<string, ConnectableInput>()
+      .set('start_sample', { type: 'number', node: inst.startSample })
+      .set('end sample', { type: 'number', node: inst.endSample }),
+    outputs: ImmMap<string, ConnectableOutput>().set('output', {
+      type: 'customAudio',
+      node: inst.node,
+    }),
   };
 };
 
@@ -54,7 +89,17 @@ export const init_granulator = async (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  // TODO
+  GranulatorRegistered.get().then(() => {
+    const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor');
+    const startSample = new OverridableAudioParam(
+      ctx,
+      (node.parameters as any).get('start_sample')
+    );
+    const endSample = new OverridableAudioParam(ctx, (node.parameters as any).get('end_sample'));
+
+    GranulatorInstancesById.set(vcId, { node, startSample, endSample });
+    updateConnectables(vcId, get_granulator_audio_connectables(vcId));
+  });
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
   updateConnectables(vcId, get_granulator_audio_connectables(vcId));
@@ -71,6 +116,13 @@ export const cleanup_granulator = (stateKey: string) => {
 
   const serialized = serializeGranulator(vcId);
   localStorage.setItem(stateKey, serialized);
+
+  const inst = GranulatorInstancesById.get(vcId);
+  if (inst) {
+    inst.node.port.postMessage({ type: 'shutdown' });
+    inst.startSample.dispose();
+    inst.endSample.dispose();
+  }
 
   mkContainerCleanupHelper()(getGranulatorDOMElementId(vcId));
 };

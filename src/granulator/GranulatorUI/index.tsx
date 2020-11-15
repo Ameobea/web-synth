@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
+import { delay } from 'src/util';
 import './Granulator.scss';
 
 const GranulatorUI: React.FC<{ vcId: string }> = ({ vcId }) => {
@@ -10,6 +12,37 @@ const GranulatorUI: React.FC<{ vcId: string }> = ({ vcId }) => {
     descriptor: SampleDescriptor;
     sampleData: AudioBuffer;
   } | null>(null);
+  useEffect(() => {
+    if (!activeSample) {
+      return;
+    }
+
+    (async () => {
+      function* retries() {
+        let attempts = 0;
+        while (attempts < 500) {
+          yield attempts;
+          attempts += 1;
+        }
+      }
+
+      for (const _i of retries()) {
+        const inst = GranulatorInstancesById.get(vcId);
+        if (!inst) {
+          await delay(20);
+          continue;
+        }
+
+        inst.node.port.postMessage({
+          type: 'setSamples',
+          samples: activeSample.sampleData.getChannelData(0),
+        });
+        return;
+      }
+
+      console.error('Failed to initialize Granulator instance');
+    })();
+  }, [activeSample, vcId]);
 
   // Debug
   useEffect(() => {
@@ -38,7 +71,7 @@ const GranulatorUI: React.FC<{ vcId: string }> = ({ vcId }) => {
         </button>
       </div>
 
-      {activeSample ? <SampleEditor sample={activeSample.sampleData} /> : null}
+      {activeSample ? <SampleEditor sample={activeSample.sampleData} vcId={vcId} /> : null}
     </div>
   );
 };

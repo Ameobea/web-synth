@@ -3,6 +3,7 @@ import * as R from 'ramda';
 
 import Loading from 'src/misc/Loading';
 import { AsyncOnce } from 'src/util';
+import { GranulatorInstancesById } from 'src/granulator';
 
 const BYTES_PER_F32 = 4;
 const BYTES_PER_PX = 4; // RGBA
@@ -75,11 +76,25 @@ const SampleEditorOverlay: React.FC<{
   height: number;
   sample: AudioBuffer;
   onBoundsChange: (newBounds: { startMs: number; endMs: number }) => void;
-}> = ({ width, height, sample, onBoundsChange }) => {
+  vcId: string;
+}> = ({ width, height, sample, onBoundsChange, vcId }) => {
   const [{ startMarkPosMs, endMarkPosMs }, setMarkPositions] = useState<{
     startMarkPosMs: number | null;
     endMarkPosMs: number | null;
   }>({ startMarkPosMs: null, endMarkPosMs: null });
+  useEffect(() => {
+    const inst = GranulatorInstancesById.get(vcId);
+    if (!inst) {
+      return;
+    }
+
+    if (startMarkPosMs !== null) {
+      inst.startSample.manualControl.offset.value = (startMarkPosMs / 1000) * sample.sampleRate;
+    }
+    if (endMarkPosMs !== null) {
+      inst.endSample.manualControl.offset.value = (endMarkPosMs / 1000) * sample.sampleRate;
+    }
+  }, [startMarkPosMs, endMarkPosMs, vcId, sample.sampleRate]);
   const middleMouseButtonDown = useRef<{
     clientX: number;
     clientY: number;
@@ -265,15 +280,20 @@ const SampleEditorOverlay: React.FC<{
             ),
           });
         } else if (endMarkPosMs === null) {
+          const newEndMarkPosMs = computeClickPosMs(
+            evt.currentTarget,
+            evt.clientX,
+            width,
+            bounds.startMs,
+            bounds.endMs
+          );
+          if (newEndMarkPosMs < startMarkPosMs) {
+            return;
+          }
+
           setMarkPositions({
             startMarkPosMs,
-            endMarkPosMs: computeClickPosMs(
-              evt.currentTarget,
-              evt.clientX,
-              width,
-              bounds.startMs,
-              bounds.endMs
-            ),
+            endMarkPosMs: newEndMarkPosMs,
           });
         }
       }}
@@ -343,7 +363,7 @@ const renderWaveform = (
   canvasCtx.putImageData(imageData, 0, 0);
 };
 
-const SampleEditor: React.FC<{ sample: AudioBuffer }> = ({ sample }) => {
+const SampleEditor: React.FC<{ sample: AudioBuffer; vcId: string }> = ({ sample, vcId }) => {
   const { width, height } = { width: 1400, height: 240 }; // TODO: Store as state somewhere serializable
 
   const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
@@ -462,6 +482,7 @@ const SampleEditor: React.FC<{ sample: AudioBuffer }> = ({ sample }) => {
         width={width}
         height={height}
         onBoundsChange={onBoundsChange}
+        vcId={vcId}
       />
     </div>
   );
