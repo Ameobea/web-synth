@@ -1,5 +1,6 @@
 opt:
   wasm-strip ./dist/wavetable.wasm
+  wasm-strip ./dist/granular.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 -c -o ./dist/$file; done
 
 build-all:
@@ -26,6 +27,7 @@ run:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src/
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
   yarn start
 
 run-frontend:
@@ -65,3 +67,7 @@ push-docker-ci:
 build-waveform-renderer:
   cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
     wasm-bindgen ../target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ../../src
+
+build-granular:
+  cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/granular.wasm ../../public

@@ -17,3 +17,4 @@ polysynth.d.ts
 litegraph.js
 cypress/videos
 public/wavetable.wasm
+public/granular.wasm

@@ -18,6 +18,7 @@ import { store } from 'src/redux';
 import { AsyncOnce } from 'src/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
 
 interface GranulatorState {}
 
@@ -29,7 +30,14 @@ const GranulatorRegistered = new AsyncOnce(() =>
 
 export const GranulatorInstancesById = new Map<
   string,
-  { node: AudioWorkletNode; startSample: OverridableAudioParam; endSample: OverridableAudioParam }
+  {
+    node: AudioWorkletNode;
+    startSample: OverridableAudioParam;
+    endSample: OverridableAudioParam;
+    grainSize: OverridableAudioParam;
+    grainSpeedRatio: OverridableAudioParam;
+    sampleSpeedRatio: OverridableAudioParam;
+  }
 >();
 
 const GranulatorUI = React.lazy(() => import('./GranulatorUI'));
@@ -44,7 +52,10 @@ const deserializeGranulator = async (serialized: string): Promise<GranulatorStat
   return {}; // TODO
 };
 
-const LazyGranulatorUI: React.FC<{ vcId: string }> = props => (
+const LazyGranulatorUI: React.FC<{
+  vcId: string;
+  initialState: GranulatorControlPanelState;
+}> = props => (
   <Suspense fallback={<Loading />}>
     <GranulatorUI {...props} />
   </Suspense>
@@ -77,6 +88,10 @@ export const get_granulator_audio_connectables = (vcId: string): AudioConnectabl
   };
 };
 
+const GranularWasm = new AsyncOnce(async () =>
+  fetch('/granular.wasm').then(res => res.arrayBuffer())
+);
+
 export const init_granulator = async (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
@@ -89,15 +104,39 @@ export const init_granulator = async (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  GranulatorRegistered.get().then(() => {
-    const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor');
-    const startSample = new OverridableAudioParam(
-      ctx,
-      (node.parameters as any).get('start_sample')
-    );
-    const endSample = new OverridableAudioParam(ctx, (node.parameters as any).get('end_sample'));
+  // TODO: Load from localStorage
+  const initialState: GranulatorControlPanelState = {
+    grain_size: 80,
+    grain_speed_ratio: 1.0,
+    sample_speed_ratio: 1.0,
+  };
 
-    GranulatorInstancesById.set(vcId, { node, startSample, endSample });
+  const granularWasmPromise = GranularWasm.get();
+  GranulatorRegistered.get().then(async () => {
+    const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor');
+    const granularWasm = await granularWasmPromise;
+    // Once we've fetched the Wasm bytes for the granular's DSP instance, we send them to the AWP
+    // to be instantiated and start.
+    node.port.postMessage({ type: 'setWasmBytes', wasmBytes: granularWasm });
+
+    const inst = {
+      node,
+      startSample: new OverridableAudioParam(ctx, (node.parameters as any).get('start_sample')),
+      endSample: new OverridableAudioParam(ctx, (node.parameters as any).get('end_sample')),
+      grainSize: new OverridableAudioParam(ctx, (node.parameters as any).get('grain_size')),
+      grainSpeedRatio: new OverridableAudioParam(
+        ctx,
+        (node.parameters as any).get('grain_speed_ratio')
+      ),
+      sampleSpeedRatio: new OverridableAudioParam(
+        ctx,
+        (node.parameters as any).get('sample_speed_ratio')
+      ),
+    };
+    inst.grainSize.manualControl.offset.value = initialState.grain_size;
+    inst.grainSpeedRatio.manualControl.offset.value = initialState.grain_speed_ratio;
+    inst.sampleSpeedRatio.manualControl.offset.value = initialState.sample_speed_ratio;
+    GranulatorInstancesById.set(vcId, inst);
     updateConnectables(vcId, get_granulator_audio_connectables(vcId));
   });
 
@@ -107,7 +146,7 @@ export const init_granulator = async (stateKey: string) => {
   mkContainerRenderHelper({
     Comp: LazyGranulatorUI,
     store,
-    getProps: () => ({ vcId }),
+    getProps: () => ({ vcId, initialState }),
   })(domId);
 };
 
