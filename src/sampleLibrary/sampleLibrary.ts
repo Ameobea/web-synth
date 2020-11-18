@@ -29,13 +29,13 @@ const traverseDir = async (
   dirHandle: FileSystemDirectoryHandle,
   prefix = ''
 ): Promise<SampleDescriptor[]> => {
-  const entries = await dirHandle.getEntries();
+  const entries = await dirHandle.entries();
   const descriptors: SampleDescriptor[] = [];
 
   const childDirs: Promise<SampleDescriptor[]>[] = [];
 
-  for await (const entry of entries) {
-    if (entry.isDirectory) {
+  for await (const [_name, entry] of entries) {
+    if (entry.kind === 'directory') {
       childDirs.push(traverseDir(entry, entry.name + '/'));
       continue;
     }

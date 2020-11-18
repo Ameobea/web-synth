@@ -47,7 +47,7 @@ func getFileSize(fileName string) (int64, error) {
 
 func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, err error) {
 	// Compile the Faust code, producing an output wasm file as well as an output JS file
-	cmd := exec.Command("faust", "-lang", "wasm", "-o", outWasmFileName, srcFilePath)
+	cmd := exec.Command("faust", "-lang", "wasm", "-ftz", "1", "-o", outWasmFileName, srcFilePath)
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb

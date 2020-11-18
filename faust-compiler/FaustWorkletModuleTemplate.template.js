@@ -105,7 +105,7 @@ const heap2Str = buf => {
   return str;
 };
 
-const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
+const clamp = (min, max, val) => Number.isNaN(val) ? 0.0 : Math.min(Math.max(min, val), max);
 
 class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -229,7 +229,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     // Set all params into the Wasm memory from the latest values we have to our `AudioParam`s
     paramDescriptors.forEach(param => {
       const paramValue = params[param.name][0];
-      if (paramValue === undefined) {
+      if (paramValue === undefined || Number.isNaN(paramValue)) {
         return;
       }
 
@@ -263,7 +263,11 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < Math.min(outputs.length, this.dspOutChannels.length); i++) {
       const dspOutput = this.dspOutChannels[i];
       for (let channelIx = 0; channelIx < outputs[i].length; channelIx++) {
-        outputs[i][channelIx].set(dspOutput);
+        // If we send NaNs or out-of-range values, computer gets very upset and destroys
+        // my entire system audio on Linux until I shut down this AWP.
+        for (let sampleIx = 0; sampleIx < outputs[i][channelIx].length; sampleIx++) {
+          outputs[i][channelIx][sampleIx] = clamp(-1.0, 1.0, dspOutput[sampleIx]);
+        }
       }
     }
 

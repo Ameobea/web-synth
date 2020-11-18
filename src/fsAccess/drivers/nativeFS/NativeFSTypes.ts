@@ -5,32 +5,24 @@ export interface FileSystemWriter {
 }
 
 export interface FileSystemFileHandle {
-  isDirectory: false;
-  isFile: true;
+  kind: 'file';
   name: string;
   createWriter: () => Promise<FileSystemWriter>;
   getFile: () => Promise<File>;
 }
 
 export interface FileSystemDirectoryHandle {
-  isDirectory: true;
-  isFile: false;
+  kind: 'directory';
   name: string;
-  getEntries: () => AsyncIterable<FileSystemFileHandle | FileSystemDirectoryHandle>;
-  getFile: (name: string, options?: { create?: boolean }) => Promise<FileSystemFileHandle>;
-  getDirectory: (
+  entries: () => AsyncIterable<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>;
+  getFileHandle: (name: string, options?: { create?: boolean }) => Promise<FileSystemFileHandle>;
+  getDirectoryHandle: (
     name: string,
     options?: { create?: boolean }
   ) => Promise<FileSystemDirectoryHandle>;
   removeEntry: (name: string, options?: unknown) => Promise<void>;
 }
 
-export interface ChooseFileSystemEntriesArgs {
-  type?: 'openDirectory';
-}
-
 export interface NativeFSShim {
-  chooseFileSystemEntries(
-    args?: ChooseFileSystemEntriesArgs
-  ): Promise<FileSystemFileHandle | FileSystemDirectoryHandle>;
+  showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
 }

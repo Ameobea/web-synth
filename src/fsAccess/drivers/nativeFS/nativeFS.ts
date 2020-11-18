@@ -1,5 +1,4 @@
 import * as R from 'ramda';
-import { UnimplementedError } from 'ameo-utils';
 
 import { renderModalWithControls } from 'src/controls/Modal';
 import { FSAccessDriver } from 'src/fsAccess/driver';
@@ -12,7 +11,7 @@ export default class NativeFSDriver implements FSAccessDriver {
   private handle: FileSystemDirectoryHandle | undefined;
 
   constructor() {
-    if (!patchedWindow.chooseFileSystemEntries) {
+    if (!patchedWindow.showDirectoryPicker) {
       alert('No native filesystem API support in current browser');
       throw new Error('No native filesystem API support in current browser');
     }
@@ -21,9 +20,7 @@ export default class NativeFSDriver implements FSAccessDriver {
   public async init(): Promise<void> {
     await renderModalWithControls(FSAccessDialog);
 
-    const dataDirHandle = (await patchedWindow.chooseFileSystemEntries({
-      type: 'openDirectory',
-    })) as FileSystemDirectoryHandle;
+    const dataDirHandle = await patchedWindow.showDirectoryPicker();
     this.handle = dataDirHandle;
   }
 
@@ -44,7 +41,7 @@ export default class NativeFSDriver implements FSAccessDriver {
     const targetName = R.last(path)!;
 
     const finalDir = await subdirNames.reduce(
-      (dirHandle, dirName) => dirHandle.then(dirHandle => dirHandle.getDirectory(dirName)),
+      (dirHandle, dirName) => dirHandle.then(dirHandle => dirHandle.getDirectoryHandle(dirName)),
       Promise.resolve(dirHandle)
     );
 
@@ -52,27 +49,27 @@ export default class NativeFSDriver implements FSAccessDriver {
   }
 
   public async createDirectory(dirName: string): Promise<void> {
-    await this.getHandle().getDirectory(dirName, { create: true });
+    await this.getHandle().getDirectoryHandle(dirName, { create: true });
   }
 
   public async getDirectory(dirName: string): Promise<FileSystemDirectoryHandle> {
-    return this.getHandle().getDirectory(dirName, { create: false });
+    return this.getHandle().getDirectoryHandle(dirName, { create: false });
   }
 
   public async createSubdirectory(
     dirName: string,
     subdirName: string
   ): Promise<FileSystemDirectoryHandle> {
-    const dirHandle = await this.getHandle().getDirectory(dirName);
-    return dirHandle.getDirectory(subdirName, { create: true });
+    const dirHandle = await this.getHandle().getDirectoryHandle(dirName);
+    return dirHandle.getDirectoryHandle(subdirName, { create: true });
   }
 
   public async getSubdirectory(
     dirName: string,
     subdirName: string
   ): Promise<FileSystemDirectoryHandle> {
-    const dirHandle = await this.getHandle().getDirectory(dirName);
-    return dirHandle.getDirectory(subdirName, { create: false });
+    const dirHandle = await this.getHandle().getDirectoryHandle(dirName);
+    return dirHandle.getDirectoryHandle(subdirName, { create: false });
   }
 
   public async deleteSubdirectory(dirName: string, subdirName: string): Promise<void> {
@@ -80,21 +77,21 @@ export default class NativeFSDriver implements FSAccessDriver {
   }
 
   public async getFile(dirName: string, filePath: string): Promise<File> {
-    const rootDirHandle = this.getHandle().getDirectory(dirName);
+    const rootDirHandle = this.getHandle().getDirectoryHandle(dirName);
     const { targetName, finalDir } = await this.traverse(rootDirHandle, filePath);
 
-    const fileHandle = await finalDir.getFile(targetName);
+    const fileHandle = await finalDir.getFileHandle(targetName);
     return fileHandle.getFile();
   }
 
   public async createFile(dirName: string, filePath: string): Promise<FileSystemFileHandle> {
-    const rootDirHandle = await this.getHandle().getDirectory(dirName);
+    const rootDirHandle = await this.getHandle().getDirectoryHandle(dirName);
     const { targetName, finalDir } = await this.traverse(rootDirHandle, filePath);
-    return finalDir.getFile(targetName);
+    return finalDir.getFileHandle(targetName);
   }
 
   public async deleteFile(dirName: string, filePath: string): Promise<void> {
-    const rootDirHandle = await this.getHandle().getDirectory(dirName);
+    const rootDirHandle = await this.getHandle().getDirectoryHandle(dirName);
     const { targetName, finalDir } = await this.traverse(rootDirHandle, filePath);
     finalDir.removeEntry(targetName);
   }

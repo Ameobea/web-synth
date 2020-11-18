@@ -40,10 +40,10 @@ const GranularControlPanel: React.FC<{
       {
         label: 'sample_speed_ratio',
         type: 'range',
-        min: 0.01,
-        max: 20,
-        scale: 'log',
+        min: -4,
+        max: 4,
         initial: initialState.sample_speed_ratio,
+        step: 0.1,
       },
     ]}
     onChange={(key: string, value: any, _state: any) => {
@@ -116,7 +116,10 @@ const GranulatorUI: React.FC<{
   // Debug
   useEffect(() => {
     (async () => {
-      const descriptor: SampleDescriptor = { name: 'cold - crash.wav', isLocal: true };
+      const descriptor: SampleDescriptor = {
+        name: 'Melodies ( 4 )/oOoOo i feel strange 91 bpm C# Minor.wav',
+        isLocal: true,
+      };
       const sampleData = await getSample(descriptor);
       setActiveSample({ descriptor, sampleData });
     })();
