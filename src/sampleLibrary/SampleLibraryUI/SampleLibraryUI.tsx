@@ -26,14 +26,9 @@ interface SampleRowProps {
   style?: React.CSSProperties;
 }
 
-export const SampleRow: React.FC<SampleRowProps &
-  React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
-  descriptor,
-  style,
-  togglePlaying,
-  isPlaying,
-  ...rest
-}) => (
+export const SampleRow: React.FC<
+  SampleRowProps & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+> = ({ descriptor, style, togglePlaying, isPlaying, ...rest }) => (
   <div className='sample-row' {...rest} style={style}>
     <PlaySampleIcon isPlaying={isPlaying} onClick={togglePlaying} />
     {descriptor.name}
@@ -138,18 +133,14 @@ export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: an
   );
 }
 
-export const LoadSamplesButtons: React.FC<{
-  localSamplesLoaded: boolean;
-  loadLocalSamples: () => void;
-  remoteSamplesLoaded: boolean;
-  loadRemoteSamples: () => void;
-} & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
-  localSamplesLoaded,
-  loadLocalSamples,
-  remoteSamplesLoaded,
-  loadRemoteSamples,
-  ...rest
-}) => (
+export const LoadSamplesButtons: React.FC<
+  {
+    localSamplesLoaded: boolean;
+    loadLocalSamples: () => void;
+    remoteSamplesLoaded: boolean;
+    loadRemoteSamples: () => void;
+  } & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+> = ({ localSamplesLoaded, loadLocalSamples, remoteSamplesLoaded, loadRemoteSamples, ...rest }) => (
   <div className='load-samples-buttons' {...rest}>
     {!localSamplesLoaded ? (
       <button style={{ width: 120 }} onClick={loadLocalSamples}>
@@ -164,7 +155,7 @@ export const LoadSamplesButtons: React.FC<{
   </div>
 );
 
-const SampleLibraryUI: React.FC<{}> = () => {
+const SampleLibraryUI: React.FC = () => {
   const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
 
   if (!Array.isArray(allSamples)) {

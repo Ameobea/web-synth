@@ -12,6 +12,8 @@ export interface GranulatorControlPanelState {
   grain_size: number;
   grain_speed_ratio: number;
   sample_speed_ratio: number;
+  voice_1_filter_cutoff: number;
+  voice_2_filter_cutoff: number;
 }
 
 const GranularControlPanel: React.FC<{
@@ -45,6 +47,22 @@ const GranularControlPanel: React.FC<{
         initial: initialState.sample_speed_ratio,
         step: 0.1,
       },
+      {
+        label: 'voice_1_filter_cutoff',
+        type: 'range',
+        min: -4000,
+        max: 4000,
+        initial: initialState.voice_1_filter_cutoff,
+        step: 10,
+      },
+      {
+        label: 'voice_2_filter_cutoff',
+        type: 'range',
+        min: -4000,
+        max: 4000,
+        initial: initialState.voice_2_filter_cutoff,
+        step: 10,
+      },
     ]}
     onChange={(key: string, value: any, _state: any) => {
       const inst = GranulatorInstancesById.get(vcId);
@@ -63,6 +81,14 @@ const GranularControlPanel: React.FC<{
         }
         case 'sample_speed_ratio': {
           inst.sampleSpeedRatio.manualControl.offset.value = value;
+          break;
+        }
+        case 'voice_1_filter_cutoff': {
+          inst.voice1FilterCutoff.manualControl.offset.value = value;
+          break;
+        }
+        case 'voice_2_filter_cutoff': {
+          inst.voice2FilterCutoff.manualControl.offset.value = value;
           break;
         }
         default: {
@@ -117,7 +143,7 @@ const GranulatorUI: React.FC<{
   useEffect(() => {
     (async () => {
       const descriptor: SampleDescriptor = {
-        name: 'Melodies ( 4 )/oOoOo i feel strange 91 bpm C# Minor.wav',
+        name: 'clouds-video.mp3',
         isLocal: true,
       };
       const sampleData = await getSample(descriptor);

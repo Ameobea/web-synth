@@ -31,6 +31,16 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
         defaultValue: 0,
         automationRate: 'k-rate',
       },
+      {
+        name: 'voice_1_filter_cutoff',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'voice_2_filter_cutoff',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+      },
     ];
   }
 
@@ -106,6 +116,8 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     const grainSize = params['grain_size'][0];
     const grainSpeedRatio = params['grain_speed_ratio'][0];
     const sampleSpeedRatio = params['sample_speed_ratio'][0];
+    const voice1FilterCutoff = params['voice_1_filter_cutoff'][0];
+    const voice2FilterCutoff = params['voice_2_filter_cutoff'][0];
 
     // Render
     const outputBufPtr = this.wasmInstance.exports.render_granular(
@@ -114,7 +126,9 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
       endSampleIx,
       grainSize,
       grainSpeedRatio,
-      sampleSpeedRatio
+      sampleSpeedRatio,
+      voice1FilterCutoff,
+      voice2FilterCutoff
     );
 
     // Fill the first output buffer and then copy them to all other outputs

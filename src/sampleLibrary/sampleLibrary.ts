@@ -78,6 +78,7 @@ export interface ListSampleOpts {
 export const listSamples = async ({ includeRemote, includeLocal }: ListSampleOpts = {}): Promise<
   SampleDescriptor[]
 > => {
+  console.log({ includeLocal });
   const [cachedSamples, localSamples, remoteSamples] = await Promise.all([
     getAllCachedSamples(),
     includeLocal

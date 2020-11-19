@@ -75,6 +75,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsp"
+version = "0.1.0"
+
+[[package]]
 name = "encoding"
 version = "0.2.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -275,6 +279,9 @@ dependencies = [
 [[package]]
 name = "granular"
 version = "0.1.0"
+dependencies = [
+ "dsp",
+]
 
 [[package]]
 name = "itoa"

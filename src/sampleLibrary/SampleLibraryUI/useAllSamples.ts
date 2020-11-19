@@ -6,6 +6,7 @@ export const useAllSamples = () => {
   const [allSamples, setAllSamples] = useState<
     SampleDescriptor[] | null | 'FETCHING' | 'FETCH_ERROR'
   >(null);
+  console.log({ allSamples });
   const [includeLocalSamples, setIncludeLocalSamples] = useState(false);
 
   const lastIncludeLocalSamples = useRef(false);
