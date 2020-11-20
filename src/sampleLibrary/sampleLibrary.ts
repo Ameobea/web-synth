@@ -36,7 +36,7 @@ const traverseDir = async (
 
   for await (const [_name, entry] of entries) {
     if (entry.kind === 'directory') {
-      childDirs.push(traverseDir(entry, entry.name + '/'));
+      childDirs.push(traverseDir(entry, prefix + entry.name + '/'));
       continue;
     }
 
@@ -78,7 +78,6 @@ export interface ListSampleOpts {
 export const listSamples = async ({ includeRemote, includeLocal }: ListSampleOpts = {}): Promise<
   SampleDescriptor[]
 > => {
-  console.log({ includeLocal });
   const [cachedSamples, localSamples, remoteSamples] = await Promise.all([
     getAllCachedSamples(),
     includeLocal

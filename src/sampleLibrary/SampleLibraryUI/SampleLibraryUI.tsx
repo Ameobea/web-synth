@@ -37,6 +37,7 @@ export const SampleRow: React.FC<
 
 const playSample = async (descriptor: SampleDescriptor): Promise<AudioBufferSourceNode> => {
   const buffer = await getSample(descriptor);
+  console.log({ buffer });
   const bufSrc = new AudioBufferSourceNode(ctx);
   bufSrc.buffer = buffer;
   bufSrc.connect(ctx.destination);
@@ -58,15 +59,18 @@ const mkDefaultSampleListingRowRenderer = ({
   sampleDescriptors,
   playingSample,
   togglePlaying,
-}: MkDefaultSampleListingRowRendererArgs): ListRowRenderer => ({ style, index, key }) => (
-  <SampleRow
-    togglePlaying={() => togglePlaying(sampleDescriptors[index])}
-    isPlaying={sampleDescriptors[index].name === playingSample?.name}
-    descriptor={sampleDescriptors[index]}
-    key={key}
-    style={style}
-  />
-);
+}: MkDefaultSampleListingRowRendererArgs): ListRowRenderer => {
+  const DefaultSampleListingRowRenderer: React.FC<any> = ({ style, index, key }) => (
+    <SampleRow
+      togglePlaying={() => togglePlaying(sampleDescriptors[index])}
+      isPlaying={sampleDescriptors[index].name === playingSample?.name}
+      descriptor={sampleDescriptors[index]}
+      key={key}
+      style={style}
+    />
+  );
+  return DefaultSampleListingRowRenderer;
+};
 
 export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: any } = {}>({
   sampleDescriptors,
@@ -101,7 +105,7 @@ export function SampleListing<ExtraMkRowRendererArgs extends { [key: string]: an
         if (playingSample !== null) {
           playingSample.bufSrc.then(bufSrc => bufSrc.stop());
         }
-        setPlayingSample({ name, bufSrc: playSample(descriptor) });
+        setPlayingSample({ name: descriptor.name, bufSrc: playSample(descriptor) });
       }
     },
     [playingSample, setPlayingSample]

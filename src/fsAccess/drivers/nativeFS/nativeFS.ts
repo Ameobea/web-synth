@@ -77,7 +77,7 @@ export default class NativeFSDriver implements FSAccessDriver {
   }
 
   public async getFile(dirName: string, filePath: string): Promise<File> {
-    const rootDirHandle = this.getHandle().getDirectoryHandle(dirName);
+    const rootDirHandle = await this.getHandle().getDirectoryHandle(dirName);
     const { targetName, finalDir } = await this.traverse(rootDirHandle, filePath);
 
     const fileHandle = await finalDir.getFileHandle(targetName);

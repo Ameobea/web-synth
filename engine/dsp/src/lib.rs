@@ -18,6 +18,14 @@ pub fn smooth(state: &mut f32, new_val: f32, smooth_factor: f32) {
 
 pub fn clamp(min: f32, max: f32, val: f32) -> f32 { val.max(min).min(max) }
 
+pub fn mix(v1_pct: f32, v1: f32, v2: f32) -> f32 { (v1_pct * v1) + (1. - v1_pct) * v2 }
+
+pub fn read_interpolated(buf: &[f32], index: f32) -> f32 {
+    let base_ix = index.trunc() as usize;
+    let next_ix = base_ix + 1;
+    mix(index.fract(), buf[next_ix], buf[base_ix])
+}
+
 #[derive(Clone, Copy)]
 pub struct ButterworthFilter {
     pub sample_rate: f32,

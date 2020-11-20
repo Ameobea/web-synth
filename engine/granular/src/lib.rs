@@ -1,6 +1,6 @@
 #![feature(box_syntax)]
 
-use dsp::{clamp, smooth, ButterworthFilter};
+use dsp::{clamp, mix, read_interpolated, smooth, ButterworthFilter};
 
 const FRAME_SIZE: usize = 128;
 const SAMPLE_RATE: usize = 44100;
@@ -20,31 +20,92 @@ impl Default for ReverseState {
     }
 }
 
-#[derive(Clone, Copy)]
+static mut SCRATCH: [(f32, f32); 8192] = [(0.0, 0.0); 8192];
+fn scratch() -> &'static mut [(f32, f32); 8192] { unsafe { &mut SCRATCH } }
+
+#[derive(Clone)]
 pub struct GranularVoice {
-    /// The index at which the current grain starts in the waveform buffer, relative to the start
-    /// of the selection
+    /// The index at which the current grain starts in the waveform buffer, absolute to the buffer
     pub cur_grain_start: f32,
-    pub last_sample: f32,
     pub reversed: ReverseState,
-    // It may be better to make these something that is provided directly per-voice in the future
-    pub pos_scale: f32,
-    pub pos_shift: f32,
-    pos_grain_size_mult: f32,
     filter: ButterworthFilter,
+    filter_cutoff: f32,
+    pub grains: Vec<Grain>,
+    pub samples_since_last_grain: f32,
 }
 
 impl Default for GranularVoice {
     fn default() -> Self {
         GranularVoice {
             cur_grain_start: 0.0,
-            last_sample: 0.0,
             reversed: ReverseState::default(),
-            pos_scale: 1.0,
-            pos_shift: 0.0,
-            pos_grain_size_mult: 0.0,
             filter: ButterworthFilter::new(SAMPLE_RATE),
+            filter_cutoff: 0.,
+            grains: Vec::with_capacity(128),
+            samples_since_last_grain: 0.,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Grain {
+    pub len_samples: f32,
+    /// Absolute index of the sample in the main buffer where this grain starts
+    pub start_sample_ix: f32,
+    pub samples_read_so_far: f32,
+    pub sample_playback_ratio: f32,
+    pub linear_slope_length: f32,
+    pub slope_linearity: f32,
+}
+
+impl Grain {
+    fn compute_linear_envelope_volume(&self, pos_in_grain: f32, linear_slope_length: f32) -> f32 {
+        let pos_in_grain = if pos_in_grain < 0.5 {
+            pos_in_grain
+        } else {
+            // Reflect across the 0.5 axis, mirroring the function from 0 to 0.5
+            0.5 - (pos_in_grain - 0.5)
+        };
+        ((pos_in_grain * 2.) / linear_slope_length).min(1.)
+    }
+
+    /// `linear_slope_length` determines how far into the grain the envelope extends on either side.
+    /// A value of 0 means that no envelope will be applied and a slope of 1 means that the
+    /// envelope will extend all the way to the center of the waveform creating a triangle.
+    ///
+    /// `slope_linearity` determines the envelope mix between the linear slope determined by
+    /// `linear_slope_length` and the sine.  It's a simple 0 to 1 mix between the linear slope and
+    /// the sine.
+    fn get_volume(&self, pos_in_grain: f32, linear_slope_length: f32, slope_linearity: f32) -> f32 {
+        let linear_slope = self.compute_linear_envelope_volume(pos_in_grain, linear_slope_length);
+        let sine_slope = (pos_in_grain * std::f32::consts::PI).sin();
+        mix(slope_linearity, linear_slope, sine_slope)
+    }
+
+    /// Returns `true` is this grain has more samples to play and `false` if it's been fully
+    /// consumed
+    pub fn tick(&mut self) -> bool {
+        self.samples_read_so_far += self.sample_playback_ratio;
+        self.samples_read_so_far < self.len_samples
+    }
+
+    pub fn sample(
+        &self,
+        buf: &[f32],
+        is_reversed: bool,
+        linear_slope_length: f32,
+        slope_linearity: f32,
+    ) -> (f32, f32) {
+        let pos_in_grain = self.samples_read_so_far / self.len_samples;
+        let sample_ix = if is_reversed {
+            self.len_samples - self.samples_read_so_far
+        } else {
+            self.samples_read_so_far
+        };
+
+        let gain = self.get_volume(pos_in_grain, linear_slope_length, slope_linearity);
+        let sample = read_interpolated(buf, self.start_sample_ix + sample_ix);
+        (gain, sample)
     }
 }
 
@@ -56,171 +117,228 @@ pub struct GranularCtx {
     pub voices: [GranularVoice; 2],
     pub last_start_sample_ix: f32,
     pub last_end_sample_ix: f32,
-    pub last_voice_1_filter_freq: f32,
-    pub last_voice_2_filter_freq: f32,
+    pub last_grain_size: f32,
 }
 
 impl Default for GranularCtx {
     fn default() -> Self {
-        let mut voices = [GranularVoice::default(); 2];
-        voices[1].pos_grain_size_mult = 0.5;
-        voices[1].pos_scale = 1.33;
-        // voices[1].reversed.grain_is_reversed = true;
-        // voices[1].reversed.grain_movement_is_reversed = true;
-
         GranularCtx {
             waveform: Vec::new(),
             cur_sample_offset: 0.0,
             rendered_output: [0.0; FRAME_SIZE],
-            voices,
+            voices: [GranularVoice::default(), GranularVoice::default()],
             last_start_sample_ix: -10.0,
             last_end_sample_ix: -10.0,
-            last_voice_1_filter_freq: 0.0,
-            last_voice_2_filter_freq: 0.0,
+            last_grain_size: 800.,
         }
     }
 }
 
+fn normalize_gain(samples_and_gains: &[(f32, f32)], total_gain: f32) -> f32 {
+    let gain_multiplier = if total_gain < 1. {
+        1.
+    } else {
+        1. / (total_gain + 0.001) // Maybe this should be scaled differently
+    };
+
+    samples_and_gains.iter().fold(0.0, |acc, (sample, gain)| {
+        acc + sample * gain * gain_multiplier
+    })
+}
+
 impl GranularVoice {
-    /// Reads a sample out of the waveform according to `self.i`, interpolating as necessary and
-    /// handling wrap-arounds.
-    pub fn get_sample(
+    fn move_read_head(
+        &mut self,
+        selection_start_sample_ix: f32,
+        selection_end_sample_ix: f32,
+        grain_size: f32,
+        movement_samples_per_sample: f32,
+    ) {
+        self.cur_grain_start = clamp(
+            selection_start_sample_ix,
+            selection_end_sample_ix,
+            self.cur_grain_start,
+        );
+        // TODO: Handle reverse
+        self.cur_grain_start += movement_samples_per_sample;
+
+        if self.cur_grain_start + grain_size > selection_end_sample_ix {
+            // Grain would overflow the selection; we need to wrap it back around to the start of
+            // the selection
+            let selection_len = selection_end_sample_ix - selection_start_sample_ix;
+            let offset_from_selection_start = self.cur_grain_start - selection_start_sample_ix;
+            let new_offset_from_selection_start =
+                offset_from_selection_start % (selection_len - grain_size);
+            self.cur_grain_start = new_offset_from_selection_start + selection_start_sample_ix;
+        }
+    }
+
+    fn seed_grain(
+        &mut self,
+        grain_size: f32,
+        linear_slope_length: f32,
+        slope_linearity: f32,
+        sample_playback_ratio: f32,
+    ) {
+        self.grains.push(Grain {
+            len_samples: grain_size,
+            start_sample_ix: self.cur_grain_start,
+            samples_read_so_far: 0.,
+            sample_playback_ratio: clamp(0.001, 1000., sample_playback_ratio),
+            linear_slope_length,
+            slope_linearity,
+        });
+    }
+
+    fn maybe_seed_new_grain(
+        &mut self,
+        samples_between_grains: f32,
+        grain_size: f32,
+        linear_slope_length: f32,
+        slope_linearity: f32,
+        sample_playback_ratio: f32,
+        movement_samples_per_sample: f32,
+    ) {
+        self.samples_since_last_grain += movement_samples_per_sample;
+        if self.grains.len() >= scratch().len() {
+            // Can't exceed the ridiculous max grain count
+            return;
+        }
+
+        if self.samples_since_last_grain >= samples_between_grains {
+            self.samples_since_last_grain -= samples_between_grains;
+            self.seed_grain(
+                grain_size,
+                linear_slope_length,
+                slope_linearity,
+                sample_playback_ratio,
+            );
+        }
+    }
+
+    fn tick_grains(&mut self) {
+        // Tick grains and remove grains that are done playing
+        let mut i = 0;
+        while i < self.grains.len() {
+            let is_still_running = {
+                let grain = &mut self.grains[i];
+                grain.tick()
+            };
+            if !is_still_running {
+                self.grains.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    pub fn update_and_get_sample(
         &mut self,
         waveform: &[f32],
-        start_sample_ix: usize,
-        end_sample_ix: usize,
-        cur_sample_offset: f32,
+        selection_start_sample_ix: f32,
+        selection_end_sample_ix: f32,
         grain_size: f32,
         // Positive values are highpass, negative values are lowpass
         filter_cutoff: f32,
+        linear_slope_length: f32,
+        slope_linearity: f32,
+        samples_between_grains: f32,
+        movement_samples_per_sample: f32,
+        sample_speed_ratio: f32,
     ) -> f32 {
-        let selection_len = end_sample_ix - start_sample_ix;
+        self.move_read_head(
+            selection_start_sample_ix,
+            selection_end_sample_ix,
+            grain_size,
+            movement_samples_per_sample,
+        );
 
-        let offset_from_start_of_grain =
-            (self.pos_grain_size_mult * grain_size) + cur_sample_offset;
-        // Constrain within the grain
-        let offset_from_start_of_grain = if self.reversed.grain_is_reversed {
-            1. - (offset_from_start_of_grain % grain_size)
-        } else {
-            offset_from_start_of_grain % grain_size
-        };
-        let i = (self.cur_grain_start * self.pos_scale) + offset_from_start_of_grain;
-        let offset_from_start_sample_ix = i - start_sample_ix as f32;
-        // Constrain within the selection
-        let offset_from_start_sample_ix = offset_from_start_sample_ix % selection_len as f32;
-        let i = start_sample_ix as f32 + offset_from_start_sample_ix;
+        self.maybe_seed_new_grain(
+            samples_between_grains,
+            grain_size,
+            linear_slope_length,
+            slope_linearity,
+            sample_speed_ratio,
+            movement_samples_per_sample,
+        );
 
-        let base_sample_ix = i.trunc() as usize;
-        let interpolation_mix = i.fract();
-        assert!(base_sample_ix < end_sample_ix);
-        // This is also relative to `start_sample_ix`
-        let next_sample_ix =
-            start_sample_ix + ((base_sample_ix - start_sample_ix + 1) % selection_len);
+        self.tick_grains();
 
-        let sample = waveform[base_sample_ix] * interpolation_mix
-            + (waveform[next_sample_ix] * (1.0 - interpolation_mix));
+        let samples_and_gains = scratch();
+        let mut total_gain = 0.;
+        let mut active_grain_count = 0;
+        self.grains.iter().for_each(|grain| {
+            let (gain, sample) = grain.sample(
+                waveform,
+                self.reversed.grain_is_reversed,
+                linear_slope_length,
+                slope_linearity,
+            );
+            total_gain += gain;
+            samples_and_gains[active_grain_count] = (gain, sample);
+            active_grain_count += 1;
+        });
 
-        if filter_cutoff.abs() < 5. {
+        let sample = normalize_gain(&samples_and_gains[0..active_grain_count], total_gain);
+
+        smooth(&mut self.filter_cutoff, filter_cutoff, 0.9);
+        if self.filter_cutoff.abs() < 15. {
             return sample;
         }
 
         // Apply filter
         if filter_cutoff > 0. {
-            self.filter.lowpass(filter_cutoff, sample)
+            self.filter.lowpass(self.filter_cutoff, sample)
         } else {
-            self.filter.highpass(-filter_cutoff, sample)
+            self.filter.highpass(-self.filter_cutoff, sample)
         }
     }
 }
 
 impl GranularCtx {
-    pub fn advance_pointers(
-        &mut self,
-        grain_size: f32,
-        // This should be voice-specific
-        grain_speed_ratio: f32,
-        // This should be voice-specific
-        sample_speed_ratio: f32,
-        start_sample_ix: f32,
-        end_sample_ix: f32,
-    ) {
-        let selection_len = end_sample_ix - start_sample_ix;
-        let new_sample_offset = (self.cur_sample_offset + sample_speed_ratio) % grain_size;
-
-        // If we've moved past the end of the grain, we move the start of the grain according to the
-        // grain speed ratio
-        for voice in &mut self.voices {
-            let reset_threshold =
-                ((voice.pos_grain_size_mult * grain_size) + grain_size) % grain_size;
-            let crossed = (self.cur_sample_offset < reset_threshold
-                && new_sample_offset > reset_threshold)
-                || (new_sample_offset < self.cur_sample_offset
-                    && (reset_threshold > self.cur_sample_offset
-                        || reset_threshold < new_sample_offset));
-
-            if crossed {
-                // If our new grain start has moved past the end of the selection, we need to loop
-                // it back around
-                let new_grain_start = voice.cur_grain_start + (grain_speed_ratio * grain_size);
-                voice.cur_grain_start = new_grain_start % selection_len
-            }
-
-            // Prevent the grain from reaching over the end of the selection which causes clicks
-            // when it wraps around
-            for _ in 0..10 {
-                let would_overflow_selection = voice.cur_grain_start + grain_size > selection_len;
-                if !would_overflow_selection {
-                    break;
-                }
-                voice.cur_grain_start =
-                    (voice.cur_grain_start + (grain_speed_ratio * grain_size)) % selection_len;
-            }
-        }
-
-        // Our new sample offset must be inside the grain, and the index must be within the bounds
-        // of the selection
-        assert!(new_sample_offset <= grain_size);
-
-        self.cur_sample_offset = new_sample_offset;
-    }
-
-    pub fn get_volume(&self, grain_size: f32) -> f32 {
-        // TODO: Slope Width
-        let pct = self.cur_sample_offset / grain_size;
-        // if pct < 0.5 {
-        //     0.3 * (1.4 * pct)
-        // } else {
-        //     1. - ((pct - 0.5) * 1.4)
-        // }
-        (pct * std::f32::consts::PI).sin()
-    }
-
     pub fn get_sample(
         &mut self,
-        start_sample_ix: usize,
-        end_sample_ix: usize,
+        selection_start_sample_ix: f32,
+        selection_end_sample_ix: f32,
         grain_size: f32,
+        linear_slope_length: f32,
+        slope_linearity: f32,
+        voice_1_filter_cutoff: f32,
+        voice_2_filter_cutoff: f32,
+        voice_1_samples_between_grains: f32,
+        voice_2_samples_between_grains: f32,
+        voice_1_gain: f32,
+        voice_2_gain: f32,
+        voice_1_movement_samples_per_sample: f32,
+        voice_2_movement_samples_per_sample: f32,
+        voice_1_sample_speed_ratio: f32,
+        voice_2_sample_speed_ratio: f32,
     ) -> f32 {
-        let v1_volume = self.get_volume(grain_size);
-        let v2_volume = 1.0 - v1_volume;
-
-        let v1_sample = self.voices[0].get_sample(
+        let v1_sample = self.voices[0].update_and_get_sample(
             &self.waveform,
-            start_sample_ix,
-            end_sample_ix,
-            self.cur_sample_offset,
+            selection_start_sample_ix,
+            selection_end_sample_ix,
             grain_size,
-            self.last_voice_1_filter_freq,
+            voice_1_filter_cutoff,
+            linear_slope_length,
+            slope_linearity,
+            voice_1_samples_between_grains,
+            voice_1_movement_samples_per_sample,
+            voice_1_sample_speed_ratio,
         );
-        let v2_sample = self.voices[1].get_sample(
+        let v2_sample = self.voices[1].update_and_get_sample(
             &self.waveform,
-            start_sample_ix,
-            end_sample_ix,
-            self.cur_sample_offset,
+            selection_start_sample_ix,
+            selection_end_sample_ix,
             grain_size,
-            self.last_voice_2_filter_freq,
+            voice_2_filter_cutoff,
+            linear_slope_length,
+            slope_linearity,
+            voice_2_samples_between_grains,
+            voice_2_movement_samples_per_sample,
+            voice_2_sample_speed_ratio,
         );
-        (v1_sample * v1_volume * 0.9) + (v2_sample * v2_volume * 0.9)
+        (v1_sample * 0.5 * voice_1_gain) + (v2_sample * 0.5 * voice_2_gain)
     }
 }
 
@@ -249,38 +367,39 @@ pub fn get_granular_waveform_ptr(ctx: *mut GranularCtx, new_waveform_len: usize)
 #[no_mangle]
 pub fn render_granular(
     ctx: *mut GranularCtx,
-    start_sample_ix: f32,
-    end_sample_ix: f32,
+    selection_start_sample_ix: f32,
+    selection_end_sample_ix: f32,
     grain_size: f32,
-    grain_speed_ratio: f32,
-    sample_speed_ratio: f32,
     voice_1_filter_cutoff: f32,
     voice_2_filter_cutoff: f32,
+    linear_slope_length: f32,
+    slope_linearity: f32,
+    voice_1_movement_samples_per_sample: f32,
+    voice_2_movement_samples_per_sample: f32,
+    voice_1_sample_speed_ratio: f32,
+    voice_2_sample_speed_ratio: f32,
+    voice_1_samples_between_grains: f32,
+    voice_2_samples_between_grains: f32,
 ) -> *const f32 {
     let ctx = unsafe { &mut *ctx };
 
     // Apply smoothing to the input of the start and end sample to try to avoid clicking
     if ctx.last_start_sample_ix > 0. {
-        smooth(&mut ctx.last_start_sample_ix, start_sample_ix, 0.995);
+        smooth(
+            &mut ctx.last_start_sample_ix,
+            selection_start_sample_ix,
+            0.995,
+        );
     } else {
-        ctx.last_start_sample_ix = start_sample_ix;
+        ctx.last_start_sample_ix = selection_start_sample_ix;
     }
     if ctx.last_end_sample_ix > 0. {
-        smooth(&mut ctx.last_end_sample_ix, end_sample_ix, 0.995);
+        smooth(&mut ctx.last_end_sample_ix, selection_end_sample_ix, 0.995);
     } else {
-        ctx.last_end_sample_ix = end_sample_ix;
+        ctx.last_end_sample_ix = selection_end_sample_ix;
     }
-    // Smoothing for the filter cutoffs
-    smooth(
-        &mut ctx.last_voice_1_filter_freq,
-        clamp(-40_000., 40_000., voice_1_filter_cutoff),
-        0.9,
-    );
-    smooth(
-        &mut ctx.last_voice_2_filter_freq,
-        clamp(-40_000., 40_000., voice_2_filter_cutoff),
-        0.9,
-    );
+    // Smoothing for grain size
+    smooth(&mut ctx.last_grain_size, grain_size, 0.9);
 
     // Start and end samples must be within the waveform
     if ctx.last_end_sample_ix >= ctx.waveform.len() as f32 {
@@ -296,17 +415,22 @@ pub fn render_granular(
     }
 
     for i in 0..FRAME_SIZE {
-        ctx.advance_pointers(
-            grain_size,
-            grain_speed_ratio,
-            sample_speed_ratio,
-            ctx.last_start_sample_ix,
-            ctx.last_end_sample_ix,
-        );
         let sample = ctx.get_sample(
-            start_sample_ix.trunc() as usize,
-            end_sample_ix.trunc() as usize,
-            grain_size,
+            selection_start_sample_ix,
+            selection_end_sample_ix,
+            ctx.last_grain_size,
+            clamp(0.001, 1.0, linear_slope_length),
+            clamp(0.001, 1.0, slope_linearity),
+            voice_1_filter_cutoff,
+            voice_2_filter_cutoff,
+            voice_1_samples_between_grains,
+            voice_2_samples_between_grains,
+            1.,
+            1.,
+            voice_1_movement_samples_per_sample,
+            voice_2_movement_samples_per_sample,
+            voice_1_sample_speed_ratio,
+            voice_2_sample_speed_ratio,
         );
         ctx.rendered_output[i] = sample;
     }

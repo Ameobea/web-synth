@@ -22,7 +22,12 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
         automationRate: 'k-rate',
       },
       {
-        name: 'grain_speed_ratio',
+        name: 'voice_1_samples_between_grains',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'voice_2_samples_between_grains',
         defaultValue: 0,
         automationRate: 'k-rate',
       },
@@ -39,6 +44,32 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
       {
         name: 'voice_2_filter_cutoff',
         defaultValue: 0,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'linear_slope_length',
+        defaultValue: 0,
+        minValue: 0,
+        maxValue: 1,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'slope_linearity',
+        defaultValue: 0,
+        minValue: 0,
+        maxValue: 1,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'voice_1_movement_samples_per_sample',
+        defaultValue: 0,
+        minValue: 0,
+        automationRate: 'k-rate',
+      },
+      {
+        name: 'voice_2_movement_samples_per_sample',
+        defaultValue: 0,
+        minValue: 0,
         automationRate: 'k-rate',
       },
     ];
@@ -107,28 +138,43 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
       throw new Error('Output 0 must have at least one channel for impl detail reasons');
     }
 
-    const startSampleIx = clamp(0, this.samples.length, params['start_sample'][0]);
-    const endSampleIx = clamp(startSampleIx, this.samples.length, params['end_sample'][0]);
-    if (endSampleIx <= startSampleIx) {
+    const selectionStartSampleIx = clamp(0, this.samples.length, params['start_sample'][0]);
+    const selectionEndSampleIx = clamp(
+      selectionStartSampleIx,
+      this.samples.length,
+      params['end_sample'][0]
+    );
+    if (selectionEndSampleIx <= selectionStartSampleIx) {
       return true;
     }
 
     const grainSize = params['grain_size'][0];
-    const grainSpeedRatio = params['grain_speed_ratio'][0];
+    const voice1SamplesBetweenGrains = params['voice_1_samples_between_grains'][0];
+    const voice2SamplesBetweenGrains = params['voice_2_samples_between_grains'][0];
     const sampleSpeedRatio = params['sample_speed_ratio'][0];
     const voice1FilterCutoff = params['voice_1_filter_cutoff'][0];
     const voice2FilterCutoff = params['voice_2_filter_cutoff'][0];
+    const linearSlopeLength = params['linear_slope_length'][0];
+    const slopeLinearity = params['slope_linearity'][0];
+    const voice1MovementSamplesPerSample = params['voice_1_movement_samples_per_sample'][0];
+    const voice2MovementSamplesPerSample = params['voice_2_movement_samples_per_sample'][0];
 
     // Render
     const outputBufPtr = this.wasmInstance.exports.render_granular(
       this.granularInstCtxPtr,
-      startSampleIx,
-      endSampleIx,
+      selectionStartSampleIx,
+      selectionEndSampleIx,
       grainSize,
-      grainSpeedRatio,
-      sampleSpeedRatio,
       voice1FilterCutoff,
-      voice2FilterCutoff
+      voice2FilterCutoff,
+      linearSlopeLength,
+      slopeLinearity,
+      voice1MovementSamplesPerSample,
+      voice2MovementSamplesPerSample,
+      sampleSpeedRatio,
+      sampleSpeedRatio, // TODO: separate per voice
+      voice1SamplesBetweenGrains,
+      voice2SamplesBetweenGrains
     );
 
     // Fill the first output buffer and then copy them to all other outputs

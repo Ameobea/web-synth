@@ -1,73 +1,42 @@
-import React, { useEffect, useState } from 'react';
+import { UnreachableException } from 'ameo-utils';
+import React, { useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import { GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
-import { delay } from 'src/util';
+import { delay, retryWithDelay } from 'src/util';
 import './Granulator.scss';
 
 export interface GranulatorControlPanelState {
   grain_size: number;
-  grain_speed_ratio: number;
+  voice_1_samples_between_grains: number;
+  voice_2_samples_between_grains: number;
   sample_speed_ratio: number;
   voice_1_filter_cutoff: number;
   voice_2_filter_cutoff: number;
+  linear_slope_length: number;
+  slope_linearity: number;
+  voice_1_movement_samples_per_sample: number;
+  voice_2_movement_samples_per_sample: number;
 }
 
 const GranularControlPanel: React.FC<{
   vcId: string;
   initialState: GranulatorControlPanelState;
-}> = ({ vcId, initialState }) => (
-  <ControlPanel
-    style={{ marginTop: 20, width: 800 }}
-    settings={[
-      {
-        label: 'grain_size',
-        type: 'range',
-        min: 0.1,
-        max: 44100,
-        scale: 'log',
-        initial: initialState.grain_size,
-      },
-      {
-        label: 'grain_speed_ratio',
-        type: 'range',
-        min: 0.01,
-        max: 20,
-        scale: 'log',
-        initial: initialState.grain_speed_ratio,
-      },
-      {
-        label: 'sample_speed_ratio',
-        type: 'range',
-        min: -4,
-        max: 4,
-        initial: initialState.sample_speed_ratio,
-        step: 0.1,
-      },
-      {
-        label: 'voice_1_filter_cutoff',
-        type: 'range',
-        min: -4000,
-        max: 4000,
-        initial: initialState.voice_1_filter_cutoff,
-        step: 10,
-      },
-      {
-        label: 'voice_2_filter_cutoff',
-        type: 'range',
-        min: -4000,
-        max: 4000,
-        initial: initialState.voice_2_filter_cutoff,
-        step: 10,
-      },
-    ]}
-    onChange={(key: string, value: any, _state: any) => {
-      const inst = GranulatorInstancesById.get(vcId);
+}> = ({ vcId, initialState }) => {
+  const onChange = useMemo(
+    () => async (key: string, value: any) => {
+      const inst = await retryWithDelay(20, 500, async () => {
+        const inst = GranulatorInstancesById.get(vcId);
+        if (!inst) {
+          throw new Error();
+        }
+        return inst;
+      });
       if (!inst) {
-        return;
+        throw new UnreachableException();
       }
 
       switch (key) {
@@ -75,8 +44,12 @@ const GranularControlPanel: React.FC<{
           inst.grainSize.manualControl.offset.value = value;
           break;
         }
-        case 'grain_speed_ratio': {
-          inst.grainSpeedRatio.manualControl.offset.value = value;
+        case 'voice_1_samples_between_grains': {
+          inst.voice1SamplesBetweenGrains.manualControl.offset.value = value;
+          break;
+        }
+        case 'voice_2_samples_between_grains': {
+          inst.voice2SamplesBetweenGrains.manualControl.offset.value = value;
           break;
         }
         case 'sample_speed_ratio': {
@@ -91,13 +64,123 @@ const GranularControlPanel: React.FC<{
           inst.voice2FilterCutoff.manualControl.offset.value = value;
           break;
         }
+        case 'linear_slope_length': {
+          inst.linearSlopeLength.manualControl.offset.value = value;
+          break;
+        }
+        case 'slope_linearity': {
+          inst.slopeLinearity.manualControl.offset.value = value;
+          break;
+        }
+        case 'voice_1_movement_samples_per_sample': {
+          inst.voice1MovementSamplesPerSample.manualControl.offset.value = value;
+          break;
+        }
+        case 'voice_2_movement_samples_per_sample': {
+          inst.voice2MovementSamplesPerSample.manualControl.offset.value = value;
+          break;
+        }
         default: {
-          console.error('Unhandled key in granular synth control panel: ', key);
+          console.error(`Unhandled key in granular synth control panel: "${key}"`);
         }
       }
-    }}
-  />
-);
+    },
+    [vcId]
+  );
+
+  useEffect(() => {
+    Object.entries(initialState).forEach(([key, val]) => onChange(key, val));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onChange]);
+
+  return (
+    <ControlPanel
+      style={{ marginTop: 20, width: 800 }}
+      settings={[
+        {
+          label: 'grain_size',
+          type: 'range',
+          min: 0.1,
+          max: 44100,
+          scale: 'log',
+          initial: initialState.grain_size,
+        },
+        {
+          label: 'voice_1_samples_between_grains',
+          type: 'range',
+          min: 1,
+          max: 20_000,
+          scale: 'log',
+          initial: initialState.voice_1_samples_between_grains,
+        },
+        {
+          label: 'voice_2_samples_between_grains',
+          type: 'range',
+          min: 1,
+          max: 20_000,
+          scale: 'log',
+          initial: initialState.voice_2_samples_between_grains,
+        },
+        {
+          label: 'sample_speed_ratio',
+          type: 'range',
+          min: 0.001,
+          max: 30,
+          initial: initialState.sample_speed_ratio,
+        },
+        {
+          label: 'voice_1_filter_cutoff',
+          type: 'range',
+          min: -4000,
+          max: 4000,
+          initial: initialState.voice_1_filter_cutoff,
+          step: 10,
+        },
+        {
+          label: 'voice_2_filter_cutoff',
+          type: 'range',
+          min: -4000,
+          max: 4000,
+          initial: initialState.voice_2_filter_cutoff,
+          step: 10,
+        },
+        {
+          label: 'linear_slope_length',
+          type: 'range',
+          min: 0,
+          max: 1,
+          initial: initialState.linear_slope_length,
+          step: 0.01,
+        },
+        {
+          label: 'slope_linearity',
+          type: 'range',
+          min: 0,
+          max: 1,
+          initial: initialState.slope_linearity,
+          step: 0.01,
+        },
+        {
+          label: 'voice_1_movement_samples_per_sample',
+          type: 'range',
+          min: 0.05,
+          max: 4000,
+          initial: initialState.voice_1_movement_samples_per_sample,
+          scale: 'log',
+        },
+        {
+          label: 'voice_2_movement_samples_per_sample',
+          type: 'range',
+          min: 0.05,
+          max: 4000,
+          initial: initialState.voice_2_movement_samples_per_sample,
+          scale: 'log',
+        },
+      ]}
+      onChange={onChange}
+    />
+  );
+};
 
 const GranulatorUI: React.FC<{
   vcId: string;

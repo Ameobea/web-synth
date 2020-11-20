@@ -143,3 +143,26 @@ export class AsyncOnce<T> {
     return this.pending!;
   }
 }
+
+export const retryWithDelay = async <T>(
+  delayMs: number,
+  maxAttempts = 20,
+  fn: () => Promise<T>
+) => {
+  function* retries() {
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+      yield attempts;
+      attempts += 1;
+    }
+  }
+
+  for (const _i of retries()) {
+    try {
+      const res = await fn();
+      return res;
+    } catch (_err) {
+      await delay(delayMs);
+    }
+  }
+};

@@ -24,7 +24,6 @@ interface GranulatorState {
   startSample: number;
   endSample: number;
   grainSize: number;
-  grainSpeedRatio: number;
   sampleSpeedRatio: number;
   voice1FilterCutoff: number;
   voice2FilterCutoff: number;
@@ -43,10 +42,15 @@ export const GranulatorInstancesById = new Map<
     startSample: OverridableAudioParam;
     endSample: OverridableAudioParam;
     grainSize: OverridableAudioParam;
-    grainSpeedRatio: OverridableAudioParam;
+    voice1SamplesBetweenGrains: OverridableAudioParam;
+    voice2SamplesBetweenGrains: OverridableAudioParam;
     sampleSpeedRatio: OverridableAudioParam;
     voice1FilterCutoff: OverridableAudioParam;
     voice2FilterCutoff: OverridableAudioParam;
+    linearSlopeLength: OverridableAudioParam;
+    slopeLinearity: OverridableAudioParam;
+    voice1MovementSamplesPerSample: OverridableAudioParam;
+    voice2MovementSamplesPerSample: OverridableAudioParam;
   }
 >();
 
@@ -117,10 +121,15 @@ export const init_granulator = async (stateKey: string) => {
   // TODO: Load from localStorage
   const initialState: GranulatorControlPanelState = {
     grain_size: 800.0,
-    grain_speed_ratio: 1.0,
+    voice_1_samples_between_grains: 800.0,
+    voice_2_samples_between_grains: 800.0,
     sample_speed_ratio: 1.0,
     voice_1_filter_cutoff: 0.0,
     voice_2_filter_cutoff: 0.0,
+    linear_slope_length: 0.3,
+    slope_linearity: 0.6,
+    voice_1_movement_samples_per_sample: 1,
+    voice_2_movement_samples_per_sample: 1,
   };
 
   const granularWasmPromise = GranularWasm.get();
@@ -137,14 +146,28 @@ export const init_granulator = async (stateKey: string) => {
       startSample: new OverridableAudioParam(ctx, params.get('start_sample')),
       endSample: new OverridableAudioParam(ctx, params.get('end_sample')),
       grainSize: new OverridableAudioParam(ctx, params.get('grain_size')),
-      grainSpeedRatio: new OverridableAudioParam(ctx, params.get('grain_speed_ratio')),
+      voice1SamplesBetweenGrains: new OverridableAudioParam(
+        ctx,
+        params.get('voice_1_samples_between_grains')
+      ),
+      voice2SamplesBetweenGrains: new OverridableAudioParam(
+        ctx,
+        params.get('voice_2_samples_between_grains')
+      ),
       sampleSpeedRatio: new OverridableAudioParam(ctx, params.get('sample_speed_ratio')),
       voice1FilterCutoff: new OverridableAudioParam(ctx, params.get('voice_1_filter_cutoff')),
       voice2FilterCutoff: new OverridableAudioParam(ctx, params.get('voice_2_filter_cutoff')),
+      linearSlopeLength: new OverridableAudioParam(ctx, params.get('linear_slope_length')),
+      slopeLinearity: new OverridableAudioParam(ctx, params.get('slope_linearity')),
+      voice1MovementSamplesPerSample: new OverridableAudioParam(
+        ctx,
+        params.get('voice_1_movement_samples_per_sample')
+      ),
+      voice2MovementSamplesPerSample: new OverridableAudioParam(
+        ctx,
+        params.get('voice_2_movement_samples_per_sample')
+      ),
     };
-    inst.grainSize.manualControl.offset.value = initialState.grain_size;
-    inst.grainSpeedRatio.manualControl.offset.value = initialState.grain_speed_ratio;
-    inst.sampleSpeedRatio.manualControl.offset.value = initialState.sample_speed_ratio;
     GranulatorInstancesById.set(vcId, inst);
     updateConnectables(vcId, get_granulator_audio_connectables(vcId));
   });
