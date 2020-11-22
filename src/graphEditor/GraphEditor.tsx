@@ -48,11 +48,13 @@ const mapStateToProps = (state: ReduxStore) => ({
 const handleNodeSelectAction = ({
   smallViewDOMId,
   lgNode,
+  setCurSelectedNode,
   setSelectedNodeVCID,
   isNowSelected,
 }: {
   smallViewDOMId: string;
   lgNode: any;
+  setCurSelectedNode: (newNode: any) => void;
   setSelectedNodeVCID: (id: string | null) => void;
   isNowSelected: boolean;
 }) => {
@@ -67,20 +69,27 @@ const handleNodeSelectAction = ({
       nodeID,
       smallViewDOMId
     );
-    setSelectedNodeVCID(nodeID);
-  } else if (lgNode.type.startsWith('customAudio')) {
-    const node = getState().viewContextManager.patchNetwork.connectables.find(
-      connectable => connectable.vcId === nodeID
-    );
-    if (node) {
-      const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
-      if (!lgNode.connectables.node[functionKey]) {
-        return;
-      }
 
-      lgNode.connectables.node[functionKey](smallViewDOMId);
+    if (isNowSelected) {
+      setCurSelectedNode(lgNode);
+      setSelectedNodeVCID(nodeID);
+    } else {
+      setCurSelectedNode(null);
+      setSelectedNodeVCID(null);
+    }
+  } else if (lgNode.type.startsWith('customAudio')) {
+    const functionKey = isNowSelected ? 'renderSmallView' : 'cleanupSmallView';
+    if (!lgNode.connectables.node[functionKey]) {
+      return;
     }
 
+    lgNode.connectables.node[functionKey](smallViewDOMId);
+
+    if (isNowSelected) {
+      setCurSelectedNode(lgNode);
+    } else {
+      setCurSelectedNode(null);
+    }
     setSelectedNodeVCID(null);
   }
 };
@@ -95,7 +104,7 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [lGraphInstance, setLGraphInstance] = useState<null | any>(null);
   const [selectedNodeVCID, setSelectedNodeVCID] = useState<string | null>(null);
-  const curSelectedNode = useRef<any>(null);
+  const [curSelectedNode, setCurSelectedNode] = useState<any>(null);
 
   const smallViewDOMId = `small-view-dom-id_${stateKey}`;
 
@@ -133,10 +142,11 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       const canvas = new LiteGraph.LGraphCanvas('#graph-editor', graph);
 
       canvas.onNodeSelected = node => {
-        if (curSelectedNode.current) {
+        if (curSelectedNode) {
           handleNodeSelectAction({
             smallViewDOMId,
-            lgNode: curSelectedNode.current,
+            lgNode: curSelectedNode,
+            setCurSelectedNode,
             setSelectedNodeVCID,
             isNowSelected: false,
           });
@@ -144,10 +154,28 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
         handleNodeSelectAction({
           smallViewDOMId,
           lgNode: node,
+          setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: true,
         });
-        curSelectedNode.current = node;
+      };
+      canvas.onNodeDeselected = node => {
+        handleNodeSelectAction({
+          smallViewDOMId,
+          lgNode: node,
+          setCurSelectedNode,
+          setSelectedNodeVCID,
+          isNowSelected: false,
+        });
+      };
+      graph.onNodeRemoved = node => {
+        handleNodeSelectAction({
+          smallViewDOMId,
+          lgNode: node,
+          setCurSelectedNode,
+          setSelectedNodeVCID,
+          isNowSelected: false,
+        });
       };
 
       graph.start();
@@ -205,14 +233,16 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
   return (
     <div className='graph-editor-container'>
       <canvas
-        ref={ref => (canvasRef.current = ref)}
+        ref={ref => {
+          canvasRef.current = ref;
+        }}
         id='graph-editor'
-        width={window.innerWidth - 600}
+        width={curSelectedNode ? window.innerWidth - 550 : window.innerWidth - 200}
         height={800}
       />
 
       <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
-        <ControlPanel style={{ height: 120, width: 500 }}>
+        <ControlPanel style={{ height: 120, width: curSelectedNode ? 500 : 150 }}>
           <Button label='arrange' action={uiControls.arrange} />
         </ControlPanel>
 
@@ -222,7 +252,13 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
           </FlatButton>
         ) : null}
         <div
-          style={{ display: 'flex', flex: 1, height: '100%', backgroundColor: '#111', width: 500 }}
+          style={{
+            display: 'flex',
+            flex: 1,
+            height: '100%',
+            backgroundColor: '#111',
+            width: curSelectedNode ? 500 : 150,
+          }}
           id={smallViewDOMId}
         />
       </div>

@@ -10,6 +10,7 @@ declare module 'litegraph.js' {
 
     export class LGraph {
       start: () => void;
+      onNodeRemoved?: (node:any)=> void | undefined;
     }
 
     export class LGraphCanvas {
