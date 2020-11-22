@@ -69,5 +69,5 @@ build-waveform-renderer:
     wasm-bindgen ../target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ../../src
 
 build-granular:
-  cd ./engine/granular && cargo build --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/debug/granular.wasm ../../public
+  cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/granular.wasm ../../public

@@ -280,7 +280,9 @@ dependencies = [
 name = "granular"
 version = "0.1.0"
 dependencies = [
+ "common",
  "dsp",
+ "rand",
 ]
 
 [[package]]

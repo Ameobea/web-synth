@@ -2,6 +2,7 @@
 
 use std::{mem, ptr};
 
+#[cfg(feature = "bindgen")]
 #[macro_use]
 extern crate serde_derive;
 
@@ -13,6 +14,7 @@ mod init;
 
 pub use crate::init::*;
 
+#[cfg(feature = "bindgen")]
 #[derive(Serialize, Deserialize)]
 pub struct RawNoteData {
     pub line_ix: usize,

@@ -34,7 +34,7 @@ fn mklines(notes: &[(f32, f32)]) -> NoteLines<usize> {
 
 #[test]
 fn note_lines_bounds() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut lines = mklines(&[
         (2.0, 10.0),
         (10.0, 12.0),
@@ -54,7 +54,7 @@ fn note_lines_bounds() {
 
 #[test]
 fn note_lines_bounds_2() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut lines = mklines(&[(4.65, 7.35), (16.5, 18.8)]);
 
     assert_eq!(lines.get_bounds(0, 30.0).bounds(), Some((18.8, None)));
@@ -66,7 +66,7 @@ fn note_lines_bounds_2() {
 
 #[test]
 fn note_lines_bounds_3() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut lines = mklines(&[(5.0, 10.0)]);
 
     assert_eq!(lines.get_bounds(0, 20.0).bounds(), Some((10.0, None)));
@@ -78,7 +78,7 @@ fn note_lines_bounds_3() {
 fn slab_key_size() {
     use std::mem;
 
-    engine::init_rng();
+    engine::init_rng(None);
 
     let (s1, s2, s3) = (
         mem::size_of::<NonZeroU32>(),
@@ -91,7 +91,7 @@ fn slab_key_size() {
 
 #[test]
 fn skiplist_construction_iteration() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut skip_list = NoteSkipList::default();
     let mut notes: Vec<NoteBox<usize>> = vec![(1.0, 2.0), (5.0, 10.0), (3.0, 4.0)]
         .into_iter()
@@ -114,7 +114,7 @@ fn skiplist_construction_iteration() {
 
 #[test]
 fn skiplist_bulk_insertion() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut skip_list = NoteSkipList::default();
 
     let mut notes = Vec::with_capacity(1000 / 2);
@@ -136,13 +136,13 @@ fn skiplist_bulk_insertion() {
 
 #[bench]
 fn skiplist_level_generation(b: &mut test::Bencher) {
-    engine::init_rng();
+    engine::init_rng(None);
     b.iter(get_skip_list_level)
 }
 
 #[test]
 fn skiplist_node_debug() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut line = NoteSkipList::default();
 
     let next_node_ptr: SlabKey<NoteSkipListNode<usize>> = line
@@ -184,7 +184,7 @@ fn skiplist_node_debug() {
 
 #[test]
 fn skiplist_debug_fmt() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut skip_list = NoteSkipList::default();
 
     let notes = &[(1., 2.), (4., 5.), (3., 4.), (2., 3.)]
@@ -253,7 +253,7 @@ fn skiplist_debug_fmt() {
 
 #[test]
 fn skiplist_region_iter() {
-    engine::init_rng();
+    engine::init_rng(None);
     let mut lines = NoteLines::new(6);
     let notes = &[
         (0, (1.0, 2.0)),

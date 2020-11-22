@@ -124,8 +124,8 @@ const GranularControlPanel: React.FC<{
         {
           label: 'sample_speed_ratio',
           type: 'range',
-          min: 0.001,
-          max: 30,
+          min: 0.01,
+          max: 10,
           initial: initialState.sample_speed_ratio,
         },
         {
@@ -163,18 +163,16 @@ const GranularControlPanel: React.FC<{
         {
           label: 'voice_1_movement_samples_per_sample',
           type: 'range',
-          min: 0.05,
-          max: 4000,
+          min: 0.0,
+          max: 4,
           initial: initialState.voice_1_movement_samples_per_sample,
-          scale: 'log',
         },
         {
           label: 'voice_2_movement_samples_per_sample',
           type: 'range',
-          min: 0.05,
-          max: 4000,
+          min: 0.0,
+          max: 4,
           initial: initialState.voice_2_movement_samples_per_sample,
-          scale: 'log',
         },
       ]}
       onChange={onChange}

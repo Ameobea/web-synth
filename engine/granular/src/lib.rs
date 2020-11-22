@@ -1,6 +1,14 @@
+//! Granular synth operating on a fixed buffer of samples.  It has multiple voices that each exist
+//! at different places within a selection of the sample buffer and move at different speeds,
+//! seeding grains from where they currently are playing.
+//!
+//! Several aspects of this design draw significant inspiration from the Clouds eurorack module made
+//! by Mutable Instruments and associated code which is available on Github: https://github.com/pichenettes/eurorack
+
 #![feature(box_syntax)]
 
 use dsp::{clamp, mix, read_interpolated, smooth, ButterworthFilter};
+use rand::prelude::*;
 
 const FRAME_SIZE: usize = 128;
 const SAMPLE_RATE: usize = 44100;
@@ -179,10 +187,25 @@ impl GranularVoice {
         linear_slope_length: f32,
         slope_linearity: f32,
         sample_playback_ratio: f32,
+        grain_start_randomness_samples: f32,
+        sample_buffer_len: usize,
     ) {
+        let start_offset = if grain_start_randomness_samples == 0. {
+            0.
+        } else {
+            common::rng().gen_range(
+                -(grain_start_randomness_samples.abs()) / 2.,
+                (grain_start_randomness_samples.abs()) / 2.,
+            )
+        };
+
         self.grains.push(Grain {
             len_samples: grain_size,
-            start_sample_ix: self.cur_grain_start,
+            start_sample_ix: clamp(
+                0.,
+                (sample_buffer_len - 1) as f32,
+                self.cur_grain_start + start_offset,
+            ),
             samples_read_so_far: 0.,
             sample_playback_ratio: clamp(0.001, 1000., sample_playback_ratio),
             linear_slope_length,
@@ -197,9 +220,10 @@ impl GranularVoice {
         linear_slope_length: f32,
         slope_linearity: f32,
         sample_playback_ratio: f32,
-        movement_samples_per_sample: f32,
+        grain_start_randomness_samples: f32,
+        sample_buffer_len: usize,
     ) {
-        self.samples_since_last_grain += movement_samples_per_sample;
+        self.samples_since_last_grain += 1.;
         if self.grains.len() >= scratch().len() {
             // Can't exceed the ridiculous max grain count
             return;
@@ -212,6 +236,8 @@ impl GranularVoice {
                 linear_slope_length,
                 slope_linearity,
                 sample_playback_ratio,
+                grain_start_randomness_samples,
+                sample_buffer_len,
             );
         }
     }
@@ -245,6 +271,7 @@ impl GranularVoice {
         samples_between_grains: f32,
         movement_samples_per_sample: f32,
         sample_speed_ratio: f32,
+        grain_start_randomness_samples: f32,
     ) -> f32 {
         self.move_read_head(
             selection_start_sample_ix,
@@ -259,7 +286,8 @@ impl GranularVoice {
             linear_slope_length,
             slope_linearity,
             sample_speed_ratio,
-            movement_samples_per_sample,
+            grain_start_randomness_samples,
+            waveform.len(),
         );
 
         self.tick_grains();
@@ -313,6 +341,8 @@ impl GranularCtx {
         voice_2_movement_samples_per_sample: f32,
         voice_1_sample_speed_ratio: f32,
         voice_2_sample_speed_ratio: f32,
+        voice_1_grain_start_randomness_samples: f32,
+        voice_2_grain_start_randomness_samples: f32,
     ) -> f32 {
         let v1_sample = self.voices[0].update_and_get_sample(
             &self.waveform,
@@ -325,6 +355,7 @@ impl GranularCtx {
             voice_1_samples_between_grains,
             voice_1_movement_samples_per_sample,
             voice_1_sample_speed_ratio,
+            voice_1_grain_start_randomness_samples,
         );
         let v2_sample = self.voices[1].update_and_get_sample(
             &self.waveform,
@@ -337,6 +368,7 @@ impl GranularCtx {
             voice_2_samples_between_grains,
             voice_2_movement_samples_per_sample,
             voice_2_sample_speed_ratio,
+            voice_2_grain_start_randomness_samples,
         );
         (v1_sample * 0.5 * voice_1_gain) + (v2_sample * 0.5 * voice_2_gain)
     }
@@ -344,6 +376,7 @@ impl GranularCtx {
 
 #[no_mangle]
 pub fn create_granular_instance() -> *mut GranularCtx {
+    common::maybe_init();
     let ctx = box GranularCtx::default();
     Box::into_raw(ctx)
 }
@@ -426,11 +459,13 @@ pub fn render_granular(
             voice_1_samples_between_grains,
             voice_2_samples_between_grains,
             1.,
-            1.,
+            0.,
             voice_1_movement_samples_per_sample,
             voice_2_movement_samples_per_sample,
             voice_1_sample_speed_ratio,
             voice_2_sample_speed_ratio,
+            200.,
+            0.,
         );
         ctx.rendered_output[i] = sample;
     }
