@@ -157,6 +157,7 @@ export const retryWithDelay = async <T>(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
   for (const _i of retries()) {
     try {
       const res = await fn();
