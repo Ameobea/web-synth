@@ -1,4 +1,9 @@
+import { ValueOf } from 'ameo-utils';
+import * as R from 'ramda';
+
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
+import { faustEditorContextMap } from 'src/faustEditor';
+import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
 
 export class FaustWorkletNode extends AudioWorkletNode {
   constructor(audioContext: AudioContext, moduleId: string, workletNameOverride?: string) {
@@ -71,12 +76,33 @@ export class FaustWorkletNode extends AudioWorkletNode {
 
   public init(
     dspArrayBuffer: ArrayBuffer,
-    { customMessageHandler }: { customMessageHandler?: (msg: MessageEvent) => void } = {}
+    {
+      customMessageHandler,
+      context,
+    }: {
+      customMessageHandler?: (msg: MessageEvent) => void;
+      context?: ValueOf<typeof faustEditorContextMap>;
+    } = {}
   ): Promise<FaustWorkletNode> {
     return new Promise(resolve => {
       this.port.onmessage = (msg: MessageEvent) => {
         if (typeof msg.data === 'object') {
           if (msg.data.jsonDef) {
+            if (context) {
+              // We set default values onto the node's params in order to allow the node to function
+              // while things initialize.
+              const uiItems = msg.data.jsonDef.ui as any[];
+              const settings = R.flatten(
+                uiItems.map(item =>
+                  mapUiGroupToControlPanelFields(item, () => void 0, context.paramDefaultValues)
+                )
+              ) as any[];
+              settings.forEach(setting => {
+                const targetParam = (this.parameters as any).get(setting.address);
+                targetParam.value = setting.initial;
+              });
+            }
+
             const pathTable = this.parseUi(msg.data.jsonDef);
             this.port.postMessage({ type: 'setPathTable', pathTable });
             resolve(this);
@@ -100,7 +126,8 @@ export class FaustWorkletNode extends AudioWorkletNode {
 export const buildFaustWorkletNode = async (
   audioContext: AudioContext,
   dspArrayBuffer: ArrayBuffer,
-  moduleID: string
+  moduleID: string,
+  context: ValueOf<typeof faustEditorContextMap>
 ): Promise<FaustWorkletNode> => {
   const faustModuleURL = `${FAUST_COMPILER_ENDPOINT}/FaustAudioWorkletProcessor.js?id=${moduleID}`;
   await audioContext.audioWorklet.addModule(faustModuleURL);
@@ -109,5 +136,5 @@ export const buildFaustWorkletNode = async (
 
   // Send the Wasm module over to the created worklet's thread via message passing so that it can instantiate it over
   // there and control it directly
-  return node.init(dspArrayBuffer);
+  return node.init(dspArrayBuffer, { context });
 };

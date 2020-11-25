@@ -516,6 +516,7 @@ export const deserializeSynthModule = (
 
     voice.gainADSRModule.setEnvelope(gainEnvelope);
     voice.gainADSRModule.setLengthMs(gainADSRLength);
+    voice.gainADSRModule.setMaxValue(1 + masterGain);
 
     voice.filterADSRModule.setEnvelope(filterEnvelope);
     voice.filterADSRModule.setLengthMs(filterADSRLength);

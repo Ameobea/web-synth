@@ -1,5 +1,5 @@
-import React, { useState, Suspense, useMemo } from 'react';
-import { connect, Provider } from 'react-redux';
+import React, { useState, Suspense, useMemo, useRef } from 'react';
+import { Provider, useSelector } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import * as R from 'ramda';
 import { Without, PropTypesOf, ValueOf } from 'ameo-utils';
@@ -9,15 +9,12 @@ import { EffectPickerCustomInput } from 'src/controls/faustEditor';
 import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
-import {
-  faustEditorContextMap,
-  get_faust_editor_connectables,
-  FaustEditorReduxInfra,
-} from 'src/faustEditor';
+import { faustEditorContextMap, get_faust_editor_connectables } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork';
 import { ReduxStore, store } from 'src/redux';
-import PolyphonyControls from './PolyphonyControls';
-import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
+import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
+// import PolyphonyControls from './PolyphonyControls';
+// import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
 
 type FaustEditorReduxStore = ReturnType<typeof faustEditorContextMap.key.reduxInfra.getState>;
 
@@ -44,7 +41,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     maxHeight: 600,
     border: '1px solid #555',
     backgroundColor: 'rgba(44,44,44,0.3)',
-    maxWidth: '40vw',
+    maxWidth: 'calc(50vw - 40px)',
   },
   buttonsWrapper: {
     display: 'flex',
@@ -62,7 +59,8 @@ const moduleIdHeaderName = 'X-Faust-Module-ID';
 
 export const compileFaustInstance = async (
   faustCode: string,
-  optimize: boolean
+  optimize: boolean,
+  context: ValueOf<typeof faustEditorContextMap>
 ): Promise<FaustWorkletNode> => {
   const formData = new FormData();
   formData.append('code.faust', new Blob([faustCode], { type: 'text/plain' }));
@@ -82,45 +80,38 @@ export const compileFaustInstance = async (
   }
 
   const wasmInstanceArrayBuffer = await res.arrayBuffer();
-  return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID);
+  return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID, context);
 };
-
-const mapEffectsPickerPanelStateToProps = ({ effects: { sharedEffects } }: ReduxStore) => ({
-  effects: sharedEffects,
-});
 
 /**
  * Creates a control panel that contains controls for browsing + loading shared/saved effects
  */
-const EffectsPickerPanelInnerInner: React.FC<
-  {
-    state: { [key: string]: any };
-    setState: (newState: any) => void;
-    loadEffect: (effect: Effect) => void;
-  } & ReturnType<typeof mapEffectsPickerPanelStateToProps>
-> = ({ state, setState, loadEffect, effects }) => (
-  <ControlPanel
-    state={state}
-    onChange={(_label: string, _newValue: any, newState: any) => setState(newState)}
-    position={{ bottom: 60, right: 44 }}
-    draggable
-  >
-    <Custom label='load effect' renderContainer Comp={EffectPickerCustomInput} />
-    <Button
-      label='Load'
-      action={() => loadEffect(effects.find(R.propEq('id', state['load effect']))!)}
-    />
-  </ControlPanel>
-);
+const EffectsPickerPanelInner: React.FC<{
+  state: { [key: string]: any };
+  setState: (newState: any) => void;
+  loadEffect: (effect: Effect) => void;
+}> = ({ state, setState, loadEffect }) => {
+  const effects = useSelector(({ effects: { sharedEffects } }: ReduxStore) => sharedEffects);
 
-const EffectsPickerPanelInner = connect(mapEffectsPickerPanelStateToProps)(
-  EffectsPickerPanelInnerInner
-);
+  return (
+    <ControlPanel
+      state={state}
+      onChange={(_label: string, _newValue: any, newState: any) => setState(newState)}
+      position={{ bottom: 60, right: 44 }}
+      draggable
+    >
+      <Custom label='load program' renderContainer Comp={EffectPickerCustomInput} />
+      <Button
+        label='Load'
+        action={() => loadEffect(effects.find(R.propEq('id', state['load program']))!)}
+      />
+    </ControlPanel>
+  );
+};
 
-const EffectsPickerPanel: React.FC<Omit<
-  PropTypesOf<typeof EffectsPickerPanelInnerInner>,
-  keyof ReturnType<typeof mapEffectsPickerPanelStateToProps>
->> = ({ ...props }) => (
+const EffectsPickerPanel: React.FC<PropTypesOf<typeof EffectsPickerPanelInner>> = ({
+  ...props
+}) => (
   <Provider store={store}>
     <EffectsPickerPanelInner {...props} />
   </Provider>
@@ -146,6 +137,8 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
 
   return (
     <div>
+      <h2>Save Program</h2>
+
       <p>
         Title{' '}
         <input
@@ -169,12 +162,6 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   );
 };
 
-const mapStateToProps = ({ faustEditor }: FaustEditorReduxStore) =>
-  R.pick(
-    ['instance', 'ControlPanelComponent', 'editorContent', 'isHidden', 'polyphonyState'],
-    faustEditor
-  );
-
 export const mkCompileButtonClickHandler = ({
   faustCode,
   optimize,
@@ -188,9 +175,10 @@ export const mkCompileButtonClickHandler = ({
   vcId: string;
   analyzerNode: AnalyserNode;
 }) => async () => {
+  const context = faustEditorContextMap[vcId];
   let faustNode: FaustWorkletNode;
   try {
-    faustNode = await compileFaustInstance(faustCode, optimize);
+    faustNode = await compileFaustInstance(faustCode, optimize, context);
   } catch (err) {
     console.error(err);
     setErrMessage(err.toString());
@@ -198,18 +186,23 @@ export const mkCompileButtonClickHandler = ({
   }
   setErrMessage('');
 
-  faustNode.connect(analyzerNode);
-  const inputNames = [...(faustNode.parameters as Map<string, AudioParam>).keys()].map(label =>
-    label.split('/').slice(2).join('/')
-  );
+  const uiItems = faustNode.jsonDef.ui as any[];
+  const settings = R.flatten(
+    uiItems.map(item =>
+      mapUiGroupToControlPanelFields(item, () => void 0, context.paramDefaultValues)
+    )
+  ) as any[];
 
-  const context = faustEditorContextMap[vcId];
+  faustNode.connect(analyzerNode);
+
   if (!context) {
     throw new Error(`No context found for Faust editor vcId ${vcId}`);
   }
   faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode };
   context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(inputNames)
+    context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(
+      settings.map(R.prop('label')) as string[]
+    )
   );
 
   // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
@@ -226,78 +219,81 @@ export const mkCompileButtonClickHandler = ({
  * to reflect this new state;
  */
 export const mkStopInstanceHandler = ({
-  reduxInfra,
   vcId,
-  context: { faustNode, analyzerNode },
+  context,
 }: {
-  reduxInfra: FaustEditorReduxInfra;
   vcId: string;
-  context: Pick<ValueOf<typeof faustEditorContextMap>, 'faustNode' | 'analyzerNode'>;
+  context: ValueOf<typeof faustEditorContextMap>;
 }) => () => {
-  reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE());
+  context.reduxInfra.dispatch(
+    context.reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
+  );
 
   // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
-  if (!faustNode) {
+  if (!context.faustNode) {
     throw new Error(
       `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
     );
   }
-  faustNode.disconnect(analyzerNode);
-  faustNode.shutdown();
+  context.faustNode.disconnect(context.analyzerNode);
+  context.faustNode.shutdown();
+  delete context.faustNode;
+
+  context.paramDefaultValues = Object.fromEntries(
+    Object.entries(context.overrideableParams).map(([address, param]) => [
+      address,
+      param.manualControl.offset.value,
+    ])
+  );
 
   // Create new audio connectables using a passthrough node
-  delete faustEditorContextMap[vcId]!.faustNode;
   updateConnectables(vcId, get_faust_editor_connectables(vcId));
+  context.overrideableParams = {};
 };
 
-const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps>> = ({
-  instance,
-  ControlPanelComponent: FaustInstanceControlPanelComponent,
-  editorContent,
-  vcId,
-  isHidden,
-  polyphonyState,
-}) => {
+const FaustEditor: React.FC<{
+  vcId: string;
+}> = ({ vcId }) => {
+  const {
+    instance,
+    ControlPanelComponent: FaustInstanceControlPanelComponent,
+    editorContent,
+    isHidden,
+    // polyphonyState,
+  } = useSelector(({ faustEditor }: FaustEditorReduxStore) =>
+    R.pick(
+      ['instance', 'ControlPanelComponent', 'editorContent', 'isHidden', 'polyphonyState'],
+      faustEditor
+    )
+  );
   const [optimize, setOptimize] = useState(true);
   const [compileErrMsg, setCompileErrMsg] = useState('');
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
+  const context = faustEditorContextMap[vcId];
 
-  const { reduxInfra, ...context } = useMemo(() => {
-    const context = faustEditorContextMap[vcId];
-    if (!context) {
-      throw new Error(
-        `Context should have been set already for Faust editor vcId ${vcId} but it has not`
-      );
-    }
-    return context;
-    // \/ We need this because of the dirty mutable state thing we have going with `faustEditorContextMap`
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vcId, instance]);
-
-  const compile = useMemo(
-    () =>
-      mkCompileButtonClickHandler({
-        faustCode: editorContent,
-        optimize,
-        setErrMessage: setCompileErrMsg,
-        vcId,
-        analyzerNode: context.analyzerNode,
-      }),
-    [editorContent, setCompileErrMsg, optimize, context.analyzerNode, vcId]
-  );
-
-  const stopInstance = useMemo(() => mkStopInstanceHandler({ reduxInfra, vcId, context }), [
-    context,
-    reduxInfra,
+  const compile = mkCompileButtonClickHandler({
+    faustCode: editorContent,
+    optimize,
+    setErrMessage: setCompileErrMsg,
     vcId,
-  ]);
+    analyzerNode: context.analyzerNode,
+  });
+  const didCompileOnMount = useRef(false);
+  if (context.compileOnMount && !didCompileOnMount.current) {
+    didCompileOnMount.current = true;
+    compile();
+  }
+
+  const stopInstance = useMemo(() => mkStopInstanceHandler({ vcId, context }), [context, vcId]);
 
   return (
     <Suspense fallback={<span>Loading...</span>}>
       <div style={styles.root}>
         <CodeEditor
           onChange={newValue =>
-            reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue))
+            context.reduxInfra.dispatch(
+              context.reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue)
+            )
           }
           value={editorContent}
         />
@@ -313,12 +309,12 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
         {instance ? <button onClick={stopInstance}>Stop</button> : null}
       </div>
       <div style={styles.bottomContent}>
-        <PolyphonyControls
+        {/* <PolyphonyControls
           state={polyphonyState}
           setState={(newState: FaustEditorPolyphonyState) =>
             reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_POLYPHONY_STATE(newState))
           }
-        />
+        /> */}
 
         <SaveControls editorContent={editorContent} />
 
@@ -328,8 +324,8 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
           state={controlPanelState}
           setState={setControlPanelState}
           loadEffect={(effect: Effect) =>
-            reduxInfra.dispatch(
-              reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
+            context.reduxInfra.dispatch(
+              context.reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
             )
           }
         />
@@ -340,4 +336,4 @@ const FaustEditor: React.FC<{ vcId: string } & ReturnType<typeof mapStateToProps
   );
 };
 
-export default connect(mapStateToProps)(FaustEditor);
+export default FaustEditor;

@@ -258,7 +258,7 @@ impl<'a, S: GridRendererUniqueIdentifier> Iterator for NoteEventIterator<'a, S> 
 
             // get the next event and swap it into the frontier array
             let next_frontier_node_opt = frontier_node.next();
-            mem::replace(frontier_node_opt, next_frontier_node_opt);
+            let _ = mem::replace(frontier_node_opt, next_frontier_node_opt);
 
             event
         })

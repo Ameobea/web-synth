@@ -104,7 +104,7 @@ pub fn create_msg_handler_context(
         schedule_events: (box move |_: usize, _: &[u8], _: &[usize], _: &[f32]| unimplemented!())
             as Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
     };
-    mem::replace(&mut ctx.voice_manager.synth_cbs, synth_cbs);
+    let _ = mem::replace(&mut ctx.voice_manager.synth_cbs, synth_cbs);
 
     Box::into_raw(ctx) as usize
 }

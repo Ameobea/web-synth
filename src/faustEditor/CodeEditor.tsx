@@ -12,7 +12,7 @@ const CodeEditor: React.FC<{
     showPrintMargin={false}
     onChange={onChange}
     name='ace-editor'
-    width='40vw'
+    width='calc(50vw - 40px)'
     value={value}
     style={{ border: '1px solid #555' }}
   />

@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
-import { Map } from 'immutable';
+import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
@@ -17,6 +17,7 @@ import {
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
 
 const ctx = new AudioContext();
 
@@ -31,6 +32,8 @@ export const faustEditorContextMap: {
     faustNode?: FaustWorkletNode;
     overrideableParams: { [key: string]: OverridableAudioParam };
     isHidden: boolean;
+    paramDefaultValues: { [paramName: string]: number };
+    compileOnMount: boolean;
   };
 } = {};
 
@@ -74,6 +77,7 @@ export const init_faust_editor = (stateKey: string) => {
       cachedInputNames: undefined,
       editorContent: '',
       polyphonyState: buildDefaultFaustEditorPolyphonyState(),
+      isRunning: false,
     });
 
   const reduxInfra = buildFaustEditorReduxInfra(serializedEditor);
@@ -82,6 +86,8 @@ export const init_faust_editor = (stateKey: string) => {
     overrideableParams: {},
     analyzerNode,
     isHidden: false,
+    paramDefaultValues: serializedEditor.paramDefaultValues ?? {},
+    compileOnMount: serializedEditor.isRunning,
   };
 
   // Create the base dom node for the faust editor
@@ -149,9 +155,8 @@ export const unhide_faust_editor = (vcId: string) => {
 export const cleanup_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
-  const { cachedInputNames, polyphonyState } = faustEditorContextMap[
-    vcId
-  ].reduxInfra.getState().faustEditor;
+  const instanceCtx = faustEditorContextMap[vcId];
+  const { cachedInputNames, polyphonyState } = instanceCtx.reduxInfra.getState().faustEditor;
 
   const editorContent = get_faust_editor_content(vcId);
   delete faustEditorContextMap[vcId];
@@ -168,27 +173,20 @@ export const cleanup_faust_editor = (stateKey: string) => {
     editorContent,
     cachedInputNames,
     polyphonyState,
+    // If the instance is actively running, we grab the param values directly from the OAPs.
+    // Otherwise, we get them from the serialized default values.
+    paramDefaultValues: instanceCtx.faustNode
+      ? Object.fromEntries(
+          Object.entries(instanceCtx.overrideableParams).map(([paramName, param]) => [
+            paramName,
+            param.manualControl.offset.value,
+          ])
+        )
+      : instanceCtx.paramDefaultValues,
+    isRunning: !!instanceCtx.faustNode,
   };
   localStorage.setItem(stateKey, JSON.stringify(serializedState));
 };
-
-/**
- * One item from the json def's `ui` property.  Defines one UI component and optinally an array of child UI components
- * if this UI component is a container.
- */
-interface UIItem {
-  type: string;
-  address: string;
-  items?: UIItem[];
-}
-
-// Taken from https://stackoverflow.com/a/53710250/3833068
-type NestedArray<T> = (T | NestedArray<T>)[];
-
-const parseUIItem = (item: UIItem): NestedArray<string> =>
-  ['vgroup', 'hgroup'].includes(item.type)
-    ? item.items!.map(parseUIItem)
-    : [item.address.replace(/\s/g, '_')];
 
 export const render_faust_editor_small_view = (vcId: string, domId: string) => {
   const context = faustEditorContextMap[vcId];
@@ -212,13 +210,14 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     let cachedInputNames: string[] | undefined;
     if (context) {
       // Prevent these from leaking
+      Object.values(context.overrideableParams).forEach(param => param.dispose());
       context.overrideableParams = {};
 
       cachedInputNames = context.reduxInfra.getState().faustEditor.cachedInputNames;
     }
 
     const passthroughNode = createPassthroughNode(GainNode);
-    let inputs = Map<string, ConnectableInput>().set('input', {
+    let inputs = ImmMap<string, ConnectableInput>().set('input', {
       node: passthroughNode,
       type: 'customAudio',
     });
@@ -236,46 +235,53 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     return {
       vcId,
       inputs,
-      outputs: Map<string, ConnectableOutput>().set('output', {
+      outputs: ImmMap<string, ConnectableOutput>().set('output', {
         node: passthroughNode,
         type: 'customAudio',
       }),
     };
   }
 
-  const { faustNode, analyzerNode } = context;
+  const { faustNode, analyzerNode, paramDefaultValues, overrideableParams } = context;
 
-  const baseInputs = Map<string, ConnectableInput>().set('input', {
+  const baseInputs = ImmMap<string, ConnectableInput>().set('input', {
     node: faustNode,
     type: 'customAudio',
   });
 
-  const flattenedUIItems = (R.flatten(
-    (faustNode.jsonDef.ui as UIItem[]).map(item => parseUIItem(item))
-  ) as unknown) as string[];
-  const inputs = flattenedUIItems.reduce((acc: Map<string, ConnectableInput>, label: string) => {
-    // If we don't have an existing `overridableParam` for this input, we need to build one using the param
-    // from the `AudioWorkletNode`
-    if (!context.overrideableParams[label]) {
-      // `as any` required due to incomplete typings in my IDE
-      const workletParam: AudioParam = (faustNode.parameters as any).get(label);
+  const uiItems = faustNode.jsonDef.ui as any[];
+  const settings = R.flatten(
+    uiItems.map(item => mapUiGroupToControlPanelFields(item, () => void 0, paramDefaultValues))
+  ) as any[];
+  const inputs = settings.reduce(
+    (acc: ImmMap<string, ConnectableInput>, { label, address, initial }) => {
+      // If we don't have an existing `overridableParam` for this input, we need to build one using the param
+      // from the `AudioWorkletNode`
+      if (!overrideableParams[address]) {
+        // `as any` required due to incomplete typings in my IDE
+        const workletParam: AudioParam = (faustNode.parameters as any).get(address);
 
-      const overridableParam = new OverridableAudioParam(ctx, workletParam);
-      context.overrideableParams[label] = overridableParam;
-    }
+        const overridableParam = new OverridableAudioParam(ctx, workletParam);
 
-    const trimmedLabel = label.split('/').slice(2).join('/');
+        // The param's value is set directly when the instance is constructed.  We switch it to
+        // zero and allow the OAP to take over controlling the param
+        overridableParam.wrappedParam.value = 0;
+        overridableParam.manualControl.offset.value = initial;
+        overrideableParams[address] = overridableParam;
+      }
 
-    return acc.set(trimmedLabel, {
-      node: context.overrideableParams[label],
-      type: 'number',
-    });
-  }, baseInputs);
+      return acc.set(label, {
+        node: overrideableParams[address],
+        type: 'number',
+      });
+    },
+    baseInputs
+  );
 
   return {
     vcId,
     inputs,
-    outputs: Map<string, ConnectableOutput>().set('output', {
+    outputs: ImmMap<string, ConnectableOutput>().set('output', {
       node: analyzerNode,
       type: 'customAudio',
     }),

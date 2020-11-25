@@ -4,7 +4,6 @@ import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap } from 'src/faustEditor';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { updateConnectables } from 'src/patchNetwork';
 
 /**
  * Structure of the JSON stored in `localStorage` for the Faust editor.
@@ -13,6 +12,8 @@ export interface SerializedFaustEditor {
   cachedInputNames: string[] | undefined;
   editorContent: string;
   polyphonyState: FaustEditorPolyphonyState;
+  paramDefaultValues?: { [paramName: string]: number };
+  isRunning: boolean;
 }
 
 export interface FaustEditorPolyphonyState {
@@ -53,9 +54,7 @@ const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam 
     return;
   }
 
-  const dstParam = context.overrideableParams[path];
-
-  return dstParam;
+  return context.overrideableParams[path];
 };
 
 const actionGroups = {
@@ -69,27 +68,22 @@ const actionGroups = {
       vcId,
     }),
     subReducer: (state: FaustEditorState, { instance, vcId }) => {
+      const setParamValue = (path: string, val: number) => {
+        const dstParam = getFaustModuleParam(vcId, path);
+        if (!dstParam) {
+          console.warn(`Param doesn't exist: "${path}"`);
+          return;
+        }
+
+        dstParam.manualControl.offset.value = +val;
+      };
+
       // Construct a new control panel instance for the newly created module
       const ControlPanelComponent = buildControlPanelComponent(
         instance.jsonDef.ui,
         instance.pathTable,
-        (path: string, val: number) => {
-          const dstParam = getFaustModuleParam(vcId, path);
-          if (!dstParam) {
-            console.warn(`Param doesn't exist: "${path}"`);
-            return;
-          }
-
-          dstParam.manualControl.offset.value = +val;
-        },
-        (path: string) => {
-          const dstParam = getFaustModuleParam(vcId, path);
-          if (!dstParam) {
-            return;
-          }
-
-          return dstParam.manualControl.offset.value;
-        }
+        setParamValue,
+        faustEditorContextMap[vcId]?.paramDefaultValues ?? {}
       );
 
       return { ...state, instance, ControlPanelComponent };

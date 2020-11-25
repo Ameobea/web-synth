@@ -122,7 +122,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     this.outs = null;
     this.isShutdown = false;
 
-    this.pathTable = [];
+    this.pathTable = null;
 
     this.initWithModule = async dspInstanceArrayBuffer => {
       await this.initDspInstance(dspInstanceArrayBuffer);
@@ -222,7 +222,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
   process(inputs, outputs, params) {
     if (this.isShutdown) {
       return false;
-    } else if (!this.dspInstance) {
+    } else if (!this.dspInstance || !this.pathTable) {
       return true;
     }
 

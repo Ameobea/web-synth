@@ -48,7 +48,8 @@ const getLabel = (address: string) => R.tail(address.split('/').slice(1)).join('
 
 const buildControlPanelField = (
   def: UiDef,
-  setParamValue: (path: string, val: number) => void
+  setParamValue: (path: string, val: number) => void,
+  paramDefaults: { [path: string]: number }
 ): ({ [key: string]: any } | null)[] => {
   const mapperFunctions: {
     [K in UiDef['type']]: (
@@ -63,8 +64,9 @@ const buildControlPanelField = (
       label: getLabel(address),
       min,
       max,
-      initial: init,
+      initial: paramDefaults[address] ?? init,
       step,
+      address,
     }),
     [InputType.vslider]: ({ address, min, max, init, step }: UiInput) => ({
       type: 'range',
@@ -72,8 +74,9 @@ const buildControlPanelField = (
       label: getLabel(address),
       min,
       max,
-      initial: init,
+      initial: paramDefaults[address] ?? init,
       step,
+      address,
     }),
     [InputType.range]: () => {
       throw new UnimplementedError();
@@ -83,6 +86,7 @@ const buildControlPanelField = (
       label: getLabel(address),
       onmousedown: () => setParamValue(address, 1),
       onmouseup: () => setParamValue(address, 0),
+      address,
     }),
     // TODO: Use real number-entry input once that's implement on the react-control-panel side
     [InputType.nentry]: ({ address, min, max, init, step }: UiInput) => ({
@@ -91,20 +95,22 @@ const buildControlPanelField = (
       label: getLabel(address),
       min,
       max,
-      initial: init,
+      initial: paramDefaults[address] ?? init,
       step,
+      address,
     }),
     [InputType.checkbox]: ({ address }) => ({
       type: 'checkbox',
       label: getLabel(address),
       initial: false,
+      address,
     }),
     // TODO: Add label once `react-control-panel` supports that
     [GroupType.vgroup]: ({ items }: { label: string; items: UiDef[] }) =>
-      R.flatten(items.map(item => buildControlPanelField(item, setParamValue))),
+      R.flatten(items.map(item => buildControlPanelField(item, setParamValue, paramDefaults))),
     // TODO: Add label once `react-control-panel` supports that
     [GroupType.hgroup]: ({ items }: { label: string; items: UiDef[] }) =>
-      R.flatten(items.map(item => buildControlPanelField(item, setParamValue))),
+      R.flatten(items.map(item => buildControlPanelField(item, setParamValue, paramDefaults))),
   };
 
   const mapper = mapperFunctions[def.type] as
@@ -125,10 +131,14 @@ const buildControlPanelField = (
     : [mappedDefs as { [key: string]: any }];
 };
 
-const mapUiGroupToControlPanelFields = (
+export const mapUiGroupToControlPanelFields = (
   group: UiGroup,
-  setParamValue: (path: string, val: number) => void
-) => filterNils(R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue))));
+  setParamValue: (path: string, val: number) => void,
+  paramDefaults: { [path: string]: number }
+) =>
+  filterNils(
+    R.flatten(group.items.map(item => buildControlPanelField(item, setParamValue, paramDefaults)))
+  );
 
 const getFaustParamBasePath = (fullPath: string): string => fullPath.split('/').slice(0, 2)[1];
 
@@ -136,7 +146,7 @@ const buildControlPanelComponent = (
   uiDef: UiGroup[],
   pathTable: { [path: string]: any },
   setParamValue: (path: string, val: number) => void,
-  getParamValue: (path: string) => number | null | undefined
+  paramDefaults: { [path: string]: number }
 ): React.FC => {
   // Get the randomly generated path base so that we can accurately match when setting params
   const pathBase = Option.of(R.head(Object.keys(pathTable)))
@@ -144,31 +154,19 @@ const buildControlPanelComponent = (
     .getOrElse('');
 
   const settings: any[] = R.flatten(
-    uiDef.map(item => mapUiGroupToControlPanelFields(item, setParamValue))
+    uiDef.map(item => mapUiGroupToControlPanelFields(item, setParamValue, paramDefaults))
   );
 
   if (R.isEmpty(settings)) {
     return () => null;
   }
 
-  // Set the initial values for the audio params
-  settings.forEach((setting: any) =>
-    setParamValue(`/${pathBase}/${setting.label}`, setting.initial || 0)
-  );
-
   const FaustEditorControlPanel = () => (
     <ControlPanel
       draggable
       theme='dark'
       position={{ top: 0, right: 44 }}
-      settings={settings.map(setting => {
-        const val = getParamValue(`/${pathBase}/${setting.label}`);
-        if (R.isNil(val)) {
-          return setting;
-        }
-
-        return { ...setting, initial: val };
-      })}
+      settings={settings}
       onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
       width={500}
     />
