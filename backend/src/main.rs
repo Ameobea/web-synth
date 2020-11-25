@@ -109,6 +109,7 @@ fn main() {
             routes::create_synth_preset,
             routes::get_synth_voice_presets,
             routes::create_synth_voice_preset,
+            routes::get_composition_by_id,
         ])
         .attach(CorsFairing)
         .launch();

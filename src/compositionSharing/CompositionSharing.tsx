@@ -10,7 +10,7 @@ import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
 import { loadComposition } from '../persistance';
 
-interface CompositionDefinition {
+export interface CompositionDefinition {
   id: number;
   title: React.ReactNode;
   author: number;
@@ -18,26 +18,21 @@ interface CompositionDefinition {
   content: string;
 }
 
-const fetchAllSharedCompositions = () =>
+const fetchAllSharedCompositions = (): Promise<CompositionDefinition[]> =>
   fetch(`${BACKEND_BASE_URL}/compositions`).then(res => res.json());
 
 const mapCompositionListingStateToProps = (state: ReduxStore) => ({
   allViewContextIds: state.viewContextManager.activeViewContexts.map(R.prop('uuid')),
 });
 
-const CompositionItem: React.FC<{
-  composition: CompositionDefinition;
-  engine: typeof import('../engine');
-  allViewContextIds: string[];
-  showButton?: boolean;
-} & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
-  composition,
-  engine,
-  allViewContextIds,
-  showButton = true,
-  className,
-  ...props
-}) => (
+const CompositionItem: React.FC<
+  {
+    composition: CompositionDefinition;
+    engine: typeof import('../engine');
+    allViewContextIds: string[];
+    showButton?: boolean;
+  } & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+> = ({ composition, engine, allViewContextIds, showButton = true, className, ...props }) => (
   <div className={`composition-item${className ? ' ' + className : ''}`} {...props}>
     <div className='composition-title'>{composition.title}</div>
     <div className='composition-description'>{composition.description}</div>
@@ -51,9 +46,9 @@ const CompositionItem: React.FC<{
   </div>
 );
 
-const CompositionListingInner: React.FC<{ engine: typeof import('../engine') } & ReturnType<
-  typeof mapCompositionListingStateToProps
->> = ({ engine, allViewContextIds }) => {
+const CompositionListingInner: React.FC<
+  { engine: typeof import('../engine') } & ReturnType<typeof mapCompositionListingStateToProps>
+> = ({ engine, allViewContextIds }) => {
   const [allSharedCompositions, setAllSharedCompositions] = useState<
     null | CompositionDefinition[]
   >(null);
@@ -139,10 +134,12 @@ const FieldRenderer: React.FC<{
   </div>
 );
 
-const ShareCompositionInner: React.FC<{} & InjectedFormProps<{
-  title: string;
-  description: string;
-}>> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => {
+const ShareCompositionInner: React.FC<
+  {} & InjectedFormProps<{
+    title: string;
+    description: string;
+  }>
+> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => {
   return (
     <>
       <form

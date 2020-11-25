@@ -87,6 +87,7 @@ const buildControlPanelField = (
       onmousedown: () => setParamValue(address, 1),
       onmouseup: () => setParamValue(address, 0),
       address,
+      initial: 0,
     }),
     // TODO: Use real number-entry input once that's implement on the react-control-panel side
     [InputType.nentry]: ({ address, min, max, init, step }: UiInput) => ({

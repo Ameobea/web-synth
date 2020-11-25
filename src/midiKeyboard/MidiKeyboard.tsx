@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
+import { useOnce } from 'ameo-utils/dist/util/react';
 
 import Loading from 'src/misc/Loading';
 import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
-import { useOnce } from 'ameo-utils/dist/util/react';
 
 const START_NOTE = 33;
 
@@ -84,6 +84,15 @@ const MidiKeyboard: React.FC<{
       }
 
       polySynthMod.handle_note_down(polySynthCtx.current!, midiNumber, 255);
+
+      // Work around incredibly annoying Firefox functionality where the slash key opens
+      // a "quick find" thing and takes focus away from the page
+      const isEditing = (['input', 'textarea'] as (string | undefined)[]).includes(
+        document.activeElement?.tagName.toLowerCase()
+      );
+      if (!isEditing) {
+        evt.preventDefault();
+      }
     };
     const handleUp = (evt: KeyboardEvent) => {
       // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event

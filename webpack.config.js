@@ -10,6 +10,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].[contenthash].js',
+    publicPath: '/'
   },
   mode: 'development',
   devtool: 'inline-source-map',
@@ -61,6 +62,7 @@ module.exports = {
   devServer: {
     port: 9000,
     contentBase: './public/',
+    historyApiFallback: true
   },
   experiments: {
     syncWebAssembly: true,

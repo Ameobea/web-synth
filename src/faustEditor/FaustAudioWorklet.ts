@@ -88,6 +88,7 @@ export class FaustWorkletNode extends AudioWorkletNode {
       this.port.onmessage = (msg: MessageEvent) => {
         if (typeof msg.data === 'object') {
           if (msg.data.jsonDef) {
+            let allDefaultParamsAreZero = false;
             if (context) {
               // We set default values onto the node's params in order to allow the node to function
               // while things initialize.
@@ -101,10 +102,11 @@ export class FaustWorkletNode extends AudioWorkletNode {
                 const targetParam = (this.parameters as any).get(setting.address);
                 targetParam.value = setting.initial;
               });
+              allDefaultParamsAreZero = settings.every(R.propEq('initial', 0));
             }
 
             const pathTable = this.parseUi(msg.data.jsonDef);
-            this.port.postMessage({ type: 'setPathTable', pathTable });
+            this.port.postMessage({ type: 'setPathTable', pathTable, allDefaultParamsAreZero });
             resolve(this);
           } else if (msg.data.log) {
             console.log(...msg.data.log);

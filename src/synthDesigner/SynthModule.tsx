@@ -282,8 +282,8 @@ const SynthModuleCompInner: React.FC<{
             detune: synth.detune,
             'adsr length ms': synth.gainADSRLength,
             adsr: synth.gainEnvelope,
-            'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(() =>
-              synth.pitchMultiplier.toString()
+            'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
+              () => synth.pitchMultiplier?.toString() ?? 1
             ),
           }),
           [

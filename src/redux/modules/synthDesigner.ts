@@ -488,10 +488,10 @@ export const deserializeSynthModule = (
     masterGain: number;
     selectedEffectType: EffectType;
     gainEnvelope: ADSRValues;
-    gainADSRLength: number;
+    gainADSRLength?: number;
     filterEnvelope: ADSRValues;
-    filterADSRLength: number;
-    pitchMultiplier: number;
+    filterADSRLength?: number;
+    pitchMultiplier?: number;
     filterBypassed?: boolean;
   },
   dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void,
@@ -515,11 +515,11 @@ export const deserializeSynthModule = (
     );
 
     voice.gainADSRModule.setEnvelope(gainEnvelope);
-    voice.gainADSRModule.setLengthMs(gainADSRLength);
+    voice.gainADSRModule.setLengthMs(gainADSRLength ?? 1000);
     voice.gainADSRModule.setMaxValue(1 + masterGain);
 
     voice.filterADSRModule.setEnvelope(filterEnvelope);
-    voice.filterADSRModule.setLengthMs(filterADSRLength);
+    voice.filterADSRModule.setLengthMs(filterADSRLength ?? 1000);
     voice.filterADSRModule.connect(voice.filterNode.frequency);
 
     return {
@@ -565,7 +565,7 @@ export const deserializeSynthModule = (
     filterEnvelope,
     filterADSRLength,
     filterParams,
-    pitchMultiplier,
+    pitchMultiplier: pitchMultiplier ?? 1,
   };
 };
 

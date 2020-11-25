@@ -201,6 +201,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
       switch (event.data.type) {
         case 'setPathTable': {
           this.pathTable = event.data.pathTable;
+          this.allDefaultParamsAreZero = event.data.allDefaultParamsAreZero;
           break;
         }
         case 'init': {
@@ -227,6 +228,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     }
 
     // Set all params into the Wasm memory from the latest values we have to our `AudioParam`s
+    let allZero = true;
     paramDescriptors.forEach(param => {
       const paramValue = params[param.name][0];
       if (paramValue === undefined || Number.isNaN(paramValue)) {
@@ -240,7 +242,16 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
         // a single value for each param.
         clamp(param.minValue, param.maxValue, paramValue)
       );
+      allZero = allZero && paramValue === 0;
     });
+    // There's a quirk in Firefox where params seem to be delayed and a few frames are rendered before
+    // the default values set into the params are set.  This is a workaround for that; we have a flag
+    // that indicates whether all the default values are zero and if they aren't, we wait until they are
+    // set to non-zero values before rendering anything.
+    if (!this.hasSuccessfullyRendered && !this.allDefaultParamsAreZero && allZero) {
+      return true;
+    }
+    this.hasSuccessfullyRendered = true;
 
     for (let i = 0; i < Math.min(inputs.length, this.dspInChannels.length); i++) {
       // Copy inputs into the Wasm heap

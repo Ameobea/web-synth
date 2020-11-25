@@ -9,6 +9,9 @@ import { commitForeignConnectables, VCMState } from 'src/redux/modules/viewConte
 import { tryParseJson } from 'src/util';
 import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
+import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
+import { BACKEND_BASE_URL } from 'src/conf';
+import { loadSharedComposition, maybeRestoreLocalComposition } from 'src/persistance';
 
 let engineHandle: typeof import('./engine');
 
@@ -102,11 +105,35 @@ export const delete_view_context = (id: string) => {
 export const set_active_vc_ix = (newActiveVxIx: number) =>
   dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
 
+const fetchAndLoadSharedComposition = async (compositionId: string) => {
+  console.log(`Loading composition id=${compositionId}`);
+  const res = await fetch(`${BACKEND_BASE_URL}/compositions/${compositionId}`);
+  if (res.status === 404) {
+    alert(`Composition with id "${compositionId}" not found`);
+    return;
+  } else if (!res.ok) {
+    alert(`Error loading composition: ${await res.text()}`);
+    return;
+  }
+
+  const composition: CompositionDefinition = await res.json();
+  await loadSharedComposition(composition);
+};
+
 if (typeof AudioWorkletNode === 'undefined') {
   createBrowserNotSupportedMessage();
 } else {
-  wasm.then(engine => {
+  wasm.then(async engine => {
     engineHandle = engine;
+
+    // Check to see if the user has reached this page via a composition share link.  If so,
+    // save the current composition and load the shared one before initializing.
+    if (window.location.pathname.startsWith('/composition/')) {
+      await fetchAndLoadSharedComposition(window.location.pathname.split('/composition/')[1]);
+    } else {
+      await maybeRestoreLocalComposition();
+    }
+
     engine.init();
 
     window.addEventListener('beforeunload', () => {
