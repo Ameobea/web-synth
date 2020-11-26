@@ -4,4 +4,5 @@ cd engine && cargo build --target wasm32-unknown-unknown && \
   cd ../spectrum_viz && cargo build --release --target wasm32-unknown-unknown && \
   cd ../wavetable && cargo build --release --target wasm32-unknown-unknown && \
   cd ../waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
-  cd ../granular && cargo build --release --target wasm32-unknown-unknown
+  cd ../granular && cargo build --release --target wasm32-unknown-unknown && \
+  cd ../event_scheduler && cargo build --release --target wasm32-unknown-unknown

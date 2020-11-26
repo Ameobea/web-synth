@@ -209,10 +209,6 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
   if (!context || !context.analyzerNode || !context.faustNode) {
     let cachedInputNames: string[] | undefined;
     if (context) {
-      // Prevent these from leaking
-      Object.values(context.overrideableParams).forEach(param => param.dispose());
-      context.overrideableParams = {};
-
       cachedInputNames = context.reduxInfra.getState().faustEditor.cachedInputNames;
     }
 

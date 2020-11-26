@@ -5,14 +5,12 @@ import { UnreachableException } from 'ameo-utils';
 import { SampleDescriptor } from 'src/sampleLibrary';
 import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
 import { buildGateOutput } from 'src/sequencer';
-import { initScheduler, stopScheduler, mkBeatScheduler } from 'src/sequencer/scheduler';
+import { BeatSchedulersBuilderByVoiceType } from 'src/sequencer/scheduler';
 
 export type VoiceTarget =
   | { type: 'sample' }
   | { type: 'midi'; synthIx: number | null; note: number }
-  | { type: 'gate'; gateIx: number | null | 'RISING_EDGE_DETECTOR' };
-
-export type PlayingStatus = { type: 'NOT_PLAYING' } | { type: 'PLAYING'; intervalHandle: number };
+  | { type: 'gate'; gateIx: number | null };
 
 export enum SchedulerScheme {
   Stable,
@@ -20,55 +18,53 @@ export enum SchedulerScheme {
   Random,
 }
 
-export const getIsSequencerPlaying = (playingStatus: PlayingStatus) =>
-  playingStatus.type === 'PLAYING';
-
 export interface SequencerReduxState {
   currentEditingVoiceIx: number;
-  activeBeat: number;
+  activeBeats: number[];
   voices: VoiceTarget[];
-  sampleBank: { [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null };
+  sampleBank:
+    | { [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null }
+    | 'LOADING';
   /**
    * For each voice, an array of the indices of all marked cells for that voice/row
    */
   marks: boolean[][];
   bpm: number;
-  playingStatus: PlayingStatus;
+  isPlaying: boolean;
   outputGainNode: GainNode;
   midiOutputs: MIDINode[];
   gateOutputs: ConstantSourceNode[];
   schedulerScheme: SchedulerScheme;
-  risingEdgeDetector: AudioWorkletNode | undefined;
+  awpHandle: AudioWorkletNode | undefined;
 }
 
 const ctx = new AudioContext();
 
-const reschedule = (state: SequencerReduxState) => {
-  if (state.playingStatus.type !== 'PLAYING') {
-    console.warn("Tried to re-schedule when sequencer wasn't playing; taking on action.");
+interface SequencerVoiceAWPConfig {
+  beatRatio: number;
+  marks: boolean[];
+}
+
+interface SequencerAWPConfig {
+  beatCount: number;
+  voices: SequencerVoiceAWPConfig[];
+}
+
+export const buildSequencerConfig = (state: SequencerReduxState): SequencerAWPConfig => {
+  return {
+    beatCount: state.marks[0]!.length,
+    voices: state.marks.map(marks => ({ marks, beatRatio: 0.25 })),
+  };
+};
+
+const reschedule = (state: SequencerReduxState): SequencerReduxState => {
+  if (!state.awpHandle) {
     return state;
   }
 
-  const schedulerHandle = state.playingStatus.intervalHandle;
-  const oldSchedulerState = stopScheduler(schedulerHandle, state);
-  const nextScheduledBeat = oldSchedulerState.curScheduledTimings.find(
-    timing => timing > ctx.currentTime
-  );
-  if (R.isNil(nextScheduledBeat)) {
-    console.warn('No scheduled beats for the most recently scheduled quantum');
-  }
+  state.awpHandle.port.postMessage({ type: 'configure', config: buildSequencerConfig(state) });
 
-  const newSchedulerHandle = initScheduler(
-    state,
-    nextScheduledBeat,
-    oldSchedulerState.totalProcessedBeats -
-      oldSchedulerState.curScheduledTimings.filter(timing => timing > ctx.currentTime).length
-  );
-
-  return {
-    ...state,
-    playingStatus: { type: 'PLAYING' as const, intervalHandle: newSchedulerHandle },
-  };
+  return state;
 };
 
 const actionGroups = {
@@ -117,26 +113,21 @@ const actionGroups = {
   TOGGLE_IS_PLAYING: buildActionGroup({
     actionCreator: () => ({ type: 'TOGGLE_IS_PLAYING' }),
     subReducer: (state: SequencerReduxState) => {
-      const isPlaying = !getIsSequencerPlaying(state.playingStatus);
+      if (!state.awpHandle) {
+        return state;
+      }
 
-      if (isPlaying) {
-        return {
-          ...state,
-          playingStatus: { type: 'PLAYING' as const, intervalHandle: initScheduler(state) },
-        };
+      if (state.isPlaying) {
+        state.awpHandle.port.postMessage({ type: 'stop' });
+        return { ...state, isPlaying: false };
       } else {
-        if (state.playingStatus.type !== 'PLAYING') {
-          console.error("Tried to stop sequencer when it wasn't playing");
-          return state;
-        }
-        stopScheduler(state.playingStatus.intervalHandle, state);
-        return { ...state, playingStatus: { type: 'NOT_PLAYING' as const } };
+        state.awpHandle.port.postMessage({ type: 'start' });
+        return reschedule({
+          ...state,
+          isPlaying: true,
+        });
       }
     },
-  }),
-  RESCHEDULE: buildActionGroup({
-    actionCreator: () => ({ type: 'RESCHEDULE' }),
-    subReducer: reschedule,
   }),
   SET_VOICE_TARGET: buildActionGroup({
     actionCreator: (voiceIx: number, newTarget: VoiceTarget) => ({
@@ -188,11 +179,6 @@ const actionGroups = {
       };
     },
   }),
-  SET_BPM: buildActionGroup({
-    actionCreator: (bpm: number | string) => ({ type: 'SET_BPM', bpm }),
-    subReducer: (state: SequencerReduxState, { bpm }) =>
-      reschedule(R.set(R.lensProp('bpm'), +bpm, state)),
-  }),
   ADD_GATE_OUTPUT: buildActionGroup({
     actionCreator: () => ({ type: 'ADD_GATE_OUTPUT' }),
     subReducer: (state: SequencerReduxState) => ({
@@ -200,19 +186,29 @@ const actionGroups = {
       gateOutputs: [...state.gateOutputs, buildGateOutput()],
     }),
   }),
-  SET_RISING_EDGE_DETECTOR: buildActionGroup({
-    actionCreator: (detector: AudioWorkletNode) => ({ type: 'SET_RISING_EDGE_DETECTOR', detector }),
-    subReducer: (state: SequencerReduxState, { detector }) => ({
+  SET_AWP_HANDLE: buildActionGroup({
+    actionCreator: (awpHandle: AudioWorkletNode) => ({ type: 'SET_AWP_HANDLE', awpHandle }),
+    subReducer: (state: SequencerReduxState, { awpHandle }) => ({
       ...state,
-      risingEdgeDetector: detector,
+      awpHandle,
     }),
   }),
-  INCREMENT_BEAT: buildActionGroup({
-    actionCreator: () => ({ type: 'INCREMENT_BEAT' }),
-    subReducer: (state: SequencerReduxState) => ({
-      ...state,
-      activeBeat: (state.activeBeat + 1) % state.marks[0]!.length,
+  SET_ACTIVE_BEATS: buildActionGroup({
+    actionCreator: (activeBeats: { voiceIx: number; beatIx: number }[]) => ({
+      type: 'SET_ACTIVE_BEATS',
+      activeBeats,
     }),
+    subReducer: (state: SequencerReduxState, { activeBeats }) => {
+      const newActiveBeats = [...state.activeBeats];
+      activeBeats.forEach(
+        ({ voiceIx, beatIx }) => (newActiveBeats[voiceIx] = beatIx % state.marks[0]!.length)
+      );
+
+      return {
+        ...state,
+        activeBeats: newActiveBeats,
+      };
+    },
   }),
   ADD_SAMPLE: buildActionGroup({
     actionCreator: (voiceIx: number, descriptor: SampleDescriptor, sampleData: AudioBuffer) => ({
@@ -223,20 +219,26 @@ const actionGroups = {
     }),
     subReducer: (state: SequencerReduxState, { voiceIx, descriptor, sampleData }) => ({
       ...state,
-      sampleBank: { ...state.sampleBank, [voiceIx]: { descriptor, buffer: sampleData } },
+      sampleBank:
+        state.sampleBank === 'LOADING'
+          ? ('LOADING' as const)
+          : { ...state.sampleBank, [voiceIx]: { descriptor, buffer: sampleData } },
     }),
+  }),
+  SET_SAMPLES: buildActionGroup({
+    actionCreator: (sampleBank: Exclude<SequencerReduxState['sampleBank'], string>) => ({
+      type: 'SET_SAMPLES',
+      sampleBank,
+    }),
+    subReducer: (state: SequencerReduxState, { sampleBank }) => ({ ...state, sampleBank }),
   }),
   SET_CURRENTLY_EDITING_VOICE_IX: buildActionGroup({
     actionCreator: (voiceIx: number) => ({ type: 'SET_CURRENTLY_EDITING_VOICE_IX', voiceIx }),
     subReducer: (state: SequencerReduxState, { voiceIx }) => {
+      const voice = state.voices[voiceIx];
       // Play a single beat of the voice now if the sequencer isn't currently playing
-      if (!getIsSequencerPlaying(state.playingStatus)) {
-        mkBeatScheduler(
-          state,
-          { scheduledBuffers: [], curScheduledTimings: [], totalProcessedBeats: 0 },
-          voiceIx,
-          state.voices[voiceIx]
-        )(ctx.currentTime);
+      if (!state.isPlaying) {
+        BeatSchedulersBuilderByVoiceType[voice.type](state, voiceIx, voice as any);
       }
 
       return {
@@ -261,15 +263,15 @@ const DEFAULT_WIDTH = 16 as const;
 
 export const buildInitialState = (): SequencerReduxState => ({
   currentEditingVoiceIx: 0,
-  activeBeat: 0,
+  activeBeats: [0],
   voices: [{ type: 'sample' as const }],
   sampleBank: {},
   marks: [R.times(() => false, DEFAULT_WIDTH)],
   bpm: 80,
-  playingStatus: { type: 'NOT_PLAYING' as const },
+  isPlaying: false,
   outputGainNode: new GainNode(ctx),
   midiOutputs: [],
   gateOutputs: [],
   schedulerScheme: SchedulerScheme.Stable,
-  risingEdgeDetector: undefined,
+  awpHandle: undefined,
 });

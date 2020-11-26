@@ -1,5 +1,5 @@
 [workspace]
-members = ["engine", "common", "midi", "polysynth", "spectrum_viz", "wavetable", "waveform_renderer", "granular"]
+members = ["engine", "common", "midi", "polysynth", "spectrum_viz", "wavetable", "waveform_renderer", "granular", "event_scheduler"]
 
 [profile.release]
 debug-assertions = true

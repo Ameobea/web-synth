@@ -17,7 +17,6 @@ import {
 } from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
 import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
-import { initScheduler } from 'src/sequencer/scheduler';
 import { SampleDescriptor, getSample } from 'src/sampleLibrary';
 import {
   buildSequencerReduxInfra,
@@ -25,11 +24,12 @@ import {
   SequencerReduxInfra,
   SequencerReduxState,
   VoiceTarget,
-  PlayingStatus,
   SchedulerScheme,
-  getIsSequencerPlaying,
+  buildSequencerConfig,
 } from './redux';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { SequencerUIProps } from 'src/sequencer/SequencerUI/SequencerUI';
+import { AsyncOnce } from 'src/util';
+import { BeatSchedulersBuilderByVoiceType } from 'src/sequencer/scheduler';
 
 const ctx = new AudioContext();
 
@@ -43,7 +43,7 @@ interface SerializedSequencer {
   sampleBank: { [voiceIx: number]: SampleDescriptor | null };
   marks: boolean[][];
   bpm: number;
-  playingStatus: PlayingStatus;
+  isPlaying: boolean;
   midiOutputCount: number;
   gateOutputCount: number;
   schedulerScheme: SchedulerScheme;
@@ -65,12 +65,13 @@ const serializeSequencer = (vcId: string): string => {
     voices,
     marks,
     bpm,
-    playingStatus,
+    isPlaying,
     midiOutputs,
     gateOutputs,
     schedulerScheme,
     sampleBank,
   } = reduxInfra.getState().sequencer;
+  console.log({ isPlaying });
 
   const serialized: SerializedSequencer = {
     currentEditingVoiceIx,
@@ -78,7 +79,7 @@ const serializeSequencer = (vcId: string): string => {
     sampleBank: Object.values(sampleBank).map(item => (item ? item.descriptor : item)),
     marks,
     bpm,
-    playingStatus,
+    isPlaying,
     midiOutputCount: midiOutputs.length,
     gateOutputCount: gateOutputs.length,
     schedulerScheme,
@@ -94,49 +95,92 @@ export const buildGateOutput = (): ConstantSourceNode => {
   return csn;
 };
 
-const deserializeSequencer = async (serialized: string): Promise<SequencerReduxState> => {
+const SequencerAWPRegistered = new AsyncOnce(() =>
+  ctx.audioWorklet.addModule('/SequencerWorkletProcessor.js')
+);
+const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
+  await SequencerAWPRegistered.get();
+  const workletHandle = new AudioWorkletNode(ctx, 'sequencer-audio-worklet-node-processor');
+
+  workletHandle.port.onmessage = msg => {
+    switch (msg.data.type) {
+      case 'triggerVoice': {
+        const state = reduxInfraMap.get(vcId)!.getState().sequencer;
+        const voiceIx = msg.data.i;
+
+        BeatSchedulersBuilderByVoiceType[state.voices[voiceIx].type](
+          state,
+          voiceIx,
+          state.voices[voiceIx] as any
+        );
+        break;
+      }
+      default: {
+        console.warn(`Unhandled message type received from sequencer AWP: ${msg.data.type}`);
+      }
+    }
+  };
+  const state = reduxInfraMap.get(vcId)!.getState().sequencer;
+  workletHandle.port.postMessage({ type: 'configure', config: buildSequencerConfig(state) });
+
+  return workletHandle;
+};
+
+const initSampleBank = async (sampleBank: { [voiceIx: number]: SampleDescriptor | null }) =>
+  (
+    await Promise.all(
+      Object.entries(sampleBank).map(async ([voiceIx, descriptor]) => {
+        if (!descriptor) {
+          return [+voiceIx, null] as const;
+        }
+
+        try {
+          const buffer = await getSample(descriptor);
+          return [+voiceIx, { descriptor, buffer }] as const;
+        } catch (err) {
+          console.warn(`Unable to load sample named "${descriptor.name}": `, err);
+          // Unable to load the referenced sample for whatever reason
+          return [+voiceIx, null] as const;
+        }
+      })
+    )
+  ).reduce(
+    (acc, [voiceIx, val]) => acc.then(acc => ({ ...acc, [voiceIx]: val })),
+    Promise.resolve({}) as Promise<{
+      [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null;
+    }>
+  );
+
+const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxState => {
   const {
     currentEditingVoiceIx,
     voices,
     sampleBank,
     marks,
     bpm,
-    playingStatus,
+    isPlaying,
     midiOutputCount,
     gateOutputCount,
     schedulerScheme,
   }: SerializedSequencer = JSON.parse(serialized);
 
+  initSampleBank(sampleBank).then(sampleBank => {
+    const reduxInfra = reduxInfraMap.get(vcId);
+    if (!reduxInfra) {
+      console.warn('No redux infra found after loading samples');
+      return;
+    }
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_SAMPLES(sampleBank));
+  });
+
   const state = {
     currentEditingVoiceIx,
-    activeBeat: 0,
+    activeBeats: voices.map(() => 0),
     voices,
-    sampleBank: await (
-      await Promise.all(
-        Object.entries(sampleBank).map(async ([voiceIx, descriptor]) => {
-          if (!descriptor) {
-            return [+voiceIx, null] as const;
-          }
-
-          try {
-            const buffer = await getSample(descriptor);
-            return [+voiceIx, { descriptor, buffer }] as const;
-          } catch (err) {
-            console.warn(`Unable to load sample named "${descriptor.name}": `, err);
-            // Unable to load the referenced sample for whatever reason
-            return [+voiceIx, null] as const;
-          }
-        })
-      )
-    ).reduce(
-      (acc, [voiceIx, val]) => acc.then(acc => ({ ...acc, [voiceIx]: val })),
-      Promise.resolve({}) as Promise<{
-        [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null;
-      }>
-    ),
+    sampleBank: 'LOADING' as const,
     marks,
     bpm,
-    playingStatus,
+    isPlaying: false, // This will be set asynchronously if auto-start enabled
     outputGainNode: new GainNode(ctx),
     midiOutputs: R.times(
       () =>
@@ -147,26 +191,34 @@ const deserializeSequencer = async (serialized: string): Promise<SequencerReduxS
     ),
     gateOutputs: R.times(buildGateOutput, gateOutputCount),
     schedulerScheme,
-    risingEdgeDetector: undefined,
+    awpHandle: undefined,
   };
 
-  // If the sequencer was playing when we saved, re-start it and set a new valid handle
-  if (state.playingStatus.type === 'PLAYING') {
-    const handle = initScheduler(state);
-    state.playingStatus = { type: 'PLAYING', intervalHandle: handle };
-  }
+  initSequenceAWP(vcId).then(awpHandle => {
+    const reduxInfra = reduxInfraMap.get(vcId);
+    if (!reduxInfra) {
+      console.warn('No redux infra found for sequencer when trying to auto-start');
+      return;
+    }
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_AWP_HANDLE(awpHandle));
+
+    // If the sequencer was playing when we saved, re-start it and set a new valid handle
+    if (isPlaying) {
+      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING());
+    }
+  });
 
   return state;
 };
 
-const loadInitialState = async (stateKey: string, vcId: string) => {
+const loadInitialState = (stateKey: string, vcId: string) => {
   const serializedState = localStorage.getItem(stateKey);
   if (!serializedState) {
     return buildInitialState();
   }
 
   try {
-    return deserializeSequencer(serializedState);
+    return deserializeSequencer(serializedState, vcId);
   } catch (_err) {
     console.error(
       `Failed to parse serialized state for sequencer id ${vcId}; building default state.`
@@ -175,38 +227,20 @@ const loadInitialState = async (stateKey: string, vcId: string) => {
   }
 };
 
-const LazySequencerUI: React.FC<
-  { vcId: string } & Pick<SequencerReduxInfra, 'dispatch' | 'actionCreators'>
-> = props => (
+const LazySequencerUI: React.FC<SequencerUIProps> = props => (
   <Suspense fallback={<Loading />}>
     <SequencerUI {...props} />
   </Suspense>
 );
-
-const buildRisingEdgeDetector = async (onDetected: () => void) => {
-  await ctx.audioWorklet.addModule('/RisingEdgeDetectorWorkletProcessor.js');
-  const workletHandle = new AudioWorkletNode(
-    ctx,
-    'rising-edge-detector-audio-worklet-node-processor'
-  );
-  workletHandle.connect(ctx.destination);
-  workletHandle.port.onmessage = onDetected;
-  return workletHandle;
-};
 
 export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
   const reduxInfra = reduxInfraMap.get(vcId);
 
   // Initialization is async, so we may not yet have a valid Redux state handle at this point.
   if (!reduxInfra) {
-    return {
-      vcId,
-      inputs: ImmMap<string, ConnectableInput>(),
-      outputs: ImmMap<string, ConnectableOutput>().set('output', {
-        node: new DummyNode(),
-        type: 'customAudio',
-      }),
-    };
+    throw new UnreachableException(
+      "Expected to find redux infra for sequencer when initializing, but didn't find it"
+    );
   }
   const reduxState = reduxInfra.getState();
 
@@ -227,7 +261,7 @@ export const get_sequencer_audio_connectables = (vcId: string): AudioConnectable
   };
 };
 
-export const init_sequencer = async (stateKey: string) => {
+export const init_sequencer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const domId = getSequencerDOMElementId(vcId);
@@ -239,19 +273,12 @@ export const init_sequencer = async (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  const initialState = await loadInitialState(stateKey, vcId);
+  const initialState = loadInitialState(stateKey, vcId);
   const reduxInfra = buildSequencerReduxInfra(initialState);
   if (!!reduxInfraMap.get(vcId)) {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);
   }
   reduxInfraMap.set(vcId, reduxInfra);
-
-  // Asynchronously init the rising edge detector and set it into the state once it's initialized
-  buildRisingEdgeDetector(() =>
-    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.INCREMENT_BEAT())
-  ).then(workletHandle =>
-    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_RISING_EDGE_DETECTOR(workletHandle))
-  );
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
   updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
@@ -261,8 +288,7 @@ export const init_sequencer = async (stateKey: string) => {
     store: reduxInfra.store,
     getProps: () => ({
       vcId,
-      actionCreators: reduxInfra.actionCreators,
-      dispatch: reduxInfra.dispatch,
+      ...reduxInfra,
     }),
   })(domId);
 };
@@ -275,11 +301,11 @@ export const cleanup_sequencer = (stateKey: string) => {
   if (!reduxInfra) {
     throw new Error(`No sequencer Redux infra map entry for sequencer with vcId ${vcId}`);
   }
-  if (getIsSequencerPlaying(reduxInfra.getState().sequencer.playingStatus)) {
+  const serialized = serializeSequencer(vcId);
+  if (reduxInfra.getState().sequencer.isPlaying) {
     reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING());
   }
 
-  const serialized = serializeSequencer(vcId);
   localStorage.setItem(stateKey, serialized);
 
   mkContainerCleanupHelper()(getSequencerDOMElementId(vcId));

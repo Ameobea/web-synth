@@ -185,18 +185,6 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     );
     dstBuffer.set(output);
 
-    // const sampleCount = endSampleIx - startSampleIx;
-    // for (let outIx = 0; outIx < FRAME_SIZE; outIx++) {
-    //   this.i += 1;
-    //   if (this.i > sampleCount || startSampleIx + this.i >= this.samples.length) {
-    //     this.i = 0;
-    //   }
-    //   dstBuffer[outIx] = this.samples[startSampleIx + this.i];
-    //   if (Number.isNaN(dstBuffer[outIx])) {
-    //     throw new Error();
-    //   }
-    // }
-
     for (let outputIx = 0; outputIx < outputs.length; outputIx++) {
       for (let channelIx = 0; channelIx < outputs[outputIx].length; channelIx++) {
         if (outputIx === 0 && channelIx === 0) {

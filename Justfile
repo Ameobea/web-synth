@@ -13,6 +13,8 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
   yarn build || npm build
 
   just opt
@@ -28,6 +30,7 @@ run:
   cp ./engine/build/* ./src/
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
   yarn start
 
 run-frontend:

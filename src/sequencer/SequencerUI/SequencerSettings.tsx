@@ -1,13 +1,7 @@
 import React, { useMemo } from 'react';
-import { connect } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 
-import { SequencerReduxState, SequencerReduxInfra } from 'src/sequencer/redux';
-
-const mapStateToProps = (state: { sequencer: SequencerReduxState }) => ({
-  bpm: state.sequencer.bpm,
-  isPlaying: state.sequencer.playingStatus.type === 'PLAYING',
-});
+import { SequencerReduxInfra } from 'src/sequencer/redux';
 
 const mkHandleChange = ({
   dispatch,
@@ -17,31 +11,33 @@ const mkHandleChange = ({
   dispatch: SequencerReduxInfra['dispatch'];
 }) => (key: string, val: any, _state: { [key: string]: any }) => {
   switch (key) {
-    case 'bpm': {
-      dispatch(actionCreators.sequencer.SET_BPM(val));
-      break;
-    }
+    // case 'bpm': {
+    //   dispatch(actionCreators.sequencer.SET_BPM(val));
+    //   break;
+    // }
     default: {
       console.error(`Unhandled key in SequencerSettings: "${key}"`);
     }
   }
 };
 
-const SequencerSettings: React.FC<{
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
-} & ReturnType<typeof mapStateToProps>> = ({ bpm, isPlaying, actionCreators, dispatch }) => {
-  const state = useMemo(() => ({ bpm }), [bpm]);
+const SequencerSettings: React.FC<SequencerReduxInfra> = ({
+  actionCreators,
+  dispatch,
+  useSelector,
+}) => {
+  const isPlaying = useSelector(state => state.sequencer.isPlaying);
+
   const settings = useMemo(
     () => [
-      {
-        type: 'range',
-        label: 'bpm',
-        min: 0,
-        max: 4000,
-        initial: 120,
-        steps: 200,
-      },
+      // {
+      //   type: 'range',
+      //   label: 'bpm',
+      //   min: 0,
+      //   max: 4000,
+      //   initial: 120,
+      //   steps: 200,
+      // },
       {
         type: 'button',
         label: isPlaying ? 'stop' : 'start',
@@ -61,9 +57,9 @@ const SequencerSettings: React.FC<{
 
   return (
     <div className='sequencer-settings'>
-      <ControlPanel state={state} settings={settings} onChange={handleChange} />
+      <ControlPanel state={{}} settings={settings} onChange={handleChange} />
     </div>
   );
 };
 
-export default connect(mapStateToProps)(SequencerSettings);
+export default SequencerSettings;

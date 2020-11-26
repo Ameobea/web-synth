@@ -70,14 +70,20 @@ const mapSampleInputStateToProps = (
   state: { sequencer: SequencerReduxState },
   { voiceIx }: { voiceIx: number }
 ) => ({
-  sampleOpt: Option.of(state.sequencer.sampleBank[voiceIx]),
+  sampleOpt:
+    typeof state.sequencer.sampleBank === 'string'
+      ? ('LOADING' as const)
+      : Option.of(state.sequencer.sampleBank[voiceIx]),
 });
 
 const SampleInputInner: React.FC<
   InputCompCommonProps<'sample'> & ReturnType<typeof mapSampleInputStateToProps>
 > = ({ sampleOpt, voiceIx, dispatch, actionCreators }) => (
   <div>
-    Selected Sample: {sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None')}
+    Selected Sample:{' '}
+    {sampleOpt === 'LOADING'
+      ? 'Loading...'
+      : sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None')}
     <button
       onClick={async () => {
         const descriptor = await selectSample();
