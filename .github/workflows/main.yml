@@ -63,7 +63,7 @@ jobs:
       - name: Install `wasm-strip`
         run: curl https://web-synth-ci-binaries.ameo.design/wasm-strip -o ~/bin/wasm-strip && chmod +x ~/bin/wasm-strip
       - name: Add custom binaries directory to the PATH
-        run: echo "::add-path::$HOME/bin"
+        run: echo "$HOME/bin" >> $GITHUB_PATH
 
       # Build all Rust modules into Wasm, run `wasm-bindgen`, compile JavaScript, and link everything together
       - name: Install node modules
@@ -116,7 +116,7 @@ jobs:
       - name: Install `phost`
         run: pip3 install --user setuptools wheel && pip3 install --user "git+https://github.com/Ameobea/phost.git#egg=phost&subdirectory=client"
       - name: Add `phost` to the `PATH`
-        run: echo "::add-path::$HOME/.local/bin"
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Extract `phost` config from secrets
         env: # Or as an environment variable
           PHOST_CONFIG_BASE64: ${{ secrets.PHOST_CONFIG_BASE64 }}
