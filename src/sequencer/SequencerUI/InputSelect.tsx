@@ -13,54 +13,59 @@ const mapSynthInputStateToProps = (state: { sequencer: SequencerReduxState }) =>
   midiOutputCount: state.sequencer.midiOutputs.length,
 });
 
-interface InputCompCommonProps<T> {
+interface InputCompCommonProps<T> extends SequencerReduxInfra {
   voiceIx: number;
   vcId: string;
   voiceTarget: Extract<VoiceTarget, { type: T }>;
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
 }
 
 const SynthInputInner: React.FC<
   InputCompCommonProps<'midi'> & ReturnType<typeof mapSynthInputStateToProps>
 > = ({ voiceIx, voiceTarget, vcId, dispatch, actionCreators, midiOutputCount }) => (
   <div>
-    <select
-      onChange={evt =>
-        dispatch(
-          actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
-            ...voiceTarget,
-            synthIx: Option.of(evt.target.value)
-              .flatMap(n => Option.of(n === 'none' ? null : +n))
-              .orNull(),
-          })
-        )
-      }
-      value={Option.of(voiceTarget.synthIx).getOrElse('none')}
-    >
-      {R.times(
-        i =>
-          i === 0 ? (
-            <option key='none' value='none'>
-              None
-            </option>
-          ) : (
-            <option key={i} value={i - 1}>
-              {i}
-            </option>
-          ),
-        midiOutputCount + 1
-      )}
-    </select>
+    <div>
+      <select
+        onChange={evt =>
+          dispatch(
+            actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
+              ...voiceTarget,
+              synthIx: Option.of(evt.target.value)
+                .flatMap(n => Option.of(n === 'none' ? null : +n))
+                .orNull(),
+            })
+          )
+        }
+        value={Option.of(voiceTarget.synthIx).getOrElse('none')}
+      >
+        {R.times(
+          i =>
+            i === 0 ? (
+              <option key='none' value='none'>
+                None
+              </option>
+            ) : (
+              <option key={i} value={i - 1}>
+                {i}
+              </option>
+            ),
+          midiOutputCount + 1
+        )}
+      </select>
 
-    <button
-      onClick={() => {
-        dispatch(actionCreators.sequencer.ADD_MIDI_OUTPUT());
-        updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
-      }}
-    >
-      Add MIDI Output
-    </button>
+      <button
+        onClick={() => {
+          dispatch(actionCreators.sequencer.ADD_MIDI_OUTPUT());
+          updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
+        }}
+      >
+        Add MIDI Output
+      </button>
+    </div>
+    <div>
+      <button onClick={() => dispatch(actionCreators.sequencer.TOGGLE_EDIT_MODE(voiceIx))}>
+        {voiceTarget.editState ? 'exit edit mode' : 'enter edit mode'}
+      </button>
+    </div>
   </div>
 );
 

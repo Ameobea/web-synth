@@ -26,6 +26,7 @@ import {
   VoiceTarget,
   SchedulerScheme,
   buildSequencerConfig,
+  SequencerMark,
 } from './redux';
 import { SequencerUIProps } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
@@ -41,7 +42,7 @@ interface SerializedSequencer {
   currentEditingVoiceIx: number;
   voices: VoiceTarget[];
   sampleBank: { [voiceIx: number]: SampleDescriptor | null };
-  marks: boolean[][];
+  marks: (SequencerMark | null)[][];
   bpm: number;
   isPlaying: boolean;
   midiOutputCount: number;

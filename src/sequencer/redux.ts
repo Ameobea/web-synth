@@ -9,7 +9,12 @@ import { BeatSchedulersBuilderByVoiceType } from 'src/sequencer/scheduler';
 
 export type VoiceTarget =
   | { type: 'sample' }
-  | { type: 'midi'; synthIx: number | null; note: number }
+  | {
+      type: 'midi';
+      synthIx: number | null;
+      note: number;
+      editState: { editingMarkIx: number | null } | null;
+    }
   | { type: 'gate'; gateIx: number | null };
 
 export enum SchedulerScheme {
@@ -17,6 +22,22 @@ export enum SchedulerScheme {
   Swung,
   Random,
 }
+
+export type SequencerMark =
+  | { type: 'gate' }
+  | { type: 'sample'; gain: number }
+  | { type: 'midi'; note: number; gain: number };
+
+const buildDefaultSequencerMark = (voice: VoiceTarget): SequencerMark => {
+  switch (voice.type) {
+    case 'gate':
+      return { type: 'gate' };
+    case 'midi':
+      return { type: 'midi', gain: 1, note: 60 };
+    case 'sample':
+      return { type: 'sample', gain: 1 };
+  }
+};
 
 export interface SequencerReduxState {
   currentEditingVoiceIx: number;
@@ -28,7 +49,7 @@ export interface SequencerReduxState {
   /**
    * For each voice, an array of the indices of all marked cells for that voice/row
    */
-  marks: boolean[][];
+  marks: (SequencerMark | null)[][];
   bpm: number;
   isPlaying: boolean;
   outputGainNode: GainNode;
@@ -53,7 +74,7 @@ interface SequencerAWPConfig {
 export const buildSequencerConfig = (state: SequencerReduxState): SequencerAWPConfig => {
   return {
     beatCount: state.marks[0]!.length,
-    voices: state.marks.map(marks => ({ marks, beatRatio: 0.25 })),
+    voices: state.marks.map(marks => ({ marks: marks.map(mark => !!mark), beatRatio: 0.25 })),
   };
 };
 
@@ -76,7 +97,7 @@ const actionGroups = {
     actionCreator: () => ({ type: 'ADD_VOICE' }),
     subReducer: (state: SequencerReduxState) => ({
       ...state,
-      marks: [...state.marks, R.times(() => false, state.marks[0]!.length)],
+      marks: [...state.marks, R.times(() => null, state.marks[0]!.length)],
       voices: [...state.voices, { type: 'sample' as const }],
     }),
   }),
@@ -99,7 +120,11 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState, { rowIx, colIx }) =>
       reschedule({
         ...state,
-        marks: R.set(R.lensPath([rowIx, colIx]), true, state.marks),
+        marks: R.set(
+          R.lensPath([rowIx, colIx]),
+          buildDefaultSequencerMark(state.voices[rowIx]),
+          state.marks
+        ),
       }),
   }),
   UNMARK: buildActionGroup({
@@ -107,7 +132,7 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState, { rowIx, colIx }) =>
       reschedule({
         ...state,
-        marks: R.set(R.lensPath([rowIx, colIx]), false, state.marks),
+        marks: R.set(R.lensPath([rowIx, colIx]), null, state.marks),
       }),
   }),
   TOGGLE_IS_PLAYING: buildActionGroup({
@@ -247,6 +272,31 @@ const actionGroups = {
       };
     },
   }),
+  TOGGLE_EDIT_MODE: buildActionGroup({
+    actionCreator: (voiceIx: number) => ({ type: 'TOGGLE_EDIT_MODE', voiceIx }),
+    subReducer: (state: SequencerReduxState, { voiceIx }) => {
+      const voice = state.voices[voiceIx];
+      if (voice.type !== 'midi') {
+        console.error('Tried to toggle editing state on non-MIDI voice');
+        return state;
+      }
+
+      const firstMarkedBeatIx = state.marks[voiceIx].findIndex(R.identity);
+      return {
+        ...state,
+        voices: R.set(
+          R.lensIndex(voiceIx),
+          {
+            ...voice,
+            editState: voice.editState
+              ? null
+              : { editingBeatIx: firstMarkedBeatIx === -1 ? firstMarkedBeatIx : null },
+          },
+          state.voices
+        ),
+      };
+    },
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -266,7 +316,7 @@ export const buildInitialState = (): SequencerReduxState => ({
   activeBeats: [0],
   voices: [{ type: 'sample' as const }],
   sampleBank: {},
-  marks: [R.times(() => false, DEFAULT_WIDTH)],
+  marks: [R.times(() => null, DEFAULT_WIDTH)],
   bpm: 80,
   isPlaying: false,
   outputGainNode: new GainNode(ctx),
