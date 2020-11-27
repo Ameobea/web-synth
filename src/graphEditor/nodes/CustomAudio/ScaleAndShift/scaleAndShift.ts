@@ -77,7 +77,12 @@ export class ScaleAndShiftNode implements ForeignNode {
     params: { [key: string]: any } | null | undefined
   ): ScaleAndShiftUIState {
     if (!params) {
-      return { input_range: [-1, 1], output_range: [0, 10] };
+      return {
+        input_range: [-1, 1],
+        output_range: [0, 10],
+        input_min_max: [-1, 1],
+        output_min_max: [-20, 20],
+      };
     }
 
     if (
@@ -101,6 +106,8 @@ export class ScaleAndShiftNode implements ForeignNode {
     return {
       input_range: params.input_range as [number, number],
       output_range: params.output_range as [number, number],
+      input_min_max: params.input_min_max || params.input_range,
+      output_min_max: params.output_min_max || params.output_range,
     };
   }
 

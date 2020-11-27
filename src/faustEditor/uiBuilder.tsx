@@ -148,7 +148,7 @@ const buildControlPanelComponent = (
   pathTable: { [path: string]: any },
   setParamValue: (path: string, val: number) => void,
   paramDefaults: { [path: string]: number }
-): React.FC => {
+) => {
   // Get the randomly generated path base so that we can accurately match when setting params
   const pathBase = Option.of(R.head(Object.keys(pathTable)))
     .map(getFaustParamBasePath)
@@ -162,11 +162,16 @@ const buildControlPanelComponent = (
     return () => null;
   }
 
-  const FaustEditorControlPanel = () => (
+  const FaustEditorControlPanel: React.FC<{
+    style?: React.CSSProperties;
+    position?: any;
+    draggable?: boolean;
+  }> = ({ position, style, draggable = true }) => (
     <ControlPanel
-      draggable
+      draggable={draggable}
       theme='dark'
-      position={{ top: 0, right: 44 }}
+      position={position === null ? undefined : { top: 0, right: 44 }}
+      style={style}
       settings={settings}
       onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
       width={500}

@@ -281,8 +281,12 @@ const actionGroups = {
     },
   }),
   TOGGLE_EDIT_MODE: buildActionGroup({
-    actionCreator: (voiceIx: number) => ({ type: 'TOGGLE_EDIT_MODE', voiceIx }),
-    subReducer: (state: SequencerReduxState, { voiceIx }) => {
+    actionCreator: (voiceIx: number, beatIx?: number) => ({
+      type: 'TOGGLE_EDIT_MODE',
+      voiceIx,
+      beatIx,
+    }),
+    subReducer: (state: SequencerReduxState, { voiceIx, beatIx }) => {
       const voice = state.voices[voiceIx];
       if (voice.type !== 'midi') {
         console.error('Tried to toggle editing state on non-MIDI voice');
@@ -293,9 +297,13 @@ const actionGroups = {
       return {
         ...state,
         markEditState:
-          state.markEditState?.voiceIx === voiceIx
+          state.markEditState?.voiceIx === voiceIx &&
+          (R.isNil(beatIx) || state.markEditState?.editingMarkIx === beatIx)
             ? null
-            : { voiceIx, editingMarkIx: firstMarkedBeatIx === -1 ? null : firstMarkedBeatIx },
+            : {
+                voiceIx,
+                editingMarkIx: beatIx ?? (firstMarkedBeatIx === -1 ? null : firstMarkedBeatIx),
+              },
       };
     },
   }),

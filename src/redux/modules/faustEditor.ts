@@ -32,7 +32,11 @@ export const buildDefaultFaustEditorPolyphonyState = (): FaustEditorPolyphonySta
 
 export interface FaustEditorState {
   instance: FaustWorkletNode | null;
-  ControlPanelComponent?: React.ComponentType;
+  ControlPanelComponent?: React.FC<{
+    style?: React.CSSProperties;
+    position?: any;
+    draggable?: boolean;
+  }>;
   editorContent: string;
   isHidden: boolean;
   polyphonyState: FaustEditorPolyphonyState;

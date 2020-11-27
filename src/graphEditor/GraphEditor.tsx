@@ -242,12 +242,15 @@ const GraphEditor: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToP
       />
 
       <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
-        <ControlPanel style={{ height: 120, width: curSelectedNode ? 500 : 150 }}>
+        <ControlPanel style={{ width: curSelectedNode ? 500 : 150 }}>
           <Button label='arrange' action={uiControls.arrange} />
         </ControlPanel>
 
         {selectedNodeVCID ? (
-          <FlatButton onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}>
+          <FlatButton
+            style={{ marginBottom: 4 }}
+            onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}
+          >
             Show Full UI
           </FlatButton>
         ) : null}

@@ -1,7 +1,8 @@
 /* eslint-disable react/jsx-key */
 import React from 'react';
+import FlatButton from 'src/misc/FlatButton';
 
-import { SequencerMark, SequencerReduxInfra } from '../redux';
+import { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
@@ -46,6 +47,14 @@ const SequencerRow: React.FC<SequencerRowProps> = ({
             } else {
               dispatch(actionCreators.sequencer.MARK(rowIx, colIx));
             }
+          }}
+          onContextMenu={evt => {
+            evt.preventDefault();
+            if (!marked) {
+              return;
+            }
+
+            dispatch(actionCreators.sequencer.TOGGLE_EDIT_MODE(rowIx, colIx));
           }}
         />
       ))}
@@ -102,6 +111,22 @@ const SequencerUI: React.FC<SequencerUIProps> = ({ vcId, ...reduxInfra }) => {
       <SequencerSettings {...reduxInfra} />
       <InputSelect vcId={vcId} {...reduxInfra} />
     </div>
+  );
+};
+
+export const SequencerSmallView: React.FC<SequencerReduxInfra> = ({
+  dispatch,
+  actionCreators,
+  useSelector,
+}) => {
+  const isPlaying = useSelector(
+    (state: { sequencer: SequencerReduxState }) => state.sequencer.isPlaying
+  );
+
+  return (
+    <FlatButton onClick={() => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING())}>
+      {isPlaying ? 'Stop' : 'Start'}
+    </FlatButton>
   );
 };
 

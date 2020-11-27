@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 
 import { faustEditorContextMap, FaustEditorReduxInfra } from 'src/faustEditor';
 import { mkStopInstanceHandler, mkCompileButtonClickHandler } from 'src/faustEditor/FaustEditor';
+import FlatButton from 'src/misc/FlatButton';
 
 const mapSmallViewCompStateToProps = (state: ReturnType<FaustEditorReduxInfra['getState']>) => ({
   instance: state.faustEditor.instance,
@@ -44,7 +45,6 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       }
 
       return mkStopInstanceHandler({
-        reduxInfra: instanceContext.reduxInfra,
         vcId,
         context: instanceContext,
       });
@@ -86,8 +86,8 @@ export const mkFaustEditorSmallView = (vcId: string) => {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <button onClick={stop}>Stop</button>
-        <ControlPanelComponent />
+        <ControlPanelComponent position={null} draggable={false} />
+        <FlatButton onClick={stop}>Stop</FlatButton>
       </div>
     );
   };

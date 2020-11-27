@@ -157,6 +157,8 @@ extern "C" {
     pub fn hide_sequencer(state_key: &str);
     pub fn unhide_sequencer(state_key: &str);
     pub fn get_sequencer_audio_connectables(state_key: &str) -> JsValue;
+    pub fn render_sequencer_small_view(vc_id: &str, target_dom_id: &str);
+    pub fn cleanup_sequencer_small_view(vc_id: &str, target_dom_id: &str);
 }
 
 #[wasm_bindgen(raw_module = "./sampleLibrary")]

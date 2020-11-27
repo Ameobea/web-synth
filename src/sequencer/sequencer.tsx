@@ -30,7 +30,7 @@ import {
   buildSequencerInputMIDINode,
   SequencerEditState,
 } from './redux';
-import { SequencerUIProps } from 'src/sequencer/SequencerUI/SequencerUI';
+import { SequencerSmallView, SequencerUIProps } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 
@@ -324,6 +324,22 @@ export const cleanup_sequencer = (stateKey: string) => {
 export const hide_sequencer = mkContainerHider(getSequencerDOMElementId);
 
 export const unhide_sequencer = mkContainerUnhider(getSequencerDOMElementId);
+
+export const render_sequencer_small_view = (vcId: string, domId: string) => {
+  const reduxInfra = SequencerReduxInfraMap.get(vcId);
+  if (!reduxInfra) {
+    throw new Error(`No redux infra for sequencer with vcId ${vcId} when rendering small view`);
+  }
+
+  mkContainerRenderHelper({
+    Comp: SequencerSmallView,
+    getProps: () => ({ ...reduxInfra }),
+    store: reduxInfra.store,
+  })(domId);
+};
+
+export const cleanup_sequencer_small_view = (_vcId: string, domId: string) =>
+  mkContainerCleanupHelper()(domId);
 
 const schedulerFnBySchedulerScheme: {
   [K in SchedulerScheme]: (bpm: number, startBeat: number, endBeat: number) => number[];
