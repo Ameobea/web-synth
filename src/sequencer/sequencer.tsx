@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { UnreachableException } from 'ameo-utils';
 
 import {
   mkContainerRenderHelper,
@@ -243,7 +243,6 @@ const LazySequencerUI: React.FC<SequencerUIProps> = props => (
 export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
   const reduxInfra = SequencerReduxInfraMap.get(vcId);
 
-  // Initialization is async, so we may not yet have a valid Redux state handle at this point.
   if (!reduxInfra) {
     throw new UnreachableException(
       "Expected to find redux infra for sequencer when initializing, but didn't find it"
@@ -340,23 +339,3 @@ export const render_sequencer_small_view = (vcId: string, domId: string) => {
 
 export const cleanup_sequencer_small_view = (_vcId: string, domId: string) =>
   mkContainerCleanupHelper()(domId);
-
-const schedulerFnBySchedulerScheme: {
-  [K in SchedulerScheme]: (bpm: number, startBeat: number, endBeat: number) => number[];
-} = {
-  [SchedulerScheme.Stable]: (bpm: number, startBeat: number, endBeat: number) =>
-    R.range(startBeat, endBeat + 1).map(beat => beat / (bpm / 60)),
-  [SchedulerScheme.Random]: (_bpm: number, _startBeat: number, _endBeat: number) => {
-    throw new UnimplementedError();
-  },
-  [SchedulerScheme.Swung]: (_bpm: number, _startBeat: number, _endBeat: number) => {
-    throw new UnimplementedError();
-  },
-};
-
-export const getBeatTimings = (
-  scheme: SchedulerScheme,
-  bpm: number,
-  startBeat: number,
-  endBeat: number
-): number[] => schedulerFnBySchedulerScheme[scheme](bpm, startBeat, endBeat);

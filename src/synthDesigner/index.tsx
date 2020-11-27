@@ -16,7 +16,7 @@ import {
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import synthDesignerModule from 'src/redux/modules/synthDesigner';
-import { buildMIDINode, MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
 import { midiToFrequency } from 'src/util';
 
 const buildSynthDesignerRedux = () => {
@@ -151,18 +151,18 @@ export const cleanup_synth_designer = (stateKey: string): string => {
   return designerState;
 };
 
-const midiInputCbCache: Map<string, MIDIInputCbs> = new Map();
+const midiInputCbCache: Map<string, MIDINode> = new Map();
 
-const getMidiNode = (stateKey: string): MIDINode =>
-  buildMIDINode(() => {
-    const cached = midiInputCbCache.get(stateKey);
-    if (cached) {
-      return cached;
-    }
+const getMidiNode = (stateKey: string): MIDINode => {
+  const cached = midiInputCbCache.get(stateKey);
+  if (cached) {
+    return cached;
+  }
 
+  const midiNode = buildMIDINode(() => {
     const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
-    const inner = {
+    return {
       onAttack: (note: number, voiceIx: number, _velocity: number, offset?: number) =>
         dispatch(
           actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx, undefined, offset)
@@ -175,9 +175,10 @@ const getMidiNode = (stateKey: string): MIDINode =>
       onClearAll: (stopPlayingNotes: boolean) =>
         dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS(stopPlayingNotes)),
     };
-    midiInputCbCache.set(stateKey, inner);
-    return inner;
   });
+  midiInputCbCache.set(stateKey, midiNode);
+  return midiNode;
+};
 
 export const getVoicePreset = (stateKey: string, synthIx: number) => {
   const voiceState = getReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];
