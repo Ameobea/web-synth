@@ -31,8 +31,8 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
     };
   }
 
-  triggerVoice(i) {
-    this.port.postMessage({ type: 'triggerVoice', i });
+  triggerVoice(voiceIx, markIx) {
+    this.port.postMessage({ type: 'triggerVoice', voiceIx, markIx });
   }
 
   process(_inputs, _outputs, _params) {
@@ -48,7 +48,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
 
         const markIx = curQuantizedBeat % this.config.beatCount;
         if (voice.marks[markIx]) {
-          this.triggerVoice(i);
+          this.triggerVoice(i, markIx);
         }
       }
     });

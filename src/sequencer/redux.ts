@@ -3,9 +3,9 @@ import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { UnreachableException } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary';
-import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode, buildMIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { buildGateOutput } from 'src/sequencer';
-import { BeatSchedulersBuilderByVoiceType } from 'src/sequencer/scheduler';
+import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 
 export type VoiceTarget =
   | { type: 'sample' }
@@ -13,7 +13,6 @@ export type VoiceTarget =
       type: 'midi';
       synthIx: number | null;
       note: number;
-      editState: { editingMarkIx: number | null } | null;
     }
   | { type: 'gate'; gateIx: number | null };
 
@@ -39,6 +38,11 @@ const buildDefaultSequencerMark = (voice: VoiceTarget): SequencerMark => {
   }
 };
 
+export interface SequencerEditState {
+  voiceIx: number;
+  editingMarkIx: number | null;
+}
+
 export interface SequencerReduxState {
   currentEditingVoiceIx: number;
   activeBeats: number[];
@@ -57,6 +61,8 @@ export interface SequencerReduxState {
   gateOutputs: ConstantSourceNode[];
   schedulerScheme: SchedulerScheme;
   awpHandle: AudioWorkletNode | undefined;
+  inputMIDINode: MIDINode;
+  markEditState: SequencerEditState | null;
 }
 
 const ctx = new AudioContext();
@@ -87,6 +93,8 @@ const reschedule = (state: SequencerReduxState): SequencerReduxState => {
 
   return state;
 };
+
+export const SequencerReduxInfraMap: Map<string, SequencerReduxInfra> = new Map();
 
 const actionGroups = {
   SET_STATE: buildActionGroup({
@@ -263,7 +271,7 @@ const actionGroups = {
       const voice = state.voices[voiceIx];
       // Play a single beat of the voice now if the sequencer isn't currently playing
       if (!state.isPlaying) {
-        BeatSchedulersBuilderByVoiceType[voice.type](state, voiceIx, voice as any);
+        SequencerBeatPlayerByVoiceType[voice.type](state, voiceIx, voice as any);
       }
 
       return {
@@ -284,16 +292,54 @@ const actionGroups = {
       const firstMarkedBeatIx = state.marks[voiceIx].findIndex(R.identity);
       return {
         ...state,
-        voices: R.set(
-          R.lensIndex(voiceIx),
-          {
-            ...voice,
-            editState: voice.editState
-              ? null
-              : { editingBeatIx: firstMarkedBeatIx === -1 ? firstMarkedBeatIx : null },
-          },
-          state.voices
+        markEditState:
+          state.markEditState?.voiceIx === voiceIx
+            ? null
+            : { voiceIx, editingMarkIx: firstMarkedBeatIx === -1 ? null : firstMarkedBeatIx },
+      };
+    },
+  }),
+  SET_MARK_STATE: buildActionGroup({
+    actionCreator: (markState: SequencerMark, advanceSelectedMark?: boolean) => ({
+      type: 'SET_MARK_STATE',
+      markState,
+      advanceSelectedMark,
+    }),
+    subReducer: (state: SequencerReduxState, { markState, advanceSelectedMark }) => {
+      if (R.isNil(state.markEditState?.editingMarkIx)) {
+        console.warn('Tried to set mark state with no editing mark selected');
+        return state;
+      }
+
+      const getNextMarkIndex = (
+        curMarkIndex: number,
+        marks: (SequencerMark | null)[]
+      ): number | null => {
+        const nextMarkIx = marks.findIndex((mark, i) => i > curMarkIndex && !!mark);
+        if (nextMarkIx !== -1) {
+          return nextMarkIx;
+        }
+
+        const firstMarkIx = marks.findIndex(mark => !!mark);
+        return firstMarkIx === -1 ? null : firstMarkIx;
+      };
+
+      return {
+        ...state,
+        marks: R.set(
+          R.lensPath([state.markEditState!.voiceIx, state.markEditState!.editingMarkIx!]),
+          markState,
+          state.marks
         ),
+        markEditState: advanceSelectedMark
+          ? {
+              voiceIx: state.markEditState!.voiceIx,
+              editingMarkIx: getNextMarkIndex(
+                state.markEditState!.editingMarkIx!,
+                state.marks[state.markEditState!.voiceIx]
+              ),
+            }
+          : state.markEditState,
       };
     },
   }),
@@ -311,7 +357,39 @@ export type SequencerReduxInfra = ReturnType<typeof buildSequencerReduxInfra>;
 
 const DEFAULT_WIDTH = 16 as const;
 
-export const buildInitialState = (): SequencerReduxState => ({
+export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
+  const inputCbs: MIDIInputCbs = {
+    onAttack: (note, _voiceIx, velocity, _offset) => {
+      const reduxInfra = SequencerReduxInfraMap.get(vcId);
+      const state = reduxInfra?.getState();
+      if (R.isNil(state?.sequencer.markEditState?.editingMarkIx)) {
+        return;
+      }
+
+      const newMark = { type: 'midi' as const, note, gain: velocity };
+      reduxInfra!.dispatch(reduxInfra!.actionCreators.sequencer.SET_MARK_STATE(newMark, true));
+
+      // Play a single beat of the voice now if the sequencer isn't currently playing
+      if (!state!.sequencer.isPlaying) {
+        const voiceIx = state!.sequencer.markEditState!.voiceIx;
+        const voice = state!.sequencer.voices[voiceIx];
+        SequencerBeatPlayerByVoiceType[voice.type](
+          state!.sequencer,
+          voiceIx,
+          voice as any,
+          newMark as any
+        );
+      }
+    },
+    onRelease: () => void 0,
+    onClearAll: () => void 0,
+    onPitchBend: () => void 0,
+  };
+
+  return buildMIDINode(() => inputCbs);
+};
+
+export const buildInitialState = (vcId: string): SequencerReduxState => ({
   currentEditingVoiceIx: 0,
   activeBeats: [0],
   voices: [{ type: 'sample' as const }],
@@ -324,4 +402,6 @@ export const buildInitialState = (): SequencerReduxState => ({
   gateOutputs: [],
   schedulerScheme: SchedulerScheme.Stable,
   awpHandle: undefined,
+  inputMIDINode: buildSequencerInputMIDINode(vcId),
+  markEditState: null,
 });

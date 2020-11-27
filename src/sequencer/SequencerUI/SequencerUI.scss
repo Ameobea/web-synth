@@ -21,6 +21,13 @@
   rect.marked:hover {
     fill: rgb(120, 148, 120);
   }
+
+  rect.active {
+    fill: rgb(194, 85, 85);
+  }
+  rect.active:hover {
+    fill: rgb(148, 120, 120);
+  }
 }
 
 .sequencer-input-select {

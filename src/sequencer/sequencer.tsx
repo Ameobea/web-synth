@@ -21,22 +21,22 @@ import { SampleDescriptor, getSample } from 'src/sampleLibrary';
 import {
   buildSequencerReduxInfra,
   buildInitialState,
-  SequencerReduxInfra,
   SequencerReduxState,
   VoiceTarget,
   SchedulerScheme,
   buildSequencerConfig,
   SequencerMark,
+  SequencerReduxInfraMap,
+  buildSequencerInputMIDINode,
+  SequencerEditState,
 } from './redux';
 import { SequencerUIProps } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
-import { BeatSchedulersBuilderByVoiceType } from 'src/sequencer/scheduler';
+import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 
 const ctx = new AudioContext();
 
 const SequencerUI = React.lazy(() => import('./SequencerUI'));
-
-const reduxInfraMap: Map<string, SequencerReduxInfra> = new Map();
 
 interface SerializedSequencer {
   currentEditingVoiceIx: number;
@@ -48,12 +48,13 @@ interface SerializedSequencer {
   midiOutputCount: number;
   gateOutputCount: number;
   schedulerScheme: SchedulerScheme;
+  markEditState?: SequencerEditState | null;
 }
 
 const getSequencerDOMElementId = (vcId: string) => `sequencer-${vcId}`;
 
 const serializeSequencer = (vcId: string): string => {
-  const reduxInfra = reduxInfraMap.get(vcId);
+  const reduxInfra = SequencerReduxInfraMap.get(vcId);
   if (!reduxInfra) {
     console.error(
       `Missing entry in sequencer redux infra map for vcId ${vcId} when trying to serialize`
@@ -71,8 +72,8 @@ const serializeSequencer = (vcId: string): string => {
     gateOutputs,
     schedulerScheme,
     sampleBank,
+    markEditState,
   } = reduxInfra.getState().sequencer;
-  console.log({ isPlaying });
 
   const serialized: SerializedSequencer = {
     currentEditingVoiceIx,
@@ -84,6 +85,7 @@ const serializeSequencer = (vcId: string): string => {
     midiOutputCount: midiOutputs.length,
     gateOutputCount: gateOutputs.length,
     schedulerScheme,
+    markEditState,
   };
 
   return JSON.stringify(serialized);
@@ -106,13 +108,14 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
   workletHandle.port.onmessage = msg => {
     switch (msg.data.type) {
       case 'triggerVoice': {
-        const state = reduxInfraMap.get(vcId)!.getState().sequencer;
-        const voiceIx = msg.data.i;
+        const state = SequencerReduxInfraMap.get(vcId)!.getState().sequencer;
+        const { voiceIx, markIx } = msg.data;
 
-        BeatSchedulersBuilderByVoiceType[state.voices[voiceIx].type](
+        SequencerBeatPlayerByVoiceType[state.voices[voiceIx].type](
           state,
           voiceIx,
-          state.voices[voiceIx] as any
+          state.voices[voiceIx] as any,
+          state.marks[voiceIx][markIx]! as any
         );
         break;
       }
@@ -121,7 +124,7 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
       }
     }
   };
-  const state = reduxInfraMap.get(vcId)!.getState().sequencer;
+  const state = SequencerReduxInfraMap.get(vcId)!.getState().sequencer;
   workletHandle.port.postMessage({ type: 'configure', config: buildSequencerConfig(state) });
 
   return workletHandle;
@@ -163,10 +166,11 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     midiOutputCount,
     gateOutputCount,
     schedulerScheme,
+    markEditState,
   }: SerializedSequencer = JSON.parse(serialized);
 
   initSampleBank(sampleBank).then(sampleBank => {
-    const reduxInfra = reduxInfraMap.get(vcId);
+    const reduxInfra = SequencerReduxInfraMap.get(vcId);
     if (!reduxInfra) {
       console.warn('No redux infra found after loading samples');
       return;
@@ -193,10 +197,12 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     gateOutputs: R.times(buildGateOutput, gateOutputCount),
     schedulerScheme,
     awpHandle: undefined,
+    inputMIDINode: buildSequencerInputMIDINode(vcId),
+    markEditState: markEditState || null,
   };
 
   initSequenceAWP(vcId).then(awpHandle => {
-    const reduxInfra = reduxInfraMap.get(vcId);
+    const reduxInfra = SequencerReduxInfraMap.get(vcId);
     if (!reduxInfra) {
       console.warn('No redux infra found for sequencer when trying to auto-start');
       return;
@@ -215,7 +221,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
 const loadInitialState = (stateKey: string, vcId: string) => {
   const serializedState = localStorage.getItem(stateKey);
   if (!serializedState) {
-    return buildInitialState();
+    return buildInitialState(vcId);
   }
 
   try {
@@ -224,7 +230,7 @@ const loadInitialState = (stateKey: string, vcId: string) => {
     console.error(
       `Failed to parse serialized state for sequencer id ${vcId}; building default state.`
     );
-    return buildInitialState();
+    return buildInitialState(vcId);
   }
 };
 
@@ -235,7 +241,7 @@ const LazySequencerUI: React.FC<SequencerUIProps> = props => (
 );
 
 export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
-  const reduxInfra = reduxInfraMap.get(vcId);
+  const reduxInfra = SequencerReduxInfraMap.get(vcId);
 
   // Initialization is async, so we may not yet have a valid Redux state handle at this point.
   if (!reduxInfra) {
@@ -257,7 +263,10 @@ export const get_sequencer_audio_connectables = (vcId: string): AudioConnectable
 
   return {
     vcId,
-    inputs: ImmMap<string, ConnectableInput>(),
+    inputs: ImmMap<string, ConnectableInput>().set('midi_input', {
+      type: 'midi',
+      node: reduxState.sequencer.inputMIDINode,
+    }),
     outputs,
   };
 };
@@ -276,10 +285,10 @@ export const init_sequencer = (stateKey: string) => {
 
   const initialState = loadInitialState(stateKey, vcId);
   const reduxInfra = buildSequencerReduxInfra(initialState);
-  if (!!reduxInfraMap.get(vcId)) {
+  if (!!SequencerReduxInfraMap.get(vcId)) {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);
   }
-  reduxInfraMap.set(vcId, reduxInfra);
+  SequencerReduxInfraMap.set(vcId, reduxInfra);
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
   updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
@@ -298,7 +307,7 @@ export const cleanup_sequencer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   // Stop it if it is playing
-  const reduxInfra = reduxInfraMap.get(vcId)!;
+  const reduxInfra = SequencerReduxInfraMap.get(vcId)!;
   if (!reduxInfra) {
     throw new Error(`No sequencer Redux infra map entry for sequencer with vcId ${vcId}`);
   }

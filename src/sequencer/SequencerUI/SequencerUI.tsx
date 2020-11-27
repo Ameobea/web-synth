@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-key */
 import React from 'react';
 
-import { SequencerReduxInfra } from '../redux';
+import { SequencerMark, SequencerReduxInfra } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
@@ -15,44 +15,52 @@ const EditingVoiceSelector: React.FC<{
   <div className={`editing-voice-selector${isSelected ? ' selected' : ''}`} onClick={onSelect} />
 );
 
-const SequencerRowInner: React.FC<{
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
+interface SequencerRowProps extends SequencerReduxInfra {
   rowIx: number;
-  marks: boolean[];
-}> = ({ actionCreators, dispatch, rowIx, marks }) => (
-  <>
-    {marks.map((marked, colIx) => (
-      <rect
-        className={marked ? 'marked' : undefined}
-        x={colIx * CELL_SIZE_PX}
-        y={rowIx * CELL_SIZE_PX}
-        width={CELL_SIZE_PX}
-        height={CELL_SIZE_PX}
-        onClick={() => {
-          if (marked) {
-            dispatch(actionCreators.sequencer.UNMARK(rowIx, colIx));
-          } else {
-            dispatch(actionCreators.sequencer.MARK(rowIx, colIx));
-          }
-        }}
-      />
-    ))}
-  </>
-);
-const SequencerRow = React.memo(SequencerRowInner);
-
-interface SequencerGridProps extends SequencerReduxInfra {
-  rowMarks: boolean[][];
 }
 
-const SequencerGrid: React.FC<SequencerGridProps> = ({
+const SequencerRow: React.FC<SequencerRowProps> = ({
+  rowIx,
   actionCreators,
   dispatch,
-  rowMarks,
   useSelector,
 }) => {
-  const currentEditingVoiceIx = useSelector(state => state.sequencer.currentEditingVoiceIx);
+  const { marks, activeIx } = useSelector(({ sequencer }) => ({
+    marks: sequencer.marks[rowIx],
+    activeIx:
+      sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
+  }));
+
+  return (
+    <>
+      {marks.map((marked, colIx) => (
+        <rect
+          className={activeIx === colIx ? 'active' : marked ? 'marked' : undefined}
+          x={colIx * CELL_SIZE_PX}
+          y={rowIx * CELL_SIZE_PX}
+          width={CELL_SIZE_PX}
+          height={CELL_SIZE_PX}
+          onClick={() => {
+            if (marked) {
+              dispatch(actionCreators.sequencer.UNMARK(rowIx, colIx));
+            } else {
+              dispatch(actionCreators.sequencer.MARK(rowIx, colIx));
+            }
+          }}
+        />
+      ))}
+    </>
+  );
+};
+
+interface SequencerGridProps extends SequencerReduxInfra {
+  rowMarks: (SequencerMark | null)[][];
+}
+
+const SequencerGrid: React.FC<SequencerGridProps> = ({ rowMarks, ...reduxInfra }) => {
+  const currentEditingVoiceIx = reduxInfra.useSelector(
+    state => state.sequencer.currentEditingVoiceIx
+  );
 
   return (
     <div className='sequencer-grid-wrapper'>
@@ -61,18 +69,17 @@ const SequencerGrid: React.FC<SequencerGridProps> = ({
           <EditingVoiceSelector
             key={i}
             isSelected={currentEditingVoiceIx === i}
-            onSelect={() => dispatch(actionCreators.sequencer.SET_CURRENTLY_EDITING_VOICE_IX(i))}
+            onSelect={() =>
+              reduxInfra.dispatch(
+                reduxInfra.actionCreators.sequencer.SET_CURRENTLY_EDITING_VOICE_IX(i)
+              )
+            }
           />
         ))}
       </div>
       <svg>
-        {rowMarks.map((marks, rowIx) => (
-          <SequencerRow
-            rowIx={rowIx}
-            actionCreators={actionCreators}
-            dispatch={dispatch}
-            marks={marks}
-          />
+        {rowMarks.map((_marks, rowIx) => (
+          <SequencerRow rowIx={rowIx} {...reduxInfra} />
         ))}
       </svg>
     </div>

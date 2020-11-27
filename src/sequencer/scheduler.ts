@@ -1,23 +1,25 @@
 import * as R from 'ramda';
 
-import { SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
+import { SequencerMark, SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
 import { scheduleEvent } from 'src/eventScheduler';
 
 const ctx = new AudioContext();
 
-type BeatSchedulerBuilder<K extends string> = (
+type BeatSchedulerPlayer<K extends string> = (
   state: SequencerReduxState,
   voiceIx: number,
-  voice: Extract<VoiceTarget, { type: K }>
+  voice: Extract<VoiceTarget, { type: K }>,
+  mark?: Extract<SequencerMark, { type: K }>
 ) => void;
 
-export const BeatSchedulersBuilderByVoiceType: {
-  [K in VoiceTarget['type']]: BeatSchedulerBuilder<K>;
+export const SequencerBeatPlayerByVoiceType: {
+  [K in VoiceTarget['type']]: BeatSchedulerPlayer<K>;
 } = {
   midi: (
     state: SequencerReduxState,
     _voiceIx: number,
-    voice: Extract<VoiceTarget, { type: 'midi' }>
+    voice: Extract<VoiceTarget, { type: 'midi' }>,
+    mark?: Extract<SequencerMark, { type: 'midi' }>
   ) => {
     if (R.isNil(voice.synthIx)) {
       return;
@@ -33,14 +35,15 @@ export const BeatSchedulersBuilderByVoiceType: {
       const beatDurationMS = (60 / state.bpm) * 1000;
       const holdDurationMS = beatDurationMS * 0.72;
 
-      onAttack(voice.note, 0, 255);
+      onAttack(mark?.note ?? voice.note, 0, 255);
       scheduleEvent(ctx.currentTime + holdDurationMS / 1000, () => onRelease(voice.note, 0, 255));
     });
   },
   sample: (
     state: SequencerReduxState,
     voiceIx: number,
-    _voice: Extract<VoiceTarget, { type: 'sample' }>
+    _voice: Extract<VoiceTarget, { type: 'sample' }>,
+    _mark?: Extract<SequencerMark, { type: 'sample' }>
   ) => {
     if (typeof state.sampleBank === 'string') {
       return;
@@ -59,7 +62,8 @@ export const BeatSchedulersBuilderByVoiceType: {
   gate: (
     state: SequencerReduxState,
     _voiceIx: number,
-    voice: Extract<VoiceTarget, { type: 'gate' }>
+    voice: Extract<VoiceTarget, { type: 'gate' }>,
+    _mark?: Extract<SequencerMark, { type: 'gate' }>
   ) => {
     if (R.isNil(voice.gateIx)) {
       return;
