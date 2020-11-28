@@ -22,6 +22,7 @@ export const hashSampleDescriptor = ({ isLocal, name }: SampleDescriptor): strin
   `${isLocal}-${name}`;
 
 const GLOBAL_SAMPLE_MANAGER = new SampleManager();
+(window as any).SampleManager = GLOBAL_SAMPLE_MANAGER;
 
 const ctx = new AudioContext();
 

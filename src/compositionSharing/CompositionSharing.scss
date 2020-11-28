@@ -32,8 +32,9 @@
       display: flex;
       flex-direction: row;
       justify-content: space-between;
-      padding-bottom: 4px;
+      align-items: center;
       padding-top: 4px;
+      border-bottom: 1px solid #444;
 
       > div {
         display: flex;
@@ -52,6 +53,7 @@
       button {
         height: 18px;
         width: 60px;
+        margin-right: 20px;
       }
     }
   }

@@ -37,6 +37,10 @@ impl ViewContext for Sequencer {
     fn cleanup_small_view(&mut self, target_dom_id: &str) {
         js::cleanup_sequencer_small_view(&self.get_id(), target_dom_id);
     }
+
+    fn list_used_samples(&self) -> Vec<JsValue> {
+        js::sequencer_list_used_samples(&self.get_state_key())
+    }
 }
 
 pub fn mk_sequencer(_definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {

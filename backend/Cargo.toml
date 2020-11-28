@@ -19,7 +19,7 @@ log = "0.4.11"
 
 rayon = "1.5"
 
-reqwest = "0.10"
+reqwest = { version = "0.10", features = ["gzip", "brotli"] }
 
 rocket = { git = "https://github.com/ameobea/Rocket.git" }
 rocket_contrib = { git = "https://github.com/ameobea/Rocket.git", features = ["json", "diesel_mysql_pool", "compression"] }

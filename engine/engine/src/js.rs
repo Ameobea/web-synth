@@ -159,6 +159,7 @@ extern "C" {
     pub fn get_sequencer_audio_connectables(state_key: &str) -> JsValue;
     pub fn render_sequencer_small_view(vc_id: &str, target_dom_id: &str);
     pub fn cleanup_sequencer_small_view(vc_id: &str, target_dom_id: &str);
+    pub fn sequencer_list_used_samples(state_key: &str) -> Vec<JsValue>;
 }
 
 #[wasm_bindgen(raw_module = "./sampleLibrary")]
@@ -185,4 +186,5 @@ extern "C" {
     pub fn hide_granulator(state_key: &str);
     pub fn unhide_granulator(state_key: &str);
     pub fn get_granulator_audio_connectables(state_key: &str) -> JsValue;
+    pub fn granulator_list_used_samples(vc_id: &str) -> Vec<JsValue>;
 }

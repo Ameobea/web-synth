@@ -70,4 +70,10 @@ pub trait ViewContext {
     /// Unrenders whatever was created by `render_small_view` in the `<div>` element with the
     /// provided `id`\
     fn cleanup_small_view(&mut self, _target_dom_id: &str) {}
+
+    /// Return a list of sample descriptors for all samples that are currently in use by this VC.
+    /// This should include all samples that are actually being played or that are in some kind of
+    /// internal state and can be played depending on some kind of signal or state transition that
+    /// doesn't explicitly depend on the user selecting a new sample.
+    fn list_used_samples(&self) -> Vec<JsValue> { Vec::new() }
 }

@@ -33,9 +33,9 @@ table! {
 }
 
 table! {
-    remote_sample_urls (id) {
+    remote_sample_urls (id, name) {
         id -> Varchar,
-        name -> Text,
+        name -> Varchar,
         sample_url -> Text,
     }
 }
@@ -63,7 +63,7 @@ table! {
         id -> Bigint,
         title -> Text,
         description -> Text,
-        body -> Text,
+        body -> Longtext,
     }
 }
 

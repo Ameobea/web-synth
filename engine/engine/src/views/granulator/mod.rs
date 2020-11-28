@@ -35,6 +35,10 @@ impl ViewContext for Granulator {
     fn get_audio_connectables(&self) -> JsValue {
         js::get_granulator_audio_connectables(&self.get_state_key())
     }
+
+    fn list_used_samples(&self) -> Vec<JsValue> {
+        js::granulator_list_used_samples(&self.uuid.to_string())
+    }
 }
 
 pub fn mk_granulator(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {

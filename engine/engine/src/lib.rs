@@ -183,3 +183,14 @@ pub fn cleanup_small_view(vc_id: &str, target_dom_id: &str) {
 
     vc_entry.context.cleanup_small_view(target_dom_id);
 }
+
+/// Returns a list of all samples that are in active use by any VC.  The list is non-deduped and
+/// can't be due to limitations of the API's use of `JsValue`.
+#[wasm_bindgen]
+pub fn get_active_samples() -> Vec<JsValue> {
+    get_vcm()
+        .contexts
+        .iter()
+        .flat_map(|vc| vc.context.list_used_samples().into_iter())
+        .collect()
+}

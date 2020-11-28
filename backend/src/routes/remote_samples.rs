@@ -53,40 +53,66 @@ pub async fn store_remote_sample(
             .map(|s| format!(".{}", s.to_string_lossy()))
             .unwrap_or_default()
     );
-    // Forward the request to the Faust server / generic go server that we forced into doing other
-    // things as well
-    let res = reqwest::Client::new()
-        .post(&format!(
-            "{}/remote_samples/{}?token={}",
-            FAUST_SERVER_URL,
-            sample_id,
-            crate::conf::CONF.auth_token
-        ))
-        .body(sample_data_buf)
-        .send()
-        .await;
-    let res = match res {
-        Ok(res) => res,
-        Err(err) => {
-            error!("Error querying go server RPC to store sample: {:?}", err);
-            return Err(String::from("Error saving sample"));
-        },
+
+    // Check if we already have this sample stored.  If so, we don't need to do anything since the
+    // hash guarentees it's the exact same one.
+    let sample_id_c = sample_id.clone();
+    let sample_url = format!("{}{}", REMOTE_SAMPLES_BUCKET_URL, sample_id);
+    let remote_sample = RemoteSample {
+        name: name.clone(),
+        id: sample_id,
+        sample_url,
     };
-    if res.status() != 200 {
-        error!(
-            "Error querying go server RPC to store sample: {:?}",
-            res.text().await
-        );
-        return Err(String::from("Error saving sample"));
+
+    let existing_samples_for_id: Vec<RemoteSample> = conn
+        .run(|conn| {
+            remote_sample_urls::table
+                .find((sample_id_c, name))
+                .load(conn)
+        })
+        .await
+        .map_err(|err| {
+            error!(
+                "Error querying DB to check if sample already exists: {:?}",
+                err
+            );
+            String::from("DB Error")
+        })?;
+
+    // If we have an exact match, we actually have nothing to do
+    if existing_samples_for_id.iter().any(|o| *o == remote_sample) {
+        return Ok(Json(remote_sample));
     }
 
-    let sample_url = format!("{}{}", REMOTE_SAMPLES_BUCKET_URL, sample_id);
-    let sample_url_c = sample_url.clone();
-    let remote_sample = RemoteSample {
-        name,
-        id: sample_id,
-        sample_url: sample_url_c,
-    };
+    if existing_samples_for_id.is_empty() {
+        // Forward the request to the Faust server / generic go server that we forced into doing
+        // other things as well
+        let res = reqwest::Client::new()
+            .post(&format!(
+                "{}/remote_samples/{}?token={}",
+                FAUST_SERVER_URL,
+                remote_sample.id,
+                crate::conf::CONF.auth_token
+            ))
+            .body(sample_data_buf)
+            .send()
+            .await;
+        let res = match res {
+            Ok(res) => res,
+            Err(err) => {
+                error!("Error querying go server RPC to store sample: {:?}", err);
+                return Err(String::from("Error saving sample"));
+            },
+        };
+        if res.status() != 200 {
+            error!(
+                "Error querying go server RPC to store sample: {:?}",
+                res.text().await
+            );
+            return Err(String::from("Error saving sample"));
+        }
+    }
+
     let remote_sample_c = remote_sample.clone();
     conn.run(move |conn| {
         diesel::insert_into(remote_sample_urls::table)

@@ -14,11 +14,12 @@ import {
   updateConnectables,
 } from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
-import { store } from 'src/redux';
+import { getState, store } from 'src/redux';
 import { AsyncOnce } from 'src/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
+import { ActiveSamplesByVcId, GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
+import { SampleDescriptor } from 'src/sampleLibrary';
 
 interface GranulatorState {
   startSample: number;
@@ -201,3 +202,6 @@ export const cleanup_granulator = (stateKey: string) => {
 export const hide_granulator = mkContainerHider(getGranulatorDOMElementId);
 
 export const unhide_granulator = mkContainerUnhider(getGranulatorDOMElementId);
+
+export const granulator_list_used_samples = (vcId: string): SampleDescriptor[] =>
+  ActiveSamplesByVcId.get(vcId) ?? [];

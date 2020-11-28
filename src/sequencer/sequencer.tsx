@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
-import { UnreachableException } from 'ameo-utils';
+import { filterNils, UnreachableException } from 'ameo-utils';
 
 import {
   mkContainerRenderHelper,
@@ -339,3 +339,38 @@ export const render_sequencer_small_view = (vcId: string, domId: string) => {
 
 export const cleanup_sequencer_small_view = (_vcId: string, domId: string) =>
   mkContainerCleanupHelper()(domId);
+
+export const sequencer_list_used_samples = (stateKey: string): SampleDescriptor[] => {
+  const vcId = stateKey.split('_')[1]!;
+  const reduxInfra = SequencerReduxInfraMap.get(vcId);
+  if (!reduxInfra) {
+    console.warn('No redux infra found for live sequencer with vcId=' + vcId);
+    return [];
+  }
+
+  const state = reduxInfra.getState().sequencer;
+  const { sampleBank } = state;
+  if (typeof sampleBank === 'string') {
+    console.warn('Tried to get list of used samples for sequencer before sample bank was loaded');
+
+    const serializedState = localStorage.getItem(stateKey);
+    if (!serializedState) {
+      return [];
+    }
+
+    try {
+      const { sampleBank }: SerializedSequencer = JSON.parse(serializedState);
+      return filterNils(Object.values(sampleBank));
+    } catch (_err) {
+      console.error(
+        `Failed to parse serialized state for sequencer id ${vcId} when getting used samples`
+      );
+      return [];
+    }
+    return [];
+  }
+
+  return filterNils(
+    state.voices.map((voice, i) => (voice.type === 'sample' ? sampleBank[i]?.descriptor : null))
+  );
+};

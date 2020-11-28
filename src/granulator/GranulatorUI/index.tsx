@@ -180,6 +180,8 @@ const GranularControlPanel: React.FC<{
   );
 };
 
+export const ActiveSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();
+
 const GranulatorUI: React.FC<{
   vcId: string;
   initialState: GranulatorControlPanelState;
@@ -231,6 +233,14 @@ const GranulatorUI: React.FC<{
       setActiveSample({ descriptor, sampleData });
     })();
   }, []);
+
+  useEffect(() => {
+    if (!activeSample?.descriptor) {
+      return;
+    }
+
+    ActiveSamplesByVcId.set(vcId, [activeSample.descriptor]);
+  }, [activeSample?.descriptor, vcId]);
 
   return (
     <div className='granulator'>
