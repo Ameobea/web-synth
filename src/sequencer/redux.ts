@@ -367,7 +367,7 @@ const DEFAULT_WIDTH = 16 as const;
 
 export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
   const inputCbs: MIDIInputCbs = {
-    onAttack: (note, _voiceIx, velocity, _offset) => {
+    onAttack: (note, velocity, _offset) => {
       const reduxInfra = SequencerReduxInfraMap.get(vcId);
       const state = reduxInfra?.getState();
       if (R.isNil(state?.sequencer.markEditState?.editingMarkIx)) {

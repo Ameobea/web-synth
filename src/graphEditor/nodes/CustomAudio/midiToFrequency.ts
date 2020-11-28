@@ -34,7 +34,7 @@ export class MIDIToFrequencyNode {
   }
 
   private getMIDIInputCbs = (): MIDIInputCbs => ({
-    onAttack: (note, _voiceIx, _velocity, offset?: number) => {
+    onAttack: (note, _velocity, offset?: number) => {
       this.gate(offset);
       this.frequencyCSN.offset.setValueAtTime(
         this.noteToFrequency(note),
@@ -47,7 +47,7 @@ export class MIDIToFrequencyNode {
         this.activeNotes.push(note);
       }
     },
-    onRelease: (note, _voiceIx, _velocity, offset?: number) => {
+    onRelease: (note, _velocity, offset?: number) => {
       if (R.isNil(offset)) {
         this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
 

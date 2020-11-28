@@ -5,8 +5,8 @@ import { PromiseResolveType } from 'ameo-utils';
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
  */
 export interface MIDIInputCbs {
-  onAttack: (note: number, voiceIx: number, velocity: number, offset?: number) => void;
-  onRelease: (note: number, voiceIx: number, velocity: number, offset?: number) => void;
+  onAttack: (note: number, velocity: number, offset?: number) => void;
+  onRelease: (note: number, velocity: number, offset?: number) => void;
   onPitchBend: (bendAmount: number, offset?: number) => void;
   onClearAll: (stopPlayingNotes: boolean) => void;
 }
@@ -71,6 +71,14 @@ export class MIDINode {
     if (beforeCbCount === this.outputCbs_.length) {
       console.warn("Tried to disconnect two MIDI nodes but they weren't connected");
     }
+  }
+
+  public onAttack(note: number, velocity: number, offset?: number) {
+    this.outputCbs.forEach(cbs => cbs.onAttack(note, velocity, offset));
+  }
+
+  public onRelease(note: number, velocity: number, offset?: number) {
+    this.outputCbs.forEach(cbs => cbs.onRelease(note, velocity, offset));
   }
 }
 

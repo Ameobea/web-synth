@@ -19,11 +19,11 @@ export class EnvelopeGenerator implements ForeignNode {
 
   private heldNotes: number[] = [];
   private gateMIDINodeInputCBs: MIDIInputCbs = {
-    onAttack: (note, _voiceIx, _velocity, offset) => {
+    onAttack: (note, _velocity, offset) => {
       this.heldNotes.push(note);
       this.adsrModule.gate(offset);
     },
-    onRelease: (note, _voiceIx, _velocity, offset) => {
+    onRelease: (note, _velocity, offset) => {
       if (R.last(this.heldNotes) === note) {
         this.adsrModule.ungate(offset);
       }

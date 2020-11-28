@@ -12,6 +12,7 @@ import {
   deserializeSynthModule,
   getInitialSynthDesignerState,
   Waveform,
+  PolysynthMod,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -85,6 +86,28 @@ export const init_synth_designer = (stateKey: string) => {
       localStorage.removeItem(stateKey);
       return getInitialSynthDesignerState(true);
     });
+
+  PolysynthMod.get().then(mod => {
+    const playNote = (voiceIx: number, note: number, velocity: number, offset?: number) =>
+      reduxInfra.dispatch(
+        reduxInfra.actionCreators.synthDesigner.GATE(
+          midiToFrequency(note),
+          voiceIx,
+          undefined,
+          offset
+        )
+      );
+
+    const releaseNote = (voiceIx: number, note: number, velocity: number, offset?: number) =>
+      reduxInfra.dispatch(
+        reduxInfra.actionCreators.synthDesigner.UNGATE(voiceIx, undefined, offset)
+      );
+
+    const ctxPtr = mod.create_polysynth_context(playNote, releaseNote);
+    reduxInfra.dispatch(
+      reduxInfra.actionCreators.synthDesigner.SET_POLYSYNTH_CTX({ ctxPtr, module: mod })
+    );
+  });
 
   if (initialState) {
     reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_STATE(initialState));
@@ -160,15 +183,29 @@ const getMidiNode = (stateKey: string): MIDINode => {
   }
 
   const midiNode = buildMIDINode(() => {
-    const { dispatch, actionCreators } = getReduxInfra(stateKey);
+    const { dispatch, getState, actionCreators } = getReduxInfra(stateKey);
+
+    const onAttack = (note: number, velocity: number, offset?: number) => {
+      const polysynthCtx = getState().synthDesigner.polysynthCtx;
+      if (!polysynthCtx) {
+        return;
+      }
+
+      polysynthCtx.module.handle_note_down(polysynthCtx.ctxPtr, note, velocity, offset);
+    };
+
+    const onRelease = (note: number, velocity: number, offset?: number) => {
+      const polysynthCtx = getState().synthDesigner.polysynthCtx;
+      if (!polysynthCtx) {
+        return;
+      }
+
+      polysynthCtx.module.handle_note_up(polysynthCtx.ctxPtr, note, offset);
+    };
 
     return {
-      onAttack: (note: number, voiceIx: number, _velocity: number, offset?: number) =>
-        dispatch(
-          actionCreators.synthDesigner.GATE(midiToFrequency(note), voiceIx, undefined, offset)
-        ),
-      onRelease: (_note: number, voiceIx: number, _velocity: number, offset?: number) =>
-        dispatch(actionCreators.synthDesigner.UNGATE(voiceIx, undefined, offset)),
+      onAttack,
+      onRelease,
       onPitchBend: () => {
         // No-op; TODO?
       },

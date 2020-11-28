@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import { UnimplementedError } from 'ameo-utils';
+import { PromiseResolveType, UnimplementedError } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
@@ -12,7 +12,7 @@ import WaveTable, {
   getDefaultWavetableDef,
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
-import { base64ArrayBuffer } from 'src/util';
+import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -93,6 +93,12 @@ export interface Voice {
   filterNode: BiquadFilterNode;
   gainADSRModule: ADSRModule;
   filterADSRModule: ADSRModule;
+}
+
+export const PolysynthMod = new AsyncOnce(() => import('src/polysynth'));
+interface PolysynthContext {
+  module: PromiseResolveType<ReturnType<typeof PolysynthMod.get>>;
+  ctxPtr: number;
 }
 
 export interface SynthModule {
@@ -340,6 +346,7 @@ export interface SynthDesignerState {
   wavyJonesInstance: AnalyserNode | undefined;
   spectrumNode: AnalyserNode;
   isHidden: boolean;
+  polysynthCtx: PolysynthContext | null;
 }
 
 const buildDefaultFilterCSNs = (): FilterCSNs => ({
@@ -561,9 +568,9 @@ export const deserializeSynthModule = (
     masterGain,
     selectedEffectType,
     gainEnvelope,
-    gainADSRLength,
+    gainADSRLength: gainADSRLength ?? 1000,
     filterEnvelope,
-    filterADSRLength,
+    filterADSRLength: filterADSRLength ?? 1000,
     filterParams,
     pitchMultiplier: pitchMultiplier ?? 1,
   };
@@ -574,6 +581,7 @@ export const getInitialSynthDesignerState = (addInitialSynth?: boolean): SynthDe
   wavyJonesInstance: undefined,
   spectrumNode: new AnalyserNode(new AudioContext()),
   isHidden: false,
+  polysynthCtx: null,
 });
 
 const getSynth = (index: number, synths: SynthDesignerState['synths']) => {
@@ -1412,6 +1420,10 @@ const actionGroups = {
       targetSynth.voices.forEach(voice => voice.filterADSRModule.setLengthMs(lengthMs));
       return setSynth(synthIx, { ...targetSynth, filterADSRLength: lengthMs }, state);
     },
+  }),
+  SET_POLYSYNTH_CTX: buildActionGroup({
+    actionCreator: (ctx: PolysynthContext) => ({ type: 'SET_POLYSYNTH_CTX', ctx }),
+    subReducer: (state: SynthDesignerState, { ctx }) => ({ ...state, polysynthCtx: ctx }),
   }),
 };
 

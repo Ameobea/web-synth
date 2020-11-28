@@ -35,7 +35,7 @@ CREATE TABLE compositions (
   author BIGINT NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
-  content TEXT NOT NULL,
+  content LONGTEXT NOT NULL,
   PRIMARY KEY (id)
 );
 
@@ -43,7 +43,7 @@ CREATE TABLE voice_presets (
   id BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
-  body TEXT NOT NULL,
+  body LONGTEXT NOT NULL,
   PRIMARY KEY (id)
 );
 

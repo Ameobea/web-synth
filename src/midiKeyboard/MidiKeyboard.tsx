@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
-import { useOnce } from 'ameo-utils/dist/util/react';
 
 import Loading from 'src/misc/Loading';
 import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 
 const START_NOTE = 33;
 
@@ -36,38 +36,13 @@ declare global {
   }
 }
 
-const MidiKeyboard: React.FC<{
-  playNote: (voiceIx: number, note: number, velocity: number) => void;
-  releaseNote: (voiceIx: number, note: number, velocity: number) => void;
-  handlePitchBend?: ((lsb: number, msb: number) => void) | null;
-}> = ({ playNote, releaseNote }) => {
-  const [polySynthMod, setPolySynthMod] = useState<typeof import('src/polysynth') | null>(null);
-  const polySynthCtx = useRef<number | null>(null);
-
-  useOnce(() => import('src/polysynth').then(setPolySynthMod));
+const MidiKeyboard: React.FC<{ midiNode: MIDINode; octaveOffset: number }> = ({
+  midiNode,
+  octaveOffset,
+}) => {
+  const MIDI_NOTES_PER_OCTAVE = 12 as const;
 
   useEffect(() => {
-    if (!polySynthMod) {
-      return;
-    }
-
-    polySynthCtx.current = polySynthMod.create_polysynth_context(
-      playNote,
-      (voiceIx: number, noteId: number) => releaseNote(voiceIx, noteId, 0)
-    );
-
-    return () => {
-      if (polySynthCtx.current !== null) {
-        polySynthMod.drop_polysynth_context(polySynthCtx.current);
-      }
-    };
-  }, [polySynthMod, playNote, releaseNote, polySynthCtx]);
-
-  useEffect(() => {
-    if (!polySynthMod || polySynthCtx.current === null) {
-      return;
-    }
-
     const handleDown = (evt: KeyboardEvent) => {
       // Discard keypresses while control key pressed
       if (evt.ctrlKey) {
@@ -83,7 +58,9 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      polySynthMod.handle_note_down(polySynthCtx.current!, midiNumber, 255);
+      midiNode.outputCbs.forEach(cbs =>
+        cbs.onAttack(midiNumber + MIDI_NOTES_PER_OCTAVE * octaveOffset, 255)
+      );
 
       // Work around incredibly annoying Firefox functionality where the slash key opens
       // a "quick find" thing and takes focus away from the page
@@ -102,7 +79,9 @@ const MidiKeyboard: React.FC<{
         return;
       }
 
-      polySynthMod.handle_note_up(polySynthCtx.current!, midiNumber);
+      midiNode.outputCbs.forEach(cbs =>
+        cbs.onRelease(midiNumber + MIDI_NOTES_PER_OCTAVE * octaveOffset, 255)
+      );
     };
 
     document.addEventListener('keydown', handleDown);
@@ -128,8 +107,6 @@ const OctaveControl: React.FC<{ value: number; onChange: (newVal: number) => voi
     <button onClick={() => onChange(value + 1)}>+</button>
   </div>
 );
-
-const MIDI_NOTES_PER_OCTAVE = 12 as const;
 
 const mkOctaveCountSelector = () =>
   createSelector(
@@ -166,21 +143,7 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
         }
       />
 
-      <MidiKeyboard
-        playNote={(voiceIx, note, velocity) =>
-          midiNode.outputCbs.forEach(cbs =>
-            cbs.onAttack(octaveOffset * MIDI_NOTES_PER_OCTAVE + note, voiceIx, velocity)
-          )
-        }
-        releaseNote={(voiceIx, note, velocity) =>
-          midiNode.outputCbs.forEach(cbs =>
-            cbs.onRelease(octaveOffset * MIDI_NOTES_PER_OCTAVE + note, voiceIx, velocity)
-          )
-        }
-        handlePitchBend={(_lsb: number, msb: number) =>
-          midiNode.outputCbs.forEach(cbs => cbs.onPitchBend(msb))
-        }
-      />
+      <MidiKeyboard octaveOffset={octaveOffset} midiNode={midiNode} />
     </div>
   );
 };

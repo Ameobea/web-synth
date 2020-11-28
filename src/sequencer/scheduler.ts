@@ -30,14 +30,14 @@ export const SequencerBeatPlayerByVoiceType: {
       throw new Error(`No MIDI output at index ${voice.synthIx} found in sequencer state`);
     }
 
-    midiOutput.outputCbs.forEach(({ onAttack, onRelease }) => {
-      // TODO: Make per-voice config of what percentage of the window to hold the note for
-      const beatDurationMS = (60 / state.bpm) * 1000;
-      const holdDurationMS = beatDurationMS * 0.72;
+    // TODO: Make per-voice config of what percentage of the window to hold the note for
+    const beatDurationMS = (60 / state.bpm) * 1000;
+    const holdDurationMS = beatDurationMS * 0.72;
 
-      onAttack(mark?.note ?? voice.note, 0, 255);
-      scheduleEvent(ctx.currentTime + holdDurationMS / 1000, () => onRelease(voice.note, 0, 255));
-    });
+    midiOutput.onAttack(mark?.note ?? voice.note, 255);
+    scheduleEvent(ctx.currentTime + holdDurationMS / 1000, () =>
+      midiOutput.onRelease(mark?.note ?? voice.note, 255)
+    );
   },
   sample: (
     state: SequencerReduxState,

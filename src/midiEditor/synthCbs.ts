@@ -17,27 +17,24 @@ const getState = (vcId: string) => {
   return state;
 };
 
-const getVoiceManager = (vcId: string) =>
-  Option.of(getState(vcId))
-    .map(R.prop('voiceManager'))
-    .orNull();
+const getMIDINode = (vcId: string) => Option.of(getState(vcId)).map(R.prop('midiNode')).orNull();
 
 export const midi_editor_trigger_attack = (vcId: string, noteId: number, offset?: number) => {
-  const voiceManager = getVoiceManager(vcId);
-  if (!voiceManager) {
+  const midiNode = getMIDINode(vcId);
+  if (!midiNode) {
     return;
   }
 
-  voiceManager.onAttack(noteId, undefined, offset);
+  midiNode.onAttack(noteId, 255, offset);
 };
 
 export const midi_editor_trigger_release = (vcId: string, noteId: number, offset?: number) => {
-  const voiceManager = getVoiceManager(vcId);
-  if (!voiceManager) {
+  const midiNode = getMIDINode(vcId);
+  if (!midiNode) {
     return;
   }
 
-  voiceManager.onRelease(noteId, offset);
+  midiNode.onRelease(noteId, 255, offset);
 };
 
 export const midi_editor_trigger_attack_release = (
@@ -72,7 +69,6 @@ export const midi_editor_cancel_all_events = (vcId: string, stopPlayingNotes: bo
     return;
   }
 
-  state.voiceManager.reset();
   state.midiNode.outputCbs.forEach(output => output.onClearAll(stopPlayingNotes));
 };
 

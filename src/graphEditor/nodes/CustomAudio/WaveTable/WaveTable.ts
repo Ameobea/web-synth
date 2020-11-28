@@ -67,7 +67,7 @@ const getWavetableWasmBytes = async () => {
     return getBytesPromise;
   }
 
-  getBytesPromise = fetch('./wavetable.wasm').then(res => res.arrayBuffer());
+  getBytesPromise = fetch('/wavetable.wasm').then(res => res.arrayBuffer());
 
   const bytes = await getBytesPromise;
   wavetableWasmBytes = bytes;
