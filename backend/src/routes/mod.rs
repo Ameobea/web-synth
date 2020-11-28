@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use diesel::{self, prelude::*};
+use rocket_contrib::json::Json;
 
 use crate::{
     models::{
@@ -14,19 +15,25 @@ use crate::{
     },
     schema, WebSynthDbConn,
 };
-use rocket_contrib::json::Json;
+
+mod remote_samples;
+pub use self::remote_samples::*;
 
 #[get("/")]
 pub fn index() -> &'static str { "Application successfully started!" }
 
 #[post("/effects", data = "<effect>")]
-pub fn create_effect(
+pub async fn create_effect(
     conn: WebSynthDbConn,
     effect: Json<InsertableEffect>,
 ) -> Result<String, String> {
-    let inserted_rows = diesel::insert_into(schema::effects::table)
-        .values(&effect.0)
-        .execute(&conn.0)
+    let inserted_rows = conn
+        .run(move |conn| {
+            diesel::insert_into(schema::effects::table)
+                .values(&effect.0)
+                .execute(conn)
+        })
+        .await
         .map_err(|err| -> String {
             error!("Error inserting row: {:?}", err);
             "Error inserting row into database".into()
@@ -36,17 +43,18 @@ pub fn create_effect(
 }
 
 #[get("/effects")]
-pub fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, String> {
+pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, String> {
     use crate::schema::effects::dsl::*;
 
-    Ok(Json(effects.load(&conn.0).map_err(|err| {
+    let all_effects = conn.run(|conn| effects.load(conn)).await.map_err(|err| {
         error!("Error querying effects: {:?}", err);
         "Error querying effects from the database".to_string()
-    })?))
+    })?;
+    Ok(Json(all_effects))
 }
 
 #[post("/compositions", data = "<composition>")]
-pub fn save_composition(
+pub async fn save_composition(
     conn: WebSynthDbConn,
     composition: Json<NewCompositionRequest>,
 ) -> Result<String, String> {
@@ -60,9 +68,13 @@ pub fn save_composition(
         })?,
     };
 
-    let inserted_rows = diesel::insert_into(schema::compositions::table)
-        .values(&new_composition)
-        .execute(&conn.0)
+    let inserted_rows = conn
+        .run(move |conn| {
+            diesel::insert_into(schema::compositions::table)
+                .values(&new_composition)
+                .execute(conn)
+        })
+        .await
         .map_err(|err| -> String {
             error!("Error inserting row: {:?}", err);
             "Error inserting row into database".into()
@@ -72,15 +84,15 @@ pub fn save_composition(
 }
 
 #[get("/compositions/<composition_id>")]
-pub fn get_composition_by_id(
+pub async fn get_composition_by_id(
     conn: WebSynthDbConn,
     composition_id: i64,
 ) -> Result<Option<Json<Composition>>, String> {
     use crate::schema::compositions::dsl::*;
 
-    let composition_opt = match compositions
-        .find(composition_id)
-        .first::<Composition>(&conn.0)
+    let composition_opt = match conn
+        .run(move |conn| compositions.find(composition_id).first::<Composition>(conn))
+        .await
     {
         Ok(composition) => Some(Json(composition)),
         Err(diesel::NotFound) => None,
@@ -94,27 +106,31 @@ pub fn get_composition_by_id(
 }
 
 #[get("/compositions")]
-pub fn get_compositions(conn: WebSynthDbConn) -> Result<Json<Vec<Composition>>, String> {
+pub async fn get_compositions(conn: WebSynthDbConn) -> Result<Json<Vec<Composition>>, String> {
     use crate::schema::compositions::dsl::*;
 
-    Ok(Json(compositions.load(&conn.0).map_err(|err| {
-        error!("Error querying compositions: {:?}", err);
-        "Error querying compositions from the database".to_string()
-    })?))
+    let all_compos = conn
+        .run(|conn| compositions.load(conn))
+        .await
+        .map_err(|err| {
+            error!("Error querying compositions: {:?}", err);
+            "Error querying compositions from the database".to_string()
+        })?;
+    Ok(Json(all_compos))
 }
 
 #[get("/synth_presets")]
-pub fn get_synth_presets(
+pub async fn get_synth_presets(
     conn0: WebSynthDbConn,
     conn1: WebSynthDbConn,
 ) -> Result<Json<Vec<InlineSynthPresetEntry>>, String> {
     use crate::schema::{synth_presets, voice_presets};
 
     let (synth_presets_, voice_presets_): (
-        Result<Vec<(i64, String, String, String)>, String>,
-        Result<Vec<(i64, String, String, String)>, String>,
-    ) = rayon::join(
-        move || {
+        Vec<(i64, String, String, String)>,
+        Vec<(i64, String, String, String)>,
+    ) = tokio::try_join!(
+        conn0.run(|conn| {
             synth_presets::table
                 .select((
                     synth_presets::id,
@@ -122,13 +138,13 @@ pub fn get_synth_presets(
                     synth_presets::description,
                     synth_presets::body,
                 ))
-                .load(&conn0.0)
+                .load(conn)
                 .map_err(|err| {
                     error!("Error querying synth presets: {:?}", err);
                     "Error querying synth presets from the database".to_string()
                 })
-        },
-        move || {
+        }),
+        conn1.run(|conn| {
             voice_presets::table
                 .select((
                     voice_presets::id,
@@ -136,16 +152,13 @@ pub fn get_synth_presets(
                     voice_presets::description,
                     voice_presets::body,
                 ))
-                .load(&conn1.0)
+                .load(conn)
                 .map_err(|err| {
                     error!("Error querying synth voice presets: {:?}", err);
                     "Error querying synth voice presets from the database".to_string()
                 })
-        },
-    );
-
-    let synth_presets_ = synth_presets_?;
-    let voice_presets_ = voice_presets_?;
+        }),
+    )?;
 
     // build a mapping of voice preset id to voice preset
     let mut voice_presets_by_id: HashMap<i64, SynthVoicePresetEntry> = HashMap::new();
@@ -194,7 +207,7 @@ pub fn get_synth_presets(
 }
 
 #[post("/synth_presets", data = "<preset>")]
-pub fn create_synth_preset(
+pub async fn create_synth_preset(
     conn: WebSynthDbConn,
     preset: Json<ReceivedSynthPresetEntry>,
 ) -> Result<(), String> {
@@ -211,53 +224,60 @@ pub fn create_synth_preset(
         body: body_,
     };
 
-    diesel::insert_into(synth_presets)
-        .values(&entry)
-        .execute(&conn.0)
-        .map_err(|err| -> String {
-            error!("Error inserting synth preset into database: {:?}", err);
-            "Error inserting synth preset into database".into()
-        })
-        .map(|_| ())
+    conn.run(move |conn| {
+        diesel::insert_into(synth_presets)
+            .values(&entry)
+            .execute(conn)
+    })
+    .await
+    .map_err(|err| -> String {
+        error!("Error inserting synth preset into database: {:?}", err);
+        "Error inserting synth preset into database".into()
+    })
+    .map(drop)
 }
 
 #[get("/synth_voice_presets")]
-pub fn get_synth_voice_presets(
+pub async fn get_synth_voice_presets(
     conn: WebSynthDbConn,
 ) -> Result<Json<Vec<SynthVoicePresetEntry>>, String> {
     use crate::schema::voice_presets::dsl::*;
 
-    Ok(Json(
-        voice_presets
-            .select((id, title, description, body))
-            .load(&conn.0)
-            .map_err(|err| {
-                error!("Error querying synth presets: {:?}", err);
-                "Error querying synth presets from the database".to_string()
-            })
-            .and_then(|items| -> Result<Vec<SynthVoicePresetEntry>, String> {
-                items
-                    .into_iter()
-                    .map(|(id_, title_, description_, body_): (i64, String, String, String)| -> Result<SynthVoicePresetEntry, String> {
-                        let preset: VoiceDefinition = serde_json::from_str(&body_).map_err(|err| -> String {
-                            let err_msg = format!("Error parsing provided synth definition: {:?}", err);
-                            error!("{}",err_msg);
-                            err_msg
-                        })?;
-                        Ok(SynthVoicePresetEntry {
-                            id: id_,
-                            title: title_,
-                            description: description_,
-                            body: preset
-                        })
-                    })
-                    .collect::<Result<Vec<_>, String>>()
-            })?,
-    ))
+    let all_presets = conn
+        .run(|conn| {
+            voice_presets
+                .select((id, title, description, body))
+                .load(conn)
+        })
+        .await
+        .map_err(|err| {
+            error!("Error querying synth presets: {:?}", err);
+            "Error querying synth presets from the database".to_string()
+        })?;
+    let all_presets: Vec<SynthVoicePresetEntry> = all_presets
+        .into_iter()
+        .map(
+            |(id_, title_, description_, body_): (i64, String, String, String)| {
+                let preset: VoiceDefinition =
+                    serde_json::from_str(&body_).map_err(|err| -> String {
+                        let err_msg = format!("Error parsing provided synth definition: {:?}", err);
+                        error!("{}", err_msg);
+                        err_msg
+                    })?;
+                Ok(SynthVoicePresetEntry {
+                    id: id_,
+                    title: title_,
+                    description: description_,
+                    body: preset,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(Json(all_presets))
 }
 
 #[post("/synth_voice_presets", data = "<voice_preset>")]
-pub fn create_synth_voice_preset(
+pub async fn create_synth_voice_preset(
     conn: WebSynthDbConn,
     voice_preset: Json<UserProvidedNewSynthVoicePreset>,
 ) -> Result<(), String> {
@@ -274,12 +294,15 @@ pub fn create_synth_voice_preset(
         body: body_,
     };
 
-    diesel::insert_into(voice_presets)
-        .values(&entry)
-        .execute(&conn.0)
-        .map_err(|err| -> String {
-            error!("Error inserting synth preset into database: {:?}", err);
-            "Error inserting synth preset into database".into()
-        })
-        .map(|_| ())
+    conn.run(move |conn| {
+        diesel::insert_into(voice_presets)
+            .values(&entry)
+            .execute(conn)
+    })
+    .await
+    .map_err(|err| -> String {
+        error!("Error inserting synth preset into database: {:?}", err);
+        "Error inserting synth preset into database".into()
+    })
+    .map(drop)
 }

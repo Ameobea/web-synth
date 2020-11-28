@@ -99,10 +99,10 @@ export class MIDIInputNode {
     // Register input handlers for the MIDI input so that MIDI events trigger our output callbacks
     // to be called appropriately.
     const ctxPtr = midiModule.create_msg_handler_context(
-      (voiceIx: number, note: number, velocity: number) =>
-        this.midiNode.outputCbs.forEach(({ onAttack }) => onAttack(note, voiceIx, velocity)),
-      (voiceIx: number, note: number, velocity: number) =>
-        this.midiNode.outputCbs.forEach(({ onRelease }) => onRelease(note, voiceIx, velocity)),
+      (_voiceIx: number, note: number, velocity: number) =>
+        this.midiNode.outputCbs.forEach(({ onAttack }) => onAttack(note, velocity)),
+      (_voiceIx: number, note: number, velocity: number) =>
+        this.midiNode.outputCbs.forEach(({ onRelease }) => onRelease(note, velocity)),
       (_lsb: number, msb: number) => {
         this.pitchBendNode.offset.value = msb;
         this.midiNode.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb));

@@ -17,23 +17,19 @@ extern crate lazy_static;
 extern crate log;
 extern crate chrono;
 extern crate fern;
+extern crate tokio;
 
 use rocket::{
     fairing::{Fairing, Info, Kind},
     http::{Method, Status},
     Request, Response,
 };
+use rocket_contrib::compression::Compression;
 
 pub mod conf;
 pub mod models;
 pub mod routes;
 pub mod schema;
-
-use self::conf::Conf;
-
-lazy_static! {
-    pub static ref CONF: Conf = Conf::default();
-}
 
 #[database("web_synth")]
 pub struct WebSynthDbConn(diesel::MysqlConnection);
@@ -41,19 +37,20 @@ pub struct WebSynthDbConn(diesel::MysqlConnection);
 /// Roll-your-own CORS fairing
 struct CorsFairing;
 
+#[async_trait]
 impl Fairing for CorsFairing {
-    fn on_response(&self, request: &Request, response: &mut Response) {
-        response.set_header(rocket::http::Header::new(
+    async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
+        res.set_header(rocket::http::Header::new(
             "Access-Control-Allow-Origin",
             "*",
         ));
-        response.set_header(rocket::http::Header::new(
+        res.set_header(rocket::http::Header::new(
             "Access-Control-Allow-Headers",
             "Content-Type",
         ));
 
-        if response.status() == Status::NotFound && request.method() == Method::Options {
-            response.set_status(Status::NoContent);
+        if res.status() == Status::NotFound && req.method() == Method::Options {
+            res.set_status(Status::NoContent);
         }
     }
 
@@ -86,7 +83,8 @@ fn init_logger() -> Result<(), fern::InitError> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     if let Err(_) = dotenv::dotenv() {
         println!("Unable to parse .env file; continuing.");
     }
@@ -97,7 +95,7 @@ fn main() {
         })
         .unwrap();
 
-    let launch_err = rocket::ignite()
+    rocket::ignite()
         .attach(WebSynthDbConn::fairing())
         .mount("/", routes![
             routes::index,
@@ -110,9 +108,14 @@ fn main() {
             routes::get_synth_voice_presets,
             routes::create_synth_voice_preset,
             routes::get_composition_by_id,
+            routes::list_remote_samples,
+            routes::store_remote_sample
         ])
         .attach(CorsFairing)
-        .launch();
+        .attach(Compression::fairing())
+        .launch()
+        .await
+        .expect("Error running Rocket");
 
-    panic!("Error initializing Rocket: {:?}", launch_err);
+    println!("Exited cleanly");
 }

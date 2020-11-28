@@ -17,6 +17,8 @@ import (
 
 	"cloud.google.com/go/storage"
 	wasm "github.com/akupila/go-wasm"
+	remoteSamples "github.com/ameobea/web-synth/faust-compiler-server/remoteSamples"
+	"github.com/gorilla/mux"
 )
 
 type compileHandler struct {
@@ -404,11 +406,13 @@ func main() {
 		log.Fatalf("Failed to create Google Cloud Storage client: %s", err)
 	}
 
+	router := mux.NewRouter()
+
 	compileHandlerInst := compileHandler{
 		ctx:                      ctx,
 		googleCloudStorageClient: client,
 	}
-	http.Handle("/compile", compileHandlerInst)
+	router.Handle("/compile", compileHandlerInst)
 
 	faustWorkletTemplateFileName := os.Getenv("FAUST_WORKLET_TEMPLATE_FILE_NAME")
 	if faustWorkletTemplateFileName == "" {
@@ -433,7 +437,9 @@ func main() {
 		googleCloudStorageClient: client,
 		faustCodeTemplate:        faustCodeTemplate,
 	}
-	http.Handle("/FaustAudioWorkletProcessor.js", faustWorkletModuleHandlerInst)
+	router.Handle("/FaustAudioWorkletProcessor.js", faustWorkletModuleHandlerInst)
+
+	remoteSamples.ServeRemoteSamplesRoutes(ctx, client, router)
 
 	port := os.Getenv("PORT")
 	if len(port) == 0 {
@@ -442,7 +448,7 @@ func main() {
 
 	println("Listening on port", port)
 
-	err = http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(":"+port, router)
 	if err != nil {
 		log.Fatalf("Error listening on port: %s", err)
 	}

@@ -4,7 +4,7 @@ table! {
         author -> Bigint,
         title -> Text,
         description -> Text,
-        content -> Text,
+        content -> Longtext,
     }
 }
 
@@ -29,6 +29,14 @@ table! {
         title -> Varchar,
         description -> Text,
         code -> Text,
+    }
+}
+
+table! {
+    remote_sample_urls (id) {
+        id -> Varchar,
+        name -> Text,
+        sample_url -> Text,
     }
 }
 
@@ -64,6 +72,7 @@ allow_tables_to_appear_in_same_query!(
     composition_tags,
     composition_tags_join,
     effects,
+    remote_sample_urls,
     synth_presets,
     users,
     voice_presets,

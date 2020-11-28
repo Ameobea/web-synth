@@ -49,12 +49,12 @@ deploy:
 
   gcloud beta run deploy $BACKEND_SERVICE_NAME \
     --platform managed \
-    --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES" \
+    --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES,AUTH_TOKEN=$AUTH_TOKEN,ROCKET_ADDRESS=0.0.0.0" \
     --image $BACKEND_IMAGE_NAME
 
   gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
     --platform managed \
-    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js" \
+    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js,AUTH_TOKEN=$AUTH_TOKEN" \
     --image $FAUST_COMPILER_IMAGE_NAME
 
   just build-all
