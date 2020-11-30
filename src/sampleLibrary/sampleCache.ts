@@ -13,11 +13,13 @@ const MAX_CACHE_SIZE_BYTES = 1024 * 1024 * 500; // 500MB
 const dbClient = new Dexie('sampleCache');
 
 dbClient.version(1).stores({
-  samples: '[isLocal+name], lastAccessed, sizeBytes',
+  samples: '[isLocal+name+id], lastAccessed, sizeBytes, url',
 });
 
 interface SampleRow {
   name: string;
+  id: string;
+  url?: string;
   isLocal: string;
   sizeBytes: number;
   lastAccessed: Date;
@@ -27,13 +29,16 @@ interface SampleRow {
 const samplesTable = (dbClient as any).samples as Dexie.Table<SampleRow, any>;
 
 const buildWhereClause = (descriptor: SampleDescriptor) => ({
-  ...descriptor,
+  name: descriptor.name,
+  id: descriptor.id || '',
   isLocal: descriptor.isLocal.toString(),
 });
 
 const buildDescriptor = (row: any): SampleDescriptor => ({
   isLocal: row.isLocal === 'true',
   name: row.name,
+  id: row.id ? row.id : undefined,
+  url: row.url,
 });
 
 const getTotalUsedCacheSpace = async () => {
@@ -52,10 +57,7 @@ const maybePruneOldEntries = async (neededBytes: number) => {
 
   let freedSpace = 0;
   while (MAX_CACHE_SIZE_BYTES - usedSpace - freedSpace <= neededBytes) {
-    const oldestEntry = await samplesTable
-      .orderBy('lastAccessed')
-      .reverse()
-      .first();
+    const oldestEntry = await samplesTable.orderBy('lastAccessed').reverse().first();
     if (R.isNil(oldestEntry)) {
       throw new Error(
         "Somehow there are no entries in the samples cache but we're still over the cache limit"
@@ -83,6 +85,7 @@ export const cacheSample = async (descriptor: SampleDescriptor, sampleData: Arra
 
   await samplesTable.put({
     ...descriptor,
+    id: descriptor.id ? descriptor.id : '',
     isLocal: descriptor.isLocal.toString(),
     sizeBytes: sampleData.byteLength,
     lastAccessed: new Date(),

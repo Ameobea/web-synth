@@ -16,6 +16,7 @@ lazy_static = "1.4.0"
 chrono = "0.4.19"
 fern = "0.6"
 log = "0.4.11"
+hound = "3.4"
 
 rayon = "1.5"
 

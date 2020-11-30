@@ -6,7 +6,6 @@ import { SampleDescriptor, getSample } from 'src/sampleLibrary/sampleLibrary';
 import Loading from 'src/misc/Loading';
 import useAllSamples from './useAllSamples';
 import './SampleLibraryUI.scss';
-import { UnimplementedError } from 'ameo-utils';
 
 const ctx = new AudioContext();
 
@@ -160,7 +159,13 @@ export const LoadSamplesButtons: React.FC<
 );
 
 const SampleLibraryUI: React.FC = () => {
-  const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
+  const {
+    includeLocalSamples,
+    setIncludeLocalSamples,
+    includeRemoteSamples,
+    setIncludeRemoteSamples,
+    allSamples,
+  } = useAllSamples();
 
   if (!Array.isArray(allSamples)) {
     return (
@@ -178,10 +183,8 @@ const SampleLibraryUI: React.FC = () => {
       <LoadSamplesButtons
         localSamplesLoaded={includeLocalSamples}
         loadLocalSamples={() => setIncludeLocalSamples(true)}
-        remoteSamplesLoaded={false}
-        loadRemoteSamples={() => {
-          throw new UnimplementedError(); // TODO
-        }}
+        remoteSamplesLoaded={includeRemoteSamples}
+        loadRemoteSamples={() => setIncludeRemoteSamples(true)}
       />
 
       <SampleListing extraMkRowRendererArgs={{}} sampleDescriptors={allSamples} />

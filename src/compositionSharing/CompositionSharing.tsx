@@ -5,7 +5,6 @@ import * as R from 'ramda';
 import { Table } from 'react-virtualized';
 import { useOnce } from 'ameo-utils/util/react';
 
-import { BACKEND_BASE_URL } from '../conf';
 import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
 import { loadComposition } from '../persistance';
@@ -14,7 +13,7 @@ import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { renderModalWithControls, ModalCompProps } from 'src/controls/Modal';
 import FlatButton from 'src/misc/FlatButton';
 import BasicModal from 'src/misc/BasicModal';
-import { RemoteSample, storeRemoteSample } from 'src/api';
+import { fetchAllSharedCompositions, saveComposition, storeRemoteSample } from 'src/api';
 
 export interface CompositionDefinition {
   id: number;
@@ -23,9 +22,6 @@ export interface CompositionDefinition {
   description: React.ReactNode;
   content: string;
 }
-
-const fetchAllSharedCompositions = (): Promise<CompositionDefinition[]> =>
-  fetch(`${BACKEND_BASE_URL}/compositions`).then(res => res.json());
 
 const CompositionItem: React.FC<
   {
@@ -202,7 +198,12 @@ const checkForLocalSamples = async () => {
 
   return [
     activeSamples,
-    remoteSamples.map(sample => ({ isLocal: false, name: sample.id })),
+    remoteSamples.map(sample => ({
+      isLocal: false,
+      name: sample.id,
+      url: sample.sampleUrl,
+      id: sample.id,
+    })),
   ] as const;
 };
 
@@ -221,6 +222,7 @@ const updateSamplesInSave = (
     const matchingIx = samples[0].findIndex(sample => R.equals(sample, save));
     if (matchingIx !== -1) {
       console.log('Found match for sample: ', save);
+      console.log('Replacing with: ', samples[1][matchingIx]);
       return samples[1][matchingIx];
     } else {
       console.warn("Found `isLocal` but didn't match any samples: ", save);
@@ -232,7 +234,13 @@ const updateSamplesInSave = (
   );
 };
 
-const saveComposition = async (vals: { title: string; description: string }) => {
+const serializeAndSaveComposition = async ({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) => {
   // Check to see if any local compositions are in use by the composition.  If so, check confirm with
   // the user whether or not they should be uploaded and handle converting them to remote samples.
   const samples = await checkForLocalSamples();
@@ -260,13 +268,7 @@ const saveComposition = async (vals: { title: string; description: string }) => 
     };
   }
 
-  const res = await fetch(`${BACKEND_BASE_URL}/compositions`, {
-    method: 'POST',
-    body: JSON.stringify({ ...vals, user: 0, content: compositionData }),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const res = await saveComposition(title, description, compositionData);
 
   if (!res.ok) {
     throw new Error(`Error while submitting composition: ${await res.text()}`);
@@ -278,29 +280,27 @@ const ShareCompositionInner: React.FC<
     title: string;
     description: string;
   }>
-> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => {
-  return (
-    <>
-      <form className='share-composition-form' onSubmit={handleSubmit(saveComposition)}>
-        <h2>Share Composition</h2>
-        <Field name='title' component={FieldRenderer} type='text' label='Title' />
-        <Field
-          name='description'
-          component={FieldRenderer}
-          ComponentOverride={({ ...args }) => <textarea {...args} />}
-          type='text'
-          label='Description'
-        />
-        <button disabled={submitting} type='submit'>
-          Submit
-        </button>
-      </form>
-      {submitSucceeded ? 'Successfully submitted!' : null}
-      {submitFailed && error ? 'Submission Failed' : null}
-      {error ? <span style={{ color: '#bb2312' }}>{error}</span> : null}
-    </>
-  );
-};
+> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => (
+  <>
+    <form className='share-composition-form' onSubmit={handleSubmit(serializeAndSaveComposition)}>
+      <h2>Share Composition</h2>
+      <Field name='title' component={FieldRenderer} type='text' label='Title' />
+      <Field
+        name='description'
+        component={FieldRenderer}
+        ComponentOverride={({ ...args }) => <textarea {...args} />}
+        type='text'
+        label='Description'
+      />
+      <button disabled={submitting} type='submit'>
+        Submit
+      </button>
+    </form>
+    {submitSucceeded ? 'Successfully submitted!' : null}
+    {submitFailed && error ? 'Submission Failed' : null}
+    {error ? <span style={{ color: '#bb2312' }}>{error}</span> : null}
+  </>
+);
 
 const ShareComposition = reduxForm<{ title: string; description: string }>({
   form: 'compositionSharing',

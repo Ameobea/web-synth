@@ -13,6 +13,7 @@ import { faustEditorContextMap, get_faust_editor_connectables } from 'src/faustE
 import { updateConnectables } from 'src/patchNetwork';
 import { ReduxStore, store } from 'src/redux';
 import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
+import { saveEffect } from 'src/api';
 // import PolyphonyControls from './PolyphonyControls';
 // import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
 
@@ -122,17 +123,12 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   const [state, setState] = useState(initialState);
 
   const saveCode = async (effect: Without<Effect, 'id'>) => {
-    const res = await fetch(`${BACKEND_BASE_URL}/effects`, {
-      method: 'POST',
-      body: JSON.stringify(effect),
-    });
-
-    if (!res.ok) {
-      console.error(`Error saving code: ${await res.text()}`);
-      return;
+    try {
+      await saveEffect(effect);
+      setState({ ...initialState, saveStatus: 'Successfully saved!' });
+    } catch (err) {
+      console.error('Error saving effect: ', err);
     }
-
-    setState({ ...initialState, saveStatus: 'Successfully saved!' });
   };
 
   return (

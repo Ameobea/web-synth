@@ -12,10 +12,13 @@ import {
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 import { cacheSample, getCachedSample, getAllCachedSamples } from 'src/sampleLibrary/sampleCache';
 import { FileSystemDirectoryHandle } from 'src/fsAccess/drivers/nativeFS/NativeFSTypes';
+import { listRemoteSamples as listRemoteSamplesFromServer } from 'src/api';
 
 export interface SampleDescriptor {
   isLocal: boolean;
   name: string;
+  id?: string;
+  url?: string;
 }
 
 export const hashSampleDescriptor = ({ isLocal, name }: SampleDescriptor): string =>
@@ -64,23 +67,35 @@ const loadLocalSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffe
 };
 
 const loadRemoteSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffer> => {
-  throw new UnimplementedError(); // TODO
+  if (!descriptor.url) {
+    throw new UnimplementedError('Unable to load remote sample without URL');
+  }
+
+  return fetch(descriptor.url!).then(res => res.arrayBuffer());
 };
 
 const listRemoteSamples = async (): Promise<SampleDescriptor[]> => {
-  return []; // TODO
+  const remoteSamples = await listRemoteSamplesFromServer();
+  return remoteSamples.map(({ sampleUrl, ...descriptor }) => ({
+    ...descriptor,
+    isLocal: false,
+    url: sampleUrl,
+  }));
 };
 
 export interface ListSampleOpts {
+  includeCached?: boolean;
   includeLocal?: boolean;
   includeRemote?: boolean;
 }
 
-export const listSamples = async ({ includeRemote, includeLocal }: ListSampleOpts = {}): Promise<
-  SampleDescriptor[]
-> => {
+export const listSamples = async ({
+  includeCached,
+  includeRemote,
+  includeLocal,
+}: ListSampleOpts = {}): Promise<SampleDescriptor[]> => {
   const [cachedSamples, localSamples, remoteSamples] = await Promise.all([
-    getAllCachedSamples(),
+    includeCached ? getAllCachedSamples() : [],
     includeLocal
       ? listLocalSamples().catch(err => {
           console.warn(err);

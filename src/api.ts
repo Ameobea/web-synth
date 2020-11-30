@@ -1,4 +1,7 @@
+import { Without } from 'ameo-utils';
+import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
+import { Effect } from 'src/redux/modules/effects';
 import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { SampleDescriptor } from 'src/sampleLibrary';
 
@@ -34,6 +37,27 @@ export const saveSynthPreset = (preset: {
     }
   });
 
+export const fetchAllSharedCompositions = (): Promise<CompositionDefinition[]> =>
+  fetch(`${BACKEND_BASE_URL}/compositions`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const saveComposition = async (
+  title: string,
+  description: string,
+  serializedComposition: { [key: string]: string }
+) =>
+  fetch(`${BACKEND_BASE_URL}/compositions`, {
+    method: 'POST',
+    body: JSON.stringify({ title, description, user: 0, content: serializedComposition }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
 export interface RemoteSample {
   id: string;
   name: string;
@@ -56,3 +80,22 @@ export const storeRemoteSample = async (
   }
   return res.json();
 };
+
+export const listRemoteSamples = async (): Promise<RemoteSample[]> =>
+  fetch(buildURL('/remote_samples')).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const saveEffect = (effect: Without<Effect, 'id'>) =>
+  fetch(`${BACKEND_BASE_URL}/effects`, {
+    method: 'POST',
+    body: JSON.stringify(effect),
+  }).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+  });
+(window as any).saveEffect = saveEffect;
