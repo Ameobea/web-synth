@@ -4,7 +4,7 @@ import { Option } from 'funfix-core';
 import { PromiseResolveType, UnimplementedError } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
-import { ADSRValues, defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
+import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import WaveTable, {
@@ -16,6 +16,7 @@ import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
   synthModule.voices.forEach(voice => {
@@ -55,17 +56,6 @@ export interface EffectModule {
   wetness: number;
   effectGainNode: GainNode;
   passthroughGainNode: GainNode;
-}
-
-export enum FilterType {
-  Lowpass = 'lowpass',
-  Highpass = 'highpass',
-  Bandpass = 'bandpass',
-  Lowshelf = 'lowshelf',
-  Highshelf = 'highshelf',
-  Peaking = 'peaking',
-  Notch = 'notch',
-  Allpass = 'allpass',
 }
 
 export interface FilterParams {
@@ -126,78 +116,6 @@ export interface SynthModule {
 const ctx = new AudioContext();
 
 const VOICE_COUNT = 16 as const;
-
-const filterSettings = {
-  bypass: {
-    label: 'bypass',
-    type: 'checkbox',
-    initial: true,
-  },
-  type: {
-    type: 'select',
-    label: 'type',
-    options: Object.values(FilterType),
-    initial: FilterType.Lowpass,
-  },
-  detune: {
-    type: 'range',
-    label: 'detune',
-    min: -200,
-    max: 200,
-    initial: 0,
-    stepSize: 5,
-  },
-  frequency: {
-    type: 'range',
-    label: 'frequency',
-    min: 80,
-    max: 24000,
-    initial: 4400,
-    scale: 'log',
-    steps: 250,
-  },
-  gain: {
-    type: 'range',
-    label: 'gain',
-    min: -20,
-    max: 40,
-    step: 0.2,
-    initial: 0,
-  },
-  q: {
-    type: 'range',
-    label: 'Q',
-    min: 0.001,
-    max: 100,
-    initial: 0.001,
-    steps: 100,
-    scale: 'log',
-  },
-  adsr: {
-    type: 'custom',
-    label: 'adsr',
-    initial: defaultAdsrEnvelope,
-    Comp: ControlPanelADSR,
-  },
-};
-
-export const getSettingsForFilterType = (filterType: FilterType) => [
-  filterSettings.bypass,
-  filterSettings.type,
-  filterSettings.frequency,
-  filterSettings.detune,
-  ...{
-    [FilterType.Lowpass]: [filterSettings.q],
-    [FilterType.Highpass]: [filterSettings.q],
-    [FilterType.Bandpass]: [filterSettings.q],
-    [FilterType.Lowshelf]: [filterSettings.gain],
-    [FilterType.Highshelf]: [filterSettings.gain],
-    [FilterType.Peaking]: [filterSettings.gain, filterSettings.q],
-    [FilterType.Notch]: [filterSettings.q],
-    [FilterType.Allpass]: [filterSettings.q],
-  }[filterType],
-  filterSettings.adsr,
-];
 
 export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
   getSettingsForFilterType(filterType).reduce(

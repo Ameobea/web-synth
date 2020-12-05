@@ -32,6 +32,7 @@ import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShi
 import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
+import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
 
 const ctx = new AudioContext();
 
@@ -76,6 +77,7 @@ interface EnhanceAudioNodeParams<T> {
   ) => {
     name: string;
     param: AudioParam;
+    defaultValue?: number;
   }[];
   paramKeys: string[];
   SmallViewRenderer?: React.FC<{ node: ForeignNode<T> }>;
@@ -146,8 +148,11 @@ const enhanceAudioNode = <T>({
       this.ctx = ctx;
 
       this.paramOverrides = getOverridableParams(this.node).reduce(
-        (acc, { name, param }) => {
+        (acc, { name, param, defaultValue }) => {
           const override = new ConstantSourceNode(this.ctx);
+          if (typeof defaultValue === 'number') {
+            override.offset.value = defaultValue;
+          }
           override.start();
           const overridableParam = new OverridableAudioParam(this.ctx, param, override);
 
@@ -293,12 +298,13 @@ const CustomBiquadFilterNode = enhanceAudioNode({
     node: foreignNode,
   }),
   getOverridableParams: (node: BiquadFilterNode) => [
-    { name: 'frequency', param: node.frequency },
-    { name: 'Q', param: node.Q },
-    { name: 'detune', param: node.detune },
-    { name: 'gain', param: node.gain },
+    { name: 'frequency', param: node.frequency, defaultValue: 1000 },
+    { name: 'Q', param: node.Q, defaultValue: 0.001 },
+    { name: 'detune', param: node.detune, defaultValue: 0 },
+    { name: 'gain', param: node.gain, defaultValue: 0 },
   ],
   paramKeys: ['frequency', 'Q', 'detune', 'gain'],
+  SmallViewRenderer: CustomBiquadFilterNodeSmallView,
 });
 
 const CustomAudioBufferSourceNode = enhanceAudioNode({

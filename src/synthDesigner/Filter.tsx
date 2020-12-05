@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { FilterParams, getSettingsForFilterType } from 'src/redux/modules/synthDesigner';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { ADSRValues } from 'src/controls/adsr';
 import { getReduxInfra } from 'src/synthDesigner';
+import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 
 const Filter: React.FC<{
   params: FilterParams;
@@ -34,7 +35,7 @@ const Filter: React.FC<{
           dispatch(actionCreators.synthDesigner.SET_FILTER_IS_BYPASSED(synthIx, val));
         }
 
-        dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key, val));
+        dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key as any, val));
       }}
     />
   );
