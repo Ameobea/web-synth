@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
 
@@ -41,6 +41,7 @@ const MidiKeyboard: React.FC<{ midiNode: MIDINode; octaveOffset: number }> = ({
   octaveOffset,
 }) => {
   const MIDI_NOTES_PER_OCTAVE = 12 as const;
+  const alreadyDownNotes = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const handleDown = (evt: KeyboardEvent) => {
@@ -50,9 +51,10 @@ const MidiKeyboard: React.FC<{ midiNode: MIDINode; octaveOffset: number }> = ({
       }
 
       // Discard duplicate events coming from holding the key down
-      if (evt.repeat) {
+      if (evt.repeat || alreadyDownNotes.current.has(evt.key)) {
         return;
       }
+      alreadyDownNotes.current.add(evt.key);
       const midiNumber = keyMap[evt.key.toLowerCase()];
       if (R.isNil(midiNumber)) {
         return;
@@ -72,6 +74,7 @@ const MidiKeyboard: React.FC<{ midiNode: MIDINode; octaveOffset: number }> = ({
       }
     };
     const handleUp = (evt: KeyboardEvent) => {
+      alreadyDownNotes.current.delete(evt.key);
       // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event
       // which causes ghost notes.
       const midiNumber = keyMap[evt.key.toLowerCase()];

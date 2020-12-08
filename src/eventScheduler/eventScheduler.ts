@@ -23,6 +23,7 @@ const callCb = (cbId: number) => {
 };
 
 const globalTempoCSN = new ConstantSourceNode(ctx);
+(window as any).globalTempoCSN = globalTempoCSN;
 globalTempoCSN.offset.value = +(localStorage.getItem('globalTempo') ?? 120);
 globalTempoCSN.start();
 

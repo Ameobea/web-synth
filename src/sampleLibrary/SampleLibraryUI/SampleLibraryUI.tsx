@@ -30,7 +30,7 @@ export const SampleRow: React.FC<
 > = ({ descriptor, style, togglePlaying, isPlaying, ...rest }) => (
   <div className='sample-row' {...rest} style={style}>
     <PlaySampleIcon isPlaying={isPlaying} onClick={togglePlaying} />
-    {descriptor.name}
+    <span title={descriptor.name}>{descriptor.name}</span>
   </div>
 );
 

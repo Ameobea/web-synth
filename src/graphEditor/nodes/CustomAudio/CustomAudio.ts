@@ -33,6 +33,7 @@ import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
+import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
 
 const ctx = new AudioContext();
 
@@ -178,9 +179,7 @@ const enhanceAudioNode = <T>({
           console.error(`No property "${key}" of node named ${name}; not setting value.`);
           return;
         } else if (!(valueContainer instanceof AudioParam)) {
-          console.error(
-            `Property "${key}" of node named ${name} isn't an \`AudioParam\`; not setting value.`
-          );
+          (this.node as any)[key] = val;
           return;
         }
 
@@ -210,10 +209,7 @@ const enhanceAudioNode = <T>({
           console.error(`No property "${key}" of node named ${name}; not setting value.`);
           return acc;
         } else if (!(valueContainer instanceof AudioParam)) {
-          console.error(
-            `Property "${key}" of node named ${name} isn't an \`AudioParam\`; not setting value.`
-          );
-          return acc;
+          return { ...acc, [key]: valueContainer };
         }
 
         return { ...acc, [key]: valueContainer.value };
@@ -247,6 +243,7 @@ const CustomGainNode = enhanceAudioNode({
   }),
   getOverridableParams: (node: GainNode) => [{ name: 'gain', param: node.gain }],
   paramKeys: ['gain'],
+  SmallViewRenderer: CustomGainNodeSmallView,
 });
 
 const CustomConstantSourceNode = enhanceAudioNode({
@@ -303,7 +300,7 @@ const CustomBiquadFilterNode = enhanceAudioNode({
     { name: 'detune', param: node.detune, defaultValue: 0 },
     { name: 'gain', param: node.gain, defaultValue: 0 },
   ],
-  paramKeys: ['frequency', 'Q', 'detune', 'gain'],
+  paramKeys: ['frequency', 'Q', 'detune', 'gain', 'type'],
   SmallViewRenderer: CustomBiquadFilterNodeSmallView,
 });
 

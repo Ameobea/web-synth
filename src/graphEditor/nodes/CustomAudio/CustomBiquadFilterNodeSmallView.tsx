@@ -23,23 +23,21 @@ const CustomBiquadFilterNodeSmallView: React.FC<{
   );
 
   return (
-    <div>
-      <ControlPanel
-        style={{ width: 400 }}
-        title='BIQUAD FILTER'
-        settings={settings}
-        state={params}
-        onChange={(key: string, val: any) => {
-          if (key === 'type') {
-            node.node!.type = val;
-          } else {
-            node.paramOverrides[key].override.offset.value = val;
-          }
+    <ControlPanel
+      style={{ width: 500 }}
+      title='BIQUAD FILTER'
+      settings={settings}
+      state={params}
+      onChange={(key: string, val: any) => {
+        if (key === 'type') {
+          node.node!.type = val;
+        } else {
+          node.paramOverrides[key].override.offset.value = val;
+        }
 
-          setParams({ ...params, [key]: val });
-        }}
-      />
-    </div>
+        setParams({ ...params, [key]: val });
+      }}
+    />
   );
 };
 

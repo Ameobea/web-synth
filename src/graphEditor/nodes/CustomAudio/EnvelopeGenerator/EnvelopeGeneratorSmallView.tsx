@@ -24,6 +24,7 @@ const EnvelopeGeneratorSmallView: React.FC<{
         Comp: ControlPanelADSR,
       },
     ]}
+    style={{ width: 500 }}
     onChange={(_key: string, _val: any, state: any) => onChange(state.adsr, state.lengthMS)}
   />
 );

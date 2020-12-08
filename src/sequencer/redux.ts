@@ -363,7 +363,7 @@ export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
 
 export type SequencerReduxInfra = ReturnType<typeof buildSequencerReduxInfra>;
 
-const DEFAULT_WIDTH = 16 as const;
+const DEFAULT_WIDTH = 32 as const;
 
 export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
   const inputCbs: MIDIInputCbs = {

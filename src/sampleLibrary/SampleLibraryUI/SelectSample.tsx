@@ -42,6 +42,9 @@ const mkSampleListingRowRenderer = ({
         ...(selectedSample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
         cursor: 'pointer',
         userSelect: 'none',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
       }}
       onClick={() =>
         setSelectedSample(
