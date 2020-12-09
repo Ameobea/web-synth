@@ -68,7 +68,7 @@ fn encode_to_wav(sample_data: Vec<u8>) -> Result<Vec<u8>, String> {
     Ok(encoded_buf)
 }
 
-#[post("/remote_samples/<name>", data = "<sample_data>")]
+#[post("/remote_samples?<name>", data = "<sample_data>")]
 pub async fn store_remote_sample(
     mut name: String,
     sample_data: rocket::Data,
@@ -154,7 +154,7 @@ pub async fn store_remote_sample(
             Err(err) => {
                 error!("Error querying go server RPC to store sample: {:?}", err);
                 return Err(String::from("Error saving sample"));
-            },
+            }
         };
         if res.status() != 200 {
             error!(

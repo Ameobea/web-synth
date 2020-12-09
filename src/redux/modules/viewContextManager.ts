@@ -198,7 +198,7 @@ const actionGroups = {
             from2.name === from.name &&
             from2.vcId === from.vcId &&
             to2.name === to.name &&
-            to2.vcId === to2.vcId
+            to2.vcId === to.vcId
         )
       ) {
         return state;

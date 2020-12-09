@@ -67,7 +67,7 @@ LGAudioConnectables.prototype.onPropertyChanged = function (name: string, value:
 
 LGAudioConnectables.prototype.onConnectionsChange = function (
   this: { graph: LiteGraphType },
-  connection: 1 | 2,
+  _connection: 1 | 2,
   _slot: number,
   isNowConnected: boolean,
   linkInfo: LiteGraphLink,
