@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
@@ -64,6 +64,7 @@ const buildControlPanelField = (
       label: getLabel(address),
       min,
       max,
+      defaultVal: init,
       initial: paramDefaults[address] ?? init,
       step,
       address,
@@ -74,6 +75,7 @@ const buildControlPanelField = (
       label: getLabel(address),
       min,
       max,
+      defaultVal: init,
       initial: paramDefaults[address] ?? init,
       step,
       address,
@@ -96,6 +98,7 @@ const buildControlPanelField = (
       label: getLabel(address),
       min,
       max,
+      defaultVal: init,
       initial: paramDefaults[address] ?? init,
       step,
       address,
@@ -166,17 +169,71 @@ const buildControlPanelComponent = (
     style?: React.CSSProperties;
     position?: any;
     draggable?: boolean;
-  }> = ({ position, style, draggable = true }) => (
-    <ControlPanel
-      draggable={draggable}
-      theme='dark'
-      position={position === null ? undefined : { top: 0, right: 44 }}
-      style={style}
-      settings={settings}
-      onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
-      width={500}
-    />
-  );
+  }> = ({ position, style, draggable = true }) => {
+    const panelCtx = useRef<any>(null);
+
+    return (
+      <ControlPanel
+        draggable={draggable}
+        theme='dark'
+        position={position === null ? undefined : { top: 0, right: 44 }}
+        style={style}
+        settings={[
+          ...settings,
+          {
+            type: 'button',
+            label: 'reset',
+            action: () => {
+              if (!panelCtx.current) {
+                return;
+              }
+              const ctx = panelCtx.current;
+
+              settings.forEach(setting => {
+                if (
+                  !setting.address ||
+                  R.isNil(setting.defaultVal) ||
+                  ctx[setting.label] === setting.defaultVal
+                ) {
+                  return;
+                }
+
+                ctx[setting.label] = setting.defaultVal;
+                setParamValue(`/${pathBase}/${setting.label}`, setting.defaultVal);
+              });
+            },
+          },
+          {
+            type: 'button',
+            label: 'randomize',
+            action: () => {
+              if (!panelCtx.current) {
+                return;
+              }
+              const ctx = panelCtx.current;
+
+              settings.forEach(setting => {
+                if (!setting.address || R.isNil(setting.min) || R.isNil(setting.max)) {
+                  return;
+                }
+
+                const scale = setting.max - setting.min;
+                const shift = setting.min;
+                const newVal = Math.random() * scale + shift;
+                ctx[setting.label] = newVal;
+                setParamValue(`/${pathBase}/${setting.label}`, newVal);
+              });
+            },
+          },
+        ]}
+        onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
+        width={500}
+        contextCb={(ctx: any) => {
+          panelCtx.current = ctx;
+        }}
+      />
+    );
+  };
   return FaustEditorControlPanel;
 };
 
