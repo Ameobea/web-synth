@@ -167,3 +167,12 @@ export const retryWithDelay = async <T>(
     }
   }
 };
+
+export const truncateWithElipsis = (s: string, maxLength: number): string => {
+  let truncated = s.slice(0, maxLength);
+  if (truncated.length !== s.length) {
+    truncated += '…';
+  }
+
+  return truncated;
+};

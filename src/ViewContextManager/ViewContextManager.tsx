@@ -31,7 +31,7 @@ const viewContexts: { children: string; name: string; displayName: string }[] = 
   { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
   { children: 'D', name: 'synth_designer', displayName: 'Synth Designer' },
   { children: 'K', name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
-  { children: 'Q', name: 'sequencer', displayName: 'Sequencer' },
+  { children: '𝍖', name: 'sequencer', displayName: 'Sequencer' },
   { children: 'L', name: 'sample_library', displayName: 'Sample Library' },
   { children: 'P', name: 'control_panel', displayName: 'Control Panel' },
   { children: '⋱', name: 'granulator', displayName: 'Granular Synthesizer' },

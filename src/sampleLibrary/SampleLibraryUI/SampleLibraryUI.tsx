@@ -36,7 +36,6 @@ export const SampleRow: React.FC<
 
 const playSample = async (descriptor: SampleDescriptor): Promise<AudioBufferSourceNode> => {
   const buffer = await getSample(descriptor);
-  console.log({ buffer });
   const bufSrc = new AudioBufferSourceNode(ctx);
   bufSrc.buffer = buffer;
   bufSrc.connect(ctx.destination);

@@ -1,3 +1,4 @@
+import { filterNils } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
@@ -15,51 +16,88 @@ const mkHandleChange = ({
     //   dispatch(actionCreators.sequencer.SET_BPM(val));
     //   break;
     // }
+    case 'beat count': {
+      dispatch(actionCreators.sequencer.SET_BEAT_COUNT(val));
+      break;
+    }
     default: {
       console.error(`Unhandled key in SequencerSettings: "${key}"`);
     }
   }
 };
 
-const SequencerSettings: React.FC<SequencerReduxInfra> = ({
+const getSequencerSettings = ({
   actionCreators,
   dispatch,
-  useSelector,
-}) => {
-  const isPlaying = useSelector(state => state.sequencer.isPlaying);
+  voiceCount,
+  isPlaying,
+  currentEditingVoiceIx,
+  markCount,
+}: SequencerReduxInfra & {
+  isPlaying: boolean;
+  voiceCount: number;
+  currentEditingVoiceIx: number;
+  markCount: number;
+}) =>
+  filterNils([
+    {
+      type: 'button',
+      label: isPlaying ? 'stop' : 'start',
+      action: () => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING()),
+    },
+    // {
+    //   type: 'range',
+    //   label: 'bpm',
+    //   min: 0,
+    //   max: 4000,
+    //   initial: 120,
+    //   steps: 200,
+    // },
+    {
+      type: 'button',
+      label: 'add voice',
+      action: () => dispatch(actionCreators.sequencer.ADD_VOICE()),
+    },
+    voiceCount > 1
+      ? {
+          type: 'button',
+          label: 'delete current voice',
+          action: () => dispatch(actionCreators.sequencer.REMOVE_VOICE(currentEditingVoiceIx)),
+        }
+      : null,
+    {
+      type: 'select',
+      label: 'beat count',
+      options: new Array(64).fill(0).map((_i, i) => i + 1),
+      initial: markCount,
+    },
+  ]);
+
+const SequencerSettings: React.FC<SequencerReduxInfra> = reduxInfra => {
+  const { isPlaying, voiceCount, currentEditingVoiceIx, markCount } = reduxInfra.useSelector(
+    state => ({
+      isPlaying: state.sequencer.isPlaying,
+      voiceCount: state.sequencer.voices.length,
+      currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
+      markCount: state.sequencer.marks[0].length,
+    })
+  );
+
+  const handleChange = useMemo(() => mkHandleChange(reduxInfra), [reduxInfra]);
 
   const settings = useMemo(
-    () => [
-      // {
-      //   type: 'range',
-      //   label: 'bpm',
-      //   min: 0,
-      //   max: 4000,
-      //   initial: 120,
-      //   steps: 200,
-      // },
-      {
-        type: 'button',
-        label: isPlaying ? 'stop' : 'start',
-        action: () => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING()),
-      },
-    ],
-    [isPlaying, actionCreators, dispatch]
-  );
-  const handleChange = useMemo(
     () =>
-      mkHandleChange({
-        dispatch,
-        actionCreators,
+      getSequencerSettings({
+        ...reduxInfra,
+        isPlaying,
+        voiceCount,
+        currentEditingVoiceIx,
+        markCount,
       }),
-    [dispatch, actionCreators]
+    [reduxInfra, isPlaying, voiceCount, currentEditingVoiceIx, markCount]
   );
 
-  return (
-    <div className='sequencer-settings'>
-      <ControlPanel state={{}} settings={settings} onChange={handleChange} />
-    </div>
-  );
+  return <ControlPanel style={{ width: 500 }} settings={settings} onChange={handleChange} />;
 };
 
 export default SequencerSettings;

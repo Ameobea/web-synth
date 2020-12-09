@@ -1,10 +1,12 @@
 /* eslint-disable react/jsx-key */
 import React from 'react';
-import FlatButton from 'src/misc/FlatButton';
+import ControlPanel from 'react-control-panel';
 
+import FlatButton from 'src/misc/FlatButton';
 import { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
+import getSequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
 
 const CELL_SIZE_PX = 40 as const;
@@ -105,10 +107,9 @@ const SequencerUI: React.FC<SequencerUIProps> = ({ vcId, ...reduxInfra }) => {
   return (
     <div className='sequencer'>
       <SequencerGrid rowMarks={marks} {...reduxInfra} />
-      <button onClick={() => reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.ADD_VOICE())}>
-        Add Voice
-      </button>
+
       <SequencerSettings {...reduxInfra} />
+
       <InputSelect vcId={vcId} {...reduxInfra} />
     </div>
   );

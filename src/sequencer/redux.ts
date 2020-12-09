@@ -103,11 +103,12 @@ const actionGroups = {
   }),
   ADD_VOICE: buildActionGroup({
     actionCreator: () => ({ type: 'ADD_VOICE' }),
-    subReducer: (state: SequencerReduxState) => ({
-      ...state,
-      marks: [...state.marks, R.times(() => null, state.marks[0]!.length)],
-      voices: [...state.voices, { type: 'sample' as const }],
-    }),
+    subReducer: (state: SequencerReduxState) =>
+      reschedule({
+        ...state,
+        marks: [...state.marks, R.times(() => null, state.marks[0]!.length)],
+        voices: [...state.voices, { type: 'sample' as const }],
+      }),
   }),
   REMOVE_VOICE: buildActionGroup({
     actionCreator: (voiceIx: number) => ({ type: 'REMOVE_VOICE', voiceIx }),
@@ -117,10 +118,10 @@ const actionGroups = {
         return state;
       }
 
-      return {
+      return reschedule({
         ...state,
         marks: R.remove(voiceIx, 1, state.marks),
-      };
+      });
     },
   }),
   MARK: buildActionGroup({
@@ -349,6 +350,24 @@ const actionGroups = {
             }
           : state.markEditState,
       };
+    },
+  }),
+  SET_BEAT_COUNT: buildActionGroup({
+    actionCreator: (beatCount: number) => ({ type: 'SET_BEAT_COUNT', beatCount }),
+    subReducer: (state: SequencerReduxState, { beatCount }) => {
+      const curMarkCount = state.marks[0].length;
+      if (curMarkCount === beatCount) {
+        return state;
+      } else if (curMarkCount < beatCount) {
+        const newMarks = state.marks.map(marks => [
+          ...marks,
+          ...new Array(beatCount - curMarkCount).fill(null),
+        ]);
+        return reschedule({ ...state, marks: newMarks });
+      } else {
+        const newMarks = state.marks.map(marks => marks.slice(0, beatCount));
+        return reschedule({ ...state, marks: newMarks });
+      }
     },
   }),
 };

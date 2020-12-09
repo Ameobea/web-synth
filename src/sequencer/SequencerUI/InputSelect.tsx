@@ -1,19 +1,47 @@
-import React from 'react';
-import { connect, useSelector } from 'react-redux';
+import React, { useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
+import ControlPanel from 'react-control-panel';
 
 import { getSample } from 'src/sampleLibrary';
 import { updateConnectables } from 'src/patchNetwork';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
-import { SequencerReduxState, VoiceTarget, SequencerReduxInfra } from '../redux';
+import { VoiceTarget, SequencerReduxInfra } from '../redux';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
+import { truncateWithElipsis } from 'src/util';
 
 interface InputCompCommonProps<T> extends SequencerReduxInfra {
   voiceIx: number;
   vcId: string;
   voiceTarget: Extract<VoiceTarget, { type: T }>;
 }
+
+const AllVoiceTargetTypes: VoiceTarget['type'][] = ['midi', 'sample', 'gate'];
+
+const buildInputTypeSetting = (voiceType: VoiceTarget['type']) => ({
+  type: 'select',
+  label: 'voice type',
+  options: AllVoiceTargetTypes,
+  initial: voiceType,
+});
+
+const mkInputOnChange = (
+  props: Pick<InputCompCommonProps<any>, 'dispatch' | 'actionCreators' | 'voiceIx'>,
+  extraOnChange?: (key: string, val: any, state: any) => void
+) => (key: string, val: any, state: any) => {
+  if (key === 'voice type') {
+    props.dispatch(
+      props.actionCreators.sequencer.SET_VOICE_TARGET(
+        props.voiceIx,
+        GetDefaultVoiceTargetByTargetType[val as keyof typeof GetDefaultVoiceTargetByTargetType]()
+      )
+    );
+    return;
+  } else if (extraOnChange) {
+    extraOnChange(key, val, state);
+  }
+};
 
 const SynthInput: React.FC<InputCompCommonProps<'midi'>> = ({
   voiceIx,
@@ -28,52 +56,61 @@ const SynthInput: React.FC<InputCompCommonProps<'midi'>> = ({
     isEditing: state.sequencer.markEditState?.voiceIx === voiceIx,
   }));
 
-  return (
-    <div>
-      <div>
-        <select
-          onChange={evt =>
-            dispatch(
-              actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
-                ...voiceTarget,
-                synthIx: Option.of(evt.target.value)
-                  .flatMap(n => Option.of(n === 'none' ? null : +n))
-                  .orNull(),
-              })
-            )
-          }
-          value={Option.of(voiceTarget.synthIx).getOrElse('none')}
-        >
-          {R.times(
-            i =>
-              i === 0 ? (
-                <option key='none' value='none'>
-                  None
-                </option>
-              ) : (
-                <option key={i} value={i - 1}>
-                  {i}
-                </option>
-              ),
-            midiOutputCount + 1
-          )}
-        </select>
+  const settings = useMemo(
+    () => [
+      buildInputTypeSetting('midi'),
+      {
+        label: 'midi output index',
+        type: 'select',
+        initial: Option.of(voiceTarget.synthIx).getOrElse('none'),
+        options: {
+          none: 'None',
+          ...Object.fromEntries(R.times(i => i, midiOutputCount).map(i => [i, i])),
+        },
+      },
+      {
+        label: 'add midi output',
+        type: 'button',
+        action: () => {
+          dispatch(actionCreators.sequencer.ADD_MIDI_OUTPUT());
+          updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
+        },
+      },
+      {
+        label: isEditing ? 'exit edit mode' : 'enter edit mode',
+        type: 'button',
+        action: () => dispatch(actionCreators.sequencer.TOGGLE_EDIT_MODE(voiceIx)),
+      },
+    ],
+    [
+      actionCreators.sequencer,
+      dispatch,
+      isEditing,
+      midiOutputCount,
+      vcId,
+      voiceIx,
+      voiceTarget.synthIx,
+    ]
+  );
 
-        <button
-          onClick={() => {
-            dispatch(actionCreators.sequencer.ADD_MIDI_OUTPUT());
-            updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
-          }}
-        >
-          Add MIDI Output
-        </button>
-      </div>
-      <div>
-        <button onClick={() => dispatch(actionCreators.sequencer.TOGGLE_EDIT_MODE(voiceIx))}>
-          {isEditing ? 'exit edit mode' : 'enter edit mode'}
-        </button>
-      </div>
-    </div>
+  return (
+    <ControlPanel
+      style={{ width: 500 }}
+      title='input mapping'
+      settings={settings}
+      onChange={mkInputOnChange({ dispatch, actionCreators, voiceIx }, (key, val, _state) => {
+        if (key === 'midi output index') {
+          dispatch(
+            actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
+              ...voiceTarget,
+              synthIx: Option.of(val)
+                .flatMap(n => Option.of(n === 'none' ? null : +n))
+                .orNull(),
+            })
+          );
+        }
+      })}
+    />
   );
 };
 
@@ -89,57 +126,84 @@ const SampleInput: React.FC<InputCompCommonProps<'sample'>> = ({
       : Option.of(state.sequencer.sampleBank[voiceIx])
   );
 
-  return (
-    <div>
-      Selected Sample:{' '}
-      {sampleOpt === 'LOADING'
-        ? 'Loading...'
-        : sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None')}
-      <button
-        onClick={async () => {
+  const settings = useMemo(
+    () => [
+      buildInputTypeSetting('sample'),
+      {
+        type: 'button',
+        label: 'pick sample',
+        action: async () => {
           const descriptor = await selectSample();
           const sampleData = await getSample(descriptor);
           dispatch(actionCreators.sequencer.ADD_SAMPLE(voiceIx, descriptor, sampleData));
           dispatch(actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, { type: 'sample' }));
-        }}
-      >
-        Pick Sample
-      </button>
-    </div>
+        },
+      },
+    ],
+    [actionCreators.sequencer, dispatch, voiceIx]
   );
-};
 
-const mapGateInputStateToProps = (state: { sequencer: SequencerReduxState }) => ({
-  gateOutputCount: state.sequencer.gateOutputs.length,
-});
-
-const GateInputInner: React.FC<
-  {
-    actionCreators: SequencerReduxInfra['actionCreators'];
-    dispatch: SequencerReduxInfra['dispatch'];
-  } & ReturnType<typeof mapGateInputStateToProps>
-> = ({ actionCreators, dispatch, gateOutputCount }) => {
+  const selectedSampleName =
+    sampleOpt === 'LOADING'
+      ? 'Loading...'
+      : sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None');
   return (
-    <div>
-      <select>
-        <option value='none'>None</option>
-        {R.times(
-          i => (
-            <option key={i} value={i}>{`Gate Output ${i + 1}`}</option>
-          ),
-          gateOutputCount
-        )}
-      </select>
-      <button onClick={() => dispatch(actionCreators.sequencer.ADD_GATE_OUTPUT())}>
-        Add Gate Output
-      </button>
-    </div>
+    <ControlPanel
+      style={{ width: 500 }}
+      title={
+        <div style={{ lineHeight: 0.98 }} title={selectedSampleName}>
+          {truncateWithElipsis('Selected Sample: ' + selectedSampleName, 130)}
+        </div>
+      }
+      settings={settings}
+      onChange={mkInputOnChange({ voiceIx, dispatch, actionCreators })}
+    />
   );
 };
 
-const GateInput = connect(mapGateInputStateToProps)(GateInputInner);
+const GateInput: React.FC<InputCompCommonProps<'gate'>> = ({
+  useSelector,
+  actionCreators,
+  dispatch,
+  voiceIx,
+}) => {
+  const gateOutputCount = useSelector(state => state.sequencer.gateOutputs.length);
 
-const AllVoiceTargetTypes: VoiceTarget['type'][] = ['midi', 'sample', 'gate'];
+  const settings = useMemo(
+    () => [
+      buildInputTypeSetting('gate'),
+      {
+        type: 'select',
+        label: 'gate output index',
+        options: {
+          none: 'None',
+          ...Object.fromEntries(R.times(i => i, gateOutputCount).map(i => [i, i + 1])),
+        },
+      },
+      {
+        type: 'button',
+        label: 'add gate output',
+        action: () => dispatch(actionCreators.sequencer.ADD_GATE_OUTPUT()),
+      },
+    ],
+    [actionCreators.sequencer, dispatch, gateOutputCount]
+  );
+
+  return (
+    <ControlPanel
+      style={{ width: 500 }}
+      title='configure gate'
+      settings={settings}
+      onChange={mkInputOnChange({ voiceIx, dispatch, actionCreators }, (key, val, _state) => {
+        if (key === 'gate output index') {
+          dispatch(
+            actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, { type: 'gate', gateIx: val })
+          );
+        }
+      })}
+    />
+  );
+};
 
 const GetDefaultVoiceTargetByTargetType: {
   [K in VoiceTarget['type']]: () => Extract<VoiceTarget, { type: K }>;
@@ -174,26 +238,6 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
 
   return (
     <div className='voice-input'>
-      <select
-        value={voiceTarget.type}
-        onChange={evt =>
-          dispatch(
-            actionCreators.sequencer.SET_VOICE_TARGET(
-              voiceIx,
-              GetDefaultVoiceTargetByTargetType[
-                evt.target.value as keyof typeof GetDefaultVoiceTargetByTargetType
-              ]()
-            )
-          )
-        }
-      >
-        {AllVoiceTargetTypes.map(targetType => (
-          <option key={targetType} value={targetType}>
-            {targetType}
-          </option>
-        ))}
-      </select>
-
       <InputComp
         voiceIx={voiceIx}
         voiceTarget={voiceTarget as any}
@@ -218,16 +262,7 @@ const InputSelect: React.FC<InputSelectProps> = ({ vcId, ...reduxInfra }) => {
 
   return (
     <div className='sequencer-input-select'>
-      <h2>Input Mapping</h2>
-
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <VoiceInput
-          vcId={vcId}
-          voiceIx={currentEditingVoiceIx}
-          voiceTarget={voice}
-          {...reduxInfra}
-        />
-      </div>
+      <VoiceInput vcId={vcId} voiceIx={currentEditingVoiceIx} voiceTarget={voice} {...reduxInfra} />
     </div>
   );
 };
