@@ -16,6 +16,7 @@ import {
 } from './SampleLibraryUI';
 import useAllSamples from './useAllSamples';
 import { renderModalWithControls } from 'src/controls/Modal';
+import FlatButton from 'src/misc/FlatButton';
 
 const mkSampleListingRowRenderer = ({
   sampleDescriptors,
@@ -36,7 +37,9 @@ const mkSampleListingRowRenderer = ({
       key={key}
       style={{
         ...(style || {}),
-        ...(selectedSample?.sample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
+        ...(selectedSample?.sample === sampleDescriptors[index]
+          ? { backgroundColor: 'rgba(101, 0, 120, 0.5)' }
+          : {}),
         cursor: 'pointer',
         userSelect: 'none',
         textOverflow: 'ellipsis',
@@ -61,17 +64,21 @@ const SelectSample: React.FC<{
     newSelectedSample: { sample: SampleDescriptor; index: number } | null
   ) => void;
 }> = ({ selectedSample, setSelectedSample }) => {
-  const { allSamples, includeLocalSamples, setIncludeLocalSamples } = useAllSamples();
+  const {
+    allSamples,
+    includeLocalSamples,
+    setIncludeLocalSamples,
+    setIncludeRemoteSamples,
+    includeRemoteSamples,
+  } = useAllSamples();
 
   return (
     <>
       <LoadSamplesButtons
         localSamplesLoaded={includeLocalSamples}
         loadLocalSamples={() => setIncludeLocalSamples(true)}
-        remoteSamplesLoaded={false}
-        loadRemoteSamples={() => {
-          throw new UnimplementedError();
-        }}
+        remoteSamplesLoaded={includeRemoteSamples}
+        loadRemoteSamples={() => setIncludeRemoteSamples(true)}
       />
 
       <SampleListing
@@ -96,16 +103,20 @@ const SampleSelectDialog: React.FC<{
   } | null>(null);
 
   return (
-    <BasicModal style={{ width: 800 }}>
+    <BasicModal style={{ width: 800, alignItems: 'center' }}>
       <SelectSample
         selectedSample={selectedSample}
         setSelectedSample={sample => setSelectedSample(sample)}
       />
 
-      <button disabled={!selectedSample} onClick={() => onSubmit(selectedSample!.sample)}>
+      <FlatButton
+        disabled={!selectedSample}
+        onClick={() => onSubmit(selectedSample!.sample)}
+        style={{ marginTop: 10 }}
+      >
         Submit
-      </button>
-      {onCancel ? <button onClick={onCancel}>Cancel</button> : null}
+      </FlatButton>
+      {onCancel ? <FlatButton onClick={onCancel}>Cancel</FlatButton> : null}
     </BasicModal>
   );
 };

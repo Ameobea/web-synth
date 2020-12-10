@@ -71,7 +71,7 @@ const playSample = async (
   const buffer = await getSample(descriptor);
   const bufSrc = new AudioBufferSourceNode(ctx);
   bufSrc.buffer = buffer;
-  bufSrc.connect(ctx.destination);
+  bufSrc.connect((ctx as any).globalVolume);
   bufSrc.onended = onFinished;
   bufSrc.start();
 
@@ -186,6 +186,7 @@ export function SampleListing({
       rowCount={sampleDescriptors.length}
       width={width}
       rowRenderer={RowRenderer}
+      scrollToIndex={selectedSample?.index}
     />
   );
 }
@@ -244,6 +245,7 @@ const SampleLibraryUI: React.FC = () => {
         loadLocalSamples={() => setIncludeLocalSamples(true)}
         remoteSamplesLoaded={includeRemoteSamples}
         loadRemoteSamples={() => setIncludeRemoteSamples(true)}
+        style={{ marginBottom: 14 }}
       />
 
       <SampleListing

@@ -173,7 +173,11 @@ const actionGroups = {
     }),
     subReducer: (state: SequencerReduxState, { voiceIx, newTarget }) => ({
       ...state,
-      voices: R.set(R.lensIndex(voiceIx), newTarget, state.voices),
+      voices: R.set(
+        R.lensIndex(voiceIx),
+        { ...newTarget, name: state.voices[voiceIx].name },
+        state.voices
+      ),
     }),
   }),
   ADD_MIDI_OUTPUT: buildActionGroup({

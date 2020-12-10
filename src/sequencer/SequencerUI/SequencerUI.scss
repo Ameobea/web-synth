@@ -55,9 +55,13 @@
 
   span {
     cursor: pointer;
-    max-width: 106px;
+    min-width: 102px;
+    max-width: 102px;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-height: 10px;
+    background-color: #222;
+    padding: 3px 2px;
   }
 
   .editing-voice-selector {
