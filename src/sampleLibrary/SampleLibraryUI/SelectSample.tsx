@@ -10,7 +10,7 @@ import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import BasicModal from 'src/misc/BasicModal';
 import {
   SampleListing,
-  MkDefaultSampleListingRowRendererArgs,
+  MkSampleListingRowRendererArgs,
   SampleRow,
   LoadSamplesButtons,
 } from './SampleLibraryUI';
@@ -23,10 +23,7 @@ const mkSampleListingRowRenderer = ({
   togglePlaying,
   selectedSample,
   setSelectedSample,
-}: MkDefaultSampleListingRowRendererArgs & {
-  selectedSample: SampleDescriptor | null;
-  setSelectedSample: (newSelectedSample: SampleDescriptor | null) => void;
-}): ListRowRenderer => {
+}: MkSampleListingRowRendererArgs): ListRowRenderer => {
   const SampleListingRowRenderer: React.FC<{
     style?: any;
     index: number;
@@ -39,7 +36,7 @@ const mkSampleListingRowRenderer = ({
       key={key}
       style={{
         ...(style || {}),
-        ...(selectedSample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
+        ...(selectedSample?.sample === sampleDescriptors[index] ? { backgroundColor: '#b0d' } : {}),
         cursor: 'pointer',
         userSelect: 'none',
         textOverflow: 'ellipsis',
@@ -48,7 +45,9 @@ const mkSampleListingRowRenderer = ({
       }}
       onClick={() =>
         setSelectedSample(
-          selectedSample === sampleDescriptors[index] ? null : sampleDescriptors[index]
+          selectedSample?.sample === sampleDescriptors[index]
+            ? null
+            : { sample: sampleDescriptors[index], index }
         )
       }
     />
@@ -57,8 +56,10 @@ const mkSampleListingRowRenderer = ({
 };
 
 const SelectSample: React.FC<{
-  selectedSample: SampleDescriptor | null;
-  setSelectedSample: (newSelectedSample: SampleDescriptor | null) => void;
+  selectedSample: { sample: SampleDescriptor; index: number } | null;
+  setSelectedSample: (
+    newSelectedSample: { sample: SampleDescriptor; index: number } | null
+  ) => void;
 }> = ({ selectedSample, setSelectedSample }) => {
   const { allSamples, includeLocalSamples, setIncludeLocalSamples } = useAllSamples();
 
@@ -74,11 +75,12 @@ const SelectSample: React.FC<{
       />
 
       <SampleListing
-        extraMkRowRendererArgs={{ selectedSample, setSelectedSample }}
+        selectedSample={selectedSample ?? null}
+        setSelectedSample={setSelectedSample}
         mkRowRenderer={mkSampleListingRowRenderer}
         sampleDescriptors={typeof allSamples === 'string' ? [] : allSamples || []}
         height={600}
-        width={400}
+        width={800}
       />
     </>
   );
@@ -88,13 +90,19 @@ const SampleSelectDialog: React.FC<{
   onSubmit: (val: SampleDescriptor) => void;
   onCancel?: () => void;
 }> = ({ onSubmit, onCancel }) => {
-  const [selectedSample, setSelectedSample] = useState<SampleDescriptor | null>(null);
+  const [selectedSample, setSelectedSample] = useState<{
+    sample: SampleDescriptor;
+    index: number;
+  } | null>(null);
 
   return (
-    <BasicModal>
-      <SelectSample selectedSample={selectedSample} setSelectedSample={setSelectedSample} />
+    <BasicModal style={{ width: 800 }}>
+      <SelectSample
+        selectedSample={selectedSample}
+        setSelectedSample={sample => setSelectedSample(sample)}
+      />
 
-      <button disabled={!selectedSample} onClick={() => onSubmit(selectedSample!)}>
+      <button disabled={!selectedSample} onClick={() => onSubmit(selectedSample!.sample)}>
         Submit
       </button>
       {onCancel ? <button onClick={onCancel}>Cancel</button> : null}

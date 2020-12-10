@@ -2,7 +2,7 @@ import React from 'react';
 
 import './BasicModal.scss';
 
-const BasicModal: React.FC<{} & React.DetailsHTMLAttributes<HTMLDivElement>> = ({
+const BasicModal: React.FC<React.DetailsHTMLAttributes<HTMLDivElement>> = ({
   children,
   ...props
 }) => (
