@@ -6,7 +6,7 @@ import { Without, PropTypesOf, ValueOf } from 'ameo-utils';
 
 import { Effect } from 'src/redux/modules/effects';
 import { EffectPickerCustomInput } from 'src/controls/faustEditor';
-import { BACKEND_BASE_URL, FAUST_COMPILER_ENDPOINT } from 'src/conf';
+import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap, get_faust_editor_connectables } from 'src/faustEditor';
@@ -38,7 +38,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     flex: 1,
     color: '#eee',
     marginLeft: 10,
-    fontFamily: "'Oxygen Mono'",
+    fontFamily: "'Oxygen Mono', monospace",
     maxHeight: 600,
     border: '1px solid #555',
     backgroundColor: 'rgba(44,44,44,0.3)',

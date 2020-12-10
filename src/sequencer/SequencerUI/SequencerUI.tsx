@@ -1,5 +1,5 @@
 /* eslint-disable react/jsx-key */
-import React from 'react';
+import React, { useState } from 'react';
 
 import FlatButton from 'src/misc/FlatButton';
 import { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
@@ -9,12 +9,64 @@ import './SequencerUI.scss';
 
 const CELL_SIZE_PX = 40 as const;
 
-const EditingVoiceSelector: React.FC<{
+const VoiceNameSelector: React.FC<{
+  name: string;
+  setName: (newName: string) => void;
+}> = ({ name, setName }) => {
+  const [isRenaming, setIsRenaming] = useState<string | null>(null);
+
+  if (isRenaming !== null) {
+    return (
+      <input
+        style={{ width: 88 }}
+        type='text'
+        value={isRenaming}
+        onChange={evt => setIsRenaming(evt.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            setName(isRenaming);
+            setIsRenaming(null);
+          } else if (e.key === 'Escape') {
+            setIsRenaming(null);
+          }
+        }}
+        ref={elem => elem?.focus()}
+      />
+    );
+  }
+
+  return <span onClick={() => setIsRenaming(name)}>{name}</span>;
+};
+
+interface EditingVoiceSelectorProps extends SequencerReduxInfra {
   isSelected: boolean;
   onSelect: () => void;
-}> = ({ isSelected, onSelect }) => (
-  <div className={`editing-voice-selector${isSelected ? ' selected' : ''}`} onClick={onSelect} />
-);
+  voiceIx: number;
+}
+
+const EditingVoiceSelector: React.FC<EditingVoiceSelectorProps> = ({
+  isSelected,
+  onSelect,
+  voiceIx,
+  useSelector,
+  dispatch,
+  actionCreators,
+}) => {
+  const name = useSelector(state => state.sequencer.voices[voiceIx].name);
+
+  return (
+    <div className='editing-voice-selector-wrapper'>
+      <VoiceNameSelector
+        name={name}
+        setName={newName => dispatch(actionCreators.sequencer.SET_VOICE_NAME(voiceIx, newName))}
+      />
+      <div
+        className={`editing-voice-selector${isSelected ? ' selected' : ''}`}
+        onClick={onSelect}
+      />
+    </div>
+  );
+};
 
 interface SequencerRowProps extends SequencerReduxInfra {
   rowIx: number;
@@ -100,6 +152,8 @@ const SequencerGrid: React.FC<SequencerGridProps> = ({ rowMarks, ...reduxInfra }
                 reduxInfra.actionCreators.sequencer.SET_CURRENTLY_EDITING_VOICE_IX(i)
               )
             }
+            voiceIx={i}
+            {...reduxInfra}
           />
         ))}
       </div>

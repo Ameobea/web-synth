@@ -46,7 +46,7 @@ export interface SequencerEditState {
 export interface SequencerReduxState {
   currentEditingVoiceIx: number;
   activeBeats: number[];
-  voices: VoiceTarget[];
+  voices: (VoiceTarget & { name: string })[];
   sampleBank:
     | { [voiceIx: number]: { descriptor: SampleDescriptor; buffer: AudioBuffer } | null }
     | 'LOADING';
@@ -109,7 +109,7 @@ const actionGroups = {
       reschedule({
         ...state,
         marks: [...state.marks, R.times(() => null, state.marks[0]!.length)],
-        voices: [...state.voices, { type: 'sample' as const }],
+        voices: [...state.voices, { type: 'sample' as const, name: 'sample' }],
       }),
   }),
   REMOVE_VOICE: buildActionGroup({
@@ -382,6 +382,13 @@ const actionGroups = {
       curActiveMarkIx,
     }),
   }),
+  SET_VOICE_NAME: buildActionGroup({
+    actionCreator: (voiceIx: number, name: string) => ({ type: 'SET_VOICE_NAME', voiceIx, name }),
+    subReducer: (state: SequencerReduxState, { voiceIx, name }) => ({
+      ...state,
+      voices: R.set(R.lensIndex(voiceIx), { ...state.voices[voiceIx], name }, state.voices),
+    }),
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -431,7 +438,7 @@ export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
 export const buildInitialState = (vcId: string): SequencerReduxState => ({
   currentEditingVoiceIx: 0,
   activeBeats: [0],
-  voices: [{ type: 'sample' as const }],
+  voices: [{ type: 'sample' as const, name: 'sample' }],
   sampleBank: {},
   marks: [R.times(() => null, DEFAULT_WIDTH)],
   bpm: 80,

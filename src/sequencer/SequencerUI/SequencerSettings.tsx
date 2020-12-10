@@ -61,7 +61,7 @@ const getSequencerSettings = ({
     voiceCount > 1
       ? {
           type: 'button',
-          label: 'delete current voice',
+          label: 'delete selected voice',
           action: () => dispatch(actionCreators.sequencer.REMOVE_VOICE(currentEditingVoiceIx)),
         }
       : null,

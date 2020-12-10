@@ -43,12 +43,30 @@
   }
 }
 
-.editing-voice-selector {
-  height: 16px;
-  width: 16px;
-  background-color: #43a;
-  margin: 12px;
-  cursor: pointer;
+.editing-voice-selector-wrapper {
+  width: 146px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding-left: 10px;
+  align-items: center;
+  font-family: 'Hack', 'Oxygen Mono', monospace;
+  font-size: 13px;
+
+  span {
+    cursor: pointer;
+    max-width: 106px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .editing-voice-selector {
+    height: 16px;
+    width: 16px;
+    background-color: #43a;
+    margin: 12px;
+    cursor: pointer;
+  }
 }
 
 .editing-voice-selector.selected {

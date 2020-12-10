@@ -40,7 +40,7 @@ const SequencerUI = React.lazy(() => import('./SequencerUI'));
 
 interface SerializedSequencer {
   currentEditingVoiceIx: number;
-  voices: VoiceTarget[];
+  voices: (VoiceTarget & { name?: string })[];
   sampleBank: { [voiceIx: number]: SampleDescriptor | null };
   marks: (SequencerMark | null)[][];
   bpm: number;
@@ -101,6 +101,16 @@ export const buildGateOutput = (): ConstantSourceNode => {
 const SequencerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule('/SequencerWorkletProcessor.js')
 );
+
+const getIsSequencerVisible = (vcId: string): boolean => {
+  const sequencerElem = document.getElementById(`sequencer-${vcId}`);
+  if (!sequencerElem) {
+    return false;
+  }
+
+  return sequencerElem.style.display !== 'none';
+};
+
 const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
   await SequencerAWPRegistered.get();
   const workletHandle = new AudioWorkletNode(ctx, 'sequencer-audio-worklet-node-processor');
@@ -120,6 +130,11 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
         break;
       }
       case 'updateCurActiveBeat': {
+        // Don't bother wasting CPU re-rendering if the sequencer is not visible
+        if (!getIsSequencerVisible(vcId)) {
+          break;
+        }
+
         const { dispatch, actionCreators } = SequencerReduxInfraMap.get(vcId)!;
         dispatch(actionCreators.sequencer.SET_CUR_ACTIVE_MARK_IX(msg.data.markIx));
         break;
@@ -186,7 +201,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
   const state = {
     currentEditingVoiceIx,
     activeBeats: voices.map(() => 0),
-    voices,
+    voices: voices.map(voice => ({ ...voice, name: voice.name ?? 'untitled' })),
     sampleBank: 'LOADING' as const,
     marks,
     bpm,
