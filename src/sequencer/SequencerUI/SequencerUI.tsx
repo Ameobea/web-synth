@@ -1,12 +1,10 @@
 /* eslint-disable react/jsx-key */
 import React from 'react';
-import ControlPanel from 'react-control-panel';
 
 import FlatButton from 'src/misc/FlatButton';
 import { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
-import getSequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
 
 const CELL_SIZE_PX = 40 as const;
@@ -22,23 +20,40 @@ interface SequencerRowProps extends SequencerReduxInfra {
   rowIx: number;
 }
 
+const getMarkClassname = (
+  editingIx: number | null,
+  activeIx: number | null,
+  markIx: number,
+  isMarked: boolean
+): string | undefined => {
+  const baseClassName = editingIx === markIx ? 'editing' : isMarked ? 'marked' : undefined;
+  if (activeIx !== markIx) {
+    return baseClassName;
+  } else if (baseClassName) {
+    return baseClassName + ' active';
+  } else {
+    return 'active';
+  }
+};
+
 const SequencerRow: React.FC<SequencerRowProps> = ({
   rowIx,
   actionCreators,
   dispatch,
   useSelector,
 }) => {
-  const { marks, activeIx } = useSelector(({ sequencer }) => ({
+  const { marks, editingIx, curActiveMarkIx } = useSelector(({ sequencer }) => ({
     marks: sequencer.marks[rowIx],
-    activeIx:
+    editingIx:
       sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
+    curActiveMarkIx: sequencer.curActiveMarkIx,
   }));
 
   return (
     <>
       {marks.map((marked, colIx) => (
         <rect
-          className={activeIx === colIx ? 'active' : marked ? 'marked' : undefined}
+          className={getMarkClassname(editingIx, curActiveMarkIx, colIx, !!marked)}
           x={colIx * CELL_SIZE_PX}
           y={rowIx * CELL_SIZE_PX}
           width={CELL_SIZE_PX}

@@ -17,7 +17,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
         }
         case 'start': {
           this.startBeat = globalThis.curBeat;
-          this.lastBeats = this.config.voices.map(() => -1);
+          this.lastBeat = -1;
           break;
         }
         case 'stop': {
@@ -35,23 +35,29 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ type: 'triggerVoice', voiceIx, markIx });
   }
 
+  updateActiveBeat(markIx) {
+    this.port.postMessage({ type: 'updateCurActiveBeat', markIx });
+  }
+
   process(_inputs, _outputs, _params) {
     if (this.startBeat === null || !this.config) {
       return true;
     }
 
     const beatsSinceStart = globalThis.curBeat - this.startBeat;
-    this.config.voices.forEach((voice, i) => {
-      const curQuantizedBeat = Math.trunc(beatsSinceStart / voice.beatRatio);
-      if (curQuantizedBeat !== this.lastBeats[i]) {
-        this.lastBeats[i] = curQuantizedBeat;
+    const curQuantizedBeat = Math.trunc(beatsSinceStart / this.config.beatRatio);
 
-        const markIx = curQuantizedBeat % this.config.beatCount;
+    if (curQuantizedBeat !== this.lastBeat) {
+      this.lastBeat = curQuantizedBeat;
+      const markIx = curQuantizedBeat % this.config.beatCount;
+      this.updateActiveBeat(markIx);
+
+      this.config.voices.forEach((voice, i) => {
         if (voice.marks[markIx]) {
           this.triggerVoice(i, markIx);
         }
-      }
-    });
+      });
+    }
 
     return true;
   }

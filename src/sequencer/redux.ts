@@ -63,24 +63,26 @@ export interface SequencerReduxState {
   awpHandle: AudioWorkletNode | undefined;
   inputMIDINode: MIDINode;
   markEditState: SequencerEditState | null;
+  curActiveMarkIx: number | null;
 }
 
 const ctx = new AudioContext();
 
 interface SequencerVoiceAWPConfig {
-  beatRatio: number;
   marks: boolean[];
 }
 
 interface SequencerAWPConfig {
   beatCount: number;
+  beatRatio: number;
   voices: SequencerVoiceAWPConfig[];
 }
 
 export const buildSequencerConfig = (state: SequencerReduxState): SequencerAWPConfig => {
   return {
     beatCount: state.marks[0]!.length,
-    voices: state.marks.map(marks => ({ marks: marks.map(mark => !!mark), beatRatio: 0.25 })),
+    beatRatio: 0.25,
+    voices: state.marks.map(marks => ({ marks: marks.map(mark => !!mark) })),
   };
 };
 
@@ -153,7 +155,7 @@ const actionGroups = {
 
       if (state.isPlaying) {
         state.awpHandle.port.postMessage({ type: 'stop' });
-        return { ...state, isPlaying: false };
+        return { ...state, isPlaying: false, curActiveMarkIx: null };
       } else {
         state.awpHandle.port.postMessage({ type: 'start' });
         return reschedule({
@@ -370,6 +372,16 @@ const actionGroups = {
       }
     },
   }),
+  SET_CUR_ACTIVE_MARK_IX: buildActionGroup({
+    actionCreator: (curActiveMarkIx: number | null) => ({
+      type: 'SET_CUR_ACTIVE_MARK_IX',
+      curActiveMarkIx,
+    }),
+    subReducer: (state: SequencerReduxState, { curActiveMarkIx }) => ({
+      ...state,
+      curActiveMarkIx,
+    }),
+  }),
 };
 
 export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
@@ -431,4 +443,5 @@ export const buildInitialState = (vcId: string): SequencerReduxState => ({
   awpHandle: undefined,
   inputMIDINode: buildSequencerInputMIDINode(vcId),
   markEditState: null,
+  curActiveMarkIx: null,
 });

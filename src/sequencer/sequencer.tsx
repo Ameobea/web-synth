@@ -119,6 +119,11 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
         );
         break;
       }
+      case 'updateCurActiveBeat': {
+        const { dispatch, actionCreators } = SequencerReduxInfraMap.get(vcId)!;
+        dispatch(actionCreators.sequencer.SET_CUR_ACTIVE_MARK_IX(msg.data.markIx));
+        break;
+      }
       default: {
         console.warn(`Unhandled message type received from sequencer AWP: ${msg.data.type}`);
       }
@@ -199,6 +204,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     awpHandle: undefined,
     inputMIDINode: buildSequencerInputMIDINode(vcId),
     markEditState: markEditState || null,
+    curActiveMarkIx: null,
   };
 
   initSequenceAWP(vcId).then(awpHandle => {

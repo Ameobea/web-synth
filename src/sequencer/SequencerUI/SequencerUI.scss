@@ -21,11 +21,18 @@
     fill: rgb(120, 148, 120);
   }
 
-  rect.active {
+  rect.editing {
     fill: rgb(194, 85, 85);
   }
-  rect.active:hover {
+  rect.editing:hover {
     fill: rgb(148, 120, 120);
+  }
+
+  rect.active {
+    fill: rgb(82, 87, 11);
+  }
+  rect.active.marked {
+    fill: rgb(137, 218, 44);
   }
 }
 
