@@ -24,9 +24,9 @@ const SidechainSmallView: React.FC<{
 }> = ({ onChange }) => (
   <ControlPanel
     settings={[
-      { type: 'range', label: 'window_size_samples', min: 1, max: 2400, step: 1, initial: 64 },
-      { type: 'range', label: 'lowpass_coefficient', min: 0.5, max: 0.999, initial: 9.99 },
-      { type: 'range', label: 'range_multiplier', min: -1, max: 1, step: 0.001, initial: -0.3 },
+      { type: 'range', label: 'window_size_samples', min: 1, max: 2400, step: 1, initial: 800 },
+      { type: 'range', label: 'lowpass_coefficient', min: 0.5, max: 0.999, initial: 0.5 },
+      { type: 'range', label: 'range_multiplier', min: -3, max: 3, step: 0.001, initial: -1 },
     ]}
     onChange={onChange}
     style={{ width: 500 }}

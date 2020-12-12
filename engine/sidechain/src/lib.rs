@@ -9,9 +9,9 @@ struct BufEntry {
 static mut MINS_BUFFER: *mut VecDeque<BufEntry> = std::ptr::null_mut();
 static mut MAXS_BUFFER: *mut VecDeque<BufEntry> = std::ptr::null_mut();
 static mut INPUT_BUFFER: *mut Vec<f32> = std::ptr::null_mut();
-static mut LOWPASS_COEFFICIENT: f32 = 0.98;
-static mut WINDOW_SIZE_SAMPLES: u32 = 64;
-static mut RANGE_MULTIPLIER: f32 = -0.3;
+static mut LOWPASS_COEFFICIENT: f32 = 0.5;
+static mut WINDOW_SIZE_SAMPLES: u32 = 800;
+static mut RANGE_MULTIPLIER: f32 = -1.;
 
 // Start it a bit higher to avoid potential underflows in sliding min/max computation
 static mut CUR_SAMPLE_IX: u32 = 100_000;

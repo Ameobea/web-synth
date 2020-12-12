@@ -10,7 +10,7 @@ const CustomGainNodeSmallView: React.FC<{ node: ForeignNode<BiquadFilterNode> }>
         type: 'range',
         label: 'gain',
         min: -1,
-        max: 0,
+        max: 2,
         initial: node.paramOverrides.gain.override.offset.value,
       },
     ]}
