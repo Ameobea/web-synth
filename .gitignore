@@ -19,3 +19,4 @@ cypress/videos
 public/wavetable.wasm
 public/granular.wasm
 public/event_scheduler.wasm
+public/sidechain.wasm

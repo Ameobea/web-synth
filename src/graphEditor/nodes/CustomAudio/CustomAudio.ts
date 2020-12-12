@@ -34,6 +34,7 @@ import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGen
 import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
 import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
+import { Sidechain } from 'src/graphEditor/nodes/CustomAudio/Sidechain';
 
 const ctx = new AudioContext();
 
@@ -443,6 +444,9 @@ export const audioNodeGetters: {
         this.connectables.node.shutdown();
       },
     },
+  },
+  'customAudio/Sidechain': {
+    nodeGetter: (vcId, params) => new Sidechain(ctx, vcId, params),
   },
 };
 
