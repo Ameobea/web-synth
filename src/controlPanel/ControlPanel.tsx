@@ -1,7 +1,4 @@
 import { Option } from 'funfix-core';
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
@@ -21,7 +18,12 @@ import {
   Control,
   buildDefaultControl,
 } from 'src/redux/modules/controlPanel';
-import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
+import {
+  mkContainerCleanupHelper,
+  mkContainerHider,
+  mkContainerRenderHelper,
+  mkContainerUnhider,
+} from 'src/reactUtils';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
@@ -75,18 +77,15 @@ export const init_control_panel = (stateKey: string) => {
     })
     .orUndefined();
   dispatch(
-    actionCreators.controlPanel.ADD_INSTANCE(
+    actionCreators.controlPanel.ADD_CONTROL_PANEL_INSTANCE(
       vcId,
       serialized?.connections || undefined,
       serialized?.presets || undefined
     )
   );
 
-  ReactDOM.render(
-    <Provider store={store}>
-      <ControlPanelUI stateKey={stateKey} />
-    </Provider>,
-    rootNode
+  mkContainerRenderHelper({ Comp: ControlPanelUI, getProps: () => ({ stateKey }), store })(
+    getRootNodeID(vcId)
   );
 };
 
@@ -100,8 +99,7 @@ export const cleanup_control_panel = (stateKey: string) => {
 
   saveStateForInstance(stateKey);
   if (rootNode) {
-    ReactDOM.unmountComponentAtNode(rootNode);
-    rootNode.remove();
+    mkContainerCleanupHelper()(getRootNodeID(vcId));
   }
 
   dispatch(actionCreators.controlPanel.REMOVE_INSTANCE(vcId));

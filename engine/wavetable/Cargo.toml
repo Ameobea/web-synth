@@ -8,3 +8,4 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+dsp = { path = "../dsp" }

@@ -82,7 +82,8 @@ export const initPatchNetwork = (
     id: string;
     serializedState?: { [key: string]: any } | null;
   }[],
-  connections: VCMState['patchNetwork']['connections']
+  connections: VCMState['patchNetwork']['connections'],
+  ctx: AudioContext
 ): PatchNetwork => {
   const engine = getEngine();
   if (!engine) {
@@ -91,7 +92,6 @@ export const initPatchNetwork = (
 
   // Create connectables for all nodes
   let newConnectablesMap = viewContexts.reduce((newConnectablesMap, { uuid }) => {
-    // TODO: Deal with default connections?
     const connectables = engine.get_vc_connectables(uuid);
     return connectables ? newConnectablesMap.set(uuid, connectables) : newConnectablesMap;
   }, Map<string, AudioConnectables>());
@@ -102,7 +102,7 @@ export const initPatchNetwork = (
       // Re-use the `AudioNode` from the old connectables if possible, falling back to creating a fresh one
       const node: ForeignNode = Option.of(oldPatchNetwork.connectables.get(id))
         .flatMap(({ node }) => Option.of(node))
-        .getOrElseL(() => audioNodeGetters[type]!.nodeGetter(id, serializedState));
+        .getOrElseL(() => new audioNodeGetters[type]!.nodeGetter(ctx, id, serializedState));
 
       return newConnectablesMap.set(id, { ...node.buildConnectables(), vcId: id });
     },

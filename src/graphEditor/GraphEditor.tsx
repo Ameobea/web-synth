@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LiteGraph } from 'litegraph.js';
 import 'litegraph.js/css/litegraph.css';
-import ControlPanel, { Button } from 'react-control-panel';
+import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 import { useSelector } from 'react-redux';
 
@@ -19,12 +19,15 @@ import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode
 import { getEngine } from 'src';
 import FlatButton from 'src/misc/FlatButton';
 import { LGraphHandlesByVcId } from 'src/graphEditor';
+import { LiteGraph as LiteGraphInstance } from 'src/graphEditor/LiteGraphTypes';
+import { filterNils } from 'ameo-utils';
 
 /**
  * Mapping of `stateKey`s to the graph instances that that they manage
  */
-const GraphEditorInstances: Map<string, LiteGraph.LGraph> = new Map();
+const GraphEditorInstances: Map<string, LiteGraphInstance> = new Map();
 (window as any).GraphEditorInstances = GraphEditorInstances;
+(window as any).LiteGraph = LiteGraph;
 
 export const saveStateForInstance = (stateKey: string) => {
   const instance = GraphEditorInstances.get(stateKey);
@@ -144,20 +147,74 @@ const handleNodeSelectAction = ({
   }
 };
 
+const GraphControls: React.FC<{
+  lGraphInstance: LiteGraphInstance | null;
+}> = ({ lGraphInstance }) => {
+  const selectedNodeType = useRef<string>('customAudio/LFO');
+
+  const settings = useMemo(() => {
+    const nodeEntries = Object.entries(LiteGraph.registered_node_types)
+      .filter(([key]) => key.startsWith('customAudio/'))
+      .map(([key, NodeClass]) => [NodeClass.typeName as string, key] as const);
+    const sortedNodeEntries = R.sortBy(([name]) => name, nodeEntries);
+
+    return filterNils([
+      lGraphInstance
+        ? { type: 'button', label: 'arrange nodes', action: () => lGraphInstance.arrange() }
+        : null,
+      {
+        type: 'select',
+        label: 'node type',
+        options: Object.fromEntries(sortedNodeEntries),
+        initial: 'customAudio/LFO',
+      },
+      {
+        type: 'button',
+        label: 'add node',
+        action: () => {
+          if (!lGraphInstance) {
+            return;
+          }
+          const node = LiteGraph.createNode(selectedNodeType.current);
+          lGraphInstance.add(node);
+        },
+      },
+    ]);
+  }, [lGraphInstance, selectedNodeType]);
+
+  return (
+    <ControlPanel
+      style={{ width: 400 }}
+      settings={settings}
+      onChange={(key: string, val: any) => {
+        switch (key) {
+          case 'node type': {
+            selectedNodeType.current = val;
+            break;
+          }
+          default: {
+            console.warn('Unhandled key in graph controls: ', key);
+          }
+        }
+      }}
+    />
+  );
+};
+
 const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [lGraphInstance, setLGraphInstance] = useState<null | any>(null);
+  const [lGraphInstance, setLGraphInstance] = useState<LiteGraphInstance | null>(null);
   const [selectedNodeVCID, setSelectedNodeVCID] = useState<string | null>(null);
   const [curSelectedNode, setCurSelectedNode] = useState<any>(null);
   const { patchNetwork, activeViewContexts, isLoaded } = useSelector((state: ReduxStore) =>
     R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager)
   );
 
+  const vcId = stateKey.split('_')[1];
   const smallViewDOMId = `small-view-dom-id_${stateKey}`;
 
   useEffect(() => {
-    const vcId = stateKey.split('_')[1];
     if (lGraphInstance) {
       LGraphHandlesByVcId.set(vcId, lGraphInstance);
       return () => {
@@ -166,7 +223,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     } else {
       LGraphHandlesByVcId.delete(vcId);
     }
-  }, [lGraphInstance, stateKey]);
+  }, [lGraphInstance, vcId]);
 
   useEffect(() => {
     if (isInitialized.current || !canvasRef.current) {
@@ -178,7 +235,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       // Register custom node types
       await registerAllCustomNodes();
 
-      const graph = new LiteGraph.LGraph();
+      const graph: LiteGraphInstance = new LiteGraph.LGraph();
       Object.keys((LiteGraph as any).registered_node_types)
         .filter(
           nodeType =>
@@ -187,7 +244,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
             !nodeType.includes('audioConnectables')
         )
         .forEach(nodeType => (LiteGraph as any).unregisterNodeType(nodeType));
-      const canvas = new LiteGraph.LGraphCanvas('#graph-editor', graph);
+      const canvas = new LiteGraph.LGraphCanvas(`#${stateKey}_canvas`, graph);
 
       canvas.onNodeSelected = node => {
         if (curSelectedNode) {
@@ -273,47 +330,42 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     lGraphInstance.setDirtyCanvas(true, true);
   }, [stateKey, lGraphInstance, isLoaded]);
 
-  const uiControls = useMemo(
-    () => (lGraphInstance ? { arrange: () => lGraphInstance.arrange() } : {}),
-    [lGraphInstance]
-  );
-
   return (
-    <div className='graph-editor-container'>
-      <canvas
-        ref={ref => {
-          canvasRef.current = ref;
-        }}
-        id='graph-editor'
-        width={curSelectedNode ? window.innerWidth - 550 : window.innerWidth - 200}
-        height={800}
-      />
-
-      <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
-        <ControlPanel style={{ width: curSelectedNode ? 500 : 150 }}>
-          <Button label='arrange' action={uiControls.arrange} />
-        </ControlPanel>
-
-        {selectedNodeVCID ? (
-          <FlatButton
-            style={{ marginBottom: 4 }}
-            onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}
-          >
-            Show Full UI
-          </FlatButton>
-        ) : null}
-        <div
-          style={{
-            display: 'flex',
-            flex: 1,
-            height: '100%',
-            backgroundColor: '#111',
-            width: curSelectedNode ? 500 : 150,
+    <>
+      <div className='graph-editor-container'>
+        <canvas
+          ref={ref => {
+            canvasRef.current = ref;
           }}
-          id={smallViewDOMId}
+          id={stateKey + '_canvas'}
+          className='graph-editor'
+          width={curSelectedNode ? window.innerWidth - 500 - 44 : window.innerWidth - 44}
+          height={window.innerHeight - 130}
         />
+
+        <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
+          {selectedNodeVCID ? (
+            <FlatButton
+              style={{ marginBottom: 4 }}
+              onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}
+            >
+              Show Full UI
+            </FlatButton>
+          ) : null}
+          <div
+            style={{
+              display: 'flex',
+              flex: 1,
+              height: '100%',
+              backgroundColor: '#111',
+              width: curSelectedNode ? 500 : 0,
+            }}
+            id={smallViewDOMId}
+          />
+        </div>
       </div>
-    </div>
+      <GraphControls lGraphInstance={lGraphInstance} />
+    </>
   );
 };
 

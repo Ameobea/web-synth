@@ -40,7 +40,7 @@ getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect
  */
 export class MicNode extends GainNode {
   public nodeType = 'customAudio/microphone';
-  public name = 'Microphone';
+  static typeName = 'Microphone';
   public vcId: string;
 
   /**

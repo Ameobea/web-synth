@@ -45,7 +45,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
   private reduxInfra: ReduxInfra;
   private workletHandle: AudioWorkletNode | null = null;
   private gainNode: GainNode;
-  public name = 'Statistics Node';
+  static typeName = 'Statistics Node';
   public nodeType = 'customAudio/statistics';
 
   public paramOverrides = {};
@@ -78,6 +78,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
 
     this.cleanupSmallView = mkContainerCleanupHelper({
       predicate: () => this.gainNode.disconnect(this.ctx.destination),
+      preserveRoot: true,
     });
   }
 

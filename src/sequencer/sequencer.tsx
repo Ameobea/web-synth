@@ -359,7 +359,7 @@ export const render_sequencer_small_view = (vcId: string, domId: string) => {
 };
 
 export const cleanup_sequencer_small_view = (_vcId: string, domId: string) =>
-  mkContainerCleanupHelper()(domId);
+  mkContainerCleanupHelper({ preserveRoot: true })(domId);
 
 export const sequencer_list_used_samples = (stateKey: string): SampleDescriptor[] => {
   const vcId = stateKey.split('_')[1]!;

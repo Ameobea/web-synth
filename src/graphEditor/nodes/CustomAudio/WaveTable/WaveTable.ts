@@ -107,7 +107,7 @@ export default class WaveTable implements ForeignNode {
   private wavetableDef: Float32Array[][] = getDefaultWavetableDef();
   private onInitialized?: (inst: WaveTable) => void;
 
-  public name = 'Wave Table Synthesizer';
+  static typeName = 'Wave Table Synthesizer';
   public nodeType = 'customAudio/wavetable';
 
   public paramOverrides: {

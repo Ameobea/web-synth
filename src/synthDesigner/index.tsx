@@ -39,7 +39,10 @@ const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 /**
  * Global map of state key to Redux infrastructure
  */
-let STATE_MAP: ImmMap<string, ReturnType<typeof buildSynthDesignerRedux>> = ImmMap();
+let STATE_MAP: ImmMap<
+  string,
+  ReturnType<typeof buildSynthDesignerRedux> & { reactRoot: unknown }
+> = ImmMap();
 
 export const getReduxInfra = (stateKey: string) => {
   const reduxInfra = STATE_MAP.get(stateKey);
@@ -55,7 +58,7 @@ export const init_synth_designer = (stateKey: string) => {
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
   // everything in a big map.
   const reduxInfra = buildSynthDesignerRedux();
-  STATE_MAP = STATE_MAP.set(stateKey, reduxInfra);
+  STATE_MAP = STATE_MAP.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
 
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
   const initialState = Try.of(() =>
@@ -125,11 +128,13 @@ export const init_synth_designer = (stateKey: string) => {
   // Mount the newly created Faust editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(synthDesignerBase);
 
-  ReactDOM.unstable_createRoot(synthDesignerBase).render(
+  const reactRoot = ReactDOM.unstable_createRoot(synthDesignerBase);
+  reactRoot.render(
     <Provider store={reduxInfra.store}>
       <SynthDesigner stateKey={stateKey} />
     </Provider>
   );
+  STATE_MAP.get(stateKey)!.reactRoot = reactRoot;
 };
 
 export const hide_synth_designer = (stateKey: string) => {
@@ -169,7 +174,14 @@ export const cleanup_synth_designer = (stateKey: string): string => {
     return designerState;
   }
 
-  ReactDOM.unmountComponentAtNode(rootNode);
+  const state = STATE_MAP.get(stateKey);
+  if (!state) {
+    console.error(
+      'Missing state map entry for synth designer when cleaning up, stateKey=' + stateKey
+    );
+  } else {
+    state.reactRoot.unmount();
+  }
   rootNode.remove();
   return designerState;
 };

@@ -1,20 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
-import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
+import {
+  mkContainerCleanupHelper,
+  mkContainerHider,
+  mkContainerRenderHelper,
+  mkContainerUnhider,
+} from 'src/reactUtils';
 
 import { store } from 'src/redux';
 import { retryAsync } from 'src/util';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
-
-const ROOT_NODE_ID = 'graph-editor-react-root' as const;
 
 export const LGraphHandlesByVcId: Map<string, any> = new Map();
 
 export const init_graph_editor = (stateKey: string) => {
   // Create the base dom node for the faust editor
   const graphEditorBaseNode = document.createElement('div');
-  graphEditorBaseNode.id = ROOT_NODE_ID;
+  graphEditorBaseNode.id = stateKey;
   graphEditorBaseNode.setAttribute(
     'style',
     'z-index: 2; width: 100%; height: calc(100vh - 40px); position: absolute; top: 0; left: 0;'
@@ -22,6 +25,8 @@ export const init_graph_editor = (stateKey: string) => {
 
   // Mount the newly created graph editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(graphEditorBaseNode);
+  // Using non-concurrent mode here because concurrent mode makes the canvas dissappear for an
+  // instant when changing small views sometimes
   ReactDOM.render(
     <Provider store={store}>
       <GraphEditor stateKey={stateKey} />
@@ -30,12 +35,12 @@ export const init_graph_editor = (stateKey: string) => {
   );
 };
 
-export const hide_graph_editor = mkContainerHider(() => ROOT_NODE_ID);
+export const hide_graph_editor = mkContainerHider(vcId => `graphEditor_${vcId}`);
 
-export const unhide_graph_editor = mkContainerUnhider(() => ROOT_NODE_ID);
+export const unhide_graph_editor = mkContainerUnhider(vcId => `graphEditor_${vcId}`);
 
 export const cleanup_graph_editor = (stateKey: string) => {
-  const graphEditorReactRootNode = document.getElementById(ROOT_NODE_ID);
+  const graphEditorReactRootNode = document.getElementById(stateKey);
   // Trigger the graph editor to save its state before its destruction.  `unmountComponentAtNode`
   // doesn't seem to trigger lifecycle methods/execute the return value of `useEffect` so we have
   // to handle this explicitly.

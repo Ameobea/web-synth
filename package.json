@@ -68,11 +68,10 @@
     "ramda": "^0.27.1",
     "react": "^0.0.0-experimental-4ead6b530",
     "react-ace": "^9.1.4",
-    "react-control-panel": ">=0.8.1",
+    "react-control-panel": ">=0.8.2",
     "react-dom": "^0.0.0-experimental-4ead6b530",
     "react-redux": "^7.2.1",
     "react-virtualized": "^9.22.2",
-    "recompose": "^0.30.0",
     "redux": "^4.0.5",
     "redux-form": "^8.3.6",
     "reselect": "^4.0.0"

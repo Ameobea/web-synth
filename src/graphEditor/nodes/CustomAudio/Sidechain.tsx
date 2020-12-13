@@ -9,7 +9,7 @@ import {
   ConnectableOutput,
   updateConnectables,
 } from 'src/patchNetwork';
-import { mkContainerRenderHelper } from 'src/reactUtils';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -36,7 +36,7 @@ const SidechainSmallView: React.FC<{
 export class Sidechain {
   public vcId: string;
   public nodeType = 'customAudio/Sidechain';
-  public name = 'Sidechain';
+  static typeName = 'Sidechain';
 
   private ctx: AudioContext;
   private gainNode: GainNode;
@@ -104,6 +104,7 @@ export class Sidechain {
         },
       }),
     });
+    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
   }
 
   private async init() {

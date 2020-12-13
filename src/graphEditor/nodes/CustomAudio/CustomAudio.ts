@@ -52,7 +52,6 @@ export interface ForeignNode<T = any> {
   serialize(): { [key: string]: any };
   buildConnectables(): AudioConnectables & { node: ForeignNode };
   nodeType: string;
-  name: string;
   /**
    * See the docs for `enhanceAudioNode`.
    */
@@ -107,17 +106,17 @@ const enhanceAudioNode = <T>({
   getOverridableParams,
   paramKeys,
   SmallViewRenderer,
-}: EnhanceAudioNodeParams<T>): new (
+}: EnhanceAudioNodeParams<T>): (new (
   ctx: AudioContext,
   vcId: string,
   params?: { [key: string]: any } | null,
   lgNode?: any
-) => ForeignNode<T> =>
+) => ForeignNode<T>) & { typeName: string } =>
   class ForeignNodeClass implements ForeignNode<T> {
     private ctx: AudioContext;
     public vcId: string;
     public nodeType = nodeType;
-    public name = name;
+    static typeName = name;
     public node: T;
     public lgNode?: any;
 
@@ -148,6 +147,14 @@ const enhanceAudioNode = <T>({
       this.vcId = vcId;
       this.lgNode = lgNode;
       this.ctx = ctx;
+
+      if (SmallViewRenderer) {
+        this.renderSmallView = mkContainerRenderHelper({
+          Comp: SmallViewRenderer,
+          getProps: () => ({ node: this }),
+        });
+        this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
+      }
 
       this.paramOverrides = getOverridableParams(this.node).reduce(
         (acc, { name, param, defaultValue }) => {
@@ -186,14 +193,6 @@ const enhanceAudioNode = <T>({
 
         valueContainer.value = val;
       });
-
-      if (SmallViewRenderer) {
-        this.renderSmallView = mkContainerRenderHelper({
-          Comp: SmallViewRenderer,
-          getProps: () => ({ node: this }),
-        });
-        this.cleanupSmallView = mkContainerCleanupHelper();
-      }
     }
 
     public buildConnectables(): AudioConnectables & {
@@ -355,25 +354,25 @@ const CustomDestinationNode = enhanceAudioNode({
  */
 export const audioNodeGetters: {
   [type: string]: {
-    nodeGetter: (vcId: string, params?: { [key: string]: any } | null) => ForeignNode;
+    nodeGetter: (new (
+      ctx: AudioContext,
+      vcId: string,
+      params?: { [key: string]: any } | null
+    ) => ForeignNode) & { typeName: string };
     protoParams?: { [key: string]: any };
   };
 } = {
   'customAudio/gain': {
-    nodeGetter: (vcId: string, params) => new CustomGainNode(ctx, vcId, params),
+    nodeGetter: CustomGainNode,
   },
   'customAudio/biquadFilter': {
-    nodeGetter: (vcId, params) => new CustomBiquadFilterNode(ctx, vcId, params),
+    nodeGetter: CustomBiquadFilterNode,
   },
   'customAudio/constantSource': {
-    nodeGetter: (vcId: string, params?: { [key: string]: any } | null) => {
-      const csn = new CustomConstantSourceNode(ctx, vcId, params);
-      csn.node!.start();
-      return csn;
-    },
+    nodeGetter: CustomConstantSourceNode,
   },
   'customAudio/audioClip': {
-    nodeGetter: (vcId, params) => new CustomAudioBufferSourceNode(ctx, vcId, params),
+    nodeGetter: CustomAudioBufferSourceNode,
     protoParams: {
       onDropFile: function (...args: unknown[]) {
         console.log('Dropped file: ', this, ...args);
@@ -381,21 +380,16 @@ export const audioNodeGetters: {
     },
   },
   'customAudio/destination': {
-    nodeGetter: (vcId, params) => new CustomDestinationNode(ctx, vcId, params),
+    nodeGetter: CustomDestinationNode,
   },
   'customAudio/microphone': {
-    nodeGetter: vcId => new MicNode(ctx, vcId),
+    nodeGetter: MicNode,
   },
   'customAudio/mixer': {
-    nodeGetter: (vcId: string, params) => new MixerNode(ctx, vcId, params),
-    protoParams: {
-      onDrawForeground: function (this: any, _ctx: CanvasRenderingContext2D) {
-        // TODO
-      },
-    },
+    nodeGetter: MixerNode,
   },
   'customAudio/MIDIInput': {
-    nodeGetter: (vcId: string, params) => new MIDIInputNode(ctx, vcId, params),
+    nodeGetter: MIDIInputNode,
     protoParams: {
       onDrawForeground: function (this: MIDIInputNode, _ctx: CanvasRenderingContext2D) {
         // TODO: Render a button that, when clicked, updates the list of available MIDI editors
@@ -415,44 +409,48 @@ export const audioNodeGetters: {
     },
   },
   'customAudio/MIDIToFrequency': {
-    nodeGetter: (vcId, params) => new MIDIToFrequencyNode(vcId, params),
+    nodeGetter: MIDIToFrequencyNode,
   },
   'customAudio/LFO': {
-    nodeGetter: (vcId, params) => new LFONode(ctx, vcId, params),
+    nodeGetter: LFONode,
   },
   'customAudio/statistics': {
-    nodeGetter: (vcId, params) => new StatisticsNode(ctx, vcId, params),
+    nodeGetter: StatisticsNode,
   },
   'customAudio/scaleAndShift': {
-    nodeGetter: (vcId, params) => new ScaleAndShiftNode(ctx, vcId, params),
+    nodeGetter: ScaleAndShiftNode,
   },
   'customAudio/wavetable': {
-    nodeGetter: (vcId, params) => new WaveTable(ctx, vcId, params),
+    nodeGetter: WaveTable,
     protoParams: {
-      onRemovedCustom: function (this: WaveTable) {
-        this.shutdown();
+      onRemovedCustom: function () {
+        this.connectables.node.shutdown();
       },
     },
   },
   'customAudio/envelopeGenerator': {
-    nodeGetter: (vcId, params) => new EnvelopeGenerator(ctx, vcId, params),
+    nodeGetter: EnvelopeGenerator,
   },
   'customAudio/Equalizer': {
-    nodeGetter: (vcId, params) => new Equalizer(ctx, vcId, params),
+    nodeGetter: Equalizer,
     protoParams: {
-      onRemovedCustom: function (this: any) {
+      onRemovedCustom: function () {
         this.connectables.node.shutdown();
       },
     },
   },
   'customAudio/Sidechain': {
-    nodeGetter: (vcId, params) => new Sidechain(ctx, vcId, params),
+    nodeGetter: Sidechain,
   },
 };
 
 const registerCustomAudioNode = (
   type: string,
-  nodeGetter: (vcId: string) => ForeignNode,
+  nodeGetter: (new (
+    ctx: AudioContext,
+    vcId: string,
+    params?: { [key: string]: any }
+  ) => ForeignNode) & { typeName: string },
   protoParams: { [key: string]: any }
 ) => {
   function CustomAudioNode(this: any) {
@@ -465,6 +463,8 @@ const registerCustomAudioNode = (
     }
   }
 
+  CustomAudioNode.typeName = nodeGetter.typeName;
+
   CustomAudioNode.prototype.onAdded = function (this: any) {
     if (R.isNil(this.id)) {
       throw new Error('`id` was nil in `CustomAudioNode`');
@@ -476,9 +476,9 @@ const registerCustomAudioNode = (
     }
 
     if (this.connectables) {
-      this.title = this.connectables.node.name;
-      if (!this.connectables.node.name) {
-        console.error('Connectables had missing node name: ', this.connectables.node);
+      this.title = nodeGetter.typeName;
+      if (!this.title) {
+        console.error('Connectables had missing node `typeName`: ', this.connectables.node);
       }
       this.connectables.vcId = id;
       if (!this.connectables.node) {
@@ -490,10 +490,10 @@ const registerCustomAudioNode = (
       // patch network when changing state and we only have `AudioConnectables` there which only hold the foreign node.
       this.connectables.node.lgNode = this;
     } else {
-      const foreignNode = nodeGetter(id);
+      const foreignNode = new nodeGetter(ctx, id);
       // Set the same reference as above
       foreignNode.lgNode = this;
-      this.title = foreignNode.name;
+      this.title = nodeGetter.typeName;
       const connectables = foreignNode.buildConnectables();
       if (connectables.vcId !== id) {
         console.error(

@@ -105,7 +105,9 @@ pub struct ADSRValues {
     pub release: ADSRValue,
 }
 
-fn default_pitch_multiplier() -> f32 { 1. }
+fn default_pitch_multiplier() -> f32 {
+    1.
+}
 
 // {
 //   type: FilterType;
@@ -153,6 +155,8 @@ pub enum VoiceDefinition {
         filter_adsr_length: f32,
         #[serde(default = "default_pitch_multiplier")]
         pitch_multiplier: f32,
+        #[serde(default)]
+        unison_spread_cents: f32,
     },
     #[serde(rename = "wavetable")]
     #[serde(rename_all = "camelCase")]

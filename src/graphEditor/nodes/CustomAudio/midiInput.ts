@@ -15,7 +15,7 @@ export type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 export class MIDIInputNode {
   public lgNode?: any;
   public nodeType = 'customAudio/MIDIInput';
-  public name = 'MIDI Input';
+  static typeName = 'MIDI Input';
 
   private vcId: string;
   private selectedInputName: string | undefined;

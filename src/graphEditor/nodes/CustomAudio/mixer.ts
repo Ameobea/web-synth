@@ -15,7 +15,7 @@ export class MixerNode {
   private ctx: AudioContext;
 
   public nodeType = 'customAudio/mixer';
-  public name = 'Mixer';
+  static typeName = 'Mixer';
   public node: GainNode;
 
   /**

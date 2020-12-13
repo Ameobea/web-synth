@@ -56,6 +56,7 @@ const AddModuleControlsInner: React.FC<
 
   return (
     <ControlPanel
+      title='voice preset'
       contextCb={(ctx: { [label: string]: any }) => {
         controlPanelContext.current = ctx;
       }}
@@ -174,6 +175,7 @@ const FullPresetControls: React.FC<{
 
   return (
     <ControlPanel
+      title='synth preset'
       state={state}
       settings={settings}
       onChange={(key: string, val: any, _state: any) => {
@@ -191,12 +193,14 @@ const FullPresetControls: React.FC<{
 const AddModuleControlsUnwrapped = connect(mapAddModuleControlsStateToProps)(
   AddModuleControlsInner
 );
-const AddAndPresetControls: React.FC<Omit<
-  PropTypesOf<typeof AddModuleControlsInner> & {
-    synthDesignerGetState: SynthDesignerReduxInfra['getState'];
-  },
-  keyof ReturnType<typeof mapAddModuleControlsStateToProps>
->> = ({ ...props }) => (
+const AddAndPresetControls: React.FC<
+  Omit<
+    PropTypesOf<typeof AddModuleControlsInner> & {
+      synthDesignerGetState: SynthDesignerReduxInfra['getState'];
+    },
+    keyof ReturnType<typeof mapAddModuleControlsStateToProps>
+  >
+> = ({ ...props }) => (
   <Provider store={store}>
     <AddModuleControlsUnwrapped {...props} />
     <FullPresetControls

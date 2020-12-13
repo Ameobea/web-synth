@@ -894,6 +894,9 @@ dependencies = [
 [[package]]
 name = "wavetable"
 version = "0.1.0"
+dependencies = [
+ "dsp",
+]
 
 [[package]]
 name = "web-sys"

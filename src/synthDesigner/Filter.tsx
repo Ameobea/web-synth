@@ -23,16 +23,19 @@ const Filter: React.FC<{
 
   return (
     <ControlPanel
+      className='filter-control-panel'
       style={{ width: 400 }}
       title='FILTER'
       settings={settings}
       state={state}
-      onChange={(key: keyof typeof state, val: any) => {
+      onChange={(key: string, val: any) => {
         if (key === 'adsr') {
           dispatch(actionCreators.synthDesigner.SET_FILTER_ADSR(val, synthIx));
           return;
         } else if (key === 'bypass') {
           dispatch(actionCreators.synthDesigner.SET_FILTER_IS_BYPASSED(synthIx, val));
+        } else if (key === 'adsr length ms') {
+          dispatch(actionCreators.synthDesigner.SET_FILTER_ADSR_LENGTH(synthIx, val));
         }
 
         dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key as any, val));

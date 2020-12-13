@@ -107,13 +107,13 @@ const hydrateConnection = (conn: Omit<ControlPanelConnection, 'node'>): ControlP
 const disconnectControl = (control: ControlPanelConnection) => control.node.disconnect();
 
 const actionGroups = {
-  ADD_INSTANCE: buildActionGroup({
+  ADD_CONTROL_PANEL_INSTANCE: buildActionGroup({
     actionCreator: (
       vcId: string,
       initialConnections?: Omit<ControlPanelConnection, 'node'>[],
       presets?: { name: string; controls: Omit<ControlPanelConnection, 'node'>[] }[]
     ) => ({
-      type: 'ADD_INSTANCE',
+      type: 'ADD_CONTROL_PANEL_INSTANCE',
       vcId,
       initialConnections,
       presets,

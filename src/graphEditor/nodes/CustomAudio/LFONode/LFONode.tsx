@@ -20,7 +20,7 @@ export class LFONode implements ForeignNode {
   private offsetNode: ConstantSourceNode;
   public oscillatorNode: OscillatorNode;
   public nodeType = 'customAudio/LFO';
-  public name = 'LFO';
+  static typeName = 'LFO';
 
   private frequencyOverrideCSN: ConstantSourceNode;
   private amplitudeOverrideCSN: ConstantSourceNode;
@@ -99,7 +99,7 @@ export class LFONode implements ForeignNode {
       }),
     });
 
-    this.cleanupSmallView = mkContainerCleanupHelper();
+    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
   }
 
   public deserialize(params: { [key: string]: any }) {

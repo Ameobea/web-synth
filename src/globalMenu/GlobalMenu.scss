@@ -9,11 +9,13 @@
 
 .global-menu {
   position: fixed;
-  top: 10px;
-  right: 52px;
-  width: 160px;
+  top: 0;
+  right: 0;
+  width: 240px;
+  height: 100vh;
   z-index: 10000000;
   background-color: #555;
+  transition: right 200ms;
 
   .global-menu-item {
     cursor: pointer;
@@ -28,6 +30,33 @@
 
   .global-menu-item:hover {
     background-color: #666;
+  }
+
+  .retract-global-menu-button {
+    width: 100%;
+    font-size: 25px;
+    text-align: left;
+    padding-right: 8px;
+  }
+}
+
+.global-tempo-control {
+  display: flex;
+  border-bottom: 1px solid #333;
+
+  p {
+    margin-top: 0;
+    margin-bottom: 2px;
+  }
+
+  input {
+    background: #252525;
+    color: #eee;
+    outline: none;
+    border: none;
+    padding: 4px;
+    width: 80px;
+    margin-left: 12px;
   }
 }
 

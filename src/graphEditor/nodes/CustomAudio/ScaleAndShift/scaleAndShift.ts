@@ -22,7 +22,7 @@ const computeScaleAndShift = ({
 };
 
 export class ScaleAndShiftNode implements ForeignNode {
-  public name = 'Scale + Shift';
+  static typeName = 'Scale + Shift';
   public nodeType = 'customAudio/scaleAndShift';
 
   private vcId: string;
@@ -63,7 +63,7 @@ export class ScaleAndShiftNode implements ForeignNode {
         },
       }),
     });
-    this.cleanupSmallView = mkContainerCleanupHelper();
+    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
   }
 
   private updateNodes() {

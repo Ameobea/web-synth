@@ -13,23 +13,22 @@ import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing
 import { BACKEND_BASE_URL } from 'src/conf';
 import { loadSharedComposition, maybeRestoreLocalComposition } from 'src/persistance';
 
+const ctx = new AudioContext();
 let engineHandle: typeof import('./engine');
 
 export const getEngine = (): typeof import('./engine') | undefined => engineHandle;
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
-  ReactDOM.render(
+  ReactDOM.unstable_createRoot(document.getElementById('view-context-manager')).render(
     <Provider store={store}>
       <ViewContextManager engine={engine} />
-    </Provider>,
-    document.getElementById('view-context-manager')
+    </Provider>
   );
 
-  ReactDOM.render(
+  ReactDOM.unstable_createRoot(document.getElementById('view-context-switcher')).render(
     <Provider store={store}>
       <ViewContextSwitcher engine={engine} />
-    </Provider>,
-    document.getElementById('view-context-switcher')
+    </Provider>
   );
 };
 
@@ -39,7 +38,7 @@ const createBrowserNotSupportedMessage = () => {
     body.children[0].remove();
   }
 
-  ReactDOM.render(<BrowserNotSupported />, body);
+  ReactDOM.unstable_createRoot(body).render(<BrowserNotSupported />);
 };
 
 export const init_view_contexts = (
@@ -84,7 +83,8 @@ export const init_view_contexts = (
     getState().viewContextManager.patchNetwork,
     newVCMState.activeViewContexts,
     newVCMState.foreignConnectables,
-    connections
+    connections,
+    ctx
   );
   dispatch(actionCreators.viewContextManager.SET_VCM_STATE(newVCMState, patchNetwork));
 };

@@ -1,6 +1,3 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
@@ -101,12 +98,12 @@ export const init_faust_editor = (stateKey: string) => {
 
   // Mount the newly created Faust editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(faustEditorBase);
-  ReactDOM.render(
-    <Provider store={reduxInfra.store}>
-      <FaustEditor vcId={vcId} />
-    </Provider>,
-    faustEditorBase
-  );
+
+  mkContainerRenderHelper({
+    Comp: FaustEditor,
+    getProps: () => ({ vcId }),
+    store: reduxInfra.store,
+  })(buildRootNodeId(vcId));
 };
 
 export const get_faust_editor_content = (vcId: string) => {
@@ -166,8 +163,7 @@ export const cleanup_faust_editor = (stateKey: string) => {
     return editorContent;
   }
 
-  ReactDOM.unmountComponentAtNode(faustEditorReactRootNode);
-  faustEditorReactRootNode.remove();
+  mkContainerCleanupHelper()(buildRootNodeId(vcId));
 
   const serializedState: SerializedFaustEditor = {
     editorContent,
@@ -202,7 +198,7 @@ export const render_faust_editor_small_view = (vcId: string, domId: string) => {
 };
 
 export const cleanup_faust_editor_small_view = (_vcId: string, domId: string) =>
-  mkContainerCleanupHelper()(domId);
+  mkContainerCleanupHelper({ preserveRoot: true })(domId);
 
 export const get_faust_editor_connectables = (vcId: string): AudioConnectables => {
   const context = faustEditorContextMap[vcId];

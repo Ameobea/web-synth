@@ -3,10 +3,7 @@
  * connected to MIDI modules.
  */
 
-import React from 'react';
-import ReactDOM from 'react-dom';
 import { Map } from 'immutable';
-import { Provider } from 'react-redux';
 
 import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
 import {
@@ -19,6 +16,7 @@ import { MidiKeyboardVC } from 'src/midiKeyboard/MidiKeyboard';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
 import { MidiKeyboardStateItem } from 'src/redux/modules/midiKeyboard';
 import { tryParseJson } from 'src/util';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 
 export let midiNodesByStateKey: Map<string, MIDINode> = Map();
 
@@ -48,11 +46,8 @@ export const init_midi_keyboard = (stateKey: string) => {
   );
   dispatch(actionCreators.midiKeyboard.ADD_MIDI_KEYBOARD(stateKey, initialState));
 
-  ReactDOM.render(
-    <Provider store={store}>
-      <MidiKeyboardVC stateKey={stateKey} />
-    </Provider>,
-    elem
+  mkContainerRenderHelper({ Comp: MidiKeyboardVC, getProps: () => ({ stateKey }), store })(
+    getMidiKeyboardDomId(vcId)
   );
 };
 
@@ -69,6 +64,7 @@ const getMidiKeyboardDomElem = (stateKey: string): HTMLDivElement | null => {
 };
 
 export const cleanup_midi_keyboard = (stateKey: string): string => {
+  const vcId = stateKey.split('_')[1]!;
   midiNodesByStateKey = midiNodesByStateKey.delete(stateKey);
 
   const elem = getMidiKeyboardDomElem(stateKey);
@@ -76,8 +72,7 @@ export const cleanup_midi_keyboard = (stateKey: string): string => {
     return '';
   }
 
-  ReactDOM.unmountComponentAtNode(elem);
-  elem.remove();
+  mkContainerCleanupHelper()(getMidiKeyboardDomId(vcId));
 
   const instanceState = getState().midiKeyboard[stateKey];
   if (!instanceState) {

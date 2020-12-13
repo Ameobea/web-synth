@@ -38,7 +38,7 @@ export class Equalizer implements ForeignNode {
   private vcId: string;
   private workletHandle: FaustWorkletNode | null = null;
   public nodeType = 'customAudio/Equalizer';
-  public name = 'Equalizer';
+  static typeName = 'Equalizer';
 
   /**
    * See the docs for `enhanceAudioNode`.
@@ -53,7 +53,7 @@ export class Equalizer implements ForeignNode {
     if (params) {
       this.deserialize(params);
     } else {
-      dispatch(actionCreators.equalizer.ADD_INSTANCE(vcId, DEFAULT_POINTS));
+      dispatch(actionCreators.equalizer.ADD_EQUALIZER_INSTANCE(vcId, DEFAULT_POINTS));
     }
 
     this.renderSmallView = mkContainerRenderHelper({
@@ -61,7 +61,7 @@ export class Equalizer implements ForeignNode {
       getProps: () => ({ vcId }),
     });
 
-    this.cleanupSmallView = mkContainerCleanupHelper();
+    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
 
     EqualizerRegistered.get().then(async () => {
       this.workletHandle = new FaustWorkletNode(ctx, '', 'equalizer-audio-worklet-node-processor');
@@ -80,7 +80,7 @@ export class Equalizer implements ForeignNode {
   }
 
   public deserialize(params: { [key: string]: any }) {
-    dispatch(actionCreators.equalizer.ADD_INSTANCE(this.vcId, params.points || []));
+    dispatch(actionCreators.equalizer.ADD_EQUALIZER_INSTANCE(this.vcId, params.points || []));
   }
 
   public serialize(): { [key: string]: any } {

@@ -15,7 +15,7 @@ export class EnvelopeGenerator implements ForeignNode {
   private adsrModule: ADSRModule;
   private adsrLengthNode: OverridableAudioParam;
   public nodeType = 'customAudio/envelopeGenerator';
-  public name = 'Envelope Generator';
+  static typeName = 'Envelope Generator';
 
   private heldNotes: number[] = [];
   private gateMIDINodeInputCBs: MIDIInputCbs = {
@@ -67,7 +67,7 @@ export class EnvelopeGenerator implements ForeignNode {
       }),
     });
 
-    this.cleanupSmallView = mkContainerCleanupHelper();
+    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
   }
 
   public paramOverrides: {

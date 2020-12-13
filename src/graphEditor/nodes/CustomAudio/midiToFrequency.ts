@@ -6,11 +6,10 @@ import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patc
 import { midiToFrequency } from 'src/util';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
-const ctx = new AudioContext();
-
 export class MIDIToFrequencyNode {
   public vcId: string;
 
+  private ctx: AudioContext;
   private midiNode: MIDINode;
   private frequencyCSN: ConstantSourceNode;
   private detuneCSN: ConstantSourceNode;
@@ -26,11 +25,11 @@ export class MIDIToFrequencyNode {
   }
 
   private gate(offset = 0) {
-    this.gateCSN.offset.setValueAtTime(1, ctx.currentTime + offset);
+    this.gateCSN.offset.setValueAtTime(1, this.ctx.currentTime + offset);
   }
 
   private unGate(offset = 0) {
-    this.gateCSN.offset.setValueAtTime(0, ctx.currentTime + offset);
+    this.gateCSN.offset.setValueAtTime(0, this.ctx.currentTime + offset);
   }
 
   private getMIDIInputCbs = (): MIDIInputCbs => ({
@@ -38,7 +37,7 @@ export class MIDIToFrequencyNode {
       this.gate(offset);
       this.frequencyCSN.offset.setValueAtTime(
         this.noteToFrequency(note),
-        ctx.currentTime + (offset || 0)
+        this.ctx.currentTime + (offset || 0)
       );
 
       if (R.isNil(offset)) {
@@ -72,7 +71,7 @@ export class MIDIToFrequencyNode {
   });
 
   public nodeType = 'customAudio/MIDIToFrequency';
-  public name = 'MIDI to Frequency';
+  static typeName = 'MIDI to Frequency';
 
   /**
    * See the docs for `enhanceAudioNode`.
@@ -81,7 +80,8 @@ export class MIDIToFrequencyNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
-  constructor(vcId: string, _params?: { [key: string]: any } | null) {
+  constructor(ctx: AudioContext, vcId: string, _params?: { [key: string]: any } | null) {
+    this.ctx = ctx;
     this.vcId = vcId;
     this.frequencyCSN = new ConstantSourceNode(ctx);
     this.frequencyCSN.start();

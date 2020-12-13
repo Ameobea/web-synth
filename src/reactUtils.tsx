@@ -2,8 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Store } from 'redux';
 import { Provider } from 'react-redux';
+import { genRandomStringID } from 'src/util';
 
-interface ContainerRenderHelperArgs<P extends { [key: string]: any } = {}> {
+interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
   /**
    * The component to render into the container
    */
@@ -22,11 +23,13 @@ interface ContainerRenderHelperArgs<P extends { [key: string]: any } = {}> {
   getProps: () => P;
 }
 
+const RootsByID: Map<string, unknown> = new Map();
+
 /**
  * Higher order function that returns a function that handles rendering the provided `Comp` into the container with the
  * id specified by the argument passed into the generated function.  Useful for implementing `renderSmallView`.
  */
-export function mkContainerRenderHelper<P extends { [key: string]: any } = {}>({
+export function mkContainerRenderHelper<P extends { [key: string]: any } = Record<any, never>>({
   Comp,
   store,
   predicate,
@@ -48,7 +51,25 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = {}>({
     ) : (
       <Comp {...props} />
     );
-    ReactDOM.render(rendered, node);
+
+    // Check to see if we've already created a root for this node
+    let root;
+    const existingRootID = node.getAttribute('data-react-root-id');
+    if (existingRootID) {
+      root = RootsByID.get(existingRootID);
+      if (!root) {
+        throw new Error(
+          'Node was marked as having a root, but entry has been removed from the roots map'
+        );
+      }
+    } else {
+      root = ReactDOM.unstable_createRoot(node);
+      const rootID = genRandomStringID();
+      node.setAttribute('data-react-root-id', rootID);
+      RootsByID.set(rootID, root);
+    }
+
+    root.render(rendered);
 
     if (predicate) {
       predicate(domId, node);
@@ -60,16 +81,41 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = {}>({
  * Complement of `mkContainerRenderHelper`.  HOF that tears down the React component rendered into the container
  * pointed to by the id passed into the returned function.
  */
-export const mkContainerCleanupHelper = ({}: {
-  predicate?: (domId: string, node: HTMLElement) => void;
+export const mkContainerCleanupHelper = ({
+  preserveRoot,
+  predicate,
+}: {
+  predicate?: (domID: string, node: HTMLElement) => void;
+  // If true, the DOM element will not be deleted and
+  preserveRoot?: boolean;
 } = {}) => (domId: string) => {
   const node = document.getElementById(domId);
   if (!node) {
     console.error(`No node with id ${domId} found when trying to clean up small view`);
     return;
   }
+  if (predicate) {
+    predicate(domId, node);
+  }
 
-  ReactDOM.unmountComponentAtNode(node);
+  const rootID = node.getAttribute('data-react-root-id');
+  if (!rootID) {
+    console.error(
+      'No `data-react-root-id` attribute found on root used in container render helper when cleaning up'
+    );
+    return;
+  }
+  const root = RootsByID.get(rootID);
+  if (!root) {
+    console.error('No root in map in container render helper when cleaning up');
+    return;
+  }
+
+  if (!preserveRoot) {
+    node.remove();
+    RootsByID.delete(rootID);
+  }
+  root.unmount();
 };
 
 export const mkContainerHider = (getContainerID: (vcId: string) => string) => (

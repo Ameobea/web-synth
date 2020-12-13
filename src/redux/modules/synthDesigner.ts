@@ -111,6 +111,7 @@ export interface SynthModule {
   filterEnvelope: ADSRValues;
   filterADSRLength: number;
   pitchMultiplier: number;
+  unisonSpreadCents?: number;
 }
 
 const ctx = new AudioContext();
@@ -138,6 +139,7 @@ function updateFilterNode<K extends keyof FilterParams>(
     }
     case 'adsr':
     case 'bypass':
+    case 'adsr length ms':
       break;
     default: {
       const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];
@@ -178,6 +180,7 @@ const packWavetableDefs = (
 
 export const serializeSynthModule = (synth: SynthModule) => ({
   unison: synth.voices[0].oscillators.length,
+  unisonSpreadCents: synth.unisonSpreadCents,
   wavetableConfig: Option.of(synth.wavetableConf?.wavetableDef)
     .map(
       (wavetableDefs): Omit<WavetableConfig, 'onInitialized'> => {
@@ -298,6 +301,21 @@ const buildDefaultFilterModule = (
   return { filterParams, filterNode };
 };
 
+const setUnisonSpread = (synth: SynthModule, spreadCents: number) => {
+  synth.voices.forEach(voice => {
+    const unison = voice.oscillators.length;
+    const middleVoiceIx = (unison - 1) / 2;
+    if (middleVoiceIx === 0) {
+      return;
+    }
+
+    voice.oscillators.forEach((osc, i) => {
+      const fract = i / middleVoiceIx - 0.5;
+      osc.detune.value = fract * spreadCents;
+    });
+  });
+};
+
 const buildDefaultSynthModule = (): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
   const { filterParams, filterNode } = buildDefaultFilterModule(filterCSNs);
@@ -404,6 +422,7 @@ export const deserializeSynthModule = (
     filterADSRLength,
     pitchMultiplier,
     filterBypassed = true,
+    unisonSpreadCents = 0,
   }: {
     waveform: Waveform;
     wavetableConfig: Omit<WavetableConfig, 'onInitialized'> | null;
@@ -418,6 +437,7 @@ export const deserializeSynthModule = (
     filterADSRLength?: number;
     pitchMultiplier?: number;
     filterBypassed?: boolean;
+    unisonSpreadCents?: number;
   },
   dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void,
   synthIx: number
@@ -476,7 +496,7 @@ export const deserializeSynthModule = (
     base.wavetableInputControls = buildWavetableInputControls(wavetableConf);
   }
 
-  return {
+  const synthModule = {
     ...base,
     waveform,
     detune,
@@ -491,7 +511,10 @@ export const deserializeSynthModule = (
     filterADSRLength: filterADSRLength ?? 1000,
     filterParams,
     pitchMultiplier: pitchMultiplier ?? 1,
+    unisonSpreadCents,
   };
+  setUnisonSpread(synthModule, unisonSpreadCents);
+  return synthModule;
 };
 
 export const getInitialSynthDesignerState = (addInitialSynth?: boolean): SynthDesignerState => ({
@@ -893,15 +916,18 @@ const actionGroups = {
 
         while (voice.oscillators.length < unison) {
           const osc = new OscillatorNode(ctx);
-          // TODO: Set detune and other params here once they are implemented and stored in state
-          // TODO: Keep track of playing state for all synths and trigger oscillators if synth is playing
+          osc.frequency.value = voice.oscillators[0].frequency.value;
           osc.type =
             targetSynth.waveform === Waveform.Wavetable ? Waveform.Sine : targetSynth.waveform;
           voice.oscillators.push(osc);
+          targetSynth.detuneCSN.connect(osc.detune);
           osc.start();
+          osc.connect(targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode);
         }
 
-        return { ...voice, oscillators: [...voice.oscillators] };
+        const newSynth = { ...voice, oscillators: [...voice.oscillators] };
+        setUnisonSpread(state.synths[synthIx], targetSynth.unisonSpreadCents ?? 0);
+        return newSynth;
       });
 
       return {
@@ -912,6 +938,17 @@ const actionGroups = {
           ...state.synths.slice(synthIx + 1),
         ],
       };
+    },
+  }),
+  SET_UNISON_SPREAD_CENTS: buildActionGroup({
+    actionCreator: (synthIx: number, unisonSpreadCents: number) => ({
+      type: 'SET_UNISON_SPREAD_CENTS',
+      synthIx,
+      unisonSpreadCents,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, unisonSpreadCents }) => {
+      setUnisonSpread(state.synths[synthIx], unisonSpreadCents);
+      return setSynth(synthIx, { ...state.synths[synthIx], unisonSpreadCents }, state);
     },
   }),
   SET_DETUNE: buildActionGroup({

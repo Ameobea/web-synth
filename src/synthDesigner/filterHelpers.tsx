@@ -85,6 +85,15 @@ export const getSettingsForFilterType = (filterType: FilterType, includeADSR = t
         [FilterType.Notch]: [filterSettings.q],
         [FilterType.Allpass]: [filterSettings.q],
       }[filterType],
+      includeADSR
+        ? {
+            type: 'range',
+            label: 'adsr length ms',
+            min: 50,
+            max: 10000,
+            initial: 1000,
+          }
+        : null,
       includeADSR ? filterSettings.adsr : null,
     ])
   );

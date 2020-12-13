@@ -84,8 +84,8 @@ extern "C" {
 #[wasm_bindgen(raw_module = "./graphEditor")]
 extern "C" {
     pub fn init_graph_editor(state_key: &str);
-    pub fn hide_graph_editor(vc_id: &str);
-    pub fn unhide_graph_editor(vc_id: &str);
+    pub fn hide_graph_editor(state_key: &str);
+    pub fn unhide_graph_editor(state_key: &str);
     pub fn cleanup_graph_editor(state_key: &str);
     pub fn arrange_graph_editor(vc_id: &str);
 }

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { connect } from 'react-redux';
+import ControlPanel from 'react-control-panel';
 
 import { faustEditorContextMap, FaustEditorReduxInfra } from 'src/faustEditor';
 import { mkStopInstanceHandler, mkCompileButtonClickHandler } from 'src/faustEditor/FaustEditor';
@@ -54,24 +55,37 @@ export const mkFaustEditorSmallView = (vcId: string) => {
     if (!instance) {
       return (
         <div>
-          <div>
-            Optimize{' '}
-            <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
-          </div>
-          <button
-            onClick={() => {
-              setCompileErr(false);
-              start();
+          <ControlPanel
+            style={{ width: 500 }}
+            settings={[
+              { type: 'checkbox', label: 'optimize', initial: true },
+              {
+                type: 'button',
+                label: 'compile + start',
+                action: () => {
+                  setCompileErr(false);
+                  start();
+                },
+              },
+            ]}
+            onChange={(key: string, val: any) => {
+              switch (key) {
+                case 'optimize': {
+                  setOptimize(val);
+                  break;
+                }
+                default: {
+                  console.warn('Unhandled key in faust editor small view RCP: ', key);
+                }
+              }
             }}
-          >
-            Start
-          </button>
+          />
+
           {compileErr ? (
             <>
               <br />
               <span style={{ color: 'red' }}>
-                There was an error while compiling; checking the main Faust Editor tab for more
-                info.
+                There was an error while compiling; check the main Faust Editor tab for more info.
               </span>
             </>
           ) : null}

@@ -69,6 +69,6 @@ push-docker-ci:
   docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
   docker push $CI_BUILDER_DOCKER_IMAGE_NAME
 
-build-sidechain:
-  cd ./engine/sidechain && cargo build --release --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/release/sidechain.wasm ../../public
+build-wavetable:
+  cd ./engine/wavetable && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/wavetable.wasm ../../public

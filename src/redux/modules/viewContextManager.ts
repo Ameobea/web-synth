@@ -333,7 +333,7 @@ const actionGroups = {
 
       const targetNode = connectables.get(vcId);
       if (!targetNode) {
-        console.warn(`Tried to delete connectables for VC ID ${vcId} but one wasn't found`);
+        // console.warn(`Tried to delete connectables for VC ID ${vcId} but one wasn't found`);
         return state;
       }
 

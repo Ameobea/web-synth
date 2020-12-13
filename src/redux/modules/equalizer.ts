@@ -46,9 +46,9 @@ const updateEqualizerConnectablesOnNextTick = (vcId: string) =>
   });
 
 const actionGroups = {
-  ADD_INSTANCE: buildActionGroup({
+  ADD_EQUALIZER_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string, points: EqualizerPoint[]) => ({
-      type: 'ADD_INSTANCE',
+      type: 'ADD_EQUALIZER_INSTANCE',
       vcId,
       points,
     }),

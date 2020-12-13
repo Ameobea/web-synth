@@ -50,4 +50,8 @@ export interface LiteGraph {
   add: (node: LiteGraphNode) => void;
   remove: (node: LiteGraphNode) => void;
   arrange: () => void;
+  start: () => void;
+  onNodeRemoved?: (node: any) => void | undefined;
+  serialize(): string;
+  setDirtyCanvas: (foreground: boolean, background: boolean) => void;
 }

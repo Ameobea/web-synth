@@ -7,7 +7,7 @@
 .synth-module {
   display: flex;
   flex-direction: row;
-  height: 409px;
+  height: 440px;
   width: 100%;
   margin-top: 10px;
   padding-bottom: 10px;
@@ -44,6 +44,10 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+  }
+
+  .filter-control-panel svg.adsr-viz {
+    margin-top: 29px !important;
   }
 }
 

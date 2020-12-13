@@ -34,6 +34,8 @@ fn mix(mix_factor: f32, low: f32, high: f32) -> f32 {
     ((1.0 - mix_factor) * low) + (mix_factor * high)
 }
 
+const SMOOTH_TAIL_LEN_SAMPLES: usize = 16;
+
 impl WaveTable {
     pub fn new(settings: WaveTableSettings) -> Self {
         let wavetable_data_size = settings.get_wavetable_size();
@@ -54,7 +56,21 @@ impl WaveTable {
             self.samples[waveform_offset_samples + sample_hi_ix],
         );
 
-        mix(sample_mix, low_sample, high_sample)
+        let base_sample = mix(sample_mix, low_sample, high_sample);
+        // We mix the final `SMOOTH_TAIL_LEN_SAMPLES` samples with the first sample of the waveform
+        // to avoid audio artifacts caused by discontinuities produced by wrapping around
+        let samples_from_the_end = self.settings.waveform_length - sample_low_ix;
+        if samples_from_the_end > SMOOTH_TAIL_LEN_SAMPLES {
+            return base_sample;
+        }
+
+        let first_sample = self.samples[waveform_offset_samples];
+        mix(
+            (SMOOTH_TAIL_LEN_SAMPLES - samples_from_the_end) as f32
+                / SMOOTH_TAIL_LEN_SAMPLES as f32,
+            base_sample,
+            first_sample,
+        )
     }
 
     fn sample_dimension(&self, dimension_ix: usize, waveform_ix: f32, sample_ix: f32) -> f32 {

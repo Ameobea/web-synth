@@ -45,6 +45,14 @@ const SYNTH_SETTINGS = [
   },
   {
     type: 'range',
+    label: 'unison spread cents',
+    initial: '0',
+    min: 0,
+    max: 40,
+    step: 0.1,
+  },
+  {
+    type: 'range',
     label: 'detune',
     min: -300,
     initial: 0,
@@ -244,6 +252,10 @@ const SynthModuleCompInner: React.FC<{
               dispatch(actionCreators.synthDesigner.SET_UNISON(index, val));
               return;
             }
+            case 'unison spread cents': {
+              dispatch(actionCreators.synthDesigner.SET_UNISON_SPREAD_CENTS(index, val));
+              return;
+            }
             case 'volume': {
               dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(index, val));
               return;
@@ -285,16 +297,18 @@ const SynthModuleCompInner: React.FC<{
             'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
               () => synth.pitchMultiplier?.toString() ?? 1
             ),
+            'unison spread cents': synth.unisonSpreadCents ?? 0,
           }),
           [
             synth.waveform,
-            unison,
             synth.masterGain,
             synth.detune,
-            synth.gainEnvelope,
-            synth.pitchMultiplier,
-            localPitchMultiplier,
             synth.gainADSRLength,
+            synth.gainEnvelope,
+            synth.unisonSpreadCents,
+            synth.pitchMultiplier,
+            unison,
+            localPitchMultiplier,
           ]
         )}
         style={{ width: 378 }}

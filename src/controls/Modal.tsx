@@ -20,15 +20,16 @@ export function renderModalWithControls<T>(
   const modalNode = document.createElement('div');
   bodyNode.appendChild(modalNode);
   modalNode.setAttribute('class', 'input-modal');
+  const root = ReactDOM.unstable_createRoot(modalNode);
 
   const unmount = () => {
-    ReactDOM.unmountComponentAtNode(modalNode);
+    root.unmount();
     bodyNode.removeChild(modalNode);
   };
 
   // Render the component into the modal and wait for its callback to be triggered
   return new Promise((resolve, reject) => {
-    ReactDOM.render(
+    root.render(
       <Comp
         onSubmit={val => {
           // Unmount the modal and resolve the `Promise`

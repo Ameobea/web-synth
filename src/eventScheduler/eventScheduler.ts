@@ -1,3 +1,5 @@
+import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
+
 let pendingEvents: { time: number; cb: () => void }[] = [];
 
 const ctx = new AudioContext();
@@ -21,11 +23,6 @@ const callCb = (cbId: number) => {
   registeredCbs.delete(cbId);
   cb();
 };
-
-const globalTempoCSN = new ConstantSourceNode(ctx);
-(window as any).globalTempoCSN = globalTempoCSN;
-globalTempoCSN.offset.value = +(localStorage.getItem('globalTempo') ?? 120);
-globalTempoCSN.start();
 
 // Init the scheduler AWP instance
 Promise.all([
