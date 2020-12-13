@@ -6,6 +6,8 @@ import { SampleDescriptor } from 'src/sampleLibrary';
 import { MIDINode, buildMIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { buildGateOutput } from 'src/sequencer';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
+import { genRandomStringID } from 'src/util';
+import { setConnectionFlowingStatus } from 'src/graphEditor/GraphEditor';
 
 export type VoiceTarget =
   | { type: 'sample' }
@@ -53,7 +55,7 @@ export interface SequencerReduxState {
   /**
    * For each voice, an array of the indices of all marked cells for that voice/row
    */
-  marks: (SequencerMark | null)[][];
+  marks: { marks: (SequencerMark | null)[]; rowID: string }[];
   bpm: number;
   isPlaying: boolean;
   outputGainNode: GainNode;
@@ -80,9 +82,9 @@ interface SequencerAWPConfig {
 
 export const buildSequencerConfig = (state: SequencerReduxState): SequencerAWPConfig => {
   return {
-    beatCount: state.marks[0]!.length,
+    beatCount: state.marks[0]!.marks.length,
     beatRatio: 0.25,
-    voices: state.marks.map(marks => ({ marks: marks.map(mark => !!mark) })),
+    voices: state.marks.map(marks => ({ marks: marks.marks.map(mark => !!mark) })),
   };
 };
 
@@ -108,7 +110,10 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState) =>
       reschedule({
         ...state,
-        marks: [...state.marks, R.times(() => null, state.marks[0]!.length)],
+        marks: [
+          ...state.marks,
+          { marks: R.times(() => null, state.marks[0]!.marks.length), rowID: genRandomStringID() },
+        ],
         voices: [...state.voices, { type: 'sample' as const, name: 'sample' }],
       }),
   }),
@@ -132,7 +137,7 @@ const actionGroups = {
       reschedule({
         ...state,
         marks: R.set(
-          R.lensPath([rowIx, colIx]),
+          R.lensPath([rowIx, 'marks', colIx]),
           buildDefaultSequencerMark(state.voices[rowIx]),
           state.marks
         ),
@@ -143,15 +148,17 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState, { rowIx, colIx }) =>
       reschedule({
         ...state,
-        marks: R.set(R.lensPath([rowIx, colIx]), null, state.marks),
+        marks: R.set(R.lensPath([rowIx, 'marks', colIx]), null, state.marks),
       }),
   }),
   TOGGLE_IS_PLAYING: buildActionGroup({
-    actionCreator: () => ({ type: 'TOGGLE_IS_PLAYING' }),
-    subReducer: (state: SequencerReduxState) => {
+    actionCreator: (vcId: string) => ({ type: 'TOGGLE_IS_PLAYING', vcId }),
+    subReducer: (state: SequencerReduxState, { vcId }) => {
       if (!state.awpHandle) {
         return state;
       }
+
+      setConnectionFlowingStatus(vcId, 'output', !state.isPlaying);
 
       if (state.isPlaying) {
         state.awpHandle.port.postMessage({ type: 'stop' });
@@ -241,7 +248,7 @@ const actionGroups = {
     subReducer: (state: SequencerReduxState, { activeBeats }) => {
       const newActiveBeats = [...state.activeBeats];
       activeBeats.forEach(
-        ({ voiceIx, beatIx }) => (newActiveBeats[voiceIx] = beatIx % state.marks[0]!.length)
+        ({ voiceIx, beatIx }) => (newActiveBeats[voiceIx] = beatIx % state.marks[0]!.marks.length)
       );
 
       return {
@@ -300,7 +307,7 @@ const actionGroups = {
         return state;
       }
 
-      const firstMarkedBeatIx = state.marks[voiceIx].findIndex(R.identity);
+      const firstMarkedBeatIx = state.marks[voiceIx].marks.findIndex(R.identity);
       return {
         ...state,
         markEditState:
@@ -342,7 +349,7 @@ const actionGroups = {
       return {
         ...state,
         marks: R.set(
-          R.lensPath([state.markEditState!.voiceIx, state.markEditState!.editingMarkIx!]),
+          R.lensPath([state.markEditState!.voiceIx, 'marks', state.markEditState!.editingMarkIx!]),
           markState,
           state.marks
         ),
@@ -351,7 +358,7 @@ const actionGroups = {
               voiceIx: state.markEditState!.voiceIx,
               editingMarkIx: getNextMarkIndex(
                 state.markEditState!.editingMarkIx!,
-                state.marks[state.markEditState!.voiceIx]
+                state.marks[state.markEditState!.voiceIx].marks
               ),
             }
           : state.markEditState,
@@ -361,17 +368,17 @@ const actionGroups = {
   SET_BEAT_COUNT: buildActionGroup({
     actionCreator: (beatCount: number) => ({ type: 'SET_BEAT_COUNT', beatCount }),
     subReducer: (state: SequencerReduxState, { beatCount }) => {
-      const curMarkCount = state.marks[0].length;
+      const curMarkCount = state.marks[0].marks.length;
       if (curMarkCount === beatCount) {
         return state;
       } else if (curMarkCount < beatCount) {
-        const newMarks = state.marks.map(marks => [
-          ...marks,
-          ...new Array(beatCount - curMarkCount).fill(null),
-        ]);
+        const newMarks = state.marks.map(row => ({
+          ...row,
+          marks: [...row.marks, ...new Array(beatCount - curMarkCount).fill(null)],
+        }));
         return reschedule({ ...state, marks: newMarks });
       } else {
-        const newMarks = state.marks.map(marks => marks.slice(0, beatCount));
+        const newMarks = state.marks.map(row => ({ ...row, marks: row.marks.slice(0, beatCount) }));
         return reschedule({ ...state, marks: newMarks });
       }
     },
@@ -395,12 +402,12 @@ const actionGroups = {
   }),
 };
 
-export const buildSequencerReduxInfra = (initialState: SequencerReduxState) => {
+export const buildSequencerReduxInfra = (initialState: SequencerReduxState, vcId: string) => {
   const modules = {
     sequencer: buildModule<SequencerReduxState, typeof actionGroups>(initialState, actionGroups),
   };
 
-  return buildStore<typeof modules>(modules);
+  return { ...buildStore<typeof modules>(modules), vcId };
 };
 
 export type SequencerReduxInfra = ReturnType<typeof buildSequencerReduxInfra>;
@@ -444,7 +451,7 @@ export const buildInitialState = (vcId: string): SequencerReduxState => ({
   activeBeats: [0],
   voices: [{ type: 'sample' as const, name: 'sample' }],
   sampleBank: {},
-  marks: [R.times(() => null, DEFAULT_WIDTH)],
+  marks: [{ marks: R.times(() => null, DEFAULT_WIDTH), rowID: genRandomStringID() }],
   bpm: 80,
   isPlaying: false,
   outputGainNode: new GainNode(ctx),

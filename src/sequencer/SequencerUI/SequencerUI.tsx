@@ -1,4 +1,3 @@
-/* eslint-disable react/jsx-key */
 import React, { useState } from 'react';
 
 import FlatButton from 'src/misc/FlatButton';
@@ -94,8 +93,12 @@ const SequencerRow: React.FC<SequencerRowProps> = ({
   dispatch,
   useSelector,
 }) => {
-  const { marks, editingIx, curActiveMarkIx } = useSelector(({ sequencer }) => ({
-    marks: sequencer.marks[rowIx],
+  const {
+    row: { marks },
+    editingIx,
+    curActiveMarkIx,
+  } = useSelector(({ sequencer }) => ({
+    row: sequencer.marks[rowIx],
     editingIx:
       sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
     curActiveMarkIx: sequencer.curActiveMarkIx,
@@ -105,6 +108,7 @@ const SequencerRow: React.FC<SequencerRowProps> = ({
     <>
       {marks.map((marked, colIx) => (
         <rect
+          key={colIx}
           className={getMarkClassname(editingIx, curActiveMarkIx, colIx, !!marked)}
           x={colIx * CELL_SIZE_PX}
           y={rowIx * CELL_SIZE_PX}
@@ -132,10 +136,10 @@ const SequencerRow: React.FC<SequencerRowProps> = ({
 };
 
 interface SequencerGridProps extends SequencerReduxInfra {
-  rowMarks: (SequencerMark | null)[][];
+  rows: { marks: (SequencerMark | null)[]; rowID: string }[];
 }
 
-const SequencerGrid: React.FC<SequencerGridProps> = ({ rowMarks, ...reduxInfra }) => {
+const SequencerGrid: React.FC<SequencerGridProps> = ({ rows, ...reduxInfra }) => {
   const currentEditingVoiceIx = reduxInfra.useSelector(
     state => state.sequencer.currentEditingVoiceIx
   );
@@ -143,7 +147,7 @@ const SequencerGrid: React.FC<SequencerGridProps> = ({ rowMarks, ...reduxInfra }
   return (
     <div className='sequencer-grid-wrapper'>
       <div className='editing-voice-selectors'>
-        {rowMarks.map((_, i) => (
+        {rows.map((_, i) => (
           <EditingVoiceSelector
             key={i}
             isSelected={currentEditingVoiceIx === i}
@@ -158,28 +162,24 @@ const SequencerGrid: React.FC<SequencerGridProps> = ({ rowMarks, ...reduxInfra }
         ))}
       </div>
       <svg>
-        {rowMarks.map((_marks, rowIx) => (
-          <SequencerRow rowIx={rowIx} {...reduxInfra} />
+        {rows.map(({ rowID }, rowIx) => (
+          <SequencerRow key={rowID} rowIx={rowIx} {...reduxInfra} />
         ))}
       </svg>
     </div>
   );
 };
 
-export interface SequencerUIProps extends SequencerReduxInfra {
-  vcId: string;
-}
-
-const SequencerUI: React.FC<SequencerUIProps> = ({ vcId, ...reduxInfra }) => {
+const SequencerUI: React.FC<SequencerReduxInfra> = reduxInfra => {
   const marks = reduxInfra.useSelector(state => state.sequencer.marks);
 
   return (
     <div className='sequencer'>
-      <SequencerGrid rowMarks={marks} {...reduxInfra} />
+      <SequencerGrid rows={marks} {...reduxInfra} />
 
       <SequencerSettings {...reduxInfra} />
 
-      <InputSelect vcId={vcId} {...reduxInfra} />
+      <InputSelect {...reduxInfra} />
     </div>
   );
 };
@@ -188,13 +188,14 @@ export const SequencerSmallView: React.FC<SequencerReduxInfra> = ({
   dispatch,
   actionCreators,
   useSelector,
+  vcId,
 }) => {
   const isPlaying = useSelector(
     (state: { sequencer: SequencerReduxState }) => state.sequencer.isPlaying
   );
 
   return (
-    <FlatButton onClick={() => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING())}>
+    <FlatButton onClick={() => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId))}>
       {isPlaying ? 'Stop' : 'Start'}
     </FlatButton>
   );

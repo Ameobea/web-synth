@@ -33,6 +33,7 @@ const getSequencerSettings = ({
   isPlaying,
   currentEditingVoiceIx,
   markCount,
+  vcId,
 }: SequencerReduxInfra & {
   isPlaying: boolean;
   voiceCount: number;
@@ -43,7 +44,7 @@ const getSequencerSettings = ({
     {
       type: 'button',
       label: isPlaying ? 'stop' : 'start',
-      action: () => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING()),
+      action: () => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId)),
     },
     // {
     //   type: 'range',
@@ -79,7 +80,7 @@ const SequencerSettings: React.FC<SequencerReduxInfra> = reduxInfra => {
       isPlaying: state.sequencer.isPlaying,
       voiceCount: state.sequencer.voices.length,
       currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
-      markCount: state.sequencer.marks[0].length,
+      markCount: state.sequencer.marks[0].marks.length,
     })
   );
 

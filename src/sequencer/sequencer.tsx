@@ -29,8 +29,9 @@ import {
   SequencerReduxInfraMap,
   buildSequencerInputMIDINode,
   SequencerEditState,
+  SequencerReduxInfra,
 } from './redux';
-import { SequencerSmallView, SequencerUIProps } from 'src/sequencer/SequencerUI/SequencerUI';
+import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 
@@ -42,7 +43,7 @@ interface SerializedSequencer {
   currentEditingVoiceIx: number;
   voices: (VoiceTarget & { name?: string })[];
   sampleBank: { [voiceIx: number]: SampleDescriptor | null };
-  marks: (SequencerMark | null)[][];
+  marks: { marks: (SequencerMark | null)[]; rowID: string }[];
   bpm: number;
   isPlaying: boolean;
   midiOutputCount: number;
@@ -125,7 +126,7 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
           state,
           voiceIx,
           state.voices[voiceIx] as any,
-          state.marks[voiceIx][markIx]! as any
+          state.marks[voiceIx].marks[markIx]! as any
         );
         break;
       }
@@ -232,7 +233,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
 
     // If the sequencer was playing when we saved, re-start it and set a new valid handle
     if (isPlaying) {
-      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING());
+      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
     }
   });
 
@@ -255,7 +256,7 @@ const loadInitialState = (stateKey: string, vcId: string) => {
   }
 };
 
-const LazySequencerUI: React.FC<SequencerUIProps> = props => (
+const LazySequencerUI: React.FC<SequencerReduxInfra> = props => (
   <Suspense fallback={<Loading />}>
     <SequencerUI {...props} />
   </Suspense>
@@ -304,7 +305,7 @@ export const init_sequencer = (stateKey: string) => {
   document.getElementById('content')!.appendChild(elem);
 
   const initialState = loadInitialState(stateKey, vcId);
-  const reduxInfra = buildSequencerReduxInfra(initialState);
+  const reduxInfra = buildSequencerReduxInfra(initialState, vcId);
   if (!!SequencerReduxInfraMap.get(vcId)) {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);
   }
@@ -317,7 +318,6 @@ export const init_sequencer = (stateKey: string) => {
     Comp: LazySequencerUI,
     store: reduxInfra.store,
     getProps: () => ({
-      vcId,
       ...reduxInfra,
     }),
   })(domId);
@@ -333,7 +333,7 @@ export const cleanup_sequencer = (stateKey: string) => {
   }
   const serialized = serializeSequencer(vcId);
   if (reduxInfra.getState().sequencer.isPlaying) {
-    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING());
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
   }
 
   localStorage.setItem(stateKey, serialized);

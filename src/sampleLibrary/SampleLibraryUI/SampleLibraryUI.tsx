@@ -148,7 +148,11 @@ export function SampleListing({
         });
       } else if (evt.key === ' ') {
         togglePlaying(selectedSample.sample);
+      } else {
+        return;
       }
+
+      evt.preventDefault();
     };
 
     document.addEventListener('keydown', handleKeydown);

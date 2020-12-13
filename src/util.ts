@@ -176,3 +176,5 @@ export const truncateWithElipsis = (s: string, maxLength: number): string => {
 
   return truncated;
 };
+
+export const genRandomStringID = () => btoa(`${Math.random()}${Math.random()}`);
