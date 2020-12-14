@@ -2,16 +2,16 @@ import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 
 const CustomBiquadFilterNodeSmallView: React.FC<{
   node: ForeignNode<BiquadFilterNode>;
 }> = ({ node }) => {
-  const [params, setParams] = useState<FilterParams>({
+  const [renderIx, setRenderIx] = useState(0);
+  const params = {
     ...node.serialize(),
-    type: node.node?.type || FilterType.Lowpass,
-  } as FilterParams);
+    type: (node.node?.type as FilterType) || FilterType.Lowpass,
+  };
 
   const settings = useMemo(
     () =>
@@ -35,7 +35,9 @@ const CustomBiquadFilterNodeSmallView: React.FC<{
           node.paramOverrides[key].override.offset.value = val;
         }
 
-        setParams({ ...params, [key]: val });
+        // Force re-render.  This component needs to be stateless (can't even have hooks state)
+        // due to the way small view rendering works.
+        setRenderIx(renderIx + 1);
       }}
     />
   );

@@ -1,12 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
-import {
-  mkContainerCleanupHelper,
-  mkContainerHider,
-  mkContainerRenderHelper,
-  mkContainerUnhider,
-} from 'src/reactUtils';
+import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 
 import { store } from 'src/redux';
 import { retryAsync } from 'src/util';

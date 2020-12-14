@@ -62,12 +62,12 @@ const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam 
 };
 
 const actionGroups = {
-  SET_INSTANCE: buildActionGroup({
+  SET_FAUST_INSTANCE: buildActionGroup({
     actionCreator: (
       instance: FaustWorkletNode,
       vcId: string
-    ): { type: 'SET_INSTANCE'; instance: FaustWorkletNode; vcId: string } => ({
-      type: 'SET_INSTANCE',
+    ): { type: 'SET_FAUST_INSTANCE'; instance: FaustWorkletNode; vcId: string } => ({
+      type: 'SET_FAUST_INSTANCE',
       instance,
       vcId,
     }),

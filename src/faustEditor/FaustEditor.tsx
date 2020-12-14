@@ -1,4 +1,4 @@
-import React, { useState, Suspense, useMemo, useRef } from 'react';
+import React, { useState, Suspense, useMemo, useRef, useEffect } from 'react';
 import { Provider, useSelector } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import * as R from 'ramda';
@@ -206,7 +206,7 @@ export const mkCompileButtonClickHandler = ({
   updateConnectables(vcId, newConnectables);
 
   context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_INSTANCE(faustNode, vcId)
+    context.reduxInfra.actionCreators.faustEditor.SET_FAUST_INSTANCE(faustNode, vcId)
   );
 };
 
@@ -267,18 +267,25 @@ const FaustEditor: React.FC<{
   const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
   const context = faustEditorContextMap[vcId];
 
-  const compile = mkCompileButtonClickHandler({
-    faustCode: editorContent,
-    optimize,
-    setErrMessage: setCompileErrMsg,
-    vcId,
-    analyzerNode: context.analyzerNode,
-  });
+  const compile = useMemo(
+    () =>
+      mkCompileButtonClickHandler({
+        faustCode: editorContent,
+        optimize,
+        setErrMessage: setCompileErrMsg,
+        vcId,
+        analyzerNode: context.analyzerNode,
+      }),
+    [context.analyzerNode, editorContent, optimize, vcId]
+  );
   const didCompileOnMount = useRef(false);
-  if (context.compileOnMount && !didCompileOnMount.current) {
-    didCompileOnMount.current = true;
-    compile();
-  }
+  useEffect(() => {
+    if (context.compileOnMount && !didCompileOnMount.current) {
+      console.log('compiling...');
+      didCompileOnMount.current = true;
+      compile();
+    }
+  }, [compile, context.compileOnMount]);
 
   const stopInstance = useMemo(() => mkStopInstanceHandler({ vcId, context }), [context, vcId]);
 

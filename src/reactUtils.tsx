@@ -44,14 +44,6 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
 
     const props = getProps();
 
-    const rendered = store ? (
-      <Provider store={store}>
-        <Comp {...props} />
-      </Provider>
-    ) : (
-      <Comp {...props} />
-    );
-
     // Check to see if we've already created a root for this node
     let root;
     const existingRootID = node.getAttribute('data-react-root-id');
@@ -69,6 +61,13 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
       RootsByID.set(rootID, root);
     }
 
+    const rendered = store ? (
+      <Provider store={store}>
+        <Comp {...props} />
+      </Provider>
+    ) : (
+      <Comp {...props} />
+    );
     root.render(rendered);
 
     if (predicate) {
@@ -100,9 +99,6 @@ export const mkContainerCleanupHelper = ({
 
   const rootID = node.getAttribute('data-react-root-id');
   if (!rootID) {
-    console.error(
-      'No `data-react-root-id` attribute found on root used in container render helper when cleaning up'
-    );
     return;
   }
   const root = RootsByID.get(rootID);
@@ -111,11 +107,13 @@ export const mkContainerCleanupHelper = ({
     return;
   }
 
-  if (!preserveRoot) {
+  if (preserveRoot) {
+    root.render(null);
+  } else {
     node.remove();
     RootsByID.delete(rootID);
+    root.unmount();
   }
-  root.unmount();
 };
 
 export const mkContainerHider = (getContainerID: (vcId: string) => string) => (

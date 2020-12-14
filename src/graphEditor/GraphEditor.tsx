@@ -98,18 +98,20 @@ export const setConnectionFlowingStatus = (
   setFlowingCb();
 };
 
-const handleNodeSelectAction = ({
+const handleNodeSelectAction = async ({
   smallViewDOMId,
   lgNode,
   setCurSelectedNode,
   setSelectedNodeVCID,
   isNowSelected,
+  curSelectedNode,
 }: {
   smallViewDOMId: string;
   lgNode: any;
   setCurSelectedNode: (newNode: any) => void;
   setSelectedNodeVCID: (id: string | null) => void;
   isNowSelected: boolean;
+  curSelectedNode: any;
 }) => {
   const nodeID: string = (lgNode as any).id.toString();
   if (lgNode instanceof LGAudioConnectables) {
@@ -126,7 +128,7 @@ const handleNodeSelectAction = ({
     if (isNowSelected) {
       setCurSelectedNode(lgNode);
       setSelectedNodeVCID(nodeID);
-    } else {
+    } else if (curSelectedNode === lgNode) {
       setCurSelectedNode(null);
       setSelectedNodeVCID(null);
     }
@@ -136,11 +138,11 @@ const handleNodeSelectAction = ({
       return;
     }
 
-    lgNode.connectables.node[functionKey](smallViewDOMId);
+    await lgNode.connectables.node[functionKey](smallViewDOMId);
 
     if (isNowSelected) {
       setCurSelectedNode(lgNode);
-    } else {
+    } else if (curSelectedNode === lgNode) {
       setCurSelectedNode(null);
     }
     setSelectedNodeVCID(null);
@@ -212,7 +214,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   );
 
   const vcId = stateKey.split('_')[1];
-  const smallViewDOMId = `small-view-dom-id_${stateKey}`;
+  const smallViewDOMId = `graph-editor_${vcId}_small-view-dom-id`;
 
   useEffect(() => {
     if (lGraphInstance) {
@@ -254,6 +256,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
             setCurSelectedNode,
             setSelectedNodeVCID,
             isNowSelected: false,
+            curSelectedNode,
           });
         }
         handleNodeSelectAction({
@@ -262,6 +265,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: true,
+          curSelectedNode,
         });
       };
       canvas.onNodeDeselected = node => {
@@ -271,6 +275,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: false,
+          curSelectedNode,
         });
       };
       graph.onNodeRemoved = node => {
@@ -280,6 +285,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: false,
+          curSelectedNode,
         });
       };
 
@@ -332,7 +338,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
   return (
     <>
-      <div className='graph-editor-container'>
+      <div className='graph-editor-container' style={{ maxHeight: window.innerHeight - 130 }}>
         <canvas
           ref={ref => {
             canvasRef.current = ref;
@@ -341,6 +347,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           className='graph-editor'
           width={curSelectedNode ? window.innerWidth - 500 - 44 : window.innerWidth - 44}
           height={window.innerHeight - 130}
+          style={{ maxHeight: window.innerHeight - 130 }}
         />
 
         <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
