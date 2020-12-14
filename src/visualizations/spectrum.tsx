@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ControlPanel from 'react-control-panel';
 import { useOnce } from 'ameo-utils';
+
 import Loading from 'src/misc/Loading';
+import { AsyncOnce } from 'src/util';
 
 export interface SpectrumVizSettings {
   color_fn: number;
@@ -17,6 +19,18 @@ interface SettingDefinition {
   description: string | null | undefined;
   id: number;
 }
+
+const RawWasmModule = new AsyncOnce(() =>
+  (import('src/spectrum_viz_bg.wasm' as any) as Promise<{ memory: WebAssembly.Memory }>).then(
+    wasmModule => {
+      type Return = typeof wasmModule & { wasmMemory: Uint8Array };
+      (wasmModule as any).wasmMemory = new Uint8Array(wasmModule.memory.buffer);
+      return wasmModule as Return;
+    }
+  )
+);
+
+const WasmModule = new AsyncOnce(() => import('src/spectrum_viz'));
 
 export const SpectrumVisualization: React.FC<{
   initialConf?: SpectrumVizSettings;
@@ -48,8 +62,8 @@ export const SpectrumVisualization: React.FC<{
 
   useOnce(async () => {
     const [spectrumVizRawModule, spectrumVizModule] = await Promise.all([
-      import('src/spectrum_viz_bg.wasm' as any) as Promise<{ memory: WebAssembly.Memory }>,
-      import('src/spectrum_viz'),
+      RawWasmModule.get(),
+      WasmModule.get(),
     ] as const);
     spectrumModule.current = spectrumVizModule;
     try {
@@ -63,13 +77,17 @@ export const SpectrumVisualization: React.FC<{
     setCtxPtr(ctxPtr);
 
     let curIx = 0;
+    const pixelDataPtr = spectrumVizModule.get_pixel_data_ptr(ctxPtr);
     const ctx = {
       rawSpectrumViz: spectrumVizRawModule,
       spectrumViz: spectrumVizModule,
-      wasmMemory: new Uint8Array(spectrumVizRawModule.memory.buffer),
+      wasmMemory: spectrumVizRawModule.wasmMemory,
       byteFrequencyData: new Uint8Array(BUFFER_SIZE),
       byteFrequencyDataPtr: spectrumVizModule.get_byte_frequency_data_ptr(ctxPtr),
-      pixelDataPtr: spectrumVizModule.get_pixel_data_ptr(ctxPtr),
+      pixelDataPtr,
+      pixelDataBuf: new Uint8ClampedArray(
+        spectrumVizRawModule.memory.buffer.slice(pixelDataPtr, pixelDataPtr + BUFFER_SIZE * 4)
+      ),
     };
 
     analyzerNode.fftSize = FFT_SIZE;
@@ -88,20 +106,19 @@ export const SpectrumVisualization: React.FC<{
 
         analyzerNode.getByteFrequencyData(ctx.byteFrequencyData);
         ctx.spectrumViz.process_viz_data(ctxPtr);
-        for (let i = 0; i < ctx.byteFrequencyData.length; i++) {
-          ctx.wasmMemory![ctx.byteFrequencyDataPtr + i] = ctx.byteFrequencyData[i];
+        if (ctx.wasmMemory.buffer !== ctx.rawSpectrumViz.memory.buffer) {
+          // Memory grown/re-allocated?
+          ctx.wasmMemory = new Uint8Array(ctx.rawSpectrumViz.memory.buffer);
         }
+        ctx.wasmMemory.set(ctx.byteFrequencyData, ctx.byteFrequencyDataPtr);
 
-        const imageData = new ImageData(
-          new Uint8ClampedArray(
-            ctx.rawSpectrumViz.memory.buffer.slice(
-              ctx.pixelDataPtr,
-              ctx.pixelDataPtr + BUFFER_SIZE * 4
-            )
-          ),
-          1,
-          BUFFER_SIZE
-        );
+        if (ctx.pixelDataBuf.buffer !== ctx.rawSpectrumViz.memory.buffer) {
+          // Memory grown/re-allocated?
+          ctx.pixelDataBuf = new Uint8ClampedArray(
+            spectrumVizRawModule.memory.buffer.slice(pixelDataPtr, pixelDataPtr + BUFFER_SIZE * 4)
+          );
+        }
+        const imageData = new ImageData(ctx.pixelDataBuf, 1, BUFFER_SIZE);
         ctx2D.putImageData(imageData, curIx, 0, 0, 0, 1, BUFFER_SIZE);
 
         animationFrameHandle.current = requestAnimationFrame(updateViz);
@@ -153,7 +170,7 @@ export const SpectrumVisualization: React.FC<{
 
       <canvas
         ref={ref => setCanvasRef(ref)}
-        width={1200}
+        width={WIDTH}
         height={1024}
         id='spectrum-visualizer'
         style={{

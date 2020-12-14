@@ -103,7 +103,12 @@ export const init_synth_designer = (stateKey: string) => {
 
     const releaseNote = (voiceIx: number, note: number, velocity: number, offset?: number) =>
       reduxInfra.dispatch(
-        reduxInfra.actionCreators.synthDesigner.UNGATE(voiceIx, undefined, offset)
+        reduxInfra.actionCreators.synthDesigner.UNGATE(
+          () => reduxInfra.getState().synthDesigner,
+          voiceIx,
+          undefined,
+          offset
+        )
       );
 
     const ctxPtr = mod.create_polysynth_context(playNote, releaseNote);

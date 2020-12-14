@@ -300,7 +300,9 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
 
       <button
         onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440, 0))}
-        onMouseUp={() => dispatch(actionCreators.synthDesigner.UNGATE(0))}
+        onMouseUp={() =>
+          dispatch(actionCreators.synthDesigner.UNGATE(() => getState().synthDesigner, 0))
+        }
       >
         Gate
       </button>

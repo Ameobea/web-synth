@@ -83,6 +83,7 @@ export interface Voice {
   filterNode: BiquadFilterNode;
   gainADSRModule: ADSRModule;
   filterADSRModule: ADSRModule;
+  lastGateOrUngateTime: number;
 }
 
 export const PolysynthMod = new AsyncOnce(() => import('src/polysynth'));
@@ -352,6 +353,23 @@ const buildDefaultSynthModule = (): SynthModule => {
       gainADSRModule.start();
       gainADSRModule.connect(outerGainNode.gain);
 
+      // We connect the ADSR modules to a dummy output in order to drive them for a while so that
+      // they can initialize.
+      //
+      // If we don't do this, they will start off in an invalid state and, naturally, make
+      // horrifically loud noises.
+      const dummyGain = new GainNode(ctx);
+      dummyGain.gain.value = 0;
+      dummyGain.connect(ctx.destination);
+      filterADSRModule.connect(dummyGain);
+      gainADSRModule.connect(dummyGain);
+
+      setTimeout(() => {
+        filterADSRModule.disconnect(dummyGain);
+        gainADSRModule.disconnect(dummyGain);
+        dummyGain.disconnect();
+      }, 1000);
+
       return {
         oscillators: [osc],
         wavetable: null,
@@ -360,6 +378,7 @@ const buildDefaultSynthModule = (): SynthModule => {
         filterNode,
         gainADSRModule,
         filterADSRModule,
+        lastGateOrUngateTime: 0,
       };
     }),
     wavetableConf: buildDefaultWavetableConfig(),
@@ -696,11 +715,6 @@ const actionGroups = {
     actionCreator: () => ({ type: 'ADD_SYNTH_MODULE' }),
     subReducer: (state: SynthDesignerState) => {
       const newModule = buildDefaultSynthModule();
-      if (state.wavyJonesInstance) {
-        newModule.voices
-          .map(R.prop('outerGainNode'))
-          .forEach(outerGainNode => outerGainNode.connect(state.wavyJonesInstance!));
-      }
 
       return {
         ...state,
@@ -828,10 +842,15 @@ const actionGroups = {
           const frequency = baseFrequency * synth.pitchMultiplier;
           const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
           const targetVoice = synth.voices[voiceIx];
+          if (!state.wavyJonesInstance) {
+            return state;
+          }
 
           // Trigger gain and filter ADSRs
           targetVoice.gainADSRModule.gate(offset);
           targetVoice.filterADSRModule.gate(offset);
+          // We edit state directly w/o updating references because this is only needed internally
+          targetVoice.lastGateOrUngateTime = ctx.currentTime;
 
           if (synth.waveform === Waveform.Wavetable && targetVoice.wavetable) {
             targetVoice.wavetable.paramOverrides.frequency.override.offset.setValueAtTime(
@@ -843,10 +862,19 @@ const actionGroups = {
           } else {
             targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
           }
+
+          targetVoice.outerGainNode.connect(state.wavyJonesInstance);
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
         const targetVoice = targetSynth.voices[voiceIx];
+        if (!state.wavyJonesInstance) {
+          return state;
+        }
+        targetVoice.outerGainNode.connect(state.wavyJonesInstance);
+
+        // We edit state directly w/o updating references because this is only needed internally
+        targetVoice.lastGateOrUngateTime = ctx.currentTime;
         const frequency = baseFrequency * targetSynth.pitchMultiplier;
         const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
 
@@ -870,16 +898,37 @@ const actionGroups = {
     },
   }),
   UNGATE: buildActionGroup({
-    actionCreator: (voiceIx: number, synthIx?: number, offset?: number) => ({
+    actionCreator: (
+      getState: () => SynthDesignerState,
+      voiceIx: number,
+      synthIx?: number,
+      offset?: number
+    ) => ({
       type: 'UNGATE',
       voiceIx,
       synthIx,
       offset,
+      getState,
     }),
-    subReducer: (state: SynthDesignerState, { voiceIx, synthIx, offset }) => {
+    subReducer: (state: SynthDesignerState, { voiceIx, synthIx, offset, getState }) => {
       if (R.isNil(synthIx)) {
-        state.synths.forEach(({ voices }) => {
+        state.synths.forEach(({ voices, gainADSRLength }) => {
           const targetVoice = voices[voiceIx];
+          // We edit state directly w/o updating references because this is only needed internally
+          const ungateTime = ctx.currentTime;
+          targetVoice.lastGateOrUngateTime = ungateTime;
+          setTimeout(() => {
+            const state = getState();
+            state.synths.forEach(({ voices }) => {
+              const targetVoice = voices[voiceIx];
+              if (targetVoice.lastGateOrUngateTime !== ungateTime) {
+                // Voice has been re-gated before it finished playing last time; do not disconnect
+                return;
+              }
+
+              targetVoice.outerGainNode.disconnect();
+            });
+          }, gainADSRLength);
 
           // Trigger release of gain and filter ADSRs
           targetVoice.gainADSRModule.ungate(offset);
@@ -888,6 +937,20 @@ const actionGroups = {
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
         const targetVoice = targetSynth.voices[voiceIx];
+        // We edit state directly w/o updating references because this is only needed internally
+        const ungateTime = ctx.currentTime;
+        targetVoice.lastGateOrUngateTime = ungateTime;
+        setTimeout(() => {
+          const state = getState();
+          const targetSynth = getSynth(synthIx, state.synths);
+          const targetVoice = targetSynth.voices[voiceIx];
+          if (targetVoice.lastGateOrUngateTime !== ungateTime) {
+            // Voice has been re-gated before it finished playing last time; do not disconnect
+            return;
+          }
+
+          targetVoice.outerGainNode.disconnect();
+        }, targetSynth.gainADSRLength);
 
         // Trigger release of gain and filter ADSRs
         targetVoice.gainADSRModule.ungate(offset);
@@ -1000,10 +1063,6 @@ const actionGroups = {
   SET_WAVY_JONES_INSTANCE: buildActionGroup({
     actionCreator: (instance: AnalyserNode) => ({ type: 'SET_WAVY_JONES_INSTANCE', instance }),
     subReducer: (state: SynthDesignerState, { instance }) => {
-      state.synths
-        .flatMap(R.prop('voices'))
-        .forEach(({ outerGainNode }) => outerGainNode.connect(instance));
-
       if (state.spectrumNode) {
         instance.connect(state.spectrumNode);
       }
@@ -1186,11 +1245,6 @@ const actionGroups = {
       const builtVoice: SynthModule = preset
         ? deserializeSynthModule(preset, dispatch, synthIx)
         : buildDefaultSynthModule();
-      if (state.wavyJonesInstance) {
-        builtVoice.voices
-          .map(R.prop('outerGainNode'))
-          .forEach(outerGainNode => outerGainNode.connect(state.wavyJonesInstance!));
-      }
 
       return { ...state, synths: R.set(R.lensIndex(synthIx), builtVoice, state.synths) };
     },
