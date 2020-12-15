@@ -4,4 +4,4 @@ export const FAUST_COMPILER_ENDPOINT =
   process.env.FAUST_COMPILER_ENDPOINT ||
   (process.env.NODE_ENV === 'development'
     ? 'http://localhost:4565'
-    : 'https://faust.p.ameo.design');
+    : 'https://faust-compiler-server-mi7imxlw6a-uc.a.run.app');

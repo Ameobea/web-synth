@@ -16,3 +16,15 @@
   display: flex;
   flex-direction: row;
 }
+
+.sample-search {
+  margin-bottom: 6px;
+  margin-top: 7px;
+
+  input {
+    margin-left: 4px;
+    background: #242424;
+    border: 1px solid #555;
+    color: #eee;
+  }
+}

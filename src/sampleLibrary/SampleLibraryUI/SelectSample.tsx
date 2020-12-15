@@ -4,7 +4,6 @@
 
 import React, { useState } from 'react';
 import { ListRowRenderer } from 'react-virtualized';
-import { UnimplementedError } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import BasicModal from 'src/misc/BasicModal';
@@ -85,7 +84,7 @@ const SelectSample: React.FC<{
         selectedSample={selectedSample ?? null}
         setSelectedSample={setSelectedSample}
         mkRowRenderer={mkSampleListingRowRenderer}
-        sampleDescriptors={typeof allSamples === 'string' ? [] : allSamples || []}
+        sampleDescriptors={allSamples}
         height={600}
         width={800}
       />

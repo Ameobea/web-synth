@@ -9,15 +9,11 @@ import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtil
 
 export interface LFOParams {
   frequency: number;
-  gain: number;
-  offset: number;
   waveform: OscillatorType;
 }
 
 export class LFONode implements ForeignNode {
   private vcId: string;
-  public gainNode: GainNode;
-  private offsetNode: ConstantSourceNode;
   public oscillatorNode: OscillatorNode;
   public nodeType = 'customAudio/LFO';
   static typeName = 'LFO';
@@ -35,16 +31,8 @@ export class LFONode implements ForeignNode {
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
-    this.gainNode = new GainNode(ctx);
-    this.gainNode.gain.value = 0;
-    this.offsetNode = new ConstantSourceNode(ctx);
-    this.offsetNode.offset.value = 0;
-    this.offsetNode.start();
     this.oscillatorNode = new OscillatorNode(ctx);
 
-    // Oscillator -> Gain -> Offset -> Output
-    this.oscillatorNode.connect(this.gainNode);
-    this.gainNode.connect(this.offsetNode.offset);
     this.oscillatorNode.start();
     this.oscillatorNode.frequency.value = 0;
 
@@ -71,23 +59,13 @@ export class LFONode implements ForeignNode {
         ),
         override: this.frequencyOverrideCSN,
       },
-      amplitude: {
-        param: new OverridableAudioParam(ctx, this.gainNode.gain, this.amplitudeOverrideCSN),
-        override: this.amplitudeOverrideCSN,
-      },
-      offset: {
-        param: new OverridableAudioParam(ctx, this.offsetNode.offset, this.offsetOverrideCSN),
-        override: this.offsetOverrideCSN,
-      },
     };
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: LFOSmallView,
       getProps: () => ({
-        onChange: ({ frequency, gain, offset, waveform }: LFOParams) => {
+        onChange: ({ frequency, waveform }: LFOParams) => {
           this.frequencyOverrideCSN.offset.value = frequency;
-          this.amplitudeOverrideCSN.offset.value = gain;
-          this.offsetOverrideCSN.offset.value = offset;
           this.oscillatorNode.type = waveform;
         },
         initialState: {
@@ -129,15 +107,12 @@ export class LFONode implements ForeignNode {
   public buildConnectables(): AudioConnectables & { node: ForeignNode } {
     return {
       vcId: this.vcId,
-      inputs: Map<string, ConnectableInput>()
-        .set('frequency', {
-          node: this.paramOverrides.frequency.param,
-          type: 'number',
-        })
-        .set('amplitude', { node: this.paramOverrides.amplitude.param, type: 'number' })
-        .set('offset', { node: this.paramOverrides.offset.param, type: 'number' }),
+      inputs: Map<string, ConnectableInput>().set('frequency', {
+        node: this.paramOverrides.frequency.param,
+        type: 'number',
+      }),
       outputs: Map<string, ConnectableOutput>().set('signal', {
-        node: this.offsetNode,
+        node: this.oscillatorNode,
         type: 'number',
       }),
       node: this,

@@ -1,6 +1,18 @@
 [workspace]
-members = ["engine", "common", "midi", "polysynth", "spectrum_viz", "wavetable", "waveform_renderer", "granular", "event_scheduler", "sidechain"]
+members = [
+  "engine",
+  "common",
+  "midi",
+  "polysynth",
+  "spectrum_viz",
+  "wavetable",
+  "waveform_renderer",
+  "granular",
+  "event_scheduler",
+  "sidechain",
+  "noise_gen"
+]
 
 [profile.release]
-debug-assertions = true
-# panic = "abort"
+# debug-assertions = true
+panic = "abort"

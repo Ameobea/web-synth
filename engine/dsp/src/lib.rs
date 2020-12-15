@@ -1,3 +1,6 @@
+/// For `coefficient` values between 0 and 1, applies smoothing to a value, interpolating between
+/// previous values and new values.  Values closer to 1 applier heavier smoothing.
+///
 /// This works as a filter for audio in the same vein as `y(n) = x(n) + x(n - 1)` where `state` is
 /// `x(n - 1)` and `new_val` is `x(n)`.  It can be made to function as either a lowpass or highpass
 /// filter depending on the value of `coefficient`.

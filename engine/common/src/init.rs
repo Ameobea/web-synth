@@ -19,7 +19,7 @@ pub fn init_rng(rng_seed: Option<u64>) {
     unsafe {
         // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
         // some actual RNG from JS so that things aren't deterministic.
-        RNG = Box::into_raw(box Pcg32::new(
+        RNG = Pcg32::new(
             rng_seed.unwrap_or_else(|| {
                 if cfg!(target_arch = "wasm32") {
                     std::mem::transmute(random())
@@ -28,7 +28,7 @@ pub fn init_rng(rng_seed: Option<u64>) {
                 }
             }),
             721_347_520_420_481_703,
-        ))
+        );
     }
 
     // Pump it a few times because it seems to generate a fully null output the first time
@@ -43,10 +43,10 @@ pub fn init_rng(rng_seed: Option<u64>) {
     unsafe {
         // slightly customized versions of the default seeds for the PCG32 PRNG, but seeded with
         // some actual RNG from JS so that things aren't deterministic.
-        RNG = Box::into_raw(box Pcg32::new(
+        RNG = Pcg32::new(
             rng_seed.unwrap_or(0xcafef00dd15ea5e5),
             721_347_520_420_481_703,
-        ))
+        );
     }
 
     // Pump it a few times because it seems to generate a fully null output the first time

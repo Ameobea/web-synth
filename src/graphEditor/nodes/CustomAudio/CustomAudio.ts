@@ -35,6 +35,7 @@ import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
 import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
 import { Sidechain } from 'src/graphEditor/nodes/CustomAudio/Sidechain';
+import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 
 const ctx = new AudioContext();
 
@@ -441,6 +442,9 @@ export const audioNodeGetters: {
   },
   'customAudio/Sidechain': {
     nodeGetter: Sidechain,
+  },
+  'customAudio/NoiseGenerator': {
+    nodeGetter: NoiseGenNode,
   },
 };
 

@@ -1,6 +1,6 @@
 #![feature(box_syntax, thread_local)]
 
-use std::{mem, ptr};
+use std::mem;
 
 #[cfg(feature = "bindgen")]
 #[macro_use]
@@ -22,10 +22,12 @@ pub struct RawNoteData {
     pub width: f32,
 }
 
+// Transmuted `rand_pcg::Pcg32::new(0xcafef00dd15ea5e5, 0xa02bdbf7bb3c0a7)` since it's not const atm
 #[thread_local]
-pub static mut RNG: *mut Pcg32 = ptr::null_mut();
+pub static mut RNG: Pcg32 =
+    unsafe { std::mem::transmute([5573589319906701683u64, 1442695040888963407u64]) };
 
-pub fn rng() -> &'static mut Pcg32 { unsafe { &mut *RNG } }
+pub fn rng() -> &'static mut Pcg32 { unsafe { &mut RNG } }
 
 pub fn uuid_v4() -> Uuid {
     let entropy: (u64, i64) = rng().gen();

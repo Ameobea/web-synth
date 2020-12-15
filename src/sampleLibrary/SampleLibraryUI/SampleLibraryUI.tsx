@@ -78,6 +78,16 @@ const playSample = async (
   return bufSrc;
 };
 
+const SampleSearch: React.FC<{ value: string; onChange: (newVal: string) => void }> = ({
+  value,
+  onChange,
+}) => (
+  <div className='sample-search'>
+    Search Samples
+    <input value={value} onChange={evt => onChange(evt.target.value)} />
+  </div>
+);
+
 export function SampleListing({
   sampleDescriptors,
   mkRowRenderer = mkDefaultSampleListingRowRenderer,
@@ -120,6 +130,44 @@ export function SampleListing({
     [playingSample, setPlayingSample]
   );
 
+  const [sampleSearch, setSampleSearch] = useState('');
+  const lowerSampleSearch = sampleSearch.toLowerCase();
+  const filteredSamples = useMemo(
+    () =>
+      typeof sampleDescriptors === 'string'
+        ? []
+        : (sampleDescriptors || []).filter(sample => {
+            if (!sampleSearch) {
+              return true;
+            }
+
+            return sample.name.toLowerCase().includes(lowerSampleSearch);
+          }),
+    [sampleDescriptors, lowerSampleSearch, sampleSearch]
+  );
+  useEffect(() => {
+    if (!selectedSample) {
+      return;
+    }
+
+    for (let i = 0; i < filteredSamples.length; i++) {
+      const sample = filteredSamples[i];
+      // Update selected sample to make sure index matches if it's still in the filtered set, otherwise
+      // deselect it if it's been filtered out
+      if (selectedSample.sample.id !== sample.id || selectedSample.sample.name !== sample.name) {
+        return;
+      }
+
+      if (selectedSample.index !== i) {
+        setSelectedSample({ sample: selectedSample.sample, index: i });
+      }
+      return;
+    }
+
+    // Selected sample has been filtered out
+    setSelectedSample(null);
+  }, [filteredSamples, selectedSample, setSelectedSample]);
+
   useEffect(() => {
     if (!selectedSample) {
       return;
@@ -131,19 +179,19 @@ export function SampleListing({
           return;
         }
 
-        togglePlaying(sampleDescriptors[selectedSample.index - 1]);
+        togglePlaying(filteredSamples[selectedSample.index - 1]);
         setSelectedSample({
-          sample: sampleDescriptors[selectedSample.index - 1],
+          sample: filteredSamples[selectedSample.index - 1],
           index: selectedSample.index - 1,
         });
       } else if (evt.key === 'ArrowDown') {
-        if (selectedSample.index === sampleDescriptors.length - 1) {
+        if (selectedSample.index === filteredSamples.length - 1) {
           return;
         }
 
-        togglePlaying(sampleDescriptors[selectedSample.index + 1]);
+        togglePlaying(filteredSamples[selectedSample.index + 1]);
         setSelectedSample({
-          sample: sampleDescriptors[selectedSample.index + 1],
+          sample: filteredSamples[selectedSample.index + 1],
           index: selectedSample.index + 1,
         });
       } else if (evt.key === ' ') {
@@ -158,7 +206,7 @@ export function SampleListing({
     document.addEventListener('keydown', handleKeydown);
 
     return () => document.removeEventListener('keydown', handleKeydown);
-  }, [sampleDescriptors, selectedSample, setSelectedSample, togglePlaying]);
+  }, [filteredSamples, selectedSample, setSelectedSample, togglePlaying]);
 
   const RowRenderer = useMemo(() => {
     const mkRowRendererArgs: MkSampleListingRowRendererArgs = {
@@ -184,14 +232,17 @@ export function SampleListing({
   }
 
   return (
-    <List
-      height={height}
-      rowHeight={20}
-      rowCount={sampleDescriptors.length}
-      width={width}
-      rowRenderer={RowRenderer}
-      scrollToIndex={selectedSample?.index}
-    />
+    <>
+      <SampleSearch value={sampleSearch} onChange={setSampleSearch} />
+      <List
+        height={height}
+        rowHeight={20}
+        rowCount={sampleDescriptors.length}
+        width={width}
+        rowRenderer={RowRenderer}
+        scrollToIndex={selectedSample?.index}
+      />
+    </>
   );
 }
 

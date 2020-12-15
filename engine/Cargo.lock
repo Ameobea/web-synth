@@ -68,7 +68,7 @@ dependencies = [
  "console_error_panic_hook",
  "log",
  "rand",
- "rand_pcg",
+ "rand_pcg 0.2.1",
  "serde",
  "serde_derive",
  "uuid",
@@ -166,7 +166,7 @@ dependencies = [
  "log",
  "polysynth",
  "rand",
- "rand_pcg",
+ "rand_pcg 0.2.1",
  "serde",
  "serde_derive",
  "serde_json",
@@ -423,6 +423,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "noise_gen"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dsp",
+ "rand",
+ "rand_pcg 0.3.0",
+]
+
+[[package]]
 name = "num-derive"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -613,9 +623,9 @@ dependencies = [
  "getrandom",
  "libc",
  "rand_chacha",
- "rand_core",
+ "rand_core 0.5.1",
  "rand_hc",
- "rand_pcg",
+ "rand_pcg 0.2.1",
 ]
 
 [[package]]
@@ -625,7 +635,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4c8ed856279c9737206bf725bf36935d8666ead7aa69b52be55af369d193402"
 dependencies = [
  "ppv-lite86",
- "rand_core",
+ "rand_core 0.5.1",
 ]
 
 [[package]]
@@ -638,12 +648,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_core"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8b34ba8cfb21243bd8df91854c830ff0d785fff2e82ebd4434c2644cb9ada18"
+
+[[package]]
 name = "rand_hc"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
- "rand_core",
+ "rand_core 0.5.1",
 ]
 
 [[package]]
@@ -652,7 +668,16 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
 dependencies = [
- "rand_core",
+ "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_pcg"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7de198537002b913568a3847e53535ace266f93526caf5c360ec41d72c5787f0"
+dependencies = [
+ "rand_core 0.6.0",
 ]
 
 [[package]]

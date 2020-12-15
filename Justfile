@@ -16,6 +16,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   yarn build || npm build
 
   just opt
@@ -33,6 +34,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   yarn start
 
 run-frontend:
@@ -69,6 +71,6 @@ push-docker-ci:
   docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
   docker push $CI_BUILDER_DOCKER_IMAGE_NAME
 
-build-wavetable:
-  cd ./engine/wavetable && cargo build --release --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/release/wavetable.wasm ../../public
+build-noise_gen:
+  cd ./engine/noise_gen && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/noise_gen.wasm ../../public
