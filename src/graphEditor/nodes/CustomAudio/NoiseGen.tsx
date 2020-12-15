@@ -41,7 +41,7 @@ const NoiseGenSmallView: React.FC<{
         enableUpdateFreq
           ? {
               type: 'range',
-              label: 'update_frequency_samples',
+              label: 'update_interval_samples',
               min: 1,
               max: 100_000,
               step: 1,
@@ -127,7 +127,7 @@ export class NoiseGenNode {
               });
               break;
             }
-            case 'update_frequency_samples': {
+            case 'update_interval_samples': {
               this.updateFreqSamples = val;
               this.awpNode.port.postMessage({
                 type: 'setNoiseType',

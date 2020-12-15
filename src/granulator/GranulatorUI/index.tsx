@@ -1,6 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import { Option } from 'funfix-core';
 
 import { GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
@@ -182,6 +183,14 @@ const GranularControlPanel: React.FC<{
 
 export const ActiveSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();
 
+const msToSamples = (ms: number | null, sampleRate: number): number | null => {
+  if (ms === null) {
+    return null;
+  }
+
+  return (ms / 1000) * sampleRate;
+};
+
 const GranulatorUI: React.FC<{
   vcId: string;
   initialState: GranulatorControlPanelState;
@@ -243,6 +252,26 @@ const GranulatorUI: React.FC<{
     ActiveSamplesByVcId.set(vcId, [activeSample.descriptor]);
   }, [activeSample?.descriptor, vcId]);
 
+  const [{ startMarkPosMs, endMarkPosMs }, setMarkPositions] = useState<{
+    startMarkPosMs: number | null;
+    endMarkPosMs: number | null;
+  }>({
+    startMarkPosMs: Option.of(
+      GranulatorInstancesById.get(vcId)?.startSample.manualControl.offset.value
+    )
+      .map(
+        initialStartMarkPosSamples =>
+          (initialStartMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000
+      )
+      .orNull(),
+    endMarkPosMs: Option.of(GranulatorInstancesById.get(vcId)?.endSample.manualControl.offset.value)
+      .map(
+        initialEndMarkPosSamples =>
+          (initialEndMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000
+      )
+      .orNull(),
+  });
+
   return (
     <div className='granulator'>
       <div style={{ display: 'flex', flexDirection: 'row' }}>
@@ -267,7 +296,34 @@ const GranulatorUI: React.FC<{
 
       <GranularControlPanel initialState={initialState} vcId={vcId} />
 
-      {activeSample ? <SampleEditor sample={activeSample.sampleData} vcId={vcId} /> : null}
+      {activeSample ? (
+        <SampleEditor
+          sample={activeSample.sampleData}
+          startMarkPosMs={startMarkPosMs}
+          endMarkPosMs={endMarkPosMs}
+          onMarkPositionsChanged={({ startMarkPosMs, endMarkPosMs }) => {
+            setMarkPositions({ startMarkPosMs, endMarkPosMs });
+
+            const inst = GranulatorInstancesById.get(vcId);
+            if (!inst) {
+              return;
+            }
+
+            if (startMarkPosMs !== null) {
+              inst.startSample.manualControl.offset.value = msToSamples(
+                startMarkPosMs,
+                activeSample.sampleData.sampleRate
+              )!;
+            }
+            if (endMarkPosMs !== null) {
+              inst.endSample.manualControl.offset.value = msToSamples(
+                endMarkPosMs,
+                activeSample.sampleData.sampleRate
+              )!;
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 };

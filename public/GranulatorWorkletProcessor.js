@@ -120,6 +120,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
         }
         case 'shutdown': {
           this.isShutdown = true;
+          break;
         }
         default: {
           console.warn('Unhandled msg event type in granulator AWP: ', evt.data.type);

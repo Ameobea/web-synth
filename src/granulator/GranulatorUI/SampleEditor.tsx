@@ -78,32 +78,21 @@ const SampleEditorOverlay: React.FC<{
   height: number;
   sample: AudioBuffer;
   onBoundsChange: (newBounds: { startMs: number; endMs: number }) => void;
-  vcId: string;
-}> = ({ width, height, sample, onBoundsChange, vcId }) => {
-  const inst = GranulatorInstancesById.get(vcId);
-  const [{ startMarkPosMs, endMarkPosMs }, setMarkPositions] = useState<{
+  startMarkPosMs: number | null;
+  endMarkPosMs: number | null;
+  onMarkPositionsChanged: (newMarkPositions: {
     startMarkPosMs: number | null;
     endMarkPosMs: number | null;
-  }>({
-    startMarkPosMs: Option.of(inst?.startSample.manualControl.offset.value)
-      .map(initialStartMarkPosSamples => (initialStartMarkPosSamples / SAMPLE_RATE) * 1000)
-      .orNull(),
-    endMarkPosMs: Option.of(inst?.endSample.manualControl.offset.value)
-      .map(initialEndMarkPosSamples => (initialEndMarkPosSamples / SAMPLE_RATE) * 1000)
-      .orNull(),
-  });
-  useEffect(() => {
-    if (!inst) {
-      return;
-    }
-
-    if (startMarkPosMs !== null) {
-      inst.startSample.manualControl.offset.value = (startMarkPosMs / 1000) * sample.sampleRate;
-    }
-    if (endMarkPosMs !== null) {
-      inst.endSample.manualControl.offset.value = (endMarkPosMs / 1000) * sample.sampleRate;
-    }
-  }, [startMarkPosMs, endMarkPosMs, sample.sampleRate, inst]);
+  }) => void;
+}> = ({
+  width,
+  height,
+  sample,
+  onBoundsChange,
+  startMarkPosMs,
+  endMarkPosMs,
+  onMarkPositionsChanged,
+}) => {
   const middleMouseButtonDown = useRef<{
     clientX: number;
     clientY: number;
@@ -224,21 +213,24 @@ const SampleEditorOverlay: React.FC<{
           newStartMarkPosMs = R.clamp(0, sampleLengthMs - 10, startMarkPosMs! + diffMs);
           newEndMarkPosMs = R.clamp(10, sampleLengthMs, newStartMarkPosMs + selectionWidthMs);
         }
-        setMarkPositions({ startMarkPosMs: newStartMarkPosMs, endMarkPosMs: newEndMarkPosMs });
+        onMarkPositionsChanged({
+          startMarkPosMs: newStartMarkPosMs,
+          endMarkPosMs: newEndMarkPosMs,
+        });
       } else if (leftMarkDragging.current) {
         const newStartMarkPosMs = R.clamp(
           0,
           endMarkPosMs === null ? sampleLengthMs - 10 : endMarkPosMs - 10,
           startMarkPosMs! + diffMs
         );
-        setMarkPositions({ endMarkPosMs, startMarkPosMs: newStartMarkPosMs });
+        onMarkPositionsChanged({ startMarkPosMs: newStartMarkPosMs, endMarkPosMs });
       } else if (rightMarkDragging.current) {
         const newEndMarkPosMs = R.clamp(
           startMarkPosMs! + 10,
           sampleLengthMs - 10,
           endMarkPosMs! + diffMs
         );
-        setMarkPositions({ endMarkPosMs: newEndMarkPosMs, startMarkPosMs });
+        onMarkPositionsChanged({ startMarkPosMs, endMarkPosMs: newEndMarkPosMs });
       }
 
       lastDownMousePos.current = evt.clientX;
@@ -278,7 +270,7 @@ const SampleEditorOverlay: React.FC<{
         }
 
         if (startMarkPosMs === null) {
-          setMarkPositions({
+          onMarkPositionsChanged({
             endMarkPosMs,
             startMarkPosMs: computeClickPosMs(
               evt.currentTarget,
@@ -300,7 +292,7 @@ const SampleEditorOverlay: React.FC<{
             return;
           }
 
-          setMarkPositions({
+          onMarkPositionsChanged({
             startMarkPosMs,
             endMarkPosMs: newEndMarkPosMs,
           });
@@ -372,7 +364,15 @@ const renderWaveform = (
   canvasCtx.putImageData(imageData, 0, 0);
 };
 
-const SampleEditor: React.FC<{ sample: AudioBuffer; vcId: string }> = ({ sample, vcId }) => {
+const SampleEditor: React.FC<{
+  sample: AudioBuffer;
+  startMarkPosMs: number | null;
+  endMarkPosMs: number | null;
+  onMarkPositionsChanged: (newMarkPositions: {
+    startMarkPosMs: number | null;
+    endMarkPosMs: number | null;
+  }) => void;
+}> = ({ sample, onMarkPositionsChanged, startMarkPosMs, endMarkPosMs }) => {
   const { width, height } = { width: 1400, height: 240 }; // TODO: Store as state somewhere serializable
 
   const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
@@ -491,7 +491,9 @@ const SampleEditor: React.FC<{ sample: AudioBuffer; vcId: string }> = ({ sample,
         width={width}
         height={height}
         onBoundsChange={onBoundsChange}
-        vcId={vcId}
+        startMarkPosMs={startMarkPosMs}
+        endMarkPosMs={endMarkPosMs}
+        onMarkPositionsChanged={newMarkPositions => onMarkPositionsChanged(newMarkPositions)}
       />
     </div>
   );
