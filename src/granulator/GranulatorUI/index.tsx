@@ -185,7 +185,8 @@ export const ActiveSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();
 const GranulatorUI: React.FC<{
   vcId: string;
   initialState: GranulatorControlPanelState;
-}> = ({ vcId, initialState }) => {
+  selectedSample: SampleDescriptor | null;
+}> = ({ vcId, initialState, selectedSample }) => {
   const [activeSample, setActiveSample] = useState<{
     descriptor: SampleDescriptor;
     sampleData: AudioBuffer;
@@ -222,17 +223,17 @@ const GranulatorUI: React.FC<{
     })();
   }, [activeSample, vcId]);
 
-  // Debug
+  // Load the previously selected sample, if one was provided
   useEffect(() => {
+    if (!selectedSample) {
+      return;
+    }
+
     (async () => {
-      const descriptor: SampleDescriptor = {
-        name: 'clouds-video.mp3',
-        isLocal: true,
-      };
-      const sampleData = await getSample(descriptor);
-      setActiveSample({ descriptor, sampleData });
+      const sampleData = await getSample(selectedSample);
+      setActiveSample({ descriptor: selectedSample, sampleData });
     })();
-  }, []);
+  }, [selectedSample]);
 
   useEffect(() => {
     if (!activeSample?.descriptor) {
@@ -252,6 +253,10 @@ const GranulatorUI: React.FC<{
           style={{ marginLeft: 20 }}
           onClick={async () => {
             const descriptor = await selectSample();
+            const inst = GranulatorInstancesById.get(vcId);
+            if (inst) {
+              inst.selectedSample = descriptor;
+            }
             const sampleData = await getSample(descriptor);
             setActiveSample({ descriptor, sampleData });
           }}

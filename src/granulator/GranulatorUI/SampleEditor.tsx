@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as R from 'ramda';
+import { Option } from 'funfix-core';
 
 import Loading from 'src/misc/Loading';
 import { AsyncOnce } from 'src/util';
@@ -7,6 +8,7 @@ import { GranulatorInstancesById } from 'src/granulator';
 
 const BYTES_PER_F32 = 4;
 const BYTES_PER_PX = 4; // RGBA
+const SAMPLE_RATE = 44100;
 
 const WaveformRendererInstance = new AsyncOnce(() =>
   import('src/waveform_renderer').then(async instance => ({
@@ -78,12 +80,19 @@ const SampleEditorOverlay: React.FC<{
   onBoundsChange: (newBounds: { startMs: number; endMs: number }) => void;
   vcId: string;
 }> = ({ width, height, sample, onBoundsChange, vcId }) => {
+  const inst = GranulatorInstancesById.get(vcId);
   const [{ startMarkPosMs, endMarkPosMs }, setMarkPositions] = useState<{
     startMarkPosMs: number | null;
     endMarkPosMs: number | null;
-  }>({ startMarkPosMs: null, endMarkPosMs: null });
+  }>({
+    startMarkPosMs: Option.of(inst?.startSample.manualControl.offset.value)
+      .map(initialStartMarkPosSamples => (initialStartMarkPosSamples / SAMPLE_RATE) * 1000)
+      .orNull(),
+    endMarkPosMs: Option.of(inst?.endSample.manualControl.offset.value)
+      .map(initialEndMarkPosSamples => (initialEndMarkPosSamples / SAMPLE_RATE) * 1000)
+      .orNull(),
+  });
   useEffect(() => {
-    const inst = GranulatorInstancesById.get(vcId);
     if (!inst) {
       return;
     }
@@ -94,7 +103,7 @@ const SampleEditorOverlay: React.FC<{
     if (endMarkPosMs !== null) {
       inst.endSample.manualControl.offset.value = (endMarkPosMs / 1000) * sample.sampleRate;
     }
-  }, [startMarkPosMs, endMarkPosMs, vcId, sample.sampleRate]);
+  }, [startMarkPosMs, endMarkPosMs, sample.sampleRate, inst]);
   const middleMouseButtonDown = useRef<{
     clientX: number;
     clientY: number;

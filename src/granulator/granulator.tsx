@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { Map as ImmMap } from 'immutable';
+import { Option } from 'funfix-core';
 
 import {
   mkContainerRenderHelper,
@@ -14,21 +15,11 @@ import {
   updateConnectables,
 } from 'src/patchNetwork';
 import Loading from 'src/misc/Loading';
-import { getState, store } from 'src/redux';
 import { AsyncOnce } from 'src/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { ActiveSamplesByVcId, GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
 import { SampleDescriptor } from 'src/sampleLibrary';
-
-interface GranulatorState {
-  startSample: number;
-  endSample: number;
-  grainSize: number;
-  sampleSpeedRatio: number;
-  voice1FilterCutoff: number;
-  voice2FilterCutoff: number;
-}
 
 const ctx = new AudioContext();
 
@@ -52,6 +43,7 @@ export const GranulatorInstancesById = new Map<
     slopeLinearity: OverridableAudioParam;
     voice1MovementSamplesPerSample: OverridableAudioParam;
     voice2MovementSamplesPerSample: OverridableAudioParam;
+    selectedSample: SampleDescriptor | null;
   }
 >();
 
@@ -59,17 +51,77 @@ const GranulatorUI = React.lazy(() => import('./GranulatorUI'));
 
 const getGranulatorDOMElementId = (vcId: string) => `granulator-${vcId}`;
 
+interface SerializedGranulator {
+  controlPanelState: GranulatorControlPanelState;
+  selectedSample: SampleDescriptor | null;
+  startSample: number | null;
+  endSample: number | null;
+}
+
 const serializeGranulator = (vcId: string): string => {
-  return JSON.stringify({}); // TODO
+  const inst = GranulatorInstancesById.get(vcId);
+  if (!inst) {
+    throw new Error(`No granulator instance with vcId=${vcId}`);
+  }
+  const controlPanelState: GranulatorControlPanelState = {
+    grain_size: inst.grainSize.manualControl.offset.value,
+    voice_1_samples_between_grains: inst.voice1SamplesBetweenGrains.manualControl.offset.value,
+    voice_2_samples_between_grains: inst.voice2SamplesBetweenGrains.manualControl.offset.value,
+    sample_speed_ratio: inst.sampleSpeedRatio.manualControl.offset.value,
+    voice_1_filter_cutoff: inst.voice1FilterCutoff.manualControl.offset.value,
+    voice_2_filter_cutoff: inst.voice2FilterCutoff.manualControl.offset.value,
+    linear_slope_length: inst.linearSlopeLength.manualControl.offset.value,
+    slope_linearity: inst.slopeLinearity.manualControl.offset.value,
+    voice_1_movement_samples_per_sample:
+      inst.voice1MovementSamplesPerSample.manualControl.offset.value,
+    voice_2_movement_samples_per_sample:
+      inst.voice2MovementSamplesPerSample.manualControl.offset.value,
+  };
+  const serialized: SerializedGranulator = {
+    controlPanelState,
+    selectedSample: inst.selectedSample,
+    startSample: inst.startSample.manualControl.offset.value,
+    endSample: inst.endSample.manualControl.offset.value,
+  };
+
+  return JSON.stringify(serialized);
 };
 
-const deserializeGranulator = async (serialized: string): Promise<GranulatorState> => {
-  return {}; // TODO
+const buildDefaultGranulatorState = (): SerializedGranulator => ({
+  controlPanelState: {
+    grain_size: 800.0,
+    voice_1_samples_between_grains: 800.0,
+    voice_2_samples_between_grains: 800.0,
+    sample_speed_ratio: 1.0,
+    voice_1_filter_cutoff: 0.0,
+    voice_2_filter_cutoff: 0.0,
+    linear_slope_length: 0.3,
+    slope_linearity: 0.6,
+    voice_1_movement_samples_per_sample: 1,
+    voice_2_movement_samples_per_sample: 1,
+  },
+  selectedSample: null,
+  startSample: null,
+  endSample: null,
+});
+
+const deserializeGranulator = (serialized: string): SerializedGranulator => {
+  try {
+    const deserialized = JSON.parse(serialized);
+    if (!deserialized.controlPanelState) {
+      throw new Error();
+    }
+    return deserialized;
+  } catch (err) {
+    console.warn('Error deserializing granulator state: ', err);
+    return buildDefaultGranulatorState();
+  }
 };
 
 const LazyGranulatorUI: React.FC<{
   vcId: string;
   initialState: GranulatorControlPanelState;
+  selectedSample: SampleDescriptor | null;
 }> = props => (
   <Suspense fallback={<Loading />}>
     <GranulatorUI {...props} />
@@ -119,19 +171,10 @@ export const init_granulator = async (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  // TODO: Load from localStorage
-  const initialState: GranulatorControlPanelState = {
-    grain_size: 800.0,
-    voice_1_samples_between_grains: 800.0,
-    voice_2_samples_between_grains: 800.0,
-    sample_speed_ratio: 1.0,
-    voice_1_filter_cutoff: 0.0,
-    voice_2_filter_cutoff: 0.0,
-    linear_slope_length: 0.3,
-    slope_linearity: 0.6,
-    voice_1_movement_samples_per_sample: 1,
-    voice_2_movement_samples_per_sample: 1,
-  };
+  const serialized = localStorage.getItem(stateKey);
+  const initialState: SerializedGranulator = Option.of(serialized)
+    .map(deserializeGranulator)
+    .getOrElseL(buildDefaultGranulatorState);
 
   const granularWasmPromise = GranularWasm.get();
   GranulatorRegistered.get().then(async () => {
@@ -168,7 +211,14 @@ export const init_granulator = async (stateKey: string) => {
         ctx,
         params.get('voice_2_movement_samples_per_sample')
       ),
+      selectedSample: initialState.selectedSample,
     };
+    if (initialState.startSample !== null) {
+      inst.startSample.manualControl.offset.value = initialState.startSample;
+    }
+    if (initialState.endSample !== null) {
+      inst.endSample.manualControl.offset.value = initialState.endSample;
+    }
     GranulatorInstancesById.set(vcId, inst);
     updateConnectables(vcId, get_granulator_audio_connectables(vcId));
   });
@@ -178,8 +228,11 @@ export const init_granulator = async (stateKey: string) => {
 
   mkContainerRenderHelper({
     Comp: LazyGranulatorUI,
-    store,
-    getProps: () => ({ vcId, initialState }),
+    getProps: () => ({
+      vcId,
+      initialState: initialState.controlPanelState,
+      selectedSample: initialState.selectedSample,
+    }),
   })(domId);
 };
 
