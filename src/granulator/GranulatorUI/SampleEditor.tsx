@@ -1,14 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
 
 import Loading from 'src/misc/Loading';
 import { AsyncOnce } from 'src/util';
-import { GranulatorInstancesById } from 'src/granulator';
 
 const BYTES_PER_F32 = 4;
 const BYTES_PER_PX = 4; // RGBA
-const SAMPLE_RATE = 44100;
 
 const WaveformRendererInstance = new AsyncOnce(() =>
   import('src/waveform_renderer').then(async instance => ({
@@ -17,7 +14,7 @@ const WaveformRendererInstance = new AsyncOnce(() =>
   }))
 );
 
-type WaveformInstance =
+export type WaveformInstance =
   | {
       type: 'loaded';
       instance: typeof import('src/waveform_renderer');
@@ -76,7 +73,7 @@ const computeClickPosMs = (
 const SampleEditorOverlay: React.FC<{
   width: number;
   height: number;
-  sample: AudioBuffer;
+  sample: { length: number; sampleRate: number };
   onBoundsChange: (newBounds: { startMs: number; endMs: number }) => void;
   startMarkPosMs: number | null;
   endMarkPosMs: number | null;
@@ -265,7 +262,7 @@ const SampleEditorOverlay: React.FC<{
     <svg
       className='granulator-overlay'
       onClick={evt => {
-        if (evt.button !== 0) {
+        if (evt.button !== 0 || sampleLengthMs === 0) {
           return;
         }
 
@@ -356,6 +353,10 @@ const renderWaveform = (
   heightPx: number,
   canvasCtx: CanvasRenderingContext2D
 ) => {
+  if (endMs === 0) {
+    return;
+  }
+
   const imageDataPtr = instance.render_waveform(ctxPtr, startMs, endMs);
   const imageDataBuf = new Uint8ClampedArray(
     memory.buffer.slice(imageDataPtr, imageDataPtr + widthPx * heightPx * BYTES_PER_PX)
@@ -364,25 +365,33 @@ const renderWaveform = (
   canvasCtx.putImageData(imageData, 0, 0);
 };
 
+type ManualSampleGetter = (
+  inst: WaveformInstance,
+  waveformRendererCtxPtr: React.MutableRefObject<number | null>,
+  bounds: React.MutableRefObject<{
+    startMs: number;
+    endMs: number;
+  }>,
+  reRender?: () => void
+) => { length: number; sampleRate: number };
+
 const SampleEditor: React.FC<{
-  sample: AudioBuffer;
+  sample: AudioBuffer | ManualSampleGetter;
   startMarkPosMs: number | null;
   endMarkPosMs: number | null;
   onMarkPositionsChanged: (newMarkPositions: {
     startMarkPosMs: number | null;
     endMarkPosMs: number | null;
   }) => void;
-}> = ({ sample, onMarkPositionsChanged, startMarkPosMs, endMarkPosMs }) => {
+}> = ({ sample: innerSample, onMarkPositionsChanged, startMarkPosMs, endMarkPosMs }) => {
   const { width, height } = { width: 1400, height: 240 }; // TODO: Store as state somewhere serializable
 
-  const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
-  const bounds = useRef({ startMs: 0, endMs: sampleLengthMs });
   const waveformRendererCanvasCtx = useRef<CanvasRenderingContext2D | null>(null);
   const waveformRendererCtxPtr = useRef<number | null>(null);
   const [waveformRendererInstance, setWaveformRendererInstance] = useState<WaveformInstance>({
     type: 'notInitialized',
   });
-
+  const bounds = useRef({ startMs: 0, endMs: 0 });
   const onBoundsChange = (newBounds: { startMs: number; endMs: number }) => {
     bounds.current = newBounds;
     if (waveformRendererInstance.type === 'loaded' && waveformRendererCtxPtr.current !== null) {
@@ -398,6 +407,17 @@ const SampleEditor: React.FC<{
       );
     }
   };
+  const sample =
+    innerSample instanceof AudioBuffer
+      ? innerSample
+      : innerSample(waveformRendererInstance, waveformRendererCtxPtr, bounds, () =>
+          onBoundsChange(bounds.current)
+        );
+
+  if (bounds.current.endMs === 0) {
+    const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
+    bounds.current.endMs = sampleLengthMs;
+  }
 
   // Async-initialize a Wasm instance for the waveform renderer if it hasn't been done yet
   useEffect(() => {
@@ -407,20 +427,28 @@ const SampleEditor: React.FC<{
 
     setWaveformRendererInstance({ type: 'loading' });
     WaveformRendererInstance.get()
-      .then(({ instance, memory }) =>
-        setWaveformRendererInstance({ type: 'loaded', instance, memory })
-      )
+      .then(({ instance, memory }) => {
+        const inst = { type: 'loaded' as const, instance, memory };
+        setWaveformRendererInstance(inst);
+        if (!(innerSample instanceof AudioBuffer)) {
+          innerSample(inst, waveformRendererCtxPtr, bounds, () => onBoundsChange(bounds.current));
+        }
+      })
       .catch(err => {
         setWaveformRendererInstance({
           type: 'error',
           error: `Error initializing waveform renderer Wasm instance: ${err}`,
         });
       });
-  }, [waveformRendererInstance]);
+  }, [innerSample, waveformRendererInstance]);
+  console.log(sample);
 
   // Create a new waveform renderer instance if we don't have one or if the sample changes
   useEffect(() => {
     if (waveformRendererInstance.type !== 'loaded') {
+      return;
+    } else if (!(innerSample instanceof AudioBuffer)) {
+      // If sample is a function, the caller has full manual control over the waveform rendering context
       return;
     }
 
@@ -440,7 +468,7 @@ const SampleEditor: React.FC<{
     );
 
     // Copy the sample into the buffer that the context allocated inside the Wasm memory
-    const samples = sample.getChannelData(0);
+    const samples = innerSample.getChannelData(0);
     const sampleBufView = new Float32Array(waveformRendererInstance.memory.buffer);
     sampleBufView.set(samples, waveformBufPtr / BYTES_PER_F32);
 
@@ -448,7 +476,7 @@ const SampleEditor: React.FC<{
       console.error("Created waveform renderer ctx, but canvas isn't yet initialized");
       return;
     }
-  }, [sample, waveformRendererInstance, width, height]);
+  }, [sample, waveformRendererInstance, width, height, innerSample]);
 
   // Re-render and set new image data if render params change, waveform renderer ctx changes, or
   useEffect(() => {

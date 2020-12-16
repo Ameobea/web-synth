@@ -5,6 +5,10 @@
 .granulator {
   margin-left: 10px;
   margin-right: 10px;
+
+  hr {
+    margin-top: 20px;
+  }
 }
 
 .waveform-renderer {
@@ -32,4 +36,12 @@
 
 .granulator-selection-indicator {
   fill: rgba(22, 140, 200, 0.2);
+}
+
+.sample-recorder {
+  h2 {
+    text-align: center;
+    margin-bottom: 12px;
+    margin-top: 8px;
+  }
 }

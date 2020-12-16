@@ -11,3 +11,5 @@ crate-type = ["cdylib", "rlib"]
 dsp = { path = "../dsp" }
 common = { path = "../common", default_features = false }
 rand = "0.7"
+hound = "3.4"
+claxon = "0.4"

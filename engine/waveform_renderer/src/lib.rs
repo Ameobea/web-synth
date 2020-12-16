@@ -42,6 +42,13 @@ pub fn create_waveform_renderer_ctx(
 }
 
 #[wasm_bindgen]
+pub fn append_samples_to_waveform(ctx: *mut WaveformRendererCtx, new_samples: &[f32]) -> usize {
+    let ctx = unsafe { &mut *ctx };
+    ctx.waveform_buf.extend_from_slice(new_samples);
+    ctx.waveform_buf.len()
+}
+
+#[wasm_bindgen]
 pub fn free_waveform_renderer_ctx(ctx: *mut WaveformRendererCtx) {
     drop(unsafe { Box::from_raw(ctx) })
 }
@@ -63,6 +70,15 @@ fn sample_to_y_val(sample: f32, half_height: f32, max_distance_from_0: f32) -> u
 #[wasm_bindgen]
 pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32) -> *const u8 {
     let ctx = unsafe { &mut *ctx };
+
+    if ctx.waveform_buf.is_empty() {
+        for (i, cell) in ctx.image_data_buf.iter_mut().enumerate() {
+            if i % 4 == 0 {
+                *cell = 0;
+            }
+        }
+        return ctx.image_data_buf.as_mut_ptr();
+    }
 
     debug_assert_eq!(
         ctx.image_data_buf.len() % 8,

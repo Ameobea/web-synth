@@ -135,7 +135,8 @@ export const get_granulator_audio_connectables = (vcId: string): AudioConnectabl
       vcId,
       inputs: ImmMap<string, ConnectableInput>()
         .set('start_sample', { type: 'number', node: new DummyNode() })
-        .set('end sample', { type: 'number', node: new DummyNode() }),
+        .set('end sample', { type: 'number', node: new DummyNode() })
+        .set('recording_input', { type: 'customAudio', node: new DummyNode() }),
       outputs: ImmMap<string, ConnectableOutput>().set('output', {
         type: 'customAudio',
         node: new DummyNode(),
@@ -147,7 +148,8 @@ export const get_granulator_audio_connectables = (vcId: string): AudioConnectabl
     vcId,
     inputs: ImmMap<string, ConnectableInput>()
       .set('start_sample', { type: 'number', node: inst.startSample })
-      .set('end sample', { type: 'number', node: inst.endSample }),
+      .set('end sample', { type: 'number', node: inst.endSample })
+      .set('recording_input', { type: 'customAudio', node: inst.node }),
     outputs: ImmMap<string, ConnectableOutput>().set('output', {
       type: 'customAudio',
       node: inst.node,
@@ -215,9 +217,13 @@ export const init_granulator = async (stateKey: string) => {
     };
     if (initialState.startSample !== null) {
       inst.startSample.manualControl.offset.value = initialState.startSample;
+    } else {
+      inst.startSample.manualControl.offset.value = -1;
     }
     if (initialState.endSample !== null) {
       inst.endSample.manualControl.offset.value = initialState.endSample;
+    } else {
+      inst.endSample.manualControl.offset.value = -1;
     }
     GranulatorInstancesById.set(vcId, inst);
     updateConnectables(vcId, get_granulator_audio_connectables(vcId));

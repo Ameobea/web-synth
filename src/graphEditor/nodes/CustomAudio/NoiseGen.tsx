@@ -27,7 +27,6 @@ const NoiseGenSmallView: React.FC<{
 }> = ({ onChange, node }) => {
   const [enableSmoothing, setEnableSmoothing] = useState(node.enableSmoothing);
   const [enableUpdateFreq, setEnableUpdateFreq] = useState(node.noiseType === 3);
-  console.log({ enableUpdateFreq });
 
   return (
     <ControlPanel

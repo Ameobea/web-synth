@@ -154,7 +154,7 @@ pub async fn store_remote_sample(
             Err(err) => {
                 error!("Error querying go server RPC to store sample: {:?}", err);
                 return Err(String::from("Error saving sample"));
-            }
+            },
         };
         if res.status() != 200 {
             error!(

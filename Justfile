@@ -71,6 +71,10 @@ push-docker-ci:
   docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
   docker push $CI_BUILDER_DOCKER_IMAGE_NAME
 
-build-noise_gen:
-  cd ./engine/noise_gen && cargo build --release --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/release/noise_gen.wasm ../../public
+build-granular:
+  cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/granular.wasm ../../public
+
+build-waveform_renderer:
+  cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/waveform_renderer.wasm ../../public

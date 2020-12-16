@@ -1,5 +1,5 @@
 import { UnreachableException } from 'ameo-utils';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Option } from 'funfix-core';
 
@@ -9,6 +9,7 @@ import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { delay, retryWithDelay } from 'src/util';
 import './Granulator.scss';
+import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';
 
 export interface GranulatorControlPanelState {
   grain_size: number;
@@ -200,6 +201,7 @@ const GranulatorUI: React.FC<{
     descriptor: SampleDescriptor;
     sampleData: AudioBuffer;
   } | null>(null);
+  const awpNode = useRef<AudioWorkletNode | null>(null);
   useEffect(() => {
     if (!activeSample) {
       return;
@@ -214,12 +216,14 @@ const GranulatorUI: React.FC<{
         }
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
       for (const _i of retries()) {
         const inst = GranulatorInstancesById.get(vcId);
         if (!inst) {
           await delay(20);
           continue;
         }
+        awpNode.current = inst.node;
 
         inst.node.port.postMessage({
           type: 'setSamples',
@@ -259,16 +263,24 @@ const GranulatorUI: React.FC<{
     startMarkPosMs: Option.of(
       GranulatorInstancesById.get(vcId)?.startSample.manualControl.offset.value
     )
-      .map(
-        initialStartMarkPosSamples =>
+      .flatMap(initialStartMarkPosSamples => {
+        if (initialStartMarkPosSamples < 0) {
+          return Option.none();
+        }
+        return Option.some(
           (initialStartMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000
-      )
+        );
+      })
       .orNull(),
     endMarkPosMs: Option.of(GranulatorInstancesById.get(vcId)?.endSample.manualControl.offset.value)
-      .map(
-        initialEndMarkPosSamples =>
+      .flatMap(initialEndMarkPosSamples => {
+        if (initialEndMarkPosSamples < 0) {
+          return Option.none();
+        }
+        return Option.some(
           (initialEndMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000
-      )
+        );
+      })
       .orNull(),
   });
 
@@ -324,6 +336,9 @@ const GranulatorUI: React.FC<{
           }}
         />
       ) : null}
+
+      <hr />
+      <SampleRecorder vcId={vcId} awpNode={awpNode} />
     </div>
   );
 };

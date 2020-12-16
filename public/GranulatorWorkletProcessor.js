@@ -2,6 +2,7 @@ const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
 
 const BYTES_PER_F32 = 4;
 const FRAME_SIZE = 128;
+const RECORDING_BLOCK_SIZE = 44100 / 3; // 3 blocks/second
 
 class GranulatorWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -84,6 +85,8 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
       this.initGranularCtx();
     }
     // We'll set the samples when we receive them if we haven't already
+
+    this.wasmMemory = new Float32Array(this.wasmInstance.exports.memory.buffer);
   }
 
   initGranularCtx() {
@@ -103,7 +106,16 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
 
     this.samples = null;
     this.i = 0;
+    this.isRecording = false;
     this.isShutdown = false;
+    // Pointer to the recording context in Wasm memory
+    this.sampleRecorderCtxPtr = 0;
+    // Number of samples that have been recorded since a block of samples was sent to the main thread
+    this.recordedSamplesSinceLastReported = 0;
+    // Index of the current recording block, used to order them on the UI thread
+    this.recordingBlockIndex = 0;
+    // The absolute index of the last sample sent to the main thread; next recording block should start here.
+    this.lastSentRecordingBlockEndIx = 0;
 
     this.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -122,6 +134,27 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
           this.isShutdown = true;
           break;
         }
+        case 'startRecording': {
+          this.isRecording = true;
+          this.recordedSamplesSinceLastReported = 0;
+          this.recordingBlockIndex = 0;
+          this.lastSentRecordingBlockEndIx = 0;
+          if (this.sampleRecorderCtxPtr) {
+            this.wasmInstance.exports.free_sample_recording_ctx(this.sampleRecorderCtxPtr);
+          }
+          this.sampleRecorderCtxPtr = this.wasmInstance.exports.create_sample_recorder_ctx();
+          break;
+        }
+        case 'stopRecording': {
+          // Send one final block of all remaining samples
+          this.sendRecordingBlock();
+          this.isRecording = false;
+          break;
+        }
+        case 'exportRecording': {
+          this.exportRecording(evt.data.format, evt.data.startSampleIx, evt.data.endSampleIx);
+          break;
+        }
         default: {
           console.warn('Unhandled msg event type in granulator AWP: ', evt.data.type);
         }
@@ -129,10 +162,98 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     };
   }
 
-  process(_inputs, outputs, params) {
+  exportRecording(format, startSampleIx, endSampleIx) {
+    if (!this.wasmInstance || !this.sampleRecorderCtxPtr) {
+      console.error('Tried to export recording w/o wasm instance and/or recording ctx');
+      return;
+    } else if (typeof startSampleIx !== 'number' || typeof endSampleIx !== 'number') {
+      console.error(
+        'Missing or invalid start and/or end sample index when encoding sample; expecting numbers'
+      );
+      return;
+    } else if (typeof format !== 'number') {
+      console.error('Missing or invalid format provided when encoding sample; expected number');
+      return;
+    }
+
+    const encodedLengthBytes = this.wasmInstance.exports.sample_recorder_encode(
+      this.sampleRecorderCtxPtr,
+      format,
+      startSampleIx,
+      endSampleIx
+    );
+    const encodedOutputPtr = this.wasmInstance.exports.sample_recorder_get_encoded_output_ptr(
+      this.sampleRecorderCtxPtr
+    );
+    const encoded = this.wasmInstance.exports.memory.buffer.slice(
+      encodedOutputPtr,
+      encodedOutputPtr + encodedLengthBytes
+    );
+    console.log('Successfully encoded recording; posting to port...');
+    this.port.postMessage({ type: 'encodedRecording', encoded });
+  }
+
+  getWasmMemory() {
+    if (this.wasmMemory.buffer !== this.wasmInstance.exports.memory.buffer) {
+      this.wasmMemory = new Float32Array(this.wasmInstance.exports.memory.buffer);
+    }
+    return this.wasmMemory;
+  }
+
+  sendRecordingBlock() {
+    const blockStartPtr = this.wasmInstance.exports.sample_recorder_get_samples_ptr(
+      this.sampleRecorderCtxPtr,
+      this.lastSentRecordingBlockEndIx
+    );
+
+    const wasmMemory = this.getWasmMemory();
+    const block = wasmMemory.slice(
+      blockStartPtr / BYTES_PER_F32,
+      blockStartPtr / BYTES_PER_F32 + this.recordedSamplesSinceLastReported
+    );
+
+    this.port.postMessage({
+      type: 'recordingBlock',
+      block,
+      index: this.recordingBlockIndex,
+    });
+
+    this.lastSentRecordingBlockEndIx += this.recordedSamplesSinceLastReported;
+    this.recordedSamplesSinceLastReported = 0;
+    this.recordingBlockIndex += 1;
+  }
+
+  updateRecording(inputs) {
+    const samples = inputs[0]?.[0];
+    if (!samples) {
+      return;
+    }
+    this.recordedSamplesSinceLastReported += samples.length;
+
+    // Copy the samples into the Wasm buffer which holds the main recording
+    const ptr = this.wasmInstance.exports.sample_recorder_record(
+      this.sampleRecorderCtxPtr,
+      samples.length
+    );
+    const wasmMemory = this.getWasmMemory();
+    wasmMemory.set(samples, ptr / BYTES_PER_F32);
+
+    // If we've written enough samples to warrant a new chunk of them being sent to the main thread,
+    // do so and update our counters accordingly
+    if (this.recordedSamplesSinceLastReported > RECORDING_BLOCK_SIZE) {
+      this.sendRecordingBlock();
+    }
+  }
+
+  process(inputs, outputs, params) {
     if (this.isShutdown) {
       return false;
     }
+
+    if (this.isRecording) {
+      this.updateRecording(inputs);
+    }
+
     if (outputs.length === 0 || !this.samples || !this.wasmInstance || !this.granularInstCtxPtr) {
       return true;
     } else if (outputs[0].length === 0) {

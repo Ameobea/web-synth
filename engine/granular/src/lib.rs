@@ -10,6 +10,8 @@
 use dsp::{clamp, mix, read_interpolated, smooth, ButterworthFilter};
 use rand::prelude::*;
 
+pub mod sample_recorder;
+
 const FRAME_SIZE: usize = 128;
 const SAMPLE_RATE: usize = 44100;
 
