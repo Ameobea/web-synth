@@ -8,7 +8,6 @@ use wasm_bindgen::prelude::*;
 const BYTES_PER_PX: usize = 4; // RGBA
 
 pub struct WaveformRendererCtx {
-    pub waveform_length_samples: u32,
     pub sample_rate: u32,
     pub width_px: u32,
     pub height_px: u32,
@@ -26,7 +25,6 @@ pub fn create_waveform_renderer_ctx(
     common::maybe_init();
 
     let mut ctx = box WaveformRendererCtx {
-        waveform_length_samples,
         sample_rate,
         width_px,
         height_px,
@@ -134,4 +132,9 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32
     }
 
     ctx.image_data_buf.as_mut_ptr()
+}
+
+#[wasm_bindgen]
+pub fn get_sample_count(ctx: *const WaveformRendererCtx) -> usize {
+    unsafe { (*ctx).waveform_buf.len() }
 }

@@ -18,10 +18,12 @@
 .granulator-start-bar {
   stroke: greenyellow;
   stroke-width: 4px;
+  display: none;
 }
 .granulator-end-bar {
   stroke: rgb(168, 0, 28);
   stroke-width: 4px;
+  display: none;
 }
 
 .granulator-overlay {

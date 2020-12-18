@@ -1,10 +1,11 @@
-import { filterNils, PropTypesOf, UnreachableException } from 'ameo-utils';
+import { filterNils, PropTypesOf } from 'ameo-utils';
 import React, { useMemo, useRef, useState } from 'react';
 import { Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 
 import { ReduxStore, store, useSelector } from 'src/redux';
-import SampleEditor, { WaveformInstance } from 'src/granulator/GranulatorUI/SampleEditor';
+import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
+import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 
 const NoInput: React.FC = () => (
   <i>
@@ -28,13 +29,8 @@ type RecordingStatus =
 
 const mkHandleAWPMessage = (recordingState: RecordingState) =>
   function handleAWPMessage(this: MessagePort, evt: MessageEvent<any>) {
-    const inst = recordingState.waveformRendererInstance;
+    const inst = recordingState.waveformRenderer;
     if (!inst) {
-      return;
-    }
-
-    const ctxPtr = recordingState.waveformRendererCtxPtr?.current;
-    if (ctxPtr === null || ctxPtr === undefined) {
       return;
     }
 
@@ -42,19 +38,16 @@ const mkHandleAWPMessage = (recordingState: RecordingState) =>
       case 'recordingBlock': {
         if (evt.data.index === recordingState.lastWrittenChunkIx + 1) {
           // We received an in-order chunk; write it into the samples buffer directly
-          recordingState.totalWrittenSamples = inst.instance.append_samples_to_waveform(
-            ctxPtr,
-            evt.data.block
-          );
           recordingState.lastWrittenChunkIx += 1;
-
-          recordingState.boundsRef!.current.endMs =
-            (recordingState.totalWrittenSamples / 44100) * 1000;
-          recordingState.reRender!();
+          inst.appendSamples(evt.data.block);
+          inst.setBounds(inst.getBounds().startMs, inst.getSampleLengthMs());
           return;
         }
 
         // TODO: Handle out-of-order chunks
+        console.error(
+          `Out-of-order chunk received with index=${evt.data.index}, last chunk index={recordingState.lastWrittenChunkIx}`
+        );
 
         break;
       }
@@ -85,14 +78,6 @@ const getSampleRecorderSettings = (
                 return;
               }
               awpNode.current!.port.postMessage({ type: 'stopRecording' });
-              const bounds = recordingState.current.boundsRef;
-              if (!bounds) {
-                throw new UnreachableException('Bounds should have been set by now');
-              }
-              if (bounds.current.endMs === 0) {
-                bounds.current.startMs = 0;
-                bounds.current.endMs = (ctx.currentTime - recordingStatus.startTime) * 1000;
-              }
 
               setRecordingStatus({
                 type: 'stopped',
@@ -102,28 +87,16 @@ const getSampleRecorderSettings = (
               });
             }
           : () => {
-              if (
-                !awpNode.current ||
-                !recordingState.current.waveformRendererInstance ||
-                !recordingState.current.waveformRendererCtxPtr
-              ) {
+              if (!awpNode.current || !recordingState.current.waveformRenderer.isInitialized()) {
                 return;
               }
+
+              // Throw away previous recording context if there was one
+              recordingState.current.waveformRenderer.reinitializeCtx();
+
               awpNode.current!.port.postMessage({ type: 'startRecording' });
               awpNode.current!.port.onmessage = mkHandleAWPMessage(recordingState.current);
 
-              if (recordingState.current.waveformRendererCtxPtr.current !== null) {
-                recordingState.current.waveformRendererInstance.instance.free_waveform_renderer_ctx(
-                  recordingState.current.waveformRendererCtxPtr.current
-                );
-              }
-              recordingState.current.waveformRendererCtxPtr.current = recordingState.current.waveformRendererInstance.instance.create_waveform_renderer_ctx(
-                0,
-                44100,
-                1400,
-                240
-              );
-              recordingState.current.totalWrittenSamples = 0;
               recordingState.current.lastWrittenChunkIx = -1;
               recordingState.current.unwrittenChunks = {};
 
@@ -138,15 +111,15 @@ const getSampleRecorderSettings = (
           type: 'button',
           label: 'export recording',
           action: () => {
-            if (!awpNode.current || !recordingState.current.waveformRendererInstance) {
+            if (!awpNode.current || !recordingState.current.waveformRenderer) {
               return;
             }
             awpNode.current!.port.postMessage({
               type: 'exportRecording',
               format: 0,
               // TODO: Switch to only export selection
-              startSampleIx: (recordingState.current.boundsRef!.current.startMs / 1000) * 44100,
-              endSampleIx: (recordingState.current.boundsRef!.current.endMs / 1000) * 44100,
+              startSampleIx: 0,
+              endSampleIx: recordingState.current.waveformRenderer.getSampleCount(),
             });
           },
         }
@@ -154,29 +127,16 @@ const getSampleRecorderSettings = (
   ]);
 
 interface RecordingState {
-  waveformRendererInstance: {
-    type: 'loaded';
-    instance: typeof import('src/waveform_renderer');
-    memory: typeof import('src/waveform_renderer_bg').memory;
-  } | null;
+  waveformRenderer: WaveformRenderer;
   unwrittenChunks: { [key: number]: Float32Array };
-  waveformRendererCtxPtr: React.MutableRefObject<number | null> | null;
   lastWrittenChunkIx: number;
-  totalWrittenSamples: number;
-  boundsRef: React.MutableRefObject<{
-    startMs: number;
-    endMs: number;
-  }> | null;
   reRender: (() => void) | null;
 }
 
 const buildDefaultRecordingState = (): RecordingState => ({
-  waveformRendererInstance: null,
+  waveformRenderer: new WaveformRenderer(),
   unwrittenChunks: {},
-  waveformRendererCtxPtr: null,
   lastWrittenChunkIx: -1,
-  totalWrittenSamples: 0,
-  boundsRef: null,
   reRender: null,
 });
 
@@ -185,13 +145,6 @@ const SampleRecorderInner: React.FC<{
 }> = ({ awpNode }) => {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({ type: 'notStarted' });
   const recordingState = useRef<RecordingState>(buildDefaultRecordingState());
-  const [{ startMarkPosMs, endMarkPosMs }, setMarkPositions] = useState<{
-    startMarkPosMs: number | null;
-    endMarkPosMs: number | null;
-  }>({
-    startMarkPosMs: null,
-    endMarkPosMs: null,
-  });
   const settings = useMemo(
     () => getSampleRecorderSettings(recordingStatus, setRecordingStatus, awpNode, recordingState),
     [awpNode, recordingStatus]
@@ -201,34 +154,7 @@ const SampleRecorderInner: React.FC<{
     <>
       <ControlPanel title='Sample Recorder Controls' settings={settings} />
 
-      <SampleEditor
-        startMarkPosMs={startMarkPosMs}
-        endMarkPosMs={endMarkPosMs}
-        onMarkPositionsChanged={setMarkPositions}
-        sample={(
-          inst: WaveformInstance,
-          waveformRendererCtxPtr: React.MutableRefObject<number | null>,
-          bounds: React.MutableRefObject<{
-            startMs: number;
-            endMs: number;
-          }>,
-          reRender?: () => void
-        ): { length: number; sampleRate: number } => {
-          recordingState.current.boundsRef = bounds;
-          if (reRender) {
-            recordingState.current.reRender = reRender;
-          }
-          recordingState.current.waveformRendererCtxPtr = waveformRendererCtxPtr;
-
-          if (inst.type === 'loaded') {
-            recordingState.current.waveformRendererInstance = inst;
-          } else {
-            return { length: 0, sampleRate: 44100 };
-          }
-
-          return { length: recordingState.current.totalWrittenSamples, sampleRate: 44100 };
-        }}
-      />
+      <SampleEditor waveformRenderer={recordingState.current.waveformRenderer} />
     </>
   );
 };

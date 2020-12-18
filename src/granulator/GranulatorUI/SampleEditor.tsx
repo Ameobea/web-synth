@@ -1,18 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import * as R from 'ramda';
 
-import Loading from 'src/misc/Loading';
-import { AsyncOnce } from 'src/util';
-
-const BYTES_PER_F32 = 4;
-const BYTES_PER_PX = 4; // RGBA
-
-const WaveformRendererInstance = new AsyncOnce(() =>
-  import('src/waveform_renderer').then(async instance => ({
-    instance,
-    memory: (await import('src/waveform_renderer_bg.wasm' as any)).memory,
-  }))
-);
+import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 
 export type WaveformInstance =
   | {
@@ -33,29 +22,6 @@ const pxToMs = (widthPx: number, startMs: number, endMs: number, val: number) =>
   return (widthMs / widthPx) * val;
 };
 
-const PosIndicator: React.FC<{
-  width: number;
-  height: number;
-  startMs: number;
-  endMs: number;
-  posMs: number;
-  isStart: boolean;
-  onMouseDown: (evt: React.MouseEvent<SVGLineElement, MouseEvent>) => void;
-}> = ({ width, height, startMs, endMs, posMs, isStart, onMouseDown }) => {
-  const x = posToPx(width, startMs, endMs, posMs);
-
-  return (
-    <line
-      x1={x}
-      x2={x}
-      y1={0}
-      y2={height}
-      className={isStart ? 'granulator-start-bar' : 'granulator-end-bar'}
-      onMouseDown={onMouseDown}
-    />
-  );
-};
-
 const computeClickPosMs = (
   svg: SVGSVGElement,
   clientX: number,
@@ -73,71 +39,103 @@ const computeClickPosMs = (
 const SampleEditorOverlay: React.FC<{
   width: number;
   height: number;
-  sample: { length: number; sampleRate: number };
-  onBoundsChange: (newBounds: { startMs: number; endMs: number }) => void;
-  startMarkPosMs: number | null;
-  endMarkPosMs: number | null;
-  onMarkPositionsChanged: (newMarkPositions: {
-    startMarkPosMs: number | null;
-    endMarkPosMs: number | null;
-  }) => void;
-}> = ({
-  width,
-  height,
-  sample,
-  onBoundsChange,
-  startMarkPosMs,
-  endMarkPosMs,
-  onMarkPositionsChanged,
-}) => {
+  waveformRenderer: WaveformRenderer;
+}> = ({ width, height, waveformRenderer }) => {
   const middleMouseButtonDown = useRef<{
     clientX: number;
     clientY: number;
   } | null>(null);
-  const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
   const selectionDragging = useRef(false);
   const leftMarkDragging = useRef(false);
   const rightMarkDragging = useRef(false);
-  const lastDownMousePos = useRef<number>(0);
+  const lastDownMousePos = useRef(0);
+  const startMarkElem = useRef<SVGLineElement | null>(null);
+  const endMarkElem = useRef<SVGLineElement | null>(null);
+  const selectionElem = useRef<SVGRectElement | null>(null);
 
-  const [bounds, setBounds] = useState({ startMs: 0, endMs: sampleLengthMs });
+  const updateMarkElems = useCallback(
+    (bounds: { startMs: number; endMs: number }) => {
+      if (bounds.endMs === 0) {
+        return;
+      }
+
+      const selection = waveformRenderer.getSelection();
+      if (startMarkElem.current) {
+        const x = (R.isNil(selection.startMarkPosMs)
+          ? 0
+          : posToPx(
+              waveformRenderer.getWidthPx(),
+              bounds.startMs,
+              bounds.endMs,
+              selection.startMarkPosMs ?? 0
+            )
+        ).toString();
+        startMarkElem.current.setAttribute('x1', x);
+        startMarkElem.current.setAttribute('x2', x);
+        startMarkElem.current.style.display = R.isNil(selection.startMarkPosMs) ? 'none' : 'inline';
+      }
+      if (endMarkElem.current) {
+        const x = (R.isNil(selection.endMarkPosMs)
+          ? 0
+          : posToPx(
+              waveformRenderer.getWidthPx(),
+              bounds.startMs,
+              bounds.endMs,
+              selection.endMarkPosMs ?? 0
+            )
+        ).toString();
+        endMarkElem.current.setAttribute('x1', x);
+        endMarkElem.current.setAttribute('x2', x);
+        endMarkElem.current.style.display = R.isNil(selection.endMarkPosMs) ? 'none' : 'inline';
+      }
+      if (selectionElem.current) {
+        selectionElem.current.setAttribute(
+          'x',
+          (R.isNil(waveformRenderer.getSelection().startMarkPosMs)
+            ? 0
+            : posToPx(
+                width,
+                bounds.startMs,
+                bounds.endMs,
+                waveformRenderer.getSelection().startMarkPosMs!
+              ) + 1
+          ).toString()
+        );
+        selectionElem.current.setAttribute(
+          'width',
+          (R.isNil(waveformRenderer.getSelection().endMarkPosMs)
+            ? 0
+            : posToPx(
+                width,
+                bounds.startMs,
+                bounds.endMs,
+                waveformRenderer.getSelection().endMarkPosMs!
+              ) -
+              posToPx(
+                width,
+                bounds.startMs,
+                bounds.endMs,
+                waveformRenderer.getSelection().startMarkPosMs!
+              ) -
+              1
+          ).toString()
+        );
+        selectionElem.current.style.display = R.isNil(waveformRenderer.getSelection().endMarkPosMs)
+          ? 'none'
+          : 'inline';
+      }
+    },
+    [waveformRenderer, width]
+  );
+
   useEffect(() => {
-    setTimeout(() => onBoundsChange(bounds));
-  }, [bounds, sample, onBoundsChange]);
-  useEffect(() => {
-    const sampleLengthMs = (sample.length / sample.sampleRate) * 1000;
-    if (sampleLengthMs < bounds.startMs || sampleLengthMs < bounds.endMs) {
-      setBounds({ startMs: 0, endMs: Math.trunc(sampleLengthMs) });
-    }
-  }, [bounds.endMs, bounds.startMs, sample]);
-
-  // Install scroll handler
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  useEffect(() => {
-    if (!svgRef.current) {
-      return;
-    }
-
-    const handleCanvasScroll = (evt: WheelEvent) => {
-      const objectBounds = (evt.target as HTMLCanvasElement).getBoundingClientRect();
-      const xPercent = (evt.clientX - objectBounds.left) / width;
-
-      // Zoom in 20%, taking pixels away from the left and right side according to where the user zoomed
-      const widthMs = bounds.endMs - bounds.startMs;
-      const leftMsToAdd = xPercent * 0.2 * widthMs * (evt.deltaY > 0 ? -1 : 1);
-      const rightMsToAdd = (1 - xPercent) * 0.2 * widthMs * (evt.deltaY > 0 ? 1 : -1);
-      const newStartMs = R.clamp(0, sampleLengthMs - 10, bounds.startMs + leftMsToAdd);
-      const newEndMs = R.clamp(newStartMs + 10, sampleLengthMs, bounds.endMs + rightMsToAdd);
-      setBounds({ startMs: newStartMs, endMs: newEndMs });
-
-      evt.preventDefault();
-      evt.stopPropagation();
+    const cb = (newBounds: { startMs: number; endMs: number }) => {
+      updateMarkElems(newBounds);
     };
+    waveformRenderer.addEventListener('boundsChange', cb);
 
-    const svg = svgRef.current;
-    svg.addEventListener('wheel', handleCanvasScroll, { passive: false });
-    return () => svg.removeEventListener('wheel', handleCanvasScroll);
-  });
+    return () => waveformRenderer.removeEventListener('boundsChange', cb);
+  }, [updateMarkElems, waveformRenderer]);
 
   // Install mouse move handler if mouse button is down
   useEffect(() => {
@@ -151,6 +149,8 @@ const SampleEditorOverlay: React.FC<{
         return;
       }
 
+      const bounds = waveformRenderer.getBounds();
+      const sampleLengthMs = waveformRenderer.getSampleLengthMs();
       const msPerPx = (bounds.endMs - bounds.startMs) / width;
       const diffMs = diffX * msPerPx;
 
@@ -164,12 +164,12 @@ const SampleEditorOverlay: React.FC<{
       }
 
       middleMouseButtonDown.current = { clientX: evt.clientX, clientY: evt.clientY };
-      setBounds({ startMs: newStartMs, endMs: newEndMs });
+      waveformRenderer.setBounds(newStartMs, newEndMs);
     };
     document.addEventListener('mousemove', handler);
 
     return () => document.removeEventListener('mousemove', handler);
-  }, [bounds.endMs, bounds.startMs, height, middleMouseButtonDown, sampleLengthMs, width]);
+  }, [height, middleMouseButtonDown, width, waveformRenderer]);
 
   const handleMouseDown = (evt: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
     if (evt.button !== 1) {
@@ -186,20 +186,17 @@ const SampleEditorOverlay: React.FC<{
     middleMouseButtonDown.current = null;
   };
 
-  const posBarBaseProps = {
-    width,
-    height,
-    ...bounds,
-  };
-
   useEffect(() => {
     const moveHandler = (evt: MouseEvent) => {
       const diff = evt.clientX - lastDownMousePos.current;
       if (diff === 0) {
         return;
       }
+      const bounds = waveformRenderer.getBounds();
+      const { startMarkPosMs, endMarkPosMs } = waveformRenderer.getSelection();
       const diffMs = pxToMs(width, bounds.startMs, bounds.endMs, diff);
       const selectionWidthMs = endMarkPosMs! - startMarkPosMs!;
+      const sampleLengthMs = waveformRenderer.getSampleLengthMs();
 
       if (selectionDragging.current) {
         let newStartMarkPosMs: number, newEndMarkPosMs: number;
@@ -210,34 +207,35 @@ const SampleEditorOverlay: React.FC<{
           newStartMarkPosMs = R.clamp(0, sampleLengthMs - 10, startMarkPosMs! + diffMs);
           newEndMarkPosMs = R.clamp(10, sampleLengthMs, newStartMarkPosMs + selectionWidthMs);
         }
-        onMarkPositionsChanged({
+        waveformRenderer.setSelection({
           startMarkPosMs: newStartMarkPosMs,
           endMarkPosMs: newEndMarkPosMs,
         });
+        updateMarkElems(waveformRenderer.getBounds());
       } else if (leftMarkDragging.current) {
         const newStartMarkPosMs = R.clamp(
           0,
           endMarkPosMs === null ? sampleLengthMs - 10 : endMarkPosMs - 10,
           startMarkPosMs! + diffMs
         );
-        onMarkPositionsChanged({ startMarkPosMs: newStartMarkPosMs, endMarkPosMs });
+        waveformRenderer.setSelection({ startMarkPosMs: newStartMarkPosMs, endMarkPosMs });
+        updateMarkElems(waveformRenderer.getBounds());
       } else if (rightMarkDragging.current) {
         const newEndMarkPosMs = R.clamp(
-          startMarkPosMs! + 10,
-          sampleLengthMs - 10,
+          startMarkPosMs! + 1,
+          sampleLengthMs - 1,
           endMarkPosMs! + diffMs
         );
-        onMarkPositionsChanged({ startMarkPosMs, endMarkPosMs: newEndMarkPosMs });
+        waveformRenderer.setSelection({ startMarkPosMs, endMarkPosMs: newEndMarkPosMs });
+        updateMarkElems(waveformRenderer.getBounds());
       }
 
       lastDownMousePos.current = evt.clientX;
     };
 
     document.addEventListener('mousemove', moveHandler);
-    return () => {
-      document.removeEventListener('mousemove', moveHandler);
-    };
-  });
+    return () => document.removeEventListener('mousemove', moveHandler);
+  }, [updateMarkElems, waveformRenderer, width]);
 
   useEffect(() => {
     const mouseDownHandler = (evt: MouseEvent) => {
@@ -258,16 +256,70 @@ const SampleEditorOverlay: React.FC<{
     };
   }, []);
 
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  useEffect(() => {
+    const node = svgRef.current;
+    if (!node) {
+      return;
+    }
+
+    const handler = (evt: WheelEvent) => {
+      const objectBounds = (evt.target as HTMLCanvasElement).getBoundingClientRect();
+      const xPercent = (evt.clientX - objectBounds.left) / width;
+
+      // Zoom in 20%, taking pixels away from the left and right side according to where the user zoomed
+      const bounds = waveformRenderer.getBounds();
+      const widthMs = bounds.endMs - bounds.startMs;
+      const sampleLengthMs = waveformRenderer.getSampleLengthMs();
+      const leftMsToAdd = xPercent * 0.2 * widthMs * (evt.deltaY > 0 ? -1 : 1);
+      const rightMsToAdd = (1 - xPercent) * 0.2 * widthMs * (evt.deltaY > 0 ? 1 : -1);
+      const newStartMs = R.clamp(0, Math.max(sampleLengthMs - 10, 0), bounds.startMs + leftMsToAdd);
+      const newEndMs = R.clamp(newStartMs + 10, sampleLengthMs, bounds.endMs + rightMsToAdd);
+      waveformRenderer.setBounds(newStartMs, newEndMs);
+
+      evt.preventDefault();
+      evt.stopPropagation();
+    };
+
+    node.addEventListener('wheel', handler);
+    return () => node.removeEventListener('wheel', handler);
+  }, [waveformRenderer, width]);
+
+  // We override these against React's wishes, but the value right now is likely to be correct
+  // so setting it can only help.
+  const bounds = waveformRenderer.getBounds();
+  const startMarkPosPx =
+    bounds.endMs === 0
+      ? 0
+      : posToPx(
+          waveformRenderer.getWidthPx(),
+          bounds.startMs,
+          bounds.endMs,
+          waveformRenderer.getSelection().startMarkPosMs ?? 0
+        ).toString();
+  const endMarkPosPx =
+    bounds.endMs === 0
+      ? 0
+      : posToPx(
+          waveformRenderer.getWidthPx(),
+          bounds.startMs,
+          bounds.endMs,
+          waveformRenderer.getSelection().endMarkPosMs ?? 0
+        ).toString();
+
   return (
     <svg
       className='granulator-overlay'
       onClick={evt => {
+        const bounds = waveformRenderer.getBounds();
+        const sampleLengthMs = bounds.endMs - bounds.startMs;
         if (evt.button !== 0 || sampleLengthMs === 0) {
           return;
         }
+        const { startMarkPosMs, endMarkPosMs } = waveformRenderer.getSelection();
 
         if (startMarkPosMs === null) {
-          onMarkPositionsChanged({
+          waveformRenderer.setSelection({
             endMarkPosMs,
             startMarkPosMs: computeClickPosMs(
               evt.currentTarget,
@@ -277,6 +329,7 @@ const SampleEditorOverlay: React.FC<{
               bounds.endMs
             ),
           });
+          updateMarkElems(waveformRenderer.getBounds());
         } else if (endMarkPosMs === null) {
           const newEndMarkPosMs = computeClickPosMs(
             evt.currentTarget,
@@ -289,10 +342,11 @@ const SampleEditorOverlay: React.FC<{
             return;
           }
 
-          onMarkPositionsChanged({
+          waveformRenderer.setSelection({
             startMarkPosMs,
             endMarkPosMs: newEndMarkPosMs,
           });
+          updateMarkElems(waveformRenderer.getBounds());
         }
       }}
       width={width}
@@ -301,230 +355,98 @@ const SampleEditorOverlay: React.FC<{
       onMouseUp={handleMouseUp}
       ref={svgRef}
     >
-      {startMarkPosMs !== null && endMarkPosMs !== null ? (
-        <rect
-          x={posToPx(width, bounds.startMs, bounds.endMs, startMarkPosMs) + 1}
-          y={0}
-          width={
-            posToPx(width, bounds.startMs, bounds.endMs, endMarkPosMs) -
-            posToPx(width, bounds.startMs, bounds.endMs, startMarkPosMs) -
-            1
-          }
-          height={height}
-          className='granulator-selection-indicator'
-          onMouseDown={() => {
-            selectionDragging.current = true;
-          }}
-        />
-      ) : null}
-      {startMarkPosMs === null ? null : (
-        <PosIndicator
-          {...posBarBaseProps}
-          posMs={startMarkPosMs}
-          isStart
-          onMouseDown={evt => {
-            leftMarkDragging.current = true;
-            evt.stopPropagation();
-          }}
-        />
-      )}
-      {endMarkPosMs === null ? null : (
-        <PosIndicator
-          {...posBarBaseProps}
-          posMs={endMarkPosMs}
-          isStart={false}
-          onMouseDown={evt => {
-            rightMarkDragging.current = true;
-            evt.stopPropagation();
-          }}
-        />
-      )}
+      <rect
+        x={
+          R.isNil(waveformRenderer.getSelection().startMarkPosMs) || bounds.endMs === 0
+            ? 0
+            : posToPx(
+                width,
+                bounds.startMs,
+                bounds.endMs,
+                waveformRenderer.getSelection().startMarkPosMs!
+              ) + 1
+        }
+        width={
+          R.isNil(waveformRenderer.getSelection().endMarkPosMs) || bounds.endMs === 0
+            ? 0
+            : posToPx(
+                width,
+                bounds.startMs,
+                bounds.endMs,
+                waveformRenderer.getSelection().endMarkPosMs!
+              ) -
+              posToPx(
+                width,
+                bounds.startMs,
+                bounds.endMs,
+                waveformRenderer.getSelection().startMarkPosMs!
+              ) -
+              1
+        }
+        y={0}
+        height={height}
+        className='granulator-selection-indicator'
+        onMouseDown={() => {
+          selectionDragging.current = true;
+        }}
+        style={{
+          display: R.isNil(waveformRenderer.getSelection().endMarkPosMs) ? 'none' : 'inline',
+        }}
+        ref={selectionElem}
+      />
+      <line
+        x1={startMarkPosPx}
+        x2={startMarkPosPx}
+        y1={0}
+        y2={height}
+        style={{
+          display: R.isNil(waveformRenderer.getSelection().startMarkPosMs) ? 'none' : 'inline',
+        }}
+        className={'granulator-start-bar'}
+        onMouseDown={evt => {
+          leftMarkDragging.current = true;
+          evt.stopPropagation();
+        }}
+        ref={startMarkElem}
+      />
+      <line
+        x1={endMarkPosPx}
+        x2={endMarkPosPx}
+        y1={0}
+        y2={height}
+        style={{
+          display: R.isNil(waveformRenderer.getSelection().endMarkPosMs) ? 'none' : 'inline',
+        }}
+        className={'granulator-end-bar'}
+        onMouseDown={evt => {
+          rightMarkDragging.current = true;
+          evt.stopPropagation();
+        }}
+        ref={endMarkElem}
+      />
     </svg>
   );
 };
 
-const renderWaveform = (
-  instance: typeof import('src/waveform_renderer'),
-  memory: typeof import('src/waveform_renderer_bg').memory,
-  ctxPtr: number,
-  startMs: number,
-  endMs: number,
-  widthPx: number,
-  heightPx: number,
-  canvasCtx: CanvasRenderingContext2D
-) => {
-  if (endMs === 0) {
-    return;
-  }
-
-  const imageDataPtr = instance.render_waveform(ctxPtr, startMs, endMs);
-  const imageDataBuf = new Uint8ClampedArray(
-    memory.buffer.slice(imageDataPtr, imageDataPtr + widthPx * heightPx * BYTES_PER_PX)
-  );
-  const imageData = new ImageData(imageDataBuf, widthPx, heightPx);
-  canvasCtx.putImageData(imageData, 0, 0);
-};
-
-type ManualSampleGetter = (
-  inst: WaveformInstance,
-  waveformRendererCtxPtr: React.MutableRefObject<number | null>,
-  bounds: React.MutableRefObject<{
-    startMs: number;
-    endMs: number;
-  }>,
-  reRender?: () => void
-) => { length: number; sampleRate: number };
-
 const SampleEditor: React.FC<{
-  sample: AudioBuffer | ManualSampleGetter;
-  startMarkPosMs: number | null;
-  endMarkPosMs: number | null;
-  onMarkPositionsChanged: (newMarkPositions: {
-    startMarkPosMs: number | null;
-    endMarkPosMs: number | null;
-  }) => void;
-}> = ({ sample: innerSample, onMarkPositionsChanged, startMarkPosMs, endMarkPosMs }) => {
-  const { width, height } = { width: 1400, height: 240 }; // TODO: Store as state somewhere serializable
-
-  const waveformRendererCanvasCtx = useRef<CanvasRenderingContext2D | null>(null);
-  const waveformRendererCtxPtr = useRef<number | null>(null);
-  const [waveformRendererInstance, setWaveformRendererInstance] = useState<WaveformInstance>({
-    type: 'notInitialized',
-  });
-  const bounds = useRef({ startMs: 0, endMs: 0 });
-  const onBoundsChange = (newBounds: { startMs: number; endMs: number }) => {
-    bounds.current = newBounds;
-    if (waveformRendererInstance.type === 'loaded' && waveformRendererCtxPtr.current !== null) {
-      renderWaveform(
-        waveformRendererInstance.instance,
-        waveformRendererInstance.memory,
-        waveformRendererCtxPtr.current,
-        bounds.current.startMs,
-        bounds.current.endMs,
-        width,
-        height,
-        waveformRendererCanvasCtx.current!
-      );
-    }
-  };
-  const sample =
-    innerSample instanceof AudioBuffer
-      ? innerSample
-      : innerSample(waveformRendererInstance, waveformRendererCtxPtr, bounds, () =>
-          onBoundsChange(bounds.current)
-        );
-
-  if (bounds.current.endMs === 0) {
-    const sampleLengthMs = Math.trunc((sample.length / sample.sampleRate) * 1000);
-    bounds.current.endMs = sampleLengthMs;
-  }
-
-  // Async-initialize a Wasm instance for the waveform renderer if it hasn't been done yet
-  useEffect(() => {
-    if (waveformRendererInstance.type !== 'notInitialized') {
-      return;
-    }
-
-    setWaveformRendererInstance({ type: 'loading' });
-    WaveformRendererInstance.get()
-      .then(({ instance, memory }) => {
-        const inst = { type: 'loaded' as const, instance, memory };
-        setWaveformRendererInstance(inst);
-        if (!(innerSample instanceof AudioBuffer)) {
-          innerSample(inst, waveformRendererCtxPtr, bounds, () => onBoundsChange(bounds.current));
-        }
-      })
-      .catch(err => {
-        setWaveformRendererInstance({
-          type: 'error',
-          error: `Error initializing waveform renderer Wasm instance: ${err}`,
-        });
-      });
-  }, [innerSample, waveformRendererInstance]);
-  console.log(sample);
-
-  // Create a new waveform renderer instance if we don't have one or if the sample changes
-  useEffect(() => {
-    if (waveformRendererInstance.type !== 'loaded') {
-      return;
-    } else if (!(innerSample instanceof AudioBuffer)) {
-      // If sample is a function, the caller has full manual control over the waveform rendering context
-      return;
-    }
-
-    if (waveformRendererCtxPtr.current) {
-      waveformRendererInstance.instance.free_waveform_renderer_ctx(waveformRendererCtxPtr.current);
-    }
-
-    // Create a new waveform renderer context which allocates buffers for the waveform data and output image data
-    waveformRendererCtxPtr.current = waveformRendererInstance.instance.create_waveform_renderer_ctx(
-      sample.length,
-      sample.sampleRate,
-      width,
-      height
-    );
-    const waveformBufPtr = waveformRendererInstance.instance.get_waveform_buf_ptr(
-      waveformRendererCtxPtr.current!
-    );
-
-    // Copy the sample into the buffer that the context allocated inside the Wasm memory
-    const samples = innerSample.getChannelData(0);
-    const sampleBufView = new Float32Array(waveformRendererInstance.memory.buffer);
-    sampleBufView.set(samples, waveformBufPtr / BYTES_PER_F32);
-
-    if (!waveformRendererCanvasCtx.current) {
-      console.error("Created waveform renderer ctx, but canvas isn't yet initialized");
-      return;
-    }
-  }, [sample, waveformRendererInstance, width, height, innerSample]);
-
-  // Re-render and set new image data if render params change, waveform renderer ctx changes, or
-  useEffect(() => {
-    if (!waveformRendererCtxPtr.current || waveformRendererInstance.type !== 'loaded') {
-      // Can't render if we haven't initialized a context yet.  When the context is initialized, we render
-      // directly so this is OK.
-      return;
-    }
-
-    renderWaveform(
-      waveformRendererInstance.instance,
-      waveformRendererInstance.memory,
-      waveformRendererCtxPtr.current,
-      bounds.current.startMs,
-      bounds.current.endMs,
-      width,
-      height,
-      waveformRendererCanvasCtx.current!
-    );
-  }, [waveformRendererInstance, width, height]);
-
-  if (waveformRendererInstance.type === 'error') {
-    return <span style={{ color: 'red' }}>{waveformRendererInstance.error}</span>;
-  } else if (waveformRendererInstance.type !== 'loaded') {
-    return <Loading />;
-  }
-
-  return (
-    <div style={{ width, height }} className='granulator-wrapper'>
-      <canvas
-        className='waveform-renderer'
-        ref={canvas => {
-          waveformRendererCanvasCtx.current = canvas?.getContext('2d') || null;
-        }}
-        width={width}
-        height={height}
-      />
-      <SampleEditorOverlay
-        sample={sample}
-        width={width}
-        height={height}
-        onBoundsChange={onBoundsChange}
-        startMarkPosMs={startMarkPosMs}
-        endMarkPosMs={endMarkPosMs}
-        onMarkPositionsChanged={newMarkPositions => onMarkPositionsChanged(newMarkPositions)}
-      />
-    </div>
-  );
-};
+  waveformRenderer: WaveformRenderer;
+}> = ({ waveformRenderer }) => (
+  <div
+    style={{ width: waveformRenderer.getWidthPx(), height: waveformRenderer.getHeightPx() }}
+    className='granulator-wrapper'
+  >
+    <canvas
+      className='waveform-renderer'
+      ref={canvas => waveformRenderer.setCanvasCtx(canvas?.getContext('2d'))}
+      width={waveformRenderer.getWidthPx()}
+      height={waveformRenderer.getHeightPx()}
+    />
+    <SampleEditorOverlay
+      width={waveformRenderer.getWidthPx()}
+      height={waveformRenderer.getHeightPx()}
+      waveformRenderer={waveformRenderer}
+    />
+  </div>
+);
 
 export default SampleEditor;

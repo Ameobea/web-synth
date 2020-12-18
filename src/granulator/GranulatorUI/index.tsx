@@ -1,7 +1,6 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import { Option } from 'funfix-core';
 
 import { GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
@@ -10,6 +9,7 @@ import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { delay, retryWithDelay } from 'src/util';
 import './Granulator.scss';
 import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';
+import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 
 export interface GranulatorControlPanelState {
   grain_size: number;
@@ -236,6 +236,13 @@ const GranulatorUI: React.FC<{
     })();
   }, [activeSample, vcId]);
 
+  const waveformRenderer = useRef(new WaveformRenderer(activeSample?.sampleData));
+  useEffect(() => {
+    if (activeSample) {
+      waveformRenderer.current.setSample(activeSample?.sampleData);
+    }
+  }, [activeSample]);
+
   // Load the previously selected sample, if one was provided
   useEffect(() => {
     if (!selectedSample) {
@@ -256,33 +263,41 @@ const GranulatorUI: React.FC<{
     ActiveSamplesByVcId.set(vcId, [activeSample.descriptor]);
   }, [activeSample?.descriptor, vcId]);
 
-  const [{ startMarkPosMs, endMarkPosMs }, setMarkPositions] = useState<{
-    startMarkPosMs: number | null;
-    endMarkPosMs: number | null;
-  }>({
-    startMarkPosMs: Option.of(
-      GranulatorInstancesById.get(vcId)?.startSample.manualControl.offset.value
-    )
-      .flatMap(initialStartMarkPosSamples => {
-        if (initialStartMarkPosSamples < 0) {
-          return Option.none();
-        }
-        return Option.some(
-          (initialStartMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000
-        );
-      })
-      .orNull(),
-    endMarkPosMs: Option.of(GranulatorInstancesById.get(vcId)?.endSample.manualControl.offset.value)
-      .flatMap(initialEndMarkPosSamples => {
-        if (initialEndMarkPosSamples < 0) {
-          return Option.none();
-        }
-        return Option.some(
-          (initialEndMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000
-        );
-      })
-      .orNull(),
-  });
+  useEffect(() => {
+    const granulatorInst = GranulatorInstancesById.get(vcId);
+    if (!granulatorInst) {
+      return;
+    }
+
+    const startMarkPosSamples = granulatorInst.startSample.manualControl.offset.value;
+    const endMarkPosSamples = granulatorInst.endSample.manualControl.offset.value;
+    waveformRenderer.current.setSelection({
+      startMarkPosMs:
+        startMarkPosSamples < 0
+          ? null
+          : (startMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000,
+      endMarkPosMs:
+        endMarkPosSamples < 0
+          ? null
+          : (endMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000,
+    });
+  }, [activeSample?.sampleData.sampleRate, vcId]);
+
+  useEffect(() => {
+    const waveformRendererInst = waveformRenderer.current;
+    const cb = (newSelection: { startMarkPosMs: number | null; endMarkPosMs: number | null }) => {
+      const inst = GranulatorInstancesById.get(vcId);
+      if (!inst) {
+        return;
+      }
+      inst.startSample.manualControl.offset.value =
+        msToSamples(newSelection.startMarkPosMs, waveformRenderer.current.getSampleRate()) ?? -1;
+      inst.endSample.manualControl.offset.value =
+        msToSamples(newSelection.endMarkPosMs, waveformRenderer.current.getSampleRate()) ?? -1;
+    };
+    waveformRendererInst.addEventListener('selectionChange', cb);
+    return () => waveformRendererInst.removeEventListener('selectionChange', cb);
+  }, [vcId]);
 
   return (
     <div className='granulator'>
@@ -308,34 +323,7 @@ const GranulatorUI: React.FC<{
 
       <GranularControlPanel initialState={initialState} vcId={vcId} />
 
-      {activeSample ? (
-        <SampleEditor
-          sample={activeSample.sampleData}
-          startMarkPosMs={startMarkPosMs}
-          endMarkPosMs={endMarkPosMs}
-          onMarkPositionsChanged={({ startMarkPosMs, endMarkPosMs }) => {
-            setMarkPositions({ startMarkPosMs, endMarkPosMs });
-
-            const inst = GranulatorInstancesById.get(vcId);
-            if (!inst) {
-              return;
-            }
-
-            if (startMarkPosMs !== null) {
-              inst.startSample.manualControl.offset.value = msToSamples(
-                startMarkPosMs,
-                activeSample.sampleData.sampleRate
-              )!;
-            }
-            if (endMarkPosMs !== null) {
-              inst.endSample.manualControl.offset.value = msToSamples(
-                endMarkPosMs,
-                activeSample.sampleData.sampleRate
-              )!;
-            }
-          }}
-        />
-      ) : null}
+      {activeSample ? <SampleEditor waveformRenderer={waveformRenderer.current} /> : null}
 
       <hr />
       <SampleRecorder vcId={vcId} awpNode={awpNode} />
