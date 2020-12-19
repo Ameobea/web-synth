@@ -1,0 +1,11 @@
+.operators {
+  display: flex;
+  flex-direction: column;
+
+  div {
+    display: flex;
+    flex-direction: row;
+    flex-basis: 30px;
+    height: 30px;
+  }
+}

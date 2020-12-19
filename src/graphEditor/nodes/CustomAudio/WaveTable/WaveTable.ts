@@ -6,7 +6,7 @@ import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/pat
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { UnreachableException } from 'ameo-utils';
-import { base64ToArrayBuffer } from 'src/util';
+import { AsyncOnce, base64ToArrayBuffer } from 'src/util';
 
 // Manually generate some waveforms... for science
 
@@ -57,42 +57,24 @@ export const getDefaultWavetableDef = () => [
   [bufs[2], bufs[3]],
 ];
 
-let wavetableWasmBytes: ArrayBuffer | null = null;
-
-let getBytesPromise: Promise<ArrayBuffer> | null = null;
-const getWavetableWasmBytes = async () => {
-  if (wavetableWasmBytes) {
-    return wavetableWasmBytes;
-  } else if (getBytesPromise) {
-    return getBytesPromise;
-  }
-
-  getBytesPromise = fetch('/wavetable.wasm').then(res => res.arrayBuffer());
-
-  const bytes = await getBytesPromise;
-  wavetableWasmBytes = bytes;
-
-  // Lazily initialize the wavetable instance as well
-  if (wavetableWasmInstance === undefined) {
-    wavetableWasmInstance = null;
-    setTimeout(getWavetableWasmInstance);
-  }
-
-  return bytes;
-};
+export const WavetableWasmBytes = new AsyncOnce(() =>
+  fetch('/wavetable.wasm').then(res => res.arrayBuffer())
+);
 
 let wavetableWasmInstance: WebAssembly.Instance | undefined | null;
-export const getWavetableWasmInstance = async () => {
-  if (wavetableWasmInstance) {
-    return wavetableWasmInstance;
-  }
+export const WavetableWasmInstance = new AsyncOnce(() =>
+  WavetableWasmBytes.get().then(async wasmBytes => {
+    const mod = await WebAssembly.compile(wasmBytes);
+    const inst = await WebAssembly.instantiate(mod);
+    wavetableWasmInstance = inst;
+    return inst;
+  })
+);
 
-  const bytes = await getWavetableWasmBytes();
-  const mod = await WebAssembly.compile(bytes);
-  const inst = await WebAssembly.instantiate(mod);
-  wavetableWasmInstance = inst;
-  return wavetableWasmInstance;
-};
+const getWavetableWasmBytes = () => WavetableWasmBytes.get();
+
+export const getWavetableWasmInstance = () => WavetableWasmInstance.get();
+
 export const getWavetableWasmInstancePreloaded = () => {
   if (!wavetableWasmInstance) {
     throw new UnreachableException('Tried to access wavetable Wasm instance before it was loaded');

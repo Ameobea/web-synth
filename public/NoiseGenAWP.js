@@ -36,7 +36,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
           break;
         }
         default: {
-          console.warn('Unhandled message type in sidechain AWP: ', evt.data.type);
+          console.warn('Unhandled message type in noisegen AWP: ', evt.data.type);
         }
       }
     };

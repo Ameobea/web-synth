@@ -75,6 +75,6 @@ build-granular:
   cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/granular.wasm ../../public
 
-build-waveform_renderer:
-  cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/release/waveform_renderer.wasm ../../public
+build-wavetable:
+  cd ./engine/wavetable && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/wavetable.wasm ../../public

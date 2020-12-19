@@ -16,3 +16,4 @@ members = [
 [profile.release]
 # debug-assertions = true
 panic = "abort"
+debug = true
