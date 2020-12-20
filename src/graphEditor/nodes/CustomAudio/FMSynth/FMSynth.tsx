@@ -43,7 +43,7 @@ export default class WaveTable implements ForeignNode {
           }
 
           this.awpHandle.port.postMessage({
-            type: 'setModulationValue',
+            type: 'setModulationIndex',
             srcOperatorIx,
             dstOperatorIx,
             valueType: 1,
@@ -81,23 +81,23 @@ export default class WaveTable implements ForeignNode {
     // TODO: Initialize with serialized values
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     setTimeout(() => {
+      this.awpHandle!.port.postMessage({
+        type: 'setOutputWeightValue',
+        operatorIx: 0,
+        valueType: 1,
+        valParamInt: 0,
+        valParamFloat: 1,
+      });
+      this.awpHandle!.port.postMessage({
+        type: 'setModulationIndex',
+        srcOperatorIx: 1,
+        dstOperatorIx: 0,
+        valueType: 0,
+        valParamInt: 0,
+        valParamFloat: 0,
+      });
       // this.awpHandle!.port.postMessage({
-      //   type: 'setOutputWeightValue',
-      //   operatorIx: 0,
-      //   valueType: 1,
-      //   valParamInt: 0,
-      //   valParamFloat: 0.5,
-      // });
-      // this.awpHandle!.port.postMessage({
-      //   type: 'setModulationValue',
-      //   srcOperatorIx: 2,
-      //   dstOperatorIx: 0,
-      //   valueType: 1,
-      //   valParamInt: 0,
-      //   valParamFloat: 1380,
-      // });
-      // this.awpHandle!.port.postMessage({
-      //   type: 'setModulationValue',
+      //   type: 'setModulationIndex',
       //   srcOperatorIx: 1,
       //   dstOperatorIx: 0,
       //   valueType: 1,
@@ -105,13 +105,27 @@ export default class WaveTable implements ForeignNode {
       //   valParamFloat: 400,
       // });
       // this.awpHandle!.port.postMessage({
-      //   type: 'setModulationValue',
+      //   type: 'setModulationIndex',
       //   srcOperatorIx: 1,
       //   dstOperatorIx: 1,
       //   valueType: 1,
       //   valParamInt: 0,
       //   valParamFloat: 400,
       // });
+      this.awpHandle!.port.postMessage({
+        type: 'setOperatorBaseFrequencySource',
+        operatorIx: 1,
+        valueType: 3,
+        valParamInt: 0,
+        valParamFloat: 4,
+      });
+      this.awpHandle!.port.postMessage({
+        type: 'setOperatorBaseFrequencySource',
+        operatorIx: 2,
+        valueType: 3,
+        valParamInt: 0,
+        valParamFloat: 4,
+      });
     }, 800);
 
     updateConnectables(this.vcId, this.buildConnectables());
@@ -130,9 +144,20 @@ export default class WaveTable implements ForeignNode {
   }
 
   public buildConnectables() {
+    console.log(this.awpHandle?.parameters);
     return {
       // TODO: include all generated inputs
-      inputs: ImmMap<string, ConnectableInput>(),
+      inputs: ImmMap<string, ConnectableInput>()
+        .set('frequency', {
+          type: 'number',
+          node: this.awpHandle
+            ? (this.awpHandle.parameters as any).get('base_frequency')
+            : new DummyNode(),
+        })
+        .set('param_0', {
+          type: 'number',
+          node: this.awpHandle ? (this.awpHandle.parameters as any).get('0') : new DummyNode(),
+        }),
       outputs: ImmMap<string, ConnectableOutput>().set('output', {
         type: 'customAudio',
         node: this.awpHandle ? this.awpHandle : new DummyNode(),

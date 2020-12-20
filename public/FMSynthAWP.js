@@ -3,16 +3,22 @@ const BYTES_PER_F32 = 32 / 8;
 const OPERATOR_COUNT = 8;
 const OUTPUT_BYTES_PER_OPERATOR = FRAME_SIZE * BYTES_PER_F32;
 const VOICE_COUNT = 8;
+const PARAM_COUNT = 8;
 
 class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
-      ...new Array(VOICE_COUNT).fill(null).map((_x, i) => ({
-        name: 'voice_' + i + '_frequency',
-        defaultValue: 440, // TODO TODO CHANGE TO 0
+      {
+        name: 'base_frequency',
+        defaultValue: 0,
+        automationRate: 'a-rate',
+      },
+      ...new Array(PARAM_COUNT).fill(null).map((_x, i) => ({
+        name: i.toString(),
+        defaultValue: 0,
         automationRate: 'a-rate',
       })),
-    ]; // TODO
+    ];
   }
 
   constructor() {
@@ -28,12 +34,12 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
           this.initWasm(evt.data.wasmBytes);
           break;
         }
-        case 'setModulationValue': {
+        case 'setModulationIndex': {
           if (!this.wasmInstance) {
-            console.error('Tried setting modulation value before Wasm instance loaded');
+            console.error('Tried setting modulation index before Wasm instance loaded');
             return;
           }
-          this.wasmInstance.exports.fm_synth_set_modulation_value(
+          this.wasmInstance.exports.fm_synth_set_modulation_index(
             this.ctxPtr,
             evt.data.srcOperatorIx,
             evt.data.dstOperatorIx,
@@ -49,6 +55,20 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
             return;
           }
           this.wasmInstance.exports.fm_synth_set_output_weight_value(
+            this.ctxPtr,
+            evt.data.operatorIx,
+            evt.data.valueType,
+            evt.data.valParamInt,
+            evt.data.valParamFloat
+          );
+          break;
+        }
+        case 'setOperatorBaseFrequencySource': {
+          if (!this.wasmInstance) {
+            console.error('Tried setting output weight value before Wasm instance loaded');
+            return;
+          }
+          this.wasmInstance.exports.fm_synth_set_operator_base_frequency_source(
             this.ctxPtr,
             evt.data.operatorIx,
             evt.data.valueType,
@@ -85,25 +105,38 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
     }
 
     let wasmMemory = this.getWasmMemoryBuffer();
-    const inputFrequencyBuffersPtr = this.wasmInstance.exports.get_input_frequency_buffers_ptr(
+    const baseFrequencyInputBufPtr = this.wasmInstance.exports.get_base_frequency_input_buffer_ptr(
       this.ctxPtr
     );
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
-      const param = params[`voice_${voiceIx}_frequency`];
-      const bufPtrForVoice = inputFrequencyBuffersPtr + OUTPUT_BYTES_PER_OPERATOR * voiceIx;
+      const param = params.base_frequency;
+
+      if (param.length === 1) {
+        wasmMemory.fill(
+          param[0],
+          baseFrequencyInputBufPtr / 4,
+          (baseFrequencyInputBufPtr + FRAME_SIZE * BYTES_PER_F32) / 4
+        );
+      } else {
+        wasmMemory.set(param, baseFrequencyInputBufPtr / 4);
+      }
+    }
+    const paramBuffersPtr = this.wasmInstance.exports.get_param_buffers_ptr(this.ctxPtr);
+    // TODO: Store active param count somewhere to avoid unnecessary memcopies
+    for (let paramIx = 0; paramIx < PARAM_COUNT; paramIx++) {
+      const param = params[paramIx.toString()];
+      const bufPtrForVoice = paramBuffersPtr + OUTPUT_BYTES_PER_OPERATOR * paramIx;
 
       if (param.length === 1) {
         wasmMemory.fill(
           param[0],
           bufPtrForVoice / 4,
-          (bufPtrForVoice + OUTPUT_BYTES_PER_OPERATOR) / 4
+          (bufPtrForVoice + FRAME_SIZE * BYTES_PER_F32) / 4
         );
       } else {
         wasmMemory.set(param, bufPtrForVoice / 4);
       }
     }
-    const paramBuffersPtr = this.wasmInstance.exports.get_param_buffers_ptr(this.ctxPtr);
-    // TODO: Copy param buffers
 
     const outputsPtr = this.wasmInstance.exports.fm_synth_generate(this.ctxPtr);
     wasmMemory = this.getWasmMemoryBuffer();
