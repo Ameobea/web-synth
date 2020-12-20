@@ -52,6 +52,7 @@ export interface LiteGraph {
   arrange: () => void;
   start: () => void;
   onNodeRemoved?: (node: any) => void | undefined;
-  serialize(): string;
+  serialize(): { [key: string]: any };
   setDirtyCanvas: (foreground: boolean, background: boolean) => void;
+  list_of_graphcanvas: any[];
 }

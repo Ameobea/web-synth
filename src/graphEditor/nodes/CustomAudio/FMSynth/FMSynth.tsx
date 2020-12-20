@@ -36,8 +36,34 @@ export default class WaveTable implements ForeignNode {
     this.renderSmallView = mkContainerRenderHelper({
       Comp: FMSynthUI,
       getProps: () => ({
-        updateBackend: (operatorIx: number, modulationIx: number, val: number) => {
-          // TODO
+        updateBackendModulation: (srcOperatorIx: number, dstOperatorIx: number, val: number) => {
+          if (!this.awpHandle) {
+            console.error('Tried to update modulation before AWP initialization');
+            return;
+          }
+
+          this.awpHandle.port.postMessage({
+            type: 'setModulationValue',
+            srcOperatorIx,
+            dstOperatorIx,
+            valueType: 1,
+            valParamInt: 0,
+            valParamFloat: val,
+          });
+        },
+        updateBackendOutput: (operatorIx: number, val: number) => {
+          if (!this.awpHandle) {
+            console.error('Tried to update output weights before AWP initialization');
+            return;
+          }
+
+          this.awpHandle.port.postMessage({
+            type: 'setOutputWeightValue',
+            operatorIx,
+            valueType: 1,
+            valParamInt: 0,
+            valParamFloat: val,
+          });
         },
       }),
     });
@@ -55,37 +81,37 @@ export default class WaveTable implements ForeignNode {
     // TODO: Initialize with serialized values
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     setTimeout(() => {
-      this.awpHandle!.port.postMessage({
-        type: 'setOutputWeightValue',
-        operatorIx: 0,
-        valueType: 1,
-        valParamInt: 0,
-        valParamFloat: 0.5,
-      });
-      this.awpHandle!.port.postMessage({
-        type: 'setModulationValue',
-        srcOperatorIx: 2,
-        dstOperatorIx: 0,
-        valueType: 1,
-        valParamInt: 0,
-        valParamFloat: 380,
-      });
-      this.awpHandle!.port.postMessage({
-        type: 'setModulationValue',
-        srcOperatorIx: 1,
-        dstOperatorIx: 0,
-        valueType: 1,
-        valParamInt: 0,
-        valParamFloat: 400,
-      });
-      this.awpHandle!.port.postMessage({
-        type: 'setModulationValue',
-        srcOperatorIx: 1,
-        dstOperatorIx: 1,
-        valueType: 1,
-        valParamInt: 0,
-        valParamFloat: 180,
-      });
+      // this.awpHandle!.port.postMessage({
+      //   type: 'setOutputWeightValue',
+      //   operatorIx: 0,
+      //   valueType: 1,
+      //   valParamInt: 0,
+      //   valParamFloat: 0.5,
+      // });
+      // this.awpHandle!.port.postMessage({
+      //   type: 'setModulationValue',
+      //   srcOperatorIx: 2,
+      //   dstOperatorIx: 0,
+      //   valueType: 1,
+      //   valParamInt: 0,
+      //   valParamFloat: 1380,
+      // });
+      // this.awpHandle!.port.postMessage({
+      //   type: 'setModulationValue',
+      //   srcOperatorIx: 1,
+      //   dstOperatorIx: 0,
+      //   valueType: 1,
+      //   valParamInt: 0,
+      //   valParamFloat: 400,
+      // });
+      // this.awpHandle!.port.postMessage({
+      //   type: 'setModulationValue',
+      //   srcOperatorIx: 1,
+      //   dstOperatorIx: 1,
+      //   valueType: 1,
+      //   valParamInt: 0,
+      //   valParamFloat: 400,
+      // });
     }, 800);
 
     updateConnectables(this.vcId, this.buildConnectables());

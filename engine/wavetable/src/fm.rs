@@ -17,8 +17,17 @@ impl SineOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
         // 1 phase corresponds to 1 period of the waveform.  1 phase is passed every (SAMPLE_RATE /
         // frequency) samples.
-        self.phase = (self.phase + (1. / (SAMPLE_RATE as f32 / frequency))) % 1.;
-        (self.phase * std::f32::consts::PI * 2.).sin()
+        self.phase = (self.phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
+
+        // unsafe {
+        //     *crate::lookup_tables::SINE_LOOKUP_TABLE.get_unchecked(
+        //         (self.phase * (crate::lookup_tables::SINE_LOOKUP_TABLE.len() - 1) as f32) as
+        // usize,     )
+        // }
+        dsp::read_interpolated(
+            &crate::lookup_tables::SINE_LOOKUP_TABLE,
+            self.phase * (crate::lookup_tables::SINE_LOOKUP_TABLE.len() - 1) as f32,
+        )
     }
 }
 
@@ -74,13 +83,12 @@ fn compute_modulated_frequency(
     let mut output_freq = frequency;
     for i in 0..OPERATOR_COUNT {
         let op_output = last_samples[i];
-        let op_multiplier = modulation_matrix.weights_per_operator[i][operator_ix].get(
-            param_buffers,
-            adsrs,
-            sample_ix,
-        );
+        let op_multiplier = modulation_matrix
+            .get_operator_modulation_weight(i, operator_ix)
+            .get(param_buffers, adsrs, sample_ix);
         output_freq += op_output * op_multiplier;
     }
+    // output_freq
     dsp::clamp(0., 20_000., output_freq)
 }
 
@@ -99,7 +107,11 @@ impl FMSynthVoice {
         let mut output_sample = 0.0f32;
 
         for operator_ix in 0..OPERATOR_COUNT {
-            let base_frequency = input_frequency_buffers[operator_ix][sample_ix];
+            let base_frequency = unsafe {
+                *input_frequency_buffers
+                    .get_unchecked(operator_ix)
+                    .get_unchecked(sample_ix)
+            };
             let modulated_frequency = compute_modulated_frequency(
                 modulation_matrix,
                 &self.last_samples,
@@ -109,7 +121,7 @@ impl FMSynthVoice {
                 sample_ix,
                 base_frequency,
             );
-            let operator_source = &mut self.operators[operator_ix];
+            let operator_source = unsafe { self.operators.get_unchecked_mut(operator_ix) };
             let sample = operator_source.gen_sample(
                 modulated_frequency,
                 wavetables,
@@ -118,7 +130,7 @@ impl FMSynthVoice {
             );
             samples_per_operator[operator_ix] = sample;
             output_sample += sample
-                * modulation_matrix.output_weights[operator_ix].get(
+                * modulation_matrix.get_output_weight(operator_ix).get(
                     param_buffers,
                     &self.adsrs,
                     sample_ix,
@@ -127,6 +139,7 @@ impl FMSynthVoice {
 
         self.last_samples = samples_per_operator;
         dsp::clamp(-1., 1., output_sample)
+        // output_sample
     }
 }
 
@@ -185,6 +198,24 @@ pub struct ModulationMatrix {
     pub output_weights: [ValueSource; OPERATOR_COUNT],
 }
 
+impl ModulationMatrix {
+    pub fn get_operator_modulation_weight(
+        &self,
+        src_operator_ix: usize,
+        dst_operator_ix: usize,
+    ) -> &ValueSource {
+        unsafe {
+            self.weights_per_operator
+                .get_unchecked(src_operator_ix)
+                .get_unchecked(dst_operator_ix)
+        }
+    }
+
+    pub fn get_output_weight(&self, operator_ix: usize) -> &ValueSource {
+        unsafe { self.output_weights.get_unchecked(operator_ix) }
+    }
+}
+
 pub struct FMSynthContext {
     pub voices: Vec<FMSynthVoice>,
     pub modulation_matrix: ModulationMatrix,
@@ -204,7 +235,12 @@ impl FMSynthContext {
                     sample_ix,
                     &self.input_frequency_buffers,
                 );
-                self.output_buffers[voice_ix][sample_ix] = sample;
+                unsafe {
+                    *self
+                        .output_buffers
+                        .get_unchecked_mut(voice_ix)
+                        .get_unchecked_mut(sample_ix) = sample
+                };
             }
         }
     }

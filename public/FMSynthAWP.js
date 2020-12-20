@@ -9,7 +9,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
     return [
       ...new Array(VOICE_COUNT).fill(null).map((_x, i) => ({
         name: 'voice_' + i + '_frequency',
-        defaultValue: 220, // TODO TODO CHANGE TO 0
+        defaultValue: 440, // TODO TODO CHANGE TO 0
         automationRate: 'a-rate',
       })),
     ]; // TODO

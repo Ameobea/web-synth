@@ -1,11 +1,24 @@
 .operators {
   display: flex;
   flex-direction: column;
+  width: 500px;
+  border: 1px solid #555;
 
-  div {
+  > div {
     display: flex;
     flex-direction: row;
-    flex-basis: 30px;
-    height: 30px;
+
+    > div {
+      flex-basis: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 3px;
+      border: 1px solid #555;
+    }
+
+    .output-weight {
+      background-color: #33bbdd33;
+    }
   }
 }

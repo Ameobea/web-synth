@@ -9,6 +9,7 @@ import 'litegraph.js/css/litegraph.css';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 import { useSelector } from 'react-redux';
+import { filterNils } from 'ameo-utils';
 
 import { registerAllCustomNodes } from './nodes';
 import './GraphEditor.scss';
@@ -20,7 +21,6 @@ import { getEngine } from 'src';
 import FlatButton from 'src/misc/FlatButton';
 import { LGraphHandlesByVcId } from 'src/graphEditor';
 import { LiteGraph as LiteGraphInstance } from 'src/graphEditor/LiteGraphTypes';
-import { filterNils } from 'ameo-utils';
 
 /**
  * Mapping of `stateKey`s to the graph instances that that they manage
@@ -37,6 +37,10 @@ export const saveStateForInstance = (stateKey: string) => {
   }
 
   const state = instance.serialize();
+  const selectedNodes: { [key: string]: any } =
+    instance.list_of_graphcanvas?.[0]?.selected_nodes ?? {};
+  state.selectedNodeVcId = Object.values(selectedNodes)[0]?.connectables?.vcId;
+
   localStorage.setItem(stateKey, JSON.stringify(state));
 
   GraphEditorInstances.delete(stateKey);
@@ -315,14 +319,26 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     }
     const state =
       localStorage[stateKey] && localStorage[stateKey].length > 0
-        ? tryParseJson<{ nodes: { id: string | number; pos: [number, number] }[] }, null>(
-            localStorage[stateKey],
-            null,
-            'Error parsing serialized LiteGraph state'
-          )
+        ? tryParseJson<
+            {
+              nodes: { id: string | number; pos: [number, number] }[];
+              selectedNodeVcId: string | null | undefined;
+            },
+            null
+          >(localStorage[stateKey], null, 'Error parsing serialized LiteGraph state')
         : null;
     if (!state) {
       return;
+    }
+
+    if (state.selectedNodeVcId) {
+      const node = lGraphInstance._nodes.find(
+        node => node.connectables?.vcId === state.selectedNodeVcId
+      );
+      setCurSelectedNode(node);
+      setSelectedNodeVCID(state.selectedNodeVcId);
+      lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
+      lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected(node);
     }
 
     state.nodes.forEach(({ id, pos }) => {

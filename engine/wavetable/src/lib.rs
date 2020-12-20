@@ -3,6 +3,7 @@
 use std::mem::{self, transmute};
 
 pub mod fm;
+pub mod lookup_tables;
 
 pub struct WaveTableSettings {
     /// Number of `f32` samples in a single waveform

@@ -21,6 +21,7 @@ declare module 'litegraph.js' {
     }
 
     export class LGraph implements LiteGraphInstance {
+      list_of_graphcanvas: any[];
       links: { [id: string]: LiteGraphLink };
       _nodes: LiteGraphNode[];
       _nodes_by_id: { [id: string]: LiteGraphNode };
@@ -29,7 +30,7 @@ declare module 'litegraph.js' {
       arrange: () => void;
       start: () => void;
       onNodeRemoved?: ((node: any) => void | undefined) | undefined;
-      serialize(): string;
+      serialize(): { [key: string]: any };
       setDirtyCanvas: (foreground: boolean, background: boolean) => void;
     }
   }
