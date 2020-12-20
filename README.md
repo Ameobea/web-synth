@@ -2,6 +2,8 @@
 
 Live version updated automatically via continuous deployment: https://notes.ameo.design/
 
+[Watch demo video on YouTube](https://www.youtube.com/watch?v=DDWYhueiqOc)
+
 This is a web-based DAW (Digital Audio Workstation) written in Rust/WebAssembly and TypeScript. Its goal is to provide tools for creating unique sounds and audio compositions within the context of the web browser. It makes use of the latest modern WebAudio API with `AudioWorkletProcessor` for executing custom DSP code written in WebAssembly.
 
 This project is still in very active development. At the time of writing this, a lot of functionality has been completed and it's possible to actually do interesting things with it! There are many bugs and rough edges, and much of the UI has very little polish or documentation. That being said, it's absolutely a functional tool and getting more usable + useful all the time!
@@ -14,7 +16,7 @@ Google Chrome is highly recommended. Although other browsers (Firefox + Safari) 
 
 I currently have no documentation or tutorials or anything for helping people learn and make use of this tool. Once I get things into a more cohesive state, I will spend the time to build that.
 
-For some demos of what this tool can do, check out these videos:
+For some other quick demos of what this tool can do, check out these videos:
 
 - https://twitter.com/Ameobea10/status/1330014698125754368?s=20
 - https://twitter.com/Ameobea10/status/1325234292151119873?s=20

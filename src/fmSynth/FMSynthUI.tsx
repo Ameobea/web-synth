@@ -81,7 +81,7 @@ const FMSynthUI: React.FC<{
             srcOperatorIx,
             dstOperatorIx,
             updateBackendModulation,
-            (prevVal: number) => prevVal + (evt.deltaY > 0 ? -1 : 1) * 10
+            (prevVal: number) => prevVal + (evt.deltaY > 0 ? -1 : 1) * 0.1
           )
         );
       }
@@ -105,7 +105,7 @@ const FMSynthUI: React.FC<{
               className='operator-square'
               key={dstOperatorIx}
             >
-              {val.toFixed(0)}
+              {Math.abs(val) < 0.01 ? null : val.toFixed(2)}
             </div>
           ))}
           <div
@@ -113,7 +113,9 @@ const FMSynthUI: React.FC<{
             key='output'
             className='operator-square output-weight'
           >
-            {state.outputWeights[srcOperatorIx].toFixed(2)}
+            {Math.abs(state.outputWeights[srcOperatorIx]) < 0.01
+              ? null
+              : state.outputWeights[srcOperatorIx].toFixed(2)}
           </div>
         </div>
       ))}

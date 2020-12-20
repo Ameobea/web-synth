@@ -10,16 +10,9 @@ pub struct SineOscillator {
 
 impl SineOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
-        if !frequency.is_normal() {
-            panic!("bad freq");
-        }
-        if frequency.abs() > 100_000. {
-            panic!();
-        }
-
         // 1 phase corresponds to 1 period of the waveform.  1 phase is passed every (SAMPLE_RATE /
         // frequency) samples.
-        if frequency.abs() > 0.001 {
+        if frequency.is_normal() && frequency.abs() > 0.001 {
             self.phase = (self.phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
             if self.phase < 0. {
                 self.phase = 1. + self.phase;
