@@ -26,7 +26,7 @@ impl SineOscillator {
         // }
         dsp::read_interpolated(
             &crate::lookup_tables::SINE_LOOKUP_TABLE,
-            self.phase * (crate::lookup_tables::SINE_LOOKUP_TABLE.len() - 1) as f32,
+            self.phase * (crate::lookup_tables::SINE_LOOKUP_TABLE.len() - 2) as f32,
         )
     }
 }

@@ -1,22 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as R from 'ramda';
 
+import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 
-const OPERATOR_COUNT = 8;
-
 interface FMSynthState {
-  operatorWeights: number[][];
+  modulationIndices: number[][];
   outputWeights: number[];
 }
-
-const buildDefaultState = (): FMSynthState => ({
-  operatorWeights: new Array(OPERATOR_COUNT)
-    .fill(null as any)
-    // One output to each of the oscillators including self for feedback and
-    .map(() => new Array(OPERATOR_COUNT).fill(0)),
-  outputWeights: new Array(OPERATOR_COUNT).fill(0),
-});
 
 type BackendModulationUpdater = (operatorIx: number, modulationIx: number, val: number) => void;
 type BackendOutputUpdater = (operatorIx: number, val: number) => void;
@@ -28,13 +19,13 @@ const setModulation = (
   updateBackendModulation: BackendModulationUpdater,
   getNewVal: (prevVal: number) => number
 ): FMSynthState => {
-  const newOperatorWeights = [...state.operatorWeights];
-  newOperatorWeights[operatorIx] = [...newOperatorWeights[operatorIx]];
-  newOperatorWeights[operatorIx][modulationIx] = getNewVal(
-    newOperatorWeights[operatorIx][modulationIx]
+  const newmodulationIndices = [...state.modulationIndices];
+  newmodulationIndices[operatorIx] = [...newmodulationIndices[operatorIx]];
+  newmodulationIndices[operatorIx][modulationIx] = getNewVal(
+    newmodulationIndices[operatorIx][modulationIx]
   );
-  updateBackendModulation(operatorIx, modulationIx, newOperatorWeights[operatorIx][modulationIx]);
-  return { ...state, operatorWeights: newOperatorWeights };
+  updateBackendModulation(operatorIx, modulationIx, newmodulationIndices[operatorIx][modulationIx]);
+  return { ...state, modulationIndices: newmodulationIndices };
 };
 
 const setOutput = (
@@ -52,8 +43,20 @@ const setOutput = (
 const FMSynthUI: React.FC<{
   updateBackendModulation: BackendModulationUpdater;
   updateBackendOutput: BackendOutputUpdater;
-}> = ({ updateBackendModulation, updateBackendOutput }) => {
-  const [state, setState] = useState(buildDefaultState());
+  modulationIndices: number[][];
+  outputWeights: number[];
+  operatorConfigs: OperatorConfig[];
+  onOperatorConfigChange: (operatorIx: number, newConfig: OperatorConfig) => void;
+}> = ({
+  updateBackendModulation,
+  updateBackendOutput,
+  modulationIndices,
+  outputWeights,
+  operatorConfigs,
+  onOperatorConfigChange,
+}) => {
+  const [state, setState] = useState({ modulationIndices, outputWeights });
+  const [selectedOperatorIx, setSelectedOperatorIx] = useState(0);
 
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
@@ -95,30 +98,43 @@ const FMSynthUI: React.FC<{
   }, [state, updateBackendModulation, updateBackendOutput]);
 
   return (
-    <div className='operators'>
-      {state.operatorWeights.map((row, srcOperatorIx) => (
-        <div key={srcOperatorIx}>
-          {row.map((val, dstOperatorIx) => (
+    <div className='fm-synth-ui'>
+      <div className='operators'>
+        {state.modulationIndices.map((row, srcOperatorIx) => (
+          <div className='operator-row' key={srcOperatorIx}>
             <div
-              data-src-operator-ix={srcOperatorIx}
-              data-dst-operator-ix={dstOperatorIx}
-              className='operator-square'
-              key={dstOperatorIx}
+              className={
+                'operator-select' +
+                (selectedOperatorIx === srcOperatorIx ? ' operator-selected' : '')
+              }
+              onClick={() => setSelectedOperatorIx(srcOperatorIx)}
+            />
+            {row.map((val, dstOperatorIx) => (
+              <div
+                data-src-operator-ix={srcOperatorIx}
+                data-dst-operator-ix={dstOperatorIx}
+                className='operator-square'
+                key={dstOperatorIx}
+              >
+                {Math.abs(val) < 0.01 ? null : val.toFixed(2)}
+              </div>
+            ))}
+            <div
+              data-operator-ix={srcOperatorIx}
+              key='output'
+              className='operator-square output-weight'
             >
-              {Math.abs(val) < 0.01 ? null : val.toFixed(2)}
+              {Math.abs(state.outputWeights[srcOperatorIx]) < 0.01
+                ? null
+                : state.outputWeights[srcOperatorIx].toFixed(2)}
             </div>
-          ))}
-          <div
-            data-operator-ix={srcOperatorIx}
-            key='output'
-            className='operator-square output-weight'
-          >
-            {Math.abs(state.outputWeights[srcOperatorIx]) < 0.01
-              ? null
-              : state.outputWeights[srcOperatorIx].toFixed(2)}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      <ConfigureOperator
+        state={operatorConfigs[selectedOperatorIx]}
+        onChange={newConf => onOperatorConfigChange(selectedOperatorIx, newConf)}
+      />
     </div>
   );
 };

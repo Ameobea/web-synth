@@ -1,6 +1,7 @@
 import { Map as ImmMap } from 'immutable';
-import FMSynthUI from 'src/fmSynth/FMSynthUI';
 
+import FMSynthUI from 'src/fmSynth/FMSynthUI';
+import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -12,11 +13,26 @@ type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
   | { type: 'outputWeight'; operatorIx: number };
 
+const OPERATOR_COUNT = 8;
+
+const buildDefaultModulationIndices = (): number[][] => {
+  const indices = new Array(OPERATOR_COUNT).fill(null);
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    indices[i] = new Array(OPERATOR_COUNT).fill(0);
+  }
+  return indices;
+};
+
 export default class WaveTable implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string;
   private generatedInputs: FMSynthInputDescriptor[] = [];
   private awpHandle: AudioWorkletNode | null = null;
+  private modulationIndices: number[][] = buildDefaultModulationIndices();
+  private outputWeights: number[] = new Array(OPERATOR_COUNT).fill(0);
+  private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT).fill(
+    buildDefaultOperatorConfig('base frequency multiplier' as const)
+  );
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -30,17 +46,25 @@ export default class WaveTable implements ForeignNode {
     this.vcId = vcId;
 
     // TODO: Deserialize
+    if (params) {
+      this.deserialize(params);
+    }
 
     this.init();
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: FMSynthUI,
       getProps: () => ({
+        outputWeights: this.outputWeights,
+        modulationIndices: this.modulationIndices,
+        operatorConfigs: this.operatorConfigs,
         updateBackendModulation: (srcOperatorIx: number, dstOperatorIx: number, val: number) => {
           if (!this.awpHandle) {
             console.error('Tried to update modulation before AWP initialization');
             return;
           }
+
+          this.modulationIndices[srcOperatorIx][dstOperatorIx] = val;
 
           this.awpHandle.port.postMessage({
             type: 'setModulationIndex',
@@ -51,11 +75,15 @@ export default class WaveTable implements ForeignNode {
             valParamFloat: val,
           });
         },
+        onOperatorConfigChange: (operatorIx: number, newOperatorConfig: OperatorConfig) =>
+          this.handleOperatorConfigChange(operatorIx, newOperatorConfig),
         updateBackendOutput: (operatorIx: number, val: number) => {
           if (!this.awpHandle) {
             console.error('Tried to update output weights before AWP initialization');
             return;
           }
+
+          this.outputWeights[operatorIx] = val;
 
           this.awpHandle.port.postMessage({
             type: 'setOutputWeightValue',
@@ -78,73 +106,75 @@ export default class WaveTable implements ForeignNode {
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor');
 
-    // TODO: Initialize with serialized values
-    this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
-    setTimeout(() => {
-      this.awpHandle!.port.postMessage({
-        type: 'setOutputWeightValue',
-        operatorIx: 0,
-        valueType: 1,
-        valParamInt: 0,
-        valParamFloat: 1,
-      });
-      this.awpHandle!.port.postMessage({
-        type: 'setModulationIndex',
-        srcOperatorIx: 1,
-        dstOperatorIx: 0,
-        valueType: 0,
-        valParamInt: 0,
-        valParamFloat: 0,
-      });
-      // this.awpHandle!.port.postMessage({
-      //   type: 'setModulationIndex',
-      //   srcOperatorIx: 1,
-      //   dstOperatorIx: 0,
-      //   valueType: 1,
-      //   valParamInt: 0,
-      //   valParamFloat: 400,
-      // });
-      // this.awpHandle!.port.postMessage({
-      //   type: 'setModulationIndex',
-      //   srcOperatorIx: 1,
-      //   dstOperatorIx: 1,
-      //   valueType: 1,
-      //   valParamInt: 0,
-      //   valParamFloat: 400,
-      // });
-      this.awpHandle!.port.postMessage({
-        type: 'setOperatorBaseFrequencySource',
-        operatorIx: 1,
-        valueType: 3,
-        valParamInt: 0,
-        valParamFloat: 4,
-      });
-      this.awpHandle!.port.postMessage({
-        type: 'setOperatorBaseFrequencySource',
-        operatorIx: 2,
-        valueType: 3,
-        valParamInt: 0,
-        valParamFloat: 4,
-      });
-    }, 800);
+    this.awpHandle.port.postMessage({
+      type: 'setWasmBytes',
+      wasmBytes,
+      modulationIndices: this.modulationIndices,
+      outputWeights: this.outputWeights,
+    });
+
+    this.awpHandle.port.onmessage = evt => {
+      switch (evt.data.type) {
+        case 'wasmInitialized': {
+          this.operatorConfigs.forEach((config, opIx) =>
+            this.handleOperatorConfigChange(opIx, config)
+          );
+          break;
+        }
+        default: {
+          console.error('Unhandled event type from FM synth AWP: ', evt.data.type);
+        }
+      }
+    };
 
     updateConnectables(this.vcId, this.buildConnectables());
   }
 
-  private buildParamOverrides(workletHandle: AudioWorkletNode): ForeignNode['paramOverrides'] {
-    return {}; // TODO
+  private handleOperatorConfigChange(operatorIx: number, newOperatorConfig: OperatorConfig) {
+    this.operatorConfigs[operatorIx] = newOperatorConfig;
+    if (!this.awpHandle) {
+      console.warn('Tried to update operator config before awp initialized');
+      return;
+    }
+
+    switch (newOperatorConfig.type) {
+      case 'base frequency multiplier': {
+        this.awpHandle.port.postMessage({
+          type: 'setOperatorBaseFrequencySource',
+          operatorIx,
+          valueType: 3,
+          valParamInt: 0,
+          valParamFloat: newOperatorConfig.multiplier,
+        });
+        break;
+      }
+      default: {
+        console.error('Unhandled operator type: ', newOperatorConfig.type);
+      }
+    }
   }
 
   private deserialize(params: { [key: string]: any }) {
-    // TODO
+    if (params.modulationIndices) {
+      this.modulationIndices = params.modulationIndices;
+    }
+    if (params.outputWeights) {
+      this.outputWeights = params.outputWeights;
+    }
+    if (params.operatorConfigs) {
+      this.operatorConfigs = params.operatorConfigs;
+    }
   }
 
   public serialize() {
-    return {}; // TODO
+    return {
+      modulationIndices: this.modulationIndices,
+      outputWeights: this.outputWeights,
+      operatorConfigs: this.operatorConfigs,
+    };
   }
 
   public buildConnectables() {
-    console.log(this.awpHandle?.parameters);
     return {
       // TODO: include all generated inputs
       inputs: ImmMap<string, ConnectableInput>()

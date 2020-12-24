@@ -1,24 +1,41 @@
-.operators {
+.fm-synth-ui {
   display: flex;
   flex-direction: column;
-  width: 500px;
-  border: 1px solid #555;
 
-  > div {
+  .operators {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+    width: 500px;
+    border: 1px solid #555;
 
-    > div {
-      flex-basis: 40px;
-      height: 40px;
+    .operator-row {
       display: flex;
-      align-items: center;
-      padding: 3px;
-      border: 1px solid #555;
-    }
+      flex-direction: row;
 
-    .output-weight {
-      background-color: #33bbdd33;
+      > div {
+        flex-basis: 40px;
+        height: 40px;
+        display: flex;
+      }
+
+      .operator-select {
+        cursor: pointer;
+        background-color: #626d8d;
+      }
+
+      .operator-select.operator-selected {
+        background-color: #e23d4d;
+      }
+
+      .operator-square {
+        align-items: center;
+        padding: 3px;
+        border: 1px solid #555;
+      }
+
+      .output-weight {
+        background-color: #33bbdd33;
+      }
     }
   }
 }

@@ -31,7 +31,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
     this.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
-          this.initWasm(evt.data.wasmBytes);
+          this.initWasm(evt.data.wasmBytes, evt.data.modulationIndices, evt.data.outputWeights);
           break;
         }
         case 'setModulationIndex': {
@@ -84,12 +84,36 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
     };
   }
 
-  async initWasm(wasmBytes) {
+  async initWasm(wasmBytes, modulationIndices, outputWeights) {
     const importObject = { env: {} };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
     this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx(VOICE_COUNT);
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+
+    modulationIndices.forEach((indices, srcOperatorIx) =>
+      indices.forEach((modulationIndex, dstOperatorIx) =>
+        this.wasmInstance.exports.fm_synth_set_modulation_index(
+          this.ctxPtr,
+          srcOperatorIx,
+          dstOperatorIx,
+          1,
+          0,
+          modulationIndex
+        )
+      )
+    );
+    outputWeights.forEach((weight, operatorIx) =>
+      this.wasmInstance.exports.fm_synth_set_output_weight_value(
+        this.ctxPtr,
+        operatorIx,
+        1,
+        0,
+        weight
+      )
+    );
+
+    this.port.postMessage({ type: 'wasmInitialized' });
   }
 
   getWasmMemoryBuffer() {
