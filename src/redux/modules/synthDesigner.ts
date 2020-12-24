@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import { PromiseResolveType, UnimplementedError } from 'ameo-utils';
+import { PromiseResolveType, UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
@@ -12,11 +12,13 @@ import WaveTable, {
   getDefaultWavetableDef,
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
+import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
   synthModule.voices.forEach(voice => {
@@ -33,6 +35,7 @@ export enum Waveform {
   Sawtooth = 'sawtooth',
   Triangle = 'triangle',
   Wavetable = 'wavetable',
+  FM = 'fm',
 }
 
 export enum EffectType {
@@ -92,6 +95,12 @@ interface PolysynthContext {
   ctxPtr: number;
 }
 
+interface FMSynthConfig {
+  modulationIndices: number[][];
+  outputWeights: number[];
+  operatorConfigs: OperatorConfig[];
+}
+
 export interface SynthModule {
   waveform: Waveform;
   detune: number;
@@ -103,6 +112,7 @@ export interface SynthModule {
     intraDimMixes: OverridableAudioParam[];
     interDimMixes: OverridableAudioParam[];
   } | null;
+  fmSynth: FMSynth | null;
   filterParams: FilterParams;
   filterCSNs: FilterCSNs;
   masterGain: number;
@@ -205,6 +215,7 @@ export const serializeSynthModule = (synth: SynthModule) => ({
       }
     )
     .orNull(),
+  fmSynthConfig: synth.fmSynth?.serialize(),
   waveform: synth.waveform,
   detune: synth.detune,
   filter: synth.filterParams,
@@ -262,6 +273,24 @@ const disconnectWavetableInputControls = (
   inputControls.intraDimMixes.forEach(param => param.dispose());
   inputControls.interDimMixes.forEach(param => param.dispose());
 };
+
+const connectOscillators = (connect: boolean, synth: SynthModule) =>
+  synth.voices.forEach(voice =>
+    voice.oscillators.forEach(osc => {
+      try {
+        if (connect) {
+          osc.connect(synth.filterBypassed ? voice.outerGainNode : voice.filterNode);
+        } else {
+          osc.disconnect(synth.filterBypassed ? voice.outerGainNode : voice.filterNode);
+        }
+      } catch (err) {
+        console.error(
+          `Error ${connect ? 'connecting' : 'disconnecting'} oscillator and filter: `,
+          err
+        );
+      }
+    })
+  );
 
 export interface SynthDesignerState {
   synths: SynthModule[];
@@ -373,6 +402,7 @@ const buildDefaultSynthModule = (): SynthModule => {
       return {
         oscillators: [osc],
         wavetable: null,
+        fmSynth: null,
         effects: [],
         outerGainNode,
         filterNode,
@@ -382,6 +412,7 @@ const buildDefaultSynthModule = (): SynthModule => {
       };
     }),
     wavetableConf: buildDefaultWavetableConfig(),
+    fmSynth: null,
     filterParams,
     filterCSNs,
     wavetableInputControls: null,
@@ -442,6 +473,7 @@ export const deserializeSynthModule = (
     pitchMultiplier,
     filterBypassed = true,
     unisonSpreadCents = 0,
+    fmSynthConfig,
   }: {
     waveform: Waveform;
     wavetableConfig: Omit<WavetableConfig, 'onInitialized'> | null;
@@ -457,8 +489,10 @@ export const deserializeSynthModule = (
     pitchMultiplier?: number;
     filterBypassed?: boolean;
     unisonSpreadCents?: number;
+    fmSynthConfig?: FMSynthConfig | null;
   },
-  dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void,
+  dispatch: ((action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void) &
+    ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void),
   synthIx: number
 ): SynthModule => {
   const base = buildDefaultSynthModule();
@@ -490,7 +524,8 @@ export const deserializeSynthModule = (
       ...voice,
       oscillators: R.range(0, unison).map(() => {
         const osc = new OscillatorNode(ctx);
-        osc.type = waveform === Waveform.Wavetable ? Waveform.Sine : waveform;
+        osc.type =
+          waveform === Waveform.Wavetable || waveform === Waveform.FM ? Waveform.Sine : waveform;
         osc.detune.setValueAtTime(0, ctx.currentTime);
         base.detuneCSN.connect(osc.detune);
         osc.start();
@@ -522,6 +557,13 @@ export const deserializeSynthModule = (
     filterBypassed,
     voices,
     wavetableConf,
+    fmSynth:
+      waveform === Waveform.FM
+        ? new FMSynth(ctx, undefined, {
+            ...(fmSynthConfig || {}),
+            onInitialized: () => dispatch({ type: 'CONNECT_FM_SYNTH', synthIx }),
+          })
+        : null,
     masterGain,
     selectedEffectType,
     gainEnvelope,
@@ -610,7 +652,12 @@ const actionGroups = {
     actionCreator: (
       index: number,
       waveform: Waveform,
-      dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void,
+      dispatch: ((action: {
+        type: 'CONNECT_WAVETABLE';
+        synthIx: number;
+        voiceIx: number;
+      }) => void) &
+        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void),
       vcId: string
     ) => ({
       type: 'SET_WAVEFORM',
@@ -633,6 +680,7 @@ const actionGroups = {
       }
 
       let needsConnectablesUpdate = false;
+      // WAVETABLE
       if (waveform === Waveform.Wavetable) {
         if (!targetSynth.wavetableConf) {
           targetSynth.wavetableConf = buildDefaultWavetableConfig();
@@ -641,16 +689,10 @@ const actionGroups = {
           targetSynth.wavetableConf!
         );
 
-        // We're switching from a normal oscillator to a wavetable.  If we never had one before, we have to lazy-init one
+        // We're switching from a normal oscillator to a wavetable.  If we never had one
+        // before, we have to lazy-init one
+        connectOscillators(false, targetSynth);
         targetSynth.voices.forEach((voice, voiceIx) => {
-          voice.oscillators.forEach(osc => {
-            try {
-              osc.disconnect();
-            } catch (err) {
-              console.error('Error disconnecting oscillator and filter: ', err);
-            }
-          });
-
           if (!voice.wavetable) {
             voice.wavetable = new WaveTable(
               ctx,
@@ -668,19 +710,13 @@ const actionGroups = {
         });
 
         return R.set(R.lensPath(['synths', index, 'waveform']), waveform, state);
-      } else if (targetSynth.waveform === Waveform.Wavetable) {
+      }
+      if (targetSynth.waveform === Waveform.Wavetable) {
         disconnectWavetableInputControls(targetSynth.wavetableInputControls!);
         targetSynth.wavetableInputControls = null;
 
+        connectOscillators(true, targetSynth);
         targetSynth.voices.forEach(voice => {
-          voice.oscillators.forEach(osc => {
-            try {
-              osc.connect(targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode);
-            } catch (err) {
-              console.error('Error connecting oscillator and filter: ', err);
-            }
-          });
-
           const workletHandle = voice.wavetable!.workletHandle;
           if (!workletHandle) {
             // I guess they weren't initialized yet...
@@ -698,8 +734,33 @@ const actionGroups = {
             console.error('Error disconnecting wavetable worklet from filter: ', err);
           }
         });
-      } else {
-        needsConnectablesUpdate = false;
+
+        needsConnectablesUpdate = true;
+      }
+
+      // FM SYNTH
+      if (waveform === Waveform.FM) {
+        connectOscillators(true, targetSynth);
+
+        if (targetSynth.fmSynth) {
+          setTimeout(() => dispatch({ type: 'CONNECT_FM_SYNTH', synthIx: index }));
+        } else {
+          targetSynth.fmSynth = new FMSynth(ctx, undefined, {
+            onInitialized: () => dispatch({ type: 'CONNECT_FM_SYNTH', synthIx: index }),
+          });
+        }
+
+        return setSynth(index, { ...targetSynth, waveform }, state);
+      }
+      if (targetSynth.waveform === Waveform.FM) {
+        connectOscillators(false, targetSynth);
+
+        if (targetSynth.fmSynth) {
+          (targetSynth.fmSynth.buildConnectables().outputs.get('output')!
+            .node as AudioNode).disconnect();
+        } else {
+          console.error('Switched off of fm synth voice type without initialize fm synth instance');
+        }
       }
 
       if (needsConnectablesUpdate) {
@@ -859,6 +920,8 @@ const actionGroups = {
                 .map(offset => ctx.currentTime + offset)
                 .getOrElse(ctx.currentTime)
             );
+          } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
+            synth.fmSynth.setFrequency(voiceIx, frequency);
           } else {
             targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
           }
@@ -981,7 +1044,9 @@ const actionGroups = {
           const osc = new OscillatorNode(ctx);
           osc.frequency.value = voice.oscillators[0].frequency.value;
           osc.type =
-            targetSynth.waveform === Waveform.Wavetable ? Waveform.Sine : targetSynth.waveform;
+            targetSynth.waveform === Waveform.Wavetable || targetSynth.waveform === Waveform.FM
+              ? Waveform.Sine
+              : targetSynth.waveform;
           voice.oscillators.push(osc);
           targetSynth.detuneCSN.connect(osc.detune);
           osc.start();
@@ -1302,6 +1367,30 @@ const actionGroups = {
         console.error('Error connecting wavetable to `filterNode`: ', err);
       }
 
+      return state;
+    },
+  }),
+  CONNECT_FM_SYNTH: buildActionGroup({
+    actionCreator: (synthIx: number) => ({
+      type: 'CONNECT_FM_SYNTH',
+      synthIx,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      if (!targetSynth.fmSynth) {
+        throw new UnreachableException("Initialized FM synth but it's not set now");
+      }
+
+      const fmSynthConnectables = targetSynth.fmSynth.buildConnectables();
+
+      targetSynth.voices.forEach((voice, voiceIx) =>
+        (fmSynthConnectables.outputs.get('output')!.node as AudioNode).connect(
+          targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode,
+          voiceIx
+        )
+      );
+
+      // TODO
       return state;
     },
   }),

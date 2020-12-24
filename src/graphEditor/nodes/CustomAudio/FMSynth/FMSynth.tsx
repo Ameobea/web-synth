@@ -6,7 +6,12 @@ import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/patchNetwork';
+import {
+  AudioConnectables,
+  ConnectableInput,
+  ConnectableOutput,
+  updateConnectables,
+} from 'src/patchNetwork';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 
 type FMSynthInputDescriptor =
@@ -14,6 +19,7 @@ type FMSynthInputDescriptor =
   | { type: 'outputWeight'; operatorIx: number };
 
 const OPERATOR_COUNT = 8;
+const VOICE_COUNT = 16;
 
 const buildDefaultModulationIndices = (): number[][] => {
   const indices = new Array(OPERATOR_COUNT).fill(null);
@@ -23,9 +29,9 @@ const buildDefaultModulationIndices = (): number[][] => {
   return indices;
 };
 
-export default class WaveTable implements ForeignNode {
+export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
-  private vcId: string;
+  private vcId: string | undefined;
   private generatedInputs: FMSynthInputDescriptor[] = [];
   private awpHandle: AudioWorkletNode | null = null;
   private modulationIndices: number[][] = buildDefaultModulationIndices();
@@ -33,6 +39,7 @@ export default class WaveTable implements ForeignNode {
   private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT).fill(
     buildDefaultOperatorConfig('base frequency multiplier' as const)
   );
+  private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -41,7 +48,7 @@ export default class WaveTable implements ForeignNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
-  constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
+  constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
 
@@ -104,7 +111,9 @@ export default class WaveTable implements ForeignNode {
       WavetableWasmBytes.get(),
       this.ctx.audioWorklet.addModule('/FMSynthAWP.js'),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
+      numberOfOutputs: VOICE_COUNT,
+    });
 
     this.awpHandle.port.postMessage({
       type: 'setWasmBytes',
@@ -119,6 +128,10 @@ export default class WaveTable implements ForeignNode {
           this.operatorConfigs.forEach((config, opIx) =>
             this.handleOperatorConfigChange(opIx, config)
           );
+          if (this.onInitialized) {
+            this.onInitialized(this.buildConnectables());
+            this.onInitialized = undefined;
+          }
           break;
         }
         default: {
@@ -127,7 +140,9 @@ export default class WaveTable implements ForeignNode {
       }
     };
 
-    updateConnectables(this.vcId, this.buildConnectables());
+    if (this.vcId) {
+      updateConnectables(this.vcId, this.buildConnectables());
+    }
   }
 
   private handleOperatorConfigChange(operatorIx: number, newOperatorConfig: OperatorConfig) {
@@ -164,6 +179,9 @@ export default class WaveTable implements ForeignNode {
     if (params.operatorConfigs) {
       this.operatorConfigs = params.operatorConfigs;
     }
+    if (params.onInitialized) {
+      this.onInitialized = params.onInitialized;
+    }
   }
 
   public serialize() {
@@ -174,6 +192,17 @@ export default class WaveTable implements ForeignNode {
     };
   }
 
+  public setFrequency(voiceIx: number, frequency: number) {
+    if (!this.awpHandle) {
+      console.warn('Tried to set FM synth frequency before AWP initialized');
+      return;
+    }
+
+    (this.awpHandle.parameters as Map<string, AudioParam>).get(
+      `voice_${voiceIx}_base_frequency`
+    )!.value = frequency;
+  }
+
   public buildConnectables() {
     return {
       // TODO: include all generated inputs
@@ -181,7 +210,7 @@ export default class WaveTable implements ForeignNode {
         .set('frequency', {
           type: 'number',
           node: this.awpHandle
-            ? (this.awpHandle.parameters as any).get('base_frequency')
+            ? (this.awpHandle.parameters as any).get('voice_0_base_frequency')
             : new DummyNode(),
         })
         .set('param_0', {
@@ -192,7 +221,7 @@ export default class WaveTable implements ForeignNode {
         type: 'customAudio',
         node: this.awpHandle ? this.awpHandle : new DummyNode(),
       }),
-      vcId: this.vcId,
+      vcId: this.vcId!,
       node: this,
     };
   }
