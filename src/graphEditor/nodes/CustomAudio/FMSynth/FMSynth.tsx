@@ -48,6 +48,16 @@ export default class FMSynth implements ForeignNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
+  public getModulationIndices() {
+    return this.modulationIndices;
+  }
+  public getOutputWeights() {
+    return this.outputWeights;
+  }
+  public getOperatorConfigs() {
+    return this.operatorConfigs;
+  }
+
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
@@ -65,41 +75,12 @@ export default class FMSynth implements ForeignNode {
         outputWeights: this.outputWeights,
         modulationIndices: this.modulationIndices,
         operatorConfigs: this.operatorConfigs,
-        updateBackendModulation: (srcOperatorIx: number, dstOperatorIx: number, val: number) => {
-          if (!this.awpHandle) {
-            console.error('Tried to update modulation before AWP initialization');
-            return;
-          }
-
-          this.modulationIndices[srcOperatorIx][dstOperatorIx] = val;
-
-          this.awpHandle.port.postMessage({
-            type: 'setModulationIndex',
-            srcOperatorIx,
-            dstOperatorIx,
-            valueType: 1,
-            valParamInt: 0,
-            valParamFloat: val,
-          });
-        },
+        updateBackendModulation: (srcOperatorIx: number, dstOperatorIx: number, val: number) =>
+          this.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val),
         onOperatorConfigChange: (operatorIx: number, newOperatorConfig: OperatorConfig) =>
           this.handleOperatorConfigChange(operatorIx, newOperatorConfig),
-        updateBackendOutput: (operatorIx: number, val: number) => {
-          if (!this.awpHandle) {
-            console.error('Tried to update output weights before AWP initialization');
-            return;
-          }
-
-          this.outputWeights[operatorIx] = val;
-
-          this.awpHandle.port.postMessage({
-            type: 'setOutputWeightValue',
-            operatorIx,
-            valueType: 1,
-            valParamInt: 0,
-            valParamFloat: val,
-          });
-        },
+        updateBackendOutput: (operatorIx: number, val: number) =>
+          this.handleOutputWeightChange(operatorIx, val),
       }),
     });
 
@@ -145,7 +126,7 @@ export default class FMSynth implements ForeignNode {
     }
   }
 
-  private handleOperatorConfigChange(operatorIx: number, newOperatorConfig: OperatorConfig) {
+  public handleOperatorConfigChange(operatorIx: number, newOperatorConfig: OperatorConfig) {
     this.operatorConfigs[operatorIx] = newOperatorConfig;
     if (!this.awpHandle) {
       console.warn('Tried to update operator config before awp initialized');
@@ -167,6 +148,41 @@ export default class FMSynth implements ForeignNode {
         console.error('Unhandled operator type: ', newOperatorConfig.type);
       }
     }
+  }
+
+  public handleOutputWeightChange(operatorIx: number, value: number) {
+    if (!this.awpHandle) {
+      console.error('Tried to update output weights before AWP initialization');
+      return;
+    }
+
+    this.outputWeights[operatorIx] = value;
+
+    this.awpHandle.port.postMessage({
+      type: 'setOutputWeightValue',
+      operatorIx,
+      valueType: 1,
+      valParamInt: 0,
+      valParamFloat: value,
+    });
+  }
+
+  public handleModulationIndexChange(srcOperatorIx: number, dstOperatorIx: number, val: number) {
+    if (!this.awpHandle) {
+      console.error('Tried to update modulation before AWP initialization');
+      return;
+    }
+
+    this.modulationIndices[srcOperatorIx][dstOperatorIx] = val;
+
+    this.awpHandle.port.postMessage({
+      type: 'setModulationIndex',
+      srcOperatorIx,
+      dstOperatorIx,
+      valueType: 1,
+      valParamInt: 0,
+      valParamFloat: val,
+    });
   }
 
   private deserialize(params: { [key: string]: any }) {
@@ -203,6 +219,10 @@ export default class FMSynth implements ForeignNode {
     )!.value = frequency;
   }
 
+  public getAWPNode() {
+    return this.awpHandle;
+  }
+
   public buildConnectables() {
     return {
       // TODO: include all generated inputs
@@ -210,7 +230,7 @@ export default class FMSynth implements ForeignNode {
         .set('frequency', {
           type: 'number',
           node: this.awpHandle
-            ? (this.awpHandle.parameters as any).get('voice_0_base_frequency')
+            ? (this.awpHandle.parameters as any).get('voice_14_base_frequency')
             : new DummyNode(),
         })
         .set('param_0', {

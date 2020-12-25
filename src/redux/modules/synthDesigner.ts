@@ -756,8 +756,7 @@ const actionGroups = {
         connectOscillators(false, targetSynth);
 
         if (targetSynth.fmSynth) {
-          (targetSynth.fmSynth.buildConnectables().outputs.get('output')!
-            .node as AudioNode).disconnect();
+          targetSynth.fmSynth?.getAWPNode()?.disconnect();
         } else {
           console.error('Switched off of fm synth voice type without initialize fm synth instance');
         }
@@ -1285,7 +1284,12 @@ const actionGroups = {
     actionCreator: (
       synthIx: number,
       preset: SynthVoicePreset | null,
-      dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void
+      dispatch: ((action: {
+        type: 'CONNECT_WAVETABLE';
+        synthIx: number;
+        voiceIx: number;
+      }) => void) &
+        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void)
     ) => ({
       type: 'SET_VOICE_STATE',
       synthIx,
@@ -1381,16 +1385,15 @@ const actionGroups = {
         throw new UnreachableException("Initialized FM synth but it's not set now");
       }
 
-      const fmSynthConnectables = targetSynth.fmSynth.buildConnectables();
-
+      connectOscillators(false, targetSynth);
+      const fmSynthAWPNode = targetSynth.fmSynth.getAWPNode()!;
       targetSynth.voices.forEach((voice, voiceIx) =>
-        (fmSynthConnectables.outputs.get('output')!.node as AudioNode).connect(
+        fmSynthAWPNode.connect(
           targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode,
           voiceIx
         )
       );
 
-      // TODO
       return state;
     },
   }),
@@ -1450,7 +1453,12 @@ const actionGroups = {
   SET_SYNTH_PRESET: buildActionGroup({
     actionCreator: (
       preset: SynthPresetEntry,
-      dispatch: (action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void
+      dispatch: ((action: {
+        type: 'CONNECT_WAVETABLE';
+        synthIx: number;
+        voiceIx: number;
+      }) => void) &
+        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void)
     ) => ({ type: 'SET_SYNTH_PRESET', preset, dispatch }),
     subReducer: (state: SynthDesignerState, { preset, dispatch }) => {
       if (state.synths.length !== 0) {
@@ -1475,7 +1483,7 @@ const actionGroups = {
         return state;
       }
 
-      targetSynth.voices.forEach(voice => {
+      targetSynth.voices.forEach((voice, voiceIx) => {
         if (targetSynth.waveform === Waveform.Wavetable) {
           voice.wavetable?.workletHandle?.disconnect(
             filterBypassed ? voice.filterNode : voice.outerGainNode
@@ -1483,6 +1491,19 @@ const actionGroups = {
           voice.wavetable?.workletHandle?.connect(
             filterBypassed ? voice.outerGainNode : voice.filterNode
           );
+          return;
+        } else if (targetSynth.waveform === Waveform.FM && targetSynth.fmSynth) {
+          const fmSynthAWPNode = targetSynth.fmSynth.getAWPNode();
+          console.log(fmSynthAWPNode);
+          if (!fmSynthAWPNode) {
+            return;
+          }
+
+          fmSynthAWPNode.disconnect(
+            filterBypassed ? voice.filterNode : voice.outerGainNode,
+            voiceIx
+          );
+          fmSynthAWPNode.connect(filterBypassed ? voice.outerGainNode : voice.filterNode, voiceIx);
           return;
         }
 

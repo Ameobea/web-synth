@@ -268,8 +268,8 @@ pub struct FMSynthContext {
     pub modulation_matrix: ModulationMatrix,
     pub param_buffers: [[f32; FRAME_SIZE]; MAX_PARAM_BUFFERS],
     pub operator_base_frequency_sources: [OperatorFrequencySource; OPERATOR_COUNT],
-    pub base_frequency_input_buffer: [[f32; FRAME_SIZE]; OPERATOR_COUNT],
-    pub output_buffers: [[f32; FRAME_SIZE]; OPERATOR_COUNT],
+    pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
+    pub output_buffers: Vec<[f32; FRAME_SIZE]>,
 }
 
 impl FMSynthContext {
@@ -308,8 +308,8 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         param_buffers: [[0.0; FRAME_SIZE]; MAX_PARAM_BUFFERS],
         operator_base_frequency_sources: [OperatorFrequencySource::BaseFrequencyMultiplier(1.);
             OPERATOR_COUNT],
-        base_frequency_input_buffer: [[0.; FRAME_SIZE]; OPERATOR_COUNT],
-        output_buffers: [[0.0; FRAME_SIZE]; OPERATOR_COUNT],
+        base_frequency_input_buffer: vec![[0.; FRAME_SIZE]; voice_count],
+        output_buffers: vec![[0.0; FRAME_SIZE]; voice_count],
     })
 }
 

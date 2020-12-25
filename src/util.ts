@@ -1,5 +1,6 @@
 import { UnreachableException } from 'ameo-utils';
 import { Option, Try } from 'funfix-core';
+import * as R from 'ramda';
 
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
 
@@ -178,3 +179,17 @@ export const truncateWithElipsis = (s: string, maxLength: number): string => {
 };
 
 export const genRandomStringID = () => btoa(`${Math.random()}${Math.random()}`);
+
+export const classNameIncludes = (
+  className: string | SVGAnimatedString | null | undefined,
+  needle: string
+): boolean => {
+  if (R.isNil(className)) {
+    return false;
+  }
+
+  if (className instanceof SVGAnimatedString) {
+    return className.baseVal.includes(needle);
+  }
+  return className.includes(needle);
+};

@@ -19,6 +19,8 @@ import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
+import FMSynthUI from 'src/fmSynth/FMSynthUI';
+import { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 
 const SYNTH_SETTINGS = [
   {
@@ -314,8 +316,24 @@ const SynthModuleCompInner: React.FC<{
         style={{ width: 378 }}
       />
 
-      {synth.waveform === 'wavetable' ? (
+      {synth.waveform === Waveform.Wavetable ? (
         <WavetableControlPanel synth={synth} dispatch={dispatch} index={index} />
+      ) : null}
+      {synth.waveform === Waveform.FM && synth.fmSynth ? (
+        <FMSynthUI
+          updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: number) =>
+            synth.fmSynth!.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
+          }
+          updateBackendOutput={(operatorIx: number, val: number) =>
+            synth.fmSynth!.handleOutputWeightChange(operatorIx, val)
+          }
+          modulationIndices={synth.fmSynth.getModulationIndices()}
+          outputWeights={synth.fmSynth.getOutputWeights()}
+          operatorConfigs={synth.fmSynth.getOperatorConfigs()}
+          onOperatorConfigChange={(operatorIx: number, newOperatorConfig: OperatorConfig) =>
+            synth.fmSynth!.handleOperatorConfigChange(operatorIx, newOperatorConfig)
+          }
+        />
       ) : null}
 
       <FilterModule

@@ -3,6 +3,7 @@ import * as R from 'ramda';
 
 import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
+import { classNameIncludes } from 'src/util';
 
 interface FMSynthState {
   modulationIndices: number[][];
@@ -62,13 +63,13 @@ const FMSynthUI: React.FC<{
     const handler = (evt: WheelEvent) => {
       const path = evt.composedPath();
       const operatorElem = path.find(elem =>
-        (elem as any).className?.includes('operator-square')
+        classNameIncludes((elem as any).className, 'operator-square')
       ) as HTMLDivElement | undefined;
       if (!operatorElem) {
         return;
       }
 
-      if (operatorElem.className.includes('output-weight')) {
+      if (classNameIncludes(operatorElem.className, 'output-weight')) {
         const operatorIx = +operatorElem.getAttribute('data-operator-ix')!;
         setState(
           setOutput(state, operatorIx, updateBackendOutput, (prevVal: number) =>

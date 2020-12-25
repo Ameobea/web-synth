@@ -1,9 +1,9 @@
 const FRAME_SIZE = 128;
 const BYTES_PER_F32 = 32 / 8;
-const OPERATOR_COUNT = 8;
 const OUTPUT_BYTES_PER_OPERATOR = FRAME_SIZE * BYTES_PER_F32;
 const VOICE_COUNT = 16;
 const PARAM_COUNT = 8;
+const SAMPLE_RATE = 44_100;
 
 class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -12,6 +12,8 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
         name: `voice_${i}_base_frequency`,
         defaultValue: 0,
         automationRate: 'a-rate',
+        minValue: 0,
+        maxValue: SAMPLE_RATE / 2,
       })),
       ...new Array(PARAM_COUNT).fill(null).map((_x, i) => ({
         name: i.toString(),
@@ -139,7 +141,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
       if (param.length === 1) {
         wasmMemory.fill(param[0], ptrForVoice / 4, (ptrForVoice + FRAME_SIZE * BYTES_PER_F32) / 4);
       } else {
-        wasmMemory.set(param, baseFrequencyInputBufPtr / 4);
+        wasmMemory.set(param, ptrForVoice / 4);
       }
     }
     const paramBuffersPtr = this.wasmInstance.exports.get_param_buffers_ptr(this.ctxPtr);
@@ -161,12 +163,12 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
 
     const outputsPtr = this.wasmInstance.exports.fm_synth_generate(this.ctxPtr);
     wasmMemory = this.getWasmMemoryBuffer();
-    for (let opIx = 0; opIx < OPERATOR_COUNT; opIx++) {
+    for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
       const outputSlice = wasmMemory.slice(
-        (outputsPtr + opIx * OUTPUT_BYTES_PER_OPERATOR) / 4,
-        (outputsPtr + opIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4
+        (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR) / 4,
+        (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4
       );
-      outputs[opIx]?.[0]?.set(outputSlice);
+      outputs[voiceIx]?.[0]?.set(outputSlice);
     }
 
     return true;
