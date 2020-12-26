@@ -10,7 +10,8 @@ members = [
   "granular",
   "event_scheduler",
   "sidechain",
-  "noise_gen"
+  "noise_gen",
+  "distortion"
 ]
 
 [profile.release]

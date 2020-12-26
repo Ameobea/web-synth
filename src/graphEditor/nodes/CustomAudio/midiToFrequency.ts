@@ -46,17 +46,13 @@ export class MIDIToFrequencyNode {
         this.activeNotes.push(note);
       }
     },
-    onRelease: (note, _velocity, offset?: number) => {
-      if (R.isNil(offset)) {
-        this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
+    onRelease: (note, _velocity) => {
+      this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
 
-        if (!R.isEmpty(this.activeNotes)) {
-          this.frequencyCSN.offset.value = this.noteToFrequency(R.last(this.activeNotes)!);
-        } else {
-          this.unGate();
-        }
-      } else if (R.last(this.activeNotes) === note) {
-        this.unGate(offset);
+      if (!R.isEmpty(this.activeNotes)) {
+        this.frequencyCSN.offset.value = this.noteToFrequency(R.last(this.activeNotes)!);
+      } else {
+        this.unGate();
       }
     },
     onPitchBend: _bendAmount => {

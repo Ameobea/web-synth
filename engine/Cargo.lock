@@ -93,6 +93,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "distortion"
+version = "0.1.0"
+dependencies = [
+ "dsp",
+]
+
+[[package]]
 name = "dsp"
 version = "0.1.0"
 

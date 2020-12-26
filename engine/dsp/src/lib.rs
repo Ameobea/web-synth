@@ -1,3 +1,7 @@
+#![feature(min_const_generics)]
+
+pub mod circular_buffer;
+
 /// For `coefficient` values between 0 and 1, applies smoothing to a value, interpolating between
 /// previous values and new values.  Values closer to 1 applier heavier smoothing.
 ///

@@ -13,19 +13,18 @@ import { buildMIDINode, MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode
 export class EnvelopeGenerator implements ForeignNode {
   private vcId: string;
   private adsrModule: ADSRModule;
-  private adsrLengthNode: OverridableAudioParam;
   public nodeType = 'customAudio/envelopeGenerator';
   static typeName = 'Envelope Generator';
 
   private heldNotes: number[] = [];
   private gateMIDINodeInputCBs: MIDIInputCbs = {
-    onAttack: (note, _velocity, offset) => {
+    onAttack: (note, _velocity) => {
       this.heldNotes.push(note);
-      this.adsrModule.gate(offset);
+      this.adsrModule.gate();
     },
-    onRelease: (note, _velocity, offset) => {
+    onRelease: (note, _velocity) => {
       if (R.last(this.heldNotes) === note) {
-        this.adsrModule.ungate(offset);
+        this.adsrModule.ungate();
       }
       this.heldNotes = this.heldNotes.filter(oNote => note !== oNote);
     },
@@ -42,10 +41,6 @@ export class EnvelopeGenerator implements ForeignNode {
     this.vcId = vcId;
     this.adsrModule = new ADSRModule(ctx, { lengthMs: 0 });
     this.adsrModule.start();
-    this.adsrLengthNode = new OverridableAudioParam(ctx);
-    this.adsrModule.onLengthValueRecordedInitialzed(lengthMsValueRecorder =>
-      this.adsrLengthNode.replaceParam(lengthMsValueRecorder)
-    );
 
     if (params) {
       this.deserialize(params);
@@ -58,11 +53,11 @@ export class EnvelopeGenerator implements ForeignNode {
       getProps: () => ({
         onChange: (envelope: ADSRValues, lengthMS: number) => {
           this.adsrModule.setEnvelope(envelope);
-          this.adsrLengthNode.manualControl.offset.value = lengthMS;
+          this.adsrModule.setLengthMs(lengthMS);
         },
         initialState: {
           envelope: this.adsrModule.envelope,
-          lengthMS: this.adsrLengthNode.manualControl.offset.value,
+          lengthMS: this.adsrModule.lengthMs,
         },
       }),
     });
@@ -79,26 +74,24 @@ export class EnvelopeGenerator implements ForeignNode {
       this.adsrModule.setEnvelope(params.envelope);
     }
     if (!R.isNil(params.lengthMS)) {
-      this.adsrLengthNode.manualControl.offset.value = params.lengthMS;
+      this.adsrModule.setLengthMs(params.lengthMS);
     }
   }
 
   public serialize(): { [key: string]: any } {
     return {
       envelope: this.adsrModule.envelope,
-      lengthMS: this.adsrLengthNode.manualControl.offset.value,
+      lengthMS: this.adsrModule.lengthMs,
     };
   }
 
   public buildConnectables(): AudioConnectables & { node: ForeignNode } {
     return {
       vcId: this.vcId,
-      inputs: ImmMap<string, ConnectableInput>()
-        .set('gate', {
-          type: 'midi',
-          node: this.gateMIDINode,
-        })
-        .set('length_ms', { type: 'number', node: this.adsrLengthNode }),
+      inputs: ImmMap<string, ConnectableInput>().set('gate', {
+        type: 'midi',
+        node: this.gateMIDINode,
+      }),
       outputs: ImmMap<string, ConnectableOutput>().set('envelope', {
         type: 'number',
         node: this.adsrModule,

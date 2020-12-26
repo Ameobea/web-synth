@@ -101,13 +101,12 @@ export const init_synth_designer = (stateKey: string) => {
         )
       );
 
-    const releaseNote = (voiceIx: number, note: number, velocity: number, offset?: number) =>
+    const releaseNote = (voiceIx: number, _note: number, _velocity: number) =>
       reduxInfra.dispatch(
         reduxInfra.actionCreators.synthDesigner.UNGATE(
           () => reduxInfra.getState().synthDesigner,
           voiceIx,
-          undefined,
-          offset
+          undefined
         )
       );
 
