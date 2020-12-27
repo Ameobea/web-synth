@@ -1,6 +1,29 @@
+use dsp::circular_buffer::CircularBuffer;
+
+pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
+
 #[derive(Clone, Default)]
 pub struct ADSRState {
     // TODO
+}
+
+trait PhasedOscillator {
+    fn get_phase(&self) -> f32;
+
+    fn set_phase(&mut self, new_phase: f32);
+
+    fn update_phase(&mut self, frequency: f32) {
+        // 1 phase corresponds to 1 period of the waveform.  1 phase is passed every (SAMPLE_RATE /
+        // frequency) samples.
+        let phase = self.get_phase();
+        if frequency.is_normal() && frequency.abs() > 0.001 {
+            let mut new_phase = (phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
+            if new_phase < 0. {
+                new_phase = 1. + new_phase;
+            }
+            self.set_phase(new_phase);
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -8,16 +31,15 @@ pub struct SineOscillator {
     pub phase: f32,
 }
 
+impl PhasedOscillator for SineOscillator {
+    fn get_phase(&self) -> f32 { self.phase }
+
+    fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
+}
+
 impl SineOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
-        // 1 phase corresponds to 1 period of the waveform.  1 phase is passed every (SAMPLE_RATE /
-        // frequency) samples.
-        if frequency.is_normal() && frequency.abs() > 0.001 {
-            self.phase = (self.phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
-            if self.phase < 0. {
-                self.phase = 1. + self.phase;
-            }
-        }
+        self.update_phase(frequency);
 
         // unsafe {
         //     *crate::lookup_tables::SINE_LOOKUP_TABLE.get_unchecked(
@@ -32,10 +54,189 @@ impl SineOscillator {
 }
 
 #[derive(Clone)]
+pub struct ExponentialOscillator {
+    pub phase: f32,
+    pub stretch_factor: ParamSource,
+}
+
+impl ExponentialOscillator {
+    pub fn new(stretch_factor: ParamSource) -> Self {
+        ExponentialOscillator {
+            phase: 0.,
+            stretch_factor,
+        }
+    }
+}
+
+impl PhasedOscillator for ExponentialOscillator {
+    fn get_phase(&self) -> f32 { self.phase }
+
+    fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
+}
+
+impl ExponentialOscillator {
+    pub fn gen_sample(
+        &mut self,
+        frequency: f32,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        sample_ix_within_frame: usize,
+    ) -> f32 {
+        self.update_phase(frequency);
+
+        let stretch_factor = self
+            .stretch_factor
+            .get(param_buffers, adsrs, sample_ix_within_frame);
+
+        let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+        let exponent_denominator = 999.0f32;
+        let exponent = exponent_numerator / exponent_denominator;
+
+        // Transform phase into [-1, 1] range
+        let extended_phase = self.phase * 2. - 1.;
+        let absolute_phase = extended_phase.abs();
+        // val is from 0 to 1
+        let val = absolute_phase.powf(exponent);
+        // Re-apply sign
+        // output is from -1 to 1
+        val * extended_phase.signum()
+    }
+}
+
+pub struct SpectralWarpingParams {
+    pub warp_factor: ParamSource,
+    pub frequency: OperatorFrequencySource,
+    // TODO: Make this a param source if it turns out to have an effect on the sound
+    pub phase_offset: f32,
+}
+
+#[derive(Clone)]
+pub struct SpectralWarping {
+    pub frequency: OperatorFrequencySource,
+    pub buffer: CircularBuffer<SPECTRAL_WARPING_BUFFER_SIZE>,
+    pub phase_offset: f32,
+    pub osc: ExponentialOscillator,
+}
+
+impl SpectralWarping {
+    pub fn new(
+        SpectralWarpingParams {
+            warp_factor,
+            frequency,
+            phase_offset,
+        }: SpectralWarpingParams,
+    ) -> Self {
+        SpectralWarping {
+            frequency,
+            buffer: CircularBuffer::new(),
+            phase_offset,
+            osc: ExponentialOscillator::new(warp_factor),
+        }
+    }
+
+    fn get_phase_warp_diff(
+        &mut self,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        sample_ix_within_frame: usize,
+        frequency: f32,
+    ) -> f32 {
+        let warped_phase =
+            (self
+                .osc
+                .gen_sample(frequency, param_buffers, adsrs, sample_ix_within_frame)
+                + 1.)
+                / 2.;
+        warped_phase - self.osc.phase
+    }
+
+    pub fn apply(
+        &mut self,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+        sample: f32,
+    ) -> f32 {
+        self.buffer.set(sample);
+        let frequency =
+            self.frequency
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+        if frequency == 0. {
+            return sample;
+        }
+        // We look back half of the wavelength of the frequency.
+        let base_lookback_samples = ((SAMPLE_RATE as f32) / frequency) / 2.;
+
+        // We then "warp" the position of the read head according to the warp factor.
+        let phase_warp_diff =
+            self.get_phase_warp_diff(param_buffers, adsrs, sample_ix_within_frame, frequency);
+        // assert!(phase_warp_diff > -1.);
+        // assert!(phase_warp_diff < 1.);
+        let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);
+        // assert!(lookback_samples > 0.);
+
+        self.buffer.read_interpolated(-lookback_samples)
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct Operator {
+    pub oscillator_source: OscillatorSource,
+    pub spectral_warping: Option<Box<SpectralWarping>>,
+}
+
+impl Operator {
+    pub fn gen_sample(
+        &mut self,
+        frequency: f32,
+        wavetables: &mut [()],
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+    ) -> f32 {
+        let sample = self.oscillator_source.gen_sample(
+            frequency,
+            wavetables,
+            param_buffers,
+            adsrs,
+            sample_ix_within_frame,
+        );
+
+        if let Some(spectral_warping) = self.spectral_warping.as_mut() {
+            spectral_warping.apply(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                sample,
+            )
+        } else {
+            sample
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum OscillatorSource {
     Wavetable(usize),
     ParamBuffer(usize),
     Sine(SineOscillator),
+    ExponentialOscillator(ExponentialOscillator),
+}
+
+impl OscillatorSource {
+    /// Returns the current phase of the oscillator, if it has one.  Used to preserve phase in cases
+    /// where we're switching oscillator type.
+    pub fn get_phase(&self) -> Option<f32> {
+        match self {
+            OscillatorSource::Wavetable(_) => todo!(),
+            OscillatorSource::ParamBuffer(_) => None,
+            OscillatorSource::Sine(osc) => Some(osc.get_phase()),
+            OscillatorSource::ExponentialOscillator(osc) => Some(osc.get_phase()),
+        }
+    }
 }
 
 impl Default for OscillatorSource {
@@ -46,17 +247,20 @@ impl OscillatorSource {
     pub fn gen_sample(
         &mut self,
         frequency: f32,
-        wavetables: &mut [()],
+        _wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
     ) -> f32 {
         match self {
-            OscillatorSource::Wavetable(wavetable_ix) => {
+            OscillatorSource::Wavetable(_wavetable_ix) => {
                 // TODO
                 -1.0
             },
             OscillatorSource::ParamBuffer(buf_ix) => param_buffers[*buf_ix][sample_ix_within_frame],
             OscillatorSource::Sine(osc) => osc.gen_sample(frequency),
+            OscillatorSource::ExponentialOscillator(osc) =>
+                osc.gen_sample(frequency, param_buffers, adsrs, sample_ix_within_frame),
         }
     }
 }
@@ -65,7 +269,7 @@ impl OscillatorSource {
 pub struct FMSynthVoice {
     pub output: f32,
     pub adsrs: Vec<ADSRState>,
-    pub operators: [OscillatorSource; OPERATOR_COUNT],
+    pub operators: [Operator; OPERATOR_COUNT],
     pub last_samples: [f32; OPERATOR_COUNT],
     pub last_sample_frequencies_per_operator: [f32; OPERATOR_COUNT],
 }
@@ -130,12 +334,14 @@ impl FMSynthVoice {
                 &self.last_sample_frequencies_per_operator,
             );
             frequencies_per_operator[operator_ix] = modulated_frequency;
-            let carrier_source = unsafe { self.operators.get_unchecked_mut(operator_ix) };
-            let sample = carrier_source.gen_sample(
+            let carrier_operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
+            let sample = carrier_operator.gen_sample(
                 modulated_frequency,
                 wavetables,
                 param_buffers,
+                &self.adsrs,
                 sample_ix_within_frame,
+                base_frequency,
             );
             if sample > 1.0 {
                 panic!("TOO BIG");
@@ -355,6 +561,101 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
 ) {
     let param = ParamSource::from_parts(value_type, val_param_int, val_param_float);
     (*ctx).modulation_matrix.output_weights[operator_ix] = param;
+}
+
+fn build_oscillator_source(
+    operator_type: usize,
+    param_value_type: usize,
+    param_val_int: usize,
+    param_val_float: f32,
+    phase_opt: Option<f32>,
+) -> OscillatorSource {
+    match operator_type {
+        0 => OscillatorSource::Wavetable(param_val_int),
+        1 => OscillatorSource::ParamBuffer(param_val_int),
+        2 => OscillatorSource::Sine(SineOscillator {
+            phase: phase_opt.unwrap_or_default(),
+        }),
+        3 => OscillatorSource::ExponentialOscillator(ExponentialOscillator {
+            phase: phase_opt.unwrap_or_default(),
+            stretch_factor: ParamSource::from_parts(
+                param_value_type,
+                param_val_int,
+                param_val_float,
+            ),
+        }),
+        _ => panic!("Invalid operator type: {}", operator_type),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_operator_config(
+    ctx: *mut FMSynthContext,
+    operator_ix: usize,
+    operator_type: usize,
+    param_value_type: usize,
+    param_val_int: usize,
+    param_val_float: f32,
+) {
+    for voice in &mut (*ctx).voices {
+        let old_phase = voice.operators[operator_ix].oscillator_source.get_phase();
+        voice.operators[operator_ix].oscillator_source = build_oscillator_source(
+            operator_type,
+            param_value_type,
+            param_val_int,
+            param_val_float,
+            old_phase,
+        );
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_disable_spectral_warping(
+    ctx: *mut FMSynthContext,
+    operator_ix: usize,
+) {
+    for voice in &mut (*ctx).voices {
+        voice.operators[operator_ix].spectral_warping = None;
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_spectral_warping(
+    ctx: *mut FMSynthContext,
+    operator_ix: usize,
+    warp_factor_value_type: usize,
+    warp_factor_val_int: usize,
+    warp_factor_val_float: f32,
+    frequency_value_type: usize,
+    frequency_val_int: usize,
+    frequency_val_float: f32,
+    phase_offset: f32,
+) {
+    for voice in &mut (*ctx).voices {
+        let frequency = OperatorFrequencySource::from_parts(
+            frequency_value_type,
+            frequency_val_int,
+            frequency_val_float,
+        );
+        let warp_factor = ParamSource::from_parts(
+            warp_factor_value_type,
+            warp_factor_val_int,
+            warp_factor_val_float,
+        );
+        let params = SpectralWarpingParams {
+            frequency,
+            warp_factor,
+            phase_offset,
+        };
+
+        if let Some(spectral_warping) = voice.operators[operator_ix].spectral_warping.as_mut() {
+            spectral_warping.frequency = frequency;
+            spectral_warping.osc.stretch_factor = warp_factor;
+            spectral_warping.phase_offset = phase_offset;
+        } else {
+            voice.operators[operator_ix].spectral_warping = Some(box SpectralWarping::new(params));
+        }
+    }
 }
 
 #[no_mangle]

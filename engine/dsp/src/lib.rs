@@ -10,6 +10,7 @@ pub mod circular_buffer;
 /// filter depending on the value of `coefficient`.
 ///
 /// Based off of https://github.com/pichenettes/stmlib/blob/master/dsp/dsp.h#L77
+#[inline]
 pub fn one_pole(state: &mut f32, new_val: f32, coefficient: f32) {
     *state += coefficient * (new_val - *state)
 }
@@ -19,14 +20,18 @@ pub fn one_pole(state: &mut f32, new_val: f32, coefficient: f32) {
 ///
 /// `smooth_factor` determines the amount of smoothing that is applied.  The closer to 1.0 you get,
 /// the smoother it is.
+#[inline]
 pub fn smooth(state: &mut f32, new_val: f32, smooth_factor: f32) {
     *state = smooth_factor * *state + (1. - smooth_factor) * new_val;
 }
 
+#[inline]
 pub fn clamp(min: f32, max: f32, val: f32) -> f32 { val.max(min).min(max) }
 
+#[inline]
 pub fn mix(v1_pct: f32, v1: f32, v2: f32) -> f32 { (v1_pct * v1) + (1. - v1_pct) * v2 }
 
+#[inline]
 pub fn read_interpolated(buf: &[f32], index: f32) -> f32 {
     let base_ix = index.trunc() as usize;
     let next_ix = base_ix + 1;
@@ -45,6 +50,7 @@ pub struct ButterworthFilter {
 }
 
 impl ButterworthFilter {
+    #[inline]
     pub fn new(sample_rate: usize) -> Self {
         ButterworthFilter {
             sample_rate: sample_rate as f32,
@@ -53,6 +59,7 @@ impl ButterworthFilter {
         }
     }
 
+    #[inline]
     fn get_output(
         &self,
         amp_in0: f32,
@@ -67,6 +74,7 @@ impl ButterworthFilter {
             - (amp_out2 * self.delayed_outputs[0])
     }
 
+    #[inline]
     fn update_state(&mut self, input: f32, output: f32) {
         self.delayed_outputs[0] = self.delayed_outputs[1];
         self.delayed_outputs[1] = output;
@@ -75,6 +83,7 @@ impl ButterworthFilter {
     }
 
     // Adapted from code at the bottom of this page: http://basicsynth.com/index.php?page=filters
+    #[inline]
     pub fn lowpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
         let c = 1. / ((std::f32::consts::PI / self.sample_rate as f32) * cutoff_freq).tan();
         let c2 = c * c;
@@ -91,6 +100,7 @@ impl ButterworthFilter {
         output
     }
 
+    #[inline]
     pub fn highpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
         let c = ((std::f32::consts::PI / self.sample_rate) * cutoff_freq).tan();
         let c2 = c * c;
@@ -107,6 +117,7 @@ impl ButterworthFilter {
         output
     }
 
+    #[inline]
     pub fn bandpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
         let c = 1. / ((std::f32::consts::PI / self.sample_rate) * cutoff_freq).tan();
         let d = 1. + c;

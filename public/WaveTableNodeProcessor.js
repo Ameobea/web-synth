@@ -2,8 +2,6 @@ const FRAME_SIZE = 128;
 const MAX_DIMENSION_COUNT = 2;
 const BYTES_PER_F32 = 32 / 8;
 
-// const clamp = (min, max, val) => Math.min(Math.max(min, val), max);
-
 class WaveTableNodeProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [

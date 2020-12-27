@@ -65,6 +65,21 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
           );
           break;
         }
+        case 'setOperatorConfig': {
+          if (!this.wasmInstance) {
+            console.error('Tried setting output weight value before Wasm instance loaded');
+            return;
+          }
+          this.wasmInstance.exports.fm_synth_set_operator_config(
+            this.ctxPtr,
+            evt.data.operatorIx,
+            evt.data.operatorType,
+            evt.data.valueType,
+            evt.data.valParamInt,
+            evt.data.valParamFloat
+          );
+          break;
+        }
         case 'setOperatorBaseFrequencySource': {
           if (!this.wasmInstance) {
             console.error('Tried setting output weight value before Wasm instance loaded');
@@ -79,6 +94,32 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
           );
           break;
         }
+        case 'setSpectralWarping': {
+          if (!this.wasmInstance) {
+            console.error('Tried setting output weight value before Wasm instance loaded');
+            return;
+          }
+          if (evt.data.spectralWarping) {
+            const { frequency, warpFactor, phaseOffset } = evt.data.spectralWarping;
+            this.wasmInstance.exports.fm_synth_set_spectral_warping(
+              this.ctxPtr,
+              evt.data.operatorIx,
+              warpFactor.valueType,
+              warpFactor.valParamInt,
+              warpFactor.valParamFloat,
+              frequency.valueType,
+              frequency.valParamInt,
+              frequency.valParamFloat,
+              phaseOffset
+            );
+          } else {
+            this.wasmInstance.exports.fm_synth_disable_spectral_warping(
+              this.ctxPtr,
+              evt.data.operatorIx
+            );
+          }
+          break;
+        }
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }
@@ -90,6 +131,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
     const importObject = { env: {} };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
+    this.wasmInstance.exports.memory.grow(1024 * 4);
     this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx(VOICE_COUNT);
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
 

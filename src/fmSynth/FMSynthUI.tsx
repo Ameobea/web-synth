@@ -8,6 +8,7 @@ import { classNameIncludes } from 'src/util';
 interface FMSynthState {
   modulationIndices: number[][];
   outputWeights: number[];
+  operatorConfigs: OperatorConfig[];
 }
 
 type BackendModulationUpdater = (operatorIx: number, modulationIx: number, val: number) => void;
@@ -56,7 +57,11 @@ const FMSynthUI: React.FC<{
   operatorConfigs,
   onOperatorConfigChange,
 }) => {
-  const [state, setState] = useState({ modulationIndices, outputWeights });
+  const [state, setState] = useState<FMSynthState>({
+    modulationIndices,
+    outputWeights,
+    operatorConfigs,
+  });
   const [selectedOperatorIx, setSelectedOperatorIx] = useState(0);
 
   useEffect(() => {
@@ -133,8 +138,14 @@ const FMSynthUI: React.FC<{
         ))}
       </div>
       <ConfigureOperator
-        state={operatorConfigs[selectedOperatorIx]}
-        onChange={newConf => onOperatorConfigChange(selectedOperatorIx, newConf)}
+        config={state.operatorConfigs[selectedOperatorIx]}
+        onChange={newConf => {
+          setState({
+            ...state,
+            operatorConfigs: R.set(R.lensIndex(selectedOperatorIx), newConf, state.operatorConfigs),
+          });
+          onOperatorConfigChange(selectedOperatorIx, newConf);
+        }}
       />
     </div>
   );

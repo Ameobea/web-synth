@@ -1,7 +1,13 @@
 import { Map as ImmMap } from 'immutable';
+import { Option } from 'funfix-core';
 
 import FMSynthUI from 'src/fmSynth/FMSynthUI';
-import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
+import {
+  buildDefaultOperatorConfig,
+  OperatorConfig,
+  ParamSource,
+  SpectralWarpingConfig,
+} from 'src/fmSynth/ConfigureOperator';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -13,6 +19,7 @@ import {
   updateConnectables,
 } from 'src/patchNetwork';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -36,9 +43,9 @@ export default class FMSynth implements ForeignNode {
   private awpHandle: AudioWorkletNode | null = null;
   private modulationIndices: number[][] = buildDefaultModulationIndices();
   private outputWeights: number[] = new Array(OPERATOR_COUNT).fill(0);
-  private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT).fill(
-    buildDefaultOperatorConfig('base frequency multiplier' as const)
-  );
+  private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT)
+    .fill(undefined as any)
+    .map(buildDefaultOperatorConfig);
   private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
 
   static typeName = 'FM Synthesizer';
@@ -126,28 +133,87 @@ export default class FMSynth implements ForeignNode {
     }
   }
 
-  public handleOperatorConfigChange(operatorIx: number, newOperatorConfig: OperatorConfig) {
-    this.operatorConfigs[operatorIx] = newOperatorConfig;
+  private encodeParamSourceMessage(source: ParamSource) {
+    switch (source.type) {
+      case 'base frequency multiplier': {
+        return { valueType: 3, valParamInt: 0, valParamFloat: source.multiplier };
+      }
+      case 'constant': {
+        return { valueType: 1, valParamInt: 0, valParamFloat: source.value };
+      }
+      case 'param buffer': {
+        return { valueType: 0, valParamInt: source.bufferIx, valParamFloat: 0 };
+      }
+      default: {
+        throw new UnimplementedError(`frequency source not yet implemented: ${source.type}`);
+      }
+    }
+  }
+
+  private setOperatorBaseFrequencySource(operatorIx: number, source: ParamSource) {
+    if (!this.awpHandle) {
+      throw new UnreachableException();
+    }
+
+    this.awpHandle.port.postMessage({
+      type: 'setOperatorBaseFrequencySource',
+      operatorIx,
+      ...this.encodeParamSourceMessage(source),
+    });
+  }
+
+  public handleOperatorConfigChange(operatorIx: number, config: OperatorConfig) {
+    this.operatorConfigs[operatorIx] = config;
     if (!this.awpHandle) {
       console.warn('Tried to update operator config before awp initialized');
       return;
     }
 
-    switch (newOperatorConfig.type) {
-      case 'base frequency multiplier': {
-        this.awpHandle.port.postMessage({
-          type: 'setOperatorBaseFrequencySource',
-          operatorIx,
-          valueType: 3,
-          valParamInt: 0,
-          valParamFloat: newOperatorConfig.multiplier,
-        });
+    // Set the operator config along with any hyperparam config
+    this.awpHandle.port.postMessage({
+      type: 'setOperatorConfig',
+      operatorIx,
+      operatorType: {
+        wavetable: 0,
+        'sine oscillator': 2,
+        'exponential oscillator': 3,
+        'param buffer': 1,
+      }[config.type],
+      ...(() => {
+        switch (config.type) {
+          case 'exponential oscillator': {
+            return this.encodeParamSourceMessage(config.stretchFactor);
+          }
+          default: {
+            return { valueType: 0, valParamInt: 0, valParamFloat: 0 };
+          }
+        }
+      })(),
+    });
+
+    // Set base frequency source config for operators that support that
+    switch (config.type) {
+      case 'sine oscillator': {
+        this.setOperatorBaseFrequencySource(operatorIx, config.frequency);
         break;
       }
-      default: {
-        console.error('Unhandled operator type: ', newOperatorConfig.type);
+      case 'exponential oscillator': {
+        this.setOperatorBaseFrequencySource(operatorIx, config.frequency);
+        break;
       }
     }
+
+    this.awpHandle.port.postMessage({
+      type: 'setSpectralWarping',
+      operatorIx,
+      spectralWarping: Option.of(config.spectralWarping)
+        .map(({ frequency, warpFactor, phaseOffset }) => ({
+          frequency: this.encodeParamSourceMessage(frequency),
+          warpFactor: this.encodeParamSourceMessage(warpFactor),
+          phaseOffset,
+        }))
+        .orNull(),
+    });
   }
 
   public handleOutputWeightChange(operatorIx: number, value: number) {

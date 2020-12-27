@@ -3,15 +3,25 @@
 use dsp::circular_buffer::CircularBuffer;
 
 pub const FRAME_SIZE: usize = 128;
+// const CIRCULAR_BUFFER_SIZE:usize = 16777216;
+const CIRCULAR_BUFFER_SIZE: usize = 10000;
 
 pub struct WaveStretcher {
     pub cur_index: usize,
     pub io_sample_buffer: [f32; FRAME_SIZE],
     // 32MB circular buffer supporting lookback/delay required to implement this as a rolling thing
-    internal_sample_buffer: CircularBuffer<16777216>,
+    internal_sample_buffer: CircularBuffer<CIRCULAR_BUFFER_SIZE>,
     pub param_buffer: [f32; FRAME_SIZE],
     pub len_samples: usize,
 }
+
+// static mut WAVE_STRETCHER: WaveStretcher = WaveStretcher {
+//     cur_index: 0,
+//     io_sample_buffer: [0.0f32; FRAME_SIZE],
+//     internal_sample_buffer: CircularBuffer::new(),
+//     param_buffer: [0.0f32; FRAME_SIZE],
+//     len_samples: 812,
+// };
 
 impl WaveStretcher {
     pub fn new(len_samples: usize) -> Self {
@@ -33,13 +43,14 @@ impl WaveStretcher {
     ///
     /// Credit to https://www.linkedin.com/in/cameron-mcferran-hall/ for coming up with the
     /// equation used to produce this algorithm
+    #[inline(never)]
     fn get_transformed_index(&self, sample_ix: usize, stretch_factor: f32) -> f32 {
         let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
         let exponent_denominator = 999.0f32;
         let exponent = exponent_numerator / exponent_denominator;
 
         // Transform index into [-1, 1] range
-        let continuous_index = ((sample_ix as f32) / (self.len_samples as f32)) * 2. + 1.;
+        let continuous_index = ((sample_ix as f32) / (self.len_samples as f32)) * 2. - 1.;
         let positive_index = continuous_index.abs();
         // val is from 0 to 1
         let val = positive_index.powf(exponent);
@@ -48,6 +59,7 @@ impl WaveStretcher {
     }
 
     /// Both params should be between 0.0 and 1.0 inclusive
+    #[inline(never)]
     fn read_delayed_sample(
         &self,
         base_continuous_sample_ix: f32,
@@ -57,27 +69,35 @@ impl WaveStretcher {
         let diff = transformed_continuous_sample_ix - base_continuous_sample_ix;
 
         let half_length_samples = self.len_samples as f32 / 2.;
-        let sample_ix = -half_length_samples + diff * half_length_samples;
+        let sample_ix = (-half_length_samples + diff * half_length_samples).min(0.);
+        // assert!(sample_ix < 0.);
         self.internal_sample_buffer.read_interpolated(sample_ix)
     }
 
+    #[inline(never)]
+    fn process_sample(&mut self, sample_ix_in_frame: usize) {
+        self.cur_index += 1;
+        let cur_index = self.cur_index;
+        // At this point, `cur_ix <= self.len_samples`
+
+        let sample = self.io_sample_buffer[sample_ix_in_frame];
+        self.internal_sample_buffer.set(sample);
+
+        let stretch_factor = self.param_buffer[sample_ix_in_frame];
+        let base_ix = (cur_index as f32) / (self.len_samples as f32);
+        let transformed_ix = self.get_transformed_index(cur_index, stretch_factor);
+        let output_sample = self.read_delayed_sample(base_ix, transformed_ix);
+        self.io_sample_buffer[sample_ix_in_frame] = output_sample;
+
+        if self.cur_index >= self.len_samples {
+            self.cur_index = 0;
+        }
+    }
+
+    #[inline(never)]
     pub fn process(&mut self) {
         for sample_ix_in_frame in 0..FRAME_SIZE {
-            self.cur_index += 1;
-            // At this point, `cur_ix <= self.len_samples`
-
-            self.internal_sample_buffer
-                .set(self.io_sample_buffer[sample_ix_in_frame]);
-
-            let stretch_factor = self.param_buffer[sample_ix_in_frame];
-            let base_ix = (self.cur_index as f32) / (self.len_samples as f32);
-            let transformed_ix = self.get_transformed_index(self.cur_index, stretch_factor);
-            let output_sample = self.read_delayed_sample(base_ix, transformed_ix);
-            self.io_sample_buffer[sample_ix_in_frame] = output_sample;
-
-            if self.cur_index >= self.len_samples {
-                self.cur_index = 0;
-            }
+            self.process_sample(sample_ix_in_frame);
         }
     }
 }
@@ -85,6 +105,7 @@ impl WaveStretcher {
 #[no_mangle]
 pub unsafe extern "C" fn distortion_init_ctx(len_samples: usize) -> *mut WaveStretcher {
     Box::into_raw(box WaveStretcher::new(len_samples))
+    // &mut WAVE_STRETCHER as *mut _
 }
 
 #[no_mangle]

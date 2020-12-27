@@ -37,6 +37,7 @@ import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGai
 import { Sidechain } from 'src/graphEditor/nodes/CustomAudio/Sidechain';
 import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
 
 const ctx = new AudioContext();
 
@@ -449,6 +450,9 @@ export const audioNodeGetters: {
   },
   'customAudio/fmSynth': {
     nodeGetter: FMSynth,
+  },
+  'customAudio/distortion': {
+    nodeGetter: DistortionNode,
   },
 };
 

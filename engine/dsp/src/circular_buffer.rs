@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct CircularBuffer<const LENGTH: usize> {
     buffer: [f32; LENGTH],
     /// Points to the index that the most recently added value was written to
@@ -16,7 +17,7 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
     #[inline]
     pub fn set(&mut self, val: f32) {
         self.head += 1;
-        if self.head >= self.buffer.len() {
+        if self.head >= LENGTH {
             self.head = 0;
         }
 
@@ -26,17 +27,27 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
     /// Returns the value at `head + ix` in the buffer; you're always going to want this to be
     /// negative to avoid reading either old or uninitialized values
     #[inline]
-    pub const fn get(&self, ix: isize) -> f32 {
-        let ix = (self.head as isize + ix).abs() % (self.buffer.len() as isize);
-        self.buffer[if ix > 0 {
-            ix as usize
+    pub fn get(&self, ix: isize) -> f32 {
+        if ix > 0 {
+            panic!();
+        }
+        let ix = (self.head as isize + ix) % ((LENGTH - 1) as isize);
+
+        if ix >= 0 {
+            self.buffer[ix as usize]
         } else {
-            (self.buffer.len() as isize - ix) as usize
-        }]
+            self.buffer[(LENGTH as isize + ix) as usize]
+        }
     }
 
     #[inline]
     pub fn read_interpolated(&self, sample_ix: f32) -> f32 {
+        if sample_ix > 0. {
+            panic!();
+        }
+        if sample_ix == 0. {
+            return self.buffer[self.head];
+        }
         let base_ix = sample_ix.trunc();
         let next_ix = base_ix + (1. * sample_ix.signum());
 
