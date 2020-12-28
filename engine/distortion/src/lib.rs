@@ -43,7 +43,6 @@ impl WaveStretcher {
     ///
     /// Credit to https://www.linkedin.com/in/cameron-mcferran-hall/ for coming up with the
     /// equation used to produce this algorithm
-    #[inline(never)]
     fn get_transformed_index(&self, sample_ix: usize, stretch_factor: f32) -> f32 {
         let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
         let exponent_denominator = 999.0f32;
@@ -59,7 +58,6 @@ impl WaveStretcher {
     }
 
     /// Both params should be between 0.0 and 1.0 inclusive
-    #[inline(never)]
     fn read_delayed_sample(
         &self,
         base_continuous_sample_ix: f32,
@@ -74,7 +72,6 @@ impl WaveStretcher {
         self.internal_sample_buffer.read_interpolated(sample_ix)
     }
 
-    #[inline(never)]
     fn process_sample(&mut self, sample_ix_in_frame: usize) {
         self.cur_index += 1;
         let cur_index = self.cur_index;
@@ -94,7 +91,6 @@ impl WaveStretcher {
         }
     }
 
-    #[inline(never)]
     pub fn process(&mut self) {
         for sample_ix_in_frame in 0..FRAME_SIZE {
             self.process_sample(sample_ix_in_frame);

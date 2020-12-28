@@ -1,6 +1,5 @@
-use dsp::circular_buffer::CircularBuffer;
-
-pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
+pub mod effects;
+use self::effects::{Effect, EffectChain};
 
 #[derive(Clone, Default)]
 pub struct ADSRState {
@@ -16,13 +15,13 @@ trait PhasedOscillator {
         // 1 phase corresponds to 1 period of the waveform.  1 phase is passed every (SAMPLE_RATE /
         // frequency) samples.
         let phase = self.get_phase();
-        if frequency.is_normal() && frequency.abs() > 0.001 {
-            let mut new_phase = (phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
-            if new_phase < 0. {
-                new_phase = 1. + new_phase;
-            }
-            self.set_phase(new_phase);
+        // if frequency.is_normal() && frequency.abs() > 0.001 {
+        let mut new_phase = (phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
+        if new_phase < 0. {
+            new_phase = 1. + new_phase;
         }
+        self.set_phase(new_phase);
+        // }
     }
 }
 
@@ -41,14 +40,10 @@ impl SineOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
         self.update_phase(frequency);
 
-        // unsafe {
-        //     *crate::lookup_tables::SINE_LOOKUP_TABLE.get_unchecked(
-        //         (self.phase * (crate::lookup_tables::SINE_LOOKUP_TABLE.len() - 1) as f32) as
-        // usize,     )
-        // }
+        let sine_lookup_table = crate::lookup_tables::get_sine_lookup_table();
         dsp::read_interpolated(
-            &crate::lookup_tables::SINE_LOOKUP_TABLE,
-            self.phase * (crate::lookup_tables::SINE_LOOKUP_TABLE.len() - 2) as f32,
+            sine_lookup_table,
+            self.phase * (sine_lookup_table.len() - 2) as f32,
         )
     }
 }
@@ -88,7 +83,9 @@ impl ExponentialOscillator {
             .stretch_factor
             .get(param_buffers, adsrs, sample_ix_within_frame);
 
-        let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+        // let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+        let exponent_numerator =
+            fastapprox::faster::pow(10.0f32, 4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
         let exponent_denominator = 999.0f32;
         let exponent = exponent_numerator / exponent_denominator;
 
@@ -96,94 +93,20 @@ impl ExponentialOscillator {
         let extended_phase = self.phase * 2. - 1.;
         let absolute_phase = extended_phase.abs();
         // val is from 0 to 1
-        let val = absolute_phase.powf(exponent);
+        // let val = absolute_phase.powf(exponent);
+        let val = fastapprox::fast::pow(absolute_phase, exponent);
+        debug_assert!(val > -1.);
+        debug_assert!(val < 1.);
         // Re-apply sign
         // output is from -1 to 1
         val * extended_phase.signum()
     }
 }
 
-pub struct SpectralWarpingParams {
-    pub warp_factor: ParamSource,
-    pub frequency: OperatorFrequencySource,
-    // TODO: Make this a param source if it turns out to have an effect on the sound
-    pub phase_offset: f32,
-}
-
-#[derive(Clone)]
-pub struct SpectralWarping {
-    pub frequency: OperatorFrequencySource,
-    pub buffer: CircularBuffer<SPECTRAL_WARPING_BUFFER_SIZE>,
-    pub phase_offset: f32,
-    pub osc: ExponentialOscillator,
-}
-
-impl SpectralWarping {
-    pub fn new(
-        SpectralWarpingParams {
-            warp_factor,
-            frequency,
-            phase_offset,
-        }: SpectralWarpingParams,
-    ) -> Self {
-        SpectralWarping {
-            frequency,
-            buffer: CircularBuffer::new(),
-            phase_offset,
-            osc: ExponentialOscillator::new(warp_factor),
-        }
-    }
-
-    fn get_phase_warp_diff(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
-        sample_ix_within_frame: usize,
-        frequency: f32,
-    ) -> f32 {
-        let warped_phase =
-            (self
-                .osc
-                .gen_sample(frequency, param_buffers, adsrs, sample_ix_within_frame)
-                + 1.)
-                / 2.;
-        warped_phase - self.osc.phase
-    }
-
-    pub fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
-        self.buffer.set(sample);
-        let frequency =
-            self.frequency
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-        if frequency == 0. {
-            return sample;
-        }
-        // We look back half of the wavelength of the frequency.
-        let base_lookback_samples = ((SAMPLE_RATE as f32) / frequency) / 2.;
-
-        // We then "warp" the position of the read head according to the warp factor.
-        let phase_warp_diff =
-            self.get_phase_warp_diff(param_buffers, adsrs, sample_ix_within_frame, frequency);
-        // assert!(phase_warp_diff > -1.);
-        // assert!(phase_warp_diff < 1.);
-        let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);
-        // assert!(lookback_samples > 0.);
-
-        self.buffer.read_interpolated(-lookback_samples)
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct Operator {
     pub oscillator_source: OscillatorSource,
-    pub spectral_warping: Option<Box<SpectralWarping>>,
+    pub effect_chain: EffectChain,
 }
 
 impl Operator {
@@ -204,17 +127,13 @@ impl Operator {
             sample_ix_within_frame,
         );
 
-        if let Some(spectral_warping) = self.spectral_warping.as_mut() {
-            spectral_warping.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            )
-        } else {
-            sample
-        }
+        self.effect_chain.apply(
+            param_buffers,
+            adsrs,
+            sample_ix_within_frame,
+            base_frequency,
+            sample,
+        )
     }
 }
 
@@ -272,6 +191,7 @@ pub struct FMSynthVoice {
     pub operators: [Operator; OPERATOR_COUNT],
     pub last_samples: [f32; OPERATOR_COUNT],
     pub last_sample_frequencies_per_operator: [f32; OPERATOR_COUNT],
+    pub effect_chain: EffectChain,
 }
 
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
@@ -343,11 +263,9 @@ impl FMSynthVoice {
                 sample_ix_within_frame,
                 base_frequency,
             );
-            if sample > 1.0 {
-                panic!("TOO BIG");
-            } else if sample < -1.0 {
-                panic!("TOO SMALL");
-            }
+            debug_assert!(sample >= -1.);
+            debug_assert!(sample <= 1.);
+
             samples_per_operator[operator_ix] = sample;
             output_sample += sample
                 * modulation_matrix.get_output_weight(operator_ix).get(
@@ -359,7 +277,14 @@ impl FMSynthVoice {
 
         self.last_samples = samples_per_operator;
         self.last_sample_frequencies_per_operator = frequencies_per_operator;
-        output_sample
+
+        self.effect_chain.apply(
+            param_buffers,
+            &self.adsrs,
+            sample_ix_within_frame,
+            base_frequency,
+            output_sample,
+        )
     }
 }
 
@@ -508,6 +433,8 @@ impl FMSynthContext {
 
 #[no_mangle]
 pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthContext {
+    crate::lookup_tables::maybe_init_lookup_tables();
+
     Box::into_raw(box FMSynthContext {
         voices: vec![FMSynthVoice::default(); voice_count],
         modulation_matrix: ModulationMatrix::default(),
@@ -610,55 +537,6 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fm_synth_disable_spectral_warping(
-    ctx: *mut FMSynthContext,
-    operator_ix: usize,
-) {
-    for voice in &mut (*ctx).voices {
-        voice.operators[operator_ix].spectral_warping = None;
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn fm_synth_set_spectral_warping(
-    ctx: *mut FMSynthContext,
-    operator_ix: usize,
-    warp_factor_value_type: usize,
-    warp_factor_val_int: usize,
-    warp_factor_val_float: f32,
-    frequency_value_type: usize,
-    frequency_val_int: usize,
-    frequency_val_float: f32,
-    phase_offset: f32,
-) {
-    for voice in &mut (*ctx).voices {
-        let frequency = OperatorFrequencySource::from_parts(
-            frequency_value_type,
-            frequency_val_int,
-            frequency_val_float,
-        );
-        let warp_factor = ParamSource::from_parts(
-            warp_factor_value_type,
-            warp_factor_val_int,
-            warp_factor_val_float,
-        );
-        let params = SpectralWarpingParams {
-            frequency,
-            warp_factor,
-            phase_offset,
-        };
-
-        if let Some(spectral_warping) = voice.operators[operator_ix].spectral_warping.as_mut() {
-            spectral_warping.frequency = frequency;
-            spectral_warping.osc.stretch_factor = warp_factor;
-            spectral_warping.phase_offset = phase_offset;
-        } else {
-            voice.operators[operator_ix].spectral_warping = Some(box SpectralWarping::new(params));
-        }
-    }
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
     ctx: *mut FMSynthContext,
     operator_ix: usize,
@@ -668,4 +546,53 @@ pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
 ) {
     let param = OperatorFrequencySource::from_parts(value_type, value_param_int, value_param_float);
     (*ctx).operator_base_frequency_sources[operator_ix] = param;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_effect(
+    ctx: *mut FMSynthContext,
+    operator_ix: isize,
+    effect_ix: usize,
+    effect_type: isize,
+    param_1_type: usize,
+    param_1_int_val: usize,
+    param_1_float_val: f32,
+    param_2_type: usize,
+    param_2_int_val: usize,
+    param_2_float_val: f32,
+    param_3_type: usize,
+    param_3_int_val: usize,
+    param_3_float_val: f32,
+    param_4_type: usize,
+    param_4_int_val: usize,
+    param_4_float_val: f32,
+) {
+    for voice in &mut (*ctx).voices {
+        let effect_chain = if operator_ix == -1 {
+            &mut voice.effect_chain
+        } else {
+            &mut voice.operators[operator_ix as usize].effect_chain
+        };
+
+        if effect_type == -1 {
+            effect_chain.remove_effect(effect_ix);
+        } else {
+            effect_chain.set_effect(
+                effect_ix,
+                effect_type as usize,
+                param_1_type,
+                param_1_int_val,
+                param_1_float_val,
+                param_2_type,
+                param_2_int_val,
+                param_2_float_val,
+                param_3_type,
+                param_3_int_val,
+                param_3_float_val,
+                param_4_type,
+                param_4_int_val,
+                param_4_float_val,
+            );
+        }
+    }
 }

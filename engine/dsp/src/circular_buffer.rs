@@ -28,9 +28,7 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
     /// negative to avoid reading either old or uninitialized values
     #[inline]
     pub fn get(&self, ix: isize) -> f32 {
-        if ix > 0 {
-            panic!();
-        }
+        debug_assert!(ix <= 0);
         let ix = (self.head as isize + ix) % ((LENGTH - 1) as isize);
 
         if ix >= 0 {
@@ -42,9 +40,7 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
 
     #[inline]
     pub fn read_interpolated(&self, sample_ix: f32) -> f32 {
-        if sample_ix > 0. {
-            panic!();
-        }
+        debug_assert!(sample_ix <= 0.);
         if sample_ix == 0. {
             return self.buffer[self.head];
         }

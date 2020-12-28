@@ -1,7 +1,15 @@
 opt:
   wasm-strip ./dist/wavetable.wasm
   wasm-strip ./dist/granular.wasm
-  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 -c -o ./dist/$file; done
+  for file in `ls ./dist | grep "\\.wasm"`; do wasm-snip ./dist/$file -o ./dist/$file --snip-rust-fmt-code --snip-rust-panicking-code; done
+  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 --enable-simd --enable-nontrapping-float-to-int --disable-nontrapping-float-to-int -g --precompute-propagate --fast-math -c -o ./dist/$file; done
+
+opt-public:
+  wasm-strip ./public/wavetable.wasm
+  wasm-strip ./public/granular.wasm
+  for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done
+  for file in `ls ./public | grep "\\.wasm"`; do wasm-opt ./public/$file -O4 --enable-simd --enable-nontrapping-float-to-int --disable-nontrapping-float-to-int -g --precompute-propagate --fast-math -c -o ./public/$file; done
+
 
 build-all:
   cd engine \

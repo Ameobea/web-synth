@@ -1,13 +1,8 @@
 import { Map as ImmMap } from 'immutable';
-import { Option } from 'funfix-core';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import FMSynthUI from 'src/fmSynth/FMSynthUI';
-import {
-  buildDefaultOperatorConfig,
-  OperatorConfig,
-  ParamSource,
-  SpectralWarpingConfig,
-} from 'src/fmSynth/ConfigureOperator';
+import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -19,7 +14,7 @@ import {
   updateConnectables,
 } from 'src/patchNetwork';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -142,7 +137,7 @@ export default class FMSynth implements ForeignNode {
         return { valueType: 1, valParamInt: 0, valParamFloat: source.value };
       }
       case 'param buffer': {
-        return { valueType: 0, valParamInt: source.bufferIx, valParamFloat: 0 };
+        return { valueType: 0, valParamInt: source['buffer index'], valParamFloat: 0 };
       }
       default: {
         throw new UnimplementedError(`frequency source not yet implemented: ${source.type}`);
@@ -202,18 +197,6 @@ export default class FMSynth implements ForeignNode {
         break;
       }
     }
-
-    this.awpHandle.port.postMessage({
-      type: 'setSpectralWarping',
-      operatorIx,
-      spectralWarping: Option.of(config.spectralWarping)
-        .map(({ frequency, warpFactor, phaseOffset }) => ({
-          frequency: this.encodeParamSourceMessage(frequency),
-          warpFactor: this.encodeParamSourceMessage(warpFactor),
-          phaseOffset,
-        }))
-        .orNull(),
-    });
   }
 
   public handleOutputWeightChange(operatorIx: number, value: number) {

@@ -94,28 +94,36 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
           );
           break;
         }
-        case 'setSpectralWarping': {
+        case 'setEffect': {
           if (!this.wasmInstance) {
             console.error('Tried setting output weight value before Wasm instance loaded');
             return;
           }
-          if (evt.data.spectralWarping) {
-            const { frequency, warpFactor, phaseOffset } = evt.data.spectralWarping;
-            this.wasmInstance.exports.fm_synth_set_spectral_warping(
+          if (evt.data.effect) {
+            const { param1, param2, param3, param4 } = evt.data.effect;
+            this.wasmInstance.exports.fm_synth_set_effect(
               this.ctxPtr,
               evt.data.operatorIx,
-              warpFactor.valueType,
-              warpFactor.valParamInt,
-              warpFactor.valParamFloat,
-              frequency.valueType,
-              frequency.valParamInt,
-              frequency.valParamFloat,
-              phaseOffset
+              evt.data.effectIx,
+              param1?.valueType ?? 0,
+              param1?.valParamInt ?? 0,
+              param1?.valParamFloat ?? 0,
+              param2?.valueType ?? 0,
+              param2?.valParamInt ?? 0,
+              param2?.valParamFloat ?? 0,
+              param3?.valueType ?? 0,
+              param3?.valParamInt ?? 0,
+              param3?.valParamFloat ?? 0,
+              param4?.valueType ?? 0,
+              param4?.valParamInt ?? 0,
+              param4?.valParamFloat ?? 0
             );
           } else {
-            this.wasmInstance.exports.fm_synth_disable_spectral_warping(
+            this.wasmInstance.exports.fm_synth_set_effect(
               this.ctxPtr,
-              evt.data.operatorIx
+              evt.data.operatorIx,
+              evt.data.effectIx,
+              -1
             );
           }
           break;

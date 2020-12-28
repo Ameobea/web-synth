@@ -4,11 +4,14 @@ import * as R from 'ramda';
 import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
+import { Effect } from 'src/fmSynth/ConfigureEffects';
+import { UnimplementedError } from 'ameo-utils';
 
 interface FMSynthState {
   modulationIndices: number[][];
   outputWeights: number[];
   operatorConfigs: OperatorConfig[];
+  operatorEffects: (Effect | null)[][];
 }
 
 type BackendModulationUpdater = (operatorIx: number, modulationIx: number, val: number) => void;
@@ -49,6 +52,8 @@ const FMSynthUI: React.FC<{
   outputWeights: number[];
   operatorConfigs: OperatorConfig[];
   onOperatorConfigChange: (operatorIx: number, newConfig: OperatorConfig) => void;
+  operatorEffects: (Effect | null)[][];
+  setEffect: (effectIx: number, effect: Effect | null) => void;
 }> = ({
   updateBackendModulation,
   updateBackendOutput,
@@ -56,11 +61,14 @@ const FMSynthUI: React.FC<{
   outputWeights,
   operatorConfigs,
   onOperatorConfigChange,
+  operatorEffects,
+  setEffect,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationIndices,
     outputWeights,
     operatorConfigs,
+    operatorEffects,
   });
   const [selectedOperatorIx, setSelectedOperatorIx] = useState(0);
 
@@ -145,6 +153,21 @@ const FMSynthUI: React.FC<{
             operatorConfigs: R.set(R.lensIndex(selectedOperatorIx), newConf, state.operatorConfigs),
           });
           onOperatorConfigChange(selectedOperatorIx, newConf);
+        }}
+        effects={state.operatorEffects[selectedOperatorIx]}
+        onEffectsChange={(effectIx: number, newEffect: Effect | null) => {
+          setEffect(effectIx, newEffect);
+          const newState = { ...state };
+          state.operatorEffects = [...state.operatorEffects];
+          state.operatorEffects[selectedOperatorIx] = [
+            ...state.operatorEffects[selectedOperatorIx],
+          ];
+          state.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+          if (!newEffect) {
+            // TODO: Slide effects down
+            throw new UnimplementedError();
+          }
+          setState(newState);
         }}
       />
     </div>

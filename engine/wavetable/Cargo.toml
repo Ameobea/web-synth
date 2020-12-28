@@ -9,3 +9,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dsp = { path = "../dsp" }
+fastapprox = "0.3"
