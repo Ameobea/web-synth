@@ -1,8 +1,10 @@
 import { filterNils } from 'ameo-utils';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import { Option } from 'funfix-core';
 
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import FlatButton from 'src/misc/FlatButton';
 
 export type Effect =
   | {
@@ -12,12 +14,13 @@ export type Effect =
       phaseOffset: number;
     }
   | {
-      type: 'wavefolder';
+      type: 'wavecruncher';
       topFoldPosition: ParamSource;
       topFoldWidth: ParamSource;
       bottomFoldPosition: ParamSource;
       bottomFoldWidth: ParamSource;
-    };
+    }
+  | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource };
 
 const buildDefaultEffect = (type: Effect['type']): Effect => {
   switch (type) {
@@ -29,63 +32,197 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         phaseOffset: 0,
       };
     }
-    case 'wavefolder': {
+    case 'wavecruncher': {
       return {
         type,
         topFoldPosition: { type: 'constant', value: 0.8 },
         topFoldWidth: { type: 'constant', value: 0.25 },
-        bottomFoldPosition: { type: 'constant', value: 0.8 },
+        bottomFoldPosition: { type: 'constant', value: -0.8 },
         bottomFoldWidth: { type: 'constant', value: 0.25 },
+      };
+    }
+    case 'wavefolder': {
+      return {
+        type,
+        gain: { type: 'constant', value: 1.5 },
+        offset: { type: 'constant', value: 0 },
       };
     }
   }
 };
 
-const ConfigureSpectralWarping: React.FC<{
-  state: Extract<Effect, { type: 'spectral warping' }>;
+const baseTheme = {
+  background2: 'rgb(54,54,54)',
+  background2hover: 'rgb(58,58,58)',
+  foreground1: 'rgb(112,112,112)',
+  text1: 'rgb(235,235,235)',
+  text2: 'rgb(161,161,161)',
+};
+const spectralWarpTheme = { ...baseTheme, background1: 'rgb(24,48,182)' };
+const wavecruncherTheme = { ...baseTheme, background1: 'rgb(199,48,184)' };
+const wavefolderTheme = { ...baseTheme, background1: 'rgb(24,120,101)' };
+
+const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
+  'spectral warping': spectralWarpTheme,
+  wavecruncher: wavecruncherTheme,
+  wavefolder: wavefolderTheme,
+};
+
+type EffectConfigurator<T> = React.FC<{
+  state: Extract<Effect, { type: T }>;
   onChange: (newState: Effect | null) => void;
-}> = ({ state, onChange }) => {
+}>;
+
+const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({ state, onChange }) => {
   return (
     <>
       <ConfigureParamSource
+        theme={spectralWarpTheme}
         title='frequency'
         state={state.frequency}
         onChange={newFrequency => onChange({ ...state, frequency: newFrequency })}
+        min={0}
+        max={20_000}
       />
       <ConfigureParamSource
+        theme={spectralWarpTheme}
         title='warp factor'
         state={state.warpFactor}
         onChange={newWarpFactor => onChange({ ...state, warpFactor: newWarpFactor })}
+        min={0}
+        max={1}
       />
     </>
   );
 };
 
-const ConfigureWavefolder: React.FC<{
-  state: Extract<Effect, { type: 'wavefolder' }>;
+const ConfigureWavecruncher: React.FC<{
+  state: Extract<Effect, { type: 'wavecruncher' }>;
   onChange: (newState: Effect | null) => void;
 }> = ({ state, onChange }) => {
   return (
     <>
       <ConfigureParamSource
+        theme={wavecruncherTheme}
         title='top fold position'
         state={state.topFoldPosition}
         onChange={topFoldPosition => onChange({ ...state, topFoldPosition })}
+        min={0}
+        max={1}
       />
       <ConfigureParamSource
+        theme={wavecruncherTheme}
         title='top fold width'
         state={state.topFoldWidth}
         onChange={topFoldWidth => onChange({ ...state, topFoldWidth })}
+        min={0}
+        max={1}
       />
       <ConfigureParamSource
+        theme={wavecruncherTheme}
         title='bottom fold position'
         state={state.bottomFoldPosition}
         onChange={bottomFoldPosition => onChange({ ...state, bottomFoldPosition })}
+        min={-1}
+        max={0}
       />
       <ConfigureParamSource
+        theme={wavecruncherTheme}
         title='bottom fold width'
         state={state.bottomFoldWidth}
         onChange={bottomFoldWidth => onChange({ ...state, bottomFoldWidth })}
+        min={0}
+        max={1}
+      />
+    </>
+  );
+};
+
+const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange }) => (
+  <>
+    <ConfigureParamSource
+      title='gain'
+      theme={wavefolderTheme}
+      min={0}
+      max={16}
+      state={state.gain}
+      onChange={gain => onChange({ ...state, gain })}
+    />
+    <ConfigureParamSource
+      title='offset'
+      theme={wavefolderTheme}
+      min={0}
+      max={16}
+      state={state.offset}
+      onChange={offset => onChange({ ...state, offset })}
+    />
+  </>
+);
+
+const EffectManagement: React.FC<{
+  effectIx: number;
+  operatorEffects: (Effect | null)[];
+  setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
+  onChange: (newEffect: Effect | null) => void;
+}> = ({ effectIx, operatorEffects, setOperatorEffects, onChange }) => {
+  const theme = Option.of(operatorEffects[effectIx]?.type)
+    .map(type => ThemesByType[type])
+    .orUndefined();
+
+  return (
+    <>
+      <div className='effect-management' style={{ backgroundColor: theme?.background1 }}>
+        <FlatButton onClick={() => onChange(null)}>×</FlatButton>
+        {effectIx !== 0 ? (
+          <FlatButton
+            onClick={() => {
+              const newEffects = [...operatorEffects];
+              const swapEffect = operatorEffects[effectIx - 1];
+              newEffects[effectIx - 1] = newEffects[effectIx];
+              newEffects[effectIx] = swapEffect;
+              setOperatorEffects(newEffects);
+            }}
+          >
+            ↑
+          </FlatButton>
+        ) : null}
+        {operatorEffects[effectIx + 1] ? (
+          <FlatButton
+            onClick={() => {
+              const newEffects = [...operatorEffects];
+              const swapEffect = operatorEffects[effectIx + 1];
+              newEffects[effectIx + 1] = newEffects[effectIx];
+              newEffects[effectIx] = swapEffect;
+              setOperatorEffects(newEffects);
+            }}
+          >
+            ↓
+          </FlatButton>
+        ) : null}
+        <div className='effect-title'>{operatorEffects[effectIx]?.type}</div>
+      </div>
+      <ControlPanel
+        style={{ width: 378 }}
+        theme={theme}
+        state={{ 'effect type': operatorEffects[effectIx]?.type }}
+        settings={[
+          {
+            type: 'select',
+            label: 'effect type',
+            options: ['spectral warping', 'wavecruncher', 'wavefolder'] as Effect['type'][],
+          },
+        ]}
+        onChange={(key: string, val: any) => {
+          switch (key) {
+            case 'effect type': {
+              onChange({ ...(operatorEffects[effectIx] ?? {}), ...buildDefaultEffect(val) });
+              break;
+            }
+            default: {
+              console.error('Unhandled effect configurator key: ', key);
+            }
+          }
+        }}
       />
     </>
   );
@@ -99,6 +236,9 @@ const ConfigureEffectSpecific: React.FC<{
     case 'spectral warping': {
       return <ConfigureSpectralWarping state={state} onChange={onChange} />;
     }
+    case 'wavecruncher': {
+      return <ConfigureWavecruncher state={state} onChange={onChange} />;
+    }
     case 'wavefolder': {
       return <ConfigureWavefolder state={state} onChange={onChange} />;
     }
@@ -106,31 +246,21 @@ const ConfigureEffectSpecific: React.FC<{
 };
 
 const ConfigureEffect: React.FC<{
+  effectIx: number;
   state: Effect;
   onChange: (newEffect: Effect | null) => void;
-}> = ({ state, onChange }) => {
+  operatorEffects: (Effect | null)[];
+  setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
+}> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects }) => {
   return (
     <>
-      <ControlPanel
-        settings={[
-          {
-            type: 'select',
-            label: 'effect type',
-            options: ['spectral warping', 'wavefolder'] as Effect['type'][],
-          },
-        ]}
-        onChange={(key: string, val: any) => {
-          switch (key) {
-            case 'effect type': {
-              // TODO
-              break;
-            }
-            default: {
-              console.error('Unhandled effect configurator key: ', key);
-            }
-          }
-        }}
+      <EffectManagement
+        effectIx={effectIx}
+        operatorEffects={operatorEffects}
+        setOperatorEffects={setOperatorEffects}
+        onChange={onChange}
       />
+
       <ConfigureEffectSpecific state={state} onChange={onChange} />
     </>
   );
@@ -139,23 +269,35 @@ const ConfigureEffect: React.FC<{
 const ConfigureEffects: React.FC<{
   state: (Effect | null)[];
   onChange: (ix: number, newState: Effect | null) => void;
-}> = ({ state, onChange }) => {
+  operatorEffects: (Effect | null)[];
+  setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
+}> = ({ state, onChange, operatorEffects, setOperatorEffects }) => {
   const [selectedEffectType, setSelectedEffectType] = useState<Effect['type']>('spectral warping');
 
   return (
     <div className='configure-effects'>
-      {filterNils(state).map((effect, i) => (
-        <ConfigureEffect key={i} state={effect} onChange={newEffect => onChange(i, newEffect)} />
-      ))}
+      <div className='effects-controls'>
+        {filterNils(state).map((effect, i) => (
+          <ConfigureEffect
+            effectIx={i}
+            key={i}
+            state={effect}
+            onChange={newEffect => onChange(i, newEffect)}
+            operatorEffects={operatorEffects}
+            setOperatorEffects={setOperatorEffects}
+          />
+        ))}
+      </div>
 
       <ControlPanel
         state={{ 'effect type': selectedEffectType }}
+        style={{ width: 378 }}
         onChange={(_key: string, val: any) => setSelectedEffectType(val)}
         settings={[
           {
             type: 'select',
             label: 'effect type',
-            options: ['spectral warping', 'wavefolder'] as Effect['type'][],
+            options: ['spectral warping', 'wavecruncher', 'wavefolder'] as Effect['type'][],
           },
           {
             type: 'button',

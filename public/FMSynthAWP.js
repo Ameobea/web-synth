@@ -5,7 +5,7 @@ const VOICE_COUNT = 16;
 const PARAM_COUNT = 8;
 const SAMPLE_RATE = 44_100;
 
-class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
+class FMSynthAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
       ...new Array(VOICE_COUNT).fill(null).map((_x, i) => ({
@@ -99,35 +99,29 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
             console.error('Tried setting output weight value before Wasm instance loaded');
             return;
           }
-          if (evt.data.effect) {
-            const { param1, param2, param3, param4 } = evt.data.effect;
-            this.wasmInstance.exports.fm_synth_set_effect(
-              this.ctxPtr,
-              evt.data.operatorIx,
-              evt.data.effectIx,
-              param1?.valueType ?? 0,
-              param1?.valParamInt ?? 0,
-              param1?.valParamFloat ?? 0,
-              param2?.valueType ?? 0,
-              param2?.valParamInt ?? 0,
-              param2?.valParamFloat ?? 0,
-              param3?.valueType ?? 0,
-              param3?.valParamInt ?? 0,
-              param3?.valParamFloat ?? 0,
-              param4?.valueType ?? 0,
-              param4?.valParamInt ?? 0,
-              param4?.valParamFloat ?? 0
-            );
-          } else {
-            this.wasmInstance.exports.fm_synth_set_effect(
-              this.ctxPtr,
-              evt.data.operatorIx,
-              evt.data.effectIx,
-              -1
-            );
-          }
+
+          const { effectType, param1, param2, param3, param4 } = evt.data;
+          this.wasmInstance.exports.fm_synth_set_effect(
+            this.ctxPtr,
+            evt.data.operatorIx,
+            evt.data.effectIx,
+            effectType,
+            param1?.valueType ?? 0,
+            param1?.valParamInt ?? 0,
+            param1?.valParamFloat ?? 0,
+            param2?.valueType ?? 0,
+            param2?.valParamInt ?? 0,
+            param2?.valParamFloat ?? 0,
+            param3?.valueType ?? 0,
+            param3?.valParamInt ?? 0,
+            param3?.valParamFloat ?? 0,
+            param4?.valueType ?? 0,
+            param4?.valParamInt ?? 0,
+            param4?.valParamFloat ?? 0
+          );
           break;
         }
+
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }
@@ -225,4 +219,4 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('fm-synth-audio-worklet-processor', NoiseGeneratorWorkletProcessor);
+registerProcessor('fm-synth-audio-worklet-processor', FMSynthAWP);

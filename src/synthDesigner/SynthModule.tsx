@@ -333,6 +333,12 @@ const SynthModuleCompInner: React.FC<{
           onOperatorConfigChange={(operatorIx: number, newOperatorConfig: OperatorConfig) =>
             synth.fmSynth!.handleOperatorConfigChange(operatorIx, newOperatorConfig)
           }
+          operatorEffects={synth.fmSynth.getOperatorEffects()}
+          setEffect={synth.fmSynth.setEffect.bind(synth.fmSynth)}
+          initialSelectedOperatorIx={synth.fmSynth.selectedOperatorIx}
+          onOperatorSelected={opIx => {
+            synth.fmSynth!.selectedOperatorIx = opIx;
+          }}
         />
       ) : null}
 

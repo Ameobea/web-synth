@@ -93,10 +93,15 @@ impl ExponentialOscillator {
         let extended_phase = self.phase * 2. - 1.;
         let absolute_phase = extended_phase.abs();
         // val is from 0 to 1
-        // let val = absolute_phase.powf(exponent);
-        let val = fastapprox::fast::pow(absolute_phase, exponent);
-        debug_assert!(val > -1.);
-        debug_assert!(val < 1.);
+        let val = if cfg!(debug_assertions) {
+            let val = absolute_phase.powf(exponent);
+            debug_assert!(val >= -1.);
+            debug_assert!(val <= 1.);
+            val
+        } else {
+            dsp::clamp(-1., 1., fastapprox::fast::pow(absolute_phase, exponent))
+        };
+
         // Re-apply sign
         // output is from -1 to 1
         val * extended_phase.signum()
@@ -176,7 +181,16 @@ impl OscillatorSource {
                 // TODO
                 -1.0
             },
-            OscillatorSource::ParamBuffer(buf_ix) => param_buffers[*buf_ix][sample_ix_within_frame],
+            OscillatorSource::ParamBuffer(buf_ix) =>
+                if cfg!(debug_assertions) {
+                    param_buffers[*buf_ix][sample_ix_within_frame]
+                } else {
+                    *unsafe {
+                        param_buffers
+                            .get_unchecked(*buf_ix)
+                            .get_unchecked(sample_ix_within_frame)
+                    }
+                },
             OscillatorSource::Sine(osc) => osc.gen_sample(frequency),
             OscillatorSource::ExponentialOscillator(osc) =>
                 osc.gen_sample(frequency, param_buffers, adsrs, sample_ix_within_frame),
@@ -197,7 +211,7 @@ pub struct FMSynthVoice {
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
 /// frequency
 fn compute_modulated_frequency(
-    modulation_matrix: &ModulationMatrix,
+    modulation_matrix: &mut ModulationMatrix,
     last_samples: &[f32; OPERATOR_COUNT],
     param_buffers: &[[f32; FRAME_SIZE]],
     adsrs: &[ADSRState],
@@ -208,13 +222,13 @@ fn compute_modulated_frequency(
 ) -> f32 {
     let mut output_freq = carrier_base_frequency;
     for modulator_operator_ix in 0..OPERATOR_COUNT {
-        let modulator_output = last_samples[modulator_operator_ix];
+        let modulator_output = unsafe { last_samples.get_unchecked(modulator_operator_ix) };
         let modulation_index = modulation_matrix
             .get_operator_modulation_index(modulator_operator_ix, operator_ix)
             .get(param_buffers, adsrs, sample_ix_within_frame);
         output_freq += modulator_output
             * modulation_index
-            * last_sample_modulator_frequencies[modulator_operator_ix];
+            * unsafe { last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
     }
     output_freq
 }
@@ -222,7 +236,7 @@ fn compute_modulated_frequency(
 impl FMSynthVoice {
     pub fn gen_sample(
         &mut self,
-        modulation_matrix: &ModulationMatrix,
+        modulation_matrix: &mut ModulationMatrix,
         wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
         sample_ix_within_frame: usize,
@@ -253,7 +267,8 @@ impl FMSynthVoice {
                 carrier_base_frequency,
                 &self.last_sample_frequencies_per_operator,
             );
-            frequencies_per_operator[operator_ix] = modulated_frequency;
+            *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
+                modulated_frequency;
             let carrier_operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
             let sample = carrier_operator.gen_sample(
                 modulated_frequency,
@@ -266,7 +281,7 @@ impl FMSynthVoice {
             debug_assert!(sample >= -1.);
             debug_assert!(sample <= 1.);
 
-            samples_per_operator[operator_ix] = sample;
+            *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
             output_sample += sample
                 * modulation_matrix.get_output_weight(operator_ix).get(
                     param_buffers,
@@ -289,7 +304,7 @@ impl FMSynthVoice {
 }
 
 #[derive(Clone, Copy)]
-pub enum ParamSource {
+pub enum ParamSourceType {
     /// Each sample, the value for this param is pulled out of the parameter buffer of this index.
     /// These buffers are populated externally every frame.
     ParamBuffer(usize),
@@ -300,6 +315,33 @@ pub enum ParamSource {
 }
 
 #[derive(Clone, Copy)]
+pub struct ParamSource {
+    pub source_type: ParamSourceType,
+    pub value: f32,
+}
+
+impl ParamSource {
+    pub fn new(source_type: ParamSourceType) -> Self {
+        ParamSource {
+            source_type,
+            value: 0.,
+        }
+    }
+
+    pub fn get(
+        &mut self,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        sample_ix_within_frame: usize,
+    ) -> f32 {
+        let output = self
+            .source_type
+            .get(param_buffers, adsrs, sample_ix_within_frame);
+        dsp::one_pole(&mut self.value, output, 0.99)
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum OperatorFrequencySource {
     ValueSource(ParamSource),
     BaseFrequencyMultiplier(f32),
@@ -307,7 +349,7 @@ pub enum OperatorFrequencySource {
 
 impl OperatorFrequencySource {
     pub fn get(
-        &self,
+        &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix: usize,
@@ -322,9 +364,15 @@ impl OperatorFrequencySource {
 
     pub fn from_parts(value_type: usize, value_param_int: usize, value_param_float: f32) -> Self {
         match value_type {
-            0 => OperatorFrequencySource::ValueSource(ParamSource::ParamBuffer(value_param_int)),
-            1 => OperatorFrequencySource::ValueSource(ParamSource::Constant(value_param_float)),
-            2 => OperatorFrequencySource::ValueSource(ParamSource::PerVoiceADSR(value_param_int)),
+            0 => OperatorFrequencySource::ValueSource(ParamSource::new(
+                ParamSourceType::ParamBuffer(value_param_int),
+            )),
+            1 => OperatorFrequencySource::ValueSource(ParamSource::new(ParamSourceType::Constant(
+                value_param_float,
+            ))),
+            2 => OperatorFrequencySource::ValueSource(ParamSource::new(
+                ParamSourceType::PerVoiceADSR(value_param_int),
+            )),
             3 => OperatorFrequencySource::BaseFrequencyMultiplier(value_param_float),
             _ => panic!("Invalid value type; expected 0-3"),
         }
@@ -332,10 +380,10 @@ impl OperatorFrequencySource {
 }
 
 impl Default for ParamSource {
-    fn default() -> Self { ParamSource::Constant(0.0) }
+    fn default() -> Self { Self::new(ParamSourceType::Constant(0.0)) }
 }
 
-impl ParamSource {
+impl ParamSourceType {
     pub fn get(
         &self,
         param_buffers: &[[f32; FRAME_SIZE]],
@@ -343,10 +391,24 @@ impl ParamSource {
         sample_ix_within_frame: usize,
     ) -> f32 {
         match self {
-            ParamSource::ParamBuffer(buf_ix) => param_buffers[*buf_ix][sample_ix_within_frame],
-            ParamSource::Constant(val) => *val,
-            ParamSource::PerVoiceADSR(adsr_ix) => {
-                let adsr = &adsrs[*adsr_ix];
+            ParamSourceType::ParamBuffer(buf_ix) =>
+                if cfg!(debug_assertions) {
+                    param_buffers[*buf_ix][sample_ix_within_frame]
+                } else {
+                    unsafe {
+                        *param_buffers
+                            .get_unchecked(*buf_ix)
+                            .get_unchecked(sample_ix_within_frame)
+                    }
+                },
+            ParamSourceType::Constant(val) => *val,
+            ParamSourceType::PerVoiceADSR(adsr_ix) => {
+                let adsr = if cfg!(debug_assertions) {
+                    &adsrs[*adsr_ix]
+                } else {
+                    unsafe { adsrs.get_unchecked(*adsr_ix) }
+                };
+
                 // TODO
                 -1.
             },
@@ -355,9 +417,9 @@ impl ParamSource {
 
     pub fn from_parts(value_type: usize, value_param_int: usize, value_param_float: f32) -> Self {
         match value_type {
-            0 => ParamSource::ParamBuffer(value_param_int),
-            1 => ParamSource::Constant(value_param_float),
-            2 => ParamSource::PerVoiceADSR(value_param_int),
+            0 => ParamSourceType::ParamBuffer(value_param_int),
+            1 => ParamSourceType::Constant(value_param_float),
+            2 => ParamSourceType::PerVoiceADSR(value_param_int),
             _ => panic!("Invalid value type; expected 0-2"),
         }
     }
@@ -378,19 +440,27 @@ pub struct ModulationMatrix {
 
 impl ModulationMatrix {
     pub fn get_operator_modulation_index(
-        &self,
+        &mut self,
         src_operator_ix: usize,
         dst_operator_ix: usize,
-    ) -> &ParamSource {
-        unsafe {
-            self.weights_per_operator
-                .get_unchecked(src_operator_ix)
-                .get_unchecked(dst_operator_ix)
+    ) -> &mut ParamSource {
+        if cfg!(debug_assertions) {
+            &mut self.weights_per_operator[src_operator_ix][dst_operator_ix]
+        } else {
+            unsafe {
+                self.weights_per_operator
+                    .get_unchecked_mut(src_operator_ix)
+                    .get_unchecked_mut(dst_operator_ix)
+            }
         }
     }
 
-    pub fn get_output_weight(&self, operator_ix: usize) -> &ParamSource {
-        unsafe { self.output_weights.get_unchecked(operator_ix) }
+    pub fn get_output_weight(&mut self, operator_ix: usize) -> &mut ParamSource {
+        if cfg!(debug_assertions) {
+            &mut self.output_weights[operator_ix]
+        } else {
+            unsafe { self.output_weights.get_unchecked_mut(operator_ix) }
+        }
     }
 }
 
@@ -407,47 +477,52 @@ impl FMSynthContext {
     pub fn generate(&mut self) {
         for sample_ix in 0..FRAME_SIZE {
             for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
+                let base_frequency = *unsafe {
+                    self.base_frequency_input_buffer
+                        .get_unchecked(voice_ix)
+                        .get_unchecked(sample_ix)
+                };
+                if base_frequency == 0. {
+                    continue;
+                }
+
                 let sample = voice.gen_sample(
-                    &self.modulation_matrix,
+                    &mut self.modulation_matrix,
                     &mut [],
                     &self.param_buffers,
                     sample_ix,
                     &self.operator_base_frequency_sources,
-                    unsafe {
-                        *self
-                            .base_frequency_input_buffer
-                            .get_unchecked(voice_ix)
-                            .get_unchecked(sample_ix)
-                    },
+                    base_frequency,
                 );
-                unsafe {
-                    *self
-                        .output_buffers
+                *unsafe {
+                    self.output_buffers
                         .get_unchecked_mut(voice_ix)
-                        .get_unchecked_mut(sample_ix) = sample
-                };
+                        .get_unchecked_mut(sample_ix)
+                } = sample;
             }
         }
     }
 }
 
 #[no_mangle]
+#[cold]
 pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthContext {
     crate::lookup_tables::maybe_init_lookup_tables();
 
     Box::into_raw(box FMSynthContext {
         voices: vec![FMSynthVoice::default(); voice_count],
         modulation_matrix: ModulationMatrix::default(),
-        param_buffers: [[0.0; FRAME_SIZE]; MAX_PARAM_BUFFERS],
+        param_buffers: std::mem::MaybeUninit::uninit().assume_init(),
         operator_base_frequency_sources: [OperatorFrequencySource::BaseFrequencyMultiplier(1.);
             OPERATOR_COUNT],
         base_frequency_input_buffer: vec![[0.; FRAME_SIZE]; voice_count],
-        output_buffers: vec![[0.0; FRAME_SIZE]; voice_count],
+        output_buffers: vec![std::mem::MaybeUninit::uninit().assume_init(); voice_count],
     })
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn free_fm_synth_ctx(ctx: *mut FMSynthContext) { drop(Box::from_raw(ctx)) }
+// #[no_mangle]
+// #[cold]
+// pub unsafe extern "C" fn free_fm_synth_ctx(ctx: *mut FMSynthContext) { drop(Box::from_raw(ctx)) }
 
 #[no_mangle]
 pub unsafe extern "C" fn get_param_buffers_ptr(ctx: *mut FMSynthContext) -> *mut [f32; FRAME_SIZE] {
@@ -474,7 +549,11 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
     val_param_int: usize,
     val_param_float: f32,
 ) {
-    let param = ParamSource::from_parts(value_type, val_param_int, val_param_float);
+    let param = ParamSource::new(ParamSourceType::from_parts(
+        value_type,
+        val_param_int,
+        val_param_float,
+    ));
     (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix] = param;
 }
 
@@ -486,7 +565,11 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
     val_param_int: usize,
     val_param_float: f32,
 ) {
-    let param = ParamSource::from_parts(value_type, val_param_int, val_param_float);
+    let param = ParamSource::new(ParamSourceType::from_parts(
+        value_type,
+        val_param_int,
+        val_param_float,
+    ));
     (*ctx).modulation_matrix.output_weights[operator_ix] = param;
 }
 
@@ -505,11 +588,11 @@ fn build_oscillator_source(
         }),
         3 => OscillatorSource::ExponentialOscillator(ExponentialOscillator {
             phase: phase_opt.unwrap_or_default(),
-            stretch_factor: ParamSource::from_parts(
+            stretch_factor: ParamSource::new(ParamSourceType::from_parts(
                 param_value_type,
                 param_val_int,
                 param_val_float,
-            ),
+            )),
         }),
         _ => panic!("Invalid operator type: {}", operator_type),
     }

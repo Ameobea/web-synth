@@ -15,6 +15,7 @@ import {
 } from 'src/patchNetwork';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import { Effect } from 'src/fmSynth/ConfigureEffects';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -41,6 +42,10 @@ export default class FMSynth implements ForeignNode {
   private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT)
     .fill(undefined as any)
     .map(buildDefaultOperatorConfig);
+  private operatorEffects: (Effect | null)[][] = new Array(OPERATOR_COUNT)
+    .fill(null as any)
+    .map(() => new Array(16).fill(null));
+  public selectedOperatorIx: number | null = null;
   private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
 
   static typeName = 'FM Synthesizer';
@@ -59,12 +64,14 @@ export default class FMSynth implements ForeignNode {
   public getOperatorConfigs() {
     return this.operatorConfigs;
   }
+  public getOperatorEffects() {
+    return this.operatorEffects;
+  }
 
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
 
-    // TODO: Deserialize
     if (params) {
       this.deserialize(params);
     }
@@ -83,6 +90,13 @@ export default class FMSynth implements ForeignNode {
           this.handleOperatorConfigChange(operatorIx, newOperatorConfig),
         updateBackendOutput: (operatorIx: number, val: number) =>
           this.handleOutputWeightChange(operatorIx, val),
+        operatorEffects: this.operatorEffects,
+        setEffect: (operatorIx: number | null, effectIx: number, newEffect: Effect | null) =>
+          this.setEffect(operatorIx, effectIx, newEffect),
+        initialSelectedOperatorIx: this.selectedOperatorIx,
+        onOperatorSelected: (operatorIx: number) => {
+          this.selectedOperatorIx = operatorIx;
+        },
       }),
     });
 
@@ -111,6 +125,12 @@ export default class FMSynth implements ForeignNode {
           this.operatorConfigs.forEach((config, opIx) =>
             this.handleOperatorConfigChange(opIx, config)
           );
+          this.operatorEffects.forEach((effectsForOp, opIx) => {
+            effectsForOp.forEach((effect, effectIx) => {
+              this.setEffect(opIx, effectIx, effect);
+            });
+          });
+
           if (this.onInitialized) {
             this.onInitialized(this.buildConnectables());
             this.onInitialized = undefined;
@@ -128,7 +148,7 @@ export default class FMSynth implements ForeignNode {
     }
   }
 
-  private encodeParamSourceMessage(source: ParamSource) {
+  private encodeParamSource(source: ParamSource) {
     switch (source.type) {
       case 'base frequency multiplier': {
         return { valueType: 3, valParamInt: 0, valParamFloat: source.multiplier };
@@ -153,7 +173,7 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.postMessage({
       type: 'setOperatorBaseFrequencySource',
       operatorIx,
-      ...this.encodeParamSourceMessage(source),
+      ...this.encodeParamSource(source),
     });
   }
 
@@ -177,7 +197,7 @@ export default class FMSynth implements ForeignNode {
       ...(() => {
         switch (config.type) {
           case 'exponential oscillator': {
-            return this.encodeParamSourceMessage(config.stretchFactor);
+            return this.encodeParamSource(config.stretchFactor);
           }
           default: {
             return { valueType: 0, valParamInt: 0, valParamFloat: 0 };
@@ -234,6 +254,67 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
+  private encodeEffect(effect: Effect | null) {
+    if (!effect) {
+      return [-1, null, null, null, null];
+    }
+
+    switch (effect.type) {
+      case 'spectral warping': {
+        return [
+          0,
+          this.encodeParamSource(effect.frequency),
+          this.encodeParamSource(effect.warpFactor),
+          null,
+          null,
+        ];
+      }
+      case 'wavecruncher': {
+        return [
+          1,
+          this.encodeParamSource(effect.topFoldPosition),
+          this.encodeParamSource(effect.topFoldWidth),
+          this.encodeParamSource(effect.bottomFoldPosition),
+          this.encodeParamSource(effect.bottomFoldWidth),
+        ];
+      }
+      case 'wavefolder': {
+        return [
+          3,
+          this.encodeParamSource(effect.gain),
+          this.encodeParamSource(effect.offset),
+          null,
+          null,
+        ];
+      }
+    }
+  }
+
+  public setEffect(operatorIx: number | null, effectIx: number, newEffect: Effect | null) {
+    if (!this.awpHandle) {
+      console.error('Tried to set effect before AWP initialization');
+      return;
+    }
+    if (operatorIx === null) {
+      throw new UnimplementedError(); // TODO
+    } else {
+      this.operatorEffects[operatorIx][effectIx] = newEffect;
+    }
+
+    const [effectType, param1, param2, param3, param4] = this.encodeEffect(newEffect);
+
+    this.awpHandle.port.postMessage({
+      type: 'setEffect',
+      operatorIx,
+      effectIx,
+      effectType,
+      param1,
+      param2,
+      param3,
+      param4,
+    });
+  }
+
   private deserialize(params: { [key: string]: any }) {
     if (params.modulationIndices) {
       this.modulationIndices = params.modulationIndices;
@@ -247,6 +328,9 @@ export default class FMSynth implements ForeignNode {
     if (params.onInitialized) {
       this.onInitialized = params.onInitialized;
     }
+    if (params.operatorEffects) {
+      this.operatorEffects = params.operatorEffects;
+    }
   }
 
   public serialize() {
@@ -254,6 +338,8 @@ export default class FMSynth implements ForeignNode {
       modulationIndices: this.modulationIndices,
       outputWeights: this.outputWeights,
       operatorConfigs: this.operatorConfigs,
+      operatorEffects: this.operatorEffects,
+      selectedOperatorIx: this.selectedOperatorIx,
     };
   }
 

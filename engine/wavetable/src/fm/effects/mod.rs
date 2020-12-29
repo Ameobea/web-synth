@@ -1,12 +1,16 @@
 use spectral_warping::SpectralWarpingParams;
 
-use super::{ADSRState, OperatorFrequencySource, ParamSource, FRAME_SIZE};
+use super::{ADSRState, OperatorFrequencySource, ParamSource, ParamSourceType, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod spectral_warping;
 pub mod wavefolder;
 
-use self::{bitcrusher::Bitcrusher, spectral_warping::SpectralWarping, wavefolder::Wavefolder};
+use self::{
+    bitcrusher::Bitcrusher,
+    spectral_warping::SpectralWarping,
+    wavefolder::{Wavecruncher, Wavefolder},
+};
 
 pub trait Effect {
     fn apply(
@@ -24,6 +28,7 @@ pub enum EffectInstance {
     SpectralWarping(Box<SpectralWarping>),
     Wavefolder(Wavefolder),
     Bitcrusher(Bitcrusher),
+    Wavecruncher(Wavecruncher),
 }
 
 impl EffectInstance {
@@ -50,8 +55,11 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                 );
-                let warp_factor =
-                    ParamSource::from_parts(param_2_type, param_2_int_val, param_2_float_val);
+                let warp_factor = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
                 let params = SpectralWarpingParams {
                     frequency,
                     warp_factor,
@@ -61,16 +69,28 @@ impl EffectInstance {
                 EffectInstance::SpectralWarping(box SpectralWarping::new(params))
             },
             1 => {
-                let top_fold_position =
-                    ParamSource::from_parts(param_1_type, param_1_int_val, param_1_float_val);
-                let top_fold_width =
-                    ParamSource::from_parts(param_2_type, param_2_int_val, param_2_float_val);
-                let bottom_fold_position =
-                    ParamSource::from_parts(param_3_type, param_3_int_val, param_3_float_val);
-                let bottom_fold_width =
-                    ParamSource::from_parts(param_4_type, param_4_int_val, param_4_float_val);
+                let top_fold_position = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                let top_fold_width = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+                let bottom_fold_position = ParamSource::new(ParamSourceType::from_parts(
+                    param_3_type,
+                    param_3_int_val,
+                    param_3_float_val,
+                ));
+                let bottom_fold_width = ParamSource::new(ParamSourceType::from_parts(
+                    param_4_type,
+                    param_4_int_val,
+                    param_4_float_val,
+                ));
 
-                EffectInstance::Wavefolder(Wavefolder {
+                EffectInstance::Wavecruncher(Wavecruncher {
                     top_fold_position,
                     top_fold_width,
                     bottom_fold_position,
@@ -79,6 +99,20 @@ impl EffectInstance {
             },
             2 => {
                 todo!()
+            },
+            3 => {
+                let gain = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                let offset = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+
+                EffectInstance::Wavefolder(Wavefolder { gain, offset })
             },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
@@ -112,8 +146,9 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                 );
-                spectral_warping.osc.stretch_factor =
-                    ParamSource::from_parts(param_2_type, param_2_int_val, param_2_float_val);
+                spectral_warping.osc.stretch_factor = ParamSource::new(
+                    ParamSourceType::from_parts(param_2_type, param_2_int_val, param_2_float_val),
+                );
 
                 return true;
             },
@@ -147,7 +182,7 @@ impl Effect for EffectInstance {
                 base_frequency,
                 sample,
             ),
-            EffectInstance::Wavefolder(e) => e.apply(
+            EffectInstance::Wavecruncher(e) => e.apply(
                 param_buffers,
                 adsrs,
                 sample_ix_within_frame,
@@ -161,12 +196,19 @@ impl Effect for EffectInstance {
                 base_frequency,
                 sample,
             ),
+            EffectInstance::Wavefolder(e) => e.apply(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                sample,
+            ),
         }
     }
 }
 
 #[derive(Clone, Default)]
-pub struct EffectChain([Option<EffectInstance>; 16]);
+pub struct EffectChain([Option<Box<EffectInstance>>; 16]);
 
 impl EffectChain {
     pub fn set_effect(
@@ -207,7 +249,7 @@ impl EffectChain {
             }
         }
 
-        self.0[effect_ix] = Some(EffectInstance::from_parts(
+        self.0[effect_ix] = Some(box EffectInstance::from_parts(
             effect_type,
             param_1_type,
             param_1_int_val,

@@ -975,7 +975,7 @@ const actionGroups = {
           targetVoice.lastGateOrUngateTime = ungateTime;
           setTimeout(() => {
             const state = getState();
-            state.synths.forEach(({ voices }) => {
+            state.synths.forEach(({ voices, fmSynth, waveform }) => {
               const targetVoice = voices[voiceIx];
               if (targetVoice.lastGateOrUngateTime !== ungateTime) {
                 // Voice has been re-gated before it finished playing last time; do not disconnect
@@ -983,6 +983,11 @@ const actionGroups = {
               }
 
               targetVoice.outerGainNode.disconnect();
+
+              // Optimization to avoid computing voices that aren't playing
+              if (waveform === Waveform.FM && fmSynth) {
+                fmSynth.setFrequency(voiceIx, 0);
+              }
             });
           }, gainADSRLength);
 
@@ -1006,6 +1011,11 @@ const actionGroups = {
           }
 
           targetVoice.outerGainNode.disconnect();
+
+          // Optimization to avoid computing voices that aren't playing
+          if (targetSynth.waveform === Waveform.FM && targetSynth.fmSynth) {
+            targetSynth.fmSynth.setFrequency(voiceIx, 0);
+          }
         }, targetSynth.gainADSRLength);
 
         // Trigger release of gain and filter ADSRs
@@ -1488,7 +1498,6 @@ const actionGroups = {
           return;
         } else if (targetSynth.waveform === Waveform.FM && targetSynth.fmSynth) {
           const fmSynthAWPNode = targetSynth.fmSynth.getAWPNode();
-          console.log(fmSynthAWPNode);
           if (!fmSynthAWPNode) {
             return;
           }

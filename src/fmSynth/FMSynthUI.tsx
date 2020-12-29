@@ -5,7 +5,6 @@ import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
 import { Effect } from 'src/fmSynth/ConfigureEffects';
-import { UnimplementedError } from 'ameo-utils';
 
 interface FMSynthState {
   modulationIndices: number[][];
@@ -53,7 +52,9 @@ const FMSynthUI: React.FC<{
   operatorConfigs: OperatorConfig[];
   onOperatorConfigChange: (operatorIx: number, newConfig: OperatorConfig) => void;
   operatorEffects: (Effect | null)[][];
-  setEffect: (effectIx: number, effect: Effect | null) => void;
+  setEffect: (operatorIx: number | null, effectIx: number, effect: Effect | null) => void;
+  initialSelectedOperatorIx: number | null;
+  onOperatorSelected: (operatorIx: number) => void;
 }> = ({
   updateBackendModulation,
   updateBackendOutput,
@@ -63,6 +64,8 @@ const FMSynthUI: React.FC<{
   onOperatorConfigChange,
   operatorEffects,
   setEffect,
+  initialSelectedOperatorIx,
+  onOperatorSelected,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationIndices,
@@ -70,7 +73,7 @@ const FMSynthUI: React.FC<{
     operatorConfigs,
     operatorEffects,
   });
-  const [selectedOperatorIx, setSelectedOperatorIx] = useState(0);
+  const [selectedOperatorIx, setSelectedOperatorIx] = useState(initialSelectedOperatorIx ?? 0);
 
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
@@ -121,7 +124,10 @@ const FMSynthUI: React.FC<{
                 'operator-select' +
                 (selectedOperatorIx === srcOperatorIx ? ' operator-selected' : '')
               }
-              onClick={() => setSelectedOperatorIx(srcOperatorIx)}
+              onClick={() => {
+                setSelectedOperatorIx(srcOperatorIx);
+                onOperatorSelected(srcOperatorIx);
+              }}
             />
             {row.map((val, dstOperatorIx) => (
               <div
@@ -156,18 +162,38 @@ const FMSynthUI: React.FC<{
         }}
         effects={state.operatorEffects[selectedOperatorIx]}
         onEffectsChange={(effectIx: number, newEffect: Effect | null) => {
-          setEffect(effectIx, newEffect);
+          setEffect(selectedOperatorIx, effectIx, newEffect);
           const newState = { ...state };
-          state.operatorEffects = [...state.operatorEffects];
-          state.operatorEffects[selectedOperatorIx] = [
-            ...state.operatorEffects[selectedOperatorIx],
+          newState.operatorEffects = [...newState.operatorEffects];
+          newState.operatorEffects[selectedOperatorIx] = [
+            ...newState.operatorEffects[selectedOperatorIx],
           ];
-          state.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+          newState.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+
           if (!newEffect) {
-            // TODO: Slide effects down
-            throw new UnimplementedError();
+            // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
+            for (let i = effectIx; i < newState.operatorEffects[selectedOperatorIx].length; i++) {
+              const nextEffect = newState.operatorEffects[selectedOperatorIx][i + 1];
+              if (nextEffect) {
+                newState.operatorEffects[selectedOperatorIx][i] = nextEffect;
+                newState.operatorEffects[selectedOperatorIx][i + 1] = null;
+                setEffect(selectedOperatorIx, i + 1, null);
+              }
+            }
           }
+
           setState(newState);
+        }}
+        setEffects={newEffects => {
+          newEffects.forEach((effect, effectIx) => setEffect(selectedOperatorIx, effectIx, effect));
+          setState({
+            ...state,
+            operatorEffects: R.set(
+              R.lensIndex(selectedOperatorIx),
+              newEffects,
+              state.operatorEffects
+            ),
+          });
         }}
       />
     </div>

@@ -1,4 +1,4 @@
-#![feature(nll, box_syntax, let_chains)]
+#![feature(nll, box_syntax)]
 
 use std::mem::{self, transmute};
 

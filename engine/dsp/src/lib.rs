@@ -11,8 +11,9 @@ pub mod circular_buffer;
 ///
 /// Based off of https://github.com/pichenettes/stmlib/blob/master/dsp/dsp.h#L77
 #[inline]
-pub fn one_pole(state: &mut f32, new_val: f32, coefficient: f32) {
-    *state += coefficient * (new_val - *state)
+pub fn one_pole(state: &mut f32, new_val: f32, coefficient: f32) -> f32 {
+    *state += coefficient * (new_val - *state);
+    *state
 }
 
 /// Low pass filter that smooths changes in a signal.  This is helpful to avoid audio artifacts that
@@ -35,7 +36,17 @@ pub fn mix(v1_pct: f32, v1: f32, v2: f32) -> f32 { (v1_pct * v1) + (1. - v1_pct)
 pub fn read_interpolated(buf: &[f32], index: f32) -> f32 {
     let base_ix = index.trunc() as usize;
     let next_ix = base_ix + 1;
-    mix(index.fract(), buf[next_ix], buf[base_ix])
+    if cfg!(debug_assertions) {
+        mix(index.fract(), buf[next_ix], buf[base_ix])
+    } else {
+        unsafe {
+            mix(
+                index.fract(),
+                *buf.get_unchecked(next_ix),
+                *buf.get_unchecked(base_ix),
+            )
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

@@ -39,4 +39,32 @@
       }
     }
   }
+
+  .configure-effects {
+    .effects-controls {
+      display: flex;
+      flex-direction: column;
+      max-height: 330px;
+      overflow: auto;
+    }
+
+    .effect-management {
+      display: flex;
+      flex-direction: row;
+
+      button {
+        width: 20px;
+      }
+      button:hover {
+        font-weight: bold;
+      }
+
+      .effect-title {
+        width: 300px;
+        text-align: center;
+        margin-left: 8px;
+        margin-right: 28px;
+      }
+    }
+  }
 }

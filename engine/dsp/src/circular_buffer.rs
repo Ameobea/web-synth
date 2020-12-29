@@ -42,7 +42,11 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
     pub fn read_interpolated(&self, sample_ix: f32) -> f32 {
         debug_assert!(sample_ix <= 0.);
         if sample_ix == 0. {
-            return self.buffer[self.head];
+            if cfg!(debug_assertions) {
+                return self.buffer[self.head];
+            } else {
+                return *unsafe { self.buffer.get_unchecked(self.head) };
+            }
         }
         let base_ix = sample_ix.trunc();
         let next_ix = base_ix + (1. * sample_ix.signum());

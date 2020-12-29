@@ -48,7 +48,8 @@ const ConfigureOperator: React.FC<{
   onChange: (newConfig: OperatorConfig) => void;
   effects: (Effect | null)[];
   onEffectsChange: (effectIx: number, newEffect: Effect | null) => void;
-}> = ({ config, onChange, effects, onEffectsChange }) => {
+  setEffects: (newEffects: (Effect | null)[]) => void;
+}> = ({ config, onChange, effects, onEffectsChange, setEffects }) => {
   const operatorTypeSettings = useMemo(
     () => [
       {
@@ -60,19 +61,17 @@ const ConfigureOperator: React.FC<{
           'param buffer',
         ] as OperatorConfig['type'][],
       },
-      {
-        type: 'checkbox',
-        label: 'enable spectral warping',
-      },
     ],
     []
   );
+  const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
   return (
     <div className='operator-config'>
       <ControlPanel
         style={{ width: 378 }}
         settings={operatorTypeSettings}
+        state={operatorTypeState}
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'operator type': {
@@ -90,6 +89,8 @@ const ConfigureOperator: React.FC<{
           title='frequency'
           state={config.frequency}
           onChange={newFrequency => onChange({ ...config, frequency: newFrequency })}
+          min={0}
+          max={20000}
         />
       ) : null}
       {config.type === 'exponential oscillator' ? (
@@ -97,9 +98,16 @@ const ConfigureOperator: React.FC<{
           title='stretch factor'
           state={config.stretchFactor}
           onChange={newStretchFactor => onChange({ ...config, stretchFactor: newStretchFactor })}
+          min={0}
+          max={1}
         />
       ) : null}
-      <ConfigureEffects state={effects} onChange={onEffectsChange} />
+      <ConfigureEffects
+        state={effects}
+        onChange={onEffectsChange}
+        operatorEffects={effects}
+        setOperatorEffects={setEffects}
+      />
     </div>
   );
 };

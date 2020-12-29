@@ -48,9 +48,14 @@ export const buildDefaultParamSource = (type: ParamSource['type']): ParamSource 
 
 const ConfigureParamSource: React.FC<{
   title?: string;
+  theme?: { [key: string]: any };
   state: ParamSource;
   onChange: (newState: ParamSource) => void;
-}> = ({ title, state, onChange }) => {
+  min?: number;
+  max?: number;
+  step?: number;
+  scale?: 'log';
+}> = ({ title, theme, state, onChange, min, max, scale }) => {
   const { type: paramType } = state;
   const settings = useMemo(() => {
     switch (paramType) {
@@ -65,7 +70,7 @@ const ConfigureParamSource: React.FC<{
         ];
       }
       case 'constant': {
-        return [buildTypeSetting(), { type: 'text', label: 'value' }];
+        return [buildTypeSetting(), { type: 'range', label: 'value', min, max, scale }];
       }
       case 'adsr': {
         return [
@@ -93,11 +98,13 @@ const ConfigureParamSource: React.FC<{
         console.error('Invalid operator state type: ', paramType);
       }
     }
-  }, [paramType]);
+  }, [max, min, paramType, scale]);
 
   return (
     <ControlPanel
       title={title}
+      theme={theme}
+      style={{ width: 378 }}
       settings={settings}
       state={state}
       onChange={(key: string, value: any) => {
