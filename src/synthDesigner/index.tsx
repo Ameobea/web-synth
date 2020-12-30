@@ -16,13 +16,15 @@ import {
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import synthDesignerModule from 'src/redux/modules/synthDesigner';
+import buildSynthDesignerReduxModule from 'src/redux/modules/synthDesigner';
 import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
 import { midiToFrequency } from 'src/util';
+import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
-const buildSynthDesignerRedux = () => {
+const buildSynthDesignerRedux = (vcId: string) => {
   const modules = {
-    synthDesigner: synthDesignerModule,
+    synthDesigner: buildSynthDesignerReduxModule(vcId),
   };
 
   return buildStore<typeof modules>(modules, undefined, { form: formReducer });
@@ -57,7 +59,8 @@ export const init_synth_designer = (stateKey: string) => {
   // Create a fresh Redux store just for this instance.  It makes things a lot simpler on the Redux side due to the
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
   // everything in a big map.
-  const reduxInfra = buildSynthDesignerRedux();
+  const vcId = stateKey.split('_')[1]!;
+  const reduxInfra = buildSynthDesignerRedux(vcId);
   STATE_MAP = STATE_MAP.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
 
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
@@ -87,7 +90,7 @@ export const init_synth_designer = (stateKey: string) => {
     })
     .getOrElseL(() => {
       localStorage.removeItem(stateKey);
-      return getInitialSynthDesignerState(true);
+      return getInitialSynthDesignerState(true, vcId);
     });
 
   PolysynthMod.get().then(mod => {
@@ -117,12 +120,12 @@ export const init_synth_designer = (stateKey: string) => {
   });
 
   if (initialState) {
+    initialState.vcId = vcId;
     reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_STATE(initialState));
   }
 
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');
-  const vcId = stateKey.split('_')[1]!;
   synthDesignerBase.id = getRootNodeId(vcId);
   synthDesignerBase.setAttribute(
     'style',
@@ -258,19 +261,31 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
             type: 'number',
           });
 
-        if (synth.waveform !== Waveform.Wavetable) {
-          return inputsForSynth;
+        if (synth.waveform === Waveform.Wavetable) {
+          const withIntraMixInputs = synth.wavetableInputControls!.intraDimMixes.reduce(
+            (acc, param, dimIx) => acc.set(`dim_${dimIx}_mix`, { node: param, type: 'number' }),
+            inputsForSynth
+          );
+          return synth.wavetableInputControls!.interDimMixes.reduce(
+            (acc, param, dimIx) =>
+              acc.set(`dim_${dimIx}x${dimIx + 1}_mix`, { node: param, type: 'number' }),
+            withIntraMixInputs
+          );
+        } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
+          const awpNode = synth.fmSynth!.getAWPNode();
+          return new Array(PARAM_BUFFER_COUNT).fill(null as any).reduce(
+            (acc, _i, i) =>
+              acc.set('fm_input_' + i, {
+                type: 'number',
+                node: awpNode
+                  ? (awpNode.parameters as Map<string, AudioParam>).get(i.toString())
+                  : new DummyNode(),
+              }),
+            inputsForSynth
+          );
         }
 
-        const withIntraMixInputs = synth.wavetableInputControls!.intraDimMixes.reduce(
-          (acc, param, dimIx) => acc.set(`dim_${dimIx}_mix`, { node: param, type: 'number' }),
-          inputsForSynth
-        );
-        return synth.wavetableInputControls!.interDimMixes.reduce(
-          (acc, param, dimIx) =>
-            acc.set(`dim_${dimIx}x${dimIx + 1}_mix`, { node: param, type: 'number' }),
-          withIntraMixInputs
-        );
+        return inputsForSynth;
       }, ImmMap<string, ConnectableInput>())
       .set('midi', { node: getMidiNode(stateKey), type: 'midi' }),
     outputs: ImmMap<string, ConnectableOutput>().set('masterOutput', {

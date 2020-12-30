@@ -1,22 +1,20 @@
 use dsp::circular_buffer::CircularBuffer;
 
 use super::Effect;
-use crate::fm::{
-    ADSRState, ExponentialOscillator, OperatorFrequencySource, ParamSource, FRAME_SIZE, SAMPLE_RATE,
-};
+use crate::fm::{ADSRState, ExponentialOscillator, ParamSource, FRAME_SIZE, SAMPLE_RATE};
 
 pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
 
 pub struct SpectralWarpingParams {
     pub warp_factor: ParamSource,
-    pub frequency: OperatorFrequencySource,
+    pub frequency: ParamSource,
     // TODO: Make this a param source if it turns out to have an effect on the sound
     pub phase_offset: f32,
 }
 
 #[derive(Clone)]
 pub struct SpectralWarping {
-    pub frequency: OperatorFrequencySource,
+    pub frequency: ParamSource,
     pub buffer: CircularBuffer<SPECTRAL_WARPING_BUFFER_SIZE>,
     pub phase_offset: f32,
     pub osc: ExponentialOscillator,
@@ -43,14 +41,17 @@ impl SpectralWarping {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
+        base_frequency: f32,
         frequency: f32,
     ) -> f32 {
-        let warped_phase =
-            (self
-                .osc
-                .gen_sample(frequency, param_buffers, adsrs, sample_ix_within_frame)
-                + 1.)
-                / 2.;
+        let warped_phase = (self.osc.gen_sample(
+            frequency,
+            param_buffers,
+            adsrs,
+            sample_ix_within_frame,
+            base_frequency,
+        ) + 1.)
+            / 2.;
         debug_assert!(warped_phase > 0.);
         debug_assert!(warped_phase < 1.);
         debug_assert!(self.osc.phase > 0.);
@@ -79,8 +80,13 @@ impl Effect for SpectralWarping {
         let base_lookback_samples = ((SAMPLE_RATE as f32) / frequency) / 2.;
 
         // We then "warp" the position of the read head according to the warp factor.
-        let phase_warp_diff =
-            self.get_phase_warp_diff(param_buffers, adsrs, sample_ix_within_frame, frequency);
+        let phase_warp_diff = self.get_phase_warp_diff(
+            param_buffers,
+            adsrs,
+            sample_ix_within_frame,
+            base_frequency,
+            frequency,
+        );
         debug_assert!(phase_warp_diff > -1.);
         debug_assert!(phase_warp_diff < 1.);
         let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);

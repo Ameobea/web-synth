@@ -240,14 +240,7 @@ const SynthModuleCompInner: React.FC<{
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'waveform': {
-              dispatch(
-                actionCreators.synthDesigner.SET_WAVEFORM(
-                  index,
-                  val,
-                  dispatch,
-                  stateKey.split('_')[1]
-                )
-              );
+              dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val, dispatch));
               return;
             }
             case 'unison': {
@@ -334,6 +327,7 @@ const SynthModuleCompInner: React.FC<{
             synth.fmSynth!.handleOperatorConfigChange(operatorIx, newOperatorConfig)
           }
           operatorEffects={synth.fmSynth.getOperatorEffects()}
+          mainEffectChain={synth.fmSynth.getMainEffectChain()}
           setEffect={synth.fmSynth.setEffect.bind(synth.fmSynth)}
           initialSelectedOperatorIx={synth.fmSynth.selectedOperatorIx}
           onOperatorSelected={opIx => {

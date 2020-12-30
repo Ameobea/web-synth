@@ -103,7 +103,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
           const { effectType, param1, param2, param3, param4 } = evt.data;
           this.wasmInstance.exports.fm_synth_set_effect(
             this.ctxPtr,
-            evt.data.operatorIx,
+            evt.data.operatorIx ?? -1,
             evt.data.effectIx,
             effectType,
             param1?.valueType ?? 0,

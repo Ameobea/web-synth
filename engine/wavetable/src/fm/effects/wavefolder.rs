@@ -26,15 +26,19 @@ impl Effect for Wavecruncher {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
-        _base_frequency: f32,
+        base_frequency: f32,
         sample: f32,
     ) -> f32 {
         let folded_sample = if sample > 0. {
             let fold_position = dsp::clamp(
                 0.,
                 1.,
-                self.top_fold_position
-                    .get(param_buffers, adsrs, sample_ix_within_frame),
+                self.top_fold_position.get(
+                    param_buffers,
+                    adsrs,
+                    sample_ix_within_frame,
+                    base_frequency,
+                ),
             );
 
             let overflow_amount = sample - fold_position;
@@ -42,17 +46,24 @@ impl Effect for Wavecruncher {
                 return sample;
             }
 
-            let fold_width = self
-                .top_fold_width
-                .get(param_buffers, adsrs, sample_ix_within_frame);
+            let fold_width = self.top_fold_width.get(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            );
 
             sample + -(overflow_amount / fold_width).trunc() * fold_width * 2.
         } else {
             let fold_position = dsp::clamp(
                 -1.,
                 0.,
-                self.bottom_fold_position
-                    .get(param_buffers, adsrs, sample_ix_within_frame),
+                self.bottom_fold_position.get(
+                    param_buffers,
+                    adsrs,
+                    sample_ix_within_frame,
+                    base_frequency,
+                ),
             );
 
             let overflow_amount = -(sample - fold_position);
@@ -60,9 +71,12 @@ impl Effect for Wavecruncher {
                 return sample;
             }
 
-            let fold_width =
-                self.bottom_fold_width
-                    .get(param_buffers, adsrs, sample_ix_within_frame);
+            let fold_width = self.bottom_fold_width.get(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            );
             sample - -(overflow_amount / fold_width).trunc() * fold_width * 2.
         };
 
@@ -82,15 +96,17 @@ impl Effect for Wavefolder {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
-        _base_frequency: f32,
+        base_frequency: f32,
         sample: f32,
     ) -> f32 {
-        let gain = self.gain.get(param_buffers, adsrs, sample_ix_within_frame);
+        let gain = self
+            .gain
+            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
         let offset = self
             .offset
-            .get(param_buffers, adsrs, sample_ix_within_frame);
+            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
 
+        // Credit to mikedorf for this: https://discord.com/channels/590254806208217089/590657587939115048/793255717569822780
         fastapprox::faster::sinfull(std::f32::consts::PI * (sample * gain + offset / 2.))
-        // (std::f32::consts::PI * (sample * gain + offset / 2.)).sin()
     }
 }

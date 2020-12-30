@@ -76,12 +76,13 @@ impl ExponentialOscillator {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
+        base_frequency: f32,
     ) -> f32 {
         self.update_phase(frequency);
 
-        let stretch_factor = self
-            .stretch_factor
-            .get(param_buffers, adsrs, sample_ix_within_frame);
+        let stretch_factor =
+            self.stretch_factor
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
 
         // let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
         let exponent_numerator =
@@ -130,6 +131,7 @@ impl Operator {
             param_buffers,
             adsrs,
             sample_ix_within_frame,
+            base_frequency,
         );
 
         self.effect_chain.apply(
@@ -175,6 +177,7 @@ impl OscillatorSource {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
+        base_frequency: f32,
     ) -> f32 {
         match self {
             OscillatorSource::Wavetable(_wavetable_ix) => {
@@ -192,8 +195,13 @@ impl OscillatorSource {
                     }
                 },
             OscillatorSource::Sine(osc) => osc.gen_sample(frequency),
-            OscillatorSource::ExponentialOscillator(osc) =>
-                osc.gen_sample(frequency, param_buffers, adsrs, sample_ix_within_frame),
+            OscillatorSource::ExponentialOscillator(osc) => osc.gen_sample(
+                frequency,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            ),
         }
     }
 }
@@ -217,6 +225,7 @@ fn compute_modulated_frequency(
     adsrs: &[ADSRState],
     operator_ix: usize,
     sample_ix_within_frame: usize,
+    base_frequency: f32,
     carrier_base_frequency: f32,
     last_sample_modulator_frequencies: &[f32; OPERATOR_COUNT],
 ) -> f32 {
@@ -225,7 +234,7 @@ fn compute_modulated_frequency(
         let modulator_output = unsafe { last_samples.get_unchecked(modulator_operator_ix) };
         let modulation_index = modulation_matrix
             .get_operator_modulation_index(modulator_operator_ix, operator_ix)
-            .get(param_buffers, adsrs, sample_ix_within_frame);
+            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
         output_freq += modulator_output
             * modulation_index
             * unsafe { last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
@@ -240,7 +249,7 @@ impl FMSynthVoice {
         wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
         sample_ix_within_frame: usize,
-        operator_base_frequency_sources: &[OperatorFrequencySource; OPERATOR_COUNT],
+        operator_base_frequency_sources: &[ParamSource; OPERATOR_COUNT],
         base_frequency: f32,
     ) -> f32 {
         // TODO: Update ADSR state
@@ -264,6 +273,7 @@ impl FMSynthVoice {
                 &self.adsrs,
                 operator_ix,
                 sample_ix_within_frame,
+                base_frequency,
                 carrier_base_frequency,
                 &self.last_sample_frequencies_per_operator,
             );
@@ -287,6 +297,7 @@ impl FMSynthVoice {
                     param_buffers,
                     &self.adsrs,
                     sample_ix_within_frame,
+                    base_frequency,
                 );
         }
 
@@ -312,6 +323,7 @@ pub enum ParamSourceType {
     /// The value of this parameter is determined by the output of a per-voice ADSR that is
     /// triggered every time that voice is triggered.
     PerVoiceADSR(usize),
+    BaseFrequencyMultiplier(f32),
 }
 
 #[derive(Clone, Copy)]
@@ -333,49 +345,17 @@ impl ParamSource {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
-    ) -> f32 {
-        let output = self
-            .source_type
-            .get(param_buffers, adsrs, sample_ix_within_frame);
-        dsp::one_pole(&mut self.value, output, 0.99)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum OperatorFrequencySource {
-    ValueSource(ParamSource),
-    BaseFrequencyMultiplier(f32),
-}
-
-impl OperatorFrequencySource {
-    pub fn get(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
-        sample_ix: usize,
         base_frequency: f32,
     ) -> f32 {
-        match self {
-            OperatorFrequencySource::ValueSource(src) => src.get(param_buffers, adsrs, sample_ix),
-            OperatorFrequencySource::BaseFrequencyMultiplier(multiplier) =>
-                base_frequency * *multiplier,
-        }
+        let output =
+            self.source_type
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+        dsp::one_pole(&mut self.value, output, 0.99)
     }
 
-    pub fn from_parts(value_type: usize, value_param_int: usize, value_param_float: f32) -> Self {
-        match value_type {
-            0 => OperatorFrequencySource::ValueSource(ParamSource::new(
-                ParamSourceType::ParamBuffer(value_param_int),
-            )),
-            1 => OperatorFrequencySource::ValueSource(ParamSource::new(ParamSourceType::Constant(
-                value_param_float,
-            ))),
-            2 => OperatorFrequencySource::ValueSource(ParamSource::new(
-                ParamSourceType::PerVoiceADSR(value_param_int),
-            )),
-            3 => OperatorFrequencySource::BaseFrequencyMultiplier(value_param_float),
-            _ => panic!("Invalid value type; expected 0-3"),
-        }
+    /// Replaces the param generator while preserving the previous value used for smoothing
+    pub fn replace(&mut self, new_source_type: ParamSourceType) {
+        self.source_type = new_source_type;
     }
 }
 
@@ -389,6 +369,7 @@ impl ParamSourceType {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[ADSRState],
         sample_ix_within_frame: usize,
+        base_frequency: f32,
     ) -> f32 {
         match self {
             ParamSourceType::ParamBuffer(buf_ix) =>
@@ -412,6 +393,7 @@ impl ParamSourceType {
                 // TODO
                 -1.
             },
+            ParamSourceType::BaseFrequencyMultiplier(multiplier) => base_frequency * multiplier,
         }
     }
 
@@ -420,6 +402,7 @@ impl ParamSourceType {
             0 => ParamSourceType::ParamBuffer(value_param_int),
             1 => ParamSourceType::Constant(value_param_float),
             2 => ParamSourceType::PerVoiceADSR(value_param_int),
+            3 => ParamSourceType::BaseFrequencyMultiplier(value_param_float),
             _ => panic!("Invalid value type; expected 0-2"),
         }
     }
@@ -468,7 +451,7 @@ pub struct FMSynthContext {
     pub voices: Vec<FMSynthVoice>,
     pub modulation_matrix: ModulationMatrix,
     pub param_buffers: [[f32; FRAME_SIZE]; MAX_PARAM_BUFFERS],
-    pub operator_base_frequency_sources: [OperatorFrequencySource; OPERATOR_COUNT],
+    pub operator_base_frequency_sources: [ParamSource; OPERATOR_COUNT],
     pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
     pub output_buffers: Vec<[f32; FRAME_SIZE]>,
 }
@@ -513,8 +496,9 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         voices: vec![FMSynthVoice::default(); voice_count],
         modulation_matrix: ModulationMatrix::default(),
         param_buffers: std::mem::MaybeUninit::uninit().assume_init(),
-        operator_base_frequency_sources: [OperatorFrequencySource::BaseFrequencyMultiplier(1.);
-            OPERATOR_COUNT],
+        operator_base_frequency_sources: [ParamSource::new(
+            ParamSourceType::BaseFrequencyMultiplier(1.),
+        ); OPERATOR_COUNT],
         base_frequency_input_buffer: vec![[0.; FRAME_SIZE]; voice_count],
         output_buffers: vec![std::mem::MaybeUninit::uninit().assume_init(); voice_count],
     })
@@ -627,7 +611,11 @@ pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
     value_param_int: usize,
     value_param_float: f32,
 ) {
-    let param = OperatorFrequencySource::from_parts(value_type, value_param_int, value_param_float);
+    let param = ParamSource::new(ParamSourceType::from_parts(
+        value_type,
+        value_param_int,
+        value_param_float,
+    ));
     (*ctx).operator_base_frequency_sources[operator_ix] = param;
 }
 

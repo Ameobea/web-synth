@@ -67,4 +67,18 @@
       }
     }
   }
+
+  .main-effect-chain-selector {
+    background-color: #626d8d;
+    text-align: center;
+    cursor: pointer;
+    padding: 3px;
+    margin: 2px 0px;
+  }
+  .main-effect-chain-selector[data-active='true'] {
+    background-color: #e23d4d;
+  }
+  .main-effect-chain-selector:hover {
+    font-weight: bold;
+  }
 }

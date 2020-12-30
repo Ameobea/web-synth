@@ -1,6 +1,6 @@
 use spectral_warping::SpectralWarpingParams;
 
-use super::{ADSRState, OperatorFrequencySource, ParamSource, ParamSourceType, FRAME_SIZE};
+use super::{ADSRState, ParamSource, ParamSourceType, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod spectral_warping;
@@ -26,9 +26,9 @@ pub trait Effect {
 #[derive(Clone)]
 pub enum EffectInstance {
     SpectralWarping(Box<SpectralWarping>),
-    Wavefolder(Wavefolder),
-    Bitcrusher(Bitcrusher),
     Wavecruncher(Wavecruncher),
+    Bitcrusher(Bitcrusher),
+    Wavefolder(Wavefolder),
 }
 
 impl EffectInstance {
@@ -50,11 +50,11 @@ impl EffectInstance {
     ) -> Self {
         match effect_type {
             0 => {
-                let frequency = OperatorFrequencySource::from_parts(
+                let frequency = ParamSource::new(ParamSourceType::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
-                );
+                ));
                 let warp_factor = ParamSource::new(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
@@ -98,7 +98,18 @@ impl EffectInstance {
                 })
             },
             2 => {
-                todo!()
+                let sample_rate = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                let bit_depth = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+
+                EffectInstance::Bitcrusher(Bitcrusher::new(sample_rate, bit_depth))
             },
             3 => {
                 let gain = ParamSource::new(ParamSourceType::from_parts(
@@ -141,24 +152,46 @@ impl EffectInstance {
                     EffectInstance::SpectralWarping(spectral_warping) => spectral_warping,
                     _ => return false,
                 };
-                spectral_warping.frequency = OperatorFrequencySource::from_parts(
-                    param_1_type,
-                    param_1_int_val,
-                    param_1_float_val,
-                );
-                spectral_warping.osc.stretch_factor = ParamSource::new(
-                    ParamSourceType::from_parts(param_2_type, param_2_int_val, param_2_float_val),
-                );
+                spectral_warping
+                    .frequency
+                    .replace(ParamSourceType::from_parts(
+                        param_1_type,
+                        param_1_int_val,
+                        param_1_float_val,
+                    ));
+                spectral_warping
+                    .osc
+                    .stretch_factor
+                    .replace(ParamSourceType::from_parts(
+                        param_2_type,
+                        param_2_int_val,
+                        param_2_float_val,
+                    ));
 
                 return true;
             },
             1 => {
-                // Wavefolder is stateless
+                // Wavecruncher is stateless
                 false
             },
             2 => {
-                // Bitcrusher is stateless
-                false
+                let bitcrusher = match self {
+                    EffectInstance::Bitcrusher(bitcrusher) => bitcrusher,
+                    _ => return false,
+                };
+
+                bitcrusher.sample_rate.replace(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                bitcrusher.bit_depth.replace(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+
+                return true;
             },
             _ => false,
         }

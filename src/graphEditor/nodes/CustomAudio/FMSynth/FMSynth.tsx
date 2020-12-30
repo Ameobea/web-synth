@@ -45,6 +45,7 @@ export default class FMSynth implements ForeignNode {
   private operatorEffects: (Effect | null)[][] = new Array(OPERATOR_COUNT)
     .fill(null as any)
     .map(() => new Array(16).fill(null));
+  private mainEffectChain: (Effect | null)[] = new Array(16).fill(null);
   public selectedOperatorIx: number | null = null;
   private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
 
@@ -66,6 +67,9 @@ export default class FMSynth implements ForeignNode {
   }
   public getOperatorEffects() {
     return this.operatorEffects;
+  }
+  public getMainEffectChain() {
+    return this.mainEffectChain;
   }
 
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
@@ -122,6 +126,7 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'wasmInitialized': {
+          // Initialize backend with all effects and modulation indices that were deserialized
           this.operatorConfigs.forEach((config, opIx) =>
             this.handleOperatorConfigChange(opIx, config)
           );
@@ -130,6 +135,9 @@ export default class FMSynth implements ForeignNode {
               this.setEffect(opIx, effectIx, effect);
             });
           });
+          this.mainEffectChain.forEach((effect, effectIx) =>
+            this.setEffect(null, effectIx, effect)
+          );
 
           if (this.onInitialized) {
             this.onInitialized(this.buildConnectables());
@@ -278,6 +286,15 @@ export default class FMSynth implements ForeignNode {
           this.encodeParamSource(effect.bottomFoldWidth),
         ];
       }
+      case 'bitcrusher': {
+        return [
+          2,
+          this.encodeParamSource(effect.sampleRate),
+          this.encodeParamSource(effect.bitDepth),
+          null,
+          null,
+        ];
+      }
       case 'wavefolder': {
         return [
           3,
@@ -286,6 +303,9 @@ export default class FMSynth implements ForeignNode {
           null,
           null,
         ];
+      }
+      default: {
+        throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);
       }
     }
   }
@@ -296,7 +316,7 @@ export default class FMSynth implements ForeignNode {
       return;
     }
     if (operatorIx === null) {
-      throw new UnimplementedError(); // TODO
+      this.mainEffectChain[effectIx] = newEffect;
     } else {
       this.operatorEffects[operatorIx][effectIx] = newEffect;
     }
@@ -331,6 +351,9 @@ export default class FMSynth implements ForeignNode {
     if (params.operatorEffects) {
       this.operatorEffects = params.operatorEffects;
     }
+    if (params.mainEffectChain) {
+      this.mainEffectChain = params.mainEffectChain;
+    }
   }
 
   public serialize() {
@@ -340,6 +363,7 @@ export default class FMSynth implements ForeignNode {
       operatorConfigs: this.operatorConfigs,
       operatorEffects: this.operatorEffects,
       selectedOperatorIx: this.selectedOperatorIx,
+      mainEffectChain: this.mainEffectChain,
     };
   }
 

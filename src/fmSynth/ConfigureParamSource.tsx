@@ -2,7 +2,7 @@ import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-const PARAM_BUFFER_COUNT = 8;
+export const PARAM_BUFFER_COUNT = 8;
 const ADSR_COUNT = 8;
 
 /**

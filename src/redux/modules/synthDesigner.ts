@@ -298,6 +298,7 @@ export interface SynthDesignerState {
   spectrumNode: AnalyserNode;
   isHidden: boolean;
   polysynthCtx: PolysynthContext | null;
+  vcId: string;
 }
 
 const buildDefaultFilterCSNs = (): FilterCSNs => ({
@@ -578,12 +579,16 @@ export const deserializeSynthModule = (
   return synthModule;
 };
 
-export const getInitialSynthDesignerState = (addInitialSynth?: boolean): SynthDesignerState => ({
+export const getInitialSynthDesignerState = (
+  addInitialSynth: boolean,
+  vcId: string
+): SynthDesignerState => ({
   synths: addInitialSynth ? [buildDefaultSynthModule()] : [],
   wavyJonesInstance: undefined,
   spectrumNode: new AnalyserNode(new AudioContext()),
   isHidden: false,
   polysynthCtx: null,
+  vcId,
 });
 
 const getSynth = (index: number, synths: SynthDesignerState['synths']) => {
@@ -657,19 +662,14 @@ const actionGroups = {
         synthIx: number;
         voiceIx: number;
       }) => void) &
-        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void),
-      vcId: string
+        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void)
     ) => ({
       type: 'SET_WAVEFORM',
       index,
       waveform,
       dispatch,
-      vcId,
     }),
-    subReducer: (
-      state: SynthDesignerState,
-      { index, waveform, dispatch, vcId }
-    ): SynthDesignerState => {
+    subReducer: (state: SynthDesignerState, { index, waveform, dispatch }): SynthDesignerState => {
       // We need to make sure this is loaded for later when we save
       getWavetableWasmInstance();
 
@@ -763,8 +763,10 @@ const actionGroups = {
       }
 
       if (needsConnectablesUpdate) {
-        const newConnectables = get_synth_designer_audio_connectables(`synthDesigner_${vcId}`);
-        updateConnectables(vcId, newConnectables);
+        const newConnectables = get_synth_designer_audio_connectables(
+          `synthDesigner_${state.vcId}`
+        );
+        updateConnectables(state.vcId, newConnectables);
       }
 
       targetSynth.voices.flatMap(R.prop('oscillators')).forEach(osc => (osc.type = waveform));
@@ -1398,6 +1400,14 @@ const actionGroups = {
         )
       );
 
+      console.log(state);
+      setTimeout(() => {
+        const newConnectables = get_synth_designer_audio_connectables(
+          `synthDesigner_${state.vcId}`
+        );
+        updateConnectables(state.vcId, newConnectables);
+      });
+
       return state;
     },
   }),
@@ -1549,9 +1559,10 @@ const actionGroups = {
   }),
 };
 
-const SynthDesignerReduxInfra = buildModule<SynthDesignerState, typeof actionGroups>(
-  getInitialSynthDesignerState(true),
-  actionGroups
-);
+const buildSynthDesignerReduxInfra = (vcId: string) =>
+  buildModule<SynthDesignerState, typeof actionGroups>(
+    getInitialSynthDesignerState(true, vcId),
+    actionGroups
+  );
 
-export default SynthDesignerReduxInfra;
+export default buildSynthDesignerReduxInfra;

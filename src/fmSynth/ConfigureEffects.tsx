@@ -20,7 +20,14 @@ export type Effect =
       bottomFoldPosition: ParamSource;
       bottomFoldWidth: ParamSource;
     }
+  | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
   | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource };
+
+const EFFECT_TYPE_SETTING = {
+  type: 'select',
+  label: 'effect type',
+  options: ['spectral warping', 'wavecruncher', 'bitcrusher', 'wavefolder'] as Effect['type'][],
+};
 
 const buildDefaultEffect = (type: Effect['type']): Effect => {
   switch (type) {
@@ -39,6 +46,13 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         topFoldWidth: { type: 'constant', value: 0.25 },
         bottomFoldPosition: { type: 'constant', value: -0.8 },
         bottomFoldWidth: { type: 'constant', value: 0.25 },
+      };
+    }
+    case 'bitcrusher': {
+      return {
+        type,
+        sampleRate: { type: 'constant', value: 44_100 },
+        bitDepth: { type: 'constant', value: 32 },
       };
     }
     case 'wavefolder': {
@@ -60,11 +74,13 @@ const baseTheme = {
 };
 const spectralWarpTheme = { ...baseTheme, background1: 'rgb(24,48,182)' };
 const wavecruncherTheme = { ...baseTheme, background1: 'rgb(199,48,184)' };
+const bitcrusherTheme = { ...baseTheme, background1: 'rgb(84,47,12)' };
 const wavefolderTheme = { ...baseTheme, background1: 'rgb(24,120,101)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
   wavecruncher: wavecruncherTheme,
+  bitcrusher: bitcrusherTheme,
   wavefolder: wavefolderTheme,
 };
 
@@ -138,6 +154,29 @@ const ConfigureWavecruncher: React.FC<{
   );
 };
 
+const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({ state, onChange }) => (
+  <>
+    <ConfigureParamSource
+      title='sample rate'
+      theme={bitcrusherTheme}
+      min={1}
+      max={4410}
+      step={1}
+      state={state.sampleRate}
+      onChange={sampleRate => onChange({ ...state, sampleRate })}
+    />
+    <ConfigureParamSource
+      title='bit depth'
+      theme={bitcrusherTheme}
+      min={1}
+      max={32}
+      scale='log'
+      state={state.bitDepth}
+      onChange={bitDepth => onChange({ ...state, bitDepth })}
+    />
+  </>
+);
+
 const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange }) => (
   <>
     <ConfigureParamSource
@@ -152,7 +191,7 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange
       title='offset'
       theme={wavefolderTheme}
       min={0}
-      max={16}
+      max={8}
       state={state.offset}
       onChange={offset => onChange({ ...state, offset })}
     />
@@ -205,13 +244,7 @@ const EffectManagement: React.FC<{
         style={{ width: 378 }}
         theme={theme}
         state={{ 'effect type': operatorEffects[effectIx]?.type }}
-        settings={[
-          {
-            type: 'select',
-            label: 'effect type',
-            options: ['spectral warping', 'wavecruncher', 'wavefolder'] as Effect['type'][],
-          },
-        ]}
+        settings={[EFFECT_TYPE_SETTING]}
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'effect type': {
@@ -238,6 +271,9 @@ const ConfigureEffectSpecific: React.FC<{
     }
     case 'wavecruncher': {
       return <ConfigureWavecruncher state={state} onChange={onChange} />;
+    }
+    case 'bitcrusher': {
+      return <ConfigureBitcrusher state={state} onChange={onChange} />;
     }
     case 'wavefolder': {
       return <ConfigureWavefolder state={state} onChange={onChange} />;
@@ -269,9 +305,8 @@ const ConfigureEffect: React.FC<{
 const ConfigureEffects: React.FC<{
   state: (Effect | null)[];
   onChange: (ix: number, newState: Effect | null) => void;
-  operatorEffects: (Effect | null)[];
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-}> = ({ state, onChange, operatorEffects, setOperatorEffects }) => {
+}> = ({ state, onChange, setOperatorEffects }) => {
   const [selectedEffectType, setSelectedEffectType] = useState<Effect['type']>('spectral warping');
 
   return (
@@ -283,7 +318,7 @@ const ConfigureEffects: React.FC<{
             key={i}
             state={effect}
             onChange={newEffect => onChange(i, newEffect)}
-            operatorEffects={operatorEffects}
+            operatorEffects={state}
             setOperatorEffects={setOperatorEffects}
           />
         ))}
@@ -294,11 +329,7 @@ const ConfigureEffects: React.FC<{
         style={{ width: 378 }}
         onChange={(_key: string, val: any) => setSelectedEffectType(val)}
         settings={[
-          {
-            type: 'select',
-            label: 'effect type',
-            options: ['spectral warping', 'wavecruncher', 'wavefolder'] as Effect['type'][],
-          },
+          EFFECT_TYPE_SETTING,
           {
             type: 'button',
             label: 'add effect',

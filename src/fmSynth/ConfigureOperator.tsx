@@ -105,7 +105,6 @@ const ConfigureOperator: React.FC<{
       <ConfigureEffects
         state={effects}
         onChange={onEffectsChange}
-        operatorEffects={effects}
         setOperatorEffects={setEffects}
       />
     </div>

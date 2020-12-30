@@ -4,13 +4,15 @@ import * as R from 'ramda';
 import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
-import { Effect } from 'src/fmSynth/ConfigureEffects';
+import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
+import FlatButton from 'src/misc/FlatButton';
 
 interface FMSynthState {
   modulationIndices: number[][];
   outputWeights: number[];
   operatorConfigs: OperatorConfig[];
   operatorEffects: (Effect | null)[][];
+  mainEffectChain: (Effect | null)[];
 }
 
 type BackendModulationUpdater = (operatorIx: number, modulationIx: number, val: number) => void;
@@ -44,6 +46,16 @@ const setOutput = (
   return { ...state, outputWeights: newOutputWeights };
 };
 
+const ConfigureMainEffectChain: React.FC<{
+  mainEffectChain: (Effect | null)[];
+  onChange: (ix: number, newEffect: Effect | null) => void;
+  setEffects: (newEffects: (Effect | null)[]) => void;
+}> = ({ mainEffectChain, onChange, setEffects }) => {
+  return (
+    <ConfigureEffects state={mainEffectChain} onChange={onChange} setOperatorEffects={setEffects} />
+  );
+};
+
 const FMSynthUI: React.FC<{
   updateBackendModulation: BackendModulationUpdater;
   updateBackendOutput: BackendOutputUpdater;
@@ -52,6 +64,7 @@ const FMSynthUI: React.FC<{
   operatorConfigs: OperatorConfig[];
   onOperatorConfigChange: (operatorIx: number, newConfig: OperatorConfig) => void;
   operatorEffects: (Effect | null)[][];
+  mainEffectChain: (Effect | null)[];
   setEffect: (operatorIx: number | null, effectIx: number, effect: Effect | null) => void;
   initialSelectedOperatorIx: number | null;
   onOperatorSelected: (operatorIx: number) => void;
@@ -63,6 +76,7 @@ const FMSynthUI: React.FC<{
   operatorConfigs,
   onOperatorConfigChange,
   operatorEffects,
+  mainEffectChain,
   setEffect,
   initialSelectedOperatorIx,
   onOperatorSelected,
@@ -72,8 +86,9 @@ const FMSynthUI: React.FC<{
     outputWeights,
     operatorConfigs,
     operatorEffects,
+    mainEffectChain,
   });
-  const [selectedOperatorIx, setSelectedOperatorIx] = useState(initialSelectedOperatorIx ?? 0);
+  const [selectedOperatorIx, setSelectedOperatorIx] = useState(initialSelectedOperatorIx);
 
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
@@ -151,51 +166,93 @@ const FMSynthUI: React.FC<{
           </div>
         ))}
       </div>
-      <ConfigureOperator
-        config={state.operatorConfigs[selectedOperatorIx]}
-        onChange={newConf => {
-          setState({
-            ...state,
-            operatorConfigs: R.set(R.lensIndex(selectedOperatorIx), newConf, state.operatorConfigs),
-          });
-          onOperatorConfigChange(selectedOperatorIx, newConf);
-        }}
-        effects={state.operatorEffects[selectedOperatorIx]}
-        onEffectsChange={(effectIx: number, newEffect: Effect | null) => {
-          setEffect(selectedOperatorIx, effectIx, newEffect);
-          const newState = { ...state };
-          newState.operatorEffects = [...newState.operatorEffects];
-          newState.operatorEffects[selectedOperatorIx] = [
-            ...newState.operatorEffects[selectedOperatorIx],
-          ];
-          newState.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+      <div
+        className='main-effect-chain-selector'
+        data-active={selectedOperatorIx === null ? 'true' : 'false'}
+        onClick={() => setSelectedOperatorIx(null)}
+      >
+        MAIN EFFECT CHAIN
+      </div>
 
-          if (!newEffect) {
-            // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
-            for (let i = effectIx; i < newState.operatorEffects[selectedOperatorIx].length; i++) {
-              const nextEffect = newState.operatorEffects[selectedOperatorIx][i + 1];
-              if (nextEffect) {
-                newState.operatorEffects[selectedOperatorIx][i] = nextEffect;
-                newState.operatorEffects[selectedOperatorIx][i + 1] = null;
-                setEffect(selectedOperatorIx, i + 1, null);
+      {selectedOperatorIx === null ? (
+        <ConfigureMainEffectChain
+          mainEffectChain={state.mainEffectChain}
+          onChange={(effectIx: number, newEffect: Effect | null) => {
+            const newMainEffectChain = [...state.mainEffectChain];
+            newMainEffectChain[effectIx] = newEffect;
+            if (!newEffect) {
+              // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
+              for (let i = effectIx; i < newMainEffectChain.length; i++) {
+                const nextEffect = newMainEffectChain[i + 1];
+                if (nextEffect) {
+                  newMainEffectChain[i] = nextEffect;
+                  newMainEffectChain[i + 1] = null;
+                  setEffect(null, i + 1, null);
+                }
               }
             }
-          }
 
-          setState(newState);
-        }}
-        setEffects={newEffects => {
-          newEffects.forEach((effect, effectIx) => setEffect(selectedOperatorIx, effectIx, effect));
-          setState({
-            ...state,
-            operatorEffects: R.set(
-              R.lensIndex(selectedOperatorIx),
-              newEffects,
-              state.operatorEffects
-            ),
-          });
-        }}
-      />
+            setEffect(null, effectIx, newEffect);
+            setState({ ...state, mainEffectChain: newMainEffectChain });
+          }}
+          setEffects={(newEffects: (Effect | null)[]) => {
+            newEffects.forEach((effect, effectIx) => setEffect(null, effectIx, effect));
+            setState({ ...state, mainEffectChain: newEffects });
+          }}
+        />
+      ) : (
+        <ConfigureOperator
+          config={state.operatorConfigs[selectedOperatorIx]}
+          onChange={newConf => {
+            setState({
+              ...state,
+              operatorConfigs: R.set(
+                R.lensIndex(selectedOperatorIx),
+                newConf,
+                state.operatorConfigs
+              ),
+            });
+            onOperatorConfigChange(selectedOperatorIx, newConf);
+          }}
+          effects={state.operatorEffects[selectedOperatorIx]}
+          onEffectsChange={(effectIx: number, newEffect: Effect | null) => {
+            setEffect(selectedOperatorIx, effectIx, newEffect);
+            const newState = { ...state };
+            newState.operatorEffects = [...newState.operatorEffects];
+            newState.operatorEffects[selectedOperatorIx] = [
+              ...newState.operatorEffects[selectedOperatorIx],
+            ];
+            newState.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+
+            if (!newEffect) {
+              // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
+              for (let i = effectIx; i < newState.operatorEffects[selectedOperatorIx].length; i++) {
+                const nextEffect = newState.operatorEffects[selectedOperatorIx][i + 1];
+                if (nextEffect) {
+                  newState.operatorEffects[selectedOperatorIx][i] = nextEffect;
+                  newState.operatorEffects[selectedOperatorIx][i + 1] = null;
+                  setEffect(selectedOperatorIx, i + 1, null);
+                }
+              }
+            }
+
+            setState(newState);
+          }}
+          setEffects={newEffects => {
+            newEffects.forEach((effect, effectIx) =>
+              setEffect(selectedOperatorIx, effectIx, effect)
+            );
+            setState({
+              ...state,
+              operatorEffects: R.set(
+                R.lensIndex(selectedOperatorIx),
+                newEffects,
+                state.operatorEffects
+              ),
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
