@@ -3,7 +3,7 @@ import { getEngine } from 'src';
 
 // The number of pixels from the top of the page that the main content (canvases, editor, etc.)
 // is rendered.
-const CONTENT_OFFSET_TOP = 40;
+const CONTENT_OFFSET_TOP = 34;
 let ACTIVE_SHAPE: SVGElement = null!;
 let ATTR_COUNTER = 0;
 const notes: SVGElement[] = [];

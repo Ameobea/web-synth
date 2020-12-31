@@ -41,7 +41,7 @@ pub fn draw_cursor_gutter(conf: &GridConf) {
         FG_CANVAS_IX,
         0,
         0,
-        conf.measure_width_px,
+        conf.measure_width_px * 16,
         conf.cursor_gutter_height,
         "cursor-gutter",
         None,

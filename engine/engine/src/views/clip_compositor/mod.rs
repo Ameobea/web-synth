@@ -38,7 +38,6 @@ impl GridHandler<ClipCompositorNoteData, ClipCompositorRenderer> for ClipComposi
 
 fn get_default_clip_compositor_grid_conf() -> GridConf {
     GridConf {
-        gutter_height: 16,
         row_count: 4,
         beat_length_px: 20,
         cursor_gutter_height: 16,

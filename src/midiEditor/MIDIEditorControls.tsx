@@ -7,6 +7,7 @@ import { Option } from 'funfix-core';
 import FileUploader, { Value as FileUploaderValue } from '../controls/FileUploader';
 import { MidiFileInfo, getMidiImportSettings } from '../controls/MidiImportDialog';
 import { MIDIEditorStateMap } from 'src/midiEditor';
+import { getGlobalBpm } from 'src/globalMenu';
 
 const ctx = new AudioContext();
 
@@ -35,13 +36,6 @@ const MIDIEditorControls: React.FC<{
           engine.handle_message('set_raw_note_data', rawNoteData);
           break;
         }
-        case 'bpm': {
-          const buf = new Float64Array(2);
-          buf[0] = val;
-          buf[1] = ctx.currentTime;
-          engine.handle_message('set_bpm', new Uint8Array(buf.buffer));
-          break;
-        }
         default: {
           console.error(`Unhandled state key in MIDI editor controls: ${key}`);
         }
@@ -54,16 +48,16 @@ const MIDIEditorControls: React.FC<{
     <ControlPanel
       onChange={onChange}
       width={400}
-      position='top-right'
+      position={{ top: 32, right: 42 }}
       draggable
       settings={[
-        { type: 'range', label: 'bpm', min: 20, max: 400 },
         {
           type: 'button',
           label: 'toggle loop',
           action: () => {
-            const vals = new Float64Array(1);
+            const vals = new Float64Array(2);
             vals[0] = ctx.currentTime;
+            vals[1] = getGlobalBpm();
             engine.handle_message('toggle_loop', new Uint8Array(vals.buffer));
           },
         },
@@ -100,9 +94,11 @@ const MIDIEditorControls: React.FC<{
               );
             }
 
-            const curTimeBytes = new Uint8Array(new Float64Array([ctx.currentTime]).buffer);
+            // We lock in the BPM when starting out the recording
+            const bpm = getGlobalBpm();
+            const payloadBytes = new Uint8Array(new Float64Array([ctx.currentTime, bpm]).buffer);
             if (isRecordingMIDI) {
-              const res = engine.handle_message('toggle_recording_midi', curTimeBytes);
+              const res = engine.handle_message('toggle_recording_midi', payloadBytes);
               if (!R.isNil(res)) {
                 console.error(
                   'Got bytes back from engine when trying to stop MIDI recording; expected none.',
@@ -112,7 +108,7 @@ const MIDIEditorControls: React.FC<{
 
               state.midiRecordingCtxPtr = Option.none();
             } else {
-              const ctxPtrBytes = engine.handle_message('toggle_recording_midi', curTimeBytes);
+              const ctxPtrBytes = engine.handle_message('toggle_recording_midi', payloadBytes);
 
               if (R.isNil(ctxPtrBytes)) {
                 console.error(

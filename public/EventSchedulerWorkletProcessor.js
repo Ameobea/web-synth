@@ -27,6 +27,14 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
           this.scheduleEvent(event.data.time, event.data.cbId);
           break;
         }
+        case 'scheduleBeats': {
+          this.scheduleEventBeats(event.data.beats, event.data.cbId);
+          break;
+        }
+        case 'scheduleBeatsRelative': {
+          this.scheduleEventBeats(globalThis.curBeat + event.data.beatsFromNow, event.data.cbId);
+          break;
+        }
         case 'shutdown': {
           this.isShutdown = true;
           break;
@@ -45,16 +53,30 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
     });
 
     // Schedule any events that we missed while the Wasm instance was initializing
-    this.pendingEvents.forEach(event => this.scheduleEvent(event.time, event.cbId));
+    this.pendingEvents.forEach(event =>
+      event.time === null
+        ? this.scheduleBeatEvent(event.beat, event.cbId)
+        : this.scheduleEvent(event.time, event.cbId)
+    );
+    this.pendingEvents = null;
   }
 
   scheduleEvent(time, cbId) {
     if (!this.wasmInstance) {
-      this.pendingEvents.push({ time, cbId });
+      this.pendingEvents.push({ time, beats: null, cbId });
       return;
     }
 
     this.wasmInstance.exports.schedule(time, cbId);
+  }
+
+  scheduleEventBeats(beats, cbId) {
+    if (!this.wasmInstance) {
+      this.pendingEvents.push({ time: null, beats, cbId });
+      return;
+    }
+
+    this.wasmInstance.exports.schedule_beats(beats, cbId);
   }
 
   updateGlobalBeats(globalTempoBPM) {
@@ -67,7 +89,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
   process(_inputs, _outputs, params) {
     this.updateGlobalBeats(params.global_tempo_bpm[0]);
     if (this.wasmInstance) {
-      this.wasmInstance.exports.run(currentTime);
+      this.wasmInstance.exports.run(currentTime, globalThis.curBeat);
     }
 
     return true;

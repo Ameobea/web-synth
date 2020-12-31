@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
 import { Option } from 'funfix-core';
-import { UnreachableException, UnimplementedError } from 'ameo-utils';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import {
   AudioConnectables,
@@ -74,19 +74,19 @@ export const init_midi_editor_ui = (vcId: string) => {
 
   // And build one for accepting MIDI input when recording
   const inputMIDINode = buildMIDINode(() => ({
-    onAttack: (noteId: number, velocity: number, offset?: number | undefined) => {
+    onAttack: (noteId: number, velocity: number) => {
       midiEditorState.midiRecordingCtxPtr.forEach(ptr =>
         getEngine()!.midi_editor_record_note_down(ptr, ctx.currentTime, noteId)
       );
 
-      midiNode.outputCbs.forEach(outputCbs => outputCbs.onAttack(noteId, velocity, offset));
+      midiNode.outputCbs.forEach(outputCbs => outputCbs.onAttack(noteId, velocity));
     },
-    onRelease: (noteId: number, velocity: number, offset?: number | undefined) => {
+    onRelease: (noteId: number, velocity: number) => {
       midiEditorState.midiRecordingCtxPtr.forEach(ptr =>
         getEngine()!.midi_editor_record_note_up(ptr, ctx.currentTime, noteId)
       );
 
-      midiNode.outputCbs.forEach(outputCbs => outputCbs.onRelease(noteId, velocity, offset));
+      midiNode.outputCbs.forEach(outputCbs => outputCbs.onRelease(noteId, velocity));
     },
     onClearAll: (...args) => {
       midiEditorState.midiRecordingCtxPtr.forEach(_ptr => {

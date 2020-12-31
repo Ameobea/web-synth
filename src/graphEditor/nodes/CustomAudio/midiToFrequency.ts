@@ -58,7 +58,7 @@ export class MIDIToFrequencyNode {
     onPitchBend: _bendAmount => {
       // no-op
     },
-    onClearAll: (_stopPlayingNotes: boolean) => {
+    onClearAll: () => {
       this.gateCSN.offset.cancelScheduledValues(0);
       this.gateCSN.offset.value = 0;
       this.frequencyCSN.offset.cancelScheduledValues(0);

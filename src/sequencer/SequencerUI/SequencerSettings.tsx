@@ -12,10 +12,6 @@ const mkHandleChange = ({
   dispatch: SequencerReduxInfra['dispatch'];
 }) => (key: string, val: any, _state: { [key: string]: any }) => {
   switch (key) {
-    // case 'bpm': {
-    //   dispatch(actionCreators.sequencer.SET_BPM(val));
-    //   break;
-    // }
     case 'beat count': {
       dispatch(actionCreators.sequencer.SET_BEAT_COUNT(val));
       break;
@@ -46,14 +42,6 @@ const getSequencerSettings = ({
       label: isPlaying ? 'stop' : 'start',
       action: () => dispatch(actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId)),
     },
-    // {
-    //   type: 'range',
-    //   label: 'bpm',
-    //   min: 0,
-    //   max: 4000,
-    //   initial: 120,
-    //   steps: 200,
-    // },
     {
       type: 'button',
       label: 'add voice',

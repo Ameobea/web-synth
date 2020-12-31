@@ -1258,26 +1258,21 @@ const actionGroups = {
     },
   }),
   CLEAR_ALL_SCHEDULED_MIDI_EVENTS: buildActionGroup({
-    actionCreator: (stopPlayingNotes: boolean) => ({
-      type: 'CLEAR_ALL_SCHEDULED_MIDI_EVENTS',
-      stopPlayingNotes,
-    }),
-    subReducer: (state: SynthDesignerState, { stopPlayingNotes }) => {
+    actionCreator: () => ({ type: 'CLEAR_ALL_SCHEDULED_MIDI_EVENTS' }),
+    subReducer: (state: SynthDesignerState, {}) => {
       state.synths.forEach(synth =>
         synth.voices.forEach(voice => {
           voice.gainADSRModule.offset.cancelScheduledValues(0);
           voice.filterADSRModule.offset.cancelScheduledValues(0);
 
-          if (stopPlayingNotes) {
-            voice.gainADSRModule.offset.linearRampToValueAtTime(
-              voice.gainADSRModule.minValue,
-              ctx.currentTime + 1.5 / 1000
-            );
-            voice.filterADSRModule.offset.linearRampToValueAtTime(
-              voice.filterADSRModule.minValue,
-              ctx.currentTime + 1.5 / 1000
-            );
-          }
+          voice.gainADSRModule.offset.linearRampToValueAtTime(
+            voice.gainADSRModule.minValue,
+            ctx.currentTime + 1.5 / 1000
+          );
+          voice.filterADSRModule.offset.linearRampToValueAtTime(
+            voice.filterADSRModule.minValue,
+            ctx.currentTime + 1.5 / 1000
+          );
 
           voice.oscillators.forEach(osc => osc.frequency.cancelScheduledValues(0));
         })
@@ -1400,7 +1395,6 @@ const actionGroups = {
         )
       );
 
-      console.log(state);
       setTimeout(() => {
         const newConnectables = get_synth_designer_audio_connectables(
           `synthDesigner_${state.vcId}`

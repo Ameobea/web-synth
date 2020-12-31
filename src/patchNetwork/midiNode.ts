@@ -5,10 +5,10 @@ import { PromiseResolveType } from 'ameo-utils';
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
  */
 export interface MIDIInputCbs {
-  onAttack: (note: number, velocity: number, offset?: number) => void;
-  onRelease: (note: number, velocity: number, offset?: number) => void;
-  onPitchBend: (bendAmount: number, offset?: number) => void;
-  onClearAll: (stopPlayingNotes: boolean) => void;
+  onAttack: (note: number, velocity: number) => void;
+  onRelease: (note: number, velocity: number) => void;
+  onPitchBend: (bendAmount: number) => void;
+  onClearAll: () => void;
 }
 
 // hilarious
@@ -73,12 +73,16 @@ export class MIDINode {
     }
   }
 
-  public onAttack(note: number, velocity: number, offset?: number) {
-    this.outputCbs.forEach(cbs => cbs.onAttack(note, velocity, offset));
+  public onAttack(note: number, velocity: number) {
+    this.outputCbs.forEach(cbs => cbs.onAttack(note, velocity));
   }
 
-  public onRelease(note: number, velocity: number, offset?: number) {
-    this.outputCbs.forEach(cbs => cbs.onRelease(note, velocity, offset));
+  public onRelease(note: number, velocity: number) {
+    this.outputCbs.forEach(cbs => cbs.onRelease(note, velocity));
+  }
+
+  public clearAll() {
+    this.outputCbs.forEach(cbs => cbs.onClearAll());
   }
 }
 

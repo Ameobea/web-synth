@@ -1,26 +1,28 @@
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 
-let pendingEvents: { time: number; cb: () => void }[] = [];
+let PendingEvents: { time: number | null; beats: number | null; cbId: number }[] = [];
 
 const ctx = new AudioContext();
-let schedulerHandle: AudioWorkletNode | null = null;
+let SchedulerHandle: AudioWorkletNode | null = null;
 
 let cbIdCounter = 0;
-const registeredCbs: Map<number, () => void> = new Map();
+const RegisteredCbs: Map<number, () => void> = new Map();
 
 const registerCb = (cb: () => void): number => {
   const cbId = cbIdCounter++;
-  registeredCbs.set(cbId, cb);
+  RegisteredCbs.set(cbId, cb);
   return cbId;
 };
 
+export const cancelCb = (cbId: number) => RegisteredCbs.delete(cbId);
+
 const callCb = (cbId: number) => {
-  const cb = registeredCbs.get(cbId);
+  const cb = RegisteredCbs.get(cbId);
   if (!cb) {
     // Cancelled?
     return;
   }
-  registeredCbs.delete(cbId);
+  RegisteredCbs.delete(cbId);
   cb();
 };
 
@@ -29,20 +31,50 @@ Promise.all([
   fetch('/event_scheduler.wasm').then(res => res.arrayBuffer()),
   ctx.audioWorklet.addModule('/EventSchedulerWorkletProcessor.js'),
 ] as const).then(([wasmArrayBuffer]) => {
-  schedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
-  globalTempoCSN.connect((schedulerHandle.parameters as any).get('global_tempo_bpm'));
-  schedulerHandle.port.onmessage = evt => callCb(evt.data);
-  schedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
-  pendingEvents.forEach(({ time, cb }) => scheduleEvent(time, cb));
-  pendingEvents = [];
+  SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
+  globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));
+  SchedulerHandle.port.onmessage = evt => callCb(evt.data);
+  SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
+  PendingEvents.forEach(({ time, beats, cbId }) =>
+    time === null
+      ? SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId })
+      : SchedulerHandle!.port.postMessage({ type: 'schedule', time, cbId })
+  );
+  PendingEvents = [];
 });
 
-export const scheduleEvent = (time: number, cb: () => void) => {
-  if (!schedulerHandle) {
-    pendingEvents.push({ time, cb });
-    return;
+export const scheduleEvent = (time: number, cb: () => void): number => {
+  const cbId = registerCb(cb);
+  if (!SchedulerHandle) {
+    PendingEvents.push({ time, beats: null, cbId });
+    return cbId;
   }
 
+  SchedulerHandle.port.postMessage({ type: 'schedule', time, cbId });
+  return cbId;
+};
+
+export const scheduleEventBeats = (beats: number, cb: () => void): number => {
   const cbId = registerCb(cb);
-  schedulerHandle.port.postMessage({ type: 'schedule', time, cbId });
+  if (!SchedulerHandle) {
+    PendingEvents.push({ time: null, beats, cbId });
+    return cbId;
+  }
+
+  SchedulerHandle.port.postMessage({ type: 'scheduleBeats', beats, cbId });
+  return cbId;
+};
+
+/**
+ * @param beatsFromNow When to start the even, in beats, from the current beat
+ */
+export const scheduleEventBeatsRelative = (beatsFromNow: number, cb: () => void): number => {
+  const cbId = registerCb(cb);
+  if (!SchedulerHandle) {
+    PendingEvents.push({ time: null, beats: 0, cbId });
+    return cbId;
+  }
+
+  SchedulerHandle.port.postMessage({ type: 'scheduleBeatsRelative', beatsFromNow, cbId });
+  return cbId;
 };

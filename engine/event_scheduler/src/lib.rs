@@ -30,6 +30,8 @@ impl PartialOrd for ScheduledEvent {
 
 static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, U1048576, Min> =
     BinaryHeap(heapless::i::BinaryHeap::new());
+static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, U1048576, Min> =
+    BinaryHeap(heapless::i::BinaryHeap::new());
 
 #[no_mangle]
 pub extern "C" fn schedule(time: f64, cb_id: i32) {
@@ -37,7 +39,12 @@ pub extern "C" fn schedule(time: f64, cb_id: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn run(cur_time: f64) {
+pub extern "C" fn schedule_beats(beats: f64, cb_id: i32) {
+    unsafe { SCHEDULED_BEAT_EVENTS.push_unchecked(ScheduledEvent { time: beats, cb_id }) }
+}
+
+#[no_mangle]
+pub extern "C" fn run(cur_time: f64, cur_beats: f64) {
     let scheduled_events = unsafe { &mut SCHEDULED_EVENTS };
     loop {
         match scheduled_events.peek() {
@@ -47,6 +54,18 @@ pub extern "C" fn run(cur_time: f64) {
         }
 
         let evt = unsafe { scheduled_events.pop_unchecked() };
+        unsafe { run_callback(evt.cb_id) };
+    }
+
+    let scheduled_beat_events = unsafe { &mut SCHEDULED_BEAT_EVENTS };
+    loop {
+        match scheduled_beat_events.peek() {
+            None => break,
+            Some(evt) if evt.time > cur_beats => break,
+            _ => (),
+        }
+
+        let evt = unsafe { scheduled_beat_events.pop_unchecked() };
         unsafe { run_callback(evt.cb_id) };
     }
 }

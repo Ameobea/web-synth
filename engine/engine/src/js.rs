@@ -107,11 +107,11 @@ extern "C" {
     pub fn midi_editor_trigger_attack_release(vc_id: &str, note_id: usize, duration: f32);
     pub fn midi_editor_schedule_events(
         vc_id: &str,
-        events: &[u8],
-        note_ids: &[usize],
-        timings: &[f64],
+        events: Vec<u8>,
+        note_ids: Vec<usize>,
+        timings: Vec<f32>,
     );
-    pub fn midi_editor_cancel_all_events(vc_id: &str, stop_playing_notes: bool);
+    pub fn midi_editor_cancel_all_events(vc_id: &str);
     pub fn register_midi_editor_loop_interval(
         cb: &Closure<dyn FnMut(f64)>,
         inteval_ms: usize,

@@ -228,8 +228,7 @@ const getMidiNode = (stateKey: string): MIDINode => {
       onPitchBend: () => {
         // No-op; TODO?
       },
-      onClearAll: (stopPlayingNotes: boolean) =>
-        dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS(stopPlayingNotes)),
+      onClearAll: () => dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS()),
     };
   });
   midiInputCbCache.set(stateKey, midiNode);

@@ -12,7 +12,6 @@ pub fn handle_key_down(key: &str, control_pressed: bool, shift_pressed: bool) {
         .handle_key_down(key, control_pressed, shift_pressed);
 }
 
-#[allow(clippy::needless_pass_by_value)]
 #[wasm_bindgen]
 pub fn handle_key_up(key: &str, control_pressed: bool, shift_pressed: bool) {
     get_vcm()

@@ -31,7 +31,7 @@ export class EnvelopeGenerator implements ForeignNode {
     onPitchBend: () => {
       /* no-op */
     },
-    onClearAll: _stopPlayingNotes => {
+    onClearAll: () => {
       this.adsrModule.ungate();
     },
   };

@@ -26,6 +26,8 @@ export const globalTempoCSN = new ConstantSourceNode(ctx);
 globalTempoCSN.offset.value = +(localStorage.getItem('globalTempo') ?? 120);
 globalTempoCSN.start();
 
+export const getGlobalBpm = () => globalTempoCSN.offset.value;
+
 const setGlobalTempo = (newGlobalTempo: number) => {
   globalTempoCSN.offset.value = newGlobalTempo;
   localStorage.globalTempo = newGlobalTempo.toFixed(1);

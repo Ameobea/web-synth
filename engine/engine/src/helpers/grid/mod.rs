@@ -307,7 +307,6 @@ pub struct Grid<S: GridRendererUniqueIdentifier, R: GridRenderer<S>, H: GridHand
 #[derive(Clone)]
 pub struct GridConf {
     pub row_count: usize,
-    pub gutter_height: usize,
     pub beat_length_px: usize,
     pub note_snap_beat_interval: f32,
     pub cursor_gutter_height: usize,

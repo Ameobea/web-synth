@@ -217,7 +217,7 @@ const actionGroups = {
       });
 
       removed.disconnect();
-      removed.inputCbs.onClearAll(true);
+      removed.inputCbs.onClearAll();
 
       return {
         ...state,
@@ -416,7 +416,7 @@ const DEFAULT_WIDTH = 32 as const;
 
 export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
   const inputCbs: MIDIInputCbs = {
-    onAttack: (note, velocity, _offset) => {
+    onAttack: (note, velocity) => {
       const reduxInfra = SequencerReduxInfraMap.get(vcId);
       const state = reduxInfra?.getState();
       if (R.isNil(state?.sequencer.markEditState?.editingMarkIx)) {

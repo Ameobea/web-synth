@@ -8,16 +8,17 @@ pub type SchedulerStateHandle = *mut SchedulerState;
 pub type SchedulerLoopHandle = usize;
 
 pub struct SchedulerState {
+    /// Absolute time in seconds at which this scheduler was started
     pub start_time: f64,
     pub interval_handle: SchedulerLoopHandle,
     pub cursor_animation_frame_handle: SchedulerLoopHandle,
     pub end_time_of_last_scheduling_period: f64,
     pub total_previously_scheduled_beats: f64,
-    pub schedule_offset_seconds: f64,
     pub state: &'static mut MIDIEditorGridHandler,
     pub grid_state: &'static mut GridState<usize>,
     pub cb: Closure<(dyn std::ops::FnMut(f64) + 'static)>,
     pub cursor_animation_cb: Closure<dyn std::ops::FnMut(f64) + 'static>,
+    pub bpm: f64,
 }
 
 impl SchedulerState {
@@ -37,7 +38,7 @@ impl SchedulerState {
         let loop_length_beats = end_mark_pos_beats - start_mark_pos_beats;
 
         let time_since_start = cur_time - self.start_time;
-        let beats_since_start = self.state.time_to_beats(time_since_start);
+        let beats_since_start = time_to_beats(self.bpm, time_since_start);
         let loops_since_start = beats_since_start / loop_length_beats;
         let cur_loop_percentage_finished = loops_since_start.fract();
         let cur_loop_beats_from_start = cur_loop_percentage_finished * loop_length_beats;
@@ -48,9 +49,7 @@ impl SchedulerState {
 const RESCHEDULE_INTERVAL_MS: usize = 2222;
 
 pub fn run_midi_editor_loop_scheduler(scheduler_state_handle: SchedulerStateHandle, cur_time: f64) {
-    let mut scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
-    run_scheduler(&mut scheduler_state, cur_time);
-    std::mem::forget(scheduler_state);
+    run_scheduler(unsafe { &mut *scheduler_state_handle }, cur_time);
 }
 
 fn init_scheduler_interval(scheduler_state: SchedulerState) -> SchedulerStateHandle {
@@ -68,7 +67,7 @@ fn init_scheduler_interval(scheduler_state: SchedulerState) -> SchedulerStateHan
 }
 
 fn animate_cursor(scheduler_state_handle: SchedulerStateHandle, cur_time: f64) {
-    let scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
+    let scheduler_state = unsafe { &mut *scheduler_state_handle };
 
     let cursor_pos_beats = scheduler_state.get_cur_cursor_pos_beats(cur_time);
     let cursor_pos_px = scheduler_state
@@ -78,12 +77,10 @@ fn animate_cursor(scheduler_state_handle: SchedulerStateHandle, cur_time: f64) {
 
     scheduler_state.grid_state.cursor_pos_beats = cursor_pos_beats as f32;
     MidiEditorGridRenderer::set_cursor_pos(scheduler_state.grid_state.cursor_dom_id, cursor_pos_px);
-
-    std::mem::forget(scheduler_state);
 }
 
 fn init_cursor_animation_interval(scheduler_state_handle: SchedulerStateHandle) {
-    let mut scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
+    let mut scheduler_state = unsafe { &mut *scheduler_state_handle };
     let cb = Closure::wrap(
         (box (move |cur_time: f64| animate_cursor(scheduler_state_handle, cur_time)))
             as Box<dyn FnMut(f64)>,
@@ -91,14 +88,13 @@ fn init_cursor_animation_interval(scheduler_state_handle: SchedulerStateHandle) 
     let animation_frame_handle = js::midi_editor_register_animation_frame(&cb);
     scheduler_state.cursor_animation_frame_handle = animation_frame_handle;
     scheduler_state.cursor_animation_cb = cb;
-    std::mem::forget(scheduler_state);
 }
 
-pub fn cancel_loop(scheduler_state_handle: SchedulerStateHandle, stop_playing_notes: bool) {
+pub fn cancel_loop(scheduler_state_handle: SchedulerStateHandle) {
     let scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
     js::cancel_midi_editor_loop_interval(scheduler_state.interval_handle);
     js::midi_editor_cancel_animation_frame(scheduler_state.cursor_animation_frame_handle);
-    js::midi_editor_cancel_all_events(&scheduler_state.state.vc_id, stop_playing_notes);
+    js::midi_editor_cancel_all_events(&scheduler_state.state.vc_id);
     drop(scheduler_state);
 }
 
@@ -107,6 +103,7 @@ pub fn init_scheduler_loop(
     cursor_pos_beats: f64,
     state: &mut MIDIEditorGridHandler,
     grid_state: &mut GridState<usize>,
+    bpm: f64,
 ) -> Option<SchedulerStateHandle> {
     let end_mark_pos = match state
         .loop_end_mark_measure
@@ -132,19 +129,19 @@ pub fn init_scheduler_loop(
 
     // Pretend we've already scheduled up to the start cursor offset
     let beats_to_skip = start_beat - start_mark_pos;
-    let time_to_skip = state.beats_to_seconds(beats_to_skip);
+    let time_to_skip = beats_to_seconds(bpm, beats_to_skip);
 
     let scheduler_state = SchedulerState {
         cb: Closure::new(box |_: f64| {}),
         cursor_animation_cb: Closure::new(box |_: f64| {}),
         start_time: start_time - time_to_skip,
-        schedule_offset_seconds: time_to_skip,
         interval_handle: 0,
         cursor_animation_frame_handle: 0,
         end_time_of_last_scheduling_period: start_time + time_to_skip,
         total_previously_scheduled_beats: beats_to_skip,
         state: unsafe { std::mem::transmute(state) },
         grid_state: unsafe { std::mem::transmute(grid_state) },
+        bpm,
     };
     let handle = init_scheduler_interval(scheduler_state);
     init_cursor_animation_interval(handle);
@@ -154,25 +151,27 @@ pub fn init_scheduler_loop(
 }
 
 /// Clears all pending events and re-schedules starting at the current time
-pub fn reschedule(cur_time: f64, scheduler_state_handle: SchedulerStateHandle, old_bpm: f64) {
-    let scheduler_state = unsafe { Box::from_raw(scheduler_state_handle) };
+pub fn reschedule(cur_time: f64, scheduler_state_handle: SchedulerStateHandle) {
+    let scheduler_state = unsafe { &mut *scheduler_state_handle };
 
     // Find where the cursor is the instant that we're rescheduling
-    let new_bpm = scheduler_state.state.bpm;
-    scheduler_state.state.bpm = old_bpm;
     let cur_cursor_pos_beats = scheduler_state.get_cur_cursor_pos_beats(cur_time);
-    scheduler_state.state.bpm = new_bpm;
 
     // Delightfully unsafe
     let grid_state: &'static mut GridState<usize> =
-        unsafe { std::mem::transmute(scheduler_state.grid_state as *mut _) };
+        unsafe { &mut *(scheduler_state.grid_state as *mut _) };
     let state: &'static mut MIDIEditorGridHandler =
-        unsafe { std::mem::transmute(scheduler_state.state as *mut _) };
-    std::mem::forget(scheduler_state);
+        unsafe { &mut *(scheduler_state.state as *mut _) };
 
     // Cancel the current scheduler and initialize a new one, freshly updated with the current state
-    cancel_loop(scheduler_state_handle, true);
-    let new_loop_handle = init_scheduler_loop(cur_time, cur_cursor_pos_beats, state, grid_state);
+    cancel_loop(scheduler_state_handle);
+    let new_loop_handle = init_scheduler_loop(
+        cur_time,
+        cur_cursor_pos_beats,
+        state,
+        grid_state,
+        scheduler_state.bpm,
+    );
     state.loop_handle = new_loop_handle;
 }
 
@@ -193,7 +192,7 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
         },
     };
     let loop_length_beats = end_mark_pos_beats - start_mark_pos_beats;
-    let loop_length_seconds = scheduler_state.state.beats_to_seconds(loop_length_beats);
+    let loop_length_seconds = beats_to_seconds(scheduler_state.bpm, loop_length_beats);
     let total_previously_scheduled_full_loops =
         (scheduler_state.total_previously_scheduled_beats / loop_length_beats).trunc();
 
@@ -201,9 +200,8 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
     let end_time_of_cur_sched_window = cur_time + ((RESCHEDULE_INTERVAL_MS * 3) as f64 / 1000.);
     let cur_sched_period_length_seconds =
         end_time_of_cur_sched_window - cur_sched_period_start_time;
-    let cur_sched_period_length_beats = scheduler_state
-        .state
-        .time_to_beats(cur_sched_period_length_seconds);
+    let cur_sched_period_length_beats =
+        time_to_beats(scheduler_state.bpm, cur_sched_period_length_seconds);
     let beats_to_schedule = cur_sched_period_length_beats;
     trace!("beats_to_schedule: {}", beats_to_schedule);
 
@@ -211,7 +209,7 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
     // covered
     let mut is_attack_flags: Vec<u8> = Vec::new();
     let mut note_ids: Vec<usize> = Vec::new();
-    let mut event_timings: Vec<f64> = Vec::new();
+    let mut event_timings: Vec<f32> = Vec::new();
 
     let beats_from_start_of_cur_loop =
         scheduler_state.total_previously_scheduled_beats % loop_length_beats;
@@ -242,14 +240,14 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
         is_attack_flags.push(tern(event.is_start, 1, 0));
         let event_time_seconds = scheduler_state.start_time
             + (total_previously_scheduled_full_loops * loop_length_seconds)
-            + scheduler_state.state.beats_to_seconds(event.beat as f64);
-        event_timings.push(event_time_seconds);
+            + beats_to_seconds(scheduler_state.bpm, event.beat as f64);
+        event_timings.push(event_time_seconds as f32);
     }
     js::midi_editor_schedule_events(
         &scheduler_state.state.vc_id,
-        &is_attack_flags,
-        &note_ids,
-        &event_timings,
+        is_attack_flags,
+        note_ids,
+        event_timings,
     );
 
     let scheduled_beats = relative_end_beat - relative_start_beat;
@@ -263,7 +261,7 @@ fn run_scheduler(scheduler_state: &mut SchedulerState, cur_time: f64) {
     // another (potentially partial) loop to be scheduled
     if scheduled_beats < beats_to_schedule {
         scheduler_state.end_time_of_last_scheduling_period +=
-            scheduler_state.state.beats_to_seconds(scheduled_beats);
+            beats_to_seconds(scheduler_state.bpm, scheduled_beats);
         trace!(
             "Need to schedule another (potentially partial) loop; \
              end_time_of_last_scheduling_period: {}",
