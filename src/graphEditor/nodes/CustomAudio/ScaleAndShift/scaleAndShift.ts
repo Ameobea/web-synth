@@ -1,7 +1,7 @@
 import { Map } from 'immutable';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import ScaleAndShiftSmallView, {
   ScaleAndShiftUIState,

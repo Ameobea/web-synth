@@ -15,7 +15,7 @@ import {
   PolysynthMod,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import buildSynthDesignerReduxModule from 'src/redux/modules/synthDesigner';
 import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
 import { midiToFrequency } from 'src/util';
@@ -204,22 +204,22 @@ const getMidiNode = (stateKey: string): MIDINode => {
   const midiNode = buildMIDINode(() => {
     const { dispatch, getState, actionCreators } = getReduxInfra(stateKey);
 
-    const onAttack = (note: number, velocity: number, offset?: number) => {
+    const onAttack = (note: number, velocity: number) => {
       const polysynthCtx = getState().synthDesigner.polysynthCtx;
       if (!polysynthCtx) {
         return;
       }
 
-      polysynthCtx.module.handle_note_down(polysynthCtx.ctxPtr, note, velocity, offset);
+      polysynthCtx.module.handle_note_down(polysynthCtx.ctxPtr, note, velocity);
     };
 
-    const onRelease = (note: number, velocity: number, offset?: number) => {
+    const onRelease = (note: number, _velocity: number) => {
       const polysynthCtx = getState().synthDesigner.polysynthCtx;
       if (!polysynthCtx) {
         return;
       }
 
-      polysynthCtx.module.handle_note_up(polysynthCtx.ctxPtr, note, offset);
+      polysynthCtx.module.handle_note_up(polysynthCtx.ctxPtr, note);
     };
 
     return {

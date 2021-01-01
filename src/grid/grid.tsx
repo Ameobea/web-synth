@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import { getEngine } from 'src';
+import { getEngine } from 'src/util';
 
 // The number of pixels from the top of the page that the main content (canvases, editor, etc.)
 // is rendered.

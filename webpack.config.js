@@ -6,11 +6,12 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
   entry: {
     index: './src/index.tsx',
+    fmDemo: './src/fmDemo/index.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].[contenthash].js',
-    publicPath: '/'
+    publicPath: '/',
   },
   mode: 'development',
   devtool: 'inline-source-map',
@@ -56,13 +57,24 @@ module.exports = {
       title: 'Web Synth',
       minify: true,
       template: 'index.hbs',
+      chunks: ['index'],
+    }),
+    new HtmlWebpackPlugin({
+      alwaysWriteToDisk: true,
+      title: 'Rust/Wasm FM Synth',
+      minify: true,
+      injdex: true,
+      template: 'fm-synth-demo.hbs',
+      filename: 'fm/index.html',
+      hash: true,
+      chunks: ['fmDemo'],
     }),
     new webpack.EnvironmentPlugin(['BACKEND_BASE_URL', 'FAUST_COMPILER_ENDPOINT']),
   ],
   devServer: {
     port: 9000,
     contentBase: './public/',
-    historyApiFallback: true
+    historyApiFallback: true,
   },
   experiments: {
     syncWebAssembly: true,

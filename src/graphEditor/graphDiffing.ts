@@ -9,7 +9,7 @@ import {
   LiteGraphNode,
   LiteGraphConnectablesNode,
 } from 'src/graphEditor/LiteGraphTypes';
-import { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
+import type { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
 import { ReduxStore } from 'src/redux';
 
 const createAudioConnectablesNode = (

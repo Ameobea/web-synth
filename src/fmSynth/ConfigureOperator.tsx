@@ -1,8 +1,8 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
 
+import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, {
   buildDefaultParamSource,
   ParamSource,

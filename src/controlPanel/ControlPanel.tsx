@@ -4,12 +4,8 @@ import * as R from 'ramda';
 
 import { actionCreators, dispatch, getState, store } from 'src/redux';
 import ControlPanelUI from 'src/controlPanel/ControlPanelUI';
-import {
-  AudioConnectables,
-  ConnectableDescriptor,
-  ConnectableOutput,
-  updateConnectables,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableDescriptor, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import './ControlPanel.scss';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import {

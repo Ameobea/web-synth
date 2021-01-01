@@ -1,11 +1,7 @@
 import { Map } from 'immutable';
 
-import {
-  AudioConnectables,
-  updateConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export class MixerNode {

@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import { Map } from 'immutable';
 
 import { MIDINode, buildMIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { midiToFrequency } from 'src/util';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 

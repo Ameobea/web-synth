@@ -13,14 +13,13 @@ import {
   get_synth_designer_audio_connectables,
   getVoicePreset,
 } from 'src/synthDesigner';
-import { updateConnectables } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, getState, useSelector } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
-import FMSynthUI from 'src/fmSynth/FMSynthUI';
-import { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
+import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 
 const SYNTH_SETTINGS = [
   {
@@ -313,27 +312,7 @@ const SynthModuleCompInner: React.FC<{
         <WavetableControlPanel synth={synth} dispatch={dispatch} index={index} />
       ) : null}
       {synth.waveform === Waveform.FM && synth.fmSynth ? (
-        <FMSynthUI
-          updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: number) =>
-            synth.fmSynth!.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
-          }
-          updateBackendOutput={(operatorIx: number, val: number) =>
-            synth.fmSynth!.handleOutputWeightChange(operatorIx, val)
-          }
-          modulationIndices={synth.fmSynth.getModulationIndices()}
-          outputWeights={synth.fmSynth.getOutputWeights()}
-          operatorConfigs={synth.fmSynth.getOperatorConfigs()}
-          onOperatorConfigChange={(operatorIx: number, newOperatorConfig: OperatorConfig) =>
-            synth.fmSynth!.handleOperatorConfigChange(operatorIx, newOperatorConfig)
-          }
-          operatorEffects={synth.fmSynth.getOperatorEffects()}
-          mainEffectChain={synth.fmSynth.getMainEffectChain()}
-          setEffect={synth.fmSynth.setEffect.bind(synth.fmSynth)}
-          initialSelectedOperatorIx={synth.fmSynth.selectedOperatorIx}
-          onOperatorSelected={opIx => {
-            synth.fmSynth!.selectedOperatorIx = opIx;
-          }}
-        />
+        <ConnectedFMSynthUI synth={synth.fmSynth} />
       ) : null}
 
       <FilterModule

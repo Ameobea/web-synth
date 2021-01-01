@@ -10,13 +10,8 @@ import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
-import {
-  AudioConnectables,
-  addNode,
-  removeNode,
-  ConnectableInput,
-  ConnectableOutput,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { addNode, removeNode } from 'src/patchNetwork/interface';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';

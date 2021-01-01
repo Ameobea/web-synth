@@ -193,3 +193,10 @@ export const classNameIncludes = (
   }
   return className.includes(needle);
 };
+
+let engineHandle: typeof import('./engine');
+
+export const setEngine = (engine: typeof import('./engine')) => {
+  engineHandle = engine;
+};
+export const getEngine = (): typeof import('./engine') | undefined => engineHandle;

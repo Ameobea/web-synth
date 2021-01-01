@@ -5,7 +5,7 @@ import { Option } from 'funfix-core';
 import ControlPanel from 'react-control-panel';
 
 import { getSample } from 'src/sampleLibrary';
-import { updateConnectables } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
 import { VoiceTarget, SequencerReduxInfra } from '../redux';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';

@@ -8,12 +8,8 @@ import {
   mkContainerHider,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import {
-  AudioConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-  updateConnectables,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import Loading from 'src/misc/Loading';
 import { AsyncOnce } from 'src/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';

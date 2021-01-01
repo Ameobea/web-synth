@@ -15,10 +15,10 @@ import WaveTable, {
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
-import { updateConnectables } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
-import { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
+import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
   synthModule.voices.forEach(voice => {

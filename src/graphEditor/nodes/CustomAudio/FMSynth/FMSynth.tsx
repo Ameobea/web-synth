@@ -1,21 +1,17 @@
 import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
-import FMSynthUI from 'src/fmSynth/FMSynthUI';
+import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import {
-  AudioConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-  updateConnectables,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
-import { Effect } from 'src/fmSynth/ConfigureEffects';
+import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import type { Effect } from 'src/fmSynth/ConfigureEffects';
+import { AsyncOnce } from 'src/util';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -31,6 +27,10 @@ const buildDefaultModulationIndices = (): number[][] => {
   }
   return indices;
 };
+
+const WavetableWasmBytes = new AsyncOnce(() =>
+  fetch('/wavetable.wasm').then(res => res.arrayBuffer())
+);
 
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
@@ -83,25 +83,8 @@ export default class FMSynth implements ForeignNode {
     this.init();
 
     this.renderSmallView = mkContainerRenderHelper({
-      Comp: FMSynthUI,
-      getProps: () => ({
-        outputWeights: this.outputWeights,
-        modulationIndices: this.modulationIndices,
-        operatorConfigs: this.operatorConfigs,
-        updateBackendModulation: (srcOperatorIx: number, dstOperatorIx: number, val: number) =>
-          this.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val),
-        onOperatorConfigChange: (operatorIx: number, newOperatorConfig: OperatorConfig) =>
-          this.handleOperatorConfigChange(operatorIx, newOperatorConfig),
-        updateBackendOutput: (operatorIx: number, val: number) =>
-          this.handleOutputWeightChange(operatorIx, val),
-        operatorEffects: this.operatorEffects,
-        setEffect: (operatorIx: number | null, effectIx: number, newEffect: Effect | null) =>
-          this.setEffect(operatorIx, effectIx, newEffect),
-        initialSelectedOperatorIx: this.selectedOperatorIx,
-        onOperatorSelected: (operatorIx: number) => {
-          this.selectedOperatorIx = operatorIx;
-        },
-      }),
+      Comp: ConnectedFMSynthUI,
+      getProps: () => ({ synth: this }),
     });
 
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });

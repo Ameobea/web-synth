@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
-import { MIDINode } from 'src/patchNetwork/midiNode';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
 
 const noop = () => {};
 

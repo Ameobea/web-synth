@@ -10,7 +10,7 @@ import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap, get_faust_editor_connectables } from 'src/faustEditor';
-import { updateConnectables } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { ReduxStore, store } from 'src/redux';
 import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
 import { saveEffect } from 'src/api';

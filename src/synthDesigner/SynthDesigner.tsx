@@ -15,13 +15,13 @@ import {
 } from 'src/synthDesigner';
 import { ReduxStore, store } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
-import { updateConnectables } from 'src/patchNetwork';
 import SynthModuleComp from './SynthModule';
 import EffectModuleComp from './effects/Effect';
 import './SynthDesigner.scss';
 import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from 'src/synthDesigner/SavePresetModal';
 import { saveSynthPreset } from 'src/api';
+import { updateConnectables } from 'src/patchNetwork/interface';
 
 declare class WavyJones extends AnalyserNode {
   public lineColor: string;

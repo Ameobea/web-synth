@@ -1,4 +1,4 @@
-import { AudioConnectables } from 'src/patchNetwork';
+import type { AudioConnectables } from 'src/patchNetwork';
 
 export interface LiteGraphNodePort {
   label: string;

@@ -4,12 +4,8 @@ import EqualizerSmallView from './EqualizerUI';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import {
-  AudioConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-  updateConnectables,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { actionCreators, dispatch, getState } from 'src/redux';
 import { EqualizerPoint } from 'src/redux/modules/equalizer';
 import { AsyncOnce } from 'src/util';

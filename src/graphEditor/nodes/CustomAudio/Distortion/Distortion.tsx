@@ -4,7 +4,8 @@ import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DistortionUI from 'src/graphEditor/nodes/CustomAudio/Distortion/DistortionUI';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/patchNetwork';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
 

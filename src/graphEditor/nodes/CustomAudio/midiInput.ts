@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 import { IterableValueOf, PromiseResolveType } from 'ameo-utils';
 
-import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
 import { MIDINode, MIDIAccess, buildMIDINode } from 'src/patchNetwork/midiNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 

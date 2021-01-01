@@ -1,0 +1,31 @@
+.midi-keyboard {
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-direction: row;
+
+  .octave-changer-label {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    text-align: center;
+    width: 20px;
+    margin-right: -2px;
+  }
+  .octave-changer {
+    display: flex;
+    flex-direction: column;
+    margin-right: 6px;
+
+    button:nth-child(1) {
+      margin-bottom: 1px;
+    }
+    button:nth-child(2) {
+      margin-top: 2px;
+    }
+    button {
+      flex: 1;
+      width: 40px;
+      font-size: 20px;
+    }
+  }
+}

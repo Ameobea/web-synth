@@ -5,7 +5,7 @@ import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
 import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
-import FlatButton from 'src/misc/FlatButton';
+import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 interface FMSynthState {
   modulationIndices: number[][];
@@ -256,5 +256,29 @@ const FMSynthUI: React.FC<{
     </div>
   );
 };
+
+export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
+  <FMSynthUI
+    updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: number) =>
+      synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
+    }
+    updateBackendOutput={(operatorIx: number, val: number) =>
+      synth.handleOutputWeightChange(operatorIx, val)
+    }
+    modulationIndices={synth.getModulationIndices()}
+    outputWeights={synth.getOutputWeights()}
+    operatorConfigs={synth.getOperatorConfigs()}
+    onOperatorConfigChange={(operatorIx: number, newOperatorConfig: OperatorConfig) =>
+      synth.handleOperatorConfigChange(operatorIx, newOperatorConfig)
+    }
+    operatorEffects={synth.getOperatorEffects()}
+    mainEffectChain={synth.getMainEffectChain()}
+    setEffect={synth.setEffect.bind(synth)}
+    initialSelectedOperatorIx={synth.selectedOperatorIx}
+    onOperatorSelected={opIx => {
+      synth.selectedOperatorIx = opIx;
+    }}
+  />
+);
 
 export default FMSynthUI;

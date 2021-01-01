@@ -2,7 +2,7 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import LFOSmallView, { ALL_WAVEFORMS } from './LFONodeUI';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';

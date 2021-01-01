@@ -5,7 +5,7 @@
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 
-import { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
 import {
   LiteGraphNodeInput,
   LiteGraphLink,

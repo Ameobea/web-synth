@@ -8,7 +8,7 @@ import { useOnce } from 'ameo-utils/util/react';
 import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
 import { loadComposition } from '../persistance';
-import { getEngine } from 'src';
+import { getEngine } from 'src/util';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { renderModalWithControls, ModalCompProps } from 'src/controls/Modal';
 import FlatButton from 'src/misc/FlatButton';

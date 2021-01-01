@@ -6,7 +6,6 @@ export class ADSRModule extends ConstantSourceNode {
   public maxValue: number;
   public lengthMs = 1000;
   public envelope: ADSRValues = defaultAdsrEnvelope;
-  private mostRecentGateTime: number | null = null;
 
   constructor(
     ctx: AudioContext,
@@ -52,7 +51,6 @@ export class ADSRModule extends ConstantSourceNode {
       return;
     }
 
-    this.mostRecentGateTime = this.ctx.currentTime;
     this.offset.cancelScheduledValues(0);
 
     const range = this.maxValue - this.minValue;

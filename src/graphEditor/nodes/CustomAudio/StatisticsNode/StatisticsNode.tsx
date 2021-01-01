@@ -6,7 +6,7 @@ import { Map } from 'immutable';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
-import { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import StatisticsNodeUI from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNodeUI';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 

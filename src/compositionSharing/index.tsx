@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { Provider } from 'react-redux';
 
 import { store } from '../redux';
 import CompositionSharing from './CompositionSharing';
-import { Provider } from 'react-redux';
-import { getEngine } from '..';
+import { getEngine } from 'src/util';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 
 const ROOT_NODE_ID = 'composition-sharing-react-root' as const;

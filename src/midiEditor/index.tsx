@@ -12,7 +12,7 @@ import {
   ConnectableInput,
 } from 'src/patchNetwork';
 import MIDIEditorUI, { buildMIDIEditorUIDomId } from 'src/midiEditor/MIDIEditorUI';
-import { getEngine } from 'src';
+import { getEngine } from 'src/util';
 import { store } from 'src/redux';
 import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
 

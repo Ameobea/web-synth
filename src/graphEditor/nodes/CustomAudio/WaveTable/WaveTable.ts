@@ -2,7 +2,8 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import { ConnectableInput, ConnectableOutput, updateConnectables } from 'src/patchNetwork';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { UnreachableException } from 'ameo-utils';

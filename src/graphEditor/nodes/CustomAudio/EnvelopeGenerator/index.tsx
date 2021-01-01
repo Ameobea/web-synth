@@ -2,7 +2,7 @@ import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { ADSRValues } from 'src/controls/adsr';
 import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';

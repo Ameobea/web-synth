@@ -1,3 +1,5 @@
+import type { AudioConnectables } from 'src/patchNetwork';
+
 declare module 'react-control-panel';
 
 declare module 'litegraph.js' {
@@ -50,3 +52,5 @@ declare const process: {
 };
 
 declare function dbg<T>(arg: T): T;
+
+declare function updateConnectables(vcId: string, newConnectables: AudioConnectables): void;

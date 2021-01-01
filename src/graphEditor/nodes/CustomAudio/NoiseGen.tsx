@@ -4,12 +4,8 @@ import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import {
-  AudioConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-  updateConnectables,
-} from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';

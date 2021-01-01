@@ -17,7 +17,7 @@ import { getState, ReduxStore } from 'src/redux';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { tryParseJson } from 'src/util';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
-import { getEngine } from 'src';
+import { getEngine } from 'src/util';
 import FlatButton from 'src/misc/FlatButton';
 import { LGraphHandlesByVcId } from 'src/graphEditor';
 import { LiteGraph as LiteGraphInstance } from 'src/graphEditor/LiteGraphTypes';

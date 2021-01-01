@@ -4,19 +4,17 @@ import { Provider } from 'react-redux';
 
 const wasm = import('./engine');
 import { actionCreators, dispatch, store, getState } from './redux';
-import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
-import { commitForeignConnectables, VCMState } from 'src/redux/modules/viewContextManager';
-import { tryParseJson } from 'src/util';
+import type { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+import type { VCMState } from 'src/redux/modules/viewContextManager';
+import { setEngine, tryParseJson } from 'src/util';
 import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
-import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
+import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
 import { loadSharedComposition, maybeRestoreLocalComposition } from 'src/persistance';
+import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
 
 const ctx = new AudioContext();
-let engineHandle: typeof import('./engine');
-
-export const getEngine = (): typeof import('./engine') | undefined => engineHandle;
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
   ReactDOM.unstable_createRoot(document.getElementById('view-context-manager')).render(
@@ -124,7 +122,7 @@ if (typeof AudioWorkletNode === 'undefined') {
   createBrowserNotSupportedMessage();
 } else {
   wasm.then(async engine => {
-    engineHandle = engine;
+    setEngine(engine);
 
     // Check to see if the user has reached this page via a composition share link.  If so,
     // save the current composition and load the shared one before initializing.

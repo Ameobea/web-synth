@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
 import FaustEditor from './FaustEditor';
-import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import {
