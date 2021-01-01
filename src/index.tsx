@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 
 const wasm = import('./engine');
 import { actionCreators, dispatch, store, getState } from './redux';
-import type { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
 import { setEngine, tryParseJson } from 'src/util';
 import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';

@@ -98,7 +98,7 @@ export const MidiKeyboard: React.FC<{
         return;
       }
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
-      if (R.isNil(midiNumber)) {
+      if (R.isNil(keyMap[evt.key.toLowerCase()])) {
         return;
       } else if (evt.repeat) {
         return;
@@ -116,7 +116,7 @@ export const MidiKeyboard: React.FC<{
     };
     const handleUp = (evt: KeyboardEvent) => {
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
-      if (R.isNil(midiNumber)) {
+      if (R.isNil(keyMap[evt.key.toLowerCase()])) {
         return;
       }
       releaseNote(midiNumber);
