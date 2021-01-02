@@ -21,12 +21,19 @@ export type Effect =
       bottomFoldWidth: ParamSource;
     }
   | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
-  | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource };
+  | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource }
+  | { type: 'soft clipper'; preGain: ParamSource; postGain: ParamSource };
 
 const EFFECT_TYPE_SETTING = {
   type: 'select',
   label: 'effect type',
-  options: ['spectral warping', 'wavecruncher', 'bitcrusher', 'wavefolder'] as Effect['type'][],
+  options: [
+    'spectral warping',
+    'wavecruncher',
+    'bitcrusher',
+    'wavefolder',
+    'soft clipper',
+  ] as Effect['type'][],
 };
 
 const buildDefaultEffect = (type: Effect['type']): Effect => {
@@ -62,6 +69,13 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         offset: { type: 'constant', value: 0 },
       };
     }
+    case 'soft clipper': {
+      return {
+        type,
+        preGain: { type: 'constant', value: 1.5 },
+        postGain: { type: 'constant', value: 1.5 },
+      };
+    }
   }
 };
 
@@ -76,12 +90,14 @@ const spectralWarpTheme = { ...baseTheme, background1: 'rgb(24,48,182)' };
 const wavecruncherTheme = { ...baseTheme, background1: 'rgb(199,48,184)' };
 const bitcrusherTheme = { ...baseTheme, background1: 'rgb(84,47,12)' };
 const wavefolderTheme = { ...baseTheme, background1: 'rgb(24,120,101)' };
+const softClipperTheme = { ...baseTheme, background1: 'rgb(88,88,22)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
   wavecruncher: wavecruncherTheme,
   bitcrusher: bitcrusherTheme,
   wavefolder: wavefolderTheme,
+  'soft clipper': softClipperTheme,
 };
 
 type EffectConfigurator<T> = React.FC<{
@@ -198,6 +214,28 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange
   </>
 );
 
+const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({ state, onChange }) => (
+  <>
+    <ConfigureParamSource
+      title='pre gain'
+      theme={softClipperTheme}
+      min={0.1}
+      max={50}
+      scale='log'
+      state={state.preGain}
+      onChange={preGain => onChange({ ...state, preGain })}
+    />
+    <ConfigureParamSource
+      title='post gain'
+      theme={softClipperTheme}
+      min={0.1}
+      max={5}
+      state={state.postGain}
+      onChange={postGain => onChange({ ...state, postGain })}
+    />
+  </>
+);
+
 const EffectManagement: React.FC<{
   effectIx: number;
   operatorEffects: (Effect | null)[];
@@ -277,6 +315,9 @@ const ConfigureEffectSpecific: React.FC<{
     }
     case 'wavefolder': {
       return <ConfigureWavefolder state={state} onChange={onChange} />;
+    }
+    case 'soft clipper': {
+      return <ConfigureSoftClipper state={state} onChange={onChange} />;
     }
   }
 };

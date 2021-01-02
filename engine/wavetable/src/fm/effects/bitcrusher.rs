@@ -30,11 +30,11 @@ impl Bitcrusher {
         let amplitude_bucket_count = even_faster_pow2(bit_depth);
         let bucket_size = 2. / amplitude_bucket_count;
 
-        dsp::clamp(
-            -1.,
-            1.,
-            sample - (sample / bucket_size).fract() * bucket_size,
-        )
+        // dsp::clamp(
+        //     -1.,
+        //     1.,
+        sample - (sample / bucket_size).fract() * bucket_size
+        // )
     }
 }
 

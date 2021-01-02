@@ -2,6 +2,7 @@ import * as R from 'ramda';
 
 import { SequencerMark, SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
 import { scheduleEvent } from 'src/eventScheduler';
+import { getGlobalBpm } from 'src/globalMenu';
 
 const ctx = new AudioContext();
 
@@ -31,7 +32,7 @@ export const SequencerBeatPlayerByVoiceType: {
     }
 
     // TODO: Make per-voice config of what percentage of the window to hold the note for
-    const beatDurationMS = (60 / state.bpm) * 1000;
+    const beatDurationMS = (60 / getGlobalBpm()) * 1000;
     const holdDurationMS = beatDurationMS * 0.72;
 
     midiOutput.onAttack(mark?.note ?? voice.note, 255);

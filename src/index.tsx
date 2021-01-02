@@ -6,7 +6,7 @@ const wasm = import('./engine');
 import { actionCreators, dispatch, store, getState } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
-import { setEngine, tryParseJson } from 'src/util';
+import { getEngine, setEngine, tryParseJson } from 'src/util';
 import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';

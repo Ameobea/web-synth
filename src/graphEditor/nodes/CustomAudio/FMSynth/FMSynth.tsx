@@ -287,6 +287,15 @@ export default class FMSynth implements ForeignNode {
           null,
         ];
       }
+      case 'soft clipper': {
+        return [
+          4,
+          this.encodeParamSource(effect.preGain),
+          this.encodeParamSource(effect.postGain),
+          null,
+          null,
+        ];
+      }
       default: {
         throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);
       }

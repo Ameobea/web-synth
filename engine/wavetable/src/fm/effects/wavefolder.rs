@@ -1,3 +1,5 @@
+use dsp::filters::dc_blocker::DCBlocker;
+
 use super::Effect;
 use crate::fm::{ADSRState, ParamSource, ParamSourceType, FRAME_SIZE};
 
@@ -88,6 +90,17 @@ impl Effect for Wavecruncher {
 pub struct Wavefolder {
     pub gain: ParamSource,
     pub offset: ParamSource,
+    dc_blocker: DCBlocker,
+}
+
+impl Wavefolder {
+    pub fn new(gain: ParamSource, offset: ParamSource) -> Self {
+        Wavefolder {
+            gain,
+            offset,
+            dc_blocker: DCBlocker::default(),
+        }
+    }
 }
 
 impl Effect for Wavefolder {
@@ -107,6 +120,10 @@ impl Effect for Wavefolder {
             .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
 
         // Credit to mikedorf for this: https://discord.com/channels/590254806208217089/590657587939115048/793255717569822780
-        fastapprox::faster::sinfull(std::f32::consts::PI * (sample * gain + offset / 2.))
+        let output =
+            fastapprox::faster::sinfull(std::f32::consts::PI * (sample * gain + offset / 2.));
+        // Filter out extremely low frequencies / remove offset bias
+        self.dc_blocker.apply(output)
+        // output
     }
 }

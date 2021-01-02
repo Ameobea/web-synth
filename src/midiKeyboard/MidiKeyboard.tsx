@@ -72,7 +72,7 @@ export const MidiKeyboard: React.FC<{
     }
     setAlreadyDownNotes({ type: 'ADD', midiNumber });
 
-    onAttack(midiNumber + MIDI_NOTES_PER_OCTAVE * octaveOffset);
+    onAttack(midiNumber);
   };
 
   const releaseNote = (midiNumber: number) => {
@@ -80,7 +80,7 @@ export const MidiKeyboard: React.FC<{
     // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event
     // which causes ghost notes.
 
-    onRelease(midiNumber + MIDI_NOTES_PER_OCTAVE * octaveOffset);
+    onRelease(midiNumber);
   };
 
   const setOctaveOffset = (newOctaveOffset: number) => {

@@ -146,10 +146,10 @@ const handleNodeSelectAction = async ({
 
     if (isNowSelected) {
       setCurSelectedNode(lgNode);
+      setSelectedNodeVCID(null);
     } else if (curSelectedNode === lgNode) {
       setCurSelectedNode(null);
     }
-    setSelectedNodeVCID(null);
   }
 };
 

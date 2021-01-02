@@ -1,8 +1,10 @@
+use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
 use super::{ADSRState, ParamSource, ParamSourceType, FRAME_SIZE};
 
 pub mod bitcrusher;
+pub mod soft_clipper;
 pub mod spectral_warping;
 pub mod wavefolder;
 
@@ -29,6 +31,7 @@ pub enum EffectInstance {
     Wavecruncher(Wavecruncher),
     Bitcrusher(Bitcrusher),
     Wavefolder(Wavefolder),
+    SoftClipper(SoftClipper),
 }
 
 impl EffectInstance {
@@ -123,7 +126,21 @@ impl EffectInstance {
                     param_2_float_val,
                 ));
 
-                EffectInstance::Wavefolder(Wavefolder { gain, offset })
+                EffectInstance::Wavefolder(Wavefolder::new(gain, offset))
+            },
+            4 => {
+                let pre_gain = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                let post_gain = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+
+                EffectInstance::SoftClipper(SoftClipper::new(pre_gain, post_gain))
             },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
@@ -171,7 +188,8 @@ impl EffectInstance {
                 return true;
             },
             1 => {
-                // Wavecruncher is stateless
+                // If things get a bit crunchy here I don't really care
+                // (too lazy to impl this)
                 false
             },
             2 => {
@@ -186,6 +204,44 @@ impl EffectInstance {
                     param_1_float_val,
                 ));
                 bitcrusher.bit_depth.replace(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+
+                return true;
+            },
+            3 => {
+                let wavefolder = match self {
+                    EffectInstance::Wavefolder(wavefolder) => wavefolder,
+                    _ => return false,
+                };
+
+                wavefolder.gain.replace(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                wavefolder.offset.replace(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                ));
+
+                return true;
+            },
+            4 => {
+                let soft_clipper = match self {
+                    EffectInstance::SoftClipper(soft_clipper) => soft_clipper,
+                    _ => return false,
+                };
+
+                soft_clipper.pre_gain.replace(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                ));
+                soft_clipper.post_gain.replace(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
@@ -230,6 +286,13 @@ impl Effect for EffectInstance {
                 sample,
             ),
             EffectInstance::Wavefolder(e) => e.apply(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                sample,
+            ),
+            EffectInstance::SoftClipper(e) => e.apply(
                 param_buffers,
                 adsrs,
                 sample_ix_within_frame,

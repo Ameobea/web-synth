@@ -7,7 +7,7 @@
 
 #![feature(box_syntax)]
 
-use dsp::{clamp, mix, read_interpolated, smooth, ButterworthFilter};
+use dsp::{clamp, filters::butterworth::ButterworthFilter, mix, read_interpolated, smooth};
 use rand::prelude::*;
 
 pub mod sample_recorder;
