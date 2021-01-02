@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
 
-  .operators {
+  .modulation-matrix {
     display: flex;
     flex-direction: column;
     width: 376px;
@@ -32,6 +32,10 @@
         align-items: center;
         // padding: 3px;
         border: 1px solid #555;
+        cursor: pointer;
+      }
+      .operator-square[data-active='true'] {
+        background-color: #e23d4d;
       }
 
       .output-weight {

@@ -1,7 +1,7 @@
 import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 
-import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
+import { ConnectedFMSynthUI, UISelection } from 'src/fmSynth/FMSynthUI';
 import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -20,10 +20,10 @@ type FMSynthInputDescriptor =
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 16;
 
-const buildDefaultModulationIndices = (): number[][] => {
+const buildDefaultModulationIndices = (): ParamSource[][] => {
   const indices = new Array(OPERATOR_COUNT).fill(null);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
-    indices[i] = new Array(OPERATOR_COUNT).fill(0);
+    indices[i] = new Array(OPERATOR_COUNT).fill(0).map(() => ({ type: 'constant', value: 0 }));
   }
   return indices;
 };
@@ -37,7 +37,7 @@ export default class FMSynth implements ForeignNode {
   private vcId: string | undefined;
   private generatedInputs: FMSynthInputDescriptor[] = [];
   private awpHandle: AudioWorkletNode | null = null;
-  private modulationIndices: number[][] = buildDefaultModulationIndices();
+  private modulationMatrix: ParamSource[][] = buildDefaultModulationIndices();
   private outputWeights: number[] = new Array(OPERATOR_COUNT).fill(0);
   private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT)
     .fill(undefined as any)
@@ -46,7 +46,7 @@ export default class FMSynth implements ForeignNode {
     .fill(null as any)
     .map(() => new Array(16).fill(null));
   private mainEffectChain: (Effect | null)[] = new Array(16).fill(null);
-  public selectedOperatorIx: number | null = null;
+  public selectedUI: UISelection | null = null;
   private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
 
   static typeName = 'FM Synthesizer';
@@ -56,8 +56,8 @@ export default class FMSynth implements ForeignNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
-  public getModulationIndices() {
-    return this.modulationIndices;
+  public getModulationMatrix() {
+    return this.modulationMatrix;
   }
   public getOutputWeights() {
     return this.outputWeights;
@@ -102,7 +102,9 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.postMessage({
       type: 'setWasmBytes',
       wasmBytes,
-      modulationIndices: this.modulationIndices,
+      modulationMatrix: this.modulationMatrix.map(row =>
+        row.map(cell => this.encodeParamSource(cell))
+      ),
       outputWeights: this.outputWeights,
     });
 
@@ -227,21 +229,23 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public handleModulationIndexChange(srcOperatorIx: number, dstOperatorIx: number, val: number) {
+  public handleModulationIndexChange(
+    srcOperatorIx: number,
+    dstOperatorIx: number,
+    val: ParamSource
+  ) {
     if (!this.awpHandle) {
       console.error('Tried to update modulation before AWP initialization');
       return;
     }
 
-    this.modulationIndices[srcOperatorIx][dstOperatorIx] = val;
+    this.modulationMatrix[srcOperatorIx][dstOperatorIx] = val;
 
     this.awpHandle.port.postMessage({
       type: 'setModulationIndex',
       srcOperatorIx,
       dstOperatorIx,
-      valueType: 1,
-      valParamInt: 0,
-      valParamFloat: val,
+      ...this.encodeParamSource(val),
     });
   }
 
@@ -328,8 +332,8 @@ export default class FMSynth implements ForeignNode {
   }
 
   private deserialize(params: { [key: string]: any }) {
-    if (params.modulationIndices) {
-      this.modulationIndices = params.modulationIndices;
+    if (params.modulationMatrix) {
+      this.modulationMatrix = params.modulationMatrix;
     }
     if (params.outputWeights) {
       this.outputWeights = params.outputWeights;
@@ -346,15 +350,18 @@ export default class FMSynth implements ForeignNode {
     if (params.mainEffectChain) {
       this.mainEffectChain = params.mainEffectChain;
     }
+    if (params.selectedUI) {
+      this.selectedUI = params.selectedUI;
+    }
   }
 
   public serialize() {
     return {
-      modulationIndices: this.modulationIndices,
+      modulationMatrix: this.modulationMatrix,
       outputWeights: this.outputWeights,
       operatorConfigs: this.operatorConfigs,
       operatorEffects: this.operatorEffects,
-      selectedOperatorIx: this.selectedOperatorIx,
+      selectedUI: this.selectedUI,
       mainEffectChain: this.mainEffectChain,
     };
   }

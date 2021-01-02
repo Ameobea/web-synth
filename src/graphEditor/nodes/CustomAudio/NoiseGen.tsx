@@ -48,9 +48,8 @@ const NoiseGenSmallView: React.FC<{
           ? {
               type: 'range',
               label: 'smoothing_coefficient',
-              min: 0.95,
-              max: 0.9999,
-              scale: 'log',
+              min: 0.99,
+              max: 0.99999,
               initial: node.smoothingCoefficient,
             }
           : null,

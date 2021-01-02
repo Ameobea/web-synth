@@ -1,7 +1,5 @@
 import type { AudioConnectables } from 'src/patchNetwork';
 
-declare module 'react-control-panel';
-
 declare module 'litegraph.js' {
   import {
     LiteGraphNode,

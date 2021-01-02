@@ -6,32 +6,44 @@ import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
 import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
+import { UnreachableException } from 'ameo-utils';
+import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
+import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 
 interface FMSynthState {
-  modulationIndices: number[][];
+  modulationMatrix: ParamSource[][];
   outputWeights: number[];
   operatorConfigs: OperatorConfig[];
   operatorEffects: (Effect | null)[][];
   mainEffectChain: (Effect | null)[];
 }
 
-type BackendModulationUpdater = (operatorIx: number, modulationIx: number, val: number) => void;
+type BackendModulationUpdater = (
+  operatorIx: number,
+  modulationIx: number,
+  val: ParamSource
+) => void;
 type BackendOutputUpdater = (operatorIx: number, val: number) => void;
 
 const setModulation = (
   state: FMSynthState,
-  operatorIx: number,
-  modulationIx: number,
+  srcOperatorIx: number,
+  dstOperatorIx: number,
   updateBackendModulation: BackendModulationUpdater,
-  getNewVal: (prevVal: number) => number
+  getNewVal: (prevVal: ParamSource) => ParamSource
 ): FMSynthState => {
-  const newmodulationIndices = [...state.modulationIndices];
-  newmodulationIndices[operatorIx] = [...newmodulationIndices[operatorIx]];
-  newmodulationIndices[operatorIx][modulationIx] = getNewVal(
-    newmodulationIndices[operatorIx][modulationIx]
+  const newModulationIndices = [...state.modulationMatrix];
+  newModulationIndices[srcOperatorIx] = [...newModulationIndices[srcOperatorIx]];
+  newModulationIndices[srcOperatorIx][dstOperatorIx] = getNewVal(
+    newModulationIndices[srcOperatorIx][dstOperatorIx]
   );
-  updateBackendModulation(operatorIx, modulationIx, newmodulationIndices[operatorIx][modulationIx]);
-  return { ...state, modulationIndices: newmodulationIndices };
+  updateBackendModulation(
+    srcOperatorIx,
+    dstOperatorIx,
+    newModulationIndices[srcOperatorIx][dstOperatorIx]
+  );
+  return { ...state, modulationMatrix: newModulationIndices };
 };
 
 const setOutput = (
@@ -56,39 +68,48 @@ const ConfigureMainEffectChain: React.FC<{
   );
 };
 
+export type UISelection =
+  | { type: 'mainEffectChain' }
+  | { type: 'operator'; index: number }
+  | { type: 'modulationIndex'; srcOperatorIx: number; dstOperatorIx: number };
+
 const FMSynthUI: React.FC<{
   updateBackendModulation: BackendModulationUpdater;
   updateBackendOutput: BackendOutputUpdater;
-  modulationIndices: number[][];
+  modulationMatrix: ParamSource[][];
   outputWeights: number[];
   operatorConfigs: OperatorConfig[];
   onOperatorConfigChange: (operatorIx: number, newConfig: OperatorConfig) => void;
   operatorEffects: (Effect | null)[][];
   mainEffectChain: (Effect | null)[];
   setEffect: (operatorIx: number | null, effectIx: number, effect: Effect | null) => void;
-  initialSelectedOperatorIx: number | null;
-  onOperatorSelected: (operatorIx: number) => void;
+  initialSelectedUI?: UISelection | null;
+  onSelectedUIChange: (newSelectedUI: UISelection | null) => void;
 }> = ({
   updateBackendModulation,
   updateBackendOutput,
-  modulationIndices,
+  modulationMatrix,
   outputWeights,
   operatorConfigs,
   onOperatorConfigChange,
   operatorEffects,
   mainEffectChain,
   setEffect,
-  initialSelectedOperatorIx,
-  onOperatorSelected,
+  initialSelectedUI,
+  onSelectedUIChange,
 }) => {
   const [state, setState] = useState<FMSynthState>({
-    modulationIndices,
+    modulationMatrix,
     outputWeights,
     operatorConfigs,
     operatorEffects,
     mainEffectChain,
   });
-  const [selectedOperatorIx, setSelectedOperatorIx] = useState(initialSelectedOperatorIx);
+  const [selectedUI, setSelectedUIInner] = useState<UISelection | null>(initialSelectedUI ?? null);
+  const setSelectedUI = (newSelectedUI: UISelection | null) => {
+    onSelectedUIChange(newSelectedUI);
+    setSelectedUIInner(newSelectedUI);
+  };
 
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
@@ -116,7 +137,12 @@ const FMSynthUI: React.FC<{
             srcOperatorIx,
             dstOperatorIx,
             updateBackendModulation,
-            (prevVal: number) => prevVal + (evt.deltaY > 0 ? -1 : 1) * 0.1
+            (prevVal: ParamSource) => {
+              if (prevVal.type !== 'constant') {
+                return prevVal;
+              }
+              return { type: 'constant', value: prevVal.value + (evt.deltaY > 0 ? -1 : 1) * 0.1 };
+            }
           )
         );
       }
@@ -129,143 +155,160 @@ const FMSynthUI: React.FC<{
     return () => window.removeEventListener('wheel', handler);
   }, [state, updateBackendModulation, updateBackendOutput]);
 
+  const handleMainEffectChainChange = (effectIx: number, newEffect: Effect | null) => {
+    const newMainEffectChain = [...state.mainEffectChain];
+    newMainEffectChain[effectIx] = newEffect;
+    if (!newEffect) {
+      // Slide remaining effects down.  Deleting will trigger this to happen on the
+      // backend as well.
+      for (let i = effectIx; i < newMainEffectChain.length; i++) {
+        const nextEffect = newMainEffectChain[i + 1];
+        if (nextEffect) {
+          newMainEffectChain[i] = nextEffect;
+          newMainEffectChain[i + 1] = null;
+          setEffect(null, i + 1, null);
+        }
+      }
+    }
+
+    setEffect(null, effectIx, newEffect);
+    setState({ ...state, mainEffectChain: newMainEffectChain });
+  };
+
+  const handleEffectChange = (effectIx: number, newEffect: Effect | null) => {
+    if (selectedUI?.type !== 'operator') {
+      console.warn('UI invariant in handleEffectChange');
+      return;
+    }
+    const { index: selectedOperatorIx } = selectedUI;
+
+    setEffect(selectedOperatorIx, effectIx, newEffect);
+    const newState = { ...state };
+    newState.operatorEffects = [...newState.operatorEffects];
+    newState.operatorEffects[selectedOperatorIx] = [
+      ...newState.operatorEffects[selectedOperatorIx],
+    ];
+    newState.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+
+    if (!newEffect) {
+      // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
+      for (let i = effectIx; i < newState.operatorEffects[selectedOperatorIx].length; i++) {
+        const nextEffect = newState.operatorEffects[selectedOperatorIx][i + 1];
+        if (nextEffect) {
+          newState.operatorEffects[selectedOperatorIx][i] = nextEffect;
+          newState.operatorEffects[selectedOperatorIx][i + 1] = null;
+          setEffect(selectedOperatorIx, i + 1, null);
+        }
+      }
+    }
+
+    setState(newState);
+  };
+
   return (
     <div className='fm-synth-ui'>
-      <div className='operators'>
-        {state.modulationIndices.map((row, srcOperatorIx) => (
-          <div className='operator-row' key={srcOperatorIx}>
-            <div
-              className={
-                'operator-select' +
-                (selectedOperatorIx === srcOperatorIx ? ' operator-selected' : '')
-              }
-              onClick={() => {
-                setSelectedOperatorIx(srcOperatorIx);
-                onOperatorSelected(srcOperatorIx);
-              }}
-            />
-            {row.map((val, dstOperatorIx) => (
-              <div
-                data-src-operator-ix={srcOperatorIx}
-                data-dst-operator-ix={dstOperatorIx}
-                className='operator-square'
-                key={dstOperatorIx}
-              >
-                {Math.abs(val) < 0.01 ? null : val.toFixed(2)}
-              </div>
-            ))}
-            <div
-              data-operator-ix={srcOperatorIx}
-              key='output'
-              className='operator-square output-weight'
-            >
-              {Math.abs(state.outputWeights[srcOperatorIx]) < 0.01
-                ? null
-                : state.outputWeights[srcOperatorIx].toFixed(2)}
-            </div>
-          </div>
-        ))}
-      </div>
+      <ModulationMatrix
+        selectedOperatorIx={selectedUI?.type === 'operator' ? selectedUI.index : null}
+        onOperatorSelected={(newSelectedOperatorIx: number) =>
+          setSelectedUI({ type: 'operator', index: newSelectedOperatorIx })
+        }
+        onModulationIndexSelected={(srcOperatorIx: number, dstOperatorIx: number) =>
+          setSelectedUI({ type: 'modulationIndex', srcOperatorIx, dstOperatorIx })
+        }
+        modulationIndices={state.modulationMatrix}
+        outputWeights={state.outputWeights}
+        selectedUI={selectedUI}
+      />
       <div
         className='main-effect-chain-selector'
-        data-active={selectedOperatorIx === null ? 'true' : 'false'}
-        onClick={() => setSelectedOperatorIx(null)}
+        data-active={selectedUI?.type === 'mainEffectChain' ? 'true' : 'false'}
+        onClick={() => setSelectedUI({ type: 'mainEffectChain' })}
       >
         MAIN EFFECT CHAIN
       </div>
 
-      {selectedOperatorIx === null ? (
+      {selectedUI?.type === 'mainEffectChain' ? (
         <ConfigureMainEffectChain
           mainEffectChain={state.mainEffectChain}
-          onChange={(effectIx: number, newEffect: Effect | null) => {
-            const newMainEffectChain = [...state.mainEffectChain];
-            newMainEffectChain[effectIx] = newEffect;
-            if (!newEffect) {
-              // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
-              for (let i = effectIx; i < newMainEffectChain.length; i++) {
-                const nextEffect = newMainEffectChain[i + 1];
-                if (nextEffect) {
-                  newMainEffectChain[i] = nextEffect;
-                  newMainEffectChain[i + 1] = null;
-                  setEffect(null, i + 1, null);
-                }
-              }
-            }
-
-            setEffect(null, effectIx, newEffect);
-            setState({ ...state, mainEffectChain: newMainEffectChain });
-          }}
+          onChange={handleMainEffectChainChange}
           setEffects={(newEffects: (Effect | null)[]) => {
             newEffects.forEach((effect, effectIx) => setEffect(null, effectIx, effect));
             setState({ ...state, mainEffectChain: newEffects });
           }}
         />
-      ) : (
-        <ConfigureOperator
-          config={state.operatorConfigs[selectedOperatorIx]}
-          onChange={newConf => {
-            setState({
-              ...state,
-              operatorConfigs: R.set(
-                R.lensIndex(selectedOperatorIx),
-                newConf,
-                state.operatorConfigs
-              ),
-            });
-            onOperatorConfigChange(selectedOperatorIx, newConf);
-          }}
-          effects={state.operatorEffects[selectedOperatorIx]}
-          onEffectsChange={(effectIx: number, newEffect: Effect | null) => {
-            setEffect(selectedOperatorIx, effectIx, newEffect);
-            const newState = { ...state };
-            newState.operatorEffects = [...newState.operatorEffects];
-            newState.operatorEffects[selectedOperatorIx] = [
-              ...newState.operatorEffects[selectedOperatorIx],
-            ];
-            newState.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
+      ) : null}
+      {selectedUI?.type === 'operator'
+        ? (() => {
+            const selectedOperatorIx = selectedUI.index;
 
-            if (!newEffect) {
-              // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
-              for (let i = effectIx; i < newState.operatorEffects[selectedOperatorIx].length; i++) {
-                const nextEffect = newState.operatorEffects[selectedOperatorIx][i + 1];
-                if (nextEffect) {
-                  newState.operatorEffects[selectedOperatorIx][i] = nextEffect;
-                  newState.operatorEffects[selectedOperatorIx][i + 1] = null;
-                  setEffect(selectedOperatorIx, i + 1, null);
-                }
-              }
-            }
-
-            setState(newState);
-          }}
-          setEffects={newEffects => {
-            newEffects.forEach((effect, effectIx) =>
-              setEffect(selectedOperatorIx, effectIx, effect)
+            return (
+              <ConfigureOperator
+                config={state.operatorConfigs[selectedOperatorIx]}
+                onChange={newConf => {
+                  setState({
+                    ...state,
+                    operatorConfigs: R.set(
+                      R.lensIndex(selectedOperatorIx),
+                      newConf,
+                      state.operatorConfigs
+                    ),
+                  });
+                  onOperatorConfigChange(selectedOperatorIx, newConf);
+                }}
+                effects={state.operatorEffects[selectedOperatorIx]}
+                onEffectsChange={handleEffectChange}
+                setEffects={newEffects => {
+                  newEffects.forEach((effect, effectIx) =>
+                    setEffect(selectedOperatorIx, effectIx, effect)
+                  );
+                  setState({
+                    ...state,
+                    operatorEffects: R.set(
+                      R.lensIndex(selectedOperatorIx),
+                      newEffects,
+                      state.operatorEffects
+                    ),
+                  });
+                }}
+              />
             );
-            setState({
-              ...state,
-              operatorEffects: R.set(
-                R.lensIndex(selectedOperatorIx),
-                newEffects,
-                state.operatorEffects
-              ),
-            });
-          }}
+          })()
+        : null}
+      {selectedUI?.type === 'modulationIndex' ? (
+        <ConfigureModulationIndex
+          srcOperatorIx={selectedUI.srcOperatorIx}
+          dstOperatorIx={selectedUI.dstOperatorIx}
+          modulationIndices={state.modulationMatrix}
+          onChange={(
+            srcOperatorIx: number,
+            dstOperatorIx: number,
+            newModulationIndex: ParamSource
+          ) =>
+            setState(
+              setModulation(
+                state,
+                srcOperatorIx,
+                dstOperatorIx,
+                updateBackendModulation,
+                (_prevVal: ParamSource) => newModulationIndex
+              )
+            )
+          }
         />
-      )}
+      ) : null}
     </div>
   );
 };
 
 export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
   <FMSynthUI
-    updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: number) =>
+    updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
       synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
     }
     updateBackendOutput={(operatorIx: number, val: number) =>
       synth.handleOutputWeightChange(operatorIx, val)
     }
-    modulationIndices={synth.getModulationIndices()}
+    modulationMatrix={synth.getModulationMatrix()}
     outputWeights={synth.getOutputWeights()}
     operatorConfigs={synth.getOperatorConfigs()}
     onOperatorConfigChange={(operatorIx: number, newOperatorConfig: OperatorConfig) =>
@@ -274,9 +317,9 @@ export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
     operatorEffects={synth.getOperatorEffects()}
     mainEffectChain={synth.getMainEffectChain()}
     setEffect={synth.setEffect.bind(synth)}
-    initialSelectedOperatorIx={synth.selectedOperatorIx}
-    onOperatorSelected={opIx => {
-      synth.selectedOperatorIx = opIx;
+    initialSelectedUI={synth.selectedUI}
+    onSelectedUIChange={newSelectedUI => {
+      synth.selectedUI = newSelectedUI;
     }}
   />
 );
