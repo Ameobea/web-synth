@@ -216,6 +216,7 @@ const FMSynthUI: React.FC<{
           setSelectedUI({ type: 'modulationIndex', srcOperatorIx, dstOperatorIx })
         }
         modulationIndices={state.modulationMatrix}
+        operatorConfigs={state.operatorConfigs}
         outputWeights={state.outputWeights}
         selectedUI={selectedUI}
       />

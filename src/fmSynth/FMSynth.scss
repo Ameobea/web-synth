@@ -1,12 +1,44 @@
+@import 'src/colors.scss';
+
+@keyframes borderColor {
+  0% {
+    border-color: #0a414e;
+  }
+  25% {
+    border-color: #280550;
+  }
+  50% {
+    border-color: #4d063d;
+  }
+  75% {
+    border-color: #1a0b5c;
+  }
+  100% {
+    border-color: #0a414e;
+  }
+}
+
 .fm-synth-ui {
   display: flex;
   flex-direction: column;
+  color: white;
+
+  div[data-hovered='true'] {
+    $hover-color: lighten($highlight-2, 50);
+    background-color: mix($hover-color, #000, $weight: 10%);
+  }
+
+  .modulation-matrix,
+  .operator-square,
+  .operator-select {
+    border: 1px solid;
+    animation: borderColor 15s infinite linear;
+  }
 
   .modulation-matrix {
     display: flex;
     flex-direction: column;
     width: 376px;
-    border: 1px solid #555;
 
     .operator-row {
       display: flex;
@@ -17,29 +49,31 @@
         height: 36px;
         display: flex;
         font-size: 12.5px;
+        justify-content: center;
       }
 
       .operator-select {
         cursor: pointer;
-        background-color: #626d8d;
+        background-color: $highlight-1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
 
       .operator-select.operator-selected {
-        background-color: #e23d4d;
+        background-color: $highlight-4;
       }
 
       .operator-square {
         align-items: center;
-        // padding: 3px;
-        border: 1px solid #555;
         cursor: pointer;
       }
       .operator-square[data-active='true'] {
-        background-color: #e23d4d;
+        background-color: $highlight-4;
       }
 
       .output-weight {
-        background-color: #33bbdd33;
+        background-color: $highlight-2;
       }
     }
   }
@@ -73,14 +107,14 @@
   }
 
   .main-effect-chain-selector {
-    background-color: #626d8d;
+    background-color: $highlight-5;
     text-align: center;
     cursor: pointer;
     padding: 3px;
     margin: 2px 0px;
   }
   .main-effect-chain-selector[data-active='true'] {
-    background-color: #e23d4d;
+    background-color: $highlight-4;
   }
   .main-effect-chain-selector:hover {
     font-weight: bold;
