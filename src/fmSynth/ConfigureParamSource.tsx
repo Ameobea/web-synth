@@ -1,6 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import * as R from 'ramda';
 
 export const PARAM_BUFFER_COUNT = 8;
 const ADSR_COUNT = 8;
@@ -64,7 +65,7 @@ const ConfigureParamSource: React.FC<{
           buildTypeSetting(),
           {
             type: 'select',
-            label: 'buffer ix',
+            label: 'buffer index',
             options: new Array(PARAM_BUFFER_COUNT).fill(0).map((_i, i) => i),
           },
         ];
@@ -106,7 +107,11 @@ const ConfigureParamSource: React.FC<{
       theme={theme}
       style={{ width: 378 }}
       settings={settings}
-      state={state}
+      state={{
+        ...state,
+        'buffer index':
+          state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
+      }}
       onChange={(key: string, value: any) => {
         switch (key) {
           case 'type': {
@@ -117,8 +122,8 @@ const ConfigureParamSource: React.FC<{
             onChange(updateState(state, buildDefaultParamSource(value)));
             break;
           }
-          case 'buffer ix': {
-            onChange(updateState(state, { 'buffer index': value }));
+          case 'buffer index': {
+            onChange(updateState(state, { 'buffer index': +value }));
             break;
           }
           case 'value': {
@@ -129,7 +134,7 @@ const ConfigureParamSource: React.FC<{
             break;
           }
           case 'adsr index': {
-            onChange(updateState(state, { 'adsr index': value }));
+            onChange(updateState(state, { 'adsr index': +value }));
             break;
           }
           case 'multiplier': {

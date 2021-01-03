@@ -1,4 +1,8 @@
 pub mod effects;
+use std::hint::unreachable_unchecked;
+
+use effects::bitcrusher::even_faster_pow;
+
 use self::effects::{Effect, EffectChain};
 
 #[derive(Clone, Default)]
@@ -69,6 +73,37 @@ impl PhasedOscillator for ExponentialOscillator {
     fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
 }
 
+/// Taken from `fastapprox::fast` but with some checks/extra work removed since we know things
+/// statically that the compiler can't seem to figure out even with some coaxing
+mod fast {
+    use fastapprox::bits::{from_bits, to_bits};
+
+    /// Base 2 logarithm.
+    #[inline]
+    pub fn log2(x: f32) -> f32 {
+        let vx = to_bits(x);
+        let mx = from_bits((vx & 0x007FFFFF_u32) | 0x3f000000);
+        let mut y = vx as f32;
+        y *= 1.1920928955078125e-7_f32;
+        y - 124.22551499_f32 - 1.498030302_f32 * mx - 1.72587999_f32 / (0.3520887068_f32 + mx)
+    }
+
+    /// Raises 2 to a floating point power.  MUST NOT BE CALLED WITH NEGATIVE OR DENORMAL ARGUMENTS
+    #[inline]
+    pub fn pow2(p: f32) -> f32 {
+        let w = p as i32;
+        let z = p - (w as f32);
+        let v = ((1 << 23) as f32
+            * (p + 121.2740575_f32 + 27.7280233_f32 / (4.84252568_f32 - z) - 1.49012907_f32 * z))
+            as u32;
+        from_bits(v)
+    }
+
+    /// Raises a number to a floating point power.
+    #[inline]
+    pub fn pow(x: f32, p: f32) -> f32 { pow2(p * log2(x)) }
+}
+
 impl ExponentialOscillator {
     pub fn gen_sample(
         &mut self,
@@ -80,19 +115,29 @@ impl ExponentialOscillator {
     ) -> f32 {
         self.update_phase(frequency);
 
-        let stretch_factor =
-            self.stretch_factor
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+        let stretch_factor = self
+            .stretch_factor
+            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
+            .abs()
+            .min(1.);
+        if stretch_factor < 0. {
+            unsafe { unreachable_unchecked() }
+        }
 
         // let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
-        let exponent_numerator =
-            fastapprox::faster::pow(10.0f32, 4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+        let exponent_numerator = even_faster_pow(10.0f32, stretch_factor * 0.32 + 1.4) + 1.;
         let exponent_denominator = 999.0f32;
         let exponent = exponent_numerator / exponent_denominator;
+        if exponent < 0. {
+            unsafe { unreachable_unchecked() }
+        }
 
         // Transform phase into [-1, 1] range
         let extended_phase = self.phase * 2. - 1.;
         let absolute_phase = extended_phase.abs();
+        if absolute_phase < 0. {
+            unsafe { unreachable_unchecked() }
+        }
         // val is from 0 to 1
         let val = if cfg!(debug_assertions) {
             let val = absolute_phase.powf(exponent);
@@ -100,7 +145,7 @@ impl ExponentialOscillator {
             debug_assert!(val <= 1.);
             val
         } else {
-            dsp::clamp(-1., 1., fastapprox::fast::pow(absolute_phase, exponent))
+            dsp::clamp(-1., 1., self::fast::pow(absolute_phase, exponent))
         };
 
         // Re-apply sign
@@ -237,80 +282,87 @@ fn compute_modulated_frequency(
             .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
         output_freq += modulator_output
             * modulation_index
-            * unsafe { last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
+            * unsafe { *last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
     }
     output_freq
 }
 
 impl FMSynthVoice {
-    pub fn gen_sample(
+    pub fn gen_samples(
         &mut self,
         modulation_matrix: &mut ModulationMatrix,
         wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
-        sample_ix_within_frame: usize,
         operator_base_frequency_sources: &[ParamSource; OPERATOR_COUNT],
-        base_frequency: f32,
-    ) -> f32 {
-        // TODO: Update ADSR state
+        base_frequencies: &[f32],
+        output_buffer: &mut [f32],
+    ) {
+        let mut samples_per_operator: [f32; OPERATOR_COUNT] = self.last_samples;
+        let mut frequencies_per_operator: [f32; OPERATOR_COUNT] =
+            self.last_sample_frequencies_per_operator;
 
-        let mut samples_per_operator: [f32; OPERATOR_COUNT] = [0.0f32; OPERATOR_COUNT];
-        let mut frequencies_per_operator: [f32; OPERATOR_COUNT] = [0.0f32; OPERATOR_COUNT];
-        let mut output_sample = 0.0f32;
+        for sample_ix_within_frame in 0..FRAME_SIZE {
+            let mut output_sample = 0.0f32;
 
-        for operator_ix in 0..OPERATOR_COUNT {
-            let carrier_base_frequency =
-                unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }.get(
+            let base_frequency = *unsafe { base_frequencies.get_unchecked(sample_ix_within_frame) };
+
+            // TODO: Update ADSR state
+
+            for operator_ix in 0..OPERATOR_COUNT {
+                let carrier_base_frequency =
+                    unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }.get(
+                        param_buffers,
+                        &self.adsrs,
+                        sample_ix_within_frame,
+                        base_frequency,
+                    );
+                let modulated_frequency = compute_modulated_frequency(
+                    modulation_matrix,
+                    &samples_per_operator,
+                    param_buffers,
+                    &self.adsrs,
+                    operator_ix,
+                    sample_ix_within_frame,
+                    base_frequency,
+                    carrier_base_frequency,
+                    &frequencies_per_operator,
+                );
+                *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
+                    modulated_frequency;
+                let carrier_operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
+                let sample = carrier_operator.gen_sample(
+                    modulated_frequency,
+                    wavetables,
                     param_buffers,
                     &self.adsrs,
                     sample_ix_within_frame,
                     base_frequency,
                 );
-            let modulated_frequency = compute_modulated_frequency(
-                modulation_matrix,
-                &self.last_samples,
-                param_buffers,
-                &self.adsrs,
-                operator_ix,
-                sample_ix_within_frame,
-                base_frequency,
-                carrier_base_frequency,
-                &self.last_sample_frequencies_per_operator,
-            );
-            *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
-                modulated_frequency;
-            let carrier_operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
-            let sample = carrier_operator.gen_sample(
-                modulated_frequency,
-                wavetables,
-                param_buffers,
-                &self.adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-            );
-            debug_assert!(sample >= -1.);
-            debug_assert!(sample <= 1.);
+                debug_assert!(sample >= -1.);
+                debug_assert!(sample <= 1.);
 
-            *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
-            output_sample += sample
-                * modulation_matrix.get_output_weight(operator_ix).get(
-                    param_buffers,
-                    &self.adsrs,
-                    sample_ix_within_frame,
-                    base_frequency,
-                );
+                *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
+                output_sample += sample
+                    * modulation_matrix.get_output_weight(operator_ix).get(
+                        param_buffers,
+                        &self.adsrs,
+                        sample_ix_within_frame,
+                        base_frequency,
+                    );
+            }
+
+            debug_assert!(output_sample == 0. || output_sample.is_normal());
+            unsafe {
+                *output_buffer.get_unchecked_mut(sample_ix_within_frame) =
+                    dsp::clamp(-10., 10., output_sample);
+            }
         }
 
         self.last_samples = samples_per_operator;
         self.last_sample_frequencies_per_operator = frequencies_per_operator;
 
-        self.effect_chain.apply(
-            param_buffers,
-            &self.adsrs,
-            sample_ix_within_frame,
-            base_frequency,
-            output_sample,
-        )
+        self.effect_chain
+            .apply_all(param_buffers, &self.adsrs, base_frequencies, output_buffer);
     }
 }
 
@@ -350,7 +402,9 @@ impl ParamSource {
         let output =
             self.source_type
                 .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-        dsp::one_pole(&mut self.value, output, 0.99)
+        // Apply smoothing to avoid clicks/pops/other audio artifacts caused by jumping between
+        // param values quickly
+        dsp::one_pole(&mut self.value, output, 0.995)
     }
 
     /// Replaces the param generator while preserving the previous value used for smoothing
@@ -458,31 +512,22 @@ pub struct FMSynthContext {
 
 impl FMSynthContext {
     pub fn generate(&mut self) {
-        for sample_ix in 0..FRAME_SIZE {
-            for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
-                let base_frequency = *unsafe {
-                    self.base_frequency_input_buffer
-                        .get_unchecked(voice_ix)
-                        .get_unchecked(sample_ix)
-                };
-                if base_frequency == 0. {
-                    continue;
-                }
-
-                let sample = voice.gen_sample(
-                    &mut self.modulation_matrix,
-                    &mut [],
-                    &self.param_buffers,
-                    sample_ix,
-                    &self.operator_base_frequency_sources,
-                    base_frequency,
-                );
-                *unsafe {
-                    self.output_buffers
-                        .get_unchecked_mut(voice_ix)
-                        .get_unchecked_mut(sample_ix)
-                } = sample;
+        for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
+            let base_frequency_buffer =
+                unsafe { self.base_frequency_input_buffer.get_unchecked(voice_ix) };
+            if unsafe { *base_frequency_buffer.get_unchecked(0) } == 0. {
+                continue;
             }
+            let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
+
+            voice.gen_samples(
+                &mut self.modulation_matrix,
+                &mut [],
+                &self.param_buffers,
+                &self.operator_base_frequency_sources,
+                base_frequency_buffer,
+                output_buffer,
+            );
         }
     }
 }

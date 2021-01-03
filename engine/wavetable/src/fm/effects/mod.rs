@@ -27,7 +27,7 @@ pub trait Effect {
 
 #[derive(Clone)]
 pub enum EffectInstance {
-    SpectralWarping(Box<SpectralWarping>),
+    SpectralWarping(SpectralWarping),
     Wavecruncher(Wavecruncher),
     Bitcrusher(Bitcrusher),
     Wavefolder(Wavefolder),
@@ -69,7 +69,7 @@ impl EffectInstance {
                     phase_offset: 0.,
                 };
 
-                EffectInstance::SpectralWarping(box SpectralWarping::new(params))
+                EffectInstance::SpectralWarping(SpectralWarping::new(params))
             },
             1 => {
                 let top_fold_position = ParamSource::new(ParamSourceType::from_parts(
@@ -394,5 +394,38 @@ impl Effect for EffectChain {
             );
         }
         sample
+    }
+}
+
+impl EffectChain {
+    pub fn apply_all(
+        &mut self,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        base_frequencies: &[f32],
+        samples: &mut [f32],
+    ) {
+        if self.0[0].is_none() {
+            return;
+        }
+
+        for sample_ix_within_frame in 0..FRAME_SIZE {
+            let sample = unsafe { samples.get_unchecked_mut(sample_ix_within_frame) };
+            let base_frequency = unsafe { *base_frequencies.get_unchecked(sample_ix_within_frame) };
+
+            for effect in &mut self.0 {
+                let effect = match effect {
+                    Some(effect) => effect,
+                    None => continue,
+                };
+                *sample = effect.apply(
+                    param_buffers,
+                    adsrs,
+                    sample_ix_within_frame,
+                    base_frequency,
+                    *sample,
+                );
+            }
+        }
     }
 }

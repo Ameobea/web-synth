@@ -20,3 +20,6 @@ panic = "abort"
 debug = true
 codegen-units = 1
 lto = "fat"
+
+[profile.dev]
+debug-assertions = false

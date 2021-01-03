@@ -970,28 +970,31 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { voiceIx, synthIx, getState }) => {
       if (R.isNil(synthIx)) {
-        state.synths.forEach(({ voices, gainADSRLength }) => {
+        state.synths.forEach(({ voices, gainADSRLength }, synthIx) => {
           const targetVoice = voices[voiceIx];
           // We edit state directly w/o updating references because this is only needed internally
           const ungateTime = ctx.currentTime;
           targetVoice.lastGateOrUngateTime = ungateTime;
+          const releaseLengthMs =
+            (1 - targetVoice.gainADSRModule.envelope.release.pos) * gainADSRLength;
+
           setTimeout(() => {
             const state = getState();
-            state.synths.forEach(({ voices, fmSynth, waveform }) => {
-              const targetVoice = voices[voiceIx];
-              if (targetVoice.lastGateOrUngateTime !== ungateTime) {
-                // Voice has been re-gated before it finished playing last time; do not disconnect
-                return;
-              }
+            const targetSynth = state.synths[synthIx];
+            const { waveform, fmSynth } = targetSynth;
+            const targetVoice = voices[voiceIx];
+            if (targetVoice.lastGateOrUngateTime !== ungateTime) {
+              // Voice has been re-gated before it finished playing last time; do not disconnect
+              return;
+            }
 
-              targetVoice.outerGainNode.disconnect();
+            targetVoice.outerGainNode.disconnect();
 
-              // Optimization to avoid computing voices that aren't playing
-              if (waveform === Waveform.FM && fmSynth) {
-                fmSynth.setFrequency(voiceIx, 0);
-              }
-            });
-          }, gainADSRLength);
+            // Optimization to avoid computing voices that aren't playing
+            if (waveform === Waveform.FM && fmSynth) {
+              fmSynth.setFrequency(voiceIx, 0);
+            }
+          }, releaseLengthMs + 150);
 
           // Trigger release of gain and filter ADSRs
           targetVoice.gainADSRModule.ungate();
@@ -1003,6 +1006,9 @@ const actionGroups = {
         // We edit state directly w/o updating references because this is only needed internally
         const ungateTime = ctx.currentTime;
         targetVoice.lastGateOrUngateTime = ungateTime;
+        const releaseLengthMs =
+          (1 - targetVoice.gainADSRModule.envelope.release.pos) * targetSynth.gainADSRLength;
+
         setTimeout(() => {
           const state = getState();
           const targetSynth = getSynth(synthIx, state.synths);
@@ -1018,7 +1024,7 @@ const actionGroups = {
           if (targetSynth.waveform === Waveform.FM && targetSynth.fmSynth) {
             targetSynth.fmSynth.setFrequency(voiceIx, 0);
           }
-        }, targetSynth.gainADSRLength);
+        }, releaseLengthMs + 150);
 
         // Trigger release of gain and filter ADSRs
         targetVoice.gainADSRModule.ungate();

@@ -15,7 +15,7 @@ pub struct SpectralWarpingParams {
 #[derive(Clone)]
 pub struct SpectralWarping {
     pub frequency: ParamSource,
-    pub buffer: CircularBuffer<SPECTRAL_WARPING_BUFFER_SIZE>,
+    pub buffer: Box<CircularBuffer<SPECTRAL_WARPING_BUFFER_SIZE>>,
     pub phase_offset: f32,
     pub osc: ExponentialOscillator,
 }
@@ -30,7 +30,7 @@ impl SpectralWarping {
     ) -> Self {
         SpectralWarping {
             frequency,
-            buffer: CircularBuffer::new(),
+            buffer: box CircularBuffer::new(),
             phase_offset,
             osc: ExponentialOscillator::new(warp_factor),
         }
@@ -52,10 +52,10 @@ impl SpectralWarping {
             base_frequency,
         ) + 1.)
             / 2.;
-        debug_assert!(warped_phase > 0.);
-        debug_assert!(warped_phase < 1.);
-        debug_assert!(self.osc.phase > 0.);
-        debug_assert!(self.osc.phase < 1.);
+        debug_assert!(warped_phase >= 0.);
+        debug_assert!(warped_phase <= 1.);
+        debug_assert!(self.osc.phase >= 0.);
+        debug_assert!(self.osc.phase <= 1.);
         warped_phase - self.osc.phase
     }
 }
@@ -73,11 +73,11 @@ impl Effect for SpectralWarping {
         let frequency =
             self.frequency
                 .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-        if frequency == 0. {
-            return sample;
-        }
         // We look back half of the wavelength of the frequency.
         let base_lookback_samples = ((SAMPLE_RATE as f32) / frequency) / 2.;
+        if !base_lookback_samples.is_normal() {
+            return sample;
+        }
 
         // We then "warp" the position of the read head according to the warp factor.
         let phase_warp_diff = self.get_phase_warp_diff(
@@ -87,10 +87,10 @@ impl Effect for SpectralWarping {
             base_frequency,
             frequency,
         );
-        debug_assert!(phase_warp_diff > -1.);
-        debug_assert!(phase_warp_diff < 1.);
+        debug_assert!(phase_warp_diff >= -1.);
+        debug_assert!(phase_warp_diff <= 1.);
         let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);
-        debug_assert!(lookback_samples > 0.);
+        debug_assert!(lookback_samples >= 0.);
 
         self.buffer.read_interpolated(-lookback_samples)
     }

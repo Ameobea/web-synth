@@ -1,10 +1,10 @@
 opt:
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-snip ./dist/$file -o ./dist/$file; done
-  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 --enable-simd --enable-nontrapping-float-to-int --disable-nontrapping-float-to-int -g --precompute-propagate --fast-math -c -o ./dist/$file; done
+  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 --enable-simd --enable-nontrapping-float-to-int -g --precompute-propagate --fast-math -c -o ./dist/$file; done
 
 opt-public:
   # for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done
-  for file in `ls ./public | grep "\\.wasm"`; do wasm-opt ./public/$file -O4 --enable-simd --enable-nontrapping-float-to-int --disable-nontrapping-float-to-int -g --precompute-propagate --fast-math -c -o ./public/$file; done
+  for file in `ls ./public | grep "\\.wasm"`; do echo $file && wasm-opt ./public/$file -O3 --enable-simd --enable-nontrapping-float-to-int -g --precompute-propagate --fast-math -c -o ./public/$file; done
 
 
 build-all:

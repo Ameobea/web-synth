@@ -18,6 +18,18 @@
   }
 }
 
+@keyframes selectedUI {
+  0% {
+    background-position: 0% 74%;
+  }
+  50% {
+    background-position: 100% 27%;
+  }
+  100% {
+    background-position: 0% 74%;
+  }
+}
+
 .fm-synth-ui {
   display: flex;
   flex-direction: column;
@@ -61,7 +73,9 @@
       }
 
       .operator-select.operator-selected {
-        background-color: $highlight-4;
+        background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
+        background-size: 140% 140%;
+        animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
       }
 
       .operator-square {
@@ -69,7 +83,9 @@
         cursor: pointer;
       }
       .operator-square[data-active='true'] {
-        background-color: $highlight-4;
+        background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
+        background-size: 140% 140%;
+        animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
       }
 
       .output-weight {
@@ -114,7 +130,9 @@
     margin: 2px 0px;
   }
   .main-effect-chain-selector[data-active='true'] {
-    background-color: $highlight-4;
+    background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
+    background-size: 140% 140%;
+    animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
   }
   .main-effect-chain-selector:hover {
     font-weight: bold;

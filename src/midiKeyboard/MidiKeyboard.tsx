@@ -53,8 +53,15 @@ export const MidiKeyboard: React.FC<{
       action: { type: 'ADD' | 'REMOVE'; midiNumber: number } | { type: 'CLEAR' }
     ) => {
       if (action.type === 'ADD') {
+        // Discard duplicate events coming from holding the key down
+        if (state.has(action.midiNumber)) {
+          return state;
+        }
+
+        onAttack(action.midiNumber);
         return state.add(action.midiNumber);
       } else if (action.type === 'REMOVE') {
+        onRelease(action.midiNumber);
         return state.remove(action.midiNumber);
       } else if (action.type === 'CLEAR') {
         return ImmSet();
@@ -65,23 +72,15 @@ export const MidiKeyboard: React.FC<{
     ImmSet()
   );
 
-  const playNote = (midiNumber: number) => {
-    // Discard duplicate events coming from holding the key down
-    if (alreadyDownNotes.has(midiNumber)) {
-      return;
-    }
-    setAlreadyDownNotes({ type: 'ADD', midiNumber });
+  const playNote = useMemo(
+    () => (midiNumber: number) => setAlreadyDownNotes({ type: 'ADD', midiNumber }),
+    []
+  );
 
-    onAttack(midiNumber);
-  };
-
-  const releaseNote = (midiNumber: number) => {
-    setAlreadyDownNotes({ type: 'REMOVE', midiNumber });
-    // Sometimes shift is accidentally pressed while releasing which causes a different key in the release event than the down event
-    // which causes ghost notes.
-
-    onRelease(midiNumber);
-  };
+  const releaseNote = useMemo(
+    () => (midiNumber: number) => setAlreadyDownNotes({ type: 'REMOVE', midiNumber }),
+    []
+  );
 
   const setOctaveOffset = (newOctaveOffset: number) => {
     onOctaveOffsetChange(newOctaveOffset);
@@ -129,7 +128,7 @@ export const MidiKeyboard: React.FC<{
       document.removeEventListener('keydown', handleDown);
       document.removeEventListener('keyup', handleUp);
     };
-  });
+  }, [octaveOffset, playNote, releaseNote]);
 
   return (
     <div className='midi-keyboard'>
