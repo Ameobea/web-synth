@@ -5,7 +5,7 @@ import * as R from 'ramda';
 import { ReduxStore } from 'src/redux';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import GlobalVolumeSlider from './GlobalVolumeSlider';
-import './ViewContextManager.css';
+import './ViewContextManager.scss';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -173,7 +173,7 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
       key={uuid}
       style={{
         ...styles.viewContextTab,
-        backgroundColor: active ? 'rgb(86, 30, 86)' : undefined,
+        backgroundColor: active ? '#64c896' : undefined,
       }}
       onClick={() => {
         if (!active) {

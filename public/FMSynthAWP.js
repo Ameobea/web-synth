@@ -178,8 +178,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const baseFrequencyInputBufPtr = this.wasmInstance.exports.get_base_frequency_input_buffer_ptr(
       this.ctxPtr
     );
+    const baseFrequencyParams = new Array(VOICE_COUNT);
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
       const param = params[`voice_${voiceIx}_base_frequency`];
+      baseFrequencyParams[voiceIx] = param;
       const ptrForVoice = baseFrequencyInputBufPtr + FRAME_SIZE * BYTES_PER_F32 * voiceIx;
 
       if (param.length === 1) {
@@ -208,6 +210,11 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const outputsPtr = this.wasmInstance.exports.fm_synth_generate(this.ctxPtr);
     wasmMemory = this.getWasmMemoryBuffer();
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
+      const voiceParam = baseFrequencyParams[voiceIx];
+      if (voiceParam.length === 1 && voiceParam[0] === 0) {
+        continue;
+      }
+
       const outputSlice = wasmMemory.slice(
         (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR) / 4,
         (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4

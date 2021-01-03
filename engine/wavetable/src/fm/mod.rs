@@ -283,6 +283,7 @@ fn compute_modulated_frequency(
         output_freq += modulator_output
             * modulation_index
             * unsafe { *last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
+        debug_assert!(output_freq == 0. || output_freq.is_normal());
     }
     output_freq
 }
@@ -426,8 +427,8 @@ impl ParamSourceType {
         base_frequency: f32,
     ) -> f32 {
         match self {
-            ParamSourceType::ParamBuffer(buf_ix) =>
-                if cfg!(debug_assertions) {
+            ParamSourceType::ParamBuffer(buf_ix) => {
+                let raw = if cfg!(debug_assertions) {
                     param_buffers[*buf_ix][sample_ix_within_frame]
                 } else {
                     unsafe {
@@ -435,7 +436,14 @@ impl ParamSourceType {
                             .get_unchecked(*buf_ix)
                             .get_unchecked(sample_ix_within_frame)
                     }
-                },
+                };
+
+                if raw.is_normal() {
+                    raw
+                } else {
+                    0.
+                }
+            },
             ParamSourceType::Constant(val) => *val,
             ParamSourceType::PerVoiceADSR(adsr_ix) => {
                 let adsr = if cfg!(debug_assertions) {

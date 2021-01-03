@@ -15,11 +15,11 @@ members = [
 ]
 
 [profile.release]
-# debug-assertions = true
+debug-assertions = true
 panic = "abort"
 debug = true
 codegen-units = 1
 lto = "fat"
 
 [profile.dev]
-debug-assertions = false
+# debug-assertions = false

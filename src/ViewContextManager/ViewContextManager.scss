@@ -1,3 +1,5 @@
+@import 'colors.scss';
+
 #view-context-manager {
   position: absolute;
   top: 85;
@@ -19,27 +21,27 @@
   margin-bottom: 4px;
   height: 32px;
   width: 32px;
-  color: #bababa;
-  border: 1px solid #7e7e7e;
+  color: #fff;
+  border: 1px solid #666;
   cursor: pointer;
-  background-color: #283538;
+  background-color: $highlight-5;
   font-size: 13.5px;
 }
 
 input.view-context-switcher-tab-renamer {
   width: 90%;
-  background-color: #3d273d;
-  color: #efe;
+  background-color: $highlight-1;
+  color: #111;
   margin-right: 5%;
   margin-left: 5%;
-  border: 1px solid #7e7e7e;
+  border: 1px solid #666;
   height: 70%;
   margin-bottom: 5%;
   margin-top: 5%;
 }
 
 .vc-close-tab-icon {
-  color: #971010;
+  color: $highlight-4;
   font-size: 20px;
   font-family: 'Hack', 'Oxygen Mono', monospace;
   margin-right: 4px;
