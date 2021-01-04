@@ -281,7 +281,6 @@ const FaustEditor: React.FC<{
   const didCompileOnMount = useRef(false);
   useEffect(() => {
     if (context.compileOnMount && !didCompileOnMount.current) {
-      console.log('compiling...');
       didCompileOnMount.current = true;
       compile();
     }

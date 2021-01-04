@@ -7,10 +7,10 @@
 .synth-module {
   display: flex;
   flex-direction: row;
-  width: 100%;
-  margin-top: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #222;
+  padding-bottom: 2px;
+  padding-top: 2px;
+  max-width: calc(100vw - 44px);
+  overflow-x: scroll;
 
   button,
   select {
@@ -21,11 +21,10 @@
     color: #b22;
     font-family: Hack, Oxygen Mono, monospace;
     cursor: pointer;
-    padding-right: 4px;
-    margin-right: -17px;
     z-index: 3;
-    margin-left: 5px;
-    height: 10px;
+    font-size: 22px;
+    transform: translate(4px, -2px);
+    position: absolute;
   }
 
   .effects {

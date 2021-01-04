@@ -80,17 +80,18 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
 };
 
 const baseTheme = {
+  background1: 'rgb(35,35,35)',
   background2: 'rgb(54,54,54)',
   background2hover: 'rgb(58,58,58)',
   foreground1: 'rgb(112,112,112)',
   text1: 'rgb(235,235,235)',
   text2: 'rgb(161,161,161)',
 };
-const spectralWarpTheme = { ...baseTheme, background1: 'rgb(24,48,182)' };
-const wavecruncherTheme = { ...baseTheme, background1: 'rgb(199,48,184)' };
-const bitcrusherTheme = { ...baseTheme, background1: 'rgb(84,47,12)' };
-const wavefolderTheme = { ...baseTheme, background1: 'rgb(24,120,101)' };
-const softClipperTheme = { ...baseTheme, background1: 'rgb(88,88,22)' };
+const spectralWarpTheme = { ...baseTheme, background2: 'rgb(24,38,56)' };
+const wavecruncherTheme = { ...baseTheme, background2: 'rgb(19,14,18)' };
+const bitcrusherTheme = { ...baseTheme, background2: 'rgb(24,14,4)' };
+const wavefolderTheme = { ...baseTheme, background2: 'rgb(24,38,41)' };
+const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -105,70 +106,66 @@ type EffectConfigurator<T> = React.FC<{
   onChange: (newState: Effect | null) => void;
 }>;
 
-const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({ state, onChange }) => {
-  return (
-    <>
-      <ConfigureParamSource
-        theme={spectralWarpTheme}
-        title='frequency'
-        state={state.frequency}
-        onChange={newFrequency => onChange({ ...state, frequency: newFrequency })}
-        min={0}
-        max={20_000}
-      />
-      <ConfigureParamSource
-        theme={spectralWarpTheme}
-        title='warp factor'
-        state={state.warpFactor}
-        onChange={newWarpFactor => onChange({ ...state, warpFactor: newWarpFactor })}
-        min={0}
-        max={1}
-      />
-    </>
-  );
-};
+const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({ state, onChange }) => (
+  <>
+    <ConfigureParamSource
+      theme={spectralWarpTheme}
+      title='frequency'
+      state={state.frequency}
+      onChange={newFrequency => onChange({ ...state, frequency: newFrequency })}
+      min={0}
+      max={20_000}
+    />
+    <ConfigureParamSource
+      theme={spectralWarpTheme}
+      title='warp factor'
+      state={state.warpFactor}
+      onChange={newWarpFactor => onChange({ ...state, warpFactor: newWarpFactor })}
+      min={0}
+      max={1}
+    />
+  </>
+);
 
 const ConfigureWavecruncher: React.FC<{
   state: Extract<Effect, { type: 'wavecruncher' }>;
   onChange: (newState: Effect | null) => void;
-}> = ({ state, onChange }) => {
-  return (
-    <>
-      <ConfigureParamSource
-        theme={wavecruncherTheme}
-        title='top fold position'
-        state={state.topFoldPosition}
-        onChange={topFoldPosition => onChange({ ...state, topFoldPosition })}
-        min={0}
-        max={1}
-      />
-      <ConfigureParamSource
-        theme={wavecruncherTheme}
-        title='top fold width'
-        state={state.topFoldWidth}
-        onChange={topFoldWidth => onChange({ ...state, topFoldWidth })}
-        min={0}
-        max={1}
-      />
-      <ConfigureParamSource
-        theme={wavecruncherTheme}
-        title='bottom fold position'
-        state={state.bottomFoldPosition}
-        onChange={bottomFoldPosition => onChange({ ...state, bottomFoldPosition })}
-        min={-1}
-        max={0}
-      />
-      <ConfigureParamSource
-        theme={wavecruncherTheme}
-        title='bottom fold width'
-        state={state.bottomFoldWidth}
-        onChange={bottomFoldWidth => onChange({ ...state, bottomFoldWidth })}
-        min={0}
-        max={1}
-      />
-    </>
-  );
-};
+}> = ({ state, onChange }) => (
+  <>
+    <ConfigureParamSource
+      theme={wavecruncherTheme}
+      title='top fold position'
+      state={state.topFoldPosition}
+      onChange={topFoldPosition => onChange({ ...state, topFoldPosition })}
+      min={0}
+      max={1}
+    />
+    <ConfigureParamSource
+      theme={wavecruncherTheme}
+      title='top fold width'
+      state={state.topFoldWidth}
+      onChange={topFoldWidth => onChange({ ...state, topFoldWidth })}
+      min={0}
+      max={1}
+    />
+    <ConfigureParamSource
+      theme={wavecruncherTheme}
+      title='bottom fold position'
+      state={state.bottomFoldPosition}
+      onChange={bottomFoldPosition => onChange({ ...state, bottomFoldPosition })}
+      min={-1}
+      max={0}
+    />
+    <ConfigureParamSource
+      theme={wavecruncherTheme}
+      title='bottom fold width'
+      state={state.bottomFoldWidth}
+      onChange={bottomFoldWidth => onChange({ ...state, bottomFoldWidth })}
+      min={0}
+      max={1}
+    />
+  </>
+);
 
 const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({ state, onChange }) => (
   <>
@@ -278,8 +275,8 @@ const EffectManagement: React.FC<{
         ) : null}
         <div className='effect-title'>{operatorEffects[effectIx]?.type}</div>
       </div>
-      <ControlPanel
-        style={{ width: 378 }}
+      {/* <ControlPanel
+        style={{ width: 376 }}
         theme={theme}
         state={{ 'effect type': operatorEffects[effectIx]?.type }}
         settings={[EFFECT_TYPE_SETTING]}
@@ -294,7 +291,7 @@ const EffectManagement: React.FC<{
             }
           }
         }}
-      />
+      /> */}
     </>
   );
 };
@@ -328,30 +325,33 @@ const ConfigureEffect: React.FC<{
   onChange: (newEffect: Effect | null) => void;
   operatorEffects: (Effect | null)[];
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-}> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects }) => {
-  return (
-    <>
-      <EffectManagement
-        effectIx={effectIx}
-        operatorEffects={operatorEffects}
-        setOperatorEffects={setOperatorEffects}
-        onChange={onChange}
-      />
+}> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects }) => (
+  <div className='configure-effect'>
+    <EffectManagement
+      effectIx={effectIx}
+      operatorEffects={operatorEffects}
+      setOperatorEffects={setOperatorEffects}
+      onChange={onChange}
+    />
 
-      <ConfigureEffectSpecific state={state} onChange={onChange} />
-    </>
-  );
-};
+    <ConfigureEffectSpecific state={state} onChange={onChange} />
+  </div>
+);
 
 const ConfigureEffects: React.FC<{
   state: (Effect | null)[];
   onChange: (ix: number, newState: Effect | null) => void;
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-}> = ({ state, onChange, setOperatorEffects }) => {
+  operatorIx: number | null;
+}> = ({ state, onChange, setOperatorEffects, operatorIx }) => {
   const [selectedEffectType, setSelectedEffectType] = useState<Effect['type']>('spectral warping');
 
   return (
     <div className='configure-effects'>
+      <ControlPanel
+        title={operatorIx === null ? 'main effect chain' : `operator ${operatorIx} effects`}
+        style={{ width: 376 }}
+      />
       <div className='effects-controls'>
         {filterNils(state).map((effect, i) => (
           <ConfigureEffect
@@ -367,7 +367,7 @@ const ConfigureEffects: React.FC<{
 
       <ControlPanel
         state={{ 'effect type': selectedEffectType }}
-        style={{ width: 378 }}
+        style={{ width: 376 }}
         onChange={(_key: string, val: any) => setSelectedEffectType(val)}
         settings={[
           EFFECT_TYPE_SETTING,

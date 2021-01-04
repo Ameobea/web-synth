@@ -246,7 +246,7 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
       <div className='synth-designer'>
         {synthDesignerState.synths.map((synth, i) => (
           <SynthModuleComp key={i} synth={synth} index={i} stateKey={stateKey}>
-            {synth.voices[0].effects.map((effect, effectIx) => (
+            {/* {synth.voices[0].effects.map((effect, effectIx) => (
               <EffectModuleComp
                 effectName={effect.effect.type}
                 key={effectIx}
@@ -286,7 +286,7 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
               >
                 Add Effect
               </button>
-            </div>
+            </div> */}
           </SynthModuleComp>
         ))}
 

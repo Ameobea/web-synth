@@ -163,7 +163,6 @@ export const SpectrumVisualization: React.FC<{
               initial: spectrumSettingsDefinition.color_functions[0].id,
             },
           ]}
-          position={{ bottom: 180, right: 44 }}
           draggable
         />
       )}

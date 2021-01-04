@@ -49,7 +49,8 @@ const ConfigureOperator: React.FC<{
   effects: (Effect | null)[];
   onEffectsChange: (effectIx: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
-}> = ({ config, onChange, effects, onEffectsChange, setEffects }) => {
+  operatorIx: number;
+}> = ({ config, onChange, effects, onEffectsChange, setEffects, operatorIx }) => {
   const operatorTypeSettings = useMemo(
     () => [
       {
@@ -69,8 +70,9 @@ const ConfigureOperator: React.FC<{
   return (
     <div className='operator-config'>
       <ControlPanel
-        style={{ width: 378 }}
+        style={{ width: 376 }}
         settings={operatorTypeSettings}
+        title={`configure operator ${operatorIx}`}
         state={operatorTypeState}
         onChange={(key: string, val: any) => {
           switch (key) {
@@ -103,6 +105,7 @@ const ConfigureOperator: React.FC<{
         />
       ) : null}
       <ConfigureEffects
+        operatorIx={operatorIx}
         state={effects}
         onChange={onEffectsChange}
         setOperatorEffects={setEffects}

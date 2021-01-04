@@ -8,6 +8,7 @@ export const ModulationMatrix: React.FC<{
   selectedUI: UISelection | null;
   selectedOperatorIx: number | null;
   onOperatorSelected: (newSelectedOperatorIx: number) => void;
+  resetModulationIndex: (srcOperatorIx: number, dstOperatorIx: number) => void;
   onModulationIndexSelected: (srcOperatorIx: number, dstOperatorIx: number) => void;
   modulationIndices: ParamSource[][];
   operatorConfigs: OperatorConfig[];
@@ -16,6 +17,7 @@ export const ModulationMatrix: React.FC<{
   selectedUI,
   selectedOperatorIx,
   onOperatorSelected,
+  resetModulationIndex,
   onModulationIndexSelected,
   modulationIndices,
   operatorConfigs,
@@ -49,8 +51,8 @@ export const ModulationMatrix: React.FC<{
           >
             {(operatorConfigs[srcOperatorIx].type === 'sine oscillator' ||
               operatorConfigs[srcOperatorIx].type === 'exponential oscillator') &&
-            operatorConfigs[srcOperatorIx].frequency.type === 'base frequency multiplier'
-              ? operatorConfigs[srcOperatorIx].frequency.multiplier.toFixed(3)
+            (operatorConfigs[srcOperatorIx] as any).frequency.type === 'base frequency multiplier'
+              ? (operatorConfigs[srcOperatorIx] as any).frequency.multiplier.toFixed(3)
               : '-'}
           </div>
           {row.map((val, dstOperatorIx) => (
@@ -68,6 +70,11 @@ export const ModulationMatrix: React.FC<{
               className='operator-square'
               key={dstOperatorIx}
               onClick={() => onModulationIndexSelected(srcOperatorIx, dstOperatorIx)}
+              onDoubleClick={() => {
+                if (val.type === 'constant') {
+                  resetModulationIndex(srcOperatorIx, dstOperatorIx);
+                }
+              }}
               onMouseEnter={() => {
                 setHoveredRowIx(srcOperatorIx);
                 setHoveredColIx(dstOperatorIx);
@@ -85,9 +92,17 @@ export const ModulationMatrix: React.FC<{
             key='output'
             className='operator-square output-weight'
           >
-            {Math.abs(outputWeights[srcOperatorIx]) < 0.01
-              ? null
-              : outputWeights[srcOperatorIx].toFixed(2)}
+            <div
+              className='operator-weight-lens'
+              style={{
+                backgroundColor: `rgba(80, 251, 69, ${outputWeights[srcOperatorIx] ?? 0})`,
+                color: (outputWeights[srcOperatorIx] ?? 0) > 0.5 ? '#111' : undefined,
+              }}
+            >
+              {Math.abs(outputWeights[srcOperatorIx]) < 0.01
+                ? null
+                : outputWeights[srcOperatorIx].toFixed(2)}
+            </div>
           </div>
         </div>
       ))}

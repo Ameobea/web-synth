@@ -97,7 +97,7 @@ const FMSynthDemo: React.FC = () => {
     <div>
       <div className='fm-synth-demo-controls'>
         <ControlPanel
-          style={{ width: 380 }}
+          style={{ width: 378 }}
           settings={[
             {
               type: 'custom',

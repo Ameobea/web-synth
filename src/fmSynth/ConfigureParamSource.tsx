@@ -1,7 +1,6 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
 export const PARAM_BUFFER_COUNT = 8;
 const ADSR_COUNT = 8;
@@ -16,10 +15,12 @@ export type ParamSource =
   | { type: 'adsr'; 'adsr index': number }
   | { type: 'base frequency multiplier'; multiplier: number };
 
-const buildTypeSetting = () => ({
+const buildTypeSetting = (excludedTypes?: ParamSource['type'][]) => ({
   type: 'select',
   label: 'type',
-  options: ['param buffer', 'constant', 'adsr', 'base frequency multiplier'],
+  options: ['param buffer', 'constant', 'adsr', 'base frequency multiplier'].filter(
+    paramType => !excludedTypes?.includes(paramType as any)
+  ),
 });
 
 const updateState = (state: ParamSource, newState: Partial<ParamSource>): ParamSource => ({
@@ -56,13 +57,14 @@ const ConfigureParamSource: React.FC<{
   max?: number;
   step?: number;
   scale?: 'log';
-}> = ({ title, theme, state, onChange, min, max, scale }) => {
+  excludedTypes?: ParamSource['type'][];
+}> = ({ title, theme, state, onChange, min, max, scale, excludedTypes }) => {
   const { type: paramType } = state;
   const settings = useMemo(() => {
     switch (paramType) {
       case 'param buffer': {
         return [
-          buildTypeSetting(),
+          buildTypeSetting(excludedTypes),
           {
             type: 'select',
             label: 'buffer index',
@@ -71,11 +73,14 @@ const ConfigureParamSource: React.FC<{
         ];
       }
       case 'constant': {
-        return [buildTypeSetting(), { type: 'range', label: 'value', min, max, scale }];
+        return [
+          buildTypeSetting(excludedTypes),
+          { type: 'range', label: 'value', min, max, scale },
+        ];
       }
       case 'adsr': {
         return [
-          buildTypeSetting(),
+          buildTypeSetting(excludedTypes),
           {
             type: 'select',
             label: 'adsr index',
@@ -85,7 +90,7 @@ const ConfigureParamSource: React.FC<{
       }
       case 'base frequency multiplier': {
         return [
-          buildTypeSetting(),
+          buildTypeSetting(excludedTypes),
           {
             type: 'range',
             label: 'multiplier',
@@ -99,13 +104,13 @@ const ConfigureParamSource: React.FC<{
         console.error('Invalid operator state type: ', paramType);
       }
     }
-  }, [max, min, paramType, scale]);
+  }, [max, min, paramType, scale, excludedTypes]);
 
   return (
     <ControlPanel
       title={title}
       theme={theme}
-      style={{ width: 378 }}
+      style={{ width: 376 }}
       settings={settings}
       state={{
         ...state,

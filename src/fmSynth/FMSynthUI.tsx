@@ -7,7 +7,6 @@ import { classNameIncludes } from 'src/util';
 import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
-import { UnreachableException } from 'ameo-utils';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 
@@ -62,11 +61,14 @@ const ConfigureMainEffectChain: React.FC<{
   mainEffectChain: (Effect | null)[];
   onChange: (ix: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
-}> = ({ mainEffectChain, onChange, setEffects }) => {
-  return (
-    <ConfigureEffects state={mainEffectChain} onChange={onChange} setOperatorEffects={setEffects} />
-  );
-};
+}> = ({ mainEffectChain, onChange, setEffects }) => (
+  <ConfigureEffects
+    operatorIx={null}
+    state={mainEffectChain}
+    onChange={onChange}
+    setOperatorEffects={setEffects}
+  />
+);
 
 export type UISelection =
   | { type: 'mainEffectChain' }
@@ -206,98 +208,110 @@ const FMSynthUI: React.FC<{
   };
 
   return (
-    <div className='fm-synth-ui'>
-      <ModulationMatrix
-        selectedOperatorIx={selectedUI?.type === 'operator' ? selectedUI.index : null}
-        onOperatorSelected={(newSelectedOperatorIx: number) =>
-          setSelectedUI({ type: 'operator', index: newSelectedOperatorIx })
-        }
-        onModulationIndexSelected={(srcOperatorIx: number, dstOperatorIx: number) =>
-          setSelectedUI({ type: 'modulationIndex', srcOperatorIx, dstOperatorIx })
-        }
-        modulationIndices={state.modulationMatrix}
-        operatorConfigs={state.operatorConfigs}
-        outputWeights={state.outputWeights}
-        selectedUI={selectedUI}
-      />
-      <div
-        className='main-effect-chain-selector'
-        data-active={selectedUI?.type === 'mainEffectChain' ? 'true' : 'false'}
-        onClick={() => setSelectedUI({ type: 'mainEffectChain' })}
-      >
-        MAIN EFFECT CHAIN
-      </div>
-
-      {selectedUI?.type === 'mainEffectChain' ? (
-        <ConfigureMainEffectChain
-          mainEffectChain={state.mainEffectChain}
-          onChange={handleMainEffectChainChange}
-          setEffects={(newEffects: (Effect | null)[]) => {
-            newEffects.forEach((effect, effectIx) => setEffect(null, effectIx, effect));
-            setState({ ...state, mainEffectChain: newEffects });
-          }}
-        />
-      ) : null}
-      {selectedUI?.type === 'operator'
-        ? (() => {
-            const selectedOperatorIx = selectedUI.index;
-
-            return (
-              <ConfigureOperator
-                config={state.operatorConfigs[selectedOperatorIx]}
-                onChange={newConf => {
-                  setState({
-                    ...state,
-                    operatorConfigs: R.set(
-                      R.lensIndex(selectedOperatorIx),
-                      newConf,
-                      state.operatorConfigs
-                    ),
-                  });
-                  onOperatorConfigChange(selectedOperatorIx, newConf);
-                }}
-                effects={state.operatorEffects[selectedOperatorIx]}
-                onEffectsChange={handleEffectChange}
-                setEffects={newEffects => {
-                  newEffects.forEach((effect, effectIx) =>
-                    setEffect(selectedOperatorIx, effectIx, effect)
-                  );
-                  setState({
-                    ...state,
-                    operatorEffects: R.set(
-                      R.lensIndex(selectedOperatorIx),
-                      newEffects,
-                      state.operatorEffects
-                    ),
-                  });
-                }}
-              />
-            );
-          })()
-        : null}
-      {selectedUI?.type === 'modulationIndex' ? (
-        <ConfigureModulationIndex
-          srcOperatorIx={selectedUI.srcOperatorIx}
-          dstOperatorIx={selectedUI.dstOperatorIx}
-          modulationIndices={state.modulationMatrix}
-          onChange={(
-            srcOperatorIx: number,
-            dstOperatorIx: number,
-            newModulationIndex: ParamSource
-          ) =>
+    <>
+      <div className='fm-synth-ui'>
+        <ModulationMatrix
+          selectedOperatorIx={selectedUI?.type === 'operator' ? selectedUI.index : null}
+          onOperatorSelected={(newSelectedOperatorIx: number) =>
+            setSelectedUI({ type: 'operator', index: newSelectedOperatorIx })
+          }
+          onModulationIndexSelected={(srcOperatorIx: number, dstOperatorIx: number) =>
+            setSelectedUI({ type: 'modulationIndex', srcOperatorIx, dstOperatorIx })
+          }
+          resetModulationIndex={(srcOperatorIx: number, dstOperatorIx: number) =>
             setState(
-              setModulation(
-                state,
-                srcOperatorIx,
-                dstOperatorIx,
-                updateBackendModulation,
-                (_prevVal: ParamSource) => newModulationIndex
-              )
+              setModulation(state, srcOperatorIx, dstOperatorIx, updateBackendModulation, () => ({
+                type: 'constant',
+                value: 0,
+              }))
             )
           }
+          modulationIndices={state.modulationMatrix}
+          operatorConfigs={state.operatorConfigs}
+          outputWeights={state.outputWeights}
+          selectedUI={selectedUI}
         />
-      ) : null}
-    </div>
+        <div
+          className='main-effect-chain-selector'
+          data-active={selectedUI?.type === 'mainEffectChain' ? 'true' : 'false'}
+          onClick={() => setSelectedUI({ type: 'mainEffectChain' })}
+        >
+          MAIN EFFECT CHAIN
+        </div>
+      </div>
+      <div className='fm-synth-configuration'>
+        {selectedUI?.type === 'mainEffectChain' ? (
+          <ConfigureMainEffectChain
+            mainEffectChain={state.mainEffectChain}
+            onChange={handleMainEffectChainChange}
+            setEffects={(newEffects: (Effect | null)[]) => {
+              newEffects.forEach((effect, effectIx) => setEffect(null, effectIx, effect));
+              setState({ ...state, mainEffectChain: newEffects });
+            }}
+          />
+        ) : null}
+        {selectedUI?.type === 'operator'
+          ? (() => {
+              const selectedOperatorIx = selectedUI.index;
+
+              return (
+                <ConfigureOperator
+                  operatorIx={selectedUI.index}
+                  config={state.operatorConfigs[selectedOperatorIx]}
+                  onChange={newConf => {
+                    setState({
+                      ...state,
+                      operatorConfigs: R.set(
+                        R.lensIndex(selectedOperatorIx),
+                        newConf,
+                        state.operatorConfigs
+                      ),
+                    });
+                    onOperatorConfigChange(selectedOperatorIx, newConf);
+                  }}
+                  effects={state.operatorEffects[selectedOperatorIx]}
+                  onEffectsChange={handleEffectChange}
+                  setEffects={newEffects => {
+                    newEffects.forEach((effect, effectIx) =>
+                      setEffect(selectedOperatorIx, effectIx, effect)
+                    );
+                    setState({
+                      ...state,
+                      operatorEffects: R.set(
+                        R.lensIndex(selectedOperatorIx),
+                        newEffects,
+                        state.operatorEffects
+                      ),
+                    });
+                  }}
+                />
+              );
+            })()
+          : null}
+        {selectedUI?.type === 'modulationIndex' ? (
+          <ConfigureModulationIndex
+            srcOperatorIx={selectedUI.srcOperatorIx}
+            dstOperatorIx={selectedUI.dstOperatorIx}
+            modulationIndices={state.modulationMatrix}
+            onChange={(
+              srcOperatorIx: number,
+              dstOperatorIx: number,
+              newModulationIndex: ParamSource
+            ) =>
+              setState(
+                setModulation(
+                  state,
+                  srcOperatorIx,
+                  dstOperatorIx,
+                  updateBackendModulation,
+                  (_prevVal: ParamSource) => newModulationIndex
+                )
+              )
+            }
+          />
+        ) : null}
+      </div>
+    </>
   );
 };
 

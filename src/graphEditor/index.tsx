@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
-import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 
+import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { store } from 'src/redux';
 import { retryAsync } from 'src/util';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
@@ -30,9 +30,21 @@ export const init_graph_editor = (stateKey: string) => {
   );
 };
 
-export const hide_graph_editor = mkContainerHider(vcId => `graphEditor_${vcId}`);
+export const hide_graph_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1];
+  const inst = LGraphHandlesByVcId.get(vcId);
+  // Stop rendering when not visible to save resources
+  inst?.list_of_graphcanvas?.forEach((canvas: any) => canvas.stopRendering());
+  mkContainerHider(vcId => `graphEditor_${vcId}`)(stateKey);
+};
 
-export const unhide_graph_editor = mkContainerUnhider(vcId => `graphEditor_${vcId}`);
+export const unhide_graph_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1];
+  const inst = LGraphHandlesByVcId.get(vcId);
+  // Resume rendering now that the graph editor is visible
+  inst?.list_of_graphcanvas?.forEach((canvas: any) => canvas.startRendering());
+  mkContainerUnhider(vcId => `graphEditor_${vcId}`)(stateKey);
+};
 
 export const cleanup_graph_editor = (stateKey: string) => {
   const graphEditorReactRootNode = document.getElementById(stateKey);

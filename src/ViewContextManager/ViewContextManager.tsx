@@ -156,7 +156,7 @@ const VCTabCloseIcon: React.FC<{
   onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
 }> = ({ onClick }) => (
   <div onClick={onClick} className='vc-close-tab-icon'>
-    x
+    ×
   </div>
 );
 
@@ -173,7 +173,7 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
       key={uuid}
       style={{
         ...styles.viewContextTab,
-        backgroundColor: active ? '#64c896' : undefined,
+        backgroundColor: active ? '#419282' : undefined,
       }}
       onClick={() => {
         if (!active) {

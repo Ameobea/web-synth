@@ -33,7 +33,9 @@
 .fm-synth-ui {
   display: flex;
   flex-direction: column;
+  background-color: #232323;
   color: white;
+  max-width: 378px;
 
   div[data-hovered='true'] {
     $hover-color: lighten($highlight-2, 50);
@@ -66,7 +68,7 @@
 
       .operator-select {
         cursor: pointer;
-        background-color: $highlight-1;
+        background-color: $highlight-2;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -81,6 +83,7 @@
       .operator-square {
         align-items: center;
         cursor: pointer;
+        background-color: #121212;
       }
       .operator-square[data-active='true'] {
         background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
@@ -89,35 +92,14 @@
       }
 
       .output-weight {
-        background-color: $highlight-2;
+        background-color: #121212;
       }
-    }
-  }
-
-  .configure-effects {
-    .effects-controls {
-      display: flex;
-      flex-direction: column;
-      max-height: 330px;
-      overflow: auto;
-    }
-
-    .effect-management {
-      display: flex;
-      flex-direction: row;
-
-      button {
-        width: 20px;
-      }
-      button:hover {
-        font-weight: bold;
-      }
-
-      .effect-title {
-        width: 300px;
-        text-align: center;
-        margin-left: 8px;
-        margin-right: 28px;
+      .operator-weight-lens {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
     }
   }
@@ -128,6 +110,7 @@
     cursor: pointer;
     padding: 3px;
     margin: 2px 0px;
+    border: 1px solid #181818;
   }
   .main-effect-chain-selector[data-active='true'] {
     background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
@@ -136,5 +119,52 @@
   }
   .main-effect-chain-selector:hover {
     font-weight: bold;
+  }
+}
+
+.fm-synth-configuration {
+  background-color: #232323;
+  padding: 0px 2px;
+}
+
+.configure-effects {
+  max-width: 376px;
+
+  .effects-controls {
+    display: flex;
+    flex-direction: column;
+    max-height: 330px;
+    overflow-y: auto;
+
+    .configure-effect {
+      .effect-management {
+        display: flex;
+        flex-direction: row;
+        text-transform: uppercase;
+        font-family: 'Hack', monospace;
+        opacity: 0.95;
+
+        button {
+          width: 20px;
+          padding: 0;
+        }
+        button:hover {
+          font-weight: bold;
+        }
+
+        .effect-title {
+          width: 300px;
+          text-align: center;
+          margin-left: 8px;
+          margin-right: 28px;
+          font-size: 12px;
+          padding-top: 4px;
+        }
+      }
+    }
+  }
+
+  .configure-effect:nth-child(even) {
+    background-color: #000;
   }
 }

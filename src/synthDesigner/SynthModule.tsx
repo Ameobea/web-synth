@@ -230,7 +230,7 @@ const SynthModuleCompInner: React.FC<{
           updateConnectables(vcId, newConnectables);
         }}
       >
-        X
+        ×
       </div>
 
       <ControlPanel
@@ -305,7 +305,7 @@ const SynthModuleCompInner: React.FC<{
             localPitchMultiplier,
           ]
         )}
-        style={{ width: 378 }}
+        style={{ width: 376 }}
       />
 
       {synth.waveform === Waveform.Wavetable ? (
