@@ -1,10 +1,10 @@
-pub mod effects;
+use core::arch::wasm32::*;
 use std::hint::unreachable_unchecked;
 
 use dsp::oscillator::PhasedOscillator;
-use effects::bitcrusher::even_faster_pow;
 
-use self::effects::{Effect, EffectChain};
+pub mod effects;
+use self::effects::{bitcrusher::even_faster_pow, Effect, EffectChain};
 
 #[derive(Clone, Default)]
 pub struct ADSRState {
@@ -246,22 +246,23 @@ pub struct FMSynthVoice {
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
 /// frequency
 fn compute_modulated_frequency(
-    modulation_matrix: &mut ModulationMatrix,
     last_samples: &[f32; OPERATOR_COUNT],
-    param_buffers: &[[f32; FRAME_SIZE]],
-    adsrs: &[ADSRState],
     operator_ix: usize,
     sample_ix_within_frame: usize,
-    base_frequency: f32,
     carrier_base_frequency: f32,
     last_sample_modulator_frequencies: &[f32; OPERATOR_COUNT],
+    modulation_indices: &[[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
 ) -> f32 {
     let mut output_freq = carrier_base_frequency;
     for modulator_operator_ix in 0..OPERATOR_COUNT {
         let modulator_output = unsafe { last_samples.get_unchecked(modulator_operator_ix) };
-        let modulation_index = modulation_matrix
-            .get_operator_modulation_index(modulator_operator_ix, operator_ix)
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+        let modulation_index = unsafe {
+            *modulation_indices
+                .get_unchecked(modulator_operator_ix)
+                .get_unchecked(operator_ix)
+                .get_unchecked(sample_ix_within_frame)
+        };
+
         output_freq += modulator_output
             * modulation_index
             * unsafe { *last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
@@ -277,12 +278,45 @@ impl FMSynthVoice {
         wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
         operator_base_frequency_sources: &[ParamSource; OPERATOR_COUNT],
-        base_frequencies: &[f32],
-        output_buffer: &mut [f32],
+        base_frequencies: &[f32; FRAME_SIZE],
+        output_buffer: &mut [f32; FRAME_SIZE],
     ) {
         let mut samples_per_operator: [f32; OPERATOR_COUNT] = self.last_samples;
         let mut frequencies_per_operator: [f32; OPERATOR_COUNT] =
             self.last_sample_frequencies_per_operator;
+
+        // Render all operator base frequencies for the full frame ahead of time using SIMD
+        let mut operator_base_frequencies: [[f32; FRAME_SIZE]; OPERATOR_COUNT] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let render_params = RenderRawParams {
+            param_buffers,
+            adsrs: &self.adsrs,
+            base_frequencies,
+        };
+        for operator_ix in 0..OPERATOR_COUNT {
+            unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }
+                .render_raw(&render_params, unsafe {
+                    operator_base_frequencies.get_unchecked_mut(operator_ix)
+                });
+        }
+
+        // Render all modulation indices for the full frame ahread of time using SIMD
+        // modulation_indices[src_operator_ix][dst_operator_ix][sample_ix_within_frame]
+        let mut modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        for src_operator_ix in 0..OPERATOR_COUNT {
+            for dst_operator_ix in 0..OPERATOR_COUNT {
+                let param = modulation_matrix
+                    .get_operator_modulation_index(src_operator_ix, dst_operator_ix);
+                // TODO: smoothing
+                let buf = unsafe {
+                    modulation_indices
+                        .get_unchecked_mut(src_operator_ix)
+                        .get_unchecked_mut(dst_operator_ix)
+                };
+                param.render_raw(&render_params, buf);
+            }
+        }
 
         for sample_ix_within_frame in 0..FRAME_SIZE {
             let mut output_sample = 0.0f32;
@@ -292,23 +326,18 @@ impl FMSynthVoice {
             // TODO: Update ADSR state
 
             for operator_ix in 0..OPERATOR_COUNT {
-                let carrier_base_frequency =
-                    unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }.get_raw(
-                        param_buffers,
-                        &self.adsrs,
-                        sample_ix_within_frame,
-                        base_frequency,
-                    );
+                let carrier_base_frequency = unsafe {
+                    *operator_base_frequencies
+                        .get_unchecked(operator_ix)
+                        .get_unchecked(sample_ix_within_frame)
+                };
                 let modulated_frequency = compute_modulated_frequency(
-                    modulation_matrix,
                     &samples_per_operator,
-                    param_buffers,
-                    &self.adsrs,
                     operator_ix,
                     sample_ix_within_frame,
-                    base_frequency,
                     carrier_base_frequency,
                     &frequencies_per_operator,
+                    &modulation_indices,
                 );
                 *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
                     modulated_frequency;
@@ -344,8 +373,7 @@ impl FMSynthVoice {
         self.last_samples = samples_per_operator;
         self.last_sample_frequencies_per_operator = frequencies_per_operator;
 
-        self.effect_chain
-            .apply_all(param_buffers, &self.adsrs, base_frequencies, output_buffer);
+        self.effect_chain.apply_all(&render_params, output_buffer);
     }
 }
 
@@ -365,6 +393,12 @@ pub enum ParamSourceType {
 pub struct ParamSource {
     pub source_type: ParamSourceType,
     pub value: f32,
+}
+
+pub struct RenderRawParams<'a> {
+    pub param_buffers: &'a [[f32; FRAME_SIZE]],
+    pub adsrs: &'a [ADSRState],
+    pub base_frequencies: &'a [f32; FRAME_SIZE],
 }
 
 impl ParamSource {
@@ -399,6 +433,10 @@ impl ParamSource {
         // Apply smoothing to avoid clicks/pops/other audio artifacts caused by jumping between
         // param values quickly
         dsp::one_pole(&mut self.value, output, 0.995)
+    }
+
+    pub fn render_raw<'a>(&self, params: &RenderRawParams<'a>, output_buf: &mut [f32; FRAME_SIZE]) {
+        self.source_type.render_raw(params, output_buf);
     }
 
     /// Replaces the param generator while preserving the previous value used for smoothing
@@ -460,6 +498,51 @@ impl ParamSourceType {
             2 => ParamSourceType::PerVoiceADSR(value_param_int),
             3 => ParamSourceType::BaseFrequencyMultiplier(value_param_float),
             _ => panic!("Invalid value type; expected 0-2"),
+        }
+    }
+
+    pub fn render_raw<'a>(
+        &self,
+        RenderRawParams {
+            param_buffers,
+            adsrs,
+            base_frequencies,
+        }: &'a RenderRawParams<'a>,
+        output_buf: &mut [f32; FRAME_SIZE],
+    ) {
+        match self {
+            ParamSourceType::Constant(val) => unsafe {
+                let splat = f32x4_splat(*val);
+                let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                for i in 0..FRAME_SIZE / 4 {
+                    v128_store(base_output_ptr.add(i), splat);
+                }
+            },
+            ParamSourceType::ParamBuffer(buffer_ix) => {
+                let param_buf = unsafe { param_buffers.get_unchecked(*buffer_ix) };
+                let base_input_ptr = param_buf.as_ptr() as *const v128;
+                let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                for i in 0..FRAME_SIZE / 4 {
+                    unsafe {
+                        let v = v128_load(base_input_ptr.add(i));
+                        v128_store(base_output_ptr.add(i), v);
+                    }
+                }
+            },
+            ParamSourceType::BaseFrequencyMultiplier(multiplier) => {
+                let base_input_ptr = base_frequencies.as_ptr() as *const v128;
+                let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                let multiplier = unsafe { f32x4_splat(*multiplier) };
+
+                for i in 0..FRAME_SIZE / 4 {
+                    unsafe {
+                        let v = v128_load(base_input_ptr.add(i));
+                        let multiplied = f32x4_mul(v, multiplier);
+                        v128_store(base_output_ptr.add(i), multiplied);
+                    }
+                }
+            },
+            ParamSourceType::PerVoiceADSR(_) => todo!(),
         }
     }
 }

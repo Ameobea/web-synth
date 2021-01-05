@@ -1,5 +1,3 @@
-#![feature(min_const_generics)]
-
 pub mod circular_buffer;
 pub mod filters;
 pub mod oscillator;

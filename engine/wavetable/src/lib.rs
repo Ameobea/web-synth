@@ -1,4 +1,4 @@
-#![feature(nll, box_syntax)]
+#![feature(nll, box_syntax, stdsimd, wasm_simd)]
 
 use std::mem::{self, transmute};
 

@@ -1,7 +1,7 @@
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
-use super::{ADSRState, ParamSource, ParamSourceType, FRAME_SIZE};
+use super::{ADSRState, ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod soft_clipper;
@@ -23,6 +23,30 @@ pub trait Effect {
         base_frequency: f32,
         sample: f32,
     ) -> f32;
+
+    /// Apply the effect to the buffer of samples in-place
+    fn apply_all<'a>(
+        &mut self,
+        RenderRawParams {
+            param_buffers,
+            adsrs,
+            base_frequencies,
+        }: &RenderRawParams<'a>,
+        samples: &mut [f32; FRAME_SIZE],
+    ) {
+        // Fall back to the serial implementation if a SIMD one isn't available
+        for sample_ix_within_frame in 0..FRAME_SIZE {
+            let sample = unsafe { samples.get_unchecked_mut(sample_ix_within_frame) };
+            let base_frequency = unsafe { *base_frequencies.get_unchecked(sample_ix_within_frame) };
+            *sample = self.apply(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                *sample,
+            );
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -301,6 +325,16 @@ impl Effect for EffectInstance {
             ),
         }
     }
+
+    fn apply_all<'a>(&mut self, params: &RenderRawParams<'a>, samples: &mut [f32; FRAME_SIZE]) {
+        match self {
+            EffectInstance::SpectralWarping(e) => e.apply_all(params, samples),
+            EffectInstance::Wavecruncher(e) => e.apply_all(params, samples),
+            EffectInstance::Bitcrusher(e) => e.apply_all(params, samples),
+            EffectInstance::Wavefolder(e) => e.apply_all(params, samples),
+            EffectInstance::SoftClipper(e) => e.apply_all(params, samples),
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -395,37 +429,14 @@ impl Effect for EffectChain {
         }
         sample
     }
-}
 
-impl EffectChain {
-    pub fn apply_all(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
-        base_frequencies: &[f32],
-        samples: &mut [f32],
-    ) {
-        if self.0[0].is_none() {
-            return;
-        }
-
-        for sample_ix_within_frame in 0..FRAME_SIZE {
-            let sample = unsafe { samples.get_unchecked_mut(sample_ix_within_frame) };
-            let base_frequency = unsafe { *base_frequencies.get_unchecked(sample_ix_within_frame) };
-
-            for effect in &mut self.0 {
-                let effect = match effect {
-                    Some(effect) => effect,
-                    None => continue,
-                };
-                *sample = effect.apply(
-                    param_buffers,
-                    adsrs,
-                    sample_ix_within_frame,
-                    base_frequency,
-                    *sample,
-                );
-            }
+    fn apply_all<'a>(&mut self, params: &RenderRawParams<'a>, samples: &mut [f32; FRAME_SIZE]) {
+        for effect in &mut self.0 {
+            let effect = match effect {
+                Some(effect) => effect,
+                None => return,
+            };
+            effect.apply_all(params, samples);
         }
     }
 }

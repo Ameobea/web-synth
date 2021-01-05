@@ -10,7 +10,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 dsp = { path = "../dsp" }
 fastapprox = "0.3"
+core_arch = { git = "git://git@github.com/rust-lang/stdarch", optional = true }
 
 [features]
-default_features = []
-simd = []
+default = ["simd"]
+simd = ["core_arch"]

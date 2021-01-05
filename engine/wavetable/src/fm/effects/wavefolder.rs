@@ -1,7 +1,7 @@
 use dsp::filters::dc_blocker::DCBlocker;
 
 use super::Effect;
-use crate::fm::{ADSRState, ParamSource, ParamSourceType, FRAME_SIZE};
+use crate::fm::{ADSRState, ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 #[derive(Clone)]
 pub struct Wavecruncher {
@@ -125,5 +125,29 @@ impl Effect for Wavefolder {
         // Filter out extremely low frequencies / remove offset bias
         self.dc_blocker.apply(output)
         // output
+    }
+
+    fn apply_all<'a>(&mut self, params: &RenderRawParams<'a>, samples: &mut [f32; FRAME_SIZE]) {
+        let mut rendered_gain: [f32; FRAME_SIZE] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        self.gain.render_raw(params, &mut rendered_gain);
+        let mut rendered_offset: [f32; FRAME_SIZE] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        self.offset.render_raw(params, &mut rendered_offset);
+
+        for i in 0..FRAME_SIZE {
+            unsafe {
+                let sample = samples.get_unchecked(i);
+                let gain = *rendered_gain.get_unchecked(i);
+                let offset = *rendered_offset.get_unchecked(i);
+
+                let output = fastapprox::faster::sinfull(
+                    std::f32::consts::PI * (sample * gain + offset / 2.),
+                );
+                // Filter out extremely low frequencies / remove offset bias
+
+                *samples.get_unchecked_mut(i) = self.dc_blocker.apply(output);
+            }
+        }
     }
 }

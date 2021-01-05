@@ -100,6 +100,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_arch"
+version = "0.1.5"
+source = "git+git://git@github.com/rust-lang/stdarch#0000457c89413f2266d3f8b61b3663f8f22c7a47"
+
+[[package]]
 name = "distortion"
 version = "0.1.0"
 dependencies = [
@@ -954,6 +959,7 @@ dependencies = [
 name = "wavetable"
 version = "0.1.0"
 dependencies = [
+ "core_arch",
  "dsp",
  "fastapprox",
 ]
