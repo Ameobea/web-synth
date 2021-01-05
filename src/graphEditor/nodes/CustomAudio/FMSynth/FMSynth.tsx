@@ -18,7 +18,7 @@ type FMSynthInputDescriptor =
   | { type: 'outputWeight'; operatorIx: number };
 
 const OPERATOR_COUNT = 8;
-const VOICE_COUNT = 16;
+const VOICE_COUNT = 10;
 
 const buildDefaultModulationIndices = (): ParamSource[][] => {
   const indices = new Array(OPERATOR_COUNT).fill(null);

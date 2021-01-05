@@ -1,6 +1,7 @@
 pub mod effects;
 use std::hint::unreachable_unchecked;
 
+use dsp::oscillator::PhasedOscillator;
 use effects::bitcrusher::even_faster_pow;
 
 use self::effects::{Effect, EffectChain};
@@ -8,25 +9,6 @@ use self::effects::{Effect, EffectChain};
 #[derive(Clone, Default)]
 pub struct ADSRState {
     // TODO
-}
-
-trait PhasedOscillator {
-    fn get_phase(&self) -> f32;
-
-    fn set_phase(&mut self, new_phase: f32);
-
-    fn update_phase(&mut self, frequency: f32) {
-        // 1 phase corresponds to 1 period of the waveform.  1 phase is passed every (SAMPLE_RATE /
-        // frequency) samples.
-        let phase = self.get_phase();
-        // if frequency.is_normal() && frequency.abs() > 0.001 {
-        let mut new_phase = (phase + (1. / (SAMPLE_RATE as f32 / frequency))).fract();
-        if new_phase < 0. {
-            new_phase = 1. + new_phase;
-        }
-        self.set_phase(new_phase);
-        // }
-    }
 }
 
 #[derive(Clone, Default)]
@@ -311,7 +293,7 @@ impl FMSynthVoice {
 
             for operator_ix in 0..OPERATOR_COUNT {
                 let carrier_base_frequency =
-                    unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }.get(
+                    unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }.get_raw(
                         param_buffers,
                         &self.adsrs,
                         sample_ix_within_frame,
@@ -393,6 +375,17 @@ impl ParamSource {
         }
     }
 
+    pub fn get_raw(
+        &mut self,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[ADSRState],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+    ) -> f32 {
+        self.source_type
+            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
+    }
+
     pub fn get(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
@@ -438,11 +431,12 @@ impl ParamSourceType {
                     }
                 };
 
-                if raw.is_normal() {
-                    raw
-                } else {
-                    0.
-                }
+                // if raw.is_normal() {
+                //     raw
+                // } else {
+                //     0.
+                // }
+                raw
             },
             ParamSourceType::Constant(val) => *val,
             ParamSourceType::PerVoiceADSR(adsr_ix) => {

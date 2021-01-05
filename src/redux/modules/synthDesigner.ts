@@ -127,7 +127,7 @@ export interface SynthModule {
 
 const ctx = new AudioContext();
 
-const VOICE_COUNT = 16 as const;
+const VOICE_COUNT = 10 as const;
 
 export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
   getSettingsForFilterType(filterType).reduce(

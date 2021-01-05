@@ -40,7 +40,7 @@ pub struct SynthCallbacks<
     pub schedule_events: SE,
 }
 
-pub const POLY_SYNTH_VOICE_COUNT: usize = 16; // TODO: Make this a configurable param
+pub const POLY_SYNTH_VOICE_COUNT: usize = 10; // TODO: Make this a configurable param
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum VoicePlayingStatus {

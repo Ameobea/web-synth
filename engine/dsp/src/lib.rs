@@ -2,6 +2,7 @@
 
 pub mod circular_buffer;
 pub mod filters;
+pub mod oscillator;
 
 /// For `coefficient` values between 0 and 1, applies smoothing to a value, interpolating between
 /// previous values and new values.  Values closer to 1 applier heavier smoothing.

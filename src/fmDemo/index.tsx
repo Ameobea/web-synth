@@ -12,7 +12,7 @@ import './fmDemo.scss';
 import { ControlPanelADSR, defaultAdsrEnvelope } from 'src/controls/adsr';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 
-const VOICE_COUNT = 16;
+const VOICE_COUNT = 10;
 
 const ctx = new AudioContext();
 const mainGain = new GainNode(ctx);

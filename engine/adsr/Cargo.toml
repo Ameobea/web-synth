@@ -1,16 +1,11 @@
 [package]
-name = "wavetable"
-version = "0.1.0"
 authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2018"
+name = "adsr"
+version = "0.1.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-dsp = { path = "../dsp" }
-fastapprox = "0.3"
-
-[features]
-default_features = []
-simd = []
+dsp = {path = "../dsp" }
