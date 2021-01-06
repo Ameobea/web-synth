@@ -1,7 +1,7 @@
 use core::arch::wasm32::*;
 use std::{hint::unreachable_unchecked, rc::Rc};
 
-use adsr::{Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE};
+use adsr::{Adsr, AdsrStep, GateStatus, RampFn, RENDERED_BUFFER_SIZE};
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
@@ -914,7 +914,7 @@ pub unsafe extern "C" fn set_adsr(
     let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
 
     for voice in &mut (*ctx).voices {
-        let adsr = Adsr::new(
+        let mut adsr = Adsr::new(
             ADSR_STEP_BUFFER[..step_count].to_owned(),
             if loop_point < 0. {
                 None
@@ -926,6 +926,14 @@ pub unsafe extern "C" fn set_adsr(
             shared_buffer.clone(),
         );
         if voice.adsrs.get(adsr_ix).is_some() {
+            let old_phase = voice.adsrs[adsr_ix].phase;
+            let gate_status = voice.adsrs[adsr_ix].gate_status;
+            adsr.gate_status = gate_status;
+            adsr.phase = match gate_status {
+                GateStatus::GatedFrozen => release_start_phase,
+                GateStatus::Done => 1.,
+                _ => old_phase,
+            };
             voice.adsrs[adsr_ix] = adsr;
         } else if voice.adsrs.len() != adsr_ix {
             panic!(
@@ -939,4 +947,15 @@ pub unsafe extern "C" fn set_adsr(
     }
     // Render the ADSR's shared buffer
     (*ctx).voices[0].adsrs[adsr_ix].render();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_adsr_length(
+    ctx: *mut FMSynthContext,
+    adsr_ix: usize,
+    adsr_len_samples: f32,
+) {
+    for voice in &mut (*ctx).voices {
+        voice.adsrs[adsr_ix].set_len_samples(adsr_len_samples);
+    }
 }

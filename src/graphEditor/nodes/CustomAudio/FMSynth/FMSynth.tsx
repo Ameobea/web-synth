@@ -346,16 +346,25 @@ export default class FMSynth implements ForeignNode {
       return;
     }
 
+    const isLenOnlyChange = this.adsrs?.[adsrIx].lenSamples !== newAdsr.lenSamples;
     this.adsrs[adsrIx] = newAdsr;
 
-    this.awpHandle.port.postMessage({
-      type: 'setAdsr',
-      adsrIx,
-      steps: newAdsr.steps.map(step => this.encodeAdsrStep(step)),
-      lenSamples: newAdsr.lenSamples,
-      releasePoint: newAdsr.releasePoint,
-      loopPoint: newAdsr.loopPoint,
-    });
+    if (isLenOnlyChange) {
+      this.awpHandle.port.postMessage({
+        type: 'setAdsrLength',
+        adsrIx,
+        lenSamples: newAdsr.lenSamples,
+      });
+    } else {
+      this.awpHandle.port.postMessage({
+        type: 'setAdsr',
+        adsrIx,
+        steps: newAdsr.steps.map(step => this.encodeAdsrStep(step)),
+        lenSamples: newAdsr.lenSamples,
+        releasePoint: newAdsr.releasePoint,
+        loopPoint: newAdsr.loopPoint,
+      });
+    }
   }
 
   private encodeEffect(effect: Effect | null) {

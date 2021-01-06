@@ -43,8 +43,6 @@ fn compute_pos(prev_step: &AdsrStep, next_step: &AdsrStep, phase: f32) -> f32 {
             let y_diff = next_step.y - prev_step.y;
             let distance = next_step.x - prev_step.x;
             let x = (phase - prev_step.x) / distance;
-            // unsafe { debug1(y_diff, distance, x) };
-            // TODO: Look into replacing this with faster version if accuracy is good enough
             // prev_step.y + x.powf(exponent) * y_diff
             prev_step.y + even_faster_pow(x, exponent) * y_diff
         },
@@ -75,10 +73,10 @@ pub enum GateStatus {
 #[derive(Clone)]
 pub struct Adsr {
     /// From 0 to 1 representing position in the ADSR from start to end
-    phase: f32,
-    gate_status: GateStatus,
+    pub phase: f32,
+    pub gate_status: GateStatus,
     /// Point at which the decay begins.
-    release_start_phase: f32,
+    pub release_start_phase: f32,
     steps: Vec<AdsrStep>,
     /// If provided, once the ADSR hits point `release_start_phase`, it will loop back to
     /// `loop_point` until it is released.
@@ -218,7 +216,6 @@ impl Adsr {
                 for i in 0..FRAME_SIZE {
                     self.cur_frame_output[i] = frozen_output;
                 }
-                unsafe { debug1(frozen_output, self.phase, self.release_start_phase) };
                 self.gate_status = GateStatus::GatedFrozen;
                 return;
             }

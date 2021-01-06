@@ -154,6 +154,19 @@ class FMSynthAWP extends AudioWorkletProcessor {
           );
           break;
         }
+        case 'setAdsrLength': {
+          if (!this.wasmInstance) {
+            console.error('Tried setting adsr length before Wasm instance loaded');
+            return;
+          }
+          this.wasmInstance.exports.set_adsr_length(
+            this.ctxPtr,
+            evt.data.adsrIx,
+            evt.data.lenSamples
+          );
+
+          break;
+        }
         case 'gate': {
           if (!this.wasmInstance) {
             console.warn('Tried gating before Wasm instance loaded');
