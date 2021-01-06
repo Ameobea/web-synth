@@ -1,14 +1,17 @@
 use core::arch::wasm32::*;
-use std::hint::unreachable_unchecked;
+use std::{hint::unreachable_unchecked, rc::Rc};
 
-use dsp::oscillator::PhasedOscillator;
+use adsr::{Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE};
+use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
-use self::effects::{bitcrusher::even_faster_pow, Effect, EffectChain};
+use self::effects::{Effect, EffectChain};
 
 #[derive(Clone, Default)]
-pub struct ADSRState {
-    // TODO
+pub struct AdsrState {
+    pub adsr_ix: usize,
+    pub scale: f32,
+    pub shift: f32,
 }
 
 #[derive(Clone, Default)]
@@ -91,7 +94,7 @@ impl ExponentialOscillator {
         &mut self,
         frequency: f32,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
@@ -148,7 +151,7 @@ impl Operator {
         frequency: f32,
         wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
@@ -202,7 +205,7 @@ impl OscillatorSource {
         frequency: f32,
         _wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
@@ -236,7 +239,7 @@ impl OscillatorSource {
 #[derive(Clone, Default)]
 pub struct FMSynthVoice {
     pub output: f32,
-    pub adsrs: Vec<ADSRState>,
+    pub adsrs: Vec<Adsr>,
     pub operators: [Operator; OPERATOR_COUNT],
     pub last_samples: [f32; OPERATOR_COUNT],
     pub last_sample_frequencies_per_operator: [f32; OPERATOR_COUNT],
@@ -285,6 +288,11 @@ impl FMSynthVoice {
         let mut frequencies_per_operator: [f32; OPERATOR_COUNT] =
             self.last_sample_frequencies_per_operator;
 
+        // Update and pre-render all ADSRs
+        for adsr in &mut self.adsrs {
+            adsr.render_frame();
+        }
+
         // Render all operator base frequencies for the full frame ahead of time using SIMD
         let mut operator_base_frequencies: [[f32; FRAME_SIZE]; OPERATOR_COUNT] =
             unsafe { std::mem::MaybeUninit::uninit().assume_init() };
@@ -294,7 +302,7 @@ impl FMSynthVoice {
             base_frequencies,
         };
         for operator_ix in 0..OPERATOR_COUNT {
-            unsafe { *operator_base_frequency_sources.get_unchecked(operator_ix) }
+            unsafe { operator_base_frequency_sources.get_unchecked(operator_ix) }
                 .render_raw(&render_params, unsafe {
                     operator_base_frequencies.get_unchecked_mut(operator_ix)
                 });
@@ -308,7 +316,7 @@ impl FMSynthVoice {
             for dst_operator_ix in 0..OPERATOR_COUNT {
                 let param = modulation_matrix
                     .get_operator_modulation_index(src_operator_ix, dst_operator_ix);
-                // TODO: smoothing
+                // TODO: smoothing?
                 let buf = unsafe {
                     modulation_indices
                         .get_unchecked_mut(src_operator_ix)
@@ -322,8 +330,6 @@ impl FMSynthVoice {
             let mut output_sample = 0.0f32;
 
             let base_frequency = *unsafe { base_frequencies.get_unchecked(sample_ix_within_frame) };
-
-            // TODO: Update ADSR state
 
             for operator_ix in 0..OPERATOR_COUNT {
                 let carrier_base_frequency = unsafe {
@@ -377,7 +383,7 @@ impl FMSynthVoice {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum ParamSourceType {
     /// Each sample, the value for this param is pulled out of the parameter buffer of this index.
     /// These buffers are populated externally every frame.
@@ -385,11 +391,11 @@ pub enum ParamSourceType {
     Constant(f32),
     /// The value of this parameter is determined by the output of a per-voice ADSR that is
     /// triggered every time that voice is triggered.
-    PerVoiceADSR(usize),
+    PerVoiceADSR(AdsrState),
     BaseFrequencyMultiplier(f32),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ParamSource {
     pub source_type: ParamSourceType,
     pub value: f32,
@@ -397,7 +403,7 @@ pub struct ParamSource {
 
 pub struct RenderRawParams<'a> {
     pub param_buffers: &'a [[f32; FRAME_SIZE]],
-    pub adsrs: &'a [ADSRState],
+    pub adsrs: &'a [Adsr],
     pub base_frequencies: &'a [f32; FRAME_SIZE],
 }
 
@@ -412,7 +418,7 @@ impl ParamSource {
     pub fn get_raw(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
@@ -423,7 +429,7 @@ impl ParamSource {
     pub fn get(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
@@ -453,7 +459,7 @@ impl ParamSourceType {
     pub fn get(
         &self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
@@ -477,25 +483,42 @@ impl ParamSourceType {
                 raw
             },
             ParamSourceType::Constant(val) => *val,
-            ParamSourceType::PerVoiceADSR(adsr_ix) => {
+            ParamSourceType::PerVoiceADSR(AdsrState {
+                adsr_ix,
+                scale,
+                shift,
+            }) => {
                 let adsr = if cfg!(debug_assertions) {
                     &adsrs[*adsr_ix]
                 } else {
                     unsafe { adsrs.get_unchecked(*adsr_ix) }
                 };
 
-                // TODO
-                -1.
+                (unsafe {
+                    *adsr
+                        .get_cur_frame_output()
+                        .get_unchecked(sample_ix_within_frame)
+                }) * scale
+                    + shift
             },
             ParamSourceType::BaseFrequencyMultiplier(multiplier) => base_frequency * multiplier,
         }
     }
 
-    pub fn from_parts(value_type: usize, value_param_int: usize, value_param_float: f32) -> Self {
+    pub fn from_parts(
+        value_type: usize,
+        value_param_int: usize,
+        value_param_float: f32,
+        value_param_float_2: f32,
+    ) -> Self {
         match value_type {
             0 => ParamSourceType::ParamBuffer(value_param_int),
             1 => ParamSourceType::Constant(value_param_float),
-            2 => ParamSourceType::PerVoiceADSR(value_param_int),
+            2 => ParamSourceType::PerVoiceADSR(AdsrState {
+                adsr_ix: value_param_int,
+                scale: value_param_float,
+                shift: value_param_float_2,
+            }),
             3 => ParamSourceType::BaseFrequencyMultiplier(value_param_float),
             _ => panic!("Invalid value type; expected 0-2"),
         }
@@ -542,7 +565,27 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::PerVoiceADSR(_) => todo!(),
+            ParamSourceType::PerVoiceADSR(AdsrState {
+                adsr_ix,
+                scale,
+                shift,
+            }) => {
+                let scale = unsafe { f32x4_splat(*scale) };
+                let shift = unsafe { f32x4_splat(*shift) };
+
+                let adsr = unsafe { adsrs.get_unchecked(*adsr_ix) };
+                let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                let adsr_buf_ptr = adsr.get_cur_frame_output().as_ptr() as *const v128;
+
+                for i in 0..FRAME_SIZE / 4 {
+                    unsafe {
+                        let v = v128_load(adsr_buf_ptr.add(i));
+                        let scaled = f32x4_mul(v, scale);
+                        let scaled_and_shifted = f32x4_add(scaled, shift);
+                        v128_store(base_output_ptr.add(i), scaled_and_shifted);
+                    }
+                }
+            },
         }
     }
 }
@@ -622,16 +665,30 @@ impl FMSynthContext {
 pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthContext {
     crate::lookup_tables::maybe_init_lookup_tables();
 
-    Box::into_raw(box FMSynthContext {
-        voices: vec![FMSynthVoice::default(); voice_count],
+    let ctx = Box::into_raw(box FMSynthContext {
+        voices: Vec::with_capacity(voice_count),
         modulation_matrix: ModulationMatrix::default(),
         param_buffers: std::mem::MaybeUninit::uninit().assume_init(),
-        operator_base_frequency_sources: [ParamSource::new(
-            ParamSourceType::BaseFrequencyMultiplier(1.),
-        ); OPERATOR_COUNT],
-        base_frequency_input_buffer: vec![[0.; FRAME_SIZE]; voice_count],
-        output_buffers: vec![std::mem::MaybeUninit::uninit().assume_init(); voice_count],
-    })
+        operator_base_frequency_sources: std::mem::MaybeUninit::uninit().assume_init(),
+        base_frequency_input_buffer: Vec::with_capacity(voice_count),
+        output_buffers: Vec::with_capacity(voice_count),
+    });
+    for i in 0..OPERATOR_COUNT {
+        (*ctx)
+            .operator_base_frequency_sources
+            .as_mut_ptr()
+            .add(i)
+            .write(ParamSource::new(ParamSourceType::BaseFrequencyMultiplier(
+                1.,
+            )));
+    }
+    for _ in 0..voice_count {
+        (*ctx).voices.push(FMSynthVoice::default());
+    }
+    (*ctx).base_frequency_input_buffer.set_len(voice_count);
+    (*ctx).output_buffers.set_len(voice_count);
+
+    ctx
 }
 
 // #[no_mangle]
@@ -662,11 +719,13 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
     value_type: usize,
     val_param_int: usize,
     val_param_float: f32,
+    val_param_float_2: f32,
 ) {
     let param = ParamSource::new(ParamSourceType::from_parts(
         value_type,
         val_param_int,
         val_param_float,
+        val_param_float_2,
     ));
     (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix] = param;
 }
@@ -678,11 +737,13 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
     value_type: usize,
     val_param_int: usize,
     val_param_float: f32,
+    val_param_float_2: f32,
 ) {
     let param = ParamSource::new(ParamSourceType::from_parts(
         value_type,
         val_param_int,
         val_param_float,
+        val_param_float_2,
     ));
     (*ctx).modulation_matrix.output_weights[operator_ix] = param;
 }
@@ -692,6 +753,7 @@ fn build_oscillator_source(
     param_value_type: usize,
     param_val_int: usize,
     param_val_float: f32,
+    val_param_float_2: f32,
     phase_opt: Option<f32>,
 ) -> OscillatorSource {
     match operator_type {
@@ -706,6 +768,7 @@ fn build_oscillator_source(
                 param_value_type,
                 param_val_int,
                 param_val_float,
+                val_param_float_2,
             )),
         }),
         _ => panic!("Invalid operator type: {}", operator_type),
@@ -720,6 +783,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     param_value_type: usize,
     param_val_int: usize,
     param_val_float: f32,
+    param_val_float_2: f32,
 ) {
     for voice in &mut (*ctx).voices {
         let old_phase = voice.operators[operator_ix].oscillator_source.get_phase();
@@ -728,6 +792,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
             param_value_type,
             param_val_int,
             param_val_float,
+            param_val_float_2,
             old_phase,
         );
     }
@@ -740,11 +805,13 @@ pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
     value_type: usize,
     value_param_int: usize,
     value_param_float: f32,
+    val_param_float_2: f32,
 ) {
     let param = ParamSource::new(ParamSourceType::from_parts(
         value_type,
         value_param_int,
         value_param_float,
+        val_param_float_2,
     ));
     (*ctx).operator_base_frequency_sources[operator_ix] = param;
 }
@@ -758,15 +825,19 @@ pub unsafe extern "C" fn fm_synth_set_effect(
     param_1_type: usize,
     param_1_int_val: usize,
     param_1_float_val: f32,
+    param_1_float_val_2: f32,
     param_2_type: usize,
     param_2_int_val: usize,
     param_2_float_val: f32,
+    param_2_float_val_2: f32,
     param_3_type: usize,
     param_3_int_val: usize,
     param_3_float_val: f32,
+    param_3_float_val_2: f32,
     param_4_type: usize,
     param_4_int_val: usize,
     param_4_float_val: f32,
+    param_4_float_val_2: f32,
 ) {
     for voice in &mut (*ctx).voices {
         let effect_chain = if operator_ix == -1 {
@@ -784,16 +855,88 @@ pub unsafe extern "C" fn fm_synth_set_effect(
                 param_1_type,
                 param_1_int_val,
                 param_1_float_val,
+                param_1_float_val_2,
                 param_2_type,
                 param_2_int_val,
                 param_2_float_val,
+                param_2_float_val_2,
                 param_3_type,
                 param_3_int_val,
                 param_3_float_val,
+                param_3_float_val_2,
                 param_4_type,
                 param_4_int_val,
                 param_4_float_val,
+                param_4_float_val_2,
             );
         }
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
+    for adsr in &mut (*ctx).voices[voice_ix].adsrs {
+        adsr.gate();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ungate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
+    for adsr in &mut (*ctx).voices[voice_ix].adsrs {
+        adsr.ungate();
+    }
+}
+
+static mut ADSR_STEP_BUFFER: [AdsrStep; 512] = [AdsrStep {
+    x: 0.,
+    y: 0.,
+    ramper: RampFn::Linear,
+}; 512];
+#[no_mangle]
+pub unsafe extern "C" fn set_adsr_step_buffer(i: usize, x: f32, y: f32, ramper: u32, param: f32) {
+    ADSR_STEP_BUFFER[i] = AdsrStep {
+        x,
+        y,
+        ramper: RampFn::from_u32(ramper, param),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_adsr(
+    ctx: *mut FMSynthContext,
+    adsr_ix: usize,
+    step_count: usize,
+    len_samples: f32,
+    release_start_phase: f32,
+    loop_point: f32,
+) {
+    let shared_buffer = box [0.0f32; RENDERED_BUFFER_SIZE];
+    let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
+
+    for voice in &mut (*ctx).voices {
+        let adsr = Adsr::new(
+            ADSR_STEP_BUFFER[..step_count].to_owned(),
+            if loop_point < 0. {
+                None
+            } else {
+                Some(loop_point)
+            },
+            len_samples,
+            release_start_phase,
+            shared_buffer.clone(),
+        );
+        if voice.adsrs.get(adsr_ix).is_some() {
+            voice.adsrs[adsr_ix] = adsr;
+        } else if voice.adsrs.len() != adsr_ix {
+            panic!(
+                "Tried to set ADSR index {} but only {} adsrs exist",
+                adsr_ix,
+                voice.adsrs.len()
+            );
+        } else {
+            voice.adsrs.push(adsr);
+        }
+    }
+    // Render the ADSR's shared buffer
+    (*ctx).voices[0].adsrs[adsr_ix].render();
 }

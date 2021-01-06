@@ -114,6 +114,9 @@ dependencies = [
 [[package]]
 name = "dsp"
 version = "0.1.0"
+dependencies = [
+ "fastapprox",
+]
 
 [[package]]
 name = "encoding"
@@ -959,6 +962,7 @@ dependencies = [
 name = "wavetable"
 version = "0.1.0"
 dependencies = [
+ "adsr",
  "core_arch",
  "dsp",
  "fastapprox",

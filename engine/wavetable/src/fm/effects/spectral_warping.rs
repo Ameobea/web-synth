@@ -1,7 +1,8 @@
+use adsr::Adsr;
 use dsp::circular_buffer::CircularBuffer;
 
 use super::Effect;
-use crate::fm::{ADSRState, ExponentialOscillator, ParamSource, FRAME_SIZE, SAMPLE_RATE};
+use crate::fm::{ExponentialOscillator, ParamSource, FRAME_SIZE, SAMPLE_RATE};
 
 pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
 
@@ -39,7 +40,7 @@ impl SpectralWarping {
     fn get_phase_warp_diff(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         frequency: f32,
@@ -64,7 +65,7 @@ impl Effect for SpectralWarping {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,

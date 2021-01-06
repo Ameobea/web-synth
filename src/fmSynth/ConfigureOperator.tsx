@@ -2,11 +2,12 @@ import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
+import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, {
   buildDefaultParamSource,
   ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 /**
  * The algorithm used to produce the output for the operator.
@@ -24,13 +25,13 @@ export const buildDefaultOperatorConfig = (
     case 'sine oscillator': {
       return {
         type,
-        frequency: buildDefaultParamSource('base frequency multiplier'),
+        frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
       };
     }
     case 'exponential oscillator': {
       return {
         type,
-        frequency: buildDefaultParamSource('base frequency multiplier'),
+        frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
         stretchFactor: { type: 'constant', value: 0.5 },
       };
     }
@@ -50,7 +51,18 @@ const ConfigureOperator: React.FC<{
   onEffectsChange: (effectIx: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
   operatorIx: number;
-}> = ({ config, onChange, effects, onEffectsChange, setEffects, operatorIx }) => {
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
+}> = ({
+  config,
+  onChange,
+  effects,
+  onEffectsChange,
+  setEffects,
+  operatorIx,
+  adsrs,
+  onAdsrChange,
+}) => {
   const operatorTypeSettings = useMemo(
     () => [
       {
@@ -93,6 +105,8 @@ const ConfigureOperator: React.FC<{
           onChange={newFrequency => onChange({ ...config, frequency: newFrequency })}
           min={0}
           max={20000}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
         />
       ) : null}
       {config.type === 'exponential oscillator' ? (
@@ -102,6 +116,8 @@ const ConfigureOperator: React.FC<{
           onChange={newStretchFactor => onChange({ ...config, stretchFactor: newStretchFactor })}
           min={0}
           max={1}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
         />
       ) : null}
       <ConfigureEffects
@@ -109,6 +125,8 @@ const ConfigureOperator: React.FC<{
         state={effects}
         onChange={onEffectsChange}
         setOperatorEffects={setEffects}
+        adsrs={adsrs}
+        onAdsrChange={onAdsrChange}
       />
     </div>
   );

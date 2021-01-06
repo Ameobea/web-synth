@@ -4,8 +4,8 @@ import * as R from 'ramda';
 import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
-import ConfigureEffects, { Effect } from 'src/fmSynth/ConfigureEffects';
-import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
+import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
@@ -16,6 +16,7 @@ interface FMSynthState {
   operatorConfigs: OperatorConfig[];
   operatorEffects: (Effect | null)[][];
   mainEffectChain: (Effect | null)[];
+  adsrs: Adsr[];
 }
 
 type BackendModulationUpdater = (
@@ -61,12 +62,16 @@ const ConfigureMainEffectChain: React.FC<{
   mainEffectChain: (Effect | null)[];
   onChange: (ix: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
-}> = ({ mainEffectChain, onChange, setEffects }) => (
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
+}> = ({ mainEffectChain, onChange, setEffects, adsrs, onAdsrChange }) => (
   <ConfigureEffects
     operatorIx={null}
     state={mainEffectChain}
     onChange={onChange}
     setOperatorEffects={setEffects}
+    adsrs={adsrs}
+    onAdsrChange={onAdsrChange}
   />
 );
 
@@ -87,6 +92,8 @@ const FMSynthUI: React.FC<{
   setEffect: (operatorIx: number | null, effectIx: number, effect: Effect | null) => void;
   initialSelectedUI?: UISelection | null;
   onSelectedUIChange: (newSelectedUI: UISelection | null) => void;
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
 }> = ({
   updateBackendModulation,
   updateBackendOutput,
@@ -99,6 +106,8 @@ const FMSynthUI: React.FC<{
   setEffect,
   initialSelectedUI,
   onSelectedUIChange,
+  adsrs,
+  onAdsrChange,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -106,6 +115,7 @@ const FMSynthUI: React.FC<{
     operatorConfigs,
     operatorEffects,
     mainEffectChain,
+    adsrs,
   });
   const [selectedUI, setSelectedUIInner] = useState<UISelection | null>(initialSelectedUI ?? null);
   const setSelectedUI = (newSelectedUI: UISelection | null) => {
@@ -207,6 +217,11 @@ const FMSynthUI: React.FC<{
     setState(newState);
   };
 
+  const handleAdsrChange = (adsrIx: number, newAdsr: Adsr) => {
+    onAdsrChange(adsrIx, newAdsr);
+    setState({ ...state, adsrs: R.set(R.lensIndex(adsrIx), newAdsr, state.adsrs) });
+  };
+
   return (
     <>
       <div className='fm-synth-ui'>
@@ -248,6 +263,8 @@ const FMSynthUI: React.FC<{
               newEffects.forEach((effect, effectIx) => setEffect(null, effectIx, effect));
               setState({ ...state, mainEffectChain: newEffects });
             }}
+            adsrs={state.adsrs}
+            onAdsrChange={handleAdsrChange}
           />
         ) : null}
         {selectedUI?.type === 'operator'
@@ -284,6 +301,8 @@ const FMSynthUI: React.FC<{
                       ),
                     });
                   }}
+                  adsrs={state.adsrs}
+                  onAdsrChange={handleAdsrChange}
                 />
               );
             })()
@@ -308,6 +327,8 @@ const FMSynthUI: React.FC<{
                 )
               )
             }
+            adsrs={state.adsrs}
+            onAdsrChange={handleAdsrChange}
           />
         ) : null}
       </div>
@@ -336,6 +357,8 @@ export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
     onSelectedUIChange={newSelectedUI => {
       synth.selectedUI = newSelectedUI;
     }}
+    adsrs={synth.getAdsrs()}
+    onAdsrChange={(adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr)}
   />
 );
 

@@ -1,5 +1,8 @@
+use adsr::Adsr;
+use dsp::even_faster_pow2;
+
 use super::Effect;
-use crate::fm::{ADSRState, ParamSource, FRAME_SIZE};
+use crate::fm::{ParamSource, FRAME_SIZE};
 
 #[derive(Clone)]
 pub struct Bitcrusher {
@@ -8,17 +11,6 @@ pub struct Bitcrusher {
     pub samples_since_last_sample: usize,
     pub held_sample: f32,
 }
-
-/// Same as `fastapprox::faster::pow2` except we elide the check for large negative values and
-/// assume that negative values will never be passed to this function
-pub fn even_faster_pow2(p: f32) -> f32 {
-    let v = ((1 << 23) as f32 * (p + 126.94269504_f32)) as u32;
-    fastapprox::bits::from_bits(v)
-}
-
-/// Same as `fastapprox::faster::pow` except we elide the check for large negative values and
-/// assume that negative values will never be passed to this function
-pub fn even_faster_pow(x: f32, p: f32) -> f32 { even_faster_pow2(p * fastapprox::faster::log2(x)) }
 
 impl Bitcrusher {
     pub fn new(sample_rate: ParamSource, bit_depth: ParamSource) -> Self {
@@ -46,7 +38,7 @@ impl Effect for Bitcrusher {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,

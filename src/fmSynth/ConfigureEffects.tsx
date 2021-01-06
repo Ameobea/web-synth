@@ -5,6 +5,7 @@ import { Option } from 'funfix-core';
 
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import FlatButton from 'src/misc/FlatButton';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 export type Effect =
   | {
@@ -104,12 +105,21 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
 type EffectConfigurator<T> = React.FC<{
   state: Extract<Effect, { type: T }>;
   onChange: (newState: Effect | null) => void;
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
 }>;
 
-const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({ state, onChange }) => (
+const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
   <>
     <ConfigureParamSource
       theme={spectralWarpTheme}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       title='frequency'
       state={state.frequency}
       onChange={newFrequency => onChange({ ...state, frequency: newFrequency })}
@@ -118,6 +128,8 @@ const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({ stat
     />
     <ConfigureParamSource
       theme={spectralWarpTheme}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       title='warp factor'
       state={state.warpFactor}
       onChange={newWarpFactor => onChange({ ...state, warpFactor: newWarpFactor })}
@@ -127,13 +139,17 @@ const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({ stat
   </>
 );
 
-const ConfigureWavecruncher: React.FC<{
-  state: Extract<Effect, { type: 'wavecruncher' }>;
-  onChange: (newState: Effect | null) => void;
-}> = ({ state, onChange }) => (
+const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
   <>
     <ConfigureParamSource
       theme={wavecruncherTheme}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       title='top fold position'
       state={state.topFoldPosition}
       onChange={topFoldPosition => onChange({ ...state, topFoldPosition })}
@@ -142,6 +158,8 @@ const ConfigureWavecruncher: React.FC<{
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       title='top fold width'
       state={state.topFoldWidth}
       onChange={topFoldWidth => onChange({ ...state, topFoldWidth })}
@@ -150,6 +168,8 @@ const ConfigureWavecruncher: React.FC<{
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       title='bottom fold position'
       state={state.bottomFoldPosition}
       onChange={bottomFoldPosition => onChange({ ...state, bottomFoldPosition })}
@@ -158,6 +178,8 @@ const ConfigureWavecruncher: React.FC<{
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       title='bottom fold width'
       state={state.bottomFoldWidth}
       onChange={bottomFoldWidth => onChange({ ...state, bottomFoldWidth })}
@@ -167,10 +189,17 @@ const ConfigureWavecruncher: React.FC<{
   </>
 );
 
-const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({ state, onChange }) => (
+const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
   <>
     <ConfigureParamSource
       title='sample rate'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
       min={1}
       max={4410}
@@ -180,6 +209,8 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({ state, onChange
     />
     <ConfigureParamSource
       title='bit depth'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
       min={1}
       max={32}
@@ -190,10 +221,17 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({ state, onChange
   </>
 );
 
-const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange }) => (
+const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
   <>
     <ConfigureParamSource
       title='gain'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       theme={wavefolderTheme}
       min={0}
       max={16}
@@ -202,6 +240,8 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange
     />
     <ConfigureParamSource
       title='offset'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       theme={wavefolderTheme}
       min={0}
       max={8}
@@ -211,10 +251,17 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({ state, onChange
   </>
 );
 
-const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({ state, onChange }) => (
+const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
   <>
     <ConfigureParamSource
       title='pre gain'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       theme={softClipperTheme}
       min={0.1}
       max={50}
@@ -224,6 +271,8 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({ state, onCha
     />
     <ConfigureParamSource
       title='post gain'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
       theme={softClipperTheme}
       min={0.1}
       max={5}
@@ -296,25 +345,65 @@ const EffectManagement: React.FC<{
   );
 };
 
+export type AdsrChangeHandler = (adsrIx: number, newValue: Adsr) => void;
+
 const ConfigureEffectSpecific: React.FC<{
   state: Effect;
   onChange: (newEffect: Effect | null) => void;
-}> = ({ state, onChange }) => {
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
+}> = ({ state, onChange, adsrs, onAdsrChange }) => {
+  // TODO: object lookup
   switch (state.type) {
     case 'spectral warping': {
-      return <ConfigureSpectralWarping state={state} onChange={onChange} />;
+      return (
+        <ConfigureSpectralWarping
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      );
     }
     case 'wavecruncher': {
-      return <ConfigureWavecruncher state={state} onChange={onChange} />;
+      return (
+        <ConfigureWavecruncher
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      );
     }
     case 'bitcrusher': {
-      return <ConfigureBitcrusher state={state} onChange={onChange} />;
+      return (
+        <ConfigureBitcrusher
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      );
     }
     case 'wavefolder': {
-      return <ConfigureWavefolder state={state} onChange={onChange} />;
+      return (
+        <ConfigureWavefolder
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      );
     }
     case 'soft clipper': {
-      return <ConfigureSoftClipper state={state} onChange={onChange} />;
+      return (
+        <ConfigureSoftClipper
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      );
     }
   }
 };
@@ -325,7 +414,9 @@ const ConfigureEffect: React.FC<{
   onChange: (newEffect: Effect | null) => void;
   operatorEffects: (Effect | null)[];
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-}> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects }) => (
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
+}> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects, adsrs, onAdsrChange }) => (
   <div className='configure-effect'>
     <EffectManagement
       effectIx={effectIx}
@@ -334,7 +425,12 @@ const ConfigureEffect: React.FC<{
       onChange={onChange}
     />
 
-    <ConfigureEffectSpecific state={state} onChange={onChange} />
+    <ConfigureEffectSpecific
+      state={state}
+      onChange={onChange}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+    />
   </div>
 );
 
@@ -342,8 +438,10 @@ const ConfigureEffects: React.FC<{
   state: (Effect | null)[];
   onChange: (ix: number, newState: Effect | null) => void;
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
   operatorIx: number | null;
-}> = ({ state, onChange, setOperatorEffects, operatorIx }) => {
+}> = ({ state, onChange, setOperatorEffects, operatorIx, adsrs, onAdsrChange }) => {
   const [selectedEffectType, setSelectedEffectType] = useState<Effect['type']>('spectral warping');
 
   return (
@@ -361,6 +459,8 @@ const ConfigureEffects: React.FC<{
             onChange={newEffect => onChange(i, newEffect)}
             operatorEffects={state}
             setOperatorEffects={setOperatorEffects}
+            adsrs={adsrs}
+            onAdsrChange={onAdsrChange}
           />
         ))}
       </div>

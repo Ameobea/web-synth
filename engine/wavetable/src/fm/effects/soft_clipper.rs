@@ -1,3 +1,4 @@
+use adsr::Adsr;
 use dsp::filters::dc_blocker::DCBlocker;
 
 use super::Effect;
@@ -24,7 +25,7 @@ impl Effect for SoftClipper {
     fn apply(
         &mut self,
         param_buffers: &[[f32; crate::fm::FRAME_SIZE]],
-        adsrs: &[crate::fm::ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,

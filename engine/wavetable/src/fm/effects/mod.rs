@@ -1,7 +1,8 @@
+use adsr::Adsr;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
-use super::{ADSRState, ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
+use super::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod soft_clipper;
@@ -18,7 +19,7 @@ pub trait Effect {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,
@@ -65,15 +66,19 @@ impl EffectInstance {
         param_1_type: usize,
         param_1_int_val: usize,
         param_1_float_val: f32,
+        param_1_float_val_2: f32,
         param_2_type: usize,
         param_2_int_val: usize,
         param_2_float_val: f32,
+        param_2_float_val_2: f32,
         param_3_type: usize,
         param_3_int_val: usize,
         param_3_float_val: f32,
+        param_3_float_val_2: f32,
         param_4_type: usize,
         param_4_int_val: usize,
         param_4_float_val: f32,
+        param_4_float_val_2: f32,
     ) -> Self {
         match effect_type {
             0 => {
@@ -81,11 +86,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 let warp_factor = ParamSource::new(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
                 let params = SpectralWarpingParams {
                     frequency,
@@ -100,21 +107,25 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 let top_fold_width = ParamSource::new(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
                 let bottom_fold_position = ParamSource::new(ParamSourceType::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
+                    param_3_float_val_2,
                 ));
                 let bottom_fold_width = ParamSource::new(ParamSourceType::from_parts(
                     param_4_type,
                     param_4_int_val,
                     param_4_float_val,
+                    param_4_float_val_2,
                 ));
 
                 EffectInstance::Wavecruncher(Wavecruncher {
@@ -129,11 +140,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 let bit_depth = ParamSource::new(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
 
                 EffectInstance::Bitcrusher(Bitcrusher::new(sample_rate, bit_depth))
@@ -143,11 +156,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 let offset = ParamSource::new(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
 
                 EffectInstance::Wavefolder(Wavefolder::new(gain, offset))
@@ -157,11 +172,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 let post_gain = ParamSource::new(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
 
                 EffectInstance::SoftClipper(SoftClipper::new(pre_gain, post_gain))
@@ -177,15 +194,19 @@ impl EffectInstance {
         param_1_type: usize,
         param_1_int_val: usize,
         param_1_float_val: f32,
+        param_1_float_val_2: f32,
         param_2_type: usize,
         param_2_int_val: usize,
         param_2_float_val: f32,
+        param_2_float_val_2: f32,
         _param_3_type: usize,
         _param_3_int_val: usize,
         _param_3_float_val: f32,
+        _param_3_float_val_2: f32,
         _param_4_type: usize,
         _param_4_int_val: usize,
         _param_4_float_val: f32,
+        _param_4_float_val_2: f32,
     ) -> bool {
         match effect_type {
             0 => {
@@ -199,6 +220,7 @@ impl EffectInstance {
                         param_1_type,
                         param_1_int_val,
                         param_1_float_val,
+                        param_1_float_val_2,
                     ));
                 spectral_warping
                     .osc
@@ -207,6 +229,7 @@ impl EffectInstance {
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
+                        param_2_float_val_2,
                     ));
 
                 return true;
@@ -226,11 +249,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 bitcrusher.bit_depth.replace(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
 
                 return true;
@@ -245,11 +270,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 wavefolder.offset.replace(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
 
                 return true;
@@ -264,11 +291,13 @@ impl EffectInstance {
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
+                    param_1_float_val_2,
                 ));
                 soft_clipper.post_gain.replace(ParamSourceType::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
+                    param_2_float_val_2,
                 ));
 
                 return true;
@@ -282,7 +311,7 @@ impl Effect for EffectInstance {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,
@@ -348,15 +377,19 @@ impl EffectChain {
         param_1_type: usize,
         param_1_int_val: usize,
         param_1_float_val: f32,
+        param_1_float_val_2: f32,
         param_2_type: usize,
         param_2_int_val: usize,
         param_2_float_val: f32,
+        param_2_float_val_2: f32,
         param_3_type: usize,
         param_3_int_val: usize,
         param_3_float_val: f32,
+        param_3_float_val_2: f32,
         param_4_type: usize,
         param_4_int_val: usize,
         param_4_float_val: f32,
+        param_4_float_val_2: f32,
     ) {
         if let Some(effect) = &mut self.0[effect_ix] {
             let successfully_updated = effect.maybe_update_from_parts(
@@ -364,15 +397,19 @@ impl EffectChain {
                 param_1_type,
                 param_1_int_val,
                 param_1_float_val,
+                param_1_float_val_2,
                 param_2_type,
                 param_2_int_val,
                 param_2_float_val,
+                param_2_float_val_2,
                 param_3_type,
                 param_3_int_val,
                 param_3_float_val,
+                param_3_float_val_2,
                 param_4_type,
                 param_4_int_val,
                 param_4_float_val,
+                param_4_float_val_2,
             );
             if successfully_updated {
                 return;
@@ -384,15 +421,19 @@ impl EffectChain {
             param_1_type,
             param_1_int_val,
             param_1_float_val,
+            param_1_float_val_2,
             param_2_type,
             param_2_int_val,
             param_2_float_val,
+            param_2_float_val_2,
             param_3_type,
             param_3_int_val,
             param_3_float_val,
+            param_3_float_val_2,
             param_4_type,
             param_4_int_val,
             param_4_float_val,
+            param_4_float_val_2,
         ));
     }
 
@@ -409,7 +450,7 @@ impl Effect for EffectChain {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         mut sample: f32,

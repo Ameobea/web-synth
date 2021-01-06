@@ -9,7 +9,7 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import { ParamSource, buildDefaultAdsr } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import { AsyncOnce } from 'src/util';
 
@@ -32,10 +32,37 @@ const WavetableWasmBytes = new AsyncOnce(() =>
   fetch('/wavetable.wasm').then(res => res.arrayBuffer())
 );
 
+/**
+ * Corresponds to `RampFn` in the Wasm engine
+ */
+export type RampFn =
+  | { type: 'linear' }
+  | { type: 'instant' }
+  | { type: 'exponential'; exponent: number };
+
+/**
+ * Corresponds to `AdsrStep` in the Wasm engine
+ */
+export interface AdsrStep {
+  x: number;
+  y: number;
+  ramper: RampFn;
+}
+
+/**
+ * Corresponds to `Adsr` in the Wasm engine
+ */
+export interface Adsr {
+  steps: AdsrStep[];
+  lenSamples: number;
+  loopPoint: number | null;
+  releasePoint: number;
+}
+
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
-  private generatedInputs: FMSynthInputDescriptor[] = [];
+  private generatedInputs: FMSynthInputDescriptor[] = []; // TODO: Populate this rather than expose raw indexed param buffers
   private awpHandle: AudioWorkletNode | null = null;
   private modulationMatrix: ParamSource[][] = buildDefaultModulationIndices();
   private outputWeights: number[] = new Array(OPERATOR_COUNT).fill(0);
@@ -46,6 +73,7 @@ export default class FMSynth implements ForeignNode {
     .fill(null as any)
     .map(() => new Array(16).fill(null));
   private mainEffectChain: (Effect | null)[] = new Array(16).fill(null);
+  private adsrs: Adsr[] = [buildDefaultAdsr()];
   public selectedUI: UISelection | null = null;
   private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
 
@@ -71,6 +99,9 @@ export default class FMSynth implements ForeignNode {
   public getMainEffectChain() {
     return this.mainEffectChain;
   }
+  public getAdsrs() {
+    return this.adsrs;
+  }
 
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
@@ -90,6 +121,22 @@ export default class FMSynth implements ForeignNode {
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
   }
 
+  private encodeAdsrStep(step: AdsrStep) {
+    const param = step.ramper.type === 'exponential' ? step.ramper.exponent : 0;
+    const ramper = { linear: 0, instant: 1, exponential: 2 }[step.ramper.type];
+    return { x: step.x, y: step.y, ramper, param };
+  }
+
+  private encodeAdsr(adsr: Adsr, adsrIx: number) {
+    return {
+      adsrIx,
+      steps: adsr.steps.map(step => this.encodeAdsrStep(step)),
+      lenSamples: adsr.lenSamples,
+      releasePoint: adsr.releasePoint,
+      loopPoint: adsr.loopPoint,
+    };
+  }
+
   private async init() {
     const [wasmBytes] = await Promise.all([
       WavetableWasmBytes.get(),
@@ -106,6 +153,7 @@ export default class FMSynth implements ForeignNode {
         row.map(cell => this.encodeParamSource(cell))
       ),
       outputWeights: this.outputWeights,
+      adsrs: this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
     });
 
     this.awpHandle.port.onmessage = evt => {
@@ -141,19 +189,61 @@ export default class FMSynth implements ForeignNode {
     }
   }
 
+  public onGate(voiceIx: number) {
+    if (!this.awpHandle) {
+      console.warn('Tried gating before AWP initialized');
+      return;
+    }
+    this.awpHandle.port.postMessage({ type: 'gate', voiceIx });
+  }
+
+  public onUnGate(voiceIx: number) {
+    if (!this.awpHandle) {
+      console.warn('Tried ungating before AWP initialized');
+      return;
+    }
+    this.awpHandle.port.postMessage({ type: 'ungate', voiceIx });
+  }
+
   private encodeParamSource(source: ParamSource) {
     switch (source.type) {
       case 'base frequency multiplier': {
-        return { valueType: 3, valParamInt: 0, valParamFloat: source.multiplier };
+        return {
+          valueType: 3,
+          valParamInt: 0,
+          valParamFloat: source.multiplier,
+          valParamFloat2: 0,
+        };
       }
       case 'constant': {
-        return { valueType: 1, valParamInt: 0, valParamFloat: source.value };
+        return {
+          valueType: 1,
+          valParamInt: 0,
+          valParamFloat: source.value,
+          valParamFloat2: 0,
+        };
+      }
+      case 'adsr': {
+        return {
+          valueType: 2,
+          valParamInt: source['adsr index'],
+          valParamFloat: source.scale,
+          valParamFloat2: source.shift,
+        };
       }
       case 'param buffer': {
-        return { valueType: 0, valParamInt: source['buffer index'], valParamFloat: 0 };
+        return {
+          valueType: 0,
+          valParamInt: source['buffer index'],
+          valParamFloat: 0,
+          valParamFloat2: 0,
+        };
       }
+
       default: {
-        throw new UnimplementedError(`frequency source not yet implemented: ${source.type}`);
+        throw new UnimplementedError(
+          `frequency source not yet implemented: ${(source as any).type}`
+        );
       }
     }
   }
@@ -193,7 +283,7 @@ export default class FMSynth implements ForeignNode {
             return this.encodeParamSource(config.stretchFactor);
           }
           default: {
-            return { valueType: 0, valParamInt: 0, valParamFloat: 0 };
+            return { valueType: 0, valParamInt: 0, valParamFloat: 0, valParamFloat2: 0 };
           }
         }
       })(),
@@ -226,6 +316,7 @@ export default class FMSynth implements ForeignNode {
       valueType: 1,
       valParamInt: 0,
       valParamFloat: value,
+      valParamFloat2: 0,
     });
   }
 
@@ -246,6 +337,24 @@ export default class FMSynth implements ForeignNode {
       srcOperatorIx,
       dstOperatorIx,
       ...this.encodeParamSource(val),
+    });
+  }
+
+  public handleAdsrChange(adsrIx: number, newAdsr: Adsr) {
+    if (!this.awpHandle) {
+      console.error('Tried to set ADSR before AWP initialization');
+      return;
+    }
+
+    this.adsrs[adsrIx] = newAdsr;
+
+    this.awpHandle.port.postMessage({
+      type: 'setAdsr',
+      adsrIx,
+      steps: newAdsr.steps.map(step => this.encodeAdsrStep(step)),
+      lenSamples: newAdsr.lenSamples,
+      releasePoint: newAdsr.releasePoint,
+      loopPoint: newAdsr.loopPoint,
     });
   }
 
@@ -353,6 +462,9 @@ export default class FMSynth implements ForeignNode {
     if (params.selectedUI) {
       this.selectedUI = params.selectedUI;
     }
+    if (params.adsrs) {
+      this.adsrs = params.adsrs;
+    }
   }
 
   public serialize() {
@@ -363,6 +475,7 @@ export default class FMSynth implements ForeignNode {
       operatorEffects: this.operatorEffects,
       selectedUI: this.selectedUI,
       mainEffectChain: this.mainEffectChain,
+      adsrs: this.adsrs,
     };
   }
 

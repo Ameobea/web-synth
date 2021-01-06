@@ -1,13 +1,17 @@
 import React from 'react';
 
+import { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 const ConfigureModulationIndex: React.FC<{
   srcOperatorIx: number;
   dstOperatorIx: number;
   modulationIndices: ParamSource[][];
   onChange: (srcOperatorIx: number, dstOperatorIx: number, newModulationIndex: ParamSource) => void;
-}> = ({ srcOperatorIx, dstOperatorIx, modulationIndices, onChange }) => (
+  adsrs: Adsr[];
+  onAdsrChange: AdsrChangeHandler;
+}> = ({ srcOperatorIx, dstOperatorIx, modulationIndices, onChange, adsrs, onAdsrChange }) => (
   <div className='configure-modulation-index'>
     <ConfigureParamSource
       title='modulation index'
@@ -16,6 +20,8 @@ const ConfigureModulationIndex: React.FC<{
       min={-30}
       max={30}
       excludedTypes={['base frequency multiplier']}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
     />
   </div>
 );

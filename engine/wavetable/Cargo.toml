@@ -8,6 +8,7 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+adsr = { path = "../adsr" }
 dsp = { path = "../dsp" }
 fastapprox = "0.3"
 core_arch = { git = "git://git@github.com/rust-lang/stdarch", optional = true }

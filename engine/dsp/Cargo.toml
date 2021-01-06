@@ -8,3 +8,4 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+fastapprox = "0.3"

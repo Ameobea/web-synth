@@ -901,6 +901,7 @@ const actionGroups = {
       // TODO: Dedup
       if (R.isNil(synthIx)) {
         state.synths.forEach(synth => {
+          synth.fmSynth?.onGate(voiceIx);
           const frequency = baseFrequency * synth.pitchMultiplier;
           const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
           const targetVoice = synth.voices[voiceIx];
@@ -931,6 +932,7 @@ const actionGroups = {
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
+        targetSynth.fmSynth?.onGate(voiceIx);
         const targetVoice = targetSynth.voices[voiceIx];
         if (!state.wavyJonesInstance) {
           return state;
@@ -970,7 +972,8 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { voiceIx, synthIx, getState }) => {
       if (R.isNil(synthIx)) {
-        state.synths.forEach(({ voices, gainADSRLength }, synthIx) => {
+        state.synths.forEach(({ voices, gainADSRLength, fmSynth }, synthIx) => {
+          fmSynth?.onUnGate(voiceIx);
           const targetVoice = voices[voiceIx];
           // We edit state directly w/o updating references because this is only needed internally
           const ungateTime = ctx.currentTime;
@@ -1002,6 +1005,7 @@ const actionGroups = {
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
+        targetSynth.fmSynth?.onUnGate(voiceIx);
         const targetVoice = targetSynth.voices[voiceIx];
         // We edit state directly w/o updating references because this is only needed internally
         const ungateTime = ctx.currentTime;

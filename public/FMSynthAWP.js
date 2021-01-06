@@ -33,7 +33,12 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
-          this.initWasm(evt.data.wasmBytes, evt.data.modulationMatrix, evt.data.outputWeights);
+          this.initWasm(
+            evt.data.wasmBytes,
+            evt.data.modulationMatrix,
+            evt.data.outputWeights,
+            evt.data.adsrs
+          );
           break;
         }
         case 'setModulationIndex': {
@@ -47,7 +52,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.dstOperatorIx,
             evt.data.valueType,
             evt.data.valParamInt,
-            evt.data.valParamFloat
+            evt.data.valParamFloat,
+            evt.data.valParamFloat2
           );
           break;
         }
@@ -61,13 +67,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.operatorIx,
             evt.data.valueType,
             evt.data.valParamInt,
-            evt.data.valParamFloat
+            evt.data.valParamFloat,
+            evt.data.valParamFloat2
           );
           break;
         }
         case 'setOperatorConfig': {
           if (!this.wasmInstance) {
-            console.error('Tried setting output weight value before Wasm instance loaded');
+            console.error('Tried setting operator config before Wasm instance loaded');
             return;
           }
           this.wasmInstance.exports.fm_synth_set_operator_config(
@@ -76,13 +83,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.operatorType,
             evt.data.valueType,
             evt.data.valParamInt,
-            evt.data.valParamFloat
+            evt.data.valParamFloat,
+            evt.data.valParamFloat2
           );
           break;
         }
         case 'setOperatorBaseFrequencySource': {
           if (!this.wasmInstance) {
-            console.error('Tried setting output weight value before Wasm instance loaded');
+            console.error('Tried setting output weight before Wasm instance loaded');
             return;
           }
           this.wasmInstance.exports.fm_synth_set_operator_base_frequency_source(
@@ -90,13 +98,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.operatorIx,
             evt.data.valueType,
             evt.data.valParamInt,
-            evt.data.valParamFloat
+            evt.data.valParamFloat,
+            evt.data.valParamFloat2
           );
           break;
         }
         case 'setEffect': {
           if (!this.wasmInstance) {
-            console.error('Tried setting output weight value before Wasm instance loaded');
+            console.error('Tried setting effect value before Wasm instance loaded');
             return;
           }
 
@@ -109,19 +118,60 @@ class FMSynthAWP extends AudioWorkletProcessor {
             param1?.valueType ?? 0,
             param1?.valParamInt ?? 0,
             param1?.valParamFloat ?? 0,
+            param1?.valParamFloat2 ?? 0,
             param2?.valueType ?? 0,
             param2?.valParamInt ?? 0,
             param2?.valParamFloat ?? 0,
+            param2?.valParamFloat2 ?? 0,
             param3?.valueType ?? 0,
             param3?.valParamInt ?? 0,
             param3?.valParamFloat ?? 0,
+            param3?.valParamFloat2 ?? 0,
             param4?.valueType ?? 0,
             param4?.valParamInt ?? 0,
-            param4?.valParamFloat ?? 0
+            param4?.valParamFloat ?? 0,
+            param4?.valParamFloat2 ?? 0
           );
           break;
         }
+        case 'setAdsr': {
+          if (!this.wasmInstance) {
+            console.error('Tried setting adsr value before Wasm instance loaded');
+            return;
+          }
 
+          const { adsrIx, steps, lenSamples, releasePoint, loopPoint } = evt.data;
+          steps.forEach(({ x, y, ramper, param }, stepIx) => {
+            this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
+          });
+          this.wasmInstance.exports.set_adsr(
+            this.ctxPtr,
+            adsrIx,
+            steps.length,
+            lenSamples,
+            releasePoint,
+            loopPoint ?? -1.0
+          );
+          break;
+        }
+        case 'gate': {
+          if (!this.wasmInstance) {
+            console.warn('Tried gating before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.gate_voice(this.ctxPtr, evt.data.voiceIx);
+          break;
+        }
+        case 'ungate': {
+          if (!this.wasmInstance) {
+            console.warn('Tried ungating before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.ungate_voice(this.ctxPtr, evt.data.voiceIx);
+          break;
+        }
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }
@@ -129,8 +179,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
     };
   }
 
-  async initWasm(wasmBytes, modulationMatrix, outputWeights) {
-    const importObject = { env: {} };
+  async initWasm(wasmBytes, modulationMatrix, outputWeights, adsrs) {
+    const importObject = { env: { debug1: (...args) => console.log(...args) } };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
     this.wasmInstance.exports.memory.grow(1024 * 4);
@@ -145,7 +195,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
           dstOperatorIx,
           paramSource.valueType,
           paramSource.valParamInt,
-          paramSource.valParamFloat
+          paramSource.valParamFloat,
+          paramSource.valParamFloat2
         )
       )
     );
@@ -155,9 +206,23 @@ class FMSynthAWP extends AudioWorkletProcessor {
         operatorIx,
         1,
         0,
-        weight
+        weight,
+        0
       )
     );
+    adsrs.forEach(({ steps, lenSamples, releasePoint, loopPoint }, adsrIx) => {
+      steps.forEach(({ x, y, ramper, param }, stepIx) => {
+        this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
+      });
+      this.wasmInstance.exports.set_adsr(
+        this.ctxPtr,
+        adsrIx,
+        steps.length,
+        lenSamples,
+        releasePoint,
+        loopPoint ?? -1.0
+      );
+    });
 
     this.port.postMessage({ type: 'wasmInitialized' });
   }

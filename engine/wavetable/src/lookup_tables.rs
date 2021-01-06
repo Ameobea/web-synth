@@ -6,7 +6,7 @@ pub fn maybe_init_lookup_tables() {
     unsafe {
         if SINE_LOOKUP_TABLE.is_null() {
             SINE_LOOKUP_TABLE = Box::into_raw(box std::mem::MaybeUninit::uninit().assume_init());
-            let lookup_table_size = (*SINE_LOOKUP_TABLE).len();
+            let lookup_table_size = 1024 * 4;
 
             for i in 0..(lookup_table_size) {
                 *(*SINE_LOOKUP_TABLE).get_unchecked_mut(i) =

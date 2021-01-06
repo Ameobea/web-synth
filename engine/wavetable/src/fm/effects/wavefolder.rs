@@ -1,7 +1,8 @@
+use adsr::Adsr;
 use dsp::filters::dc_blocker::DCBlocker;
 
 use super::Effect;
-use crate::fm::{ADSRState, ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
+use crate::fm::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 #[derive(Clone)]
 pub struct Wavecruncher {
@@ -26,7 +27,7 @@ impl Effect for Wavecruncher {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,
@@ -107,7 +108,7 @@ impl Effect for Wavefolder {
     fn apply(
         &mut self,
         param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[ADSRState],
+        adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
         sample: f32,
