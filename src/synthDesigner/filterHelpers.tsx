@@ -2,6 +2,7 @@ import { filterNils } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 
 export enum FilterType {
   Lowpass = 'lowpass',
@@ -97,3 +98,9 @@ export const getSettingsForFilterType = (filterType: FilterType, includeADSR = t
       includeADSR ? filterSettings.adsr : null,
     ])
   );
+
+export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
+  getSettingsForFilterType(filterType).reduce(
+    (acc, { label, initial }) => ({ ...acc, [label]: initial }),
+    {}
+  ) as FilterParams;

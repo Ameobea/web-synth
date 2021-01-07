@@ -1,10 +1,10 @@
 {
   "rules": {
     "@typescript-eslint/indent": 0,
-    "quotes": [2, "single", { "avoidEscape": true }],
+    "quotes": [1, "single", { "avoidEscape": true }],
     "linebreak-style": [2, "unix"],
-    "semi": [2, "always"],
-    "comma-dangle": [2, "only-multiline"],
+    "semi": 0,
+    "comma-dangle": [1, "only-multiline"],
     "no-console": 0,
     "no-global-assign": 0,
     "no-multiple-empty-lines": [2, { "max": 1 }],

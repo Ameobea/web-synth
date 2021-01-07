@@ -13,6 +13,7 @@ import type { CompositionDefinition } from 'src/compositionSharing/CompositionSh
 import { BACKEND_BASE_URL } from 'src/conf';
 import { loadSharedComposition, maybeRestoreLocalComposition } from 'src/persistance';
 import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
+import { initSentry } from 'src/sentry';
 
 const ctx = new AudioContext();
 
@@ -121,6 +122,8 @@ const fetchAndLoadSharedComposition = async (compositionId: string) => {
 if (typeof AudioWorkletNode === 'undefined') {
   createBrowserNotSupportedMessage();
 } else {
+  initSentry();
+
   wasm.then(async engine => {
     setEngine(engine);
 

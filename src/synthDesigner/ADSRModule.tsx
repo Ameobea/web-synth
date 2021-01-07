@@ -57,15 +57,23 @@ export class ADSRModule extends ConstantSourceNode {
     const { attack, decay } = this.envelope;
 
     // Ramp to the attack
-    this.offset.exponentialRampToValueAtTime(
-      this.minValue + attack.magnitude * range,
-      this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
-    );
+    if (attack.pos > 0) {
+      this.offset.exponentialRampToValueAtTime(
+        Math.max(this.minValue + attack.magnitude * range, 0.0001),
+        this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
+      );
+    } else {
+      this.offset.setValueAtTime(this.minValue + attack.magnitude * range, this.ctx.currentTime);
+    }
     // Ramp to the decay and hold there
-    this.offset.exponentialRampToValueAtTime(
-      this.minValue + decay.magnitude * range,
-      this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
-    );
+    if (decay.pos - attack.pos > 0) {
+      this.offset.exponentialRampToValueAtTime(
+        Math.max(this.minValue + decay.magnitude * range, 0.0001),
+        this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
+      );
+    } else {
+      this.offset.setValueAtTime(this.minValue + decay.magnitude * range, this.ctx.currentTime);
+    }
   }
 
   /**

@@ -202,7 +202,7 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
       onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
       min={1}
-      max={4410}
+      max={44_100}
       step={1}
       state={state.sampleRate}
       onChange={sampleRate => onChange({ ...state, sampleRate })}

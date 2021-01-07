@@ -35,14 +35,15 @@ const updateState = (state: ParamSource, newState: Partial<ParamSource>): ParamS
 export const buildDefaultParamSource = (
   type: ParamSource['type'],
   min: number,
-  max: number
+  max: number,
+  defaultVal = min
 ): ParamSource => {
   switch (type) {
     case 'param buffer': {
       return { type, 'buffer index': 0 };
     }
     case 'constant': {
-      return { type, value: 0 };
+      return { type, value: defaultVal };
     }
     case 'adsr': {
       return { type, 'adsr index': 0, scale: max - min, shift: min };
@@ -71,17 +72,17 @@ const decodeAdsr = (prevState: Adsr, newState: ADSRValues): Adsr => {
   newAdsr.steps[1] = {
     x: newState.attack.pos,
     y: newState.attack.magnitude,
-    ramper: { type: 'exponential', exponent: 2 },
+    ramper: { type: 'exponential', exponent: 1 / 2 },
   };
   newAdsr.steps[2] = {
     x: newState.decay.pos,
     y: newState.decay.magnitude,
-    ramper: { type: 'exponential', exponent: 2 },
+    ramper: { type: 'exponential', exponent: 1 / 2 },
   };
   newAdsr.steps[3] = {
     x: newState.release.pos,
     y: newState.release.magnitude,
-    ramper: { type: 'exponential', exponent: 2 },
+    ramper: { type: 'exponential', exponent: 1 / 2 },
   };
   return newAdsr;
 };
@@ -89,10 +90,10 @@ const decodeAdsr = (prevState: Adsr, newState: ADSRValues): Adsr => {
 export const buildDefaultAdsr = (): Adsr => ({
   steps: [
     { x: 0, y: 0, ramper: { type: 'linear' } }, // start
-    { x: 0.05, y: 0.865, ramper: { type: 'exponential', exponent: 2 } }, // attack
-    { x: 0.12, y: 0.8, ramper: { type: 'exponential', exponent: 2 } }, // decay
-    { x: 0.93, y: 0.8, ramper: { type: 'exponential', exponent: 2 } }, // release
-    { x: 1, y: 0, ramper: { type: 'exponential', exponent: 2 } }, // end
+    { x: 0.05, y: 0.865, ramper: { type: 'exponential', exponent: 1 / 2 } }, // attack
+    { x: 0.12, y: 0.8, ramper: { type: 'exponential', exponent: 1 / 2 } }, // decay
+    { x: 0.93, y: 0.8, ramper: { type: 'exponential', exponent: 1 / 2 } }, // release
+    { x: 1, y: 0, ramper: { type: 'exponential', exponent: 1 / 2 } }, // end
   ],
   lenSamples: 44100,
   loopPoint: null,
@@ -109,6 +110,7 @@ const ConfigureParamSource: React.FC<{
   min?: number;
   max?: number;
   step?: number;
+  defaultVal?: number;
   scale?: 'log';
   excludedTypes?: ParamSource['type'][];
 }> = ({
@@ -120,6 +122,8 @@ const ConfigureParamSource: React.FC<{
   onChange,
   min = 0,
   max = 1,
+  step,
+  defaultVal,
   scale,
   excludedTypes,
 }) => {
@@ -139,7 +143,7 @@ const ConfigureParamSource: React.FC<{
       case 'constant': {
         return [
           buildTypeSetting(excludedTypes),
-          { type: 'range', label: 'value', min, max, scale },
+          { type: 'range', label: 'value', min, max, scale, step },
         ];
       }
       case 'adsr': {
@@ -193,7 +197,7 @@ const ConfigureParamSource: React.FC<{
         console.error('Invalid operator state type: ', paramType);
       }
     }
-  }, [paramType, excludedTypes, min, max, scale, adsrs.length, onAdsrChange]);
+  }, [paramType, excludedTypes, min, max, scale, step, adsrs.length, onAdsrChange]);
 
   return (
     <ControlPanel
@@ -220,7 +224,7 @@ const ConfigureParamSource: React.FC<{
               return;
             }
 
-            onChange(updateState(state, buildDefaultParamSource(value, min, max)));
+            onChange(updateState(state, buildDefaultParamSource(value, min, max, defaultVal)));
             break;
           }
           case 'buffer index': {

@@ -30,7 +30,7 @@ export const getMicrophoneStream = (): Promise<MediaStream> =>
   });
 
 const micNode = new GainNode(ctx);
-getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect(micNode));
+// getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect(micNode));
 
 /**
  * This is a custom node type that we use to facilitate initializing the patch network and everything else synchronously while also having

@@ -4,6 +4,42 @@ import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import type { UISelection } from 'src/fmSynth/FMSynthUI';
 
+const formatOperatorConfig = (config: OperatorConfig) => {
+  if (
+    (config.type === 'sine oscillator' || config.type === 'exponential oscillator') &&
+    config.frequency.type === 'base frequency multiplier'
+  ) {
+    return config.frequency.multiplier.toFixed(3);
+  }
+
+  return '-';
+};
+
+const formatParamSource = (param: ParamSource): React.ReactNode => {
+  if (param.type === 'constant') {
+    return Math.abs(param.value) < 0.01 ? null : param.value.toFixed(2);
+  } else if (param.type === 'adsr') {
+    return (
+      <span className='adsr-param'>
+        ADSR {param['adsr index']}
+        <br />
+        {param.shift.toPrecision(3)} <br />
+        {(param.shift + param.scale).toPrecision(3)}
+      </span>
+    );
+  } else if (param.type === 'base frequency multiplier') {
+    return (
+      <>
+        Base Freq
+        <br />X<br />
+        {param.multiplier.toFixed(3)}
+      </>
+    );
+  } else {
+    return '-';
+  }
+};
+
 export const ModulationMatrix: React.FC<{
   selectedUI: UISelection | null;
   selectedOperatorIx: number | null;
@@ -49,11 +85,7 @@ export const ModulationMatrix: React.FC<{
             }}
             onMouseEnter={() => setHoveredRowIx(srcOperatorIx)}
           >
-            {(operatorConfigs[srcOperatorIx].type === 'sine oscillator' ||
-              operatorConfigs[srcOperatorIx].type === 'exponential oscillator') &&
-            (operatorConfigs[srcOperatorIx] as any).frequency.type === 'base frequency multiplier'
-              ? (operatorConfigs[srcOperatorIx] as any).frequency.multiplier.toFixed(3)
-              : '-'}
+            {formatOperatorConfig(operatorConfigs[srcOperatorIx])}
           </div>
           {row.map((val, dstOperatorIx) => (
             <div
@@ -80,11 +112,7 @@ export const ModulationMatrix: React.FC<{
                 setHoveredColIx(dstOperatorIx);
               }}
             >
-              {val.type === 'constant'
-                ? Math.abs(val.value) < 0.01
-                  ? null
-                  : val.value.toFixed(2)
-                : '-'}
+              {formatParamSource(val)}
             </div>
           ))}
           <div

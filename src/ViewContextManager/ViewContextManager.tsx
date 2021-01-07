@@ -88,10 +88,10 @@ export const ViewContextManager: React.FC<{
         …
       </ViewContextIcon>
       <ViewContextIcon
-        displayName='Start Audio'
+        displayName='Set Global Volume'
         onClick={() => setVolumeSliderOpen(true)}
         style={{ backgroundColor: 'rgb(47, 77, 121)', justifyContent: 'space-around' }}
-        name='Start Audio'
+        name='Set Global Volume'
       >
         <>
           🔊

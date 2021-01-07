@@ -132,7 +132,10 @@ export const MidiKeyboard: React.FC<{
 
   return (
     <div className='midi-keyboard'>
-      <div className='octave-changer-label'>Octave</div>
+      <div className='octave-controls-wrapper'>
+        <div className='octave-changer-label'>Octave</div>
+        <div className='octave-offset-display'>{octaveOffset}</div>
+      </div>
       <div className='octave-changer'>
         <button onClick={() => setOctaveOffset(Math.min(octaveOffset + 1, 4))}>↑</button>
         <button onClick={() => setOctaveOffset(Math.max(octaveOffset - 1, -1))}>↓</button>

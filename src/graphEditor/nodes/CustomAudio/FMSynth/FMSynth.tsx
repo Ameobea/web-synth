@@ -1,12 +1,13 @@
 import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
+// import { simd as getHasSIMDSupport } from 'wasm-feature-detect';
 
 import { ConnectedFMSynthUI, UISelection } from 'src/fmSynth/FMSynthUI';
 import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ParamSource, buildDefaultAdsr } from 'src/fmSynth/ConfigureParamSource';
@@ -28,9 +29,19 @@ const buildDefaultModulationIndices = (): ParamSource[][] => {
   return indices;
 };
 
-const WavetableWasmBytes = new AsyncOnce(() =>
-  fetch('/wavetable.wasm').then(res => res.arrayBuffer())
-);
+// prettier-ignore
+const getHasSIMDSupport = async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
+
+const WavetableWasmBytes = new AsyncOnce(async () => {
+  const hasSIMDSupport = await getHasSIMDSupport();
+  console.log(
+    hasSIMDSupport
+      ? 'Wasm SIMD support detected!'
+      : 'Wasm SIMD support NOT detected; using fallback Wasm'
+  );
+  const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
+  return res.then(res => res.arrayBuffer());
+});
 
 /**
  * Corresponds to `RampFn` in the Wasm engine
@@ -75,7 +86,7 @@ export default class FMSynth implements ForeignNode {
   private mainEffectChain: (Effect | null)[] = new Array(16).fill(null);
   private adsrs: Adsr[] = [buildDefaultAdsr()];
   public selectedUI: UISelection | null = null;
-  private onInitialized: ((connectables: AudioConnectables) => void) | undefined;
+  private onInitialized: ((inst: FMSynth) => void) | undefined;
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -137,7 +148,7 @@ export default class FMSynth implements ForeignNode {
     };
   }
 
-  private async init() {
+  public async init() {
     const [wasmBytes] = await Promise.all([
       WavetableWasmBytes.get(),
       this.ctx.audioWorklet.addModule('/FMSynthAWP.js'),
@@ -173,7 +184,7 @@ export default class FMSynth implements ForeignNode {
           );
 
           if (this.onInitialized) {
-            this.onInitialized(this.buildConnectables());
+            this.onInitialized(this);
             this.onInitialized = undefined;
           }
           break;
@@ -346,7 +357,8 @@ export default class FMSynth implements ForeignNode {
       return;
     }
 
-    const isLenOnlyChange = this.adsrs?.[adsrIx].lenSamples !== newAdsr.lenSamples;
+    const isLenOnlyChange =
+      this.adsrs[adsrIx] && this.adsrs[adsrIx].lenSamples !== newAdsr.lenSamples;
     this.adsrs[adsrIx] = newAdsr;
 
     if (isLenOnlyChange) {
@@ -449,7 +461,7 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  private deserialize(params: { [key: string]: any }) {
+  public deserialize(params: { [key: string]: any }) {
     if (params.modulationMatrix) {
       this.modulationMatrix = params.modulationMatrix;
     }

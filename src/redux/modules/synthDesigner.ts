@@ -17,7 +17,7 @@ import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
@@ -128,12 +128,6 @@ export interface SynthModule {
 const ctx = new AudioContext();
 
 const VOICE_COUNT = 10 as const;
-
-export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
-  getSettingsForFilterType(filterType).reduce(
-    (acc, { label, initial }) => ({ ...acc, [label]: initial }),
-    {}
-  ) as FilterParams;
 
 function updateFilterNode<K extends keyof FilterParams>(
   nodes: BiquadFilterNode[],

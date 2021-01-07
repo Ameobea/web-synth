@@ -44,13 +44,15 @@
   },
   "scripts": {
     "start": "webpack serve",
-    "build": "rm -rf dist/* && BACKEND_BASE_URL=\"https://notes-backend.p.ameo.design\" webpack --config webpack.prod.js && cp -r ./public/* ./dist",
+    "build": "rm -rf dist/* && NODE_OPTIONS=--experimental-worker BACKEND_BASE_URL=\"https://notes-backend.p.ameo.design\" webpack --config webpack.prod.js && cp -r ./public/* ./dist",
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --browser chrome --record --key 58905cf6-d1cb-43de-b6cd-b55954039c1a",
     "cypress:serve": "serve -p 9000 dist"
   },
   "dependencies": {
+    "@sentry/react": "^5.29.2",
+    "@sentry/tracing": "^5.29.2",
     "@types/ramda": "^0.27.25",
     "@types/react": "^16.9.52",
     "@types/react-dom": "^16.9.8",

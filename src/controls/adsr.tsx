@@ -126,7 +126,7 @@ const ADSRControls: React.FC<ADSRControlPropTypes> = ({
           const { top: yOffset, left: xOffset } = svgElement.current!.getBoundingClientRect();
 
           const pos = (x - xOffset) / width;
-          const magnitude = 1 - (y - yOffset) / height;
+          const magnitude = clamp(0, 1, 1 - (y - yOffset) / height);
 
           // Avoid setting a pos lower than that of the previous setting or higher than the next
           // setting (if they exist).

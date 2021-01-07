@@ -101,6 +101,12 @@
         justify-content: center;
         align-items: center;
       }
+
+      .adsr-param {
+        font-size: 10px;
+        text-align: center;
+        line-height: 1;
+      }
     }
   }
 
@@ -127,8 +133,13 @@
   padding: 0px 2px;
 }
 
+.operator-config {
+  display: flex;
+  flex-direction: column;
+}
+
 .configure-effects {
-  max-width: 376px;
+  max-width: 391px;
 
   .effects-controls {
     display: flex;

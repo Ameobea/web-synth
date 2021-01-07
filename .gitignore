@@ -22,3 +22,4 @@ public/event_scheduler.wasm
 public/sidechain.wasm
 public/noise_gen.wasm
 public/distortion.wasm
+public/wavetable_no_simd.wasm

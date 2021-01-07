@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Option } from 'funfix-core';
 
+import './GlobalVolume.scss';
+
 const ctx = new AudioContext();
 
 const GlobalVolumeSlider: React.FC<{ onClose: () => void }> = ({ onClose }) => {

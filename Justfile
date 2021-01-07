@@ -1,5 +1,7 @@
 opt:
-  for file in `ls ./dist | grep "\\.wasm"`; do wasm-snip ./dist/$file -o ./dist/$file; done
+  # for file in `ls ./dist | grep "\\.wasm"`; do wasm-snip ./dist/$file -o ./dist/$file; done
+  # `wasm-strip` doesn't deal with simd, so we manually strip off DWARF debug info from Wasm modules that use SIMD
+  wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 --enable-simd --enable-nontrapping-float-to-int --precompute-propagate --fast-math --detect-features -c -o ./dist/$file; done
 
 opt-public:
@@ -19,6 +21,7 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
@@ -39,6 +42,7 @@ run:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src/
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public

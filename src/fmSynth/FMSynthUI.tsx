@@ -219,7 +219,11 @@ const FMSynthUI: React.FC<{
 
   const handleAdsrChange = (adsrIx: number, newAdsr: Adsr) => {
     onAdsrChange(adsrIx, newAdsr);
-    setState({ ...state, adsrs: R.set(R.lensIndex(adsrIx), newAdsr, state.adsrs) });
+    if (!state.adsrs[adsrIx]) {
+      setState({ ...state, adsrs: [...state.adsrs, newAdsr] });
+    } else {
+      setState({ ...state, adsrs: R.set(R.lensIndex(adsrIx), newAdsr, state.adsrs) });
+    }
   };
 
   return (

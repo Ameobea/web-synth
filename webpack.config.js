@@ -70,7 +70,7 @@ module.exports = {
       minify: true,
       injdex: true,
       template: 'fm-synth-demo.hbs',
-      filename: 'fm/index.html',
+      filename: 'fm.html',
       hash: true,
       chunks: ['fmDemo'],
     }),

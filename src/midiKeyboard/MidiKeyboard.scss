@@ -3,13 +3,22 @@
   margin-right: auto;
   display: flex;
   flex-direction: row;
+  height: 228px;
+
+  .octave-controls-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid #ffffff2d;
+    border-right: none;
+    letter-spacing: -3px;
+  }
 
   .octave-changer-label {
     writing-mode: vertical-rl;
     text-orientation: upright;
     text-align: center;
     width: 20px;
-    margin-right: -2px;
   }
   .octave-changer {
     display: flex;
@@ -27,5 +36,14 @@
       width: 40px;
       font-size: 20px;
     }
+  }
+
+  .octave-offset-display {
+    display: flex;
+    justify-content: center;
+    font-weight: bold;
+    border-top: 1px solid #ffffff2d;
+    margin-top: 3px;
+    padding-right: 2px;
   }
 }

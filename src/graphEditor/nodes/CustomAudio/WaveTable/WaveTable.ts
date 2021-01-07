@@ -1,5 +1,6 @@
 import { Map } from 'immutable';
 import * as R from 'ramda';
+// import { simd as getHasSIMDSupport } from 'wasm-feature-detect';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -58,9 +59,19 @@ export const getDefaultWavetableDef = () => [
   [bufs[2], bufs[3]],
 ];
 
-export const WavetableWasmBytes = new AsyncOnce(() =>
-  fetch('/wavetable.wasm').then(res => res.arrayBuffer())
-);
+// prettier-ignore
+const getHasSIMDSupport = async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
+
+const WavetableWasmBytes = new AsyncOnce(async () => {
+  const hasSIMDSupport = await getHasSIMDSupport();
+  console.log(
+    hasSIMDSupport
+      ? 'Wasm SIMD support detected!'
+      : 'Wasm SIMD support NOT detected; using fallback Wasm'
+  );
+  const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
+  return res.then(res => res.arrayBuffer());
+});
 
 let wavetableWasmInstance: WebAssembly.Instance | undefined | null;
 export const WavetableWasmInstance = new AsyncOnce(() =>

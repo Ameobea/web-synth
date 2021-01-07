@@ -1,3 +1,4 @@
+#[cfg(feature = "simd")]
 use core::arch::wasm32::*;
 use std::{hint::unreachable_unchecked, rc::Rc};
 
@@ -524,6 +525,7 @@ impl ParamSourceType {
         }
     }
 
+    #[cfg(feature = "simd")]
     pub fn render_raw<'a>(
         &self,
         RenderRawParams {
@@ -583,6 +585,51 @@ impl ParamSourceType {
                         let scaled = f32x4_mul(v, scale);
                         let scaled_and_shifted = f32x4_add(scaled, shift);
                         v128_store(base_output_ptr.add(i), scaled_and_shifted);
+                    }
+                }
+            },
+        }
+    }
+
+    #[cfg(not(feature = "simd"))]
+    pub fn render_raw<'a>(
+        &self,
+        RenderRawParams {
+            param_buffers,
+            adsrs,
+            base_frequencies,
+        }: &'a RenderRawParams<'a>,
+        output_buf: &mut [f32; FRAME_SIZE],
+    ) {
+        match self {
+            ParamSourceType::Constant(val) =>
+                for i in 0..FRAME_SIZE {
+                    unsafe {
+                        *output_buf.get_unchecked_mut(i) = *val;
+                    };
+                },
+            ParamSourceType::ParamBuffer(buffer_ix) => {
+                output_buf.clone_from_slice(unsafe { param_buffers.get_unchecked(*buffer_ix) });
+            },
+            ParamSourceType::BaseFrequencyMultiplier(multiplier) =>
+                for i in 0..FRAME_SIZE {
+                    unsafe {
+                        *output_buf.get_unchecked_mut(i) =
+                            (*base_frequencies.get_unchecked(i)) * *multiplier;
+                    };
+                },
+            ParamSourceType::PerVoiceADSR(AdsrState {
+                adsr_ix,
+                scale,
+                shift,
+            }) => {
+                let adsr = unsafe { adsrs.get_unchecked(*adsr_ix) };
+                let adsr_buf = adsr.get_cur_frame_output();
+
+                for i in 0..FRAME_SIZE {
+                    unsafe {
+                        *output_buf.get_unchecked_mut(i) =
+                            (*adsr_buf.get_unchecked(i)) * (*scale) + (*shift);
                     }
                 }
             },
@@ -928,11 +975,17 @@ pub unsafe extern "C" fn set_adsr(
         if voice.adsrs.get(adsr_ix).is_some() {
             let old_phase = voice.adsrs[adsr_ix].phase;
             let gate_status = voice.adsrs[adsr_ix].gate_status;
-            adsr.gate_status = gate_status;
             adsr.phase = match gate_status {
                 GateStatus::GatedFrozen => release_start_phase,
                 GateStatus::Done => 1.,
                 _ => old_phase,
+            };
+            // Switch out of frozen states into active ones to trigger one frame of samples to be
+            // generated for the new ADSR
+            adsr.gate_status = match gate_status {
+                GateStatus::GatedFrozen => GateStatus::Gated,
+                GateStatus::Done => GateStatus::Releasing,
+                other => other,
             };
             voice.adsrs[adsr_ix] = adsr;
         } else if voice.adsrs.len() != adsr_ix {
