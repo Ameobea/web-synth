@@ -10,6 +10,7 @@ import Loading from 'src/misc/Loading';
 import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
 import './MidiKeyboard.scss';
+import ADSR2 from 'src/controls/adsr2/adsr2';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 33;
@@ -135,7 +136,8 @@ export const MidiKeyboard: React.FC<{
 
   return (
     <div className='midi-keyboard'>
-      <div className='octave-controls-wrapper'>
+      <ADSRDemo />
+      {/* <div className='octave-controls-wrapper'>
         <div className='octave-changer-label'>Octave</div>
         <div className='octave-offset-display'>{octaveOffset}</div>
       </div>
@@ -176,7 +178,7 @@ export const MidiKeyboard: React.FC<{
             );
           }}
         />
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -220,3 +222,5 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
     </div>
   );
 };
+
+const ADSRDemo: React.FC = () => <ADSR2 onChange={console.log} />;
