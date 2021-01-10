@@ -99,11 +99,8 @@ export const MidiKeyboard: React.FC<{
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
       if (R.isNil(keyMap[evt.key.toLowerCase()])) {
         return;
-      } else if (evt.repeat) {
-        return;
       }
 
-      playNote(midiNumber);
       // Work around incredibly annoying Firefox functionality where the slash key opens
       // a "quick find" thing and takes focus away from the page
       const isEditing = (['input', 'textarea'] as (string | undefined)[]).includes(
@@ -112,6 +109,12 @@ export const MidiKeyboard: React.FC<{
       if (!isEditing) {
         evt.preventDefault();
       }
+
+      if (evt.repeat) {
+        return;
+      }
+
+      playNote(midiNumber);
     };
     const handleUp = (evt: KeyboardEvent) => {
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;

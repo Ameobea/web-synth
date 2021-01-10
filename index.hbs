@@ -12,7 +12,7 @@
       // pre-constructed instance.
       const OldAudioContext = globalThis.AudioContext;
 
-      const globalContext = new AudioContext();
+      const globalContext = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
       globalContext.globalVolume = new GainNode(globalContext);
       globalContext.globalVolume.gain.value = 1;
       globalContext.globalVolume.connect(globalContext.destination);

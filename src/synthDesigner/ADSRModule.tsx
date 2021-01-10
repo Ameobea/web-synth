@@ -58,19 +58,35 @@ export class ADSRModule extends ConstantSourceNode {
 
     // Ramp to the attack
     if (attack.pos > 0) {
-      this.offset.exponentialRampToValueAtTime(
-        Math.max(this.minValue + attack.magnitude * range, 0.0001),
-        this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
-      );
+      // Firefox is 100% broken for exponential ramping and seems to have serious bugs for various `AudioParam`
+      // methods including `exponentialRampToValueAtTime` and possibly `setValueCurveAtTime` and `cancelScheduledValues`.
+      if (navigator.userAgent.includes('Firefox/')) {
+        this.offset.linearRampToValueAtTime(
+          this.minValue + attack.magnitude * range,
+          this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
+        );
+      } else {
+        this.offset.exponentialRampToValueAtTime(
+          Math.max(this.minValue + attack.magnitude * range, 0.0001),
+          this.ctx.currentTime + (attack.pos * this.lengthMs) / 1000.0
+        );
+      }
     } else {
       this.offset.setValueAtTime(this.minValue + attack.magnitude * range, this.ctx.currentTime);
     }
     // Ramp to the decay and hold there
     if (decay.pos - attack.pos > 0) {
-      this.offset.exponentialRampToValueAtTime(
-        Math.max(this.minValue + decay.magnitude * range, 0.0001),
-        this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
-      );
+      if (navigator.userAgent.includes('Firefox/')) {
+        this.offset.linearRampToValueAtTime(
+          this.minValue + decay.magnitude * range,
+          this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
+        );
+      } else {
+        this.offset.exponentialRampToValueAtTime(
+          Math.max(this.minValue + decay.magnitude * range, 0.0001),
+          this.ctx.currentTime + (decay.pos * this.lengthMs) / 1000.0
+        );
+      }
     } else {
       this.offset.setValueAtTime(this.minValue + decay.magnitude * range, this.ctx.currentTime);
     }
@@ -92,9 +108,16 @@ export class ADSRModule extends ConstantSourceNode {
     this.offset.cancelScheduledValues(0);
 
     const releaseDuration = ((1.0 - release.pos) * this.lengthMs) / 1000.0;
-    this.offset.exponentialRampToValueAtTime(
-      this.minValue === 0 ? 0.0001 : this.minValue,
-      this.ctx.currentTime + releaseDuration
-    );
+    if (navigator.userAgent.includes('Firefox/')) {
+      this.offset.linearRampToValueAtTime(
+        this.minValue,
+        this.ctx.currentTime + releaseDuration * 0.35 // shorten the release since linear releases sound way longer
+      );
+    } else {
+      this.offset.exponentialRampToValueAtTime(
+        this.minValue === 0 ? 0.0001 : this.minValue,
+        this.ctx.currentTime + releaseDuration
+      );
+    }
   }
 }

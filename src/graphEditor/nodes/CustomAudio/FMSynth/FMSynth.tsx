@@ -32,16 +32,27 @@ const buildDefaultModulationIndices = (): ParamSource[][] => {
 // prettier-ignore
 const getHasSIMDSupport = async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
 
-const WavetableWasmBytes = new AsyncOnce(async () => {
-  const hasSIMDSupport = await getHasSIMDSupport();
-  console.log(
-    hasSIMDSupport
-      ? 'Wasm SIMD support detected!'
-      : 'Wasm SIMD support NOT detected; using fallback Wasm'
-  );
-  const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
-  return res.then(res => res.arrayBuffer());
-});
+const WavetableWasmBytes = new AsyncOnce(
+  async (): Promise<ArrayBuffer> => {
+    const hasSIMDSupport = await getHasSIMDSupport();
+    console.log(
+      hasSIMDSupport
+        ? 'Wasm SIMD support detected!'
+        : 'Wasm SIMD support NOT detected; using fallback Wasm'
+    );
+    const simdStatusElem = document.getElementById('simd-status');
+    if (simdStatusElem) {
+      if (hasSIMDSupport) {
+        simdStatusElem.setAttribute('style', 'display:block; color: #08bf3f;');
+      } else {
+        simdStatusElem.innerHTML = 'SIMD support not detected; using non-SIMD Wasm';
+        simdStatusElem.setAttribute('style', 'display:block; color: #cfeb1e;');
+      }
+    }
+    const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
+    return res.then(res => res.arrayBuffer());
+  }
+);
 
 /**
  * Corresponds to `RampFn` in the Wasm engine

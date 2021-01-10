@@ -289,7 +289,9 @@ class FMSynthAWP extends AudioWorkletProcessor {
     wasmMemory = this.getWasmMemoryBuffer();
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
       const voiceParam = baseFrequencyParams[voiceIx];
+
       if (voiceParam.length === 1 && voiceParam[0] === 0) {
+        outputs[voiceIx]?.[0]?.fill(0);
         continue;
       }
 

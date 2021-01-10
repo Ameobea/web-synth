@@ -19,3 +19,22 @@
   flex: 1;
   align-items: flex-end;
 }
+
+#root
+  > div
+  > div.fm-synth-demo-controls
+  > div:nth-child(1)
+  > div:nth-child(1)
+  > div:nth-child(1)
+  > div.draggable
+  > span {
+  color: rgb(216, 36, 36) !important;
+}
+
+#simd-status {
+  max-width: 200px;
+}
+
+.midi-keyboard {
+  max-width: calc(100vw - 400px);
+}

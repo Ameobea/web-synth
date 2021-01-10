@@ -1,0 +1,8 @@
+#simd-status {
+  position: absolute;
+  bottom: 0;
+  right: 7px;
+  font-family: 'Oxygen Mono', monospace;
+  font-size: 13px;
+  display: none;
+}
