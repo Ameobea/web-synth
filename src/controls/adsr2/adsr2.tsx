@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
+import { UnreachableException } from 'ameo-utils';
 
 import { AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
@@ -9,6 +10,7 @@ const LINE_COLOR = 0x33dd88;
 const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
 const STEP_HANDLE_WIDTH = 8;
 const HANDLE_COLOR = 0x4399ab;
+const RAMP_HANDLE_COLOR = 0x3592df;
 const ctx = new AudioContext();
 
 interface SerializedADSR2State {
@@ -19,7 +21,223 @@ interface SerializedADSR2State {
 }
 
 interface ADSR2Sprites {
-  rampCurves: PIXI.Graphics[];
+  rampCurves: RampCurve[];
+}
+
+/**
+ * Controls the properties of a ramp curve.  Can be dragged, but must be bounded by the marks that define
+ * the start and stop of the ramp it belongs to.
+ */
+class RampHandle {
+  private dragData: PIXI.InteractionData | null = null;
+  private startStep: AdsrStep;
+  private endStep: AdsrStep;
+  private inst: ADSR2Instance;
+  private parentRamp: RampCurve;
+  private graphics!: PIXI.Graphics;
+
+  private computeInitialPos(): PIXI.Point {
+    const rampStartPx = this.startStep.x * this.inst.width;
+    const rampWidthPx = (this.endStep.x - this.startStep.x) * this.inst.width;
+    const rampHeightPx = (this.endStep.y - this.startStep.y) * this.inst.height;
+
+    switch (this.endStep.ramper.type) {
+      case 'exponential': {
+        const x = 0.5;
+        const y = Math.pow(x, this.endStep.ramper.exponent);
+        return new PIXI.Point(
+          rampStartPx + x * rampWidthPx,
+          this.startStep.y * this.inst.height + y * rampHeightPx
+        );
+      }
+      default: {
+        throw new UnreachableException(
+          'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
+        );
+      }
+    }
+  }
+
+  private computeNewEndPoint(pos: PIXI.Point) {
+    switch (this.endStep.ramper.type) {
+      case 'exponential': {
+        const x = R.clamp(
+          0.001,
+          0.999,
+          (pos.x / this.inst.width - this.startStep.x) / (this.endStep.x - this.startStep.x)
+        );
+        const y = R.clamp(
+          0.001,
+          0.999,
+          (pos.y / this.inst.height - this.startStep.y) / (this.endStep.y - this.startStep.y)
+        );
+        // Actually using some math I learned in school for maybe the first time...
+        // Law of logarithms:
+        // log(x^n) = n*log(x)
+        // y = x^n -> log(y) = n * log(x) -> n = log(y)/log(x)
+        let exponent = Math.log(y) / Math.log(x);
+        if (Number.isNaN(exponent)) {
+          exponent = 1;
+        }
+        this.endStep.ramper.exponent = exponent;
+        break;
+      }
+      default: {
+        throw new UnreachableException(
+          'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
+        );
+      }
+    }
+  }
+
+  private handleDrag(newPos: PIXI.Point) {
+    // Always constrain drags to the area defined by the marks
+    newPos.x = R.clamp(
+      this.startStep.x * this.inst.width,
+      this.endStep.x * this.inst.width,
+      newPos.x
+    );
+    newPos.y = R.clamp(
+      Math.min(this.startStep.y * this.inst.height, this.endStep.y * this.inst.height),
+      Math.max(this.startStep.y * this.inst.height, this.endStep.y * this.inst.height),
+      newPos.y
+    );
+    this.graphics.position = newPos;
+
+    this.computeNewEndPoint(newPos);
+
+    this.parentRamp.reRenderRampCurve(this.startStep, this.endStep);
+
+    this.inst.onChange(this.inst.serialize());
+  }
+
+  private render() {
+    const g = new PIXI.Graphics();
+    g.lineStyle(1, 0x000000);
+    g.beginFill(RAMP_HANDLE_COLOR);
+    g.drawCircle(0, 0, STEP_HANDLE_WIDTH);
+    g.endFill();
+    g.position = this.computeInitialPos();
+
+    g.interactive = true;
+    g.on('pointerdown', (evt: any) => {
+      this.dragData = evt.data;
+    })
+      .on('pointerup', () => {
+        this.dragData = null;
+      })
+      .on('pointerupoutside', () => {
+        this.dragData = null;
+      })
+      .on('pointermove', () => {
+        if (!this.dragData) {
+          return;
+        }
+
+        const newPosition = this.dragData.getLocalPosition(this.graphics.parent);
+        this.handleDrag(newPosition);
+      });
+
+    this.graphics = g;
+    this.inst.app.stage.addChild(g);
+  }
+
+  constructor(inst: ADSR2Instance, parentRamp: RampCurve, startStep: AdsrStep, endStep: AdsrStep) {
+    this.inst = inst;
+    this.startStep = startStep;
+    this.endStep = endStep;
+    this.parentRamp = parentRamp;
+    this.render();
+  }
+
+  public destroy() {
+    this.inst.app.stage.removeChild(this.graphics);
+    this.graphics.destroy();
+  }
+}
+
+/**
+ * Entity representing the ramp curve between two `AdsrkMark`s.  Contains PIXI graphics for both the curve itself
+ * as well as optionally a handle entity for modifying the curve.
+ */
+class RampCurve {
+  private curve: PIXI.Graphics;
+  private handle: RampHandle | null;
+  private inst: ADSR2Instance;
+
+  constructor(inst: ADSR2Instance, startStep: AdsrStep, endStep: AdsrStep) {
+    this.inst = inst;
+    this.curve = this.renderRampCurve(startStep, endStep);
+    this.handle = this.buildRampHandle(startStep, endStep);
+  }
+
+  private buildRampHandle(startStep: AdsrStep, endStep: AdsrStep) {
+    switch (endStep.ramper.type) {
+      case 'exponential': {
+        return new RampHandle(this.inst, this, startStep, endStep);
+      }
+      default: {
+        return null;
+      }
+    }
+  }
+
+  private computeRampCurve(step1: AdsrStep, step2: AdsrStep): { x: number; y: number }[] {
+    switch (step2.ramper.type) {
+      case 'linear': {
+        return [
+          { x: step1.x * this.inst.width, y: step1.y * this.inst.height },
+          { x: step2.x * this.inst.width, y: step2.y * this.inst.height },
+        ];
+      }
+      case 'exponential': {
+        const widthPx = (step2.x - step1.x) * this.inst.width;
+        const heightPx = (step2.y - step1.y) * this.inst.height;
+        const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
+
+        const pts = [];
+        for (let i = 0; i <= pointCount; i++) {
+          const x = i / pointCount;
+          const y = Math.pow(x, step2.ramper.exponent);
+          pts.push({
+            x: step1.x * this.inst.width + x * widthPx,
+            y: step1.y * this.inst.height + y * heightPx,
+          });
+        }
+        return pts;
+      }
+      case 'instant': {
+        return [
+          { x: step1.x * this.inst.width, y: step1.y * this.inst.height },
+          { x: step2.x * this.inst.width, y: step1.y * this.inst.height },
+          { x: step2.x * this.inst.width, y: step2.y * this.inst.height },
+        ];
+      }
+    }
+  }
+
+  public renderRampCurve(step1: AdsrStep, step2: AdsrStep): PIXI.Graphics {
+    const graphics = new PIXI.Graphics();
+    graphics.lineStyle(2.5, LINE_COLOR, 1, 0.5);
+    const [start, ...points] = this.computeRampCurve(step1, step2);
+    graphics.moveTo(start.x, start.y);
+    points.forEach(({ x, y }) => graphics.lineTo(x, y));
+    this.inst.app.stage.addChild(graphics);
+    return graphics;
+  }
+
+  public reRenderRampCurve(startStep: AdsrStep, endStep: AdsrStep) {
+    if (this.curve) {
+      this.inst.app.stage.removeChild(this.curve);
+      this.curve.destroy();
+    }
+    this.curve = this.renderRampCurve(startStep, endStep);
+  }
+
+  public destroy() {
+    this.inst.app.stage.removeChild(this.curve);
+    this.handle?.destroy();
+  }
 }
 
 class StepHandle {
@@ -28,9 +246,9 @@ class StepHandle {
   private dragData: PIXI.InteractionData | null = null;
   public step: AdsrStep;
 
-  private handleMove(newPos: PIXI.Point) {
+  private handleMove(newPos: PIXI.Point, thisHandleIx: number) {
     this.graphics.position = newPos;
-    this.inst.sortAndUpdateMarks();
+    this.inst.sortAndUpdateMarks(thisHandleIx);
     this.inst.onChange(this.inst.serialize());
   }
 
@@ -73,7 +291,7 @@ class StepHandle {
 
         this.step.x = newPosition.x / this.inst.width;
         this.step.y = newPosition.y / this.inst.height;
-        this.handleMove(newPosition);
+        this.handleMove(newPosition, index);
       });
 
     this.inst.app.stage.addChild(g);
@@ -87,13 +305,18 @@ class StepHandle {
     this.step = step;
     this.render();
   }
+
+  public destroy() {
+    this.inst.app.stage.removeChild(this.graphics);
+    this.graphics.destroy();
+  }
 }
 
 class ADSR2Instance {
   public app: PIXI.Application;
   private lengthMs = 1000;
   public steps!: StepHandle[];
-  private sprites!: ADSR2Sprites;
+  public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
   private decayPoint!: number;
   public onChange: (newState: SerializedADSR2State) => void;
@@ -107,72 +330,26 @@ class ADSR2Instance {
     return this.app.renderer.height;
   }
 
-  public sortAndUpdateMarks() {
-    const prevSteps = [...this.steps];
+  public sortAndUpdateMarks(updatedMarkIx?: number) {
     this.steps = R.sortBy(step => step.step.x, this.steps);
 
-    this.steps.forEach((step, i) => {
-      if (
-        i === 0 ||
-        (step.step.x === prevSteps[i].step.x &&
-          step.step.y === prevSteps[i].step.y &&
-          step.step.x === prevSteps[i - 1].step.x &&
-          step.step.y === prevSteps[i - 1].step.y)
-      ) {
+    while (this.sprites.rampCurves.length < this.steps.length - 1) {
+      this.sprites.rampCurves.push(null as any); // this will get reconciled instantly
+    }
+
+    this.sprites.rampCurves.forEach((_i, curveIx) => {
+      // If the updated mark doesn't touch this ramp curve, we can leave it be
+      if (!R.isNil(updatedMarkIx) && curveIx !== updatedMarkIx && curveIx !== updatedMarkIx - 1) {
         return;
       }
 
-      this.app.stage.removeChild(this.sprites.rampCurves[i - 1]);
-      this.sprites.rampCurves[i - 1]?.destroy();
-      this.sprites.rampCurves[i - 1] = this.renderRampCurve(
-        this.steps[i - 1].step,
-        this.steps[i].step
+      this.sprites.rampCurves[curveIx]?.destroy();
+      this.sprites.rampCurves[curveIx] = new RampCurve(
+        this,
+        this.steps[curveIx].step,
+        this.steps[curveIx + 1].step
       );
     });
-  }
-
-  private computeRampCurve(step1: AdsrStep, step2: AdsrStep): { x: number; y: number }[] {
-    switch (step2.ramper.type) {
-      case 'linear': {
-        return [
-          { x: step1.x * this.width, y: step1.y * this.height },
-          { x: step2.x * this.width, y: step2.y * this.height },
-        ];
-      }
-      case 'exponential': {
-        const widthPx = (step2.x - step1.x) * this.width;
-        const heightPx = (step2.y - step1.y) * this.height;
-        const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
-
-        const pts = [];
-        for (let i = 0; i <= pointCount; i++) {
-          const x = i / pointCount;
-          const y = Math.pow(x, step2.ramper.exponent);
-          pts.push({
-            x: step1.x * this.width + x * widthPx,
-            y: step1.y * this.height + y * heightPx,
-          });
-        }
-        return pts;
-      }
-      case 'instant': {
-        return [
-          { x: step1.x * this.width, y: step1.y * this.height },
-          { x: step2.x * this.width, y: step1.y * this.height },
-          { x: step2.x * this.width, y: step2.y * this.height },
-        ];
-      }
-    }
-  }
-
-  private renderRampCurve(step1: AdsrStep, step2: AdsrStep): PIXI.Graphics {
-    const graphics = new PIXI.Graphics();
-    graphics.lineStyle(2.5, LINE_COLOR, 1, 0.5);
-    const [start, ...points] = this.computeRampCurve(step1, step2);
-    graphics.moveTo(start.x, start.y);
-    points.forEach(({ x, y }) => graphics.lineTo(x, y));
-    this.app.stage.addChild(graphics);
-    return graphics;
   }
 
   constructor(
@@ -201,8 +378,8 @@ class ADSR2Instance {
     } else {
       this.steps = [
         { x: 0, y: 0.5, ramper: { type: 'linear' as const } },
-        { x: 0.5, y: 0.8, ramper: { type: 'linear' as const } },
-        { x: 1, y: 0.5, ramper: { type: 'linear' as const } },
+        { x: 0.5, y: 0.8, ramper: { type: 'exponential' as const, exponent: 1.5 } },
+        { x: 1, y: 0.5, ramper: { type: 'exponential' as const, exponent: 1.1 } },
       ].map(step => new StepHandle(this, step));
       this.decayPoint = 0.8;
     }
@@ -250,9 +427,9 @@ class ADSR2Instance {
   }
 
   private renderInitial() {
-    const rampCurves: PIXI.Graphics[] = [];
+    const rampCurves = [];
     for (let i = 0; i < this.steps.length - 1; i++) {
-      rampCurves.push(this.renderRampCurve(this.steps[i].step, this.steps[i + 1].step));
+      rampCurves.push(new RampCurve(this, this.steps[i].step, this.steps[i + 1].step));
     }
 
     this.sprites = { rampCurves };
