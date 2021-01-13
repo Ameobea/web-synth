@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import { ADSRValues, ControlPanelADSR } from 'src/controls/adsr';
+import ADSR2, { SerializedADSR2State } from 'src/controls/adsr2/adsr2';
 
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -57,35 +57,24 @@ export const buildDefaultParamSource = (
   }
 };
 
-const encodeAdsr = ({ steps }: Adsr): ADSRValues => {
-  // Using the old ADSR impl, we have 5 control points: start, attack, decay, release, end
-  return {
-    attack: { pos: steps[1].x, magnitude: steps[1].y },
-    decay: { pos: steps[2].x, magnitude: steps[2].y },
-    release: { pos: steps[3].x, magnitude: steps[3].y },
-  };
-};
+const encodeAdsr = ({
+  steps,
+  lenSamples,
+  loopPoint,
+  releasePoint,
+}: Adsr): SerializedADSR2State => ({
+  steps,
+  lengthMs: (lenSamples / SAMPLE_RATE) * 1000,
+  loopPoint,
+  releasePoint,
+});
 
-const decodeAdsr = (prevState: Adsr, newState: ADSRValues): Adsr => {
-  const newAdsr = { ...prevState, releasePoint: newState.release.pos };
-  newAdsr.steps = [...prevState.steps];
-  newAdsr.steps[1] = {
-    x: newState.attack.pos,
-    y: newState.attack.magnitude,
-    ramper: { type: 'exponential', exponent: 1 / 2 },
-  };
-  newAdsr.steps[2] = {
-    x: newState.decay.pos,
-    y: newState.decay.magnitude,
-    ramper: { type: 'exponential', exponent: 1 / 2 },
-  };
-  newAdsr.steps[3] = {
-    x: newState.release.pos,
-    y: newState.release.magnitude,
-    ramper: { type: 'exponential', exponent: 1 / 2 },
-  };
-  return newAdsr;
-};
+const decodeAdsr = (prevState: Adsr, newState: SerializedADSR2State): Adsr => ({
+  steps: [...newState.steps],
+  releasePoint: newState.releasePoint,
+  lenSamples: (newState.lengthMs / 1000) * SAMPLE_RATE,
+  loopPoint: newState.loopPoint,
+});
 
 export const buildDefaultAdsr = (): Adsr => ({
   steps: [
@@ -100,7 +89,7 @@ export const buildDefaultAdsr = (): Adsr => ({
   releasePoint: 0.7,
 });
 
-const ConfigureParamSource: React.FC<{
+interface ConfigureParamSourceProps {
   title?: string;
   theme?: { [key: string]: any };
   state: ParamSource;
@@ -113,7 +102,9 @@ const ConfigureParamSource: React.FC<{
   defaultVal?: number;
   scale?: 'log';
   excludedTypes?: ParamSource['type'][];
-}> = ({
+}
+
+const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
   title,
   adsrs,
   onAdsrChange,
@@ -174,11 +165,6 @@ const ConfigureParamSource: React.FC<{
             min,
             max,
           },
-          {
-            type: 'custom',
-            label: 'adsr',
-            Comp: ControlPanelADSR,
-          },
         ];
       }
       case 'base frequency multiplier': {
@@ -200,79 +186,87 @@ const ConfigureParamSource: React.FC<{
   }, [paramType, excludedTypes, min, max, scale, step, adsrs.length, onAdsrChange]);
 
   return (
-    <ControlPanel
-      title={title}
-      theme={theme}
-      style={{ width: 376 }}
-      settings={settings}
-      state={{
-        ...state,
-        'buffer index':
-          state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
-        'output range':
-          state.type === 'adsr' ? [state.shift, state.shift + state.scale] : undefined,
-        adsr: state.type === 'adsr' ? encodeAdsr(adsrs[state['adsr index']]) : undefined,
-        'adsr length ms':
-          state.type === 'adsr'
-            ? (adsrs[state['adsr index']].lenSamples / 44_100) * 1000
-            : undefined,
-      }}
-      onChange={(key: string, value: any) => {
-        switch (key) {
-          case 'type': {
-            if (state.type === value) {
-              return;
-            }
+    <>
+      <ControlPanel
+        title={title}
+        theme={theme}
+        style={{ width: 376 }}
+        settings={settings}
+        state={{
+          ...state,
+          'buffer index':
+            state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
+          'output range':
+            state.type === 'adsr' ? [state.shift, state.shift + state.scale] : undefined,
+          adsr: state.type === 'adsr' ? encodeAdsr(adsrs[state['adsr index']]) : undefined,
+          'adsr length ms':
+            state.type === 'adsr'
+              ? (adsrs[state['adsr index']].lenSamples / 44_100) * 1000
+              : undefined,
+        }}
+        onChange={(key: string, value: any) => {
+          switch (key) {
+            case 'type': {
+              if (state.type === value) {
+                return;
+              }
 
-            onChange(updateState(state, buildDefaultParamSource(value, min, max, defaultVal)));
-            break;
-          }
-          case 'buffer index': {
-            onChange(updateState(state, { 'buffer index': +value }));
-            break;
-          }
-          case 'value': {
-            if (window.isNaN(value)) {
+              onChange(updateState(state, buildDefaultParamSource(value, min, max, defaultVal)));
               break;
             }
-            onChange(updateState(state, { value }));
-            break;
+            case 'buffer index': {
+              onChange(updateState(state, { 'buffer index': +value }));
+              break;
+            }
+            case 'value': {
+              if (window.isNaN(value)) {
+                break;
+              }
+              onChange(updateState(state, { value }));
+              break;
+            }
+            case 'adsr index': {
+              onChange(updateState(state, { 'adsr index': +value }));
+              break;
+            }
+            case 'output range': {
+              const [clampedMin, clampedMax]: [number, number] = value;
+              const scale = clampedMax - clampedMin;
+              const shift = clampedMin;
+              onChange(updateState(state, { scale, shift }));
+              break;
+            }
+            case 'adsr length ms': {
+              const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+              onAdsrChange(adsrIx, { ...adsrs[adsrIx], lenSamples: (value / 1000) * SAMPLE_RATE });
+              break;
+            }
+            case 'multiplier': {
+              if (window.isNaN(value)) {
+                break;
+              }
+              onChange(updateState(state, { multiplier: value }));
+              break;
+            }
+            default: {
+              console.error('Unhandled param value configurator key: ', key);
+            }
           }
-          case 'adsr index': {
-            onChange(updateState(state, { 'adsr index': +value }));
-            break;
-          }
-          case 'output range': {
-            const [clampedMin, clampedMax]: [number, number] = value;
-            const scale = clampedMax - clampedMin;
-            const shift = clampedMin;
-            onChange(updateState(state, { scale, shift }));
-            break;
-          }
-          case 'adsr': {
+        }}
+      />
+      {state.type === 'adsr' ? (
+        <ADSR2
+          width={376}
+          height={222}
+          initialState={encodeAdsr(adsrs[state['adsr index']])}
+          onChange={value => {
             const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
             const decoded = decodeAdsr(adsrs[adsrIx], value);
             onAdsrChange(adsrIx, decoded);
-            break;
-          }
-          case 'adsr length ms': {
-            const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-            onAdsrChange(adsrIx, { ...adsrs[adsrIx], lenSamples: (value / 1000) * SAMPLE_RATE });
-            break;
-          }
-          case 'multiplier': {
-            if (window.isNaN(value)) {
-              break;
-            }
-            onChange(updateState(state, { multiplier: value }));
-            break;
-          }
-          default: {
-            console.error('Unhandled param value configurator key: ', key);
-          }
-        }
-      }}
-    />
+          }}
+        />
+      ) : null}
+    </>
   );
 };
 

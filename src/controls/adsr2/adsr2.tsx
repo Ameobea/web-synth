@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
@@ -8,16 +8,16 @@ import { AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 const BACKGROUND_COLOR = 0x131313;
 const LINE_COLOR = 0x33dd88;
 const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
-const STEP_HANDLE_WIDTH = 8;
+const STEP_HANDLE_WIDTH = 6;
 const HANDLE_COLOR = 0x4399ab;
 const RAMP_HANDLE_COLOR = 0x3592df;
 const ctx = new AudioContext();
 
-interface SerializedADSR2State {
+export interface SerializedADSR2State {
   steps: AdsrStep[];
   lengthMs: number;
   loopPoint: number | null;
-  decayPoint: number;
+  releasePoint: number;
 }
 
 interface ADSR2Sprites {
@@ -108,7 +108,7 @@ class RampHandle {
 
     this.parentRamp.reRenderRampCurve(this.startStep, this.endStep);
 
-    this.inst.onChange(this.inst.serialize());
+    this.inst.onUpdated();
   }
 
   private render() {
@@ -249,7 +249,7 @@ class StepHandle {
   private handleMove(newPos: PIXI.Point, thisHandleIx: number) {
     this.graphics.position = newPos;
     this.inst.sortAndUpdateMarks(thisHandleIx);
-    this.inst.onChange(this.inst.serialize());
+    this.inst.onUpdated();
   }
 
   private render() {
@@ -292,12 +292,28 @@ class StepHandle {
         this.step.x = newPosition.x / this.inst.width;
         this.step.y = newPosition.y / this.inst.height;
         this.handleMove(newPosition, index);
+      })
+      .on('rightdown', (evt: any) => {
+        const data: PIXI.InteractionData = evt.data;
+        data.originalEvent.preventDefault();
+        data.originalEvent.stopPropagation();
+        this.delete();
       });
 
     this.inst.app.stage.addChild(g);
     g.x = this.step.x * this.inst.width;
     g.y = this.step.y * this.inst.height;
     this.graphics = g;
+  }
+
+  private delete() {
+    const ourIndex = this.inst.steps.findIndex(o => o === this);
+    if (ourIndex === 0 || ourIndex === this.inst.steps.length - 1) {
+      return;
+    }
+    this.inst.steps.splice(ourIndex, 1);
+    this.destroy();
+    this.inst.sortAndUpdateMarks();
   }
 
   constructor(inst: ADSR2Instance, step: AdsrStep) {
@@ -318,8 +334,8 @@ class ADSR2Instance {
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
-  private decayPoint!: number;
-  public onChange: (newState: SerializedADSR2State) => void;
+  private releasePoint!: number;
+  private onChange: (newState: SerializedADSR2State) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
 
@@ -330,11 +346,33 @@ class ADSR2Instance {
     return this.app.renderer.height;
   }
 
+  public onUpdated() {
+    this.onChange(this.serialize());
+  }
+
+  public setLengthMs(newLengthMs: number) {
+    if (this.lengthMs === newLengthMs) {
+      return;
+    }
+
+    this.lengthMs = newLengthMs;
+    this.onUpdated();
+  }
+
   public sortAndUpdateMarks(updatedMarkIx?: number) {
     this.steps = R.sortBy(step => step.step.x, this.steps);
 
     while (this.sprites.rampCurves.length < this.steps.length - 1) {
       this.sprites.rampCurves.push(null as any); // this will get reconciled instantly
+    }
+    while (this.sprites.rampCurves.length > this.steps.length - 1) {
+      if (!R.isNil(updatedMarkIx)) {
+        throw new UnreachableException(
+          "Can't have an updated mark index when there are more ramps than expected"
+        );
+      }
+      console.log('popping ramp curve', this.sprites.rampCurves.length, this.steps.length - 1);
+      this.sprites.rampCurves.pop()!.destroy();
     }
 
     this.sprites.rampCurves.forEach((_i, curveIx) => {
@@ -373,7 +411,7 @@ class ADSR2Instance {
 
     this.initBackgroundClickHandler();
 
-    if (initialState) {
+    if (initialState && !(initialState as any).attack) {
       this.deserialize(initialState);
     } else {
       this.steps = [
@@ -381,7 +419,7 @@ class ADSR2Instance {
         { x: 0.5, y: 0.8, ramper: { type: 'exponential' as const, exponent: 1.5 } },
         { x: 1, y: 0.5, ramper: { type: 'exponential' as const, exponent: 1.1 } },
       ].map(step => new StepHandle(this, step));
-      this.decayPoint = 0.8;
+      this.releasePoint = 0.8;
     }
 
     this.renderInitial();
@@ -436,18 +474,18 @@ class ADSR2Instance {
   }
 
   private deserialize(state: SerializedADSR2State) {
-    this.steps = state.steps.map(step => new StepHandle(this, step));
+    this.steps = state.steps.map(step => new StepHandle(this, { ...step, y: 1 - step.y }));
     this.lengthMs = state.lengthMs;
     this.loopPoint = state.loopPoint;
-    this.decayPoint = state.decayPoint;
+    this.releasePoint = state.releasePoint;
   }
 
   public serialize(): SerializedADSR2State {
     return {
-      steps: this.steps.map(step => step.step),
+      steps: this.steps.map(step => ({ ...step.step, y: 1 - step.step.y })),
       lengthMs: this.lengthMs,
-      loopPoint: this.loopPoint,
-      decayPoint: this.decayPoint,
+      loopPoint: this.loopPoint ?? 0,
+      releasePoint: this.releasePoint,
     };
   }
 }
@@ -462,8 +500,17 @@ interface ADSR2Props {
 const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, onChange }) => {
   const instance = useRef<ADSR2Instance | null>(null);
 
+  useEffect(() => {
+    if (!instance.current || !initialState) {
+      return;
+    }
+
+    instance.current.setLengthMs(initialState.lengthMs);
+  }, [initialState]);
+
   return (
     <canvas
+      onContextMenu={evt => evt.preventDefault()}
       height={height}
       width={width}
       style={{ minHeight: height, minWidth: width, maxHeight: height, maxWidth: width }}

@@ -136,8 +136,8 @@ export const MidiKeyboard: React.FC<{
 
   return (
     <div className='midi-keyboard'>
-      <ADSRDemo />
-      {/* <div className='octave-controls-wrapper'>
+      {/* <ADSRDemo /> */}
+      <div className='octave-controls-wrapper'>
         <div className='octave-changer-label'>Octave</div>
         <div className='octave-offset-display'>{octaveOffset}</div>
       </div>
@@ -178,7 +178,7 @@ export const MidiKeyboard: React.FC<{
             );
           }}
         />
-      </div> */}
+      </div>
     </div>
   );
 };
