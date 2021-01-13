@@ -4,6 +4,7 @@ const OUTPUT_BYTES_PER_OPERATOR = FRAME_SIZE * BYTES_PER_F32;
 const VOICE_COUNT = 10;
 const PARAM_COUNT = 8;
 const SAMPLE_RATE = 44_100;
+const ADSR_PHASE_BUF_LENGTH = 256;
 
 class FMSynthAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -237,7 +238,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
       );
     });
 
-    this.port.postMessage({ type: 'wasmInitialized' });
+    this.audioThreadDataBufferInner = new SharedArrayBuffer(ADSR_PHASE_BUF_LENGTH * BYTES_PER_F32);
+    this.audioThreadDataBuffer = new Float32Array(this.audioThreadDataBufferInner);
+    this.adsrPhasesBufPtr = this.wasmInstance.exports.get_adsr_phases_buf_ptr(this.ctxPtr);
+
+    this.port.postMessage({
+      type: 'wasmInitialized',
+      audioThreadDataBuffer: this.audioThreadDataBufferInner,
+    });
   }
 
   getWasmMemoryBuffer() {
@@ -301,6 +309,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
       );
       outputs[voiceIx]?.[0]?.set(outputSlice);
     }
+
+    // Copy current ADSR phases to shared buffer
+    const adsrPhaseBuf = wasmMemory.slice(
+      this.adsrPhasesBufPtr / BYTES_PER_F32,
+      this.adsrPhasesBufPtr / BYTES_PER_F32 + ADSR_PHASE_BUF_LENGTH
+    );
+    this.audioThreadDataBuffer.set(adsrPhaseBuf);
 
     return true;
   }

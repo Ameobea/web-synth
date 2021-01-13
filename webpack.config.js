@@ -80,6 +80,11 @@ module.exports = {
     port: 9000,
     contentBase: './public/',
     historyApiFallback: true,
+    headers: {
+      // Support sending `SharedArrayBuffer` between threads
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
   experiments: {
     syncWebAssembly: true,

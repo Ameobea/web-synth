@@ -90,6 +90,10 @@ pub struct Adsr {
     /// Optimization to avoid having to do some math in the hot path.  Always should be equal to
     /// `(1 / len_samples) `
     cached_phase_diff_per_sample: f32,
+    /// If set, whenever the ADSR is updated, the most recent phase will be written to this
+    /// pointer.  This is used to facilitate rendering of ADSRs in the UI by sharing some memory
+    /// containing the current phase of all active ADSRs.
+    pub store_phase_to: Option<*mut f32>,
 }
 
 const DEFAULT_FIRST_STEP: AdsrStep = AdsrStep {
@@ -116,6 +120,7 @@ impl Adsr {
             cur_frame_output: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
             len_samples,
             cached_phase_diff_per_sample: (1. / len_samples),
+            store_phase_to: None,
         }
     }
 
@@ -204,6 +209,12 @@ impl Adsr {
         )
     }
 
+    fn maybe_write_cur_phase(&self) {
+        if let Some(write_to_ptr) = self.store_phase_to {
+            unsafe { std::ptr::write(write_to_ptr, self.phase) };
+        }
+    }
+
     /// Populates `self.cur_frame_output` with samples for the current frame
     pub fn render_frame(&mut self) {
         match self.gate_status {
@@ -217,6 +228,7 @@ impl Adsr {
                     self.cur_frame_output[i] = frozen_output;
                 }
                 self.gate_status = GateStatus::GatedFrozen;
+                self.maybe_write_cur_phase();
                 return;
             }
             GateStatus::Releasing if self.phase >= 1. => {
@@ -228,13 +240,17 @@ impl Adsr {
                 }
                 self.gate_status = GateStatus::Done;
             },
-            GateStatus::GatedFrozen | GateStatus::Done => return,
+            GateStatus::GatedFrozen | GateStatus::Done => {
+                self.maybe_write_cur_phase();
+                return;
+            },
             _ => (),
         }
 
         for i in 0..FRAME_SIZE {
             self.cur_frame_output[i] = self.get_sample();
         }
+        self.maybe_write_cur_phase();
     }
 
     pub fn get_cur_frame_output(&self) -> &[f32; FRAME_SIZE] { &self.cur_frame_output }

@@ -33,7 +33,13 @@ Promise.all([
 ] as const).then(([wasmArrayBuffer]) => {
   SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
   globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));
-  SchedulerHandle.port.onmessage = evt => callCb(evt.data);
+  SchedulerHandle.port.onmessage = evt => {
+    if (typeof evt.data === 'number') {
+      callCb(evt.data);
+    } else {
+      console.log(evt.data);
+    }
+  };
   SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
   PendingEvents.forEach(({ time, beats, cbId }) =>
     time === null

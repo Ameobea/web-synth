@@ -8,9 +8,10 @@ import { AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 const BACKGROUND_COLOR = 0x131313;
 const LINE_COLOR = 0x33dd88;
 const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
-const STEP_HANDLE_WIDTH = 6;
+const STEP_HANDLE_WIDTH = 4.5;
 const HANDLE_COLOR = 0x4399ab;
 const RAMP_HANDLE_COLOR = 0x3592df;
+const PHASE_MARKER_COLOR = 0xf7e045;
 const ctx = new AudioContext();
 
 export interface SerializedADSR2State {
@@ -113,7 +114,7 @@ class RampHandle {
 
   private render() {
     const g = new PIXI.Graphics();
-    g.lineStyle(1, 0x000000);
+    g.lineStyle(1, 0x000000, 0.3);
     g.beginFill(RAMP_HANDLE_COLOR);
     g.drawCircle(0, 0, STEP_HANDLE_WIDTH);
     g.endFill();
@@ -328,6 +329,21 @@ class StepHandle {
   }
 }
 
+/**
+ * A handle containing a piece of memory shared between this thread and the audio thread used to obtain real-time info
+ * about the ADSR instance as it is running.
+ */
+export interface AudioThreadData {
+  /**
+   * The shared memory buffer between this thread and the audio thread.
+   */
+  buffer?: Float32Array;
+  /**
+   * The index of `buffer` at which the envelope's current phase is stored and updated
+   */
+  phaseIndex: number;
+}
+
 class ADSR2Instance {
   public app: PIXI.Application;
   private lengthMs = 1000;
@@ -338,6 +354,7 @@ class ADSR2Instance {
   private onChange: (newState: SerializedADSR2State) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
+  private audioThreadData: AudioThreadData;
 
   public get width() {
     return this.app.renderer.width;
@@ -371,7 +388,6 @@ class ADSR2Instance {
           "Can't have an updated mark index when there are more ramps than expected"
         );
       }
-      console.log('popping ramp curve', this.sprites.rampCurves.length, this.steps.length - 1);
       this.sprites.rampCurves.pop()!.destroy();
     }
 
@@ -390,12 +406,28 @@ class ADSR2Instance {
     });
   }
 
+  /**
+   * Builds the PIXI entity used to indicate the phase of the ADSR
+   */
+  private buildPhaseMarker() {
+    const g = new PIXI.Graphics();
+    g.lineStyle(0, 0, 0);
+    g.moveTo(0, 0);
+    g.zIndex = -1;
+    g.beginFill(PHASE_MARKER_COLOR, 0.22);
+    g.drawRect(0, 0, this.width, this.height);
+    g.endFill();
+    this.app.stage.addChildAt(g, 0);
+    return g;
+  }
+
   constructor(
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
     onChange: (newState: SerializedADSR2State) => void,
     ctx: AudioContext,
+    audioThreadData: AudioThreadData,
     initialState?: SerializedADSR2State
   ) {
     const app = new PIXI.Application({
@@ -405,6 +437,8 @@ class ADSR2Instance {
       width,
       backgroundColor: BACKGROUND_COLOR,
     });
+
+    this.audioThreadData = audioThreadData;
     this.app = app;
     this.onChange = onChange;
     this.ctx = ctx;
@@ -438,6 +472,7 @@ class ADSR2Instance {
 
   private initBackgroundClickHandler() {
     const bg = new PIXI.Sprite(PIXI.Texture.EMPTY);
+    bg.zIndex = -2;
     bg.width = this.width;
     bg.height = this.height;
     bg.interactive = true;
@@ -471,6 +506,16 @@ class ADSR2Instance {
     }
 
     this.sprites = { rampCurves };
+
+    const phaseMarker = this.buildPhaseMarker();
+
+    this.app.ticker.add(() => {
+      if (!this.audioThreadData.buffer) {
+        return;
+      }
+      const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
+      phaseMarker.x = -this.width + phase * this.width;
+    });
   }
 
   private deserialize(state: SerializedADSR2State) {
@@ -495,9 +540,16 @@ interface ADSR2Props {
   height?: number;
   initialState?: SerializedADSR2State;
   onChange: (newState: SerializedADSR2State) => void;
+  audioThreadData: AudioThreadData;
 }
 
-const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, onChange }) => {
+const ADSR2: React.FC<ADSR2Props> = ({
+  width = 600,
+  height = 380,
+  initialState,
+  audioThreadData,
+  onChange,
+}) => {
   const instance = useRef<ADSR2Instance | null>(null);
 
   useEffect(() => {
@@ -519,7 +571,15 @@ const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, 
           return;
         }
 
-        instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState);
+        instance.current = new ADSR2Instance(
+          width,
+          height,
+          canvas,
+          onChange,
+          ctx,
+          audioThreadData,
+          initialState
+        );
       }}
     />
   );

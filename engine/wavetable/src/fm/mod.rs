@@ -683,6 +683,8 @@ pub struct FMSynthContext {
     pub operator_base_frequency_sources: [ParamSource; OPERATOR_COUNT],
     pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
     pub output_buffers: Vec<[f32; FRAME_SIZE]>,
+    pub most_recent_gated_voice_ix: usize,
+    pub adsr_phase_buf: [f32; 256],
 }
 
 impl FMSynthContext {
@@ -719,6 +721,8 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         operator_base_frequency_sources: std::mem::MaybeUninit::uninit().assume_init(),
         base_frequency_input_buffer: Vec::with_capacity(voice_count),
         output_buffers: Vec::with_capacity(voice_count),
+        most_recent_gated_voice_ix: 0,
+        adsr_phase_buf: [0.; 256],
     });
     for i in 0..OPERATOR_COUNT {
         (*ctx)
@@ -921,8 +925,20 @@ pub unsafe extern "C" fn fm_synth_set_effect(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *const f32 {
+    (*ctx).adsr_phase_buf.as_ptr() as *const _
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
-    for adsr in &mut (*ctx).voices[voice_ix].adsrs {
+    // Stop recording phases for the last recently gated voice so the new one can record them
+    for adsr in &mut (*ctx).voices[(*ctx).most_recent_gated_voice_ix].adsrs {
+        adsr.store_phase_to = None;
+    }
+    (*ctx).most_recent_gated_voice_ix = voice_ix;
+
+    for (i, adsr) in (*ctx).voices[voice_ix].adsrs.iter_mut().enumerate() {
+        adsr.store_phase_to = Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(i));
         adsr.gate();
     }
 }

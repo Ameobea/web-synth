@@ -11,9 +11,13 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
   }
 
   constructor() {
-    globalThis.curBeat = 0;
-
     super();
+    globalThis.curBeat = 0;
+    this.beatManagerSABInner = new SharedArrayBuffer(1024);
+    this.beatManagerSAB = new Float32Array(this.beatManagerSABInner);
+    console.log('sending global beat SAB');
+    this.port.postMessage({ type: 'beatManagerSAB', beatManagerSAB: this.beatManagerSAB });
+
     this.pendingEvents = [];
     this.lastRecordedTime = 0;
 
@@ -84,6 +88,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
     const passedBeats = (globalTempoBPM / 60) * passedTime;
     this.lastRecordedTime = currentTime;
     globalThis.curBeat += passedBeats;
+    this.beatManagerSAB[0] = globalThis.curBeat;
   }
 
   process(_inputs, _outputs, params) {

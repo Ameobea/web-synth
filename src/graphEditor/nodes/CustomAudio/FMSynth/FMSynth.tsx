@@ -13,6 +13,7 @@ import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtil
 import { ParamSource, buildDefaultAdsr } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import { AsyncOnce } from 'src/util';
+import { AudioThreadData } from 'src/controls/adsr2/adsr2';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -79,6 +80,7 @@ export interface Adsr {
   lenSamples: number;
   loopPoint: number | null;
   releasePoint: number;
+  audioThreadData: AudioThreadData;
 }
 
 export default class FMSynth implements ForeignNode {
@@ -98,6 +100,7 @@ export default class FMSynth implements ForeignNode {
   private adsrs: Adsr[] = [buildDefaultAdsr()];
   public selectedUI: UISelection | null = null;
   private onInitialized: ((inst: FMSynth) => void) | undefined;
+  private audioThreadDataBuffer: Float32Array | null = null;
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -181,6 +184,15 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'wasmInitialized': {
+          if (evt.data.audioThreadDataBuffer) {
+            this.audioThreadDataBuffer = new Float32Array(
+              evt.data.audioThreadDataBuffer as SharedArrayBuffer
+            );
+            this.adsrs.forEach((adsr, i) => {
+              adsr.audioThreadData = { buffer: this.audioThreadDataBuffer!, phaseIndex: i };
+            });
+          }
+
           // Initialize backend with all effects and modulation indices that were deserialized
           this.operatorConfigs.forEach((config, opIx) =>
             this.handleOperatorConfigChange(opIx, config)

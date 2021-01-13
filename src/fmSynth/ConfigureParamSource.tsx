@@ -74,6 +74,7 @@ const decodeAdsr = (prevState: Adsr, newState: SerializedADSR2State): Adsr => ({
   releasePoint: newState.releasePoint,
   lenSamples: (newState.lengthMs / 1000) * SAMPLE_RATE,
   loopPoint: newState.loopPoint,
+  audioThreadData: prevState.audioThreadData,
 });
 
 export const buildDefaultAdsr = (): Adsr => ({
@@ -87,6 +88,7 @@ export const buildDefaultAdsr = (): Adsr => ({
   lenSamples: 44100,
   loopPoint: null,
   releasePoint: 0.7,
+  audioThreadData: { phaseIndex: 0 },
 });
 
 interface ConfigureParamSourceProps {
@@ -264,6 +266,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
             const decoded = decodeAdsr(adsrs[adsrIx], value);
             onAdsrChange(adsrIx, decoded);
           }}
+          audioThreadData={adsrs[state['adsr index']].audioThreadData}
         />
       ) : null}
     </>
