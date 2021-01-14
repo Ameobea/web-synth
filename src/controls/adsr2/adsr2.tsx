@@ -15,14 +15,6 @@ const RAMP_HANDLE_COLOR = 0x3592df;
 const PHASE_MARKER_COLOR = 0xf7e045;
 const ctx = new AudioContext();
 
-export interface SerializedADSR2State {
-  steps: AdsrStep[];
-  lengthMs: number;
-  loopPoint: number | null;
-  releasePoint: number;
-  audioThreadData?: AudioThreadData;
-}
-
 interface ADSR2Sprites {
   rampCurves: RampCurve[];
 }
@@ -50,7 +42,7 @@ class RampHandle {
         const y = Math.pow(x, this.endStep.ramper.exponent);
         return new PIXI.Point(
           rampStartPx + x * rampWidthPx,
-          this.startStep.y * this.inst.height + y * rampHeightPx
+          this.inst.height - (this.startStep.y * this.inst.height + y * rampHeightPx)
         );
       }
       default: {
@@ -62,16 +54,19 @@ class RampHandle {
   }
 
   private computeNewEndPoint(pos: PIXI.Point) {
+    // handle inverted direction of y axis compared to what we want
+    pos.y = this.inst.height - pos.y;
+
     switch (this.endStep.ramper.type) {
       case 'exponential': {
         const x = R.clamp(
-          0.001,
-          0.999,
+          0.01,
+          0.99,
           (pos.x / this.inst.width - this.startStep.x) / (this.endStep.x - this.startStep.x)
         );
         const y = R.clamp(
-          0.001,
-          0.999,
+          0.01,
+          0.99,
           (pos.y / this.inst.height - this.startStep.y) / (this.endStep.y - this.startStep.y)
         );
         // Actually using some math I learned in school for maybe the first time...
@@ -101,8 +96,8 @@ class RampHandle {
       newPos.x
     );
     newPos.y = R.clamp(
-      Math.min(this.startStep.y * this.inst.height, this.endStep.y * this.inst.height),
-      Math.max(this.startStep.y * this.inst.height, this.endStep.y * this.inst.height),
+      Math.min((1 - this.startStep.y) * this.inst.height, (1 - this.endStep.y) * this.inst.height),
+      Math.max((1 - this.startStep.y) * this.inst.height, (1 - this.endStep.y) * this.inst.height),
       newPos.y
     );
     this.graphics.position = newPos;
@@ -189,13 +184,13 @@ class RampCurve {
     switch (step2.ramper.type) {
       case 'linear': {
         return [
-          { x: step1.x * this.inst.width, y: step1.y * this.inst.height },
-          { x: step2.x * this.inst.width, y: step2.y * this.inst.height },
+          { x: step1.x * this.inst.width, y: (1 - step1.y) * this.inst.height },
+          { x: step2.x * this.inst.width, y: (1 - step2.y) * this.inst.height },
         ];
       }
       case 'exponential': {
         const widthPx = (step2.x - step1.x) * this.inst.width;
-        const heightPx = (step2.y - step1.y) * this.inst.height;
+        const heightPx = (1 - step2.y - (1 - step1.y)) * this.inst.height;
         const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
 
         const pts = [];
@@ -204,16 +199,16 @@ class RampCurve {
           const y = Math.pow(x, step2.ramper.exponent);
           pts.push({
             x: step1.x * this.inst.width + x * widthPx,
-            y: step1.y * this.inst.height + y * heightPx,
+            y: (1 - step1.y) * this.inst.height + y * heightPx,
           });
         }
         return pts;
       }
       case 'instant': {
         return [
-          { x: step1.x * this.inst.width, y: step1.y * this.inst.height },
-          { x: step2.x * this.inst.width, y: step1.y * this.inst.height },
-          { x: step2.x * this.inst.width, y: step2.y * this.inst.height },
+          { x: step1.x * this.inst.width, y: (1 - step1.y) * this.inst.height },
+          { x: step2.x * this.inst.width, y: (1 - step1.y) * this.inst.height },
+          { x: step2.x * this.inst.width, y: (1 - step2.y) * this.inst.height },
         ];
       }
     }
@@ -293,7 +288,7 @@ class StepHandle {
         newPosition.y = R.clamp(0, this.inst.height - 0.0001, newPosition.y);
 
         this.step.x = newPosition.x / this.inst.width;
-        this.step.y = newPosition.y / this.inst.height;
+        this.step.y = 1 - newPosition.y / this.inst.height;
         this.handleMove(newPosition, index);
       })
       .on('rightdown', (evt: any) => {
@@ -305,7 +300,7 @@ class StepHandle {
 
     this.inst.app.stage.addChild(g);
     g.x = this.step.x * this.inst.width;
-    g.y = this.step.y * this.inst.height;
+    g.y = (1 - this.step.y) * this.inst.height;
     this.graphics = g;
   }
 
@@ -353,10 +348,11 @@ class ADSR2Instance {
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
   private releasePoint!: number;
-  private onChange: (newState: SerializedADSR2State) => void;
+  private onChange: (newState: Adsr) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
-  private audioThreadData: AudioThreadData | undefined;
+  private audioThreadData: AudioThreadData;
+  private randomNumber = Math.random();
 
   public get width() {
     return this.app.renderer.width;
@@ -367,6 +363,40 @@ class ADSR2Instance {
 
   public onUpdated() {
     this.onChange(this.serialize());
+  }
+
+  private setSteps(newSteps: AdsrStep[]) {
+    this.steps.forEach(step => step.destroy());
+    this.steps = newSteps.map(step => new StepHandle(this, R.clone(step)));
+    this.sortAndUpdateMarks();
+  }
+
+  public update(state: Adsr) {
+    if (isNaN(state.lenSamples)) {
+      state.lenSamples = 1000;
+    }
+
+    const newLengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
+    if (this.lengthMs !== newLengthMs) {
+      this.lengthMs = newLengthMs;
+      // TODO: Update rendering
+    }
+
+    if (!R.equals(this.steps.map(R.prop('step')), state.steps)) {
+      this.setSteps(state.steps);
+    }
+
+    if (this.loopPoint !== state.loopPoint) {
+      this.loopPoint = state.loopPoint;
+      // TODO: Update rendering
+    }
+
+    if (this.releasePoint !== state.releasePoint) {
+      this.loopPoint = state.loopPoint;
+      // TODO: Update rendering
+    }
+
+    this.audioThreadData = state.audioThreadData;
   }
 
   public setLengthMs(newLengthMs: number) {
@@ -427,9 +457,9 @@ class ADSR2Instance {
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
-    onChange: (newState: SerializedADSR2State) => void,
+    onChange: (newState: Adsr) => void,
     ctx: AudioContext,
-    initialState?: Adsr
+    initialState: Adsr
   ) {
     const app = new PIXI.Application({
       antialias: true,
@@ -520,18 +550,20 @@ class ADSR2Instance {
   }
 
   private deserialize(state: Adsr) {
-    this.steps = state.steps.map(step => new StepHandle(this, { ...step, y: 1 - step.y }));
+    state.lenSamples = state.lenSamples ?? 1000;
+    this.steps = state.steps.map(step => new StepHandle(this, R.clone(step)));
     this.lengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
     this.loopPoint = state.loopPoint;
     this.releasePoint = state.releasePoint;
   }
 
-  public serialize(): SerializedADSR2State {
+  public serialize(): Adsr {
     return {
-      steps: this.steps.map(step => ({ ...step.step, y: 1 - step.step.y })),
-      lengthMs: this.lengthMs,
+      steps: this.steps.map(R.prop('step')),
+      lenSamples: (this.lengthMs / 1000) * SAMPLE_RATE,
       loopPoint: this.loopPoint ?? 0,
       releasePoint: this.releasePoint,
+      audioThreadData: this.audioThreadData!,
     };
   }
 
@@ -543,15 +575,11 @@ class ADSR2Instance {
 interface ADSR2Props {
   width?: number;
   height?: number;
-  initialState?: Adsr;
-  onChange: (newState: SerializedADSR2State) => void;
-  /**
-   * A unique ID that identifies this ADSR instance.  Should be changed if `initialState` changes externally.
-   */
-  id: string | number;
+  initialState: Adsr;
+  onChange: (newState: Adsr) => void;
 }
 
-const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, onChange, id }) => {
+const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, onChange }) => {
   const instance = useRef<ADSR2Instance | null>(null);
 
   useEffect(() => {
@@ -559,24 +587,16 @@ const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, 
       return;
     }
 
-    instance.current.setLengthMs((initialState.lenSamples / SAMPLE_RATE) * 1000);
+    instance.current.update(initialState);
   }, [initialState]);
-
-  const lastID = useRef(id);
-  useEffect(() => {
-    if (!instance.current || id === lastID.current) {
-      return;
-    }
-
-    lastID.current = id;
-    const canvasRef = instance.current.app.view;
-    instance.current.destroy();
-    instance.current = new ADSR2Instance(width, height, canvasRef, onChange, ctx, initialState);
-  }, [height, id, initialState, onChange, width]);
 
   return (
     <canvas
       onContextMenu={evt => evt.preventDefault()}
+      onMouseDown={evt => {
+        evt.stopPropagation();
+        evt.preventDefault();
+      }}
       height={height}
       width={width}
       style={{ minHeight: height, minWidth: width, maxHeight: height, maxWidth: width }}

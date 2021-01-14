@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import ADSR2, { SerializedADSR2State } from 'src/controls/adsr2/adsr2';
+import ADSR2 from 'src/controls/adsr2/adsr2';
 
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -56,28 +56,6 @@ export const buildDefaultParamSource = (
     }
   }
 };
-
-const encodeAdsr = ({
-  steps,
-  lenSamples,
-  loopPoint,
-  releasePoint,
-  audioThreadData,
-}: Adsr): SerializedADSR2State => ({
-  steps,
-  lengthMs: (lenSamples / SAMPLE_RATE) * 1000,
-  loopPoint,
-  releasePoint,
-  audioThreadData,
-});
-
-const decodeAdsr = (prevState: Adsr, newState: SerializedADSR2State): Adsr => ({
-  steps: [...newState.steps],
-  releasePoint: newState.releasePoint,
-  lenSamples: (newState.lengthMs / 1000) * SAMPLE_RATE,
-  loopPoint: newState.loopPoint,
-  audioThreadData: prevState.audioThreadData,
-});
 
 export const buildDefaultAdsr = (): Adsr => ({
   steps: [
@@ -202,7 +180,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
             state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
           'output range':
             state.type === 'adsr' ? [state.shift, state.shift + state.scale] : undefined,
-          adsr: state.type === 'adsr' ? encodeAdsr(adsrs[state['adsr index']]) : undefined,
+          adsr: state.type === 'adsr' ? adsrs[state['adsr index']] : undefined,
           'adsr length ms':
             state.type === 'adsr'
               ? (adsrs[state['adsr index']].lenSamples / 44_100) * 1000
@@ -263,12 +241,10 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
           width={376}
           height={222}
           initialState={adsrs[state['adsr index']]}
-          onChange={value => {
+          onChange={newAdsr => {
             const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-            const decoded = decodeAdsr(adsrs[adsrIx], value);
-            onAdsrChange(adsrIx, decoded);
+            onAdsrChange(adsrIx, newAdsr);
           }}
-          id={state['adsr index']}
         />
       ) : null}
     </>
