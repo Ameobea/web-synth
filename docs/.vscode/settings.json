@@ -1,0 +1,19 @@
+{
+  "editor.minimap.enabled": false,
+  "editor.wrappingIndent": "indent",
+  "editor.overviewRulerBorder": false,
+  "editor.lineHeight": 24,
+  "workbench.colorTheme": "Gray Matter Dark",
+  "[markdown]": {
+    "editor.quickSuggestions": true
+  },
+  "files.exclude": {
+    "**/node_modules": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules": true
+  },
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "sync",
+  "vscodeMarkdownNotes.noteCompletionConvention": "noExtension"
+}
