@@ -282,8 +282,9 @@ impl FMSynthVoice {
         wavetables: &mut [()],
         param_buffers: &[[f32; FRAME_SIZE]],
         operator_base_frequency_sources: &[ParamSource; OPERATOR_COUNT],
-        base_frequencies: &[f32; FRAME_SIZE],
+        raw_base_frequencies: &[f32; FRAME_SIZE],
         output_buffer: &mut [f32; FRAME_SIZE],
+        detune: Option<&ParamSource>,
     ) {
         let mut samples_per_operator: [f32; OPERATOR_COUNT] = self.last_samples;
         let mut frequencies_per_operator: [f32; OPERATOR_COUNT] =
@@ -293,6 +294,40 @@ impl FMSynthVoice {
         for adsr in &mut self.adsrs {
             adsr.render_frame();
         }
+
+        // If necessary, compute detuned base frequency based off of detune param
+        let mut detuned_base_frequencies: [f32; FRAME_SIZE] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let base_frequencies = match detune {
+            Some(detune) => {
+                let mut detune_outputs: [f32; FRAME_SIZE] =
+                    unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+                detune.render_raw(
+                    &RenderRawParams {
+                        param_buffers,
+                        adsrs: &self.adsrs,
+                        base_frequencies: raw_base_frequencies,
+                    },
+                    &mut detune_outputs,
+                );
+
+                // Based off of WebAudio's detune:
+                // https://www.w3.org/TR/webaudio/#computedfrequency
+                //
+                // computedFrequency(t) = frequency(t) * pow(2, detune(t) / 1200)
+                for i in 0..FRAME_SIZE {
+                    unsafe {
+                        let freq = raw_base_frequencies.get_unchecked(i);
+                        let detune = detune_outputs.get_unchecked(i);
+                        *detuned_base_frequencies.get_unchecked_mut(i) =
+                            freq * fastapprox::fast::pow2(detune / 1200.);
+                    }
+                }
+
+                &detuned_base_frequencies
+            },
+            None => raw_base_frequencies,
+        };
 
         // Render all operator base frequencies for the full frame ahead of time using SIMD
         let mut operator_base_frequencies: [[f32; FRAME_SIZE]; OPERATOR_COUNT] =
@@ -685,6 +720,7 @@ pub struct FMSynthContext {
     pub output_buffers: Vec<[f32; FRAME_SIZE]>,
     pub most_recent_gated_voice_ix: usize,
     pub adsr_phase_buf: [f32; 256],
+    pub detune: Option<ParamSource>,
 }
 
 impl FMSynthContext {
@@ -704,6 +740,7 @@ impl FMSynthContext {
                 &self.operator_base_frequency_sources,
                 base_frequency_buffer,
                 output_buffer,
+                self.detune.as_ref(),
             );
         }
     }
@@ -723,6 +760,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         output_buffers: Vec::with_capacity(voice_count),
         most_recent_gated_voice_ix: 0,
         adsr_phase_buf: [0.; 256],
+        detune: None,
     });
     for i in 0..OPERATOR_COUNT {
         (*ctx)
@@ -868,6 +906,27 @@ pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_detune(
+    ctx: *mut FMSynthContext,
+    param_type: isize,
+    param_int_val: usize,
+    param_float_val: f32,
+    param_float_val_2: f32,
+) {
+    if param_type < 0 {
+        (*ctx).detune = None;
+        return;
+    }
+    let param = ParamSourceType::from_parts(
+        param_type as usize,
+        param_int_val,
+        param_float_val,
+        param_float_val_2,
+    );
+    (*ctx).detune = Some(ParamSource::new(param));
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_effect(
     ctx: *mut FMSynthContext,
     operator_ix: isize,
@@ -991,6 +1050,8 @@ pub unsafe extern "C" fn set_adsr(
         if voice.adsrs.get(adsr_ix).is_some() {
             let old_phase = voice.adsrs[adsr_ix].phase;
             let gate_status = voice.adsrs[adsr_ix].gate_status;
+            let store_phase_to = voice.adsrs[adsr_ix].store_phase_to;
+
             adsr.phase = match gate_status {
                 GateStatus::GatedFrozen => release_start_phase,
                 GateStatus::Done => 1.,
@@ -1003,6 +1064,7 @@ pub unsafe extern "C" fn set_adsr(
                 GateStatus::Done => GateStatus::Releasing,
                 other => other,
             };
+            adsr.store_phase_to = store_phase_to;
             voice.adsrs[adsr_ix] = adsr;
         } else if voice.adsrs.len() != adsr_ix {
             panic!(

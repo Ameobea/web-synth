@@ -3,8 +3,9 @@ import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
 
-import { AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
+const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
 const LINE_COLOR = 0x33dd88;
 const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
@@ -19,6 +20,7 @@ export interface SerializedADSR2State {
   lengthMs: number;
   loopPoint: number | null;
   releasePoint: number;
+  audioThreadData?: AudioThreadData;
 }
 
 interface ADSR2Sprites {
@@ -354,7 +356,7 @@ class ADSR2Instance {
   private onChange: (newState: SerializedADSR2State) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
-  private audioThreadData: AudioThreadData;
+  private audioThreadData: AudioThreadData | undefined;
 
   public get width() {
     return this.app.renderer.width;
@@ -427,8 +429,7 @@ class ADSR2Instance {
     canvas: HTMLCanvasElement,
     onChange: (newState: SerializedADSR2State) => void,
     ctx: AudioContext,
-    audioThreadData: AudioThreadData,
-    initialState?: SerializedADSR2State
+    initialState?: Adsr
   ) {
     const app = new PIXI.Application({
       antialias: true,
@@ -438,7 +439,7 @@ class ADSR2Instance {
       backgroundColor: BACKGROUND_COLOR,
     });
 
-    this.audioThreadData = audioThreadData;
+    this.audioThreadData = initialState?.audioThreadData;
     this.app = app;
     this.onChange = onChange;
     this.ctx = ctx;
@@ -510,7 +511,7 @@ class ADSR2Instance {
     const phaseMarker = this.buildPhaseMarker();
 
     this.app.ticker.add(() => {
-      if (!this.audioThreadData.buffer) {
+      if (!this.audioThreadData?.buffer) {
         return;
       }
       const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
@@ -518,9 +519,9 @@ class ADSR2Instance {
     });
   }
 
-  private deserialize(state: SerializedADSR2State) {
+  private deserialize(state: Adsr) {
     this.steps = state.steps.map(step => new StepHandle(this, { ...step, y: 1 - step.y }));
-    this.lengthMs = state.lengthMs;
+    this.lengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
     this.loopPoint = state.loopPoint;
     this.releasePoint = state.releasePoint;
   }
@@ -533,23 +534,24 @@ class ADSR2Instance {
       releasePoint: this.releasePoint,
     };
   }
+
+  public destroy() {
+    this.app.destroy(false);
+  }
 }
 
 interface ADSR2Props {
   width?: number;
   height?: number;
-  initialState?: SerializedADSR2State;
+  initialState?: Adsr;
   onChange: (newState: SerializedADSR2State) => void;
-  audioThreadData: AudioThreadData;
+  /**
+   * A unique ID that identifies this ADSR instance.  Should be changed if `initialState` changes externally.
+   */
+  id: string | number;
 }
 
-const ADSR2: React.FC<ADSR2Props> = ({
-  width = 600,
-  height = 380,
-  initialState,
-  audioThreadData,
-  onChange,
-}) => {
+const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, onChange, id }) => {
   const instance = useRef<ADSR2Instance | null>(null);
 
   useEffect(() => {
@@ -557,8 +559,20 @@ const ADSR2: React.FC<ADSR2Props> = ({
       return;
     }
 
-    instance.current.setLengthMs(initialState.lengthMs);
+    instance.current.setLengthMs((initialState.lenSamples / SAMPLE_RATE) * 1000);
   }, [initialState]);
+
+  const lastID = useRef(id);
+  useEffect(() => {
+    if (!instance.current || id === lastID.current) {
+      return;
+    }
+
+    lastID.current = id;
+    const canvasRef = instance.current.app.view;
+    instance.current.destroy();
+    instance.current = new ADSR2Instance(width, height, canvasRef, onChange, ctx, initialState);
+  }, [height, id, initialState, onChange, width]);
 
   return (
     <canvas
@@ -571,15 +585,7 @@ const ADSR2: React.FC<ADSR2Props> = ({
           return;
         }
 
-        instance.current = new ADSR2Instance(
-          width,
-          height,
-          canvas,
-          onChange,
-          ctx,
-          audioThreadData,
-          initialState
-        );
+        instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState);
       }}
     />
   );

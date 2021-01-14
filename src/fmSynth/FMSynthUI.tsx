@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import * as R from 'ramda';
+import ControlPanel from 'react-control-panel';
 
 import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
@@ -8,7 +9,10 @@ import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/Configu
 import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
-import { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import ConfigureParamSource, {
+  buildDefaultParamSource,
+  ParamSource,
+} from 'src/fmSynth/ConfigureParamSource';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -17,6 +21,7 @@ interface FMSynthState {
   operatorEffects: (Effect | null)[][];
   mainEffectChain: (Effect | null)[];
   adsrs: Adsr[];
+  detune: ParamSource | null;
 }
 
 type BackendModulationUpdater = (
@@ -94,6 +99,8 @@ const FMSynthUI: React.FC<{
   onSelectedUIChange: (newSelectedUI: UISelection | null) => void;
   adsrs: Adsr[];
   onAdsrChange: AdsrChangeHandler;
+  detune: ParamSource | null;
+  handleDetuneChange: (newDetune: ParamSource | null) => void;
 }> = ({
   updateBackendModulation,
   updateBackendOutput,
@@ -108,6 +115,8 @@ const FMSynthUI: React.FC<{
   onSelectedUIChange,
   adsrs,
   onAdsrChange,
+  detune,
+  handleDetuneChange,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -116,6 +125,7 @@ const FMSynthUI: React.FC<{
     operatorEffects,
     mainEffectChain,
     adsrs,
+    detune,
   });
   const [selectedUI, setSelectedUIInner] = useState<UISelection | null>(initialSelectedUI ?? null);
   const setSelectedUI = (newSelectedUI: UISelection | null) => {
@@ -257,6 +267,32 @@ const FMSynthUI: React.FC<{
         >
           MAIN EFFECT CHAIN
         </div>
+        <ControlPanel
+          state={{ 'enable detune': !!state.detune }}
+          settings={[{ type: 'checkbox', label: 'enable detune' }]}
+          onChange={(_key: string, val: boolean) => {
+            if (val) {
+              setState({ ...state, detune: buildDefaultParamSource('constant', -300, 300, 0) });
+              handleDetuneChange(null);
+            } else {
+              setState({ ...state, detune: null });
+              handleDetuneChange(null);
+            }
+          }}
+        />
+        {state.detune ? (
+          <ConfigureParamSource
+            state={state.detune}
+            onChange={newDetune => {
+              setState({ ...state, detune: newDetune });
+              handleDetuneChange(newDetune);
+            }}
+            adsrs={state.adsrs}
+            onAdsrChange={handleAdsrChange}
+            min={-600}
+            max={600}
+          />
+        ) : null}
       </div>
       <div className='fm-synth-configuration'>
         {selectedUI?.type === 'mainEffectChain' ? (
@@ -363,6 +399,8 @@ export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
     }}
     adsrs={synth.getAdsrs()}
     onAdsrChange={(adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr)}
+    detune={synth.detune}
+    handleDetuneChange={(newDetune: ParamSource) => synth.handleDetuneChange(newDetune)}
   />
 );
 

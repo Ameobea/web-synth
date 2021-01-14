@@ -101,6 +101,7 @@ export default class FMSynth implements ForeignNode {
   public selectedUI: UISelection | null = null;
   private onInitialized: ((inst: FMSynth) => void) | undefined;
   private audioThreadDataBuffer: Float32Array | null = null;
+  public detune: ParamSource | null = null;
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -188,8 +189,8 @@ export default class FMSynth implements ForeignNode {
             this.audioThreadDataBuffer = new Float32Array(
               evt.data.audioThreadDataBuffer as SharedArrayBuffer
             );
-            this.adsrs.forEach((adsr, i) => {
-              adsr.audioThreadData = { buffer: this.audioThreadDataBuffer!, phaseIndex: i };
+            this.adsrs.forEach(adsr => {
+              adsr.audioThreadData.buffer = this.audioThreadDataBuffer!;
             });
           }
 
@@ -205,6 +206,7 @@ export default class FMSynth implements ForeignNode {
           this.mainEffectChain.forEach((effect, effectIx) =>
             this.setEffect(null, effectIx, effect)
           );
+          this.handleDetuneChange(this.detune);
 
           if (this.onInitialized) {
             this.onInitialized(this);
@@ -239,7 +241,11 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.postMessage({ type: 'ungate', voiceIx });
   }
 
-  private encodeParamSource(source: ParamSource) {
+  private encodeParamSource(source: ParamSource | null | undefined) {
+    if (!source) {
+      return { valueType: -1, valParamInt: 0, valParamFloat: 0, valParamFloat2: 0 };
+    }
+
     switch (source.type) {
       case 'base frequency multiplier': {
         return {
@@ -507,7 +513,15 @@ export default class FMSynth implements ForeignNode {
       this.selectedUI = params.selectedUI;
     }
     if (params.adsrs) {
-      this.adsrs = params.adsrs;
+      this.adsrs = params.adsrs.map(
+        (adsr: Exclude<Adsr, 'audioThreadData'>, i: number): Adsr => ({
+          ...adsr,
+          audioThreadData: { phaseIndex: i },
+        })
+      );
+    }
+    if (params.detune) {
+      this.detune = params.detune;
     }
   }
 
@@ -520,6 +534,7 @@ export default class FMSynth implements ForeignNode {
       selectedUI: this.selectedUI,
       mainEffectChain: this.mainEffectChain,
       adsrs: this.adsrs,
+      detune: this.detune,
     };
   }
 
@@ -532,6 +547,16 @@ export default class FMSynth implements ForeignNode {
     (this.awpHandle.parameters as Map<string, AudioParam>).get(
       `voice_${voiceIx}_base_frequency`
     )!.value = frequency;
+  }
+
+  public handleDetuneChange(newDetune: ParamSource | null) {
+    this.detune = newDetune;
+    if (!this.awpHandle) {
+      console.warn('Tried to set FM synth detune before AWP initialized');
+      return;
+    }
+
+    this.awpHandle.port.postMessage({ type: 'setDetune', ...this.encodeParamSource(newDetune) });
   }
 
   public getAWPNode() {

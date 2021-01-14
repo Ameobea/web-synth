@@ -62,11 +62,13 @@ const encodeAdsr = ({
   lenSamples,
   loopPoint,
   releasePoint,
+  audioThreadData,
 }: Adsr): SerializedADSR2State => ({
   steps,
   lengthMs: (lenSamples / SAMPLE_RATE) * 1000,
   loopPoint,
   releasePoint,
+  audioThreadData,
 });
 
 const decodeAdsr = (prevState: Adsr, newState: SerializedADSR2State): Adsr => ({
@@ -260,13 +262,13 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
         <ADSR2
           width={376}
           height={222}
-          initialState={encodeAdsr(adsrs[state['adsr index']])}
+          initialState={adsrs[state['adsr index']]}
           onChange={value => {
             const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
             const decoded = decodeAdsr(adsrs[adsrIx], value);
             onAdsrChange(adsrIx, decoded);
           }}
-          audioThreadData={adsrs[state['adsr index']].audioThreadData}
+          id={state['adsr index']}
         />
       ) : null}
     </>

@@ -186,6 +186,21 @@ class FMSynthAWP extends AudioWorkletProcessor {
           this.wasmInstance.exports.ungate_voice(this.ctxPtr, evt.data.voiceIx);
           break;
         }
+        case 'setDetune': {
+          if (!this.wasmInstance) {
+            console.warn('Tried ungating before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.fm_synth_set_detune(
+            this.ctxPtr,
+            evt.data.valueType ?? 0,
+            evt.data.valParamInt ?? 0,
+            evt.data.valParamFloat ?? 0,
+            evt.data.valParamFloat2 ?? 0
+          );
+          break;
+        }
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }
