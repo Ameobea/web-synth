@@ -449,6 +449,7 @@ class ADSR2Instance {
     g.beginFill(PHASE_MARKER_COLOR, 0.22);
     g.drawRect(0, 0, this.width, this.height);
     g.endFill();
+    g.x = -this.width;
     this.app.stage.addChildAt(g, 0);
     return g;
   }

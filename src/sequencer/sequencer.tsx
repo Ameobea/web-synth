@@ -96,7 +96,9 @@ export const buildGateOutput = (): ConstantSourceNode => {
 };
 
 const SequencerAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule('/SequencerWorkletProcessor.js')
+  ctx.audioWorklet.addModule(
+    '/SequencerWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+  )
 );
 
 const getIsSequencerVisible = (vcId: string): boolean => {

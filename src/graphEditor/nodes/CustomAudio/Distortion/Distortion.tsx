@@ -57,7 +57,9 @@ export default class DistortionNode implements ForeignNode {
   private async init() {
     const [wasmBytes] = await Promise.all([
       DistortionWasmBytes.get(),
-      this.ctx.audioWorklet.addModule('/DistortionAWP.js'),
+      this.ctx.audioWorklet.addModule(
+        '/DistortionAWP.js?cacheBust=' + btoa(Math.random().toString())
+      ),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'distortion-awp');
     this.stretchFactorOAP = new OverridableAudioParam(

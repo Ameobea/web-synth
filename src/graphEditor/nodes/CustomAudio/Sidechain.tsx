@@ -11,7 +11,9 @@ import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const SidechainAWPRegistered = new AsyncOnce(() =>
-  new AudioContext().audioWorklet.addModule('/SidechainWorkletProcessor.js')
+  new AudioContext().audioWorklet.addModule(
+    '/SidechainWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+  )
 );
 const SidechainWasm = new AsyncOnce(() => fetch('/sidechain.wasm').then(res => res.arrayBuffer()));
 

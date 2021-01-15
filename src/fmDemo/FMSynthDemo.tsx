@@ -455,13 +455,18 @@ const FMSynthDemo: React.FC = () => {
 initSentry();
 const root = (ReactDOM as any).unstable_createRoot(document.getElementById('root')!);
 
-if (navigator.userAgent.includes('Firefox/')) {
-  setTimeout(() => {
-    const elem = document.getElementById('simd-status');
+setTimeout(() => {
+  const elem = document.getElementById('simd-status');
+  if (navigator.userAgent.includes('Firefox/')) {
     elem!.innerHTML +=
       '<br /><br/><span style="color: rgb(233,142,24);">Firefox has <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1171438">several</a> <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1567777">bugs</a> in its WebAudio implementation; Chrome will give a better experience</span>';
-  }, 1000);
-}
+  }
+
+  if (typeof SharedArrayBuffer === 'undefined') {
+    elem!.innerHTML +=
+      '<br /><br/><span style="color: rgb(233,142,24);"><code>SharedArrayBuffer</code> support not detected; some visualizations and other features are not available.</span>';
+  }
+}, 1000);
 
 if (typeof AudioWorkletNode === 'undefined') {
   root.render(

@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <meta http-equiv="origin-trial" content="AoiY10kKU8SneGIdwFOcHukRRAYQpHwtx8unkZhbPjl4S8hVCEemZgWAITkcbFDnWvBDMclWHAffGJc6tlKSHAIAAABaeyJvcmlnaW4iOiJodHRwczovL25vdGVzLmFtZW8uZGVzaWduOjQ0MyIsImZlYXR1cmUiOiJXZWJBc3NlbWJseVNpbWQiLCJleHBpcnkiOjE2MTM1MTcwOTh9">
+    <meta http-equiv="origin-trial" content="AqMUTRiGfKKC5RVut5KvTieXZqSeFx119QSgrTQ64spTIUlqovZFxKmheIykmOXvRKzQBMWVIKHyME6lXuMQCwsAAABaeyJvcmlnaW4iOiJodHRwczovL3N5bnRoLmFtZW8uZGVzaWduOjQ0MyIsImZlYXR1cmUiOiJXZWJBc3NlbWJseVNpbWQiLCJleHBpcnkiOjE2MTQzMTIwNzZ9">
     <title>{{ htmlWebpackPlugin.options.title }}</title>
     <script type="text/javascript">
       // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
@@ -12,7 +12,24 @@
       // pre-constructed instance.
       const OldAudioContext = globalThis.AudioContext;
 
-      const globalContext = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
+      let latencyHint = 'realtime';
+      if (localStorage.getItem('latencyHint')) {
+        latencyHint = +localStorage.getItem('latencyHint');
+      } else if (navigator.platform.includes("Linux")) {
+        // Get the host operating system's base audio context and use that for latency hint computation
+        const _ctx = new AudioContext();
+        const hostSampleRate = _ctx.sampleRate;
+        _ctx.close();
+        latencyHint = 800 / hostSampleRate;
+      }
+
+      const globalContext = new AudioContext({
+        sampleRate: 44100,
+        // This is important for Linux because pulseaudio is weird and drops frames if this isn't set precisely right
+        //
+        // This value came up in google chrome bug database conversation and seems to fix it
+        latencyHint: latencyHint,
+      });
       globalContext.globalVolume = new GainNode(globalContext);
       globalContext.globalVolume.gain.value = 1;
       globalContext.globalVolume.connect(globalContext.destination);
@@ -34,6 +51,17 @@
       rel="stylesheet"
       href="//cdn.jsdelivr.net/npm/hack-font@3.3.0/build/web/hack-subset.css"
     />
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-B1ES83ZTMR"></script>
+    <script>
+      if (!window.location.href.includes('localhost')) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-B1ES83ZTMR');
+      }
+    </script>
   </head>
 
   <body>

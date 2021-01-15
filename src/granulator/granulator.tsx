@@ -20,7 +20,9 @@ import { SampleDescriptor } from 'src/sampleLibrary';
 const ctx = new AudioContext();
 
 const GranulatorRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule('/GranulatorWorkletProcessor.js')
+  ctx.audioWorklet.addModule(
+    '/GranulatorWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+  )
 );
 
 export const GranulatorInstancesById = new Map<

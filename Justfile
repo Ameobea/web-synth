@@ -76,6 +76,7 @@ deploy:
 
   just build-all
   phost update notes patch ./dist
+  rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" --delete ./dist/* debian@synth.ameo.design:/var/www/synth/
 
 build-docker-ci:
   docker build -t $CI_BUILDER_DOCKER_IMAGE_NAME -f Dockerfile.CI .

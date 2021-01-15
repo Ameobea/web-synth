@@ -83,7 +83,9 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
   }
 
   private async initWorklet() {
-    await this.ctx.audioWorklet.addModule('/StatisticsNodeProcessor.js');
+    await this.ctx.audioWorklet.addModule(
+      '/StatisticsNodeProcessor.js?cacheBust=' + btoa(Math.random().toString())
+    );
     this.workletHandle = new AudioWorkletNode(this.ctx, 'statistics-node-processor');
     this.connect((this.workletHandle.parameters as any).get('input'));
     this.workletHandle.connect(this.gainNode);

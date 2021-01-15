@@ -253,9 +253,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
       );
     });
 
-    this.audioThreadDataBufferInner = new SharedArrayBuffer(ADSR_PHASE_BUF_LENGTH * BYTES_PER_F32);
-    this.audioThreadDataBuffer = new Float32Array(this.audioThreadDataBufferInner);
-    this.adsrPhasesBufPtr = this.wasmInstance.exports.get_adsr_phases_buf_ptr(this.ctxPtr);
+    if (typeof SharedArrayBuffer !== 'undefined') {
+      this.audioThreadDataBufferInner = new SharedArrayBuffer(
+        ADSR_PHASE_BUF_LENGTH * BYTES_PER_F32
+      );
+      this.audioThreadDataBuffer = new Float32Array(this.audioThreadDataBufferInner);
+      this.adsrPhasesBufPtr = this.wasmInstance.exports.get_adsr_phases_buf_ptr(this.ctxPtr);
+    }
 
     this.port.postMessage({
       type: 'wasmInitialized',
@@ -326,11 +330,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
     }
 
     // Copy current ADSR phases to shared buffer
-    const adsrPhaseBuf = wasmMemory.slice(
-      this.adsrPhasesBufPtr / BYTES_PER_F32,
-      this.adsrPhasesBufPtr / BYTES_PER_F32 + ADSR_PHASE_BUF_LENGTH
-    );
-    this.audioThreadDataBuffer.set(adsrPhaseBuf);
+    if (this.audioThreadDataBuffer) {
+      const adsrPhaseBuf = wasmMemory.slice(
+        this.adsrPhasesBufPtr / BYTES_PER_F32,
+        this.adsrPhasesBufPtr / BYTES_PER_F32 + ADSR_PHASE_BUF_LENGTH
+      );
+      this.audioThreadDataBuffer.set(adsrPhaseBuf);
+    }
 
     return true;
   }

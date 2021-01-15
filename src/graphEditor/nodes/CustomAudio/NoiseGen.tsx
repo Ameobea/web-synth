@@ -13,7 +13,9 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { filterNils } from 'ameo-utils';
 
 const NoiseGenAWPRegistered = new AsyncOnce(() =>
-  new AudioContext().audioWorklet.addModule('/NoiseGenAWP.js')
+  new AudioContext().audioWorklet.addModule(
+    '/NoiseGenAWP.js?cacheBust=' + btoa(Math.random().toString())
+  )
 );
 const NoiseGenWasm = new AsyncOnce(() => fetch('/noise_gen.wasm').then(res => res.arrayBuffer()));
 

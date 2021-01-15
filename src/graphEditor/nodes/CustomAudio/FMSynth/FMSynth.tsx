@@ -166,7 +166,7 @@ export default class FMSynth implements ForeignNode {
   public async init() {
     const [wasmBytes] = await Promise.all([
       WavetableWasmBytes.get(),
-      this.ctx.audioWorklet.addModule('/FMSynthAWP.js'),
+      this.ctx.audioWorklet.addModule('/FMSynthAWP.js?randId=' + btoa(Math.random().toString())),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       numberOfOutputs: VOICE_COUNT,

@@ -17,7 +17,9 @@ const registerRecorder = async (ctx: AudioContext) => {
     return;
   }
 
-  const prom = ctx.audioWorklet.addModule('/ValueRecorderWorkletProcessor.js');
+  const prom = ctx.audioWorklet.addModule(
+    '/ValueRecorderWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+  );
   recorderIsRegistered = prom;
   await prom;
   recorderIsRegistered = true;
