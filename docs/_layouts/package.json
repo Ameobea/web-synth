@@ -16,7 +16,7 @@
   "main": "n/a",
   "scripts": {
     "develop": "gatsby develop",
-    "build": "gatsby build",
+    "build": "gatsby build --prefix-paths",
     "start": "gatsby serve"
   }
 }

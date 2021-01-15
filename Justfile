@@ -12,6 +12,11 @@ opt-public-profiling:
   # for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done
   for file in `ls ./public | grep "\\.wasm"`; do echo $file && wasm-opt ./public/$file -O4 --enable-simd --enable-nontrapping-float-to-int --precompute-propagate --fast-math --detect-features -g -c -o ./public/$file; done
 
+build-docs:
+  cd docs/_layouts && yarn build
+  rm -rf ./dist/docs
+  cp -r ./docs/_layouts/public ./dist/docs
+
 build-all:
   cd engine \
     && ./release.sh \
@@ -31,6 +36,8 @@ build-all:
   yarn build || npm build
 
   just opt
+
+  just build-docs
 
 run:
   cd engine \

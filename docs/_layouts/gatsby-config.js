@@ -1,20 +1,15 @@
 module.exports = {
-  pathPrefix: `/foam-gatsby-template`,
+  pathPrefix: `/docs`,
   siteMetadata: {
-    title: `Foam`,
+    title: `web synth docs`,
   },
   plugins: [
     {
       resolve: `gatsby-theme-garden`,
       options: {
-        rootNote: "/readme",
+        rootNote: '/readme',
         contentPath: `${__dirname}/..`,
-        ignore: [
-          "**/_layouts/**",
-          "**/.git/**",
-          "**/.github/**",
-          "**/.vscode/**",
-        ],
+        ignore: ['**/_layouts/**', '**/.git/**', '**/.github/**', '**/.vscode/**'],
       },
     },
   ],
