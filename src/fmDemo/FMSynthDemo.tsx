@@ -301,6 +301,8 @@ const FMSynthDemo: React.FC = () => {
       .forEach((effect, effectIx) => synth.setEffect(null, 15 - effectIx, effect));
     // FM synth selected UI
     synth.selectedUI = preset.synth.selectedUI;
+    // FM synth detune
+    synth.handleDetuneChange(preset.synth.detune);
 
     // Clear all UI and trigger it to re-initialize internal state from scratch
     reRenderAll();

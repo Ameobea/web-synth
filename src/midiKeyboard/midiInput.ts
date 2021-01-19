@@ -1,58 +1,30 @@
-import { Map } from 'immutable';
-import * as R from 'ramda';
 import { Option } from 'funfix-core';
-import { IterableValueOf, PromiseResolveType } from 'ameo-utils';
+import { IterableValueOf, UnreachableException } from 'ameo-utils';
 
-import type { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
-import { MIDINode, MIDIAccess, buildMIDINode } from 'src/patchNetwork/midiNode';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { MIDINode, MIDIAccess } from 'src/patchNetwork/midiNode';
 
-export type MIDIInput = IterableValueOf<MIDIAccess['inputs']>;
+export type BulitinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
 /**
- * Defines a custom audio node that processes MIDI events from some hardware MIDI device
+ * Processes MIDI events from some hardware MIDI device
  */
-export class MIDIInputNode {
-  public lgNode?: any;
+export class MIDIInput {
   public nodeType = 'customAudio/MIDIInput';
   static typeName = 'MIDI Input';
 
-  private vcId: string;
   private selectedInputName: string | undefined;
   private wasmMidiCtxPtr: number | undefined;
   private midiModule: typeof import('src/midi') | undefined;
-  private midiInput: MIDIInput | undefined;
+  private midiAccess: MIDIAccess | undefined;
+  private midiInput: BulitinMIDIInput | undefined;
   private midiMsgHandlerCb: ((evt: Event & { data: Uint8Array }) => void) | undefined;
   private pitchBendNode: ConstantSourceNode;
   private modWheelNode: ConstantSourceNode;
-
-  /**
-   * See the docs for `enhanceAudioNode`.
-   */
-  public paramOverrides: {
-    [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
-  } = {};
-
-  public async updateInputs(providedAccess?: MIDIAccess) {
-    const access = providedAccess || (await navigator.requestMIDIAccess());
-    const allInputs: MIDIInput[] = [];
-    for (const [, input] of access.inputs) {
-      allInputs.push(input);
-    }
-
-    if (!R.isEmpty(allInputs)) {
-      this.lgNode.addProperty('inputName', this.selectedInputName || allInputs[0].name, 'enum', {
-        values: allInputs.map(R.prop('name')),
-      });
-    }
-  }
-
-  private midiNode: MIDINode = buildMIDINode(() => {
-    throw new Error("Tried to get input callbacks for `MIDIInput` but it doesn't accept inputs");
-  });
+  private onInitCbs: (() => void)[] = [];
+  private midiNode: MIDINode | undefined;
 
   private async initMIDI() {
-    let access: PromiseResolveType<ReturnType<typeof navigator.requestMIDIAccess>>;
+    let access: MIDIAccess;
     let midiModule: typeof import('src/midi');
     try {
       // Request MIDI access and load the Wasm MIDI module at the same time
@@ -67,16 +39,15 @@ export class MIDIInputNode {
       return;
     }
 
+    this.midiAccess = access;
+    this.onInitCbs.forEach(cb => cb());
+    this.onInitCbs = [];
     if ((access.inputs as any).size === 0) {
       // No available MIDI inputs
       return;
     }
 
     this.midiModule = midiModule;
-
-    if (this.lgNode) {
-      this.updateInputs(access);
-    }
 
     const input = Option.of(this.selectedInputName)
       .flatMap(inputName => {
@@ -89,23 +60,24 @@ export class MIDIInputNode {
         return Option.none();
       })
       .getOrElseL(() => {
+        // If no input was pre-selected, pick an arbitrary one
         for (const [, input] of access.inputs) {
           return input;
         }
 
-        throw new Error('Entered unreachable code');
+        throw new UnreachableException();
       });
 
     // Register input handlers for the MIDI input so that MIDI events trigger our output callbacks
     // to be called appropriately.
     const ctxPtr = midiModule.create_msg_handler_context(
       (_voiceIx: number, note: number, velocity: number) =>
-        this.midiNode.outputCbs.forEach(({ onAttack }) => onAttack(note, velocity)),
+        this.midiNode?.outputCbs.forEach(({ onAttack }) => onAttack(note, velocity)),
       (_voiceIx: number, note: number, velocity: number) =>
-        this.midiNode.outputCbs.forEach(({ onRelease }) => onRelease(note, velocity)),
+        this.midiNode?.outputCbs.forEach(({ onRelease }) => onRelease(note, velocity)),
       (_lsb: number, msb: number) => {
         this.pitchBendNode.offset.value = msb;
-        this.midiNode.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb));
+        this.midiNode?.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb));
       },
       (modWheelValue: number) => {
         this.modWheelNode.offset.value = modWheelValue;
@@ -123,29 +95,20 @@ export class MIDIInputNode {
 
   constructor(
     ctx: AudioContext,
-    vcId: string,
-    params: { [key: string]: any } | null = {},
-    lgNode?: any
+    midiNode: MIDINode,
+    initialSelectedInputName?: string | undefined
   ) {
-    this.vcId = vcId;
-    this.lgNode = lgNode;
-
     this.pitchBendNode = new ConstantSourceNode(ctx);
     this.pitchBendNode.offset.value = 0;
     this.pitchBendNode.start();
     this.modWheelNode = new ConstantSourceNode(ctx);
     this.modWheelNode.offset.value = 0;
     this.modWheelNode.start();
+    this.midiNode = midiNode;
 
-    if (params) {
-      if (params.inputName !== undefined && typeof params.inputName !== 'string') {
-        throw new Error(`Invalid type of \`inputName\`: ${typeof params.inputName}`);
-      }
+    this.selectedInputName = initialSelectedInputName;
 
-      this.selectedInputName = params.inputName;
-    }
-
-    this.initMIDI(); // Maybe a side-effectful constructor isn't the best idea but w/e
+    this.initMIDI();
   }
 
   public serialize() {
@@ -169,24 +132,28 @@ export class MIDIInputNode {
     return this.initMIDI();
   }
 
-  public buildConnectables(): AudioConnectables & { node: NonNullable<AudioConnectables['node']> } {
-    return {
-      inputs: Map<string, ConnectableInput>(),
-      outputs: Map<string, ConnectableOutput>()
-        .set('midi_output', {
-          node: this.midiNode,
-          type: 'midi',
-        })
-        .set('pitch_bend', {
-          node: this.pitchBendNode,
-          type: 'number',
-        })
-        .set('mod_wheel', {
-          node: this.modWheelNode,
-          type: 'number',
-        }),
-      vcId: this.vcId,
-      node: this,
-    };
+  public async getMidiInputNames(): Promise<string[]> {
+    if (this.midiAccess) {
+      const inputNames: string[] = [];
+      for (const [, input] of this.midiAccess.inputs) {
+        if (input.name.toLowerCase().includes('midi through port')) {
+          continue;
+        }
+        inputNames.push(input.name);
+      }
+      return inputNames;
+    }
+
+    return new Promise(resolve => {
+      this.onInitCbs.push(async () => resolve(await this.getMidiInputNames()));
+    });
+  }
+
+  public disconnectMidiNode() {
+    this.midiNode = undefined;
+  }
+
+  public connectMidiNode(midiNode: MIDINode) {
+    this.midiNode = midiNode;
   }
 }

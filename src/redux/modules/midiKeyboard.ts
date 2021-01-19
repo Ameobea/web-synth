@@ -1,12 +1,35 @@
+import { UnreachableException } from 'ameo-utils';
 import { buildActionGroup, buildModule } from 'jantix';
+import { midiNodesByStateKey } from 'src/midiKeyboard';
+
+import { MIDIInput } from 'src/midiKeyboard/midiInput';
+
+const ctx = new AudioContext();
+
+export enum MidiKeyboardMode {
+  /**
+   * Uses an external MIDI device connected via WebMIDI
+   */
+  MidiInput,
+  /**
+   * Uses the normal computer keyboard keys to send MIDI events
+   */
+  ComputerKeyboard,
+}
 
 export interface MidiKeyboardStateItem {
+  mode: MidiKeyboardMode;
+  midiInput: MIDIInput | undefined;
+  midiInputName: string | undefined;
   octaveOffset: number;
 }
 
 export type MidiKeyboardState = { [stateKey: string]: MidiKeyboardStateItem };
 
 const DEFAULT_MIDI_KEYBOARD_STATE_ITEM: MidiKeyboardStateItem = {
+  mode: MidiKeyboardMode.ComputerKeyboard,
+  midiInput: undefined,
+  midiInputName: undefined,
   octaveOffset: 0,
 };
 
@@ -53,6 +76,76 @@ const actionGroups = {
         return state;
       }
       return { ...state, [stateKey]: { ...instanceState, octaveOffset } };
+    },
+  }),
+  SET_MIDI_INPUT_NAME: buildActionGroup({
+    actionCreator: (stateKey: string, midiInputName: string | undefined) => ({
+      type: 'SET_MIDI_INPUT_NAME',
+      stateKey,
+      midiInputName,
+    }),
+    subReducer: (state: MidiKeyboardState, { stateKey, midiInputName }) => {
+      if (!state[stateKey].midiInput) {
+        throw new UnreachableException(
+          `No \`midiInput\` for stateKey=${stateKey} but we're handling input change`
+        );
+      }
+      if (midiInputName) {
+        const midiNode = midiNodesByStateKey.get(stateKey);
+        if (!midiNode) {
+          throw new UnreachableException(
+            'No MIDI node found for midi keyboard with `stateKey`: ' + stateKey
+          );
+        }
+        state[stateKey].midiInput!.connectMidiNode(midiNode);
+        state[stateKey].midiInput!.handleSelectedInputName(midiInputName);
+      } else {
+        state[stateKey].midiInput!.disconnectMidiNode();
+      }
+
+      return {
+        ...state,
+        [stateKey]: {
+          ...state[stateKey],
+          midiInputName: midiInputName ? midiInputName : undefined,
+        },
+      };
+    },
+  }),
+  SET_MIDI_INPUT_MODE: buildActionGroup({
+    actionCreator: (stateKey: string, mode: MidiKeyboardMode) => ({
+      type: 'SET_MIDI_INPUT_MODE',
+      stateKey,
+      mode,
+    }),
+    subReducer: (state: MidiKeyboardState, { stateKey, mode }) => {
+      const midiNode = midiNodesByStateKey.get(stateKey);
+      if (!midiNode) {
+        throw new UnreachableException(
+          'No MIDI node found for midi keyboard with `stateKey`: ' + stateKey
+        );
+      }
+
+      const midiInput =
+        state[stateKey].midiInput ??
+        (mode === MidiKeyboardMode.MidiInput
+          ? new MIDIInput(ctx, midiNode, state[stateKey].midiInputName)
+          : undefined);
+
+      if (mode !== MidiKeyboardMode.MidiInput && state[stateKey].midiInput) {
+        state[stateKey].midiInput!.disconnectMidiNode();
+      } else if (mode === MidiKeyboardMode.MidiInput) {
+        if (state[stateKey].midiInput) {
+          state[stateKey].midiInput!.connectMidiNode(midiNode);
+        } else {
+          state[stateKey].midiInput = new MIDIInput(ctx, midiNode);
+        }
+      }
+
+      return {
+        ...state,
+        [stateKey]: { ...state[stateKey], midiInput, mode },
+      };
     },
   }),
 };

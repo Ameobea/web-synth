@@ -15,7 +15,6 @@ import { addNode, removeNode } from 'src/patchNetwork/interface';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
-import { MIDIInputNode } from 'src/graphEditor/nodes/CustomAudio/midiInput';
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -423,26 +422,6 @@ export const audioNodeGetters: {
   },
   'customAudio/mixer': {
     nodeGetter: MixerNode,
-  },
-  'customAudio/MIDIInput': {
-    nodeGetter: MIDIInputNode,
-    protoParams: {
-      onDrawForeground: function (this: MIDIInputNode, _ctx: CanvasRenderingContext2D) {
-        // TODO: Render a button that, when clicked, updates the list of available MIDI editors
-      },
-      onAddedCustom: function (this: any) {
-        this.connectables.node.updateInputs();
-      },
-      onPropertyChanged: function (
-        this: { connectables: AudioConnectables },
-        name: string,
-        value: any
-      ) {
-        if (name === 'inputName') {
-          (this.connectables.node! as any).handleSelectedInputName(value);
-        }
-      },
-    },
   },
   'customAudio/MIDIToFrequency': {
     nodeGetter: MIDIToFrequencyNode,

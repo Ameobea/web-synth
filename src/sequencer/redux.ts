@@ -3,7 +3,7 @@ import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { UnreachableException } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary';
-import { MIDINode, buildMIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
+import { MIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { buildGateOutput } from 'src/sequencer';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 import { genRandomStringID } from 'src/util';
@@ -191,12 +191,7 @@ const actionGroups = {
     actionCreator: () => ({ type: 'ADD_MIDI_OUTPUT' }),
     subReducer: (state: SequencerReduxState) => ({
       ...state,
-      midiOutputs: [
-        ...state.midiOutputs,
-        buildMIDINode(() => {
-          throw new UnreachableException('MIDI output of sequencer has no inputs');
-        }),
-      ],
+      midiOutputs: [...state.midiOutputs, new MIDINode()],
     }),
   }),
   REMOVE_MIDI_OUTPUT: buildActionGroup({
@@ -443,7 +438,7 @@ export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
     onPitchBend: () => void 0,
   };
 
-  return buildMIDINode(() => inputCbs);
+  return new MIDINode(() => inputCbs);
 };
 
 export const buildInitialState = (vcId: string): SequencerReduxState => ({

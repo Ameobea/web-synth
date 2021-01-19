@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import { Map } from 'immutable';
 
-import { MIDINode, buildMIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
+import { MIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { midiToFrequency } from 'src/util';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -89,7 +89,7 @@ export class MIDIToFrequencyNode {
     this.detuneCSN.offset.value = 0;
     this.frequencyCSN.connect(this.detuneCSN.offset);
 
-    this.midiNode = buildMIDINode(this.getMIDIInputCbs);
+    this.midiNode = new MIDINode(this.getMIDIInputCbs);
   }
 
   public buildConnectables(): AudioConnectables & { node: MIDIToFrequencyNode } {

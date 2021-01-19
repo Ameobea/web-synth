@@ -5,6 +5,7 @@ use spectral_warping::SpectralWarpingParams;
 use super::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
+pub mod butterworth_filter;
 pub mod soft_clipper;
 pub mod spectral_warping;
 pub mod wavefolder;

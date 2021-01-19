@@ -61,7 +61,7 @@ module.exports = {
       alwaysWriteToDisk: true,
       title: 'Web Synth',
       minify: true,
-      template: 'index.hbs',
+      template: 'src/index.hbs',
       chunks: ['index'],
     }),
     new HtmlWebpackPlugin({
@@ -69,7 +69,7 @@ module.exports = {
       title: 'Rust/Wasm FM Synth',
       minify: true,
       injdex: true,
-      template: 'fm-synth-demo.hbs',
+      template: 'src/fm-synth-demo.hbs',
       filename: 'fm.html',
       hash: true,
       chunks: ['fmDemo'],

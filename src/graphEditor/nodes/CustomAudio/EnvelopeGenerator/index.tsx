@@ -8,7 +8,7 @@ import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/Envelo
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { buildMIDINode, MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 
 export class EnvelopeGenerator implements ForeignNode {
   private vcId: string;
@@ -35,7 +35,7 @@ export class EnvelopeGenerator implements ForeignNode {
       this.adsrModule.ungate();
     },
   };
-  private gateMIDINode: MIDINode = buildMIDINode(() => this.gateMIDINodeInputCBs);
+  private gateMIDINode: MIDINode = new MIDINode(() => this.gateMIDINodeInputCBs);
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;

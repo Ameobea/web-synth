@@ -1,16 +1,17 @@
-import React, { useEffect, useMemo, useReducer } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
 import { Piano } from 'react-piano';
 import 'react-piano/dist/styles.css';
 import { Set as ImmSet } from 'immutable';
 import { UnreachableException } from 'ameo-utils';
+import ControlPanel from 'react-control-panel';
 
 import Loading from 'src/misc/Loading';
 import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
 import './MidiKeyboard.scss';
-import ADSR2 from 'src/controls/adsr2/adsr2';
+import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 33;
@@ -41,6 +42,32 @@ declare global {
     requestMIDIAccess: () => Promise<MIDIAccess>;
   }
 }
+
+const MODE_PICKER_SETTINGS = [
+  { type: 'multibox', label: 'input source', names: ['computer keyboard', 'external midi device'] },
+];
+
+const MidiKeyboardModePicker: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+  const mode = useSelector((state: ReduxStore) => state.midiKeyboard[stateKey].mode);
+
+  return (
+    <ControlPanel
+      style={{ width: 800 }}
+      settings={MODE_PICKER_SETTINGS}
+      state={{
+        'input source': mode === MidiKeyboardMode.MidiInput ? [false, true] : [true, false],
+      }}
+      onChange={(_key: string, val: any) => {
+        const newMode =
+          mode === MidiKeyboardMode.MidiInput && (val[0] || !val[1])
+            ? MidiKeyboardMode.ComputerKeyboard
+            : MidiKeyboardMode.MidiInput;
+
+        dispatch(actionCreators.midiKeyboard.SET_MIDI_INPUT_MODE(stateKey, newMode));
+      }}
+    />
+  );
+};
 
 export const MidiKeyboard: React.FC<{
   octaveOffset: number;
@@ -202,15 +229,54 @@ const mkOctaveCountSelector = () =>
  */
 export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const octaveCountSelector = useMemo(() => mkOctaveCountSelector(), []);
-  const octaveOffset = useSelector((state: ReduxStore) => octaveCountSelector(state, stateKey));
+  const { octaveOffset, mode, midiInput, midiInputName } = useSelector((state: ReduxStore) => ({
+    octaveOffset: octaveCountSelector(state, stateKey),
+    mode: state.midiKeyboard[stateKey].mode,
+    midiInput: state.midiKeyboard[stateKey].midiInput,
+    midiInputName: state.midiKeyboard[stateKey].midiInputName,
+  }));
+  const [midiInputNames, setMidiInputNames] = useState<string[]>([]);
+  useEffect(() => {
+    midiInput?.getMidiInputNames().then(inputNames => setMidiInputNames(['', ...inputNames]));
+  }, [midiInput]);
+  const midiInputSettings = useMemo(
+    () => [
+      { type: 'select', label: 'midi input device', options: midiInputNames },
+      {
+        type: 'button',
+        label: 'refresh device list',
+        action: () =>
+          midiInput?.getMidiInputNames().then(inputNames => setMidiInputNames(['', ...inputNames])),
+      },
+    ],
+    [midiInput, midiInputNames]
+  );
 
   const midiNode = useMemo(() => midiNodesByStateKey.get(stateKey), [stateKey]);
   if (!midiNode) {
     return <Loading />;
   }
 
+  if (mode === MidiKeyboardMode.MidiInput) {
+    return (
+      <div className='midi-keyboard-vc'>
+        <MidiKeyboardModePicker stateKey={stateKey} />
+        <ControlPanel
+          title='midi input'
+          style={{ width: 800 }}
+          settings={midiInputSettings}
+          state={{ 'midi input device': midiInputName ?? '' }}
+          onChange={(_key: string, midiInputName: string) => {
+            dispatch(actionCreators.midiKeyboard.SET_MIDI_INPUT_NAME(stateKey, midiInputName));
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className='midi-keyboard-vc'>
+      <MidiKeyboardModePicker stateKey={stateKey} />
       <MidiKeyboard
         octaveOffset={octaveOffset}
         onOctaveOffsetChange={(newOctaveOffset: number) =>
@@ -222,5 +288,3 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
     </div>
   );
 };
-
-const ADSRDemo: React.FC = () => <ADSR2 onChange={console.log} />;

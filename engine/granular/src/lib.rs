@@ -13,7 +13,6 @@ use rand::prelude::*;
 pub mod sample_recorder;
 
 const FRAME_SIZE: usize = 128;
-const SAMPLE_RATE: usize = 44100;
 
 #[derive(Clone, Copy)]
 pub struct ReverseState {
@@ -49,7 +48,7 @@ impl Default for GranularVoice {
         GranularVoice {
             cur_grain_start: 0.0,
             reversed: ReverseState::default(),
-            filter: ButterworthFilter::new(SAMPLE_RATE),
+            filter: ButterworthFilter::default(),
             filter_cutoff: 0.,
             grains: Vec::with_capacity(128),
             samples_since_last_grain: 0.,

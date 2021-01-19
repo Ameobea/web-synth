@@ -12,7 +12,7 @@ import {
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import Loading from 'src/misc/Loading';
-import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 import { SampleDescriptor, getSample } from 'src/sampleLibrary';
 import {
   buildSequencerReduxInfra,
@@ -206,13 +206,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     bpm,
     isPlaying: false, // This will be set asynchronously if auto-start enabled
     outputGainNode: new GainNode(ctx),
-    midiOutputs: R.times(
-      () =>
-        buildMIDINode(() => {
-          throw new UnreachableException('MIDI output of sequencer has no inputs');
-        }),
-      midiOutputCount
-    ),
+    midiOutputs: R.times(() => new MIDINode(), midiOutputCount),
     gateOutputs: R.times(buildGateOutput, gateOutputCount),
     schedulerScheme,
     awpHandle: undefined,

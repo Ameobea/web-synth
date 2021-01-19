@@ -14,7 +14,7 @@ import {
 import MIDIEditorUI, { buildMIDIEditorUIDomId } from 'src/midiEditor/MIDIEditorUI';
 import { getEngine } from 'src/util';
 import { store } from 'src/redux';
-import { MIDINode, buildMIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 
 export interface MIDIEditorState {
   midiRecordingCtxPtr: Option<number>;
@@ -62,9 +62,7 @@ export const init_midi_editor_ui = (vcId: string) => {
   document.getElementById('root')!.append(container);
 
   // Build a MIDI node for outputting MIDI events from the MIDI editor
-  const midiNode = buildMIDINode(() => {
-    throw new UnreachableException("MIDI editor MIDI node doesn't accept input");
-  });
+  const midiNode = new MIDINode();
 
   const midiEditorState: MIDIEditorState = {
     midiRecordingCtxPtr: Option.none(),
@@ -73,7 +71,7 @@ export const init_midi_editor_ui = (vcId: string) => {
   };
 
   // And build one for accepting MIDI input when recording
-  const inputMIDINode = buildMIDINode(() => ({
+  const inputMIDINode = new MIDINode(() => ({
     onAttack: (noteId: number, velocity: number) => {
       midiEditorState.midiRecordingCtxPtr.forEach(ptr =>
         getEngine()!.midi_editor_record_note_down(ptr, ctx.currentTime, noteId)

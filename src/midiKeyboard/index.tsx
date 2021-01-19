@@ -2,10 +2,9 @@
  * View context that creates a MIDI keyboard that is controllable via the normal keyboard and capable of being
  * connected to MIDI modules.
  */
+import { Map as ImmMap } from 'immutable';
 
-import { Map } from 'immutable';
-
-import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 import {
   create_empty_audio_connectables,
   AudioConnectables,
@@ -14,22 +13,21 @@ import {
 } from 'src/patchNetwork';
 import { MidiKeyboardVC } from 'src/midiKeyboard/MidiKeyboard';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
-import { MidiKeyboardStateItem } from 'src/redux/modules/midiKeyboard';
+import { MidiKeyboardMode, MidiKeyboardStateItem } from 'src/redux/modules/midiKeyboard';
 import { tryParseJson } from 'src/util';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { MIDIInput } from 'src/midiKeyboard/midiInput';
 
-export let midiNodesByStateKey: Map<string, MIDINode> = Map();
+const ctx = new AudioContext();
+
+export const midiNodesByStateKey: Map<string, MIDINode> = new Map();
 
 const getMidiKeyboardDomId = (vcId: string) => `midiKeyboard_${vcId}`;
 
 export const init_midi_keyboard = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-  midiNodesByStateKey = midiNodesByStateKey.set(
-    stateKey,
-    buildMIDINode(() => {
-      throw new Error('MIDI Keyboard does not accept MIDI input; it only creates output');
-    })
-  );
+  const midiNode = new MIDINode();
+  midiNodesByStateKey.set(stateKey, midiNode);
 
   const elem = document.createElement('div');
   elem.id = getMidiKeyboardDomId(vcId);
@@ -39,12 +37,26 @@ export const init_midi_keyboard = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  const initialState = tryParseJson<MidiKeyboardStateItem, undefined>(
+  const initialState = tryParseJson<Omit<MidiKeyboardStateItem, 'midiInput'>, undefined>(
     localStorage.getItem(stateKey)!,
     undefined,
     `Failed to parse localStorage state for MIDI keyboard with stateKey ${stateKey}; reverting to initial state.`
   );
-  dispatch(actionCreators.midiKeyboard.ADD_MIDI_KEYBOARD(stateKey, initialState));
+
+  dispatch(
+    actionCreators.midiKeyboard.ADD_MIDI_KEYBOARD(
+      stateKey,
+      initialState
+        ? {
+            ...initialState,
+            midiInput:
+              initialState.mode === MidiKeyboardMode.MidiInput
+                ? new MIDIInput(ctx, midiNode, initialState.midiInputName)
+                : undefined,
+          }
+        : undefined
+    )
+  );
 
   mkContainerRenderHelper({ Comp: MidiKeyboardVC, getProps: () => ({ stateKey }), store })(
     getMidiKeyboardDomId(vcId)
@@ -65,7 +77,7 @@ const getMidiKeyboardDomElem = (stateKey: string): HTMLDivElement | null => {
 
 export const cleanup_midi_keyboard = (stateKey: string): string => {
   const vcId = stateKey.split('_')[1]!;
-  midiNodesByStateKey = midiNodesByStateKey.delete(stateKey);
+  midiNodesByStateKey.delete(stateKey);
 
   const elem = getMidiKeyboardDomElem(stateKey);
   if (!elem) {
@@ -79,7 +91,9 @@ export const cleanup_midi_keyboard = (stateKey: string): string => {
     console.error(`No MIDI keyboard state for MIDI keyboard with state key ${stateKey}`);
     return '';
   }
-  return JSON.stringify(instanceState);
+  const toSerialize = { ...instanceState };
+  delete toSerialize.midiInput;
+  return JSON.stringify(toSerialize);
 };
 
 export const hide_midi_keyboard = (stateKey: string) => {
@@ -108,7 +122,7 @@ export const get_midi_keyboard_audio_connectables = (stateKey: string): AudioCon
 
   return {
     vcId,
-    inputs: Map<string, ConnectableInput>(),
-    outputs: Map<string, ConnectableOutput>().set('midi out', { node: midiNode, type: 'midi' }),
+    inputs: ImmMap<string, ConnectableInput>(),
+    outputs: ImmMap<string, ConnectableOutput>().set('midi out', { node: midiNode, type: 'midi' }),
   };
 };

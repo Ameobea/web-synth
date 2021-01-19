@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import { PromiseResolveType } from 'ameo-utils';
+import { PromiseResolveType, UnreachableException } from 'ameo-utils';
 
 /**
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
@@ -23,8 +23,12 @@ export class MIDINode {
   private getInputCbs: () => MIDIInputCbs;
   private cachedInputCbs: MIDIInputCbs | null = null;
 
-  constructor(getInputCbs: () => MIDIInputCbs) {
-    this.getInputCbs = getInputCbs;
+  constructor(getInputCbs?: (() => MIDIInputCbs) | undefined) {
+    this.getInputCbs =
+      getInputCbs ??
+      (() => {
+        throw new UnreachableException("MIDI node doesn't accept inputs");
+      });
   }
 
   /**
@@ -85,5 +89,3 @@ export class MIDINode {
     this.outputCbs.forEach(cbs => cbs.onClearAll());
   }
 }
-
-export const buildMIDINode = (getInputCbs: () => MIDIInputCbs) => new MIDINode(getInputCbs);

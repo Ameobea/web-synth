@@ -2,6 +2,8 @@ pub mod circular_buffer;
 pub mod filters;
 pub mod oscillator;
 
+pub const SAMPLE_RATE: f32 = 44_100.;
+
 /// For `coefficient` values between 0 and 1, applies smoothing to a value, interpolating between
 /// previous values and new values.  Values closer to 1 applier heavier smoothing.
 ///

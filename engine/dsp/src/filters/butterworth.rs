@@ -1,6 +1,7 @@
-#[derive(Clone, Copy)]
+use crate::SAMPLE_RATE;
+
+#[derive(Clone, Copy, Default)]
 pub struct ButterworthFilter {
-    pub sample_rate: f32,
     /// Holds the last 2 samples of input with index 0 being 2 samples ago and index 1 being 1
     /// sample ago
     delayed_inputs: [f32; 2],
@@ -10,15 +11,6 @@ pub struct ButterworthFilter {
 }
 
 impl ButterworthFilter {
-    #[inline]
-    pub fn new(sample_rate: usize) -> Self {
-        ButterworthFilter {
-            sample_rate: sample_rate as f32,
-            delayed_inputs: [0., 0.],
-            delayed_outputs: [0., 0.],
-        }
-    }
-
     #[inline]
     fn get_output(
         &self,
@@ -45,7 +37,7 @@ impl ButterworthFilter {
     // Adapted from code at the bottom of this page: http://basicsynth.com/index.php?page=filters
     #[inline]
     pub fn lowpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let c = 1. / ((std::f32::consts::PI / self.sample_rate as f32) * cutoff_freq).tan();
+        let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let c2 = c * c;
         let csqr2 = std::f32::consts::SQRT_2 * c;
         let d = c2 + csqr2 + 1.;
@@ -62,7 +54,7 @@ impl ButterworthFilter {
 
     #[inline]
     pub fn highpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let c = ((std::f32::consts::PI / self.sample_rate) * cutoff_freq).tan();
+        let c = ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let c2 = c * c;
         let csqr2 = std::f32::consts::SQRT_2 * c;
         let d = c2 + csqr2 + 1.;
@@ -79,7 +71,7 @@ impl ButterworthFilter {
 
     #[inline]
     pub fn bandpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let c = 1. / ((std::f32::consts::PI / self.sample_rate) * cutoff_freq).tan();
+        let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let d = 1. + c;
         let amp_in0 = 1. / d;
         let amp_in1 = 0.;
@@ -87,7 +79,7 @@ impl ButterworthFilter {
         let amp_out1 =
             // TODO: Verify that this is correct; it was `cutoffFreq/sr` and idk what sr is but
             // I can't think of anything else
-            (-c * 2. * (std::f32::consts::PI * 2. * cutoff_freq / self.sample_rate).cos()) / d;
+            (-c * 2. * (std::f32::consts::PI * 2. * cutoff_freq / SAMPLE_RATE).cos()) / d;
         let amp_out2 = (c - 1.) / d;
 
         let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);

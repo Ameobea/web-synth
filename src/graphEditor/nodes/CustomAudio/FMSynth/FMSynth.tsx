@@ -83,6 +83,8 @@ export interface Adsr {
   audioThreadData: AudioThreadData;
 }
 
+const serializeADSR = (adsr: Adsr) => ({ ...adsr, audioThreadData: undefined });
+
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
@@ -380,7 +382,10 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public handleAdsrChange(adsrIx: number, newAdsr: Adsr) {
+  public handleAdsrChange(
+    adsrIx: number,
+    newAdsr: Adsr & { audioThreadData: AudioThreadData | undefined }
+  ) {
     if (!this.awpHandle) {
       console.error('Tried to set ADSR before AWP initialization');
       return;
@@ -389,6 +394,9 @@ export default class FMSynth implements ForeignNode {
     const isLenOnlyChange =
       this.adsrs[adsrIx] && this.adsrs[adsrIx].lenSamples !== newAdsr.lenSamples;
     this.adsrs[adsrIx] = newAdsr;
+    if (!this.adsrs[adsrIx].audioThreadData) {
+      this.adsrs[adsrIx].audioThreadData = { phaseIndex: adsrIx };
+    }
 
     if (isLenOnlyChange) {
       this.awpHandle.port.postMessage({
@@ -533,7 +541,7 @@ export default class FMSynth implements ForeignNode {
       operatorEffects: this.operatorEffects,
       selectedUI: this.selectedUI,
       mainEffectChain: this.mainEffectChain,
-      adsrs: this.adsrs,
+      adsrs: this.adsrs.map(serializeADSR),
       detune: this.detune,
     };
   }

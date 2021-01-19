@@ -17,7 +17,7 @@ import {
 import SynthDesigner from './SynthDesigner';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import buildSynthDesignerReduxModule from 'src/redux/modules/synthDesigner';
-import { buildMIDINode, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 import { midiToFrequency } from 'src/util';
 import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -201,7 +201,7 @@ const getMidiNode = (stateKey: string): MIDINode => {
     return cached;
   }
 
-  const midiNode = buildMIDINode(() => {
+  const midiNode = new MIDINode(() => {
     const { dispatch, getState, actionCreators } = getReduxInfra(stateKey);
 
     const onAttack = (note: number, velocity: number) => {
