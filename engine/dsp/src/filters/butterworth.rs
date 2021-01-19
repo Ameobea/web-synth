@@ -37,6 +37,7 @@ impl ButterworthFilter {
     // Adapted from code at the bottom of this page: http://basicsynth.com/index.php?page=filters
     #[inline]
     pub fn lowpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
+        debug_assert!(cutoff_freq.is_normal());
         let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let c2 = c * c;
         let csqr2 = std::f32::consts::SQRT_2 * c;
@@ -48,29 +49,41 @@ impl ButterworthFilter {
         let amp_out2 = (c2 - csqr2 + 1.0) / d;
 
         let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);
+        debug_assert!(output.is_normal());
+        debug_assert!(output > -2.);
+        debug_assert!(output < 2.);
         self.update_state(input, output);
         output
     }
 
     #[inline]
     pub fn highpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let c = ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
+        debug_assert!(cutoff_freq.is_normal());
+        let mut c = ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
+        if c.abs() < 0.002 {
+            c = c.signum() * 0.002;
+        }
         let c2 = c * c;
         let csqr2 = std::f32::consts::SQRT_2 * c;
         let d = c2 + csqr2 + 1.;
         let amp_in0 = 1. / d;
+        debug_assert!(d.is_normal());
         let amp_in1 = -(amp_in0 + amp_in0);
         let amp_in2 = amp_in0;
         let amp_out1 = (2. * (c2 - 1.)) / d;
         let amp_out2 = (1. - csqr2 + c2) / d;
 
         let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);
+        debug_assert!(output.is_normal());
+        debug_assert!(output > -5.);
+        debug_assert!(output < 5.);
         self.update_state(input, output);
         output
     }
 
     #[inline]
     pub fn bandpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
+        debug_assert!(cutoff_freq.is_normal());
         let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let d = 1. + c;
         let amp_in0 = 1. / d;
@@ -83,6 +96,9 @@ impl ButterworthFilter {
         let amp_out2 = (c - 1.) / d;
 
         let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);
+        debug_assert!(output.is_normal());
+        debug_assert!(output > -2.);
+        debug_assert!(output < 2.);
         self.update_state(input, output);
         output
     }

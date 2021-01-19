@@ -392,8 +392,6 @@ impl FMSynthVoice {
                     sample_ix_within_frame,
                     base_frequency,
                 );
-                debug_assert!(sample >= -1.);
-                debug_assert!(sample <= 1.);
 
                 *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
                 output_sample += sample

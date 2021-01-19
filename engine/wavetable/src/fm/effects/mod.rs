@@ -12,6 +12,7 @@ pub mod wavefolder;
 
 use self::{
     bitcrusher::Bitcrusher,
+    butterworth_filter::{ButterworthFilter, ButterworthFilterMode},
     spectral_warping::SpectralWarping,
     wavefolder::{Wavecruncher, Wavefolder},
 };
@@ -58,6 +59,7 @@ pub enum EffectInstance {
     Bitcrusher(Bitcrusher),
     Wavefolder(Wavefolder),
     SoftClipper(SoftClipper),
+    ButterworthFilter(ButterworthFilter),
 }
 
 impl EffectInstance {
@@ -184,6 +186,17 @@ impl EffectInstance {
 
                 EffectInstance::SoftClipper(SoftClipper::new(pre_gain, post_gain))
             },
+            5 => {
+                let mode = ButterworthFilterMode::from(param_1_int_val);
+                let cutoff_freq = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                    param_2_float_val_2,
+                ));
+
+                EffectInstance::ButterworthFilter(ButterworthFilter::new(mode, cutoff_freq))
+            },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
     }
@@ -232,7 +245,6 @@ impl EffectInstance {
                         param_2_float_val,
                         param_2_float_val_2,
                     ));
-
                 return true;
             },
             1 => {
@@ -258,7 +270,6 @@ impl EffectInstance {
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
-
                 return true;
             },
             3 => {
@@ -279,7 +290,6 @@ impl EffectInstance {
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
-
                 return true;
             },
             4 => {
@@ -300,7 +310,24 @@ impl EffectInstance {
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
+                return true;
+            },
+            5 => {
+                let butterworth_filter = match self {
+                    EffectInstance::ButterworthFilter(butterworth_filter) => butterworth_filter,
+                    _ => return false,
+                };
 
+                let mode = ButterworthFilterMode::from(param_1_int_val);
+                let cutoff_freq = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                    param_2_float_val_2,
+                ));
+
+                butterworth_filter.mode = mode;
+                butterworth_filter.cutoff_freq = cutoff_freq;
                 return true;
             },
             _ => false,
@@ -353,6 +380,13 @@ impl Effect for EffectInstance {
                 base_frequency,
                 sample,
             ),
+            EffectInstance::ButterworthFilter(e) => e.apply(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                sample,
+            ),
         }
     }
 
@@ -363,6 +397,7 @@ impl Effect for EffectInstance {
             EffectInstance::Bitcrusher(e) => e.apply_all(params, samples),
             EffectInstance::Wavefolder(e) => e.apply_all(params, samples),
             EffectInstance::SoftClipper(e) => e.apply_all(params, samples),
+            EffectInstance::ButterworthFilter(e) => e.apply_all(params, samples),
         }
     }
 }

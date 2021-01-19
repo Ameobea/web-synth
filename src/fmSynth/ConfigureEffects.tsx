@@ -1,11 +1,17 @@
 import { filterNils } from 'ameo-utils';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Option } from 'funfix-core';
 
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import FlatButton from 'src/misc/FlatButton';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+
+export enum ButterworthFilterMode {
+  Lowpass = 0,
+  Highpass = 1,
+  Bandpass = 2,
+}
 
 export type Effect =
   | {
@@ -23,7 +29,8 @@ export type Effect =
     }
   | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
   | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource }
-  | { type: 'soft clipper'; preGain: ParamSource; postGain: ParamSource };
+  | { type: 'soft clipper'; preGain: ParamSource; postGain: ParamSource }
+  | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource };
 
 const EFFECT_TYPE_SETTING = {
   type: 'select',
@@ -34,6 +41,7 @@ const EFFECT_TYPE_SETTING = {
     'bitcrusher',
     'wavefolder',
     'soft clipper',
+    'butterworth filter',
   ] as Effect['type'][],
 };
 
@@ -77,6 +85,13 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         postGain: { type: 'constant', value: 1.5 },
       };
     }
+    case 'butterworth filter': {
+      return {
+        type,
+        mode: ButterworthFilterMode.Lowpass,
+        cutoffFrequency: { type: 'constant', value: 400 },
+      };
+    }
   }
 };
 
@@ -93,6 +108,7 @@ const wavecruncherTheme = { ...baseTheme, background2: 'rgb(19,14,18)' };
 const bitcrusherTheme = { ...baseTheme, background2: 'rgb(24,14,4)' };
 const wavefolderTheme = { ...baseTheme, background2: 'rgb(24,38,41)' };
 const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
+const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -100,6 +116,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   bitcrusher: bitcrusherTheme,
   wavefolder: wavefolderTheme,
   'soft clipper': softClipperTheme,
+  'butterworth filter': butterworthFilterTheme,
 };
 
 type EffectConfigurator<T> = React.FC<{
@@ -282,6 +299,36 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
   </>
 );
 
+const BUTTERWORTH_FILTER_MODE_SETTINGS = [
+  { type: 'select', label: 'mode', options: { lowpass: 0, highpass: 1, bandpass: 2 } },
+];
+
+const ConfigureButterworthFilter: EffectConfigurator<'butterworth filter'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
+  <>
+    <ControlPanel
+      settings={BUTTERWORTH_FILTER_MODE_SETTINGS}
+      onChange={(_key: string, val: ButterworthFilterMode) => onChange({ ...state, mode: val })}
+      state={{ mode: state.mode }}
+    />
+    <ConfigureParamSource
+      title='cutoff frequency'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={butterworthFilterTheme}
+      min={10}
+      max={20_000}
+      scale='log'
+      state={state.cutoffFrequency}
+      onChange={cutoffFrequency => onChange({ ...state, cutoffFrequency })}
+    />
+  </>
+);
+
 const EffectManagement: React.FC<{
   effectIx: number;
   operatorEffects: (Effect | null)[];
@@ -353,6 +400,19 @@ const ConfigureEffectSpecific: React.FC<{
   adsrs: Adsr[];
   onAdsrChange: AdsrChangeHandler;
 }> = ({ state, onChange, adsrs, onAdsrChange }) => {
+  const Comp = useMemo(
+    () =>
+      ({
+        'spectral warping': ConfigureSpectralWarping,
+        wavecruncher: ConfigureWavecruncher,
+        bitcrusher: ConfigureBitcrusher,
+        wavefolder: ConfigureWavefolder,
+        'soft clipper': ConfigureSoftClipper,
+        'butterworth filter': ConfigureButterworthFilter,
+      }[state.type]),
+    [state.type]
+  );
+
   // TODO: object lookup
   switch (state.type) {
     case 'spectral warping': {
@@ -398,6 +458,16 @@ const ConfigureEffectSpecific: React.FC<{
     case 'soft clipper': {
       return (
         <ConfigureSoftClipper
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      );
+    }
+    case 'butterworth filter': {
+      return (
+        <ConfigureButterworthFilter
           state={state}
           onChange={onChange}
           adsrs={adsrs}

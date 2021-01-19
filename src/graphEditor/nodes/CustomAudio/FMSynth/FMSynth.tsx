@@ -467,6 +467,20 @@ export default class FMSynth implements ForeignNode {
           null,
         ];
       }
+      case 'butterworth filter': {
+        return [
+          5,
+          {
+            valueType: -1,
+            valParamInt: effect.mode,
+            valParamFloat: 0,
+            valParamFloat2: 0,
+          },
+          this.encodeParamSource(effect.cutoffFrequency),
+          null,
+          null,
+        ];
+      }
       default: {
         throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);
       }
