@@ -6,7 +6,7 @@ use adsr::{Adsr, AdsrStep, GateStatus, RampFn, RENDERED_BUFFER_SIZE};
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
-use self::effects::{Effect, EffectChain};
+use self::effects::EffectChain;
 
 #[derive(Clone, Default)]
 pub struct AdsrState {
@@ -91,25 +91,7 @@ mod fast {
 }
 
 impl ExponentialOscillator {
-    pub fn gen_sample(
-        &mut self,
-        frequency: f32,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-    ) -> f32 {
-        self.update_phase(frequency);
-
-        let stretch_factor = self
-            .stretch_factor
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
-            .abs()
-            .min(1.);
-        if stretch_factor < 0. {
-            unsafe { unreachable_unchecked() }
-        }
-
+    pub fn gen_sample_with_stretch_factor(&mut self, stretch_factor: f32) -> f32 {
         // let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
         let exponent_numerator = even_faster_pow(10.0f32, stretch_factor * 0.32 + 1.4) + 1.;
         let exponent_denominator = 999.0f32;
@@ -138,6 +120,28 @@ impl ExponentialOscillator {
         // output is from -1 to 1
         val * extended_phase.signum()
     }
+
+    pub fn gen_sample(
+        &mut self,
+        frequency: f32,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[Adsr],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+    ) -> f32 {
+        self.update_phase(frequency);
+
+        let stretch_factor = self
+            .stretch_factor
+            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
+            .abs()
+            .min(1.);
+        if stretch_factor < 0. {
+            unsafe { unreachable_unchecked() }
+        }
+
+        self.gen_sample_with_stretch_factor(stretch_factor)
+    }
 }
 
 #[derive(Clone, Default)]
@@ -165,13 +169,8 @@ impl Operator {
             base_frequency,
         );
 
-        self.effect_chain.apply(
-            param_buffers,
-            adsrs,
-            sample_ix_within_frame,
-            base_frequency,
-            sample,
-        )
+        self.effect_chain
+            .apply(sample_ix_within_frame, base_frequency, sample)
     }
 }
 
@@ -342,6 +341,11 @@ impl FMSynthVoice {
                 .render_raw(&render_params, unsafe {
                     operator_base_frequencies.get_unchecked_mut(operator_ix)
                 });
+        }
+
+        // Render the params for all per-operator-per-voice effects ahead of time as well
+        for operator in &mut self.operators {
+            operator.effect_chain.pre_render_params(&render_params);
         }
 
         // Render all modulation indices for the full frame ahread of time using SIMD

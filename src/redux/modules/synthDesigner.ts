@@ -892,7 +892,6 @@ const actionGroups = {
       state: SynthDesignerState,
       { frequency: baseFrequency, voiceIx, synthIx, offset }
     ) => {
-      console.log(baseFrequency);
       // TODO: Dedup
       if (R.isNil(synthIx)) {
         state.synths.forEach(synth => {

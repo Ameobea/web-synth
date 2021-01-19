@@ -1,8 +1,7 @@
-use adsr::Adsr;
 use dsp::filters::dc_blocker::DCBlocker;
 
 use super::Effect;
-use crate::fm::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
+use crate::fm::{ParamSource, ParamSourceType, FRAME_SIZE};
 
 #[derive(Clone)]
 pub struct Wavecruncher {
@@ -24,66 +23,40 @@ impl Default for Wavecruncher {
 }
 
 impl Effect for Wavecruncher {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
+    fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+        let top_fold_position = unsafe { *rendered_params.get_unchecked(0) };
+        let top_fold_width = unsafe { *rendered_params.get_unchecked(1) };
+        let bottom_fold_position = unsafe { *rendered_params.get_unchecked(2) };
+        let bottom_fold_width = unsafe { *rendered_params.get_unchecked(3) };
+
         let folded_sample = if sample > 0. {
-            let fold_position = dsp::clamp(
-                0.,
-                1.,
-                self.top_fold_position.get(
-                    param_buffers,
-                    adsrs,
-                    sample_ix_within_frame,
-                    base_frequency,
-                ),
-            );
+            let fold_position = dsp::clamp(0., 1., top_fold_position);
 
             let overflow_amount = sample - fold_position;
             if overflow_amount <= 0. {
                 return sample;
             }
 
-            let fold_width = self.top_fold_width.get(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-            );
-
-            sample + -(overflow_amount / fold_width).trunc() * fold_width * 2.
+            sample + -(overflow_amount / top_fold_width).trunc() * top_fold_width * 2.
         } else {
-            let fold_position = dsp::clamp(
-                -1.,
-                0.,
-                self.bottom_fold_position.get(
-                    param_buffers,
-                    adsrs,
-                    sample_ix_within_frame,
-                    base_frequency,
-                ),
-            );
+            let fold_position = dsp::clamp(-1., 0., bottom_fold_position);
 
             let overflow_amount = -(sample - fold_position);
             if overflow_amount <= 0. {
                 return sample;
             }
 
-            let fold_width = self.bottom_fold_width.get(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-            );
-            sample - -(overflow_amount / fold_width).trunc() * fold_width * 2.
+            sample - -(overflow_amount / bottom_fold_width).trunc() * bottom_fold_width * 2.
         };
 
         dsp::clamp(-1., 1., folded_sample)
+    }
+
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+        buf[0] = Some(&mut self.top_fold_position);
+        buf[1] = Some(&mut self.top_fold_width);
+        buf[2] = Some(&mut self.bottom_fold_position);
+        buf[3] = Some(&mut self.bottom_fold_width);
     }
 }
 
@@ -105,20 +78,9 @@ impl Wavefolder {
 }
 
 impl Effect for Wavefolder {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
-        let gain = self
-            .gain
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-        let offset = self
-            .offset
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+    fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+        let gain = unsafe { *rendered_params.get_unchecked(0) };
+        let offset = unsafe { *rendered_params.get_unchecked(1) };
 
         // Credit to mikedorf for this: https://discord.com/channels/590254806208217089/590657587939115048/793255717569822780
         let output =
@@ -128,13 +90,14 @@ impl Effect for Wavefolder {
         // output
     }
 
-    fn apply_all<'a>(&mut self, params: &RenderRawParams<'a>, samples: &mut [f32; FRAME_SIZE]) {
-        let mut rendered_gain: [f32; FRAME_SIZE] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-        self.gain.render_raw(params, &mut rendered_gain);
-        let mut rendered_offset: [f32; FRAME_SIZE] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-        self.offset.render_raw(params, &mut rendered_offset);
+    fn apply_all(
+        &mut self,
+        rendered_params: &[[f32; FRAME_SIZE]],
+        _base_frequencies: &[f32; FRAME_SIZE],
+        samples: &mut [f32; FRAME_SIZE],
+    ) {
+        let rendered_gain = unsafe { rendered_params.get_unchecked(0) };
+        let rendered_offset = unsafe { rendered_params.get_unchecked(0) };
 
         for i in 0..FRAME_SIZE {
             unsafe {
@@ -150,5 +113,10 @@ impl Effect for Wavefolder {
                 *samples.get_unchecked_mut(i) = self.dc_blocker.apply(output);
             }
         }
+    }
+
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+        buf[0] = Some(&mut self.gain);
+        buf[1] = Some(&mut self.offset);
     }
 }

@@ -1,8 +1,7 @@
-use adsr::Adsr;
 use dsp::even_faster_pow2;
 
 use super::Effect;
-use crate::fm::{ParamSource, FRAME_SIZE};
+use crate::fm::ParamSource;
 
 #[derive(Clone)]
 pub struct Bitcrusher {
@@ -35,18 +34,8 @@ impl Bitcrusher {
 }
 
 impl Effect for Bitcrusher {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
-        let sample_rate = self
-            .sample_rate
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
-            .max(1.);
+    fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+        let sample_rate = (unsafe { *rendered_params.get_unchecked(0) }).max(1.);
         let undersample_ratio = sample_rate / 44_100.;
         let sample_hold_time = 1. / undersample_ratio;
         self.samples_since_last_sample += 1;
@@ -55,14 +44,14 @@ impl Effect for Bitcrusher {
         }
         self.samples_since_last_sample = 0;
 
-        let bit_depth = dsp::clamp(
-            1.,
-            32.,
-            self.bit_depth
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency),
-        );
+        let bit_depth = dsp::clamp(1., 32., unsafe { *rendered_params.get_unchecked(1) });
 
         self.held_sample = Self::discretize_sample(bit_depth, sample);
         self.held_sample
+    }
+
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+        buf[0] = Some(&mut self.sample_rate);
+        buf[1] = Some(&mut self.bit_depth);
     }
 }

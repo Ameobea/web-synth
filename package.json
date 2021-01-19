@@ -1,10 +1,10 @@
 {
-  "name": "sketch",
+  "name": "web-synth",
   "version": "0.1.0",
-  "description": "A WebAssembly sketch",
+  "description": "A browser-based audio synthesis and experimentation platform powered by WebAssembly and WebAudio",
   "main": "src/index.tsx",
-  "repository": "https://github.com/Ameobea/sketches",
-  "author": "Casey Primozic <me@ameo.link>",
+  "repository": "https://github.com/Ameobea/web-synth",
+  "author": "Casey Primozic <casey@cprimozic.net>",
   "devDependencies": {
     "@babel/core": "^7.11.6",
     "@babel/plugin-proposal-class-properties": "^7.10.4",

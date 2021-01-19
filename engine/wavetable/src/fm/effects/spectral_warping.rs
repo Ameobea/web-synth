@@ -1,8 +1,7 @@
-use adsr::Adsr;
 use dsp::circular_buffer::CircularBuffer;
 
 use super::Effect;
-use crate::fm::{ExponentialOscillator, ParamSource, FRAME_SIZE, SAMPLE_RATE};
+use crate::fm::{ExponentialOscillator, ParamSource, SAMPLE_RATE};
 
 pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
 
@@ -37,22 +36,9 @@ impl SpectralWarping {
         }
     }
 
-    fn get_phase_warp_diff(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        frequency: f32,
-    ) -> f32 {
-        let warped_phase = (self.osc.gen_sample(
-            frequency,
-            param_buffers,
-            adsrs,
-            sample_ix_within_frame,
-            base_frequency,
-        ) + 1.)
-            / 2.;
+    fn get_phase_warp_diff(&mut self, stretch_factor: f32) -> f32 {
+        let osc_output = self.osc.gen_sample_with_stretch_factor(stretch_factor);
+        let warped_phase = (osc_output + 1.) / 2.;
         debug_assert!(warped_phase >= 0.);
         debug_assert!(warped_phase <= 1.);
         debug_assert!(self.osc.phase >= 0.);
@@ -62,18 +48,10 @@ impl SpectralWarping {
 }
 
 impl Effect for SpectralWarping {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
+    fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
         self.buffer.set(sample);
-        let frequency =
-            self.frequency
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+        let frequency = unsafe { *rendered_params.get_unchecked(0) };
+        let stretch_factor = unsafe { *rendered_params.get_unchecked(1) };
         // We look back half of the wavelength of the frequency.
         let base_lookback_samples = ((SAMPLE_RATE as f32) / frequency) / 2.;
         if !base_lookback_samples.is_normal() {
@@ -81,18 +59,17 @@ impl Effect for SpectralWarping {
         }
 
         // We then "warp" the position of the read head according to the warp factor.
-        let phase_warp_diff = self.get_phase_warp_diff(
-            param_buffers,
-            adsrs,
-            sample_ix_within_frame,
-            base_frequency,
-            frequency,
-        );
+        let phase_warp_diff = self.get_phase_warp_diff(stretch_factor);
         debug_assert!(phase_warp_diff >= -1.);
         debug_assert!(phase_warp_diff <= 1.);
         let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);
         debug_assert!(lookback_samples >= 0.);
 
         self.buffer.read_interpolated(-lookback_samples)
+    }
+
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+        buf[0] = Some(&mut self.frequency);
+        buf[1] = Some(&mut self.osc.stretch_factor);
     }
 }

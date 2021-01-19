@@ -1,4 +1,3 @@
-use adsr::Adsr;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
@@ -18,33 +17,42 @@ use self::{
 };
 
 pub trait Effect {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32;
+    /// Should populate the provided buffer with pointers to internal `ParamSource`s for this
+    /// effect.  It is expected that this buffer will contain all `None`s when it is provided as an
+    /// argument to this function.
+    ///
+    /// The buffer should be filled up from front to back.  For example, if the effect implementing
+    /// this method has only 2 parameters, the buffer should be modified to set index 0 and 1 to
+    /// `Some(_)` and index 2 and 3 should be left as `None`.
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]);
+
+    fn apply(&mut self, rendered_params: &[f32], base_frequency: f32, sample: f32) -> f32;
 
     /// Apply the effect to the buffer of samples in-place
-    fn apply_all<'a>(
+    fn apply_all(
         &mut self,
-        RenderRawParams {
-            param_buffers,
-            adsrs,
-            base_frequencies,
-        }: &RenderRawParams<'a>,
+        rendered_params: &[[f32; FRAME_SIZE]],
+        base_frequencies: &[f32; FRAME_SIZE],
         samples: &mut [f32; FRAME_SIZE],
     ) {
+        let mut params_for_sample = [0.; 4];
         // Fall back to the serial implementation if a SIMD one isn't available
         for sample_ix_within_frame in 0..FRAME_SIZE {
+            for i in 0..rendered_params.len() {
+                unsafe {
+                    *params_for_sample.get_unchecked_mut(i) = *rendered_params
+                        .get_unchecked(i)
+                        .get_unchecked(sample_ix_within_frame);
+                }
+            }
+
             let sample = unsafe { samples.get_unchecked_mut(sample_ix_within_frame) };
             let base_frequency = unsafe { *base_frequencies.get_unchecked(sample_ix_within_frame) };
+
             *sample = self.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
+                unsafe {
+                    std::slice::from_raw_parts(params_for_sample.as_ptr(), rendered_params.len())
+                },
                 base_frequency,
                 *sample,
             );
@@ -336,74 +344,66 @@ impl EffectInstance {
 }
 
 impl Effect for EffectInstance {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
+    fn apply(&mut self, rendered_params: &[f32], base_frequency: f32, sample: f32) -> f32 {
         match self {
-            EffectInstance::SpectralWarping(e) => e.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            ),
-            EffectInstance::Wavecruncher(e) => e.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            ),
-            EffectInstance::Bitcrusher(e) => e.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            ),
-            EffectInstance::Wavefolder(e) => e.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            ),
-            EffectInstance::SoftClipper(e) => e.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            ),
-            EffectInstance::ButterworthFilter(e) => e.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            ),
+            EffectInstance::SpectralWarping(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::Wavecruncher(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::Bitcrusher(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::Wavefolder(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::SoftClipper(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::ButterworthFilter(e) =>
+                e.apply(rendered_params, base_frequency, sample),
         }
     }
 
-    fn apply_all<'a>(&mut self, params: &RenderRawParams<'a>, samples: &mut [f32; FRAME_SIZE]) {
+    fn apply_all(
+        &mut self,
+        rendered_params: &[[f32; FRAME_SIZE]],
+        base_frequencies: &[f32; FRAME_SIZE],
+        samples: &mut [f32; FRAME_SIZE],
+    ) {
         match self {
-            EffectInstance::SpectralWarping(e) => e.apply_all(params, samples),
-            EffectInstance::Wavecruncher(e) => e.apply_all(params, samples),
-            EffectInstance::Bitcrusher(e) => e.apply_all(params, samples),
-            EffectInstance::Wavefolder(e) => e.apply_all(params, samples),
-            EffectInstance::SoftClipper(e) => e.apply_all(params, samples),
-            EffectInstance::ButterworthFilter(e) => e.apply_all(params, samples),
+            EffectInstance::SpectralWarping(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::Wavecruncher(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::Bitcrusher(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::Wavefolder(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::SoftClipper(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::ButterworthFilter(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
+        }
+    }
+
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+        match self {
+            EffectInstance::SpectralWarping(e) => e.get_params(buf),
+            EffectInstance::Wavecruncher(e) => e.get_params(buf),
+            EffectInstance::Bitcrusher(e) => e.get_params(buf),
+            EffectInstance::Wavefolder(e) => e.get_params(buf),
+            EffectInstance::SoftClipper(e) => e.get_params(buf),
+            EffectInstance::ButterworthFilter(e) => e.get_params(buf),
         }
     }
 }
 
-#[derive(Clone, Default)]
-pub struct EffectChain([Option<Box<EffectInstance>>; 16]);
+#[derive(Clone)]
+pub struct EffectChain {
+    effects: [Option<Box<EffectInstance>>; 16],
+    param_render_buf: Box<[[[f32; FRAME_SIZE]; 4]; 16]>,
+}
+
+impl Default for EffectChain {
+    fn default() -> Self {
+        EffectChain {
+            effects: [None; 16],
+            param_render_buf: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+        }
+    }
+}
 
 impl EffectChain {
     pub fn set_effect(
@@ -427,7 +427,7 @@ impl EffectChain {
         param_4_float_val: f32,
         param_4_float_val_2: f32,
     ) {
-        if let Some(effect) = &mut self.0[effect_ix] {
+        if let Some(effect) = &mut self.effects[effect_ix] {
             let successfully_updated = effect.maybe_update_from_parts(
                 effect_type,
                 param_1_type,
@@ -452,7 +452,7 @@ impl EffectChain {
             }
         }
 
-        self.0[effect_ix] = Some(box EffectInstance::from_parts(
+        self.effects[effect_ix] = Some(box EffectInstance::from_parts(
             effect_type,
             param_1_type,
             param_1_int_val,
@@ -474,46 +474,113 @@ impl EffectChain {
     }
 
     pub fn remove_effect(&mut self, effect_ix: usize) {
-        self.0[effect_ix] = None;
+        self.effects[effect_ix] = None;
         // Shift all effects after the removed one down to fill the empty space
-        for effect_ix in effect_ix + 1..self.0.len() {
-            self.0[effect_ix - 1] = self.0[effect_ix].take();
+        for effect_ix in effect_ix + 1..self.effects.len() {
+            self.effects[effect_ix - 1] = self.effects[effect_ix].take();
         }
     }
 }
 
-impl Effect for EffectChain {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        mut sample: f32,
-    ) -> f32 {
-        for effect in &mut self.0 {
-            let effect = match effect {
-                Some(effect) => effect,
-                None => return sample,
-            };
-            sample = effect.apply(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
-                sample,
-            );
-        }
-        sample
-    }
+/// Given an arbitrary effect, queries the effect for its current list of parameters.  Then, renders
+/// the output of each of those parameters into a set of buffers.
+///
+/// Returns the number of params for the effect.
+fn render_effect_params<'a, E: Effect>(
+    effect: &mut E,
+    buffers: &mut [[f32; FRAME_SIZE]; 4],
+    inputs: &RenderRawParams<'a>,
+) -> usize {
+    let mut params: [Option<&mut ParamSource>; 4] = [None, None, None, None];
+    effect.get_params(&mut params);
 
-    fn apply_all<'a>(&mut self, params: &RenderRawParams<'a>, samples: &mut [f32; FRAME_SIZE]) {
-        for effect in &mut self.0 {
+    for (i, param) in core::array::IntoIter::new(params).enumerate() {
+        let param = match param {
+            Some(param) => param,
+            None => return i,
+        };
+        let output_buf = unsafe { buffers.get_unchecked_mut(i) };
+        param.render_raw(inputs, output_buf)
+    }
+    4
+}
+
+impl EffectChain {
+    pub fn pre_render_params<'a>(&mut self, render_params: &RenderRawParams<'a>) {
+        for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
             let effect = match effect {
                 Some(effect) => effect,
                 None => return,
             };
-            effect.apply_all(params, samples);
+
+            let buffers = unsafe { self.param_render_buf.get_unchecked_mut(effect_ix) };
+            render_effect_params(&mut **effect, buffers, render_params);
+        }
+    }
+
+    fn get_rendered_param(
+        param_render_buf: &[[[f32; FRAME_SIZE]; 4]; 16],
+        effect_ix: usize,
+        param_ix: usize,
+        sample_ix_within_frame: usize,
+    ) -> f32 {
+        unsafe {
+            *param_render_buf
+                .get_unchecked(effect_ix)
+                .get_unchecked(param_ix)
+                .get_unchecked(sample_ix_within_frame)
+        }
+    }
+
+    pub fn apply<'a>(
+        &mut self,
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+        sample: f32,
+    ) -> f32 {
+        let mut output = sample;
+
+        let mut params_for_sample: [f32; 4] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
+            let effect = match effect {
+                Some(effect) => effect,
+                None => break,
+            };
+
+            for param_ix in 0..4 {
+                params_for_sample[param_ix] = Self::get_rendered_param(
+                    &self.param_render_buf,
+                    effect_ix,
+                    param_ix,
+                    sample_ix_within_frame,
+                );
+            }
+
+            output = effect.apply(&params_for_sample, base_frequency, output);
+        }
+        output
+    }
+
+    pub fn apply_all<'a>(
+        &mut self,
+        render_params: &RenderRawParams<'a>,
+        samples: &mut [f32; FRAME_SIZE],
+    ) {
+        let mut rendered_params: [[f32; FRAME_SIZE]; 4] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+
+        for effect in &mut self.effects {
+            let effect = match effect {
+                Some(effect) => effect,
+                None => return,
+            };
+            let param_count =
+                render_effect_params(&mut **effect, &mut rendered_params, render_params);
+            let rendered_params =
+                unsafe { std::slice::from_raw_parts(rendered_params.as_ptr(), param_count) };
+
+            effect.apply_all(rendered_params, &render_params.base_frequencies, samples);
         }
     }
 }

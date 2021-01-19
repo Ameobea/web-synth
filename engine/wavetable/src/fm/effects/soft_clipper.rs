@@ -1,4 +1,3 @@
-use adsr::Adsr;
 use dsp::filters::dc_blocker::DCBlocker;
 
 use super::Effect;
@@ -22,20 +21,9 @@ impl SoftClipper {
 }
 
 impl Effect for SoftClipper {
-    fn apply(
-        &mut self,
-        param_buffers: &[[f32; crate::fm::FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        sample: f32,
-    ) -> f32 {
-        let pre_gain =
-            self.pre_gain
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-        let post_gain =
-            self.post_gain
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+    fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+        let pre_gain = unsafe { *rendered_params.get_unchecked(0) };
+        let post_gain = unsafe { *rendered_params.get_unchecked(1) };
         let sample = sample * pre_gain;
 
         // Cubic non-linearity https://ccrma.stanford.edu/~jos/pasp/Soft_Clipping.html
@@ -50,5 +38,10 @@ impl Effect for SoftClipper {
         let output = output_sample * post_gain;
         // Filter out extremely lower frequencies / remove offset bias
         self.dc_blocker.apply(output)
+    }
+
+    fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+        buf[0] = Some(&mut self.pre_gain);
+        buf[1] = Some(&mut self.post_gain);
     }
 }

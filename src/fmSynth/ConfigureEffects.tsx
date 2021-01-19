@@ -400,7 +400,7 @@ const ConfigureEffectSpecific: React.FC<{
   adsrs: Adsr[];
   onAdsrChange: AdsrChangeHandler;
 }> = ({ state, onChange, adsrs, onAdsrChange }) => {
-  const Comp = useMemo(
+  const Comp: EffectConfigurator<any> = useMemo(
     () =>
       ({
         'spectral warping': ConfigureSpectralWarping,
@@ -413,69 +413,7 @@ const ConfigureEffectSpecific: React.FC<{
     [state.type]
   );
 
-  // TODO: object lookup
-  switch (state.type) {
-    case 'spectral warping': {
-      return (
-        <ConfigureSpectralWarping
-          state={state}
-          onChange={onChange}
-          adsrs={adsrs}
-          onAdsrChange={onAdsrChange}
-        />
-      );
-    }
-    case 'wavecruncher': {
-      return (
-        <ConfigureWavecruncher
-          state={state}
-          onChange={onChange}
-          adsrs={adsrs}
-          onAdsrChange={onAdsrChange}
-        />
-      );
-    }
-    case 'bitcrusher': {
-      return (
-        <ConfigureBitcrusher
-          state={state}
-          onChange={onChange}
-          adsrs={adsrs}
-          onAdsrChange={onAdsrChange}
-        />
-      );
-    }
-    case 'wavefolder': {
-      return (
-        <ConfigureWavefolder
-          state={state}
-          onChange={onChange}
-          adsrs={adsrs}
-          onAdsrChange={onAdsrChange}
-        />
-      );
-    }
-    case 'soft clipper': {
-      return (
-        <ConfigureSoftClipper
-          state={state}
-          onChange={onChange}
-          adsrs={adsrs}
-          onAdsrChange={onAdsrChange}
-        />
-      );
-    }
-    case 'butterworth filter': {
-      return (
-        <ConfigureButterworthFilter
-          state={state}
-          onChange={onChange}
-          adsrs={adsrs}
-          onAdsrChange={onAdsrChange}
-        />
-      );
-    }
-  }
+  return <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />;
 };
 
 const ConfigureEffect: React.FC<{

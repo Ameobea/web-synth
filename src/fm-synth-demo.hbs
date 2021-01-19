@@ -13,7 +13,7 @@
       // pre-constructed instance.
       const OldAudioContext = globalThis.AudioContext;
 
-      let latencyHint = 'realtime';
+      let latencyHint = 'interactive';
       if (localStorage.getItem('latencyHint')) {
         latencyHint = +localStorage.getItem('latencyHint');
       } else if (navigator.platform.includes("Linux")) {
