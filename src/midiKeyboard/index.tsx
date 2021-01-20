@@ -5,18 +5,14 @@
 import { Map as ImmMap } from 'immutable';
 
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import {
-  create_empty_audio_connectables,
-  AudioConnectables,
-  ConnectableInput,
-  ConnectableOutput,
-} from 'src/patchNetwork';
+import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { MidiKeyboardVC } from 'src/midiKeyboard/MidiKeyboard';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
 import { MidiKeyboardMode, MidiKeyboardStateItem } from 'src/redux/modules/midiKeyboard';
 import { tryParseJson } from 'src/util';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
+import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 
 const ctx = new AudioContext();
 

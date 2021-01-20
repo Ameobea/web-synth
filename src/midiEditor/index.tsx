@@ -3,18 +3,14 @@ import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Map as ImmMap } from 'immutable';
 import { Option } from 'funfix-core';
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { UnimplementedError } from 'ameo-utils';
 
-import {
-  AudioConnectables,
-  create_empty_audio_connectables,
-  ConnectableOutput,
-  ConnectableInput,
-} from 'src/patchNetwork';
+import { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
 import MIDIEditorUI, { buildMIDIEditorUIDomId } from 'src/midiEditor/MIDIEditorUI';
 import { getEngine } from 'src/util';
 import { store } from 'src/redux';
 import { MIDINode } from 'src/patchNetwork/midiNode';
+import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 
 export interface MIDIEditorState {
   midiRecordingCtxPtr: Option<number>;

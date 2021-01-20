@@ -108,7 +108,6 @@ impl EffectInstance {
                 let params = SpectralWarpingParams {
                     frequency,
                     warp_factor,
-                    phase_offset: 0.,
                 };
 
                 EffectInstance::SpectralWarping(SpectralWarping::new(params))

@@ -130,7 +130,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
           {
             type: 'range',
             label: 'adsr length ms',
-            min: 10,
+            min: 1,
             max: 20_000,
             scale: 'log',
           },

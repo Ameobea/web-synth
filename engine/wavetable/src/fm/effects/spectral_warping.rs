@@ -8,15 +8,12 @@ pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
 pub struct SpectralWarpingParams {
     pub warp_factor: ParamSource,
     pub frequency: ParamSource,
-    // TODO: Make this a param source if it turns out to have an effect on the sound
-    pub phase_offset: f32,
 }
 
 #[derive(Clone)]
 pub struct SpectralWarping {
     pub frequency: ParamSource,
     pub buffer: Box<CircularBuffer<SPECTRAL_WARPING_BUFFER_SIZE>>,
-    pub phase_offset: f32,
     pub osc: ExponentialOscillator,
 }
 
@@ -25,19 +22,19 @@ impl SpectralWarping {
         SpectralWarpingParams {
             warp_factor,
             frequency,
-            phase_offset,
         }: SpectralWarpingParams,
     ) -> Self {
         SpectralWarping {
             frequency,
             buffer: box CircularBuffer::new(),
-            phase_offset,
             osc: ExponentialOscillator::new(warp_factor),
         }
     }
 
-    fn get_phase_warp_diff(&mut self, stretch_factor: f32) -> f32 {
-        let osc_output = self.osc.gen_sample_with_stretch_factor(stretch_factor);
+    fn get_phase_warp_diff(&mut self, frequency: f32, stretch_factor: f32) -> f32 {
+        let osc_output = self
+            .osc
+            .gen_sample_with_stretch_factor(frequency, stretch_factor);
         let warped_phase = (osc_output + 1.) / 2.;
         debug_assert!(warped_phase >= 0.);
         debug_assert!(warped_phase <= 1.);
@@ -59,7 +56,7 @@ impl Effect for SpectralWarping {
         }
 
         // We then "warp" the position of the read head according to the warp factor.
-        let phase_warp_diff = self.get_phase_warp_diff(stretch_factor);
+        let phase_warp_diff = self.get_phase_warp_diff(frequency, stretch_factor);
         debug_assert!(phase_warp_diff >= -1.);
         debug_assert!(phase_warp_diff <= 1.);
         let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);

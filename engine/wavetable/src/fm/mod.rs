@@ -1,6 +1,6 @@
 #[cfg(feature = "simd")]
 use core::arch::wasm32::*;
-use std::{hint::unreachable_unchecked, rc::Rc};
+use std::rc::Rc;
 
 use adsr::{Adsr, AdsrStep, GateStatus, RampFn, RENDERED_BUFFER_SIZE};
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
@@ -91,21 +91,21 @@ mod fast {
 }
 
 impl ExponentialOscillator {
-    pub fn gen_sample_with_stretch_factor(&mut self, stretch_factor: f32) -> f32 {
+    pub fn gen_sample_with_stretch_factor(&mut self, frequency: f32, stretch_factor: f32) -> f32 {
+        self.update_phase(frequency);
+        let stretch_factor = dsp::clamp(0., 1., stretch_factor);
+
         // let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
-        let exponent_numerator = even_faster_pow(10.0f32, stretch_factor * 0.32 + 1.4) + 1.;
+        let exponent_numerator = even_faster_pow(10.0f32, 4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
         let exponent_denominator = 999.0f32;
         let exponent = exponent_numerator / exponent_denominator;
-        if exponent < 0. {
-            unsafe { unreachable_unchecked() }
-        }
 
         // Transform phase into [-1, 1] range
         let extended_phase = self.phase * 2. - 1.;
         let absolute_phase = extended_phase.abs();
-        if absolute_phase < 0. {
-            unsafe { unreachable_unchecked() }
-        }
+        debug_assert!(absolute_phase >= 0.);
+        debug_assert!(absolute_phase <= 1.);
+
         // val is from 0 to 1
         let val = if cfg!(debug_assertions) {
             let val = absolute_phase.powf(exponent);
@@ -131,16 +131,11 @@ impl ExponentialOscillator {
     ) -> f32 {
         self.update_phase(frequency);
 
-        let stretch_factor = self
-            .stretch_factor
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
-            .abs()
-            .min(1.);
-        if stretch_factor < 0. {
-            unsafe { unreachable_unchecked() }
-        }
+        let stretch_factor =
+            self.stretch_factor
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
 
-        self.gen_sample_with_stretch_factor(stretch_factor)
+        self.gen_sample_with_stretch_factor(frequency, stretch_factor)
     }
 }
 

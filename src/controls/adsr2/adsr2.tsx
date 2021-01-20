@@ -548,6 +548,7 @@ class ADSR2Instance {
       const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
       phaseMarker.x = -this.width + phase * this.width;
     });
+    console.log(this);
   }
 
   private deserialize(state: Adsr) {

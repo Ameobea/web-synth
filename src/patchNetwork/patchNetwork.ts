@@ -148,9 +148,3 @@ export const initPatchNetwork = (
     connections: [...newConnections, ...addedConnections],
   };
 };
-
-export const create_empty_audio_connectables = (vcId: string): AudioConnectables => ({
-  vcId,
-  inputs: Map(),
-  outputs: Map(),
-});

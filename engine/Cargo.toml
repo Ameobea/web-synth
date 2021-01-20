@@ -23,4 +23,4 @@ codegen-units = 1
 lto = "fat"
 
 [profile.dev]
-# debug-assertions = false
+debug-assertions = true

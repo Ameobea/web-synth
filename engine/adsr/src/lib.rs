@@ -9,7 +9,7 @@ extern "C" {
 }
 
 const SAMPLE_RATE: usize = 44_100;
-pub const RENDERED_BUFFER_SIZE: usize = SAMPLE_RATE / 2;
+pub const RENDERED_BUFFER_SIZE: usize = SAMPLE_RATE * 2; // 2x oversample
 const FRAME_SIZE: usize = 128;
 
 #[derive(Clone, Copy)]

@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 pub mod manager;
 pub use self::manager::ViewContextManager;
 
-#[wasm_bindgen(raw_module = "./patchNetwork")]
+#[wasm_bindgen(raw_module = "./redux/modules/vcmUtils")]
 extern "C" {
     pub fn create_empty_audio_connectables(vc_id: &str) -> JsValue;
 }
