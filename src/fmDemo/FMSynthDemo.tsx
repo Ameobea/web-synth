@@ -18,6 +18,7 @@ import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelp
 import { initSentry } from 'src/sentry';
 import { Presets } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
+import { useWindowSize } from 'src/reactUtils';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();
 
@@ -310,16 +311,20 @@ const FMSynthDemo: React.FC = () => {
     setTimeout(() => mainGain.connect(limiter), 200);
   }, []);
 
+  const windowSize = useWindowSize();
+  // subtract the keyboard's height and add some padding
+  const height = windowSize.height - 228 - 8 - 16;
+
   if (!renderUI) {
     return null;
   }
 
   return (
     <div className='fm-synth-demo'>
-      <div className='fm-synth-demo-controls'>
+      <div className='fm-synth-demo-controls' style={{ height }}>
         <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgb(35,35,35)' }}>
           <ControlPanel
-            style={{ width: 378 }}
+            style={{ width: 470 }}
             settings={[
               {
                 type: 'range',
@@ -368,7 +373,7 @@ const FMSynthDemo: React.FC = () => {
             contextCb={(ctx: any) => {
               controlPanelCtx.current = ctx;
             }}
-            style={{ width: 378 }}
+            style={{ width: 470 }}
             settings={[
               {
                 type: 'select',

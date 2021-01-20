@@ -35,7 +35,7 @@
   flex-direction: column;
   background-color: #232323;
   color: white;
-  max-width: 378px;
+  max-width: 422px;
 
   div[data-hovered='true'] {
     $hover-color: lighten($highlight-2, 50);
@@ -52,7 +52,7 @@
   .modulation-matrix {
     display: flex;
     flex-direction: column;
-    width: 376px;
+    width: 420px;
 
     .operator-row {
       display: flex;
@@ -131,6 +131,8 @@
 .fm-synth-configuration {
   background-color: #232323;
   padding: 0px 2px;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .operator-config {
@@ -144,13 +146,11 @@
 }
 
 .configure-effects {
-  max-width: 391px;
+  max-width: 500px;
 
   .effects-controls {
     display: flex;
     flex-direction: column;
-    max-height: 330px;
-    overflow-y: auto;
 
     .configure-effect {
       .effect-management {
@@ -169,7 +169,7 @@
         }
 
         .effect-title {
-          width: 300px;
+          width: 500px;
           text-align: center;
           margin-left: 8px;
           margin-right: 28px;

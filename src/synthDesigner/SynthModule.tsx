@@ -305,7 +305,7 @@ const SynthModuleCompInner: React.FC<{
             localPitchMultiplier,
           ]
         )}
-        style={{ width: 376 }}
+        style={{ width: 470 }}
       />
 
       {synth.waveform === Waveform.Wavetable ? (

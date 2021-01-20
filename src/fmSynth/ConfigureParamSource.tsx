@@ -172,7 +172,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
       <ControlPanel
         title={title}
         theme={theme}
-        style={{ width: 376 }}
+        style={{ width: 500 }}
         settings={settings}
         state={{
           ...state,
@@ -238,8 +238,8 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
       />
       {state.type === 'adsr' ? (
         <ADSR2
-          width={376}
-          height={222}
+          width={500}
+          height={320}
           initialState={adsrs[state['adsr index']]}
           onChange={newAdsr => {
             const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];

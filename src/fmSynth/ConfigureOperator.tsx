@@ -82,7 +82,7 @@ const ConfigureOperator: React.FC<{
   return (
     <div className='operator-config'>
       <ControlPanel
-        style={{ width: 376 }}
+        style={{ width: 470 }}
         settings={operatorTypeSettings}
         title={`configure operator ${operatorIx}`}
         state={operatorTypeState}

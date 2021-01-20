@@ -7,13 +7,15 @@ import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynt
 
 const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
-const LINE_COLOR = 0x33dd88;
-const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
+const RAMP_LINE_COLOR = 0x43f79d;
+const RAMP_LINE_WIDTH = 2.4;
+const INTERPOLATED_SEGMENT_LENGTH_PX = 0.8;
 const STEP_HANDLE_WIDTH = 4.5;
-const HANDLE_COLOR = 0x4399ab;
-const RAMP_HANDLE_COLOR = 0x3592df;
+const RAMP_HANDLE_COLOR = 0x0077ff;
 const PHASE_MARKER_COLOR = 0xf7e045;
 const ctx = new AudioContext();
+
+PIXI.settings.ROUND_PIXELS = true;
 
 interface ADSR2Sprites {
   rampCurves: RampCurve[];
@@ -111,13 +113,15 @@ class RampHandle {
 
   private render() {
     const g = new PIXI.Graphics();
-    g.lineStyle(1, 0x000000, 0.3);
+    g.lineStyle(0);
     g.beginFill(RAMP_HANDLE_COLOR);
     g.drawCircle(0, 0, STEP_HANDLE_WIDTH);
     g.endFill();
     g.position = this.computeInitialPos();
-
+    g.zIndex = 2;
     g.interactive = true;
+    g.cursor = 'pointer';
+
     g.on('pointerdown', (evt: any) => {
       this.dragData = evt.data;
     })
@@ -137,7 +141,7 @@ class RampHandle {
       });
 
     this.graphics = g;
-    this.inst.app.stage.addChild(g);
+    this.inst.vizContainer.addChild(g);
   }
 
   constructor(inst: ADSR2Instance, parentRamp: RampCurve, startStep: AdsrStep, endStep: AdsrStep) {
@@ -149,7 +153,7 @@ class RampHandle {
   }
 
   public destroy() {
-    this.inst.app.stage.removeChild(this.graphics);
+    this.inst.vizContainer.removeChild(this.graphics);
     this.graphics.destroy();
   }
 }
@@ -216,24 +220,24 @@ class RampCurve {
 
   public renderRampCurve(step1: AdsrStep, step2: AdsrStep): PIXI.Graphics {
     const graphics = new PIXI.Graphics();
-    graphics.lineStyle(2.5, LINE_COLOR, 1, 0.5);
+    graphics.lineStyle(RAMP_LINE_WIDTH, RAMP_LINE_COLOR, 1, 0.5, false);
     const [start, ...points] = this.computeRampCurve(step1, step2);
     graphics.moveTo(start.x, start.y);
     points.forEach(({ x, y }) => graphics.lineTo(x, y));
-    this.inst.app.stage.addChild(graphics);
+    this.inst.vizContainer.addChild(graphics);
     return graphics;
   }
 
   public reRenderRampCurve(startStep: AdsrStep, endStep: AdsrStep) {
     if (this.curve) {
-      this.inst.app.stage.removeChild(this.curve);
+      this.inst.vizContainer.removeChild(this.curve);
       this.curve.destroy();
     }
     this.curve = this.renderRampCurve(startStep, endStep);
   }
 
   public destroy() {
-    this.inst.app.stage.removeChild(this.curve);
+    this.inst.vizContainer.removeChild(this.curve);
     this.handle?.destroy();
   }
 }
@@ -252,10 +256,11 @@ class StepHandle {
 
   private render() {
     const g = new PIXI.Graphics();
-    g.lineStyle(1, 0x000000);
-    g.beginFill(HANDLE_COLOR);
+    g.lineStyle(0);
+    g.beginFill(RAMP_LINE_COLOR);
     g.drawCircle(0, 0, STEP_HANDLE_WIDTH);
     g.endFill();
+    g.zIndex = 2;
 
     // Drag handling
     g.buttonMode = true;
@@ -298,7 +303,7 @@ class StepHandle {
         this.delete();
       });
 
-    this.inst.app.stage.addChild(g);
+    this.inst.vizContainer.addChild(g);
     g.x = this.step.x * this.inst.width;
     g.y = (1 - this.step.y) * this.inst.height;
     this.graphics = g;
@@ -321,7 +326,7 @@ class StepHandle {
   }
 
   public destroy() {
-    this.inst.app.stage.removeChild(this.graphics);
+    this.inst.vizContainer.removeChild(this.graphics);
     this.graphics.destroy();
   }
 }
@@ -341,6 +346,11 @@ export interface AudioThreadData {
   phaseIndex: number;
 }
 
+const LEFT_GUTTER_WIDTH_PX = 12;
+const RIGHT_GUTTER_WIDTH_PX = 12;
+const TOP_GUTTER_WIDTH_PX = 22;
+const BOTTOM_GUTTER_WIDTH_PX = 22;
+
 class ADSR2Instance {
   public app: PIXI.Application;
   private lengthMs = 1000;
@@ -352,13 +362,22 @@ class ADSR2Instance {
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
   private audioThreadData: AudioThreadData;
-  private randomNumber = Math.random();
+  /**
+   * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
+   */
+  public vizContainer: PIXI.Container;
 
+  /**
+   * Returns the width of the canvas in pixels minus the horizontal gutters
+   */
   public get width() {
-    return this.app.renderer.width;
+    return this.app.renderer.width - LEFT_GUTTER_WIDTH_PX - RIGHT_GUTTER_WIDTH_PX;
   }
+  /**
+   * Returns the height of the canvas in pixels minus the vertical gutters
+   */
   public get height() {
-    return this.app.renderer.height;
+    return this.app.renderer.height - TOP_GUTTER_WIDTH_PX - BOTTOM_GUTTER_WIDTH_PX;
   }
 
   public onUpdated() {
@@ -450,7 +469,7 @@ class ADSR2Instance {
     g.drawRect(0, 0, this.width, this.height);
     g.endFill();
     g.x = -this.width;
-    this.app.stage.addChildAt(g, 0);
+    this.vizContainer.addChild(g);
     return g;
   }
 
@@ -474,6 +493,17 @@ class ADSR2Instance {
     this.app = app;
     this.onChange = onChange;
     this.ctx = ctx;
+
+    this.vizContainer = new PIXI.Container();
+    this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
+    this.vizContainer.y = TOP_GUTTER_WIDTH_PX;
+    // This means that z-indices actually work
+    // this.vizContainer.sortableChildren = true;
+    // basically `overflow: hidden`, I think
+    this.vizContainer.mask = new PIXI.Graphics()
+      .beginFill(0xffffff)
+      .drawRect(LEFT_GUTTER_WIDTH_PX, TOP_GUTTER_WIDTH_PX, this.width, this.height)
+      .endFill();
 
     this.initBackgroundClickHandler();
 
@@ -503,10 +533,18 @@ class ADSR2Instance {
   }
 
   private initBackgroundClickHandler() {
-    const bg = new PIXI.Sprite(PIXI.Texture.EMPTY);
-    bg.zIndex = -2;
+    const bg = new PIXI.Graphics();
+    bg.lineStyle(1, 0x888888);
+    bg.beginFill(0x000000);
+    bg.drawRect(0, 0, this.width, this.height);
+    bg.endFill();
+    bg.x = 0;
+    bg.y = 0;
     bg.width = this.width;
     bg.height = this.height;
+    console.log(bg, this.width, this.height, bg.width, bg.height);
+
+    bg.zIndex = -2;
     bg.interactive = true;
     bg.on('click', (evt: any) => {
       const now = this.ctx.currentTime;
@@ -528,7 +566,7 @@ class ADSR2Instance {
       this.lastClick = null;
       this.addMark(pos);
     });
-    this.app.stage.addChild(bg);
+    this.vizContainer.addChild(bg);
   }
 
   private renderInitial() {
@@ -536,6 +574,8 @@ class ADSR2Instance {
     for (let i = 0; i < this.steps.length - 1; i++) {
       rampCurves.push(new RampCurve(this, this.steps[i].step, this.steps[i + 1].step));
     }
+
+    this.app.stage.addChild(this.vizContainer);
 
     this.sprites = { rampCurves };
 
@@ -548,7 +588,6 @@ class ADSR2Instance {
       const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
       phaseMarker.x = -this.width + phase * this.width;
     });
-    console.log(this);
   }
 
   private deserialize(state: Adsr) {
@@ -581,7 +620,7 @@ interface ADSR2Props {
   onChange: (newState: Adsr) => void;
 }
 
-const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 380, initialState, onChange }) => {
+const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, onChange }) => {
   const instance = useRef<ADSR2Instance | null>(null);
 
   useEffect(() => {

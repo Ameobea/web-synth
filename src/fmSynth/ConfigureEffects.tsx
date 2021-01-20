@@ -371,23 +371,6 @@ const EffectManagement: React.FC<{
         ) : null}
         <div className='effect-title'>{operatorEffects[effectIx]?.type}</div>
       </div>
-      {/* <ControlPanel
-        style={{ width: 376 }}
-        theme={theme}
-        state={{ 'effect type': operatorEffects[effectIx]?.type }}
-        settings={[EFFECT_TYPE_SETTING]}
-        onChange={(key: string, val: any) => {
-          switch (key) {
-            case 'effect type': {
-              onChange({ ...(operatorEffects[effectIx] ?? {}), ...buildDefaultEffect(val) });
-              break;
-            }
-            default: {
-              console.error('Unhandled effect configurator key: ', key);
-            }
-          }
-        }}
-      /> */}
     </>
   );
 };
@@ -456,7 +439,7 @@ const ConfigureEffects: React.FC<{
     <div className='configure-effects'>
       <ControlPanel
         title={operatorIx === null ? 'main effect chain' : `operator ${operatorIx} effects`}
-        style={{ width: 376 }}
+        style={{ width: 470 }}
       />
       <div className='effects-controls'>
         {filterNils(state).map((effect, i) => (
@@ -475,7 +458,7 @@ const ConfigureEffects: React.FC<{
 
       <ControlPanel
         state={{ 'effect type': selectedEffectType }}
-        style={{ width: 376 }}
+        style={{ width: 470 }}
         onChange={(_key: string, val: any) => setSelectedEffectType(val)}
         settings={[
           EFFECT_TYPE_SETTING,
