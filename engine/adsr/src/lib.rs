@@ -113,7 +113,10 @@ impl Adsr {
         Adsr {
             phase: 0.,
             gate_status: GateStatus::Done,
-            release_start_phase,
+            release_start_phase: match loop_point {
+                Some(loop_point) => release_start_phase.max(loop_point),
+                _ => release_start_phase,
+            },
             steps,
             loop_point,
             rendered,
@@ -187,9 +190,13 @@ impl Adsr {
         // We are gating and have crossed the release point
         if self.gate_status == GateStatus::Gated && self.phase >= self.release_start_phase {
             if let Some(loop_start) = self.loop_point {
+                if self.release_start_phase <= loop_start {
+                    self.phase = loop_start;
+                    return;
+                }
                 let overflow_amount = self.phase - self.release_start_phase;
                 let loop_size = self.release_start_phase - loop_start;
-                self.phase = loop_start + (overflow_amount / loop_size).trunc();
+                self.phase = loop_start + ((overflow_amount / loop_size).fract() * loop_size);
             } else {
                 // Lock our phase to the release point if we're still gated.  Transitioning to
                 // `GateStatus::GatedFrozen` is handled in `render_frame()`.

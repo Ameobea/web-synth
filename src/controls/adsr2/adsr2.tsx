@@ -13,6 +13,8 @@ const INTERPOLATED_SEGMENT_LENGTH_PX = 0.8;
 const STEP_HANDLE_WIDTH = 4.5;
 const RAMP_HANDLE_COLOR = 0x0077ff;
 const PHASE_MARKER_COLOR = 0xf7e045;
+const LOOP_DRAG_BAR_COLOR = 0xffd608;
+const RELEASE_DRAG_BAR_COLOR = 0x3500e3;
 const ctx = new AudioContext();
 
 PIXI.settings.ROUND_PIXELS = true;
@@ -331,6 +333,87 @@ class StepHandle {
   }
 }
 
+const makeDraggable = (
+  g: PIXI.Graphics,
+  parent: { dragData: PIXI.InteractionData | null; handleDrag: (newPos: PIXI.Point) => void }
+) => {
+  g.buttonMode = true;
+  g.interactive = true;
+  g.on('pointerdown', (evt: any) => {
+    parent.dragData = evt.data;
+  })
+    .on('pointerup', () => {
+      parent.dragData = null;
+    })
+    .on('pointerupoutside', () => {
+      parent.dragData = null;
+    })
+    .on('pointermove', () => {
+      if (!parent.dragData) {
+        return;
+      }
+
+      const newPosition = parent.dragData.getLocalPosition(g.parent);
+      parent.handleDrag(newPosition);
+    });
+};
+
+/**
+ * Bar attached to the top of the ADSR that can be dragged from side to side.
+ */
+class DragBar {
+  private inst: ADSR2Instance;
+  private g!: PIXI.Graphics;
+  public dragData: PIXI.InteractionData | null = null;
+  private onDrag: (newVal: number) => void;
+
+  constructor(
+    inst: ADSR2Instance,
+    color: number,
+    initialPos: number,
+    onDrag: (newVal: number) => void
+  ) {
+    this.inst = inst;
+    this.onDrag = onDrag;
+
+    this.renderInitial(color, initialPos);
+  }
+
+  private renderInitial(color: number, initialPos: number) {
+    const g = new PIXI.Graphics();
+    g.beginFill(color);
+    g.drawCircle(0, 4, STEP_HANDLE_WIDTH);
+    g.lineStyle(2, color, 1, 0.5, false);
+    g.lineTo(0, this.inst.height + 2);
+    g.endFill();
+
+    makeDraggable(g, this);
+
+    g.x = LEFT_GUTTER_WIDTH_PX + initialPos * this.inst.width;
+    g.y = TOP_GUTTER_WIDTH_PX - 4;
+    this.inst.app.stage.addChild(g);
+    this.g = g;
+  }
+
+  public handleDrag(newPosition: PIXI.Point) {
+    // We're a child of the root container since we need to display outside of the main ADSR space, so
+    // we have to manually constrain our x position to keep it inside of that range
+    const x = R.clamp(LEFT_GUTTER_WIDTH_PX, this.inst.width + RIGHT_GUTTER_WIDTH_PX, newPosition.x);
+    this.g.x = x;
+    const newVal = (x - LEFT_GUTTER_WIDTH_PX) / this.inst.width;
+    this.onDrag(newVal);
+  }
+
+  public setPos(newPos: number) {
+    this.g.x = LEFT_GUTTER_WIDTH_PX + this.inst.width * newPos;
+  }
+
+  public destroy() {
+    this.dragData = null;
+    this.g.destroy();
+  }
+}
+
 /**
  * A handle containing a piece of memory shared between this thread and the audio thread used to obtain real-time info
  * about the ADSR instance as it is running.
@@ -357,7 +440,9 @@ class ADSR2Instance {
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
+  private loopDragBar: DragBar | null = null;
   private releasePoint!: number;
+  private releaseDragBar!: DragBar;
   private onChange: (newState: Adsr) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
@@ -579,6 +664,42 @@ class ADSR2Instance {
     this.sprites = { rampCurves };
 
     const phaseMarker = this.buildPhaseMarker();
+
+    if (!R.isNil(this.loopPoint)) {
+      this.loopDragBar = new DragBar(
+        this,
+        LOOP_DRAG_BAR_COLOR,
+        this.loopPoint,
+        (newLoopPos: number) => {
+          if (newLoopPos < 0 || newLoopPos > 1) {
+            throw new UnreachableException();
+          }
+
+          this.loopPoint = newLoopPos;
+          this.onUpdated();
+        }
+      );
+    }
+
+    this.releaseDragBar = new DragBar(
+      this,
+      RELEASE_DRAG_BAR_COLOR,
+      this.releasePoint,
+      (newReleasePos: number) => {
+        if (newReleasePos < 0 || newReleasePos > 1) {
+          throw new UnreachableException();
+        }
+
+        // release has to be after the loop point, if there is one
+        if (!R.isNil(this.loopPoint)) {
+          newReleasePos = R.clamp(this.loopPoint, 1, newReleasePos);
+          this.releaseDragBar.setPos(newReleasePos);
+        }
+
+        this.releasePoint = newReleasePos;
+        this.onUpdated();
+      }
+    );
 
     this.app.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
