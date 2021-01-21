@@ -745,6 +745,11 @@ impl FMSynthContext {
             let base_frequency_buffer =
                 unsafe { self.base_frequency_input_buffer.get_unchecked(voice_ix) };
             if unsafe { *base_frequency_buffer.get_unchecked(0) } == 0. {
+                for adsr in &mut voice.adsrs {
+                    if let Some(store_phase_to) = adsr.store_phase_to {
+                        unsafe { *store_phase_to = 0. };
+                    }
+                }
                 continue;
             }
             let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };

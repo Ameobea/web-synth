@@ -245,6 +245,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
             const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
             onAdsrChange(adsrIx, newAdsr);
           }}
+          outputRange={[state.shift, state.shift + state.scale]}
         />
       ) : null}
     </>

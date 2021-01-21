@@ -15,6 +15,7 @@ const RAMP_HANDLE_COLOR = 0x0077ff;
 const PHASE_MARKER_COLOR = 0xf7e045;
 const LOOP_DRAG_BAR_COLOR = 0xffd608;
 const RELEASE_DRAG_BAR_COLOR = 0x3500e3;
+const SCALE_MARKING_LINE_COLOR = 0xeeeeee;
 const ctx = new AudioContext();
 
 PIXI.settings.ROUND_PIXELS = true;
@@ -415,6 +416,78 @@ class DragBar {
 }
 
 /**
+ * Renders lines on the background of the ADSR to show the scale of both the x and y axises
+ */
+class ScaleMarkings {
+  private inst: ADSR2Instance;
+  private g!: PIXI.Graphics;
+  private lenMs: number;
+  private outputRange: [number, number];
+  private texts: PIXI.Text[] = [];
+
+  constructor(inst: ADSR2Instance, lenMs: number, outputRange: [number, number]) {
+    this.inst = inst;
+    this.lenMs = lenMs;
+    this.outputRange = outputRange;
+
+    this.render();
+  }
+
+  public update(lenMs: number, outputRange: [number, number]) {
+    this.lenMs = lenMs;
+    this.outputRange = outputRange;
+
+    this.render();
+  }
+
+  public destroy() {
+    this.g?.destroy();
+    this.texts.forEach(text => text.destroy());
+    this.texts = [];
+  }
+
+  private computeHorizontalAxisLineCount() {
+    return Math.round(this.inst.height / 70);
+  }
+
+  private render() {
+    this.destroy();
+
+    const g = new PIXI.Graphics();
+    g.lineStyle(0.8, SCALE_MARKING_LINE_COLOR, 0.5, 0.5, false);
+    g.moveTo(this.inst.width / 2, 0);
+    g.lineTo(this.inst.width / 2, this.inst.height);
+
+    const horizontalAxisLineCount = this.computeHorizontalAxisLineCount();
+    const horizontalAxisLineSpacing = this.inst.height / (horizontalAxisLineCount + 1);
+    for (let i = 0; i < horizontalAxisLineCount + 1; i++) {
+      if (i !== horizontalAxisLineCount) {
+        g.moveTo(1, (i + 1) * horizontalAxisLineSpacing);
+        g.lineTo(this.inst.width - 2, (i + 1) * horizontalAxisLineSpacing);
+      }
+
+      const scaledY =
+        this.outputRange[0] +
+        ((horizontalAxisLineCount + 1 - (i + 1)) / (horizontalAxisLineCount + 1)) *
+          (this.outputRange[1] - this.outputRange[0]);
+      const text = new PIXI.Text(scaledY.toPrecision(4), {
+        fontSize: 9,
+        fontFamily: 'PT Sans',
+        fill: 0xffffff,
+        align: 'left',
+      });
+      text.x = 2;
+      text.y = TOP_GUTTER_WIDTH_PX + (i + 1) * horizontalAxisLineSpacing - 12;
+      this.inst.app.stage.addChild(text);
+      this.texts.push(text);
+    }
+
+    this.g = g;
+    this.inst.vizContainer.addChildAt(g, 2);
+  }
+}
+
+/**
  * A handle containing a piece of memory shared between this thread and the audio thread used to obtain real-time info
  * about the ADSR instance as it is running.
  */
@@ -429,14 +502,15 @@ export interface AudioThreadData {
   phaseIndex: number;
 }
 
-const LEFT_GUTTER_WIDTH_PX = 12;
-const RIGHT_GUTTER_WIDTH_PX = 12;
-const TOP_GUTTER_WIDTH_PX = 22;
-const BOTTOM_GUTTER_WIDTH_PX = 22;
+const LEFT_GUTTER_WIDTH_PX = 27;
+const RIGHT_GUTTER_WIDTH_PX = 7;
+const TOP_GUTTER_WIDTH_PX = 10;
+const BOTTOM_GUTTER_WIDTH_PX = 10;
 
 class ADSR2Instance {
   public app: PIXI.Application;
   private lengthMs = 1000;
+  private outputRange: [number, number] = [0, 1];
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
@@ -447,6 +521,7 @@ class ADSR2Instance {
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
   private audioThreadData: AudioThreadData;
+  private scaleMarkings!: ScaleMarkings;
   /**
    * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
    */
@@ -467,6 +542,7 @@ class ADSR2Instance {
 
   public onUpdated() {
     this.onChange(this.serialize());
+    this.scaleMarkings.update(this.lengthMs, this.outputRange);
   }
 
   private setSteps(newSteps: AdsrStep[]) {
@@ -475,7 +551,7 @@ class ADSR2Instance {
     this.sortAndUpdateMarks();
   }
 
-  public update(state: Adsr) {
+  public update(state: Adsr, outputRange: [number, number]) {
     if (isNaN(state.lenSamples)) {
       state.lenSamples = 1000;
     }
@@ -500,7 +576,9 @@ class ADSR2Instance {
       // TODO: Update rendering
     }
 
+    this.outputRange = [...outputRange];
     this.audioThreadData = state.audioThreadData;
+    this.scaleMarkings.update(this.lengthMs, this.outputRange);
   }
 
   public setLengthMs(newLengthMs: number) {
@@ -564,7 +642,8 @@ class ADSR2Instance {
     canvas: HTMLCanvasElement,
     onChange: (newState: Adsr) => void,
     ctx: AudioContext,
-    initialState: Adsr
+    initialState: Adsr,
+    outputRange: [number, number]
   ) {
     const app = new PIXI.Application({
       antialias: true,
@@ -578,6 +657,7 @@ class ADSR2Instance {
     this.app = app;
     this.onChange = onChange;
     this.ctx = ctx;
+    this.outputRange = [...outputRange];
 
     this.vizContainer = new PIXI.Container();
     this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
@@ -587,7 +667,7 @@ class ADSR2Instance {
     // basically `overflow: hidden`, I think
     this.vizContainer.mask = new PIXI.Graphics()
       .beginFill(0xffffff)
-      .drawRect(LEFT_GUTTER_WIDTH_PX, TOP_GUTTER_WIDTH_PX, this.width, this.height)
+      .drawRect(LEFT_GUTTER_WIDTH_PX, TOP_GUTTER_WIDTH_PX, this.width - 1, this.height - 1)
       .endFill();
 
     this.initBackgroundClickHandler();
@@ -701,6 +781,8 @@ class ADSR2Instance {
       }
     );
 
+    this.scaleMarkings = new ScaleMarkings(this, this.lengthMs, this.outputRange);
+
     this.app.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
         return;
@@ -738,9 +820,16 @@ interface ADSR2Props {
   height?: number;
   initialState: Adsr;
   onChange: (newState: Adsr) => void;
+  outputRange: [number, number];
 }
 
-const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, onChange }) => {
+const ADSR2: React.FC<ADSR2Props> = ({
+  width = 600,
+  height = 480,
+  initialState,
+  onChange,
+  outputRange: [outputRangeStart, outputRangeEnd],
+}) => {
   const instance = useRef<ADSR2Instance | null>(null);
 
   useEffect(() => {
@@ -748,8 +837,8 @@ const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, 
       return;
     }
 
-    instance.current.update(initialState);
-  }, [initialState]);
+    instance.current.update(initialState, [outputRangeStart, outputRangeEnd]);
+  }, [initialState, outputRangeEnd, outputRangeStart]);
 
   return (
     <canvas
@@ -766,7 +855,10 @@ const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, 
           return;
         }
 
-        instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState);
+        instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState, [
+          outputRangeStart,
+          outputRangeEnd,
+        ]);
       }}
     />
   );
