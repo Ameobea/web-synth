@@ -280,9 +280,23 @@ impl FMSynthVoice {
         output_buffer: &mut [f32; FRAME_SIZE],
         detune: Option<&ParamSource>,
     ) {
-        let mut samples_per_operator: [f32; OPERATOR_COUNT] = self.last_samples;
-        let mut frequencies_per_operator: [f32; OPERATOR_COUNT] =
-            self.last_sample_frequencies_per_operator;
+        let mut samples_per_operator_bufs: [[f32; OPERATOR_COUNT]; 2] =
+            [self.last_samples, unsafe {
+                std::mem::MaybeUninit::uninit().assume_init()
+            }];
+        let mut last_samples_per_operator: &mut [f32; OPERATOR_COUNT] =
+            unsafe { &mut *samples_per_operator_bufs.as_mut_ptr().add(0) };
+        let mut samples_per_operator: &mut [f32; OPERATOR_COUNT] =
+            unsafe { &mut *samples_per_operator_bufs.as_mut_ptr().add(1) };
+
+        let mut frequencies_per_operator_bufs: [[f32; OPERATOR_COUNT]; 2] =
+            [self.last_sample_frequencies_per_operator, unsafe {
+                std::mem::MaybeUninit::uninit().assume_init()
+            }];
+        let mut last_frequencies_per_operator: &mut [f32; OPERATOR_COUNT] =
+            unsafe { &mut *frequencies_per_operator_bufs.as_mut_ptr().add(0) };
+        let mut frequencies_per_operator: &mut [f32; OPERATOR_COUNT] =
+            unsafe { &mut *frequencies_per_operator_bufs.as_mut_ptr().add(1) };
 
         // Update and pre-render all ADSRs
         for adsr in &mut self.adsrs {
@@ -373,11 +387,11 @@ impl FMSynthVoice {
                         .get_unchecked(sample_ix_within_frame)
                 };
                 let modulated_frequency = compute_modulated_frequency(
-                    &samples_per_operator,
+                    &last_samples_per_operator,
                     operator_ix,
                     sample_ix_within_frame,
                     carrier_base_frequency,
-                    &frequencies_per_operator,
+                    &last_frequencies_per_operator,
                     &modulation_indices,
                 );
                 *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
@@ -407,10 +421,15 @@ impl FMSynthVoice {
                 *output_buffer.get_unchecked_mut(sample_ix_within_frame) =
                     dsp::clamp(-10., 10., output_sample);
             }
+            std::mem::swap(&mut samples_per_operator, &mut last_samples_per_operator);
+            std::mem::swap(
+                &mut frequencies_per_operator,
+                &mut last_frequencies_per_operator,
+            );
         }
 
-        self.last_samples = samples_per_operator;
-        self.last_sample_frequencies_per_operator = frequencies_per_operator;
+        self.last_samples = *last_samples_per_operator;
+        self.last_sample_frequencies_per_operator = *last_frequencies_per_operator;
 
         self.effect_chain.apply_all(&render_params, output_buffer);
     }

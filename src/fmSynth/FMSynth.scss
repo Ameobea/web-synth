@@ -35,14 +35,9 @@
   flex-direction: column;
   background-color: #232323;
   color: white;
-  max-width: 422px;
+  min-width: 520px;
+  overflow-y: auto;
 
-  div[data-hovered='true'] {
-    $hover-color: lighten($highlight-2, 50);
-    background-color: mix($hover-color, #000, $weight: 10%);
-  }
-
-  .modulation-matrix,
   .operator-square,
   .operator-select {
     border: 1px solid;
@@ -52,17 +47,20 @@
   .modulation-matrix {
     display: flex;
     flex-direction: column;
-    width: 420px;
+    width: 490px;
+    margin-left: auto;
+    margin-right: auto;
 
     .operator-row {
       display: flex;
       flex-direction: row;
+      justify-content: center;
 
       > div {
-        flex-basis: 36px;
-        height: 36px;
+        flex-basis: 42px;
+        height: 42px;
         display: flex;
-        font-size: 12.5px;
+        font-size: 14px;
         justify-content: center;
       }
 
@@ -73,11 +71,17 @@
         justify-content: center;
         align-items: center;
       }
-
+      .operator-select[data-hovered='true'] {
+        $hover-color: lighten($highlight-2, 0.4);
+        background-color: mix($hover-color, $highlight-3, $weight: 40%);
+      }
       .operator-select.operator-selected {
         background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
         background-size: 140% 140%;
         animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
+      }
+      .operator-select.operator-selected[data-hovered='true'] {
+        background: mix(#ff0, #e8180e, $weight: 40%);
       }
 
       .operator-square {
@@ -103,7 +107,7 @@
       }
 
       .adsr-param {
-        font-size: 10px;
+        font-size: 12px;
         text-align: center;
         line-height: 1;
       }
@@ -117,6 +121,9 @@
     padding: 3px;
     margin: 2px 0px;
     border: 1px solid #181818;
+    width: 433px;
+    margin-left: auto;
+    margin-right: auto;
   }
   .main-effect-chain-selector[data-active='true'] {
     background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
@@ -133,6 +140,7 @@
   padding: 0px 2px;
   height: 100%;
   overflow-y: auto;
+  min-width: 500px;
 }
 
 .operator-config {
@@ -143,10 +151,11 @@
 .configure-modulation-index {
   display: flex;
   flex-direction: column;
+  width: 500px;
 }
 
 .configure-effects {
-  max-width: 500px;
+  width: 500px;
 
   .effects-controls {
     display: flex;
@@ -173,7 +182,7 @@
           text-align: center;
           margin-left: 8px;
           margin-right: 28px;
-          font-size: 12px;
+          font-size: 14px;
           padding-top: 4px;
         }
       }

@@ -312,8 +312,8 @@ const FMSynthDemo: React.FC = () => {
   }, []);
 
   const windowSize = useWindowSize();
-  // subtract the keyboard's height and add some padding
-  const height = windowSize.height - 228 - 8 - 16;
+  // subtract the keyboard's height
+  const height = windowSize.height - 228;
 
   if (!renderUI) {
     return null;
@@ -324,7 +324,7 @@ const FMSynthDemo: React.FC = () => {
       <div className='fm-synth-demo-controls' style={{ height }}>
         <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgb(35,35,35)' }}>
           <ControlPanel
-            style={{ width: 470 }}
+            style={{ width: 379 }}
             settings={[
               {
                 type: 'range',
@@ -373,7 +373,7 @@ const FMSynthDemo: React.FC = () => {
             contextCb={(ctx: any) => {
               controlPanelCtx.current = ctx;
             }}
-            style={{ width: 470 }}
+            style={{ width: 379 }}
             settings={[
               {
                 type: 'select',

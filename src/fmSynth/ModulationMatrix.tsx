@@ -71,12 +71,9 @@ export const ModulationMatrix: React.FC<{
       }}
     >
       {modulationIndices.map((row, srcOperatorIx) => (
-        <div
-          data-hovered={hoveredRowIx === srcOperatorIx ? 'true' : 'false'}
-          className={'operator-row'}
-          key={srcOperatorIx}
-        >
+        <div className={'operator-row'} key={srcOperatorIx}>
           <div
+            data-hovered={hoveredColIx === srcOperatorIx ? 'true' : 'false'}
             className={
               'operator-select' + (selectedOperatorIx === srcOperatorIx ? ' operator-selected' : '')
             }
@@ -98,7 +95,6 @@ export const ModulationMatrix: React.FC<{
                   ? 'true'
                   : 'false'
               }
-              data-hovered={hoveredColIx === dstOperatorIx ? 'true' : 'false'}
               className='operator-square'
               key={dstOperatorIx}
               onClick={() => onModulationIndexSelected(srcOperatorIx, dstOperatorIx)}

@@ -524,7 +524,7 @@ class ADSR2Instance {
   private addMark(pos: PIXI.Point) {
     const step = new StepHandle(this, {
       x: pos.x / this.width,
-      y: pos.y / this.height,
+      y: 1 - pos.y / this.height,
       ramper: { type: 'exponential' as const, exponent: 0.1 },
     });
     this.steps.push(step);

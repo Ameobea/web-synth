@@ -87,7 +87,6 @@ impl Effect for Wavefolder {
             fastapprox::faster::sinfull(std::f32::consts::PI * (sample * gain + offset / 2.));
         // Filter out extremely low frequencies / remove offset bias
         self.dc_blocker.apply(output)
-        // output
     }
 
     fn apply_all(
