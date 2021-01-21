@@ -13,6 +13,13 @@ export enum ButterworthFilterMode {
   Bandpass = 2,
 }
 
+export enum SoftClipperAlgorithm {
+  CubicNonlinearity = 0,
+  Tanh = 1,
+  XOverOnePlusAbsX = 2,
+  HardClipper = 3,
+}
+
 export type Effect =
   | {
       type: 'spectral warping';
@@ -29,7 +36,12 @@ export type Effect =
     }
   | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
   | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource }
-  | { type: 'soft clipper'; preGain: ParamSource; postGain: ParamSource }
+  | {
+      type: 'soft clipper';
+      preGain: ParamSource;
+      postGain: ParamSource;
+      algorithm: SoftClipperAlgorithm;
+    }
   | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource };
 
 const EFFECT_TYPE_SETTING = {
@@ -83,6 +95,7 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         type,
         preGain: { type: 'constant', value: 1.5 },
         postGain: { type: 'constant', value: 1.5 },
+        algorithm: SoftClipperAlgorithm.CubicNonlinearity,
       };
     }
     case 'butterworth filter': {
@@ -268,6 +281,14 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
   </>
 );
 
+const SOFT_CLIPPER_ALGORITHM_SETTINGS = [
+  {
+    type: 'select',
+    label: 'algorithm',
+    options: { 'cubic nonlinearity': 0, tanh: 1, 'x / (1 + |x|)': 2, 'hard clipper': 3 },
+  },
+];
+
 const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
   state,
   onChange,
@@ -275,6 +296,13 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
   onAdsrChange,
 }) => (
   <>
+    <ControlPanel
+      theme={softClipperTheme}
+      style={{ width: 500 }}
+      settings={SOFT_CLIPPER_ALGORITHM_SETTINGS}
+      state={{ algorithm: state.algorithm }}
+      onChange={(_key: string, val: SoftClipperAlgorithm) => onChange({ ...state, algorithm: val })}
+    />
     <ConfigureParamSource
       title='pre gain'
       adsrs={adsrs}
@@ -439,7 +467,7 @@ const ConfigureEffects: React.FC<{
     <div className='configure-effects'>
       <ControlPanel
         title={operatorIx === null ? 'main effect chain' : `operator ${operatorIx} effects`}
-        style={{ width: 470 }}
+        style={{ width: 500 }}
       />
       <div className='effects-controls'>
         {filterNils(state).map((effect, i) => (

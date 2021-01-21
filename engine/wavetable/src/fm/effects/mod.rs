@@ -190,8 +190,9 @@ impl EffectInstance {
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
+                let algorithm = param_3_int_val;
 
-                EffectInstance::SoftClipper(SoftClipper::new(pre_gain, post_gain))
+                EffectInstance::SoftClipper(SoftClipper::new(pre_gain, post_gain, algorithm))
             },
             5 => {
                 let mode = ButterworthFilterMode::from(param_1_int_val);
@@ -221,7 +222,7 @@ impl EffectInstance {
         param_2_float_val: f32,
         param_2_float_val_2: f32,
         _param_3_type: usize,
-        _param_3_int_val: usize,
+        param_3_int_val: usize,
         _param_3_float_val: f32,
         _param_3_float_val_2: f32,
         _param_4_type: usize,
@@ -317,6 +318,7 @@ impl EffectInstance {
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
+                soft_clipper.algorithm = unsafe { std::mem::transmute(param_3_int_val as u32) };
                 return true;
             },
             5 => {

@@ -467,7 +467,12 @@ export default class FMSynth implements ForeignNode {
           4,
           this.encodeParamSource(effect.preGain),
           this.encodeParamSource(effect.postGain),
-          null,
+          {
+            valueType: -1,
+            valParamInt: effect.algorithm,
+            valParamFloat: 0,
+            valParamFloat2: 0,
+          },
           null,
         ];
       }

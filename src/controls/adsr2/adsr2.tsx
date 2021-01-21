@@ -542,7 +542,6 @@ class ADSR2Instance {
     bg.y = 0;
     bg.width = this.width;
     bg.height = this.height;
-    console.log(bg, this.width, this.height, bg.width, bg.height);
 
     bg.zIndex = -2;
     bg.interactive = true;
