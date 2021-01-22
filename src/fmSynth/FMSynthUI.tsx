@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
@@ -115,8 +115,8 @@ const FMSynthUI: React.FC<{
   onSelectedUIChange,
   adsrs,
   onAdsrChange,
-  detune,
   handleDetuneChange,
+  detune,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -272,11 +272,12 @@ const FMSynthUI: React.FC<{
           settings={[{ type: 'checkbox', label: 'enable detune' }]}
           onChange={(_key: string, val: boolean) => {
             if (val) {
-              setState({ ...state, detune: buildDefaultParamSource('constant', -300, 300, 0) });
-              handleDetuneChange(null);
+              const newDetune = buildDefaultParamSource('constant', -300, 300, 0);
+              handleDetuneChange(newDetune);
+              setState({ ...state, detune: newDetune });
             } else {
-              setState({ ...state, detune: null });
               handleDetuneChange(null);
+              setState({ ...state, detune: null });
             }
           }}
         />
@@ -284,8 +285,8 @@ const FMSynthUI: React.FC<{
           <ConfigureParamSource
             state={state.detune}
             onChange={newDetune => {
-              setState({ ...state, detune: newDetune });
               handleDetuneChange(newDetune);
+              setState({ ...state, detune: newDetune });
             }}
             adsrs={state.adsrs}
             onAdsrChange={handleAdsrChange}
@@ -399,7 +400,7 @@ export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
     }}
     adsrs={synth.getAdsrs()}
     onAdsrChange={(adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr)}
-    detune={synth.detune}
+    detune={synth.getDetune()}
     handleDetuneChange={(newDetune: ParamSource) => synth.handleDetuneChange(newDetune)}
   />
 );

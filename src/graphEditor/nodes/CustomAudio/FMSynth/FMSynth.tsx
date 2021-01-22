@@ -103,7 +103,7 @@ export default class FMSynth implements ForeignNode {
   public selectedUI: UISelection | null = null;
   private onInitialized: ((inst: FMSynth) => void) | undefined;
   private audioThreadDataBuffer: Float32Array | null = null;
-  public detune: ParamSource | null = null;
+  private detune: ParamSource | null = null;
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -129,6 +129,9 @@ export default class FMSynth implements ForeignNode {
   }
   public getAdsrs() {
     return this.adsrs;
+  }
+  public getDetune() {
+    return this.detune;
   }
 
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
@@ -581,7 +584,7 @@ export default class FMSynth implements ForeignNode {
   }
 
   public handleDetuneChange(newDetune: ParamSource | null) {
-    this.detune = newDetune;
+    this.detune = newDetune ? { ...newDetune } : null;
     if (!this.awpHandle) {
       console.warn('Tried to set FM synth detune before AWP initialized');
       return;

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
+import ControlPanel from 'react-control-panel';
 
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
@@ -458,6 +459,22 @@ class ScaleMarkings {
     g.moveTo(this.inst.width / 2, 0);
     g.lineTo(this.inst.width / 2, this.inst.height);
 
+    const createText = (scaledY: number) => {
+      const text = new PIXI.Text(scaledY.toPrecision(4), {
+        fontSize: 9,
+        fontFamily: 'PT Sans',
+        fill: 0xffffff,
+        align: 'left',
+      });
+      text.x = 2;
+      this.inst.app.stage.addChild(text);
+      return text;
+    };
+
+    const text = createText(this.outputRange[1]);
+    text.y = TOP_GUTTER_WIDTH_PX - 2;
+    this.texts.push(text);
+
     const horizontalAxisLineCount = this.computeHorizontalAxisLineCount();
     const horizontalAxisLineSpacing = this.inst.height / (horizontalAxisLineCount + 1);
     for (let i = 0; i < horizontalAxisLineCount + 1; i++) {
@@ -470,15 +487,9 @@ class ScaleMarkings {
         this.outputRange[0] +
         ((horizontalAxisLineCount + 1 - (i + 1)) / (horizontalAxisLineCount + 1)) *
           (this.outputRange[1] - this.outputRange[0]);
-      const text = new PIXI.Text(scaledY.toPrecision(4), {
-        fontSize: 9,
-        fontFamily: 'PT Sans',
-        fill: 0xffffff,
-        align: 'left',
-      });
-      text.x = 2;
+      const text = createText(scaledY);
       text.y = TOP_GUTTER_WIDTH_PX + (i + 1) * horizontalAxisLineSpacing - 12;
-      this.inst.app.stage.addChild(text);
+
       this.texts.push(text);
     }
 
@@ -551,7 +562,8 @@ class ADSR2Instance {
     this.sortAndUpdateMarks();
   }
 
-  public update(state: Adsr, outputRange: [number, number]) {
+  public update(state: Adsr, onChange: (newState: Adsr) => void, outputRange: [number, number]) {
+    this.onChange = onChange;
     if (isNaN(state.lenSamples)) {
       state.lenSamples = 1000;
     }
@@ -559,7 +571,6 @@ class ADSR2Instance {
     const newLengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
     if (this.lengthMs !== newLengthMs) {
       this.lengthMs = newLengthMs;
-      // TODO: Update rendering
     }
 
     if (!R.equals(this.steps.map(R.prop('step')), state.steps)) {
@@ -568,12 +579,21 @@ class ADSR2Instance {
 
     if (this.loopPoint !== state.loopPoint) {
       this.loopPoint = state.loopPoint;
-      // TODO: Update rendering
+      if (R.isNil(this.loopPoint) && this.loopDragBar) {
+        this.loopDragBar.destroy();
+        this.loopDragBar = null;
+      } else if (!R.isNil(this.loopPoint)) {
+        if (this.loopDragBar) {
+          this.loopDragBar.setPos(this.loopPoint);
+        } else {
+          this.loopDragBar = this.buildLoopDragBar();
+        }
+      }
     }
 
     if (this.releasePoint !== state.releasePoint) {
-      this.loopPoint = state.loopPoint;
-      // TODO: Update rendering
+      this.releasePoint = state.releasePoint;
+      this.releaseDragBar.setPos(this.releasePoint);
     }
 
     this.outputRange = [...outputRange];
@@ -733,6 +753,25 @@ class ADSR2Instance {
     this.vizContainer.addChild(bg);
   }
 
+  private buildLoopDragBar() {
+    if (R.isNil(this.loopPoint)) {
+      throw new UnreachableException();
+    }
+
+    return new DragBar(this, LOOP_DRAG_BAR_COLOR, this.loopPoint, (newLoopPos: number) => {
+      if (newLoopPos < 0 || newLoopPos > 1) {
+        throw new UnreachableException();
+      }
+
+      // constrain loop point to be before the release point
+      newLoopPos = R.clamp(0, this.releasePoint, newLoopPos);
+      this.loopDragBar?.setPos(newLoopPos);
+
+      this.loopPoint = newLoopPos;
+      this.onUpdated();
+    });
+  }
+
   private renderInitial() {
     const rampCurves = [];
     for (let i = 0; i < this.steps.length - 1; i++) {
@@ -746,19 +785,7 @@ class ADSR2Instance {
     const phaseMarker = this.buildPhaseMarker();
 
     if (!R.isNil(this.loopPoint)) {
-      this.loopDragBar = new DragBar(
-        this,
-        LOOP_DRAG_BAR_COLOR,
-        this.loopPoint,
-        (newLoopPos: number) => {
-          if (newLoopPos < 0 || newLoopPos > 1) {
-            throw new UnreachableException();
-          }
-
-          this.loopPoint = newLoopPos;
-          this.onUpdated();
-        }
-      );
+      this.loopDragBar = this.buildLoopDragBar();
     }
 
     this.releaseDragBar = new DragBar(
@@ -804,7 +831,7 @@ class ADSR2Instance {
     return {
       steps: this.steps.map(R.prop('step')),
       lenSamples: (this.lengthMs / 1000) * SAMPLE_RATE,
-      loopPoint: this.loopPoint ?? 0,
+      loopPoint: this.loopPoint,
       releasePoint: this.releasePoint,
       audioThreadData: this.audioThreadData!,
     };
@@ -823,6 +850,8 @@ interface ADSR2Props {
   outputRange: [number, number];
 }
 
+const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
+
 const ADSR2: React.FC<ADSR2Props> = ({
   width = 600,
   height = 480,
@@ -837,30 +866,48 @@ const ADSR2: React.FC<ADSR2Props> = ({
       return;
     }
 
-    instance.current.update(initialState, [outputRangeStart, outputRangeEnd]);
-  }, [initialState, outputRangeEnd, outputRangeStart]);
+    instance.current.update(initialState, onChange, [outputRangeStart, outputRangeEnd]);
+  }, [initialState, outputRangeEnd, outputRangeStart, onChange]);
 
   return (
-    <canvas
-      onContextMenu={evt => evt.preventDefault()}
-      onMouseDown={evt => {
-        evt.stopPropagation();
-        evt.preventDefault();
-      }}
-      height={height}
-      width={width}
-      style={{ minHeight: height, minWidth: width, maxHeight: height, maxWidth: width }}
-      ref={canvas => {
-        if (!canvas || instance.current) {
-          return;
-        }
+    <div>
+      <ControlPanel
+        style={{ width: 140 }}
+        settings={ADSR2_SETTINGS}
+        state={{ loop: !R.isNil(initialState.loopPoint) }}
+        onChange={(key: string, val: any) => {
+          switch (key) {
+            case 'loop': {
+              onChange({ ...initialState, loopPoint: val ? 0 : null });
+              break;
+            }
+            default: {
+              console.error('Unhandled key in ADSR2 settings: ', key);
+            }
+          }
+        }}
+      />
+      <canvas
+        onContextMenu={evt => evt.preventDefault()}
+        onMouseDown={evt => {
+          evt.stopPropagation();
+          evt.preventDefault();
+        }}
+        height={height}
+        width={width}
+        style={{ minHeight: height, minWidth: width, maxHeight: height, maxWidth: width }}
+        ref={canvas => {
+          if (!canvas || instance.current) {
+            return;
+          }
 
-        instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState, [
-          outputRangeStart,
-          outputRangeEnd,
-        ]);
-      }}
-    />
+          instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState, [
+            outputRangeStart,
+            outputRangeEnd,
+          ]);
+        }}
+      />
+    </div>
   );
 };
 
