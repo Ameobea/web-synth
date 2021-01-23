@@ -1,3 +1,21 @@
+* {
+  scrollbar-color: rgb(27, 27, 27);
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgb(27, 27, 27);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #424242;
+    outline: 1px solid #333;
+  }
+}
+
 html {
   overflow-x: hidden;
 }

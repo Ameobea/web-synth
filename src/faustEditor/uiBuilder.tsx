@@ -3,6 +3,7 @@ import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
+import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 
 interface BaseUiDef {
   label: string;
@@ -147,19 +148,18 @@ export const mapUiGroupToControlPanelFields = (
 const getFaustParamBasePath = (fullPath: string): string => fullPath.split('/').slice(0, 2)[1];
 
 const buildControlPanelComponent = (
-  uiDef: UiGroup[],
-  pathTable: { [path: string]: any },
+  instance: DynamicCodeWorkletNode,
   setParamValue: (path: string, val: number) => void,
   paramDefaults: { [path: string]: number }
 ) => {
   // Get the randomly generated path base so that we can accurately match when setting params
-  const pathBase = Option.of(R.head(Object.keys(pathTable)))
-    .map(getFaustParamBasePath)
-    .getOrElse('');
+  const pathBase = (instance as any).pathTable
+    ? Option.of(R.head(Object.keys((instance as any).pathTable)))
+        .map(getFaustParamBasePath)
+        .getOrElse('')
+    : null;
 
-  const settings: any[] = R.flatten(
-    uiDef.map(item => mapUiGroupToControlPanelFields(item, setParamValue, paramDefaults))
-  );
+  const settings = instance.getParamSettings(paramDefaults, setParamValue);
 
   if (R.isEmpty(settings)) {
     return () => null;
@@ -199,7 +199,10 @@ const buildControlPanelComponent = (
                 }
 
                 ctx[setting.label] = setting.defaultVal;
-                setParamValue(`/${pathBase}/${setting.label}`, setting.defaultVal);
+                setParamValue(
+                  pathBase === null ? setting.label : `/${pathBase}/${setting.label}`,
+                  setting.defaultVal ?? setting.init
+                );
               });
             },
           },
@@ -221,12 +224,17 @@ const buildControlPanelComponent = (
                 const shift = setting.min;
                 const newVal = Math.random() * scale + shift;
                 ctx[setting.label] = newVal;
-                setParamValue(`/${pathBase}/${setting.label}`, newVal);
+                setParamValue(
+                  pathBase === null ? setting.label : `/${pathBase}/${setting.label}`,
+                  newVal
+                );
               });
             },
           },
         ]}
-        onChange={(path: string, val: number) => setParamValue(`/${pathBase}/${path}`, val)}
+        onChange={(path: string, val: number) =>
+          setParamValue(pathBase === null ? path : `/${pathBase}/${path}`, val)
+        }
         width={500}
         contextCb={(ctx: any) => {
           panelCtx.current = ctx;

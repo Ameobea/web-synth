@@ -6,7 +6,7 @@ import * as R from 'ramda';
 
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import 'src/index.css';
+import 'src/index.scss';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { AsyncOnce, midiToFrequency } from 'src/util';
 import './fmDemo.scss';

@@ -1,9 +1,9 @@
 import { buildActionGroup, buildModule, buildStore as buildJantixStore } from 'jantix';
 
 import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
-import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { faustEditorContextMap } from 'src/faustEditor';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 
 /**
  * Structure of the JSON stored in `localStorage` for the Faust editor.
@@ -14,6 +14,7 @@ export interface SerializedFaustEditor {
   polyphonyState: FaustEditorPolyphonyState;
   paramDefaultValues?: { [paramName: string]: number };
   isRunning: boolean;
+  language?: CodeEditorLanguage;
 }
 
 export interface FaustEditorPolyphonyState {
@@ -30,8 +31,10 @@ export const buildDefaultFaustEditorPolyphonyState = (): FaustEditorPolyphonySta
   voiceCount: 8,
 });
 
+export type CodeEditorLanguage = 'faust' | 'soul';
+
 export interface FaustEditorState {
-  instance: FaustWorkletNode | null;
+  instance: DynamicCodeWorkletNode | null;
   ControlPanelComponent?: React.FC<{
     style?: React.CSSProperties;
     position?: any;
@@ -41,6 +44,7 @@ export interface FaustEditorState {
   isHidden: boolean;
   polyphonyState: FaustEditorPolyphonyState;
   cachedInputNames: string[] | undefined;
+  language: CodeEditorLanguage;
 }
 
 const buildInitialState = (): FaustEditorState => ({
@@ -49,12 +53,13 @@ const buildInitialState = (): FaustEditorState => ({
   isHidden: false,
   polyphonyState: buildDefaultFaustEditorPolyphonyState(),
   cachedInputNames: undefined,
+  language: 'faust',
 });
 
 const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam | undefined => {
   const context = faustEditorContextMap[vcId];
   if (!context) {
-    console.error(`No Faust Editor context found for vcId "${vcId}"`);
+    console.error(`No code editor context found for vcId "${vcId}"`);
     return;
   }
 
@@ -63,10 +68,7 @@ const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam 
 
 const actionGroups = {
   SET_FAUST_INSTANCE: buildActionGroup({
-    actionCreator: (
-      instance: FaustWorkletNode,
-      vcId: string
-    ): { type: 'SET_FAUST_INSTANCE'; instance: FaustWorkletNode; vcId: string } => ({
+    actionCreator: (instance: DynamicCodeWorkletNode, vcId: string) => ({
       type: 'SET_FAUST_INSTANCE',
       instance,
       vcId,
@@ -84,8 +86,7 @@ const actionGroups = {
 
       // Construct a new control panel instance for the newly created module
       const ControlPanelComponent = buildControlPanelComponent(
-        instance.jsonDef.ui,
-        instance.pathTable,
+        instance,
         setParamValue,
         faustEditorContextMap[vcId]?.paramDefaultValues ?? {}
       );
@@ -119,10 +120,21 @@ const actionGroups = {
     }),
     subReducer: (state: FaustEditorState, { cachedInputNames }) => ({ ...state, cachedInputNames }),
   }),
+  SET_CODE_EDITOR_LANGUAGE: buildActionGroup({
+    actionCreator: (language: CodeEditorLanguage) => ({
+      type: 'SET_CODE_EDITOR_LANGUAGE',
+      language,
+    }),
+    subReducer: (state: FaustEditorState, { language }) => ({ ...state, language }),
+  }),
 };
 
 export const buildFaustEditorReduxInfra = (serialized: SerializedFaustEditor) => {
-  const initialState = { ...buildInitialState(), ...serialized };
+  const initialState = {
+    ...buildInitialState(),
+    ...serialized,
+    language: serialized.language ?? 'faust',
+  };
 
   const faustEditorModule = buildModule<FaustEditorState, typeof actionGroups>(
     initialState,

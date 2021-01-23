@@ -1,10 +1,10 @@
 import React from 'react';
 import { ANewTab } from 'ameo-utils';
 
-import 'src/index.css';
+import 'src/index.scss';
 import './BrowserNotSupported.scss';
 
-const BrowserNotSupported: React.FC<{}> = () => (
+const BrowserNotSupported: React.FC = () => (
   <div className='browser-not-supported'>
     <h1>Your Browser Isn&apos;t Supported</h1>
 

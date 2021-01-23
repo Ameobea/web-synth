@@ -1,7 +1,6 @@
 import React from 'react';
 
 import MIDIEditorControls from './MIDIEditorControls';
-import '../index.css';
 
 export const buildMIDIEditorUIDomId = (vcId: string) => `midi-editor-polysynth-controls_${vcId}`;
 

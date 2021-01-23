@@ -50,27 +50,23 @@ func (ctx remoteSampleHandler) ServeHTTP(resWriter http.ResponseWriter, req *htt
 		return
 	}
 
-	if req.Method == "POST" {
-		vars := mux.Vars(req)
-		id := vars["id"]
-		req.Body = http.MaxBytesReader(resWriter, req.Body, maxRequestSizeBytes)
-		body, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			log.Printf("Error reading body from create sample request: %s", err)
-			resWriter.WriteHeader(500)
-			resWriter.Write([]byte("Error reading body from request"))
-			return
-		}
+	vars := mux.Vars(req)
+	id := vars["id"]
+	req.Body = http.MaxBytesReader(resWriter, req.Body, maxRequestSizeBytes)
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("Error reading body from create sample request: %s", err)
+		resWriter.WriteHeader(500)
+		resWriter.Write([]byte("Error reading body from request"))
+		return
+	}
 
-		err = createRemoteSample(ctx, id, body)
-		if err != nil {
-			log.Printf("Error uploading sample to GCS: %s", err)
-			resWriter.WriteHeader(500)
-			resWriter.Write([]byte("Error storing data"))
-			return
-		}
-	} else {
-		resWriter.WriteHeader(404)
+	err = createRemoteSample(ctx, id, body)
+	if err != nil {
+		log.Printf("Error uploading sample to GCS: %s", err)
+		resWriter.WriteHeader(500)
+		resWriter.Write([]byte("Error storing data"))
+		return
 	}
 }
 

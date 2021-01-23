@@ -2,7 +2,7 @@ import React, { useState, Suspense, useMemo, useRef, useEffect } from 'react';
 import { Provider, useSelector } from 'react-redux';
 import ControlPanel, { Button, Custom } from 'react-control-panel';
 import * as R from 'ramda';
-import { Without, PropTypesOf, ValueOf } from 'ameo-utils';
+import { Without, PropTypesOf, ValueOf, filterNils } from 'ameo-utils';
 
 import { Effect } from 'src/redux/modules/effects';
 import { EffectPickerCustomInput } from 'src/controls/faustEditor';
@@ -12,8 +12,9 @@ import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAu
 import { faustEditorContextMap, get_faust_editor_connectables } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { ReduxStore, store } from 'src/redux';
-import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
 import { saveEffect } from 'src/api';
+import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
 // import PolyphonyControls from './PolyphonyControls';
 // import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
 
@@ -44,19 +45,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundColor: 'rgba(44,44,44,0.3)',
     maxWidth: 'calc(50vw - 40px)',
   },
-  buttonsWrapper: {
-    display: 'flex',
-    flexDirection: 'row',
-    padding: 8,
-  },
   bottomContent: {
     display: 'flex',
     flexDirection: 'column',
     padding: 8,
   },
 };
-
-const moduleIdHeaderName = 'X-Faust-Module-ID';
 
 export const compileFaustInstance = async (
   faustCode: string,
@@ -70,6 +64,7 @@ export const compileFaustInstance = async (
   }
 
   const res = await fetch(`${FAUST_COMPILER_ENDPOINT}/compile`, { method: 'POST', body: formData });
+  const moduleIdHeaderName = 'X-Faust-Module-ID';
   const moduleID = res.headers.get(moduleIdHeaderName);
   if (!moduleID) {
     throw new Error(`No \`${moduleIdHeaderName}\` header set in response from Faust compiler`);
@@ -82,6 +77,30 @@ export const compileFaustInstance = async (
 
   const wasmInstanceArrayBuffer = await res.arrayBuffer();
   return buildFaustWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID, context);
+};
+
+export const compileSoulInstance = async (
+  code: string,
+  _optimize: boolean,
+  context: ValueOf<typeof faustEditorContextMap>
+): Promise<DynamicCodeWorkletNode> => {
+  const res = await fetch(`${FAUST_COMPILER_ENDPOINT}/soul/compile`, {
+    method: 'POST',
+    body: code,
+  });
+  const moduleIdHeaderName = 'X-Soul-Module-ID';
+  const moduleID = res.headers.get(moduleIdHeaderName);
+  if (!moduleID) {
+    throw new Error(`No \`${moduleIdHeaderName}\` header set in response from Faust compiler`);
+  }
+
+  if (!res.ok) {
+    const errMsg = await res.text();
+    throw errMsg;
+  }
+
+  const wasmInstanceArrayBuffer = await res.arrayBuffer();
+  return buildSoulWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID, context);
 };
 
 /**
@@ -158,23 +177,31 @@ const SaveControls = ({ editorContent }: { editorContent: string }) => {
   );
 };
 
+type CodeCompiler = (
+  code: string,
+  optimize: boolean,
+  context: ValueOf<typeof faustEditorContextMap>
+) => Promise<DynamicCodeWorkletNode>;
+
 export const mkCompileButtonClickHandler = ({
-  faustCode,
+  code,
   optimize,
   setErrMessage,
   vcId,
   analyzerNode,
+  compiler = compileFaustInstance,
 }: {
-  faustCode: string;
+  code: string;
   optimize: boolean;
   setErrMessage: (errMsg: string) => void;
   vcId: string;
   analyzerNode: AnalyserNode;
+  compiler?: CodeCompiler;
 }) => async () => {
   const context = faustEditorContextMap[vcId];
-  let faustNode: FaustWorkletNode;
+  let codeNode: DynamicCodeWorkletNode;
   try {
-    faustNode = await compileFaustInstance(faustCode, optimize, context);
+    codeNode = await compiler(code, optimize, context);
   } catch (err) {
     console.error(err);
     setErrMessage(err.toString());
@@ -182,19 +209,14 @@ export const mkCompileButtonClickHandler = ({
   }
   setErrMessage('');
 
-  const uiItems = faustNode.jsonDef.ui as any[];
-  const settings = R.flatten(
-    uiItems.map(item =>
-      mapUiGroupToControlPanelFields(item, () => void 0, context.paramDefaultValues)
-    )
-  ) as any[];
-
-  faustNode.connect(analyzerNode);
-
   if (!context) {
-    throw new Error(`No context found for Faust editor vcId ${vcId}`);
+    throw new Error(`No context found for code editor vcId ${vcId}`);
   }
-  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode };
+  const settings = codeNode.getParamSettings(context.paramDefaultValues);
+
+  codeNode.connect(analyzerNode);
+
+  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode: codeNode };
   context.reduxInfra.dispatch(
     context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(
       settings.map(R.prop('label')) as string[]
@@ -206,7 +228,7 @@ export const mkCompileButtonClickHandler = ({
   updateConnectables(vcId, newConnectables);
 
   context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_FAUST_INSTANCE(faustNode, vcId)
+    context.reduxInfra.actionCreators.faustEditor.SET_FAUST_INSTANCE(codeNode, vcId)
   );
 };
 
@@ -256,9 +278,17 @@ const FaustEditor: React.FC<{
     editorContent,
     isHidden,
     // polyphonyState,
+    language,
   } = useSelector(({ faustEditor }: FaustEditorReduxStore) =>
     R.pick(
-      ['instance', 'ControlPanelComponent', 'editorContent', 'isHidden', 'polyphonyState'],
+      [
+        'instance',
+        'ControlPanelComponent',
+        'editorContent',
+        'isHidden',
+        'polyphonyState',
+        'language',
+      ],
       faustEditor
     )
   );
@@ -270,13 +300,14 @@ const FaustEditor: React.FC<{
   const compile = useMemo(
     () =>
       mkCompileButtonClickHandler({
-        faustCode: editorContent,
+        code: editorContent,
         optimize,
         setErrMessage: setCompileErrMsg,
         vcId,
         analyzerNode: context.analyzerNode,
+        compiler: language === 'faust' ? compileFaustInstance : compileSoulInstance,
       }),
-    [context.analyzerNode, editorContent, optimize, vcId]
+    [context.analyzerNode, editorContent, language, optimize, vcId]
   );
   const didCompileOnMount = useRef(false);
   useEffect(() => {
@@ -302,14 +333,35 @@ const FaustEditor: React.FC<{
 
         <div style={styles.errorConsole}>{compileErrMsg}</div>
       </div>
-      <div style={styles.buttonsWrapper}>
-        <button onClick={compile} style={{ marginRight: 10 }}>
-          Compile
-        </button>
-        Optimize
-        <input type='checkbox' checked={optimize} onChange={() => setOptimize(!optimize)} />
-        {instance ? <button onClick={stopInstance}>Stop</button> : null}
-      </div>
+      <ControlPanel
+        state={{ language, optimize: language === 'faust' && optimize }}
+        onChange={(key: string, val: any) => {
+          switch (key) {
+            case 'language': {
+              context.reduxInfra.dispatch(
+                context.reduxInfra.actionCreators.faustEditor.SET_CODE_EDITOR_LANGUAGE(val)
+              );
+              break;
+            }
+            case 'optimize': {
+              setOptimize(!optimize);
+              break;
+            }
+            default: {
+              console.error('Unhandled key in faust editor settings: ', key);
+            }
+          }
+        }}
+        settings={filterNils([
+          { type: 'select', label: 'language', options: ['faust', 'soul'] },
+          {
+            type: 'button',
+            label: instance ? 'stop' : 'compile',
+            action: instance ? stopInstance : compile,
+          },
+          language === 'faust' ? { type: 'checkbox', label: 'optimize' } : null,
+        ])}
+      />
       <div style={styles.bottomContent}>
         {/* <PolyphonyControls
           state={polyphonyState}

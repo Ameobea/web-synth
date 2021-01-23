@@ -1,10 +1,8 @@
 import { Map as ImmMap } from 'immutable';
-import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
 import FaustEditor from './FaustEditor';
 import type { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
-import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import {
   SerializedFaustEditor,
@@ -14,7 +12,7 @@ import {
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
+import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 
 const ctx = new AudioContext();
 
@@ -26,7 +24,7 @@ export const faustEditorContextMap: {
   [vcId: string]: {
     reduxInfra: FaustEditorReduxInfra;
     analyzerNode: AnalyserNode;
-    faustNode?: FaustWorkletNode;
+    faustNode?: DynamicCodeWorkletNode;
     overrideableParams: { [key: string]: OverridableAudioParam };
     isHidden: boolean;
     paramDefaultValues: { [paramName: string]: number };
@@ -153,7 +151,11 @@ export const cleanup_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const instanceCtx = faustEditorContextMap[vcId];
-  const { cachedInputNames, polyphonyState } = instanceCtx.reduxInfra.getState().faustEditor;
+  const {
+    cachedInputNames,
+    polyphonyState,
+    language,
+  } = instanceCtx.reduxInfra.getState().faustEditor;
 
   const editorContent = get_faust_editor_content(vcId);
   delete faustEditorContextMap[vcId];
@@ -180,6 +182,7 @@ export const cleanup_faust_editor = (stateKey: string) => {
         )
       : instanceCtx.paramDefaultValues,
     isRunning: !!instanceCtx.faustNode,
+    language,
   };
   localStorage.setItem(stateKey, JSON.stringify(serializedState));
 };
@@ -241,10 +244,7 @@ export const get_faust_editor_connectables = (vcId: string): AudioConnectables =
     type: 'customAudio',
   });
 
-  const uiItems = faustNode.jsonDef.ui as any[];
-  const settings = R.flatten(
-    uiItems.map(item => mapUiGroupToControlPanelFields(item, () => void 0, paramDefaultValues))
-  ) as any[];
+  const settings = faustNode.getParamSettings(paramDefaultValues);
   const inputs = settings.reduce(
     (acc: ImmMap<string, ConnectableInput>, { label, address, initial }) => {
       // If we don't have an existing `overridableParam` for this input, we need to build one using the param

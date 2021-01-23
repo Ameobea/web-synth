@@ -3,9 +3,10 @@ import * as R from 'ramda';
 
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { faustEditorContextMap } from 'src/faustEditor';
+import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
 
-export class FaustWorkletNode extends AudioWorkletNode {
+export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWorkletNode {
   constructor(audioContext: AudioContext, moduleId: string, workletNameOverride?: string) {
     super(
       audioContext,
@@ -23,11 +24,26 @@ export class FaustWorkletNode extends AudioWorkletNode {
 
   public jsonDef!: { [key: string]: any };
 
-  public parseUi = (jsonDef: any) => {
+  private parseUi = (jsonDef: any) => {
     jsonDef.ui.forEach((group: any) => this.parseUiGroup(group));
     this.jsonDef = jsonDef;
     return this.pathTable;
   };
+
+  public getParamSettings(
+    paramDefaultValues?: { [paramName: string]: number },
+    setParamValue?: (key: string, val: number) => void
+  ): any[] {
+    return R.flatten(
+      this.jsonDef.ui.map((item: any) =>
+        mapUiGroupToControlPanelFields(
+          item,
+          setParamValue ?? (() => void 0),
+          paramDefaultValues ?? {}
+        )
+      )
+    ) as any[];
+  }
 
   private parseUiGroup = (group: any) => (group.items ? this.parseUiItems(group.items) : null);
   private parseUiItems = (items: any) => items.forEach((item: any) => this.parseUiItem(item));

@@ -17,7 +17,9 @@ import (
 
 	"cloud.google.com/go/storage"
 	wasm "github.com/akupila/go-wasm"
+	compilationFileUtils "github.com/ameobea/web-synth/faust-compiler-server/compilationFileUtils"
 	remoteSamples "github.com/ameobea/web-synth/faust-compiler-server/remoteSamples"
+	soulCompiler "github.com/ameobea/web-synth/faust-compiler-server/soulCompiler"
 	"github.com/gorilla/mux"
 )
 
@@ -30,21 +32,6 @@ type faustWorkletModuleHandler struct {
 	ctx                      context.Context
 	googleCloudStorageClient *storage.Client
 	faustCodeTemplate        *template.Template
-}
-
-func getFileSize(fileName string) (int64, error) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-
-	fileStats, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	return fileStats.Size(), nil
 }
 
 func compile(srcFilePath string, outWasmFileName string) (stderr bytes.Buffer, err error) {
@@ -96,7 +83,7 @@ func (ctx compileHandler) addModuleToCache(moduleFileName string, codeHash strin
 	defer fileHandle.Close()
 
 	if _, err := io.Copy(wasmWriter, fileHandle); err != nil {
-		log.Printf("Error uploading Wasm module to google cloud storage: %s", err)
+		log.Printf("Error uploading faust module Wasm module to google cloud storage: %s", err)
 		return err
 	}
 	log.Printf("Successfully added Faust module %s to the compilation cache", wasmObjectName)
@@ -282,28 +269,9 @@ func (ctx compileHandler) ServeHTTP(resWriter http.ResponseWriter, req *http.Req
 
 	// Optimize the generated Wasm file if the `optimize` flag was set in the request body
 	if optimize {
-		log.Println("Executing `wasm-opt`...")
-
-		fileBeforeSize, err := getFileSize(outWasmFileName)
-		if err != nil {
-			resWriter.WriteHeader(400)
-			resWriter.Write([]byte("Failed to compute initial file size of output Wasm file"))
+		optSuccess := compilationFileUtils.WasmOptFile(outWasmFileName, resWriter)
+		if !optSuccess {
 			return
-		}
-
-		cmd := exec.Command("wasm-opt", outWasmFileName, "-O4", "-c", "--vacuum", "-o", outWasmFileName)
-		optError := cmd.Run()
-		if optError != nil {
-			log.Printf("Error while trying to optimize output Wasm file: %s", optError)
-		} else {
-			fileAfterSize, err := getFileSize(outWasmFileName)
-			if err != nil {
-				resWriter.WriteHeader(400)
-				resWriter.Write([]byte("Failed to compute post-optimization file size of output Wasm file"))
-				return
-			}
-
-			log.Printf("Successfully optimized output Wasm file: %d bytes -> %d bytes", fileBeforeSize, fileAfterSize)
 		}
 	}
 
@@ -349,7 +317,7 @@ func (ctx faustWorkletModuleHandler) ServeHTTP(resWriter http.ResponseWriter, re
 	moduleID := queryParams.Get("id")
 	if moduleID == "" {
 		log.Printf("Invalid `id` param provided to JS endpoint")
-		http.Error(resWriter, "You must supply an `id` query param containing ID of the Faust module to fetch.", 500)
+		http.Error(resWriter, "You must supply an `id` query param containing ID of the Faust module to fetch.", 400)
 		return
 	}
 
@@ -440,6 +408,7 @@ func main() {
 	router.Handle("/FaustAudioWorkletProcessor.js", faustWorkletModuleHandlerInst)
 
 	remoteSamples.ServeRemoteSamplesRoutes(ctx, client, router)
+	soulCompiler.ServeSoulCompilerRoutes(ctx, client, router)
 
 	port := os.Getenv("PORT")
 	if len(port) == 0 {
