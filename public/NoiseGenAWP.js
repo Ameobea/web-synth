@@ -55,7 +55,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
     }
 
     const ptr = this.wasmInstance.exports.generate();
-    const outputsSlice = this.wasmMemoryBuffer.slice(
+    const outputsSlice = this.wasmMemoryBuffer.subarray(
       ptr / BYTES_PER_F32,
       ptr / BYTES_PER_F32 + FRAME_SIZE
     );

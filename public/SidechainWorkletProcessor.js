@@ -54,7 +54,7 @@ class SidechainWorkletProcessor extends AudioWorkletProcessor {
     this.wasmInstance.exports.process();
 
     // Copy outputs out; samples are written in-place
-    const outputsSlice = this.wasmMemoryBuffer.slice(
+    const outputsSlice = this.wasmMemoryBuffer.subarray(
       this.inputsBufPtr / BYTES_PER_F32,
       this.inputsBufPtr / BYTES_PER_F32 + FRAME_SIZE
     );

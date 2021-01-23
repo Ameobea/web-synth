@@ -87,7 +87,7 @@ class DistortionAWP extends AudioWorkletProcessor {
 
     // Read outputs out (written in-place)
     outputs[0][0].set(
-      wasmMemory.slice(inputBufPtr / 4, (inputBufPtr + FRAME_SIZE * BYTES_PER_F32) / 4)
+      wasmMemory.subarray(inputBufPtr / 4, (inputBufPtr + FRAME_SIZE * BYTES_PER_F32) / 4)
     );
 
     return true;

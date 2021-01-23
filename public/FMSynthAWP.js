@@ -6,6 +6,11 @@ const PARAM_COUNT = 8;
 const SAMPLE_RATE = 44_100;
 const ADSR_PHASE_BUF_LENGTH = 256;
 
+const BASE_FREQUENCY_PARAM_NAMES = new Array(VOICE_COUNT);
+for (let i = 0; i < VOICE_COUNT; i++) {
+  BASE_FREQUENCY_PARAM_NAMES[i] = `voice_${i}_base_frequency`;
+}
+
 class FMSynthAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
@@ -215,20 +220,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.wasmInstance.exports.memory.grow(1024 * 4);
     this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx(VOICE_COUNT);
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+    this.tacentVoiceFlags = new Uint8Array(VOICE_COUNT);
 
-    modulationMatrix.forEach((indices, srcOperatorIx) =>
-      indices.forEach((paramSource, dstOperatorIx) =>
-        this.wasmInstance.exports.fm_synth_set_modulation_index(
-          this.ctxPtr,
-          srcOperatorIx,
-          dstOperatorIx,
-          paramSource.valueType,
-          paramSource.valParamInt,
-          paramSource.valParamFloat,
-          paramSource.valParamFloat2
-        )
-      )
-    );
     outputWeights.forEach((weight, operatorIx) =>
       this.wasmInstance.exports.fm_synth_set_output_weight_value(
         this.ctxPtr,
@@ -252,6 +245,19 @@ class FMSynthAWP extends AudioWorkletProcessor {
         loopPoint ?? -1.0
       );
     });
+    modulationMatrix.forEach((indices, srcOperatorIx) =>
+      indices.forEach((paramSource, dstOperatorIx) =>
+        this.wasmInstance.exports.fm_synth_set_modulation_index(
+          this.ctxPtr,
+          srcOperatorIx,
+          dstOperatorIx,
+          paramSource.valueType,
+          paramSource.valParamInt,
+          paramSource.valParamFloat,
+          paramSource.valParamFloat2
+        )
+      )
+    );
 
     if (typeof SharedArrayBuffer !== 'undefined') {
       this.audioThreadDataBufferInner = new SharedArrayBuffer(
@@ -283,10 +289,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const baseFrequencyInputBufPtr = this.wasmInstance.exports.get_base_frequency_input_buffer_ptr(
       this.ctxPtr
     );
-    const baseFrequencyParams = new Array(VOICE_COUNT);
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
-      const param = params[`voice_${voiceIx}_base_frequency`];
-      baseFrequencyParams[voiceIx] = param;
+      const param = params[BASE_FREQUENCY_PARAM_NAMES[voiceIx]];
+      const voiceIsTacent = param.length === 0 && param[0] === 0;
+      if (voiceIsTacent && this.tacentVoiceFlags[voiceIx] === 1) {
+        continue;
+      }
+      this.tacentVoiceFlags[voiceIx] = voiceIsTacent ? 1 : 0;
       const ptrForVoice = baseFrequencyInputBufPtr + FRAME_SIZE * BYTES_PER_F32 * voiceIx;
 
       if (param.length === 1) {
@@ -298,7 +307,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const paramBuffersPtr = this.wasmInstance.exports.get_param_buffers_ptr(this.ctxPtr);
     // TODO: Store active param count somewhere to avoid unnecessary memcopies
     for (let paramIx = 0; paramIx < PARAM_COUNT; paramIx++) {
-      const param = params[paramIx.toString()];
+      const param = params[paramIx];
       const bufPtrForVoice = paramBuffersPtr + OUTPUT_BYTES_PER_OPERATOR * paramIx;
 
       if (param.length === 1) {
@@ -315,14 +324,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const outputsPtr = this.wasmInstance.exports.fm_synth_generate(this.ctxPtr);
     wasmMemory = this.getWasmMemoryBuffer();
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
-      const voiceParam = baseFrequencyParams[voiceIx];
-
-      if (voiceParam.length === 1 && voiceParam[0] === 0) {
+      const voiceIsTacent = this.tacentVoiceFlags[voiceIx];
+      if (voiceIsTacent) {
         outputs[voiceIx]?.[0]?.fill(0);
         continue;
       }
 
-      const outputSlice = wasmMemory.slice(
+      const outputSlice = wasmMemory.subarray(
         (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR) / 4,
         (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4
       );
@@ -331,7 +339,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
 
     // Copy current ADSR phases to shared buffer
     if (this.audioThreadDataBuffer) {
-      const adsrPhaseBuf = wasmMemory.slice(
+      const adsrPhaseBuf = wasmMemory.subarray(
         this.adsrPhasesBufPtr / BYTES_PER_F32,
         this.adsrPhasesBufPtr / BYTES_PER_F32 + ADSR_PHASE_BUF_LENGTH
       );

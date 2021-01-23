@@ -185,7 +185,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     const encodedOutputPtr = this.wasmInstance.exports.sample_recorder_get_encoded_output_ptr(
       this.sampleRecorderCtxPtr
     );
-    const encoded = this.wasmInstance.exports.memory.buffer.slice(
+    const encoded = this.wasmInstance.exports.memory.buffer.subarray(
       encodedOutputPtr,
       encodedOutputPtr + encodedLengthBytes
     );
@@ -207,7 +207,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     );
 
     const wasmMemory = this.getWasmMemory();
-    const block = wasmMemory.slice(
+    const block = wasmMemory.subarray(
       blockStartPtr / BYTES_PER_F32,
       blockStartPtr / BYTES_PER_F32 + this.recordedSamplesSinceLastReported
     );
@@ -301,7 +301,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
 
     // Fill the first output buffer and then copy them to all other outputs
     const dstBuffer = outputs[0][0];
-    const output = new Float32Array(this.wasmInstance.exports.memory.buffer).slice(
+    const output = new Float32Array(this.wasmInstance.exports.memory.buffer).subarray(
       outputBufPtr / BYTES_PER_F32,
       outputBufPtr / BYTES_PER_F32 + FRAME_SIZE
     );

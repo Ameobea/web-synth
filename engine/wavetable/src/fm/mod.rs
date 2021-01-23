@@ -8,7 +8,7 @@ use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 pub mod effects;
 use self::effects::EffectChain;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 pub struct AdsrState {
     pub adsr_ix: usize,
     pub scale: f32,
@@ -143,6 +143,7 @@ impl ExponentialOscillator {
 pub struct Operator {
     pub oscillator_source: OscillatorSource,
     pub effect_chain: EffectChain,
+    pub enabled: bool,
 }
 
 impl Operator {
@@ -155,6 +156,10 @@ impl Operator {
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
+        if !self.enabled {
+            return 0.;
+        }
+
         let sample = self.oscillator_source.gen_sample(
             frequency,
             wavetables,
@@ -171,9 +176,9 @@ impl Operator {
 
 #[derive(Clone)]
 pub enum OscillatorSource {
+    Sine(SineOscillator),
     Wavetable(usize),
     ParamBuffer(usize),
-    Sine(SineOscillator),
     ExponentialOscillator(ExponentialOscillator),
 }
 
@@ -345,23 +350,26 @@ impl FMSynthVoice {
             adsrs: &self.adsrs,
             base_frequencies,
         };
+        let mut modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT] =
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+
         for operator_ix in 0..OPERATOR_COUNT {
+            let operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
+            if !operator.enabled {
+                continue;
+            }
+
             unsafe { operator_base_frequency_sources.get_unchecked(operator_ix) }
                 .render_raw(&render_params, unsafe {
                     operator_base_frequencies.get_unchecked_mut(operator_ix)
                 });
-        }
 
-        // Render the params for all per-operator-per-voice effects ahead of time as well
-        for operator in &mut self.operators {
+            // Render the params for all per-operator-per-voice effects ahead of time as well
             operator.effect_chain.pre_render_params(&render_params);
-        }
 
-        // Render all modulation indices for the full frame ahread of time using SIMD
-        // modulation_indices[src_operator_ix][dst_operator_ix][sample_ix_within_frame]
-        let mut modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-        for src_operator_ix in 0..OPERATOR_COUNT {
+            // Render all modulation indices for the full frame ahead of time using SIMD
+            // modulation_indices[src_operator_ix][dst_operator_ix][sample_ix_within_frame]
+            let src_operator_ix = operator_ix;
             for dst_operator_ix in 0..OPERATOR_COUNT {
                 let param = modulation_matrix
                     .get_operator_modulation_index(src_operator_ix, dst_operator_ix);
@@ -381,6 +389,11 @@ impl FMSynthVoice {
             let base_frequency = *unsafe { base_frequencies.get_unchecked(sample_ix_within_frame) };
 
             for operator_ix in 0..OPERATOR_COUNT {
+                let carrier_operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
+                if !carrier_operator.enabled {
+                    continue;
+                }
+
                 let carrier_base_frequency = unsafe {
                     *operator_base_frequencies
                         .get_unchecked(operator_ix)
@@ -396,7 +409,7 @@ impl FMSynthVoice {
                 );
                 *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
                     modulated_frequency;
-                let carrier_operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
+
                 let sample = carrier_operator.gen_sample(
                     modulated_frequency,
                     wavetables,
@@ -435,7 +448,7 @@ impl FMSynthVoice {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ParamSourceType {
     /// Each sample, the value for this param is pulled out of the parameter buffer of this index.
     /// These buffers are populated externally every frame.
@@ -801,10 +814,6 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     ctx
 }
 
-// #[no_mangle]
-// #[cold]
-// pub unsafe extern "C" fn free_fm_synth_ctx(ctx: *mut FMSynthContext) { drop(Box::from_raw(ctx)) }
-
 #[no_mangle]
 pub unsafe extern "C" fn get_param_buffers_ptr(ctx: *mut FMSynthContext) -> *mut [f32; FRAME_SIZE] {
     (*ctx).param_buffers.as_mut_ptr()
@@ -838,6 +847,25 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
         val_param_float_2,
     ));
     (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix] = param;
+
+    // Check to see if any operators need to be enabled/disabled
+    for operator_ix in 0..OPERATOR_COUNT {
+        // operator is disabled if it doesn't output anything and doesn't modulate any other
+        // operators
+        let disabled = (*ctx).modulation_matrix.output_weights[operator_ix].source_type
+            == ParamSourceType::Constant(0.)
+            && (0..OPERATOR_COUNT).all(|dst_operator_ix| {
+                (*ctx)
+                    .modulation_matrix
+                    .get_operator_modulation_index(operator_ix, dst_operator_ix)
+                    .source_type
+                    == ParamSourceType::Constant(0.)
+            });
+
+        for voice in &mut (*ctx).voices {
+            voice.operators[operator_ix].enabled = !disabled;
+        }
+    }
 }
 
 #[no_mangle]
