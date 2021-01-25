@@ -98,7 +98,10 @@ const ConfigureOperator: React.FC<{
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'operator type': {
-              onChange(buildDefaultOperatorConfig(val as OperatorConfig['type']));
+              const newOperator = buildDefaultOperatorConfig(val as OperatorConfig['type']);
+              (newOperator as any).frequency =
+                (operatorTypeState as any).frequency ?? (config as any).frequency;
+              onChange(newOperator);
               break;
             }
             default: {

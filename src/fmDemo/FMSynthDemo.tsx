@@ -244,7 +244,7 @@ const FMSynthDemo: React.FC = () => {
 
   const loadPreset = useCallback((presetName: keyof typeof Presets) => {
     loadedPreset.current = presetName;
-    const preset = Presets[presetName];
+    const preset = R.clone(Presets[presetName]);
     const oldGlobalVolume = serialized?.globalVolume;
     serialized = preset;
     serialized.globalVolume = oldGlobalVolume ?? serialized.globalVolume;

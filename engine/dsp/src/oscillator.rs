@@ -17,4 +17,8 @@ pub trait PhasedOscillator {
         self.set_phase(new_phase);
         // }
     }
+
+    fn update_phase_oversampled(&mut self, oversample_multiplier: f32, frequency: f32) {
+        self.update_phase(frequency / oversample_multiplier)
+    }
 }

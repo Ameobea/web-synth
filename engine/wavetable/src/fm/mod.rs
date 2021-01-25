@@ -51,13 +51,23 @@ impl PhasedOscillator for SquareOscillator {
 
 impl SquareOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
-        self.update_phase(frequency);
-
-        if self.phase < 0.5 {
-            1.
-        } else {
-            -1.
+        if frequency.abs() < 1000. {
+            self.update_phase(frequency);
+            return if self.phase < 0.5 { 1. } else { -1. };
         }
+
+        // 4x oversampling to avoid aliasing
+        let mut out = 0.;
+        self.update_phase_oversampled(4., frequency);
+        out += if self.phase < 0.5 { 0.25 } else { -0.25 };
+        self.update_phase_oversampled(4., frequency);
+        out += if self.phase < 0.5 { 0.25 } else { -0.25 };
+        self.update_phase_oversampled(4., frequency);
+        out += if self.phase < 0.5 { 0.25 } else { -0.25 };
+        self.update_phase_oversampled(4., frequency);
+        out += if self.phase < 0.5 { 0.25 } else { -0.25 };
+
+        out
     }
 }
 
@@ -97,13 +107,39 @@ impl PhasedOscillator for SawtoothOscillator {
 
 impl SawtoothOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
-        self.update_phase(frequency);
-
         let sawtooth_lookup_table = crate::lookup_tables::get_sawtooth_lookup_table();
-        dsp::read_interpolated(
+        if frequency.abs() < 1000. {
+            self.update_phase(frequency);
+            return dsp::read_interpolated(
+                sawtooth_lookup_table,
+                self.phase * (sawtooth_lookup_table.len() - 2) as f32,
+            );
+        }
+
+        // 4x oversampling to avoid aliasing
+        let mut out = 0.;
+        self.update_phase_oversampled(4., frequency);
+        out += dsp::read_interpolated(
             sawtooth_lookup_table,
             self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-        )
+        ) * 0.25;
+        self.update_phase_oversampled(4., frequency);
+        out += dsp::read_interpolated(
+            sawtooth_lookup_table,
+            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
+        ) * 0.25;
+        self.update_phase_oversampled(4., frequency);
+        out += dsp::read_interpolated(
+            sawtooth_lookup_table,
+            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
+        ) * 0.25;
+        self.update_phase_oversampled(4., frequency);
+        out += dsp::read_interpolated(
+            sawtooth_lookup_table,
+            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
+        ) * 0.25;
+
+        out
     }
 }
 
