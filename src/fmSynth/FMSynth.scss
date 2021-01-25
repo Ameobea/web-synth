@@ -99,6 +99,11 @@
       .output-weight {
         background-color: #121212;
       }
+      .output-weight[data-selected='true'] {
+        background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
+        background-size: 140% 140%;
+        animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
+      }
       .operator-weight-lens {
         width: 100%;
         height: 100%;
@@ -152,6 +157,10 @@
 .configure-modulation-index {
   display: flex;
   flex-direction: column;
+  width: 500px;
+}
+
+.configure-output-weight {
   width: 500px;
 }
 

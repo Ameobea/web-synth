@@ -40,36 +40,71 @@ const formatParamSource = (param: ParamSource): React.ReactNode => {
   }
 };
 
+const OutputWeightSquare: React.FC<{
+  operatorIx: number;
+  outputWeights: ParamSource[];
+  onClick: () => void;
+  isSelected: boolean;
+}> = ({ operatorIx, outputWeights, onClick, isSelected }) => {
+  const val = outputWeights[operatorIx];
+  const operatorWeight = val.type === 'constant' ? val.value : null;
+
+  const style = (() => {
+    if (isSelected) {
+      return undefined;
+    }
+
+    if (operatorWeight === null) {
+      return { backgroundColor: '#2ffab6', color: 'black' };
+    }
+    return {
+      backgroundColor: `rgba(80, 251, 69, ${operatorWeight})`,
+      color: operatorWeight > 0.5 ? '#111' : undefined,
+    };
+  })();
+
+  return (
+    <div
+      onClick={onClick}
+      data-operator-ix={operatorIx}
+      data-selected={isSelected ? 'true' : 'false'}
+      key='output'
+      className='operator-square output-weight'
+    >
+      <div className='operator-weight-lens' style={style}>
+        {operatorWeight !== null && Math.abs(operatorWeight) < 0.01
+          ? null
+          : formatParamSource(outputWeights[operatorIx])}
+      </div>
+    </div>
+  );
+};
+
 export const ModulationMatrix: React.FC<{
   selectedUI: UISelection | null;
-  selectedOperatorIx: number | null;
   onOperatorSelected: (newSelectedOperatorIx: number) => void;
   resetModulationIndex: (srcOperatorIx: number, dstOperatorIx: number) => void;
   onModulationIndexSelected: (srcOperatorIx: number, dstOperatorIx: number) => void;
   modulationIndices: ParamSource[][];
   operatorConfigs: OperatorConfig[];
-  outputWeights: number[];
+  outputWeights: ParamSource[];
+  onOutputWeightSelected: (operatorIx: number) => void;
 }> = ({
   selectedUI,
-  selectedOperatorIx,
   onOperatorSelected,
   resetModulationIndex,
   onModulationIndexSelected,
   modulationIndices,
   operatorConfigs,
   outputWeights,
+  onOutputWeightSelected,
 }) => {
-  const [hoveredRowIx, setHoveredRowIx] = useState<number | null>(null);
   const [hoveredColIx, setHoveredColIx] = useState<number | null>(null);
 
+  const selectedOperatorIx = selectedUI?.type === 'operator' ? selectedUI.index : null;
+
   return (
-    <div
-      className='modulation-matrix'
-      onMouseLeave={() => {
-        setHoveredRowIx(null);
-        setHoveredColIx(null);
-      }}
-    >
+    <div className='modulation-matrix' onMouseLeave={() => setHoveredColIx(null)}>
       {modulationIndices.map((row, srcOperatorIx) => (
         <div className={'operator-row'} key={srcOperatorIx}>
           <div
@@ -80,7 +115,6 @@ export const ModulationMatrix: React.FC<{
             onClick={() => {
               onOperatorSelected(srcOperatorIx);
             }}
-            onMouseEnter={() => setHoveredRowIx(srcOperatorIx)}
           >
             {formatOperatorConfig(operatorConfigs[srcOperatorIx])}
           </div>
@@ -103,31 +137,19 @@ export const ModulationMatrix: React.FC<{
                   resetModulationIndex(srcOperatorIx, dstOperatorIx);
                 }
               }}
-              onMouseEnter={() => {
-                setHoveredRowIx(srcOperatorIx);
-                setHoveredColIx(dstOperatorIx);
-              }}
+              onMouseEnter={() => setHoveredColIx(dstOperatorIx)}
             >
               {formatParamSource(val)}
             </div>
           ))}
-          <div
-            data-operator-ix={srcOperatorIx}
-            key='output'
-            className='operator-square output-weight'
-          >
-            <div
-              className='operator-weight-lens'
-              style={{
-                backgroundColor: `rgba(80, 251, 69, ${outputWeights[srcOperatorIx] ?? 0})`,
-                color: (outputWeights[srcOperatorIx] ?? 0) > 0.5 ? '#111' : undefined,
-              }}
-            >
-              {Math.abs(outputWeights[srcOperatorIx]) < 0.01
-                ? null
-                : outputWeights[srcOperatorIx].toFixed(2)}
-            </div>
-          </div>
+          <OutputWeightSquare
+            onClick={() => onOutputWeightSelected(srcOperatorIx)}
+            operatorIx={srcOperatorIx}
+            outputWeights={outputWeights}
+            isSelected={
+              selectedUI?.type === 'outputWeight' && selectedUI.operatorIx === srcOperatorIx
+            }
+          />
         </div>
       ))}
     </div>

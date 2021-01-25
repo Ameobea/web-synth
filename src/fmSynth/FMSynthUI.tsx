@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
@@ -13,10 +13,11 @@ import ConfigureParamSource, {
   buildDefaultParamSource,
   ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
+import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
-  outputWeights: number[];
+  outputWeights: ParamSource[];
   operatorConfigs: OperatorConfig[];
   operatorEffects: (Effect | null)[][];
   mainEffectChain: (Effect | null)[];
@@ -29,7 +30,7 @@ type BackendModulationUpdater = (
   modulationIx: number,
   val: ParamSource
 ) => void;
-type BackendOutputUpdater = (operatorIx: number, val: number) => void;
+type BackendOutputUpdater = (operatorIx: number, val: ParamSource) => void;
 
 const setModulation = (
   state: FMSynthState,
@@ -55,10 +56,22 @@ const setOutput = (
   state: FMSynthState,
   operatorIx: number,
   updateBackendOutput: BackendOutputUpdater,
-  getNewVal: (prevVal: number) => number
+  getNewVal: ParamSource | ((prevVal: number) => number)
 ): FMSynthState => {
   const newOutputWeights = [...state.outputWeights];
-  newOutputWeights[operatorIx] = getNewVal(newOutputWeights[operatorIx]);
+  newOutputWeights[operatorIx] =
+    typeof getNewVal === 'function'
+      ? ((): ParamSource => {
+          const prevOperatorVal = state.outputWeights[operatorIx];
+          const prevOutputWeight =
+            prevOperatorVal.type === 'constant' ? prevOperatorVal.value : null;
+          if (prevOutputWeight === null) {
+            return prevOperatorVal;
+          }
+
+          return { type: 'constant', value: getNewVal(prevOutputWeight) };
+        })()
+      : getNewVal;
   updateBackendOutput(operatorIx, newOutputWeights[operatorIx]);
   return { ...state, outputWeights: newOutputWeights };
 };
@@ -83,13 +96,14 @@ const ConfigureMainEffectChain: React.FC<{
 export type UISelection =
   | { type: 'mainEffectChain' }
   | { type: 'operator'; index: number }
-  | { type: 'modulationIndex'; srcOperatorIx: number; dstOperatorIx: number };
+  | { type: 'modulationIndex'; srcOperatorIx: number; dstOperatorIx: number }
+  | { type: 'outputWeight'; operatorIx: number };
 
 const FMSynthUI: React.FC<{
   updateBackendModulation: BackendModulationUpdater;
   updateBackendOutput: BackendOutputUpdater;
   modulationMatrix: ParamSource[][];
-  outputWeights: number[];
+  outputWeights: ParamSource[];
   operatorConfigs: OperatorConfig[];
   onOperatorConfigChange: (operatorIx: number, newConfig: OperatorConfig) => void;
   operatorEffects: (Effect | null)[][];
@@ -240,7 +254,6 @@ const FMSynthUI: React.FC<{
     <>
       <div className='fm-synth-ui'>
         <ModulationMatrix
-          selectedOperatorIx={selectedUI?.type === 'operator' ? selectedUI.index : null}
           onOperatorSelected={(newSelectedOperatorIx: number) =>
             setSelectedUI({ type: 'operator', index: newSelectedOperatorIx })
           }
@@ -259,6 +272,9 @@ const FMSynthUI: React.FC<{
           operatorConfigs={state.operatorConfigs}
           outputWeights={state.outputWeights}
           selectedUI={selectedUI}
+          onOutputWeightSelected={(operatorIx: number) =>
+            setSelectedUI({ type: 'outputWeight', operatorIx })
+          }
         />
         <div
           className='main-effect-chain-selector'
@@ -372,6 +388,19 @@ const FMSynthUI: React.FC<{
             onAdsrChange={handleAdsrChange}
           />
         ) : null}
+        {selectedUI?.type === 'outputWeight' ? (
+          <ConfigureOutputWeight
+            operatorIx={selectedUI.operatorIx}
+            adsrs={adsrs}
+            onAdsrChange={handleAdsrChange}
+            state={state.outputWeights[selectedUI.operatorIx]}
+            onChange={(newOutputWeight: ParamSource) =>
+              setState(
+                setOutput(state, selectedUI.operatorIx, updateBackendOutput, newOutputWeight)
+              )
+            }
+          />
+        ) : null}
       </div>
     </>
   );
@@ -382,7 +411,7 @@ export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
     updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
       synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
     }
-    updateBackendOutput={(operatorIx: number, val: number) =>
+    updateBackendOutput={(operatorIx: number, val: ParamSource) =>
       synth.handleOutputWeightChange(operatorIx, val)
     }
     modulationMatrix={synth.getModulationMatrix()}

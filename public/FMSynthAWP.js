@@ -222,14 +222,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
     this.tacentVoiceFlags = new Uint8Array(VOICE_COUNT);
 
-    outputWeights.forEach((weight, operatorIx) =>
+    outputWeights.forEach((paramSource, operatorIx) =>
       this.wasmInstance.exports.fm_synth_set_output_weight_value(
         this.ctxPtr,
         operatorIx,
-        1,
-        0,
-        weight,
-        0
+        paramSource.valueType,
+        paramSource.valParamInt,
+        paramSource.valParamFloat,
+        paramSource.valParamFloat2
       )
     );
     adsrs.forEach(({ steps, lenSamples, releasePoint, loopPoint }, adsrIx) => {

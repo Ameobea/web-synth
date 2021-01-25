@@ -78,7 +78,7 @@ deploy:
 
   gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
     --platform managed \
-    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js,AUTH_TOKEN=$AUTH_TOKEN" \
+    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js,SOUL_WORKLET_TEMPLATE_FILE_NAME=/opt/SoulAWP.template.js,AUTH_TOKEN=$AUTH_TOKEN" \
     --image $FAUST_COMPILER_IMAGE_NAME
 
   just build-all

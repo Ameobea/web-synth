@@ -91,7 +91,9 @@ export default class FMSynth implements ForeignNode {
   private generatedInputs: FMSynthInputDescriptor[] = []; // TODO: Populate this rather than expose raw indexed param buffers
   private awpHandle: AudioWorkletNode | null = null;
   private modulationMatrix: ParamSource[][] = buildDefaultModulationIndices();
-  private outputWeights: number[] = new Array(OPERATOR_COUNT).fill(0);
+  private outputWeights: ParamSource[] = new Array(OPERATOR_COUNT)
+    .fill(null as any)
+    .map(() => ({ type: 'constant' as const, value: 0 }));
   private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT)
     .fill(undefined as any)
     .map(buildDefaultOperatorConfig);
@@ -187,7 +189,7 @@ export default class FMSynth implements ForeignNode {
       modulationMatrix: this.modulationMatrix.map(row =>
         row.map(cell => this.encodeParamSource(cell))
       ),
-      outputWeights: this.outputWeights,
+      outputWeights: this.outputWeights.map(ps => this.encodeParamSource(ps)),
       adsrs: this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
     });
 
@@ -288,7 +290,6 @@ export default class FMSynth implements ForeignNode {
           valParamFloat2: 0,
         };
       }
-
       default: {
         throw new UnimplementedError(
           `frequency source not yet implemented: ${(source as any).type}`
@@ -351,21 +352,24 @@ export default class FMSynth implements ForeignNode {
     }
   }
 
-  public handleOutputWeightChange(operatorIx: number, value: number) {
+  public handleOutputWeightChange(operatorIx: number, rawVal: ParamSource | number) {
     if (!this.awpHandle) {
       console.error('Tried to update output weights before AWP initialization');
       return;
     }
+    const value =
+      typeof rawVal === 'number' ? { type: 'constant' as const, value: rawVal } : rawVal;
+    if (value.type === 'constant' && typeof value.value !== 'number') {
+      value.value = 0;
+    }
 
     this.outputWeights[operatorIx] = value;
+    console.log({ value });
 
     this.awpHandle.port.postMessage({
       type: 'setOutputWeightValue',
       operatorIx,
-      valueType: 1,
-      valParamInt: 0,
-      valParamFloat: value,
-      valParamFloat2: 0,
+      ...this.encodeParamSource(value),
     });
   }
 
@@ -378,6 +382,9 @@ export default class FMSynth implements ForeignNode {
       console.error('Tried to update modulation before AWP initialization');
       return;
     }
+    if (val.type === 'constant' && Math.abs(val.value) < 0.001) {
+      val.value = 0;
+    }
 
     this.modulationMatrix[srcOperatorIx][dstOperatorIx] = val;
 
@@ -389,10 +396,7 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public handleAdsrChange(
-    adsrIx: number,
-    newAdsr: Adsr & { audioThreadData: AudioThreadData | undefined }
-  ) {
+  public handleAdsrChange(adsrIx: number, newAdsr: Omit<Adsr, 'audioThreadData'>) {
     if (!this.awpHandle) {
       console.error('Tried to set ADSR before AWP initialization');
       return;
@@ -400,7 +404,7 @@ export default class FMSynth implements ForeignNode {
 
     const isLenOnlyChange =
       this.adsrs[adsrIx] && this.adsrs[adsrIx].lenSamples !== newAdsr.lenSamples;
-    this.adsrs[adsrIx] = newAdsr;
+    this.adsrs[adsrIx] = { ...newAdsr, audioThreadData: this.adsrs[adsrIx].audioThreadData };
     if (!this.adsrs[adsrIx].audioThreadData) {
       this.adsrs[adsrIx].audioThreadData = { phaseIndex: adsrIx };
     }
@@ -527,9 +531,31 @@ export default class FMSynth implements ForeignNode {
   public deserialize(params: { [key: string]: any }) {
     if (params.modulationMatrix) {
       this.modulationMatrix = params.modulationMatrix;
+      this.modulationMatrix.forEach(row =>
+        row.forEach(ps => {
+          if (ps.type === 'constant' && Math.abs(ps.value) < 0.001) {
+            ps.value = 0;
+          }
+        })
+      );
     }
     if (params.outputWeights) {
-      this.outputWeights = params.outputWeights;
+      if (typeof params.outputWeights[0] === 'number') {
+        this.outputWeights = params.outputWeights.map((value: number) => ({
+          type: 'constant' as const,
+          value: Math.abs(value) < 0.001 ? 0 : value,
+        }));
+      } else {
+        this.outputWeights = params.outputWeights;
+        this.outputWeights.forEach(val => {
+          if (val.type === 'constant' && typeof val.value !== 'number') {
+            val.value = 0;
+          } else if (val.type == 'constant' && Math.abs(val.value) < 0.001) {
+            val.value = 0;
+          }
+        });
+      }
+      console.log(this);
     }
     if (params.operatorConfigs) {
       this.operatorConfigs = params.operatorConfigs;

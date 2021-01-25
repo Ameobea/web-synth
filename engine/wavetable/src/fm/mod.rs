@@ -139,6 +139,9 @@ impl ExponentialOscillator {
     }
 }
 
+#[inline(always)]
+fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
+
 #[derive(Clone, Default)]
 pub struct Operator {
     pub oscillator_source: OscillatorSource,
@@ -236,7 +239,7 @@ impl OscillatorSource {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct FMSynthVoice {
     pub output: f32,
     pub adsrs: Vec<Adsr>,
@@ -244,6 +247,30 @@ pub struct FMSynthVoice {
     pub last_samples: [f32; OPERATOR_COUNT],
     pub last_sample_frequencies_per_operator: [f32; OPERATOR_COUNT],
     pub effect_chain: EffectChain,
+    cached_modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
+}
+
+impl Default for FMSynthVoice {
+    fn default() -> Self {
+        FMSynthVoice {
+            output: 0.,
+            adsrs: Vec::new(),
+            operators: [
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+            ],
+            last_samples: [0.0; OPERATOR_COUNT],
+            last_sample_frequencies_per_operator: [0.0; OPERATOR_COUNT],
+            effect_chain: EffectChain::default(),
+            cached_modulation_indices: [[[0.0; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
+        }
+    }
 }
 
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
@@ -286,18 +313,14 @@ impl FMSynthVoice {
         detune: Option<&ParamSource>,
     ) {
         let mut samples_per_operator_bufs: [[f32; OPERATOR_COUNT]; 2] =
-            [self.last_samples, unsafe {
-                std::mem::MaybeUninit::uninit().assume_init()
-            }];
+            [self.last_samples, uninit()];
         let mut last_samples_per_operator: &mut [f32; OPERATOR_COUNT] =
             unsafe { &mut *samples_per_operator_bufs.as_mut_ptr().add(0) };
         let mut samples_per_operator: &mut [f32; OPERATOR_COUNT] =
             unsafe { &mut *samples_per_operator_bufs.as_mut_ptr().add(1) };
 
         let mut frequencies_per_operator_bufs: [[f32; OPERATOR_COUNT]; 2] =
-            [self.last_sample_frequencies_per_operator, unsafe {
-                std::mem::MaybeUninit::uninit().assume_init()
-            }];
+            [self.last_sample_frequencies_per_operator, uninit()];
         let mut last_frequencies_per_operator: &mut [f32; OPERATOR_COUNT] =
             unsafe { &mut *frequencies_per_operator_bufs.as_mut_ptr().add(0) };
         let mut frequencies_per_operator: &mut [f32; OPERATOR_COUNT] =
@@ -309,12 +332,10 @@ impl FMSynthVoice {
         }
 
         // If necessary, compute detuned base frequency based off of detune param
-        let mut detuned_base_frequencies: [f32; FRAME_SIZE] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut detuned_base_frequencies: [f32; FRAME_SIZE] = uninit();
         let base_frequencies = match detune {
             Some(detune) => {
-                let mut detune_outputs: [f32; FRAME_SIZE] =
-                    unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+                let mut detune_outputs: [f32; FRAME_SIZE] = uninit();
                 detune.render_raw(
                     &RenderRawParams {
                         param_buffers,
@@ -342,26 +363,35 @@ impl FMSynthVoice {
             None => raw_base_frequencies,
         };
 
+        // Render all output weights for the full frame
+        let mut rendered_output_weights: [[f32; FRAME_SIZE]; OPERATOR_COUNT] = uninit();
+
         // Render all operator base frequencies for the full frame ahead of time using SIMD
-        let mut operator_base_frequencies: [[f32; FRAME_SIZE]; OPERATOR_COUNT] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut operator_base_frequencies: [[f32; FRAME_SIZE]; OPERATOR_COUNT] = uninit();
+
         let render_params = RenderRawParams {
             param_buffers,
             adsrs: &self.adsrs,
             base_frequencies,
         };
-        let mut modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
 
         for operator_ix in 0..OPERATOR_COUNT {
             let operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
             if !operator.enabled {
+                last_samples_per_operator[operator_ix] = 0.;
+                last_frequencies_per_operator[operator_ix] = 0.;
                 continue;
             }
 
             unsafe { operator_base_frequency_sources.get_unchecked(operator_ix) }
                 .render_raw(&render_params, unsafe {
                     operator_base_frequencies.get_unchecked_mut(operator_ix)
+                });
+
+            modulation_matrix
+                .get_output_weight(operator_ix)
+                .render_raw(&render_params, unsafe {
+                    rendered_output_weights.get_unchecked_mut(operator_ix)
                 });
 
             // Render the params for all per-operator-per-voice effects ahead of time as well
@@ -373,9 +403,8 @@ impl FMSynthVoice {
             for dst_operator_ix in 0..OPERATOR_COUNT {
                 let param = modulation_matrix
                     .get_operator_modulation_index(src_operator_ix, dst_operator_ix);
-                // TODO: smoothing?
                 let buf = unsafe {
-                    modulation_indices
+                    self.cached_modulation_indices
                         .get_unchecked_mut(src_operator_ix)
                         .get_unchecked_mut(dst_operator_ix)
                 };
@@ -405,7 +434,7 @@ impl FMSynthVoice {
                     sample_ix_within_frame,
                     carrier_base_frequency,
                     &last_frequencies_per_operator,
-                    &modulation_indices,
+                    &self.cached_modulation_indices,
                 );
                 *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
                     modulated_frequency;
@@ -421,12 +450,11 @@ impl FMSynthVoice {
 
                 *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
                 output_sample += sample
-                    * modulation_matrix.get_output_weight(operator_ix).get(
-                        param_buffers,
-                        &self.adsrs,
-                        sample_ix_within_frame,
-                        base_frequency,
-                    );
+                    * unsafe {
+                        *rendered_output_weights
+                            .get_unchecked(operator_ix)
+                            .get_unchecked(sample_ix_within_frame)
+                    };
             }
 
             debug_assert!(output_sample == 0. || output_sample.is_normal());
@@ -788,8 +816,8 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     let ctx = Box::into_raw(box FMSynthContext {
         voices: Vec::with_capacity(voice_count),
         modulation_matrix: ModulationMatrix::default(),
-        param_buffers: std::mem::MaybeUninit::uninit().assume_init(),
-        operator_base_frequency_sources: std::mem::MaybeUninit::uninit().assume_init(),
+        param_buffers: uninit(),
+        operator_base_frequency_sources: uninit(),
         base_frequency_input_buffer: Vec::with_capacity(voice_count),
         output_buffers: Vec::with_capacity(voice_count),
         most_recent_gated_voice_ix: 0,
@@ -863,7 +891,18 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
             });
 
         for voice in &mut (*ctx).voices {
+            let was_disabled = !voice.operators[operator_ix].enabled;
             voice.operators[operator_ix].enabled = !disabled;
+
+            // zero out cached modulation indices to avoid having to do so every tick
+            if !was_disabled && disabled {
+                for dst_operator_ix in 0..OPERATOR_COUNT {
+                    for voice in &mut (*ctx).voices {
+                        voice.cached_modulation_indices[operator_ix][dst_operator_ix] =
+                            [0.; FRAME_SIZE];
+                    }
+                }
+            }
         }
     }
 }
