@@ -6,10 +6,26 @@ import type { UISelection } from 'src/fmSynth/FMSynthUI';
 
 const formatOperatorConfig = (config: OperatorConfig) => {
   if (
-    (config.type === 'sine oscillator' || config.type === 'exponential oscillator') &&
+    (config.type === 'sine oscillator' ||
+      config.type === 'exponential oscillator' ||
+      config.type === 'triangle oscillator' ||
+      config.type === 'square oscillator' ||
+      config.type === 'sawtooth oscillator') &&
     config.frequency.type === 'base frequency multiplier'
   ) {
-    return config.frequency.multiplier.toFixed(3);
+    const abbrev = {
+      'sine oscillator': 'SINE',
+      'exponential oscillator': 'EXP',
+      'triangle oscillator': 'TRI',
+      'square oscillator': 'SQR',
+      'sawtooth oscillator': 'SAW',
+    }[config.type];
+    return (
+      <>
+        <span style={{ fontSize: 11 }}>{abbrev}</span>
+        {config.frequency.multiplier.toFixed(3)}
+      </>
+    );
   }
 
   return '-';

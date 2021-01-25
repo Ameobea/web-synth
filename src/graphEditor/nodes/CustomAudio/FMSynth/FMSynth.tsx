@@ -1,6 +1,6 @@
 import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
-// import { simd as getHasSIMDSupport } from 'wasm-feature-detect';
+import * as R from 'ramda';
 
 import { ConnectedFMSynthUI, UISelection } from 'src/fmSynth/FMSynthUI';
 import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
@@ -196,6 +196,7 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'wasmInitialized': {
+          console.log(evt.data);
           if (evt.data.audioThreadDataBuffer) {
             this.audioThreadDataBuffer = new Float32Array(
               evt.data.audioThreadDataBuffer as SharedArrayBuffer
@@ -311,7 +312,7 @@ export default class FMSynth implements ForeignNode {
   }
 
   public handleOperatorConfigChange(operatorIx: number, config: OperatorConfig) {
-    this.operatorConfigs[operatorIx] = config;
+    this.operatorConfigs[operatorIx] = R.clone(config);
     if (!this.awpHandle) {
       console.warn('Tried to update operator config before awp initialized');
       return;
@@ -326,6 +327,9 @@ export default class FMSynth implements ForeignNode {
         'sine oscillator': 2,
         'exponential oscillator': 3,
         'param buffer': 1,
+        'square oscillator': 4,
+        'triangle oscillator': 5,
+        'sawtooth oscillator': 6,
       }[config.type],
       ...(() => {
         switch (config.type) {
@@ -341,11 +345,11 @@ export default class FMSynth implements ForeignNode {
 
     // Set base frequency source config for operators that support that
     switch (config.type) {
-      case 'sine oscillator': {
-        this.setOperatorBaseFrequencySource(operatorIx, config.frequency);
-        break;
-      }
-      case 'exponential oscillator': {
+      case 'sine oscillator':
+      case 'exponential oscillator':
+      case 'square oscillator':
+      case 'triangle oscillator':
+      case 'sawtooth oscillator': {
         this.setOperatorBaseFrequencySource(operatorIx, config.frequency);
         break;
       }
@@ -358,13 +362,12 @@ export default class FMSynth implements ForeignNode {
       return;
     }
     const value =
-      typeof rawVal === 'number' ? { type: 'constant' as const, value: rawVal } : rawVal;
+      typeof rawVal === 'number' ? { type: 'constant' as const, value: rawVal } : R.clone(rawVal);
     if (value.type === 'constant' && typeof value.value !== 'number') {
       value.value = 0;
     }
 
     this.outputWeights[operatorIx] = value;
-    console.log({ value });
 
     this.awpHandle.port.postMessage({
       type: 'setOutputWeightValue',
@@ -376,12 +379,13 @@ export default class FMSynth implements ForeignNode {
   public handleModulationIndexChange(
     srcOperatorIx: number,
     dstOperatorIx: number,
-    val: ParamSource
+    rawVal: ParamSource
   ) {
     if (!this.awpHandle) {
       console.error('Tried to update modulation before AWP initialization');
       return;
     }
+    const val = R.clone(rawVal);
     if (val.type === 'constant' && Math.abs(val.value) < 0.001) {
       val.value = 0;
     }
@@ -396,18 +400,22 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public handleAdsrChange(adsrIx: number, newAdsr: Omit<Adsr, 'audioThreadData'>) {
+  public handleAdsrChange(adsrIx: number, newAdsrRaw: Omit<Adsr, 'audioThreadData'>) {
     if (!this.awpHandle) {
       console.error('Tried to set ADSR before AWP initialization');
       return;
     }
 
     const isLenOnlyChange =
-      this.adsrs[adsrIx] && this.adsrs[adsrIx].lenSamples !== newAdsr.lenSamples;
-    this.adsrs[adsrIx] = { ...newAdsr, audioThreadData: this.adsrs[adsrIx].audioThreadData };
-    if (!this.adsrs[adsrIx].audioThreadData) {
-      this.adsrs[adsrIx].audioThreadData = { phaseIndex: adsrIx };
-    }
+      this.adsrs[adsrIx] && this.adsrs[adsrIx].lenSamples !== newAdsrRaw.lenSamples;
+    const newAdsr = R.clone({ ...newAdsrRaw, audioThreadData: undefined });
+    this.adsrs[adsrIx] = {
+      ...newAdsr,
+      audioThreadData: {
+        phaseIndex: adsrIx,
+        buffer: this.audioThreadDataBuffer ?? undefined,
+      },
+    };
 
     if (isLenOnlyChange) {
       this.awpHandle.port.postMessage({
@@ -509,9 +517,9 @@ export default class FMSynth implements ForeignNode {
       return;
     }
     if (operatorIx === null) {
-      this.mainEffectChain[effectIx] = newEffect;
+      this.mainEffectChain[effectIx] = R.clone(newEffect);
     } else {
-      this.operatorEffects[operatorIx][effectIx] = newEffect;
+      this.operatorEffects[operatorIx][effectIx] = R.clone(newEffect);
     }
 
     const [effectType, param1, param2, param3, param4] = this.encodeEffect(newEffect);
@@ -555,7 +563,6 @@ export default class FMSynth implements ForeignNode {
           }
         });
       }
-      console.log(this);
     }
     if (params.operatorConfigs) {
       this.operatorConfigs = params.operatorConfigs;
@@ -610,7 +617,7 @@ export default class FMSynth implements ForeignNode {
   }
 
   public handleDetuneChange(newDetune: ParamSource | null) {
-    this.detune = newDetune ? { ...newDetune } : null;
+    this.detune = R.clone(newDetune);
     if (!this.awpHandle) {
       console.warn('Tried to set FM synth detune before AWP initialized');
       return;

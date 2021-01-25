@@ -43,6 +43,11 @@
   .operator-select {
     border: 1px solid;
     animation: borderColor 15s infinite linear;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
   }
 
   .modulation-matrix {
@@ -68,9 +73,6 @@
       .operator-select {
         cursor: pointer;
         background-color: $highlight-2;
-        display: flex;
-        justify-content: center;
-        align-items: center;
       }
       .operator-select[data-hovered='true'] {
         $hover-color: lighten($highlight-2, 0.4);

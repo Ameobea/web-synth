@@ -39,6 +39,75 @@ impl SineOscillator {
 }
 
 #[derive(Clone)]
+pub struct SquareOscillator {
+    pub phase: f32,
+}
+
+impl PhasedOscillator for SquareOscillator {
+    fn get_phase(&self) -> f32 { self.phase }
+
+    fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
+}
+
+impl SquareOscillator {
+    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
+        self.update_phase(frequency);
+
+        if self.phase < 0.5 {
+            1.
+        } else {
+            -1.
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct TriangleOscillator {
+    pub phase: f32,
+}
+
+impl PhasedOscillator for TriangleOscillator {
+    fn get_phase(&self) -> f32 { self.phase }
+
+    fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
+}
+
+impl TriangleOscillator {
+    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
+        self.update_phase(frequency);
+
+        let triangle_lookup_table = crate::lookup_tables::get_triangle_lookup_table();
+        dsp::read_interpolated(
+            triangle_lookup_table,
+            self.phase * (triangle_lookup_table.len() - 2) as f32,
+        )
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct SawtoothOscillator {
+    pub phase: f32,
+}
+
+impl PhasedOscillator for SawtoothOscillator {
+    fn get_phase(&self) -> f32 { self.phase }
+
+    fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
+}
+
+impl SawtoothOscillator {
+    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
+        self.update_phase(frequency);
+
+        let sawtooth_lookup_table = crate::lookup_tables::get_sawtooth_lookup_table();
+        dsp::read_interpolated(
+            sawtooth_lookup_table,
+            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
+        )
+    }
+}
+
+#[derive(Clone)]
 pub struct ExponentialOscillator {
     pub phase: f32,
     pub stretch_factor: ParamSource,
@@ -183,6 +252,9 @@ pub enum OscillatorSource {
     Wavetable(usize),
     ParamBuffer(usize),
     ExponentialOscillator(ExponentialOscillator),
+    Square(SquareOscillator),
+    Triangle(TriangleOscillator),
+    Sawtooth(SawtoothOscillator),
 }
 
 impl OscillatorSource {
@@ -194,6 +266,9 @@ impl OscillatorSource {
             OscillatorSource::ParamBuffer(_) => None,
             OscillatorSource::Sine(osc) => Some(osc.get_phase()),
             OscillatorSource::ExponentialOscillator(osc) => Some(osc.get_phase()),
+            OscillatorSource::Square(osc) => Some(osc.get_phase()),
+            OscillatorSource::Triangle(osc) => Some(osc.get_phase()),
+            OscillatorSource::Sawtooth(osc) => Some(osc.get_phase()),
         }
     }
 }
@@ -235,6 +310,9 @@ impl OscillatorSource {
                 sample_ix_within_frame,
                 base_frequency,
             ),
+            OscillatorSource::Square(osc) => osc.gen_sample(frequency),
+            OscillatorSource::Triangle(osc) => osc.gen_sample(frequency),
+            OscillatorSource::Sawtooth(osc) => osc.gen_sample(frequency),
         }
     }
 }
@@ -947,6 +1025,15 @@ fn build_oscillator_source(
                 param_val_float,
                 val_param_float_2,
             )),
+        }),
+        4 => OscillatorSource::Square(SquareOscillator {
+            phase: phase_opt.unwrap_or_default(),
+        }),
+        5 => OscillatorSource::Triangle(TriangleOscillator {
+            phase: phase_opt.unwrap_or_default(),
+        }),
+        6 => OscillatorSource::Sawtooth(SawtoothOscillator {
+            phase: phase_opt.unwrap_or_default(),
         }),
         _ => panic!("Invalid operator type: {}", operator_type),
     }

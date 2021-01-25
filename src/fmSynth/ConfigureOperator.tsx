@@ -16,13 +16,19 @@ export type OperatorConfig =
   | { type: 'wavetable'; wavetableIx: number }
   | { type: 'sine oscillator'; frequency: ParamSource }
   | { type: 'exponential oscillator'; frequency: ParamSource; stretchFactor: ParamSource }
-  | { type: 'param buffer'; bufferIx: number };
+  | { type: 'param buffer'; bufferIx: number }
+  | { type: 'square oscillator'; frequency: ParamSource }
+  | { type: 'triangle oscillator'; frequency: ParamSource }
+  | { type: 'sawtooth oscillator'; frequency: ParamSource };
 
 export const buildDefaultOperatorConfig = (
   type: OperatorConfig['type'] = 'sine oscillator'
 ): OperatorConfig => {
   switch (type) {
-    case 'sine oscillator': {
+    case 'sine oscillator':
+    case 'square oscillator':
+    case 'triangle oscillator':
+    case 'sawtooth oscillator': {
       return {
         type,
         frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
@@ -70,6 +76,9 @@ const ConfigureOperator: React.FC<{
         label: 'operator type',
         options: [
           'sine oscillator',
+          'square oscillator',
+          'triangle oscillator',
+          'sawtooth oscillator',
           'exponential oscillator',
           'param buffer',
         ] as OperatorConfig['type'][],
@@ -98,7 +107,11 @@ const ConfigureOperator: React.FC<{
           }
         }}
       />
-      {config.type === 'sine oscillator' || config.type === 'exponential oscillator' ? (
+      {config.type === 'sine oscillator' ||
+      config.type === 'exponential oscillator' ||
+      config.type === 'square oscillator' ||
+      config.type === 'triangle oscillator' ||
+      config.type === 'sawtooth oscillator' ? (
         <ConfigureParamSource
           title='frequency'
           state={config.frequency}
