@@ -28,13 +28,29 @@ impl PhasedOscillator for SineOscillator {
 
 impl SineOscillator {
     pub fn gen_sample(&mut self, frequency: f32) -> f32 {
-        self.update_phase(frequency);
+        // self.update_phase(frequency);
 
         let sine_lookup_table = crate::lookup_tables::get_sine_lookup_table();
-        dsp::read_interpolated(
-            sine_lookup_table,
-            self.phase * (sine_lookup_table.len() - 2) as f32,
-        )
+        if frequency.abs() < 1000. {
+            self.update_phase(frequency);
+            return dsp::read_interpolated(
+                sine_lookup_table,
+                self.phase * (sine_lookup_table.len() - 2) as f32,
+            );
+        }
+
+        // 2x oversampling to avoid aliasing
+        let mut out = 0.;
+        let oversample_ratio = 2usize;
+        for _ in 0..oversample_ratio {
+            self.update_phase_oversampled(oversample_ratio as f32, frequency);
+            out += dsp::read_interpolated(
+                sine_lookup_table,
+                self.phase * (sine_lookup_table.len() - 2) as f32,
+            ) * (1. / (oversample_ratio as f32));
+        }
+
+        out
     }
 }
 
