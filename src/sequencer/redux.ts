@@ -1,6 +1,5 @@
 import * as R from 'ramda';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
-import { UnreachableException } from 'ameo-utils';
 
 import { SampleDescriptor } from 'src/sampleLibrary';
 import { MIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';

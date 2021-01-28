@@ -103,9 +103,7 @@ const SynthInput: React.FC<InputCompCommonProps<'midi'>> = ({
           dispatch(
             actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
               ...voiceTarget,
-              synthIx: Option.of(val)
-                .flatMap(n => Option.of(n === 'none' ? null : +n))
-                .orNull(),
+              synthIx: Number.isNaN(+val) ? null : +val,
             })
           );
         }

@@ -61,7 +61,9 @@ const OutputWeightSquare: React.FC<{
   outputWeights: ParamSource[];
   onClick: () => void;
   isSelected: boolean;
-}> = ({ operatorIx, outputWeights, onClick, isSelected }) => {
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}> = ({ operatorIx, outputWeights, onClick, isSelected, onMouseEnter, onMouseLeave }) => {
   const val = outputWeights[operatorIx];
   const operatorWeight = val.type === 'constant' ? val.value : null;
 
@@ -86,6 +88,8 @@ const OutputWeightSquare: React.FC<{
       data-selected={isSelected ? 'true' : 'false'}
       key='output'
       className='operator-square output-weight'
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div className='operator-weight-lens' style={style}>
         {operatorWeight !== null && Math.abs(operatorWeight) < 0.01
@@ -94,6 +98,14 @@ const OutputWeightSquare: React.FC<{
       </div>
     </div>
   );
+};
+
+const getModulationIndexName = (srcOperatorIx: number, dstOperatorIx: number) => {
+  if (srcOperatorIx === dstOperatorIx) {
+    return `Operator ${srcOperatorIx + 1} Feedback`;
+  }
+
+  return `Operator ${srcOperatorIx + 1} -> ${dstOperatorIx + 1} Modulation Index`;
 };
 
 export const ModulationMatrix: React.FC<{
@@ -116,59 +128,90 @@ export const ModulationMatrix: React.FC<{
   onOutputWeightSelected,
 }) => {
   const [hoveredColIx, setHoveredColIx] = useState<number | null>(null);
+  const [hoveredModulationEntity, setHoveredModulationEntity] = useState<string | null>(null);
 
   const selectedOperatorIx = selectedUI?.type === 'operator' ? selectedUI.index : null;
 
   return (
-    <div className='modulation-matrix' onMouseLeave={() => setHoveredColIx(null)}>
-      {modulationIndices.map((row, srcOperatorIx) => (
-        <div className={'operator-row'} key={srcOperatorIx}>
-          <div
-            data-hovered={hoveredColIx === srcOperatorIx ? 'true' : 'false'}
-            className={
-              'operator-select' + (selectedOperatorIx === srcOperatorIx ? ' operator-selected' : '')
-            }
-            onClick={() => {
-              onOperatorSelected(srcOperatorIx);
-            }}
-          >
-            {formatOperatorConfig(operatorConfigs[srcOperatorIx])}
-          </div>
-          {row.map((val, dstOperatorIx) => (
+    <>
+      <div className='hovered-modulation-entity'>{hoveredModulationEntity}</div>
+      <div className='modulation-matrix' onMouseLeave={() => setHoveredColIx(null)}>
+        {modulationIndices.map((row, srcOperatorIx) => (
+          <div className={'operator-row'} key={srcOperatorIx}>
             <div
-              data-src-operator-ix={srcOperatorIx}
-              data-dst-operator-ix={dstOperatorIx}
-              data-active={
-                selectedUI?.type === 'modulationIndex' &&
-                selectedUI.srcOperatorIx === srcOperatorIx &&
-                selectedUI.dstOperatorIx === dstOperatorIx
-                  ? 'true'
-                  : 'false'
+              data-hovered={hoveredColIx === srcOperatorIx ? 'true' : 'false'}
+              className={
+                'operator-select' +
+                (selectedOperatorIx === srcOperatorIx ? ' operator-selected' : '')
               }
-              className='operator-square'
-              key={dstOperatorIx}
-              onClick={() => onModulationIndexSelected(srcOperatorIx, dstOperatorIx)}
-              onDoubleClick={() => {
-                if (val.type === 'constant') {
-                  resetModulationIndex(srcOperatorIx, dstOperatorIx);
+              onClick={() => onOperatorSelected(srcOperatorIx)}
+              onMouseEnter={() =>
+                setHoveredModulationEntity(`Operator ${srcOperatorIx + 1} Config`)
+              }
+              onMouseLeave={() => {
+                if (hoveredModulationEntity === `Operator ${srcOperatorIx + 1} Config`) {
+                  setHoveredModulationEntity(null);
                 }
               }}
-              onMouseEnter={() => setHoveredColIx(dstOperatorIx)}
             >
-              {formatParamSource(val)}
+              {formatOperatorConfig(operatorConfigs[srcOperatorIx])}
             </div>
-          ))}
-          <OutputWeightSquare
-            onClick={() => onOutputWeightSelected(srcOperatorIx)}
-            operatorIx={srcOperatorIx}
-            outputWeights={outputWeights}
-            isSelected={
-              selectedUI?.type === 'outputWeight' && selectedUI.operatorIx === srcOperatorIx
-            }
-          />
-        </div>
-      ))}
-    </div>
+            {row.map((val, dstOperatorIx) => (
+              <div
+                data-src-operator-ix={srcOperatorIx}
+                data-dst-operator-ix={dstOperatorIx}
+                data-active={
+                  selectedUI?.type === 'modulationIndex' &&
+                  selectedUI.srcOperatorIx === srcOperatorIx &&
+                  selectedUI.dstOperatorIx === dstOperatorIx
+                    ? 'true'
+                    : 'false'
+                }
+                className={`operator-square${
+                  srcOperatorIx === dstOperatorIx ? ' operator-square-feedback' : ''
+                }`}
+                key={dstOperatorIx}
+                onClick={() => onModulationIndexSelected(srcOperatorIx, dstOperatorIx)}
+                onMouseEnter={() => {
+                  setHoveredColIx(dstOperatorIx);
+                  setHoveredModulationEntity(getModulationIndexName(srcOperatorIx, dstOperatorIx));
+                }}
+                onMouseLeave={() => {
+                  if (
+                    hoveredModulationEntity === getModulationIndexName(srcOperatorIx, dstOperatorIx)
+                  ) {
+                    setHoveredModulationEntity(null);
+                  }
+                }}
+                onDoubleClick={() => {
+                  if (val.type === 'constant') {
+                    resetModulationIndex(srcOperatorIx, dstOperatorIx);
+                  }
+                }}
+              >
+                {formatParamSource(val)}
+              </div>
+            ))}
+            <OutputWeightSquare
+              onClick={() => onOutputWeightSelected(srcOperatorIx)}
+              operatorIx={srcOperatorIx}
+              outputWeights={outputWeights}
+              isSelected={
+                selectedUI?.type === 'outputWeight' && selectedUI.operatorIx === srcOperatorIx
+              }
+              onMouseEnter={() =>
+                setHoveredModulationEntity(`Operator ${srcOperatorIx + 1} Output Weight`)
+              }
+              onMouseLeave={() => {
+                if (hoveredModulationEntity === `Operator ${srcOperatorIx + 1} Output Weight`) {
+                  setHoveredModulationEntity(null);
+                }
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </>
   );
 };
 

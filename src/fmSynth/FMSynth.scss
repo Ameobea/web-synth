@@ -39,6 +39,14 @@
   min-width: 520px;
   overflow-y: auto;
 
+  .hovered-modulation-entity {
+    width: 100%;
+    text-align: center;
+    text-transform: uppercase;
+    color: #ddd;
+    height: 20px;
+  }
+
   .operator-square,
   .operator-select {
     border: 1px solid;
@@ -96,6 +104,9 @@
         background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
         background-size: 140% 140%;
         animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
+      }
+      .operator-square.operator-square-feedback {
+        background-color: #340000;
       }
 
       .output-weight {
