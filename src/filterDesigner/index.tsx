@@ -2,9 +2,8 @@ import React, { Suspense } from 'react';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
-import * as R from 'ramda';
-import Loading from 'src/misc/Loading';
 
+import Loading from 'src/misc/Loading';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 
 import {
@@ -16,7 +15,12 @@ import {
 import { FilterParams } from 'src/redux/modules/synthDesigner';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import { FilterType } from 'src/synthDesigner/filterHelpers';
-import type { FilterDesignerState } from './FilterDesigner';
+import {
+  FilterDesignerState,
+  deserializeFilterDesigner,
+  serializeFilterDesigner,
+  setFilter,
+} from 'src/filterDesigner/util';
 
 const FilterDesigner = React.lazy(() => import('./FilterDesigner'));
 
@@ -29,35 +33,6 @@ const LazyFilterDesignerUI: React.FC<PropTypesOf<typeof FilterDesigner>> = props
 const ctx = new AudioContext();
 const StatesByVcId = new Map<string, FilterDesignerState>();
 
-interface SerializedFilterDesigner {
-  filters: FilterParams[];
-}
-
-const serializeFilterDesigner = (state: FilterDesignerState): string => {
-  const serialized: SerializedFilterDesigner = { filters: state.filters.map(R.prop('params')) };
-  return JSON.stringify(serialized);
-};
-
-const freqResToDb = (res: number): number => (Math.log(res) * 20) / Math.LN10;
-const setFilter = (filter: BiquadFilterNode, params: FilterParams) => {
-  filter.type = params.type;
-  filter.Q.value = freqResToDb(params.Q ?? 0);
-  filter.frequency.value = params.frequency;
-  filter.detune.value = params.detune;
-  filter.gain.value = params.gain;
-};
-
-const deserializeFilterDesigner = (serialized: string): FilterDesignerState => {
-  const parsed: SerializedFilterDesigner = JSON.parse(serialized);
-  return {
-    filters: parsed.filters.map(params => {
-      const filter = new BiquadFilterNode(ctx);
-      setFilter(filter, params);
-      return { params, filter, id: btoa(Math.random().toString()) };
-    }),
-  };
-};
-
 const buildDefaultFilterDesignerState = (): FilterDesignerState => {
   const filterParams: FilterParams[] = [
     { type: FilterType.Lowpass, frequency: 1000, Q: 0.71, gain: 0, detune: 0 },
@@ -67,9 +42,10 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
   return {
     filters: filterParams.map(params => {
       const filter = new BiquadFilterNode(ctx);
-      setFilter(filter, params);
+      setFilter(filter, params, null);
       return { params, filter, id: btoa(Math.random().toString()) };
     }),
+    lockedFrequency: null,
   };
 };
 
@@ -89,7 +65,7 @@ export const init_filter_designer = async (stateKey: string) => {
 
   const serialized = localStorage.getItem(stateKey);
   const initialState: FilterDesignerState = Option.of(serialized)
-    .map(deserializeFilterDesigner)
+    .map(s => deserializeFilterDesigner(JSON.parse(s)))
     .getOrElseL(buildDefaultFilterDesignerState);
   StatesByVcId.set(vcId, initialState);
 

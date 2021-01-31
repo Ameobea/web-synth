@@ -200,3 +200,13 @@ export const setEngine = (engine: typeof import('./engine')) => {
   engineHandle = engine;
 };
 export const getEngine = (): typeof import('./engine') | undefined => engineHandle;
+
+export const freqResToDb = (res: number): number => {
+  const db = (20.0 * Math.log(res)) / Math.LN10;
+  if (db > 100) {
+    return 100;
+  } else if (db < -100) {
+    return -100;
+  }
+  return Number.isNaN(db) ? -100 : db;
+};

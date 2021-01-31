@@ -2,6 +2,41 @@
   display: flex;
   flex-direction: row;
 
+  button {
+    width: 20px;
+    padding: 0;
+  }
+  button:hover {
+    font-weight: bold;
+  }
+
+  .filter-inst {
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .filter-params {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+  }
+
+  .frequency-response-container {
+    h1,
+    h2 {
+      margin-left: 80px;
+      margin-top: 22px;
+      margin-bottom: -20px;
+      text-align: center;
+      text-transform: uppercase;
+      font-family: 'Oxygen Mono', Hack, monospace;
+      font-size: 17px;
+      color: rgba(255, 255, 255, 0.69);
+    }
+  }
+
   .filter-designer-frequency-response-plot {
     width: 800px;
     height: 350px;
