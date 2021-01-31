@@ -69,10 +69,14 @@ const filterSettings = {
   },
 };
 
-export const getSettingsForFilterType = (filterType: FilterType, includeADSR = true) =>
+export const getSettingsForFilterType = (
+  filterType: FilterType,
+  includeADSR = true,
+  includeBypass = true
+) =>
   R.clone(
     filterNils([
-      filterSettings.bypass,
+      includeBypass ? filterSettings.bypass : null,
       filterSettings.type,
       filterSettings.frequency,
       filterSettings.detune,

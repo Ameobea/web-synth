@@ -188,3 +188,12 @@ extern "C" {
     pub fn get_granulator_audio_connectables(state_key: &str) -> JsValue;
     pub fn granulator_list_used_samples(vc_id: &str) -> Vec<JsValue>;
 }
+
+#[wasm_bindgen(raw_module = "./filterDesigner")]
+extern "C" {
+    pub fn init_filter_designer(state_key: &str);
+    pub fn hide_filter_designer(vc_id: &str);
+    pub fn unhide_filter_designer(vc_id: &str);
+    pub fn cleanup_filter_designer(state_key: &str);
+    pub fn get_filter_designer_audio_connectables(state_key: &str) -> JsValue;
+}

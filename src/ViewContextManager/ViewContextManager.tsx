@@ -26,7 +26,7 @@ const styles: { [key: string]: React.CSSProperties } = {
 const viewContexts: { children: string; name: string; displayName: string }[] = [
   { children: 'C', name: 'clip_compositor', displayName: 'Clip Compositor' },
   { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor' },
-  { children: 'F', name: 'faust_editor', displayName: 'Faust Code Editor' },
+  { children: 'E', name: 'faust_editor', displayName: 'Faust Code Editor' },
   { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },
   { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
   { children: 'D', name: 'synth_designer', displayName: 'Synth Designer' },
@@ -35,6 +35,7 @@ const viewContexts: { children: string; name: string; displayName: string }[] = 
   { children: 'L', name: 'sample_library', displayName: 'Sample Library' },
   { children: 'P', name: 'control_panel', displayName: 'Control Panel' },
   { children: '⋱', name: 'granulator', displayName: 'Granular Synthesizer' },
+  { children: 'F', name: 'filter_designer', displayName: 'Filter Designer' },
 ];
 
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {

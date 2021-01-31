@@ -129,6 +129,7 @@ const ctx = new AudioContext();
 
 const VOICE_COUNT = 10 as const;
 
+const freqResToDb = (res: number): number => (20.0 * Math.log(res)) / Math.LN10;
 function updateFilterNode<K extends keyof FilterParams>(
   nodes: BiquadFilterNode[],
   csns: FilterCSNs,
@@ -145,6 +146,10 @@ function updateFilterNode<K extends keyof FilterParams>(
     case 'adsr':
     case 'bypass':
     case 'adsr length ms':
+      break;
+    case 'q':
+    case 'Q':
+      csns.Q.offset.setValueAtTime(freqResToDb(val as number), ctx.currentTime);
       break;
     default: {
       const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];

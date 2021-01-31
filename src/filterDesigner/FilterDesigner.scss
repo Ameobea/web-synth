@@ -1,0 +1,26 @@
+.filter-designer {
+  display: flex;
+  flex-direction: row;
+
+  .filter-designer-frequency-response-plot {
+    width: 800px;
+    height: 350px;
+  }
+
+  ul {
+    list-style-type: none;
+  }
+
+  svg .x-axis,
+  svg .y-axis {
+    text {
+      font: 10px sans-serif;
+    }
+
+    path,
+    line {
+      fill: none;
+      shape-rendering: crispEdges;
+    }
+  }
+}

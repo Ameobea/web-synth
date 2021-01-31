@@ -8,6 +8,7 @@ use crate::{
         composition_sharing::mk_composition_sharing,
         control_panel::mk_control_panel,
         faust_editor::{mk_faust_editor, FaustEditor},
+        filter_designer::mk_filter_designer,
         granulator::mk_granulator,
         graph_editor::mk_graph_editor,
         midi_editor::mk_midi_editor,
@@ -353,6 +354,9 @@ impl ViewContextManager {
             Some(graph_editor_vc_id)
         };
 
+        if self.active_context_ix >= self.contexts.len() {
+            self.active_context_ix = 0;
+        }
         self.contexts[self.active_context_ix].context.unhide();
 
         self.commit();
@@ -546,6 +550,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "sample_library" => mk_sample_library(conf, uuid),
         "control_panel" => mk_control_panel(conf, uuid),
         "granulator" => mk_granulator(conf, uuid),
+        "filter_designer" => mk_filter_designer(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

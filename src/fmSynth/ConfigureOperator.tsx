@@ -93,7 +93,7 @@ const ConfigureOperator: React.FC<{
       <ControlPanel
         style={{ width: 470 }}
         settings={operatorTypeSettings}
-        title={`configure operator ${operatorIx}`}
+        title={`configure operator ${operatorIx + 1}`}
         state={operatorTypeState}
         onChange={(key: string, val: any) => {
           switch (key) {
