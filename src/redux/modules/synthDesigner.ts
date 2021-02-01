@@ -13,7 +13,7 @@ import WaveTable, {
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { AsyncOnce, base64ArrayBuffer } from 'src/util';
+import { AsyncOnce, base64ArrayBuffer, linearToDb } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -129,7 +129,6 @@ const ctx = new AudioContext();
 
 const VOICE_COUNT = 10 as const;
 
-const freqResToDb = (res: number): number => (20.0 * Math.log(res)) / Math.LN10;
 function updateFilterNode<K extends keyof FilterParams>(
   nodes: BiquadFilterNode[],
   csns: FilterCSNs,
@@ -149,7 +148,7 @@ function updateFilterNode<K extends keyof FilterParams>(
       break;
     case 'q':
     case 'Q':
-      csns.Q.offset.setValueAtTime(freqResToDb(val as number), ctx.currentTime);
+      csns.Q.offset.setValueAtTime(linearToDb(val as number), ctx.currentTime);
       break;
     default: {
       const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];

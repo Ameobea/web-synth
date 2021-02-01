@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
+import * as R from 'ramda';
 
 import Loading from 'src/misc/Loading';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -20,7 +21,9 @@ import {
   deserializeFilterDesigner,
   serializeFilterDesigner,
   setFilter,
+  connectFilterChain,
 } from 'src/filterDesigner/util';
+import { updateConnectables } from 'src/patchNetwork/interface';
 
 const FilterDesigner = React.lazy(() => import('./FilterDesigner'));
 
@@ -39,12 +42,15 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
     { type: FilterType.Lowpass, frequency: 8800, Q: 11.71, gain: 0, detune: 0 },
   ];
 
+  const filters = filterParams.map(params => {
+    const filter = new BiquadFilterNode(ctx);
+    setFilter(filter, params, null);
+    return { params, filter, id: btoa(Math.random().toString()) };
+  });
+  connectFilterChain(filters.map(R.prop('filter')));
+
   return {
-    filters: filterParams.map(params => {
-      const filter = new BiquadFilterNode(ctx);
-      setFilter(filter, params, null);
-      return { params, filter, id: btoa(Math.random().toString()) };
-    }),
+    filters,
     lockedFrequency: null,
   };
 };
@@ -75,7 +81,13 @@ export const init_filter_designer = async (stateKey: string) => {
 
   mkContainerRenderHelper({
     Comp: LazyFilterDesignerUI,
-    getProps: () => ({ vcId, initialState, onChange }),
+    getProps: () => ({
+      vcId,
+      initialState,
+      onChange,
+      updateConnectables: (newState?: FilterDesignerState) =>
+        updateConnectables(vcId, get_filter_designer_audio_connectables(vcId, newState)),
+    }),
   })(domId);
 };
 
@@ -98,9 +110,11 @@ export const hide_filter_designer = mkContainerHider(getFilterDesignerDOMElement
 
 export const unhide_filter_designer = mkContainerUnhider(getFilterDesignerDOMElementId);
 
-export const get_filter_designer_audio_connectables = (stateKey: string): AudioConnectables => {
-  const vcId = stateKey.split('_')[1];
-  const state = StatesByVcId.get(vcId);
+export const get_filter_designer_audio_connectables = (
+  vcId: string,
+  stateOverride?: FilterDesignerState
+): AudioConnectables => {
+  const state = stateOverride ?? StatesByVcId.get(vcId);
   if (!state) {
     throw new UnreachableException('Missing state for filter designer vcId=' + vcId);
   }
@@ -108,7 +122,7 @@ export const get_filter_designer_audio_connectables = (stateKey: string): AudioC
     return create_empty_audio_connectables(vcId);
   }
 
-  return {
+  return dbg({
     vcId,
     inputs: ImmMap<string, ConnectableInput>().set('input', {
       type: 'customAudio',
@@ -118,5 +132,5 @@ export const get_filter_designer_audio_connectables = (stateKey: string): AudioC
       type: 'customAudio',
       node: state.filters[state.filters.length - 1].filter,
     }),
-  };
+  });
 };

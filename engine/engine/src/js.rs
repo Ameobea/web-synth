@@ -195,5 +195,5 @@ extern "C" {
     pub fn hide_filter_designer(vc_id: &str);
     pub fn unhide_filter_designer(vc_id: &str);
     pub fn cleanup_filter_designer(state_key: &str);
-    pub fn get_filter_designer_audio_connectables(state_key: &str) -> JsValue;
+    pub fn get_filter_designer_audio_connectables(vc_id: &str) -> JsValue;
 }

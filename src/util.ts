@@ -201,8 +201,8 @@ export const setEngine = (engine: typeof import('./engine')) => {
 };
 export const getEngine = (): typeof import('./engine') | undefined => engineHandle;
 
-export const freqResToDb = (res: number): number => {
-  const db = (20.0 * Math.log(res)) / Math.LN10;
+export const linearToDb = (res: number): number => {
+  const db = (20 * Math.log(res)) / Math.LN10;
   if (db > 100) {
     return 100;
   } else if (db < -100) {
@@ -210,3 +210,5 @@ export const freqResToDb = (res: number): number => {
   }
   return Number.isNaN(db) ? -100 : db;
 };
+
+export const dbToLinear = (dB: number): number => Math.pow(10, dB / 20);

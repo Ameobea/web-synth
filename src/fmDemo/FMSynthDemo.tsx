@@ -151,11 +151,10 @@ const filterAdsrs = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   return adsr;
 });
 
-const freqResToDb = (res: number): number => (Math.log(res) * 20) / Math.LN10;
 const initFilterFromGlobalState = (filter: BiquadFilterNode) => {
   filter.frequency.value = GlobalState.filterParams.frequency ?? 1000;
   filter.detune.value = GlobalState.filterParams.detune ?? 0;
-  filter.Q.value = freqResToDb(GlobalState.filterParams.Q ?? 0);
+  filter.Q.value = GlobalState.filterParams.Q ?? 0;
   filter.type = GlobalState.filterParams.type;
   filter.gain.value = GlobalState.filterParams.gain ?? 0;
 };

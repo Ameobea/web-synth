@@ -24,7 +24,7 @@ impl ViewContext for FilterDesigner {
     }
 
     fn get_audio_connectables(&self) -> JsValue {
-        js::get_filter_designer_audio_connectables(&self.get_state_key())
+        js::get_filter_designer_audio_connectables(&self.uuid.to_string())
     }
 
     fn get_id(&self) -> String { self.uuid.to_string() }

@@ -6,12 +6,14 @@ import * as R from 'ramda';
 
 import { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
-import { freqResToDb } from 'src/util';
+import { linearToDb } from 'src/util';
 import d3 from './d3';
 import './FilterDesigner.scss';
 import FlatButton from 'src/misc/FlatButton';
 import {
+  connectFilterChain,
   deserializeFilterDesigner,
+  disconnectFilterChain,
   FilterDesignerState,
   SerializedFilterDesigner,
   setFilter,
@@ -41,7 +43,15 @@ const buildDefaultFilter = (type: FilterType.Lowpass | FilterType.Highpass, Q: n
   Q,
 });
 
+// higher-order filter Q factors determined using this: https://www.earlevel.com/main/2016/09/29/cascading-filters/
 const Presets: { name: string; preset: SerializedFilterDesigner }[] = [
+  {
+    name: 'init',
+    preset: {
+      filters: [buildDefaultFilter(FilterType.Lowpass, 0.70710678)],
+      lockedFrequency: null,
+    },
+  },
   {
     name: 'order 4 LP',
     preset: {
@@ -227,7 +237,7 @@ class FilterDesigner {
     document.querySelector(`#${this.containerId} .chart-data`)?.remove();
 
     const maxVal = Math.max(
-      freqResToDb(frequencyResponses.reduce((acc, val) => Math.max(acc, val), 0)),
+      linearToDb(frequencyResponses.reduce((acc, val) => Math.max(acc, val), 0)),
       10
     );
     const y = d3.scaleLinear().domain([-80, maxVal]).range([HEIGHT, 0]);
@@ -264,7 +274,7 @@ class FilterDesigner {
       .datum(
         new Array(frequencies.length)
           .fill(null)
-          .map((_, i) => [frequencies[i], freqResToDb(frequencyResponses[i])] as [number, number])
+          .map((_, i) => [frequencies[i], linearToDb(frequencyResponses[i])] as [number, number])
       )
       .attr('fill', 'none')
       .attr('stroke', LINE_COLOR)
@@ -285,7 +295,8 @@ const FilterDesignerUI: React.FC<{
   vcId: string;
   initialState: FilterDesignerState;
   onChange: (newState: FilterDesignerState) => void;
-}> = ({ vcId, initialState, onChange }) => {
+  updateConnectables?: (newState?: FilterDesignerState) => void;
+}> = ({ vcId, initialState, onChange, updateConnectables }) => {
   const containerId = useMemo(() => btoa(vcId).replace(/=/g, ''), [vcId]);
   const inst = useMemo(() => {
     const inst = StateByVcId.get(vcId);
@@ -312,13 +323,16 @@ const FilterDesignerUI: React.FC<{
         type: 'button',
         label: 'load preset',
         action: () => {
+          disconnectFilterChain(state.filters.map(R.prop('filter')));
           const { preset } = Presets.find(R.propEq('name', selectedPresetName))!;
           const newState = deserializeFilterDesigner(preset);
+          connectFilterChain(newState.filters.map(R.prop('filter')));
           setState(newState);
+          updateConnectables?.(newState);
         },
       },
     ]);
-  }, [selectedPresetName, state.lockedFrequency]);
+  }, [selectedPresetName, state.filters, state.lockedFrequency, updateConnectables]);
   useEffect(() => {
     if (R.isNil(state.lockedFrequency)) {
       return;
@@ -377,8 +391,11 @@ const FilterDesignerUI: React.FC<{
               return;
             }
 
-            const newFilters = state.filters.filter((_, i) => i !== filterIx);
-            setState({ ...state, filters: newFilters });
+            disconnectFilterChain(state.filters.map(R.prop('filter')));
+            const newState = { ...state, filters: state.filters.filter((_, i) => i !== filterIx) };
+            connectFilterChain(newState.filters.map(R.prop('filter')));
+            setState(newState);
+            updateConnectables?.(newState);
           }}
         />
         <ControlPanel
@@ -388,16 +405,20 @@ const FilterDesignerUI: React.FC<{
               type: 'button',
               label: 'add filter',
               action: () => {
+                disconnectFilterChain(state.filters.map(R.prop('filter')));
                 const newFilter = new BiquadFilterNode(ctx);
                 const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
                 setFilter(newFilter, params, state.lockedFrequency);
-                setState({
+                const newState = {
                   ...state,
                   filters: [
                     ...state.filters,
                     { filter: newFilter, params, id: btoa(Math.random().toString()) },
                   ],
-                });
+                };
+                connectFilterChain(newState.filters.map(R.prop('filter')));
+                setState(newState);
+                updateConnectables?.(newState);
               },
             },
           ]}

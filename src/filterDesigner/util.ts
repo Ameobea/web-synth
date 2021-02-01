@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 
 import { FilterParams } from 'src/redux/modules/synthDesigner';
-import { freqResToDb } from 'src/util';
+import { linearToDb } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -25,14 +25,19 @@ export const serializeFilterDesigner = (state: FilterDesignerState): string => {
 
 export const deserializeFilterDesigner = (
   parsed: SerializedFilterDesigner
-): FilterDesignerState => ({
-  filters: parsed.filters.map(params => {
+): FilterDesignerState => {
+  const filters = parsed.filters.map(params => {
     const filter = new BiquadFilterNode(ctx);
     setFilter(filter, params, parsed.lockedFrequency);
     return { params, filter, id: btoa(Math.random().toString()) };
-  }),
-  lockedFrequency: parsed.lockedFrequency ?? null,
-});
+  });
+  connectFilterChain(filters.map(R.prop('filter')));
+
+  return {
+    filters,
+    lockedFrequency: parsed.lockedFrequency ?? null,
+  };
+};
 
 export const setFilter = (
   filter: BiquadFilterNode,
@@ -40,7 +45,7 @@ export const setFilter = (
   lockedFrequency: number | null | undefined
 ) => {
   filter.type = params.type;
-  filter.Q.value = freqResToDb(params.Q ?? 0);
+  filter.Q.value = linearToDb(params.Q ?? 0);
   filter.detune.value = params.detune;
   filter.gain.value = params.gain;
   if (!R.isNil(lockedFrequency)) {
@@ -48,4 +53,20 @@ export const setFilter = (
   } else {
     filter.frequency.value = params.frequency;
   }
+};
+
+export const connectFilterChain = (filters: BiquadFilterNode[]) => {
+  const [firstFilter, ...rest] = filters;
+  rest.reduce((acc, filter) => {
+    acc.connect(filter);
+    return filter;
+  }, firstFilter);
+};
+
+export const disconnectFilterChain = (filters: BiquadFilterNode[]) => {
+  const [firstFilter, ...rest] = filters;
+  rest.reduce((acc, filter) => {
+    acc.disconnect(filter);
+    return filter;
+  }, firstFilter);
 };

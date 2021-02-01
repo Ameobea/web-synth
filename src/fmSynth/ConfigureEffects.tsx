@@ -466,7 +466,7 @@ const ConfigureEffects: React.FC<{
   return (
     <div className='configure-effects'>
       <ControlPanel
-        title={operatorIx === null ? 'main effect chain' : `operator ${operatorIx} effects`}
+        title={operatorIx === null ? 'main effect chain' : `operator ${operatorIx + 1} effects`}
         style={{ width: 500 }}
       />
       <div className='effects-controls'>
