@@ -5,7 +5,11 @@ import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
 import { FilterParams } from 'src/redux/modules/synthDesigner';
-import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import {
+  buildDefaultFilter,
+  FilterType,
+  getSettingsForFilterType,
+} from 'src/synthDesigner/filterHelpers';
 import { linearToDb } from 'src/util';
 import d3 from './d3';
 import './FilterDesigner.scss';
@@ -18,6 +22,7 @@ import {
   SerializedFilterDesigner,
   setFilter,
 } from 'src/filterDesigner/util';
+import { computeHigherOrderBiquadQFactors } from 'src/synthDesigner/biquadFilterModule';
 
 const ctx = new AudioContext();
 const DATA_SIZE = 512;
@@ -35,34 +40,27 @@ const scaleValue = (x: number) =>
   Math.exp(Math.log(min) + ((Math.log(max) - Math.log(min)) * (x / DATA_SIZE) * 100) / 100);
 const FREQUENCIES = new Float32Array(DATA_SIZE).map((_, i) => scaleValue(i));
 
-const buildDefaultFilter = (type: FilterType.Lowpass | FilterType.Highpass, Q: number) => ({
-  type,
-  frequency: 440,
-  detune: 0,
-  gain: 0,
-  Q,
-});
-
-// higher-order filter Q factors determined using this: https://www.earlevel.com/main/2016/09/29/cascading-filters/
 const Presets: { name: string; preset: SerializedFilterDesigner }[] = [
   {
     name: 'init',
     preset: {
-      filters: [buildDefaultFilter(FilterType.Lowpass, 0.70710678)],
+      filters: [buildDefaultFilter(FilterType.Lowpass, computeHigherOrderBiquadQFactors(2)[0])],
       lockedFrequency: null,
     },
   },
   {
     name: 'order 4 LP',
     preset: {
-      filters: [0.5411961, 1.306563].map(q => buildDefaultFilter(FilterType.Lowpass, q)),
+      filters: computeHigherOrderBiquadQFactors(4).map(q =>
+        buildDefaultFilter(FilterType.Lowpass, q)
+      ),
       lockedFrequency: 440,
     },
   },
   {
     name: 'order 8 LP',
     preset: {
-      filters: [0.50979558, 0.60134489, 0.89997622, 2.5629154].map(q =>
+      filters: computeHigherOrderBiquadQFactors(8).map(q =>
         buildDefaultFilter(FilterType.Lowpass, q)
       ),
       lockedFrequency: 440,
@@ -71,30 +69,25 @@ const Presets: { name: string; preset: SerializedFilterDesigner }[] = [
   {
     name: 'order 16 LP',
     preset: {
-      filters: [
-        0.50241929,
-        0.52249861,
-        0.56694403,
-        0.64682178,
-        0.78815462,
-        1.0606777,
-        1.7224471,
-        5.1011486,
-      ].map(q => buildDefaultFilter(FilterType.Lowpass, q)),
+      filters: computeHigherOrderBiquadQFactors(16).map(q =>
+        buildDefaultFilter(FilterType.Lowpass, q)
+      ),
       lockedFrequency: 440,
     },
   },
   {
     name: 'order 4 HP',
     preset: {
-      filters: [0.5411961, 1.306563].map(q => buildDefaultFilter(FilterType.Highpass, q)),
+      filters: computeHigherOrderBiquadQFactors(4).map(q =>
+        buildDefaultFilter(FilterType.Highpass, q)
+      ),
       lockedFrequency: 440,
     },
   },
   {
     name: 'order 8 HP',
     preset: {
-      filters: [0.50979558, 0.60134489, 0.89997622, 2.5629154].map(q =>
+      filters: computeHigherOrderBiquadQFactors(8).map(q =>
         buildDefaultFilter(FilterType.Highpass, q)
       ),
       lockedFrequency: 440,
@@ -103,16 +96,9 @@ const Presets: { name: string; preset: SerializedFilterDesigner }[] = [
   {
     name: 'order 16 HP',
     preset: {
-      filters: [
-        0.50241929,
-        0.52249861,
-        0.56694403,
-        0.64682178,
-        0.78815462,
-        1.0606777,
-        1.7224471,
-        5.1011486,
-      ].map(q => buildDefaultFilter(FilterType.Highpass, q)),
+      filters: computeHigherOrderBiquadQFactors(16).map(q =>
+        buildDefaultFilter(FilterType.Highpass, q)
+      ),
       lockedFrequency: 440,
     },
   },

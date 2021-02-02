@@ -9,7 +9,13 @@ import { dbToLinear, linearToDb } from 'src/util';
 
 export enum FilterType {
   Lowpass = 'lowpass',
+  LP4 = 'order 4 lowpass',
+  LP8 = 'order 8 lowpass',
+  LP16 = 'order 16 lowpass',
   Highpass = 'highpass',
+  HP4 = 'order 4 highpass',
+  HP8 = 'order 8 highpass',
+  HP16 = 'order 16 highpass',
   Bandpass = 'bandpass',
   Lowshelf = 'lowshelf',
   Highshelf = 'highshelf',
@@ -62,7 +68,7 @@ const filterSettings = {
   frequency: {
     type: 'range',
     label: 'frequency',
-    min: 80,
+    min: 10,
     max: 24000,
     initial: 4400,
     scale: 'log',
@@ -101,16 +107,20 @@ export const getSettingsForFilterType = (
       filterSettings.type,
       filterSettings.frequency,
       filterSettings.detune,
-      ...{
-        [FilterType.Lowpass]: [filterSettings.q],
-        [FilterType.Highpass]: [filterSettings.q],
-        [FilterType.Bandpass]: [filterSettings.q],
-        [FilterType.Lowshelf]: [filterSettings.gain],
-        [FilterType.Highshelf]: [filterSettings.gain],
-        [FilterType.Peaking]: [filterSettings.gain, filterSettings.q],
-        [FilterType.Notch]: [filterSettings.q],
-        [FilterType.Allpass]: [filterSettings.q],
-      }[filterType],
+      ...(() => {
+        switch (filterType) {
+          case FilterType.Lowshelf:
+          case FilterType.Highshelf: {
+            return [filterSettings.gain];
+          }
+          case FilterType.Peaking: {
+            return [filterSettings.gain, filterSettings.q];
+          }
+          default: {
+            return [filterSettings.q];
+          }
+        }
+      })(),
       includeADSR
         ? {
             type: 'range',
@@ -129,3 +139,11 @@ export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
     (acc, { label, initial }) => ({ ...acc, [label]: initial }),
     {}
   ) as FilterParams;
+
+export const buildDefaultFilter = (type: FilterType.Lowpass | FilterType.Highpass, Q: number) => ({
+  type,
+  frequency: 440,
+  detune: 0,
+  gain: 0,
+  Q,
+});

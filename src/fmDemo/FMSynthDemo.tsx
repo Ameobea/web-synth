@@ -12,7 +12,7 @@ import { AsyncOnce, midiToFrequency } from 'src/util';
 import './fmDemo.scss';
 import { ADSRValues, ControlPanelADSR, defaultAdsrEnvelope } from 'src/controls/adsr';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
-import FilterConfig from 'src/fmDemo/FilterConfig';
+import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import { initSentry } from 'src/sentry';
@@ -36,12 +36,28 @@ export interface SerializedFMSynthDemoState {
 
 const VOICE_COUNT = 10;
 
+const GlobalState: {
+  octaveOffset: number;
+  globalVolume: number;
+  filterParams: FilterParams;
+  filterEnvelope: ADSRValues;
+  filterBypassed: boolean;
+  filterEnvelopeLenMs: number;
+} = {
+  octaveOffset: 1,
+  globalVolume: 0.2,
+  filterParams: getDefaultFilterParams(FilterType.Lowpass),
+  filterEnvelope: { ...defaultAdsrEnvelope },
+  filterBypassed: false,
+  filterEnvelopeLenMs: 1000,
+};
+
 const ctx = new AudioContext();
 const mainGain = new GainNode(ctx);
 mainGain.gain.value = 0.1;
 const filters = new Array(VOICE_COUNT).fill(null).map(() => {
-  const filter = new BiquadFilterNode(ctx);
-  filter.connect(mainGain);
+  const filter = new FilterContainer(ctx, GlobalState.filterParams);
+  filter.getOutput().connect(mainGain);
   return filter;
 });
 
@@ -62,22 +78,6 @@ let polySynthMod: PromiseResolveType<ReturnType<typeof PolysynthMod.get>>;
 
 // Start fetching immediately
 PolysynthMod.get();
-
-const GlobalState: {
-  octaveOffset: number;
-  globalVolume: number;
-  filterParams: FilterParams;
-  filterEnvelope: ADSRValues;
-  filterBypassed: boolean;
-  filterEnvelopeLenMs: number;
-} = {
-  octaveOffset: 1,
-  globalVolume: 0.2,
-  filterParams: getDefaultFilterParams(FilterType.Lowpass),
-  filterEnvelope: { ...defaultAdsrEnvelope },
-  filterBypassed: false,
-  filterEnvelopeLenMs: 1000,
-};
 
 const serializeState = () => {
   const serialized: SerializedFMSynthDemoState = {
@@ -128,7 +128,7 @@ const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   if (filterBypassed) {
     gain.connect(mainGain);
   } else {
-    gain.connect(filters[voiceIx]);
+    gain.connect(filters[voiceIx].getInput());
   }
   return gain;
 });
@@ -146,22 +146,14 @@ const adsrs = new Array(VOICE_COUNT).fill(null).map((_i, i) => {
 });
 const filterAdsrs = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const adsr = new ADSRModule(ctx, { minValue: 0, maxValue: 10000, lengthMs: 1000 });
-  adsr.connect(filters[voiceIx].frequency);
+  adsr.connect(filters[voiceIx].csns.frequency.manualControl.offset);
   adsr.start();
   return adsr;
 });
 
-const initFilterFromGlobalState = (filter: BiquadFilterNode) => {
-  filter.frequency.value = GlobalState.filterParams.frequency ?? 1000;
-  filter.detune.value = GlobalState.filterParams.detune ?? 0;
-  filter.Q.value = GlobalState.filterParams.Q ?? 0;
-  filter.type = GlobalState.filterParams.type;
-  filter.gain.value = GlobalState.filterParams.gain ?? 0;
-};
-
 if (!R.isNil(serialized?.filterParams)) {
   GlobalState.filterParams = serialized!.filterParams;
-  filters.forEach(initFilterFromGlobalState);
+  filters.forEach(filter => filter.setAll(GlobalState.filterParams));
 }
 if (!R.isNil(serialized?.filterEnvelope)) {
   GlobalState.filterEnvelope = serialized!.filterEnvelope;
@@ -267,7 +259,7 @@ const FMSynthDemo: React.FC = () => {
     GlobalState.filterEnvelope = preset.filterEnvelope;
     GlobalState.filterParams = preset.filterParams;
     GlobalState.filterEnvelopeLenMs = preset.filterEnvelopeLenMs;
-    filters.forEach(initFilterFromGlobalState);
+    filters.forEach(filter => filter.setAll(GlobalState.filterParams));
 
     // Disconnect main output to avoid any horrific artifacts while we're switching
     mainGain.disconnect(limiter);
@@ -434,13 +426,13 @@ const FMSynthDemo: React.FC = () => {
 
             if (bypass && !GlobalState.filterBypassed) {
               voiceGains.forEach((node, voiceIx) => {
-                node.disconnect(filters[voiceIx]);
+                node.disconnect(filters[voiceIx].getInput());
                 node.connect(mainGain);
               });
             } else if (!bypass && GlobalState.filterBypassed) {
               voiceGains.forEach((node, voiceIx) => {
                 node.disconnect(mainGain);
-                node.connect(filters[voiceIx]);
+                node.connect(filters[voiceIx].getInput());
               });
             }
             GlobalState.filterBypassed = bypass;

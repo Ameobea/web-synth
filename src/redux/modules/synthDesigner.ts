@@ -13,12 +13,17 @@ import WaveTable, {
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { AsyncOnce, base64ArrayBuffer, linearToDb } from 'src/util';
+import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
+import {
+  AbstractFilterModule,
+  buildAbstractFilterModule,
+  FilterCSNs,
+} from 'src/synthDesigner/biquadFilterModule';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
   synthModule.voices.forEach(voice => {
@@ -69,13 +74,6 @@ export interface FilterParams {
   detune: number;
 }
 
-export interface FilterCSNs {
-  frequency: ConstantSourceNode;
-  Q: ConstantSourceNode;
-  gain: ConstantSourceNode;
-  detune: ConstantSourceNode;
-}
-
 export interface Voice {
   oscillators: OscillatorNode[];
   wavetable: WaveTable | null;
@@ -83,7 +81,7 @@ export interface Voice {
   // The node that is connected to whatever the synth module as a whole is connected to.  Its
   // source is either the end of the effects chain or the inner gain node.
   outerGainNode: GainNode;
-  filterNode: BiquadFilterNode;
+  filterNode: AbstractFilterModule;
   gainADSRModule: ADSRModule;
   filterADSRModule: ADSRModule;
   lastGateOrUngateTime: number;
@@ -129,30 +127,33 @@ const ctx = new AudioContext();
 
 const VOICE_COUNT = 10 as const;
 
+/**
+ * @returns a new array of filters to replace the old ones if new ones had to be created due to the
+ * filter type changing, `null` otherwise
+ */
 function updateFilterNode<K extends keyof FilterParams>(
-  nodes: BiquadFilterNode[],
+  filters: AbstractFilterModule[],
   csns: FilterCSNs,
   key: K,
   val: FilterParams[K]
-) {
+): AbstractFilterModule[] | null {
   switch (key) {
     case 'type': {
-      nodes.forEach(node => {
-        node.type = val as FilterType;
-      });
-      break;
+      filters.forEach(filter => filter.destroy());
+      return R.range(0, filters.length).map(() => buildAbstractFilterModule(ctx, val as any, csns));
     }
     case 'adsr':
     case 'bypass':
     case 'adsr length ms':
-      break;
+      return null;
     case 'q':
     case 'Q':
-      csns.Q.offset.setValueAtTime(linearToDb(val as number), ctx.currentTime);
-      break;
+      csns.Q.manualControl.offset.value = (val as any) ?? 0;
+      return null;
     default: {
-      const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>];
-      param.offset.setValueAtTime(val as number, ctx.currentTime);
+      const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>].manualControl;
+      param.offset.value = val as number;
+      return null;
     }
   }
 }
@@ -273,22 +274,42 @@ const disconnectWavetableInputControls = (
 };
 
 const connectOscillators = (connect: boolean, synth: SynthModule) =>
-  synth.voices.forEach(voice =>
-    voice.oscillators.forEach(osc => {
-      try {
-        if (connect) {
-          osc.connect(synth.filterBypassed ? voice.outerGainNode : voice.filterNode);
-        } else {
-          osc.disconnect(synth.filterBypassed ? voice.outerGainNode : voice.filterNode);
-        }
-      } catch (err) {
-        console.error(
-          `Error ${connect ? 'connecting' : 'disconnecting'} oscillator and filter: `,
-          err
-        );
+  synth.voices.forEach((voice, voiceIx) => {
+    const voiceDst = synth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput();
+
+    if (synth.waveform === Waveform.Wavetable && voice.wavetable) {
+      const wavetableOutput = voice.wavetable.buildConnectables().outputs.get('output')?.node as
+        | AudioNode
+        | undefined;
+      if (connect) {
+        wavetableOutput?.connect(voiceDst);
+      } else {
+        wavetableOutput?.disconnect();
       }
-    })
-  );
+    } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
+      const fmSynthAWPNode = synth.fmSynth.getAWPNode();
+      if (connect) {
+        fmSynthAWPNode?.connect(voiceDst, voiceIx);
+      } else {
+        fmSynthAWPNode?.disconnect();
+      }
+    } else {
+      voice.oscillators.forEach(osc => {
+        try {
+          if (connect) {
+            osc.connect(voiceDst);
+          } else {
+            osc.disconnect();
+          }
+        } catch (err) {
+          console.error(
+            `Error ${connect ? 'connecting' : 'disconnecting'} oscillator and filter: `,
+            err
+          );
+        }
+      });
+    }
+  });
 
 export interface SynthDesignerState {
   synths: SynthModule[];
@@ -300,32 +321,33 @@ export interface SynthDesignerState {
 }
 
 const buildDefaultFilterCSNs = (): FilterCSNs => ({
-  frequency: new ConstantSourceNode(ctx),
-  Q: new ConstantSourceNode(ctx),
-  gain: new ConstantSourceNode(ctx),
-  detune: new ConstantSourceNode(ctx),
+  frequency: new OverridableAudioParam(ctx),
+  Q: new OverridableAudioParam(ctx),
+  gain: new OverridableAudioParam(ctx),
+  detune: new OverridableAudioParam(ctx),
 });
 
 const buildDefaultFilterModule = (
+  filterType: FilterType,
   filterCSNs: FilterCSNs,
   filterADSRModule?: ADSRModule
 ): {
   filterParams: FilterParams;
-  filterNode: BiquadFilterNode;
+  filterNode: AbstractFilterModule;
 } => {
-  const filterNode = new BiquadFilterNode(ctx);
-  const filterParams = getDefaultFilterParams(FilterType.Lowpass);
-  filterParams.type = Option.of(filterParams.type).getOrElse(FilterType.Lowpass);
-  if (filterADSRModule) {
-    filterCSNs.frequency.connect(filterADSRModule.offset);
-  }
-  filterCSNs.Q.connect(filterNode.Q);
-  filterCSNs.gain.connect(filterNode.gain);
-  filterCSNs.detune.connect(filterNode.detune);
+  const filterNode = buildAbstractFilterModule(ctx, filterType, filterCSNs);
+  const filterParams = getDefaultFilterParams(filterType);
+  filterParams.type = Option.of(filterParams.type).getOrElse(filterType);
+  // TODO: This will need to be connected better
+  // if (filterADSRModule) {
+  //   filterCSNs.frequency.connect(filterADSRModule.offset);
+  // }
 
-  Object.entries(filterParams).forEach(([key, val]) =>
-    updateFilterNode([filterNode], filterCSNs, key as keyof typeof filterParams, val)
-  );
+  Object.entries(filterParams)
+    .filter(([k, _v]) => k !== 'type')
+    .forEach(([key, val]) =>
+      updateFilterNode([filterNode], filterCSNs, key as keyof typeof filterParams, val)
+    );
 
   return { filterParams, filterNode };
 };
@@ -345,10 +367,9 @@ const setUnisonSpread = (synth: SynthModule, spreadCents: number) => {
   });
 };
 
-const buildDefaultSynthModule = (): SynthModule => {
+const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
-  const { filterParams, filterNode } = buildDefaultFilterModule(filterCSNs);
-  filterNode.disconnect();
+  const { filterParams } = buildDefaultFilterModule(filterType, filterCSNs);
 
   const masterGain = 0.0;
   const inst: SynthModule = {
@@ -368,9 +389,9 @@ const buildDefaultSynthModule = (): SynthModule => {
       });
       filterADSRModule.start();
 
-      const { filterNode } = buildDefaultFilterModule(filterCSNs, filterADSRModule);
-      filterADSRModule.connect(filterNode.frequency);
-      filterNode.connect(outerGainNode);
+      const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs, filterADSRModule);
+      // TODO: Connect ADSR once we can do so intelligently
+      filterNode.getOutput().connect(outerGainNode);
 
       const osc = new OscillatorNode(ctx);
       osc.start();
@@ -427,11 +448,6 @@ const buildDefaultSynthModule = (): SynthModule => {
   // Connect up + start all the CSNs
   inst.voices.flatMap(R.prop('oscillators')).forEach(osc => inst.detuneCSN.connect(osc.detune));
   inst.detuneCSN.start();
-
-  filterCSNs.detune.start();
-  filterCSNs.frequency.start();
-  filterCSNs.gain.start();
-  filterCSNs.Q.start();
 
   return inst;
 };
@@ -494,7 +510,7 @@ export const deserializeSynthModule = (
     ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void),
   synthIx: number
 ): SynthModule => {
-  const base = buildDefaultSynthModule();
+  const base = buildDefaultSynthModule(filterParams.type);
   const wavetableConf = {
     ...buildDefaultWavetableConfig(),
     ...baseWavetableConfig,
@@ -506,10 +522,12 @@ export const deserializeSynthModule = (
       osc.disconnect();
     });
 
-    voice.filterNode.connect(voice.outerGainNode);
-    Object.entries(filterParams).forEach(([key, val]: [keyof typeof filterParams, any]) =>
-      updateFilterNode([voice.filterNode], base.filterCSNs, key, val)
-    );
+    voice.filterNode.getOutput().connect(voice.outerGainNode);
+    Object.entries(filterParams)
+      .filter(([k, _v]) => k !== 'type')
+      .forEach(([key, val]: [keyof typeof filterParams, any]) =>
+        updateFilterNode([voice.filterNode], base.filterCSNs, key, val)
+      );
 
     voice.gainADSRModule.setEnvelope(gainEnvelope);
     voice.gainADSRModule.setLengthMs(gainADSRLength ?? 1000);
@@ -517,7 +535,7 @@ export const deserializeSynthModule = (
 
     voice.filterADSRModule.setEnvelope(filterEnvelope);
     voice.filterADSRModule.setLengthMs(filterADSRLength ?? 1000);
-    voice.filterADSRModule.connect(voice.filterNode.frequency);
+    // TODO: Connect filter ADSR module once we can do so intelligently
 
     return {
       ...voice,
@@ -528,7 +546,7 @@ export const deserializeSynthModule = (
         osc.detune.setValueAtTime(0, ctx.currentTime);
         base.detuneCSN.connect(osc.detune);
         osc.start();
-        osc.connect(filterBypassed ? voice.outerGainNode : voice.filterNode);
+        osc.connect(filterBypassed ? voice.outerGainNode : voice.filterNode.getInput());
         return osc;
       }),
       wavetable:
@@ -573,6 +591,9 @@ export const deserializeSynthModule = (
     pitchMultiplier: pitchMultiplier ?? 1,
     unisonSpreadCents,
   };
+  connectOscillators(false, synthModule);
+  connectOscillators(true, synthModule);
+
   setUnisonSpread(synthModule, unisonSpreadCents);
   return synthModule;
 };
@@ -581,7 +602,7 @@ export const getInitialSynthDesignerState = (
   addInitialSynth: boolean,
   vcId: string
 ): SynthDesignerState => ({
-  synths: addInitialSynth ? [buildDefaultSynthModule()] : [],
+  synths: addInitialSynth ? [buildDefaultSynthModule(FilterType.Lowpass)] : [],
   wavyJonesInstance: undefined,
   spectrumNode: new AnalyserNode(new AudioContext()),
   isHidden: false,
@@ -724,7 +745,7 @@ const actionGroups = {
 
           try {
             workletHandle.disconnect(
-              targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode
+              targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput()
             );
             voice.wavetable!.shutdown();
             voice.wavetable = null;
@@ -774,7 +795,7 @@ const actionGroups = {
   ADD_SYNTH_MODULE: buildActionGroup({
     actionCreator: () => ({ type: 'ADD_SYNTH_MODULE' }),
     subReducer: (state: SynthDesignerState) => {
-      const newModule = buildDefaultSynthModule();
+      const newModule = buildDefaultSynthModule(FilterType.Lowpass);
 
       return {
         ...state,
@@ -814,7 +835,7 @@ const actionGroups = {
           .map(R.prop('effect'))
           .map(R.prop('node'))
           // TODO: Should work with filter bypassing and probably go after the filter in that case.
-          .getOrElse(voice.filterNode);
+          .getOrElse(voice.filterNode.getOutput());
 
         synthOutput.disconnect();
         synthOutput.connect(effect.node);
@@ -868,7 +889,7 @@ const actionGroups = {
           .map(R.prop('effect'))
           .map(R.prop('node'))
           // TODO: Should work with filter bypassing and probably go after the filter in that case.
-          .getOrElse(voice.filterNode);
+          .getOrElse(voice.filterNode.getOutput());
         const newDst = Option.of(voice.effects[effectIndex + 1])
           .map(R.prop('effect'))
           .map(R.prop('node'))
@@ -1063,7 +1084,9 @@ const actionGroups = {
           voice.oscillators.push(osc);
           targetSynth.detuneCSN.connect(osc.detune);
           osc.start();
-          osc.connect(targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode);
+          osc.connect(
+            targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput()
+          );
         }
 
         const newSynth = { ...voice, oscillators: [...voice.oscillators] };
@@ -1228,17 +1251,26 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, key, val }) => {
       const targetSynth = getSynth(synthIx, state.synths);
 
-      updateFilterNode(
+      const newSynth = {
+        ...targetSynth,
+        filterParams: { ...targetSynth.filterParams, ...targetSynth.filterParams, [key]: val },
+      };
+      const newFilters = updateFilterNode(
         targetSynth.voices.map(R.prop('filterNode')),
         targetSynth.filterCSNs,
         key as keyof FilterParams,
         val
       );
+      if (newFilters) {
+        connectOscillators(false, targetSynth);
+        newSynth.voices = newSynth.voices.map((voice, voiceIx) => ({
+          ...voice,
+          filterNode: newFilters[voiceIx],
+        }));
+        newSynth.voices.forEach(voice => voice.filterNode.getOutput().connect(voice.outerGainNode));
+        connectOscillators(true, newSynth);
+      }
 
-      const newSynth = {
-        ...targetSynth,
-        filterParams: { ...targetSynth.filterParams, ...targetSynth.filterParams, [key]: val },
-      };
       return setSynth(synthIx, newSynth, state);
     },
   }),
@@ -1322,7 +1354,7 @@ const actionGroups = {
 
       const builtVoice: SynthModule = preset
         ? deserializeSynthModule(preset, dispatch, synthIx)
-        : buildDefaultSynthModule();
+        : buildDefaultSynthModule(FilterType.Lowpass);
 
       return { ...state, synths: R.set(R.lensIndex(synthIx), builtVoice, state.synths) };
     },
@@ -1374,7 +1406,7 @@ const actionGroups = {
 
       try {
         targetVoice.wavetable.workletHandle.connect(
-          targetSynth.filterBypassed ? targetVoice.outerGainNode : targetVoice.filterNode
+          targetSynth.filterBypassed ? targetVoice.outerGainNode : targetVoice.filterNode.getInput()
         );
       } catch (err) {
         console.error('Error connecting wavetable to `filterNode`: ', err);
@@ -1395,13 +1427,7 @@ const actionGroups = {
       }
 
       connectOscillators(false, targetSynth);
-      const fmSynthAWPNode = targetSynth.fmSynth.getAWPNode()!;
-      targetSynth.voices.forEach((voice, voiceIx) =>
-        fmSynthAWPNode.connect(
-          targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode,
-          voiceIx
-        )
-      );
+      connectOscillators(true, targetSynth);
 
       setTimeout(() => {
         const newConnectables = get_synth_designer_audio_connectables(
@@ -1499,36 +1525,11 @@ const actionGroups = {
         return state;
       }
 
-      targetSynth.voices.forEach((voice, voiceIx) => {
-        if (targetSynth.waveform === Waveform.Wavetable) {
-          voice.wavetable?.workletHandle?.disconnect(
-            filterBypassed ? voice.filterNode : voice.outerGainNode
-          );
-          voice.wavetable?.workletHandle?.connect(
-            filterBypassed ? voice.outerGainNode : voice.filterNode
-          );
-          return;
-        } else if (targetSynth.waveform === Waveform.FM && targetSynth.fmSynth) {
-          const fmSynthAWPNode = targetSynth.fmSynth.getAWPNode();
-          if (!fmSynthAWPNode) {
-            return;
-          }
+      connectOscillators(false, targetSynth);
+      const newSynth = { ...targetSynth, filterBypassed };
+      connectOscillators(true, newSynth);
 
-          fmSynthAWPNode.disconnect(
-            filterBypassed ? voice.filterNode : voice.outerGainNode,
-            voiceIx
-          );
-          fmSynthAWPNode.connect(filterBypassed ? voice.outerGainNode : voice.filterNode, voiceIx);
-          return;
-        }
-
-        voice.oscillators.forEach(osc => {
-          osc.disconnect(filterBypassed ? voice.filterNode : voice.outerGainNode);
-          osc.connect(filterBypassed ? voice.outerGainNode : voice.filterNode);
-        });
-      });
-
-      return setSynth(synthIx, { ...targetSynth, filterBypassed }, state);
+      return setSynth(synthIx, newSynth, state);
     },
   }),
   SET_GAIN_ADSR_LENGTH: buildActionGroup({

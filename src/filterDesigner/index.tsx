@@ -122,7 +122,7 @@ export const get_filter_designer_audio_connectables = (
     return create_empty_audio_connectables(vcId);
   }
 
-  return dbg({
+  return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>().set('input', {
       type: 'customAudio',
@@ -132,5 +132,5 @@ export const get_filter_designer_audio_connectables = (
       type: 'customAudio',
       node: state.filters[state.filters.length - 1].filter,
     }),
-  });
+  };
 };

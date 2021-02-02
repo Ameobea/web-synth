@@ -1,7 +1,6 @@
 import * as R from 'ramda';
 
 import { FilterParams } from 'src/redux/modules/synthDesigner';
-import { linearToDb } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -45,7 +44,7 @@ export const setFilter = (
   lockedFrequency: number | null | undefined
 ) => {
   filter.type = params.type;
-  filter.Q.value = linearToDb(params.Q ?? 0);
+  filter.Q.value = params.Q ?? 0;
   filter.detune.value = params.detune;
   filter.gain.value = params.gain;
   if (!R.isNil(lockedFrequency)) {
