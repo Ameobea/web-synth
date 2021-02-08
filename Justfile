@@ -32,6 +32,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
   cp ./engine/build/* ./src
   yarn build || npm build
 
@@ -55,6 +56,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
   yarn start
 
 run-frontend:

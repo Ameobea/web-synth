@@ -4,10 +4,14 @@ use std::rc::Rc;
 
 use dsp::even_faster_pow;
 
+#[cfg(feature = "exports")]
+pub mod exports;
+
 extern "C" {
     pub fn debug1(v1: f32, v2: f32, v3: f32);
 }
 
+/// Samples per second
 const SAMPLE_RATE: usize = 44_100;
 pub const RENDERED_BUFFER_SIZE: usize = SAMPLE_RATE;
 const FRAME_SIZE: usize = 128;
@@ -270,4 +274,11 @@ impl Adsr {
 
     /// After setting steps, the shared buffer must be re-rendered.
     pub fn set_steps(&mut self, new_steps: Vec<AdsrStep>) { self.steps = new_steps; }
+
+    pub fn set_release_start_phase(&mut self, new_release_start_phase: f32) {
+        self.release_start_phase = match self.loop_point {
+            Some(loop_point) => new_release_start_phase.max(loop_point),
+            _ => new_release_start_phase,
+        };
+    }
 }

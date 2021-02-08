@@ -9,3 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dsp = {path = "../dsp" }
+
+[features]
+exports = []
+default = []

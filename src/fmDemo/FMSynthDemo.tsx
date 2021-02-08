@@ -5,12 +5,12 @@ import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
 import { ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { AsyncOnce, midiToFrequency } from 'src/util';
 import './fmDemo.scss';
-import { ADSRValues, ControlPanelADSR, defaultAdsrEnvelope } from 'src/controls/adsr';
+import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { FilterParams } from 'src/redux/modules/synthDesigner';
@@ -19,6 +19,7 @@ import { initSentry } from 'src/sentry';
 import { Presets } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { useWindowSize } from 'src/reactUtils';
+import ControlPanelADSR2 from 'src/controls/adsr2/ControlPanelADSR2';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();
 
@@ -26,7 +27,7 @@ export interface SerializedFMSynthDemoState {
   synth: ReturnType<typeof _getSerializeType>;
   octaveOffset: number;
   globalVolume: number;
-  gainEnvelope: ADSRValues;
+  gainEnvelope: ADSRValues | Adsr;
   gainEnvelopeLengthMS: number;
   filterParams: FilterParams;
   filterEnvelope: ADSRValues;
@@ -336,7 +337,7 @@ const FMSynthDemo: React.FC = () => {
                 type: 'custom',
                 label: 'volume envelope',
                 initial: serialized?.gainEnvelope ?? defaultAdsrEnvelope,
-                Comp: ControlPanelADSR,
+                Comp: ControlPanelADSR2,
               },
             ]}
             onChange={(key: string, val: any) => {

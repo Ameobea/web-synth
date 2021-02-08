@@ -1,8 +1,8 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import ADSR2 from 'src/controls/adsr2/adsr2';
 
+import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
