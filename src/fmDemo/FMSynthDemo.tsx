@@ -7,7 +7,7 @@ import * as R from 'ramda';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
-import { ADSRModule } from 'src/synthDesigner/ADSRModule';
+import { ADSR2Module, ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { AsyncOnce, midiToFrequency } from 'src/util';
 import './fmDemo.scss';
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
@@ -134,7 +134,13 @@ const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   return gain;
 });
 const adsrs = new Array(VOICE_COUNT).fill(null).map((_i, i) => {
-  const adsr = new ADSRModule(ctx, { minValue: 0, maxValue: 1, lengthMs: 1000 });
+  const adsr = new ADSR2Module(ctx, {
+    minValue: 0,
+    maxValue: 1,
+    lengthMs: 1000,
+    loopPoint: null,
+    releaseStartPhase: 0.7,
+  });
   adsr.connect(voiceGains[i].gain);
   if (!R.isNil(serialized?.gainEnvelopeLengthMS)) {
     adsr.setLengthMs(serialized!.gainEnvelopeLengthMS);
