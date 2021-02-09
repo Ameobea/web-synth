@@ -80,8 +80,8 @@ jobs:
       # Build all Rust modules into Wasm, run `wasm-bindgen`, compile JavaScript, and link everything together
       - name: Install node modules
         run: yarn
-      - name: Install Gatsby
-        run: yarn global add gatsby
+      - name: Install docs node modules
+        run: cd docs/_layouts && yarn
       - name: Build all wasm + javascript
         run: just build-all
         env:
