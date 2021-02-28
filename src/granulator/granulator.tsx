@@ -155,9 +155,7 @@ export const get_granulator_audio_connectables = (vcId: string): AudioConnectabl
   };
 };
 
-const GranularWasm = new AsyncOnce(async () =>
-  fetch('/granular.wasm').then(res => res.arrayBuffer())
-);
+const GranularWasm = new AsyncOnce(() => fetch('/granular.wasm').then(res => res.arrayBuffer()));
 
 export const init_granulator = async (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;

@@ -845,21 +845,27 @@ class ADSR2Instance {
 interface ADSR2Props {
   width?: number;
   height?: number;
-  initialState: Adsr;
-  onChange: (newState: Adsr) => void;
-  outputRange: [number, number];
+  initialState: Adsr & { outputRange: [number, number] };
+  onChange: (newState: Adsr & { outputRange: [number, number] }) => void;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
 
-const ADSR2: React.FC<ADSR2Props> = ({
-  width = 600,
-  height = 480,
-  initialState,
-  onChange,
-  outputRange: [outputRangeStart, outputRangeEnd],
-}) => {
+export const buildDefaultADSR2Envelope = (audioThreadData: AudioThreadData): Adsr => ({
+  steps: [
+    { x: 0, y: 0.2, ramper: { type: 'exponential', exponent: 0.5 } },
+    { x: 0.5, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
+    { x: 1, y: 0.2, ramper: { type: 'exponential', exponent: 0.5 } },
+  ],
+  lenSamples: 44_100,
+  loopPoint: 0,
+  releasePoint: 0.7,
+  audioThreadData,
+});
+
+const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, onChange }) => {
   const instance = useRef<ADSR2Instance | null>(null);
+  const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
 
   useEffect(() => {
     if (!instance.current || !initialState) {

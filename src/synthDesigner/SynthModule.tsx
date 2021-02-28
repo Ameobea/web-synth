@@ -218,6 +218,10 @@ const SynthModuleCompInner: React.FC<{
   const unison = synth.voices[0].oscillators.length;
   const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
+  const filterEnvelope = useMemo(
+    () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
+    [synth.filterEnvelope]
+  );
 
   return (
     <div className='synth-module'>
@@ -318,7 +322,7 @@ const SynthModuleCompInner: React.FC<{
       <FilterModule
         synthIx={index}
         params={synth.filterParams}
-        filterEnvelope={synth.filterEnvelope}
+        filterEnvelope={filterEnvelope}
         stateKey={stateKey}
         bypass={synth.filterBypassed}
       />

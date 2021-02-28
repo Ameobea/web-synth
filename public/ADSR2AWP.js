@@ -81,6 +81,13 @@ class ADSR2AWP extends AudioWorkletProcessor {
     };
   }
 
+  getWasmMemoryBuffer() {
+    if (this.wasmMemoryBuffer.buffer !== this.wasmInstance.exports.memory.buffer) {
+      this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+    }
+    return this.wasmMemoryBuffer;
+  }
+
   setEncodedSteps(encodedSteps) {
     if (encodedSteps.length % 4 !== 0) {
       throw new Error('Expected encoded steps length to be divisible by 4');
@@ -118,7 +125,7 @@ class ADSR2AWP extends AudioWorkletProcessor {
     }
 
     const ptr = this.wasmInstance.exports.process_adsr(this.ctxPtr);
-    const outputsSlice = this.wasmMemoryBuffer.subarray(
+    const outputsSlice = this.getWasmMemoryBuffer().subarray(
       ptr / BYTES_PER_F32,
       ptr / BYTES_PER_F32 + FRAME_SIZE
     );

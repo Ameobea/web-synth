@@ -1,30 +1,37 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import * as R from 'ramda';
 
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import { ADSRValues } from 'src/controls/adsr';
 import { getReduxInfra } from 'src/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 const Filter: React.FC<{
   params: FilterParams;
   synthIx: number;
-  filterEnvelope: ADSRValues;
+  filterEnvelope: Adsr & { outputRange: [number, number] };
   bypass: boolean;
   stateKey: string;
 }> = ({ params, synthIx, filterEnvelope, bypass, stateKey }) => {
   const settings = useMemo(() => getSettingsForFilterType(params.type), [params.type]);
-  const state = useMemo(() => ({ ...params, adsr: filterEnvelope, bypass }), [
-    params,
-    filterEnvelope,
-    bypass,
-  ]);
+  if (!filterEnvelope.outputRange) {
+    console.error('Missing `outputRange` on `filterEnvelope` provided to `<Filter />`');
+  }
+  const state = useMemo(() => {
+    const state = { ...params, adsr: filterEnvelope, bypass };
+    if (!R.isNil(state.Q) && Number.isNaN(state.Q)) {
+      console.warn('NaN Q found for filter; normalizing...');
+      state.Q = 1;
+    }
+    return state;
+  }, [params, filterEnvelope, bypass]);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return (
     <ControlPanel
       className='filter-control-panel'
-      style={{ width: 400 }}
+      style={{ width: 600 }}
       title='FILTER'
       settings={settings}
       state={state}

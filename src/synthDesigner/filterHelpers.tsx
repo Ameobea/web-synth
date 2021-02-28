@@ -3,9 +3,10 @@ import { filterNils } from 'ameo-utils';
 import * as R from 'ramda';
 import { Range } from 'react-control-panel';
 
-import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
+import ControlPanelADSR2 from 'src/controls/adsr2/ControlPanelADSR2';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
 export enum FilterType {
   Lowpass = 'lowpass',
@@ -32,18 +33,30 @@ export enum FilterType {
 const CustomQSetting: React.FC<{
   value: number;
   onChange: (newVal: number) => void;
-}> = ({ value, onChange }) => (
-  <Range
-    label='Q'
-    onChange={(newQ: number) => onChange(linearToDb(newQ))}
-    value={dbToLinear(value)}
-    min={0.01}
-    max={30}
-    steps={300}
-    scale='log'
-    initial={0.001}
-  />
-);
+}> = ({ value, onChange }) => {
+  if (R.isNil(value)) {
+    console.error('Nil `Q` value but Q control panel setting rendered; reseting to default...');
+    value = 1;
+  }
+  let linearQ = dbToLinear(value);
+  if (Number.isNaN(linearQ)) {
+    console.error('NaN `Q` value after converting from log to linear; logQ=' + value);
+    linearQ = 1;
+  }
+
+  return (
+    <Range
+      label='Q'
+      onChange={(newQ: number) => onChange(linearToDb(newQ))}
+      value={linearQ}
+      min={0.01}
+      max={30}
+      steps={300}
+      scale='log'
+      initial={0.001}
+    />
+  );
+};
 
 const filterSettings = {
   bypass: {
@@ -91,8 +104,8 @@ const filterSettings = {
   adsr: {
     type: 'custom',
     label: 'adsr',
-    initial: defaultAdsrEnvelope,
-    Comp: ControlPanelADSR,
+    initial: { ...buildDefaultADSR2Envelope({ phaseIndex: 0 }), outputRange: [0, 20_000] },
+    Comp: ControlPanelADSR2,
   },
 };
 

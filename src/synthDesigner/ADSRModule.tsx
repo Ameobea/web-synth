@@ -1,20 +1,24 @@
 import { UnreachableException } from 'ameo-utils';
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
-import { AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce } from 'src/util';
 
 const ADSR2AWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet.addModule(
-    '/ADSR2AWP.js?cacheBust=' + btoa(Math.random().toString())
+    '/ADSR2AWP.js' +
+      (window.location.href.includes('localhost')
+        ? ''
+        : '?cacheBust=' + btoa(Math.random().toString()))
   )
 );
-const ADSRWasm = new AsyncOnce(() =>
-  fetch(
-    '/adsr.wasm' + window.location.href.includes('localhost')
+const ADSRWasm = new AsyncOnce(() => {
+  const url =
+    '/adsr.wasm' +
+    (window.location.href.includes('localhost')
       ? ''
-      : `?cacheBust=${btoa(Math.random().toString())}`
-  ).then(res => res.arrayBuffer())
-);
+      : `?cacheBust=${btoa(Math.random().toString())}`);
+  return fetch(url).then(res => res.arrayBuffer());
+});
 
 export interface ADSR2Params {
   minValue?: number;
@@ -25,11 +29,17 @@ export interface ADSR2Params {
   steps: AdsrStep[];
 }
 
+const SAMPLE_RATE = 44_100;
+
 export class ADSR2Module {
   private ctx: AudioContext;
   private scale: GainNode;
   private shift: ConstantSourceNode;
   private awp: AudioWorkletNode | undefined;
+  /**
+   * Params that will be sent to the AWP to initialize it
+   */
+  private initParams: ADSR2Params;
 
   constructor(ctx: AudioContext, params: ADSR2Params) {
     this.ctx = ctx;
@@ -38,7 +48,8 @@ export class ADSR2Module {
     this.shift = new ConstantSourceNode(ctx);
     this.setOutputRange([params.minValue ?? 0, params.maxValue ?? 1]);
     this.shift.start();
-    this.init(params);
+    this.initParams = params;
+    this.init();
   }
 
   private static encodeADSRSteps(steps: AdsrStep[]): Float32Array {
@@ -52,16 +63,16 @@ export class ADSR2Module {
     return encoded;
   }
 
-  private async init(params: ADSR2Params) {
+  private async init() {
     const [wasmBytes] = await Promise.all([ADSRWasm.get(), ADSR2AWPRegistered.get()] as const);
     this.awp = new AudioWorkletNode(this.ctx, 'adsr2-awp');
     this.awp.port.postMessage({
       type: 'setWasmBytes',
       wasmBytes,
-      encodedSteps: ADSR2Module.encodeADSRSteps(params.steps),
-      loopPoint: params.loopPoint,
-      lenMs: params.lengthMs,
-      releaseStartPhase: params.releaseStartPhase,
+      encodedSteps: ADSR2Module.encodeADSRSteps(this.initParams.steps),
+      loopPoint: this.initParams.loopPoint,
+      lenMs: this.initParams.lengthMs,
+      releaseStartPhase: this.initParams.releaseStartPhase,
     });
     this.awp.connect(this.scale).connect(this.shift.offset);
   }
@@ -70,9 +81,16 @@ export class ADSR2Module {
     return this.shift;
   }
 
+  public setState(newState: Adsr) {
+    this.setSteps(newState.steps);
+    this.setLoopPoint(newState.loopPoint);
+    this.setReleaseStartPhase(newState.releasePoint);
+    this.setLengthMs((newState.lenSamples / SAMPLE_RATE) * 1000);
+  }
+
   public setSteps(newSteps: AdsrStep[]) {
     if (!this.awp) {
-      console.error('Tried to set new steps before AWP initialized');
+      this.initParams.steps = newSteps;
       return;
     }
     const encodedSteps = ADSR2Module.encodeADSRSteps(newSteps);
@@ -81,15 +99,15 @@ export class ADSR2Module {
 
   public setLoopPoint(newLoopPoint: number | null | undefined) {
     if (!this.awp) {
-      console.error("Can't set ADSR2 loop point before AWP is initialized");
+      this.initParams.loopPoint = newLoopPoint;
       return;
     }
     this.awp.port.postMessage({ type: 'setLoopPoint', loopPoint: newLoopPoint });
   }
 
-  public setReleaseStartPhase(newReleaseStartPhase: number | null | undefined) {
+  public setReleaseStartPhase(newReleaseStartPhase: number) {
     if (!this.awp) {
-      console.error("Can't set ADSR2 release start phase before AWP is initialized");
+      this.initParams.releaseStartPhase = newReleaseStartPhase;
       return;
     }
     this.awp.port.postMessage({
@@ -100,7 +118,7 @@ export class ADSR2Module {
 
   public setLengthMs(newLengthMs: number) {
     if (!this.awp) {
-      console.error('Failed to set ADSR2 length ms due to AWP not being initialized');
+      this.initParams.lengthMs = newLengthMs;
       return;
     }
     this.awp.port.postMessage({ type: 'setLenMs', lenMs: newLengthMs });

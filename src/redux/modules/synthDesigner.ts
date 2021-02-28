@@ -5,14 +5,14 @@ import { PromiseResolveType, UnimplementedError, UnreachableException } from 'am
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
-import { ADSRModule } from 'src/synthDesigner/ADSRModule';
+import { ADSR2Module, ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import WaveTable, {
   decodeWavetableDef,
   getDefaultWavetableDef,
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
-import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, base64ArrayBuffer } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
@@ -24,6 +24,7 @@ import {
   buildAbstractFilterModule,
   FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
 const disposeSynthModule = (synthModule: SynthModule) => {
   synthModule.voices.forEach(voice => {
@@ -83,7 +84,7 @@ export interface Voice {
   outerGainNode: GainNode;
   filterNode: AbstractFilterModule;
   gainADSRModule: ADSRModule;
-  filterADSRModule: ADSRModule;
+  filterADSRModule: ADSR2Module;
   lastGateOrUngateTime: number;
 }
 
@@ -117,7 +118,7 @@ export interface SynthModule {
   selectedEffectType: EffectType;
   gainEnvelope: ADSRValues;
   gainADSRLength: number;
-  filterEnvelope: ADSRValues;
+  filterEnvelope: Adsr;
   filterADSRLength: number;
   pitchMultiplier: number;
   unisonSpreadCents?: number;
@@ -327,10 +328,28 @@ const buildDefaultFilterCSNs = (): FilterCSNs => ({
   detune: new OverridableAudioParam(ctx),
 });
 
+const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
+  if (Object.keys(envelope).every(k => ['attack', 'decay', 'release'].includes(k))) {
+    const env = envelope as ADSRValues;
+    return {
+      steps: [env.attack, env.decay, env.release].map(s => ({
+        x: s.pos,
+        y: s.magnitude,
+        ramper: { type: 'exponential', exponent: 1 },
+      })),
+      lenSamples: 44_100,
+      loopPoint: null,
+      releasePoint: env.release.pos,
+      audioThreadData: { phaseIndex: 0 },
+    };
+  }
+  return envelope as Adsr;
+};
+
 const buildDefaultFilterModule = (
   filterType: FilterType,
   filterCSNs: FilterCSNs,
-  filterADSRModule?: ADSRModule
+  filterADSRModule?: ADSR2Module
 ): {
   filterParams: FilterParams;
   filterNode: AbstractFilterModule;
@@ -382,12 +401,13 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
       outerGainNode.gain.setValueAtTime(0, ctx.currentTime);
 
       // Start the filter ADSR module and configure it to modulate the voice's filter node's frequency
-      const filterADSRModule = new ADSRModule(ctx, {
+      const filterADSRModule = new ADSR2Module(ctx, {
         minValue: 0,
         maxValue: 10000,
         lengthMs: 2000,
+        steps: buildDefaultADSR2Envelope({ phaseIndex: 0 }).steps,
+        releaseStartPhase: 0.8,
       });
-      filterADSRModule.start();
 
       const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs, filterADSRModule);
       // TODO: Connect ADSR once we can do so intelligently
@@ -410,11 +430,11 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
       const dummyGain = new GainNode(ctx);
       dummyGain.gain.value = 0;
       dummyGain.connect(ctx.destination);
-      filterADSRModule.connect(dummyGain);
+      filterADSRModule.getOutput().connect(dummyGain);
       gainADSRModule.connect(dummyGain);
 
       setTimeout(() => {
-        filterADSRModule.disconnect(dummyGain);
+        filterADSRModule.getOutput().disconnect(dummyGain);
         gainADSRModule.disconnect(dummyGain);
         dummyGain.disconnect();
       }, 1000);
@@ -440,7 +460,7 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
     selectedEffectType: EffectType.Reverb,
     gainEnvelope: defaultAdsrEnvelope,
     gainADSRLength: 1000,
-    filterEnvelope: defaultAdsrEnvelope,
+    filterEnvelope: buildDefaultADSR2Envelope({ phaseIndex: 0 }),
     filterADSRLength: 1000,
     pitchMultiplier: 1,
   };
@@ -499,7 +519,7 @@ export const deserializeSynthModule = (
     selectedEffectType: EffectType;
     gainEnvelope: ADSRValues;
     gainADSRLength?: number;
-    filterEnvelope: ADSRValues;
+    filterEnvelope: ADSRValues | Adsr;
     filterADSRLength?: number;
     pitchMultiplier?: number;
     filterBypassed?: boolean;
@@ -533,7 +553,10 @@ export const deserializeSynthModule = (
     voice.gainADSRModule.setLengthMs(gainADSRLength ?? 1000);
     voice.gainADSRModule.setMaxValue(1 + masterGain);
 
-    voice.filterADSRModule.setEnvelope(filterEnvelope);
+    if ((filterEnvelope as any).attack) {
+      filterEnvelope = buildDefaultADSR2Envelope({ phaseIndex: 0 });
+    }
+    voice.filterADSRModule.setState(filterEnvelope as Adsr);
     voice.filterADSRModule.setLengthMs(filterADSRLength ?? 1000);
     // TODO: Connect filter ADSR module once we can do so intelligently
 
@@ -585,7 +608,7 @@ export const deserializeSynthModule = (
     selectedEffectType,
     gainEnvelope,
     gainADSRLength: gainADSRLength ?? 1000,
-    filterEnvelope,
+    filterEnvelope: normalizeEnvelope(filterEnvelope),
     filterADSRLength: filterADSRLength ?? 1000,
     filterParams,
     pitchMultiplier: pitchMultiplier ?? 1,
@@ -1149,14 +1172,14 @@ const actionGroups = {
     },
   }),
   SET_FILTER_ADSR: buildActionGroup({
-    actionCreator: (envelope: ADSRValues, synthIx: number) => ({
+    actionCreator: (envelope: Adsr, synthIx: number) => ({
       type: 'SET_FILTER_ADSR',
       envelope,
       synthIx,
     }),
     subReducer: (state: SynthDesignerState, { envelope, synthIx }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.voices.forEach(voice => voice.filterADSRModule.setEnvelope(envelope));
+      targetSynth.voices.forEach(voice => voice.filterADSRModule.setState(envelope));
 
       return setSynth(synthIx, { ...targetSynth, filterEnvelope: envelope }, state);
     },
@@ -1303,14 +1326,9 @@ const actionGroups = {
       state.synths.forEach(synth =>
         synth.voices.forEach(voice => {
           voice.gainADSRModule.offset.cancelScheduledValues(0);
-          voice.filterADSRModule.offset.cancelScheduledValues(0);
 
           voice.gainADSRModule.offset.linearRampToValueAtTime(
             voice.gainADSRModule.minValue,
-            ctx.currentTime + 1.5 / 1000
-          );
-          voice.filterADSRModule.offset.linearRampToValueAtTime(
-            voice.filterADSRModule.minValue,
             ctx.currentTime + 1.5 / 1000
           );
 
