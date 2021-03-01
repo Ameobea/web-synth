@@ -1,0 +1,6 @@
+[submodule "src/vocalSynthesis/sinsy"]
+	path = src/vocalSynthesis/sinsy
+	url = https://github.com/Ameobea/sinsy.git
+[submodule "src/vocalSynthesis/hts_engine_API"]
+	path = src/vocalSynthesis/hts_engine_API
+	url = https://github.com/Ameobea/hts_engine_API.git

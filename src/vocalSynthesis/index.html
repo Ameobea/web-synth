@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+  <script>
+    // From https://stackoverflow.com/a/33622881
+    const downloadURL = function(data, fileName) {
+      var a;
+      a = document.createElement('a');
+      a.href = data;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.style = 'display: none';
+      a.click();
+      a.remove();
+    };
+
+    const downloadBlob = function(data, fileName, mimeType) {
+      var blob, url;
+      blob = new Blob([data], {
+        type: mimeType
+      });
+      url = window.URL.createObjectURL(blob);
+      downloadURL(url, fileName);
+      setTimeout(function() {
+        return window.URL.revokeObjectURL(url);
+      }, 1000);
+    };
+
+    var Module = {};
+
+    const htsVoice = fetch(
+      /*'https://ameo.link/u/8tg.htsvoice'*/
+      'http://localhost:8080/8tg.htsvoice'
+    ).then(res => res.arrayBuffer());
+    const song = fetch('https://ameo.link/u/8th.xml').then(res => res.text());
+    const moduleLoaded = new Promise((resolve) => {
+      Module.onRuntimeInitialized = function() {
+        window.Module = Module;
+        console.log('loaded!');
+        resolve();
+      };
+    });
+
+    Promise.all([htsVoice, song, Module]).then(([htsVoice, song, Module]) => {
+      // Add HTS voice file into the module's virtual filesystem
+      Module.FS.writeFile('voice.htsvoice', new Uint8Array(htsVoice));
+      console.log('HTS Voice written to virtual FS');
+
+      // Run
+      Module.run_sinsy(song);
+      console.log('Sinsy done!  Retrieving output file...');
+
+      // Retrieve output file
+      const file = Module.FS.readFile('out.wav', { encoding: 'binary' });
+      downloadBlob(file, 'out.wav', 'audio/wav');
+    });
+  </script>
+  <script src="build/sinsy.js"></script>
+</html>

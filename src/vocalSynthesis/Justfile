@@ -1,0 +1,15 @@
+build-base:
+  cd hts_engine_API/src && emcmake cmake . && emmake make -j
+  cd sinsy/src && emcmake cmake . && emmake make -j sinsy
+
+debug:
+  just build-base
+
+  cd sinsy/src && em++ -g -s WASM=1 -s ENVIRONMENT=web --no-entry --bind -I include/sinsy/ -L../../hts_engine_API/src/lib -l hts_engine_API --embed-file dic -s ASSERTIONS=1 -s ALLOW_MEMORY_GROWTH=1 -s FORCE_FILESYSTEM=1 -s 'EXTRA_EXPORTED_RUNTIME_METHODS=["FS"]' bin/libsinsy.cpp ../../hts_engine_API/src/lib/libhts_engine_API.a lib/libsinsy.a -o ../../build/sinsy.js
+
+build:
+  just build-base
+
+  cd sinsy/src && em++ -O3 -s WASM=1 -s ENVIRONMENT=web --no-entry --bind -I include/sinsy/ -L../../hts_engine_API/src/lib -l hts_engine_API --embed-file dic -s ASSERTIONS=1 -s ALLOW_MEMORY_GROWTH=1 -s FORCE_FILESYSTEM=1 -s 'EXTRA_EXPORTED_RUNTIME_METHODS=["FS"]' bin/libsinsy.cpp ../../hts_engine_API/src/lib/libhts_engine_API.a lib/libsinsy.a -o ../../build/sinsy.js
+
+  wasm-opt ./sinsy/src/sinsy.wasm -O4 --enable-nontrapping-float-to-int --precompute-propagate --fast-math -c -o ./sinsy/src/sinsy.wasm
