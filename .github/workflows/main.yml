@@ -8,6 +8,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+        with:
+          submodules: 'recursive'
 
       # Set up build environment + toolchains with Rust nightly with Wasm support and NodeJS
       - name: Install minimal Rust nightly
