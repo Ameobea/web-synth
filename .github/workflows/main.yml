@@ -14,9 +14,9 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2021-01-30
+          toolchain: nightly-2021-03-01
       - name: Use Rust nightly
-        run: rustup default nightly-2021-01-30
+        run: rustup default nightly-2021-03-01
       - name: Install Rust Wasm support
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v1
@@ -30,7 +30,7 @@ jobs:
       #   uses: actions/cache@v1
       #   with:
       #     path: ~/.cargo/bin
-      #     key: ${{ runner.os }}_nightly-2021-01-30_cargo-registry_just-0.5.1_wasm-bindgen-cli-0.2.54
+      #     key: ${{ runner.os }}_nightly-2021-03-01_cargo-registry_just-0.5.1_wasm-bindgen-cli-0.2.54
       - name: Cache cargo registry
         uses: actions/cache@v2
         env:
@@ -51,7 +51,7 @@ jobs:
           cache-name: cache-target-dir
         with:
           path: ./engine/target
-          key: ${{ runner.os }}-build-${{ env.cache-name }}_nightly-2021-01-30_${{ hashFiles('engine/Cargo.lock') }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}_nightly-2021-03-01_${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache node modules
         uses: actions/cache@v2
         env:
