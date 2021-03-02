@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { ControlPanelCustomComponentProps } from '../types';
+import './FileUploader.scss';
 
 export interface Value<T = ArrayBuffer> {
   fileName: string;
@@ -13,7 +14,7 @@ const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Va
 
     const reader = new FileReader();
 
-    reader.onload = function() {
+    reader.onload = function () {
       if (this.readyState !== FileReader.DONE) {
         reject(new Error('Error converting uploaded file to `ArrayBuffer`'));
         return;
@@ -38,7 +39,7 @@ export const parseUploadedFileAsText = (
 
     const reader = new FileReader();
 
-    reader.onload = function() {
+    reader.onload = function () {
       if (this.readyState !== FileReader.DONE) {
         reject(new Error('Error converting uploaded file to `ArrayBuffer`'));
         return;
@@ -55,10 +56,13 @@ export const parseUploadedFileAsText = (
     reader.readAsText(file);
   });
 
-const FileUploader: React.FC<ControlPanelCustomComponentProps<Value>> = ({ onChange }) => (
-  <div>
-    Upload file
-    <input type='file' onChange={evt => parseUploadedFile(evt).then(onChange)} />
+const FileUploader: React.FC<ControlPanelCustomComponentProps<Value>> = ({ onChange, value }) => (
+  <div className='file-uploader'>
+    <div>Upload file</div>
+    <div>
+      <div>{value ? value.fileName : null}</div>
+      <input type='file' onChange={evt => parseUploadedFile(evt).then(onChange)} />
+    </div>
   </div>
 );
 

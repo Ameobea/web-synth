@@ -7,6 +7,7 @@ import effectsModule from './modules/effects';
 import presetsModule, { fetchSynthPresets, fetchSynthVoicePresets } from './modules/presets';
 import controlPanelModule from './modules/controlPanel';
 import equalizerModule from 'src/redux/modules/equalizer';
+import sinsyModule from 'src/redux/modules/sinsy';
 
 const modules = {
   viewContextManager: viewContextManagerModule,
@@ -15,6 +16,7 @@ const modules = {
   presets: presetsModule,
   controlPanel: controlPanelModule,
   equalizer: equalizerModule,
+  sinsy: sinsyModule,
 };
 
 export const { store, getState, dispatch, actionCreators, useSelector } = buildStore<

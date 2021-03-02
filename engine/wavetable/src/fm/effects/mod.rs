@@ -400,7 +400,10 @@ pub struct EffectChain {
 impl Default for EffectChain {
     fn default() -> Self {
         EffectChain {
-            effects: [None; 16],
+            effects: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None,
+            ],
             param_render_buf: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
         }
     }

@@ -4,9 +4,7 @@
     stdsimd,
     wasm_simd,
     const_maybe_uninit_assume_init,
-    get_mut_unchecked,
-    array_value_iter,
-    const_in_array_repeat_expressions
+    get_mut_unchecked
 )]
 
 use std::mem::{self, transmute};

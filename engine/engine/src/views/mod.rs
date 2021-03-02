@@ -9,4 +9,5 @@ pub mod midi_editor;
 pub mod midi_keyboard;
 pub mod sample_library;
 pub mod sequencer;
+pub mod sinsy;
 pub mod synth_designer;

@@ -17,6 +17,14 @@ build-docs:
   rm -rf ./dist/docs
   cp -r ./docs/_layouts/public ./dist/docs
 
+debug-sinsy:
+  cd src/vocalSynthesis && just debug
+  cp src/vocalSynthesis/build/sinsy.* ./public
+
+build-sinsy:
+  cd src/vocalSynthesis && just build
+  cp src/vocalSynthesis/build/sinsy.* ./public
+
 build-all:
   cd engine \
     && ./release.sh \
@@ -34,6 +42,9 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
   cp ./engine/build/* ./src
+
+  just build-sinsy
+
   yarn build || npm build
 
   just opt
@@ -57,6 +68,9 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
+
+  just debug-sinsy
+
   yarn start
 
 run-frontend:
