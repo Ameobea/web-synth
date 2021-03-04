@@ -3,7 +3,7 @@ name: Build, Test, and Deploy
 on: [push]
 
 env:
-  EM_VERSION: 1.39.18
+  EM_VERSION: 2.0.14
   EM_CACHE_FOLDER: 'emsdk-cache'
 
 jobs:
