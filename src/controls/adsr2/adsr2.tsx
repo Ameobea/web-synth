@@ -393,7 +393,7 @@ class DragBar {
 
     g.x = LEFT_GUTTER_WIDTH_PX + initialPos * this.inst.width;
     g.y = TOP_GUTTER_WIDTH_PX - 4;
-    this.inst.app.stage.addChild(g);
+    this.inst.app?.stage.addChild(g);
     this.g = g;
   }
 
@@ -467,7 +467,7 @@ class ScaleMarkings {
         align: 'left',
       });
       text.x = 2;
-      this.inst.app.stage.addChild(text);
+      this.inst.app?.stage.addChild(text);
       return text;
     };
 
@@ -519,7 +519,10 @@ const TOP_GUTTER_WIDTH_PX = 10;
 const BOTTOM_GUTTER_WIDTH_PX = 10;
 
 class ADSR2Instance {
-  public app: PIXI.Application;
+  /**
+   * This only time this will be uninitialized is when WebGL isn't supported by the browser (probably in CI)
+   */
+  public app: PIXI.Application | undefined;
   private lengthMs = 1000;
   private outputRange: [number, number] = [0, 1];
   public steps!: StepHandle[];
@@ -542,12 +545,18 @@ class ADSR2Instance {
    * Returns the width of the canvas in pixels minus the horizontal gutters
    */
   public get width() {
+    if (!this.app) {
+      return 0;
+    }
     return this.app.renderer.width - LEFT_GUTTER_WIDTH_PX - RIGHT_GUTTER_WIDTH_PX;
   }
   /**
    * Returns the height of the canvas in pixels minus the vertical gutters
    */
   public get height() {
+    if (!this.app) {
+      return 0;
+    }
     return this.app.renderer.height - TOP_GUTTER_WIDTH_PX - BOTTOM_GUTTER_WIDTH_PX;
   }
 
@@ -665,16 +674,7 @@ class ADSR2Instance {
     initialState: Adsr,
     outputRange: [number, number]
   ) {
-    const app = new PIXI.Application({
-      antialias: true,
-      view: canvas,
-      height,
-      width,
-      backgroundColor: BACKGROUND_COLOR,
-    });
-
     this.audioThreadData = initialState?.audioThreadData;
-    this.app = app;
     this.onChange = onChange;
     this.ctx = ctx;
     this.outputRange = [...outputRange];
@@ -702,6 +702,20 @@ class ADSR2Instance {
       ].map(step => new StepHandle(this, step));
       this.releasePoint = 0.8;
     }
+
+    let app: PIXI.Application | undefined = undefined;
+    try {
+      app = new PIXI.Application({
+        antialias: true,
+        view: canvas,
+        height,
+        width,
+        backgroundColor: BACKGROUND_COLOR,
+      });
+    } catch (err) {
+      console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
+    }
+    this.app = app;
 
     this.renderInitial();
   }
@@ -778,7 +792,7 @@ class ADSR2Instance {
       rampCurves.push(new RampCurve(this, this.steps[i].step, this.steps[i + 1].step));
     }
 
-    this.app.stage.addChild(this.vizContainer);
+    this.app?.stage.addChild(this.vizContainer);
 
     this.sprites = { rampCurves };
 
@@ -810,7 +824,7 @@ class ADSR2Instance {
 
     this.scaleMarkings = new ScaleMarkings(this, this.lengthMs, this.outputRange);
 
-    this.app.ticker.add(() => {
+    this.app?.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
         return;
       }
@@ -838,7 +852,7 @@ class ADSR2Instance {
   }
 
   public destroy() {
-    this.app.destroy(false);
+    this.app?.destroy(false);
   }
 }
 
