@@ -2,6 +2,10 @@ name: Build, Test, and Deploy
 
 on: [push]
 
+env:
+  EM_VERSION: 1.39.18
+  EM_CACHE_FOLDER: 'emsdk-cache'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,20 +14,6 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: 'recursive'
-
-      # Set up build environment + toolchains with Rust nightly with Wasm support and NodeJS
-      - name: Install minimal Rust nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-01
-      - name: Use Rust nightly
-        run: rustup default nightly-2021-03-01
-      - name: Install Rust Wasm support
-        run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v1
-        with:
-          node-version: '14.5'
 
       # Caching
       # \/ Disabled due to (what sems to be) a bug in the `actions/cache` action (issue filed)
@@ -75,6 +65,31 @@ jobs:
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
+      - name: Cache Emscripten
+        id: cache-emscripten-system-libraries
+        uses: actions/cache@v2
+        with:
+          path: ${{env.EM_CACHE_FOLDER}}
+          key: ${{env.EM_VERSION}}-${{ runner.os }}
+
+      # Set up build environment + toolchains with Rust nightly with Wasm support and NodeJS
+      - name: Install minimal Rust nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2021-03-01
+      - name: Use Rust nightly
+        run: rustup default nightly-2021-03-01
+      - name: Install Rust Wasm support
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '14.5'
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v7
+        with:
+          version: ${{env.EM_VERSION}}
+          actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
 
       - name: Create custom binaries directory
         run: mkdir ~/bin
