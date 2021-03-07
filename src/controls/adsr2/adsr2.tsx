@@ -423,10 +423,10 @@ class ScaleMarkings {
   private inst: ADSR2Instance;
   private g!: PIXI.Graphics;
   private lenMs: number;
-  private outputRange: [number, number];
+  private outputRange: readonly [number, number];
   private texts: PIXI.Text[] = [];
 
-  constructor(inst: ADSR2Instance, lenMs: number, outputRange: [number, number]) {
+  constructor(inst: ADSR2Instance, lenMs: number, outputRange: readonly [number, number]) {
     this.inst = inst;
     this.lenMs = lenMs;
     this.outputRange = outputRange;
@@ -434,8 +434,11 @@ class ScaleMarkings {
     this.render();
   }
 
-  public update(lenMs: number, outputRange: [number, number]) {
-    this.lenMs = lenMs;
+  public update(lenMs: number, outputRange: readonly [number, number]) {
+    if (lenMs === this.lenMs && R.equals(outputRange, this.outputRange)) {
+      return;
+    }
+
     this.outputRange = outputRange;
 
     this.render();
@@ -524,14 +527,14 @@ class ADSR2Instance {
    */
   public app: PIXI.Application | undefined;
   private lengthMs = 1000;
-  private outputRange: [number, number] = [0, 1];
+  private outputRange: readonly [number, number] = [0, 1];
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
   private loopDragBar: DragBar | null = null;
   private releasePoint!: number;
   private releaseDragBar!: DragBar;
-  private onChange: (newState: Adsr) => void;
+  private onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
   private audioThreadData: AudioThreadData;
@@ -571,16 +574,19 @@ class ADSR2Instance {
     this.sortAndUpdateMarks();
   }
 
-  public update(state: Adsr, onChange: (newState: Adsr) => void, outputRange: [number, number]) {
+  public update(
+    state: Adsr,
+    onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void,
+    outputRange: readonly [number, number]
+  ) {
     this.onChange = onChange;
     if (isNaN(state.lenSamples)) {
+      console.warn(`\`state.lenSamples\` is ${state.lenSamples}; setting to 1000...`);
       state.lenSamples = 1000;
     }
 
     const newLengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
-    if (this.lengthMs !== newLengthMs) {
-      this.lengthMs = newLengthMs;
-    }
+    this.lengthMs = newLengthMs;
 
     if (!R.equals(this.steps.map(R.prop('step')), state.steps)) {
       this.setSteps(state.steps);
@@ -672,7 +678,7 @@ class ADSR2Instance {
     onChange: (newState: Adsr) => void,
     ctx: AudioContext,
     initialState: Adsr,
-    outputRange: [number, number]
+    outputRange: readonly [number, number]
   ) {
     try {
       this.app = new PIXI.Application({
@@ -832,20 +838,21 @@ class ADSR2Instance {
   }
 
   private deserialize(state: Adsr) {
-    state.lenSamples = state.lenSamples ?? 1000;
+    state.lenSamples = state.lenSamples ?? SAMPLE_RATE;
     this.steps = state.steps.map(step => new StepHandle(this, R.clone(step)));
     this.lengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
     this.loopPoint = state.loopPoint;
     this.releasePoint = state.releasePoint;
   }
 
-  public serialize(): Adsr {
+  public serialize(): Adsr & { outputRange: readonly [number, number] } {
     return {
       steps: this.steps.map(R.prop('step')),
       lenSamples: (this.lengthMs / 1000) * SAMPLE_RATE,
       loopPoint: this.loopPoint,
       releasePoint: this.releasePoint,
       audioThreadData: this.audioThreadData!,
+      outputRange: this.outputRange,
     };
   }
 
@@ -857,8 +864,8 @@ class ADSR2Instance {
 interface ADSR2Props {
   width?: number;
   height?: number;
-  initialState: Adsr & { outputRange: [number, number] };
-  onChange: (newState: Adsr & { outputRange: [number, number] }) => void;
+  initialState: Adsr & { outputRange: readonly [number, number] };
+  onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -869,7 +876,7 @@ export const buildDefaultADSR2Envelope = (audioThreadData: AudioThreadData): Ads
     { x: 0.5, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
     { x: 1, y: 0.2, ramper: { type: 'exponential', exponent: 0.5 } },
   ],
-  lenSamples: 44_100,
+  lenSamples: SAMPLE_RATE,
   loopPoint: 0,
   releasePoint: 0.7,
   audioThreadData,

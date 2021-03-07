@@ -1,7 +1,12 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import { PromiseResolveType, UnimplementedError, UnreachableException } from 'ameo-utils';
+import {
+  filterNils,
+  PromiseResolveType,
+  UnimplementedError,
+  UnreachableException,
+} from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
@@ -348,15 +353,24 @@ const buildDefaultFilterCSNs = (): FilterCSNs => ({
   detune: new OverridableAudioParam(ctx),
 });
 
-const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
+export const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
   if (Object.keys(envelope).every(k => ['attack', 'decay', 'release'].includes(k))) {
     const env = envelope as ADSRValues;
-    return {
-      steps: [env.attack, env.decay, env.release].map(s => ({
+    const normalizedSteps = filterNils([
+      env.attack.pos === 0
+        ? null
+        : { x: 0, y: 0, ramper: { type: 'exponential' as const, exponent: 1 } },
+      ...[env.attack, env.decay, env.release].map(s => ({
         x: s.pos,
         y: s.magnitude,
-        ramper: { type: 'exponential', exponent: 1 },
+        ramper: { type: 'exponential' as const, exponent: 1 },
       })),
+      env.release.pos === 1
+        ? null
+        : { x: 1, y: 0, ramper: { type: 'exponential' as const, exponent: 1 } },
+    ]);
+    return {
+      steps: normalizedSteps,
       lenSamples: 44_100,
       loopPoint: null,
       releasePoint: env.release.pos,

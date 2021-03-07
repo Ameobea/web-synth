@@ -1,16 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import * as R from 'ramda';
 
-import type { ADSRValues } from 'src/controls/adsr';
+import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import { ADSRModule } from 'src/synthDesigner/ADSRModule';
+import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import {
   AbstractFilterModule,
   buildAbstractFilterModule,
   FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { msToSamples, samplesToMs } from 'src/util';
 
 export class FilterContainer {
   private ctx: AudioContext;
@@ -67,12 +69,12 @@ export class FilterContainer {
 
 const handleFilterChange = (
   filters: FilterContainer[],
-  adsrs: ADSRModule[],
-  state: { params: FilterParams; envelope: ADSRValues; bypass: boolean; envelopeLenMs: number },
+  adsrs: ADSR2Module[],
+  state: { params: FilterParams; envelope: Adsr; bypass: boolean },
   key: string,
   val: any
 ) => {
-  const newState = { ...state, params: { ...state.params } };
+  const newState = { ...state, envelope: { ...state.envelope }, params: { ...state.params } };
   switch (key) {
     case 'frequency':
     case 'Q':
@@ -88,11 +90,11 @@ const handleFilterChange = (
     }
     case 'adsr length ms': {
       adsrs.forEach(adsr => adsr.setLengthMs(val));
-      newState.envelopeLenMs = val;
+      newState.envelope.lenSamples = msToSamples(val);
       break;
     }
     case 'adsr': {
-      adsrs.forEach(adsr => adsr.setEnvelope(val));
+      adsrs.forEach(adsr => adsr.setState(val));
       newState.envelope = val;
       break;
     }
@@ -110,42 +112,43 @@ const handleFilterChange = (
 const FilterConfig: React.FC<{
   initialState: {
     params: FilterParams;
-    envelope: ADSRValues;
+    envelope: Adsr;
     bypass: boolean;
-    envelopeLenMs: number;
   };
   filters: FilterContainer[];
-  adsrs: ADSRModule[];
-  onChange: (
-    params: FilterParams,
-    envelope: ADSRValues,
-    bypass: boolean,
-    envelopeLenMs: number
-  ) => void;
+  adsrs: ADSR2Module[];
+  onChange: (params: FilterParams, envelope: Adsr, bypass: boolean) => void;
 }> = ({ initialState, filters, adsrs, onChange }) => {
   const [state, setState] = useState(initialState);
 
-  const settings = useMemo(() => getSettingsForFilterType(state.params.type), [state.params.type]);
+  const settings = useMemo(
+    () =>
+      getSettingsForFilterType(state.params.type).map(s => {
+        delete (s as any).initial;
+        return s;
+      }),
+    [state.params.type]
+  );
   const controlPanelState = useMemo(
     () => ({
       ...state.params,
-      adsr: state.envelope,
+      adsr: { ...state.envelope, outputRange: [0, 44_100 / 2] },
       bypass: state.bypass,
-      'adsr length ms': state.envelopeLenMs,
+      'adsr length ms': R.clamp(0, 10000, samplesToMs(state.envelope.lenSamples)),
     }),
-    [state.bypass, state.envelope, state.envelopeLenMs, state.params]
+    [state.bypass, state.envelope, state.params]
   );
 
   return (
     <ControlPanel
       className='filter-control-panel'
-      style={{ width: 400 }}
+      style={{ width: 700 }}
       title='FILTER'
       settings={settings}
       state={controlPanelState}
       onChange={(key: string, val: any) => {
         const newState = handleFilterChange(filters, adsrs, state, key, val);
-        onChange(newState.params, newState.envelope, newState.bypass, newState.envelopeLenMs);
+        onChange(newState.params, newState.envelope, newState.bypass);
         setState(newState);
       }}
     />

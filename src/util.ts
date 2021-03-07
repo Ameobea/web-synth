@@ -17,6 +17,10 @@ export const roundTo = (num: number, decimals: number): number => {
 
 export const midiToFrequency = (midiNote: number) => Math.pow(2, (midiNote - 69) / 12) * 440;
 
+export const msToSamples = (ms: number): number => (ms / 1000) * 44_100;
+
+export const samplesToMs = (samples: number): number => (samples / 44_100) * 1000;
+
 /**
  * Tries to parse the provided string out of JSON.
  **/

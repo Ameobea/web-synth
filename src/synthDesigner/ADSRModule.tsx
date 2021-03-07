@@ -1,7 +1,9 @@
 import { UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
+
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
 
 const ADSR2AWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet.addModule(
@@ -23,13 +25,11 @@ const ADSRWasm = new AsyncOnce(() => {
 export interface ADSR2Params {
   minValue?: number;
   maxValue?: number;
-  lengthMs?: number;
+  lengthMs: number;
   loopPoint?: number | null;
   releaseStartPhase: number;
   steps: AdsrStep[];
 }
-
-const SAMPLE_RATE = 44_100;
 
 export class ADSR2Module {
   private ctx: AudioContext;
@@ -39,7 +39,7 @@ export class ADSR2Module {
   /**
    * Params that will be sent to the AWP to initialize it
    */
-  private initParams: ADSR2Params;
+  private params: ADSR2Params;
 
   constructor(ctx: AudioContext, params: ADSR2Params) {
     this.ctx = ctx;
@@ -48,7 +48,7 @@ export class ADSR2Module {
     this.shift = new ConstantSourceNode(ctx);
     this.setOutputRange([params.minValue ?? 0, params.maxValue ?? 1]);
     this.shift.start();
-    this.initParams = params;
+    this.params = params;
     this.init();
   }
 
@@ -69,10 +69,10 @@ export class ADSR2Module {
     this.awp.port.postMessage({
       type: 'setWasmBytes',
       wasmBytes,
-      encodedSteps: ADSR2Module.encodeADSRSteps(this.initParams.steps),
-      loopPoint: this.initParams.loopPoint,
-      lenMs: this.initParams.lengthMs,
-      releaseStartPhase: this.initParams.releaseStartPhase,
+      encodedSteps: ADSR2Module.encodeADSRSteps(this.params.steps),
+      loopPoint: this.params.loopPoint,
+      lenMs: this.params.lengthMs,
+      releaseStartPhase: this.params.releaseStartPhase,
     });
     this.awp.connect(this.scale).connect(this.shift.offset);
   }
@@ -83,14 +83,19 @@ export class ADSR2Module {
 
   public setState(newState: Adsr) {
     this.setSteps(newState.steps);
+    this.params.steps = R.clone(newState.steps);
     this.setLoopPoint(newState.loopPoint);
+    this.params.loopPoint = newState.loopPoint;
     this.setReleaseStartPhase(newState.releasePoint);
-    this.setLengthMs((newState.lenSamples / SAMPLE_RATE) * 1000);
+    this.params.releaseStartPhase = newState.releasePoint;
+    const newLengthMs = samplesToMs(newState.lenSamples);
+    this.setLengthMs(newLengthMs);
+    this.params.lengthMs = newLengthMs;
   }
 
   public setSteps(newSteps: AdsrStep[]) {
+    this.params.steps = newSteps;
     if (!this.awp) {
-      this.initParams.steps = newSteps;
       return;
     }
     const encodedSteps = ADSR2Module.encodeADSRSteps(newSteps);
@@ -98,16 +103,16 @@ export class ADSR2Module {
   }
 
   public setLoopPoint(newLoopPoint: number | null | undefined) {
+    this.params.loopPoint = newLoopPoint;
     if (!this.awp) {
-      this.initParams.loopPoint = newLoopPoint;
       return;
     }
     this.awp.port.postMessage({ type: 'setLoopPoint', loopPoint: newLoopPoint });
   }
 
   public setReleaseStartPhase(newReleaseStartPhase: number) {
+    this.params.releaseStartPhase = newReleaseStartPhase;
     if (!this.awp) {
-      this.initParams.releaseStartPhase = newReleaseStartPhase;
       return;
     }
     this.awp.port.postMessage({
@@ -117,11 +122,19 @@ export class ADSR2Module {
   }
 
   public setLengthMs(newLengthMs: number) {
+    this.params.lengthMs = newLengthMs;
     if (!this.awp) {
-      this.initParams.lengthMs = newLengthMs;
       return;
     }
     this.awp.port.postMessage({ type: 'setLenMs', lenMs: newLengthMs });
+  }
+
+  public getReleaseStartPhase(): number {
+    return this.params.releaseStartPhase;
+  }
+
+  public getLengthMs(): number {
+    return this.params.lengthMs;
   }
 
   public setOutputRange([minVal, maxVal]: [number, number]) {
@@ -143,6 +156,16 @@ export class ADSR2Module {
       return;
     }
     this.awp.port.postMessage({ type: 'ungate' });
+  }
+
+  public serialize(): Adsr {
+    return {
+      steps: R.clone(this.params.steps),
+      lenSamples: msToSamples(this.params.lengthMs),
+      loopPoint: this.params.loopPoint ?? null,
+      releasePoint: this.params.releaseStartPhase ?? null,
+      audioThreadData: { phaseIndex: 0 },
+    };
   }
 
   public destroy() {

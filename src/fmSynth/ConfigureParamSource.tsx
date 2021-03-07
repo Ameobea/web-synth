@@ -5,9 +5,9 @@ import ControlPanel from 'react-control-panel';
 import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { msToSamples, samplesToMs } from 'src/util';
 
 export const PARAM_BUFFER_COUNT = 8;
-const SAMPLE_RATE = 44_100;
 
 /**
  * A parameter/value generator function.  Used to produce the frequency input values for
@@ -182,9 +182,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
             state.type === 'adsr' ? [state.shift, state.shift + state.scale] : undefined,
           adsr: state.type === 'adsr' ? adsrs[state['adsr index']] : undefined,
           'adsr length ms':
-            state.type === 'adsr'
-              ? (adsrs[state['adsr index']].lenSamples / 44_100) * 1000
-              : undefined,
+            state.type === 'adsr' ? samplesToMs(adsrs[state['adsr index']].lenSamples) : undefined,
         }}
         onChange={(key: string, value: any) => {
           switch (key) {
@@ -220,7 +218,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
             }
             case 'adsr length ms': {
               const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-              onAdsrChange(adsrIx, { ...adsrs[adsrIx], lenSamples: (value / 1000) * SAMPLE_RATE });
+              onAdsrChange(adsrIx, { ...adsrs[adsrIx], lenSamples: msToSamples(value) });
               break;
             }
             case 'multiplier': {
