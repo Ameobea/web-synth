@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useMemo, useRef, useState } from 'react';
 import { Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
-import { PropTypesOf, UnreachableException } from 'ameo-utils';
+import { filterNils, PropTypesOf, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
@@ -20,65 +20,6 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-
-const SYNTH_SETTINGS = [
-  {
-    type: 'range',
-    label: 'volume',
-    min: -1,
-    initial: 0.1,
-    max: 1,
-    step: 0.008,
-  },
-  {
-    type: 'select',
-    label: 'waveform',
-    options: Object.values(Waveform),
-    initial: Waveform.Sine,
-  },
-  {
-    type: 'range',
-    label: 'unison',
-    min: 1,
-    initial: 1,
-    max: 32,
-    step: 1,
-  },
-  {
-    type: 'range',
-    label: 'unison spread cents',
-    initial: '0',
-    min: 0,
-    max: 40,
-    step: 0.1,
-  },
-  {
-    type: 'range',
-    label: 'detune',
-    min: -300,
-    initial: 0,
-    max: 300,
-    step: 0.5,
-  },
-  {
-    type: 'text',
-    label: 'pitch multiplier',
-    initial: '1',
-  },
-  {
-    type: 'range',
-    label: 'adsr length ms',
-    min: 50,
-    max: 10000,
-    initial: 1000,
-  },
-  {
-    type: 'custom',
-    label: 'adsr',
-    initial: defaultAdsrEnvelope,
-    Comp: ControlPanelADSR,
-  },
-];
 
 const WavetableControlPanel: React.FC<{
   synth: SynthModule;
@@ -222,6 +163,72 @@ const SynthModuleCompInner: React.FC<{
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
     [synth.filterEnvelope]
   );
+  const settings = useMemo(
+    () =>
+      filterNils([
+        {
+          type: 'range',
+          label: 'volume',
+          min: -1,
+          initial: 0.1,
+          max: 1,
+          step: 0.008,
+        },
+        {
+          type: 'select',
+          label: 'waveform',
+          options: Object.values(Waveform),
+          initial: Waveform.Sine,
+        },
+        synth.waveform !== Waveform.FM && synth.waveform !== Waveform.Wavetable
+          ? {
+              type: 'range',
+              label: 'unison',
+              min: 1,
+              initial: 1,
+              max: 32,
+              step: 1,
+            }
+          : null,
+        synth.waveform !== Waveform.FM && synth.waveform !== Waveform.Wavetable
+          ? {
+              type: 'range',
+              label: 'unison spread cents',
+              initial: '0',
+              min: 0,
+              max: 40,
+              step: 0.1,
+            }
+          : null,
+        {
+          type: 'range',
+          label: 'detune',
+          min: -300,
+          initial: 0,
+          max: 300,
+          step: 0.5,
+        },
+        {
+          type: 'text',
+          label: 'pitch multiplier',
+          initial: '1',
+        },
+        {
+          type: 'range',
+          label: 'adsr length ms',
+          min: 50,
+          max: 10000,
+          initial: 1000,
+        },
+        {
+          type: 'custom',
+          label: 'adsr',
+          initial: defaultAdsrEnvelope,
+          Comp: ControlPanelADSR,
+        },
+      ]),
+    [synth.waveform]
+  );
 
   return (
     <div className='synth-module'>
@@ -239,7 +246,7 @@ const SynthModuleCompInner: React.FC<{
 
       <ControlPanel
         title='SYNTH'
-        settings={SYNTH_SETTINGS}
+        settings={settings}
         onChange={(key: string, val: any) => {
           switch (key) {
             case 'waveform': {

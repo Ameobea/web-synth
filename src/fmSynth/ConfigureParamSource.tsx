@@ -240,12 +240,14 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
         <ADSR2
           width={500}
           height={320}
-          initialState={adsrs[state['adsr index']]}
+          initialState={{
+            ...adsrs[state['adsr index']],
+            outputRange: [state.shift, state.shift + state.scale],
+          }}
           onChange={newAdsr => {
             const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
             onAdsrChange(adsrIx, newAdsr);
           }}
-          outputRange={[state.shift, state.shift + state.scale]}
         />
       ) : null}
     </>

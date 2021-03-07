@@ -100,6 +100,11 @@ interface FMSynthConfig {
   operatorConfigs: OperatorConfig[];
 }
 
+export enum FilterFrequencySource {
+  CSNs,
+  ADSR,
+}
+
 export interface SynthModule {
   waveform: Waveform;
   detune: number;
@@ -113,7 +118,15 @@ export interface SynthModule {
   } | null;
   fmSynth: FMSynth | null;
   filterParams: FilterParams;
+  /**
+   * These are the `OverridableAudioParam`s that are exported from the synth module and can be used to
+   * control the filter's params either via UI or patch network.
+   *
+   * They are not used if filter ADSR is enabled, in which case the ADSR has full control over the
+   * filter's frequency.
+   */
   filterCSNs: FilterCSNs;
+  filterFrequencySource: FilterFrequencySource;
   masterGain: number;
   selectedEffectType: EffectType;
   gainEnvelope: ADSRValues;
@@ -278,37 +291,44 @@ const connectOscillators = (connect: boolean, synth: SynthModule) =>
   synth.voices.forEach((voice, voiceIx) => {
     const voiceDst = synth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput();
 
-    if (synth.waveform === Waveform.Wavetable && voice.wavetable) {
-      const wavetableOutput = voice.wavetable.buildConnectables().outputs.get('output')?.node as
-        | AudioNode
-        | undefined;
-      if (connect) {
-        wavetableOutput?.connect(voiceDst);
-      } else {
+    const wavetableOutput = voice.wavetable?.buildConnectables().outputs.get('output')?.node as
+      | AudioNode
+      | undefined;
+
+    const fmSynthAWPNode = synth.fmSynth?.getAWPNode();
+
+    if (!connect) {
+      try {
         wavetableOutput?.disconnect();
+      } catch (_err) {
+        // pass
       }
-    } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
-      const fmSynthAWPNode = synth.fmSynth.getAWPNode();
-      if (connect) {
-        fmSynthAWPNode?.connect(voiceDst, voiceIx);
-      } else {
+
+      try {
         fmSynthAWPNode?.disconnect();
+      } catch (_err) {
+        // pass
       }
-    } else {
+
       voice.oscillators.forEach(osc => {
         try {
-          if (connect) {
-            osc.connect(voiceDst);
-          } else {
-            osc.disconnect();
-          }
+          osc.disconnect();
         } catch (err) {
-          console.error(
-            `Error ${connect ? 'connecting' : 'disconnecting'} oscillator and filter: `,
-            err
-          );
+          // pass
         }
       });
+
+      return;
+    }
+
+    if (synth.waveform === Waveform.Wavetable) {
+      wavetableOutput?.connect(voiceDst);
+    } else if (synth.waveform === Waveform.FM) {
+      if (synth.fmSynth) {
+        fmSynthAWPNode?.connect(voiceDst, voiceIx);
+      }
+    } else {
+      voice.oscillators.forEach(osc => osc.connect(voiceDst));
     }
   });
 
@@ -348,8 +368,7 @@ const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
 
 const buildDefaultFilterModule = (
   filterType: FilterType,
-  filterCSNs: FilterCSNs,
-  filterADSRModule?: ADSR2Module
+  filterCSNs: FilterCSNs
 ): {
   filterParams: FilterParams;
   filterNode: AbstractFilterModule;
@@ -357,10 +376,6 @@ const buildDefaultFilterModule = (
   const filterNode = buildAbstractFilterModule(ctx, filterType, filterCSNs);
   const filterParams = getDefaultFilterParams(filterType);
   filterParams.type = Option.of(filterParams.type).getOrElse(filterType);
-  // TODO: This will need to be connected better
-  // if (filterADSRModule) {
-  //   filterCSNs.frequency.connect(filterADSRModule.offset);
-  // }
 
   Object.entries(filterParams)
     .filter(([k, _v]) => k !== 'type')
@@ -409,7 +424,7 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
         releaseStartPhase: 0.8,
       });
 
-      const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs, filterADSRModule);
+      const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs);
       // TODO: Connect ADSR once we can do so intelligently
       filterNode.getOutput().connect(outerGainNode);
 
@@ -455,6 +470,7 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
     fmSynth: null,
     filterParams,
     filterCSNs,
+    filterFrequencySource: FilterFrequencySource.CSNs,
     wavetableInputControls: null,
     masterGain,
     selectedEffectType: EffectType.Reverb,
@@ -945,7 +961,7 @@ const actionGroups = {
         state.synths.forEach(synth => {
           synth.fmSynth?.onGate(voiceIx);
           const frequency = baseFrequency * synth.pitchMultiplier;
-          const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
+
           const targetVoice = synth.voices[voiceIx];
           if (!state.wavyJonesInstance) {
             return state;
@@ -967,6 +983,7 @@ const actionGroups = {
           } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
             synth.fmSynth.setFrequency(voiceIx, frequency);
           } else {
+            const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
             targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
           }
 

@@ -674,6 +674,18 @@ class ADSR2Instance {
     initialState: Adsr,
     outputRange: [number, number]
   ) {
+    try {
+      this.app = new PIXI.Application({
+        antialias: true,
+        view: canvas,
+        height,
+        width,
+        backgroundColor: BACKGROUND_COLOR,
+      });
+    } catch (err) {
+      console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
+    }
+
     this.audioThreadData = initialState?.audioThreadData;
     this.onChange = onChange;
     this.ctx = ctx;
@@ -702,20 +714,6 @@ class ADSR2Instance {
       ].map(step => new StepHandle(this, step));
       this.releasePoint = 0.8;
     }
-
-    let app: PIXI.Application | undefined = undefined;
-    try {
-      app = new PIXI.Application({
-        antialias: true,
-        view: canvas,
-        height,
-        width,
-        backgroundColor: BACKGROUND_COLOR,
-      });
-    } catch (err) {
-      console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
-    }
-    this.app = app;
 
     this.renderInitial();
   }

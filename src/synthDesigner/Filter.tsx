@@ -10,7 +10,7 @@ import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 const Filter: React.FC<{
   params: FilterParams;
   synthIx: number;
-  filterEnvelope: Adsr & { outputRange: [number, number] };
+  filterEnvelope: Adsr & { outputRange: readonly [number, number] };
   bypass: boolean;
   stateKey: string;
 }> = ({ params, synthIx, filterEnvelope, bypass, stateKey }) => {
