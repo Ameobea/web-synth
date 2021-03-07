@@ -6,6 +6,14 @@ pub struct AdsrContext {
     pub adsr: Adsr,
 }
 
+fn round_tiny_to_zero(val: f32) -> f32 {
+    if val.abs() < 0.00001 {
+        0.
+    } else {
+        val
+    }
+}
+
 fn decode_steps(encoded_steps: &[f32]) -> Vec<AdsrStep> {
     assert_eq!(
         encoded_steps.len() % 4,
@@ -24,7 +32,11 @@ fn decode_steps(encoded_steps: &[f32]) -> Vec<AdsrStep> {
                     },
                     _ => unreachable!("Invalid ramp fn type val"),
                 };
-                AdsrStep { x, y, ramper }
+                AdsrStep {
+                    x: round_tiny_to_zero(x),
+                    y: round_tiny_to_zero(y),
+                    ramper,
+                }
             },
             _ => unreachable!(),
         })

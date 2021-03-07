@@ -5,10 +5,12 @@ class ADSR2AWP extends AudioWorkletProcessor {
   constructor() {
     super();
     this.isShutdown = false;
+    this.lastOut = 0;
 
     this.port.onmessage = async evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
+          console.log(evt.data.encodedSteps);
           await this.initWasm(
             evt.data.wasmBytes,
             evt.data.encodedSteps,
@@ -129,6 +131,22 @@ class ADSR2AWP extends AudioWorkletProcessor {
       ptr / BYTES_PER_F32,
       ptr / BYTES_PER_F32 + FRAME_SIZE
     );
+    // DEBUG
+    // let maxDiff = 0;
+    for (let i = 0; i < FRAME_SIZE; i++) {
+      if (outputsSlice[i] > 0.001) {
+        console.log(i, outputsSlice[i]);
+      }
+      // maxDiff = Math.max(maxDiff, Math.abs(outputsSlice[i + 1] - outputsSlice[i]));
+    }
+    // if (maxDiff > 0.01) {
+    //   console.log('JUMP: ', maxDiff);
+    // }
+    // if (Math.abs(this.lastOut - outputsSlice[0]) > 0.01) {
+    //   console.log('inter-frame jump: ', Math.abs(this.lastOut - outputsSlice[0]));
+    // }
+    // this.lastOut = outputsSlice[FRAME_SIZE - 1];
+    // DEBUG
     output.set(outputsSlice);
 
     return true;
