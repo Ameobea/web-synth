@@ -35,6 +35,9 @@ impl RampFn {
 }
 
 fn compute_pos(prev_step: &AdsrStep, next_step: &AdsrStep, phase: f32) -> f32 {
+    let distance = next_step.x - prev_step.x;
+    debug_assert!(distance > 0.);
+
     match next_step.ramper {
         RampFn::Instant => prev_step.y,
         RampFn::Linear => {
@@ -45,7 +48,6 @@ fn compute_pos(prev_step: &AdsrStep, next_step: &AdsrStep, phase: f32) -> f32 {
         },
         RampFn::Exponential { exponent } => {
             let y_diff = next_step.y - prev_step.y;
-            let distance = next_step.x - prev_step.x;
             let x = (phase - prev_step.x) / distance;
             // prev_step.y + x.powf(exponent) * y_diff
             prev_step.y + even_faster_pow(x, exponent) * y_diff
@@ -164,6 +166,17 @@ impl Adsr {
                 next_step_opt = self.steps.get(next_step_ix);
             }
 
+            // Handle garbage steps that have the same x as the previous step
+            while prev_step_opt
+                .map(|step| step.x)
+                .unwrap_or(DEFAULT_FIRST_STEP.x)
+                == next_step_opt.map(|step| step.x).unwrap_or(100.)
+            {
+                next_step_ix += 1;
+                prev_step_opt = Some(next_step_opt.unwrap());
+                next_step_opt = self.steps.get(next_step_ix);
+            }
+
             let next_step = match next_step_opt.as_mut() {
                 Some(step) => step,
                 None => {
@@ -214,10 +227,12 @@ impl Adsr {
         self.advance_phase();
 
         debug_assert!(self.phase >= 0. && self.phase <= 1.);
-        dsp::read_interpolated(
+        let sample = dsp::read_interpolated(
             &*self.rendered,
             self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
-        )
+        );
+        debug_assert!(sample.is_normal() || sample == 0.);
+        sample
     }
 
     fn maybe_write_cur_phase(&self) {

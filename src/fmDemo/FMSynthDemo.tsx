@@ -110,7 +110,7 @@ const serializeState = () => {
     globalVolume: GlobalState.globalVolume,
     gainEnvelope: adsrs[0].serialize(),
     filterParams: GlobalState.filterParams,
-    filterEnvelope: GlobalState.filterEnvelope,
+    filterEnvelope: filterAdsrs[0].serialize(),
     filterBypassed: GlobalState.filterBypassed,
   };
   return JSON.stringify(serialized);
@@ -173,6 +173,7 @@ const filterAdsrs = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const base = Option.of(serialized?.filterEnvelope)
     .map(normalizeEnvelope)
     .getOrElseL(buildDefaultFilterEnvelope);
+  GlobalState.filterEnvelope = base;
   const adsr = new ADSR2Module(ctx, {
     minValue: 0,
     maxValue: 1,
@@ -337,68 +338,109 @@ const PresetsControlPanel: React.FC<{
 }> = ({ setOctaveOffset, reRenderAll }) => {
   const loadedPreset = useRef<keyof typeof Presets | null>(null);
 
-  const loadPreset = useCallback((presetName: keyof typeof Presets) => {
-    loadedPreset.current = presetName;
-    const preset = R.clone(Presets[presetName]);
-    const oldGlobalVolume = serialized?.globalVolume;
-    serialized = preset;
-    serialized.globalVolume = oldGlobalVolume ?? serialized.globalVolume;
-    synth.deserialize(preset.synth);
+  const loadPreset = useCallback(
+    (presetName: keyof typeof Presets) => {
+      loadedPreset.current = presetName;
+      const preset = R.clone(Presets[presetName]);
+      const oldGlobalVolume = serialized?.globalVolume;
+      serialized = preset;
+      serialized.globalVolume = oldGlobalVolume ?? serialized.globalVolume;
+      synth.deserialize(preset.synth);
 
-    // Gain ADSRs
-    adsrs.forEach(adsr => adsr.setState(normalizeEnvelope(preset.gainEnvelope)));
-    // Filter ADSRs
-    filterAdsrs.forEach(adsr => adsr.setState(normalizeEnvelope(preset.filterEnvelope)));
-    // Octave offset
-    setOctaveOffset(preset.octaveOffset);
-    GlobalState.octaveOffset = preset.octaveOffset;
-    // Filters
-    GlobalState.filterEnvelope = preset.filterEnvelope;
-    GlobalState.filterParams = preset.filterParams;
-    filters.forEach(filter => filter.setAll(GlobalState.filterParams));
+      // Gain ADSRs
+      adsrs.forEach(adsr => adsr.setState(normalizeEnvelope(preset.gainEnvelope)));
+      // Filter ADSRs
+      filterAdsrs.forEach(adsr => adsr.setState(normalizeEnvelope(preset.filterEnvelope)));
+      // Octave offset
+      setOctaveOffset(preset.octaveOffset);
+      GlobalState.octaveOffset = preset.octaveOffset;
+      // Filters
+      GlobalState.filterEnvelope = preset.filterEnvelope;
+      GlobalState.filterParams = preset.filterParams;
+      filters.forEach(filter => filter.setAll(GlobalState.filterParams));
 
-    // Disconnect main output to avoid any horrific artifacts while we're switching
-    mainGain.disconnect(limiter);
+      // Disconnect main output to avoid any horrific artifacts while we're switching
+      mainGain.disconnect(limiter);
 
-    // FM synth ADSRs
-    preset.synth.adsrs.forEach((adsr, adsrIx) => synth.handleAdsrChange(adsrIx, adsr));
-    // FM synth modulation matrix
-    preset.synth.modulationMatrix.forEach((row, srcOperatorIx) => {
-      row.forEach((modIx, dstOperatorIx) => {
-        synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, modIx);
+      // FM synth ADSRs
+      preset.synth.adsrs.forEach((adsr, adsrIx) => synth.handleAdsrChange(adsrIx, adsr));
+      // FM synth modulation matrix
+      preset.synth.modulationMatrix.forEach((row, srcOperatorIx) => {
+        row.forEach((modIx, dstOperatorIx) => {
+          synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, modIx);
+        });
       });
-    });
-    // FM synth output weights
-    preset.synth.outputWeights.forEach((outputWeight, operatorIx) =>
-      synth.handleOutputWeightChange(operatorIx, outputWeight)
-    );
-    // FM synth operator configs
-    preset.synth.operatorConfigs.forEach((config, opIx) =>
-      synth.handleOperatorConfigChange(opIx, config)
-    );
-    // FM synth operator effects
-    preset.synth.operatorEffects.forEach((effectsForOp, opIx) => {
-      // Reverse order so that they hopefully get removed in descending order
-      [...effectsForOp].reverse().forEach((effect, effectIx) => {
-        synth.setEffect(opIx, 15 - effectIx, effect);
+      // FM synth output weights
+      preset.synth.outputWeights.forEach((outputWeight, operatorIx) =>
+        synth.handleOutputWeightChange(operatorIx, outputWeight)
+      );
+      // FM synth operator configs
+      preset.synth.operatorConfigs.forEach((config, opIx) =>
+        synth.handleOperatorConfigChange(opIx, config)
+      );
+      // FM synth operator effects
+      preset.synth.operatorEffects.forEach((effectsForOp, opIx) => {
+        // Reverse order so that they hopefully get removed in descending order
+        [...effectsForOp].reverse().forEach((effect, effectIx) => {
+          synth.setEffect(opIx, 15 - effectIx, effect);
+        });
       });
-    });
-    // FM synth main effects
-    [...preset.synth.mainEffectChain]
-      // Reverse order so that they hopefully get removed in descending order
-      .reverse()
-      .forEach((effect, effectIx) => synth.setEffect(null, 15 - effectIx, effect));
-    // FM synth selected UI
-    synth.selectedUI = preset.synth.selectedUI;
-    // FM synth detune
-    synth.handleDetuneChange(preset.synth.detune);
+      // FM synth main effects
+      [...preset.synth.mainEffectChain]
+        // Reverse order so that they hopefully get removed in descending order
+        .reverse()
+        .forEach((effect, effectIx) => synth.setEffect(null, 15 - effectIx, effect));
+      // FM synth selected UI
+      synth.selectedUI = preset.synth.selectedUI;
+      // FM synth detune
+      synth.handleDetuneChange(preset.synth.detune);
 
-    // Clear all UI and trigger it to re-initialize internal state from scratch
-    reRenderAll();
+      // Clear all UI and trigger it to re-initialize internal state from scratch
+      reRenderAll();
 
-    setTimeout(() => mainGain.connect(limiter), 200);
-  }, []);
+      setTimeout(() => mainGain.connect(limiter), 200);
+    },
+    [reRenderAll, setOctaveOffset]
+  );
   const controlPanelCtx = useRef<any>(null);
+
+  const settings = useMemo(
+    () => [
+      {
+        type: 'select',
+        label: 'select preset',
+        options: Object.keys(Presets),
+        initial: loadedPreset.current ?? 'el. piano 1',
+      },
+      {
+        type: 'button',
+        label: 'load preset',
+        action: () => {
+          if (!controlPanelCtx) {
+            console.error('Tried to load preset, but control panel context not ready');
+            return;
+          }
+
+          const presetName = controlPanelCtx.current['select preset'];
+          loadPreset(presetName);
+        },
+      },
+      {
+        type: 'button',
+        label: 'copy preset to clipboard',
+        action: async () => {
+          const serialized = serializeState();
+          try {
+            navigator.clipboard.writeText(serialized);
+            alert('Successfully copied to clipboard');
+          } catch (err) {
+            alert('Error copying text to clipboard: ' + err);
+          }
+        },
+      },
+    ],
+    [loadPreset]
+  );
 
   return (
     <ControlPanel
@@ -407,40 +449,7 @@ const PresetsControlPanel: React.FC<{
         controlPanelCtx.current = ctx;
       }}
       style={{ width: 379 }}
-      settings={[
-        {
-          type: 'select',
-          label: 'select preset',
-          options: Object.keys(Presets),
-          initial: loadedPreset.current ?? 'el. piano 1',
-        },
-        {
-          type: 'button',
-          label: 'load preset',
-          action: () => {
-            if (!controlPanelCtx) {
-              console.error('Tried to load preset, but control panel context not ready');
-              return;
-            }
-
-            const presetName = controlPanelCtx.current['select preset'];
-            loadPreset(presetName);
-          },
-        },
-        {
-          type: 'button',
-          label: 'copy preset to clipboard',
-          action: async () => {
-            const serialized = serializeState();
-            try {
-              navigator.clipboard.writeText(serialized);
-              alert('Successfully copied to clipboard');
-            } catch (err) {
-              alert('Error copying text to clipboard: ' + err);
-            }
-          },
-        },
-      ]}
+      settings={settings}
       theme={{ ...baseTheme, text1: 'rgb(75 255 89)' }}
     />
   );
