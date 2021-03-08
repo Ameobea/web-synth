@@ -419,24 +419,32 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
   const { filterParams } = buildDefaultFilterModule(filterType, filterCSNs);
 
+  // Start the filter ADSR module and configure it to modulate the voice's filter node's frequency
+  const filterADSRModule = new ADSR2Module(
+    ctx,
+    {
+      minValue: 0,
+      maxValue: 10000,
+      lengthMs: 2000,
+      steps: buildDefaultADSR2Envelope({ phaseIndex: 0 }).steps,
+      releaseStartPhase: 0.8,
+    },
+    VOICE_COUNT
+  );
+
+  const dummyGain = new GainNode(ctx);
+  dummyGain.gain.value = 0;
+  dummyGain.connect(ctx.destination);
+
   const masterGain = 0.0;
   const inst: SynthModule = {
     waveform: Waveform.Sine,
     detune: 0,
     detuneCSN: new ConstantSourceNode(ctx),
     filterBypassed: true,
-    voices: R.range(0, VOICE_COUNT).map(() => {
+    voices: R.range(0, VOICE_COUNT).map((_, voiceIndex) => {
       const outerGainNode = new GainNode(ctx);
       outerGainNode.gain.setValueAtTime(0, ctx.currentTime);
-
-      // Start the filter ADSR module and configure it to modulate the voice's filter node's frequency
-      const filterADSRModule = new ADSR2Module(ctx, {
-        minValue: 0,
-        maxValue: 10000,
-        lengthMs: 2000,
-        steps: buildDefaultADSR2Envelope({ phaseIndex: 0 }).steps,
-        releaseStartPhase: 0.8,
-      });
 
       const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs);
       // TODO: Connect ADSR once we can do so intelligently
@@ -456,14 +464,11 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
       //
       // If we don't do this, they will start off in an invalid state and, naturally, make
       // horrifically loud noises.
-      const dummyGain = new GainNode(ctx);
-      dummyGain.gain.value = 0;
-      dummyGain.connect(ctx.destination);
-      filterADSRModule.getOutput().connect(dummyGain);
+      filterADSRModule.getOutput().then(output => output.connect(dummyGain, voiceIndex));
       gainADSRModule.connect(dummyGain);
 
       setTimeout(() => {
-        filterADSRModule.getOutput().disconnect(dummyGain);
+        filterADSRModule.getOutput().then(output => output.disconnect(dummyGain, voiceIndex));
         gainADSRModule.disconnect(dummyGain);
         dummyGain.disconnect();
       }, 1000);
@@ -983,7 +988,7 @@ const actionGroups = {
 
           // Trigger gain and filter ADSRs
           targetVoice.gainADSRModule.gate();
-          targetVoice.filterADSRModule.gate();
+          targetVoice.filterADSRModule.gate(voiceIx);
           // We edit state directly w/o updating references because this is only needed internally
           targetVoice.lastGateOrUngateTime = ctx.currentTime;
 
@@ -1019,7 +1024,7 @@ const actionGroups = {
 
         // Trigger gain and filter ADSRs
         targetVoice.gainADSRModule.gate();
-        targetVoice.filterADSRModule.gate();
+        targetVoice.filterADSRModule.gate(voiceIx);
 
         if (targetSynth.waveform === Waveform.Wavetable && targetVoice.wavetable) {
           targetVoice.wavetable.paramOverrides.frequency.override.offset.setValueAtTime(
@@ -1074,7 +1079,7 @@ const actionGroups = {
 
           // Trigger release of gain and filter ADSRs
           targetVoice.gainADSRModule.ungate();
-          targetVoice.filterADSRModule.ungate();
+          targetVoice.filterADSRModule.ungate(voiceIx);
         });
       } else {
         const targetSynth = getSynth(synthIx, state.synths);
@@ -1105,7 +1110,7 @@ const actionGroups = {
 
         // Trigger release of gain and filter ADSRs
         targetVoice.gainADSRModule.ungate();
-        targetVoice.filterADSRModule.ungate();
+        targetVoice.filterADSRModule.ungate(voiceIx);
       }
 
       return state;

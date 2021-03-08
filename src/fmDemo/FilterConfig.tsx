@@ -16,7 +16,7 @@ import { msToSamples, samplesToMs } from 'src/util';
 
 export class FilterContainer {
   private ctx: AudioContext;
-  private csns: FilterCSNs;
+  public csns: FilterCSNs;
   private input: GainNode;
   private output: GainNode;
   private inner: AbstractFilterModule;
@@ -69,7 +69,7 @@ export class FilterContainer {
 
 const handleFilterChange = (
   filters: FilterContainer[],
-  adsrs: ADSR2Module[],
+  adsrs: ADSR2Module,
   state: { params: FilterParams; envelope: Adsr; bypass: boolean },
   key: string,
   val: any
@@ -89,12 +89,12 @@ const handleFilterChange = (
       break;
     }
     case 'adsr length ms': {
-      adsrs.forEach(adsr => adsr.setLengthMs(val));
+      adsrs.setLengthMs(val);
       newState.envelope.lenSamples = msToSamples(val);
       break;
     }
     case 'adsr': {
-      adsrs.forEach(adsr => adsr.setState(val));
+      adsrs.setState(val);
       newState.envelope = val;
       break;
     }
@@ -116,7 +116,7 @@ const FilterConfig: React.FC<{
     bypass: boolean;
   };
   filters: FilterContainer[];
-  adsrs: ADSR2Module[];
+  adsrs: ADSR2Module;
   onChange: (params: FilterParams, envelope: Adsr, bypass: boolean) => void;
 }> = ({ initialState, filters, adsrs, onChange }) => {
   const [state, setState] = useState(initialState);

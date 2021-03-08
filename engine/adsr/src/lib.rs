@@ -242,14 +242,14 @@ impl Adsr {
     }
 
     /// Populates `self.cur_frame_output` with samples for the current frame
-    pub fn render_frame(&mut self) {
+    pub fn render_frame(&mut self, scale: f32, shift: f32) {
         match self.gate_status {
             GateStatus::Gated
                 if self.loop_point.is_none() && self.phase >= self.release_start_phase =>
             {
                 // No loop point, so we freeze the output value and avoid re-rendering until after
                 // ungating
-                let frozen_output = self.get_sample();
+                let frozen_output = self.get_sample() * scale + shift;
                 for i in 0..FRAME_SIZE {
                     self.cur_frame_output[i] = frozen_output;
                 }
@@ -260,7 +260,7 @@ impl Adsr {
             GateStatus::Releasing if self.phase >= 1. => {
                 // If we are done, we output our final value forever and freeze the output buffer,
                 // not requiring any further rendering until we are re-gated
-                let last_output = self.rendered[self.rendered.len() - 1];
+                let last_output = self.rendered[self.rendered.len() - 1] * scale + shift;
                 for i in 0..FRAME_SIZE {
                     self.cur_frame_output[i] = last_output;
                 }
@@ -274,7 +274,7 @@ impl Adsr {
         }
 
         for i in 0..FRAME_SIZE {
-            self.cur_frame_output[i] = self.get_sample();
+            self.cur_frame_output[i] = self.get_sample() * scale + shift;
         }
         self.maybe_write_cur_phase();
     }

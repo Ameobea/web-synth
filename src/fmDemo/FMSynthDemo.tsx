@@ -108,9 +108,9 @@ const serializeState = () => {
     synth: synth.serialize(),
     octaveOffset: GlobalState.octaveOffset,
     globalVolume: GlobalState.globalVolume,
-    gainEnvelope: adsrs[0].serialize(),
+    gainEnvelope: adsrs.serialize(),
     filterParams: GlobalState.filterParams,
-    filterEnvelope: filterAdsrs[0].serialize(),
+    filterEnvelope: filterAdsrs.serialize(),
     filterBypassed: GlobalState.filterBypassed,
   };
   return JSON.stringify(serialized);
@@ -154,37 +154,55 @@ const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   }
   return gain;
 });
-const adsrs = new Array(VOICE_COUNT).fill(null).map((_i, i) => {
+const adsrs = (() => {
   const base = Option.of(serialized?.gainEnvelope)
     .map(normalizeEnvelope)
     .getOrElseL(buildDefaultGainADSR);
-  const adsr = new ADSR2Module(ctx, {
-    minValue: 0,
-    maxValue: 1,
-    lengthMs: samplesToMs(base.lenSamples),
-    loopPoint: base.loopPoint,
-    releaseStartPhase: base.releasePoint,
-    steps: base.steps,
+  const adsr = new ADSR2Module(
+    ctx,
+    {
+      minValue: 0,
+      maxValue: 1,
+      lengthMs: samplesToMs(base.lenSamples),
+      loopPoint: base.loopPoint,
+      releaseStartPhase: base.releasePoint,
+      steps: base.steps,
+    },
+    VOICE_COUNT
+  );
+
+  adsr.getOutput().then(adsrOutput => {
+    voiceGains.forEach((voiceGain, i) => {
+      adsrOutput.connect(voiceGain.gain, i);
+    });
   });
-  adsr.getOutput().connect(voiceGains[i].gain);
   return adsr;
-});
-const filterAdsrs = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
+})();
+const filterAdsrs = (() => {
   const base = Option.of(serialized?.filterEnvelope)
     .map(normalizeEnvelope)
     .getOrElseL(buildDefaultFilterEnvelope);
   GlobalState.filterEnvelope = base;
-  const adsr = new ADSR2Module(ctx, {
-    minValue: 0,
-    maxValue: 1,
-    lengthMs: samplesToMs(base.lenSamples),
-    loopPoint: base.loopPoint,
-    releaseStartPhase: base.releasePoint,
-    steps: base.steps,
+  const adsr = new ADSR2Module(
+    ctx,
+    {
+      minValue: 0,
+      maxValue: 1,
+      lengthMs: samplesToMs(base.lenSamples),
+      loopPoint: base.loopPoint,
+      releaseStartPhase: base.releasePoint,
+      steps: base.steps,
+    },
+    VOICE_COUNT
+  );
+
+  adsr.getOutput().then(adsrOutput => {
+    filters.forEach((filter, i) => {
+      adsrOutput.connect(filter.csns.frequency.manualControl.offset, i);
+    });
   });
-  adsr.getOutput().connect(filters[voiceIx].csns.frequency.manualControl.offset);
   return adsr;
-});
+})();
 
 if (!R.isNil(serialized?.filterParams)) {
   GlobalState.filterParams = serialized!.filterParams;
@@ -213,16 +231,15 @@ const synth = new FMSynth(ctx, undefined, {
           `voice_${voiceIx}_base_frequency`
         )!.value = frequency;
 
-        adsrs[voiceIx].gate();
-        filterAdsrs[voiceIx].gate();
+        adsrs.gate(voiceIx);
+        filterAdsrs.gate(voiceIx);
         inst.onGate(voiceIx);
         LastGateTimeByVoice[voiceIx] = ctx.currentTime;
       };
 
       const releaseNote = (voiceIx: number, _note: number, _velocity: number) => {
         const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
-        const releaseLengthMs =
-          (1 - adsrs[voiceIx].getReleaseStartPhase()) * adsrs[voiceIx].getLengthMs();
+        const releaseLengthMs = (1 - adsrs.getReleaseStartPhase()) * adsrs.getLengthMs();
         setTimeout(() => {
           // If the voice has been re-gated since releasing, don't disconnect
           if (LastGateTimeByVoice[voiceIx] !== expectedLastGateTime) {
@@ -235,8 +252,8 @@ const synth = new FMSynth(ctx, undefined, {
           freqParam.value = 0;
         }, releaseLengthMs);
 
-        adsrs[voiceIx].ungate();
-        filterAdsrs[voiceIx].ungate();
+        adsrs.ungate(voiceIx);
+        filterAdsrs.ungate(voiceIx);
         inst.onUnGate(voiceIx);
       };
 
@@ -296,28 +313,26 @@ const MainControlPanel: React.FC = ({}) => {
             break;
           }
           case 'volume envelope': {
-            adsrs.forEach(adsr =>
-              adsr.setState({
-                ...val,
-                lenSamples: msToSamples(adsr.getLengthMs()),
-              })
-            );
+            adsrs.setState({
+              ...val,
+              lenSamples: msToSamples(adsrs.getLengthMs()),
+            });
             setMainControlPanelState({
               ...mainControlPanelState,
               'volume envelope': {
                 ...val,
-                lenSamples: msToSamples(adsrs[0].getLengthMs()),
+                lenSamples: msToSamples(adsrs.getLengthMs()),
               },
             });
             break;
           }
           case 'volume envelope length ms': {
-            adsrs.forEach(adsr => adsr.setLengthMs(val));
+            adsrs.setLengthMs(val);
             setMainControlPanelState({
               ...mainControlPanelState,
               'volume envelope': {
                 ...mainControlPanelState['volume envelope'],
-                lenSamples: msToSamples(adsrs[0].getLengthMs()),
+                lenSamples: msToSamples(adsrs.getLengthMs()),
               },
               'volume envelope length ms': val,
             });
@@ -348,9 +363,9 @@ const PresetsControlPanel: React.FC<{
       synth.deserialize(preset.synth);
 
       // Gain ADSRs
-      adsrs.forEach(adsr => adsr.setState(normalizeEnvelope(preset.gainEnvelope)));
+      adsrs.setState(normalizeEnvelope(preset.gainEnvelope));
       // Filter ADSRs
-      filterAdsrs.forEach(adsr => adsr.setState(normalizeEnvelope(preset.filterEnvelope)));
+      filterAdsrs.setState(normalizeEnvelope(preset.filterEnvelope));
       // Octave offset
       setOctaveOffset(preset.octaveOffset);
       GlobalState.octaveOffset = preset.octaveOffset;

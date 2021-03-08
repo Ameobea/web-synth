@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::{Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE, SAMPLE_RATE};
 
 pub struct AdsrContext {
-    pub adsr: Adsr,
+    pub adsrs: Vec<Adsr>,
 }
 
 fn round_tiny_to_zero(val: f32) -> f32 {
@@ -64,24 +64,31 @@ pub unsafe extern "C" fn create_adsr_ctx(
     loop_point: f32,
     len_ms: f32,
     release_start_phase: f32,
+    adsr_count: usize,
 ) -> *mut AdsrContext {
     let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> =
         Rc::new(std::mem::MaybeUninit::uninit().assume_init());
     let len_samples = ms_to_samples(len_ms);
-    let mut adsr = Adsr::new(
-        decode_steps(ENCODED_ADSR_STEP_BUF.as_slice()),
-        if loop_point < 0. {
-            None
-        } else {
-            Some(loop_point)
-        },
-        len_samples,
-        release_start_phase,
-        rendered,
-    );
-    adsr.render();
+    let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
+    assert!(adsr_count > 0);
 
-    Box::into_raw(box AdsrContext { adsr })
+    let mut adsrs = Vec::with_capacity(adsr_count);
+    for _ in 0..adsr_count {
+        adsrs.push(Adsr::new(
+            decoded_steps.clone(),
+            if loop_point < 0. {
+                None
+            } else {
+                Some(loop_point)
+            },
+            len_samples,
+            release_start_phase,
+            Rc::clone(&rendered),
+        ));
+    }
+    adsrs[0].render();
+
+    Box::into_raw(box AdsrContext { adsrs })
 }
 
 #[no_mangle]
@@ -89,37 +96,54 @@ pub unsafe extern "C" fn free_adsr_ctx(ctx: *mut AdsrContext) { drop(Box::from_r
 
 #[no_mangle]
 pub unsafe extern "C" fn update_adsr_steps(ctx: *mut AdsrContext) {
-    let adsr = &mut (*ctx).adsr;
-    adsr.set_steps(decode_steps(ENCODED_ADSR_STEP_BUF.as_slice()));
-    adsr.render();
+    let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
+    for adsr in &mut (*ctx).adsrs {
+        adsr.set_steps(decoded_steps.clone());
+    }
+    (*ctx).adsrs[0].render();
 }
 
 fn ms_to_samples(ms: f32) -> f32 { (ms / 1000.) * SAMPLE_RATE as f32 }
 
 #[no_mangle]
 pub unsafe extern "C" fn update_adsr_len_ms(ctx: *mut AdsrContext, new_len_ms: f32) {
-    (*ctx).adsr.set_len_samples(ms_to_samples(new_len_ms))
+    for adsr in &mut (*ctx).adsrs {
+        adsr.set_len_samples(ms_to_samples(new_len_ms))
+    }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext) { (*ctx).adsr.gate() }
+pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext, index: usize) {
+    (*ctx).adsrs[index].gate()
+}
 
 #[no_mangle]
-pub unsafe extern "C" fn ungate_adsr(ctx: *mut AdsrContext) { (*ctx).adsr.ungate() }
+pub unsafe extern "C" fn ungate_adsr(ctx: *mut AdsrContext, index: usize) {
+    (*ctx).adsrs[index].ungate()
+}
 
 #[no_mangle]
-pub unsafe extern "C" fn process_adsr(ctx: *mut AdsrContext) -> *const f32 {
-    (*ctx).adsr.render_frame();
-    (*ctx).adsr.get_cur_frame_output().as_ptr()
+pub unsafe extern "C" fn process_adsr(
+    ctx: *mut AdsrContext,
+    output_range_min: f32,
+    output_range_max: f32,
+) {
+    let shift = output_range_min;
+    let scale = output_range_max - output_range_min;
+    for adsr in &mut (*ctx).adsrs {
+        adsr.render_frame(scale, shift);
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn adsr_set_loop_point(ctx: *mut AdsrContext, new_loop_point: f32) {
-    (*ctx).adsr.set_loop_point(if new_loop_point < 0. {
-        None
-    } else {
-        Some(new_loop_point)
-    });
+    for adsr in &mut (*ctx).adsrs {
+        adsr.set_loop_point(if new_loop_point < 0. {
+            None
+        } else {
+            Some(new_loop_point)
+        });
+    }
 }
 
 #[no_mangle]
@@ -127,5 +151,15 @@ pub unsafe extern "C" fn adsr_set_release_start_phase(
     ctx: *mut AdsrContext,
     new_release_start_phase: f32,
 ) {
-    (*ctx).adsr.set_release_start_phase(new_release_start_phase);
+    for adsr in &mut (*ctx).adsrs {
+        adsr.set_release_start_phase(new_release_start_phase);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn adsr_get_output_buf_ptr(
+    ctx: *const AdsrContext,
+    index: usize,
+) -> *const f32 {
+    (*ctx).adsrs[index].get_cur_frame_output().as_ptr()
 }

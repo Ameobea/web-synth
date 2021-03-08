@@ -458,7 +458,7 @@ impl FMSynthVoice {
 
         // Update and pre-render all ADSRs
         for adsr in &mut self.adsrs {
-            adsr.render_frame();
+            adsr.render_frame(1., 0.);
         }
 
         // If necessary, compute detuned base frequency based off of detune param

@@ -33,23 +33,19 @@ export interface ADSR2Params {
 
 export class ADSR2Module {
   private ctx: AudioContext;
-  private scale: GainNode;
-  private shift: ConstantSourceNode;
+  private outputRange: [number, number];
   private awp: AudioWorkletNode | undefined;
   /**
    * Params that will be sent to the AWP to initialize it
    */
   private params: ADSR2Params;
+  private onInitializedCbs: (() => void)[] = [];
 
-  constructor(ctx: AudioContext, params: ADSR2Params) {
+  constructor(ctx: AudioContext, params: ADSR2Params, instanceCount: number) {
     this.ctx = ctx;
-
-    this.scale = new GainNode(ctx);
-    this.shift = new ConstantSourceNode(ctx);
-    this.setOutputRange([params.minValue ?? 0, params.maxValue ?? 1]);
-    this.shift.start();
+    this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
     this.params = params;
-    this.init();
+    this.init(instanceCount);
   }
 
   private static encodeADSRSteps(steps: AdsrStep[]): Float32Array {
@@ -63,22 +59,37 @@ export class ADSR2Module {
     return encoded;
   }
 
-  private async init() {
+  private async init(instanceCount: number) {
     const [wasmBytes] = await Promise.all([ADSRWasm.get(), ADSR2AWPRegistered.get()] as const);
-    this.awp = new AudioWorkletNode(this.ctx, 'adsr2-awp');
+    this.awp = new AudioWorkletNode(this.ctx, 'multi-adsr2-awp', {
+      numberOfOutputs: instanceCount,
+      numberOfInputs: 0,
+      outputChannelCount: new Array(instanceCount).fill(1),
+      processorOptions: { instanceCount },
+    });
     this.awp.port.postMessage({
       type: 'setWasmBytes',
       wasmBytes,
       encodedSteps: ADSR2Module.encodeADSRSteps(this.params.steps),
       loopPoint: this.params.loopPoint,
       lenMs: this.params.lengthMs,
-      releaseStartPhase: this.params.releaseStartPhase,
+      outputRange: this.outputRange,
     });
-    this.awp.connect(this.scale).connect(this.shift.offset);
+    this.onInitializedCbs.forEach(cb => cb());
+    this.onInitializedCbs = [];
   }
 
-  public getOutput(): ConstantSourceNode {
-    return this.shift;
+  /**
+   * Only returns `undefined` if the AWP is not initialized yet
+   */
+  public async getOutput(): Promise<AudioWorkletNode> {
+    if (this.awp) {
+      return this.awp;
+    }
+
+    return new Promise(resolve => {
+      this.onInitializedCbs.push(() => resolve(this.awp!));
+    });
   }
 
   public setState(newState: Adsr) {
@@ -138,24 +149,28 @@ export class ADSR2Module {
   }
 
   public setOutputRange([minVal, maxVal]: [number, number]) {
-    this.scale.gain.value = maxVal - minVal;
-    this.shift.offset.value = minVal;
+    this.outputRange = [minVal, maxVal];
+    if (!this.awp) {
+      console.error('Tried to set ADSR2 output range before AWP initialized');
+      return;
+    }
+    this.awp.port.postMessage({ type: 'setOutputRange', outputRange: [minVal, maxVal] });
   }
 
-  public gate() {
+  public gate(adsrIndex: number) {
     if (!this.awp) {
       console.error('Failed to gate ADSR2 due to AWP not being initialized');
       return;
     }
-    this.awp.port.postMessage({ type: 'gate' });
+    this.awp.port.postMessage({ type: 'gate', index: adsrIndex });
   }
 
-  public ungate() {
+  public ungate(adsrIndex: number) {
     if (!this.awp) {
       console.error('Failed to ungate ADSR2 due to AWP not being initialized');
       return;
     }
-    this.awp.port.postMessage({ type: 'ungate' });
+    this.awp.port.postMessage({ type: 'ungate', index: adsrIndex });
   }
 
   public serialize(): Adsr {
@@ -169,7 +184,6 @@ export class ADSR2Module {
   }
 
   public destroy() {
-    this.scale.disconnect(this.shift);
     if (!this.awp) {
       throw new UnreachableException('Tried to destroy AWP before initialization');
     }

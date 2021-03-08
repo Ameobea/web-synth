@@ -1,10 +1,19 @@
 const FRAME_SIZE = 128;
 const BYTES_PER_F32 = 32 / 8;
 
-class ADSR2AWP extends AudioWorkletProcessor {
-  constructor() {
+class MultiADSR2AWP extends AudioWorkletProcessor {
+  constructor(options) {
     super();
+
+    this.adsrInstanceCount = options.processorOptions.instanceCount;
+    if (typeof this.adsrInstanceCount !== 'number') {
+      throw new Error(
+        'Must provide a number for `options.processorOptions.instanceCount` to `MultiADSR2AWP`'
+      );
+    }
+
     this.isShutdown = false;
+    this.outputRange = [0, 1];
 
     this.port.onmessage = async evt => {
       switch (evt.data.type) {
@@ -14,7 +23,8 @@ class ADSR2AWP extends AudioWorkletProcessor {
             evt.data.encodedSteps,
             evt.data.loopPoint,
             evt.data.lenMs,
-            evt.data.releaseStartPhase
+            evt.data.releaseStartPhase,
+            evt.data.outputRange
           );
           break;
         }
@@ -63,7 +73,7 @@ class ADSR2AWP extends AudioWorkletProcessor {
             console.warn('Tried to gate before wasm inst initialize in ADSR2 AWP');
             break;
           }
-          this.wasmInstance.exports.gate_adsr(this.ctxPtr);
+          this.wasmInstance.exports.gate_adsr(this.ctxPtr, evt.data.index);
           break;
         }
         case 'ungate': {
@@ -71,7 +81,12 @@ class ADSR2AWP extends AudioWorkletProcessor {
             console.warn('Tried to ungate before wasm inst initialize in ADSR2 AWP');
             break;
           }
-          this.wasmInstance.exports.ungate_adsr(this.ctxPtr);
+          this.wasmInstance.exports.ungate_adsr(this.ctxPtr, evt.data.index);
+          break;
+        }
+        case 'setOutputRange': {
+          console.log(evt.data);
+          this.outputRange = evt.data.outputRange;
           break;
         }
         default: {
@@ -112,8 +127,12 @@ class ADSR2AWP extends AudioWorkletProcessor {
     this.ctxPtr = this.wasmInstance.exports.create_adsr_ctx(
       loopPoint ?? -1,
       lenMs,
-      releaseStartPhase
+      releaseStartPhase,
+      this.adsrInstanceCount
     );
+    this.outputBufPtrs = new Array(this.adsrInstanceCount)
+      .fill(null)
+      .map((_, i) => this.wasmInstance.exports.adsr_get_output_buf_ptr(this.ctxPtr, i));
   }
 
   process(_inputs, outputs, _params) {
@@ -124,15 +143,23 @@ class ADSR2AWP extends AudioWorkletProcessor {
       return false;
     }
 
-    const ptr = this.wasmInstance.exports.process_adsr(this.ctxPtr);
-    const outputsSlice = this.getWasmMemoryBuffer().subarray(
-      ptr / BYTES_PER_F32,
-      ptr / BYTES_PER_F32 + FRAME_SIZE
-    );
-    output.set(outputsSlice);
+    this.wasmInstance.exports.process_adsr(this.ctxPtr, this.outputRange[0], this.outputRange[1]);
+    for (let i = 0; i < this.adsrInstanceCount; i++) {
+      const output = outputs[i]?.[0];
+      if (!output) {
+        continue;
+      }
+
+      const ptr = this.outputBufPtrs[i];
+      const outputsSlice = this.getWasmMemoryBuffer().subarray(
+        ptr / BYTES_PER_F32,
+        ptr / BYTES_PER_F32 + FRAME_SIZE
+      );
+      output.set(outputsSlice);
+    }
 
     return true;
   }
 }
 
-registerProcessor('adsr2-awp', ADSR2AWP);
+registerProcessor('multi-adsr2-awp', MultiADSR2AWP);
