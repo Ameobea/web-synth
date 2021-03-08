@@ -71,6 +71,7 @@ export class ADSR2Module {
       type: 'setWasmBytes',
       wasmBytes,
       encodedSteps: ADSR2Module.encodeADSRSteps(this.params.steps),
+      releaseStartPhase: this.params.releaseStartPhase,
       loopPoint: this.params.loopPoint,
       lenMs: this.params.lengthMs,
       outputRange: this.outputRange,

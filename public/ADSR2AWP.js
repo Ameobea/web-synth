@@ -18,6 +18,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     this.port.onmessage = async evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
+          this.outputRange = evt.data.outputRange;
           await this.initWasm(
             evt.data.wasmBytes,
             evt.data.encodedSteps,

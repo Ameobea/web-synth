@@ -458,7 +458,7 @@ class ScaleMarkings {
     this.destroy();
 
     const g = new PIXI.Graphics();
-    g.lineStyle(0.8, SCALE_MARKING_LINE_COLOR, 0.5, 0.5, false);
+    g.lineStyle(0.5, SCALE_MARKING_LINE_COLOR, 0.5, 0.5, false);
     g.moveTo(this.inst.width / 2, 0);
     g.lineTo(this.inst.width / 2, this.inst.height);
 

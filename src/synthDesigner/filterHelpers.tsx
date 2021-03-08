@@ -5,7 +5,9 @@ import { Range } from 'react-control-panel';
 
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
-import ControlPanelADSR2 from 'src/controls/adsr2/ControlPanelADSR2';
+import ControlPanelADSR2, {
+  mkControlPanelADSR2WithSize,
+} from 'src/controls/adsr2/ControlPanelADSR2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
 export enum FilterType {
@@ -105,7 +107,7 @@ const filterSettings = {
     type: 'custom',
     label: 'adsr',
     initial: { ...buildDefaultADSR2Envelope({ phaseIndex: 0 }), outputRange: [0, 20_000] },
-    Comp: ControlPanelADSR2,
+    Comp: mkControlPanelADSR2WithSize(500, 320),
   },
 };
 
@@ -134,6 +136,7 @@ export const getSettingsForFilterType = (
           }
         }
       })(),
+      includeADSR ? { type: 'checkbox', label: 'enable adsr', initial: true } : null,
       includeADSR
         ? {
             type: 'range',

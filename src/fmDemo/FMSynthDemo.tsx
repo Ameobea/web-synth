@@ -32,6 +32,7 @@ export interface SerializedFMSynthDemoState {
   filterParams: FilterParams;
   filterEnvelope: ADSRValues | Adsr;
   filterBypassed: boolean;
+  filterADSREnabled?: boolean | undefined;
 }
 
 const VOICE_COUNT = 10;
@@ -68,12 +69,14 @@ const GlobalState: {
   filterParams: FilterParams;
   filterEnvelope: ADSRValues | Adsr;
   filterBypassed: boolean;
+  filterADSREnabled: boolean;
 } = {
   octaveOffset: 1,
   globalVolume: 0.2,
   filterParams: getDefaultFilterParams(FilterType.Lowpass),
   filterEnvelope: buildDefaultFilterEnvelope(),
   filterBypassed: false,
+  filterADSREnabled: true,
 };
 
 const ctx = new AudioContext();
@@ -112,6 +115,7 @@ const serializeState = () => {
     filterParams: GlobalState.filterParams,
     filterEnvelope: filterAdsrs.serialize(),
     filterBypassed: GlobalState.filterBypassed,
+    filterADSREnabled: GlobalState.filterADSREnabled,
   };
   return JSON.stringify(serialized);
 };
@@ -142,6 +146,7 @@ if (!R.isNil(serialized?.octaveOffset)) {
 if (!R.isNil(serialized?.filterBypassed)) {
   GlobalState.filterBypassed = serialized!.filterBypassed;
 }
+GlobalState.filterADSREnabled = serialized!.filterADSREnabled ?? true;
 
 const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const gain = new GainNode(ctx);
@@ -186,8 +191,8 @@ const filterAdsrs = (() => {
   const adsr = new ADSR2Module(
     ctx,
     {
-      minValue: 0,
-      maxValue: 1,
+      minValue: 80,
+      maxValue: 44_100 / 2,
       lengthMs: samplesToMs(base.lenSamples),
       loopPoint: base.loopPoint,
       releaseStartPhase: base.releasePoint,
@@ -198,9 +203,13 @@ const filterAdsrs = (() => {
 
   adsr.getOutput().then(adsrOutput => {
     filters.forEach((filter, i) => {
-      adsrOutput.connect(filter.csns.frequency.manualControl.offset, i);
+      adsrOutput.connect(filter.csns.frequency, i);
+      // Filter is overridden if ADSR is disabled, meaning that the frequency slider from the UI
+      // controls the fliter's frequency completely
+      filter.csns.frequency.setIsOverridden(!GlobalState.filterADSREnabled);
     });
   });
+
   return adsr;
 })();
 
@@ -347,6 +356,20 @@ const MainControlPanel: React.FC = ({}) => {
   );
 };
 
+const bypassFilter = () => {
+  voiceGains.forEach((node, voiceIx) => {
+    node.disconnect(filters[voiceIx].getInput());
+    node.connect(mainGain);
+  });
+};
+
+const unBypassFilter = () => {
+  voiceGains.forEach((node, voiceIx) => {
+    node.disconnect(mainGain);
+    node.connect(filters[voiceIx].getInput());
+  });
+};
+
 const PresetsControlPanel: React.FC<{
   setOctaveOffset: (newOctaveOffset: number) => void;
   reRenderAll: () => void;
@@ -373,6 +396,14 @@ const PresetsControlPanel: React.FC<{
       GlobalState.filterEnvelope = preset.filterEnvelope;
       GlobalState.filterParams = preset.filterParams;
       filters.forEach(filter => filter.setAll(GlobalState.filterParams));
+      if (preset.filterBypassed !== GlobalState.filterBypassed) {
+        if (preset.filterBypassed) {
+          bypassFilter();
+        } else {
+          unBypassFilter();
+        }
+      }
+      GlobalState.filterBypassed = preset.filterBypassed;
 
       // Disconnect main output to avoid any horrific artifacts while we're switching
       mainGain.disconnect(limiter);
@@ -508,21 +539,25 @@ const FMSynthDemo: React.FC = () => {
             params: GlobalState.filterParams,
             envelope: normalizeEnvelope(GlobalState.filterEnvelope),
             bypass: GlobalState.filterBypassed,
+            enableADSR: GlobalState.filterADSREnabled,
           }}
-          onChange={(params: FilterParams, envelope: Adsr, bypass: boolean) => {
+          onChange={(
+            params: FilterParams,
+            envelope: Adsr,
+            bypass: boolean,
+            enableADSR: boolean
+          ) => {
             GlobalState.filterParams = params;
             GlobalState.filterEnvelope = envelope;
+            if (GlobalState.filterADSREnabled !== enableADSR) {
+              filters.forEach(filter => filter.csns.frequency.setIsOverridden(!enableADSR));
+            }
+            GlobalState.filterADSREnabled = enableADSR;
 
             if (bypass && !GlobalState.filterBypassed) {
-              voiceGains.forEach((node, voiceIx) => {
-                node.disconnect(filters[voiceIx].getInput());
-                node.connect(mainGain);
-              });
+              bypassFilter();
             } else if (!bypass && GlobalState.filterBypassed) {
-              voiceGains.forEach((node, voiceIx) => {
-                node.disconnect(mainGain);
-                node.connect(filters[voiceIx].getInput());
-              });
+              unBypassFilter();
             }
             GlobalState.filterBypassed = bypass;
           }}

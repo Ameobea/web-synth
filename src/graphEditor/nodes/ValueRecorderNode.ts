@@ -36,6 +36,9 @@ export const createValueRecorder = async (
   param.lastValue = defaultValue;
 
   workletHandle.port.onmessage = msg => {
+    if (msg.data !== 0) {
+      console.log(msg.data);
+    }
     param.lastValue = msg.data;
   };
   return param;

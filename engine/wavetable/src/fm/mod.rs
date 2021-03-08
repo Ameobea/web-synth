@@ -459,6 +459,11 @@ impl FMSynthVoice {
         // Update and pre-render all ADSRs
         for adsr in &mut self.adsrs {
             adsr.render_frame(1., 0.);
+            // for val in adsr.get_cur_frame_output() {
+            //     if *val != 0. && !val.is_normal() {
+            //         panic!();
+            //     }
+            // }
         }
 
         // If necessary, compute detuned base frequency based off of detune param
@@ -579,12 +584,16 @@ impl FMSynthVoice {
                 );
 
                 *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
+
                 output_sample += sample
                     * unsafe {
                         *rendered_output_weights
                             .get_unchecked(operator_ix)
                             .get_unchecked(sample_ix_within_frame)
                     };
+                // if output_sample != 0. && !output_sample.is_normal() {
+                //     panic!();
+                // }
             }
 
             debug_assert!(output_sample == 0. || output_sample.is_normal());

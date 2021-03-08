@@ -373,7 +373,7 @@ export const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
       steps: normalizedSteps,
       lenSamples: 44_100,
       loopPoint: null,
-      releasePoint: env.release.pos,
+      releasePoint: env.release.pos ?? 0.9,
       audioThreadData: { phaseIndex: 0 },
     };
   }

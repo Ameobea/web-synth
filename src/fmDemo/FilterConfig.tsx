@@ -70,7 +70,7 @@ export class FilterContainer {
 const handleFilterChange = (
   filters: FilterContainer[],
   adsrs: ADSR2Module,
-  state: { params: FilterParams; envelope: Adsr; bypass: boolean },
+  state: { params: FilterParams; envelope: Adsr; bypass: boolean; enableADSR: boolean },
   key: string,
   val: any
 ) => {
@@ -86,6 +86,10 @@ const handleFilterChange = (
     case 'type': {
       filters.forEach(filter => filter.setType(val));
       newState.params.type = val;
+      break;
+    }
+    case 'enable adsr': {
+      newState.enableADSR = val;
       break;
     }
     case 'adsr length ms': {
@@ -114,29 +118,40 @@ const FilterConfig: React.FC<{
     params: FilterParams;
     envelope: Adsr;
     bypass: boolean;
+    enableADSR: boolean;
   };
   filters: FilterContainer[];
   adsrs: ADSR2Module;
-  onChange: (params: FilterParams, envelope: Adsr, bypass: boolean) => void;
+  onChange: (params: FilterParams, envelope: Adsr, bypass: boolean, enableADSR: boolean) => void;
 }> = ({ initialState, filters, adsrs, onChange }) => {
   const [state, setState] = useState(initialState);
 
   const settings = useMemo(
     () =>
-      getSettingsForFilterType(state.params.type).map(s => {
-        delete (s as any).initial;
-        return s;
-      }),
-    [state.params.type]
+      getSettingsForFilterType(state.params.type, true, true)
+        .filter(s => {
+          if (!state.enableADSR && (s.label === 'adsr' || s.label === 'adsr length ms')) {
+            return false;
+          } else if (state.enableADSR && s.label === 'frequency') {
+            return false;
+          }
+          return true;
+        })
+        .map(s => {
+          delete (s as any).initial;
+          return s;
+        }),
+    [state.enableADSR, state.params.type]
   );
   const controlPanelState = useMemo(
     () => ({
       ...state.params,
-      adsr: { ...state.envelope, outputRange: [0, 44_100 / 2] },
+      'enable adsr': state.enableADSR,
+      adsr: { ...state.envelope, outputRange: [80, 44_100 / 2] },
       bypass: state.bypass,
       'adsr length ms': R.clamp(0, 10000, samplesToMs(state.envelope.lenSamples)),
     }),
-    [state.bypass, state.envelope, state.params]
+    [state.bypass, state.enableADSR, state.envelope, state.params]
   );
 
   return (
@@ -148,7 +163,7 @@ const FilterConfig: React.FC<{
       state={controlPanelState}
       onChange={(key: string, val: any) => {
         const newState = handleFilterChange(filters, adsrs, state, key, val);
-        onChange(newState.params, newState.envelope, newState.bypass);
+        onChange(newState.params, newState.envelope, newState.bypass, newState.enableADSR);
         setState(newState);
       }}
     />
