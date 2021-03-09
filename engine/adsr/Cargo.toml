@@ -12,4 +12,4 @@ dsp = {path = "../dsp" }
 
 [features]
 exports = []
-default = []
+default = ["exports"] # TODO REVERT

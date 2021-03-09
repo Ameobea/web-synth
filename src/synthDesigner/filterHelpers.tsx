@@ -5,9 +5,7 @@ import { Range } from 'react-control-panel';
 
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
-import ControlPanelADSR2, {
-  mkControlPanelADSR2WithSize,
-} from 'src/controls/adsr2/ControlPanelADSR2';
+import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
 export enum FilterType {

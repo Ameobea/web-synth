@@ -16,6 +16,27 @@
   margin-right: auto;
   max-width: 100%;
   box-sizing: border-box;
+
+  > div {
+    overflow-y: auto;
+  }
+}
+
+.fm-synth-main-control-panel {
+  display: flex;
+  flex-direction: column;
+  background-color: rgb(35, 35, 35);
+  min-width: 400px;
+}
+
+.fm-synth-filter-control-panel {
+  display: flex;
+  background: rgb(35, 35, 35);
+  min-width: 530px;
+  padding: 14px 14px 8px;
+  opacity: 0.95;
+  flex-basis: 700px;
+  flex-direction: column;
 }
 
 .midi-keyboard-wrapper {

@@ -134,6 +134,16 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     this.outputBufPtrs = new Array(this.adsrInstanceCount)
       .fill(null)
       .map((_, i) => this.wasmInstance.exports.adsr_get_output_buf_ptr(this.ctxPtr, i));
+
+    // Create `SharedArrayBuffer` to synchronize ADSR phase between the AWP and the UI
+    if (typeof SharedArrayBuffer !== 'undefined') {
+      this.audioThreadDataBufferInner = new SharedArrayBuffer(1 * BYTES_PER_F32);
+      this.audioThreadDataBuffer = new Float32Array(this.audioThreadDataBufferInner);
+    }
+    this.port.postMessage({
+      type: 'phaseDataBuffer',
+      phaseDataBuffer: this.audioThreadDataBufferInner,
+    });
   }
 
   process(_inputs, outputs, _params) {
@@ -144,7 +154,14 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
       return false;
     }
 
-    this.wasmInstance.exports.process_adsr(this.ctxPtr, this.outputRange[0], this.outputRange[1]);
+    const curPhase = this.wasmInstance.exports.process_adsr(
+      this.ctxPtr,
+      this.outputRange[0],
+      this.outputRange[1]
+    );
+    // Record the current phase of the most recently gated ADSR which will be displayed
+    // in the UI as an indicator on the ADSR UI
+    this.audioThreadDataBuffer[0] = curPhase;
     for (let i = 0; i < this.adsrInstanceCount; i++) {
       const output = outputs[i]?.[0];
       if (!output) {

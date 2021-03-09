@@ -2,6 +2,7 @@ import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
+import { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
 
@@ -40,11 +41,18 @@ export class ADSR2Module {
    */
   private params: ADSR2Params;
   private onInitializedCbs: (() => void)[] = [];
+  private audioThreadData: AudioThreadData;
 
-  constructor(ctx: AudioContext, params: ADSR2Params, instanceCount: number) {
+  constructor(
+    ctx: AudioContext,
+    params: ADSR2Params,
+    instanceCount: number,
+    audioThreadData: AudioThreadData
+  ) {
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
     this.params = params;
+    this.audioThreadData = audioThreadData;
     this.init(instanceCount);
   }
 
@@ -67,6 +75,20 @@ export class ADSR2Module {
       outputChannelCount: new Array(instanceCount).fill(1),
       processorOptions: { instanceCount },
     });
+    this.awp.port.onmessage = evt => {
+      switch (evt.data.type) {
+        case 'phaseDataBuffer': {
+          this.audioThreadData.buffer = new Float32Array(
+            evt.data.phaseDataBuffer as SharedArrayBuffer
+          );
+          console.log(this.audioThreadData.buffer);
+          break;
+        }
+        default: {
+          console.error('Unhandled message type from ADSR2 AWP: ', evt.data.type);
+        }
+      }
+    };
     this.awp.port.postMessage({
       type: 'setWasmBytes',
       wasmBytes,

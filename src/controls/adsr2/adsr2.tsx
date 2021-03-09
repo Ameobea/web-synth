@@ -692,7 +692,7 @@ class ADSR2Instance {
       console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
     }
 
-    this.audioThreadData = initialState?.audioThreadData;
+    this.audioThreadData = initialState.audioThreadData;
     this.onChange = onChange;
     this.ctx = ctx;
     this.outputRange = [...outputRange];

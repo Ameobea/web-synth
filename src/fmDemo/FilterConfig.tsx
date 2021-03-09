@@ -156,7 +156,7 @@ const FilterConfig: React.FC<{
 
   return (
     <ControlPanel
-      className='filter-control-panel'
+      className='fm-synth-filter-control-panel'
       style={{ width: 700 }}
       title='FILTER'
       settings={settings}

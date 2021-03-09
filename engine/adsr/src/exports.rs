@@ -4,6 +4,16 @@ use crate::{Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE, SAMPLE_RATE};
 
 pub struct AdsrContext {
     pub adsrs: Vec<Adsr>,
+    pub most_recent_gated_ix: usize,
+}
+
+impl AdsrContext {
+    pub fn new(adsrs: Vec<Adsr>) -> Self {
+        AdsrContext {
+            adsrs,
+            most_recent_gated_ix: 0,
+        }
+    }
 }
 
 fn round_tiny_to_zero(val: f32) -> f32 {
@@ -88,11 +98,11 @@ pub unsafe extern "C" fn create_adsr_ctx(
     }
     adsrs[0].render();
 
-    Box::into_raw(box AdsrContext { adsrs })
+    Box::into_raw(box AdsrContext::new(adsrs))
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn free_adsr_ctx(ctx: *mut AdsrContext) { drop(Box::from_raw(ctx)) }
+// #[no_mangle]
+// pub unsafe extern "C" fn free_adsr_ctx(ctx: *mut AdsrContext) { drop(Box::from_raw(ctx)) }
 
 #[no_mangle]
 pub unsafe extern "C" fn update_adsr_steps(ctx: *mut AdsrContext) {
@@ -114,7 +124,8 @@ pub unsafe extern "C" fn update_adsr_len_ms(ctx: *mut AdsrContext, new_len_ms: f
 
 #[no_mangle]
 pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext, index: usize) {
-    (*ctx).adsrs[index].gate()
+    (*ctx).adsrs[index].gate();
+    (*ctx).most_recent_gated_ix = index;
 }
 
 #[no_mangle]
@@ -122,17 +133,21 @@ pub unsafe extern "C" fn ungate_adsr(ctx: *mut AdsrContext, index: usize) {
     (*ctx).adsrs[index].ungate()
 }
 
+/// Updates all ADSRs, rendering them to their respective output buffers.  Returns the current phase
+/// of the most recent gated ADSR.
 #[no_mangle]
 pub unsafe extern "C" fn process_adsr(
     ctx: *mut AdsrContext,
     output_range_min: f32,
     output_range_max: f32,
-) {
+) -> f32 {
     let shift = output_range_min;
     let scale = output_range_max - output_range_min;
     for adsr in &mut (*ctx).adsrs {
         adsr.render_frame(scale, shift);
     }
+
+    (*ctx).adsrs[(*ctx).most_recent_gated_ix].phase
 }
 
 #[no_mangle]

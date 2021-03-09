@@ -173,7 +173,8 @@ const adsrs = (() => {
       releaseStartPhase: base.releasePoint,
       steps: base.steps,
     },
-    VOICE_COUNT
+    VOICE_COUNT,
+    base.audioThreadData
   );
 
   adsr.getOutput().then(adsrOutput => {
@@ -198,7 +199,8 @@ const filterAdsrs = (() => {
       releaseStartPhase: base.releasePoint,
       steps: base.steps,
     },
-    VOICE_COUNT
+    VOICE_COUNT,
+    base.audioThreadData
   );
 
   adsr.getOutput().then(adsrOutput => {
@@ -526,7 +528,7 @@ const FMSynthDemo: React.FC = () => {
   return (
     <div className='fm-synth-demo'>
       <div className='fm-synth-demo-controls' style={{ height }}>
-        <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgb(35,35,35)' }}>
+        <div className='fm-synth-main-control-panel'>
           <MainControlPanel />
           <PresetsControlPanel setOctaveOffset={setOctaveOffset} reRenderAll={reRenderAll} />
         </div>
