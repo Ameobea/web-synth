@@ -16,7 +16,7 @@ members = [
 ]
 
 [profile.release]
-debug-assertions = true
+#debug-assertions = true
 panic = "abort"
 debug = true
 codegen-units = 1

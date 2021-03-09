@@ -163,6 +163,7 @@ function updateFilterNode<K extends keyof FilterParams>(
     }
     case 'adsr':
     case 'bypass':
+    case 'enable adsr':
     case 'adsr length ms':
       return null;
     case 'q':
@@ -170,7 +171,12 @@ function updateFilterNode<K extends keyof FilterParams>(
       csns.Q.manualControl.offset.value = (val as any) ?? 0;
       return null;
     default: {
-      const param: ConstantSourceNode = csns[key as Exclude<typeof key, 'type'>].manualControl;
+      const baseParam = csns[key as Exclude<typeof key, 'type'>];
+      if (!baseParam) {
+        console.error('`updateFilterNode`: unhandled key: ', key);
+        return null;
+      }
+      const param: ConstantSourceNode = baseParam.manualControl;
       param.offset.value = val as number;
       return null;
     }
