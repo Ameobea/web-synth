@@ -1,6 +1,6 @@
 # vocal synthesis
 
-There's a lot of stuff out there for vocal synthesis.  Much of it seems to be Japanese.  I'm focusing on musical/singing aspects, the sure leader of which is Vocaloid.  However, Vocaloid is very much proprietary and entirely closed off.  However, there are alternatives:
+There's a lot of stuff out there for vocal synthesis.  It's a field that has seen research and work for decades.  There's a high representation of content from Japanese researchers, it seems.  I'm focusing on musical/singing aspects, the sure leader of which is Vocaloid.  However, Vocaloid is very much proprietary and entirely closed off.  However, there are alternatives:
 
 - [[utau]]: Freeware similar to Vocaloid with lots of freely available soundbanks.  However, the quality is almost always far lower than that of the Vocaloids, especially modern ones.
 - [[synthesizer-v]]: More recent, actively updated, non-free vocal synthesizer built by this genius: <https://github.com/Sleepwalking>
@@ -8,13 +8,23 @@ There's a lot of stuff out there for vocal synthesis.  Much of it seems to be Ja
 - [Open JTalk](http://open-jtalk.sourceforge.net/), a high-quality Japanese language speech synth that uses [[HTS]] under the hood
 - [eCantorix](https://github.com/divVerent/ecantorix) which uses [eSpeak](http://espeak.sourceforge.net/) under the hood (I know nothing about this but saw it mentioned in an UTAU discussion thread)
 
-Then, there's some amount of actual open-source stuff out there as well.  The most of it seems to be based off of [[HTS]], a speech synthesis system that uses Hiden Markov Models and Deep Neural Networks to synthesize audio. There's a closely related project called Festival that seems to use at least parts of HTS internally.  [[sinsy]] is an open source singing synth that builds on top of HTS to generate synthesized singing.  It's still under development very recently (as of Dec 2020 they released some significant new features).  However, it seems that they stopped publishing source code updates with their latest features, and basically none of their trained voice models are available.  Another popular one out there that builds on top of HTS is [[open-jtalk]] which is like Sinsy but targeted at speech rather than song.
+Then, there's some amount of actual open-source stuff out there as well.  The most of it seems to be based off of [[HTS]], a speech synthesis system that uses Hiden Markov Models and Deep Neural Networks to synthesize audio. [[sinsy]] is an open source singing synth that builds on top of HTS to generate synthesized singing.  It's still under development very recently (as of Dec 2020 they released some significant new features).  However, it seems that they stopped publishing source code updates with their latest features, and basically none of their trained voice models are available.  Another popular one out there that builds on top of HTS is [[open-jtalk]] which is like Sinsy but targeted at speech rather than song.
 
-From what I can tell, there really isn't a readily available drop-in open source solution available.  [[sinsy]] is the closest that I've found to that, but as I mention in the article many of their best/most recent features don't seem to be available in their open source release and none (well, all but one crappy one) of their voice models seem to be publicly available.  Building something broadly useful in this space for web-synth will almost certainly require a ton of effort and be a massive undertaking in and of itself.  Although there is a wide range of content out there, much of which is open source, the majority seems to be at the framework level ([[HTS]]) or in the form of demos/research/POC.  I do not plan to spend much effort in this space due to the huge investment that would be required and the limited scope.
+From what I can tell, there really isn't a readily available drop-in open source solution available.  [[sinsy]] is the closest that I've found to that, but as I mention in the article many of their best/most recent features don't seem to be available in their open source release and none (well, all but one crappy one) of their voice models seem to be publicly available.  Building something broadly useful in this space for web-synth will almost certainly require a ton of effort and be a massive undertaking in and of itself.
 
-If I do come back to this and spend time developing something, I feel that it will be something in the [[utau]] space.  Their method of [[concatenative-synthesis]] is much more accessible than the hidden markove model training stuff used by [[HTS]], and there is actually an active community of people out there involved with it.
+## open source libraries
 
-## sleepwalking
+* [[world-vocoder]]
+* [[libllsm2]]
+* [[hts]]
+
+### machine learning
+
+Recently, as in the past 3-5 years, there has been an explosion of activity in neural-network powered audio generation.  There has been a lot of research from places like Google invested in very strong TTS for obvious reasons.  The strongest and most actively researched member of this space seems to be [[wavenet]], a generative artificial neural network that produces output audio sample-by-sample rather than using vocoders or anything else like that.  It is what powers Google's in-house TTS across their suite of products and software.
+
+The more I read into these things, the more accessible it actually seems to be.  There are a lot of high-quality implementations of the research papers created by places like NVIDIA.  Training data for the TTS parts
+
+### sleepwalking
 
 There is a notable exception to much of my assessment above in the form of a single person: [[sleepwalking]].  His Github has a collection of seemingly high-quality libraries that are still updated and actively used in his [[synthesizer-v]] software, meaning that they have real-world use and applicability in a popular, high-quality piece of vocal synthesis software.
 
@@ -24,6 +34,9 @@ There is a notable exception to much of my assessment above in the form of a sin
 [sinsy]: sinsy "sinsy"
 [HTS]: hts "HTS"
 [open-jtalk]: open-jtalk "Open JTalk"
-[concatenative-synthesis]: concatenative-synthesis "concatenative-synthesis"
+[world-vocoder]: world-vocoder "world-vocoder"
+[libllsm2]: libllsm2 "libllsm2"
+[hts]: hts "HTS"
+[wavenet]: wavenet "wavenet"
 [sleepwalking]: sleepwalking "sleepwalking"
 [//end]: # "Autogenerated link references"
