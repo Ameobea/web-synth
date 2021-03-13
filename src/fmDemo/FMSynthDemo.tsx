@@ -406,6 +406,10 @@ const PresetsControlPanel: React.FC<{
         }
       }
       GlobalState.filterBypassed = preset.filterBypassed;
+      if (GlobalState.filterADSREnabled !== (preset.filterADSREnabled ?? false)) {
+        filters.forEach(filter => filter.csns.frequency.setIsOverridden(!preset.filterADSREnabled));
+      }
+      GlobalState.filterADSREnabled = preset.filterADSREnabled ?? false;
 
       // Disconnect main output to avoid any horrific artifacts while we're switching
       mainGain.disconnect(limiter);

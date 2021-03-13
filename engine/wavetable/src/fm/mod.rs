@@ -945,6 +945,37 @@ impl FMSynthContext {
             );
         }
     }
+
+    pub fn update_operator_enabled_statuses(&mut self) {
+        // Check to see if any operators need to be enabled/disabled
+        for operator_ix in 0..OPERATOR_COUNT {
+            // operator is disabled if it doesn't output anything and doesn't modulate any other
+            // operators
+            let disabled = self.modulation_matrix.output_weights[operator_ix].source_type
+                == ParamSourceType::Constant(0.)
+                && (0..OPERATOR_COUNT).all(|dst_operator_ix| {
+                    self.modulation_matrix
+                        .get_operator_modulation_index(operator_ix, dst_operator_ix)
+                        .source_type
+                        == ParamSourceType::Constant(0.)
+                });
+
+            for voice_ix in 0..self.voices.len() {
+                let was_disabled = !self.voices[voice_ix].operators[operator_ix].enabled;
+                self.voices[voice_ix].operators[operator_ix].enabled = !disabled;
+
+                // zero out cached modulation indices to avoid having to do so every tick
+                if !was_disabled && disabled {
+                    for dst_operator_ix in 0..OPERATOR_COUNT {
+                        for voice in &mut self.voices {
+                            voice.cached_modulation_indices[operator_ix][dst_operator_ix] =
+                                [0.; FRAME_SIZE];
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[no_mangle]
@@ -1015,35 +1046,7 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
     ));
     (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix] = param;
 
-    // Check to see if any operators need to be enabled/disabled
-    for operator_ix in 0..OPERATOR_COUNT {
-        // operator is disabled if it doesn't output anything and doesn't modulate any other
-        // operators
-        let disabled = (*ctx).modulation_matrix.output_weights[operator_ix].source_type
-            == ParamSourceType::Constant(0.)
-            && (0..OPERATOR_COUNT).all(|dst_operator_ix| {
-                (*ctx)
-                    .modulation_matrix
-                    .get_operator_modulation_index(operator_ix, dst_operator_ix)
-                    .source_type
-                    == ParamSourceType::Constant(0.)
-            });
-
-        for voice in &mut (*ctx).voices {
-            let was_disabled = !voice.operators[operator_ix].enabled;
-            voice.operators[operator_ix].enabled = !disabled;
-
-            // zero out cached modulation indices to avoid having to do so every tick
-            if !was_disabled && disabled {
-                for dst_operator_ix in 0..OPERATOR_COUNT {
-                    for voice in &mut (*ctx).voices {
-                        voice.cached_modulation_indices[operator_ix][dst_operator_ix] =
-                            [0.; FRAME_SIZE];
-                    }
-                }
-            }
-        }
-    }
+    (*ctx).update_operator_enabled_statuses();
 }
 
 #[no_mangle]
@@ -1062,6 +1065,8 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
         val_param_float_2,
     ));
     (*ctx).modulation_matrix.output_weights[operator_ix] = param;
+
+    (*ctx).update_operator_enabled_statuses();
 }
 
 fn build_oscillator_source(
