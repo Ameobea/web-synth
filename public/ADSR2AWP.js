@@ -139,6 +139,8 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     if (typeof SharedArrayBuffer !== 'undefined') {
       this.audioThreadDataBufferInner = new SharedArrayBuffer(1 * BYTES_PER_F32);
       this.audioThreadDataBuffer = new Float32Array(this.audioThreadDataBufferInner);
+    } else {
+      this.audioThreadDataBuffer = new Float32Array(1);
     }
     this.port.postMessage({
       type: 'phaseDataBuffer',

@@ -163,7 +163,7 @@ function updateFilterNode<K extends keyof FilterParams>(
     }
     case 'adsr':
     case 'bypass':
-    case 'enable adsr':
+    case 'enable envelope':
     case 'adsr length ms':
       return null;
     case 'q':

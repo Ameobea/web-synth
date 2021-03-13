@@ -21,6 +21,8 @@ import { Presets } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { useWindowSize } from 'src/reactUtils';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
+import { MIDIInput } from 'src/midiKeyboard/midiInput';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();
 
@@ -33,6 +35,7 @@ export interface SerializedFMSynthDemoState {
   filterEnvelope: ADSRValues | Adsr;
   filterBypassed: boolean;
   filterADSREnabled?: boolean | undefined;
+  selectedMIDIInputName: string | undefined;
 }
 
 const VOICE_COUNT = 10;
@@ -70,6 +73,7 @@ const GlobalState: {
   filterEnvelope: ADSRValues | Adsr;
   filterBypassed: boolean;
   filterADSREnabled: boolean;
+  selectedMIDIInputName?: string | undefined;
 } = {
   octaveOffset: 1,
   globalVolume: 0.2,
@@ -77,6 +81,7 @@ const GlobalState: {
   filterEnvelope: buildDefaultFilterEnvelope(),
   filterBypassed: false,
   filterADSREnabled: true,
+  selectedMIDIInputName: undefined,
 };
 
 const ctx = new AudioContext();
@@ -116,6 +121,7 @@ const serializeState = () => {
     filterEnvelope: filterAdsrs.serialize(),
     filterBypassed: GlobalState.filterBypassed,
     filterADSREnabled: GlobalState.filterADSREnabled,
+    selectedMIDIInputName: GlobalState.selectedMIDIInputName,
   };
   return JSON.stringify(serialized);
 };
@@ -147,6 +153,7 @@ if (!R.isNil(serialized?.filterBypassed)) {
   GlobalState.filterBypassed = serialized!.filterBypassed;
 }
 GlobalState.filterADSREnabled = serialized!.filterADSREnabled ?? true;
+GlobalState.selectedMIDIInputName = serialized!.selectedMIDIInputName;
 
 const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const gain = new GainNode(ctx);
@@ -273,6 +280,21 @@ const synth = new FMSynth(ctx, undefined, {
     });
   },
 });
+
+const midiInputNode = new MIDINode();
+const midiInput = new MIDIInput(ctx, midiInputNode, GlobalState.selectedMIDIInputName);
+const midiOutput = new MIDINode(() => ({
+  onAttack: (note, _velocity) => polySynthMod?.handle_note_down(polysynthCtxPtr, note),
+  onRelease: (note, _velocity) => polySynthMod?.handle_note_up(polysynthCtxPtr, note),
+  onClearAll: () => {
+    // no-op; this will never get sent directly from user MIDI devices and only exists
+    // for internal web-synth use cases that aren't part of this demo
+  },
+  onPitchBend: () => {
+    // not implemented
+  },
+}));
+midiInputNode.connect(midiOutput);
 
 const MainControlPanel: React.FC = ({}) => {
   const gainEnvelope = useMemo(
@@ -507,6 +529,68 @@ const PresetsControlPanel: React.FC<{
   );
 };
 
+const MIDIInputControlPanel: React.FC = () => {
+  const [availableMIDIInputs, setAvailableMIDIInputs] = useState<string[]>([]);
+  const [selectedMIDIInputName, setSelectedMIDIInputNameInner] = useState<string>(
+    GlobalState.selectedMIDIInputName ?? ''
+  );
+  const setSelectedMIDIInputName = (newMIDIInputName: string) => {
+    GlobalState.selectedMIDIInputName = newMIDIInputName ? newMIDIInputName : undefined;
+    setSelectedMIDIInputNameInner(newMIDIInputName);
+    console.log({ newMIDIInputName });
+    midiInput.handleSelectedInputName(newMIDIInputName ? newMIDIInputName : undefined);
+  };
+
+  useEffect(() => {
+    midiInput.getMidiInputNames().then(availableMIDIInputNames => {
+      setAvailableMIDIInputs(['', ...availableMIDIInputNames]);
+      if (
+        GlobalState.selectedMIDIInputName &&
+        availableMIDIInputNames.includes(GlobalState.selectedMIDIInputName)
+      ) {
+        setSelectedMIDIInputName(GlobalState.selectedMIDIInputName);
+      }
+    });
+  }, []);
+
+  const settings = useMemo(
+    () => [
+      { label: 'midi device', type: 'select', options: availableMIDIInputs },
+      {
+        label: 'refresh midi device list',
+        type: 'button',
+        action: () =>
+          midiInput
+            .getMidiInputNames()
+            .then(availableMIDIInputNames =>
+              setAvailableMIDIInputs(['', ...availableMIDIInputNames])
+            ),
+      },
+    ],
+    [availableMIDIInputs]
+  );
+  const state = useMemo(() => ({ 'midi device': selectedMIDIInputName }), [selectedMIDIInputName]);
+
+  return (
+    <ControlPanel
+      settings={settings}
+      style={{ width: 379 }}
+      state={state}
+      onChange={(key: string, val: any) => {
+        switch (key) {
+          case 'midi device': {
+            setSelectedMIDIInputName(val);
+            break;
+          }
+          default: {
+            console.error('Unhandled key in MIDI input control panel: ', key);
+          }
+        }
+      }}
+    />
+  );
+};
+
 const FMSynthDemo: React.FC = () => {
   const [octaveOffset, setOctaveOffsetInner] = useState(serialized?.octaveOffset ?? 1);
   const setOctaveOffset = (newOctaveOffset: number) => {
@@ -535,6 +619,7 @@ const FMSynthDemo: React.FC = () => {
         <div className='fm-synth-main-control-panel'>
           <MainControlPanel />
           <PresetsControlPanel setOctaveOffset={setOctaveOffset} reRenderAll={reRenderAll} />
+          <MIDIInputControlPanel />
         </div>
 
         <ConnectedFMSynthUI synth={synth} />
@@ -586,9 +671,12 @@ const root = (ReactDOM as any).unstable_createRoot(document.getElementById('root
 
 setTimeout(() => {
   const elem = document.getElementById('simd-status');
-  if (navigator.userAgent.includes('Firefox/')) {
+
+  if (!navigator.requestMIDIAccess) {
     elem!.innerHTML +=
-      '<br /><br/><span style="color: rgb(233,142,24);">Firefox has <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1171438">several</a> <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1567777">bugs</a> in its WebAudio implementation; Chrome will give a better experience</span>';
+      '<br /><br/><span style="color: rgb(233,142,24);">Web MIDI support not detected; external MIDI device support not available</span>';
+  } else {
+    elem!.innerHTML += '<br/><br/><span>Web MIDI support detected</span>';
   }
 
   if (typeof SharedArrayBuffer === 'undefined') {

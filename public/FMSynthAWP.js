@@ -265,6 +265,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
       );
       this.audioThreadDataBuffer = new Float32Array(this.audioThreadDataBufferInner);
       this.adsrPhasesBufPtr = this.wasmInstance.exports.get_adsr_phases_buf_ptr(this.ctxPtr);
+    } else {
+      this.audioThreadDataBuffer = new Float32Array(1);
     }
 
     this.port.postMessage({
@@ -338,7 +340,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     }
 
     // Copy current ADSR phases to shared buffer
-    if (this.audioThreadDataBuffer) {
+    if (this.audioThreadDataBuffer && this.adsrPhasesBufPtr) {
       const adsrPhaseBuf = wasmMemory.subarray(
         this.adsrPhasesBufPtr / BYTES_PER_F32,
         this.adsrPhasesBufPtr / BYTES_PER_F32 + ADSR_PHASE_BUF_LENGTH

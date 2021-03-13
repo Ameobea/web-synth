@@ -134,7 +134,7 @@ export const getSettingsForFilterType = (
           }
         }
       })(),
-      includeADSR ? { type: 'checkbox', label: 'enable adsr', initial: true } : null,
+      includeADSR ? { type: 'checkbox', label: 'enable envelope', initial: true } : null,
       includeADSR
         ? {
             type: 'range',

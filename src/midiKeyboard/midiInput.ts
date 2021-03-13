@@ -1,5 +1,6 @@
 import { Option } from 'funfix-core';
 import { IterableValueOf, UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
 
 import { MIDINode, MIDIAccess } from 'src/patchNetwork/midiNode';
 
@@ -29,9 +30,7 @@ export class MIDIInput {
     try {
       // Request MIDI access and load the Wasm MIDI module at the same time
       [access, midiModule] = await Promise.all([
-        navigator
-          .requestMIDIAccess()
-          .catch(err => `Error while attempting to get MIDI access: ${err}`),
+        navigator.requestMIDIAccess(),
         this.midiModule || import('src/midi'),
       ] as [Promise<typeof access>, Promise<typeof midiModule>]);
     } catch (err) {
@@ -115,13 +114,14 @@ export class MIDIInput {
     return { inputName: this.selectedInputName };
   }
 
-  public handleSelectedInputName(newInputName: string) {
+  public handleSelectedInputName(newInputName: string | undefined) {
     if (this.selectedInputName === newInputName) {
       return;
     }
 
     if (this.wasmMidiCtxPtr && this.midiModule) {
       this.midiModule.drop_msg_handler_ctx(this.wasmMidiCtxPtr);
+      this.wasmMidiCtxPtr = 0;
       if (this.midiInput && this.midiMsgHandlerCb) {
         this.midiInput.removeEventListener('midimessage', this.midiMsgHandlerCb);
       }
@@ -129,7 +129,9 @@ export class MIDIInput {
 
     this.selectedInputName = newInputName;
 
-    return this.initMIDI();
+    if (!R.isNil(this.selectedInputName)) {
+      this.initMIDI();
+    }
   }
 
   public async getMidiInputNames(): Promise<string[]> {
