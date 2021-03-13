@@ -1,11 +1,12 @@
 # festival
 
-**Festival** is an open source [[vocal-synthesis]] software package from Carnegie Mellon University.  It is very old but had its most recent release in December 2017. It has ties with the [[hts]] ecosystem.
+**Festival** is an open source [[vocal-synthesis]] software package from Carnegie Mellon University (CMU).  It is very old but had its most recent release in December 2017. It has ties with the [[hts]] ecosystem.
 
 ## links
 
 * festvox: the parent project of festival, flite, and other supporting software packages: <http://festvox.org/>
 * flite (festival-lite): a small, slimmed-down version of Festival: <http://www.festvox.org/flite/>
+* CMU Arctic database of recorded speech: <http://festvox.org/cmu_arctic/>
 
 Main website: <http://www.festvox.org/flite/>
 
