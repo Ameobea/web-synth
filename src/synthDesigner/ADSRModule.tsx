@@ -81,7 +81,6 @@ export class ADSR2Module {
           this.audioThreadData.buffer = new Float32Array(
             evt.data.phaseDataBuffer as SharedArrayBuffer
           );
-          console.log(this.audioThreadData.buffer);
           break;
         }
         default: {

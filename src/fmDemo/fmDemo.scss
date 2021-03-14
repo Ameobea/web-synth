@@ -29,6 +29,16 @@
   min-width: 400px;
 }
 
+@media screen and (max-width: 799px) {
+  .fm-synth-main-control-panel {
+    min-width: 100vw;
+  }
+
+  select, input, button {
+    font-size: 10px;
+  }
+}
+
 .fm-synth-filter-control-panel {
   display: flex;
   background: rgb(35, 35, 35);
@@ -46,10 +56,7 @@
   align-items: flex-end;
 }
 
-#root
-  > div
-  > div.fm-synth-demo-controls
-  > div:nth-child(1)
+#root div.fm-synth-main-control-panel
   > div:nth-child(1)
   > div:nth-child(1)
   > div.draggable
@@ -61,6 +68,19 @@
   max-width: 200px;
 }
 
-.midi-keyboard {
-  max-width: calc(100vw - 400px);
+// Make github corner smaller on Mobile so it doesn't cover up important UI
+@media screen and (max-width: 799px) {
+  .github-corner > svg {
+    transform: scale(0.5) translate(40px, -40px);
+  }
+
+  .ReactPiano__NoteLabelContainer {
+    display: none;
+  }
+}
+
+@media screen and (min-width: 800px) {
+  .midi-keyboard {
+    max-width: calc(100vw - 400px);
+  }
 }

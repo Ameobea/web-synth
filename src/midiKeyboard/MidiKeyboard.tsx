@@ -74,7 +74,8 @@ export const MidiKeyboard: React.FC<{
   onOctaveOffsetChange: (newOctaveOffset: number) => void;
   onAttack: (midiNumber: number) => void;
   onRelease: (midiNumber: number) => void;
-}> = ({ octaveOffset, onOctaveOffsetChange, onAttack, onRelease }) => {
+  style?: React.CSSProperties;
+}> = ({ octaveOffset, onOctaveOffsetChange, onAttack, onRelease, style }) => {
   const [alreadyDownNotes, setAlreadyDownNotes] = useReducer(
     (
       state: ImmSet<number>,
@@ -162,7 +163,7 @@ export const MidiKeyboard: React.FC<{
   }, [octaveOffset, playNote, releaseNote]);
 
   return (
-    <div className='midi-keyboard'>
+    <div className='midi-keyboard' style={style}>
       {/* <ADSRDemo /> */}
       <div className='octave-controls-wrapper'>
         <div className='octave-changer-label'>Octave</div>

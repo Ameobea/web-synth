@@ -1,4 +1,4 @@
-import { PromiseResolveType } from 'ameo-utils';
+import { filterNils, PromiseResolveType } from 'ameo-utils';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import ControlPanel from 'react-control-panel';
@@ -313,29 +313,38 @@ const MainControlPanel: React.FC = ({}) => {
   });
 
   const SizedControlPanelADSR2 = useMemo(() => mkControlPanelADSR2WithSize(360, 200), []);
-
-  return (
-    <ControlPanel
-      style={{ width: 379 }}
-      settings={[
+  const settings = useMemo(
+    () =>
+      filterNils([
         {
           type: 'range',
           label: 'MAIN VOLUME',
           min: 0,
           max: 1,
         },
-        {
-          type: 'range',
-          label: 'volume envelope length ms',
-          min: 10,
-          max: 10_000,
-        },
-        {
-          type: 'custom',
-          label: 'volume envelope',
-          Comp: SizedControlPanelADSR2,
-        },
-      ]}
+        window.screen.width < 800
+          ? null
+          : {
+              type: 'range',
+              label: 'volume envelope length ms',
+              min: 10,
+              max: 10_000,
+            },
+        window.screen.width < 800
+          ? null
+          : {
+              type: 'custom',
+              label: 'volume envelope',
+              Comp: SizedControlPanelADSR2,
+            },
+      ]),
+    [SizedControlPanelADSR2]
+  );
+
+  return (
+    <ControlPanel
+      style={{ width: window.screen.width < 800 ? '100%' : 379 }}
+      settings={settings}
       state={mainControlPanelState}
       onChange={(key: string, val: any) => {
         switch (key) {
@@ -479,40 +488,43 @@ const PresetsControlPanel: React.FC<{
   const controlPanelCtx = useRef<any>(null);
 
   const settings = useMemo(
-    () => [
-      {
-        type: 'select',
-        label: 'select preset',
-        options: Object.keys(Presets),
-        initial: loadedPreset.current ?? 'el. piano 1',
-      },
-      {
-        type: 'button',
-        label: 'load preset',
-        action: () => {
-          if (!controlPanelCtx) {
-            console.error('Tried to load preset, but control panel context not ready');
-            return;
-          }
+    () =>
+      filterNils([
+        {
+          type: 'select',
+          label: 'select preset',
+          options: Object.keys(Presets),
+          initial: loadedPreset.current ?? 'el. piano 1',
+        },
+        {
+          type: 'button',
+          label: 'load preset',
+          action: () => {
+            if (!controlPanelCtx) {
+              console.error('Tried to load preset, but control panel context not ready');
+              return;
+            }
 
-          const presetName = controlPanelCtx.current['select preset'];
-          loadPreset(presetName);
+            const presetName = controlPanelCtx.current['select preset'];
+            loadPreset(presetName);
+          },
         },
-      },
-      {
-        type: 'button',
-        label: 'copy preset to clipboard',
-        action: async () => {
-          const serialized = serializeState();
-          try {
-            navigator.clipboard.writeText(serialized);
-            alert('Successfully copied to clipboard');
-          } catch (err) {
-            alert('Error copying text to clipboard: ' + err);
-          }
-        },
-      },
-    ],
+        window.screen.width < 800
+          ? null
+          : {
+              type: 'button',
+              label: 'copy preset to clipboard',
+              action: async () => {
+                const serialized = serializeState();
+                try {
+                  navigator.clipboard.writeText(serialized);
+                  alert('Successfully copied to clipboard');
+                } catch (err) {
+                  alert('Error copying text to clipboard: ' + err);
+                }
+              },
+            },
+      ]),
     [loadPreset]
   );
 
@@ -522,7 +534,7 @@ const PresetsControlPanel: React.FC<{
       contextCb={(ctx: any) => {
         controlPanelCtx.current = ctx;
       }}
-      style={{ width: 379 }}
+      style={{ width: window.screen.width < 800 ? '100%' : 379 }}
       settings={settings}
       theme={{ ...baseTheme, text1: 'rgb(75 255 89)' }}
     />
@@ -574,7 +586,7 @@ const MIDIInputControlPanel: React.FC = () => {
   return (
     <ControlPanel
       settings={settings}
-      style={{ width: 379 }}
+      style={{ width: window.screen.width < 800 ? '100%' : 379 }}
       state={state}
       onChange={(key: string, val: any) => {
         switch (key) {
@@ -611,6 +623,36 @@ const FMSynthDemo: React.FC = () => {
 
   if (!renderUI) {
     return null;
+  }
+
+  if (window.screen.width < 800) {
+    return (
+      <>
+        <div className='fm-synth-main-control-panel'>
+          <MainControlPanel />
+          <PresetsControlPanel setOctaveOffset={setOctaveOffset} reRenderAll={reRenderAll} />
+        </div>
+
+        <p>
+          This is a trimmed-down version for mobile; visit the site on desktop for the full
+          experience! Try turning your phone sideways as well.
+        </p>
+        <p>
+          It&apos;s also possible that the demo might not work at all due to poor support of modern
+          web APIs in some mobile browsers.
+        </p>
+
+        <div className='midi-keyboard-wrapper' style={{ bottom: 0, position: 'absolute' }}>
+          <MidiKeyboard
+            octaveOffset={octaveOffset}
+            onOctaveOffsetChange={setOctaveOffset}
+            onAttack={midiNumber => polySynthMod?.handle_note_down(polysynthCtxPtr, midiNumber)}
+            onRelease={midiNumber => polySynthMod?.handle_note_up(polysynthCtxPtr, midiNumber)}
+            style={{ height: 180 }}
+          />
+        </div>
+      </>
+    );
   }
 
   return (
