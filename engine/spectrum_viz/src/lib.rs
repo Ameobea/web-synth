@@ -213,7 +213,7 @@ pub fn process_viz_data(ctx: *mut Context) {
         .unwrap_or_else(|| panic!("No color fn found with index {}", color_fn_ix));
 
     unsafe {
-        for (i, val) in (&((*ctx).byte_frequency_data)[..]).iter().enumerate() {
+        for (i, val) in (&((*ctx).byte_frequency_data)[..]).iter().rev().enumerate() {
             let [r, g, b, _] = color_fn((*ctx).scaler_fn, *val);
             (*ctx).pixel_buffer[i * 4] = r;
             (*ctx).pixel_buffer[i * 4 + 1] = g;

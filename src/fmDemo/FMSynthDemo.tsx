@@ -23,6 +23,7 @@ import { useWindowSize } from 'src/reactUtils';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MIDINode } from 'src/patchNetwork/midiNode';
+import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();
 
@@ -95,6 +96,14 @@ const filters = new Array(VOICE_COUNT).fill(null).map(() => {
   filter.getOutput().connect(mainGain);
   return filter;
 });
+
+const analyzerNode = new AnalyserNode(ctx);
+mainGain.connect(analyzerNode);
+// We connect it but pass through no audio, just keep it driven as a part of the
+// audio graph.
+const muter = new GainNode(ctx);
+muter.gain.value = 0;
+muter.connect(ctx.destination);
 
 document.addEventListener('keydown', () => ctx.resume(), { once: true });
 document.addEventListener('mousedown', () => ctx.resume(), { once: true });
@@ -620,6 +629,7 @@ const FMSynthDemo: React.FC = () => {
     setOctaveOffsetInner(newOctaveOffset);
   };
   const [renderUI, setRenderUI] = useState(true);
+  const [showViz, setShowViz] = useState(false);
   const reRenderAll = () => setRenderUI(false);
   useEffect(() => {
     if (!renderUI) {
@@ -676,39 +686,60 @@ const FMSynthDemo: React.FC = () => {
           <MainControlPanel />
           <PresetsControlPanel setOctaveOffset={setOctaveOffset} reRenderAll={reRenderAll} />
           <MIDIInputControlPanel />
+          <ControlPanel
+            settings={[
+              {
+                type: 'button',
+                label: showViz ? 'hide visualization' : 'show visualization',
+                action: () => setShowViz(!showViz),
+              },
+            ]}
+            style={{ width: 379 }}
+          />
         </div>
 
-        <ConnectedFMSynthUI synth={synth} />
-        <FilterConfig
-          filters={filters}
-          adsrs={filterAdsrs}
-          initialState={{
-            params: GlobalState.filterParams,
-            envelope: normalizeEnvelope(GlobalState.filterEnvelope),
-            bypass: GlobalState.filterBypassed,
-            enableADSR: GlobalState.filterADSREnabled,
-          }}
-          onChange={(
-            params: FilterParams,
-            envelope: Adsr,
-            bypass: boolean,
-            enableADSR: boolean
-          ) => {
-            GlobalState.filterParams = params;
-            GlobalState.filterEnvelope = envelope;
-            if (GlobalState.filterADSREnabled !== enableADSR) {
-              filters.forEach(filter => filter.csns.frequency.setIsOverridden(!enableADSR));
-            }
-            GlobalState.filterADSREnabled = enableADSR;
+        {showViz ? (
+          <SpectrumVisualization
+            paused={false}
+            analyzerNode={analyzerNode}
+            initialConf={{ color_fn: 2, scaler_fn: 0 }}
+            height={800}
+          />
+        ) : (
+          <>
+            <ConnectedFMSynthUI synth={synth} />
+            <FilterConfig
+              filters={filters}
+              adsrs={filterAdsrs}
+              initialState={{
+                params: GlobalState.filterParams,
+                envelope: normalizeEnvelope(GlobalState.filterEnvelope),
+                bypass: GlobalState.filterBypassed,
+                enableADSR: GlobalState.filterADSREnabled,
+              }}
+              onChange={(
+                params: FilterParams,
+                envelope: Adsr,
+                bypass: boolean,
+                enableADSR: boolean
+              ) => {
+                GlobalState.filterParams = params;
+                GlobalState.filterEnvelope = envelope;
+                if (GlobalState.filterADSREnabled !== enableADSR) {
+                  filters.forEach(filter => filter.csns.frequency.setIsOverridden(!enableADSR));
+                }
+                GlobalState.filterADSREnabled = enableADSR;
 
-            if (bypass && !GlobalState.filterBypassed) {
-              bypassFilter();
-            } else if (!bypass && GlobalState.filterBypassed) {
-              unBypassFilter();
-            }
-            GlobalState.filterBypassed = bypass;
-          }}
-        />
+                if (bypass && !GlobalState.filterBypassed) {
+                  bypassFilter();
+                } else if (!bypass && GlobalState.filterBypassed) {
+                  unBypassFilter();
+                }
+                GlobalState.filterBypassed = bypass;
+              }}
+            />
+          </>
+        )}
       </div>
       <div className='midi-keyboard-wrapper'>
         <MidiKeyboard

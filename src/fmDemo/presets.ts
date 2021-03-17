@@ -42,7 +42,7 @@ export const Presets: { [name: string]: SerializedFMSynthDemoState } = {
   pluck: JSON.parse(pluck),
   flourine: JSON.parse(flourine),
   'electric harpsicord': JSON.parse(elHarpsicord),
-  'dubstep growl': JSON.parse(dubstepGrowl1),
+  'dubsteppy growl': JSON.parse(dubstepGrowl1),
   'lost ufo': JSON.parse(lostUfo),
   harmonic: JSON.parse(harmonic),
   vanadinite: JSON.parse(vanadinite),

@@ -32,12 +32,21 @@ const RawWasmModule = new AsyncOnce(() =>
 
 const WasmModule = new AsyncOnce(() => import('src/spectrum_viz'));
 
-export const SpectrumVisualization: React.FC<{
+interface SpectrumVisualizationProps {
   initialConf?: SpectrumVizSettings;
   canvasStyle?: React.CSSProperties;
   analyzerNode: AnalyserNode;
   paused?: boolean;
-}> = ({ initialConf, canvasStyle, analyzerNode, paused = false }) => {
+  height?: number;
+}
+
+export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
+  initialConf,
+  canvasStyle,
+  analyzerNode,
+  paused = false,
+  height = 1024,
+}) => {
   const [spectrumSettingsDefinition, setSpectrumSettingsDefinition] = useState<{
     color_functions: SettingDefinition[];
     scaler_functions: SettingDefinition[];
@@ -49,6 +58,7 @@ export const SpectrumVisualization: React.FC<{
     ((ctx2D: CanvasRenderingContext2D) => () => void) | null
   >(null);
   const animationFrameHandle = useRef<number | null>(null);
+  const lockedHeight = useRef(height);
 
   useEffect(() => {
     if (paused && animationFrameHandle.current !== null) {
@@ -74,6 +84,9 @@ export const SpectrumVisualization: React.FC<{
     }
 
     const ctxPtr = spectrumModule.current.new_context(0, 0);
+    if (initialConf) {
+      spectrumModule.current!.set_conf(ctxPtr, initialConf.color_fn, initialConf.scaler_fn);
+    }
     setCtxPtr(ctxPtr);
 
     let curIx = 0;
@@ -115,11 +128,14 @@ export const SpectrumVisualization: React.FC<{
         if (ctx.pixelDataBuf.buffer !== ctx.rawSpectrumViz.memory.buffer) {
           // Memory grown/re-allocated?
           ctx.pixelDataBuf = new Uint8ClampedArray(
-            spectrumVizRawModule.memory.buffer.slice(pixelDataPtr, pixelDataPtr + BUFFER_SIZE * 4)
+            spectrumVizRawModule.memory.buffer.slice(
+              pixelDataPtr + (BUFFER_SIZE - lockedHeight.current) * 4,
+              pixelDataPtr + (BUFFER_SIZE - lockedHeight.current) * 4 + lockedHeight.current * 4
+            )
           );
         }
-        const imageData = new ImageData(ctx.pixelDataBuf, 1, BUFFER_SIZE);
-        ctx2D.putImageData(imageData, curIx, 0, 0, 0, 1, BUFFER_SIZE);
+        const imageData = new ImageData(ctx.pixelDataBuf, 1, lockedHeight.current);
+        ctx2D.putImageData(imageData, curIx, 0, 0, 0, 1, lockedHeight.current);
 
         animationFrameHandle.current = requestAnimationFrame(updateViz);
       };
@@ -139,7 +155,6 @@ export const SpectrumVisualization: React.FC<{
         <Loading />
       ) : (
         <ControlPanel
-          state={initialConf}
           onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) =>
             spectrumModule.current!.set_conf(ctxPtr, +color_fn, +scaler_fn)
           }
@@ -151,7 +166,7 @@ export const SpectrumVisualization: React.FC<{
                 (acc, { id, name }) => ({ ...acc, [name]: id }),
                 {}
               ),
-              initial: spectrumSettingsDefinition.scaler_functions[0].id,
+              initial: spectrumSettingsDefinition.scaler_functions[initialConf?.scaler_fn ?? 0].id,
             },
             {
               type: 'select',
@@ -160,7 +175,7 @@ export const SpectrumVisualization: React.FC<{
                 (acc, { id, name }) => ({ ...acc, [name]: id }),
                 {}
               ),
-              initial: spectrumSettingsDefinition.color_functions[0].id,
+              initial: spectrumSettingsDefinition.color_functions[initialConf?.color_fn ?? 0].id,
             },
           ]}
           draggable
@@ -170,7 +185,7 @@ export const SpectrumVisualization: React.FC<{
       <canvas
         ref={ref => setCanvasRef(ref)}
         width={WIDTH}
-        height={1024}
+        height={lockedHeight.current}
         id='spectrum-visualizer'
         style={{
           backgroundColor: '#000',
