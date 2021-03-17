@@ -66,6 +66,7 @@
 
 #simd-status {
   max-width: 200px;
+  z-index: 5;
 }
 
 // Make github corner smaller on Mobile so it doesn't cover up important UI
@@ -76,6 +77,10 @@
 
   .ReactPiano__NoteLabelContainer {
     display: none;
+  }
+
+  #simd-status {
+    pointer-events: none;
   }
 }
 

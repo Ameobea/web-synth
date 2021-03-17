@@ -2,7 +2,10 @@
 use core::arch::wasm32::*;
 use std::rc::Rc;
 
-use adsr::{Adsr, AdsrStep, GateStatus, RampFn, RENDERED_BUFFER_SIZE};
+use adsr::{
+    Adsr, AdsrStep, EarlyReleaseConfig, EarlyReleaseStrategy, GateStatus, RampFn,
+    RENDERED_BUFFER_SIZE,
+};
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
@@ -1287,6 +1290,7 @@ pub unsafe extern "C" fn set_adsr(
             len_samples,
             release_start_phase,
             shared_buffer.clone(),
+            EarlyReleaseConfig::default(),
         );
         if voice.adsrs.get(adsr_ix).is_some() {
             let old_phase = voice.adsrs[adsr_ix].phase;

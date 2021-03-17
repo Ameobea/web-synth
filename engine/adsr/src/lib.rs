@@ -70,10 +70,51 @@ pub enum GateStatus {
     /// been pre-filled with that value, so rendering is not required until afer the ADSR is
     /// un-gated and the release is triggered.
     GatedFrozen,
+    /// We released the note before the we reached the release point.  To avoid the issue where
+    /// audio artifacts emerge because we jump from the current phase to the release point, we add
+    /// the option to smoothly mix between the current value and the release value.
+    EarlyRelease {
+        /// The x value of the ADSR when it was released.  MUST be < `release_start_phase` or else
+        /// we wouldn't do early release and would continue following the envelope like normal.
+        start_x: f32,
+        /// The y value of the ADSR when it was released
+        start_y: f32,
+        /// The y value of the envelope at `release_start_phase`
+        release_start_point_y: f32,
+        /// Number of samples in the early release that we've processed so far
+        cur_progress_samples: usize,
+    },
     Releasing,
     /// The ADSR has been released and reached the end of its phase.  The output buffer has been
     /// filled with the final output value, and further rendering is not required.
     Done,
+}
+
+/// Method that we use if releasing the ADSR before we reach the release point
+#[derive(Clone)]
+pub enum EarlyReleaseStrategy {
+    /// We mix linearly between the start value (value of the ADSR when it was released) and the
+    /// value at the release point linearly
+    LinearMix,
+    /// We follow the ADSR's envelope at an increased speed, bridging the gap between the point at
+    /// which the ADSR was released and the release point in `len_samples` samples
+    FastEnvelopeFollow,
+}
+
+/// Determines how we handle releasing if the ADSR is ungated before the release point
+#[derive(Clone)]
+pub struct EarlyReleaseConfig {
+    pub strategy: EarlyReleaseStrategy,
+    pub len_samples: usize,
+}
+
+impl Default for EarlyReleaseConfig {
+    fn default() -> Self {
+        EarlyReleaseConfig {
+            strategy: EarlyReleaseStrategy::LinearMix,
+            len_samples: 2_640,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -83,6 +124,7 @@ pub struct Adsr {
     pub gate_status: GateStatus,
     /// Point at which the decay begins.
     pub release_start_phase: f32,
+    pub early_release_config: EarlyReleaseConfig,
     steps: Vec<AdsrStep>,
     /// If provided, once the ADSR hits point `release_start_phase`, it will loop back to
     /// `loop_point` until it is released.
@@ -115,6 +157,7 @@ impl Adsr {
         len_samples: f32,
         release_start_phase: f32,
         rendered: Rc<[f32; RENDERED_BUFFER_SIZE]>,
+        early_release_config: EarlyReleaseConfig,
     ) -> Self {
         Adsr {
             phase: 0.,
@@ -123,6 +166,7 @@ impl Adsr {
                 Some(loop_point) => release_start_phase.max(loop_point),
                 _ => release_start_phase,
             },
+            early_release_config,
             steps,
             loop_point,
             rendered,
@@ -139,8 +183,23 @@ impl Adsr {
     }
 
     pub fn ungate(&mut self) {
-        self.phase = self.release_start_phase;
-        self.gate_status = GateStatus::Releasing;
+        if self.phase < self.release_start_phase {
+            self.gate_status = GateStatus::EarlyRelease {
+                start_x: self.phase,
+                start_y: dsp::read_interpolated(
+                    &*self.rendered,
+                    self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
+                ),
+                release_start_point_y: dsp::read_interpolated(
+                    &*self.rendered,
+                    self.release_start_phase * (RENDERED_BUFFER_SIZE - 2) as f32,
+                ),
+                cur_progress_samples: 0,
+            };
+        } else {
+            self.phase = self.release_start_phase;
+            self.gate_status = GateStatus::Releasing;
+        }
     }
 
     /// Renders the ADSR into the shared buffer.  Only needs to be called once for all ADSRs that
@@ -190,6 +249,16 @@ impl Adsr {
             let prev_step = prev_step_opt.unwrap_or(&DEFAULT_FIRST_STEP);
             buf[i] = compute_pos(prev_step, next_step, phase);
         }
+
+        // Make sure that when we fully finish the ADSR, we emit the final step's terminal value
+        // forever instead of getting stuck a few indices before the end due to mixing/etc.
+        match self.steps.last() {
+            Some(step) if step.x == 1. => {
+                buf[buf.len() - 2] = step.y;
+                buf[buf.len() - 1] = step.y;
+            },
+            _ => (),
+        }
     }
 
     pub fn set_len_samples(&mut self, new_len_samples: f32) {
@@ -202,6 +271,20 @@ impl Adsr {
     /// TODO: Fastpath this if we are not close to hitting the decay point (if gated )or the end of
     /// the waveform (if released)
     fn advance_phase(&mut self) {
+        if let GateStatus::EarlyRelease {
+            cur_progress_samples,
+            ..
+        } = &mut self.gate_status
+        {
+            *cur_progress_samples += 1;
+            if *cur_progress_samples <= self.early_release_config.len_samples {
+                return;
+            } else {
+                self.phase = self.release_start_phase;
+                self.gate_status = GateStatus::Releasing;
+            }
+        }
+
         self.phase = (self.phase + self.cached_phase_diff_per_sample).min(1.);
 
         // We are gating and have crossed the release point
@@ -226,11 +309,35 @@ impl Adsr {
     fn get_sample(&mut self) -> f32 {
         self.advance_phase();
 
-        debug_assert!(self.phase >= 0. && self.phase <= 1.);
-        let sample = dsp::read_interpolated(
-            &*self.rendered,
-            self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
-        );
+        let sample = match self.gate_status {
+            GateStatus::EarlyRelease {
+                cur_progress_samples,
+                start_x,
+                start_y,
+                release_start_point_y,
+                ..
+            } => {
+                let early_release_phase =
+                    (cur_progress_samples as f32) / self.early_release_config.len_samples as f32;
+
+                let early_release_phase_len = self.release_start_phase - start_x;
+                self.phase = start_x + early_release_phase * early_release_phase_len;
+
+                match self.early_release_config.strategy {
+                    EarlyReleaseStrategy::FastEnvelopeFollow => todo!(),
+                    EarlyReleaseStrategy::LinearMix =>
+                        dsp::mix(early_release_phase, release_start_point_y, start_y),
+                }
+            },
+            _ => {
+                debug_assert!(self.phase >= 0. && self.phase <= 1.);
+                dsp::read_interpolated(
+                    &*self.rendered,
+                    self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
+                )
+            },
+        };
+
         debug_assert!(sample.is_normal() || sample == 0.);
         sample
     }
@@ -260,11 +367,6 @@ impl Adsr {
             GateStatus::Releasing if self.phase >= 1. => {
                 // If we are done, we output our final value forever and freeze the output buffer,
                 // not requiring any further rendering until we are re-gated
-                let last_output = self.rendered[self.rendered.len() - 1] * scale + shift;
-                for i in 0..FRAME_SIZE {
-                    self.cur_frame_output[i] = last_output;
-                }
-                self.gate_status = GateStatus::Done;
             },
             GateStatus::GatedFrozen | GateStatus::Done => {
                 self.maybe_write_cur_phase();

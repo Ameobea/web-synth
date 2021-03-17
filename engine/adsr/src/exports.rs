@@ -17,7 +17,7 @@ impl AdsrContext {
 }
 
 fn round_tiny_to_zero(val: f32) -> f32 {
-    if val.abs() < 0.00001 {
+    if val.abs() < 0.001 {
         0.
     } else {
         val
@@ -94,6 +94,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
             len_samples,
             release_start_phase,
             Rc::clone(&rendered),
+            crate::EarlyReleaseConfig::default(),
         ));
     }
     adsrs[0].render();

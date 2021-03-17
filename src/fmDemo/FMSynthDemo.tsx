@@ -36,6 +36,7 @@ export interface SerializedFMSynthDemoState {
   filterBypassed: boolean;
   filterADSREnabled?: boolean | undefined;
   selectedMIDIInputName: string | undefined;
+  lastLoadedPreset?: string | undefined;
 }
 
 const VOICE_COUNT = 10;
@@ -74,6 +75,7 @@ const GlobalState: {
   filterBypassed: boolean;
   filterADSREnabled: boolean;
   selectedMIDIInputName?: string | undefined;
+  lastLoadedPreset?: string | undefined;
 } = {
   octaveOffset: 1,
   globalVolume: 0.2,
@@ -82,6 +84,7 @@ const GlobalState: {
   filterBypassed: false,
   filterADSREnabled: true,
   selectedMIDIInputName: undefined,
+  lastLoadedPreset: undefined,
 };
 
 const ctx = new AudioContext();
@@ -122,6 +125,7 @@ const serializeState = () => {
     filterBypassed: GlobalState.filterBypassed,
     filterADSREnabled: GlobalState.filterADSREnabled,
     selectedMIDIInputName: GlobalState.selectedMIDIInputName,
+    lastLoadedPreset: GlobalState.lastLoadedPreset,
   };
   return JSON.stringify(serialized);
 };
@@ -137,7 +141,8 @@ try {
   if (localStorage.fmSynthDemoState) {
     serialized = JSON.parse(localStorage.fmSynthDemoState);
   } else {
-    serialized = Presets['bass guitar'];
+    serialized = Presets['pluck'];
+    GlobalState.lastLoadedPreset = 'pluck';
   }
 } catch (err) {
   console.error('Error deserializing fm synth');
@@ -154,6 +159,7 @@ if (!R.isNil(serialized?.filterBypassed)) {
 }
 GlobalState.filterADSREnabled = serialized!.filterADSREnabled ?? true;
 GlobalState.selectedMIDIInputName = serialized!.selectedMIDIInputName;
+GlobalState.lastLoadedPreset = serialized!.lastLoadedPreset;
 
 const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const gain = new GainNode(ctx);
@@ -257,7 +263,6 @@ const synth = new FMSynth(ctx, undefined, {
 
       const releaseNote = (voiceIx: number, _note: number, _velocity: number) => {
         const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
-        const releaseLengthMs = (1 - adsrs.getReleaseStartPhase()) * adsrs.getLengthMs();
         setTimeout(() => {
           // If the voice has been re-gated since releasing, don't disconnect
           if (LastGateTimeByVoice[voiceIx] !== expectedLastGateTime) {
@@ -268,7 +273,7 @@ const synth = new FMSynth(ctx, undefined, {
             `voice_${voiceIx}_base_frequency`
           )!;
           freqParam.value = 0;
-        }, releaseLengthMs);
+        }, adsrs.getLengthMs());
 
         adsrs.ungate(voiceIx);
         filterAdsrs.ungate(voiceIx);
@@ -407,11 +412,9 @@ const PresetsControlPanel: React.FC<{
   setOctaveOffset: (newOctaveOffset: number) => void;
   reRenderAll: () => void;
 }> = ({ setOctaveOffset, reRenderAll }) => {
-  const loadedPreset = useRef<keyof typeof Presets | null>(null);
-
   const loadPreset = useCallback(
-    (presetName: keyof typeof Presets) => {
-      loadedPreset.current = presetName;
+    (presetName: string) => {
+      GlobalState.lastLoadedPreset = presetName;
       const preset = R.clone(Presets[presetName]);
       const oldGlobalVolume = serialized?.globalVolume;
       serialized = preset;
@@ -494,7 +497,7 @@ const PresetsControlPanel: React.FC<{
           type: 'select',
           label: 'select preset',
           options: Object.keys(Presets),
-          initial: loadedPreset.current ?? 'el. piano 1',
+          initial: GlobalState.lastLoadedPreset ?? 'pluck',
         },
         {
           type: 'button',
@@ -633,14 +636,18 @@ const FMSynthDemo: React.FC = () => {
           <PresetsControlPanel setOctaveOffset={setOctaveOffset} reRenderAll={reRenderAll} />
         </div>
 
-        <p>
-          This is a trimmed-down version for mobile; visit the site on desktop for the full
-          experience! Try turning your phone sideways as well.
-        </p>
-        <p>
-          It&apos;s also possible that the demo might not work at all due to poor support of modern
-          web APIs in some mobile browsers.
-        </p>
+        {window.screen.width < window.screen.height ? (
+          <>
+            <p>
+              This is a trimmed-down version for mobile; visit the site on desktop for the full
+              experience! Try turning your phone sideways as well.
+            </p>
+            <p>
+              It&apos;s also possible that the demo might not work at all due to poor support of
+              modern web APIs in some mobile browsers.
+            </p>
+          </>
+        ) : null}
 
         <div className='midi-keyboard-wrapper' style={{ bottom: 0, position: 'absolute' }}>
           <MidiKeyboard
