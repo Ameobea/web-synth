@@ -1065,23 +1065,31 @@ const actionGroups = {
           const releaseLengthMs =
             (1 - targetVoice.gainADSRModule.envelope.release.pos) * gainADSRLength;
 
-          setTimeout(() => {
-            const state = getState();
-            const targetSynth = state.synths[synthIx];
-            const { waveform, fmSynth } = targetSynth;
-            const targetVoice = voices[voiceIx];
-            if (targetVoice.lastGateOrUngateTime !== ungateTime) {
-              // Voice has been re-gated before it finished playing last time; do not disconnect
-              return;
-            }
+          setTimeout(
+            () => {
+              const state = getState();
+              const targetSynth = state.synths[synthIx];
+              const { waveform, fmSynth } = targetSynth;
+              const targetVoice = voices[voiceIx];
+              if (targetVoice.lastGateOrUngateTime !== ungateTime) {
+                // Voice has been re-gated before it finished playing last time; do not disconnect
+                return;
+              }
 
-            targetVoice.outerGainNode.disconnect();
+              targetVoice.outerGainNode.disconnect();
 
-            // Optimization to avoid computing voices that aren't playing
-            if (waveform === Waveform.FM && fmSynth) {
-              fmSynth.setFrequency(voiceIx, 0);
-            }
-          }, releaseLengthMs + 150);
+              // Optimization to avoid computing voices that aren't playing
+              if (waveform === Waveform.FM && fmSynth) {
+                fmSynth.setFrequency(voiceIx, 0);
+              }
+            },
+            // We wait until the voice is done playing, accounting for the early-release phase and
+            // adding a little bit extra leeway
+            //
+            // We will need to make this dynamic if we make the length of the early release period
+            // user-configurable
+            releaseLengthMs + (2_640 / 44_100) * 1000 + 60
+          );
 
           // Trigger release of gain and filter ADSRs
           targetVoice.gainADSRModule.ungate();

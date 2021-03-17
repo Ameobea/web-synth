@@ -261,6 +261,13 @@ const synth = new FMSynth(ctx, undefined, {
         LastGateTimeByVoice[voiceIx] = ctx.currentTime;
       };
 
+      // We wait until the voice is done playing, accounting for the early-release phase and
+      // adding a little bit extra leeway
+      //
+      // We will need to make this dynamic if we make the length of the early release period
+      // user-configurable
+      const releaseLengthMs =
+        (1 - adsrs.getReleaseStartPhase()) * adsrs.getLengthMs() + (2_640 / 44_100) * 1000 + 60;
       const releaseNote = (voiceIx: number, _note: number, _velocity: number) => {
         const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
         setTimeout(() => {
@@ -273,7 +280,7 @@ const synth = new FMSynth(ctx, undefined, {
             `voice_${voiceIx}_base_frequency`
           )!;
           freqParam.value = 0;
-        }, adsrs.getLengthMs());
+        }, releaseLengthMs);
 
         adsrs.ungate(voiceIx);
         filterAdsrs.ungate(voiceIx);
