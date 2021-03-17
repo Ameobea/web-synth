@@ -4,6 +4,7 @@ import { useOnce } from 'ameo-utils';
 
 import Loading from 'src/misc/Loading';
 import { AsyncOnce } from 'src/util';
+import { getSentry } from 'src/sentry';
 
 export interface SpectrumVizSettings {
   color_fn: number;
@@ -155,9 +156,12 @@ export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
         <Loading />
       ) : (
         <ControlPanel
-          onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) =>
-            spectrumModule.current!.set_conf(ctxPtr, +color_fn, +scaler_fn)
-          }
+          onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
+            getSentry()?.captureMessage('Spectrum viz change settings', {
+              extra: { color_fn, scaler_fn },
+            });
+            spectrumModule.current!.set_conf(ctxPtr, +color_fn, +scaler_fn);
+          }}
           settings={[
             {
               type: 'select',

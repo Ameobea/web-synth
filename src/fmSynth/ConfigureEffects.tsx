@@ -6,6 +6,7 @@ import { Option } from 'funfix-core';
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import FlatButton from 'src/misc/FlatButton';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { getSentry } from 'src/sentry';
 
 export enum ButterworthFilterMode {
   Lowpass = 0,
@@ -374,6 +375,9 @@ const EffectManagement: React.FC<{
         {effectIx !== 0 ? (
           <FlatButton
             onClick={() => {
+              getSentry()?.captureMessage('Shift FM synth effect position', {
+                extra: { direction: 'up', effectIx },
+              });
               const newEffects = [...operatorEffects];
               const swapEffect = operatorEffects[effectIx - 1];
               newEffects[effectIx - 1] = newEffects[effectIx];
@@ -387,6 +391,9 @@ const EffectManagement: React.FC<{
         {operatorEffects[effectIx + 1] ? (
           <FlatButton
             onClick={() => {
+              getSentry()?.captureMessage('Shift FM synth effect position', {
+                extra: { direction: 'down', effectIx },
+              });
               const newEffects = [...operatorEffects];
               const swapEffect = operatorEffects[effectIx + 1];
               newEffects[effectIx + 1] = newEffects[effectIx];
@@ -494,6 +501,7 @@ const ConfigureEffects: React.FC<{
             type: 'button',
             label: 'add effect',
             action: () => {
+              getSentry()?.captureMessage('Add FM Synth Effect', { extra: { selectedEffectType } });
               const activeEffectCount = state.filter(e => e).length;
               if (activeEffectCount === state.length) {
                 // Max effect count reached

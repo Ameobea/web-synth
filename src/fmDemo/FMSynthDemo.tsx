@@ -113,8 +113,10 @@ const sentryRecord = (msg: string, extra: Record<string, any> = {}) => {
   if (!sentry) {
     return;
   }
-  sentry.captureMessage(msg, { extra: { ...extra, fmSynthDemo: true } });
+  sentry.captureMessage(msg, { tags: { fmSynthDemo: true }, extra });
 };
+
+getSentry()?.setContext('fmSynthDemo', { fmSynthDemo: true });
 
 // Add a limiter in between the main output and the destination to avoid super loud noises
 // and extra volume caused by combining multiple voices
@@ -578,13 +580,11 @@ const MIDIInputControlPanel: React.FC = () => {
   const setSelectedMIDIInputName = (newMIDIInputName: string) => {
     GlobalState.selectedMIDIInputName = newMIDIInputName ? newMIDIInputName : undefined;
     setSelectedMIDIInputNameInner(newMIDIInputName);
-    console.log({ newMIDIInputName });
     midiInput.handleSelectedInputName(newMIDIInputName ? newMIDIInputName : undefined);
   };
 
   useEffect(() => {
     midiInput.getMidiInputNames().then(availableMIDIInputNames => {
-      getSentry()?.setContext('availableMIDIInputNames', { availableMIDIInputNames });
       setAvailableMIDIInputs(['', ...availableMIDIInputNames]);
       if (
         GlobalState.selectedMIDIInputName &&
@@ -620,6 +620,7 @@ const MIDIInputControlPanel: React.FC = () => {
       onChange={(key: string, val: any) => {
         switch (key) {
           case 'midi device': {
+            sentryRecord('Selected MIDI device', { midiInputName: val });
             setSelectedMIDIInputName(val);
             break;
           }
@@ -757,7 +758,10 @@ const FMSynthDemo: React.FC = () => {
       <div className='midi-keyboard-wrapper'>
         <MidiKeyboard
           octaveOffset={octaveOffset}
-          onOctaveOffsetChange={setOctaveOffset}
+          onOctaveOffsetChange={newOctaveOffset => {
+            setOctaveOffset(newOctaveOffset);
+            sentryRecord('Octave offset change', { newOctaveOffset });
+          }}
           onAttack={midiNumber => polySynthMod?.handle_note_down(polysynthCtxPtr, midiNumber)}
           onRelease={midiNumber => polySynthMod?.handle_note_up(polysynthCtxPtr, midiNumber)}
         />
@@ -778,6 +782,10 @@ setTimeout(() => {
   } else {
     elem!.innerHTML += '<br/><br/><span>Web MIDI support detected</span>';
   }
+  getSentry()?.setContext('hasWebMIDISupport', {
+    hasWebMIDISupport: !!navigator.requestMIDIAccess,
+    hasSharedArrayBufferSupport: typeof SharedArrayBuffer !== 'undefined',
+  });
 
   if (typeof SharedArrayBuffer === 'undefined') {
     elem!.innerHTML +=
@@ -786,6 +794,9 @@ setTimeout(() => {
 }, 1000);
 
 if (typeof AudioWorkletNode === 'undefined') {
+  getSentry()?.captureException(
+    new Error('Browser does not support `AudioWorkletNode`; displaying not supported message')
+  );
   root.render(
     <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
       <BrowserNotSupported />

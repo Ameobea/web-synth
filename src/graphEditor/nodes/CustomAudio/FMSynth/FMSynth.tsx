@@ -14,6 +14,7 @@ import { ParamSource, buildDefaultAdsr } from 'src/fmSynth/ConfigureParamSource'
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import { AsyncOnce } from 'src/util';
 import { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import { getSentry } from 'src/sentry';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -31,11 +32,12 @@ const buildDefaultModulationIndices = (): ParamSource[][] => {
 };
 
 // prettier-ignore
-const getHasSIMDSupport = async() => WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
+const getHasSIMDSupport = async () => WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
 
 const WavetableWasmBytes = new AsyncOnce(
   async (): Promise<ArrayBuffer> => {
     const hasSIMDSupport = await getHasSIMDSupport();
+    getSentry()?.setContext('wasmSIMDSupport', { hasWasmSIMDSupport: hasSIMDSupport });
     console.log(
       hasSIMDSupport
         ? 'Wasm SIMD support detected!'
