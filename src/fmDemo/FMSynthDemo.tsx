@@ -16,7 +16,7 @@ import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { normalizeEnvelope, FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { initSentry } from 'src/sentry';
+import { getSentry, initSentry } from 'src/sentry';
 import { Presets } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { useWindowSize } from 'src/reactUtils';
@@ -107,6 +107,14 @@ muter.connect(ctx.destination);
 
 document.addEventListener('keydown', () => ctx.resume(), { once: true });
 document.addEventListener('mousedown', () => ctx.resume(), { once: true });
+
+const sentryRecord = (msg: string, extra: Record<string, any> = {}) => {
+  const sentry = getSentry();
+  if (!sentry) {
+    return;
+  }
+  sentry.captureMessage(msg, { extra: { ...extra, fmSynthDemo: true } });
+};
 
 // Add a limiter in between the main output and the destination to avoid super loud noises
 // and extra volume caused by combining multiple voices
@@ -525,6 +533,7 @@ const PresetsControlPanel: React.FC<{
             }
 
             const presetName = controlPanelCtx.current['select preset'];
+            sentryRecord('Load preset', { presetName });
             loadPreset(presetName);
           },
         },
@@ -535,6 +544,7 @@ const PresetsControlPanel: React.FC<{
               label: 'copy preset to clipboard',
               action: async () => {
                 const serialized = serializeState();
+                sentryRecord('Copy preset to keyboard', { serialized });
                 try {
                   navigator.clipboard.writeText(serialized);
                   alert('Successfully copied to clipboard');
@@ -574,6 +584,7 @@ const MIDIInputControlPanel: React.FC = () => {
 
   useEffect(() => {
     midiInput.getMidiInputNames().then(availableMIDIInputNames => {
+      getSentry()?.setContext('availableMIDIInputNames', { availableMIDIInputNames });
       setAvailableMIDIInputs(['', ...availableMIDIInputNames]);
       if (
         GlobalState.selectedMIDIInputName &&
@@ -591,11 +602,10 @@ const MIDIInputControlPanel: React.FC = () => {
         label: 'refresh midi device list',
         type: 'button',
         action: () =>
-          midiInput
-            .getMidiInputNames()
-            .then(availableMIDIInputNames =>
-              setAvailableMIDIInputs(['', ...availableMIDIInputNames])
-            ),
+          midiInput.getMidiInputNames().then(availableMIDIInputNames => {
+            sentryRecord('Refreshed FM synth demo MIDI device list', { availableMIDIInputNames });
+            setAvailableMIDIInputs(['', ...availableMIDIInputNames]);
+          }),
       },
     ],
     [availableMIDIInputs]
@@ -691,7 +701,10 @@ const FMSynthDemo: React.FC = () => {
               {
                 type: 'button',
                 label: showViz ? 'hide visualization' : 'show visualization',
-                action: () => setShowViz(!showViz),
+                action: () => {
+                  sentryRecord('toggle fm synth demo visualization', { wasVisible: showViz });
+                  setShowViz(!showViz);
+                },
               },
             ]}
             style={{ width: 379 }}

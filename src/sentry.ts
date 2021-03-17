@@ -1,6 +1,14 @@
 import * as Sentry from '@sentry/react';
 import { Integrations } from '@sentry/tracing';
 
+export const getSentry = (): typeof Sentry | undefined => {
+  // Don't clutter up sentry logs with debug stuff
+  if (window.location.href.includes('http://localhost')) {
+    return undefined;
+  }
+  return Sentry;
+};
+
 export const initSentry = () => {
   // Don't clutter up sentry logs with debug stuff
   if (window.location.href.includes('http://localhost')) {
