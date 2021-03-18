@@ -34,7 +34,9 @@
     min-width: 100vw;
   }
 
-  select, input, button {
+  select,
+  input,
+  button {
     font-size: 10px;
   }
 }
@@ -56,11 +58,7 @@
   align-items: flex-end;
 }
 
-#root div.fm-synth-main-control-panel
-  > div:nth-child(1)
-  > div:nth-child(1)
-  > div.draggable
-  > span {
+#root div.fm-synth-main-control-panel > div:nth-child(1) > div:nth-child(1) > div.draggable > span {
   color: rgb(216, 36, 36) !important;
 }
 
@@ -81,11 +79,47 @@
 
   #simd-status {
     pointer-events: none;
+    line-height: 1;
   }
 }
 
-@media screen and (min-width: 800px) {
+@media screen and (min-width: 1000px) {
   .midi-keyboard {
     max-width: calc(100vw - 400px);
+  }
+}
+
+.fm-synth-demo-mobile-text {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+@media screen and (max-height: 350px) {
+  .fm-synth-demo-mobile-text {
+    display: none;
+  }
+}
+
+@media screen and (max-height: 420px) {
+  .fm-synth-demo-mobile-text {
+    font-size: 14px;
+    line-height: 1.1;
+
+    p {
+      margin-top: 2px;
+      margin-bottom: 2px;
+    }
+  }
+}
+
+@media screen and (max-height: 388px) {
+  .fm-synth-demo-mobile-text {
+    font-size: 12px !important;
+    line-height: 1 !important;
+
+    p {
+      margin-top: 2px !important;
+      margin-bottom: 2px !important;
+    }
   }
 }

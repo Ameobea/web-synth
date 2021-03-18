@@ -198,7 +198,6 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'wasmInitialized': {
-          console.log(evt.data);
           if (evt.data.audioThreadDataBuffer) {
             this.audioThreadDataBuffer = new Float32Array(
               evt.data.audioThreadDataBuffer as SharedArrayBuffer

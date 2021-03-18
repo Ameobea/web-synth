@@ -71,8 +71,9 @@ const buildDefaultFilterEnvelope = (): Adsr => ({
 const GlobalState: {
   octaveOffset: number;
   globalVolume: number;
+  gainEnvelope: Adsr;
   filterParams: FilterParams;
-  filterEnvelope: ADSRValues | Adsr;
+  filterEnvelope: Adsr;
   filterBypassed: boolean;
   filterADSREnabled: boolean;
   selectedMIDIInputName?: string | undefined;
@@ -80,6 +81,7 @@ const GlobalState: {
 } = {
   octaveOffset: 1,
   globalVolume: 0.2,
+  gainEnvelope: buildDefaultGainADSR(),
   filterParams: getDefaultFilterParams(FilterType.Lowpass),
   filterEnvelope: buildDefaultFilterEnvelope(),
   filterBypassed: false,
@@ -96,6 +98,15 @@ const filters = new Array(VOICE_COUNT).fill(null).map(() => {
   filter.getOutput().connect(mainGain);
   return filter;
 });
+
+// Disable context menu on mobile that can be caused by long holds on keys
+if (window.screen.width < 1000) {
+  window.oncontextmenu = function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  };
+}
 
 const analyzerNode = new AnalyserNode(ctx);
 mainGain.connect(analyzerNode);
@@ -179,6 +190,9 @@ if (!R.isNil(serialized?.filterBypassed)) {
 GlobalState.filterADSREnabled = serialized!.filterADSREnabled ?? true;
 GlobalState.selectedMIDIInputName = serialized!.selectedMIDIInputName;
 GlobalState.lastLoadedPreset = serialized!.lastLoadedPreset;
+if (serialized!.gainEnvelope) {
+  GlobalState.gainEnvelope = normalizeEnvelope(serialized!.gainEnvelope);
+}
 
 const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const gain = new GainNode(ctx);
@@ -216,6 +230,7 @@ const adsrs = (() => {
   });
   return adsr;
 })();
+
 const filterAdsrs = (() => {
   const base = Option.of(serialized?.filterEnvelope)
     .map(normalizeEnvelope)
@@ -328,17 +343,11 @@ const midiOutput = new MIDINode(() => ({
 midiInputNode.connect(midiOutput);
 
 const MainControlPanel: React.FC = ({}) => {
-  const gainEnvelope = useMemo(
-    () =>
-      Option.of(serialized?.gainEnvelope).map(normalizeEnvelope).getOrElseL(buildDefaultGainADSR),
-    []
-  );
-
   const [mainControlPanelState, setMainControlPanelState] = useState({
-    'MAIN VOLUME': serialized?.globalVolume ?? 0.1,
-    'volume envelope length ms': samplesToMs(gainEnvelope.lenSamples),
+    'MAIN VOLUME': GlobalState.globalVolume,
+    'volume envelope length ms': samplesToMs(GlobalState.gainEnvelope.lenSamples),
     'volume envelope': {
-      ...gainEnvelope,
+      ...GlobalState.gainEnvelope,
       outputRange: [0, 1],
     },
   });
@@ -353,7 +362,7 @@ const MainControlPanel: React.FC = ({}) => {
           min: 0,
           max: 1,
         },
-        window.screen.width < 800
+        window.screen.width < 1000
           ? null
           : {
               type: 'range',
@@ -361,7 +370,7 @@ const MainControlPanel: React.FC = ({}) => {
               min: 10,
               max: 10_000,
             },
-        window.screen.width < 800
+        window.screen.width < 1000
           ? null
           : {
               type: 'custom',
@@ -374,7 +383,7 @@ const MainControlPanel: React.FC = ({}) => {
 
   return (
     <ControlPanel
-      style={{ width: window.screen.width < 800 ? '100%' : 379 }}
+      style={{ width: window.screen.width < 1000 ? '100%' : 379 }}
       settings={settings}
       state={mainControlPanelState}
       onChange={(key: string, val: any) => {
@@ -442,20 +451,28 @@ const PresetsControlPanel: React.FC<{
     (presetName: string) => {
       GlobalState.lastLoadedPreset = presetName;
       const preset = R.clone(Presets[presetName]);
-      const oldGlobalVolume = serialized?.globalVolume;
       serialized = preset;
-      serialized.globalVolume = oldGlobalVolume ?? serialized.globalVolume;
       synth.deserialize(preset.synth);
 
       // Gain ADSRs
-      adsrs.setState(normalizeEnvelope(preset.gainEnvelope));
+      const gainEnvelope: Adsr = {
+        ...normalizeEnvelope(preset.gainEnvelope),
+        audioThreadData: GlobalState.gainEnvelope.audioThreadData,
+      };
+      adsrs.setState(gainEnvelope);
+      GlobalState.gainEnvelope = gainEnvelope;
       // Filter ADSRs
       filterAdsrs.setState(normalizeEnvelope(preset.filterEnvelope));
       // Octave offset
       setOctaveOffset(preset.octaveOffset);
       GlobalState.octaveOffset = preset.octaveOffset;
       // Filters
-      GlobalState.filterEnvelope = preset.filterEnvelope;
+      const filterEnvelope = {
+        ...normalizeEnvelope(preset.filterEnvelope),
+        audioThreadData: GlobalState.filterEnvelope.audioThreadData,
+      };
+      GlobalState.filterEnvelope = filterEnvelope;
+      filterAdsrs.setState(filterEnvelope);
       GlobalState.filterParams = preset.filterParams;
       filters.forEach(filter => filter.setAll(GlobalState.filterParams));
       if (preset.filterBypassed !== GlobalState.filterBypassed) {
@@ -539,7 +556,7 @@ const PresetsControlPanel: React.FC<{
             loadPreset(presetName);
           },
         },
-        window.screen.width < 800
+        window.screen.width < 1000
           ? null
           : {
               type: 'button',
@@ -565,7 +582,7 @@ const PresetsControlPanel: React.FC<{
       contextCb={(ctx: any) => {
         controlPanelCtx.current = ctx;
       }}
-      style={{ width: window.screen.width < 800 ? '100%' : 379 }}
+      style={{ width: window.screen.width < 1000 ? '100%' : 379 }}
       settings={settings}
       theme={{ ...baseTheme, text1: 'rgb(75 255 89)' }}
     />
@@ -615,7 +632,7 @@ const MIDIInputControlPanel: React.FC = () => {
   return (
     <ControlPanel
       settings={settings}
-      style={{ width: window.screen.width < 800 ? '100%' : 379 }}
+      style={{ width: window.screen.width < 1000 ? '100%' : 379 }}
       state={state}
       onChange={(key: string, val: any) => {
         switch (key) {
@@ -656,7 +673,7 @@ const FMSynthDemo: React.FC = () => {
     return null;
   }
 
-  if (window.screen.width < 800) {
+  if (window.screen.width < 1000) {
     return (
       <>
         <div className='fm-synth-main-control-panel'>
@@ -664,18 +681,19 @@ const FMSynthDemo: React.FC = () => {
           <PresetsControlPanel setOctaveOffset={setOctaveOffset} reRenderAll={reRenderAll} />
         </div>
 
-        {window.screen.width < window.screen.height ? (
-          <>
-            <p>
-              This is a trimmed-down version for mobile; visit the site on desktop for the full
-              experience! Try turning your phone sideways as well.
-            </p>
-            <p>
-              It&apos;s also possible that the demo might not work at all due to poor support of
-              modern web APIs in some mobile browsers.
-            </p>
-          </>
-        ) : null}
+        <div className='fm-synth-demo-mobile-text'>
+          <p>
+            This is a trimmed-down version for mobile; visit the site on desktop for the full
+            experience!{' '}
+            {window.screen.width < window.screen.height
+              ? 'Try turning your phone sideways as well.'
+              : null}
+          </p>
+          <p>
+            It&apos;s also possible that the demo might not work at all due to poor support of
+            modern web APIs in some mobile browsers.
+          </p>
+        </div>
 
         <div className='midi-keyboard-wrapper' style={{ bottom: 0, position: 'absolute' }}>
           <MidiKeyboard

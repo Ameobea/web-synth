@@ -41,7 +41,7 @@ export class ADSR2Module {
    */
   private params: ADSR2Params;
   private onInitializedCbs: (() => void)[] = [];
-  private audioThreadData: AudioThreadData;
+  public audioThreadData: AudioThreadData;
 
   constructor(
     ctx: AudioContext,

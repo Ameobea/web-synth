@@ -2,7 +2,7 @@ import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import ADSR2 from 'src/controls/adsr2/adsr2';
+import ADSR2, { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { msToSamples, samplesToMs } from 'src/util';
@@ -57,7 +57,7 @@ export const buildDefaultParamSource = (
   }
 };
 
-export const buildDefaultAdsr = (): Adsr => ({
+export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): Adsr => ({
   steps: [
     { x: 0, y: 0, ramper: { type: 'linear' } }, // start
     { x: 0.05, y: 0.865, ramper: { type: 'exponential', exponent: 1 / 2 } }, // attack
@@ -68,7 +68,7 @@ export const buildDefaultAdsr = (): Adsr => ({
   lenSamples: 44100,
   loopPoint: null,
   releasePoint: 0.7,
-  audioThreadData: { phaseIndex: 0 },
+  audioThreadData: audioThreadData ?? { phaseIndex: 0 },
 });
 
 interface ConfigureParamSourceProps {
@@ -138,7 +138,10 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
             type: 'button',
             label: 'add adsr',
             action: () => {
-              onAdsrChange(adsrs.length, buildDefaultAdsr());
+              onAdsrChange(
+                adsrs.length,
+                buildDefaultAdsr({ ...adsrs[0].audioThreadData, phaseIndex: adsrs.length })
+              );
             },
           },
           {
@@ -165,7 +168,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
         console.error('Invalid operator state type: ', paramType);
       }
     }
-  }, [paramType, excludedTypes, min, max, scale, step, adsrs.length, onAdsrChange]);
+  }, [paramType, excludedTypes, min, max, scale, step, adsrs, onAdsrChange]);
 
   return (
     <>
