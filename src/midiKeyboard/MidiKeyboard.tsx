@@ -79,7 +79,7 @@ export const MidiKeyboard: React.FC<{
   const [alreadyDownNotes, setAlreadyDownNotes] = useReducer(
     (
       state: ImmSet<number>,
-      action: { type: 'ADD' | 'REMOVE'; midiNumber: number } | { type: 'CLEAR' }
+      action: { type: 'ADD' | 'REMOVE'; midiNumber: number; execute?: boolean } | { type: 'CLEAR' }
     ) => {
       if (action.type === 'ADD') {
         // Discard duplicate events coming from holding the key down
@@ -87,14 +87,14 @@ export const MidiKeyboard: React.FC<{
           return state;
         }
 
-        onAttack(action.midiNumber);
+        if (action.execute !== false) onAttack(action.midiNumber);
         return state.add(action.midiNumber);
       } else if (action.type === 'REMOVE') {
         if (!state.has(action.midiNumber)) {
           return state;
         }
 
-        onRelease(action.midiNumber);
+        if (action.execute !== false) onRelease(action.midiNumber);
         return state.remove(action.midiNumber);
       } else if (action.type === 'CLEAR') {
         return ImmSet();
@@ -147,14 +147,14 @@ export const MidiKeyboard: React.FC<{
         return;
       }
 
-      playNote(midiNumber);
+      setAlreadyDownNotes({ type: 'ADD', midiNumber, execute: false });
     };
     const handleUp = (evt: KeyboardEvent) => {
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
       if (R.isNil(keyMap[evt.key.toLowerCase()])) {
         return;
       }
-      releaseNote(midiNumber);
+      setAlreadyDownNotes({ type: 'REMOVE', midiNumber, execute: false });
     };
 
     document.addEventListener('keydown', handleDown);
@@ -169,7 +169,15 @@ export const MidiKeyboard: React.FC<{
   const activeNotes = useMemo(() => alreadyDownNotes.toArray(), [alreadyDownNotes]);
 
   return (
-    <div className='midi-keyboard' style={style}>
+    <div
+      className='midi-keyboard'
+      style={style}
+      onContextMenuCapture={evt => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return false;
+      }}
+    >
       {/* <ADSRDemo /> */}
       <div className='octave-controls-wrapper'>
         <div className='octave-changer-label'>Octave</div>
@@ -184,15 +192,22 @@ export const MidiKeyboard: React.FC<{
           width:
             Math.min(document.documentElement.clientWidth ?? window.innerWidth ?? 0, 1000) - 64,
         }}
+        onContextMenuCapture={evt => {
+          console.log('inner.');
+          evt.preventDefault();
+          evt.stopPropagation();
+          return false;
+        }}
+        ref={elem => elem?.addEventListener('selectionchange', console.log)}
       >
         <Piano
           noteRange={{
             first: START_NOTE + octaveOffset * MIDI_NOTES_PER_OCTAVE,
             last: START_NOTE + 15 + octaveOffset * MIDI_NOTES_PER_OCTAVE,
           }}
-          playNote={playNote}
-          stopNote={releaseNote}
           activeNotes={activeNotes}
+          playNote={onAttack}
+          stopNote={onRelease}
           renderNoteLabel={({
             midiNumber,
           }: {

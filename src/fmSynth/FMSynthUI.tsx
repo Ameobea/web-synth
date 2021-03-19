@@ -39,7 +39,6 @@ const ctx = new AudioContext();
 const muted = new GainNode(ctx);
 muted.gain.value = 0;
 muted.connect(ctx.destination);
-const VOICE_COUNT = 10;
 
 const setModulation = (
   state: FMSynthState,

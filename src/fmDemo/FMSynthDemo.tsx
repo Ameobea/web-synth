@@ -104,6 +104,7 @@ if (window.screen.width < 1000) {
   window.oncontextmenu = function (event) {
     event.preventDefault();
     event.stopPropagation();
+    event.stopImmediatePropagation();
     return false;
   };
 }
@@ -116,8 +117,13 @@ const muter = new GainNode(ctx);
 muter.gain.value = 0;
 muter.connect(ctx.destination);
 
+// Web browsers like to disable audio contexts when they first exist to prevent auto-play video/audio ads.
+//
+// We explicitly re-enable it whenever the user does something on the page.
 document.addEventListener('keydown', () => ctx.resume(), { once: true });
 document.addEventListener('mousedown', () => ctx.resume(), { once: true });
+document.addEventListener('touchstart', () => ctx.resume(), { once: true });
+document.addEventListener('touchend', () => ctx.resume(), { once: true });
 
 const sentryRecord = (msg: string, extra: Record<string, any> = {}) => {
   const sentry = getSentry();
@@ -688,10 +694,6 @@ const FMSynthDemo: React.FC = () => {
             {window.screen.width < window.screen.height
               ? 'Try turning your phone sideways as well.'
               : null}
-          </p>
-          <p>
-            It&apos;s also possible that the demo might not work at all due to poor support of
-            modern web APIs in some mobile browsers.
           </p>
         </div>
 

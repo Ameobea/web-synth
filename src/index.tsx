@@ -17,6 +17,14 @@ import { initSentry } from 'src/sentry';
 
 const ctx = new AudioContext();
 
+// Web browsers like to disable audio contexts when they first exist to prevent auto-play video/audio ads.
+//
+// We explicitly re-enable it whenever the user does something on the page.
+document.addEventListener('keydown', () => ctx.resume(), { once: true });
+document.addEventListener('mousedown', () => ctx.resume(), { once: true });
+document.addEventListener('touchstart', () => ctx.resume(), { once: true });
+document.addEventListener('touchend', () => ctx.resume(), { once: true });
+
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
   ReactDOM.unstable_createRoot(document.getElementById('view-context-manager')).render(
     <Provider store={store}>

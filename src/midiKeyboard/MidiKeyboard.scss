@@ -9,6 +9,11 @@
   display: flex;
   flex-direction: row;
   height: 228px;
+  user-select: none;
+
+  * {
+    user-select: none;
+  }
 
   .octave-controls-wrapper {
     display: flex;

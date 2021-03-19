@@ -80,6 +80,8 @@ module.exports = {
     port: 9000,
     contentBase: './public/',
     historyApiFallback: true,
+    disableHostCheck: true,
+    host: '0.0.0.0',
     headers: {
       // Support sending `SharedArrayBuffer` between threads
       'Cross-Origin-Opener-Policy': 'same-origin',
