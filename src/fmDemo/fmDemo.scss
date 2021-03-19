@@ -81,6 +81,10 @@
     pointer-events: none;
     line-height: 1;
   }
+
+  #fm-synth-links {
+    display: none;
+  }
 }
 
 @media screen and (min-width: 1000px) {
