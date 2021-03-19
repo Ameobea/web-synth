@@ -90,6 +90,10 @@ export const MidiKeyboard: React.FC<{
         onAttack(action.midiNumber);
         return state.add(action.midiNumber);
       } else if (action.type === 'REMOVE') {
+        if (!state.has(action.midiNumber)) {
+          return state;
+        }
+
         onRelease(action.midiNumber);
         return state.remove(action.midiNumber);
       } else if (action.type === 'CLEAR') {
@@ -162,6 +166,8 @@ export const MidiKeyboard: React.FC<{
     };
   }, [octaveOffset, playNote, releaseNote]);
 
+  const activeNotes = useMemo(() => alreadyDownNotes.toArray(), [alreadyDownNotes]);
+
   return (
     <div className='midi-keyboard' style={style}>
       {/* <ADSRDemo /> */}
@@ -186,7 +192,7 @@ export const MidiKeyboard: React.FC<{
           }}
           playNote={playNote}
           stopNote={releaseNote}
-          activeNotes={alreadyDownNotes.toArray()}
+          activeNotes={activeNotes}
           renderNoteLabel={({
             midiNumber,
           }: {
