@@ -116,7 +116,7 @@ export type UISelection =
   | { type: 'outputWeight'; operatorIx: number }
   | { type: 'oscilloscope' };
 
-const FMSynthUI: React.FC<{
+interface FMSynthUIProps {
   updateBackendModulation: BackendModulationUpdater;
   updateBackendOutput: BackendOutputUpdater;
   modulationMatrix: ParamSource[][];
@@ -133,7 +133,9 @@ const FMSynthUI: React.FC<{
   detune: ParamSource | null;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
   getFMSynthOutput: () => Promise<AudioNode>;
-}> = ({
+}
+
+const FMSynthUI: React.FC<FMSynthUIProps> = ({
   updateBackendModulation,
   updateBackendOutput,
   modulationMatrix,
