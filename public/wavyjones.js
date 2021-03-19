@@ -1,11 +1,11 @@
 // Taken/Adapted from https://github.com/stuartmemo/wavy-jones
 
-var WavyJones = function (context, elem, updateInterval) {
+window.WavyJones = function (context, elem, updateInterval, width, height) {
   var analyser = context.createAnalyser();
   var elem = document.getElementById(elem);
 
-  analyser.width = elem.offsetWidth;
-  analyser.height = elem.offsetHeight;
+  analyser.width = elem.offsetWidth || width;
+  analyser.height = elem.offsetHeight || height;
   analyser.lineColor = 'yellow';
   analyser.lineThickness = 5;
 
@@ -53,7 +53,7 @@ var WavyJones = function (context, elem, updateInterval) {
 
     oscLine.setAttribute('d', graphStr);
 
-    setTimeout(drawLine, updateInterval || 100);
+    analyser.animationFrameHandle = requestAnimationFrame(drawLine);
   };
 
   drawLine();

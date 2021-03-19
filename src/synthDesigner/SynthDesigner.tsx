@@ -4,8 +4,7 @@ import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
 
-import { EffectType, serializeSynthModule } from 'src/redux/modules/synthDesigner';
-import { buildEffect } from 'src/synthDesigner/effects';
+import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import {
   SynthDesignerReduxStore,
@@ -16,18 +15,12 @@ import {
 import { ReduxStore, store } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import SynthModuleComp from './SynthModule';
-import EffectModuleComp from './effects/Effect';
 import './SynthDesigner.scss';
 import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from 'src/synthDesigner/SavePresetModal';
 import { saveSynthPreset } from 'src/api';
 import { updateConnectables } from 'src/patchNetwork/interface';
-
-declare class WavyJones extends AnalyserNode {
-  public lineColor: string;
-  public lineThickness: number;
-  constructor(ctx: AudioContext, nodeId: string, updateIntervalMs?: number);
-}
+import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
 
 const mapAddModuleControlsStateToProps = (state: ReduxStore) => ({
   voicePresets: state.presets.voicePresets,
@@ -233,12 +226,8 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
       return;
     }
 
-    wavyJonesInstance.current = new WavyJones(new AudioContext(), 'oscilloscope', 40);
-
-    wavyJonesInstance.current.lineColor = '#FFF';
-    wavyJonesInstance.current.lineThickness = 1.2;
-
-    dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(wavyJonesInstance.current));
+    const newWavyJonesInstance = buildWavyJonesInstance(new AudioContext(), 'oscilloscope');
+    dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(newWavyJonesInstance));
   });
 
   return (
@@ -307,7 +296,7 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
         Gate
       </button>
 
-      <div id='oscilloscope' ref={oscilloscopeNode}></div>
+      <div id='synth-designer-oscilloscope' ref={oscilloscopeNode}></div>
 
       {synthDesignerState.spectrumNode ? (
         <SpectrumVisualization

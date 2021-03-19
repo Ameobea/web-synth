@@ -719,7 +719,7 @@ const FMSynthDemo: React.FC = () => {
             settings={[
               {
                 type: 'button',
-                label: showViz ? 'hide visualization' : 'show visualization',
+                label: showViz ? 'hide spectrogram' : 'show spectrogram',
                 action: () => {
                   sentryRecord('toggle fm synth demo visualization', { wasVisible: showViz });
                   setShowViz(!showViz);
@@ -739,7 +739,7 @@ const FMSynthDemo: React.FC = () => {
           />
         ) : (
           <>
-            <ConnectedFMSynthUI synth={synth} />
+            <ConnectedFMSynthUI synth={synth} getFMSynthOutput={async () => mainGain} />
             <FilterConfig
               filters={filters}
               adsrs={filterAdsrs}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
@@ -14,6 +14,9 @@ import ConfigureParamSource, {
   ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
 import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
+import HelpIcon from 'src/misc/HelpIcon';
+import { WaveformIcon } from 'src/misc/Icons';
+import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -31,6 +34,12 @@ type BackendModulationUpdater = (
   val: ParamSource
 ) => void;
 type BackendOutputUpdater = (operatorIx: number, val: ParamSource) => void;
+
+const ctx = new AudioContext();
+const muted = new GainNode(ctx);
+muted.gain.value = 0;
+muted.connect(ctx.destination);
+const VOICE_COUNT = 10;
 
 const setModulation = (
   state: FMSynthState,
@@ -93,11 +102,19 @@ const ConfigureMainEffectChain: React.FC<{
   />
 );
 
+const initializeWavyJones = (getFMSynthOutput: () => Promise<AudioNode>) => {
+  const inst = buildWavyJonesInstance(ctx, 'fm-synth-oscilloscope', 490, 240);
+  getFMSynthOutput().then(fmSynthOutput => fmSynthOutput.connect(inst));
+  inst.connect(muted);
+  return inst;
+};
+
 export type UISelection =
   | { type: 'mainEffectChain' }
   | { type: 'operator'; index: number }
   | { type: 'modulationIndex'; srcOperatorIx: number; dstOperatorIx: number }
-  | { type: 'outputWeight'; operatorIx: number };
+  | { type: 'outputWeight'; operatorIx: number }
+  | { type: 'oscilloscope' };
 
 const FMSynthUI: React.FC<{
   updateBackendModulation: BackendModulationUpdater;
@@ -115,6 +132,7 @@ const FMSynthUI: React.FC<{
   onAdsrChange: AdsrChangeHandler;
   detune: ParamSource | null;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
+  getFMSynthOutput: () => Promise<AudioNode>;
 }> = ({
   updateBackendModulation,
   updateBackendOutput,
@@ -131,6 +149,7 @@ const FMSynthUI: React.FC<{
   onAdsrChange,
   handleDetuneChange,
   detune,
+  getFMSynthOutput,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -146,6 +165,39 @@ const FMSynthUI: React.FC<{
     onSelectedUIChange(newSelectedUI);
     setSelectedUIInner(newSelectedUI);
   };
+  const wavyJonesInstance = useRef<WavyJones | null>(null);
+
+  useEffect(() => {
+    if (selectedUI?.type === 'oscilloscope') {
+      if (!wavyJonesInstance.current) {
+        wavyJonesInstance.current = initializeWavyJones(getFMSynthOutput);
+      }
+      return;
+    }
+
+    // Free wavyjones instances when not displayed
+    if (wavyJonesInstance.current) {
+      try {
+        const inst = wavyJonesInstance.current;
+        inst.disconnect();
+        getFMSynthOutput().then(fmSynthOutputNode => {
+          try {
+            fmSynthOutputNode.disconnect(inst);
+          } catch (_err) {
+            // pass
+          }
+        });
+      } catch (_err) {
+        // pass
+      }
+      cancelAnimationFrame(wavyJonesInstance.current.animationFrameHandle);
+      wavyJonesInstance.current = null;
+      const vizElem = document.querySelector('#fm-synth-oscilloscope');
+      while (vizElem?.firstChild) {
+        vizElem.removeChild(vizElem.firstChild);
+      }
+    }
+  }, [getFMSynthOutput, selectedUI?.type]);
 
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
@@ -253,6 +305,9 @@ const FMSynthUI: React.FC<{
   return (
     <>
       <div className='fm-synth-ui'>
+        <h2>
+          Modulation Matrix <HelpIcon link='modulation-matrix' />
+        </h2>
         <ModulationMatrix
           onOperatorSelected={(newSelectedOperatorIx: number) =>
             setSelectedUI({ type: 'operator', index: newSelectedOperatorIx })
@@ -276,13 +331,41 @@ const FMSynthUI: React.FC<{
             setSelectedUI({ type: 'outputWeight', operatorIx })
           }
         />
-        <div
-          className='main-effect-chain-selector'
-          data-active={selectedUI?.type === 'mainEffectChain' ? 'true' : 'false'}
-          onClick={() => setSelectedUI({ type: 'mainEffectChain' })}
-        >
-          MAIN EFFECT CHAIN
+
+        <div className='bottom-button-wrapper'>
+          <div
+            role='button'
+            className='main-effect-chain-selector'
+            data-active={selectedUI?.type === 'mainEffectChain' ? 'true' : 'false'}
+            onClick={() => setSelectedUI({ type: 'mainEffectChain' })}
+          >
+            MAIN EFFECT CHAIN
+          </div>
+          <div
+            role='button'
+            className='oscilloscope-button'
+            onClick={() => {
+              if (selectedUI?.type === 'oscilloscope') {
+                return;
+              }
+              wavyJonesInstance.current = initializeWavyJones(getFMSynthOutput);
+              setSelectedUI({ type: 'oscilloscope' });
+            }}
+            data-active={selectedUI?.type === 'oscilloscope' ? 'true' : 'false'}
+            title='oscilloscope'
+          >
+            <WaveformIcon style={{ height: 28, width: 28, marginTop: -1 }} />
+          </div>
         </div>
+
+        <HelpIcon
+          link='detune'
+          style={{ marginTop: 8, zIndex: 1 }}
+          tooltipStyle={{ zIndex: 1, transform: 'translate(0px, 34px)' }}
+          size={12}
+          arrow={false}
+          position='top-start'
+        />
         <ControlPanel
           state={{ 'enable detune': !!state.detune }}
           settings={[{ type: 'checkbox', label: 'enable detune' }]}
@@ -401,12 +484,19 @@ const FMSynthUI: React.FC<{
             }
           />
         ) : null}
+        <div
+          id='fm-synth-oscilloscope'
+          style={{ display: selectedUI?.type === 'oscilloscope' ? 'block' : 'none' }}
+        />
       </div>
     </>
   );
 };
 
-export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
+export const ConnectedFMSynthUI: React.FC<{
+  synth: FMSynth;
+  getFMSynthOutput: () => Promise<AudioNode>;
+}> = ({ synth, getFMSynthOutput }) => (
   <FMSynthUI
     updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
       synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
@@ -431,6 +521,7 @@ export const ConnectedFMSynthUI: React.FC<{ synth: FMSynth }> = ({ synth }) => (
     onAdsrChange={(adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr)}
     detune={synth.getDetune()}
     handleDetuneChange={(newDetune: ParamSource) => synth.handleDetuneChange(newDetune)}
+    getFMSynthOutput={getFMSynthOutput}
   />
 );
 

@@ -39,6 +39,14 @@
   min-width: 520px;
   overflow-y: auto;
 
+  h2 {
+    margin: 10px 0 -3px 0;
+    text-align: center;
+    font-family: Hack, monospace;
+    font-weight: normal;
+    font-size: 18px;
+  }
+
   .hovered-modulation-entity {
     width: 100%;
     text-align: center;
@@ -133,25 +141,58 @@
     }
   }
 
-  .main-effect-chain-selector {
-    background-color: $highlight-5;
-    text-align: center;
-    cursor: pointer;
-    padding: 3px;
-    margin: 2px 0px;
-    border: 1px solid #181818;
+  .bottom-button-wrapper {
     width: 433px;
     margin-left: auto;
     margin-right: auto;
+    display: flex;
+    flex-direction: row;
+
+    .main-effect-chain-selector {
+      background-color: $highlight-5;
+      text-align: center;
+      cursor: pointer;
+      padding: 3px;
+      margin: 2px 0px;
+      border: 1px solid #181818;
+      flex: 1;
+    }
+    .main-effect-chain-selector[data-active='true'] {
+      background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
+      background-size: 140% 140%;
+      animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
+    }
+    .main-effect-chain-selector:hover {
+      font-weight: bold;
+    }
+
+    .oscilloscope-button {
+      flex: 0;
+      margin-left: 4px;
+      padding-top: 2px;
+      background-color: $highlight-5;
+      border: 1px solid #181818;
+      padding: 0px 0px 2px 0px;
+      max-height: 24px;
+      margin-top: 2px;
+      cursor: pointer;
+
+      path {
+        fill: #fcfcfc;
+      }
+    }
+
+    .oscilloscope-button[data-active='true'] {
+      background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
+      background-size: 140% 140%;
+      animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
+    }
   }
-  .main-effect-chain-selector[data-active='true'] {
-    background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
-    background-size: 140% 140%;
-    animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
-  }
-  .main-effect-chain-selector:hover {
-    font-weight: bold;
-  }
+}
+
+#fm-synth-oscilloscope {
+  width: 490px;
+  height: 240px;
 }
 
 .fm-synth-configuration {

@@ -13,6 +13,7 @@ import {
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 import { msToSamples, samplesToMs } from 'src/util';
+import HelpIcon from 'src/misc/HelpIcon';
 
 export class FilterContainer {
   private ctx: AudioContext;
@@ -158,7 +159,11 @@ const FilterConfig: React.FC<{
     <ControlPanel
       className='fm-synth-filter-control-panel'
       style={{ width: 700 }}
-      title='FILTER'
+      title={
+        <>
+          FILTER <HelpIcon link='filter' size={14} color='rgb(161, 161, 161)' />
+        </>
+      }
       settings={settings}
       state={controlPanelState}
       onChange={(key: string, val: any) => {

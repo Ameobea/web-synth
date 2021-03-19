@@ -7,6 +7,7 @@ import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSou
 import FlatButton from 'src/misc/FlatButton';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { getSentry } from 'src/sentry';
+import HelpIcon from 'src/misc/HelpIcon';
 
 export enum ButterworthFilterMode {
   Lowpass = 0,
@@ -473,7 +474,16 @@ const ConfigureEffects: React.FC<{
   return (
     <div className='configure-effects'>
       <ControlPanel
-        title={operatorIx === null ? 'main effect chain' : `operator ${operatorIx + 1} effects`}
+        title={
+          operatorIx === null ? (
+            <>
+              {'main effect chain '}
+              <HelpIcon link='fm-synth-main-effect-chain' color='rgb(161, 161, 161)' size={12} />
+            </>
+          ) : (
+            `operator ${operatorIx + 1} effects`
+          )
+        }
         style={{ width: 500 }}
       />
       <div className='effects-controls'>

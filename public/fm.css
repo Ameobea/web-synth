@@ -1,9 +1,19 @@
-#simd-status {
+#simd-status,
+#fm-synth-links {
   position: absolute;
   bottom: 0;
-  right: 7px;
   font-family: 'Oxygen Mono', monospace;
   font-size: 13px;
+}
+
+#simd-status {
+  right: 7px;
   display: none;
   text-align: right;
+}
+
+#fm-synth-links {
+  left: 7px;
+  text-align: left;
+  line-height: 1.7;
 }

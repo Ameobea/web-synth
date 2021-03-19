@@ -72,7 +72,7 @@ export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): Adsr => ({
 });
 
 interface ConfigureParamSourceProps {
-  title?: string;
+  title?: React.ReactNode;
   theme?: { [key: string]: any };
   state: ParamSource;
   onChange: (newState: ParamSource) => void;
