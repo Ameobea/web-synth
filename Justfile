@@ -2,7 +2,7 @@ opt:
   # for file in `ls ./dist | grep "\\.wasm"`; do wasm-snip ./dist/$file -o ./dist/$file; done
   # `wasm-strip` doesn't deal with simd, so we manually strip off DWARF debug info from Wasm modules that use SIMD
   wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
-  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -O4 --enable-simd --enable-nontrapping-float-to-int --precompute-propagate --fast-math --detect-features -c -o ./dist/$file; done
+  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g -O4 --enable-simd --enable-nontrapping-float-to-int --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
 
 opt-public:
   # for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done

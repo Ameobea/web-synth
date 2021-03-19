@@ -18,7 +18,7 @@ members = [
 [profile.release]
 #debug-assertions = true
 panic = "abort"
-debug = true
+debug = 1
 codegen-units = 1
 lto = "fat"
 
