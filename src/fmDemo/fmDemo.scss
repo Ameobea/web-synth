@@ -90,6 +90,15 @@
   color: rgb(216, 36, 36) !important;
 }
 
+#root
+  > div
+  > div.fm-synth-demo-controls
+  > div.fm-synth-main-control-panel
+  > div:nth-child(2)
+  > div:nth-child(1) {
+  color: white !important;
+}
+
 #simd-status {
   max-width: 200px;
   z-index: 5;

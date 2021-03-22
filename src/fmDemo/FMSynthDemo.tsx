@@ -584,13 +584,17 @@ const PresetsControlPanel: React.FC<{
 
   return (
     <ControlPanel
-      title='presets'
+      title='choose preset'
       contextCb={(ctx: any) => {
         controlPanelCtx.current = ctx;
       }}
       style={{ width: window.screen.width < 1000 ? '100%' : 379 }}
       settings={settings}
-      theme={{ ...baseTheme, text1: 'rgb(75 255 89)' }}
+      theme={{
+        ...baseTheme,
+        background1: 'rgb(14 149 102 / 80%)',
+        text1: 'rgb(255 255 255)',
+      }}
     />
   );
 };
