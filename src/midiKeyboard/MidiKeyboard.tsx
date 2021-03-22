@@ -79,7 +79,7 @@ export const MidiKeyboard: React.FC<{
   const [alreadyDownNotes, setAlreadyDownNotes] = useReducer(
     (
       state: ImmSet<number>,
-      action: { type: 'ADD' | 'REMOVE'; midiNumber: number; execute?: boolean } | { type: 'CLEAR' }
+      action: { type: 'ADD' | 'REMOVE'; midiNumber: number } | { type: 'CLEAR' }
     ) => {
       if (action.type === 'ADD') {
         // Discard duplicate events coming from holding the key down
@@ -87,14 +87,14 @@ export const MidiKeyboard: React.FC<{
           return state;
         }
 
-        if (action.execute !== false) onAttack(action.midiNumber);
+        onAttack(action.midiNumber);
         return state.add(action.midiNumber);
       } else if (action.type === 'REMOVE') {
         if (!state.has(action.midiNumber)) {
           return state;
         }
 
-        if (action.execute !== false) onRelease(action.midiNumber);
+        onRelease(action.midiNumber);
         return state.remove(action.midiNumber);
       } else if (action.type === 'CLEAR') {
         return ImmSet();
@@ -147,14 +147,14 @@ export const MidiKeyboard: React.FC<{
         return;
       }
 
-      setAlreadyDownNotes({ type: 'ADD', midiNumber, execute: false });
+      setAlreadyDownNotes({ type: 'ADD', midiNumber });
     };
     const handleUp = (evt: KeyboardEvent) => {
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
       if (R.isNil(keyMap[evt.key.toLowerCase()])) {
         return;
       }
-      setAlreadyDownNotes({ type: 'REMOVE', midiNumber, execute: false });
+      setAlreadyDownNotes({ type: 'REMOVE', midiNumber });
     };
 
     document.addEventListener('keydown', handleDown);

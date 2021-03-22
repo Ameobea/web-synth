@@ -66,7 +66,7 @@ module.exports = {
     }),
     new HtmlWebpackPlugin({
       alwaysWriteToDisk: true,
-      title: 'Rust/Wasm FM Synth',
+      title: 'Rust+Wasm-powered FM Synth',
       minify: true,
       injdex: true,
       template: 'src/fm-synth-demo.hbs',

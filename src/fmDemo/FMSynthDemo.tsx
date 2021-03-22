@@ -697,6 +697,14 @@ const FMSynthDemo: React.FC = () => {
           </p>
         </div>
 
+        <div className='fm-synth-mobile-links'>
+          <a href='/blog/fm-synth-rust-wasm-simd/'>Blog post</a>
+          <br />
+          <a href='/docs/fm-synth'>Docs</a>
+          <br />
+          <a href='https://www.youtube.com/watch?v=N4mZn9ZczDM'>Demo video + walkthrough</a>
+        </div>
+
         <div className='midi-keyboard-wrapper' style={{ bottom: 0, position: 'absolute' }}>
           <MidiKeyboard
             octaveOffset={octaveOffset}

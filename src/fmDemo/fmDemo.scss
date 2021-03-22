@@ -41,6 +41,34 @@
   }
 }
 
+.fm-synth-mobile-links {
+  text-align: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+}
+
+@media screen and (min-width: 800px) {
+  .fm-synth-mobile-links {
+    display: none;
+  }
+}
+
+@media screen and (min-height: 500px) {
+  .fm-synth-mobile-links {
+    display: flex;
+    flex-direction: column;
+
+    > br {
+      display: none;
+    }
+    > * {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+  }
+}
+
 .fm-synth-filter-control-panel {
   display: flex;
   background: rgb(35, 35, 35);

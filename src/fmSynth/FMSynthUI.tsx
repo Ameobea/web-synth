@@ -359,14 +359,14 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
           </div>
         </div>
 
-        <HelpIcon
+        {/* <HelpIcon
           link='detune'
           style={{ marginTop: 8, zIndex: 1 }}
           tooltipStyle={{ zIndex: 1, transform: 'translate(0px, 34px)' }}
           size={12}
           arrow={false}
           position='top-start'
-        />
+        /> */}
         <ControlPanel
           state={{ 'enable detune': !!state.detune }}
           settings={[{ type: 'checkbox', label: 'enable detune' }]}
