@@ -36,7 +36,7 @@ type BackendModulationUpdater = (
 type BackendOutputUpdater = (operatorIx: number, val: ParamSource) => void;
 
 const ctx = new AudioContext();
-const muted = new GainNode(ctx);
+const muted = ctx.createGain();
 muted.gain.value = 0;
 muted.connect(ctx.destination);
 

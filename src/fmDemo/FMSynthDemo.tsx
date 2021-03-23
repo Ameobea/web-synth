@@ -16,7 +16,7 @@ import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { normalizeEnvelope, FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { getSentry, initSentry } from 'src/sentry';
+import { getSentry } from 'src/sentry';
 import { Presets } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { useWindowSize } from 'src/reactUtils';
@@ -89,6 +89,21 @@ const GlobalState: {
   selectedMIDIInputName: undefined,
   lastLoadedPreset: undefined,
 };
+
+const root = (ReactDOM as any).unstable_createRoot(document.getElementById('root')!);
+
+const environmentIsValid =
+  typeof AudioWorkletNode !== 'undefined' && typeof ConstantSourceNode !== 'undefined';
+if (!environmentIsValid) {
+  getSentry()?.captureException(
+    new Error('Browser does not support `AudioWorkletNode`; displaying not supported message')
+  );
+  root.render(
+    <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
+      <BrowserNotSupported />
+    </div>
+  );
+}
 
 const ctx = new AudioContext();
 const mainGain = new GainNode(ctx);
@@ -802,9 +817,6 @@ const FMSynthDemo: React.FC = () => {
   );
 };
 
-initSentry();
-const root = (ReactDOM as any).unstable_createRoot(document.getElementById('root')!);
-
 setTimeout(() => {
   const elem = document.getElementById('simd-status');
 
@@ -825,15 +837,6 @@ setTimeout(() => {
   }
 }, 1000);
 
-if (typeof AudioWorkletNode === 'undefined') {
-  getSentry()?.captureException(
-    new Error('Browser does not support `AudioWorkletNode`; displaying not supported message')
-  );
-  root.render(
-    <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
-      <BrowserNotSupported />
-    </div>
-  );
-} else {
+if (environmentIsValid) {
   root.render(<FMSynthDemo />);
 }

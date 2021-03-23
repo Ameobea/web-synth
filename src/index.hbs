@@ -10,6 +10,9 @@
       //
       // Here, we patch the global `AudioContext` instance so that constructing new instances of it just returns the same
       // pre-constructed instance.
+      if (!window.audioContext && window.webkitAudioContext) {
+        window.AudioContext = window.webkitAudioContext;
+      }
       const OldAudioContext = globalThis.AudioContext;
 
       let latencyHint = 'interactive';
