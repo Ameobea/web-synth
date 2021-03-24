@@ -49,6 +49,9 @@ export class ADSR2Module {
     instanceCount: number,
     audioThreadData: AudioThreadData
   ) {
+    if (!audioThreadData) {
+      console.warn('Missing `audioThreadData` in ADSR2Module constructor');
+    }
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
     this.params = params;
@@ -78,14 +81,15 @@ export class ADSR2Module {
     this.awp.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'phaseDataBuffer': {
-          if (this.audioThreadData) {
+          if (!this.audioThreadData) {
             console.warn(
               '`audioThreadData` was nil in `ADSR2Module` event handler for `phaseDataBuffer` event handler'
             );
-            this.audioThreadData.buffer = new Float32Array(
-              evt.data.phaseDataBuffer as SharedArrayBuffer
-            );
+            break;
           }
+          this.audioThreadData.buffer = new Float32Array(
+            evt.data.phaseDataBuffer as SharedArrayBuffer
+          );
           break;
         }
         default: {

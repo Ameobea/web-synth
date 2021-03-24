@@ -1,14 +1,33 @@
 // Taken/Adapted from https://github.com/stuartmemo/wavy-jones
 
+const delay = delayMs => new Promise(resolve => setTimeout(resolve, delayMs));
+
+const retryAsync = async (
+  fn, //: () => Promise<T>,
+  attempts,
+  delayMs
+) => {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fn();
+      return res;
+    } catch (err) {
+      if (i === attempts - 1) {
+        // Out of attempts
+        throw err;
+      }
+
+      await delay(delayMs);
+    }
+  }
+  throw new UnreachableException();
+};
+
 window.WavyJones = function (context, elem, updateInterval, width, height) {
   var analyser = context.createAnalyser();
-  var elem = document.getElementById(elem);
-  if (!elem) {
-    return;
-  }
 
-  analyser.width = elem.offsetWidth || width;
-  analyser.height = elem.offsetHeight || height;
+  analyser.width = width;
+  analyser.height = height;
   analyser.lineColor = 'yellow';
   analyser.lineThickness = 5;
 
@@ -21,45 +40,62 @@ window.WavyJones = function (context, elem, updateInterval, width, height) {
     'xmlns:xlink',
     'http://www.w3.org/1999/xlink'
   );
-  elem.appendChild(paper);
 
-  var oscLine = document.createElementNS(svgNamespace, 'path');
-  oscLine.setAttribute('stroke', analyser.lineColor);
-  oscLine.setAttribute('stroke-width', analyser.lineThickness);
-  oscLine.setAttribute('fill', 'none');
-  paper.appendChild(oscLine);
-
-  var noDataPoints = 10,
-    freqData = new Uint8Array(analyser.frequencyBinCount);
-
-  var drawLine = function () {
-    analyser.getByteTimeDomainData(freqData);
-
-    var graphPoints = [],
-      graphStr = '';
-
-    graphPoints.push('M0, ' + analyser.height / 2);
-
-    for (var i = 0; i < freqData.length; i++) {
-      if (i % noDataPoints) {
-        var point = (freqData[i] / 128) * (analyser.height / 2);
-        graphPoints.push('L' + i + ', ' + point);
+  retryAsync(
+    async () => {
+      const elem_ = document.getElementById(elem);
+      if (!elem) {
+        throw new Error();
       }
+      return elem_;
+    },
+    30,
+    50
+  ).then(elem => {
+    if (!elem) {
+      return;
     }
 
-    for (i = 0; i < graphPoints.length; i++) {
-      graphStr += graphPoints[i];
-    }
+    elem.appendChild(paper);
 
+    var oscLine = document.createElementNS(svgNamespace, 'path');
     oscLine.setAttribute('stroke', analyser.lineColor);
     oscLine.setAttribute('stroke-width', analyser.lineThickness);
+    oscLine.setAttribute('fill', 'none');
+    paper.appendChild(oscLine);
 
-    oscLine.setAttribute('d', graphStr);
+    var noDataPoints = 10,
+      freqData = new Uint8Array(analyser.frequencyBinCount);
 
-    analyser.animationFrameHandle = requestAnimationFrame(drawLine);
-  };
+    var drawLine = function () {
+      analyser.getByteTimeDomainData(freqData);
 
-  drawLine();
+      var graphPoints = [],
+        graphStr = '';
+
+      graphPoints.push('M0, ' + analyser.height / 2);
+
+      for (var i = 0; i < freqData.length; i++) {
+        if (i % noDataPoints) {
+          var point = (freqData[i] / 128) * (analyser.height / 2);
+          graphPoints.push('L' + i + ', ' + point);
+        }
+      }
+
+      for (i = 0; i < graphPoints.length; i++) {
+        graphStr += graphPoints[i];
+      }
+
+      oscLine.setAttribute('stroke', analyser.lineColor);
+      oscLine.setAttribute('stroke-width', analyser.lineThickness);
+
+      oscLine.setAttribute('d', graphStr);
+
+      analyser.animationFrameHandle = requestAnimationFrame(drawLine);
+    };
+
+    drawLine();
+  });
 
   return analyser;
 };
