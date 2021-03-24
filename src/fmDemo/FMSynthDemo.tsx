@@ -196,7 +196,12 @@ try {
     GlobalState.lastLoadedPreset = 'pluck';
   }
 } catch (err) {
+  getSentry()?.captureException(err, {
+    extra: { localStorage__fmSynthDemoState: localStorage.fmSynthDemoState },
+  });
   console.error('Error deserializing fm synth');
+  serialized = Presets['pluck'];
+  GlobalState.lastLoadedPreset = 'pluck';
 }
 if (!R.isNil(serialized?.globalVolume)) {
   mainGain.gain.value = serialized!.globalVolume;
