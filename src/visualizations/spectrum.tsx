@@ -187,7 +187,11 @@ export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
       )}
 
       <canvas
-        ref={ref => setCanvasRef(ref)}
+        ref={ref => {
+          if (ref !== canvasRef) {
+            setCanvasRef(ref);
+          }
+        }}
         width={WIDTH}
         height={lockedHeight.current}
         id='spectrum-visualizer'
