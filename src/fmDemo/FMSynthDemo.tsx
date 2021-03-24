@@ -468,8 +468,13 @@ const PresetsControlPanel: React.FC<{
   setOctaveOffset: (newOctaveOffset: number) => void;
   reRenderAll: () => void;
 }> = ({ setOctaveOffset, reRenderAll }) => {
+  const isLoadingPreset = useRef(false);
   const loadPreset = useCallback(
     (presetName: string) => {
+      if (isLoadingPreset.current) {
+        return;
+      }
+
       GlobalState.lastLoadedPreset = presetName;
       const preset = R.clone(Presets[presetName]);
       serialized = preset;
@@ -548,7 +553,10 @@ const PresetsControlPanel: React.FC<{
       // Clear all UI and trigger it to re-initialize internal state from scratch
       reRenderAll();
 
-      setTimeout(() => mainGain.connect(limiter), 200);
+      setTimeout(() => {
+        mainGain.connect(limiter);
+        isLoadingPreset.current = false;
+      }, 200);
     },
     [reRenderAll, setOctaveOffset]
   );
