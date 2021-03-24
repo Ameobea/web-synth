@@ -52,7 +52,7 @@ const WavetableWasmBytes = new AsyncOnce(
         simdStatusElem.setAttribute('style', 'display:block; color: #cfeb1e;');
       }
     }
-    const res = fetch(hasSIMDSupport ? '/wavetable_simd.wasm' : '/wavetable_no_simd.wasm');
+    const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
     return res.then(res => res.arrayBuffer());
   }
 );
