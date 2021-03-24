@@ -3,6 +3,9 @@
 window.WavyJones = function (context, elem, updateInterval, width, height) {
   var analyser = context.createAnalyser();
   var elem = document.getElementById(elem);
+  if (!elem) {
+    return;
+  }
 
   analyser.width = elem.offsetWidth || width;
   analyser.height = elem.offsetHeight || height;

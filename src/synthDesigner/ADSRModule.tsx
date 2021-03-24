@@ -78,9 +78,14 @@ export class ADSR2Module {
     this.awp.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'phaseDataBuffer': {
-          this.audioThreadData.buffer = new Float32Array(
-            evt.data.phaseDataBuffer as SharedArrayBuffer
-          );
+          if (this.audioThreadData) {
+            console.warn(
+              '`audioThreadData` was nil in `ADSR2Module` event handler for `phaseDataBuffer` event handler'
+            );
+            this.audioThreadData.buffer = new Float32Array(
+              evt.data.phaseDataBuffer as SharedArrayBuffer
+            );
+          }
           break;
         }
         default: {
