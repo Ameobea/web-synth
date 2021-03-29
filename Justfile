@@ -137,3 +137,8 @@ build-spectrum-viz:
   cd ./engine/spectrum_viz && cargo build --release --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/spectrum* ./src/
+
+build-midi:
+  cd ./engine/midi && cargo build --target wasm32-unknown-unknown && \
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/midi.wasm --browser --remove-producers-section --out-dir ./engine/build
+  cp ./engine/build/midi* ./src/

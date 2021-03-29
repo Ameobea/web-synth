@@ -8,7 +8,7 @@
     "no-console": 0,
     "no-global-assign": 0,
     "no-multiple-empty-lines": [2, { "max": 1 }],
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-unused-vars": 0,
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "prefer-const": [
       "error",

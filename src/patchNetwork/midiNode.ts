@@ -9,6 +9,7 @@ export interface MIDIInputCbs {
   onRelease: (note: number, velocity: number) => void;
   onPitchBend: (bendAmount: number) => void;
   onClearAll: () => void;
+  onGenericControl?: (controlIndex: number, controlValue: number) => void;
 }
 
 // hilarious

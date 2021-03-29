@@ -17,6 +17,9 @@ import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
 import HelpIcon from 'src/misc/HelpIcon';
 import { WaveformIcon } from 'src/misc/Icons';
 import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
+import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -132,6 +135,8 @@ interface FMSynthUIProps {
   detune: ParamSource | null;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
   getFMSynthOutput: () => Promise<AudioNode>;
+  midiNode: MIDINode;
+  midiControlValuesCache: MIDIControlValuesCache;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -151,6 +156,8 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   handleDetuneChange,
   detune,
   getFMSynthOutput,
+  midiNode,
+  midiControlValuesCache,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -167,6 +174,32 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     setSelectedUIInner(newSelectedUI);
   };
   const wavyJonesInstance = useRef<WavyJones | null>(null);
+
+  const onOperatorChange = (selectedOperatorIx: number, newConf: OperatorConfig) => {
+    setState({
+      ...state,
+      operatorConfigs: R.set(R.lensIndex(selectedOperatorIx), newConf, state.operatorConfigs),
+    });
+    onOperatorConfigChange(selectedOperatorIx, newConf);
+  };
+
+  const onModulationIndexChange = (
+    srcOperatorIx: number,
+    dstOperatorIx: number,
+    newModulationIndex: ParamSource
+  ) =>
+    setState(
+      setModulation(
+        state,
+        srcOperatorIx,
+        dstOperatorIx,
+        updateBackendModulation,
+        (_prevVal: ParamSource) => newModulationIndex
+      )
+    );
+
+  const onOutputWeightChange = (operatorIx: number, newOutputWeight: ParamSource) =>
+    setState(setOutput(state, operatorIx, updateBackendOutput, newOutputWeight));
 
   useEffect(() => {
     if (selectedUI?.type === 'oscilloscope') {
@@ -304,7 +337,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   };
 
   return (
-    <>
+    <TrainingMIDIControlIndexContext.Provider value={{ midiNode, midiControlValuesCache }}>
       <div className='fm-synth-ui'>
         <h2>
           Modulation Matrix <HelpIcon link='modulation-matrix' />
@@ -416,17 +449,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                 <ConfigureOperator
                   operatorIx={selectedUI.index}
                   config={state.operatorConfigs[selectedOperatorIx]}
-                  onChange={newConf => {
-                    setState({
-                      ...state,
-                      operatorConfigs: R.set(
-                        R.lensIndex(selectedOperatorIx),
-                        newConf,
-                        state.operatorConfigs
-                      ),
-                    });
-                    onOperatorConfigChange(selectedOperatorIx, newConf);
-                  }}
+                  onChange={newConf => onOperatorChange(selectedOperatorIx, newConf)}
                   effects={state.operatorEffects[selectedOperatorIx]}
                   onEffectsChange={handleEffectChange}
                   setEffects={newEffects => {
@@ -453,21 +476,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             srcOperatorIx={selectedUI.srcOperatorIx}
             dstOperatorIx={selectedUI.dstOperatorIx}
             modulationIndices={state.modulationMatrix}
-            onChange={(
-              srcOperatorIx: number,
-              dstOperatorIx: number,
-              newModulationIndex: ParamSource
-            ) =>
-              setState(
-                setModulation(
-                  state,
-                  srcOperatorIx,
-                  dstOperatorIx,
-                  updateBackendModulation,
-                  (_prevVal: ParamSource) => newModulationIndex
-                )
-              )
-            }
+            onChange={onModulationIndexChange}
             adsrs={state.adsrs}
             onAdsrChange={handleAdsrChange}
           />
@@ -478,10 +487,8 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             adsrs={adsrs}
             onAdsrChange={handleAdsrChange}
             state={state.outputWeights[selectedUI.operatorIx]}
-            onChange={(newOutputWeight: ParamSource) =>
-              setState(
-                setOutput(state, selectedUI.operatorIx, updateBackendOutput, newOutputWeight)
-              )
+            onChange={newOutputWeight =>
+              onOutputWeightChange(selectedUI.operatorIx, newOutputWeight)
             }
           />
         ) : null}
@@ -490,14 +497,15 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
           style={{ display: selectedUI?.type === 'oscilloscope' ? 'block' : 'none' }}
         />
       </div>
-    </>
+    </TrainingMIDIControlIndexContext.Provider>
   );
 };
 
 export const ConnectedFMSynthUI: React.FC<{
   synth: FMSynth;
   getFMSynthOutput: () => Promise<AudioNode>;
-}> = ({ synth, getFMSynthOutput }) => (
+  midiNode: MIDINode;
+}> = ({ synth, getFMSynthOutput, midiNode }) => (
   <FMSynthUI
     updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
       synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
@@ -523,6 +531,8 @@ export const ConnectedFMSynthUI: React.FC<{
     detune={synth.getDetune()}
     handleDetuneChange={(newDetune: ParamSource) => synth.handleDetuneChange(newDetune)}
     getFMSynthOutput={getFMSynthOutput}
+    midiNode={midiNode}
+    midiControlValuesCache={synth.midiControlValuesCache}
   />
 );
 

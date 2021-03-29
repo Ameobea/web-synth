@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import type { UISelection } from 'src/fmSynth/FMSynthUI';
+import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
+import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 
 const formatOperatorConfig = (config: OperatorConfig) => {
   if (
@@ -31,9 +33,26 @@ const formatOperatorConfig = (config: OperatorConfig) => {
   return '-';
 };
 
-const formatParamSource = (param: ParamSource): React.ReactNode => {
+const FormattedMIDIControlValue: React.FC<{
+  controlIndex: number;
+  scale: number;
+  shift: number;
+  midiControlValuesCache: MIDIControlValuesCache;
+}> = ({ midiControlValuesCache, controlIndex, scale, shift }) => {
+  const [rawValue, setRawValue] = useState(midiControlValuesCache.get(controlIndex));
+  useEffect(() => {
+    const callback = (newValue: number) => setRawValue(newValue);
+    midiControlValuesCache.registerCallback(controlIndex, callback);
+
+    return () => midiControlValuesCache.unregisterCallback(controlIndex, callback);
+  }, [controlIndex, midiControlValuesCache]);
+
+  return <>{((rawValue / 127) * scale + shift).toFixed(2)}</>;
+};
+
+const FormattedParamSource: React.FC<{ param: ParamSource }> = ({ param }) => {
   if (param.type === 'constant') {
-    return Math.abs(param.value) < 0.01 ? null : param.value.toFixed(2);
+    return <>{Math.abs(param.value) < 0.01 ? null : param.value.toFixed(2)}</>;
   } else if (param.type === 'adsr') {
     return (
       <span className='adsr-param'>
@@ -51,8 +70,29 @@ const formatParamSource = (param: ParamSource): React.ReactNode => {
         {param.multiplier.toFixed(3)}
       </>
     );
+  } else if (param.type === 'midi control') {
+    if (
+      param.type === 'midi control' &&
+      param.midiControlIndex !== null &&
+      param.midiControlIndex !== 'LEARNING'
+    ) {
+      return (
+        <TrainingMIDIControlIndexContext.Consumer>
+          {({ midiControlValuesCache }) => (
+            <FormattedMIDIControlValue
+              midiControlValuesCache={midiControlValuesCache}
+              controlIndex={param.midiControlIndex}
+              scale={param.scale}
+              shift={param.shift}
+            />
+          )}
+        </TrainingMIDIControlIndexContext.Consumer>
+      );
+    } else {
+      return <>{'...'}</>;
+    }
   } else {
-    return '-';
+    return <>{'-'}</>;
   }
 };
 
@@ -92,9 +132,9 @@ const OutputWeightSquare: React.FC<{
       onMouseLeave={onMouseLeave}
     >
       <div className='operator-weight-lens' style={style}>
-        {operatorWeight !== null && Math.abs(operatorWeight) < 0.01
-          ? null
-          : formatParamSource(outputWeights[operatorIx])}
+        {operatorWeight !== null && Math.abs(operatorWeight) < 0.01 ? null : (
+          <FormattedParamSource param={outputWeights[operatorIx]} />
+        )}
       </div>
     </div>
   );
@@ -189,7 +229,7 @@ export const ModulationMatrix: React.FC<{
                   }
                 }}
               >
-                {formatParamSource(val)}
+                <FormattedParamSource param={val} />
               </div>
             ))}
             <OutputWeightSquare

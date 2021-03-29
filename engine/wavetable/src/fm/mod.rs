@@ -11,6 +11,17 @@ use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 pub mod effects;
 use self::effects::EffectChain;
 
+pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: usize) {
+    if index >= MIDI_CONTROL_VALUES.len() || value > 127 {
+        panic!();
+    }
+
+    MIDI_CONTROL_VALUES[index] = (value as f32) / 127.;
+}
+
 #[derive(Clone, Default, PartialEq)]
 pub struct AdsrState {
     pub adsr_ix: usize,
@@ -628,6 +639,11 @@ pub enum ParamSourceType {
     /// triggered every time that voice is triggered.
     PerVoiceADSR(AdsrState),
     BaseFrequencyMultiplier(f32),
+    MIDIControlValue {
+        control_index: usize,
+        scale: f32,
+        shift: f32,
+    },
 }
 
 #[derive(Clone)]
@@ -737,6 +753,11 @@ impl ParamSourceType {
                     + shift
             },
             ParamSourceType::BaseFrequencyMultiplier(multiplier) => base_frequency * multiplier,
+            ParamSourceType::MIDIControlValue {
+                control_index,
+                scale,
+                shift,
+            } => unsafe { MIDI_CONTROL_VALUES[*control_index] * *scale + *shift },
         }
     }
 
@@ -755,7 +776,12 @@ impl ParamSourceType {
                 shift: value_param_float_2,
             }),
             3 => ParamSourceType::BaseFrequencyMultiplier(value_param_float),
-            _ => panic!("Invalid value type; expected 0-2"),
+            4 => ParamSourceType::MIDIControlValue {
+                control_index: value_param_int,
+                scale: value_param_float,
+                shift: value_param_float_2,
+            },
+            _ => panic!("Invalid value type; expected [0,4]"),
         }
     }
 
@@ -822,6 +848,21 @@ impl ParamSourceType {
                     }
                 }
             },
+            ParamSourceType::MIDIControlValue {
+                control_index,
+                scale,
+                shift,
+            } => {
+                let value =
+                    unsafe { f32x4_splat(MIDI_CONTROL_VALUES[*control_index] * scale + shift) };
+
+                let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                for i in 0..FRAME_SIZE / 4 {
+                    unsafe {
+                        v128_store(base_output_ptr.add(i), value);
+                    }
+                }
+            },
         }
     }
 
@@ -864,6 +905,19 @@ impl ParamSourceType {
                     unsafe {
                         *output_buf.get_unchecked_mut(i) =
                             (*adsr_buf.get_unchecked(i)) * (*scale) + (*shift);
+                    }
+                }
+            },
+            ParamSourceType::MIDIControlValue {
+                control_index,
+                scale,
+                shift,
+            } => {
+                let value = unsafe { MIDI_CONTROL_VALUES[*control_index] * *scale + *shift };
+
+                for i in 0..FRAME_SIZE {
+                    unsafe {
+                        *output_buf.get_unchecked_mut(i) = value;
                     }
                 }
             },

@@ -4,7 +4,10 @@ import ControlPanel from 'react-control-panel';
 
 import ADSR2, { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
+import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { msToSamples, samplesToMs } from 'src/util';
 
 export const PARAM_BUFFER_COUNT = 8;
@@ -17,12 +20,38 @@ export type ParamSource =
   | { type: 'param buffer'; 'buffer index': number }
   | { type: 'constant'; value: number }
   | { type: 'adsr'; 'adsr index': number; scale: number; shift: number }
-  | { type: 'base frequency multiplier'; multiplier: number };
+  | { type: 'base frequency multiplier'; multiplier: number }
+  | {
+      type: 'midi control';
+      midiControlIndex: number;
+      scale: number;
+      shift: number;
+      dstMIDINode?: undefined;
+    }
+  | {
+      type: 'midi control';
+      midiControlIndex: null;
+      scale: number;
+      shift: number;
+      dstMIDINode?: undefined;
+    }
+  | {
+      type: 'midi control';
+      midiControlIndex: 'LEARNING';
+      /**
+       * If we're in this state, this node is connected as the destination to the MIDI node
+       * controlling the FM synth.  We use this to intercept generic control events so we know
+       * which control index to associate/learn
+       */
+      dstMIDINode: MIDINode;
+      scale: number;
+      shift: number;
+    };
 
 const buildTypeSetting = (excludedTypes?: ParamSource['type'][]) => ({
   type: 'select',
   label: 'type',
-  options: ['param buffer', 'constant', 'adsr', 'base frequency multiplier'].filter(
+  options: ['param buffer', 'constant', 'adsr', 'base frequency multiplier', 'midi control'].filter(
     paramType => !excludedTypes?.includes(paramType as any)
   ),
 });
@@ -50,6 +79,9 @@ export const buildDefaultParamSource = (
     }
     case 'base frequency multiplier': {
       return { type, multiplier: 1 };
+    }
+    case 'midi control': {
+      return { type, midiControlIndex: null, scale: 0, shift: 0 };
     }
     default: {
       throw new UnreachableException('Invalid operator state type: ' + type);
@@ -86,7 +118,12 @@ interface ConfigureParamSourceProps {
   excludedTypes?: ParamSource['type'][];
 }
 
-const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
+interface ConfigureParamSourceInnerProps extends ConfigureParamSourceProps {
+  midiNode: MIDINode;
+  midiControlValuesCache: MIDIControlValuesCache;
+}
+
+const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
   title,
   adsrs,
   onAdsrChange,
@@ -99,10 +136,10 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
   defaultVal,
   scale,
   excludedTypes,
+  midiNode,
 }) => {
-  const { type: paramType } = state;
   const settings = useMemo(() => {
-    switch (paramType) {
+    switch (state.type) {
       case 'param buffer': {
         return [
           buildTypeSetting(excludedTypes),
@@ -164,11 +201,64 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
           },
         ];
       }
+      case 'midi control': {
+        return [
+          buildTypeSetting(excludedTypes),
+          {
+            type: 'button',
+            label: state.midiControlIndex === 'LEARNING' ? 'cancel learning' : 'learn midi',
+            action: () => {
+              if (state.midiControlIndex === 'LEARNING') {
+                midiNode.disconnect(state.dstMIDINode);
+                onChange({ ...state, midiControlIndex: null, dstMIDINode: undefined });
+              } else {
+                const cbs: MIDIInputCbs = {
+                  onAttack: () => {
+                    /* ignore */
+                  },
+                  onRelease: () => {
+                    /* ignore */
+                  },
+                  onPitchBend: () => {
+                    /* ignore */
+                  },
+                  onClearAll: () => {
+                    /* ignore */
+                  },
+                  onGenericControl: (controlIndex, _controlValue) => {
+                    console.log('Assigning MIDI control index: ', controlIndex);
+
+                    onChange({
+                      ...state,
+                      midiControlIndex: controlIndex,
+                      dstMIDINode: undefined,
+                    });
+                    midiNode.disconnect(dstMIDINode);
+                  },
+                };
+                const dstMIDINode = new MIDINode(() => cbs);
+                midiNode.connect(dstMIDINode);
+                onChange({
+                  ...state,
+                  midiControlIndex: 'LEARNING' as const,
+                  dstMIDINode,
+                });
+              }
+            },
+          },
+          {
+            label: 'output range',
+            type: 'interval',
+            min,
+            max,
+          },
+        ];
+      }
       default: {
-        console.error('Invalid operator state type: ', paramType);
+        console.error('Invalid operator state type: ', (state as any).type);
       }
     }
-  }, [paramType, excludedTypes, min, max, scale, step, adsrs, onAdsrChange]);
+  }, [state, excludedTypes, min, max, scale, step, adsrs, onAdsrChange, midiNode, onChange]);
 
   return (
     <>
@@ -182,7 +272,9 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
           'buffer index':
             state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
           'output range':
-            state.type === 'adsr' ? [state.shift, state.shift + state.scale] : undefined,
+            state.type === 'adsr' || state.type === 'midi control'
+              ? [state.shift, state.shift + state.scale]
+              : undefined,
           adsr: state.type === 'adsr' ? adsrs[state['adsr index']] : undefined,
           'adsr length ms':
             state.type === 'adsr' ? samplesToMs(adsrs[state['adsr index']].lenSamples) : undefined,
@@ -254,5 +346,17 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({
     </>
   );
 };
+
+const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({ ...props }) => (
+  <TrainingMIDIControlIndexContext.Consumer>
+    {({ midiNode, midiControlValuesCache }) => (
+      <ConfigureParamSourceInner
+        {...props}
+        midiNode={midiNode}
+        midiControlValuesCache={midiControlValuesCache}
+      />
+    )}
+  </TrainingMIDIControlIndexContext.Consumer>
+);
 
 export default ConfigureParamSource;

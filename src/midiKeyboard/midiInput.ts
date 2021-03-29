@@ -80,7 +80,11 @@ export class MIDIInput {
       },
       (modWheelValue: number) => {
         this.modWheelNode.offset.value = modWheelValue;
-      }
+      },
+      (controlIndex: number, controlValue: number) =>
+        this.midiNode?.outputCbs.forEach(({ onGenericControl }) =>
+          onGenericControl?.(controlIndex, controlValue)
+        )
     );
     this.wasmMidiCtxPtr = ctxPtr;
 

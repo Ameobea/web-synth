@@ -206,6 +206,18 @@ class FMSynthAWP extends AudioWorkletProcessor {
           );
           break;
         }
+        case 'midiControlValue': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set MIDI control value before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.fm_synth_set_midi_control_value(
+            evt.data.controlIndex,
+            evt.data.controlValue
+          );
+          break;
+        }
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }

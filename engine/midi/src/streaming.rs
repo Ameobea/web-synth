@@ -20,6 +20,7 @@ pub struct MsgHandlerContext {
         Box<dyn Fn(usize, usize, f32, f32)>,
         Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
     >,
+    pub generic_control_handler: Option<Function>,
 }
 
 #[wasm_bindgen]
@@ -28,6 +29,7 @@ pub fn create_msg_handler_context(
     release_note: Function,
     pitch_bend: Option<Function>,
     mod_wheel: Option<Function>,
+    generic_control_handler: Option<Function>,
 ) -> usize {
     common::maybe_init();
 
@@ -45,6 +47,7 @@ pub fn create_msg_handler_context(
             trigger_attack_release: box |_, _, _, _| panic!(),
             schedule_events: box |_, _, _, _| panic!(),
         }),
+        generic_control_handler,
     };
 
     // Replace the temporary synth cb pointers with real ones
@@ -177,10 +180,22 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
                 Ok(())
             }
         },
-        status => {
-            trace!("Unhandled MIDI event of type {}", status);
-            Ok(())
-        },
+        status =>
+            if let Some(handler) = &ctx.generic_control_handler {
+                handler
+                    .call2(
+                        &JsValue::NULL,
+                        &JsValue::from(evt.data[1]),
+                        &JsValue::from(evt.data[2]),
+                    )
+                    .map(|_| ())
+            } else {
+                debug!(
+                    "Unhandled MIDI event of type {}, msg={:?}",
+                    status, evt.data
+                );
+                Ok(())
+            },
     };
     if let Err(err) = res {
         error!("Error executing MIDI event handler callback: {:?}", err);

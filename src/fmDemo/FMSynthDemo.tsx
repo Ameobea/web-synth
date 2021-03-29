@@ -11,34 +11,18 @@ import 'src/index.scss';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { AsyncOnce, midiToFrequency, msToSamples, samplesToMs } from 'src/util';
 import './fmDemo.scss';
-import { ADSRValues } from 'src/controls/adsr';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { normalizeEnvelope, FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import { getSentry } from 'src/sentry';
-import { Presets } from 'src/fmDemo/presets';
+import { Presets, SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { useWindowSize } from 'src/reactUtils';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
-
-const _getSerializeType = (synth: FMSynth) => synth.serialize();
-
-export interface SerializedFMSynthDemoState {
-  synth: ReturnType<typeof _getSerializeType>;
-  octaveOffset: number;
-  globalVolume: number;
-  gainEnvelope: ADSRValues | Adsr;
-  filterParams: FilterParams;
-  filterEnvelope: ADSRValues | Adsr;
-  filterBypassed: boolean;
-  filterADSREnabled?: boolean | undefined;
-  selectedMIDIInputName: string | undefined;
-  lastLoadedPreset?: string | undefined;
-}
 
 const VOICE_COUNT = 10;
 const SAMPLE_RATE = 44_100;
@@ -182,14 +166,16 @@ const serializeState = () => {
 };
 
 window.onbeforeunload = () => {
-  localStorage.fmSynthDemoState = serializeState();
+  if (localStorage) {
+    localStorage.fmSynthDemoState = serializeState();
+  }
 };
 
 const LastGateTimeByVoice = new Array(10).fill(0);
 
 let serialized: SerializedFMSynthDemoState | null = null;
 try {
-  if (localStorage.fmSynthDemoState) {
+  if (localStorage?.fmSynthDemoState) {
     serialized = JSON.parse(localStorage.fmSynthDemoState);
   } else {
     serialized = Presets['pluck'];
@@ -197,7 +183,7 @@ try {
   }
 } catch (err) {
   getSentry()?.captureException(err, {
-    extra: { localStorage__fmSynthDemoState: localStorage.fmSynthDemoState },
+    extra: { localStorage__fmSynthDemoState: localStorage?.fmSynthDemoState },
   });
   console.error('Error deserializing fm synth');
   serialized = Presets['pluck'];
@@ -302,8 +288,24 @@ const baseTheme = {
   text2: 'rgb(161,161,161)',
 };
 
+const midiInputNode = new MIDINode();
+const midiInput = new MIDIInput(ctx, midiInputNode, GlobalState.selectedMIDIInputName);
+const midiOutput = new MIDINode(() => ({
+  onAttack: (note, _velocity) => polySynthMod?.handle_note_down(polysynthCtxPtr, note),
+  onRelease: (note, _velocity) => polySynthMod?.handle_note_up(polysynthCtxPtr, note),
+  onClearAll: () => {
+    // no-op; this will never get sent directly from user MIDI devices and only exists
+    // for internal web-synth use cases that aren't part of this demo
+  },
+  onPitchBend: () => {
+    // not implemented
+  },
+}));
+midiInputNode.connect(midiOutput);
+
 const synth = new FMSynth(ctx, undefined, {
   ...(serialized?.synth ?? {}),
+  midiNode: midiInputNode,
   onInitialized: (inst: FMSynth) => {
     const awpNode = synth.getAWPNode()!;
     voiceGains.forEach((voiceGain, voiceIx) => awpNode.connect(voiceGain, voiceIx));
@@ -352,21 +354,6 @@ const synth = new FMSynth(ctx, undefined, {
     });
   },
 });
-
-const midiInputNode = new MIDINode();
-const midiInput = new MIDIInput(ctx, midiInputNode, GlobalState.selectedMIDIInputName);
-const midiOutput = new MIDINode(() => ({
-  onAttack: (note, _velocity) => polySynthMod?.handle_note_down(polysynthCtxPtr, note),
-  onRelease: (note, _velocity) => polySynthMod?.handle_note_up(polysynthCtxPtr, note),
-  onClearAll: () => {
-    // no-op; this will never get sent directly from user MIDI devices and only exists
-    // for internal web-synth use cases that aren't part of this demo
-  },
-  onPitchBend: () => {
-    // not implemented
-  },
-}));
-midiInputNode.connect(midiOutput);
 
 const MainControlPanel: React.FC = ({}) => {
   const [mainControlPanelState, setMainControlPanelState] = useState({
@@ -781,7 +768,11 @@ const FMSynthDemo: React.FC = () => {
           />
         ) : (
           <>
-            <ConnectedFMSynthUI synth={synth} getFMSynthOutput={async () => mainGain} />
+            <ConnectedFMSynthUI
+              synth={synth}
+              getFMSynthOutput={async () => mainGain}
+              midiNode={midiInputNode}
+            />
             <FilterConfig
               filters={filters}
               adsrs={filterAdsrs}

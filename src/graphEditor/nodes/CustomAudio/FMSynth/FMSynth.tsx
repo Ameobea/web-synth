@@ -15,6 +15,8 @@ import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import { AsyncOnce } from 'src/util';
 import { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { getSentry } from 'src/sentry';
+import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 
 type FMSynthInputDescriptor =
   | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
@@ -108,6 +110,7 @@ export default class FMSynth implements ForeignNode {
   private onInitialized: ((inst: FMSynth) => void) | undefined;
   private audioThreadDataBuffer: Float32Array | null = null;
   private detune: ParamSource | null = null;
+  public midiControlValuesCache: MIDIControlValuesCache;
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -145,12 +148,42 @@ export default class FMSynth implements ForeignNode {
     if (params) {
       this.deserialize(params);
     }
+    const midiNode =
+      params?.midiNode ??
+      new MIDINode(() => ({
+        onAttack: () => {
+          // ignore
+        },
+        onRelease: () => {
+          // ignore
+        },
+        onPitchBend: () => {
+          // ignore
+        },
+        onClearAll: () => {
+          // ignore
+        },
+        onGenericControl: () => {
+          // ignore
+        },
+      }));
+    this.midiControlValuesCache = new MIDIControlValuesCache(
+      params?.lastSeenMIDIControlValues ?? {},
+      midiNode,
+      this
+    );
 
     this.init();
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: ConnectedFMSynthUI,
-      getProps: () => ({ synth: this }),
+      getProps: () => ({
+        synth: this,
+        midiNode,
+        getFMSynthOutput: () => {
+          throw new UnimplementedError();
+        },
+      }),
     });
 
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
@@ -290,6 +323,14 @@ export default class FMSynth implements ForeignNode {
           valParamInt: source['buffer index'],
           valParamFloat: 0,
           valParamFloat2: 0,
+        };
+      }
+      case 'midi control': {
+        return {
+          valueType: 4,
+          valParamInt: source.midiControlIndex,
+          valParamFloat: source.scale,
+          valParamFloat2: source.shift,
         };
       }
       default: {
@@ -603,6 +644,7 @@ export default class FMSynth implements ForeignNode {
       mainEffectChain: this.mainEffectChain,
       adsrs: this.adsrs.map(serializeADSR),
       detune: this.detune,
+      lastSeenMIDIControlValues: this.midiControlValuesCache.serialize(),
     };
   }
 
@@ -625,6 +667,14 @@ export default class FMSynth implements ForeignNode {
     }
 
     this.awpHandle.port.postMessage({ type: 'setDetune', ...this.encodeParamSource(newDetune) });
+  }
+
+  public setMIDIControlValue(controlIndex: number, controlValue: number) {
+    if (!this.awpHandle) {
+      console.warn('Tried to set MIDI control value before AWP initialized');
+      return;
+    }
+    this.awpHandle.port.postMessage({ type: 'midiControlValue', controlIndex, controlValue });
   }
 
   public getAWPNode() {

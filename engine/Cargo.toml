@@ -12,7 +12,8 @@ members = [
   "sidechain",
   "noise_gen",
   "distortion",
-  "adsr"
+  "adsr",
+  "note_container"
 ]
 
 [profile.release]

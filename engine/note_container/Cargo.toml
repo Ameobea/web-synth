@@ -1,0 +1,17 @@
+[package]
+name = "note_container"
+version = "0.1.0"
+authors = ["Casey Primozic <casey@cprimozic.net>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "=0.2.64"
+wasm-logger = "0.2.0"
+# Disable logging staticly in release, making all log calls into no-ops
+log = { version = "0.4", features = ["release_max_level_off"] }
+console_error_panic_hook = "0.1.6"
+common = { path = "../common" }
+float-ord = "0.2"
