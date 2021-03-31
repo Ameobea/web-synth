@@ -37,7 +37,7 @@ Promise.all([
     if (typeof evt.data === 'number') {
       callCb(evt.data);
     } else {
-      console.log(evt.data);
+      // console.log(evt.data);
     }
   };
   SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });

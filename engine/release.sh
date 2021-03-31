@@ -11,4 +11,5 @@ cd engine && cargo build --target wasm32-unknown-unknown --release &&
   cd ../sidechain && cargo build --release --target wasm32-unknown-unknown &&
   cd ../noise_gen && cargo build --release --target wasm32-unknown-unknown &&
   cd ../distortion && cargo build --release --target wasm32-unknown-unknown &&
-  cd ../adsr && cargo build --features=exports --release --target wasm32-unknown-unknown
+  cd ../adsr && cargo build --features=exports --release --target wasm32-unknown-unknown &&
+  cd ../note_container && cargo build --release --target wasm32-unknown-unknown

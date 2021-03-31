@@ -476,11 +476,9 @@ name = "note_container"
 version = "0.1.0"
 dependencies = [
  "common",
- "console_error_panic_hook",
  "float-ord",
  "log",
  "wasm-bindgen",
- "wasm-logger",
 ]
 
 [[package]]

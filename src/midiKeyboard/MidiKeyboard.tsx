@@ -12,6 +12,7 @@ import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
 import './MidiKeyboard.scss';
 import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
+import MIDIEditor2 from 'src/midiEditor2/MIDIEditor2';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 33;
@@ -290,6 +291,26 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
           onChange={(_key: string, midiInputName: string) => {
             dispatch(actionCreators.midiKeyboard.SET_MIDI_INPUT_NAME(stateKey, midiInputName));
           }}
+        />
+        <MIDIEditor2
+          initialState={{
+            lines: [
+              [
+                { id: 0, startPoint: 1, length: 3 },
+                { id: 1, startPoint: 6, length: 3 },
+              ],
+              [{ id: 2, startPoint: 1.5, length: 8 }],
+            ],
+            view: {
+              pxPerBeat: 20,
+              scrollHorizontalBeats: 0,
+              scrollVerticalPx: 0,
+              beatsPerMeasure: 4,
+            },
+            selectedNoteIDs: [],
+          }}
+          height={800}
+          width={800}
         />
       </div>
     );

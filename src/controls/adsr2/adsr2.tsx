@@ -5,6 +5,7 @@ import { UnreachableException } from 'ameo-utils';
 import ControlPanel from 'react-control-panel';
 
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { makeDraggable } from 'src/controls/pixiUtils';
 
 const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
@@ -334,31 +335,6 @@ class StepHandle {
     this.graphics.destroy();
   }
 }
-
-const makeDraggable = (
-  g: PIXI.Graphics,
-  parent: { dragData: PIXI.InteractionData | null; handleDrag: (newPos: PIXI.Point) => void }
-) => {
-  g.buttonMode = true;
-  g.interactive = true;
-  g.on('pointerdown', (evt: any) => {
-    parent.dragData = evt.data;
-  })
-    .on('pointerup', () => {
-      parent.dragData = null;
-    })
-    .on('pointerupoutside', () => {
-      parent.dragData = null;
-    })
-    .on('pointermove', () => {
-      if (!parent.dragData) {
-        return;
-      }
-
-      const newPosition = parent.dragData.getLocalPosition(g.parent);
-      parent.handleDrag(newPosition);
-    });
-};
 
 /**
  * Bar attached to the top of the ADSR that can be dragged from side to side.
