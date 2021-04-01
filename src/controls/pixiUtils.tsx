@@ -5,11 +5,14 @@ export interface DragState {
   handleDrag: (newPos: PIXI.Point) => void;
 }
 
-export const makeDraggable = (g: PIXI.Graphics, parent: DragState) => {
-  g.buttonMode = true;
+export const makeDraggable = (g: PIXI.Graphics, parent: DragState, stopPropagation?: boolean) => {
   g.interactive = true;
   g.on('pointerdown', (evt: any) => {
+    console.log('setting drag data');
     parent.dragData = evt.data;
+    if (stopPropagation) {
+      evt.stopPropagation();
+    }
   })
     .on('pointerup', () => {
       parent.dragData = null;

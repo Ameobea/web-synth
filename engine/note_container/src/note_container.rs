@@ -37,6 +37,22 @@ impl NoteContainer {
                 _ => return false,
             }
         }
+
+        // We also need to make sure that we're not completely within a bigger note.  We can
+        // determine this by checking if the first entry to the left starts a note.
+        let mut range = self
+            .inner
+            .range((
+                Bound::Included(FloatOrd(-100.)),
+                Bound::Included(FloatOrd(start_point)),
+            ))
+            .rev();
+        match range.next().map(|(_point, entry)| entry) {
+            None => (),
+            Some(NoteEntry::NoteEnd { .. }) => (),
+            Some(_) => return false,
+        }
+
         return true;
     }
 
@@ -657,4 +673,19 @@ pub fn resize_note_end_blocked() {
     container.add_note(1., resizing_note);
     let new_end_point = container.resize_note_end(1., resizing_note.id, 6.);
     assert_eq!(new_end_point, 4.);
+}
+
+#[test]
+/// It should not be possible to move a note such that it is entirely within another note
+pub fn prevent_moving_inside_other_notes() {
+    let mut container = NoteContainer::default();
+    let big_note = Note {
+        id: 0,
+        length: 100.,
+    };
+    let moving_note = Note { id: 1, length: 1. };
+    container.add_note(0., big_note);
+    container.add_note(105., moving_note);
+    let new_start_point = container.move_note_horizontal(105., 1, 80.);
+    assert_eq!(new_start_point, 100.);
 }

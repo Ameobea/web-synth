@@ -1,8 +1,8 @@
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
-import { makeDraggable } from 'src/controls/pixiUtils';
 
+import { makeDraggable } from 'src/controls/pixiUtils';
 import * as conf from './conf';
 
 export interface Note {
@@ -25,15 +25,110 @@ export interface MIDIEditorView {
 }
 
 export interface SerializedMIDIEditor2State {
-  lines: Note[][];
+  lines: { startPoint: number; length: number }[][];
   view: MIDIEditorView;
   selectedNoteIDs: number[];
+}
+
+enum NoteDragHandleSide {
+  Left,
+  Right,
+}
+
+class NoteDragHandle {
+  private parentNote: NoteBox;
+  private graphics: PIXI.Graphics;
+  private side: NoteDragHandleSide;
+  private downPos: PIXI.Point | null = null;
+  private originalPosBeats = 0;
+
+  constructor(parentNote: NoteBox, side: NoteDragHandleSide) {
+    this.parentNote = parentNote;
+    this.side = side;
+    this.graphics = this.buildInitialGraphics();
+
+    this.render();
+  }
+
+  private buildInitialGraphics(): PIXI.Graphics {
+    const g = new PIXI.Graphics();
+    g.beginFill(0x333333, 0.32);
+    g.drawRect(0, 1, 20, conf.LINE_HEIGHT - 2);
+    g.endFill();
+    this.parentNote.graphics.addChild(g);
+    g.interactive = true;
+    g.cursor = 'ew-resize';
+    g.on('pointerdown', (evt: any) => {
+      const data: PIXI.InteractionData = evt.data;
+      this.downPos = data.global.clone();
+      evt.stopPropagation();
+      this.originalPosBeats =
+        this.side === NoteDragHandleSide.Left
+          ? this.parentNote.note.startPoint
+          : this.parentNote.note.startPoint + this.parentNote.note.length;
+
+      this.parentNote.line.app.addMouseUpCB(() => {
+        console.log('up');
+        this.downPos = null;
+      });
+    }).on('pointermove', (evt: any) => this.handleDrag(evt.data));
+    return g;
+  }
+
+  private computeWidth() {
+    const noteWidth = this.parentNote.getWidthPx();
+    if (noteWidth >= 20) {
+      return 8;
+    }
+
+    return Math.max(Math.floor((noteWidth - 6) / 2), 1);
+  }
+
+  private handleDrag(data: PIXI.InteractionData) {
+    if (!this.downPos) {
+      return;
+    }
+    const diffPx = data.global.x - this.downPos.x;
+    const diffBeats = this.parentNote.line.app.pxToBeats(diffPx);
+    const newPosBeats = this.originalPosBeats + diffBeats;
+    if (this.side === NoteDragHandleSide.Left) {
+      this.parentNote.line.app.resizeNoteHorizontalStart(
+        this.parentNote.line.index,
+        this.parentNote.note.startPoint,
+        this.parentNote.note.id,
+        newPosBeats
+      );
+    } else {
+      this.parentNote.line.app.resizeNoteHorizontalEnd(
+        this.parentNote.line.index,
+        this.parentNote.note.startPoint,
+        this.parentNote.note.id,
+        newPosBeats
+      );
+    }
+  }
+
+  public render() {
+    const parentNoteWidthPx = this.parentNote.getWidthPx();
+    this.graphics!.x =
+      this.side === NoteDragHandleSide.Left
+        ? 0
+        : Math.max(parentNoteWidthPx - this.computeWidth(), 0);
+    this.graphics.scale = new PIXI.Point(this.computeWidth() / 20, 1);
+  }
+
+  public destroy() {
+    if (this.graphics) {
+      this.parentNote.graphics.removeChild(this.graphics);
+      this.graphics.destroy();
+    }
+  }
 }
 
 class NoteBox {
   public line: NoteLine;
   public note: Note;
-  private graphics: PIXI.Graphics;
+  public graphics: PIXI.Graphics;
   private isSelected = false;
   public dragData: PIXI.InteractionData | null = null;
   /**
@@ -41,29 +136,15 @@ class NoteBox {
    * that the pointer remains at the same point in the note while dragging.
    */
   private dragXOffsetPx = 0;
+  private leftDragHandle: NoteDragHandle;
+  private rightDragHandle: NoteDragHandle;
 
   constructor(line: NoteLine, note: Note) {
     this.line = line;
     this.note = note;
     this.graphics = new PIXI.Graphics();
-    this.render();
-  }
-
-  public render() {
-    if (this.graphics) {
-      this.line.container.removeChild(this.graphics);
-      this.graphics.destroy();
-    }
-    this.graphics = new PIXI.Graphics();
-    const width = this.note.length * this.line.app.view.pxPerBeat;
-    this.graphics.lineStyle(1, 0x0);
-    this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
-    this.graphics.drawRect(0, 0, width, conf.LINE_HEIGHT - 1);
-    this.graphics.endFill();
-    this.graphics.x =
-      (this.note.startPoint - this.line.app.view.scrollHorizontalBeats) *
-      this.line.app.view.pxPerBeat;
     this.graphics.interactive = true;
+    this.graphics.cursor = 'pointer';
     this.graphics.on('pointerdown', (evt: any) => {
       const interactionData: PIXI.InteractionData = evt.data;
       this.dragXOffsetPx = interactionData.global.x - this.line.app.beatsToPx(this.note.startPoint);
@@ -83,7 +164,28 @@ class NoteBox {
       this.dragData = null;
     });
 
+    this.leftDragHandle = new NoteDragHandle(this, NoteDragHandleSide.Left);
+    this.rightDragHandle = new NoteDragHandle(this, NoteDragHandleSide.Right);
+
+    this.render();
+  }
+
+  public render() {
+    const width = this.note.length * this.line.app.view.pxPerBeat;
+    this.graphics.width = width;
+    this.graphics.clear();
+    this.graphics.lineStyle(1, 0x0);
+    this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
+    this.graphics.drawRect(0, 0, width, conf.LINE_HEIGHT - 1);
+    this.graphics.endFill();
+    this.graphics.x =
+      (this.note.startPoint - this.line.app.view.scrollHorizontalBeats) *
+      this.line.app.view.pxPerBeat;
+
     this.line.container.addChild(this.graphics);
+
+    this.leftDragHandle.render();
+    this.rightDragHandle.render();
   }
 
   public handleDrag(newPos: PIXI.Point) {
@@ -114,13 +216,23 @@ class NoteBox {
     this.render();
   }
 
+  public getWidthPx(): number {
+    return this.line.app.beatsToPx(this.note.length);
+  }
+
   public destroy() {
+    this.leftDragHandle.destroy();
+    this.rightDragHandle.destroy();
     this.line.container.removeChild(this.graphics);
     this.graphics.destroy();
   }
 }
 
 interface NoteCreationState {
+  /**
+   * Point that the mouse went down at regardless of what direction they moved in after that
+   */
+  originalPosBeats: number;
   startPositionBeats: number;
   endPositionBeats: number;
   id: number | null;
@@ -145,7 +257,6 @@ class NoteLine {
     this.background.drawRect(0, 0, this.app.width, conf.LINE_HEIGHT);
     this.background.endFill();
     this.background.interactive = true;
-    this.background.cursor = 'default';
     this.container.addChild(this.background);
     this.container.width = this.app.width;
     this.container.y = index * conf.LINE_HEIGHT;
@@ -162,9 +273,11 @@ class NoteLine {
   private installNoteCreationHandlers() {
     this.background
       .on('pointerdown', (evt: any) => {
+        this.app.deselectAllNotes();
         const data: PIXI.InteractionData = evt.data;
         const posBeats = this.app.pxToBeats(data.getLocalPosition(this.background).x);
         this.noteCreationState = {
+          originalPosBeats: posBeats,
           startPositionBeats: posBeats,
           id: null,
           endPositionBeats: posBeats,
@@ -182,13 +295,10 @@ class NoteLine {
         const data: PIXI.InteractionData = evt.data;
         const newPosBeats = this.app.pxToBeats(data.getLocalPosition(this.background).x);
         let [newStartPosBeats, newEndPosBeats] = [
-          Math.min(newPosBeats, this.noteCreationState.startPositionBeats),
-          Math.max(newPosBeats, this.noteCreationState.endPositionBeats),
+          Math.min(newPosBeats, this.noteCreationState.originalPosBeats),
+          Math.max(newPosBeats, this.noteCreationState.originalPosBeats),
         ];
-        const noteLengthPx = Math.abs(
-          this.app.beatsToPx(this.noteCreationState.startPositionBeats - newPosBeats)
-        );
-
+        const noteLengthPx = this.app.beatsToPx(newEndPosBeats - newStartPosBeats);
         if (!this.app.wasm) {
           throw new UnreachableException();
         }
@@ -316,6 +426,8 @@ export default class MIDIEditor2Instance {
       width,
       backgroundColor: conf.BACKGROUND_COLOR,
     });
+    const interactionManager = this.app.renderer.plugins.interaction;
+    interactionManager.cursorStyles['ew-resize'] = 'ew-resize';
 
     this.initEventHandlers();
     this.linesContainer = new PIXI.Container();
@@ -328,13 +440,13 @@ export default class MIDIEditor2Instance {
     const noteLinesCtxPtr = wasmInst.create_note_lines(conf.LINE_COUNT);
     this.wasm = { instance: wasmInst, noteLinesCtxPtr };
 
-    initialState.lines.forEach((notes, lineIx) => {
-      notes.forEach(note => {
+    const lines: Note[][] = initialState.lines.map((notes, lineIx) => {
+      return notes.map(note => {
         const id = wasmInst.create_note(noteLinesCtxPtr, lineIx, note.startPoint, note.length);
-        note.id = id;
+        return { ...note, id };
       });
     });
-    this.lines = initialState.lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
+    this.lines = lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
   }
 
   public pxToBeats(px: number) {
@@ -433,6 +545,16 @@ export default class MIDIEditor2Instance {
       throw new UnreachableException('Tried to resize note before Wasm initialized');
     }
 
+    // Prevent the note from being resized to be too small by forcing its length to remain above
+    // the minimum note size by modifying the desired new start point
+    const endPoint = note.note.startPoint + note.note.length;
+    const newLengthPx = Math.max(
+      this.beatsToPx(endPoint - newStartPoint),
+      conf.MIN_DRAWING_NOTE_WIDTH_PX
+    );
+    const newLengthBeats = this.pxToBeats(newLengthPx);
+    newStartPoint = endPoint - newLengthBeats;
+
     const realNewStartPoint = this.wasm.instance.resize_note_horizontal_start(
       this.wasm.noteLinesCtxPtr,
       lineIx,
@@ -440,6 +562,7 @@ export default class MIDIEditor2Instance {
       id,
       newStartPoint
     );
+    note.note.length += note.note.startPoint - realNewStartPoint;
     note.note.startPoint = realNewStartPoint;
     note.render();
     return realNewStartPoint;
@@ -460,6 +583,15 @@ export default class MIDIEditor2Instance {
       throw new UnreachableException('Tried to resize note before Wasm initialized');
     }
 
+    // Prevent the note from being resized to be too small by forcing its length to remain above
+    // the minimum note size by modifying the desired new end point
+    const newLengthPx = Math.max(
+      this.beatsToPx(newEndPoint - startPoint),
+      conf.MIN_DRAWING_NOTE_WIDTH_PX
+    );
+    const newLengthBeats = this.pxToBeats(newLengthPx);
+    newEndPoint = startPoint + newLengthBeats;
+
     const realNewEndPoint = this.wasm.instance.resize_note_horizontal_end(
       this.wasm.noteLinesCtxPtr,
       lineIx,
@@ -475,7 +607,12 @@ export default class MIDIEditor2Instance {
   public serialize(): SerializedMIDIEditor2State {
     return {
       selectedNoteIDs: [...this.selectedNoteIDs],
-      lines: this.lines.map(line => [...line.notesByID.values()].map(note => note.note)),
+      lines: this.lines.map(line =>
+        [...line.notesByID.values()].map(note => ({
+          startPoint: note.note.startPoint,
+          length: note.note.length,
+        }))
+      ),
       view: this.view,
     };
   }

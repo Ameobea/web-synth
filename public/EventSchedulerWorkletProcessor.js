@@ -16,7 +16,6 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
     if (typeof SharedArrayBuffer !== 'undefined') {
       this.beatManagerSABInner = new SharedArrayBuffer(1024);
       this.beatManagerSAB = new Float32Array(this.beatManagerSABInner);
-      console.log('sending global beat SAB');
     }
     this.port.postMessage({ type: 'beatManagerSAB', beatManagerSAB: this.beatManagerSAB });
 
