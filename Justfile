@@ -56,12 +56,17 @@ build-all:
 run:
   cd engine \
     && ./build.sh \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/engine.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/midi.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/debug/note_container.wasm --browser --remove-producers-section --out-dir ./build
+    && rm -rf /tmp/wasm \
+    && mkdir /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/debug/*.wasm /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
+    && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen /tmp/wasm/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen /tmp/wasm/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen /tmp/wasm/note_container.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/build/* ./src/
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public

@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, ops::Bound};
+use std::{
+    collections::{BTreeMap, HashSet},
+    ops::Bound,
+};
 
 use float_ord::FloatOrd;
 
@@ -13,6 +16,19 @@ pub enum NoteEntry {
     NoteStart { note: Note },
     NoteEnd { note_id: u32 },
     StartAndEnd { start_note: Note, end_note_id: u32 },
+}
+
+impl NoteEntry {
+    pub fn get_ids(&self) -> (u32, Option<u32>) {
+        match self {
+            NoteEntry::NoteStart { note } => (note.id, None),
+            NoteEntry::NoteEnd { note_id } => (*note_id, None),
+            NoteEntry::StartAndEnd {
+                start_note,
+                end_note_id,
+            } => (start_note.id, Some(*end_note_id)),
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -517,6 +533,39 @@ impl NoteContainer {
         }
 
         real_new_start_point
+    }
+
+    pub fn iter_notes(&self, acc: &mut HashSet<u32>, start_point: f64, end_point: f64) {
+        let iterator = self.inner.range((
+            Bound::Included(FloatOrd(start_point)),
+            Bound::Included(FloatOrd(end_point)),
+        ));
+
+        for (_pos, entry) in iterator {
+            let (id1, id2_opt) = entry.get_ids();
+            acc.insert(id1);
+            if let Some(id2) = id2_opt {
+                acc.insert(id2);
+            }
+        }
+
+        // Lastly, we need to check if we're fully inside of a note
+        let mut iterator = self
+            .inner
+            .range((
+                Bound::Included(FloatOrd(-1.)),
+                Bound::Excluded(FloatOrd(start_point)),
+            ))
+            .rev();
+        match iterator.next() {
+            Some((_point, NoteEntry::NoteStart { note })) => {
+                acc.insert(note.id);
+            },
+            Some((_point, NoteEntry::StartAndEnd { start_note, .. })) => {
+                acc.insert(start_note.id);
+            },
+            _ => (),
+        }
     }
 }
 

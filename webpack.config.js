@@ -3,7 +3,7 @@ const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-module.exports = {
+const config = {
   entry: {
     index: './src/index.tsx',
     fmDemo: './src/fmDemo/index.tsx',
@@ -14,7 +14,7 @@ module.exports = {
     publicPath: '/',
   },
   mode: 'development',
-  devtool: 'inline-source-map',
+  devtool: 'eval-cheap-module-source-map',
   module: {
     rules: [
       {
@@ -92,3 +92,6 @@ module.exports = {
     syncWebAssembly: true,
   },
 };
+
+// module.exports = smp.wrap(config);
+module.exports = config;

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::note_container::NoteContainer;
 
 /// Represents an array of `NoteContainer`s, matching the representation of the MIDI editor where
@@ -23,5 +25,20 @@ impl NoteLines {
         }
         self.lines[dst_line_ix].add_note(note_start, note);
         true
+    }
+
+    pub fn iter_notes(
+        &self,
+        start_line_ix: usize,
+        end_line_ix: usize,
+        start_point: f64,
+        end_point: f64,
+    ) -> Vec<u32> {
+        let mut acc: HashSet<u32> = HashSet::new();
+        for line_ix in start_line_ix..=end_line_ix {
+            let line = &self.lines[line_ix];
+            line.iter_notes(&mut acc, start_point, end_point);
+        }
+        acc.into_iter().collect()
     }
 }

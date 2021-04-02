@@ -26,10 +26,20 @@ pub fn get_new_note_id() -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn create_note(lines: *mut NoteLines, line_ix: usize, start_point: f64, length: f64) -> u32 {
+pub fn create_note(
+    lines: *mut NoteLines,
+    line_ix: usize,
+    start_point: f64,
+    length: f64,
+    note_id: u32,
+) -> u32 {
     let notes = unsafe { &mut *lines };
     let container = &mut notes.lines[line_ix];
-    let note_id = get_new_note_id();
+    let note_id = if note_id == 0 {
+        get_new_note_id()
+    } else {
+        note_id
+    };
     container.add_note(start_point, Note {
         id: note_id,
         length,
@@ -81,4 +91,28 @@ pub fn resize_note_horizontal_end(
     let notes = unsafe { &mut *lines };
     let container = &mut notes.lines[line_ix];
     container.resize_note_end(start_point, note_id, new_end_point)
+}
+
+#[wasm_bindgen]
+pub fn check_can_add_note(
+    lines: *const NoteLines,
+    line_ix: usize,
+    start_point: f64,
+    length: f64,
+) -> bool {
+    let notes = unsafe { &*lines };
+    let container = &notes.lines[line_ix];
+    container.check_can_add_note(start_point, length)
+}
+
+#[wasm_bindgen]
+pub fn iter_notes(
+    lines: *const NoteLines,
+    start_line_ix: usize,
+    end_line_ix: usize,
+    start_point: f64,
+    end_point: f64,
+) -> Vec<u32> {
+    let notes = unsafe { &*lines };
+    notes.iter_notes(start_line_ix, end_line_ix, start_point, end_point)
 }

@@ -2,10 +2,7 @@
 use core::arch::wasm32::*;
 use std::rc::Rc;
 
-use adsr::{
-    Adsr, AdsrStep, EarlyReleaseConfig, EarlyReleaseStrategy, GateStatus, RampFn,
-    RENDERED_BUFFER_SIZE,
-};
+use adsr::{Adsr, AdsrStep, EarlyReleaseConfig, GateStatus, RampFn, RENDERED_BUFFER_SIZE};
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
