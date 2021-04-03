@@ -1,6 +1,7 @@
 use uuid::Uuid;
+use wasm_bindgen::JsValue;
 
-use crate::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{js, view_context::ViewContext};
 
 /// This is just a shim to the JS-based sample library component.
 pub struct Sinsy {

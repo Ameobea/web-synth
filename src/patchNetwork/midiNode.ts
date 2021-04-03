@@ -15,13 +15,22 @@ export interface MIDIInputCbs {
 // hilarious
 export type MIDIAccess = PromiseResolveType<ReturnType<typeof navigator['requestMIDIAccess']>>;
 
+export const mkBuildPasthroughInputCBs = (node: MIDINode) => (): MIDIInputCbs => ({
+  onAttack: (note, velocity) => node.onAttack(note, velocity),
+  onRelease: (note, velocity) => node.onRelease(note, velocity),
+  onPitchBend: bendAmount => node.outputCbs.forEach(cb => cb.onPitchBend(bendAmount)),
+  onClearAll: () => node.outputCbs.forEach(cbs => cbs.onClearAll()),
+  onGenericControl: (controlIndex, controlValue) =>
+    node.outputCbs.forEach(cbs => cbs.onGenericControl?.(controlIndex, controlValue)),
+});
+
 /**
  * A `MIDINode` is a special kind of connectable that deals with polyphonic MIDI events.  They are connectable
  * in the patch network with a connection type of 'midi'.
  */
 export class MIDINode {
   private outputCbs_: MIDIInputCbs[] = [];
-  private getInputCbs: () => MIDIInputCbs;
+  public getInputCbs: () => MIDIInputCbs;
   private cachedInputCbs: MIDIInputCbs | null = null;
 
   constructor(getInputCbs?: (() => MIDIInputCbs) | undefined) {

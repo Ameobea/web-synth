@@ -24,12 +24,12 @@ export interface MIDIEditorView {
 }
 
 class SelectionBox {
-  private app: MIDIEditor2Instance;
+  private app: MIDIEditorUIInstance;
   private graphics: PIXI.Graphics;
   private startPoint: PIXI.Point;
   private endPoint: PIXI.Point;
 
-  constructor(app: MIDIEditor2Instance, startPoint: PIXI.Point) {
+  constructor(app: MIDIEditorUIInstance, startPoint: PIXI.Point) {
     this.app = app;
     this.startPoint = startPoint;
     this.endPoint = startPoint;
@@ -81,7 +81,7 @@ class SelectionBox {
   }
 }
 
-export interface SerializedMIDIEditor2State {
+export interface SerializedMIDIEditorState {
   lines: { startPoint: number; length: number }[][];
   view: MIDIEditorView;
   selectedNoteIDs: number[];
@@ -108,7 +108,7 @@ class NoteDragHandle {
 
   private buildInitialGraphics(): PIXI.Graphics {
     const g = new PIXI.Graphics();
-    g.beginFill(0x333333, 0.32);
+    g.beginFill(0x585858, 0.2);
     g.drawRect(0, 1, 20, conf.LINE_HEIGHT - 2);
     g.endFill();
     this.parentNote.graphics.addChild(g);
@@ -192,6 +192,7 @@ class NoteBox {
   private isSelected = false;
   public leftDragHandle: NoteDragHandle;
   public rightDragHandle: NoteDragHandle;
+  private isCulled = true;
 
   constructor(line: NoteLine, note: Note) {
     this.line = line;
@@ -222,19 +223,28 @@ class NoteBox {
   }
 
   public render() {
-    const width = this.note.length * this.line.app.view.pxPerBeat;
-    // this.graphics.width = width;
-    // console.log({})
+    const startPointPx =
+      (this.note.startPoint - this.line.app.view.scrollHorizontalBeats) *
+      this.line.app.view.pxPerBeat;
+    const widthPx = this.line.app.beatsToPx(this.note.length);
+    const endPointPx = startPointPx + widthPx;
+    // Check if we're entirely off-screen and if so, cull ourselves entirely from the scene
+    const isCulled = endPointPx < 0 || startPointPx > this.line.app.width;
+    if (isCulled && !this.isCulled) {
+      this.isCulled = isCulled;
+      this.line.container.removeChild(this.graphics);
+      return;
+    } else if (!isCulled && this.isCulled) {
+      this.isCulled = isCulled;
+      this.line.container.addChild(this.graphics);
+    }
+
     this.graphics.clear();
     this.graphics.lineStyle(1, 0x333333);
     this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
-    this.graphics.drawRect(1, 0, width, conf.LINE_HEIGHT - 1);
+    this.graphics.drawRect(1, 0, widthPx, conf.LINE_HEIGHT - 1);
     this.graphics.endFill();
-    this.graphics.x =
-      (this.note.startPoint - this.line.app.view.scrollHorizontalBeats) *
-      this.line.app.view.pxPerBeat;
-
-    this.line.container.addChild(this.graphics);
+    this.graphics.x = startPointPx;
 
     this.leftDragHandle.render();
     this.rightDragHandle.render();
@@ -284,16 +294,26 @@ interface NoteCreationState {
   id: number | null;
 }
 
+/**
+ * A cache for storing line marker sprites keyed by `pxPerBeat`
+ */
+const MarkersCache: Map<number, PIXI.Graphics> = new Map();
+
 class NoteLine {
-  public app: MIDIEditor2Instance;
+  public app: MIDIEditorUIInstance;
   public notesByID: Map<number, NoteBox> = new Map();
   public container: PIXI.Container;
   public background: PIXI.Graphics;
   public index: number;
-  private graphics: PIXI.Graphics;
+  private graphics: PIXI.Graphics | undefined;
   private noteCreationState: NoteCreationState | null = null;
+  private isCulled = true;
+  /**
+   * Used for markings caching to determine whether we need to re-render markings or not
+   */
+  private lastPxPerBeat = 0;
 
-  constructor(app: MIDIEditor2Instance, notes: Note[], index: number) {
+  constructor(app: MIDIEditorUIInstance, notes: Note[], index: number) {
     this.app = app;
     this.index = index;
     this.container = new PIXI.Container();
@@ -306,16 +326,14 @@ class NoteLine {
     this.container.addChild(this.background);
     this.container.width = this.app.width;
     this.container.y = index * conf.LINE_HEIGHT - this.app.view.scrollVerticalPx;
-    this.graphics = new PIXI.Graphics();
-    this.renderMarkers();
-    this.container.addChild(this.graphics);
+
     notes.forEach(note => {
       const noteBox = new NoteBox(this, note);
       this.app.allNotesByID.set(note.id, noteBox);
       this.notesByID.set(note.id, noteBox);
     });
-    this.app.linesContainer.addChild(this.container);
     this.installNoteCreationHandlers();
+    this.handleViewChange();
   }
 
   private installNoteCreationHandlers() {
@@ -325,9 +343,21 @@ class NoteLine {
           return;
         }
 
-        this.app.deselectAllNotes();
         const data: PIXI.InteractionData = evt.data;
-        const posBeats = this.app.pxToBeats(data.getLocalPosition(this.background).x);
+        const posBeats = this.app.snapBeat(
+          this.app.pxToBeats(data.getLocalPosition(this.background).x)
+        );
+        const isBlocked = !this.app.wasm!.instance.check_can_add_note(
+          this.app.wasm!.noteLinesCtxPtr,
+          this.index,
+          posBeats,
+          0
+        );
+        if (isBlocked) {
+          return;
+        }
+
+        this.app.deselectAllNotes();
         this.noteCreationState = {
           originalPosBeats: posBeats,
           startPositionBeats: posBeats,
@@ -399,41 +429,81 @@ class NoteLine {
   }
 
   public handleViewChange() {
-    this.container.y = this.index * conf.LINE_HEIGHT - this.app.view.scrollVerticalPx;
+    const newY = Math.max(
+      -conf.LINE_HEIGHT,
+      Math.round(this.index * conf.LINE_HEIGHT - this.app.view.scrollVerticalPx)
+    );
+    const isCulled = this.container.y + conf.LINE_HEIGHT < 0 || this.container.y > this.app.height;
+    if (!isCulled && this.isCulled) {
+      this.isCulled = isCulled;
+      this.app.linesContainer.addChild(this.container);
+    } else if (isCulled && !this.isCulled) {
+      this.isCulled = isCulled;
+      this.app.linesContainer.removeChild(this.container);
+      return;
+    }
+    this.container.y = newY;
+
     this.renderMarkers();
     for (const note of this.notesByID.values()) {
       note.render();
     }
   }
 
-  private renderMarkers() {
-    this.graphics.clear();
+  private buildMarkers(): PIXI.Graphics {
+    const cached = MarkersCache.get(this.app.view.pxPerBeat);
+    if (cached) {
+      return cached.clone();
+    }
 
+    const g = new PIXI.Graphics();
     // bottom border
-    this.graphics.lineStyle(1, conf.LINE_BORDER_COLOR);
-    this.graphics.moveTo(0, conf.LINE_HEIGHT);
-    this.graphics.lineTo(this.app.width, conf.LINE_HEIGHT);
+    g.lineStyle(1, conf.LINE_BORDER_COLOR);
+    g.moveTo(0, conf.LINE_HEIGHT);
+    g.lineTo(this.app.width * 2, conf.LINE_HEIGHT);
 
-    let beat = Math.ceil(this.app.view.scrollHorizontalBeats);
+    let beat = 0;
     const visibleBeats = this.app.width / this.app.view.pxPerBeat;
-    const endBeat = Math.floor(this.app.view.scrollHorizontalBeats + visibleBeats);
+    const endBeat = Math.floor(visibleBeats) + 20;
     while (beat <= endBeat) {
       const isMeasureLine = beat % this.app.view.beatsPerMeasure === 0;
-      let x = this.app.beatsToPx(beat - this.app.view.scrollHorizontalBeats);
+      let x = this.app.beatsToPx(beat);
       if (isMeasureLine) {
         // We want the measure lines to be crisp, so we ensure that they're exactly 1 pixel wide
         // https://github.com/pixijs/pixi.js/issues/4328
         x = Math.round(x) - 0.5;
-        this.graphics.lineStyle(1, conf.MEASURE_LINE_COLOR);
-        this.graphics.moveTo(x, 0);
-        this.graphics.lineTo(x, conf.LINE_HEIGHT - 0);
+        g.lineStyle(1, conf.MEASURE_LINE_COLOR);
+        g.moveTo(x, 0);
+        g.lineTo(x, conf.LINE_HEIGHT - 0);
       } else {
-        this.graphics.lineStyle(0.8, conf.NOTE_MARK_COLOR);
-        this.graphics.moveTo(x, conf.LINE_HEIGHT * 0.87);
-        this.graphics.lineTo(x, conf.LINE_HEIGHT);
+        g.lineStyle(0.8, conf.NOTE_MARK_COLOR);
+        g.moveTo(x, conf.LINE_HEIGHT * 0.87);
+        g.lineTo(x, conf.LINE_HEIGHT);
       }
       beat += 1;
     }
+
+    g.cacheAsBitmap = true;
+    MarkersCache.set(this.app.view.pxPerBeat, g);
+    return g.clone();
+  }
+
+  private renderMarkers() {
+    if (!this.graphics || this.lastPxPerBeat !== this.app.view.pxPerBeat) {
+      if (this.graphics) {
+        this.container.removeChild(this.graphics);
+        this.graphics.destroy();
+      }
+
+      this.graphics = this.buildMarkers();
+      this.container.addChild(this.graphics);
+      // after background, before notes
+      this.container.setChildIndex(this.graphics, 1);
+      this.lastPxPerBeat = this.app.view.pxPerBeat;
+    }
+
+    const xOffsetBeats = -(this.app.view.scrollHorizontalBeats % this.app.view.beatsPerMeasure);
+    this.graphics.x = this.app.beatsToPx(xOffsetBeats);
   }
 
   public destroy() {
@@ -445,7 +515,7 @@ class NoteLine {
   }
 }
 
-export default class MIDIEditor2Instance {
+export default class MIDIEditorUIInstance {
   public width: number;
   public height: number;
   private app: PIXI.Application;
@@ -487,7 +557,7 @@ export default class MIDIEditor2Instance {
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
-    initialState: SerializedMIDIEditor2State
+    initialState: SerializedMIDIEditorState
   ) {
     this.width = width;
     this.height = height;
@@ -533,7 +603,7 @@ export default class MIDIEditor2Instance {
     this.init(initialState);
   }
 
-  private async init(initialState: SerializedMIDIEditor2State) {
+  private async init(initialState: SerializedMIDIEditorState) {
     const wasmInst = await import('src/note_container');
     const noteLinesCtxPtr = wasmInst.create_note_lines(conf.LINE_COUNT);
     this.wasm = { instance: wasmInst, noteLinesCtxPtr };
@@ -545,6 +615,7 @@ export default class MIDIEditor2Instance {
       });
     });
     this.lines = lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
+    initialState.selectedNoteIDs.forEach(noteId => this.selectNote(noteId));
   }
 
   public pxToBeats(px: number) {
@@ -730,7 +801,12 @@ export default class MIDIEditor2Instance {
       this.panningData.startView.scrollHorizontalBeats + this.pxToBeats(xDiffPx),
       0
     );
-    this.view.scrollVerticalPx = Math.max(this.panningData.startView.scrollVerticalPx + yDiffPx, 0);
+    const maxVerticalScrollPx = Math.max(this.lines.length * conf.LINE_HEIGHT - this.height, 0);
+    this.view.scrollVerticalPx = R.clamp(
+      0,
+      maxVerticalScrollPx,
+      this.panningData.startView.scrollVerticalPx + yDiffPx
+    );
     this.handleViewChange();
   }
 
@@ -902,7 +978,7 @@ export default class MIDIEditor2Instance {
     note.line.notesByID.set(note.note.id, note);
   }
 
-  public serialize(): SerializedMIDIEditor2State {
+  public serialize(): SerializedMIDIEditorState {
     return {
       selectedNoteIDs: [...this.selectedNoteIDs],
       lines: this.lines.map(line =>
@@ -911,7 +987,7 @@ export default class MIDIEditor2Instance {
           length: note.note.length,
         }))
       ),
-      view: this.view,
+      view: R.clone(this.view),
       beatSnapInterval: this.beatSnapInterval,
     };
   }
@@ -920,9 +996,27 @@ export default class MIDIEditor2Instance {
     this.lines.forEach(line => line.handleViewChange());
   }
 
-  private handleZoom(deltaYPx: number) {
-    const multiplier = Math.pow(2, -deltaYPx / conf.SCROLL_ZOOM_DOUBLE_INTERVAL_PX);
-    this.view.pxPerBeat = Math.max(this.view.pxPerBeat * multiplier, 1);
+  private handleZoom(evt: WheelEvent) {
+    const deltaYPx = evt.deltaY;
+    const rect = (evt.target as HTMLCanvasElement).getBoundingClientRect();
+    const xPx = evt.clientX - rect.left;
+    const xPercent = xPx / this.width;
+    const multiplier =
+      deltaYPx > 0
+        ? deltaYPx / conf.SCROLL_ZOOM_DOUBLE_INTERVAL_PX
+        : // We adjust the multiplier to make it reversable so zooming in and then zooming out
+          // by the same amount puts the zoom at the same point as before.
+          1 - 1 / (1 + -deltaYPx / conf.SCROLL_ZOOM_DOUBLE_INTERVAL_PX);
+    const widthBeats = this.pxToBeats(this.width);
+    const endBeat = this.view.scrollHorizontalBeats + widthBeats;
+
+    const leftBeatsToAdd = xPercent * multiplier * widthBeats * (evt.deltaY > 0 ? -1 : 1);
+    const rightBeatsToAdd = (1 - xPercent) * multiplier * widthBeats * (evt.deltaY > 0 ? 1 : -1);
+    this.view.scrollHorizontalBeats = Math.max(0, this.view.scrollHorizontalBeats + leftBeatsToAdd);
+    const newEndBeat = Math.max(this.view.scrollHorizontalBeats + 1, endBeat + rightBeatsToAdd);
+    const newWidthBeats = newEndBeat - this.view.scrollHorizontalBeats;
+    this.view.pxPerBeat = this.width / newWidthBeats;
+
     this.handleViewChange();
   }
 
@@ -968,7 +1062,7 @@ export default class MIDIEditor2Instance {
           return;
         }
 
-        this.handleZoom(evt.deltaY);
+        this.handleZoom(evt);
         evt.preventDefault();
         evt.stopPropagation();
       },
@@ -992,8 +1086,10 @@ export default class MIDIEditor2Instance {
 
   public destroy() {
     this.cleanupEventHandlers();
-    this.lines.forEach(line => line.destroy());
-    this.app.stage.removeChild(this.linesContainer);
-    this.linesContainer.destroy();
+    try {
+      this.app.destroy();
+    } catch (err) {
+      console.warn('Error destroying MIDI editor PIXI instance: ', err);
+    }
   }
 }

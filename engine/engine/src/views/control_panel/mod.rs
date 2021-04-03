@@ -1,7 +1,7 @@
-use serde_json;
 use uuid::Uuid;
+use wasm_bindgen::JsValue;
 
-use crate::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{js, view_context::ViewContext};
 
 #[derive(Serialize, Deserialize)]
 pub struct ControlPanel {

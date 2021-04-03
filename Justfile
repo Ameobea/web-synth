@@ -116,10 +116,6 @@ push-docker-ci:
   docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
   docker push $CI_BUILDER_DOCKER_IMAGE_NAME
 
-build-engine:
-  cd ./engine/engine && cargo build --release --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/release/engine.wasm ../../public
-
 debug-engine:
   cd ./engine/engine && cargo build --target wasm32-unknown-unknown && \
   cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/debug/engine.wasm --browser --remove-producers-section --out-dir ./build && \

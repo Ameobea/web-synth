@@ -1,9 +1,9 @@
 //! Defines a view that creates a text editor and controls for compiling and running Faust scripts.
 
-use serde_json;
 use uuid::Uuid;
+use wasm_bindgen::JsValue;
 
-use crate::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{js, view_context::ViewContext};
 
 /// This is just a shim to the JS-based Faust editor.  Since there really aren't any complicated
 /// interactive or graphical components of this view context, the actual implementation for this

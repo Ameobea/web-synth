@@ -4,7 +4,6 @@ use uuid::Uuid;
 use crate::{
     prelude::*,
     views::{
-        clip_compositor::mk_clip_compositor,
         composition_sharing::mk_composition_sharing,
         control_panel::mk_control_panel,
         faust_editor::{mk_faust_editor, FaustEditor},
@@ -541,7 +540,6 @@ impl ViewContextManager {
 pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
     match name {
         "midi_editor" => mk_midi_editor(conf, uuid),
-        "clip_compositor" => mk_clip_compositor(conf, uuid),
         "faust_editor" => mk_faust_editor(conf, uuid),
         "graph_editor" => mk_graph_editor(conf, uuid),
         "composition_sharing" => mk_composition_sharing(conf, uuid),

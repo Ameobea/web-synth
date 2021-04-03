@@ -24,7 +24,6 @@ const styles: { [key: string]: React.CSSProperties } = {
 };
 
 const viewContexts: { children: string; name: string; displayName: string }[] = [
-  { children: 'C', name: 'clip_compositor', displayName: 'Clip Compositor' },
   { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor' },
   { children: 'E', name: 'faust_editor', displayName: 'Faust Code Editor' },
   { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },

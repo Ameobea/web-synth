@@ -1,4 +1,3 @@
-pub mod clip_compositor;
 pub mod composition_sharing;
 pub mod control_panel;
 pub mod faust_editor;

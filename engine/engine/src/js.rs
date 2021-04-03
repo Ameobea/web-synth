@@ -2,8 +2,6 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::views::midi_editor::scheduler::SchedulerLoopHandle;
-
 #[wasm_bindgen(raw_module = "./index")]
 extern "C" {
     pub fn init_view_contexts(
@@ -92,36 +90,11 @@ extern "C" {
 
 #[wasm_bindgen(raw_module = "./midiEditor")]
 extern "C" {
-    pub fn hide_midi_editor(vc_id: &str);
-    pub fn unhide_midi_editor(vc_id: &str);
-    pub fn create_midi_editor_audio_connectables(id: &str) -> JsValue;
-
-    pub fn init_midi_editor_ui(vc_id: &str);
-    pub fn cleanup_midi_editor_ui(vc_id: &str);
-}
-
-#[wasm_bindgen(raw_module = "./midiEditor/synthCbs")]
-extern "C" {
-    pub fn midi_editor_trigger_attack(vc_id: &str, note_id: usize);
-    pub fn midi_editor_trigger_release(vc_id: &str, note_id: usize);
-    pub fn midi_editor_trigger_attack_release(vc_id: &str, note_id: usize, duration: f32);
-    pub fn midi_editor_schedule_events(
-        vc_id: &str,
-        events: Vec<u8>,
-        note_ids: Vec<usize>,
-        timings: Vec<f32>,
-    );
-    pub fn midi_editor_cancel_all_events(vc_id: &str);
-    pub fn register_midi_editor_loop_interval(
-        cb: &Closure<dyn FnMut(f64)>,
-        inteval_ms: usize,
-    ) -> SchedulerLoopHandle;
-    pub fn cancel_midi_editor_loop_interval(handle: SchedulerLoopHandle);
-    pub fn midi_editor_register_animation_frame(
-        cb: &Closure<dyn FnMut(f64)>,
-    ) -> SchedulerLoopHandle;
-    pub fn midi_editor_cancel_animation_frame(handle: SchedulerLoopHandle);
-    pub fn get_cur_audio_ctx_time() -> f64;
+    pub fn hide_midi_editor(state_key: &str);
+    pub fn unhide_midi_editor(state_key: &str);
+    pub fn init_midi_editor(vc_id: &str);
+    pub fn cleanup_midi_editor(vc_id: &str);
+    pub fn get_midi_editor_audio_connectables(vc_id: &str) -> JsValue;
 }
 
 #[wasm_bindgen(raw_module = "./compositionSharing")]

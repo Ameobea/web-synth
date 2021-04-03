@@ -1,9 +1,8 @@
 //! Defines a view that allows connecting between components of an audio composition together
 
-use serde_json;
 use uuid::Uuid;
 
-use crate::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{js, view_context::ViewContext};
 
 /// This is just a shim to the JS-based graph editor.  Since there really aren't any complicated
 /// interactive or graphical components of this view context, the actual implementation for this

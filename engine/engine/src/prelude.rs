@@ -7,9 +7,7 @@ pub use common::{rng, uuid_v4, RNG};
 
 pub use super::{
     constants::*,
-    get_vcm,
-    helpers::grid::GridRendererUniqueIdentifier,
-    js,
+    get_vcm, js,
     util::{self, *},
     view_context::{
         self,

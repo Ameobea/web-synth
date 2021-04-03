@@ -137,7 +137,7 @@ export const mkContainerUnhider = (getContainerID: (vcId: string) => string, dis
   const elemID = getContainerID(vcId);
   const elem = document.getElementById(elemID);
   if (!elem) {
-    console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
+    console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't unhide.`);
     return;
   }
 

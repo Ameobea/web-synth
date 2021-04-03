@@ -1,9 +1,8 @@
 //! Defines a view that creates an interface for sharing compositions + browsing shared compositions
 
-use serde_json;
 use uuid::Uuid;
 
-use crate::{helpers::grid::prelude::*, view_context::ViewContext};
+use crate::{js, view_context::ViewContext};
 
 /// This is just a shim to the JS-based composition sharing UI.  Since there really aren't any
 /// complicated interactive or graphical components of this view context, the actual implementation
