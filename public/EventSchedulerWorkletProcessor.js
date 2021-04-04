@@ -21,11 +21,35 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
 
     this.pendingEvents = [];
     this.lastRecordedTime = 0;
+    this.isStarted = false;
 
     this.port.onmessage = event => {
       switch (event.data.type) {
         case 'init': {
           this.initWasm(event.data.wasmArrayBuffer);
+          break;
+        }
+        case 'start': {
+          if (!this.wasmInstance) {
+            console.error('Tried to start event scheduler before Wasm initialized');
+            break;
+          }
+
+          globalThis.curBeat = 0;
+          this.lastRecordedTime = currentTime;
+          this.wasmInstance.exports.start(currentTime);
+          this.isStarted = true;
+          break;
+        }
+        case 'stop': {
+          if (!this.wasmInstance) {
+            console.error('Tried to stop event scheduler before Wasm initialized');
+            break;
+          }
+
+          globalThis.curBeat = 0;
+          this.wasmInstance.exports.stop();
+          this.isStarted = false;
           break;
         }
         case 'schedule': {
@@ -85,17 +109,26 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
   }
 
   updateGlobalBeats(globalTempoBPM) {
-    const passedTime = currentTime - this.lastRecordedTime;
-    const passedBeats = (globalTempoBPM / 60) * passedTime;
-    this.lastRecordedTime = currentTime;
-    globalThis.curBeat += passedBeats;
+    if (this.isStarted) {
+      const passedTime = currentTime - this.lastRecordedTime;
+      const passedBeats = (globalTempoBPM / 60) * passedTime;
+      this.lastRecordedTime = currentTime;
+      globalThis.curBeat += passedBeats;
+    }
+
     if (this.beatManagerSABInner) {
       this.beatManagerSAB[0] = globalThis.curBeat;
+      this.beatManagerSAB[1] = globalTempoBPM;
     }
   }
 
   process(_inputs, _outputs, params) {
     this.updateGlobalBeats(params.global_tempo_bpm[0]);
+
+    if (!this.isStarted) {
+      return true;
+    }
+
     if (this.wasmInstance) {
       this.wasmInstance.exports.run(currentTime, globalThis.curBeat);
     }

@@ -20,6 +20,7 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
+import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const WavetableControlPanel: React.FC<{
   synth: SynthModule;
@@ -89,6 +90,61 @@ const PresetsControlPanel: React.FC<{
   const voicePresetIds = useSelector(voicePresetIdsSelector);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
+  const settings = useMemo(
+    () => [
+      {
+        label: 'preset',
+        type: 'select',
+        options: { blank: 'blank', ...voicePresetIds },
+        initial: 'blank',
+      },
+      {
+        label: 'load preset',
+        type: 'button',
+        action: () => {
+          if (!controlPanelContext.current) {
+            console.error('Control panel context never set!');
+            return;
+          }
+
+          const presetId = controlPanelContext.current.preset;
+          const allVoicePresets = getState().presets.voicePresets;
+          if (typeof allVoicePresets === 'string') {
+            console.error("Somehow voice presets aren't loaded at this point...");
+            return;
+          }
+
+          const preset =
+            presetId === 'blank' ? null : allVoicePresets.find(R.propEq('id', +presetId));
+          if (preset === undefined) {
+            console.error(
+              `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
+            );
+            return;
+          }
+
+          dispatch(
+            actionCreators.synthDesigner.SET_VOICE_STATE(
+              index,
+              preset ? preset.body : null,
+              dispatch
+            )
+          );
+        },
+      },
+      {
+        label: 'save preset',
+        type: 'button',
+        action: async () => {
+          const { title, description } = await renderModalWithControls(SavePresetModal);
+          const presetBody = getVoicePreset(stateKey, index);
+          await saveSynthVoicePreset({ title, description, body: presetBody });
+        },
+      },
+    ],
+    [actionCreators.synthDesigner, dispatch, index, stateKey, voicePresetIds]
+  );
+
   return (
     <ControlPanel
       proxy
@@ -96,57 +152,7 @@ const PresetsControlPanel: React.FC<{
         controlPanelContext.current = ctx;
       }}
       style={{ height: 97 }}
-      settings={[
-        {
-          label: 'preset',
-          type: 'select',
-          options: { blank: 'blank', ...voicePresetIds },
-          initial: 'blank',
-        },
-        {
-          label: 'load preset',
-          type: 'button',
-          action: () => {
-            if (!controlPanelContext.current) {
-              console.error('Control panel context never set!');
-              return;
-            }
-
-            const presetId = controlPanelContext.current.preset;
-            const allVoicePresets = getState().presets.voicePresets;
-            if (typeof allVoicePresets === 'string') {
-              console.error("Somehow voice presets aren't loaded at this point...");
-              return;
-            }
-
-            const preset =
-              presetId === 'blank' ? null : allVoicePresets.find(R.propEq('id', +presetId));
-            if (preset === undefined) {
-              console.error(
-                `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
-              );
-              return;
-            }
-
-            dispatch(
-              actionCreators.synthDesigner.SET_VOICE_STATE(
-                index,
-                preset ? preset.body : null,
-                dispatch
-              )
-            );
-          },
-        },
-        {
-          label: 'save preset',
-          type: 'button',
-          action: async () => {
-            const { title, description } = await renderModalWithControls(SavePresetModal);
-            const presetBody = getVoicePreset(stateKey, index);
-            await saveSynthVoicePreset({ title, description, body: presetBody });
-          },
-        },
-      ]}
+      settings={settings}
     />
   );
 };
@@ -155,7 +161,7 @@ const SynthModuleCompInner: React.FC<{
   index: number;
   synth: SynthModule;
   stateKey: string;
-}> = ({ index, synth, stateKey, children = null }) => {
+}> = ({ index, synth, stateKey, children = null, ...rest }) => {
   const unison = synth.voices[0].oscillators.length;
   const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);

@@ -218,9 +218,7 @@ const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   return gain;
 });
 const adsrs = (() => {
-  const base = Option.of(serialized?.gainEnvelope)
-    .map(normalizeEnvelope)
-    .getOrElseL(buildDefaultGainADSR);
+  const base = GlobalState.gainEnvelope;
   const adsr = new ADSR2Module(
     ctx,
     {
@@ -244,9 +242,7 @@ const adsrs = (() => {
 })();
 
 const filterAdsrs = (() => {
-  const base = Option.of(serialized?.filterEnvelope)
-    .map(normalizeEnvelope)
-    .getOrElseL(buildDefaultFilterEnvelope);
+  const base = GlobalState.filterEnvelope;
   GlobalState.filterEnvelope = base;
   const adsr = new ADSR2Module(
     ctx,

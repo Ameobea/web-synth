@@ -31,8 +31,19 @@ const MIDIEditor: React.FC<{
           return;
         }
 
-        instance.current = new MIDIEditorUIInstance(width, height, ref, initialState);
+        instance.current = new MIDIEditorUIInstance(
+          width,
+          height,
+          ref,
+          initialState,
+          parentInstance
+        );
         parentInstance.registerUI(instance.current);
+      }}
+      onMouseDown={evt => {
+        // Prevent clicks on the canvas from selecting text and stuff in the rest of the page
+        evt.preventDefault();
+        evt.stopPropagation();
       }}
     />
   );

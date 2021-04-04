@@ -10,8 +10,8 @@ import { makeDraggable } from 'src/controls/pixiUtils';
 const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
 const RAMP_LINE_COLOR = 0x43f79d;
-const RAMP_LINE_WIDTH = 2.4;
-const INTERPOLATED_SEGMENT_LENGTH_PX = 0.8;
+const RAMP_LINE_WIDTH = 1.4;
+const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
 const STEP_HANDLE_WIDTH = 4.5;
 const RAMP_HANDLE_COLOR = 0x0077ff;
 const PHASE_MARKER_COLOR = 0xf7e045;
@@ -25,6 +25,8 @@ PIXI.settings.ROUND_PIXELS = true;
 interface ADSR2Sprites {
   rampCurves: RampCurve[];
 }
+
+PIXI.utils.skipHello();
 
 /**
  * Controls the properties of a ramp curve.  Can be dragged, but must be bounded by the marks that define
@@ -659,6 +661,8 @@ class ADSR2Instance {
     try {
       this.app = new PIXI.Application({
         antialias: true,
+        resolution: 1,
+        autoDensity: true,
         view: canvas,
         height,
         width,

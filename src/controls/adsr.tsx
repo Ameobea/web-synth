@@ -3,7 +3,7 @@
  * side with callbacks into Wasm for value changes.
  */
 
-import React, { useRef, Fragment, SVGAttributes } from 'react';
+import React, { useRef, Fragment, SVGAttributes, useMemo } from 'react';
 import { Value } from 'react-control-panel';
 
 import { clamp, roundTo } from '../util';
@@ -95,23 +95,23 @@ const ADSRControls: React.FC<ADSRControlPropTypes> = ({
   value,
   onChange,
   handleRadius = 6,
-  style = {},
+  style,
 }) => {
   const svgElement = useRef<null | SVGSVGElement>(null);
+  const combinedStyle = useMemo(
+    () => ({
+      backgroundColor: '#1b1b1b',
+      border: '1px solid #444',
+      marginTop: 3,
+      width,
+      height,
+      ...(style ?? {}),
+    }),
+    [height, style, width]
+  );
 
   return (
-    <svg
-      className='adsr-viz'
-      style={{
-        backgroundColor: '#1b1b1b',
-        border: '1px solid #444',
-        marginTop: 3,
-        width,
-        height,
-        ...style,
-      }}
-      ref={svgElement}
-    >
+    <svg className='adsr-viz' style={combinedStyle} ref={svgElement}>
       <ADSRSegment
         x1={0}
         y1={height}

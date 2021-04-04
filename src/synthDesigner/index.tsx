@@ -228,7 +228,9 @@ const getMidiNode = (stateKey: string): MIDINode => {
       onPitchBend: () => {
         // No-op; TODO?
       },
-      onClearAll: () => dispatch(actionCreators.synthDesigner.CLEAR_ALL_SCHEDULED_MIDI_EVENTS()),
+      onClearAll: () => {
+        /* deprecated */
+      },
     };
   });
   midiInputCbCache.set(stateKey, midiNode);

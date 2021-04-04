@@ -26,6 +26,7 @@
   cursor: pointer;
   background-color: $highlight-5;
   font-size: 13.5px;
+  user-select: none;
 }
 
 input.view-context-switcher-tab-renamer {

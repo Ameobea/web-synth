@@ -1370,25 +1370,6 @@ const actionGroups = {
       return setSynth(synthIx, { ...targetSynth, selectedEffectType: effectType }, state);
     },
   }),
-  CLEAR_ALL_SCHEDULED_MIDI_EVENTS: buildActionGroup({
-    actionCreator: () => ({ type: 'CLEAR_ALL_SCHEDULED_MIDI_EVENTS' }),
-    subReducer: (state: SynthDesignerState, {}) => {
-      state.synths.forEach(synth =>
-        synth.voices.forEach(voice => {
-          voice.gainADSRModule.offset.cancelScheduledValues(0);
-
-          voice.gainADSRModule.offset.linearRampToValueAtTime(
-            voice.gainADSRModule.minValue,
-            ctx.currentTime + 1.5 / 1000
-          );
-
-          voice.oscillators.forEach(osc => osc.frequency.cancelScheduledValues(0));
-        })
-      );
-
-      return state;
-    },
-  }),
   SET_VOICE_STATE: buildActionGroup({
     actionCreator: (
       synthIx: number,

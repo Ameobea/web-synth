@@ -23,7 +23,7 @@ const retryAsync = async (
   throw new UnreachableException();
 };
 
-window.WavyJones = function (context, elem, updateInterval, width, height) {
+window.WavyJones = function (context, elem, width, height) {
   var analyser = context.createAnalyser();
 
   analyser.width = width;

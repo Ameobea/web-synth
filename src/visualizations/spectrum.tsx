@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ControlPanel from 'react-control-panel';
 import { useOnce } from 'ameo-utils';
 
@@ -150,40 +150,49 @@ export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
     setMkUpdateViz(() => mkUpdateVisualization);
   });
 
+  const onSettingChange = useCallback(
+    (_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
+      getSentry()?.captureMessage('Spectrum viz change settings', {
+        extra: { color_fn, scaler_fn },
+      });
+      spectrumModule.current!.set_conf(ctxPtr!, +color_fn, +scaler_fn);
+    },
+    [ctxPtr]
+  );
+
+  const settings = useMemo(() => {
+    if (!spectrumSettingsDefinition) {
+      return [];
+    }
+
+    return [
+      {
+        type: 'select',
+        label: 'scaler_fn',
+        options: spectrumSettingsDefinition.scaler_functions.reduce(
+          (acc, { id, name }) => ({ ...acc, [name]: id }),
+          {}
+        ),
+        initial: spectrumSettingsDefinition.scaler_functions[initialConf?.scaler_fn ?? 0].id,
+      },
+      {
+        type: 'select',
+        label: 'color_fn',
+        options: spectrumSettingsDefinition.color_functions.reduce(
+          (acc, { id, name }) => ({ ...acc, [name]: id }),
+          {}
+        ),
+        initial: spectrumSettingsDefinition.color_functions[initialConf?.color_fn ?? 0].id,
+      },
+    ];
+  }, [initialConf?.color_fn, initialConf?.scaler_fn, spectrumSettingsDefinition]);
+
   return (
     <>
       {!spectrumSettingsDefinition || !spectrumModule.current || ctxPtr === null ? (
         <Loading />
       ) : (
-        <ControlPanel
-          onChange={(_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
-            getSentry()?.captureMessage('Spectrum viz change settings', {
-              extra: { color_fn, scaler_fn },
-            });
-            spectrumModule.current!.set_conf(ctxPtr, +color_fn, +scaler_fn);
-          }}
-          settings={[
-            {
-              type: 'select',
-              label: 'scaler_fn',
-              options: spectrumSettingsDefinition.scaler_functions.reduce(
-                (acc, { id, name }) => ({ ...acc, [name]: id }),
-                {}
-              ),
-              initial: spectrumSettingsDefinition.scaler_functions[initialConf?.scaler_fn ?? 0].id,
-            },
-            {
-              type: 'select',
-              label: 'color_fn',
-              options: spectrumSettingsDefinition.color_functions.reduce(
-                (acc, { id, name }) => ({ ...acc, [name]: id }),
-                {}
-              ),
-              initial: spectrumSettingsDefinition.color_functions[initialConf?.color_fn ?? 0].id,
-            },
-          ]}
-          draggable
-        />
+        <ControlPanel onChange={onSettingChange} settings={settings} draggable />
       )}
 
       <canvas

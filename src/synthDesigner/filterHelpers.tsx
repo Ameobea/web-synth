@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { filterNils } from 'ameo-utils';
 import * as R from 'ramda';
 import { Range } from 'react-control-panel';
@@ -7,6 +7,7 @@ import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 export enum FilterType {
   Lowpass = 'lowpass',
@@ -43,17 +44,20 @@ const CustomQSetting: React.FC<{
     console.error('NaN `Q` value after converting from log to linear; logQ=' + value);
     linearQ = 1;
   }
+  const wrappedOnChange = useCallback(
+    (newQ: number) => console.log({ newQ }) || onChange(linearToDb(newQ)),
+    [onChange]
+  );
 
   return (
     <Range
       label='Q'
-      onChange={(newQ: number) => onChange(linearToDb(newQ))}
+      onChange={wrappedOnChange}
       value={linearQ}
       min={0.01}
       max={30}
       steps={300}
       scale='log'
-      initial={0.001}
     />
   );
 };
@@ -100,6 +104,7 @@ const filterSettings = {
     label: 'Q',
     Comp: CustomQSetting,
     renderContainer: false,
+    initial: 1,
   },
   adsr: {
     type: 'custom',

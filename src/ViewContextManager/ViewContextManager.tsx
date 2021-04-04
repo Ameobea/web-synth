@@ -6,6 +6,15 @@ import { ReduxStore } from 'src/redux';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import GlobalVolumeSlider from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
+import {
+  getIsGlobalBeatCounterStarted,
+  registerStartCB,
+  registerStopCB,
+  startAll,
+  stopAll,
+  unregisterStartCB,
+  unregisterStopCB,
+} from 'src/eventScheduler';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -56,7 +65,11 @@ const ViewContextIcon: React.FC<ViewContextIconProps> = ({
     role='button'
     title={displayName}
     className='view-context-icon'
-    onClick={onClick}
+    onClick={evt => {
+      onClick();
+      evt.preventDefault();
+      evt.stopPropagation();
+    }}
     style={style}
     {...rest}
   >
@@ -68,30 +81,65 @@ export const ViewContextManager: React.FC<{
   engine: typeof import('src/engine');
 }> = ({ engine }) => {
   const [volumeSliderOpen, setVolumeSliderOpen] = useState(false);
+  const [globalBeatCounterStarted, setGlobalBeatCounterStarted] = useState(
+    getIsGlobalBeatCounterStarted()
+  );
+
+  useEffect(() => {
+    const startCb = () => setGlobalBeatCounterStarted(true);
+    const stopCb = () => setGlobalBeatCounterStarted(false);
+    registerStartCB(startCb);
+    registerStopCB(stopCb);
+
+    return () => {
+      unregisterStartCB(startCb);
+      unregisterStopCB(stopCb);
+    };
+  }, []);
 
   return (
     <div style={styles.root}>
       <GlobalMenuButton engine={engine} />
       <ViewContextIcon
         displayName='Reset View Context Manager'
-        onClick={engine.reset_vcm}
-        style={{ backgroundColor: '#730505', justifyContent: 'space-around' }}
+        onClick={() => {
+          const confirmed = confirm('Really clear EVERYTHING and reset to scratch?');
+          if (!confirmed) {
+            return;
+          }
+          engine.reset_vcm();
+        }}
+        style={{ backgroundColor: '#730505', justifyContent: 'space-around', fontSize: 36 }}
         name='Delete'
       >
-        X
+        ×
       </ViewContextIcon>
       <ViewContextIcon
-        displayName='Start Audio'
-        onClick={() => new AudioContext().resume()}
-        style={{ backgroundColor: 'rgb(26, 130, 24)', justifyContent: 'space-around' }}
-        name='Start Audio'
+        displayName={globalBeatCounterStarted ? 'Stop' : 'Start'}
+        onClick={() => {
+          if (globalBeatCounterStarted) {
+            stopAll();
+          } else {
+            startAll();
+          }
+        }}
+        style={{
+          backgroundColor: 'rgb(26, 130, 24)',
+          justifyContent: 'space-around',
+          fontSize: 27,
+        }}
+        name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
       >
-        …
+        {globalBeatCounterStarted ? '⏹️' : '▶️'}
       </ViewContextIcon>
       <ViewContextIcon
         displayName='Set Global Volume'
         onClick={() => setVolumeSliderOpen(true)}
-        style={{ backgroundColor: 'rgb(47, 77, 121)', justifyContent: 'space-around' }}
+        style={{
+          backgroundColor: 'rgb(47, 77, 121)',
+          justifyContent: 'space-around',
+          fontSize: 27,
+        }}
         name='Set Global Volume'
       >
         <>

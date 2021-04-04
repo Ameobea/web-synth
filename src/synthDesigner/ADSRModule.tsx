@@ -47,15 +47,12 @@ export class ADSR2Module {
     ctx: AudioContext,
     params: ADSR2Params,
     instanceCount: number,
-    audioThreadData: AudioThreadData
+    audioThreadData?: AudioThreadData
   ) {
-    if (!audioThreadData) {
-      console.warn('Missing `audioThreadData` in ADSR2Module constructor');
-    }
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
     this.params = params;
-    this.audioThreadData = audioThreadData;
+    this.audioThreadData = audioThreadData ?? { phaseIndex: 0 };
     this.init(instanceCount);
   }
 

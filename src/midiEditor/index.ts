@@ -13,47 +13,51 @@ import {
 import MIDIEditorUIInstance, {
   SerializedMIDIEditorState,
 } from 'src/midiEditor/MIDIEditorUIInstance';
-import * as conf from './conf';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
-
-interface RecordingPlaybackState {
-  type: 'recording';
-}
-
-interface LoopingPlaybackState {
-  type: 'looping';
-}
-
-type PlaybackState = RecordingPlaybackState | LoopingPlaybackState;
+import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 
 export class MIDIEditorInstance {
   public vcId: string;
   public midiInput: MIDINode;
   public midiOutput: MIDINode;
-  private playbackState: PlaybackState | null = null;
-  private uiInstance: MIDIEditorUIInstance | undefined;
+  private playbackHandler: MIDIEditorPlaybackHandler;
+  public uiInstance: MIDIEditorUIInstance | undefined;
+  public lineCount: number;
   private midiInputCBs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
+      if (!this.playbackHandler.isPlaying) {
+        this.midiInput.onAttack(note, velocity);
+      }
       // TODO
     },
     onRelease: (note, velocity) => {
+      if (!this.playbackHandler.isPlaying) {
+        this.midiInput.onRelease(note, velocity);
+      }
       // TODO
     },
-    onPitchBend: () => {
-      /* ignore */
+    onPitchBend: bendAmount => {
+      if (!this.playbackHandler.isPlaying) {
+        this.midiInput.outputCbs.forEach(cbs => cbs.onPitchBend(bendAmount));
+      }
     },
     onClearAll: () => {
+      if (!this.playbackHandler.isPlaying) {
+        this.midiInput.outputCbs.forEach(cbs => cbs.onClearAll());
+      }
       // TODO
     },
   };
 
-  constructor(vcId: string) {
+  constructor(vcId: string, lineCount: number) {
+    this.lineCount = lineCount;
     this.vcId = vcId;
     this.midiInput = new MIDINode(() => this.midiInputCBs);
     this.midiOutput = new MIDINode();
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
     // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
+    this.playbackHandler = new MIDIEditorPlaybackHandler(this);
   }
 
   /**
@@ -70,18 +74,53 @@ export class MIDIEditorInstance {
     }
     return this.uiInstance.serialize();
   }
+
+  public gate(lineIx: number) {
+    this.midiInputCBs.onAttack(this.lineCount - lineIx, 255);
+  }
+
+  public ungate(lineIx: number) {
+    this.midiInputCBs.onRelease(this.lineCount - lineIx, 255);
+  }
+
+  public getWasmInstance() {
+    if (!this.uiInstance) {
+      throw new UnreachableException('Tried to get Wasm instance before UI instance initialized');
+    } else if (!this.uiInstance.wasm) {
+      throw new UnreachableException('Tried to get Wasm instance before it was initialized');
+    }
+    return this.uiInstance.wasm;
+  }
+
+  public getCursorPosBeats(): number {
+    return this.playbackHandler.getCursorPosBeats();
+  }
+
+  public destroy() {
+    try {
+      this.playbackHandler.destroy();
+      this.uiInstance?.destroy();
+    } catch (err) {
+      console.warn('Error destroying `MIDIEditorInstance`: ', err);
+    }
+  }
 }
 
 const Instances: Map<string, MIDIEditorInstance> = new Map();
 
 const getContainerID = (vcId: string) => `midiEditor_${vcId}`;
 
-const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => ({
-  lines: new Array(conf.LINE_COUNT).fill(null).map(() => []),
-  view: { pxPerBeat: 32, scrollVerticalPx: 0, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
-  beatSnapInterval: 1,
-  selectedNoteIDs: [],
-});
+const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
+  const maxMIDINumber = 90;
+  return {
+    lines: new Array(maxMIDINumber)
+      .fill(null)
+      .map((_, lineIx) => ({ notes: [], midiNumber: maxMIDINumber - lineIx })),
+    view: { pxPerBeat: 32, scrollVerticalPx: 0, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
+    beatSnapInterval: 1,
+    selectedNoteIDs: [],
+  };
+};
 
 export const hide_midi_editor = mkContainerHider(getContainerID);
 
@@ -89,18 +128,6 @@ export const unhide_midi_editor = mkContainerUnhider(getContainerID);
 
 export const init_midi_editor = (vcId: string) => {
   const stateKey = `midiEditor_${vcId}`;
-  const inst = new MIDIEditorInstance(vcId);
-  Instances.set(vcId, inst);
-
-  const domID = getContainerID(vcId);
-  const elem = document.createElement('div');
-  elem.id = domID;
-  elem.setAttribute(
-    'style',
-    'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
-  );
-  document.getElementById('content')!.appendChild(elem);
-
   const initialState: SerializedMIDIEditorState = Option.of(localStorage.getItem(stateKey))
     .flatMap(k => {
       try {
@@ -111,7 +138,17 @@ export const init_midi_editor = (vcId: string) => {
       }
     })
     .getOrElseL(buildDefaultMIDIEditorState);
-  console.log(initialState);
+  const inst = new MIDIEditorInstance(vcId, initialState.lines.length);
+  Instances.set(vcId, inst);
+
+  const domID = getContainerID(vcId);
+  const elem = document.createElement('div');
+  elem.id = domID;
+  elem.setAttribute(
+    'style',
+    'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; display: none;'
+  );
+  document.getElementById('content')!.appendChild(elem);
 
   mkContainerRenderHelper({
     Comp: MIDIEditor,
@@ -134,9 +171,11 @@ export const cleanup_midi_editor = (vcId: string) => {
     );
   }
 
-  console.log(inst.serialize().lines[0]);
   const serializedState = JSON.stringify(inst.serialize());
   localStorage.setItem(stateKey, serializedState);
+
+  Instances.delete(vcId);
+  inst.destroy();
 
   mkContainerCleanupHelper({})(getContainerID(vcId));
 };

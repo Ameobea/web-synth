@@ -1,7 +1,11 @@
+use std::{collections::HashMap, ops::Bound};
+
+use float_ord::FloatOrd;
+use js_sys::Function;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    note_container::{Note, NoteContainer},
+    note_container::{Note, NoteContainer, NoteEntry},
     note_lines::NoteLines,
 };
 
@@ -115,4 +119,104 @@ pub fn iter_notes(
 ) -> Vec<u32> {
     let notes = unsafe { &*lines };
     notes.iter_notes(start_line_ix, end_line_ix, start_point, end_point)
+}
+
+/// Calls `cb` for each note in all lines. If `end_beat_exclusive` is negative, it will be treated
+/// as unbounded.
+///
+/// `cb` is called with three arguments:
+///
+/// 1. an `is_attack` flag which is true if the note is starting and false if the note is ending
+/// 2. line index
+/// 3. beat
+#[wasm_bindgen]
+pub fn iter_notes_with_cb(
+    lines: *const NoteLines,
+    start_beat_inclusive: f64,
+    end_beat_exclusive: f64,
+    cb: Function,
+) {
+    let notes = unsafe { &*lines };
+
+    struct UnreleasedNote {
+        line_ix: usize,
+        start_point: f64,
+        note: Note,
+    }
+
+    let mut unreleased_notes: HashMap<u32, UnreleasedNote> = HashMap::default();
+    let mut events: Vec<(bool, usize, f64)> = Vec::default();
+    let iter = notes.lines.iter().enumerate().flat_map(|(line_ix, line)| {
+        line.inner
+            .range((
+                Bound::Included(FloatOrd(start_beat_inclusive)),
+                if end_beat_exclusive < 0. {
+                    Bound::Unbounded
+                } else {
+                    Bound::Excluded(FloatOrd(end_beat_exclusive))
+                },
+            ))
+            .map(move |(pos, entry)| (line_ix, pos.0, entry))
+    });
+    for (line_ix, pos, entry) in iter {
+        match entry {
+            NoteEntry::NoteStart { note } => {
+                events.push((true, line_ix, pos));
+                let existing = unreleased_notes.insert(note.id, UnreleasedNote {
+                    line_ix,
+                    start_point: pos,
+                    note: note.clone(),
+                });
+                assert!(
+                    existing.is_none(),
+                    "Note cannot be gated more than once before being released"
+                );
+            },
+            NoteEntry::NoteEnd { note_id } => {
+                let existing = unreleased_notes.remove(note_id);
+                if existing.is_some() {
+                    events.push((false, line_ix, pos));
+                }
+            },
+            NoteEntry::StartAndEnd {
+                start_note,
+                end_note_id,
+            } => {
+                // release before attack
+                let existing = unreleased_notes.remove(end_note_id);
+                if existing.is_some() {
+                    events.push((false, line_ix, pos));
+                }
+
+                events.push((true, line_ix, pos));
+                let existing = unreleased_notes.insert(start_note.id, UnreleasedNote {
+                    line_ix,
+                    start_point: pos,
+                    note: start_note.clone(),
+                });
+                assert!(
+                    existing.is_none(),
+                    "Note cannot be gated more than once before being released"
+                );
+            },
+        }
+    }
+
+    // Make sure that we include the release events for notes that exceed the end of the selection
+    if end_beat_exclusive < 0. {
+        assert!(unreleased_notes.is_empty());
+    }
+    for note in unreleased_notes.values() {
+        let release_time = note.start_point + note.note.length;
+        events.push((false, note.line_ix, release_time));
+    }
+
+    for (is_attack, line_ix, beat) in events {
+        let _ = cb.call3(
+            &JsValue::NULL,
+            &JsValue::from(is_attack),
+            &JsValue::from(line_ix as u32),
+            &JsValue::from(beat),
+        );
+    }
 }

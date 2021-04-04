@@ -1,6 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
+import { MIDIEditorInstance } from 'src/midiEditor';
 
 import * as conf from './conf';
 
@@ -13,6 +14,8 @@ export interface Note {
   length: number;
 }
 
+PIXI.utils.skipHello();
+
 export interface MIDIEditorView {
   /**
    * Zoom factor, indicating how many pixels per beat are rendered.
@@ -21,6 +24,52 @@ export interface MIDIEditorView {
   scrollHorizontalBeats: number;
   scrollVerticalPx: number;
   beatsPerMeasure: number;
+}
+
+class Cursor {
+  private inst: MIDIEditorUIInstance;
+  private posBeats = 0;
+  public graphics: PIXI.Graphics;
+
+  private buildGraphics(): PIXI.Graphics {
+    const g = new PIXI.Graphics();
+    g.alpha = 0.99;
+    g.lineStyle(1, conf.CURSOR_COLOR, 0.6);
+    g.moveTo(conf.CURSOR_CARET_WIDTH / 2, 1);
+    g.lineTo(conf.CURSOR_CARET_WIDTH / 2, this.inst.height);
+    g.lineStyle(0);
+    g.beginFill(conf.CURSOR_COLOR, 1);
+    g.drawPolygon([
+      new PIXI.Point(0, 0),
+      new PIXI.Point(conf.CURSOR_CARET_WIDTH, 0),
+      new PIXI.Point(conf.CURSOR_CARET_WIDTH / 2, conf.CURSOR_CARET_HEIGHT),
+      new PIXI.Point(0, 0),
+    ]);
+    g.endFill();
+    g.cacheAsBitmap = true;
+    return g;
+  }
+
+  constructor(inst: MIDIEditorUIInstance) {
+    this.inst = inst;
+    this.graphics = this.buildGraphics();
+  }
+
+  public setPosBeats(posBeats: number) {
+    this.posBeats = posBeats;
+    this.handleViewChange();
+  }
+
+  public handleViewChange() {
+    const normalizedPosBeats = this.posBeats - this.inst.view.scrollHorizontalBeats;
+    const xPx = this.inst.beatsToPx(normalizedPosBeats) + 10 - conf.CURSOR_CARET_WIDTH / 2;
+    if (xPx < 0) {
+      this.graphics.alpha = 0;
+      return;
+    }
+    this.graphics.alpha = 1;
+    this.graphics.x = xPx;
+  }
 }
 
 class SelectionBox {
@@ -82,7 +131,7 @@ class SelectionBox {
 }
 
 export interface SerializedMIDIEditorState {
-  lines: { startPoint: number; length: number }[][];
+  lines: { midiNumber: number; notes: { startPoint: number; length: number }[] }[];
   view: MIDIEditorView;
   selectedNoteIDs: number[];
   beatSnapInterval: number;
@@ -213,6 +262,9 @@ class NoteBox {
         this.line.app.selectNote(this.note.id);
       }
 
+      this.line.app.gateAllSelectedNotes();
+      this.line.app.addMouseUpCB(() => this.line.app.ungateAllSelectedNotes());
+
       this.line.app.startDraggingSelectedNotes(evt.data);
     });
 
@@ -225,8 +277,9 @@ class NoteBox {
   public render() {
     const startPointPx =
       (this.note.startPoint - this.line.app.view.scrollHorizontalBeats) *
-      this.line.app.view.pxPerBeat;
-    const widthPx = this.line.app.beatsToPx(this.note.length);
+        this.line.app.view.pxPerBeat -
+      1;
+    const widthPx = this.line.app.beatsToPx(this.note.length) - 1;
     const endPointPx = startPointPx + widthPx;
     // Check if we're entirely off-screen and if so, cull ourselves entirely from the scene
     const isCulled = endPointPx < 0 || startPointPx > this.line.app.width;
@@ -254,8 +307,6 @@ class NoteBox {
     if (!this.line.app.wasm) {
       throw new UnreachableException();
     }
-
-    // TODO: Handle vertical movement
 
     this.note.startPoint = this.line.app.wasm.instance.move_note_horizontal(
       this.line.app.wasm.noteLinesCtxPtr,
@@ -353,6 +404,7 @@ class NoteLine {
           posBeats,
           0
         );
+        this.app.parentInstance.gate(this.index);
         if (isBlocked) {
           return;
         }
@@ -367,6 +419,7 @@ class NoteLine {
 
         this.app.addMouseUpCB(() => {
           this.noteCreationState = null;
+          this.app.parentInstance.ungate(this.index);
         });
       })
       .on('pointermove', (evt: any) => {
@@ -518,6 +571,7 @@ class NoteLine {
 export default class MIDIEditorUIInstance {
   public width: number;
   public height: number;
+  public parentInstance: MIDIEditorInstance;
   private app: PIXI.Application;
   public wasm:
     | {
@@ -552,20 +606,25 @@ export default class MIDIEditorUIInstance {
   private selectionBox: SelectionBox | null = null;
   public selectionBoxButtonDown = false;
   private beatSnapInterval: number;
+  private cursor: Cursor;
 
   constructor(
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
-    initialState: SerializedMIDIEditorState
+    initialState: SerializedMIDIEditorState,
+    parentInstance: MIDIEditorInstance
   ) {
     this.width = width;
     this.height = height;
     this.view = R.clone(initialState.view);
     this.beatSnapInterval = initialState.beatSnapInterval;
+    this.parentInstance = parentInstance;
 
     this.app = new PIXI.Application({
       antialias: true,
+      resolution: 2,
+      autoDensity: true,
       view: canvas,
       height,
       width,
@@ -599,17 +658,64 @@ export default class MIDIEditorUIInstance {
           this.selectionBox.update(evt.data.getLocalPosition(this.linesContainer));
         }
       });
+
+    this.linesContainer.x = 10;
+    this.linesContainer.y = 10;
+    // Clip stuff hidden at the top outside of it
+    this.linesContainer.mask = new PIXI.Graphics()
+      .beginFill(0xff3300)
+      .drawRect(10, 10, this.width - 20, this.height - 20)
+      .endFill();
     this.app.stage.addChild(this.linesContainer);
-    this.init(initialState);
+
+    this.cursor = new Cursor(this);
+    this.app.ticker.add(() => {
+      this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
+    });
+
+    this.init(initialState).then(() => {
+      // top border on top of everything
+      this.app.stage.addChild(
+        new PIXI.Graphics()
+          .moveTo(10, 10.5)
+          .lineStyle(1, conf.LINE_BORDER_COLOR)
+          .lineTo(this.width - 10, 10.5)
+      );
+      // left border on top of everything
+      this.app.stage.addChild(
+        new PIXI.Graphics()
+          .moveTo(10.5, 10)
+          .lineStyle(1, conf.LINE_BORDER_COLOR)
+          .lineTo(10.5, this.height - 10)
+      );
+      // bottom border on top of everything
+      this.app.stage.addChild(
+        new PIXI.Graphics()
+          .moveTo(10, this.height - 10.5)
+          .lineStyle(1, conf.LINE_BORDER_COLOR)
+          .lineTo(this.width - 10, this.height - 10.5)
+      );
+      // right border on top of everything
+      this.app.stage.addChild(
+        new PIXI.Graphics()
+          .moveTo(this.width - 10.5, 10)
+          .lineStyle(1, conf.LINE_BORDER_COLOR)
+          .lineTo(this.width - 10.5, this.height - 10)
+      );
+
+      this.app.stage.addChild(this.cursor.graphics);
+    });
   }
 
   private async init(initialState: SerializedMIDIEditorState) {
     const wasmInst = await import('src/note_container');
-    const noteLinesCtxPtr = wasmInst.create_note_lines(conf.LINE_COUNT);
+    const noteLinesCtxPtr = wasmInst.create_note_lines(initialState.lines.length);
     this.wasm = { instance: wasmInst, noteLinesCtxPtr };
 
-    const lines: Note[][] = initialState.lines.map((notes, lineIx) => {
-      return notes.map(note => {
+    const lines: Note[][] = new Array(initialState.lines.length).fill(null).map(() => []);
+    initialState.lines.forEach(({ midiNumber, notes }) => {
+      const lineIx = lines.length - midiNumber;
+      lines[lineIx] = notes.map(note => {
         const id = wasmInst.create_note(noteLinesCtxPtr, lineIx, note.startPoint, note.length, 0);
         return { ...note, id };
       });
@@ -887,6 +993,24 @@ export default class MIDIEditorUIInstance {
     }
   }
 
+  public gateAllSelectedNotes() {
+    const allGatedLineIndices = new Set(
+      [...this.selectedNoteIDs].map(noteId => this.allNotesByID.get(noteId)!.line.index)
+    );
+    for (const lineIx of allGatedLineIndices) {
+      this.parentInstance.gate(lineIx);
+    }
+  }
+
+  public ungateAllSelectedNotes() {
+    const allGatedLineIndices = new Set(
+      [...this.selectedNoteIDs].map(noteId => this.allNotesByID.get(noteId)!.line.index)
+    );
+    for (const lineIx of allGatedLineIndices) {
+      this.parentInstance.ungate(lineIx);
+    }
+  }
+
   public handleDrag(data: PIXI.InteractionData) {
     if (!this.dragData) {
       return;
@@ -924,11 +1048,15 @@ export default class MIDIEditorUIInstance {
       throw new UnreachableException('Tried to drag notes before wasm initialized');
     }
     const allSelectedNotes: NoteBox[] = [];
+    const ungatedLineIndices: Set<number> = new Set();
+    const gatedLineIndices: Set<number> = new Set();
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId)!;
       allSelectedNotes.push(note);
 
+      ungatedLineIndices.add(note.line.index);
       const newLineIndex = note.line.index + lineDiff;
+      gatedLineIndices.add(newLineIndex);
       if (newLineIndex < 0 || newLineIndex >= this.lines.length) {
         return;
       }
@@ -944,6 +1072,13 @@ export default class MIDIEditorUIInstance {
       }
     }
     this.dragData.startLineIx = newStartLineIndex;
+
+    for (const lineIx of ungatedLineIndices) {
+      this.parentInstance.ungate(lineIx);
+    }
+    for (const lineIx of gatedLineIndices) {
+      this.parentInstance.gate(lineIx);
+    }
 
     // No conflicts, we can move all of them!  However, we need to make sure that we move them in order of
     // line index to ensure we don't move them into each other.
@@ -981,12 +1116,13 @@ export default class MIDIEditorUIInstance {
   public serialize(): SerializedMIDIEditorState {
     return {
       selectedNoteIDs: [...this.selectedNoteIDs],
-      lines: this.lines.map(line =>
-        [...line.notesByID.values()].map(note => ({
+      lines: this.lines.map((line, lineIx) => ({
+        midiNumber: this.lines.length - lineIx,
+        notes: [...line.notesByID.values()].map(note => ({
           startPoint: note.note.startPoint,
           length: note.note.length,
-        }))
-      ),
+        })),
+      })),
       view: R.clone(this.view),
       beatSnapInterval: this.beatSnapInterval,
     };
@@ -994,6 +1130,7 @@ export default class MIDIEditorUIInstance {
 
   private handleViewChange() {
     this.lines.forEach(line => line.handleViewChange());
+    this.cursor.handleViewChange();
   }
 
   private handleZoom(evt: WheelEvent) {

@@ -477,6 +477,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "float-ord",
+ "js-sys",
  "log",
  "wasm-bindgen",
 ]
