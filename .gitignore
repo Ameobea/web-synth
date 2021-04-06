@@ -26,3 +26,4 @@ public/wavetable_no_simd.wasm
 public/adsr.wasm
 public/sinsy.*
 src/note_container*
+!src/midiUtils.ts
