@@ -20,19 +20,21 @@ export class MIDIEditorInstance {
   public vcId: string;
   public midiInput: MIDINode;
   public midiOutput: MIDINode;
-  private playbackHandler: MIDIEditorPlaybackHandler;
+  public playbackHandler: MIDIEditorPlaybackHandler;
   public uiInstance: MIDIEditorUIInstance | undefined;
   public lineCount: number;
   private midiInputCBs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
       if (!this.playbackHandler.isPlaying) {
         this.midiInput.onAttack(note, velocity);
+        this.uiInstance?.onGated(this.lineCount - note);
       }
       // TODO
     },
     onRelease: (note, velocity) => {
       if (!this.playbackHandler.isPlaying) {
         this.midiInput.onRelease(note, velocity);
+        this.uiInstance?.onUngated(this.lineCount - note);
       }
       // TODO
     },
@@ -49,7 +51,7 @@ export class MIDIEditorInstance {
     },
   };
 
-  constructor(vcId: string, lineCount: number) {
+  constructor(vcId: string, lineCount: number, initialCursorPosBeats: number) {
     this.lineCount = lineCount;
     this.vcId = vcId;
     this.midiInput = new MIDINode(() => this.midiInputCBs);
@@ -57,7 +59,7 @@ export class MIDIEditorInstance {
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
     // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
-    this.playbackHandler = new MIDIEditorPlaybackHandler(this);
+    this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialCursorPosBeats);
   }
 
   /**
@@ -119,6 +121,7 @@ const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
     view: { pxPerBeat: 32, scrollVerticalPx: 0, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
     beatSnapInterval: 1,
     selectedNoteIDs: [],
+    cursorPosBeats: 0,
   };
 };
 
@@ -138,7 +141,11 @@ export const init_midi_editor = (vcId: string) => {
       }
     })
     .getOrElseL(buildDefaultMIDIEditorState);
-  const inst = new MIDIEditorInstance(vcId, initialState.lines.length);
+  const inst = new MIDIEditorInstance(
+    vcId,
+    initialState.lines.length,
+    initialState.cursorPosBeats ?? 0
+  );
   Instances.set(vcId, inst);
 
   const domID = getContainerID(vcId);

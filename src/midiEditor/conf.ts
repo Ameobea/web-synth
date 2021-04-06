@@ -12,7 +12,12 @@ export const MIN_DRAWING_NOTE_WIDTH_PX = 6;
  * After scrolling `SCROLL_ZOOM_DOUBLE_INTERVAL_PX` pixels, the zoom factor (px per beat) will be either doubled if scrolling
  * up (negative scroll delta) or halved if scrolling down (positive scroll delta)
  */
-export const SCROLL_ZOOM_DOUBLE_INTERVAL_PX = 220;
+export const SCROLL_ZOOM_DOUBLE_INTERVAL_PX = 410;
 export const CURSOR_COLOR = 0xcfcfcf;
-export const CURSOR_CARET_WIDTH = 10;
+export const CURSOR_CARET_WIDTH = 11;
 export const CURSOR_CARET_HEIGHT = (Math.sqrt(3) / 2) * CURSOR_CARET_WIDTH;
+export const CURSOR_GUTTER_HEIGHT = 18.5;
+export const CURSOR_GUTTER_COLOR = 0x070707;
+export const PIANO_KEYBOARD_WIDTH = 79.5;
+export const BLACK_NOTE_COLOR = 0x383838;
+export const WHITE_NOTE_COLOR = 0xcbcbcb;

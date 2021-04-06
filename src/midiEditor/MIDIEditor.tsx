@@ -45,6 +45,10 @@ const MIDIEditor: React.FC<{
         evt.preventDefault();
         evt.stopPropagation();
       }}
+      onContextMenu={evt => {
+        evt.preventDefault();
+        evt.stopPropagation();
+      }}
     />
   );
 };

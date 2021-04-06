@@ -1,6 +1,7 @@
 import {
   cancelCb,
   getCurBeat,
+  getIsGlobalBeatCounterStarted,
   registerStartCB,
   registerStopCB,
   scheduleEventBeats,
@@ -17,7 +18,7 @@ interface SchedulableNoteEvent {
 
 export default class MIDIEditorPlaybackHandler {
   private inst: MIDIEditorInstance;
-  private cursorPosBeats = 0;
+  private cursorPosBeats;
   /**
    * This uniquely identifies a single playback instance.  It is used for internal scheduling
    * to determine if a given playback session has ended or not.
@@ -36,8 +37,9 @@ export default class MIDIEditorPlaybackHandler {
     return this.playbackGeneration !== null;
   }
 
-  constructor(inst: MIDIEditorInstance) {
+  constructor(inst: MIDIEditorInstance, initialCursorPosBeats: number) {
     this.inst = inst;
+    this.cursorPosBeats = initialCursorPosBeats;
     this.cbs = {
       start: () => this.onGlobalStart(),
       stop: () => this.stopPlayback(),
@@ -71,18 +73,27 @@ export default class MIDIEditorPlaybackHandler {
     }
   }
 
+  /**
+   * Returns `true` if the cursor pos was successfuly set and playback updated to match its new position and `false`
+   * if the cursor position was not changed due to it being controlled externally or something else.
+   */
   public setCursorPosBeats(cursorPosBeats: number) {
+    if (getIsGlobalBeatCounterStarted()) {
+      return false;
+    }
+
     if (this.isPlaying) {
       // TODO: Handle re-scheduling
     }
     this.cursorPosBeats = cursorPosBeats;
+    return true;
   }
 
   private onGlobalStart() {
     if (this.isPlaying) {
       this.stopPlayback();
     }
-    this.setCursorPosBeats(0);
+    this.cursorPosBeats = 0;
     this.startPlayback(0);
   }
 
@@ -118,9 +129,11 @@ export default class MIDIEditorPlaybackHandler {
         entries.forEach(({ isAttack, lineIx }) => {
           if (isAttack) {
             this.inst.midiInput.onAttack(lineCount - lineIx, 255);
+            this.inst.uiInstance?.onGated(lineIx);
             this.heldLineIndices.add(lineIx);
           } else {
             this.inst.midiInput.onRelease(lineCount - lineIx, 255);
+            this.inst.uiInstance?.onUngated(lineIx);
             this.heldLineIndices.delete(lineIx);
           }
 
@@ -138,6 +151,7 @@ export default class MIDIEditorPlaybackHandler {
 
     for (const lineIx of this.heldLineIndices) {
       this.inst.midiInput.onRelease(this.inst.lineCount - lineIx, 255);
+      this.inst.uiInstance?.onUngated(lineIx);
     }
     this.heldLineIndices.clear();
   }
