@@ -5,6 +5,7 @@ import {
   registerStartCB,
   registerStopCB,
   scheduleEventBeats,
+  scheduleEventTimeAbsolute,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
@@ -16,15 +17,25 @@ interface SchedulableNoteEvent {
   lineIx: number;
 }
 
+type ScheduleParams =
+  | { type: 'globalBeatCounter'; curBeat: number }
+  | { type: 'localTempo'; bpm: number; startTime: number };
+
+const ctx = new AudioContext();
+
 export default class MIDIEditorPlaybackHandler {
   private inst: MIDIEditorInstance;
-  private cursorPosBeats;
+  /**
+   * Ths last *set* cursor position.  The actual cursor position will be different if playback is active;
+   * use `getCursorPosBeats()` to get the live cursor position during playback.
+   */
+  private lastSetCursorPosBeats;
   /**
    * This uniquely identifies a single playback instance.  It is used for internal scheduling
    * to determine if a given playback session has ended or not.
    */
   private playbackGeneration: number | null = null;
-  private lastPlaybackStartBeat = 0;
+  private lastPlaybackSchedulParams: ScheduleParams = { type: 'globalBeatCounter', curBeat: 0 };
   private cbs: {
     start: () => void;
     stop: () => void;
@@ -39,7 +50,7 @@ export default class MIDIEditorPlaybackHandler {
 
   constructor(inst: MIDIEditorInstance, initialCursorPosBeats: number) {
     this.inst = inst;
-    this.cursorPosBeats = initialCursorPosBeats;
+    this.lastSetCursorPosBeats = initialCursorPosBeats;
     this.cbs = {
       start: () => this.onGlobalStart(),
       stop: () => this.stopPlayback(),
@@ -51,6 +62,7 @@ export default class MIDIEditorPlaybackHandler {
   public getLoopPoint(): number | null {
     return this.loopPoint;
   }
+
   public setLoopPoint(newLoopPoint: number | null) {
     if (this.isPlaying) {
       console.warn("Can't set loop point while MIDI editor is playing");
@@ -62,14 +74,27 @@ export default class MIDIEditorPlaybackHandler {
 
   public getCursorPosBeats(): number {
     if (!this.isPlaying) {
-      return this.cursorPosBeats;
+      return this.lastSetCursorPosBeats;
     }
 
-    const curGlobalBeat = getCurBeat();
-    if (this.loopPoint !== null) {
-      return (curGlobalBeat - this.lastPlaybackStartBeat) % this.loopPoint;
+    if (this.lastPlaybackSchedulParams.type === 'globalBeatCounter') {
+      const curGlobalBeat = getCurBeat();
+      if (this.loopPoint !== null) {
+        return (curGlobalBeat - this.lastPlaybackSchedulParams.curBeat) % this.loopPoint;
+      } else {
+        return curGlobalBeat - this.lastPlaybackSchedulParams.curBeat;
+      }
     } else {
-      return curGlobalBeat - this.lastPlaybackStartBeat;
+      const timeSinceStarted = ctx.currentTime - this.lastPlaybackSchedulParams.startTime;
+      const beatsPerSecond = this.lastPlaybackSchedulParams.bpm / 60;
+      const beatsElapsed = this.lastSetCursorPosBeats + timeSinceStarted * beatsPerSecond;
+
+      if (this.loopPoint !== null) {
+        const loopLengthBeats = this.loopPoint;
+        return beatsElapsed % loopLengthBeats;
+      } else {
+        return beatsElapsed;
+      }
     }
   }
 
@@ -83,9 +108,17 @@ export default class MIDIEditorPlaybackHandler {
     }
 
     if (this.isPlaying) {
-      // TODO: Handle re-scheduling
+      if (this.lastPlaybackSchedulParams.type === 'globalBeatCounter') {
+        // TODO: Handle re-starting global event counter
+        return;
+      }
+
+      this.stopPlayback();
+      this.lastSetCursorPosBeats = cursorPosBeats;
+      this.startPlayback({ ...this.lastPlaybackSchedulParams, startTime: ctx.currentTime });
+      return;
     }
-    this.cursorPosBeats = cursorPosBeats;
+    this.lastSetCursorPosBeats = cursorPosBeats;
     return true;
   }
 
@@ -93,10 +126,14 @@ export default class MIDIEditorPlaybackHandler {
     if (this.isPlaying) {
       this.stopPlayback();
     }
-    this.cursorPosBeats = 0;
-    this.startPlayback(0);
+    this.lastSetCursorPosBeats = 0;
+    this.startPlayback({ type: 'globalBeatCounter', curBeat: 0 });
   }
 
+  /**
+   * Returns notes in the provided range of beats, normalizing them to be relative to
+   * `startBeatInclusive` ir provided.
+   */
   private getNotesInRange(
     startBeatInclusive: number | null,
     endBeatExclusive: number | null
@@ -122,10 +159,15 @@ export default class MIDIEditorPlaybackHandler {
     return noteEventsByBeat;
   }
 
-  private scheduleNotes(curBeat: number, noteEventsByBeat: Map<number, SchedulableNoteEvent[]>) {
+  private scheduleNotes(
+    noteEventsByBeat: Map<number, SchedulableNoteEvent[]>,
+    scheduleParams: ScheduleParams
+  ) {
     const lineCount = this.inst.lineCount;
     for (const [beat, entries] of noteEventsByBeat.entries()) {
-      const handle = scheduleEventBeats(curBeat + beat, () => {
+      let handle: number;
+      const cb = () => {
+        console.log('cb');
         entries.forEach(({ isAttack, lineIx }) => {
           if (isAttack) {
             this.inst.midiInput.onAttack(lineCount - lineIx, 255);
@@ -139,7 +181,22 @@ export default class MIDIEditorPlaybackHandler {
 
           this.scheduledEventHandles.delete(handle);
         });
-      });
+      };
+
+      if (scheduleParams.type === 'globalBeatCounter') {
+        handle = scheduleEventBeats(scheduleParams.curBeat + beat, cb);
+      } else {
+        const beatsPerSecond = scheduleParams.bpm / 60;
+        const secondsPerBeat = 1 / beatsPerSecond;
+        const secondsFromStart = beat * secondsPerBeat;
+        console.log({
+          startTime: scheduleParams.startTime,
+          secondsFromStart,
+          now: ctx.currentTime,
+        });
+        handle = scheduleEventTimeAbsolute(scheduleParams.startTime + secondsFromStart, cb);
+      }
+      this.scheduledEventHandles.add(handle);
     }
   }
 
@@ -159,12 +216,12 @@ export default class MIDIEditorPlaybackHandler {
   /**
    * Schedules note events for one play through of all notes in the MIDI editor, starting at the cursor position.
    */
-  private scheduleOneshot(curBeat: number) {
-    const notesInRange = this.getNotesInRange(this.cursorPosBeats, null);
-    this.scheduleNotes(curBeat, notesInRange);
+  private scheduleOneshot(scheduleParams: ScheduleParams) {
+    const notesInRange = this.getNotesInRange(this.lastSetCursorPosBeats, null);
+    this.scheduleNotes(notesInRange, scheduleParams);
   }
 
-  private scheduleLoop(curBeat: number) {
+  private scheduleLoop(scheduleParams: ScheduleParams) {
     const loopPoint = this.loopPoint!;
     const notesInRange = this.getNotesInRange(0, loopPoint);
     const loopLengthBeats = loopPoint;
@@ -176,7 +233,25 @@ export default class MIDIEditorPlaybackHandler {
         return;
       }
 
-      this.scheduleNotes(curBeat + loopLengthBeats * loopIx, notesInRange);
+      const newScheduleParams: ScheduleParams = (() => {
+        if (scheduleParams.type === 'globalBeatCounter') {
+          return {
+            type: 'globalBeatCounter' as const,
+            curBeat: scheduleParams.curBeat + loopLengthBeats * loopIx,
+          };
+        } else {
+          const beatsPerSecond = scheduleParams.bpm / 60;
+          const secondsPerBeat = 1 / beatsPerSecond;
+          const nextLoopRelativeStartTime = loopLengthBeats * secondsPerBeat;
+          return {
+            type: 'localTempo' as const,
+            bpm: scheduleParams.bpm,
+            startTime: scheduleParams.startTime + nextLoopRelativeStartTime,
+          };
+        }
+      })();
+
+      this.scheduleNotes(notesInRange, newScheduleParams);
 
       // Schedule an event before the loop ends to recursively schedule another.
       //
@@ -184,29 +259,37 @@ export default class MIDIEditorPlaybackHandler {
       // while looping, it's possible we may miss some loops.
       //
       // TODO: configure more scheduling lookahead to provide more leeway
-      const curBPM = getGlobalBpm();
-      const curBPS = curBPM / 60;
-      const oneSecondInBeats = curBPS;
-      scheduleEventBeats(loopIx * (loopLengthBeats + 1) - oneSecondInBeats, () =>
-        scheduleAnother(loopIx + 1)
-      );
+
+      if (scheduleParams.type === 'globalBeatCounter') {
+        const curBPM = getGlobalBpm();
+        const curBPS = curBPM / 60;
+        const oneSecondInBeats = curBPS;
+        scheduleEventBeats(
+          scheduleParams.curBeat + loopIx * (loopLengthBeats + 1) - oneSecondInBeats,
+          () => scheduleAnother(loopIx + 1)
+        );
+      } else {
+        const loopLengthSeconds = this.loopPoint! * scheduleParams.bpm;
+        const thisLoopEndTime = scheduleParams.startTime + loopLengthSeconds * (loopIx + 1);
+        scheduleEventTimeAbsolute(thisLoopEndTime - 1, () => scheduleAnother(loopIx + 1));
+      }
     };
 
     // Kick off the sick recursive scheduler
     scheduleAnother(0);
   }
 
-  public startPlayback(curBeat: number) {
+  public startPlayback(scheduleParams: ScheduleParams) {
     if (this.isPlaying) {
       return;
     }
 
-    this.lastPlaybackStartBeat = curBeat;
+    this.lastPlaybackSchedulParams = scheduleParams;
     this.playbackGeneration = Math.random();
     if (this.loopPoint === null) {
-      this.scheduleOneshot(curBeat);
+      this.scheduleOneshot(scheduleParams);
     } else {
-      this.scheduleLoop(curBeat);
+      this.scheduleLoop(scheduleParams);
     }
   }
 
@@ -215,7 +298,7 @@ export default class MIDIEditorPlaybackHandler {
       return;
     }
 
-    this.cursorPosBeats = this.getCursorPosBeats();
+    this.lastSetCursorPosBeats = this.getCursorPosBeats();
     this.playbackGeneration = null;
     this.cancelAllScheduledNotes();
   }

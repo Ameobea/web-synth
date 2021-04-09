@@ -37,7 +37,6 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
 
           globalThis.curBeat = 0;
           this.lastRecordedTime = currentTime;
-          this.wasmInstance.exports.start(currentTime);
           this.isStarted = true;
           break;
         }
@@ -124,10 +123,6 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
 
   process(_inputs, _outputs, params) {
     this.updateGlobalBeats(params.global_tempo_bpm[0]);
-
-    if (!this.isStarted) {
-      return true;
-    }
 
     if (this.wasmInstance) {
       this.wasmInstance.exports.run(currentTime, globalThis.curBeat);

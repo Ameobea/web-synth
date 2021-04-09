@@ -161,7 +161,7 @@ export const init_midi_editor = (vcId: string) => {
     Comp: MIDIEditor,
     getProps: () => ({
       vcId,
-      height: window.innerHeight - 80,
+      height: window.innerHeight - 140,
       width: window.innerWidth - 80,
       initialState,
       instance: inst,

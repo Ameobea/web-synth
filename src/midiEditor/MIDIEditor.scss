@@ -1,0 +1,24 @@
+.midi-editor {
+  margin-top: 20px;
+  margin-bottom: 10px;
+
+  .midi-editor-controls {
+    display: flex;
+    flex-direction: row;
+    margin-left: 20px;
+    margin-bottom: 8px;
+
+    .midi-editor-control-button {
+      cursor: pointer;
+      font-size: 36px;
+      border: 1px solid #aaa;
+      height: 34px;
+      width: 36px;
+      line-height: 37px;
+    }
+
+    .midi-editor-control-button:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 
 import { SequencerMark, SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
-import { scheduleEvent } from 'src/eventScheduler';
+import { scheduleEventTime } from 'src/eventScheduler';
 import { getGlobalBpm } from 'src/globalMenu';
 
 const ctx = new AudioContext();
@@ -36,7 +36,7 @@ export const SequencerBeatPlayerByVoiceType: {
     const holdDurationMS = beatDurationMS * 0.72;
 
     midiOutput.onAttack(mark?.note ?? voice.note, 255);
-    scheduleEvent(ctx.currentTime + holdDurationMS / 1000, () =>
+    scheduleEventTime(ctx.currentTime + holdDurationMS / 1000, () =>
       midiOutput.onRelease(mark?.note ?? voice.note, 255)
     );
   },

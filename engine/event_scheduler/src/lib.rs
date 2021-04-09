@@ -28,21 +28,13 @@ impl PartialOrd for ScheduledEvent {
     }
 }
 
-static mut IS_STARTED: bool = false;
-static mut START_TIME: f64 = 0.;
 static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, U1048576, Min> =
     BinaryHeap(heapless::i::BinaryHeap::new());
 static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, U1048576, Min> =
     BinaryHeap(heapless::i::BinaryHeap::new());
 
 #[no_mangle]
-pub unsafe extern "C" fn start(time: f64) {
-    IS_STARTED = true;
-    START_TIME = time;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn stop() { IS_STARTED = false; }
+pub unsafe extern "C" fn stop() { SCHEDULED_EVENTS.clear(); }
 
 #[no_mangle]
 pub extern "C" fn schedule(time: f64, cb_id: i32) {
@@ -56,14 +48,11 @@ pub extern "C" fn schedule_beats(beats: f64, cb_id: i32) {
 
 #[no_mangle]
 pub extern "C" fn run(raw_cur_time: f64, cur_beats: f64) {
-    // Normalize `cur_time` to be relative to the time at which the counter was started
-    let cur_time = raw_cur_time - unsafe { START_TIME };
-
     let scheduled_events = unsafe { &mut SCHEDULED_EVENTS };
     loop {
         match scheduled_events.peek() {
             None => break,
-            Some(evt) if evt.time > cur_time => break,
+            Some(evt) if evt.time > raw_cur_time => break,
             _ => (),
         }
 

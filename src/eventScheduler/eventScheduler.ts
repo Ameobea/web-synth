@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 
 let PendingEvents: { time: number | null; beats: number | null; cbId: number }[] = [];
@@ -19,6 +20,7 @@ export const cancelCb = (cbId: number) => RegisteredCbs.delete(cbId);
 let StartCBs: (() => void)[] = [];
 let StopCBs: (() => void)[] = [];
 let isStarted = false;
+let lastStartTime = 0;
 
 export const getIsGlobalBeatCounterStarted = (): boolean => isStarted;
 
@@ -40,6 +42,24 @@ export const unregisterStopCB = (cb: () => void) => {
   StopCBs = StopCBs.filter(ocb => ocb !== cb);
 };
 
+export const useIsGlobalBeatCounterStarted = () => {
+  const [isStarted, setIsStarted] = useState(getIsGlobalBeatCounterStarted());
+
+  useEffect(() => {
+    const startCb = () => setIsStarted(true);
+    const stopCb = () => setIsStarted(false);
+    registerStartCB(startCb);
+    registerStopCB(stopCb);
+
+    return () => {
+      unregisterStartCB(startCb);
+      unregisterStopCB(stopCb);
+    };
+  }, []);
+
+  return isStarted;
+};
+
 /**
  * Starts the global beat counter loop, resetting the current beat to zero.  Until this is called, no
  * events will be processed and the global current beat will remain at zero.
@@ -56,6 +76,7 @@ export const startAll = () => {
   }
 
   isStarted = true;
+  lastStartTime = ctx.currentTime;
   SchedulerHandle.port.postMessage({ type: 'start' });
   scheduleEventBeats(0, () => StartCBs.forEach(cb => cb()));
 };
@@ -95,6 +116,10 @@ const callCb = (cbId: number) => {
 
 let beatManagerSAB: Float32Array | null = null;
 
+/**
+ * Returns the current beat of the global beat counter.  This value is updated directly from the web audio rendering thread
+ * and shared with the main thread via `SharedArrayBuffer` meaning that it's quite accurate.
+ */
 export const getCurBeat = (): number => {
   if (!beatManagerSAB) {
     return 0;
@@ -134,7 +159,10 @@ Promise.all([
   PendingEvents = [];
 });
 
-export const scheduleEvent = (time: number, cb: () => void): number => {
+/**
+ * Schedules `cb` to be run when the global audio context `currentTime` reaches `time`.
+ */
+export const scheduleEventTimeAbsolute = (time: number, cb: () => void): number => {
   const cbId = registerCb(cb);
   if (!SchedulerHandle) {
     PendingEvents.push({ time, beats: null, cbId });
@@ -144,6 +172,20 @@ export const scheduleEvent = (time: number, cb: () => void): number => {
   SchedulerHandle.port.postMessage({ type: 'schedule', time, cbId });
   return cbId;
 };
+
+/**
+ * Schedules `cb` to be run `time` seconds after the time the global beat counter was last started
+ */
+export const scheduleEventTimeRelativeToStart = (time: number, cb: () => void): number =>
+  scheduleEventTimeAbsolute(time - lastStartTime, cb);
+
+/**
+ * Schedules `cb` to be run `time` seconds from the current time
+ */
+export const scheduleEventTimeRelativeToCurTime = (
+  secondsFromNow: number,
+  cb: () => void
+): number => scheduleEventTimeAbsolute(ctx.currentTime + secondsFromNow, cb);
 
 export const scheduleEventBeats = (beats: number, cb: () => void): number => {
   const cbId = registerCb(cb);
