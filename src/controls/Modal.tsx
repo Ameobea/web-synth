@@ -40,8 +40,7 @@ export function renderModalWithControls<T>(
           unmount();
           reject();
         }}
-      />,
-      modalNode
+      />
     );
   });
 }

@@ -6,6 +6,7 @@ import * as conf from './conf';
 
 export class CursorGutter {
   private app: MIDIEditorUIInstance;
+  private isDragging = false;
 
   constructor(app: MIDIEditorUIInstance) {
     this.app = app;
@@ -19,9 +20,22 @@ export class CursorGutter {
       if (evt.data.button !== 0) {
         return;
       }
+      this.isDragging = true;
 
       const xPx = evt.data.getLocalPosition(g).x;
       const xBeats = this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx);
+      this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
+
+      this.app.addMouseUpCB(() => {
+        this.isDragging = false;
+      });
+    }).on('pointermove', (evt: PIXI.InteractionEvent) => {
+      if (!this.isDragging) {
+        return;
+      }
+
+      const xPx = evt.data.getLocalPosition(g).x;
+      const xBeats = Math.max(0, this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx));
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
@@ -37,10 +51,11 @@ export class CursorGutter {
 }
 
 export class Cursor {
-  private app: MIDIEditorUIInstance;
-  private posBeats = 0;
+  protected app: MIDIEditorUIInstance;
+  protected posBeats = 0;
   public graphics: PIXI.Graphics;
   public dragData: PIXI.InteractionData | null = null;
+  protected color = conf.CURSOR_COLOR;
 
   public handleDrag(newPos: PIXI.Point) {
     const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
@@ -55,14 +70,14 @@ export class Cursor {
     this.setPosBeats(newPosBeats);
   }
 
-  private buildGraphics(): PIXI.Graphics {
+  protected buildGraphics(): PIXI.Graphics {
     const g = new PIXI.Graphics();
     g.alpha = 0.99;
-    g.lineStyle(1, conf.CURSOR_COLOR, 0.6);
+    g.lineStyle(1, this.color, 0.6);
     g.moveTo(conf.CURSOR_CARET_WIDTH / 2 + 0.25, 1);
     g.lineTo(conf.CURSOR_CARET_WIDTH / 2 + 0.25, this.app.height - 10);
     g.lineStyle(0);
-    g.beginFill(conf.CURSOR_COLOR, 1);
+    g.beginFill(this.color, 1);
     g.interactive = true;
     g.cursor = 'pointer';
     g.drawPolygon([
@@ -101,5 +116,41 @@ export class Cursor {
     }
     this.graphics.alpha = 1;
     this.graphics.x = xPx;
+  }
+
+  public getPosBeats() {
+    return this.posBeats;
+  }
+
+  public destroy() {
+    this.graphics.destroy();
+  }
+}
+
+export class LoopCursor extends Cursor {
+  protected color = conf.LOOP_CURSOR_COLOR;
+
+  constructor(inst: MIDIEditorUIInstance, loopPoint: number) {
+    super(inst);
+    this.graphics.destroy();
+    this.graphics = this.buildGraphics();
+    this.setPosBeats(loopPoint);
+  }
+
+  public handleDrag(newPos: PIXI.Point) {
+    if (this.app.parentInstance.playbackHandler.isPlaying) {
+      return;
+    }
+
+    const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
+    const newPosBeats = Math.max(
+      this.app.snapBeat(this.app.pxToBeats(normalizedX) + this.app.view.scrollHorizontalBeats),
+      0
+    );
+    const didUpdate = this.app.parentInstance.playbackHandler.setLoopPoint(newPosBeats);
+    if (!didUpdate) {
+      return;
+    }
+    this.setPosBeats(newPosBeats);
   }
 }

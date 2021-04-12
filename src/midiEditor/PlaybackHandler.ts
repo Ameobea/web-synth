@@ -11,6 +11,7 @@ import {
 } from 'src/eventScheduler';
 import { getGlobalBpm } from 'src/globalMenu';
 import { MIDIEditorInstance } from 'src/midiEditor';
+import { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 
 interface SchedulableNoteEvent {
   isAttack: boolean;
@@ -48,9 +49,10 @@ export default class MIDIEditorPlaybackHandler {
     return this.playbackGeneration !== null;
   }
 
-  constructor(inst: MIDIEditorInstance, initialCursorPosBeats: number) {
+  constructor(inst: MIDIEditorInstance, initialState: SerializedMIDIEditorState) {
     this.inst = inst;
-    this.lastSetCursorPosBeats = initialCursorPosBeats;
+    this.lastSetCursorPosBeats = initialState.cursorPosBeats;
+    this.loopPoint = initialState.loopPoint;
     this.cbs = {
       start: () => this.onGlobalStart(),
       stop: () => this.stopPlayback(),
@@ -63,13 +65,18 @@ export default class MIDIEditorPlaybackHandler {
     return this.loopPoint;
   }
 
-  public setLoopPoint(newLoopPoint: number | null) {
+  /**
+   * Retruns `true` if the loop point was actually updated and `false` if it wasn't udpated due to
+   * playback currently being active or something else.
+   */
+  public setLoopPoint(newLoopPoint: number | null): boolean {
     if (this.isPlaying) {
       console.warn("Can't set loop point while MIDI editor is playing");
-      return;
+      return false;
     }
 
     this.loopPoint = newLoopPoint;
+    return true;
   }
 
   public getCursorPosBeats(): number {
@@ -167,7 +174,6 @@ export default class MIDIEditorPlaybackHandler {
     for (const [beat, entries] of noteEventsByBeat.entries()) {
       let handle: number;
       const cb = () => {
-        console.log('cb');
         entries.forEach(({ isAttack, lineIx }) => {
           if (isAttack) {
             this.inst.midiInput.onAttack(lineCount - lineIx, 255);
@@ -189,11 +195,6 @@ export default class MIDIEditorPlaybackHandler {
         const beatsPerSecond = scheduleParams.bpm / 60;
         const secondsPerBeat = 1 / beatsPerSecond;
         const secondsFromStart = beat * secondsPerBeat;
-        console.log({
-          startTime: scheduleParams.startTime,
-          secondsFromStart,
-          now: ctx.currentTime,
-        });
         handle = scheduleEventTimeAbsolute(scheduleParams.startTime + secondsFromStart, cb);
       }
       this.scheduledEventHandles.add(handle);
@@ -242,16 +243,36 @@ export default class MIDIEditorPlaybackHandler {
         } else {
           const beatsPerSecond = scheduleParams.bpm / 60;
           const secondsPerBeat = 1 / beatsPerSecond;
-          const nextLoopRelativeStartTime = loopLengthBeats * secondsPerBeat;
+          const loopLengthSeconds = loopLengthBeats * secondsPerBeat;
+          let startTime = scheduleParams.startTime + loopLengthSeconds * loopIx;
+
+          // Adjust start time to take into account starting the first loop part of the way through
+          if (loopIx > 0) {
+            startTime -= this.lastSetCursorPosBeats * secondsPerBeat;
+          }
+
           return {
             type: 'localTempo' as const,
             bpm: scheduleParams.bpm,
-            startTime: scheduleParams.startTime + nextLoopRelativeStartTime,
+            startTime,
           };
         }
       })();
 
-      this.scheduleNotes(notesInRange, newScheduleParams);
+      // If we're starting in the middle of a loop on the first loop iteration, filter out notes that
+      // start before the starting cursor position
+      if (this.lastPlaybackSchedulParams.type === 'localTempo' && loopIx === 0) {
+        const clonedNotesInRange = new Map();
+        for (const [beat, events] of notesInRange.entries()) {
+          if (beat < this.lastSetCursorPosBeats) {
+            continue;
+          }
+          clonedNotesInRange.set(beat - this.lastSetCursorPosBeats, events);
+        }
+        this.scheduleNotes(clonedNotesInRange, newScheduleParams);
+      } else {
+        this.scheduleNotes(notesInRange, newScheduleParams);
+      }
 
       // Schedule an event before the loop ends to recursively schedule another.
       //
@@ -269,8 +290,13 @@ export default class MIDIEditorPlaybackHandler {
           () => scheduleAnother(loopIx + 1)
         );
       } else {
-        const loopLengthSeconds = this.loopPoint! * scheduleParams.bpm;
-        const thisLoopEndTime = scheduleParams.startTime + loopLengthSeconds * (loopIx + 1);
+        const beatsPerSecond = scheduleParams.bpm / 60;
+        const secondsPerBeat = 1 / beatsPerSecond;
+        const loopLengthSeconds = loopLengthBeats * secondsPerBeat;
+        const thisLoopEndTime =
+          scheduleParams.startTime +
+          loopLengthSeconds * (loopIx + 1) -
+          this.lastSetCursorPosBeats * secondsPerBeat;
         scheduleEventTimeAbsolute(thisLoopEndTime - 1, () => scheduleAnother(loopIx + 1));
       }
     };

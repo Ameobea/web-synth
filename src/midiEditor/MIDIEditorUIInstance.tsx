@@ -1,13 +1,14 @@
 import { UnreachableException } from 'ameo-utils';
 import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
+import { Option } from 'funfix-core';
+
 import { MIDIEditorInstance } from 'src/midiEditor';
-import { Cursor, CursorGutter } from 'src/midiEditor/Cursor';
+import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
 import { NoteBox, NoteDragHandleSide } from 'src/midiEditor/NoteBox';
 import NoteLine from 'src/midiEditor/NoteLine';
 import PianoKeys from 'src/midiEditor/PianoKeyboard';
 import SelectionBox from 'src/midiEditor/SelectionBox';
-
 import * as conf from './conf';
 
 export interface Note {
@@ -34,9 +35,10 @@ export interface MIDIEditorView {
 export interface SerializedMIDIEditorState {
   lines: { midiNumber: number; notes: { startPoint: number; length: number }[] }[];
   view: MIDIEditorView;
-  selectedNoteIDs: number[];
   beatSnapInterval: number;
   cursorPosBeats: number;
+  localBPM: number;
+  loopPoint: number | null;
 }
 
 export default class MIDIEditorUIInstance {
@@ -79,6 +81,8 @@ export default class MIDIEditorUIInstance {
   private beatSnapInterval: number;
   public cursor: Cursor;
   private pianoKeys: PianoKeys | undefined;
+  public localBPM: number;
+  public loopCursor: LoopCursor | null;
 
   constructor(
     width: number,
@@ -91,6 +95,10 @@ export default class MIDIEditorUIInstance {
     this.height = height;
     this.view = R.clone(initialState.view);
     this.beatSnapInterval = initialState.beatSnapInterval;
+    this.localBPM = initialState.localBPM ?? 120;
+    this.loopCursor = Option.of(initialState.loopPoint)
+      .map(loopPoint => new LoopCursor(this, loopPoint))
+      .orNull();
     this.parentInstance = parentInstance;
 
     this.app = new PIXI.Application({
@@ -169,7 +177,41 @@ export default class MIDIEditorUIInstance {
       );
 
       this.app.stage.addChild(this.cursor.graphics);
+      if (this.loopCursor) {
+        this.app.stage.addChild(this.loopCursor.graphics);
+      }
     });
+  }
+
+  private buildNoteLines(
+    serializedLines: {
+      midiNumber: number;
+      notes: {
+        startPoint: number;
+        length: number;
+      }[];
+    }[]
+  ) {
+    const lines: Note[][] = new Array(serializedLines.length).fill(null).map(() => []);
+    serializedLines.forEach(({ midiNumber, notes }) => {
+      const lineIx = lines.length - midiNumber;
+      if (lineIx >= lines.length) {
+        console.error(`Tried to load line for MIDI number ${midiNumber} which is out of range`);
+        return;
+      }
+
+      lines[lineIx] = notes.map(note => {
+        const id = this.wasm!.instance.create_note(
+          this.wasm!.noteLinesCtxPtr,
+          lineIx,
+          note.startPoint,
+          note.length,
+          0
+        );
+        return { ...note, id };
+      });
+    });
+    return lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
   }
 
   private async init(initialState: SerializedMIDIEditorState) {
@@ -177,16 +219,40 @@ export default class MIDIEditorUIInstance {
     const noteLinesCtxPtr = wasmInst.create_note_lines(initialState.lines.length);
     this.wasm = { instance: wasmInst, noteLinesCtxPtr };
 
-    const lines: Note[][] = new Array(initialState.lines.length).fill(null).map(() => []);
-    initialState.lines.forEach(({ midiNumber, notes }) => {
-      const lineIx = lines.length - midiNumber;
-      lines[lineIx] = notes.map(note => {
-        const id = wasmInst.create_note(noteLinesCtxPtr, lineIx, note.startPoint, note.length, 0);
-        return { ...note, id };
-      });
-    });
-    this.lines = lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
-    initialState.selectedNoteIDs.forEach(noteId => this.selectNote(noteId));
+    this.lines = this.buildNoteLines(initialState.lines);
+  }
+
+  public async reInitialize(newState: SerializedMIDIEditorState) {
+    if (!this.wasm) {
+      console.error('Tried to re-initialize MIDI editor state before Wasm initialized');
+      return;
+    }
+
+    // Delete all existing notes
+    for (const noteID of this.allNotesByID.keys()) {
+      this.deleteNote(noteID);
+    }
+
+    this.lines.forEach(line => line.destroy());
+    this.wasm.instance.set_line_count(this.wasm.noteLinesCtxPtr, newState.lines.length);
+    this.lines = this.buildNoteLines(newState.lines);
+
+    // Destroy + re-create piano notes
+    this.pianoKeys?.destroy();
+    this.pianoKeys = new PianoKeys(this);
+
+    // Adjust the view to match
+    this.view.beatsPerMeasure = newState.view.beatsPerMeasure;
+    this.view.pxPerBeat = newState.view.pxPerBeat;
+    this.view.scrollHorizontalBeats = newState.view.scrollHorizontalBeats;
+    this.view.scrollVerticalPx = newState.view.scrollVerticalPx;
+    this.handleViewChange();
+
+    // Set other misc. state
+    this.setBeatSnapInterval(newState.beatSnapInterval);
+    this.localBPM = newState.localBPM;
+    this.toggleLoop(newState.loopPoint);
+    this.cursor.setPosBeats(newState.cursorPosBeats);
   }
 
   public pxToBeats(px: number) {
@@ -242,6 +308,7 @@ export default class MIDIEditorUIInstance {
     );
     note.line.notesByID.delete(id);
     note.destroy();
+    this.allNotesByID.delete(id);
   }
 
   public selectNote(id: number) {
@@ -599,9 +666,32 @@ export default class MIDIEditorUIInstance {
     note.line.notesByID.set(note.note.id, note);
   }
 
+  public toggleLoop(loopPoint?: number | null | undefined) {
+    if (this.parentInstance.playbackHandler.isPlaying) {
+      return;
+    }
+
+    if (this.loopCursor) {
+      this.app.stage.removeChild(this.loopCursor.graphics);
+      this.loopCursor.destroy();
+      this.loopCursor = null;
+      this.parentInstance.playbackHandler.setLoopPoint(null);
+    } else {
+      const newLoopPoint = this.snapBeat(
+        loopPoint ?? this.parentInstance.getCursorPosBeats() + this.view.beatsPerMeasure
+      );
+      this.parentInstance.playbackHandler.setLoopPoint(newLoopPoint);
+      this.loopCursor = new LoopCursor(this, newLoopPoint);
+      this.app.stage.addChild(this.loopCursor.graphics);
+    }
+  }
+
+  public setBeatSnapInterval(newBeatSnapInterval: number) {
+    this.beatSnapInterval = newBeatSnapInterval;
+  }
+
   public serialize(): SerializedMIDIEditorState {
     return {
-      selectedNoteIDs: [],
       lines: this.lines.map((line, lineIx) => ({
         midiNumber: this.lines.length - lineIx,
         notes: [...line.notesByID.values()].map(note => ({
@@ -612,12 +702,15 @@ export default class MIDIEditorUIInstance {
       view: R.clone(this.view),
       beatSnapInterval: this.beatSnapInterval,
       cursorPosBeats: this.parentInstance.getCursorPosBeats(),
+      localBPM: this.localBPM,
+      loopPoint: this.loopCursor?.getPosBeats() ?? null,
     };
   }
 
   private handleViewChange() {
     this.lines.forEach(line => line.handleViewChange());
     this.cursor.handleViewChange();
+    this.loopCursor?.handleViewChange();
     this.pianoKeys?.handleViewChange();
   }
 

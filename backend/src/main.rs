@@ -109,7 +109,9 @@ async fn main() {
             routes::create_synth_voice_preset,
             routes::get_composition_by_id,
             routes::list_remote_samples,
-            routes::store_remote_sample
+            routes::store_remote_sample,
+            routes::save_midi_composition,
+            routes::get_midi_compositions,
         ])
         .attach(CorsFairing)
         .attach(Compression::fairing())

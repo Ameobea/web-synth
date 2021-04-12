@@ -36,23 +36,27 @@ const mkMidiImportDialog: (
 ) => React.FC<{
   onSubmit: (settings: MidiImportSettings) => void;
 }> = fileInfo => {
-  const MidiImportDialog: React.FC<{ onSubmit: (settings: MidiImportSettings) => void }> = ({
-    onSubmit,
-  }) => {
+  const MidiImportDialog: React.FC<{
+    onSubmit: (settings: MidiImportSettings) => void;
+  }> = ({ onSubmit }) => {
     const [selectedTrack, setSelectedTrack] = useState(0);
 
     return (
       <div className='midi-import-dialog'>
-        <>
-          {fileInfo.tracks.map((track, i) => (
-            <TrackInputItem
-              {...track}
-              key={i}
-              onSelect={() => setSelectedTrack(i)}
-              isSelected={selectedTrack === i}
-            />
-          ))}
-        </>
+        <div>
+          <h2>Select Track</h2>
+
+          <div>
+            {fileInfo.tracks.map((track, i) => (
+              <TrackInputItem
+                {...track}
+                key={i}
+                onSelect={() => setSelectedTrack(i)}
+                isSelected={selectedTrack === i}
+              />
+            ))}
+          </div>
+        </div>
 
         <button
           onClick={() => {
@@ -62,7 +66,9 @@ const mkMidiImportDialog: (
 
             onSubmit(settings);
           }}
-        />
+        >
+          Select Track
+        </button>
       </div>
     );
   };

@@ -6,7 +6,6 @@ export default class MIDIControlValuesCache {
   private callbacksByIndex: Map<number, ((controlValue: number) => void)[]> = new Map();
 
   constructor(initialState: { [controlIndex: number]: number }, srcNode: MIDINode, synth: FMSynth) {
-    console.log(initialState);
     Object.entries(initialState).forEach(([rawControlIndex, controlValue]) => {
       const controlIndex = +rawControlIndex;
       if (Number.isNaN(controlIndex)) {

@@ -91,14 +91,18 @@ impl From<&SMF> for MIDIFileInfo {
     }
 }
 
-/// Parses a MIDI file and returns the serialize byte representation of the `RawNote`s loaded from
-/// it.
+/// Parses a MIDI file and calls `note_cb` with `(note_id, start_beat, length)` for each note in the
+/// selected track as returned by `info_cb`.
 ///
 /// `info_cb` is a function that should be called with the object representing stats about the
 /// loaded MIDI file.  It should return a `Promise` which will then be awaited by this function.
 /// That promise should resolve to the track to be loaded.
 #[wasm_bindgen]
-pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Option<Promise> {
+pub fn load_midi_to_raw_note_bytes(
+    file_bytes: &[u8],
+    info_cb: Function,
+    note_cb: Function,
+) -> Option<Promise> {
     common::maybe_init();
 
     let mut reader = BufReader::new(file_bytes);
@@ -179,20 +183,17 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
         let track = &midi_file.tracks[track_to_read];
         info!("Reading events for track named {}", track);
         let mut cur_vtime = 0;
-        let mut notes: Vec<RawNoteData> = Vec::new();
         let mut on_notes: [u64; 255] = [NO_PLAYING_NOTE; 255];
 
         struct NoteParseContext<'a> {
             cur_vtime: u64,
             on_notes: &'a mut [u64; 255],
-            notes: &'a mut Vec<RawNoteData>,
             data: &'a [u8],
         }
 
         let handle_note_off = |NoteParseContext {
                                    cur_vtime,
                                    on_notes,
-                                   notes,
                                    data,
                                }: &mut NoteParseContext| {
             let note_id = data[1];
@@ -212,12 +213,12 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
             let note_start_ticks = on_notes[note_id as usize];
             let note_duration_beats = (*cur_vtime - note_start_ticks) as f32 / ticks_per_beat;
             let note_start_beats = note_start_ticks as f32 / ticks_per_beat;
-            let note_data = RawNoteData {
-                line_ix: note_id as usize,
-                start_beat: note_start_beats,
-                width: note_duration_beats,
-            };
-            notes.push(note_data);
+            let _ = note_cb.call3(
+                &JsValue::NULL,
+                &JsValue::from(note_id),
+                &JsValue::from(note_start_beats),
+                &JsValue::from(note_duration_beats),
+            );
 
             on_notes[note_id as usize] = NO_PLAYING_NOTE;
         };
@@ -255,7 +256,6 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
                     let mut context = NoteParseContext {
                         cur_vtime,
                         on_notes: &mut on_notes,
-                        notes: &mut notes,
                         data: &midi_evt.data,
                     };
 
@@ -272,11 +272,7 @@ pub fn load_midi_to_raw_note_bytes(file_bytes: &[u8], info_cb: Function) -> Opti
             }
         }
 
-        Ok(JsValue::from(Some(Uint8Array::from(
-            bincode::serialize(&notes)
-                .expect("Error serializing raw note data vector")
-                .as_slice(),
-        ))))
+        Ok(JsValue::NULL)
     };
 
     // Convert the JS Promise into a Rust/JS hybrid promise from that external crate

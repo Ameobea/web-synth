@@ -40,11 +40,13 @@ const WavetableWasmBytes = new AsyncOnce(
   async (): Promise<ArrayBuffer> => {
     const hasSIMDSupport = await getHasSIMDSupport();
     getSentry()?.setContext('wasmSIMDSupport', { hasWasmSIMDSupport: hasSIMDSupport });
-    console.log(
-      hasSIMDSupport
-        ? 'Wasm SIMD support detected!'
-        : 'Wasm SIMD support NOT detected; using fallback Wasm'
-    );
+    if (!window.location.href.includes('localhost')) {
+      console.log(
+        hasSIMDSupport
+          ? 'Wasm SIMD support detected!'
+          : 'Wasm SIMD support NOT detected; using fallback Wasm'
+      );
+    }
     const simdStatusElem = document.getElementById('simd-status');
     if (simdStatusElem) {
       if (hasSIMDSupport) {

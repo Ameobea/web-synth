@@ -18,8 +18,8 @@ pub use crate::init::*;
 #[derive(Serialize, Deserialize)]
 pub struct RawNoteData {
     pub line_ix: usize,
-    pub start_beat: f32,
-    pub width: f32,
+    pub start_beat: f64,
+    pub width: f64,
 }
 
 // Transmuted `rand_pcg::Pcg32::new(0xcafef00dd15ea5e5, 0xa02bdbf7bb3c0a7)` since it's not const atm

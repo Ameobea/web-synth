@@ -51,15 +51,15 @@ export class MIDIEditorInstance {
     },
   };
 
-  constructor(vcId: string, lineCount: number, initialCursorPosBeats: number) {
-    this.lineCount = lineCount;
+  constructor(vcId: string, initialState: SerializedMIDIEditorState) {
+    this.lineCount = initialState.lines.length;
     this.vcId = vcId;
     this.midiInput = new MIDINode(() => this.midiInputCBs);
     this.midiOutput = new MIDINode();
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
     // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
-    this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialCursorPosBeats);
+    this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
   }
 
   /**
@@ -122,6 +122,8 @@ const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
     beatSnapInterval: 1,
     selectedNoteIDs: [],
     cursorPosBeats: 0,
+    localBPM: 120,
+    loopPoint: null,
   };
 };
 
@@ -141,11 +143,7 @@ export const init_midi_editor = (vcId: string) => {
       }
     })
     .getOrElseL(buildDefaultMIDIEditorState);
-  const inst = new MIDIEditorInstance(
-    vcId,
-    initialState.lines.length,
-    initialState.cursorPosBeats ?? 0
-  );
+  const inst = new MIDIEditorInstance(vcId, initialState);
   Instances.set(vcId, inst);
 
   const domID = getContainerID(vcId);
@@ -166,6 +164,7 @@ export const init_midi_editor = (vcId: string) => {
       initialState,
       instance: inst,
     }),
+    enableReactQuery: true,
   })(domID);
 };
 

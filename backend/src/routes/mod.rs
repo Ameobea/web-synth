@@ -16,8 +16,9 @@ use crate::{
     schema, WebSynthDbConn,
 };
 
+pub mod midi_composition;
 mod remote_samples;
-pub use self::remote_samples::*;
+pub use self::{midi_composition::*, remote_samples::*};
 
 #[get("/")]
 pub fn index() -> &'static str { "Application successfully started!" }

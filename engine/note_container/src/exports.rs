@@ -220,3 +220,15 @@ pub fn iter_notes_with_cb(
         );
     }
 }
+
+#[wasm_bindgen]
+pub fn set_line_count(lines: *mut NoteLines, new_line_count: usize) {
+    let lines = unsafe { &mut *lines };
+
+    while lines.lines.len() < new_line_count {
+        lines.lines.push(NoteContainer::default());
+    }
+    while lines.lines.len() > new_line_count {
+        lines.lines.pop();
+    }
+}

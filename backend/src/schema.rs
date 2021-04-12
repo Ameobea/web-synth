@@ -33,6 +33,15 @@ table! {
 }
 
 table! {
+    midi_compositions (id) {
+        id -> Bigint,
+        name -> Text,
+        description -> Text,
+        composition_json -> Text,
+    }
+}
+
+table! {
     remote_sample_urls (id, name) {
         id -> Varchar,
         name -> Varchar,
@@ -72,6 +81,7 @@ allow_tables_to_appear_in_same_query!(
     composition_tags,
     composition_tags_join,
     effects,
+    midi_compositions,
     remote_sample_urls,
     synth_presets,
     users,

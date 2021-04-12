@@ -9,8 +9,8 @@ pub struct NewCompositionRequest {
     pub content: Map<String, Value>,
 }
 
-#[table_name = "compositions"]
 #[derive(Serialize, Insertable)]
+#[table_name = "compositions"]
 pub struct NewComposition {
     pub author: i64,
     pub title: String,

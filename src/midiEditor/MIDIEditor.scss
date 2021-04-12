@@ -5,20 +5,88 @@
   .midi-editor-controls {
     display: flex;
     flex-direction: row;
-    margin-left: 20px;
+    margin-left: 13px;
     margin-bottom: 8px;
+    align-items: flex-end;
 
     .midi-editor-control-button {
       cursor: pointer;
       font-size: 36px;
       border: 1px solid #aaa;
-      height: 34px;
-      width: 36px;
-      line-height: 37px;
+      height: 44px;
+      width: 44px;
+      line-height: 44px;
+      user-select: none;
+      margin-left: -1px;
+    }
+
+    .midi-editor-control-button.active {
+      color: magenta;
     }
 
     .midi-editor-control-button:hover {
       background-color: rgba(255, 255, 255, 0.1);
     }
+
+    .labeled-container {
+      display: flex;
+      flex-direction: column;
+
+      label {
+        line-height: 13px;
+        font-size: 10px;
+        margin-left: 2px;
+      }
+    }
+
+    input {
+      width: 50px;
+      height: 42px;
+      background-color: #151515;
+      color: #bababa;
+      border: 1px solid #aaa;
+      outline: none;
+    }
+
+    .midi-editor-beat-snap-controls {
+      display: flex;
+      flex-direction: row;
+      max-width: 69px;
+      flex-wrap: wrap;
+
+      .midi-editor-beat-snap-control-button {
+        height: 23px;
+        min-width: 22px;
+        flex-basis: 22px;
+        border: 1px solid #aaa;
+        box-sizing: border-box;
+        cursor: pointer;
+        padding-left: 5px;
+        font-size: 18px;
+        line-height: 22px;
+        margin-left: -1px;
+      }
+      .midi-editor-beat-snap-control-button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      .midi-editor-beat-snap-control-button:nth-child(n + 4) {
+        border-top: none;
+      }
+      .midi-editor-beat-snap-control-button[data-active='true'] {
+        color: magenta;
+      }
+    }
+  }
+}
+
+.midi-modal {
+  h1,
+  h2,
+  h3 {
+    text-align: center;
+  }
+
+  input[type='file'] {
+    margin-bottom: 10px;
   }
 }

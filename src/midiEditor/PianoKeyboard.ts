@@ -19,7 +19,7 @@ export default class PianoKeys {
   private drawKey(lineIx: number, g: PIXI.Graphics) {
     const baseY = lineIx * conf.LINE_HEIGHT;
     const noteName = midiNumberToNoteName(this.app.lines.length - lineIx);
-    const isBlackKey = noteName.includes('b') || noteName.includes('#');
+    const isBlackKey = noteName.includes('♭') || noteName.includes('♯');
 
     g.beginFill(isBlackKey ? conf.BLACK_NOTE_COLOR : conf.WHITE_NOTE_COLOR);
     g.drawRect(0, baseY, conf.PIANO_KEYBOARD_WIDTH, conf.LINE_HEIGHT);
@@ -37,7 +37,7 @@ export default class PianoKeys {
   private drawLabel(lineIx: number, g: PIXI.Graphics) {
     const baseY = lineIx * conf.LINE_HEIGHT;
     const noteName = midiNumberToNoteName(this.app.lines.length - lineIx);
-    const isBlackKey = noteName.includes('b') || noteName.includes('#');
+    const isBlackKey = noteName.includes('♭') || noteName.includes('♯');
 
     const text = new PIXI.Text(noteName, {
       fontFamily: 'PT Sans',
@@ -166,5 +166,14 @@ export default class PianoKeys {
       this.container.removeChild(existingGraphics!);
       existingGraphics!.destroy();
     }
+  }
+
+  public destroy() {
+    this.container.removeChild(this.keysLayer);
+    this.container.removeChild(this.labelLayer);
+    this.keysLayer.destroy();
+    this.labelLayer.destroy();
+    this.app.app.stage.removeChild(this.container);
+    this.container.destroy();
   }
 }

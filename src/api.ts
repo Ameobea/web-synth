@@ -1,6 +1,8 @@
 import { Without } from 'ameo-utils';
+
 import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
+import { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 import { Effect } from 'src/redux/modules/effects';
 import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { SampleDescriptor } from 'src/sampleLibrary';
@@ -98,4 +100,23 @@ export const saveEffect = (effect: Without<Effect, 'id'>) =>
       throw await res.text();
     }
   });
-(window as any).saveEffect = saveEffect;
+
+export interface SavedMIDIComposition {
+  id: number;
+  name: string;
+  description: string;
+  composition: SerializedMIDIEditorState;
+}
+
+export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]> =>
+  fetch(`${BACKEND_BASE_URL}/midi_compositions`).then(res => res.json());
+
+export const saveMIDIComposition = async (
+  name: string,
+  description: string,
+  composition: SerializedMIDIEditorState
+) =>
+  fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
+    body: JSON.stringify({ name, description, composition }),
+    method: 'POST',
+  });

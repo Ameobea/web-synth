@@ -231,11 +231,11 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
     <ConfigureParamSource
       title='sample rate'
       adsrs={adsrs}
+      scale='log'
       onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
-      min={1}
+      min={100}
       max={44_100}
-      step={1}
       state={state.sampleRate}
       onChange={sampleRate => onChange({ ...state, sampleRate })}
     />

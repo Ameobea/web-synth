@@ -20,7 +20,7 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from 'src/synthDesigner/SavePresetModal';
 import { saveSynthPreset } from 'src/api';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
+import { buildWavyJonesInstance } from 'src/visualizations/WavyJones';
 import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const mapAddModuleControlsStateToProps = (state: ReduxStore) => ({

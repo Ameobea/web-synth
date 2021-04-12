@@ -64,11 +64,13 @@ const getHasSIMDSupport = async()=>WebAssembly.validate(new Uint8Array([0,97,115
 
 const WavetableWasmBytes = new AsyncOnce(async () => {
   const hasSIMDSupport = await getHasSIMDSupport();
-  console.log(
-    hasSIMDSupport
-      ? 'Wasm SIMD support detected!'
-      : 'Wasm SIMD support NOT detected; using fallback Wasm'
-  );
+  if (!window.location.href.includes('localhost')) {
+    console.log(
+      hasSIMDSupport
+        ? 'Wasm SIMD support detected!'
+        : 'Wasm SIMD support NOT detected; using fallback Wasm'
+    );
+  }
   const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
   return res.then(res => res.arrayBuffer());
 });

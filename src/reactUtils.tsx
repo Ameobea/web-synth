@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Store } from 'redux';
 import { Provider } from 'react-redux';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import * as R from 'ramda';
+
 import { genRandomStringID } from 'src/util';
 
 interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
@@ -21,6 +24,10 @@ interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<an
    * The props to be passed to the rendered component
    */
   getProps: () => P;
+  /**
+   * If `true`, the rendered component will be wrapped with a `react-query` `QueryClientProvider`
+   */
+  enableReactQuery?: boolean;
 }
 
 const RootsByID: Map<string, unknown> = new Map();
@@ -34,6 +41,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
   store,
   predicate,
   getProps,
+  enableReactQuery,
 }: ContainerRenderHelperArgs<P>) {
   return (domId: string) => {
     const node = document.getElementById(domId);
@@ -61,13 +69,23 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
       RootsByID.set(rootID, root);
     }
 
-    const rendered = store ? (
-      <Provider store={store}>
-        <Comp {...props} />
-      </Provider>
-    ) : (
-      <Comp {...props} />
+    const wrap = R.compose(
+      (rendered: React.ReactNode) => {
+        if (store) {
+          return <Provider store={store}>{rendered}</Provider>;
+        }
+        return rendered;
+      },
+      (rendered: React.ReactNode) => {
+        if (enableReactQuery) {
+          return (
+            <QueryClientProvider client={getReactQueryClient()}>{rendered}</QueryClientProvider>
+          );
+        }
+        return rendered;
+      }
     );
+    const rendered = wrap(<Comp {...props} />);
     root.render(rendered);
 
     if (predicate) {
@@ -209,4 +227,19 @@ export function useWhyDidYouUpdate<T extends { [key: string]: any }>(name: strin
     // Finally update previousProps with current props for next hook call
     previousProps.current = props;
   });
+}
+
+const ReactQueryClient = new QueryClient();
+
+export const getReactQueryClient = (): QueryClient => ReactQueryClient;
+
+export function withReactQueryClient<T extends Record<string, any>>(
+  Comp: React.ComponentType<T>
+): React.ComponentType<T> {
+  const WithReactQueryClient: React.FC<T> = ({ ...props }) => (
+    <QueryClientProvider client={ReactQueryClient}>
+      <Comp {...props} />
+    </QueryClientProvider>
+  );
+  return WithReactQueryClient;
 }
