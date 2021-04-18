@@ -160,6 +160,7 @@ export default class MIDIEditorUIInstance {
     this.cursor.setPosBeats(initialState.cursorPosBeats ?? 0);
     this.app.ticker.add(() => {
       this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
+      this.parentInstance.playbackHandler?.recordingCtx?.tick();
     });
 
     this.init(initialState).then(() => {
@@ -271,6 +272,9 @@ export default class MIDIEditorUIInstance {
     return Math.round(rawBeat * (1 / this.beatSnapInterval)) / (1 / this.beatSnapInterval);
   }
 
+  /**
+   * @returns ID of the created note
+   */
   public addNote(lineIx: number, startPoint: number, length: number): number {
     if (!this.wasm) {
       throw new UnreachableException('Tried to create note before Wasm initialized');
@@ -384,6 +388,9 @@ export default class MIDIEditorUIInstance {
     return realNewStartPoint;
   }
 
+  /**
+   * @returns the actual new endpoint of the note after requesting resize
+   */
   public resizeNoteHorizontalEnd(
     lineIx: number,
     startPoint: number,
@@ -707,6 +714,36 @@ export default class MIDIEditorUIInstance {
     };
   }
 
+  /**
+   * Encodes all notes into a buffer representing `RawNoteData` structs from the `common` Wasm crate.
+   *
+   * This is passed into Wasm and used export MIDI files.
+   */
+  public exportToRawNoteDataBuffer(): Uint8Array {
+    const totalNoteCount = this.allNotesByID.size;
+    const rawNoteSizeBytes = 4 + 8 + 8 + 4; // note number, start_beat, length, padding
+    const buffer = new Uint8Array(rawNoteSizeBytes * totalNoteCount);
+    const u32View = new Uint32Array(buffer.buffer);
+    const f64View = new Float64Array(buffer.buffer);
+
+    let entryCount = 0;
+    this.lines.forEach((line, lineIx) => {
+      for (const note of line.notesByID.values()) {
+        const u32BufferOffset = entryCount * 6;
+        const midiNumber = this.lines.length - lineIx;
+        u32View[u32BufferOffset] = midiNumber;
+
+        const f64BufferOffset = entryCount * 3;
+        f64View[f64BufferOffset + 1] = note.note.startPoint;
+        f64View[f64BufferOffset + 2] = note.note.length;
+
+        entryCount += 1;
+      }
+    });
+
+    return buffer;
+  }
+
   private handleViewChange() {
     this.lines.forEach(line => line.handleViewChange());
     this.cursor.handleViewChange();
@@ -717,8 +754,8 @@ export default class MIDIEditorUIInstance {
   private handleZoom(evt: WheelEvent) {
     const deltaYPx = evt.deltaY;
     const rect = (evt.target as HTMLCanvasElement).getBoundingClientRect();
-    const xPx = evt.clientX - rect.left;
-    const xPercent = xPx / this.width;
+    const xPx = evt.clientX - rect.left - conf.PIANO_KEYBOARD_WIDTH;
+    const xPercent = xPx / (this.width - conf.PIANO_KEYBOARD_WIDTH);
     const multiplier =
       deltaYPx > 0
         ? deltaYPx / conf.SCROLL_ZOOM_DOUBLE_INTERVAL_PX

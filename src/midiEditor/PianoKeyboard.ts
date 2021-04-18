@@ -102,7 +102,6 @@ export default class PianoKeys {
         if (evt.data.button !== 0) {
           return;
         }
-        console.log('pointerdown');
 
         const y = evt.data.getLocalPosition(this.container).y;
         downLineIx = this.computeLineIx(y);

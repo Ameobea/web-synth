@@ -8,7 +8,6 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bincode = "1.3"
 console_error_panic_hook = "0.1.6"
 futures = "0.3"
 # Disable logging staticly in release, making all log calls into no-ops
@@ -28,3 +27,4 @@ path = "../common"
 
 [dependencies.rimd]
 git = "https://github.com/Ameobea/rimd.git"
+# path = "/home/casey/rimd"

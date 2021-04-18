@@ -1,3 +1,5 @@
+import * as R from 'ramda';
+
 import {
   cancelCb,
   getCurBeat,
@@ -20,12 +22,121 @@ interface SchedulableNoteEvent {
 
 type ScheduleParams =
   | { type: 'globalBeatCounter'; curBeat: number }
-  | { type: 'localTempo'; bpm: number; startTime: number };
+  | {
+      type: 'localTempo';
+      bpm: number;
+      /**
+       * The time from the global audio context at the instant playback was started
+       */
+      startTime: number;
+    };
 
 const ctx = new AudioContext();
 
+class RecordingContext {
+  private playbackHandler: MIDIEditorPlaybackHandler;
+  private downNoteIdsByMIDINumber: Map<number, number> = new Map();
+
+  constructor(playbackHandler: MIDIEditorPlaybackHandler) {
+    this.playbackHandler = playbackHandler;
+  }
+
+  private getCurBeat(): number {
+    return this.playbackHandler.getCursorPosBeats();
+  }
+
+  public tick() {
+    const curBeat = this.getCurBeat();
+    const uiInstance = this.playbackHandler.inst.uiInstance;
+    if (!uiInstance) {
+      return;
+    }
+
+    // Udpate the lengths of all down notes
+    for (const [midiNumber, noteID] of this.downNoteIdsByMIDINumber.entries()) {
+      const noteBox = uiInstance.allNotesByID.get(noteID);
+      if (!noteBox) {
+        console.error(
+          `Did not find down note id=${noteID} midiNumber=${midiNumber} in playback handler tick`
+        );
+        continue;
+      }
+
+      const startBeat = noteBox.note.startPoint;
+      const newLength = curBeat - startBeat;
+      const lineIx = uiInstance.lines.length - midiNumber;
+
+      // handle wrapping around when looping
+      if (newLength < 0) {
+        this.onRelease(midiNumber);
+        return;
+      }
+
+      uiInstance.resizeNoteHorizontalEnd(lineIx, startBeat, noteID, startBeat + newLength);
+    }
+  }
+
+  public onAttack(midiNumber: number) {
+    if (this.downNoteIdsByMIDINumber.has(midiNumber)) {
+      // console.warn('Ignoring duplicate note down event for note id=' + midiNumber);
+      return;
+    }
+
+    const curBeat = this.getCurBeat();
+    const uiInstance = this.playbackHandler.inst.uiInstance;
+    if (!uiInstance) {
+      return;
+    }
+    const wasm = uiInstance.wasm;
+    if (!wasm) {
+      return;
+    }
+
+    const lineIx = uiInstance.lines.length - midiNumber;
+    const canAdd = wasm.instance.check_can_add_note(wasm.noteLinesCtxPtr, lineIx, curBeat, 0.001);
+    if (!canAdd) {
+      return;
+    }
+
+    const noteID = uiInstance.addNote(lineIx, curBeat, 0.001);
+    this.downNoteIdsByMIDINumber.set(midiNumber, noteID);
+  }
+
+  public onRelease(midiNumber: number) {
+    console.trace('onRelease: ', midiNumber);
+    const curBeat = this.getCurBeat();
+    const uiInstance = this.playbackHandler.inst.uiInstance;
+    if (!uiInstance) {
+      return;
+    }
+
+    const noteID = this.downNoteIdsByMIDINumber.get(midiNumber);
+    if (R.isNil(noteID)) {
+      // console.warn('Note is not down when released: ', midiNumber);
+      return;
+    }
+    const noteBox = uiInstance.allNotesByID.get(noteID);
+    if (R.isNil(noteBox)) {
+      console.error(`Not was in down map but didn't exist in all notes mapping; id=${noteID}`);
+      this.downNoteIdsByMIDINumber.delete(noteID);
+      return;
+    }
+    const startBeat = noteBox.note.startPoint;
+    const newLength = curBeat - startBeat;
+    const lineIx = uiInstance.lines.length - midiNumber;
+    uiInstance.resizeNoteHorizontalEnd(lineIx, startBeat, noteID, startBeat + newLength);
+    this.downNoteIdsByMIDINumber.delete(midiNumber);
+  }
+
+  public destroy() {
+    for (const midiNumber of this.downNoteIdsByMIDINumber.keys()) {
+      this.onRelease(midiNumber);
+    }
+  }
+}
+
 export default class MIDIEditorPlaybackHandler {
-  private inst: MIDIEditorInstance;
+  public inst: MIDIEditorInstance;
   /**
    * Ths last *set* cursor position.  The actual cursor position will be different if playback is active;
    * use `getCursorPosBeats()` to get the live cursor position during playback.
@@ -44,6 +155,7 @@ export default class MIDIEditorPlaybackHandler {
   private loopPoint: number | null = null;
   private scheduledEventHandles: Set<number> = new Set();
   private heldLineIndices: Set<number> = new Set();
+  public recordingCtx: RecordingContext | null = null;
 
   public get isPlaying() {
     return this.playbackGeneration !== null;
@@ -327,6 +439,38 @@ export default class MIDIEditorPlaybackHandler {
     this.lastSetCursorPosBeats = this.getCursorPosBeats();
     this.playbackGeneration = null;
     this.cancelAllScheduledNotes();
+  }
+
+  public startRecording() {
+    if (this.recordingCtx) {
+      console.warn('Tried to start recording, but recording context already exists');
+      return;
+    }
+
+    this.recordingCtx = new RecordingContext(this);
+    if (!this.isPlaying) {
+      this.startPlayback({
+        type: 'localTempo',
+        bpm: this.inst.uiInstance?.localBPM ?? 120,
+        startTime: ctx.currentTime,
+      });
+    }
+  }
+
+  public stopRecording() {
+    if (!this.recordingCtx) {
+      console.warn('Tried to start recording, but no recording ctx exists');
+      return;
+    }
+
+    // Release all held notes instantly
+    this.recordingCtx.destroy();
+
+    if (this.lastPlaybackSchedulParams.type === 'localTempo') {
+      this.stopPlayback();
+    }
+
+    this.recordingCtx = null;
   }
 
   public destroy() {

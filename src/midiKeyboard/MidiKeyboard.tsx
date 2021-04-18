@@ -14,9 +14,10 @@ import './MidiKeyboard.scss';
 import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
-const START_NOTE = 33;
+const START_NOTE = 32;
 
-const keys = ['z', 's', 'x', 'c', 'f', 'v', 'g', 'b', 'n', 'j', 'm', 'k', ',', 'l', '.', '/'];
+// prettier-ignore
+const keys = ['a','z', 's', 'x', 'c', 'f', 'v', 'g', 'b', 'n', 'j', 'm', 'k', ',', 'l', '.', '/', "'"];
 
 const keyMap: { [key: string]: number } = keys.reduce(
   (acc, key, i) => ({ ...acc, [key]: START_NOTE + i }),
@@ -192,7 +193,6 @@ export const MidiKeyboard: React.FC<{
             Math.min(document.documentElement.clientWidth ?? window.innerWidth ?? 0, 1000) - 64,
         }}
         onContextMenuCapture={evt => {
-          console.log('inner.');
           evt.preventDefault();
           evt.stopPropagation();
           return false;
@@ -201,8 +201,8 @@ export const MidiKeyboard: React.FC<{
       >
         <Piano
           noteRange={{
-            first: START_NOTE + octaveOffset * MIDI_NOTES_PER_OCTAVE,
-            last: START_NOTE + 15 + octaveOffset * MIDI_NOTES_PER_OCTAVE,
+            first: START_NOTE + octaveOffset * MIDI_NOTES_PER_OCTAVE - 1,
+            last: START_NOTE + 16 + octaveOffset * MIDI_NOTES_PER_OCTAVE + 1,
           }}
           activeNotes={activeNotes}
           playNote={onAttack}
@@ -221,7 +221,7 @@ export const MidiKeyboard: React.FC<{
               <div
                 style={{ paddingLeft: 2, paddingRight: 2, color: '#353535', userSelect: 'none' }}
               >
-                {keys[index].toUpperCase()}
+                {keys[index]?.toUpperCase() || ''}
               </div>
             );
           }}

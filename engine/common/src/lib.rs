@@ -14,10 +14,12 @@ mod init;
 
 pub use crate::init::*;
 
+#[repr(packed)]
 #[cfg(feature = "bindgen")]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct RawNoteData {
-    pub line_ix: usize,
+    pub line_ix: u32,
+    pub padding: u32,
     pub start_beat: f64,
     pub width: f64,
 }

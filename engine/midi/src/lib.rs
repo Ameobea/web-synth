@@ -24,8 +24,12 @@ pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
     let ticks_per_beat = 256.;
     common::maybe_init();
 
-    let notes: Vec<RawNoteData> =
-        bincode::deserialize(note_data).expect("Error deserializing note data");
+    let notes: &[RawNoteData] = unsafe {
+        std::slice::from_raw_parts(
+            note_data.as_ptr() as *const _,
+            note_data.len() / std::mem::size_of::<RawNoteData>(),
+        )
+    };
 
     let mut builder = rimd::SMFBuilder::new();
     let mut midi_events = Vec::with_capacity(notes.len() * 2);
@@ -226,7 +230,7 @@ pub fn load_midi_to_raw_note_bytes(
         let handle_note_on = |context: &mut NoteParseContext| {
             let note_id = context.data[1];
             let velocity = context.data[2];
-            info!(
+            debug!(
                 "Note on event; vtime: {}, note_id: {}, velocity: {}",
                 context.cur_vtime, note_id, velocity
             );
@@ -249,6 +253,10 @@ pub fn load_midi_to_raw_note_bytes(
 
         for TrackEvent { vtime, event } in &track.events {
             cur_vtime += vtime;
+            trace!("cur_vtime={}, evt={:?}", cur_vtime, TrackEvent {
+                vtime: *vtime,
+                event: event.clone()
+            });
 
             match event {
                 Event::Meta(meta_evt) => info!("Ignoring meta event: {:?}", meta_evt),

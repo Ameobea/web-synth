@@ -43,16 +43,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
 
 [[package]]
-name = "bincode"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f30d3a39baa26f9651f17b375061f3233dde33424a8b72b0dbe93a68a0bc896d"
-dependencies = [
- "byteorder",
- "serde",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -184,7 +174,6 @@ name = "engine"
 version = "0.1.0"
 dependencies = [
  "base64",
- "bincode",
  "common",
  "console_error_panic_hook",
  "fnv",
@@ -445,7 +434,6 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 name = "midi"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "common",
  "console_error_panic_hook",
  "futures",
@@ -733,7 +721,7 @@ dependencies = [
 [[package]]
 name = "rimd"
 version = "0.0.2"
-source = "git+https://github.com/Ameobea/rimd.git#66fe4555a912d7cd964dad1ce7e63064820589e7"
+source = "git+https://github.com/Ameobea/rimd.git#290fe5429bd40d37e30d2efd1696f7880c8a6226"
 dependencies = [
  "byteorder",
  "encoding",

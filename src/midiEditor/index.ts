@@ -29,14 +29,20 @@ export class MIDIEditorInstance {
         this.midiInput.onAttack(note, velocity);
         this.uiInstance?.onGated(this.lineCount - note);
       }
-      // TODO
+
+      if (this.playbackHandler?.recordingCtx) {
+        this.playbackHandler.recordingCtx.onAttack(note);
+      }
     },
     onRelease: (note, velocity) => {
       if (!this.playbackHandler.isPlaying) {
         this.midiInput.onRelease(note, velocity);
         this.uiInstance?.onUngated(this.lineCount - note);
       }
-      // TODO
+
+      if (this.playbackHandler?.recordingCtx) {
+        this.playbackHandler.recordingCtx.onRelease(note);
+      }
     },
     onPitchBend: bendAmount => {
       if (!this.playbackHandler.isPlaying) {
@@ -120,7 +126,6 @@ const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
       .map((_, lineIx) => ({ notes: [], midiNumber: maxMIDINumber - lineIx })),
     view: { pxPerBeat: 32, scrollVerticalPx: 0, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
     beatSnapInterval: 1,
-    selectedNoteIDs: [],
     cursorPosBeats: 0,
     localBPM: 120,
     loopPoint: null,

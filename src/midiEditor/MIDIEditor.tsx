@@ -18,6 +18,7 @@ import { withReactQueryClient } from 'src/reactUtils';
 import FileUploader, { Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { AsyncOnce } from 'src/util';
 import { MidiFileInfo, getMidiImportSettings } from 'src/controls/MidiImportDialog';
+import download from 'downloadjs';
 
 const ctx = new AudioContext();
 
@@ -206,6 +207,7 @@ const MIDIEditorControls: React.FC<{
 }> = ({ inst, initialState, onChange: onChangeInner }) => {
   const isGlobalBeatCounterStarted = useIsGlobalBeatCounterStarted();
   const [state, setStateInner] = useState(initialState);
+  const [isRecording, setIsRecording] = useState(false);
   const onChange = (newState: MIDIEditorControlsState) => {
     if (!inst.current) {
       return;
@@ -241,6 +243,32 @@ const MIDIEditorControls: React.FC<{
       />
       <MIDIEditorControlButton
         onClick={() => {
+          if (!inst.current) {
+            return;
+          }
+
+          const playbackHandler = inst.current.parentInstance.playbackHandler;
+          if (isRecording) {
+            setIsRecording(false);
+            playbackHandler.stopRecording();
+            return;
+          }
+
+          setIsRecording(true);
+          playbackHandler.startRecording();
+        }}
+        title={isRecording ? 'Stop recording MIDI' : 'Start recording MIDI'}
+        label={<div style={{ marginLeft: -1 }}>⏺</div>}
+        style={{
+          fontSize: 46,
+          textAlign: 'center',
+          color: 'red',
+          backgroundColor: isRecording ? '#881111' : undefined,
+          lineHeight: '48px',
+        }}
+      />
+      <MIDIEditorControlButton
+        onClick={() => {
           if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
             return;
           }
@@ -252,13 +280,32 @@ const MIDIEditorControls: React.FC<{
         style={{ fontSize: 15, textAlign: 'center' }}
         active={state.loopEnabled}
       />
+      <MIDIEditorControlButton
+        onClick={async () => {
+          if (!inst.current) {
+            return;
+          }
+
+          const proceed = confirm('Really clear all notes?');
+          if (!proceed) {
+            return;
+          }
+
+          for (const noteId of inst.current.allNotesByID.keys()) {
+            inst.current.deleteNote(noteId);
+          }
+        }}
+        title='Clear all notes'
+        label='✕'
+        style={{ fontSize: 29, textAlign: 'center', color: 'red' }}
+      />
       <div className='labeled-container'>
         <label>BPM</label>
         <input
           type='number'
           value={state.bpm}
           onChange={evt => onChange({ ...state, bpm: +evt.target.value })}
-          style={{ marginLeft: -1 }}
+          style={{ marginLeft: -1, fontSize: 20 }}
         />
       </div>
       <div className='labeled-container'>
@@ -278,7 +325,7 @@ const MIDIEditorControls: React.FC<{
           type='number'
           value={state.beatsPerMeasure}
           onChange={evt => onChange({ ...state, beatsPerMeasure: +evt.target.value })}
-          style={{ width: 63 }}
+          style={{ width: 63, fontSize: 20 }}
         />
       </div>
       <MIDIEditorControlButton
@@ -383,8 +430,15 @@ const MIDIEditorControls: React.FC<{
         style={{ fontSize: 29, textAlign: 'center' }}
       />
       <MIDIEditorControlButton
-        onClick={() => {
-          // TODO
+        onClick={async () => {
+          if (!inst.current) {
+            return;
+          }
+
+          const rawNoteDataBuf = inst.current.exportToRawNoteDataBuffer();
+          const midiModule = await MIDIWasmModule.get();
+          const midiFileData = midiModule.write_to_midi('midi_composition', rawNoteDataBuf);
+          download(midiFileData, 'midi_composition.mid', 'audio/midi');
         }}
         title='Download MIDI File'
         label='⭳'
