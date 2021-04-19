@@ -2,6 +2,8 @@
 
 The **MIDI Editor** allows the editing of MIDI data visually to create music.  It is the primary way that songs are written using web synth.
 
+![A screenshot of the MIDI editor showing some drawn notes, the toolbar, and the piano keyboard labeling notes](https://ameo.link/u/8wy.png)
+
 The current MIDI editor was the first piece of web synth that was built, and it is in very bad shape.  It is functional in a very small sense, but integrates with the rest of the the [[patch-network]] cleanly.  In addition to inputting notes, it also supports playback, looping, and recording from MIDI inputs.
 
 I am in the process of building a new MIDI editor from scratch; see [[2021-03-20]] for the initial design document and some thoughts on its implementation.

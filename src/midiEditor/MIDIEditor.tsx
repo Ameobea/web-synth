@@ -135,7 +135,7 @@ const LoadMIDICompositionModalContent: React.FC<{
               }
 
               const compositionID = controlPanelCtx.current.composition;
-              const composition = midiCompositions.find(R.propEq('id', compositionID));
+              const composition = midiCompositions.find(comp => comp.id == compositionID);
               if (!composition) {
                 console.error('Selected composition not loaded, id=' + compositionID);
                 return;
@@ -279,6 +279,57 @@ const MIDIEditorControls: React.FC<{
         title={state.loopEnabled ? 'Disable Loop' : 'Enable Loop'}
         style={{ fontSize: 15, textAlign: 'center' }}
         active={state.loopEnabled}
+      />
+      <MIDIEditorControlButton
+        onClick={() => {
+          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+            return;
+          }
+
+          // TODO
+        }}
+        label={
+          // Adapted from: https://stackoverflow.com/a/60023353/3833068
+          <div style={{ marginTop: -2 }}>
+            <span
+              style={{
+                fontSize: '.875em',
+                marginRight: '.125em',
+                position: 'relative',
+                top: '-.25em',
+                left: '-.125em',
+              }}
+            >
+              📄<span style={{ position: 'absolute', top: '.15em', left: '.25em' }}>📄</span>
+            </span>
+          </div>
+        }
+        title='Copy selection'
+        style={{ fontSize: 24, textAlign: 'center' }}
+      />
+      <MIDIEditorControlButton
+        onClick={() => {
+          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+            return;
+          }
+
+          // TODO
+        }}
+        label='✂️'
+        title='Cut selection'
+        style={{ fontSize: 24, textAlign: 'center' }}
+      />
+      <MIDIEditorControlButton
+        onClick={() => {
+          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+            return;
+          }
+
+          // TODO
+        }}
+        label='📋'
+        title='Paste selection'
+        style={{ fontSize: 24, textAlign: 'center' }}
       />
       <MIDIEditorControlButton
         onClick={async () => {

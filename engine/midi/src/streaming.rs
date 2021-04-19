@@ -185,8 +185,8 @@ pub fn handle_midi_evt(evt_bytes: Vec<u8>, ctx_ptr: *mut MsgHandlerContext) {
                 handler
                     .call2(
                         &JsValue::NULL,
-                        &JsValue::from(evt.data[1]),
-                        &JsValue::from(evt.data[2]),
+                        &JsValue::from(*evt.data.get(1).unwrap_or(&0)),
+                        &JsValue::from(*evt.data.get(2).unwrap_or(&0)),
                     )
                     .map(|_| ())
             } else {

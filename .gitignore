@@ -27,3 +27,5 @@ public/adsr.wasm
 public/sinsy.*
 src/note_container*
 !src/midiUtils.ts
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*

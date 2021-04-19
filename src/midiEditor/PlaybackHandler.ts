@@ -103,7 +103,6 @@ class RecordingContext {
   }
 
   public onRelease(midiNumber: number) {
-    console.trace('onRelease: ', midiNumber);
     const curBeat = this.getCurBeat();
     const uiInstance = this.playbackHandler.inst.uiInstance;
     if (!uiInstance) {

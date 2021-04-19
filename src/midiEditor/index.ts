@@ -25,7 +25,7 @@ export class MIDIEditorInstance {
   public lineCount: number;
   private midiInputCBs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
-      if (!this.playbackHandler.isPlaying) {
+      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
         this.midiInput.onAttack(note, velocity);
         this.uiInstance?.onGated(this.lineCount - note);
       }
@@ -35,7 +35,7 @@ export class MIDIEditorInstance {
       }
     },
     onRelease: (note, velocity) => {
-      if (!this.playbackHandler.isPlaying) {
+      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
         this.midiInput.onRelease(note, velocity);
         this.uiInstance?.onUngated(this.lineCount - note);
       }
@@ -45,12 +45,12 @@ export class MIDIEditorInstance {
       }
     },
     onPitchBend: bendAmount => {
-      if (!this.playbackHandler.isPlaying) {
+      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
         this.midiInput.outputCbs.forEach(cbs => cbs.onPitchBend(bendAmount));
       }
     },
     onClearAll: () => {
-      if (!this.playbackHandler.isPlaying) {
+      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
         this.midiInput.outputCbs.forEach(cbs => cbs.onClearAll());
       }
       // TODO

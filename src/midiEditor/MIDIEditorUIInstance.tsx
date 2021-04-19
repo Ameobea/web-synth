@@ -83,6 +83,8 @@ export default class MIDIEditorUIInstance {
   private pianoKeys: PianoKeys | undefined;
   public localBPM: number;
   public loopCursor: LoopCursor | null;
+  private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
+  private isHidden = true;
 
   constructor(
     width: number,
@@ -509,6 +511,63 @@ export default class MIDIEditorUIInstance {
     }
   }
 
+  public copySelection() {
+    this.clipboard = [];
+    for (const noteID of this.selectedNoteIDs.values()) {
+      const note = this.allNotesByID.get(noteID)!;
+      this.clipboard.push({
+        lineIx: note.line.index,
+        startPoint: note.note.startPoint,
+        length: note.note.length,
+      });
+    }
+  }
+
+  public cutSelection() {
+    this.copySelection();
+    // Delete all selected notes since we're cutting
+    for (const noteID of this.selectedNoteIDs.keys()) {
+      this.deleteNote(noteID);
+    }
+  }
+
+  public pasteSelection() {
+    if (R.isEmpty(this.clipboard) || !this.wasm) {
+      return;
+    }
+    const wasm = this.wasm;
+
+    const cursorPosBeats = this.parentInstance.playbackHandler.getCursorPosBeats();
+    const startBeat = Math.min(...this.clipboard.map(R.prop('startPoint')));
+    const endBeat = Math.max(...this.clipboard.map(note => note.startPoint + note.length));
+
+    // First we deselect all selected notes since we'll be selecting all pasted notes after creating them
+    this.deselectAllNotes();
+
+    const createdNoteIDs: number[] = [];
+    // Then we create + select all notes
+    this.clipboard.forEach(note => {
+      const normalizedStartPoint = note.startPoint - startBeat + cursorPosBeats;
+      const canCreate = wasm.instance.check_can_add_note(
+        wasm.noteLinesCtxPtr,
+        note.lineIx,
+        normalizedStartPoint,
+        note.length
+      );
+      if (!canCreate) {
+        return;
+      }
+
+      const id = this.addNote(note.lineIx, normalizedStartPoint, note.length);
+      createdNoteIDs.push(id);
+    });
+
+    this.deselectAllNotes();
+    createdNoteIDs.forEach(id => this.selectNote(id));
+    const normalizedEndBeat = endBeat - startBeat + cursorPosBeats;
+    this.parentInstance.playbackHandler.setCursorPosBeats(normalizedEndBeat);
+  }
+
   public computeLineIndex(localY: number) {
     const adjustedY = localY + this.view.scrollVerticalPx;
     return Math.floor(adjustedY / conf.LINE_HEIGHT);
@@ -778,15 +837,42 @@ export default class MIDIEditorUIInstance {
   private initEventHandlers() {
     this.eventHandlerCBs = {
       keyDown: (evt: KeyboardEvent) => {
-        if (evt.key === 'Control') {
-          this.multiSelectEnabled = true;
-        } else if (evt.key === 'Shift') {
-          this.selectionBoxButtonDown = true;
-        } else if (evt.key === 'Delete') {
-          for (const id of this.selectedNoteIDs) {
-            this.deleteNote(id);
+        switch (evt.code) {
+          case 'ControlLeft':
+          case 'ControlRight': {
+            this.multiSelectEnabled = true;
+            break;
           }
-          this.selectedNoteIDs.clear();
+          case 'ShiftLeft':
+          case 'ShiftRight': {
+            this.selectionBoxButtonDown = true;
+            break;
+          }
+          case 'Delete': {
+            for (const id of this.selectedNoteIDs) {
+              this.deleteNote(id);
+            }
+            this.selectedNoteIDs.clear();
+            break;
+          }
+          case 'KeyC': {
+            if (this.multiSelectEnabled) {
+              this.copySelection();
+            }
+            break;
+          }
+          case 'KeyX': {
+            if (this.multiSelectEnabled) {
+              this.cutSelection();
+            }
+            break;
+          }
+          case 'KeyV': {
+            if (this.multiSelectEnabled) {
+              this.pasteSelection();
+            }
+            break;
+          }
         }
       },
       keyUp: (evt: KeyboardEvent) => {
@@ -837,6 +923,16 @@ export default class MIDIEditorUIInstance {
     document.removeEventListener('keyup', this.eventHandlerCBs.keyUp);
     document.removeEventListener('mouseup', this.eventHandlerCBs.mouseUp);
     document.removeEventListener('wheel', this.eventHandlerCBs.wheel);
+  }
+
+  public onUnhidden() {
+    // Activates clipboard event listeners
+    this.isHidden = false;
+  }
+
+  public onHidden() {
+    // De-activates clipboard event listeners
+    this.isHidden = true;
   }
 
   public destroy() {
