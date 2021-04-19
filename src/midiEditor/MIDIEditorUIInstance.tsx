@@ -568,6 +568,165 @@ export default class MIDIEditorUIInstance {
     this.parentInstance.playbackHandler.setCursorPosBeats(normalizedEndBeat);
   }
 
+  /**
+   * Quantizes all notes' start and end points to the nearest `beatSnapInterval`, handling conflicts and
+   * performing some other special-case operations.  See https://notes.ameo.design/docs/2021-04-18
+   * for design, algorithm, and implementation details.
+   */
+  public snapAllSelectedNotes() {
+    if (this.beatSnapInterval === 0) {
+      return;
+    }
+    const wasm = this.wasm;
+    if (!wasm) {
+      return;
+    }
+    const selectedNotesByLineIx: Map<number, NoteBox[]> = new Map();
+
+    // Step 1: Perform all operations that shorten notes since those are guarenteed to be conflict-free.
+    for (const noteID of this.selectedNoteIDs.values()) {
+      const noteBox = this.allNotesByID.get(noteID)!;
+      const { note, line } = noteBox;
+
+      let entries = selectedNotesByLineIx.get(line.index);
+      if (!entries) {
+        entries = [];
+        selectedNotesByLineIx.set(line.index, entries);
+      }
+      entries.push(noteBox);
+
+      // Ignore notes that are < half the beat snap interval for now since they need special handling
+      if (note.length <= this.beatSnapInterval / 2) {
+        continue;
+      }
+
+      const snappedStart = this.snapBeat(note.startPoint);
+      const snappedEnd = this.snapBeat(note.startPoint + note.length);
+
+      if (snappedStart > note.startPoint) {
+        this.resizeNoteHorizontalStart(line.index, note.startPoint, note.id, snappedStart);
+      }
+
+      if (snappedEnd < note.startPoint + note.length) {
+        this.resizeNoteHorizontalEnd(line.index, note.startPoint, note.id, snappedEnd);
+      }
+    }
+
+    // Step 2: Move all small notes that are < half the beat snap interval where possible, leaving the in
+    // place in case of conflicts.  We do not change their lengths to avoid them collapsing into zero length.
+    for (const [lineIx, notes] of selectedNotesByLineIx.entries()) {
+      // Sort the notes to make them in order by start beat
+      notes.sort((note1, note2) => note1.note.startPoint - note2.note.startPoint);
+
+      const shortNotes = notes.filter(({ note }) => note.length <= this.beatSnapInterval / 2);
+      shortNotes.forEach(({ note }) => {
+        wasm.instance.delete_note(wasm.noteLinesCtxPtr, lineIx, note.startPoint, note.id);
+        const snappedStart = this.snapBeat(note.startPoint);
+        const canMove = wasm.instance.check_can_add_note(
+          wasm.noteLinesCtxPtr,
+          lineIx,
+          snappedStart,
+          note.length
+        );
+
+        if (!canMove) {
+          // Re-insert the note where it was before in case of conflict
+          wasm.instance.create_note(
+            wasm.noteLinesCtxPtr,
+            lineIx,
+            note.startPoint,
+            note.length,
+            note.id
+          );
+          return;
+        }
+
+        // We're good to move the note, so re-insert at the snapped start point
+        note.startPoint = snappedStart;
+        wasm.instance.create_note(wasm.noteLinesCtxPtr, lineIx, snappedStart, note.length, note.id);
+      });
+    }
+
+    // Now, we extend notes wherever possible, falling back to leaving them as-is in case of any conflict
+    for (const noteID of this.selectedNoteIDs.values()) {
+      const noteBox = this.allNotesByID.get(noteID)!;
+      const { note, line } = noteBox;
+
+      // Ignore notes that are < half the beat snap interval since we've already handled them
+      if (note.length <= this.beatSnapInterval / 2) {
+        continue;
+      }
+
+      const snappedStart = this.snapBeat(note.startPoint);
+      const snappedEnd = this.snapBeat(note.startPoint + note.length);
+
+      if (snappedStart < note.startPoint) {
+        wasm.instance.delete_note(wasm.noteLinesCtxPtr, line.index, note.startPoint, note.id);
+        const canMove = wasm.instance.check_can_add_note(
+          wasm.noteLinesCtxPtr,
+          line.index,
+          snappedStart,
+          note.length
+        );
+
+        if (!canMove) {
+          // Re-insert the note where it was before in case of conflict
+          wasm.instance.create_note(
+            wasm.noteLinesCtxPtr,
+            line.index,
+            note.startPoint,
+            note.length,
+            note.id
+          );
+        } else {
+          note.length += snappedStart - note.startPoint;
+          note.startPoint = snappedStart;
+          wasm.instance.create_note(
+            wasm.noteLinesCtxPtr,
+            line.index,
+            note.startPoint,
+            note.length,
+            note.id
+          );
+        }
+      }
+
+      if (snappedEnd > note.startPoint + note.length) {
+        wasm.instance.delete_note(wasm.noteLinesCtxPtr, line.index, note.startPoint, note.id);
+        const newLength = note.length + (snappedEnd - (note.startPoint + note.length));
+        const canMove = wasm.instance.check_can_add_note(
+          wasm.noteLinesCtxPtr,
+          line.index,
+          note.startPoint,
+          newLength
+        );
+
+        if (!canMove) {
+          // Re-insert the note where it was before in case of conflict
+          wasm.instance.create_note(
+            wasm.noteLinesCtxPtr,
+            line.index,
+            note.startPoint,
+            note.length,
+            note.id
+          );
+        } else {
+          note.length = newLength;
+          wasm.instance.create_note(
+            wasm.noteLinesCtxPtr,
+            line.index,
+            note.startPoint,
+            note.length,
+            note.id
+          );
+        }
+      }
+    }
+
+    // Since we manually updated note lengths, re-render everything
+    this.handleViewChange();
+  }
+
   public computeLineIndex(localY: number) {
     const adjustedY = localY + this.view.scrollVerticalPx;
     return Math.floor(adjustedY / conf.LINE_HEIGHT);

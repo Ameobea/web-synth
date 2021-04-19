@@ -350,6 +350,18 @@ const MIDIEditorControls: React.FC<{
         label='✕'
         style={{ fontSize: 29, textAlign: 'center', color: 'red' }}
       />
+      <MIDIEditorControlButton
+        onClick={async () => {
+          if (!inst.current) {
+            return;
+          }
+
+          inst.current.snapAllSelectedNotes();
+        }}
+        title='Auto-snap all selected notes'
+        label='▥'
+        style={{ fontSize: 40, textAlign: 'center', lineHeight: '36px' }}
+      />
       <div className='labeled-container'>
         <label>BPM</label>
         <input

@@ -23,7 +23,9 @@ export class CursorGutter {
       this.isDragging = true;
 
       const xPx = evt.data.getLocalPosition(g).x;
-      const xBeats = this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx);
+      const xBeats = this.app.snapBeat(
+        this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx)
+      );
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
 
       this.app.addMouseUpCB(() => {
@@ -35,7 +37,9 @@ export class CursorGutter {
       }
 
       const xPx = evt.data.getLocalPosition(g).x;
-      const xBeats = Math.max(0, this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx));
+      const xBeats = this.app.snapBeat(
+        Math.max(0, this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx))
+      );
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
