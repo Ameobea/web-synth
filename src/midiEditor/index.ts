@@ -129,6 +129,7 @@ const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
     cursorPosBeats: 0,
     localBPM: 120,
     loopPoint: null,
+    metronomeEnabled: true,
   };
 };
 

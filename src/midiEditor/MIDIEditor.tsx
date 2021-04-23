@@ -48,6 +48,7 @@ interface MIDIEditorControlsState {
   loopEnabled: boolean;
   beatsPerMeasure: number;
   beatSnapInterval: number;
+  metronomeEnabled: boolean;
 }
 
 const SNAP_INTERVALS: { label: React.ReactNode; beats: number; title: string }[] = [
@@ -120,7 +121,6 @@ const LoadMIDICompositionModalContent: React.FC<{
             ),
             initial: midiCompositions[0].id,
           },
-          onCancel ? { type: 'button', label: 'cancel', action: onCancel } : null,
           {
             type: 'button',
             label: 'load',
@@ -143,6 +143,7 @@ const LoadMIDICompositionModalContent: React.FC<{
               onSubmit({ composition });
             },
           },
+          onCancel ? { type: 'button', label: 'cancel', action: onCancel } : null,
         ])}
       />
     </>
@@ -208,6 +209,7 @@ const MIDIEditorControls: React.FC<{
   const isGlobalBeatCounterStarted = useIsGlobalBeatCounterStarted();
   const [state, setStateInner] = useState(initialState);
   const [isRecording, setIsRecording] = useState(false);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(initialState.metronomeEnabled);
   const onChange = (newState: MIDIEditorControlsState) => {
     if (!inst.current) {
       return;
@@ -266,6 +268,33 @@ const MIDIEditorControls: React.FC<{
           backgroundColor: isRecording ? '#881111' : undefined,
           lineHeight: '48px',
         }}
+      />
+      <MIDIEditorControlButton
+        onClick={() => {
+          if (!inst.current || inst.current.parentInstance.playbackHandler.isPlaying) {
+            return;
+          }
+
+          inst.current.parentInstance.playbackHandler.metronomeEnabled = !metronomeEnabled;
+          setMetronomeEnabled(!metronomeEnabled);
+        }}
+        label={
+          <img
+            src='/metronome.svg'
+            style={{
+              filter: 'invert(1)',
+              marginTop: 3,
+              width: 36,
+            }}
+          />
+        }
+        title={state.loopEnabled ? 'Disable Metronome' : 'Enable Metronome'}
+        style={{
+          fontSize: 15,
+          textAlign: 'center',
+          backgroundColor: metronomeEnabled ? '#440044' : undefined,
+        }}
+        active={metronomeEnabled}
       />
       <MIDIEditorControlButton
         onClick={() => {
@@ -414,7 +443,7 @@ const MIDIEditorControls: React.FC<{
       />
       <MIDIEditorControlButton
         onClick={async () => {
-          if (!inst.current) {
+          if (!inst.current || inst.current.parentInstance.playbackHandler.isPlaying) {
             return;
           }
 
@@ -536,6 +565,7 @@ const MIDIEditor: React.FC<{
           loopEnabled: !R.isNil(initialState.loopPoint),
           beatsPerMeasure: initialState.view.beatsPerMeasure,
           beatSnapInterval: initialState.beatSnapInterval,
+          metronomeEnabled: initialState.metronomeEnabled,
         }}
         onChange={({ bpm, loopEnabled }) => {
           parentInstance.uiInstance!.localBPM = bpm;

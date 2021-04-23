@@ -39,6 +39,7 @@ export interface SerializedMIDIEditorState {
   cursorPosBeats: number;
   localBPM: number;
   loopPoint: number | null;
+  metronomeEnabled: boolean;
 }
 
 export default class MIDIEditorUIInstance {
@@ -929,6 +930,7 @@ export default class MIDIEditorUIInstance {
       cursorPosBeats: this.parentInstance.getCursorPosBeats(),
       localBPM: this.localBPM,
       loopPoint: this.loopCursor?.getPosBeats() ?? null,
+      metronomeEnabled: this.parentInstance.playbackHandler.metronomeEnabled,
     };
   }
 

@@ -155,6 +155,7 @@ export default class MIDIEditorPlaybackHandler {
   private scheduledEventHandles: Set<number> = new Set();
   private heldLineIndices: Set<number> = new Set();
   public recordingCtx: RecordingContext | null = null;
+  public metronomeEnabled: boolean;
 
   public get isPlaying() {
     return this.playbackGeneration !== null;
@@ -164,6 +165,7 @@ export default class MIDIEditorPlaybackHandler {
     this.inst = inst;
     this.lastSetCursorPosBeats = initialState.cursorPosBeats;
     this.loopPoint = initialState.loopPoint;
+    this.metronomeEnabled = initialState.metronomeEnabled;
     this.cbs = {
       start: () => this.onGlobalStart(),
       stop: () => this.stopPlayback(),
@@ -416,6 +418,62 @@ export default class MIDIEditorPlaybackHandler {
     scheduleAnother(0);
   }
 
+  private scheduleMetronome(scheduleParams: ScheduleParams) {
+    const playMetronome = () => {
+      // const node = new AudioBufferSourceNode(ctx, { buffer: MetronomeSampleBuffer });
+      // node.start();
+      // const dest = (ctx as any).globalVolume as GainNode;
+      // node.connect(dest);
+    };
+
+    const scheduleAnother = (loopIx: number) => {
+      if (scheduleParams.type === 'globalBeatCounter') {
+        // Schedule 20 beats and then recursively re-schedule
+        const startBeat = Math.ceil(scheduleParams.curBeat) + loopIx * 20;
+        for (let i = 0; i < 20; i++) {
+          const eventID = scheduleEventBeats(startBeat + i, () => {
+            playMetronome();
+            this.scheduledEventHandles.delete(eventID);
+          });
+          this.scheduledEventHandles.add(eventID);
+        }
+
+        const eventID = scheduleEventBeats(startBeat + 19, () => scheduleAnother(loopIx + 1));
+        this.scheduledEventHandles.add(eventID);
+      } else if (scheduleParams.type === 'localTempo') {
+        const beatsPerSecond = scheduleParams.bpm / 60;
+        const secondsPerBeat = 1 / beatsPerSecond;
+        // If the cursor isn't exactly on a beat divider when playback is started, we need to account for that
+        const cursorOffsetSeconds =
+          secondsPerBeat * (this.lastSetCursorPosBeats - Math.trunc(this.lastSetCursorPosBeats));
+
+        for (let i = 0; i < 20; i++) {
+          const timeSeconds =
+            scheduleParams.startTime +
+            secondsPerBeat * 20 * loopIx +
+            i * secondsPerBeat +
+            cursorOffsetSeconds;
+          const eventID = scheduleEventTimeAbsolute(timeSeconds, () => {
+            playMetronome();
+            this.scheduledEventHandles.delete(eventID);
+          });
+          this.scheduledEventHandles.add(eventID);
+        }
+
+        const eventID = scheduleEventTimeAbsolute(
+          scheduleParams.startTime +
+            secondsPerBeat * 20 * loopIx +
+            19 * secondsPerBeat +
+            cursorOffsetSeconds,
+          () => scheduleAnother(loopIx + 1)
+        );
+        this.scheduledEventHandles.add(eventID);
+      }
+    };
+
+    scheduleAnother(0);
+  }
+
   public startPlayback(scheduleParams: ScheduleParams) {
     if (this.isPlaying) {
       return;
@@ -427,6 +485,10 @@ export default class MIDIEditorPlaybackHandler {
       this.scheduleOneshot(scheduleParams);
     } else {
       this.scheduleLoop(scheduleParams);
+    }
+
+    if (this.metronomeEnabled) {
+      this.scheduleMetronome(scheduleParams);
     }
   }
 
