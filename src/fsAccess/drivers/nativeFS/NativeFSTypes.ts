@@ -4,10 +4,27 @@ export interface FileSystemWriter {
   close: () => Promise<unknown>;
 }
 
+type WriteCommandType = 'write' | 'seek' | 'truncate';
+
+interface WriteParams {
+  type: WriteCommandType;
+  size?: number;
+  position?: number;
+  data?: BufferSource | Blob | string;
+}
+
+export type FileSystemWriteChunkType = BufferSource | Blob | string | WriteParams;
+
+export interface FileSystemWritableFileStream extends WritableStream {
+  write: (data: FileSystemWriteChunkType) => Promise<undefined>;
+  seek: (position: number) => Promise<undefined>;
+  truncate: (size: number) => Promise<undefined>;
+}
+
 export interface FileSystemFileHandle {
   kind: 'file';
   name: string;
-  createWriter: () => Promise<FileSystemWriter>;
+  createWritable: () => Promise<FileSystemWritableFileStream>;
   getFile: () => Promise<File>;
 }
 

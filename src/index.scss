@@ -121,4 +121,14 @@ button {
   outline: 1px transparent;
   font-family: 'Hack', monspace;
   cursor: pointer;
+  font-size: 15px;
+  padding: 3px 8px;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+.control-panel button {
+  font-size: 13.25px;
 }

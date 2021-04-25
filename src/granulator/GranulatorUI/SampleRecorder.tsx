@@ -1,4 +1,4 @@
-import { filterNils, PropTypesOf } from 'ameo-utils';
+import { filterNils } from 'ameo-utils';
 import React, { useMemo, useRef, useState } from 'react';
 import { Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
@@ -6,6 +6,9 @@ import ControlPanel from 'react-control-panel';
 import { ReduxStore, store, useSelector } from 'src/redux';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
+import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import BasicModal from 'src/misc/BasicModal';
+import { addLocalSample } from 'src/sampleLibrary';
 
 const NoInput: React.FC = () => (
   <i>
@@ -26,6 +29,38 @@ type RecordingStatus =
       selectionStartMs: number | null;
       selectionEndMs: number | null;
     };
+
+const ExportModal: React.FC<ModalCompProps<{ name: string }>> = ({ onSubmit, onCancel }) => {
+  const [sampleName, setSampleName] = useState('');
+
+  const canSubmit = !!sampleName;
+
+  return (
+    <BasicModal>
+      <h2>Export to Sample Library</h2>
+      <div className='input-container'>
+        <label htmlFor='export-modal-sample-name'>Name</label>
+        <input
+          id='export-modal-sample-name'
+          value={sampleName}
+          onChange={evt => setSampleName(evt.target.value)}
+        />
+      </div>
+
+      <div className='buttons-container'>
+        <button onClick={onCancel}>cancel</button>
+        <button onClick={() => onSubmit({ name: sampleName })} disabled={!canSubmit}>
+          submit
+        </button>
+      </div>
+    </BasicModal>
+  );
+};
+
+const handleExport = async (encoded: ArrayBuffer) => {
+  const { name } = await renderModalWithControls(ExportModal);
+  await addLocalSample({ name: name + '.wav', isLocal: true }, encoded);
+};
 
 const mkHandleAWPMessage = (recordingState: RecordingState) =>
   function handleAWPMessage(this: MessagePort, evt: MessageEvent<any>) {
@@ -52,7 +87,9 @@ const mkHandleAWPMessage = (recordingState: RecordingState) =>
         break;
       }
       case 'encodedRecording': {
-        // TODO
+        const encoded: ArrayBuffer = evt.data.encoded;
+        handleExport(encoded);
+
         break;
       }
       default: {
@@ -75,6 +112,7 @@ const getSampleRecorderSettings = (
         recordingStatus.type === 'recording'
           ? () => {
               if (!awpNode.current) {
+                console.warn('Recording not started because AWP not started');
                 return;
               }
               awpNode.current!.port.postMessage({ type: 'stopRecording' });
@@ -87,7 +125,11 @@ const getSampleRecorderSettings = (
               });
             }
           : () => {
-              if (!awpNode.current || !recordingState.current.waveformRenderer.isInitialized()) {
+              if (!awpNode.current) {
+                console.warn('Recording not started because AWP not started');
+                return;
+              } else if (!recordingState.current.waveformRenderer.isInitialized()) {
+                console.warn('Recording not started because waveform renderer is not initialized');
                 return;
               }
 
@@ -159,10 +201,12 @@ const SampleRecorderInner: React.FC<{
   );
 };
 
-const SampleRecorder: React.FC<{
+interface SampleRecorderProps {
   vcId: string;
   awpNode: React.MutableRefObject<AudioWorkletNode | null>;
-}> = ({ vcId, awpNode }) => {
+}
+
+const SampleRecorder: React.FC<SampleRecorderProps> = ({ vcId, awpNode }) => {
   const inputConnected = useSelector((state: ReduxStore) =>
     state.viewContextManager.patchNetwork.connections.some(
       ([_src, dst]) => dst.vcId === vcId && dst.name === 'recording_input'
@@ -176,7 +220,7 @@ const SampleRecorder: React.FC<{
   return <SampleRecorderInner awpNode={awpNode} />;
 };
 
-const WrappedSampleRecorder: React.FC<PropTypesOf<typeof SampleRecorder>> = ({ ...props }) => (
+const WrappedSampleRecorder: React.FC<SampleRecorderProps> = ({ ...props }) => (
   <Provider store={store}>
     <div className='sample-recorder'>
       <h2>Sample Recorder</h2>

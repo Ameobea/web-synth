@@ -66,6 +66,28 @@ const loadLocalSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffe
   return (sampleFile as any).arrayBuffer() as Promise<ArrayBuffer>;
 };
 
+const saveLocalSample = async (descriptor: SampleDescriptor, sampleData: ArrayBuffer) => {
+  const fsAccess = await getFSAccess();
+  const samplesDirHandle = await fsAccess.getDirectory('samples');
+  // Create recorded samples dir if doesn't exist
+  let recordedSamplesDir: FileSystemDirectoryHandle | undefined;
+  for await (const [name, entry] of samplesDirHandle.entries()) {
+    if (name === 'recorded' && entry.kind === 'directory') {
+      recordedSamplesDir = entry;
+      break;
+    }
+  }
+  if (!recordedSamplesDir) {
+    recordedSamplesDir = await samplesDirHandle.getDirectoryHandle('recorded', { create: true });
+  }
+
+  const fileHandle = await recordedSamplesDir.getFileHandle(descriptor.name, { create: true });
+  const fileWriter = await fileHandle.createWritable();
+  const rs = new Blob([sampleData]).stream();
+  await rs.pipeTo(fileWriter);
+  console.log({ rs });
+};
+
 const loadRemoteSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffer> => {
   if (!descriptor.url) {
     throw new UnimplementedError('Unable to load remote sample without URL');
@@ -141,6 +163,15 @@ export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuff
   GLOBAL_SAMPLE_MANAGER.setSample(descriptor, buf);
 
   return buf;
+};
+
+/**
+ * Adds a sample to the sample manager and saves it locally as well
+ */
+export const addLocalSample = async (descriptor: SampleDescriptor, sampleData: ArrayBuffer) => {
+  await saveLocalSample(descriptor, sampleData);
+  const decoded = await ctx.decodeAudioData(sampleData);
+  GLOBAL_SAMPLE_MANAGER.setSample(descriptor, decoded);
 };
 
 export const init_sample_library = (stateKey: string) => {

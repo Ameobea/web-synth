@@ -203,10 +203,6 @@ const GranulatorUI: React.FC<{
   } | null>(null);
   const awpNode = useRef<AudioWorkletNode | null>(null);
   useEffect(() => {
-    if (!activeSample) {
-      return;
-    }
-
     (async () => {
       function* retries() {
         let attempts = 0;
@@ -227,7 +223,7 @@ const GranulatorUI: React.FC<{
 
         inst.node.port.postMessage({
           type: 'setSamples',
-          samples: activeSample.sampleData.getChannelData(0),
+          samples: activeSample?.sampleData.getChannelData(0),
         });
         return;
       }

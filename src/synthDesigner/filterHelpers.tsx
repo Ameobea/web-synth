@@ -44,10 +44,7 @@ const CustomQSetting: React.FC<{
     console.error('NaN `Q` value after converting from log to linear; logQ=' + value);
     linearQ = 1;
   }
-  const wrappedOnChange = useCallback(
-    (newQ: number) => console.log({ newQ }) || onChange(linearToDb(newQ)),
-    [onChange]
-  );
+  const wrappedOnChange = useCallback((newQ: number) => onChange(linearToDb(newQ)), [onChange]);
 
   return (
     <Range

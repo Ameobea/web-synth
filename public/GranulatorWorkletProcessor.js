@@ -121,7 +121,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
       switch (evt.data.type) {
         case 'setSamples': {
           this.samples = evt.data.samples;
-          if (this.wasmInstance) {
+          if (this.wasmInstance && this.samples) {
             this.initGranularCtx();
           }
           break;
@@ -185,7 +185,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     const encodedOutputPtr = this.wasmInstance.exports.sample_recorder_get_encoded_output_ptr(
       this.sampleRecorderCtxPtr
     );
-    const encoded = this.wasmInstance.exports.memory.buffer.subarray(
+    const encoded = this.wasmInstance.exports.memory.buffer.slice(
       encodedOutputPtr,
       encodedOutputPtr + encodedLengthBytes
     );
@@ -207,7 +207,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     );
 
     const wasmMemory = this.getWasmMemory();
-    const block = wasmMemory.subarray(
+    const block = wasmMemory.slice(
       blockStartPtr / BYTES_PER_F32,
       blockStartPtr / BYTES_PER_F32 + this.recordedSamplesSinceLastReported
     );

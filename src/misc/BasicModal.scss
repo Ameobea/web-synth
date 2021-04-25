@@ -6,4 +6,28 @@
   margin: auto;
   background-color: #232323;
   padding: 10px;
+
+  h2 {
+    text-align: center;
+  }
+
+  .input-container {
+    display: flex;
+    flex-direction: row;
+
+    label {
+      margin-right: 5px;
+    }
+  }
+
+  .buttons-container {
+    display: flex;
+    flex-direction: row;
+    margin-top: auto;
+    justify-content: flex-end;
+
+    button {
+      margin-left: 8px;
+    }
+  }
 }
