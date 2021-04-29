@@ -22,7 +22,7 @@ export enum SoftClipperAlgorithm {
   HardClipper = 3,
 }
 
-export type Effect =
+export type EffectInner =
   | {
       type: 'spectral warping';
       frequency: ParamSource;
@@ -45,6 +45,10 @@ export type Effect =
       algorithm: SoftClipperAlgorithm;
     }
   | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource };
+
+export type Effect = EffectInner & {
+  isBypassed?: boolean;
+};
 
 const EFFECT_TYPE_SETTING = {
   type: 'select',
@@ -413,6 +417,8 @@ const EffectManagement: React.FC<{
 
 export type AdsrChangeHandler = (adsrIx: number, newValue: Adsr) => void;
 
+const EFFECT_BYPASS_SETTINGS = [{ type: 'checkbox', label: 'bypass' }];
+
 const ConfigureEffectSpecific: React.FC<{
   state: Effect;
   onChange: (newEffect: Effect | null) => void;
@@ -432,7 +438,18 @@ const ConfigureEffectSpecific: React.FC<{
     [state.type]
   );
 
-  return <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />;
+  return (
+    <>
+      <ControlPanel
+        settings={EFFECT_BYPASS_SETTINGS}
+        state={{ bypass: state.isBypassed ?? false }}
+        onChange={(_key: string, val: boolean) => {
+          onChange({ ...state, isBypassed: val });
+        }}
+      />
+      <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />
+    </>
+  );
 };
 
 const ConfigureEffect: React.FC<{

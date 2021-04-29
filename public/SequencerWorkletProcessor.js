@@ -1,4 +1,4 @@
-class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
+class SequencerWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [];
   }
@@ -63,4 +63,4 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('sequencer-audio-worklet-node-processor', ValueRecorderWorkletProcessor);
+registerProcessor('sequencer-audio-worklet-node-processor', SequencerWorkletProcessor);

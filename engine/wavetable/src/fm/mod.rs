@@ -1243,6 +1243,7 @@ pub unsafe extern "C" fn fm_synth_set_effect(
     param_4_int_val: usize,
     param_4_float_val: f32,
     param_4_float_val_2: f32,
+    is_bypassed: bool,
 ) {
     for voice in &mut (*ctx).voices {
         let effect_chain = if operator_ix == -1 {
@@ -1273,6 +1274,7 @@ pub unsafe extern "C" fn fm_synth_set_effect(
                 param_4_int_val,
                 param_4_float_val,
                 param_4_float_val_2,
+                is_bypassed,
             );
         }
     }

@@ -92,6 +92,8 @@ jobs:
           actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
       - name: Install SVGO SVG optimizer
         run: yarn global add svgo
+      - name: Add globally installed yarn binaries to path
+        run: echo `yarn global bin` >> $GITHUB_PATH
 
       - name: Create custom binaries directory
         run: mkdir ~/bin

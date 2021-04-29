@@ -1,0 +1,12 @@
+[package]
+name = "sample_editor"
+version = "0.1.0"
+authors = ["Casey Primozic <casey@cprimozic.net>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+slotmap = "1.0"
+float-ord = "0.2"

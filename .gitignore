@@ -25,6 +25,8 @@ public/distortion.wasm
 public/wavetable_no_simd.wasm
 public/adsr.wasm
 public/sinsy.*
+public/note_container.wasm
+public/sample_editor.wasm
 src/note_container*
 !src/midiUtils.ts
 .ipynb_checkpoints

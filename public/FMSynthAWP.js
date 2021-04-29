@@ -115,7 +115,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          const { effectType, param1, param2, param3, param4 } = evt.data;
+          const { effectType, param1, param2, param3, param4, isBypassed } = evt.data;
           this.wasmInstance.exports.fm_synth_set_effect(
             this.ctxPtr,
             evt.data.operatorIx ?? -1,
@@ -136,7 +136,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             param4?.valueType ?? 0,
             param4?.valParamInt ?? 0,
             param4?.valParamFloat ?? 0,
-            param4?.valParamFloat2 ?? 0
+            param4?.valParamFloat2 ?? 0,
+            isBypassed ?? false
           );
           break;
         }

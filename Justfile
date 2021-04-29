@@ -44,6 +44,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -77,6 +78,8 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
 
   just debug-sinsy
 

@@ -392,8 +392,14 @@ impl Effect for EffectInstance {
 }
 
 #[derive(Clone)]
+pub struct EffectContainer {
+    pub inst: Box<EffectInstance>,
+    pub is_bypassed: bool,
+}
+
+#[derive(Clone)]
 pub struct EffectChain {
-    effects: [Option<Box<EffectInstance>>; 16],
+    effects: [Option<EffectContainer>; 16],
     param_render_buf: Box<[[[f32; FRAME_SIZE]; 4]; 16]>,
 }
 
@@ -430,9 +436,10 @@ impl EffectChain {
         param_4_int_val: usize,
         param_4_float_val: f32,
         param_4_float_val_2: f32,
+        is_bypassed: bool,
     ) {
         if let Some(effect) = &mut self.effects[effect_ix] {
-            let successfully_updated = effect.maybe_update_from_parts(
+            let successfully_updated = effect.inst.maybe_update_from_parts(
                 effect_type,
                 param_1_type,
                 param_1_int_val,
@@ -452,29 +459,33 @@ impl EffectChain {
                 param_4_float_val_2,
             );
             if successfully_updated {
+                effect.is_bypassed = is_bypassed;
                 return;
             }
         }
 
-        self.effects[effect_ix] = Some(box EffectInstance::from_parts(
-            effect_type,
-            param_1_type,
-            param_1_int_val,
-            param_1_float_val,
-            param_1_float_val_2,
-            param_2_type,
-            param_2_int_val,
-            param_2_float_val,
-            param_2_float_val_2,
-            param_3_type,
-            param_3_int_val,
-            param_3_float_val,
-            param_3_float_val_2,
-            param_4_type,
-            param_4_int_val,
-            param_4_float_val,
-            param_4_float_val_2,
-        ));
+        self.effects[effect_ix] = Some(EffectContainer {
+            inst: box EffectInstance::from_parts(
+                effect_type,
+                param_1_type,
+                param_1_int_val,
+                param_1_float_val,
+                param_1_float_val_2,
+                param_2_type,
+                param_2_int_val,
+                param_2_float_val,
+                param_2_float_val_2,
+                param_3_type,
+                param_3_int_val,
+                param_3_float_val,
+                param_3_float_val_2,
+                param_4_type,
+                param_4_int_val,
+                param_4_float_val,
+                param_4_float_val_2,
+            ),
+            is_bypassed,
+        });
     }
 
     pub fn remove_effect(&mut self, effect_ix: usize) {
@@ -513,8 +524,13 @@ impl EffectChain {
     pub fn pre_render_params<'a>(&mut self, render_params: &RenderRawParams<'a>) {
         for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
             let effect = match effect {
-                Some(effect) => effect,
-                None => return,
+                Some(effect_container) =>
+                    if effect_container.is_bypassed {
+                        continue;
+                    } else {
+                        &mut effect_container.inst
+                    },
+                _ => return,
             };
 
             let buffers = unsafe { self.param_render_buf.get_unchecked_mut(effect_ix) };
@@ -548,7 +564,12 @@ impl EffectChain {
             unsafe { std::mem::MaybeUninit::uninit().assume_init() };
         for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
             let effect = match effect {
-                Some(effect) => effect,
+                Some(effect_container) =>
+                    if effect_container.is_bypassed {
+                        continue;
+                    } else {
+                        &mut effect_container.inst
+                    },
                 None => break,
             };
 
@@ -576,7 +597,12 @@ impl EffectChain {
 
         for effect in &mut self.effects {
             let effect = match effect {
-                Some(effect) => effect,
+                Some(effect_container) =>
+                    if effect_container.is_bypassed {
+                        continue;
+                    } else {
+                        &mut effect_container.inst
+                    },
                 None => return,
             };
             let param_count =

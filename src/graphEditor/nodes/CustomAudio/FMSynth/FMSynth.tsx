@@ -18,10 +18,6 @@ import { getSentry } from 'src/sentry';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 
-type FMSynthInputDescriptor =
-  | { type: 'modulationValue'; srcOperatorIx: number; dstOperatorIx: number }
-  | { type: 'outputWeight'; operatorIx: number };
-
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
 
@@ -94,7 +90,6 @@ const serializeADSR = (adsr: Adsr) => ({ ...adsr, audioThreadData: undefined });
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
-  private generatedInputs: FMSynthInputDescriptor[] = []; // TODO: Populate this rather than expose raw indexed param buffers
   private awpHandle: AudioWorkletNode | null = null;
   private modulationMatrix: ParamSource[][] = buildDefaultModulationIndices();
   private outputWeights: ParamSource[] = new Array(OPERATOR_COUNT)
@@ -577,6 +572,7 @@ export default class FMSynth implements ForeignNode {
       param2,
       param3,
       param4,
+      isBypassed: newEffect?.isBypassed ?? false,
     });
   }
 

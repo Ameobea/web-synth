@@ -13,7 +13,8 @@ members = [
   "noise_gen",
   "distortion",
   "adsr",
-  "note_container"
+  "note_container",
+  "sample_editor"
 ]
 
 [profile.release]
