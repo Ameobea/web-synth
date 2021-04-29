@@ -5,9 +5,9 @@ Here is a non-exhaustive list of web synth modules that are currently implemente
 * [[synth-designer]]
   * [[fm-synth]]
   * [[wavetable]] synthesizer
-* [[granular-synthesis]] engine
+* [[granular-synthesizer]]
 * [[sequencer]]
-* [[vocal-synthesis]] engine
+* [[vocal-synthesis-module]]
 * [[sample-library]]
 * [[midi-editor]]
 * [[graph-editor]]
@@ -20,9 +20,8 @@ Here is a non-exhaustive list of web synth modules that are currently implemente
 [synth-designer]: synth-designer "synth designer"
 [fm-synth]: fm-synth "FM Synthesizer"
 [wavetable]: wavetable "wavetable"
-[granular-synthesis]: granular-synthesis "granular-synthesis"
+[granular-synthesizer]: granular-synthesizer "granular-synthesizer"
 [sequencer]: sequencer "sequencer"
-[vocal-synthesis]: vocal-synthesis "vocal synthesis"
 [sample-library]: sample-library "sample-library"
 [midi-editor]: midi-editor "midi-editor"
 [graph-editor]: graph-editor "graph editor"
