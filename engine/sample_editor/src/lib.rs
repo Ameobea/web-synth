@@ -50,8 +50,9 @@ fn compute_sample_len_beats(len_samples: usize, bpm: f64) -> f64 {
 /// sample-by-sample until the whole thing has been played.  Once that point is reached, the
 /// playhead is deleted.
 pub struct Playhead {
-    sample_data_ix: usize,
-    played_sample_count: usize,
+    pub sample_key: u64,
+    pub sample_data_ix: usize,
+    pub played_sample_count: usize,
 }
 
 #[derive(PartialEq)]
@@ -80,7 +81,7 @@ pub struct SampleEditorCtx {
     pub sample_data: Vec<Vec<f32>>,
     pub playheads: Vec<Playhead>,
     pub output_buffer: [f32; FRAME_SIZE],
-    pub upcoming_samples: BinaryHeap<Sample>,
+    pub upcoming_samples: BinaryHeap<(u64, Sample)>,
 }
 
 impl Default for SampleEditorCtx {
@@ -102,7 +103,7 @@ impl SampleEditorCtx {
 
         // Find all samples that would be started but not finished at the start point and create
         // playheads for them
-        for sample in self.samples.values() {
+        for (sample_key, sample) in &self.samples {
             if sample.start_pos_beats > start_beat {
                 continue;
             }
@@ -121,6 +122,7 @@ impl SampleEditorCtx {
             let start_sample_ix = (pct_complete * (sample_len_samples as f64)).trunc() as usize;
             assert!(start_sample_ix < sample_len_samples);
             self.playheads.push(Playhead {
+                sample_key: unsafe { std::mem::transmute(sample_key) },
                 sample_data_ix: sample.sample_data_ix,
                 played_sample_count: start_sample_ix,
             })
@@ -128,9 +130,11 @@ impl SampleEditorCtx {
 
         self.upcoming_samples.extend(
             self.samples
-                .values()
-                .filter(|sample| sample.start_pos_beats > start_beat)
-                .cloned(),
+                .iter()
+                .map(|(key, sample)| -> (u64, _) {
+                    (unsafe { std::mem::transmute(key) }, sample.clone())
+                })
+                .filter(|(_key, sample)| sample.start_pos_beats > start_beat),
         );
     }
 }
@@ -231,6 +235,20 @@ pub extern "C" fn create_sample(
 }
 
 #[no_mangle]
+pub extern "C" fn remove_sample(ctx: *mut SampleEditorCtx, key: u32) {
+    let ctx = unsafe { &mut *ctx };
+    let key = unsafe { std::mem::transmute(key as u64) };
+    let _sample = ctx
+        .samples
+        .remove(key)
+        .unwrap_or_else(|| panic!("{}", format!("No sample found with key={:?}", key)));
+
+    // Remove playhead for this sample if one exists
+    let key = unsafe { std::mem::transmute(key) };
+    ctx.playheads.retain(|playhead| playhead.sample_key != key);
+}
+
+#[no_mangle]
 pub extern "C" fn start_playback(ctx: *mut SampleEditorCtx, start_beat: f64, bpm: f64) {
     let ctx = unsafe { &mut *ctx };
     ctx.schedule_samples(start_beat, bpm);
@@ -251,9 +269,10 @@ pub extern "C" fn process_sample_editor(ctx: *mut SampleEditorCtx, cur_beat: f64
     // Create new playheads for all notes that start in this window
     loop {
         match ctx.upcoming_samples.peek().cloned() {
-            Some(next_sample) if next_sample.start_pos_beats > cur_beat => {
+            Some((sample_key, next_sample)) if next_sample.start_pos_beats > cur_beat => {
                 ctx.upcoming_samples.pop();
                 ctx.playheads.push(Playhead {
+                    sample_key,
                     sample_data_ix: next_sample.sample_data_ix,
                     played_sample_count: 0,
                 });

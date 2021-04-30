@@ -22,6 +22,7 @@ Here is a non-exhaustive list of web synth modules that are currently implemente
 [wavetable]: wavetable "wavetable"
 [granular-synthesizer]: granular-synthesizer "granular-synthesizer"
 [sequencer]: sequencer "sequencer"
+[vocal-synthesis-module]: vocal-synthesis-module "vocal-synthesis-module"
 [sample-library]: sample-library "sample-library"
 [midi-editor]: midi-editor "midi-editor"
 [graph-editor]: graph-editor "graph editor"
