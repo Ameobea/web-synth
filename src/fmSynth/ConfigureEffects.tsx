@@ -44,7 +44,14 @@ export type EffectInner =
       postGain: ParamSource;
       algorithm: SoftClipperAlgorithm;
     }
-  | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource };
+  | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource }
+  | {
+      type: 'delay';
+      delaySamples: ParamSource;
+      wet: ParamSource;
+      dry: ParamSource;
+      feedback: ParamSource;
+    };
 
 export type Effect = EffectInner & {
   isBypassed?: boolean;
@@ -60,6 +67,7 @@ const EFFECT_TYPE_SETTING = {
     'wavefolder',
     'soft clipper',
     'butterworth filter',
+    'delay',
   ] as Effect['type'][],
 };
 
@@ -111,6 +119,15 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         cutoffFrequency: { type: 'constant', value: 400 },
       };
     }
+    case 'delay': {
+      return {
+        type,
+        delaySamples: { type: 'constant', value: 44_100 / 2 },
+        wet: { type: 'constant', value: 0.7 },
+        dry: { type: 'constant', value: 0.7 },
+        feedback: { type: 'constant', value: 0.4 },
+      };
+    }
   }
 };
 
@@ -128,6 +145,7 @@ const bitcrusherTheme = { ...baseTheme, background2: 'rgb(24,14,4)' };
 const wavefolderTheme = { ...baseTheme, background2: 'rgb(24,38,41)' };
 const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
+const delayTheme = { ...baseTheme, background2: 'rgb(13,187,49)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -136,6 +154,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   wavefolder: wavefolderTheme,
   'soft clipper': softClipperTheme,
   'butterworth filter': butterworthFilterTheme,
+  delay: delayTheme,
 };
 
 type EffectConfigurator<T> = React.FC<{
@@ -363,6 +382,52 @@ const ConfigureButterworthFilter: EffectConfigurator<'butterworth filter'> = ({
   </>
 );
 
+const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, onAdsrChange }) => (
+  <>
+    <ConfigureParamSource
+      title='delay_samples'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={delayTheme}
+      min={1}
+      max={44_100 * 10}
+      scale='log'
+      state={state.delaySamples}
+      onChange={delaySamples => onChange({ ...state, delaySamples })}
+    />
+    <ConfigureParamSource
+      title='wet'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={delayTheme}
+      min={0}
+      max={1}
+      state={state.wet}
+      onChange={wet => onChange({ ...state, wet })}
+    />
+    <ConfigureParamSource
+      title='dry'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={delayTheme}
+      min={0}
+      max={1}
+      state={state.dry}
+      onChange={dry => onChange({ ...state, dry })}
+    />
+    <ConfigureParamSource
+      title='feedback'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={delayTheme}
+      min={0}
+      max={1}
+      state={state.feedback}
+      onChange={feedback => onChange({ ...state, feedback })}
+    />
+  </>
+);
+
 const EffectManagement: React.FC<{
   effectIx: number;
   operatorEffects: (Effect | null)[];
@@ -434,6 +499,7 @@ const ConfigureEffectSpecific: React.FC<{
         wavefolder: ConfigureWavefolder,
         'soft clipper': ConfigureSoftClipper,
         'butterworth filter': ConfigureButterworthFilter,
+        delay: ConfigureDelay,
       }[state.type]),
     [state.type]
   );
@@ -441,6 +507,7 @@ const ConfigureEffectSpecific: React.FC<{
   return (
     <>
       <ControlPanel
+        style={{ width: 500 }}
         settings={EFFECT_BYPASS_SETTINGS}
         state={{ bypass: state.isBypassed ?? false }}
         onChange={(_key: string, val: boolean) => {

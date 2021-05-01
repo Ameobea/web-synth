@@ -544,6 +544,15 @@ export default class FMSynth implements ForeignNode {
           null,
         ];
       }
+      case 'delay': {
+        return [
+          6,
+          this.encodeParamSource(effect.delaySamples),
+          this.encodeParamSource(effect.wet),
+          this.encodeParamSource(effect.dry),
+          this.encodeParamSource(effect.feedback),
+        ];
+      }
       default: {
         throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);
       }

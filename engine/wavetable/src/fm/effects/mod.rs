@@ -1,3 +1,4 @@
+use dsp::circular_buffer::CircularBuffer;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
@@ -5,6 +6,7 @@ use super::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod butterworth_filter;
+pub mod delay;
 pub mod soft_clipper;
 pub mod spectral_warping;
 pub mod wavefolder;
@@ -12,6 +14,7 @@ pub mod wavefolder;
 use self::{
     bitcrusher::Bitcrusher,
     butterworth_filter::{ButterworthFilter, ButterworthFilterMode},
+    delay::Delay,
     spectral_warping::SpectralWarping,
     wavefolder::{Wavecruncher, Wavefolder},
 };
@@ -68,6 +71,7 @@ pub enum EffectInstance {
     Wavefolder(Wavefolder),
     SoftClipper(SoftClipper),
     ButterworthFilter(ButterworthFilter),
+    Delay(Delay),
 }
 
 impl EffectInstance {
@@ -205,6 +209,37 @@ impl EffectInstance {
 
                 EffectInstance::ButterworthFilter(ButterworthFilter::new(mode, cutoff_freq))
             },
+            6 => {
+                let delay = Delay {
+                    buffer: box CircularBuffer::new(),
+                    delay_samples: ParamSource::new(ParamSourceType::from_parts(
+                        param_1_type,
+                        param_1_int_val,
+                        param_1_float_val,
+                        param_1_float_val_2,
+                    )),
+                    wet: ParamSource::new(ParamSourceType::from_parts(
+                        param_2_type,
+                        param_2_int_val,
+                        param_2_float_val,
+                        param_2_float_val_2,
+                    )),
+                    dry: ParamSource::new(ParamSourceType::from_parts(
+                        param_3_type,
+                        param_3_int_val,
+                        param_3_float_val,
+                        param_3_float_val_2,
+                    )),
+                    feedback: ParamSource::new(ParamSourceType::from_parts(
+                        param_4_type,
+                        param_4_int_val,
+                        param_4_float_val,
+                        param_4_float_val_2,
+                    )),
+                };
+
+                EffectInstance::Delay(delay)
+            },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
     }
@@ -221,14 +256,14 @@ impl EffectInstance {
         param_2_int_val: usize,
         param_2_float_val: f32,
         param_2_float_val_2: f32,
-        _param_3_type: usize,
+        param_3_type: usize,
         param_3_int_val: usize,
-        _param_3_float_val: f32,
-        _param_3_float_val_2: f32,
-        _param_4_type: usize,
-        _param_4_int_val: usize,
-        _param_4_float_val: f32,
-        _param_4_float_val_2: f32,
+        param_3_float_val: f32,
+        param_3_float_val_2: f32,
+        param_4_type: usize,
+        param_4_int_val: usize,
+        param_4_float_val: f32,
+        param_4_float_val_2: f32,
     ) -> bool {
         match effect_type {
             0 => {
@@ -339,6 +374,38 @@ impl EffectInstance {
                 butterworth_filter.cutoff_freq = cutoff_freq;
                 return true;
             },
+            6 => {
+                let delay = match self {
+                    EffectInstance::Delay(delay) => delay,
+                    _ => return false,
+                };
+
+                delay.delay_samples = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                    param_1_float_val_2,
+                ));
+                delay.wet = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                    param_2_float_val_2,
+                ));
+                delay.dry = ParamSource::new(ParamSourceType::from_parts(
+                    param_3_type,
+                    param_3_int_val,
+                    param_3_float_val,
+                    param_3_float_val_2,
+                ));
+                delay.feedback = ParamSource::new(ParamSourceType::from_parts(
+                    param_4_type,
+                    param_4_int_val,
+                    param_4_float_val,
+                    param_4_float_val_2,
+                ));
+                return true;
+            },
             _ => false,
         }
     }
@@ -354,6 +421,7 @@ impl Effect for EffectInstance {
             EffectInstance::SoftClipper(e) => e.apply(rendered_params, base_frequency, sample),
             EffectInstance::ButterworthFilter(e) =>
                 e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::Delay(e) => e.apply(rendered_params, base_frequency, sample),
         }
     }
 
@@ -376,6 +444,7 @@ impl Effect for EffectInstance {
                 e.apply_all(rendered_params, base_frequencies, samples),
             EffectInstance::ButterworthFilter(e) =>
                 e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::Delay(e) => e.apply_all(rendered_params, base_frequencies, samples),
         }
     }
 
@@ -387,6 +456,7 @@ impl Effect for EffectInstance {
             EffectInstance::Wavefolder(e) => e.get_params(buf),
             EffectInstance::SoftClipper(e) => e.get_params(buf),
             EffectInstance::ButterworthFilter(e) => e.get_params(buf),
+            EffectInstance::Delay(e) => e.get_params(buf),
         }
     }
 }
