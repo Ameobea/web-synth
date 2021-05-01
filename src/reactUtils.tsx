@@ -103,7 +103,9 @@ export const mkContainerCleanupHelper = ({
   predicate,
 }: {
   predicate?: (domID: string, node: HTMLElement) => void;
-  // If true, the DOM element will not be deleted and
+  /**
+   * If `true`, the DOM element will not be deleted.  If `false` or not provided, it will be deleted.
+   */
   preserveRoot?: boolean;
 } = {}) => (domId: string) => {
   const node = document.getElementById(domId);

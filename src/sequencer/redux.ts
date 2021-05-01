@@ -97,7 +97,12 @@ const reschedule = (state: SequencerReduxState): SequencerReduxState => {
   return state;
 };
 
-export const SequencerReduxInfraMap: Map<string, SequencerReduxInfra> = new Map();
+interface SequencerInst extends SequencerReduxInfra {
+  onGlobalStart: () => void;
+  onGlobalStop: () => void;
+}
+
+export const SequencerInstancesMap: Map<string, SequencerInst> = new Map();
 
 const actionGroups = {
   SET_STATE: buildActionGroup({
@@ -160,9 +165,11 @@ const actionGroups = {
       setConnectionFlowingStatus(vcId, 'output', !state.isPlaying);
 
       if (state.isPlaying) {
+        console.trace('stopping playback');
         state.awpHandle.port.postMessage({ type: 'stop' });
         return { ...state, isPlaying: false, curActiveMarkIx: null };
       } else {
+        console.trace('starting playback');
         state.awpHandle.port.postMessage({ type: 'start' });
         return reschedule({
           ...state,
@@ -411,7 +418,7 @@ const DEFAULT_WIDTH = 32 as const;
 export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
   const inputCbs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
-      const reduxInfra = SequencerReduxInfraMap.get(vcId);
+      const reduxInfra = SequencerInstancesMap.get(vcId);
       const state = reduxInfra?.getState();
       if (R.isNil(state?.sequencer.markEditState?.editingMarkIx)) {
         return;

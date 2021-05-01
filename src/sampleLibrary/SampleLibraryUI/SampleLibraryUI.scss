@@ -1,20 +1,32 @@
 .play-sample-icon {
   cursor: pointer;
+  margin-left: 2px;
+  margin-right: 3px;
+  user-select: none;
 }
 
 .sample-library {
   display: flex;
   flex-direction: column;
+  margin: 8px;
 }
 
 .sample-row {
   display: flex;
   flex-direction: row;
+
+  span {
+    overflow: hidden;
+  }
 }
 
 .load-samples-buttons {
   display: flex;
   flex-direction: row;
+
+  button {
+    margin-right: 4px;
+  }
 }
 
 .sample-search {

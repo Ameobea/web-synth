@@ -3,9 +3,13 @@ import { Map } from 'immutable';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView';
 
 export class MixerNode {
   private gainNodes: GainNode[];
+  public gainParams: OverridableAudioParam[];
   private outputNode: GainNode;
   private vcId: string;
   private ctx: AudioContext;
@@ -14,39 +18,25 @@ export class MixerNode {
   static typeName = 'Mixer';
   public node: GainNode;
 
-  /**
-   * See the docs for `enhanceAudioNode`.
-   */
-  paramOverrides: {
+  // unused but exists to match interface
+  public paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
-
-  private updateParamOverrides() {
-    this.paramOverrides = this.gainNodes.reduce((acc, gainNode, i) => {
-      // Re-use existing entries if they exist
-      const name = `Input ${i} Gain`;
-      if (this.paramOverrides[name]) {
-        return { ...acc, [name]: this.paramOverrides[name] };
-      }
-
-      // Create new entries as needed
-      const csn = new ConstantSourceNode(this.ctx);
-      csn.start();
-      return {
-        ...acc,
-        [name]: { param: new OverridableAudioParam(this.ctx, gainNode.gain, csn, true) },
-      };
-    }, {});
-  }
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
-    this.gainNodes = [new GainNode(ctx), new GainNode(ctx)];
     this.outputNode = new GainNode(ctx);
+    this.gainNodes = [new GainNode(ctx), new GainNode(ctx)];
+    this.gainNodes.forEach(gain => gain.connect(this.outputNode));
+    this.gainParams = this.gainNodes.map(gain => new OverridableAudioParam(ctx, gain.gain));
     this.node = this.outputNode;
+    this.renderSmallView = mkContainerRenderHelper({
+      Comp: MixerSmallView,
+      getProps: () => ({ mixer: this }),
+    });
+    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
 
-    this.updateParamOverrides();
     if (params) {
       Object.entries(params).forEach(([key, val]) => {
         if (key === 'gains') {
@@ -59,11 +49,9 @@ export class MixerNode {
             this.addInput();
           }
 
-          this.updateParamOverrides();
-
           gains.forEach((gain, i) => {
             // Set the value of the overrides for each of the
-            this.paramOverrides[`Input ${i} Gain`].override.offset.value = gain;
+            this.gainParams[i].manualControl.offset.value = gain;
           });
         }
       });
@@ -74,7 +62,7 @@ export class MixerNode {
     const newGain = new GainNode(this.ctx);
     newGain.connect(this.outputNode);
     this.gainNodes.push(newGain);
-    this.updateParamOverrides();
+    this.gainParams.push(new OverridableAudioParam(this.ctx, newGain.gain));
     updateConnectables(this.vcId, this.buildConnectables());
   }
 
@@ -84,10 +72,10 @@ export class MixerNode {
     }
 
     const removedGain = this.gainNodes.pop()!;
+    this.gainParams.pop();
     // Don't disconnect any incoming connections to this input; those will be trimmed by the graph diffing.
     // Only disconnect the internal connection.
     removedGain.disconnect(this.outputNode);
-    this.updateParamOverrides();
     updateConnectables(this.vcId, this.buildConnectables());
   }
 
@@ -102,7 +90,7 @@ export class MixerNode {
             })
             .set(`Input ${i} Gain`, {
               type: 'number',
-              node: this.paramOverrides[`Input ${i} Gain`].param,
+              node: this.gainParams[i],
             }),
         Map<string, ConnectableInput>().set('Master Gain', {
           node: this.outputNode.gain,
@@ -118,11 +106,12 @@ export class MixerNode {
     };
   }
 
+  public renderSmallView: ForeignNode['renderSmallView'];
+  public cleanupSmallView: ForeignNode['cleanupSmallView'];
+
   public serialize() {
     return {
-      gains: this.gainNodes.map(
-        (_node, i) => this.paramOverrides[`Input ${i} Gain`].override.offset.value
-      ),
+      gains: this.gainNodes.map((_node, i) => this.gainParams[i].manualControl.offset.value),
     };
   }
 }

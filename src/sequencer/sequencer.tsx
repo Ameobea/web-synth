@@ -22,7 +22,7 @@ import {
   SchedulerScheme,
   buildSequencerConfig,
   SequencerMark,
-  SequencerReduxInfraMap,
+  SequencerInstancesMap,
   buildSequencerInputMIDINode,
   SequencerEditState,
   SequencerReduxInfra,
@@ -30,6 +30,12 @@ import {
 import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
+import {
+  registerStartCB,
+  registerStopCB,
+  unregisterStartCB,
+  unregisterStopCB,
+} from 'src/eventScheduler';
 
 const ctx = new AudioContext();
 
@@ -51,7 +57,7 @@ interface SerializedSequencer {
 const getSequencerDOMElementId = (vcId: string) => `sequencer-${vcId}`;
 
 const serializeSequencer = (vcId: string): string => {
-  const reduxInfra = SequencerReduxInfraMap.get(vcId);
+  const reduxInfra = SequencerInstancesMap.get(vcId);
   if (!reduxInfra) {
     console.error(
       `Missing entry in sequencer redux infra map for vcId ${vcId} when trying to serialize`
@@ -117,7 +123,7 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
   workletHandle.port.onmessage = msg => {
     switch (msg.data.type) {
       case 'triggerVoice': {
-        const state = SequencerReduxInfraMap.get(vcId)!.getState().sequencer;
+        const state = SequencerInstancesMap.get(vcId)!.getState().sequencer;
         const { voiceIx, markIx } = msg.data;
 
         SequencerBeatPlayerByVoiceType[state.voices[voiceIx].type](
@@ -134,7 +140,7 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
           break;
         }
 
-        const { dispatch, actionCreators } = SequencerReduxInfraMap.get(vcId)!;
+        const { dispatch, actionCreators } = SequencerInstancesMap.get(vcId)!;
         dispatch(actionCreators.sequencer.SET_CUR_ACTIVE_MARK_IX(msg.data.markIx));
         break;
       }
@@ -143,7 +149,7 @@ const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
       }
     }
   };
-  const state = SequencerReduxInfraMap.get(vcId)!.getState().sequencer;
+  const state = SequencerInstancesMap.get(vcId)!.getState().sequencer;
   workletHandle.port.postMessage({ type: 'configure', config: buildSequencerConfig(state) });
 
   return workletHandle;
@@ -189,7 +195,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
   }: SerializedSequencer = JSON.parse(serialized);
 
   initSampleBank(sampleBank).then(sampleBank => {
-    const reduxInfra = SequencerReduxInfraMap.get(vcId);
+    const reduxInfra = SequencerInstancesMap.get(vcId);
     if (!reduxInfra) {
       console.warn('No redux infra found after loading samples');
       return;
@@ -216,7 +222,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
   };
 
   initSequenceAWP(vcId).then(awpHandle => {
-    const reduxInfra = SequencerReduxInfraMap.get(vcId);
+    const reduxInfra = SequencerInstancesMap.get(vcId);
     if (!reduxInfra) {
       console.warn('No redux infra found for sequencer when trying to auto-start');
       return;
@@ -255,7 +261,7 @@ const LazySequencerUI: React.FC<SequencerReduxInfra> = props => (
 );
 
 export const get_sequencer_audio_connectables = (vcId: string): AudioConnectables => {
-  const reduxInfra = SequencerReduxInfraMap.get(vcId);
+  const reduxInfra = SequencerInstancesMap.get(vcId);
 
   if (!reduxInfra) {
     throw new UnreachableException(
@@ -298,10 +304,26 @@ export const init_sequencer = (stateKey: string) => {
 
   const initialState = loadInitialState(stateKey, vcId);
   const reduxInfra = buildSequencerReduxInfra(initialState, vcId);
-  if (!!SequencerReduxInfraMap.get(vcId)) {
+  if (!!SequencerInstancesMap.get(vcId)) {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);
   }
-  SequencerReduxInfraMap.set(vcId, reduxInfra);
+
+  const onGlobalStart = () => {
+    const isPlaying = reduxInfra.getState().sequencer.isPlaying;
+    if (isPlaying) {
+      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
+    }
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
+  };
+  registerStartCB(onGlobalStart);
+  const onGlobalStop = () => {
+    const isPlaying = reduxInfra.getState().sequencer.isPlaying;
+    if (isPlaying) {
+      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
+    }
+  };
+  registerStopCB(onGlobalStop);
+  SequencerInstancesMap.set(vcId, { ...reduxInfra, onGlobalStart, onGlobalStop });
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
   updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
@@ -319,7 +341,9 @@ export const cleanup_sequencer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   // Stop it if it is playing
-  const reduxInfra = SequencerReduxInfraMap.get(vcId)!;
+  const { onGlobalStart, onGlobalStop, ...reduxInfra } = SequencerInstancesMap.get(vcId)!;
+  unregisterStartCB(onGlobalStart);
+  unregisterStopCB(onGlobalStop);
   if (!reduxInfra) {
     throw new Error(`No sequencer Redux infra map entry for sequencer with vcId ${vcId}`);
   }
@@ -338,7 +362,7 @@ export const hide_sequencer = mkContainerHider(getSequencerDOMElementId);
 export const unhide_sequencer = mkContainerUnhider(getSequencerDOMElementId);
 
 export const render_sequencer_small_view = (vcId: string, domId: string) => {
-  const reduxInfra = SequencerReduxInfraMap.get(vcId);
+  const reduxInfra = SequencerInstancesMap.get(vcId);
   if (!reduxInfra) {
     throw new Error(`No redux infra for sequencer with vcId ${vcId} when rendering small view`);
   }
@@ -355,7 +379,7 @@ export const cleanup_sequencer_small_view = (_vcId: string, domId: string) =>
 
 export const sequencer_list_used_samples = (stateKey: string): SampleDescriptor[] => {
   const vcId = stateKey.split('_')[1]!;
-  const reduxInfra = SequencerReduxInfraMap.get(vcId);
+  const reduxInfra = SequencerInstancesMap.get(vcId);
   if (!reduxInfra) {
     console.warn('No redux infra found for live sequencer with vcId=' + vcId);
     return [];

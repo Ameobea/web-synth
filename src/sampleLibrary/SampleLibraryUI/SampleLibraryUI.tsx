@@ -1,36 +1,55 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as R from 'ramda';
 import { List, ListRowRenderer } from 'react-virtualized';
+import { parse as parsePath } from 'path-browserify';
 
 import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import Loading from 'src/misc/Loading';
 import useAllSamples from './useAllSamples';
 import './SampleLibraryUI.scss';
 
-const PlaySampleIcon: React.FC<{
+interface PlaySampleIconProps {
   onClick: () => void;
   isPlaying: boolean;
-}> = ({ isPlaying, onClick }) => (
+}
+
+const PlaySampleIcon: React.FC<PlaySampleIconProps> = ({ isPlaying, onClick }) => (
   <div className='play-sample-icon' onClick={onClick}>
     {isPlaying ? '■' : '▶'}
   </div>
 );
 
-interface SampleRowProps {
+interface SampleRowProps
+  extends React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement> {
   isPlaying: boolean;
   togglePlaying: () => void;
   descriptor: SampleDescriptor;
   style?: React.CSSProperties;
 }
 
-export const SampleRow: React.FC<
-  SampleRowProps & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
-> = ({ descriptor, style, togglePlaying, isPlaying, ...rest }) => (
-  <div className='sample-row' {...rest} style={style}>
-    <PlaySampleIcon isPlaying={isPlaying} onClick={togglePlaying} />
-    <span title={descriptor.name}>{descriptor.name}</span>
-  </div>
-);
+export const SampleRow: React.FC<SampleRowProps> = ({
+  descriptor,
+  style,
+  togglePlaying,
+  isPlaying,
+  ...rest
+}) => {
+  const parsedName = (() => {
+    try {
+      const parsed = parsePath(descriptor.name);
+      return parsed.name;
+    } catch (err) {
+      return descriptor.name;
+    }
+  })();
+
+  return (
+    <div className='sample-row' {...rest} style={style}>
+      <PlaySampleIcon isPlaying={isPlaying} onClick={togglePlaying} />
+      <span title={descriptor.name}>{parsedName}</span>
+    </div>
+  );
+};
 
 export interface MkSampleListingRowRendererArgs {
   sampleDescriptors: SampleDescriptor[];
@@ -78,24 +97,19 @@ const playSample = async (
   return bufSrc;
 };
 
-const SampleSearch: React.FC<{ value: string; onChange: (newVal: string) => void }> = ({
-  value,
-  onChange,
-}) => (
+interface SampleSearchProps {
+  value: string;
+  onChange: (newVal: string) => void;
+}
+
+const SampleSearch: React.FC<SampleSearchProps> = ({ value, onChange }) => (
   <div className='sample-search'>
     Search Samples
     <input value={value} onChange={evt => onChange(evt.target.value)} />
   </div>
 );
 
-export function SampleListing({
-  sampleDescriptors,
-  mkRowRenderer = mkDefaultSampleListingRowRenderer,
-  height = 800,
-  width = 500,
-  selectedSample,
-  setSelectedSample,
-}: {
+interface SampleListingProps {
   sampleDescriptors: SampleDescriptor[];
   mkRowRenderer?: (args: MkSampleListingRowRendererArgs) => ListRowRenderer;
   height?: number;
@@ -104,7 +118,16 @@ export function SampleListing({
   setSelectedSample: (
     newSelectedSample: { sample: SampleDescriptor; index: number } | null
   ) => void;
-}) {
+}
+
+export const SampleListing: React.FC<SampleListingProps> = ({
+  sampleDescriptors,
+  mkRowRenderer = mkDefaultSampleListingRowRenderer,
+  height = 800,
+  width = 500,
+  selectedSample,
+  setSelectedSample,
+}) => {
   const [playingSample, setPlayingSample] = useState<{
     name: string;
     bufSrc: Promise<AudioBufferSourceNode>;
@@ -210,7 +233,7 @@ export function SampleListing({
 
   const RowRenderer = useMemo(() => {
     const mkRowRendererArgs: MkSampleListingRowRendererArgs = {
-      sampleDescriptors,
+      sampleDescriptors: filteredSamples,
       playingSample,
       togglePlaying,
       selectedSample,
@@ -219,7 +242,7 @@ export function SampleListing({
 
     return mkRowRenderer(mkRowRendererArgs);
   }, [
-    sampleDescriptors,
+    filteredSamples,
     playingSample,
     togglePlaying,
     selectedSample,
@@ -237,23 +260,30 @@ export function SampleListing({
       <List
         height={height}
         rowHeight={20}
-        rowCount={sampleDescriptors.length}
+        rowCount={filteredSamples.length}
         width={width}
         rowRenderer={RowRenderer}
         scrollToIndex={selectedSample?.index}
       />
     </>
   );
+};
+
+interface LoadSamplesButtonsProps
+  extends React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement> {
+  localSamplesLoaded: boolean;
+  loadLocalSamples: () => void;
+  remoteSamplesLoaded: boolean;
+  loadRemoteSamples: () => void;
 }
 
-export const LoadSamplesButtons: React.FC<
-  {
-    localSamplesLoaded: boolean;
-    loadLocalSamples: () => void;
-    remoteSamplesLoaded: boolean;
-    loadRemoteSamples: () => void;
-  } & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
-> = ({ localSamplesLoaded, loadLocalSamples, remoteSamplesLoaded, loadRemoteSamples, ...rest }) => (
+export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
+  localSamplesLoaded,
+  loadLocalSamples,
+  remoteSamplesLoaded,
+  loadRemoteSamples,
+  ...rest
+}) => (
   <div className='load-samples-buttons' {...rest}>
     {!localSamplesLoaded ? (
       <button style={{ width: 120 }} onClick={loadLocalSamples}>
