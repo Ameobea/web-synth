@@ -4,6 +4,7 @@ import * as R from 'ramda';
 
 import MIDIEditorUIInstance, { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox';
+import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';
 import * as conf from './conf';
 
 export interface NoteCreationState {
@@ -35,7 +36,13 @@ export default class NoteLine {
    */
   private lastPxPerBeat = 0;
 
-  constructor(app: MIDIEditorUIInstance, notes: Note[], index: number) {
+  constructor(
+    app: MIDIEditorUIInstance,
+    notes: Note[],
+    index: number,
+    NoteBoxClass: typeof NoteBox = MIDINoteBox,
+    enableNoteCreation = true
+  ) {
     this.app = app;
     this.index = index;
     this.container = new PIXI.Container();
@@ -50,11 +57,13 @@ export default class NoteLine {
     this.container.y = index * conf.LINE_HEIGHT - this.app.view.scrollVerticalPx;
 
     notes.forEach(note => {
-      const noteBox = new NoteBox(this, note);
+      const noteBox = new NoteBoxClass(this, note);
       this.app.allNotesByID.set(note.id, noteBox);
       this.notesByID.set(note.id, noteBox);
     });
-    this.installNoteCreationHandlers();
+    if (enableNoteCreation) {
+      this.installNoteCreationHandlers();
+    }
     this.handleViewChange();
   }
 

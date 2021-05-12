@@ -145,7 +145,7 @@ const bitcrusherTheme = { ...baseTheme, background2: 'rgb(24,14,4)' };
 const wavefolderTheme = { ...baseTheme, background2: 'rgb(24,38,41)' };
 const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
-const delayTheme = { ...baseTheme, background2: 'rgb(13,187,49)' };
+const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,

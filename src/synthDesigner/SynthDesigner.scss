@@ -11,6 +11,8 @@
   padding-top: 2px;
   max-width: calc(100vw - 44px);
   overflow-x: scroll;
+  max-height: 80vh;
+  overflow-y: auto;
 
   button,
   select {
@@ -46,6 +48,16 @@
 
   .filter-control-panel svg.adsr-viz {
     margin-top: 29px !important;
+  }
+
+  // FM synth style overrides
+  .configure-effects {
+    max-height: 80vh;
+    overflow-y: auto;
+
+    .control-panel {
+      width: 488px !important;
+    }
   }
 }
 

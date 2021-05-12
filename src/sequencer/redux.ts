@@ -165,11 +165,9 @@ const actionGroups = {
       setConnectionFlowingStatus(vcId, 'output', !state.isPlaying);
 
       if (state.isPlaying) {
-        console.trace('stopping playback');
         state.awpHandle.port.postMessage({ type: 'stop' });
         return { ...state, isPlaying: false, curActiveMarkIx: null };
       } else {
-        console.trace('starting playback');
         state.awpHandle.port.postMessage({ type: 'start' });
         return reschedule({
           ...state,

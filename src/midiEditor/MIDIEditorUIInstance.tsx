@@ -5,11 +5,15 @@ import { Option } from 'funfix-core';
 
 import { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
-import { NoteBox, NoteDragHandleSide } from 'src/midiEditor/NoteBox';
+import { NoteBox } from 'src/midiEditor/NoteBox';
 import NoteLine from 'src/midiEditor/NoteLine';
 import PianoKeys from 'src/midiEditor/PianoKeyboard';
 import SelectionBox from 'src/midiEditor/SelectionBox';
 import * as conf from './conf';
+import MIDINoteBox, {
+  NoteDragHandle,
+  NoteDragHandleSide,
+} from 'src/midiEditor/NoteBox/MIDINoteBox';
 
 export interface Note {
   id: number;
@@ -71,6 +75,7 @@ export default class MIDIEditorUIInstance {
     globalStartPoint: PIXI.Point;
     side: NoteDragHandleSide;
     originalPosBeatsByNoteId: Map<number, number>;
+    dragHandlesByNoteID: Map<number, NoteDragHandle>;
   } | null = null;
   private dragData: {
     globalStartPoint: PIXI.Point;
@@ -86,6 +91,7 @@ export default class MIDIEditorUIInstance {
   public loopCursor: LoopCursor | null;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
   private isHidden = true;
+  public noteMetadataByNoteID: Map<number, any> = new Map();
 
   constructor(
     width: number,
@@ -278,7 +284,12 @@ export default class MIDIEditorUIInstance {
   /**
    * @returns ID of the created note
    */
-  public addNote(lineIx: number, startPoint: number, length: number): number {
+  public addNote(
+    lineIx: number,
+    startPoint: number,
+    length: number,
+    NoteBoxClass: typeof NoteBox = MIDINoteBox
+  ): number {
     if (!this.wasm) {
       throw new UnreachableException('Tried to create note before Wasm initialized');
     }
@@ -289,7 +300,7 @@ export default class MIDIEditorUIInstance {
       length,
       0
     );
-    const noteBox = new NoteBox(this.lines[lineIx], { id, startPoint, length });
+    const noteBox = new NoteBoxClass(this.lines[lineIx], { id, startPoint, length });
     this.lines[lineIx].notesByID.set(id, noteBox);
     this.allNotesByID.set(id, noteBox);
     this.selectNote(id);
@@ -470,6 +481,7 @@ export default class MIDIEditorUIInstance {
       globalStartPoint: data.global.clone(),
       side,
       originalPosBeatsByNoteId: new Map(),
+      dragHandlesByNoteID: new Map(),
     };
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId);
@@ -484,6 +496,18 @@ export default class MIDIEditorUIInstance {
           ? note.note.startPoint
           : note.note.startPoint + note.note.length;
       this.resizeData.originalPosBeatsByNoteId.set(noteId, originalPosBeats);
+      const specializedNote = (() => {
+        if (note instanceof MIDINoteBox) {
+          return note as MIDINoteBox;
+        }
+        throw new UnreachableException("Cannot resize notes that don't have drag handles");
+      })();
+      this.resizeData.dragHandlesByNoteID.set(
+        noteId,
+        side === NoteDragHandleSide.Left
+          ? specializedNote.leftDragHandle
+          : specializedNote.rightDragHandle
+      );
     }
   }
 
@@ -499,11 +523,8 @@ export default class MIDIEditorUIInstance {
           `Note id ${noteId} is selected but is not in the global mapping`
         );
       }
+      const handle = this.resizeData.dragHandlesByNoteID.get(noteId)!;
 
-      const handle =
-        this.resizeData.side === NoteDragHandleSide.Left
-          ? note.leftDragHandle
-          : note.rightDragHandle;
       const originalPosBeats = this.resizeData.originalPosBeatsByNoteId.get(noteId);
       if (R.isNil(originalPosBeats)) {
         throw new UnreachableException(`No original pos beats recorded for note id ${noteId}`);
