@@ -8,6 +8,6 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "=0.2.64"
+wasm-bindgen = "=0.2.73"
 common = { path = "../common" }
 log = { version = "0.4", features = ["release_max_level_off"] }

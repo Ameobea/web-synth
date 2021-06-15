@@ -63,6 +63,7 @@ run:
     && cp ./target/wasm32-unknown-unknown/debug/*.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/release/note_container.wasm /tmp/wasm \
     && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
