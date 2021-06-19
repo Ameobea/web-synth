@@ -1,14 +1,13 @@
 import { Map } from 'immutable';
 import * as R from 'ramda';
-// import { simd as getHasSIMDSupport } from 'wasm-feature-detect';
+import { UnreachableException } from 'ameo-utils';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { UnreachableException } from 'ameo-utils';
-import { AsyncOnce, base64ToArrayBuffer } from 'src/util';
+import { AsyncOnce, base64ToArrayBuffer, getHasSIMDSupport } from 'src/util';
 
 // Manually generate some waveforms... for science
 
@@ -59,11 +58,8 @@ export const getDefaultWavetableDef = () => [
   [bufs[2], bufs[3]],
 ];
 
-// prettier-ignore
-const getHasSIMDSupport = async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
-
 const WavetableWasmBytes = new AsyncOnce(async () => {
-  const hasSIMDSupport = await getHasSIMDSupport();
+  const hasSIMDSupport = getHasSIMDSupport();
   if (!window.location.href.includes('localhost')) {
     console.log(
       hasSIMDSupport
@@ -225,9 +221,8 @@ export default class WaveTable implements ForeignNode {
     for (let dimensionIx = 0; dimensionIx < dimensionCount; dimensionIx++) {
       for (let waveformIx = 0; waveformIx < waveformsPerDimension; waveformIx++) {
         for (let sampleIx = 0; sampleIx < waveformLength; sampleIx++) {
-          tableSamples[
-            samplesPerDimension * dimensionIx + waveformLength * waveformIx + sampleIx
-          ] = this.wavetableDef[dimensionIx][waveformIx][sampleIx];
+          tableSamples[samplesPerDimension * dimensionIx + waveformLength * waveformIx + sampleIx] =
+            this.wavetableDef[dimensionIx][waveformIx][sampleIx];
         }
       }
     }
