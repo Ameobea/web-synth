@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
@@ -169,10 +169,13 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     detune,
   });
   const [selectedUI, setSelectedUIInner] = useState<UISelection | null>(initialSelectedUI ?? null);
-  const setSelectedUI = (newSelectedUI: UISelection | null) => {
-    onSelectedUIChange(newSelectedUI);
-    setSelectedUIInner(newSelectedUI);
-  };
+  const setSelectedUI = useCallback(
+    (newSelectedUI: UISelection | null) => {
+      onSelectedUIChange(newSelectedUI);
+      setSelectedUIInner(newSelectedUI);
+    },
+    [onSelectedUIChange]
+  );
   const wavyJonesInstance = useRef<WavyJones | null>(null);
 
   const onOperatorChange = (selectedOperatorIx: number, newConf: OperatorConfig) => {
@@ -343,27 +346,34 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
           Modulation Matrix <HelpIcon link='modulation-matrix' />
         </h2>
         <ModulationMatrix
-          onOperatorSelected={(newSelectedOperatorIx: number) =>
-            setSelectedUI({ type: 'operator', index: newSelectedOperatorIx })
-          }
-          onModulationIndexSelected={(srcOperatorIx: number, dstOperatorIx: number) =>
-            setSelectedUI({ type: 'modulationIndex', srcOperatorIx, dstOperatorIx })
-          }
-          resetModulationIndex={(srcOperatorIx: number, dstOperatorIx: number) =>
-            setState(
-              setModulation(state, srcOperatorIx, dstOperatorIx, updateBackendModulation, () => ({
-                type: 'constant',
-                value: 0,
-              }))
-            )
-          }
+          onOperatorSelected={useCallback(
+            (newSelectedOperatorIx: number) =>
+              setSelectedUI({ type: 'operator', index: newSelectedOperatorIx }),
+            [setSelectedUI]
+          )}
+          onModulationIndexSelected={useCallback(
+            (srcOperatorIx: number, dstOperatorIx: number) =>
+              setSelectedUI({ type: 'modulationIndex', srcOperatorIx, dstOperatorIx }),
+            [setSelectedUI]
+          )}
+          resetModulationIndex={useCallback(
+            (srcOperatorIx: number, dstOperatorIx: number) =>
+              setState(
+                setModulation(state, srcOperatorIx, dstOperatorIx, updateBackendModulation, () => ({
+                  type: 'constant',
+                  value: 0,
+                }))
+              ),
+            [state, updateBackendModulation]
+          )}
           modulationIndices={state.modulationMatrix}
           operatorConfigs={state.operatorConfigs}
           outputWeights={state.outputWeights}
           selectedUI={selectedUI}
-          onOutputWeightSelected={(operatorIx: number) =>
-            setSelectedUI({ type: 'outputWeight', operatorIx })
-          }
+          onOutputWeightSelected={useCallback(
+            (operatorIx: number) => setSelectedUI({ type: 'outputWeight', operatorIx }),
+            [setSelectedUI]
+          )}
         />
 
         <div className='bottom-button-wrapper'>
@@ -507,29 +517,43 @@ export const ConnectedFMSynthUI: React.FC<{
   midiNode: MIDINode;
 }> = ({ synth, getFMSynthOutput, midiNode }) => (
   <FMSynthUI
-    updateBackendModulation={(srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
-      synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val)
-    }
-    updateBackendOutput={(operatorIx: number, val: ParamSource) =>
-      synth.handleOutputWeightChange(operatorIx, val)
-    }
+    updateBackendModulation={useCallback(
+      (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
+        synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val),
+      [synth]
+    )}
+    updateBackendOutput={useCallback(
+      (operatorIx: number, val: ParamSource) => synth.handleOutputWeightChange(operatorIx, val),
+      [synth]
+    )}
     modulationMatrix={synth.getModulationMatrix()}
     outputWeights={synth.getOutputWeights()}
     operatorConfigs={synth.getOperatorConfigs()}
-    onOperatorConfigChange={(operatorIx: number, newOperatorConfig: OperatorConfig) =>
-      synth.handleOperatorConfigChange(operatorIx, newOperatorConfig)
-    }
+    onOperatorConfigChange={useCallback(
+      (operatorIx: number, newOperatorConfig: OperatorConfig) =>
+        synth.handleOperatorConfigChange(operatorIx, newOperatorConfig),
+      [synth]
+    )}
     operatorEffects={synth.getOperatorEffects()}
     mainEffectChain={synth.getMainEffectChain()}
     setEffect={synth.setEffect.bind(synth)}
     initialSelectedUI={synth.selectedUI}
-    onSelectedUIChange={newSelectedUI => {
-      synth.selectedUI = newSelectedUI;
-    }}
+    onSelectedUIChange={useCallback(
+      newSelectedUI => {
+        synth.selectedUI = newSelectedUI;
+      },
+      [synth]
+    )}
     adsrs={synth.getAdsrs()}
-    onAdsrChange={(adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr)}
+    onAdsrChange={useCallback(
+      (adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr),
+      [synth]
+    )}
     detune={synth.getDetune()}
-    handleDetuneChange={(newDetune: ParamSource) => synth.handleDetuneChange(newDetune)}
+    handleDetuneChange={useCallback(
+      (newDetune: ParamSource) => synth.handleDetuneChange(newDetune),
+      [synth]
+    )}
     getFMSynthOutput={getFMSynthOutput}
     midiNode={midiNode}
     midiControlValuesCache={synth.midiControlValuesCache}

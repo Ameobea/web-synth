@@ -217,27 +217,21 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   unison: synth.voices[0].oscillators.length,
   unisonSpreadCents: synth.unisonSpreadCents,
   wavetableConfig: Option.of(synth.wavetableConf?.wavetableDef)
-    .map(
-      (wavetableDefs): Omit<WavetableConfig, 'onInitialized'> => {
-        const {
-          dimensionCount,
-          waveformsPerDimension,
-          samplesPerWaveform,
-          packed,
-        } = packWavetableDefs(wavetableDefs);
+    .map((wavetableDefs): Omit<WavetableConfig, 'onInitialized'> => {
+      const { dimensionCount, waveformsPerDimension, samplesPerWaveform, packed } =
+        packWavetableDefs(wavetableDefs);
 
-        const encodedWavetableDef = base64ArrayBuffer(packed.buffer);
+      const encodedWavetableDef = base64ArrayBuffer(packed.buffer);
 
-        return {
-          encodedWavetableDef,
-          dimensionCount: dimensionCount,
-          waveformsPerDimension,
-          samplesPerWaveform,
-          intraDimMixes: synth.wavetableConf!.intraDimMixes,
-          interDimMixes: synth.wavetableConf!.interDimMixes,
-        };
-      }
-    )
+      return {
+        encodedWavetableDef,
+        dimensionCount: dimensionCount,
+        waveformsPerDimension,
+        samplesPerWaveform,
+        intraDimMixes: synth.wavetableConf!.intraDimMixes,
+        interDimMixes: synth.wavetableConf!.interDimMixes,
+      };
+    })
     .orNull(),
   fmSynthConfig: synth.fmSynth?.serialize(),
   waveform: synth.waveform,
@@ -1069,6 +1063,9 @@ const actionGroups = {
             () => {
               const state = getState();
               const targetSynth = state.synths[synthIx];
+              if (!targetSynth) {
+                return;
+              }
               const { waveform, fmSynth } = targetSynth;
               const targetVoice = voices[voiceIx];
               if (targetVoice.lastGateOrUngateTime !== ungateTime) {
@@ -1108,6 +1105,9 @@ const actionGroups = {
         setTimeout(() => {
           const state = getState();
           const targetSynth = getSynth(synthIx, state.synths);
+          if (!targetSynth) {
+            return;
+          }
           const targetVoice = targetSynth.voices[voiceIx];
           if (targetVoice.lastGateOrUngateTime !== ungateTime) {
             // Voice has been re-gated before it finished playing last time; do not disconnect

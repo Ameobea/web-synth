@@ -34,7 +34,11 @@ export const hide_graph_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
   const inst = LGraphHandlesByVcId.get(vcId);
   // Stop rendering when not visible to save resources
-  inst?.list_of_graphcanvas?.forEach((canvas: any) => canvas.stopRendering());
+  inst?.list_of_graphcanvas?.forEach((canvas: any) => {
+    console.log(canvas);
+    canvas.stopRendering();
+    canvas.pause_rendering = true;
+  });
   mkContainerHider(vcId => `graphEditor_${vcId}`)(stateKey);
 };
 
@@ -42,7 +46,10 @@ export const unhide_graph_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
   const inst = LGraphHandlesByVcId.get(vcId);
   // Resume rendering now that the graph editor is visible
-  inst?.list_of_graphcanvas?.forEach((canvas: any) => canvas.startRendering());
+  inst?.list_of_graphcanvas?.forEach((canvas: any) => {
+    canvas.startRendering();
+    canvas.pause_rendering = false;
+  });
   mkContainerUnhider(vcId => `graphEditor_${vcId}`)(stateKey);
 };
 

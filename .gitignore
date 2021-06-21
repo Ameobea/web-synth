@@ -31,3 +31,4 @@ src/note_container*
 !src/midiUtils.ts
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
+src/polysynth_bg.wasm.d.ts

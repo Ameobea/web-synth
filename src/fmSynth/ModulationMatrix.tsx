@@ -148,7 +148,7 @@ const getModulationIndexName = (srcOperatorIx: number, dstOperatorIx: number) =>
   return `Operator ${srcOperatorIx + 1} -> ${dstOperatorIx + 1} Modulation Index`;
 };
 
-export const ModulationMatrix: React.FC<{
+interface ModulationMatrixProps {
   selectedUI: UISelection | null;
   onOperatorSelected: (newSelectedOperatorIx: number) => void;
   resetModulationIndex: (srcOperatorIx: number, dstOperatorIx: number) => void;
@@ -157,7 +157,9 @@ export const ModulationMatrix: React.FC<{
   operatorConfigs: OperatorConfig[];
   outputWeights: ParamSource[];
   onOutputWeightSelected: (operatorIx: number) => void;
-}> = ({
+}
+
+export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
   selectedUI,
   onOperatorSelected,
   resetModulationIndex,

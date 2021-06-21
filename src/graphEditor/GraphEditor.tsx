@@ -19,7 +19,7 @@ import { tryParseJson } from 'src/util';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import { getEngine } from 'src/util';
 import FlatButton from 'src/misc/FlatButton';
-import { LGraphHandlesByVcId } from 'src/graphEditor';
+import { hide_graph_editor, LGraphHandlesByVcId } from 'src/graphEditor';
 import { LiteGraph as LiteGraphInstance } from 'src/graphEditor/LiteGraphTypes';
 
 /**
@@ -223,6 +223,14 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   useEffect(() => {
     if (lGraphInstance) {
       LGraphHandlesByVcId.set(vcId, lGraphInstance);
+
+      // If the graph editor isn't visible, make sure we stop its rendering to save resources
+      const { activeViewContexts, activeViewContextIx } = getState().viewContextManager;
+      const activeVC = activeViewContexts[activeViewContextIx];
+      if (activeVC.uuid !== vcId) {
+        hide_graph_editor(`graphEditor_${vcId}`);
+      }
+
       return () => {
         LGraphHandlesByVcId.delete(vcId);
       };
