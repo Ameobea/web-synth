@@ -35,7 +35,6 @@ export const hide_graph_editor = (stateKey: string) => {
   const inst = LGraphHandlesByVcId.get(vcId);
   // Stop rendering when not visible to save resources
   inst?.list_of_graphcanvas?.forEach((canvas: any) => {
-    console.log(canvas);
     canvas.stopRendering();
     canvas.pause_rendering = true;
   });

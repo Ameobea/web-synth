@@ -103,7 +103,7 @@ class SoulAWP extends AudioWorkletProcessor {
 
     this.dspInstance.exports.processBlock(FRAME_SIZE);
 
-    outputs[0][0].set(this.outputBuffer);
+    outputs.forEach(output => output.forEach(channel => channel.set(this.outputBuffer)));
 
     return true;
   }

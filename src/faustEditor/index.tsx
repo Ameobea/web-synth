@@ -151,11 +151,8 @@ export const cleanup_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const instanceCtx = faustEditorContextMap[vcId];
-  const {
-    cachedInputNames,
-    polyphonyState,
-    language,
-  } = instanceCtx.reduxInfra.getState().faustEditor;
+  const { cachedInputNames, polyphonyState, language } =
+    instanceCtx.reduxInfra.getState().faustEditor;
 
   const editorContent = get_faust_editor_content(vcId);
   delete faustEditorContextMap[vcId];

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
-import { Piano } from 'react-piano';
+import { Piano, Keyboard } from 'react-piano';
 import 'react-piano/dist/styles.css';
 import { Set as ImmSet } from 'immutable';
 import { UnreachableException } from 'ameo-utils';
@@ -15,6 +15,9 @@ import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 32;
+
+// Suppress annoying prop types error in the console that doesn't matter
+Keyboard.propTypes = undefined;
 
 // prettier-ignore
 const keys = ['a','z', 's', 'x', 'c', 'f', 'v', 'g', 'b', 'n', 'j', 'm', 'k', ',', 'l', '.', '/', "'"];

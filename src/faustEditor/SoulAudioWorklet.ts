@@ -1,6 +1,6 @@
 import { UnreachableException, ValueOf } from 'ameo-utils';
-import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 
+import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { faustEditorContextMap } from 'src/faustEditor';
 import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 
@@ -11,7 +11,7 @@ export default class SoulAudioWorklet extends AudioWorkletNode implements Dynami
     super(audioContext, workletNameOverride ? workletNameOverride : `soul-awp-${moduleId}`);
   }
 
-  public async init(
+  public init(
     dspArrayBuffer: ArrayBuffer,
     _args?: {
       customMessageHandler?: (msg: MessageEvent) => void;
@@ -36,7 +36,10 @@ export default class SoulAudioWorklet extends AudioWorkletNode implements Dynami
     });
   }
 
-  public getParamSettings() {
+  public getParamSettings(
+    paramDefaultValues?: { [paramName: string]: number },
+    _setParamValue?: (key: string, val: number) => void
+  ) {
     if (!this.jsonDef) {
       throw new UnreachableException(
         'Tried to get param settings for soul worklet before initialization'
@@ -47,9 +50,9 @@ export default class SoulAudioWorklet extends AudioWorkletNode implements Dynami
       ...param.properties,
       label: param.id,
       address: param.id,
-      defaultValue: param.properties.init,
-      defaultVal: param.properties.init,
-      initial: param.properties.init,
+      defaultValue: paramDefaultValues?.[param.id] ?? param.properties.init,
+      defaultVal: paramDefaultValues?.[param.id] ?? param.properties.init,
+      initial: paramDefaultValues?.[param.id] ?? param.properties.init,
       type: 'range',
     }));
   }

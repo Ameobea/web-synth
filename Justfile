@@ -1,6 +1,4 @@
 opt:
-  # for file in `ls ./dist | grep "\\.wasm"`; do wasm-snip ./dist/$file -o ./dist/$file; done
-  # `wasm-strip` doesn't deal with simd, so we manually strip off DWARF debug info from Wasm modules that use SIMD
   wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g -O4 --enable-simd --enable-nontrapping-float-to-int --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
   svgo -p 1 --multipass -f ./dist -o ./dist
@@ -26,7 +24,12 @@ build-sinsy:
   cd src/vocalSynthesis && just build
   cp src/vocalSynthesis/build/sinsy.* ./public
 
+remove-annoying-litegraph-warning:
+  sed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
+
 build-all:
+  just remove-annoying-litegraph-warning
+
   cd engine \
     && ./release.sh \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/engine.wasm --browser --remove-producers-section --out-dir ./build \
@@ -56,6 +59,8 @@ build-all:
   just build-docs
 
 run:
+  just remove-annoying-litegraph-warning
+
   cd engine \
     && ./build.sh \
     && rm -rf /tmp/wasm \
