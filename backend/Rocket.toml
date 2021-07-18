@@ -1,20 +1,6 @@
-[development]
-address = "localhost"
-port = 7467
-keep_alive = 5
-log = "normal"
-limits = { forms = 32000768 }
-
-[staging]
+[default]
 address = "0.0.0.0"
 port = 7467
 keep_alive = 5
-log = "normal"
-limits = { forms = 32000768 }
-
-[production]
-address = "0.0.0.0"
-port = 7467
-keep_alive = 5
-log = "normal"
-limits = { forms = 32000768 }
+limits = { form = "32MiB", forms = "32MiB", json = "32MiB", bytes = "50MiB", string = "1MiB", file = "32MiB", data-form = "32MiB" }
+cli_colors = true

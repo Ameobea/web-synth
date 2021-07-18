@@ -5,8 +5,6 @@ extern crate diesel;
 extern crate dotenv;
 #[macro_use]
 extern crate rocket;
-#[macro_use]
-extern crate rocket_contrib;
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
@@ -16,15 +14,15 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate chrono;
-extern crate fern;
 extern crate tokio;
+#[macro_use]
+extern crate rocket_sync_db_pools;
 
 use rocket::{
     fairing::{Fairing, Info, Kind},
     http::{Method, Status},
     Request, Response,
 };
-use rocket_contrib::compression::Compression;
 
 pub mod conf;
 pub mod models;
@@ -37,7 +35,7 @@ pub struct WebSynthDbConn(diesel::MysqlConnection);
 /// Roll-your-own CORS fairing
 struct CorsFairing;
 
-#[async_trait]
+#[rocket::async_trait]
 impl Fairing for CorsFairing {
     async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
         res.set_header(rocket::http::Header::new(
@@ -62,40 +60,13 @@ impl Fairing for CorsFairing {
     }
 }
 
-fn init_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d %H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Debug)
-        .level_for("hyper", log::LevelFilter::Info)
-        .level_for("mio", log::LevelFilter::Info)
-        .level_for("tokio_core", log::LevelFilter::Info)
-        .level_for("tokio_reactor", log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .apply()?;
-    Ok(())
-}
-
-#[tokio::main]
+#[rocket::main]
 async fn main() {
     if let Err(_) = dotenv::dotenv() {
         println!("Unable to parse .env file; continuing.");
     }
 
-    init_logger()
-        .map_err(|err| -> ! {
-            panic!("Failed to initialize logger: {:?}", err);
-        })
-        .unwrap();
-
-    rocket::ignite()
+    rocket::build()
         .attach(WebSynthDbConn::fairing())
         .mount("/", routes![
             routes::index,
@@ -114,7 +85,10 @@ async fn main() {
             routes::get_midi_compositions,
         ])
         .attach(CorsFairing)
-        .attach(Compression::fairing())
+        .attach(rocket_async_compression::Compression::fairing())
+        .ignite()
+        .await
+        .expect("Error starting Rocket")
         .launch()
         .await
         .expect("Error running Rocket");

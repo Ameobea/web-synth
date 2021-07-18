@@ -4,8 +4,7 @@ use std::{
 };
 
 use diesel::prelude::*;
-use rocket::data::ToByteUnit;
-use rocket_contrib::json::Json;
+use rocket::{data::ToByteUnit, serde::json::Json};
 use sha2::{Digest, Sha256};
 
 use crate::{models::remote_samples::RemoteSample, WebSynthDbConn};
@@ -71,7 +70,7 @@ fn encode_to_wav(sample_data: Vec<u8>) -> Result<Vec<u8>, String> {
 #[post("/remote_samples?<name>", data = "<sample_data>")]
 pub async fn store_remote_sample(
     mut name: String,
-    sample_data: rocket::Data,
+    sample_data: rocket::Data<'_>,
     conn: WebSynthDbConn,
 ) -> Result<Json<RemoteSample>, String> {
     use crate::schema::remote_sample_urls;

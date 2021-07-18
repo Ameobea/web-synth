@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use diesel::{self, prelude::*};
-use rocket_contrib::json::Json;
+use rocket::serde::json::Json;
 
 use crate::{
     models::{
@@ -21,7 +21,11 @@ mod remote_samples;
 pub use self::{midi_composition::*, remote_samples::*};
 
 #[get("/")]
-pub fn index() -> &'static str { "Application successfully started!" }
+pub fn index() -> &'static str {
+    warn!("TEST");
+    info!("TEST");
+    "Application successfully started!"
+}
 
 #[post("/effects", data = "<effect>")]
 pub async fn create_effect(

@@ -14,16 +14,16 @@ hex = "0.4"
 lazy_static = "1.4.0"
 
 chrono = "0.4.19"
-fern = "0.6"
 log = "0.4.11"
 hound = "3.4"
 
 rayon = "1.5"
 
-reqwest = { version = "0.10", features = ["gzip", "brotli"] }
+reqwest = { version = "0.11", features = ["gzip", "brotli"] }
 
-rocket = { git = "https://github.com/ameobea/Rocket.git" }
-rocket_contrib = { git = "https://github.com/ameobea/Rocket.git", features = ["json", "diesel_mysql_pool", "compression"] }
+rocket = { git = "https://github.com/SergioBenitez/Rocket.git", rev = "693f4f9ee50057fc735e6e7037e6dee5b485ba10", features = ["json"] }
+rocket_sync_db_pools = { git = "https://github.com/SergioBenitez/Rocket.git", rev = "693f4f9ee50057fc735e6e7037e6dee5b485ba10", features = ["diesel_mysql_pool"]}
+rocket_async_compression = { git = "https://github.com/ameobea/rocket_async_compression.git" }
 
 serde_json = "1.0"
 serde = "1.0"
@@ -31,4 +31,4 @@ serde_derive = "1.0"
 
 sha2 = "0.9"
 
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
