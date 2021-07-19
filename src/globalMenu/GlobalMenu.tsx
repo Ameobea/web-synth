@@ -62,8 +62,9 @@ const GlobalMenu: React.FC<{
   engine: typeof import('../engine');
   isOpen: boolean;
 }> = ({ closeMenu, engine, isOpen }) => {
-  const allViewContextIds = useSelector((state: ReduxStore) =>
-    state.viewContextManager.activeViewContexts.map(R.prop('uuid'))
+  const allViewContextIds = useSelector(
+    (state: ReduxStore) => state.viewContextManager.activeViewContexts.map(R.prop('uuid')),
+    R.equals
   );
 
   return (

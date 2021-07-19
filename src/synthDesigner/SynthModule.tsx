@@ -1,13 +1,13 @@
 import * as R from 'ramda';
-import React, { useMemo, useRef, useState } from 'react';
-import { Provider } from 'react-redux';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Provider, shallowEqual } from 'react-redux';
 import ControlPanel from 'react-control-panel';
-import { filterNils, PropTypesOf, UnreachableException } from 'ameo-utils';
+import { filterNils, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
-import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
+import { buildDefaultGainADSR2Envelope } from 'src/controls/adsr';
 import {
   getReduxInfra,
   get_synth_designer_audio_connectables,
@@ -20,13 +20,19 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
+import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 
-const WavetableControlPanel: React.FC<{
+interface WavetableControlPanelProps {
   synth: SynthModule;
   dispatch: ReturnType<typeof getReduxInfra>['dispatch'];
   index: number;
-}> = ({ synth, dispatch, index }) => {
+}
+
+const WavetableControlPanel: React.FC<WavetableControlPanelProps> = ({
+  synth,
+  dispatch,
+  index,
+}) => {
   const wavetableUIState = useMemo(() => {
     if (!synth.wavetableConf) {
       return null;
@@ -42,41 +48,50 @@ const WavetableControlPanel: React.FC<{
     }, acc);
   }, [synth.wavetableConf]);
 
+  const settings = useMemo(
+    () => [
+      ...synth.wavetableConf!.intraDimMixes.map((_mix, dimIx) => ({
+        type: 'range',
+        min: 0,
+        max: 1,
+        label: `intra_dim_${dimIx}_mix`,
+      })),
+      ...synth.wavetableConf!.interDimMixes.map((_mix, dimIx) => ({
+        type: 'range',
+        min: 0,
+        max: 1,
+        label: `inter_dim_${dimIx}_mix`,
+      })),
+    ],
+    [synth.wavetableConf]
+  );
+  const onChange = useCallback(
+    (key: string, val: any) => {
+      if (key.startsWith('intra_dim_')) {
+        const dimIx = +key.split('intra_dim_')[1].split('_mix')[0];
+        dispatch({ type: 'SET_WAVETABLE_INTRA_DIM_MIX', synthIx: index, dimIx, mix: val });
+        return;
+      } else if (key.startsWith('inter_dim_')) {
+        const baseDimIx = +key.split('inter_dim_')[1].split('_mix')[0];
+        dispatch({
+          type: 'SET_WAVETABLE_INTER_DIM_MIX',
+          synthIx: index,
+          baseDimIx,
+          mix: val,
+        });
+        return;
+      }
+
+      throw new UnreachableException(`Unhandled wavetable key: ${key}`);
+    },
+    [dispatch, index]
+  );
+
   return (
     <ControlPanel
       title='WAVETABLE'
-      settings={[
-        ...synth.wavetableConf!.intraDimMixes.map((_mix, dimIx) => ({
-          type: 'range',
-          min: 0,
-          max: 1,
-          label: `intra_dim_${dimIx}_mix`,
-        })),
-        ...synth.wavetableConf!.interDimMixes.map((_mix, dimIx) => ({
-          type: 'range',
-          min: 0,
-          max: 1,
-          label: `inter_dim_${dimIx}_mix`,
-        })),
-      ]}
-      onChange={(key: string, val: any) => {
-        if (key.startsWith('intra_dim_')) {
-          const dimIx = +key.split('intra_dim_')[1].split('_mix')[0];
-          dispatch({ type: 'SET_WAVETABLE_INTRA_DIM_MIX', synthIx: index, dimIx, mix: val });
-          return;
-        } else if (key.startsWith('inter_dim_')) {
-          const baseDimIx = +key.split('inter_dim_')[1].split('_mix')[0];
-          dispatch({
-            type: 'SET_WAVETABLE_INTER_DIM_MIX',
-            synthIx: index,
-            baseDimIx,
-            mix: val,
-          });
-          return;
-        }
-
-        throw new UnreachableException(`Unhandled wavetable key: ${key}`);
-      }}
+      settings={settings}
+      onChange={onChange}
       state={wavetableUIState}
     />
   );
@@ -87,7 +102,7 @@ const PresetsControlPanel: React.FC<{
   stateKey: string;
 }> = ({ index, stateKey }) => {
   const controlPanelContext = useRef<{ preset: string } | null>(null);
-  const voicePresetIds = useSelector(voicePresetIdsSelector);
+  const voicePresetIds = useSelector(voicePresetIdsSelector, shallowEqual);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   const settings = useMemo(
@@ -157,11 +172,20 @@ const PresetsControlPanel: React.FC<{
   );
 };
 
-const SynthModuleCompInner: React.FC<{
+const SizedControlPanelADSR2 = mkControlPanelADSR2WithSize(360, 200);
+
+interface SynthModuleCompProps {
   index: number;
   synth: SynthModule;
   stateKey: string;
-}> = ({ index, synth, stateKey, children = null, ...rest }) => {
+}
+
+const SynthModuleComp: React.FC<SynthModuleCompProps> = ({
+  index,
+  synth,
+  stateKey,
+  children = null,
+}) => {
   const unison = synth.voices[0].oscillators.length;
   const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
@@ -169,6 +193,7 @@ const SynthModuleCompInner: React.FC<{
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
     [synth.filterEnvelope]
   );
+
   const settings = useMemo(
     () =>
       filterNils([
@@ -229,8 +254,8 @@ const SynthModuleCompInner: React.FC<{
         {
           type: 'custom',
           label: 'adsr',
-          initial: defaultAdsrEnvelope,
-          Comp: ControlPanelADSR,
+          initial: buildDefaultGainADSR2Envelope(),
+          Comp: SizedControlPanelADSR2,
         },
       ]),
     [synth.waveform]
@@ -304,7 +329,7 @@ const SynthModuleCompInner: React.FC<{
             unison,
             detune: synth.detune,
             'adsr length ms': synth.gainADSRLength,
-            adsr: synth.gainEnvelope,
+            adsr: { ...synth.gainEnvelope, outputRange: [0, 1] as const },
             'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
               () => synth.pitchMultiplier?.toString() ?? 1
             ),
@@ -338,6 +363,7 @@ const SynthModuleCompInner: React.FC<{
         filterEnvelope={filterEnvelope}
         stateKey={stateKey}
         bypass={synth.filterBypassed}
+        enableEnvelope={synth.enableFilterEnvelope}
       />
 
       <div className='effects'>{children}</div>
@@ -349,9 +375,9 @@ const SynthModuleCompInner: React.FC<{
   );
 };
 
-const SynthModuleComp: React.FC<PropTypesOf<typeof SynthModuleCompInner>> = ({ ...props }) => (
+const SynthModuleCompWithProvider: React.FC<SynthModuleCompProps> = ({ ...props }) => (
   <Provider store={store}>
-    <SynthModuleCompInner {...props} />
+    <SynthModuleComp {...props} />
   </Provider>
 );
-export default SynthModuleComp;
+export default SynthModuleCompWithProvider;

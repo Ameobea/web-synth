@@ -6,6 +6,7 @@
 import React, { useRef, Fragment, SVGAttributes, useMemo } from 'react';
 import { Value } from 'react-control-panel';
 
+import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { clamp, roundTo } from '../util';
 
 export interface ADSRValue {
@@ -26,6 +27,19 @@ export const defaultAdsrEnvelope: ADSRValues = {
   decay: { pos: 0.14, magnitude: 0.35 },
   release: { pos: 0.9, magnitude: 0.35 },
 };
+
+export const buildDefaultGainADSR2Envelope = (): Adsr => ({
+  steps: [
+    { x: 0, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
+    { x: 0.04, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
+    { x: 0.7, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
+    { x: 1, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
+  ],
+  lenSamples: 44_100,
+  loopPoint: null,
+  releasePoint: 0.7,
+  audioThreadData: { phaseIndex: 0 },
+});
 
 interface MousePos {
   x: number;

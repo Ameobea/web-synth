@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { shallowEqual } from 'react-redux';
 
 import FlatButton from 'src/misc/FlatButton';
 import { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
@@ -97,12 +98,15 @@ const SequencerRow: React.FC<SequencerRowProps> = ({
     row: { marks },
     editingIx,
     curActiveMarkIx,
-  } = useSelector(({ sequencer }) => ({
-    row: sequencer.marks[rowIx],
-    editingIx:
-      sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
-    curActiveMarkIx: sequencer.curActiveMarkIx,
-  }));
+  } = useSelector(
+    ({ sequencer }) => ({
+      row: sequencer.marks[rowIx],
+      editingIx:
+        sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
+      curActiveMarkIx: sequencer.curActiveMarkIx,
+    }),
+    shallowEqual
+  );
 
   return (
     <>

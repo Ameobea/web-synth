@@ -8,7 +8,7 @@ import { LiteGraph } from 'litegraph.js';
 import 'litegraph.js/css/litegraph.css';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 import { filterNils } from 'ameo-utils';
 
 import { registerAllCustomNodes } from './nodes';
@@ -213,8 +213,10 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const [lGraphInstance, setLGraphInstance] = useState<LiteGraphInstance | null>(null);
   const [selectedNodeVCID, setSelectedNodeVCID] = useState<string | null>(null);
   const [curSelectedNode, setCurSelectedNode] = useState<any>(null);
-  const { patchNetwork, activeViewContexts, isLoaded } = useSelector((state: ReduxStore) =>
-    R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager)
+  const { patchNetwork, activeViewContexts, isLoaded } = useSelector(
+    (state: ReduxStore) =>
+      R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager),
+    shallowEqual
   );
 
   const vcId = stateKey.split('_')[1];

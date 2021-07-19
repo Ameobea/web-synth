@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import downloadjs from 'downloadjs';
 
@@ -12,7 +12,7 @@ const SinsyUI: React.FC<{ vcId: string }> = ({ vcId }) => {
   const { selectedHtsVoice, musicXml, sinsyModule } = useSelector((state: ReduxStore) => {
     const { selectedHtsVoice, musicXml } = state.sinsy.instances[vcId];
     return { sinsyModule: state.sinsy.sinsyModule, selectedHtsVoice, musicXml };
-  });
+  }, shallowEqual);
   const settings = useMemo(
     () => [
       {

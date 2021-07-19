@@ -120,7 +120,7 @@ export class ADSR2Module {
     });
   }
 
-  public setState(newState: Adsr) {
+  public setState(newState: Adsr & { outputRange?: [number, number] }) {
     this.setSteps(newState.steps);
     this.params.steps = R.clone(newState.steps);
     this.setLoopPoint(newState.loopPoint);
@@ -130,6 +130,12 @@ export class ADSR2Module {
     const newLengthMs = samplesToMs(newState.lenSamples);
     this.setLengthMs(newLengthMs);
     this.params.lengthMs = newLengthMs;
+    if (newState.outputRange) {
+      this.outputRange = newState.outputRange;
+      if (this.awp) {
+        this.setOutputRange(newState.outputRange);
+      }
+    }
   }
 
   public setSteps(newSteps: AdsrStep[]) {
@@ -177,6 +183,10 @@ export class ADSR2Module {
   }
 
   public setOutputRange([minVal, maxVal]: [number, number]) {
+    if (minVal === this.outputRange[0] && maxVal === this.outputRange[1]) {
+      return;
+    }
+
     this.outputRange = [minVal, maxVal];
     if (!this.awp) {
       console.error('Tried to set ADSR2 output range before AWP initialized');

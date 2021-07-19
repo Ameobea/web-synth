@@ -54,8 +54,9 @@ const CompositionListing: React.FC<{ engine: typeof import('../engine') }> = ({ 
       .then(setAllSharedCompositions)
       .catch(err => setErrorMessage(`Failed to fetch shared compositions: ${err.message}`));
   });
-  const allViewContextIds = useSelector((state: ReduxStore) =>
-    state.viewContextManager.activeViewContexts.map(R.prop('uuid'))
+  const allViewContextIds = useSelector(
+    (state: ReduxStore) => state.viewContextManager.activeViewContexts.map(R.prop('uuid')),
+    R.equals
   );
 
   if (!allSharedCompositions) {

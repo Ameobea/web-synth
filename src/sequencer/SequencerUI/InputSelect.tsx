@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 import ControlPanel from 'react-control-panel';
@@ -26,22 +26,24 @@ const buildInputTypeSetting = (voiceType: VoiceTarget['type']) => ({
   initial: voiceType,
 });
 
-const mkInputOnChange = (
-  props: Pick<InputCompCommonProps<any>, 'dispatch' | 'actionCreators' | 'voiceIx'>,
-  extraOnChange?: (key: string, val: any, state: any) => void
-) => (key: string, val: any, state: any) => {
-  if (key === 'voice type') {
-    props.dispatch(
-      props.actionCreators.sequencer.SET_VOICE_TARGET(
-        props.voiceIx,
-        GetDefaultVoiceTargetByTargetType[val as keyof typeof GetDefaultVoiceTargetByTargetType]()
-      )
-    );
-    return;
-  } else if (extraOnChange) {
-    extraOnChange(key, val, state);
-  }
-};
+const mkInputOnChange =
+  (
+    props: Pick<InputCompCommonProps<any>, 'dispatch' | 'actionCreators' | 'voiceIx'>,
+    extraOnChange?: (key: string, val: any, state: any) => void
+  ) =>
+  (key: string, val: any, state: any) => {
+    if (key === 'voice type') {
+      props.dispatch(
+        props.actionCreators.sequencer.SET_VOICE_TARGET(
+          props.voiceIx,
+          GetDefaultVoiceTargetByTargetType[val as keyof typeof GetDefaultVoiceTargetByTargetType]()
+        )
+      );
+      return;
+    } else if (extraOnChange) {
+      extraOnChange(key, val, state);
+    }
+  };
 
 const SynthInput: React.FC<InputCompCommonProps<'midi'>> = ({
   voiceIx,
@@ -51,10 +53,13 @@ const SynthInput: React.FC<InputCompCommonProps<'midi'>> = ({
   actionCreators,
   useSelector,
 }) => {
-  const { midiOutputCount, isEditing } = useSelector(state => ({
-    midiOutputCount: state.sequencer.midiOutputs.length,
-    isEditing: state.sequencer.markEditState?.voiceIx === voiceIx,
-  }));
+  const { midiOutputCount, isEditing } = useSelector(
+    state => ({
+      midiOutputCount: state.sequencer.midiOutputs.length,
+      isEditing: state.sequencer.markEditState?.voiceIx === voiceIx,
+    }),
+    shallowEqual
+  );
 
   const settings = useMemo(
     () => [
@@ -121,7 +126,7 @@ const SampleInput: React.FC<InputCompCommonProps<'sample'>> = ({
   const sampleOpt = useSelector(state =>
     typeof state.sequencer.sampleBank === 'string'
       ? ('LOADING' as const)
-      : Option.of(state.sequencer.sampleBank[voiceIx])
+      : state.sequencer.sampleBank[voiceIx] ?? null
   );
 
   const settings = useMemo(
@@ -142,9 +147,7 @@ const SampleInput: React.FC<InputCompCommonProps<'sample'>> = ({
   );
 
   const selectedSampleName =
-    sampleOpt === 'LOADING'
-      ? 'Loading...'
-      : sampleOpt.map(({ descriptor }) => descriptor.name).getOrElse('None');
+    sampleOpt === 'LOADING' ? 'Loading...' : sampleOpt?.descriptor?.name ?? 'None';
   return (
     <ControlPanel
       style={{ width: 500 }}
@@ -253,10 +256,13 @@ interface InputSelectProps extends SequencerReduxInfra {
 }
 
 const InputSelect: React.FC<InputSelectProps> = ({ vcId, ...reduxInfra }) => {
-  const { voice, currentEditingVoiceIx } = reduxInfra.useSelector(state => ({
-    currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
-    voice: state.sequencer.voices[state.sequencer.currentEditingVoiceIx],
-  }));
+  const { voice, currentEditingVoiceIx } = reduxInfra.useSelector(
+    state => ({
+      currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
+      voice: state.sequencer.voices[state.sequencer.currentEditingVoiceIx],
+    }),
+    shallowEqual
+  );
 
   return (
     <div className='sequencer-input-select'>

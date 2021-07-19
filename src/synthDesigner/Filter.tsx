@@ -5,27 +5,37 @@ import * as R from 'ramda';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { getReduxInfra } from 'src/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
-import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
-const Filter: React.FC<{
+interface FilterProps {
   params: FilterParams;
   synthIx: number;
+  enableEnvelope: boolean;
   filterEnvelope: Adsr & { outputRange: readonly [number, number] };
   bypass: boolean;
   stateKey: string;
-}> = ({ params, synthIx, filterEnvelope, bypass, stateKey }) => {
+}
+
+const Filter: React.FC<FilterProps> = ({
+  params,
+  synthIx,
+  enableEnvelope,
+  filterEnvelope,
+  bypass,
+  stateKey,
+}) => {
   const settings = useMemo(() => getSettingsForFilterType(params.type), [params.type]);
   if (!filterEnvelope.outputRange) {
     console.error('Missing `outputRange` on `filterEnvelope` provided to `<Filter />`');
   }
   const state = useMemo(() => {
-    const state = { ...params, adsr: filterEnvelope, bypass };
+    const state = { ...params, adsr: filterEnvelope, bypass, enableEnvelope };
     if (!R.isNil(state.Q) && Number.isNaN(state.Q)) {
       console.warn('NaN Q found for filter; normalizing...');
       state.Q = 1;
     }
     return state;
-  }, [params, filterEnvelope, bypass]);
+  }, [params, filterEnvelope, bypass, enableEnvelope]);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
   return (

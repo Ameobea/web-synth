@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
 
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -23,22 +22,10 @@ import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
+import { buildDefaultGainADSR2Envelope } from 'src/controls/adsr';
 
 const VOICE_COUNT = 10;
 const SAMPLE_RATE = 44_100;
-
-const buildDefaultGainADSR = (): Adsr => ({
-  steps: [
-    { x: 0, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 0.04, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 0.7, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 1, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
-  ],
-  lenSamples: SAMPLE_RATE,
-  loopPoint: null,
-  releasePoint: 0.7,
-  audioThreadData: { phaseIndex: 0 },
-});
 
 const buildDefaultFilterEnvelope = (): Adsr => ({
   steps: [
@@ -65,7 +52,7 @@ const GlobalState: {
 } = {
   octaveOffset: 1,
   globalVolume: 0.2,
-  gainEnvelope: buildDefaultGainADSR(),
+  gainEnvelope: buildDefaultGainADSR2Envelope(),
   filterParams: getDefaultFilterParams(FilterType.Lowpass),
   filterEnvelope: buildDefaultFilterEnvelope(),
   filterBypassed: false,

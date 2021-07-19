@@ -1,26 +1,29 @@
 import { filterNils } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import { shallowEqual } from 'react-redux';
 
 import { SequencerReduxInfra } from 'src/sequencer/redux';
 
-const mkHandleChange = ({
-  dispatch,
-  actionCreators,
-}: {
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
-}) => (key: string, val: any, _state: { [key: string]: any }) => {
-  switch (key) {
-    case 'beat count': {
-      dispatch(actionCreators.sequencer.SET_BEAT_COUNT(val));
-      break;
+const mkHandleChange =
+  ({
+    dispatch,
+    actionCreators,
+  }: {
+    actionCreators: SequencerReduxInfra['actionCreators'];
+    dispatch: SequencerReduxInfra['dispatch'];
+  }) =>
+  (key: string, val: any, _state: { [key: string]: any }) => {
+    switch (key) {
+      case 'beat count': {
+        dispatch(actionCreators.sequencer.SET_BEAT_COUNT(val));
+        break;
+      }
+      default: {
+        console.error(`Unhandled key in SequencerSettings: "${key}"`);
+      }
     }
-    default: {
-      console.error(`Unhandled key in SequencerSettings: "${key}"`);
-    }
-  }
-};
+  };
 
 const getSequencerSettings = ({
   actionCreators,
@@ -69,7 +72,8 @@ const SequencerSettings: React.FC<SequencerReduxInfra> = reduxInfra => {
       voiceCount: state.sequencer.voices.length,
       currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
       markCount: state.sequencer.marks[0].marks.length,
-    })
+    }),
+    shallowEqual
   );
 
   const handleChange = useMemo(() => mkHandleChange(reduxInfra), [reduxInfra]);

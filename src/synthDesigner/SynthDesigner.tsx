@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { connect, Provider, useSelector } from 'react-redux';
+import { Provider, shallowEqual, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
@@ -21,34 +21,27 @@ import SavePresetModal from 'src/synthDesigner/SavePresetModal';
 import { saveSynthPreset } from 'src/api';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { buildWavyJonesInstance } from 'src/visualizations/WavyJones';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
 
-const mapAddModuleControlsStateToProps = (state: ReduxStore) => ({
-  voicePresets: state.presets.voicePresets,
-  voicePresetIds: voicePresetIdsSelector(state),
-});
+interface AddModuleControlsProps {
+  stateKey: string;
+  synthDesignerActionCreators: SynthDesignerReduxInfra['actionCreators'];
+  synthDesignerDispatch: SynthDesignerReduxInfra['dispatch'];
+  synthDesignerGetState: SynthDesignerReduxInfra['getState'];
+}
 
-const AddModuleControlsInner: React.FC<
-  {
-    stateKey: string;
-    synthDesignerActionCreators: SynthDesignerReduxInfra['actionCreators'];
-    synthDesignerDispatch: SynthDesignerReduxInfra['dispatch'];
-    synthDesignerGetState: SynthDesignerReduxInfra['getState'];
-  } & ReturnType<typeof mapAddModuleControlsStateToProps>
-> = ({
+const AddModuleControls: React.FC<AddModuleControlsProps> = ({
   stateKey,
-  voicePresets,
-  voicePresetIds,
   synthDesignerActionCreators,
   synthDesignerDispatch,
 }) => {
-  useWhyDidYouUpdate('sd', {
-    stateKey,
-    asdfasdf: synthDesignerActionCreators.synthDesigner,
-    synthDesignerDispatch,
-    voicePresetIds,
-    voicePresets,
-  });
+  const { voicePresetIds, voicePresets } = useSelector(
+    (state: ReduxStore) => ({
+      voicePresets: state.presets.voicePresets,
+      voicePresetIds: voicePresetIdsSelector(state),
+    }),
+    shallowEqual
+  );
+
   const controlPanelContext = useRef<{ [label: string]: any } | undefined>();
   const settings = useMemo(() => {
     if (typeof voicePresets === 'string') {
@@ -110,15 +103,25 @@ const AddModuleControlsInner: React.FC<
   );
 };
 
-const FullPresetControls: React.FC<{
+interface FullPresetControlsProps {
   actionCreators: SynthDesignerReduxInfra['actionCreators'];
   stateKey: string;
   getState: SynthDesignerReduxInfra['getState'];
   dispatch: SynthDesignerReduxInfra['dispatch'];
-}> = ({ actionCreators, stateKey, getState, dispatch }) => {
-  const { synthPresets } = useSelector((state: ReduxStore) => ({
-    synthPresets: state.presets.synthPresets,
-  }));
+}
+
+const FullPresetControls: React.FC<FullPresetControlsProps> = ({
+  actionCreators,
+  stateKey,
+  getState,
+  dispatch,
+}) => {
+  const { synthPresets } = useSelector(
+    (state: ReduxStore) => ({
+      synthPresets: state.presets.synthPresets,
+    }),
+    shallowEqual
+  );
   const [state, setState] = useState<{ preset: number | undefined | null }>({ preset: undefined });
   useEffect(() => {
     if (typeof synthPresets !== 'string' && !state.preset && synthPresets.length > 0) {
@@ -204,19 +207,13 @@ const FullPresetControls: React.FC<{
   );
 };
 
-const AddModuleControlsUnwrapped = connect(mapAddModuleControlsStateToProps)(
-  AddModuleControlsInner
-);
-const AddAndPresetControls: React.FC<
-  Omit<
-    PropTypesOf<typeof AddModuleControlsInner> & {
-      synthDesignerGetState: SynthDesignerReduxInfra['getState'];
-    },
-    keyof ReturnType<typeof mapAddModuleControlsStateToProps>
-  >
-> = ({ ...props }) => (
+interface AddAndPresetControlsProps extends PropTypesOf<typeof AddModuleControls> {
+  synthDesignerGetState: SynthDesignerReduxInfra['getState'];
+}
+
+const AddAndPresetControls: React.FC<AddAndPresetControlsProps> = ({ ...props }) => (
   <Provider store={store}>
-    <AddModuleControlsUnwrapped {...props} />
+    <AddModuleControls {...props} />
     <FullPresetControls
       actionCreators={props.synthDesignerActionCreators}
       stateKey={props.stateKey}
@@ -226,23 +223,25 @@ const AddAndPresetControls: React.FC<
   </Provider>
 );
 
-const mapStateToProps = ({ synthDesigner }: SynthDesignerReduxStore) => ({
-  synthDesignerState: synthDesigner,
-});
+interface SynthDesignerProps {
+  stateKey: string;
+}
 
-const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateToProps>> = ({
-  synthDesignerState,
-  stateKey,
-}) => {
+const SynthDesigner: React.FC<SynthDesignerProps> = ({ stateKey }) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
-  const { dispatch, actionCreators, getState } = getReduxInfra(stateKey);
+  const { dispatch, actionCreators, getState, useSelector } = getReduxInfra(stateKey);
+  const { synths, wavyJonesInstance, spectrumNode, isHidden } = useSelector(
+    ({ synthDesigner: { synths, wavyJonesInstance, spectrumNode, isHidden } }) => ({
+      synths,
+      wavyJonesInstance,
+      spectrumNode,
+      isHidden,
+    }),
+    shallowEqual
+  );
 
   useEffect(() => {
-    if (
-      !oscilloscopeNode.current ||
-      R.isEmpty(synthDesignerState.synths) ||
-      synthDesignerState.wavyJonesInstance
-    ) {
+    if (!oscilloscopeNode.current || R.isEmpty(synths) || wavyJonesInstance) {
       return;
     }
 
@@ -253,17 +252,12 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
       240
     );
     dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(newWavyJonesInstance));
-  }, [
-    actionCreators.synthDesigner,
-    dispatch,
-    synthDesignerState.synths,
-    synthDesignerState.wavyJonesInstance,
-  ]);
+  }, [actionCreators.synthDesigner, dispatch, synths, wavyJonesInstance]);
 
   return (
     <>
       <div className='synth-designer'>
-        {synthDesignerState.synths.map((synth, i) => (
+        {synths.map((synth, i) => (
           <SynthModuleComp key={i} synth={synth} index={i} stateKey={stateKey}>
             {/* effects */}
           </SynthModuleComp>
@@ -288,14 +282,11 @@ const SynthDesigner: React.FC<{ stateKey: string } & ReturnType<typeof mapStateT
 
       <div id='synth-designer-oscilloscope' ref={oscilloscopeNode}></div>
 
-      {synthDesignerState.spectrumNode ? (
-        <SpectrumVisualization
-          paused={synthDesignerState.isHidden}
-          analyzerNode={synthDesignerState.spectrumNode}
-        />
+      {spectrumNode ? (
+        <SpectrumVisualization paused={isHidden} analyzerNode={spectrumNode} />
       ) : null}
     </>
   );
 };
 
-export default connect(mapStateToProps)(SynthDesigner);
+export default SynthDesigner;

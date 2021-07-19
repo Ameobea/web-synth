@@ -12,6 +12,7 @@ import { midiNodesByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
 import './MidiKeyboard.scss';
 import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
+import { shallowEqual } from 'react-redux';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 32;
@@ -253,12 +254,15 @@ const mkOctaveCountSelector = () =>
  */
 export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const octaveCountSelector = useMemo(() => mkOctaveCountSelector(), []);
-  const { octaveOffset, mode, midiInput, midiInputName } = useSelector((state: ReduxStore) => ({
-    octaveOffset: octaveCountSelector(state, stateKey),
-    mode: state.midiKeyboard[stateKey].mode,
-    midiInput: state.midiKeyboard[stateKey].midiInput,
-    midiInputName: state.midiKeyboard[stateKey].midiInputName,
-  }));
+  const { octaveOffset, mode, midiInput, midiInputName } = useSelector(
+    (state: ReduxStore) => ({
+      octaveOffset: octaveCountSelector(state, stateKey),
+      mode: state.midiKeyboard[stateKey].mode,
+      midiInput: state.midiKeyboard[stateKey].midiInput,
+      midiInputName: state.midiKeyboard[stateKey].midiInputName,
+    }),
+    shallowEqual
+  );
   const [midiInputNames, setMidiInputNames] = useState<string[]>([]);
   useEffect(() => {
     midiInput?.getMidiInputNames().then(inputNames => setMidiInputNames(['', ...inputNames]));
