@@ -1,0 +1,8 @@
+run:
+  yarn develop
+
+build:
+  yarn build
+
+serve:
+  yarn start
