@@ -23,5 +23,12 @@ module.exports = {
         anonymize: false,
       },
     },
+    {
+      resolve: 'gatsby-plugin-plausible',
+      options: {
+        domain: 'notes.ameo.design',
+        customDomain: 'plausible.ameo.dev',
+      },
+    },
   ],
 };
