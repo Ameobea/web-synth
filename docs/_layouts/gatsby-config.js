@@ -27,7 +27,7 @@ module.exports = {
       resolve: 'gatsby-plugin-plausible',
       options: {
         domain: 'notes.ameo.design',
-        customDomain: 'plausible.ameo.dev',
+        customDomain: 'pause.ameo.dev',
       },
     },
   ],

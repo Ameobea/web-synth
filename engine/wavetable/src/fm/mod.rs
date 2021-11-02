@@ -814,7 +814,7 @@ impl ParamSourceType {
             ParamSourceType::BaseFrequencyMultiplier(multiplier) => {
                 let base_input_ptr = base_frequencies.as_ptr() as *const v128;
                 let base_output_ptr = output_buf.as_ptr() as *mut v128;
-                let multiplier = unsafe { f32x4_splat(*multiplier) };
+                let multiplier = f32x4_splat(*multiplier);
 
                 for i in 0..FRAME_SIZE / 4 {
                     unsafe {
@@ -829,8 +829,8 @@ impl ParamSourceType {
                 scale,
                 shift,
             }) => {
-                let scale = unsafe { f32x4_splat(*scale) };
-                let shift = unsafe { f32x4_splat(*shift) };
+                let scale = f32x4_splat(*scale);
+                let shift = f32x4_splat(*shift);
 
                 let adsr = unsafe { adsrs.get_unchecked(*adsr_ix) };
                 let base_output_ptr = output_buf.as_ptr() as *mut v128;
