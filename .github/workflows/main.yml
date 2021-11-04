@@ -116,7 +116,7 @@ jobs:
       - name: Build all wasm + javascript
         run: just build-all
         env:
-          FAUST_COMPILER_ENDPOINT: 'https://faust-compiler-server-mi7imxlw6a-uc.a.run.app'
+          FAUST_COMPILER_ENDPOINT: 'https://faust-compiler.ameo.design'
 
       - name: Upload built site as artifacts
         uses: actions/upload-artifact@v1
