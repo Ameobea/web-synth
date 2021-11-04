@@ -7,7 +7,6 @@ import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 export enum FilterType {
   Lowpass = 'lowpass',
@@ -26,15 +25,17 @@ export enum FilterType {
   Allpass = 'allpass',
 }
 
+interface CustomQSettingProps {
+  value: number;
+  onChange: (newVal: number) => void;
+}
+
 /**
  * Converts values between linear and dB.  Most places have their Q values in linear units starting at 0, but WebAudio
  * uses Q factors in dB.  So we display the value in linear units starting at 0 and convert them transparently
  * to dB behind the scenes.
  */
-const CustomQSetting: React.FC<{
-  value: number;
-  onChange: (newVal: number) => void;
-}> = ({ value, onChange }) => {
+const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
   if (R.isNil(value)) {
     console.error('Nil `Q` value but Q control panel setting rendered; reseting to default...');
     value = 1;
@@ -99,7 +100,7 @@ const filterSettings = {
   q: {
     type: 'custom',
     label: 'Q',
-    Comp: CustomQSetting,
+    Comp: React.memo(CustomQSetting),
     renderContainer: false,
     initial: 1,
   },

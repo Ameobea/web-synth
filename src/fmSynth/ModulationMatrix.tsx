@@ -33,12 +33,19 @@ const formatOperatorConfig = (config: OperatorConfig) => {
   return '-';
 };
 
-const FormattedMIDIControlValue: React.FC<{
+interface FormattedMIDIControlValueProps {
   controlIndex: number;
   scale: number;
   shift: number;
   midiControlValuesCache: MIDIControlValuesCache;
-}> = ({ midiControlValuesCache, controlIndex, scale, shift }) => {
+}
+
+const FormattedMIDIControlValue: React.FC<FormattedMIDIControlValueProps> = ({
+  midiControlValuesCache,
+  controlIndex,
+  scale,
+  shift,
+}) => {
   const [rawValue, setRawValue] = useState(midiControlValuesCache.get(controlIndex));
   useEffect(() => {
     const callback = (newValue: number) => setRawValue(newValue);
@@ -96,14 +103,23 @@ const FormattedParamSource: React.FC<{ param: ParamSource }> = ({ param }) => {
   }
 };
 
-const OutputWeightSquare: React.FC<{
+interface OutputWeightSquareProps {
   operatorIx: number;
   outputWeights: ParamSource[];
   onClick: () => void;
   isSelected: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-}> = ({ operatorIx, outputWeights, onClick, isSelected, onMouseEnter, onMouseLeave }) => {
+}
+
+const OutputWeightSquare: React.FC<OutputWeightSquareProps> = ({
+  operatorIx,
+  outputWeights,
+  onClick,
+  isSelected,
+  onMouseEnter,
+  onMouseLeave,
+}) => {
   const val = outputWeights[operatorIx];
   const operatorWeight = val.type === 'constant' ? val.value : null;
 
@@ -256,5 +272,5 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
     </>
   );
 };
-
-export default ModulationMatrix;
+9;
+export default React.memo(ModulationMatrix);

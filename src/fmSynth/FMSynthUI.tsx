@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
@@ -433,8 +433,8 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             }}
             adsrs={state.adsrs}
             onAdsrChange={handleAdsrChange}
-            min={-600}
-            max={600}
+            min={-1200}
+            max={1200}
           />
         ) : null}
       </div>
@@ -515,7 +515,7 @@ export const ConnectedFMSynthUI: React.FC<{
   synth: FMSynth;
   getFMSynthOutput: () => Promise<AudioNode>;
   midiNode: MIDINode;
-}> = ({ synth, getFMSynthOutput, midiNode }) => (
+}> = React.memo(({ synth, getFMSynthOutput, midiNode }) => (
   <FMSynthUI
     updateBackendModulation={useCallback(
       (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
@@ -536,7 +536,7 @@ export const ConnectedFMSynthUI: React.FC<{
     )}
     operatorEffects={synth.getOperatorEffects()}
     mainEffectChain={synth.getMainEffectChain()}
-    setEffect={synth.setEffect.bind(synth)}
+    setEffect={useMemo(() => synth.setEffect.bind(synth), [synth])}
     initialSelectedUI={synth.selectedUI}
     onSelectedUIChange={useCallback(
       newSelectedUI => {
@@ -558,6 +558,6 @@ export const ConnectedFMSynthUI: React.FC<{
     midiNode={midiNode}
     midiControlValuesCache={synth.midiControlValuesCache}
   />
-);
+));
 
-export default FMSynthUI;
+export default React.memo(FMSynthUI);

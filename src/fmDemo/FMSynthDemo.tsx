@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
 
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';

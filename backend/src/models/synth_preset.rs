@@ -25,6 +25,8 @@ pub enum SynthType {
     Sawtooth,
     #[serde(rename = "triangle")]
     Triangle,
+    #[serde(rename = "fm")]
+    Fm,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -33,7 +35,13 @@ pub struct WavetableSettings {
 }
 
 // Lowpass = 'lowpass',
+// LP4 = 'order 4 lowpass',
+// LP8 = 'order 8 lowpass',
+// LP16 = 'order 16 lowpass',
 // Highpass = 'highpass',
+// HP4 = 'order 4 highpass',
+// HP8 = 'order 8 highpass',
+// HP16 = 'order 16 highpass',
 // Bandpass = 'bandpass',
 // Lowshelf = 'lowshelf',
 // Highshelf = 'highshelf',
@@ -44,8 +52,20 @@ pub struct WavetableSettings {
 pub enum FilterType {
     #[serde(rename = "lowpass")]
     Lowpass,
+    #[serde(rename = "order 4 lowpass")]
+    LP4,
+    #[serde(rename = "order 8 lowpass")]
+    LP8,
+    #[serde(rename = "order 16 lowpass")]
+    LP16,
     #[serde(rename = "highpass")]
     Highpass,
+    #[serde(rename = "order 4 highpass")]
+    HP4,
+    #[serde(rename = "order 8 highpass")]
+    HP8,
+    #[serde(rename = "order 16 highpass")]
+    HP16,
     #[serde(rename = "bandpass")]
     Bandpass,
     #[serde(rename = "lowshelf")]
@@ -60,10 +80,23 @@ pub enum FilterType {
     Allpass,
 }
 
+// export interface FilterParams {
+//     type: FilterType;
+//     frequency: number;
+//     Q?: number;
+//     gain: number;
+//     detune: number;
+// }
 #[derive(Serialize, Deserialize)]
 pub struct FilterParams {
     #[serde(rename = "type")]
     pub filter_type: FilterType,
+    pub frequency: f64,
+    #[serde(rename = "Q")]
+    pub q: Option<f64>,
+    #[serde(default)]
+    pub gain: f64,
+    pub detune: f64,
 }
 
 // export enum EffectType {
@@ -105,8 +138,67 @@ pub struct ADSRValues {
     pub release: ADSRValue,
 }
 
-fn default_pitch_multiplier() -> f32 {
-    1.
+fn default_pitch_multiplier() -> f32 { 1. }
+
+// export interface AudioThreadData {
+//     /**
+//      * The shared memory buffer between this thread and the audio thread.
+//      */
+//     buffer?: Float32Array;
+//     /**
+//      * The index of `buffer` at which the envelope's current phase is stored and updated
+//      */
+//     phaseIndex: number;
+// }
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioThreadData {
+    buffer: Option<Vec<f32>>,
+    phase_index: usize,
+}
+
+// export type RampFn =
+//   | { type: 'linear' }
+//   | { type: 'instant' }
+//   | { type: 'exponential'; exponent: number };
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum RampFn {
+    #[serde(rename = "linear")]
+    Linear,
+    #[serde(rename = "instant")]
+    Instant,
+    #[serde(rename = "exponential")]
+    Exponential { exponent: f32 },
+}
+
+// export interface AdsrStep {
+//     x: number;
+//     y: number;
+//     ramper: RampFn;
+// }
+#[derive(Serialize, Deserialize)]
+pub struct AdsrStep {
+    x: f32,
+    y: f32,
+    ramper: RampFn,
+}
+
+// export interface Adsr {
+//     steps: AdsrStep[];
+//     lenSamples: number;
+//     loopPoint: number | null;
+//     releasePoint: number;
+//     audioThreadData: AudioThreadData;
+// }
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Adsr {
+    steps: Vec<AdsrStep>,
+    len_samples: f32,
+    loop_point: Option<usize>,
+    release_point: f32,
+    audio_thread_data: AudioThreadData,
 }
 
 // {
@@ -144,13 +236,14 @@ pub enum VoiceDefinition {
         unison: usize,
         waveform: SynthType,
         detune: f32,
+        fm_synth_config: serde_json::Value,
         filter: FilterParams,
         master_gain: f32,
         selected_effect_type: EffectType,
         gain_envelope: ADSRValues,
         #[serde(rename = "gainADSRLength")]
         gain_adsr_length: f32,
-        filter_envelope: ADSRValues,
+        filter_envelope: Adsr,
         #[serde(rename = "filterADSRLength")]
         filter_adsr_length: f32,
         #[serde(default = "default_pitch_multiplier")]

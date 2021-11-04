@@ -268,7 +268,7 @@ impl Adsr {
 
     /// Advance phase by one sample's worth
     ///
-    /// TODO: Fastpath this if we are not close to hitting the decay point (if gated )or the end of
+    /// TODO: Fastpath this if we are not close to hitting the decay point (if gated) or the end of
     /// the waveform (if released)
     fn advance_phase(&mut self) {
         if let GateStatus::EarlyRelease {

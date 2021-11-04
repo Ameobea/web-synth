@@ -190,4 +190,4 @@ export const ControlPanelADSR: React.FC<ControlPanelADSRProps> = ({ value, onCha
   </>
 );
 
-export default ADSRControls;
+export default React.memo(ADSRControls);

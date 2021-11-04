@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { filterNils, PropTypesOf, UnreachableException } from 'ameo-utils';
@@ -20,7 +20,6 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const WavetableControlPanel: React.FC<{
   synth: SynthModule;
@@ -236,6 +235,54 @@ const SynthModuleCompInner: React.FC<{
     [synth.waveform]
   );
 
+  const handleSynthChange = useCallback(
+    (key: string, val: any) => {
+      switch (key) {
+        case 'waveform': {
+          dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val, dispatch));
+          return;
+        }
+        case 'unison': {
+          dispatch(actionCreators.synthDesigner.SET_UNISON(index, val));
+          return;
+        }
+        case 'unison spread cents': {
+          dispatch(actionCreators.synthDesigner.SET_UNISON_SPREAD_CENTS(index, val));
+          return;
+        }
+        case 'volume': {
+          dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(index, val));
+          return;
+        }
+        case 'detune': {
+          dispatch(actionCreators.synthDesigner.SET_DETUNE(val, index));
+          return;
+        }
+        case 'adsr': {
+          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, index));
+          return;
+        }
+        case 'adsr length ms': {
+          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(index, val));
+          return;
+        }
+        case 'pitch multiplier': {
+          setLocalPitchMultiplier(val);
+          const value = Number.parseFloat(val);
+          if (Number.isNaN(value)) {
+            return;
+          }
+          dispatch(actionCreators.synthDesigner.SET_PITCH_MULTIPLIER(index, value));
+          return;
+        }
+        default: {
+          console.warn('Unhandled key in synth control panel: ', key);
+        }
+      }
+    },
+    [actionCreators.synthDesigner, dispatch, index]
+  );
+
   return (
     <div className='synth-module'>
       <div
@@ -253,50 +300,7 @@ const SynthModuleCompInner: React.FC<{
       <ControlPanel
         title='SYNTH'
         settings={settings}
-        onChange={(key: string, val: any) => {
-          switch (key) {
-            case 'waveform': {
-              dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val, dispatch));
-              return;
-            }
-            case 'unison': {
-              dispatch(actionCreators.synthDesigner.SET_UNISON(index, val));
-              return;
-            }
-            case 'unison spread cents': {
-              dispatch(actionCreators.synthDesigner.SET_UNISON_SPREAD_CENTS(index, val));
-              return;
-            }
-            case 'volume': {
-              dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(index, val));
-              return;
-            }
-            case 'detune': {
-              dispatch(actionCreators.synthDesigner.SET_DETUNE(val, index));
-              return;
-            }
-            case 'adsr': {
-              dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, index));
-              return;
-            }
-            case 'adsr length ms': {
-              dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(index, val));
-              return;
-            }
-            case 'pitch multiplier': {
-              setLocalPitchMultiplier(val);
-              const value = Number.parseFloat(val);
-              if (Number.isNaN(value)) {
-                return;
-              }
-              dispatch(actionCreators.synthDesigner.SET_PITCH_MULTIPLIER(index, value));
-              return;
-            }
-            default: {
-              console.warn('Unhandled key in synth control panel: ', key);
-            }
-          }
-        }}
+        onChange={handleSynthChange}
         state={useMemo(
           () => ({
             waveform: synth.waveform,
@@ -354,4 +358,4 @@ const SynthModuleComp: React.FC<PropTypesOf<typeof SynthModuleCompInner>> = ({ .
     <SynthModuleCompInner {...props} />
   </Provider>
 );
-export default SynthModuleComp;
+export default React.memo(SynthModuleComp);
