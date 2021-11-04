@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{models::remote_samples::RemoteSample, WebSynthDbConn};
 
-const FAUST_SERVER_URL: &str = "https://faust-compiler-server-mi7imxlw6a-uc.a.run.app";
+const FAUST_SERVER_URL: &str = "https://faust-compiler.ameo.design";
 // const FAUST_SERVER_URL: &str = "http://localhost:4565";
 const REMOTE_SAMPLES_BUCKET_URL: &str = "https://storage.googleapis.com/web-synth-remote-samples/";
 
