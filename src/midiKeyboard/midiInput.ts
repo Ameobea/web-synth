@@ -19,8 +19,8 @@ export class MIDIInput {
   private midiAccess: MIDIAccess | undefined;
   private midiInput: BulitinMIDIInput | undefined;
   private midiMsgHandlerCb: ((evt: Event & { data: Uint8Array }) => void) | undefined;
-  private pitchBendNode: ConstantSourceNode;
-  private modWheelNode: ConstantSourceNode;
+  public pitchBendNode: ConstantSourceNode;
+  public modWheelNode: ConstantSourceNode;
   private onInitCbs: (() => void)[] = [];
   private midiNode: MIDINode | undefined;
 

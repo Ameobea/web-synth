@@ -8,10 +8,13 @@ import { UnreachableException } from 'ameo-utils';
 import ControlPanel from 'react-control-panel';
 
 import Loading from 'src/misc/Loading';
-import { midiNodesByStateKey } from 'src/midiKeyboard';
+import { midiKeyboardCtxByStateKey } from 'src/midiKeyboard';
 import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
 import './MidiKeyboard.scss';
 import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
+import MidiKeyboardOutputMappingConfigurator, {
+  GenericControlCb,
+} from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 32;
@@ -248,10 +251,20 @@ const mkOctaveCountSelector = () =>
     instanceState => instanceState.octaveOffset
   );
 
+export interface MidiKeyboardVCProps {
+  stateKey: string;
+  registerGenericControlCb: (cb: GenericControlCb) => void;
+  deregisterGenericControlCb: (cb: GenericControlCb) => void;
+}
+
 /**
  * the component that is mounted to render the view context containing the inner `MidiKeyboard` component
  */
-export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
+  stateKey,
+  registerGenericControlCb,
+  deregisterGenericControlCb,
+}) => {
   const octaveCountSelector = useMemo(() => mkOctaveCountSelector(), []);
   const { octaveOffset, mode, midiInput, midiInputName } = useSelector((state: ReduxStore) => ({
     octaveOffset: octaveCountSelector(state, stateKey),
@@ -276,7 +289,7 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
     [midiInput, midiInputNames]
   );
 
-  const midiNode = useMemo(() => midiNodesByStateKey.get(stateKey), [stateKey]);
+  const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
   if (!midiNode) {
     return <Loading />;
   }
@@ -293,6 +306,11 @@ export const MidiKeyboardVC: React.FC<{ stateKey: string }> = ({ stateKey }) => 
           onChange={(_key: string, midiInputName: string) => {
             dispatch(actionCreators.midiKeyboard.SET_MIDI_INPUT_NAME(stateKey, midiInputName));
           }}
+        />
+        <MidiKeyboardOutputMappingConfigurator
+          stateKey={stateKey}
+          registerGenericControlCb={registerGenericControlCb}
+          deregisterGenericControlCb={deregisterGenericControlCb}
         />
       </div>
     );

@@ -1,10 +1,19 @@
 import { UnreachableException } from 'ameo-utils';
 import { buildActionGroup, buildModule } from 'jantix';
-import { midiNodesByStateKey } from 'src/midiKeyboard';
+import * as R from 'ramda';
 
+import { updateConnectables } from 'src/patchNetwork/interface';
+import {
+  get_midi_keyboard_audio_connectables,
+  MappedOutput,
+  MIDIKeyboardCtx,
+  midiKeyboardCtxByStateKey,
+} from 'src/midiKeyboard';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 
 const ctx = new AudioContext();
+
+const getVCId = (stateKey: string) => stateKey.split('_')[1]!;
 
 export enum MidiKeyboardMode {
   /**
@@ -17,20 +26,84 @@ export enum MidiKeyboardMode {
   ComputerKeyboard,
 }
 
+export interface MidiKeyboardMappedOutputDescriptor {
+  controlIndex: number;
+  scale: number;
+  shift: number;
+}
+
 export interface MidiKeyboardStateItem {
   mode: MidiKeyboardMode;
   midiInput: MIDIInput | undefined;
   midiInputName: string | undefined;
   octaveOffset: number;
+  mappedOutputs: MidiKeyboardMappedOutputDescriptor[];
 }
 
 export type MidiKeyboardState = { [stateKey: string]: MidiKeyboardStateItem };
+
+const getMidiKeyboardCtx = (stateKey: string): MIDIKeyboardCtx => {
+  const midiKeyboardCtx = midiKeyboardCtxByStateKey.get(stateKey);
+  if (!midiKeyboardCtx) {
+    throw new UnreachableException(`No ctx entry found for midi keyboard state key ${stateKey}`);
+  }
+  return midiKeyboardCtx;
+};
+
+export const computeMappedOutputValue = (
+  outputDescriptor: MidiKeyboardMappedOutputDescriptor,
+  rawValue: number
+): number => {
+  return rawValue * outputDescriptor.scale + outputDescriptor.shift;
+};
+
+/**
+ * Updates the underlying CSN for a mapped output, re-computing its value based on the last recorded raw value
+ */
+const updateMappedOutputCSN = (
+  stateKey: string,
+  outputIx: number,
+  outputDescriptor: MidiKeyboardMappedOutputDescriptor
+) => {
+  const midiKeyboardCtx = getMidiKeyboardCtx(stateKey);
+  const lastRawValue =
+    midiKeyboardCtx.lastSeenRawMIDIControlValuesByControlIndex.get(outputDescriptor.controlIndex) ??
+    0;
+
+  const output = midiKeyboardCtx.mappedOutputs[outputIx];
+  if (!output) {
+    throw new UnreachableException(`No mapped output found at index ${outputIx}`);
+  }
+
+  const outputValue = computeMappedOutputValue(outputDescriptor, lastRawValue);
+  output.csn.offset.value = outputValue;
+};
+
+const buildMappedOutputName = (
+  existingMappedOutputs: MappedOutput[],
+  controlIndex: number
+): string => {
+  const base = `midi control index ${controlIndex}`;
+  if (!existingMappedOutputs.some(output => output.name === base)) {
+    return base;
+  }
+
+  let offset = 1;
+  let renamed = `${base} (${offset})`;
+  while (existingMappedOutputs.some(output => output.name === renamed)) {
+    offset += 1;
+    renamed = `${base} (${offset})`;
+  }
+
+  return renamed;
+};
 
 const DEFAULT_MIDI_KEYBOARD_STATE_ITEM: MidiKeyboardStateItem = {
   mode: MidiKeyboardMode.ComputerKeyboard,
   midiInput: undefined,
   midiInputName: undefined,
   octaveOffset: 0,
+  mappedOutputs: [],
 };
 
 const getInstance = (state: MidiKeyboardState, stateKey: string): MidiKeyboardStateItem | null => {
@@ -91,7 +164,7 @@ const actionGroups = {
         );
       }
       if (midiInputName) {
-        const midiNode = midiNodesByStateKey.get(stateKey);
+        const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
         if (!midiNode) {
           throw new UnreachableException(
             'No MIDI node found for midi keyboard with `stateKey`: ' + stateKey
@@ -119,33 +192,116 @@ const actionGroups = {
       mode,
     }),
     subReducer: (state: MidiKeyboardState, { stateKey, mode }) => {
-      const midiNode = midiNodesByStateKey.get(stateKey);
-      if (!midiNode) {
+      const mutableCtx = midiKeyboardCtxByStateKey.get(stateKey);
+      if (!mutableCtx) {
         throw new UnreachableException(
-          'No MIDI node found for midi keyboard with `stateKey`: ' + stateKey
+          'No mutable ctx found for midi keyboard with `stateKey`: ' + stateKey
         );
       }
 
+      const buildMIDIInput = () => {
+        const midiInput = new MIDIInput(ctx, mutableCtx.midiNode, state[stateKey].midiInputName);
+        midiInput.modWheelNode.offset.value = mutableCtx.lastSeenModWheel;
+        midiInput.pitchBendNode.offset.value = mutableCtx.lastSeenPitchBend;
+        return midiInput;
+      };
+
       const midiInput =
         state[stateKey].midiInput ??
-        (mode === MidiKeyboardMode.MidiInput
-          ? new MIDIInput(ctx, midiNode, state[stateKey].midiInputName)
-          : undefined);
+        (mode === MidiKeyboardMode.MidiInput ? buildMIDIInput() : undefined);
 
       if (mode !== MidiKeyboardMode.MidiInput && state[stateKey].midiInput) {
         state[stateKey].midiInput!.disconnectMidiNode();
       } else if (mode === MidiKeyboardMode.MidiInput) {
         if (state[stateKey].midiInput) {
-          state[stateKey].midiInput!.connectMidiNode(midiNode);
+          state[stateKey].midiInput!.connectMidiNode(mutableCtx.midiNode);
         } else {
-          state[stateKey].midiInput = new MIDIInput(ctx, midiNode);
+          state[stateKey].midiInput = buildMIDIInput();
         }
       }
+
+      setTimeout(() =>
+        updateConnectables(getVCId(stateKey), get_midi_keyboard_audio_connectables(stateKey))
+      );
 
       return {
         ...state,
         [stateKey]: { ...state[stateKey], midiInput, mode },
       };
+    },
+  }),
+  ADD_NEW_MAPPED_OUTPUT: buildActionGroup({
+    actionCreator: (stateKey: string, controlIndex: number) => ({
+      type: 'ADD_NEW_MAPPED_OUTPUT' as const,
+      stateKey,
+      controlIndex,
+    }),
+    subReducer: (state: MidiKeyboardState, { stateKey, controlIndex }) => {
+      const midiKeyboardCtx = getMidiKeyboardCtx(stateKey);
+      const csn = ctx.createConstantSource();
+      csn.offset.value = 0;
+      csn.start();
+      midiKeyboardCtx.mappedOutputs.push({
+        csn,
+        name: buildMappedOutputName(midiKeyboardCtx.mappedOutputs, controlIndex),
+      });
+
+      setTimeout(() =>
+        updateConnectables(getVCId(stateKey), get_midi_keyboard_audio_connectables(stateKey))
+      );
+
+      const inst = state[stateKey];
+      const newOutput: MidiKeyboardMappedOutputDescriptor = { controlIndex, scale: 1, shift: 0 };
+      const newInst = { ...inst, mappedOutputs: [...inst.mappedOutputs, newOutput] };
+      return { ...state, [stateKey]: newInst };
+    },
+  }),
+  SET_MAPPED_OUTPUT_SCALE_AND_SHIFT: buildActionGroup({
+    actionCreator: (stateKey: string, outputIx: number, scale: number, shift: number) => ({
+      type: 'SET_MAPPED_OUTPUT_SCALE_AND_SHIFT',
+      outputIx,
+      stateKey,
+      scale,
+      shift,
+    }),
+    subReducer: (state: MidiKeyboardState, { stateKey, outputIx, scale, shift }) => {
+      const outputDescriptor = state[stateKey].mappedOutputs[outputIx];
+      updateMappedOutputCSN(stateKey, outputIx, outputDescriptor);
+
+      return {
+        ...state,
+        [stateKey]: {
+          ...state[stateKey],
+          mappedOutputs: R.set(
+            R.lensIndex(outputIx),
+            {
+              ...state[stateKey].mappedOutputs[outputIx],
+              scale,
+              shift,
+            },
+            state[stateKey].mappedOutputs
+          ),
+        },
+      };
+    },
+  }),
+  REMOVE_MAPPED_OUTPUT: buildActionGroup({
+    actionCreator: (stateKey: string, outputIx: number) => ({
+      type: 'REMOVE_MAPPED_OUTPUT',
+      stateKey,
+      outputIx,
+    }),
+    subReducer: (state: MidiKeyboardState, { stateKey, outputIx }) => {
+      const ctx = getMidiKeyboardCtx(stateKey);
+      ctx.mappedOutputs = R.remove(outputIx, 1, ctx.mappedOutputs);
+
+      setTimeout(() =>
+        updateConnectables(getVCId(stateKey), get_midi_keyboard_audio_connectables(stateKey))
+      );
+
+      const inst = state[stateKey];
+      const newInst = { ...inst, mappedOutputs: R.remove(outputIx, 1, inst.mappedOutputs) };
+      return { ...state, [stateKey]: newInst };
     },
   }),
 };
