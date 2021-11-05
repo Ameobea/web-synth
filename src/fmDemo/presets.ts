@@ -86,38 +86,38 @@ export const Presets: { [name: string]: SerializedFMSynthDemoState } = {
   undercity: JSON.parse(dubstep),
 };
 
-export const convertToSynthDesignerVoicePreset = (
-  preset: SerializedFMSynthDemoState
-): ReturnType<typeof serializeSynthModule> => {
-  const normalizedFilterEnvelope = normalizeEnvelope(preset.filterEnvelope);
+// export const convertToSynthDesignerVoicePreset = (
+//   preset: SerializedFMSynthDemoState
+// ): ReturnType<typeof serializeSynthModule> => {
+//   const normalizedFilterEnvelope = normalizeEnvelope(preset.filterEnvelope);
 
-  return {
-    type: 'standard',
-    unison: 1,
-    unisonSpreadCents: 0,
-    wavetableConfig: null,
-    fmSynthConfig: preset.synth,
-    waveform: Waveform.FM,
-    detune: 0,
-    filter: preset.filterParams,
-    masterGain: 0.2,
-    selectedEffectType: EffectType.Bitcrusher,
-    gainEnvelope: defaultAdsrEnvelope,
-    gainADSRLength: 1000,
-    filterEnvelope: normalizeEnvelope(preset.filterEnvelope),
-    filterADSRLength: normalizedFilterEnvelope.lenSamples * 44_100,
-    pitchMultiplier: 1,
-    filterBypassed: preset.filterBypassed,
-  };
-};
+//   return {
+//     type: 'standard',
+//     unison: 1,
+//     unisonSpreadCents: 0,
+//     wavetableConfig: null,
+//     fmSynthConfig: preset.synth,
+//     waveform: Waveform.FM,
+//     detune: 0,
+//     filter: preset.filterParams,
+//     masterGain: 0.2,
+//     selectedEffectType: EffectType.Bitcrusher,
+//     gainEnvelope: defaultAdsrEnvelope,
+//     gainADSRLength: 1000,
+//     filterEnvelope: normalizeEnvelope(preset.filterEnvelope),
+//     filterADSRLength: normalizedFilterEnvelope.lenSamples * 44_100,
+//     pitchMultiplier: 1,
+//     filterBypassed: preset.filterBypassed,
+//   };
+// };
 
-export const convertAndUploadPresets = () => {
-  Object.entries(Presets).forEach(([name, preset]) => {
-    const synthDesignerPreset = convertToSynthDesignerVoicePreset(preset);
-    saveSynthVoicePreset({
-      title: name,
-      description: 'Preset ported from FM Synth demo',
-      body: synthDesignerPreset,
-    });
-  });
-};
+// export const convertAndUploadPresets = () => {
+//   Object.entries(Presets).forEach(([name, preset]) => {
+//     const synthDesignerPreset = convertToSynthDesignerVoicePreset(preset);
+//     saveSynthVoicePreset({
+//       title: name,
+//       description: 'Preset ported from FM Synth demo',
+//       body: synthDesignerPreset,
+//     });
+//   });
+// };

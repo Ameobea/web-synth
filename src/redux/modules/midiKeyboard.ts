@@ -79,6 +79,36 @@ const updateMappedOutputCSN = (
   output.csn.offset.value = outputValue;
 };
 
+export const buildFreshOutputDescriptorsByControlIndex = (
+  mappedOutputs: MIDIKeyboardCtx['mappedOutputs'],
+  mappedOutputDescriptors: MidiKeyboardMappedOutputDescriptor[]
+): Map<
+  number,
+  { output: MappedOutput; outputDescriptor: MidiKeyboardMappedOutputDescriptor }[]
+> => {
+  const map: Map<
+    number,
+    { output: MappedOutput; outputDescriptor: MidiKeyboardMappedOutputDescriptor }[]
+  > = new Map();
+
+  mappedOutputDescriptors.forEach((outputDescriptor, outputIx) => {
+    const output = mappedOutputs[outputIx];
+    if (!output) {
+      throw new UnreachableException(`No mapped output found at index ${outputIx}`);
+    }
+
+    const existing = map.get(outputDescriptor.controlIndex);
+    if (existing) {
+      existing.push({ output, outputDescriptor });
+      return;
+    }
+
+    map.set(outputDescriptor.controlIndex, [{ output, outputDescriptor }]);
+  });
+
+  return map;
+};
+
 const buildMappedOutputName = (
   existingMappedOutputs: MappedOutput[],
   controlIndex: number
@@ -253,6 +283,12 @@ const actionGroups = {
       const inst = state[stateKey];
       const newOutput: MidiKeyboardMappedOutputDescriptor = { controlIndex, scale: 1, shift: 0 };
       const newInst = { ...inst, mappedOutputs: [...inst.mappedOutputs, newOutput] };
+
+      midiKeyboardCtx.outputDescriptorsByControlIndex = buildFreshOutputDescriptorsByControlIndex(
+        midiKeyboardCtx.mappedOutputs,
+        newInst.mappedOutputs
+      );
+
       return { ...state, [stateKey]: newInst };
     },
   }),
@@ -267,22 +303,27 @@ const actionGroups = {
     subReducer: (state: MidiKeyboardState, { stateKey, outputIx, scale, shift }) => {
       const outputDescriptor = state[stateKey].mappedOutputs[outputIx];
       updateMappedOutputCSN(stateKey, outputIx, outputDescriptor);
+      const ctx = getMidiKeyboardCtx(stateKey);
 
-      return {
-        ...state,
-        [stateKey]: {
-          ...state[stateKey],
-          mappedOutputs: R.set(
-            R.lensIndex(outputIx),
-            {
-              ...state[stateKey].mappedOutputs[outputIx],
-              scale,
-              shift,
-            },
-            state[stateKey].mappedOutputs
-          ),
-        },
+      const newInst = {
+        ...state[stateKey],
+        mappedOutputs: R.set(
+          R.lensIndex(outputIx),
+          {
+            ...state[stateKey].mappedOutputs[outputIx],
+            scale,
+            shift,
+          },
+          state[stateKey].mappedOutputs
+        ),
       };
+
+      ctx.outputDescriptorsByControlIndex = buildFreshOutputDescriptorsByControlIndex(
+        ctx.mappedOutputs,
+        newInst.mappedOutputs
+      );
+
+      return { ...state, [stateKey]: newInst };
     },
   }),
   REMOVE_MAPPED_OUTPUT: buildActionGroup({
@@ -301,6 +342,12 @@ const actionGroups = {
 
       const inst = state[stateKey];
       const newInst = { ...inst, mappedOutputs: R.remove(outputIx, 1, inst.mappedOutputs) };
+
+      ctx.outputDescriptorsByControlIndex = buildFreshOutputDescriptorsByControlIndex(
+        ctx.mappedOutputs,
+        newInst.mappedOutputs
+      );
+
       return { ...state, [stateKey]: newInst };
     },
   }),

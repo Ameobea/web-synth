@@ -1,27 +1,129 @@
 import React, { useState } from 'react';
-import { shallowEqual, useSelector } from 'react-redux';
+import { shallowEqual, useDispatch, useSelector } from 'react-redux';
 
-import { MappedOutput, midiKeyboardCtxByStateKey } from 'src/midiKeyboard';
-import type { ReduxStore } from 'src/redux';
+import { RangeInput } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
+import {
+  get_midi_keyboard_audio_connectables,
+  MappedOutput,
+  midiKeyboardCtxByStateKey,
+} from 'src/midiKeyboard';
+import { ConnectableDescriptor } from 'src/patchNetwork';
+import { connect, updateConnectables } from 'src/patchNetwork/interface';
+import { actionCreators, getState, ReduxStore } from 'src/redux';
 import type { MidiKeyboardMappedOutputDescriptor } from 'src/redux/modules/midiKeyboard';
+import { connectNodes } from 'src/redux/modules/vcmUtils';
 import './MidiKeyboardOutputMappingConfigurator.scss';
 
 const OutputMappingScaleAndShiftControls: React.FC<{
   descriptor: MidiKeyboardMappedOutputDescriptor;
-}> = ({ descriptor }) => <div className='output-mapping-scale-and-shift-controls'>TODO</div>;
-
-interface OutputMappingRowProps {
-  output: MappedOutput;
-  descriptor: MidiKeyboardMappedOutputDescriptor;
-}
-
-const OutputMappingRow: React.FC<OutputMappingRowProps> = ({ output, descriptor }) => (
-  <div className='output-mapping-row'>
-    <div title='MIDI control index'>{descriptor.controlIndex}</div>
-    <div title='Output connectable name'>{output.name}</div>
-    <OutputMappingScaleAndShiftControls descriptor={descriptor} />
+  onChange: (scale: number, shift: number) => void;
+}> = ({ descriptor, onChange }) => (
+  <div className='output-mapping-scale-and-shift-controls'>
+    <div className='title'>Output Range</div>
+    <RangeInput
+      containerStyle={{ display: 'flex', flexDirection: 'row', width: 220 }}
+      inputStyle={{ width: 100 }}
+      value={
+        [
+          0 * descriptor.scale + descriptor.shift,
+          127 * descriptor.scale + descriptor.shift,
+        ] as const
+      }
+      onChange={newRange => {
+        const range = newRange[1] - newRange[0];
+        const scale = range / 127;
+        const shift = newRange[0];
+        onChange(scale, shift);
+      }}
+    />
   </div>
 );
+
+interface OutputMappingRowProps {
+  stateKey: string;
+  outputIx: number;
+  output: MappedOutput;
+  descriptor: MidiKeyboardMappedOutputDescriptor;
+  deleteMapping: () => void;
+}
+
+const OutputMappingRow: React.FC<OutputMappingRowProps> = ({
+  stateKey,
+  outputIx,
+  output,
+  descriptor,
+  deleteMapping,
+}) => {
+  const dispatch = useDispatch();
+  const [editingName, setEditingName] = useState(output.name);
+  const nameRef = React.useRef<HTMLInputElement>(null);
+
+  return (
+    <div className='output-mapping-row'>
+      <button className='delete-mapping-button' title='Delete Mapping' onClick={deleteMapping}>
+        &times;
+      </button>
+      <div title='MIDI control index' className='midi-control-index'>
+        {descriptor.controlIndex}
+      </div>
+      <div title='Output connectable name' className='output-connectable-name'>
+        <input
+          ref={nameRef}
+          type='text'
+          value={editingName}
+          onChange={evt => setEditingName(evt.target.value)}
+          onKeyDown={evt => {
+            if (evt.key === 'Enter') {
+              if (editingName === output.name) {
+                return;
+              }
+              const ctx = midiKeyboardCtxByStateKey.get(stateKey)!;
+              const vcId = stateKey.split('_')[1]!;
+
+              // Validate that name is unique
+              const allNames = ctx.mappedOutputs.map(o => o.name);
+              if (allNames.includes(editingName)) {
+                alert('Output name must be unique');
+                return;
+              }
+
+              // Re-connect everything previously connected the old name to the new name
+              const oldName = ctx.mappedOutputs[outputIx].name;
+              const allConnectedDestinations =
+                getState().viewContextManager.patchNetwork.connections.filter(
+                  ([from, _to]) => from.vcId === vcId && from.name === oldName
+                );
+
+              // Store in Redux + update connectables.
+              ctx.mappedOutputs[outputIx].name = editingName;
+              updateConnectables(vcId, get_midi_keyboard_audio_connectables(stateKey));
+
+              const newFromDescriptor: ConnectableDescriptor = { vcId, name: editingName };
+              allConnectedDestinations.forEach(([_from, to]) => {
+                connect(newFromDescriptor, to);
+              });
+
+              nameRef.current!.blur();
+            }
+          }}
+        />
+      </div>
+      <OutputMappingScaleAndShiftControls
+        descriptor={descriptor}
+        onChange={(scale, shift) =>
+          dispatch(
+            actionCreators.midiKeyboard.SET_MAPPED_OUTPUT_SCALE_AND_SHIFT(
+              stateKey,
+              outputIx,
+              scale,
+              shift
+            )
+          )
+        }
+      />
+    </div>
+  );
+};
 
 const AddOutputMappingPrompt: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <div className='add-output-mapping-prompt'>
@@ -48,6 +150,7 @@ const MidiKeyboardOutputMappingConfigurator: React.FC<{
   deregisterGenericControlCb: (cb: GenericControlCb) => void;
 }> = ({ stateKey, registerGenericControlCb, deregisterGenericControlCb }) => {
   const [midiLearnState, setMidiLearnState] = useState<MidiLearnState>({ type: 'notLearning' });
+  const dispatch = useDispatch();
   const mappedOutputs = useSelector(
     (state: ReduxStore) => state.midiKeyboard[stateKey].mappedOutputs,
     shallowEqual
@@ -61,9 +164,14 @@ const MidiKeyboardOutputMappingConfigurator: React.FC<{
     <div className='midi-keyboard-output-mapping-configurator'>
       {mappedOutputs.map((descriptor, outputIx) => (
         <OutputMappingRow
+          stateKey={stateKey}
           key={mutableCtx.mappedOutputs[outputIx].name}
+          outputIx={outputIx}
           descriptor={descriptor}
           output={mutableCtx.mappedOutputs[outputIx]}
+          deleteMapping={() =>
+            dispatch(actionCreators.midiKeyboard.REMOVE_MAPPED_OUTPUT(stateKey, outputIx))
+          }
         />
       ))}
       {midiLearnState.type === 'learning' ? (
@@ -81,7 +189,9 @@ const MidiKeyboardOutputMappingConfigurator: React.FC<{
                 `Learning MIDI generic control mapping for control index=${controlIndex}`
               );
 
-              // TODO
+              dispatch(actionCreators.midiKeyboard.ADD_NEW_MAPPED_OUTPUT(stateKey, controlIndex));
+              deregisterGenericControlCb(cb);
+              setMidiLearnState({ type: 'notLearning' });
             };
 
             registerGenericControlCb(cb);

@@ -8,10 +8,10 @@ import ScaleAndShiftSmallView, {
 } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
-const computeScaleAndShift = ({
+export const computeScaleAndShift = ({
   input_range: inputRange,
   output_range: outputRange,
-}: ScaleAndShiftUIState) => {
+}: Pick<ScaleAndShiftUIState, 'input_range' | 'output_range'>) => {
   const inputRangeSize = inputRange[1] - inputRange[0];
   const firstMultiplier = inputRangeSize === 0 ? 0 : 1 / inputRangeSize;
   const firstOffset = -inputRange[0];

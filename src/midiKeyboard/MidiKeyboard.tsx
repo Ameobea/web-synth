@@ -330,3 +330,18 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
     </div>
   );
 };
+
+export const mkMidiKeyboardSmallView = (
+  stateKey: string,
+  registerGenericControlCb: (cb: GenericControlCb) => void,
+  deregisterGenericControlCb: (cb: GenericControlCb) => void
+) => {
+  const MidiKeyboardSmallView: React.FC = () => (
+    <MidiKeyboardOutputMappingConfigurator
+      stateKey={stateKey}
+      registerGenericControlCb={registerGenericControlCb}
+      deregisterGenericControlCb={deregisterGenericControlCb}
+    />
+  );
+  return MidiKeyboardSmallView;
+};

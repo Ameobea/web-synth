@@ -21,7 +21,6 @@ import SavePresetModal from 'src/synthDesigner/SavePresetModal';
 import { saveSynthPreset } from 'src/api';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { buildWavyJonesInstance } from 'src/visualizations/WavyJones';
-import { convertAndUploadPresets } from 'src/fmDemo/presets';
 
 interface AddModuleControlsProps {
   stateKey: string;
@@ -267,7 +266,6 @@ const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         onMouseUp={() =>
           dispatch(actionCreators.synthDesigner.UNGATE(() => getState().synthDesigner, 0))
         }
-        onClick={() => convertAndUploadPresets()}
       >
         Gate
       </button>

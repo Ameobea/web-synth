@@ -34,6 +34,14 @@ impl ViewContext for MIDIKeyboard {
     fn get_audio_connectables(&self) -> JsValue {
         js::get_midi_keyboard_audio_connectables(&self.get_state_key())
     }
+
+    fn render_small_view(&mut self, target_dom_id: &str) {
+        js::render_midi_keyboard_small_view(&self.get_state_key(), target_dom_id);
+    }
+
+    fn cleanup_small_view(&mut self, target_dom_id: &str) {
+        js::cleanup_midi_keyboard_small_view(&self.get_id(), target_dom_id);
+    }
 }
 
 pub fn mk_midi_keyboard(_definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {

@@ -121,6 +121,8 @@ extern "C" {
     pub fn unhide_midi_keyboard(state_key: &str);
     pub fn cleanup_midi_keyboard(state_key: &str) -> String;
     pub fn get_midi_keyboard_audio_connectables(state_key: &str) -> JsValue;
+    pub fn render_midi_keyboard_small_view(state_key: &str, target_dom_id: &str);
+    pub fn cleanup_midi_keyboard_small_view(vc_id: &str, target_dom_id: &str);
 }
 
 #[wasm_bindgen(raw_module = "./sequencer")]

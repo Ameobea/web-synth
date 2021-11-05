@@ -41,10 +41,8 @@ const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 /**
  * Global map of state key to Redux infrastructure
  */
-let STATE_MAP: ImmMap<
-  string,
-  ReturnType<typeof buildSynthDesignerRedux> & { reactRoot: unknown }
-> = ImmMap();
+let STATE_MAP: ImmMap<string, ReturnType<typeof buildSynthDesignerRedux> & { reactRoot: unknown }> =
+  ImmMap();
 
 export const getReduxInfra = (stateKey: string) => {
   const reduxInfra = STATE_MAP.get(stateKey);
@@ -249,16 +247,16 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
   return {
     vcId: stateKey.split('_')[1]!,
     inputs: synths
-      .reduce((acc, synth, i) => {
+      .reduce((acc, synth, voiceIx) => {
         const inputsForSynth = acc
-          .set(`synth_${i}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
-          .set(`synth_${i}_filter_frequency`, {
-            node: synth.filterCSNs.frequency.offset,
+          .set(`synth_${voiceIx}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
+          .set(`synth_${voiceIx}_filter_frequency`, {
+            node: synth.filterCSNs.frequency,
             type: 'number',
           })
-          .set(`synth_${i}_filter_q`, { node: synth.filterCSNs.Q.offset, type: 'number' })
-          .set(`synth_${i}_filter_detune`, {
-            node: synth.filterCSNs.detune.offset,
+          .set(`synth_${voiceIx}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' })
+          .set(`synth_${voiceIx}_filter_detune`, {
+            node: synth.filterCSNs.detune,
             type: 'number',
           });
 
@@ -276,7 +274,7 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
           const awpNode = synth.fmSynth!.getAWPNode();
           return new Array(PARAM_BUFFER_COUNT).fill(null as any).reduce(
             (acc, _i, i) =>
-              acc.set('fm_input_' + i, {
+              acc.set(`synth_${voiceIx}_fm_input_${i}`, {
                 type: 'number',
                 node: awpNode
                   ? (awpNode.parameters as Map<string, AudioParam>).get(i.toString())
