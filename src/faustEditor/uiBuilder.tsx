@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
@@ -165,12 +165,75 @@ const buildControlPanelComponent = (
     return () => null;
   }
 
+  const handleChange = (path: string, val: number) =>
+    setParamValue(pathBase === null ? path : `/${pathBase}/${path}`, val);
+
   const FaustEditorControlPanel: React.FC<{
     style?: React.CSSProperties;
     position?: any;
     draggable?: boolean;
   }> = ({ position, style, draggable = true }) => {
     const panelCtx = useRef<any>(null);
+    const combinedSettings = useMemo(
+      () => [
+        ...settings,
+        {
+          type: 'button',
+          label: 'reset',
+          action: () => {
+            if (!panelCtx.current) {
+              return;
+            }
+            const ctx = panelCtx.current;
+
+            settings.forEach(setting => {
+              if (
+                !setting.address ||
+                R.isNil(setting.defaultVal) ||
+                ctx[setting.label] === setting.defaultVal
+              ) {
+                return;
+              }
+
+              ctx[setting.label] = setting.defaultVal;
+              setParamValue(
+                pathBase === null ? setting.label : `/${pathBase}/${setting.label}`,
+                setting.defaultVal ?? setting.init
+              );
+            });
+          },
+        },
+        {
+          type: 'button',
+          label: 'randomize',
+          action: () => {
+            if (!panelCtx.current) {
+              return;
+            }
+            const ctx = panelCtx.current;
+
+            settings.forEach(setting => {
+              if (!setting.address || R.isNil(setting.min) || R.isNil(setting.max)) {
+                return;
+              }
+
+              const scale = setting.max - setting.min;
+              const shift = setting.min;
+              const newVal = Math.random() * scale + shift;
+              ctx[setting.label] = newVal;
+              setParamValue(
+                pathBase === null ? setting.label : `/${pathBase}/${setting.label}`,
+                newVal
+              );
+            });
+          },
+        },
+      ],
+      []
+    );
+    const contextCb = useCallback((ctx: any) => {
+      panelCtx.current = ctx;
+    }, []);
 
     return (
       <ControlPanel
@@ -178,67 +241,10 @@ const buildControlPanelComponent = (
         theme='dark'
         position={position === null ? undefined : { top: 0, right: 44 }}
         style={style}
-        settings={[
-          ...settings,
-          {
-            type: 'button',
-            label: 'reset',
-            action: () => {
-              if (!panelCtx.current) {
-                return;
-              }
-              const ctx = panelCtx.current;
-
-              settings.forEach(setting => {
-                if (
-                  !setting.address ||
-                  R.isNil(setting.defaultVal) ||
-                  ctx[setting.label] === setting.defaultVal
-                ) {
-                  return;
-                }
-
-                ctx[setting.label] = setting.defaultVal;
-                setParamValue(
-                  pathBase === null ? setting.label : `/${pathBase}/${setting.label}`,
-                  setting.defaultVal ?? setting.init
-                );
-              });
-            },
-          },
-          {
-            type: 'button',
-            label: 'randomize',
-            action: () => {
-              if (!panelCtx.current) {
-                return;
-              }
-              const ctx = panelCtx.current;
-
-              settings.forEach(setting => {
-                if (!setting.address || R.isNil(setting.min) || R.isNil(setting.max)) {
-                  return;
-                }
-
-                const scale = setting.max - setting.min;
-                const shift = setting.min;
-                const newVal = Math.random() * scale + shift;
-                ctx[setting.label] = newVal;
-                setParamValue(
-                  pathBase === null ? setting.label : `/${pathBase}/${setting.label}`,
-                  newVal
-                );
-              });
-            },
-          },
-        ]}
-        onChange={(path: string, val: number) =>
-          setParamValue(pathBase === null ? path : `/${pathBase}/${path}`, val)
-        }
+        settings={combinedSettings}
+        onChange={handleChange}
         width={500}
-        contextCb={(ctx: any) => {
-          panelCtx.current = ctx;
-        }}
+        contextCb={contextCb}
       />
     );
   };

@@ -20,6 +20,7 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
+import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const WavetableControlPanel: React.FC<{
   synth: SynthModule;
@@ -156,18 +157,25 @@ const PresetsControlPanel: React.FC<{
   );
 };
 
-const SynthModuleCompInner: React.FC<{
-  index: number;
-  synth: SynthModule;
+interface SynthControlPanelProps
+  extends Pick<
+    SynthModule,
+    | 'unisonSpreadCents'
+    | 'waveform'
+    | 'masterGain'
+    | 'detune'
+    | 'gainADSRLength'
+    | 'gainEnvelope'
+    | 'pitchMultiplier'
+  > {
   stateKey: string;
-}> = ({ index, synth, stateKey, children = null, ...rest }) => {
-  const unison = synth.voices[0].oscillators.length;
+  index: number;
+  unison: number;
+}
+
+const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
   const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
-  const { dispatch, actionCreators } = getReduxInfra(stateKey);
-  const filterEnvelope = useMemo(
-    () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
-    [synth.filterEnvelope]
-  );
+  const { dispatch, actionCreators } = getReduxInfra(props.stateKey);
   const settings = useMemo(
     () =>
       filterNils([
@@ -185,7 +193,7 @@ const SynthModuleCompInner: React.FC<{
           options: Object.values(Waveform),
           initial: Waveform.Sine,
         },
-        synth.waveform !== Waveform.FM && synth.waveform !== Waveform.Wavetable
+        props.waveform !== Waveform.FM && props.waveform !== Waveform.Wavetable
           ? {
               type: 'range',
               label: 'unison',
@@ -195,7 +203,7 @@ const SynthModuleCompInner: React.FC<{
               step: 1,
             }
           : null,
-        synth.waveform !== Waveform.FM && synth.waveform !== Waveform.Wavetable
+        props.waveform !== Waveform.FM && props.waveform !== Waveform.Wavetable
           ? {
               type: 'range',
               label: 'unison spread cents',
@@ -232,38 +240,38 @@ const SynthModuleCompInner: React.FC<{
           Comp: ControlPanelADSR,
         },
       ]),
-    [synth.waveform]
+    [props.waveform]
   );
 
   const handleSynthChange = useCallback(
     (key: string, val: any) => {
       switch (key) {
         case 'waveform': {
-          dispatch(actionCreators.synthDesigner.SET_WAVEFORM(index, val, dispatch));
+          dispatch(actionCreators.synthDesigner.SET_WAVEFORM(props.index, val, dispatch));
           return;
         }
         case 'unison': {
-          dispatch(actionCreators.synthDesigner.SET_UNISON(index, val));
+          dispatch(actionCreators.synthDesigner.SET_UNISON(props.index, val));
           return;
         }
         case 'unison spread cents': {
-          dispatch(actionCreators.synthDesigner.SET_UNISON_SPREAD_CENTS(index, val));
+          dispatch(actionCreators.synthDesigner.SET_UNISON_SPREAD_CENTS(props.index, val));
           return;
         }
         case 'volume': {
-          dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(index, val));
+          dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(props.index, val));
           return;
         }
         case 'detune': {
-          dispatch(actionCreators.synthDesigner.SET_DETUNE(val, index));
+          dispatch(actionCreators.synthDesigner.SET_DETUNE(val, props.index));
           return;
         }
         case 'adsr': {
-          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, index));
+          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, props.index));
           return;
         }
         case 'adsr length ms': {
-          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(index, val));
+          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(props.index, val));
           return;
         }
         case 'pitch multiplier': {
@@ -272,7 +280,7 @@ const SynthModuleCompInner: React.FC<{
           if (Number.isNaN(value)) {
             return;
           }
-          dispatch(actionCreators.synthDesigner.SET_PITCH_MULTIPLIER(index, value));
+          dispatch(actionCreators.synthDesigner.SET_PITCH_MULTIPLIER(props.index, value));
           return;
         }
         default: {
@@ -280,7 +288,54 @@ const SynthModuleCompInner: React.FC<{
         }
       }
     },
-    [actionCreators.synthDesigner, dispatch, index]
+    [actionCreators.synthDesigner, dispatch, props.index]
+  );
+
+  return (
+    <ControlPanel
+      title='SYNTH'
+      settings={settings}
+      onChange={handleSynthChange}
+      state={useMemo(
+        () => ({
+          waveform: props.waveform,
+          volume: props.masterGain,
+          unison: props.unison,
+          detune: props.detune,
+          'adsr length ms': props.gainADSRLength,
+          adsr: props.gainEnvelope,
+          'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
+            () => props.pitchMultiplier?.toString() ?? 1
+          ),
+          'unison spread cents': props.unisonSpreadCents ?? 0,
+        }),
+        [
+          props.waveform,
+          props.masterGain,
+          props.detune,
+          props.gainADSRLength,
+          props.gainEnvelope,
+          props.unisonSpreadCents,
+          props.pitchMultiplier,
+          props.unison,
+          localPitchMultiplier,
+        ]
+      )}
+      width={470}
+    />
+  );
+};
+const SynthControlPanel = React.memo(SynthControlPanelInner);
+
+const SynthModuleCompInner: React.FC<{
+  index: number;
+  synth: SynthModule;
+  stateKey: string;
+}> = ({ index, synth, stateKey, children = null, ...rest }) => {
+  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+  const filterEnvelope = useMemo(
+    () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
+    [synth.filterEnvelope]
   );
 
   return (
@@ -297,36 +352,22 @@ const SynthModuleCompInner: React.FC<{
         ×
       </div>
 
-      <ControlPanel
-        title='SYNTH'
-        settings={settings}
-        onChange={handleSynthChange}
-        state={useMemo(
-          () => ({
-            waveform: synth.waveform,
-            volume: synth.masterGain,
-            unison,
-            detune: synth.detune,
-            'adsr length ms': synth.gainADSRLength,
-            adsr: synth.gainEnvelope,
-            'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
-              () => synth.pitchMultiplier?.toString() ?? 1
-            ),
-            'unison spread cents': synth.unisonSpreadCents ?? 0,
-          }),
+      <SynthControlPanel
+        {...R.pick(
           [
-            synth.waveform,
-            synth.masterGain,
-            synth.detune,
-            synth.gainADSRLength,
-            synth.gainEnvelope,
-            synth.unisonSpreadCents,
-            synth.pitchMultiplier,
-            unison,
-            localPitchMultiplier,
-          ]
+            'unisonSpreadCents',
+            'waveform',
+            'masterGain',
+            'detune',
+            'gainADSRLength',
+            'gainEnvelope',
+            'pitchMultiplier',
+          ],
+          synth
         )}
-        style={{ width: 470 }}
+        unison={synth.voices[0].oscillators.length}
+        stateKey={stateKey}
+        index={index}
       />
 
       {synth.waveform === Waveform.Wavetable ? (

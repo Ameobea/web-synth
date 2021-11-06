@@ -207,7 +207,7 @@ interface AddAndPresetControlsProps extends AddModuleControlsProps {
   synthDesignerGetState: SynthDesignerReduxInfra['getState'];
 }
 
-const AddAndPresetControls: React.FC<AddAndPresetControlsProps> = ({ ...props }) => (
+const AddAndPresetControlsInner: React.FC<AddAndPresetControlsProps> = ({ ...props }) => (
   <Provider store={store}>
     <AddModuleControls {...props} />
     <FullPresetControls
@@ -218,6 +218,7 @@ const AddAndPresetControls: React.FC<AddAndPresetControlsProps> = ({ ...props })
     />
   </Provider>
 );
+const AddAndPresetControls = React.memo(AddAndPresetControlsInner);
 
 const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);

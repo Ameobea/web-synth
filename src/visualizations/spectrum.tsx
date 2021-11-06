@@ -3,7 +3,7 @@ import ControlPanel from 'react-control-panel';
 import { useOnce } from 'ameo-utils';
 
 import Loading from 'src/misc/Loading';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, elemInView } from 'src/util';
 import { getSentry } from 'src/sentry';
 
 export interface SpectrumVizSettings {
@@ -41,7 +41,7 @@ interface SpectrumVisualizationProps {
   height?: number;
 }
 
-export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
+const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
   initialConf,
   canvasStyle,
   analyzerNode,
@@ -60,6 +60,16 @@ export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
   >(null);
   const animationFrameHandle = useRef<number | null>(null);
   const lockedHeight = useRef(height);
+  const isInView = useRef(true);
+
+  useEffect(() => {
+    const cb = () => {
+      isInView.current = canvasRef ? elemInView(canvasRef) : false;
+    };
+    const intervalHandle = setInterval(cb, 230);
+
+    return () => clearInterval(intervalHandle);
+  }, [canvasRef]);
 
   useEffect(() => {
     if (paused && animationFrameHandle.current !== null) {
@@ -107,8 +117,10 @@ export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
     analyzerNode.fftSize = FFT_SIZE;
 
     const mkUpdateVisualization = (ctx2D: CanvasRenderingContext2D) => {
+      isInView.current = elemInView(ctx2D.canvas);
+
       const updateViz = () => {
-        if (ctx === null) {
+        if (ctx === null || !isInView.current) {
           animationFrameHandle.current = requestAnimationFrame(updateViz);
           return;
         }
@@ -213,3 +225,5 @@ export const SpectrumVisualization: React.FC<SpectrumVisualizationProps> = ({
     </>
   );
 };
+
+export const SpectrumVisualization = React.memo(SpectrumVisualizationInner);

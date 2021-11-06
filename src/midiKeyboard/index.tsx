@@ -273,15 +273,18 @@ export const get_midi_keyboard_audio_connectables = (stateKey: string): AudioCon
     node: ctx.midiNode,
     type: 'midi',
   });
-  if (reduxState.midiInput) {
+  if (reduxState.midiInput && reduxState.mode === MidiKeyboardMode.MidiInput) {
     baseOutputs = baseOutputs
       .set('pitch bend', { type: 'number', node: reduxState.midiInput.pitchBendNode })
       .set('mod wheel', { type: 'number', node: reduxState.midiInput.modWheelNode });
   }
-  const outputs = ctx.mappedOutputs.reduce(
-    (acc, output) => acc.set(output.name, { type: 'number', node: output.csn }),
-    baseOutputs
-  );
+  const outputs =
+    reduxState.mode === MidiKeyboardMode.MidiInput
+      ? ctx.mappedOutputs.reduce(
+          (acc, output) => acc.set(output.name, { type: 'number', node: output.csn }),
+          baseOutputs
+        )
+      : baseOutputs;
 
   return {
     vcId,
