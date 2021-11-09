@@ -27,7 +27,14 @@ build-sinsy:
   # cp src/vocalSynthesis/build/sinsy.* ./public
 
 remove-annoying-litegraph-warning:
-  gsed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  if ! command -v gsed &> /dev/null
+  then
+      sed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
+  else
+      gsed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
+  fi
 
 build-all:
   just remove-annoying-litegraph-warning
