@@ -51,6 +51,12 @@ export type EffectInner =
       wet: ParamSource;
       dry: ParamSource;
       feedback: ParamSource;
+    }
+  | {
+      type: 'moog filter';
+      cutoffFrequency: ParamSource;
+      resonance: ParamSource;
+      drive: ParamSource;
     };
 
 export type Effect = EffectInner & {
@@ -68,6 +74,7 @@ const EFFECT_TYPE_SETTING = {
     'soft clipper',
     'butterworth filter',
     'delay',
+    'moog filter',
   ] as Effect['type'][],
 };
 
@@ -128,6 +135,14 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         feedback: { type: 'constant', value: 0.4 },
       };
     }
+    case 'moog filter': {
+      return {
+        type,
+        cutoffFrequency: { type: 'constant', value: 400 },
+        resonance: { type: 'constant', value: 0.5 },
+        drive: { type: 'constant', value: 0.5 },
+      };
+    }
   }
 };
 
@@ -146,6 +161,7 @@ const wavefolderTheme = { ...baseTheme, background2: 'rgb(24,38,41)' };
 const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
 const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
+const moogFilterTheme = { ...baseTheme, background2: 'rgb(49,69,120)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -155,6 +171,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'soft clipper': softClipperTheme,
   'butterworth filter': butterworthFilterTheme,
   delay: delayTheme,
+  'moog filter': moogFilterTheme,
 };
 
 type EffectConfigurator<T> = React.FC<{
@@ -428,6 +445,47 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
   </>
 );
 
+const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
+  <>
+    <ConfigureParamSource
+      title='cutoff frequency'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={moogFilterTheme}
+      min={1}
+      max={7000}
+      scale='log'
+      state={state.cutoffFrequency}
+      onChange={cutoffFrequency => onChange({ ...state, cutoffFrequency })}
+    />
+    <ConfigureParamSource
+      title='resonance'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={moogFilterTheme}
+      min={0.3}
+      max={7}
+      state={state.resonance}
+      onChange={resonance => onChange({ ...state, resonance })}
+    />
+    <ConfigureParamSource
+      title='drive'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={moogFilterTheme}
+      min={0}
+      max={3}
+      state={state.drive}
+      onChange={drive => onChange({ ...state, drive })}
+    />
+  </>
+);
+
 const EffectManagement: React.FC<{
   effectIx: number;
   operatorEffects: (Effect | null)[];
@@ -500,6 +558,7 @@ const ConfigureEffectSpecific: React.FC<{
         'soft clipper': ConfigureSoftClipper,
         'butterworth filter': ConfigureButterworthFilter,
         delay: ConfigureDelay,
+        'moog filter': ConfigureMoogFilter,
       }[state.type]),
     [state.type]
   );

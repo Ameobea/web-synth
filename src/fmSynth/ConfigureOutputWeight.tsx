@@ -1,6 +1,6 @@
 import React from 'react';
-import { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 
+import { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
@@ -10,8 +10,9 @@ const ConfigureOutputWeight: React.FC<{
   onChange: (newState: ParamSource) => void;
   adsrs: Adsr[];
   onAdsrChange: AdsrChangeHandler;
-}> = ({ operatorIx, state, onChange, adsrs, onAdsrChange }) => (
-  <div className='configure-output-weight'>
+  synthID: string;
+}> = ({ operatorIx, state, onChange, adsrs, onAdsrChange, synthID }) => (
+  <div className='configure-output-weight' data-synth-id={synthID}>
     <ConfigureParamSource
       title={`Operator ${operatorIx} output weight`}
       state={state}

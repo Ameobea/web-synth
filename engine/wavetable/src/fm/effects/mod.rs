@@ -7,6 +7,7 @@ use super::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 pub mod bitcrusher;
 pub mod butterworth_filter;
 pub mod delay;
+pub mod moog;
 pub mod soft_clipper;
 pub mod spectral_warping;
 pub mod wavefolder;
@@ -15,6 +16,7 @@ use self::{
     bitcrusher::Bitcrusher,
     butterworth_filter::{ButterworthFilter, ButterworthFilterMode},
     delay::Delay,
+    moog::MoogFilter,
     spectral_warping::SpectralWarping,
     wavefolder::{Wavecruncher, Wavefolder},
 };
@@ -72,6 +74,7 @@ pub enum EffectInstance {
     SoftClipper(SoftClipper),
     ButterworthFilter(ButterworthFilter),
     Delay(Delay),
+    MoogFilter(MoogFilter),
 }
 
 impl EffectInstance {
@@ -239,6 +242,30 @@ impl EffectInstance {
                 };
 
                 EffectInstance::Delay(delay)
+            },
+            7 => {
+                let moog_filter = MoogFilter::new(
+                    ParamSource::new(ParamSourceType::from_parts(
+                        param_1_type,
+                        param_1_int_val,
+                        param_1_float_val,
+                        param_1_float_val_2,
+                    )),
+                    ParamSource::new(ParamSourceType::from_parts(
+                        param_2_type,
+                        param_2_int_val,
+                        param_2_float_val,
+                        param_2_float_val_2,
+                    )),
+                    ParamSource::new(ParamSourceType::from_parts(
+                        param_3_type,
+                        param_3_int_val,
+                        param_3_float_val,
+                        param_3_float_val_2,
+                    )),
+                );
+
+                EffectInstance::MoogFilter(moog_filter)
             },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
@@ -422,6 +449,7 @@ impl Effect for EffectInstance {
             EffectInstance::ButterworthFilter(e) =>
                 e.apply(rendered_params, base_frequency, sample),
             EffectInstance::Delay(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::MoogFilter(e) => e.apply(rendered_params, base_frequency, sample),
         }
     }
 
@@ -445,6 +473,8 @@ impl Effect for EffectInstance {
             EffectInstance::ButterworthFilter(e) =>
                 e.apply_all(rendered_params, base_frequencies, samples),
             EffectInstance::Delay(e) => e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::MoogFilter(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
         }
     }
 
@@ -457,6 +487,7 @@ impl Effect for EffectInstance {
             EffectInstance::SoftClipper(e) => e.get_params(buf),
             EffectInstance::ButterworthFilter(e) => e.get_params(buf),
             EffectInstance::Delay(e) => e.get_params(buf),
+            EffectInstance::MoogFilter(e) => e.get_params(buf),
         }
     }
 }

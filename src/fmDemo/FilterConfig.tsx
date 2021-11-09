@@ -98,6 +98,11 @@ const handleFilterChange = (
       newState.envelope.lenSamples = msToSamples(val);
       break;
     }
+    case 'log scale': {
+      adsrs.setLogScale(val);
+      newState.envelope.logScale = val;
+      break;
+    }
     case 'adsr': {
       adsrs.setState(val);
       newState.envelope = val;

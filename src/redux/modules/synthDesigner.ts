@@ -165,6 +165,7 @@ function updateFilterNode<K extends keyof FilterParams>(
     case 'bypass':
     case 'enable envelope':
     case 'adsr length ms':
+    case 'log scale':
       return null;
     case 'q':
     case 'Q':
@@ -1591,6 +1592,17 @@ const actionGroups = {
       const targetSynth = getSynth(synthIx, state.synths);
       targetSynth.voices.forEach(voice => voice.gainADSRModule.setLengthMs(lengthMs));
       return setSynth(synthIx, { ...targetSynth, gainADSRLength: lengthMs }, state);
+    },
+  }),
+  SET_GAIN_LOG_SCALE: buildActionGroup({
+    actionCreator: (synthIx: number, logScale: boolean) => ({
+      type: 'SET_GAIN_LOG_SCALE',
+      synthIx,
+      logScale,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, logScale }) => {
+      // Not currently implemented since ADSR1 doesn't support log scale
+      return state;
     },
   }),
   SET_FILTER_ADSR_LENGTH: buildActionGroup({

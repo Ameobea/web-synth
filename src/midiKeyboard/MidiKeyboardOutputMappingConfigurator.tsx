@@ -11,15 +11,25 @@ import { ConnectableDescriptor } from 'src/patchNetwork';
 import { connect, updateConnectables } from 'src/patchNetwork/interface';
 import { actionCreators, getState, ReduxStore } from 'src/redux';
 import type { MidiKeyboardMappedOutputDescriptor } from 'src/redux/modules/midiKeyboard';
-import { connectNodes } from 'src/redux/modules/vcmUtils';
 import './MidiKeyboardOutputMappingConfigurator.scss';
 
 const OutputMappingScaleAndShiftControls: React.FC<{
   descriptor: MidiKeyboardMappedOutputDescriptor;
-  onChange: (scale: number, shift: number) => void;
+  onChange: (scale: number, shift: number, logScale: boolean) => void;
 }> = ({ descriptor, onChange }) => (
   <div className='output-mapping-scale-and-shift-controls'>
-    <div className='title'>Output Range</div>
+    <div className='top'>
+      <div className='title'>Output Range</div>
+      <div className='log-range-checkbox-wrapper'>
+        <div className='log-title'>log scale</div>
+        <input
+          type='checkbox'
+          checked={descriptor.logScale}
+          onChange={() => onChange(descriptor.scale, descriptor.shift, !descriptor.logScale)}
+          className='log-range-checkbox'
+        />
+      </div>
+    </div>
     <RangeInput
       containerStyle={{ display: 'flex', flexDirection: 'row', width: 220 }}
       inputStyle={{ width: 100 }}
@@ -33,7 +43,7 @@ const OutputMappingScaleAndShiftControls: React.FC<{
         const range = newRange[1] - newRange[0];
         const scale = range / 127;
         const shift = newRange[0];
-        onChange(scale, shift);
+        onChange(scale, shift, descriptor.logScale);
       }}
     />
   </div>
@@ -110,13 +120,14 @@ const OutputMappingRow: React.FC<OutputMappingRowProps> = ({
       </div>
       <OutputMappingScaleAndShiftControls
         descriptor={descriptor}
-        onChange={(scale, shift) =>
+        onChange={(scale, shift, logScale) =>
           dispatch(
-            actionCreators.midiKeyboard.SET_MAPPED_OUTPUT_SCALE_AND_SHIFT(
+            actionCreators.midiKeyboard.SET_MAPPED_OUTPUT_PARAMS(
               stateKey,
               outputIx,
               scale,
-              shift
+              shift,
+              logScale
             )
           )
         }

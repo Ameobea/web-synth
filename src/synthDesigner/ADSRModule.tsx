@@ -30,6 +30,7 @@ export interface ADSR2Params {
   loopPoint?: number | null;
   releaseStartPhase: number;
   steps: AdsrStep[];
+  logScale?: boolean;
 }
 
 export class ADSR2Module {
@@ -130,6 +131,7 @@ export class ADSR2Module {
     const newLengthMs = samplesToMs(newState.lenSamples);
     this.setLengthMs(newLengthMs);
     this.params.lengthMs = newLengthMs;
+    this.setLogScale(newState.logScale ?? false);
   }
 
   public setSteps(newSteps: AdsrStep[]) {
@@ -168,12 +170,25 @@ export class ADSR2Module {
     this.awp.port.postMessage({ type: 'setLenMs', lenMs: newLengthMs });
   }
 
+  public setLogScale(logScale: boolean) {
+    this.params.logScale = logScale;
+    if (!this.awp) {
+      return;
+    }
+
+    this.awp.port.postMessage({ type: 'setLogScale', logScale });
+  }
+
   public getReleaseStartPhase(): number {
     return this.params.releaseStartPhase;
   }
 
   public getLengthMs(): number {
     return this.params.lengthMs;
+  }
+
+  public getSteps(): AdsrStep[] {
+    return this.params.steps;
   }
 
   public setOutputRange([minVal, maxVal]: [number, number]) {
@@ -208,6 +223,7 @@ export class ADSR2Module {
       loopPoint: this.params.loopPoint ?? null,
       releasePoint: this.params.releaseStartPhase ?? null,
       audioThreadData: { phaseIndex: 0 },
+      logScale: this.params.logScale ?? false,
     };
   }
 

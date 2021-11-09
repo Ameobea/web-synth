@@ -1,3 +1,5 @@
+use fastapprox::fast;
+
 pub mod circular_buffer;
 pub mod filters;
 pub mod oscillator;
@@ -61,3 +63,15 @@ pub fn even_faster_pow2(p: f32) -> f32 {
 /// Same as `fastapprox::faster::pow` except we elide the check for large negative values and
 /// assume that negative values will never be passed to this function
 pub fn even_faster_pow(x: f32, p: f32) -> f32 { even_faster_pow2(p * fastapprox::faster::log2(x)) }
+
+pub fn mk_linear_to_log(logmin: f32, logmax: f32, logsign: f32) -> impl Fn(f32) -> f32 {
+    move |x| {
+        logsign * fast::exp(fast::ln(logmin) + ((fast::ln(logmax) - fast::ln(logmin)) * x) / 100.)
+    }
+}
+
+pub fn mk_log_to_linear(logmin: f32, logmax: f32, logsign: f32) -> impl Fn(f32) -> f32 {
+    move |y| {
+        ((fast::ln(y * logsign) - fast::ln(logmin)) * 100.) / (fast::ln(logmax) - fast::ln(logmin))
+    }
+}

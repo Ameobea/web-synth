@@ -767,6 +767,7 @@ const FMSynthDemo: React.FC = () => {
               synth={synth}
               getFMSynthOutput={async () => mainGain}
               midiNode={midiInputNode}
+              synthID='demo'
             />
             <FilterConfig
               filters={filters}

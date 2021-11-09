@@ -163,7 +163,7 @@ export const init_midi_keyboard = (stateKey: string) => {
             ? new MIDIInput(ctx, midiNode, initialState.midiInputName)
             : undefined,
         mappedOutputs: (initialState.mappedOutputs ?? []).map(descriptor =>
-          R.pick(['controlIndex' as const, 'scale' as const, 'shift' as const], descriptor)
+          R.pick(['controlIndex', 'scale', 'shift', 'logScale'], descriptor)
         ),
       }
     : undefined;

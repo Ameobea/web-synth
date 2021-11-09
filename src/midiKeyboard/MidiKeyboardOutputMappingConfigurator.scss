@@ -51,13 +51,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  font-family: Hack, 'Input Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+
+  .top {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    margin-bottom: 3px;
+  }
+
+  .log-range-checkbox-wrapper {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+  }
 
   .title {
     text-align: center;
-    font-family: Hack, 'Input Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
-    font-size: 12px;
     margin-top: 3px;
-    margin-bottom: 3px;
+    flex: 1;
   }
 }
 

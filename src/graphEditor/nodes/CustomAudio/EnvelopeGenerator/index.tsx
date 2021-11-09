@@ -6,13 +6,25 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { ADSRValues } from 'src/controls/adsr';
 import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { ADSRModule } from 'src/synthDesigner/ADSRModule';
+import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { normalizeEnvelope } from 'src/redux/modules/synthDesigner';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+
+interface SerializedState {
+  envelope: Adsr;
+  outputRange: [number, number];
+}
 
 export class EnvelopeGenerator implements ForeignNode {
   private vcId: string;
-  private adsrModule: ADSRModule;
+  private adsrModule: ADSR2Module;
+  private adsrOutputNode: AudioNode | null = null;
+  private outputRange: [number, number] = [0, 1];
   public nodeType = 'customAudio/envelopeGenerator';
   static typeName = 'Envelope Generator';
 
@@ -20,11 +32,11 @@ export class EnvelopeGenerator implements ForeignNode {
   private gateMIDINodeInputCBs: MIDIInputCbs = {
     onAttack: (note, _velocity) => {
       this.heldNotes.push(note);
-      this.adsrModule.gate();
+      this.adsrModule.gate(0);
     },
     onRelease: (note, _velocity) => {
       if (R.last(this.heldNotes) === note) {
-        this.adsrModule.ungate();
+        this.adsrModule.ungate(0);
       }
       this.heldNotes = this.heldNotes.filter(oNote => note !== oNote);
     },
@@ -32,18 +44,32 @@ export class EnvelopeGenerator implements ForeignNode {
       /* no-op */
     },
     onClearAll: () => {
-      this.adsrModule.ungate();
+      this.adsrModule.ungate(0);
     },
   };
   private gateMIDINode: MIDINode = new MIDINode(() => this.gateMIDINodeInputCBs);
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
-    this.adsrModule = new ADSRModule(ctx, { lengthMs: 0 });
-    this.adsrModule.start();
+    this.adsrModule = new ADSR2Module(
+      ctx,
+      {
+        minValue: params?.outputRange?.[0] ?? 0,
+        maxValue: params?.outputRange?.[1] ?? 1,
+        lengthMs: 2000,
+        steps: buildDefaultADSR2Envelope({ phaseIndex: 0 }).steps,
+        releaseStartPhase: 0.978,
+      },
+      1
+    );
+
+    this.adsrModule.getOutput().then(output => {
+      this.adsrOutputNode = output;
+      updateConnectables(vcId, this.buildConnectables());
+    });
 
     if (params) {
-      this.deserialize(params);
+      this.deserialize(params as SerializedState);
     } else {
       // TODO: Set defaults?
     }
@@ -51,13 +77,14 @@ export class EnvelopeGenerator implements ForeignNode {
     this.renderSmallView = mkContainerRenderHelper({
       Comp: EnvelopeGeneratorSmallView,
       getProps: () => ({
-        onChange: (envelope: ADSRValues, lengthMS: number) => {
-          this.adsrModule.setEnvelope(envelope);
+        onChange: (envelope: Adsr | ADSRValues, lengthMS: number) => {
+          this.adsrModule.setState(normalizeEnvelope(envelope));
           this.adsrModule.setLengthMs(lengthMS);
         },
+        setLogScale: (logScale: boolean) => this.adsrModule.setLogScale(logScale),
         initialState: {
-          envelope: this.adsrModule.envelope,
-          lengthMS: this.adsrModule.lengthMs,
+          envelope: { ...this.adsrModule.serialize(), outputRange: this.outputRange },
+          lengthMS: this.adsrModule.getLengthMs(),
         },
       }),
     });
@@ -69,19 +96,20 @@ export class EnvelopeGenerator implements ForeignNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
-  public deserialize(params: { [key: string]: any }) {
+  public deserialize(params: SerializedState) {
     if (!R.isNil(params.envelope)) {
-      this.adsrModule.setEnvelope(params.envelope);
+      const serialized: Adsr = params.envelope;
+      this.adsrModule.setState(normalizeEnvelope(serialized));
     }
-    if (!R.isNil(params.lengthMS)) {
-      this.adsrModule.setLengthMs(params.lengthMS);
+    if (!R.isNil(params.outputRange)) {
+      this.outputRange = params.outputRange;
     }
   }
 
-  public serialize(): { [key: string]: any } {
+  public serialize(): SerializedState {
     return {
-      envelope: this.adsrModule.envelope,
-      lengthMS: this.adsrModule.lengthMs,
+      envelope: this.adsrModule.serialize(),
+      outputRange: this.outputRange,
     };
   }
 
@@ -94,7 +122,7 @@ export class EnvelopeGenerator implements ForeignNode {
       }),
       outputs: ImmMap<string, ConnectableOutput>().set('envelope', {
         type: 'number',
-        node: this.adsrModule,
+        node: this.adsrOutputNode ?? new DummyNode(),
       }),
       node: this,
     };

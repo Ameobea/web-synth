@@ -1,3 +1,5 @@
+set dotenv-load := true
+
 opt:
   wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g -O4 --enable-simd --enable-nontrapping-float-to-int --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done

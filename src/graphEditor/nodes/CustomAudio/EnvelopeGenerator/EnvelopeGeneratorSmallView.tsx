@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { ADSRValues, ControlPanelADSR } from 'src/controls/adsr';
+import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
-const EnvelopeGeneratorSmallView: React.FC<{
-  onChange: (params: ADSRValues, lengthMS: number) => void;
-  initialState: { envelope: ADSRValues; lengthMS: number };
-}> = ({ onChange, initialState }) => (
-  <ControlPanel
-    settings={[
+interface EnvelopeGeneratorSmallViewProps {
+  onChange: (params: Adsr, lengthMS: number) => void;
+  setLogScale: (logScale: boolean) => void;
+  initialState: { envelope: Adsr & { outputRange: [number, number] }; lengthMS: number };
+}
+
+const EnvelopeGeneratorSmallView: React.FC<EnvelopeGeneratorSmallViewProps> = ({
+  onChange,
+  setLogScale,
+  initialState,
+}) => {
+  const settings = useMemo(
+    () => [
+      {
+        type: 'checkbox',
+        label: 'log scale',
+        initial: initialState.envelope.logScale ?? false,
+      },
       {
         type: 'range',
         min: 1,
@@ -21,12 +34,25 @@ const EnvelopeGeneratorSmallView: React.FC<{
         type: 'custom',
         label: 'adsr',
         initial: initialState.envelope,
-        Comp: ControlPanelADSR,
+        Comp: mkControlPanelADSR2WithSize(475),
       },
-    ]}
-    style={{ width: 500 }}
-    onChange={(_key: string, _val: any, state: any) => onChange(state.adsr, state.lengthMS)}
-  />
-);
+    ],
+    [initialState.envelope, initialState.lengthMS]
+  );
+
+  const handleChange = useCallback(
+    (key: string, val: any, state: any) => {
+      if (key === 'log scale') {
+        setLogScale(val);
+        return;
+      }
+
+      onChange({ ...state.adsr, logScale: state['log scale'] }, state.lengthMS);
+    },
+    [onChange, setLogScale]
+  );
+
+  return <ControlPanel settings={settings} width={500} onChange={handleChange} />;
+};
 
 export default EnvelopeGeneratorSmallView;

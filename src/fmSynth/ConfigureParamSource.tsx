@@ -171,6 +171,10 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
             max: 20_000,
             scale: 'log',
           },
+          // {
+          //   type: 'checkbox',
+          //   label: 'log scale',
+          // },
           {
             type: 'button',
             label: 'add adsr',
@@ -276,6 +280,8 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
               ? [state.shift, state.shift + state.scale]
               : undefined,
           adsr: state.type === 'adsr' ? adsrs[state['adsr index']] : undefined,
+          'log scale':
+            state.type === 'adsr' ? adsrs[state['adsr index']].logScale ?? false : undefined,
           'adsr length ms':
             state.type === 'adsr' ? samplesToMs(adsrs[state['adsr index']].lenSamples) : undefined,
         }}
@@ -316,6 +322,11 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
               onAdsrChange(adsrIx, { ...adsrs[adsrIx], lenSamples: msToSamples(value) });
               break;
             }
+            case 'log scale': {
+              const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+              onAdsrChange(adsrIx, { ...adsrs[adsrIx], logScale: value ?? false });
+              break;
+            }
             case 'multiplier': {
               if (window.isNaN(value)) {
                 break;
@@ -331,7 +342,7 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
       />
       {state.type === 'adsr' ? (
         <ADSR2
-          width={500}
+          width={490}
           height={320}
           initialState={{
             ...adsrs[state['adsr index']],
@@ -347,7 +358,7 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
   );
 };
 
-const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = ({ ...props }) => (
+const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = props => (
   <TrainingMIDIControlIndexContext.Consumer>
     {({ midiNode, midiControlValuesCache }) => (
       <ConfigureParamSourceInner

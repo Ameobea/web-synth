@@ -1,3 +1,5 @@
+set dotenv-load := true
+
 build-base:
   cd hts_engine_API/src && emcmake cmake . && emmake make -j
   cd sinsy/src && emcmake cmake . && emmake make -j sinsy

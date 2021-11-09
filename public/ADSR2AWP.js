@@ -14,11 +14,13 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
 
     this.isShutdown = false;
     this.outputRange = [0, 1];
+    this.logScale = false;
 
     this.port.onmessage = async evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
           this.outputRange = evt.data.outputRange;
+          this.logScale = evt.data.logScale;
           await this.initWasm(
             evt.data.wasmBytes,
             evt.data.encodedSteps,
@@ -63,6 +65,10 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
             this.ctxPtr,
             evt.data.releaseStartPhase
           );
+          break;
+        }
+        case 'setLogScale': {
+          this.logScale = evt.data.logScale;
           break;
         }
         case 'shutdown': {
@@ -159,7 +165,8 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     const curPhase = this.wasmInstance.exports.process_adsr(
       this.ctxPtr,
       this.outputRange[0],
-      this.outputRange[1]
+      this.outputRange[1],
+      this.logScale
     );
     // Record the current phase of the most recently gated ADSR which will be displayed
     // in the UI as an indicator on the ADSR UI

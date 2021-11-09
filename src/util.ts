@@ -233,3 +233,9 @@ export function elemInView(elm: HTMLElement) {
   const right = rect.left - vpWidth >= 0;
   return !above && !below && !left && !right;
 }
+
+export const mkLinearToLog = (logmin: number, logmax: number, logsign: number) => (x: number) =>
+  logsign * Math.exp(Math.log(logmin) + ((Math.log(logmax) - Math.log(logmin)) * x) / 100);
+
+export const mkLogToLinear = (logmin: number, logmax: number, logsign: number) => (y: number) =>
+  ((Math.log(y * logsign) - Math.log(logmin)) * 100) / (Math.log(logmax) - Math.log(logmin));

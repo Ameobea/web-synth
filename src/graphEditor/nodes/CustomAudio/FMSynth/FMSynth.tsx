@@ -78,6 +78,7 @@ export interface Adsr {
   loopPoint: number | null;
   releasePoint: number;
   audioThreadData: AudioThreadData;
+  logScale?: boolean;
 }
 
 const serializeADSR = (adsr: Adsr) => ({ ...adsr, audioThreadData: undefined });
@@ -90,6 +91,7 @@ export default class FMSynth implements ForeignNode {
   private outputWeights: ParamSource[] = new Array(OPERATOR_COUNT)
     .fill(null as any)
     .map(() => ({ type: 'constant' as const, value: 0 }));
+  private logScale = false;
   private operatorConfigs: OperatorConfig[] = new Array(OPERATOR_COUNT)
     .fill(undefined as any)
     .map(buildDefaultOperatorConfig);
@@ -175,6 +177,7 @@ export default class FMSynth implements ForeignNode {
         getFMSynthOutput: () => {
           throw new UnimplementedError();
         },
+        synthID: vcId ?? '',
       }),
     });
 
@@ -212,6 +215,7 @@ export default class FMSynth implements ForeignNode {
 
     this.awpHandle.port.postMessage({
       type: 'setWasmBytes',
+      logScale: this.logScale,
       wasmBytes,
       modulationMatrix: this.modulationMatrix.map(row =>
         row.map(cell => this.encodeParamSource(cell))
@@ -465,6 +469,7 @@ export default class FMSynth implements ForeignNode {
         lenSamples: newAdsr.lenSamples,
         releasePoint: newAdsr.releasePoint,
         loopPoint: newAdsr.loopPoint,
+        logScale: newAdsr.logScale ?? false,
       });
     }
   }
@@ -546,6 +551,15 @@ export default class FMSynth implements ForeignNode {
           this.encodeParamSource(effect.wet),
           this.encodeParamSource(effect.dry),
           this.encodeParamSource(effect.feedback),
+        ];
+      }
+      case 'moog filter': {
+        return [
+          7,
+          this.encodeParamSource(effect.cutoffFrequency),
+          this.encodeParamSource(effect.resonance),
+          this.encodeParamSource(effect.drive),
+          null,
         ];
       }
       default: {

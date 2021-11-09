@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use dsp::even_faster_pow;
+use dsp::{even_faster_pow, mk_linear_to_log};
 
 #[cfg(feature = "exports")]
 pub mod exports;
@@ -349,14 +349,22 @@ impl Adsr {
     }
 
     /// Populates `self.cur_frame_output` with samples for the current frame
-    pub fn render_frame(&mut self, scale: f32, shift: f32) {
+    pub fn render_frame(&mut self, scale: f32, shift: f32, log_scale: Option<[f32; 2]>) {
         match self.gate_status {
             GateStatus::Gated
                 if self.loop_point.is_none() && self.phase >= self.release_start_phase =>
             {
                 // No loop point, so we freeze the output value and avoid re-rendering until after
                 // ungating
-                let frozen_output = self.get_sample() * scale + shift;
+                let mut frozen_output = self.get_sample()
+                    * if log_scale.is_some() {
+                        100.
+                    } else {
+                        scale + shift
+                    };
+                if let Some([min, max]) = log_scale {
+                    frozen_output = mk_linear_to_log(min, max, max.signum())(frozen_output);
+                }
                 for i in 0..FRAME_SIZE {
                     self.cur_frame_output[i] = frozen_output;
                 }
@@ -375,10 +383,24 @@ impl Adsr {
             _ => (),
         }
 
-        for i in 0..FRAME_SIZE {
-            self.cur_frame_output[i] = self.get_sample() * scale + shift;
+        if log_scale.is_some() {
+            for i in 0..FRAME_SIZE {
+                self.cur_frame_output[i] = self.get_sample() * 100.;
+            }
+        } else {
+            for i in 0..FRAME_SIZE {
+                self.cur_frame_output[i] = self.get_sample() * scale + shift;
+            }
         }
         self.maybe_write_cur_phase();
+
+        if let Some([min, max]) = log_scale {
+            let linear_to_log = mk_linear_to_log(min, max, max.signum());
+
+            for i in 0..FRAME_SIZE {
+                self.cur_frame_output[i] = linear_to_log(self.cur_frame_output[i]);
+            }
+        }
     }
 
     pub fn get_cur_frame_output(&self) -> &[f32; FRAME_SIZE] { &self.cur_frame_output }

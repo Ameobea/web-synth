@@ -234,6 +234,11 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
           initial: 1000,
         },
         {
+          type: 'checkbox',
+          label: 'log scale',
+          initial: false,
+        },
+        {
           type: 'custom',
           label: 'adsr',
           initial: defaultAdsrEnvelope,
@@ -272,6 +277,10 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         }
         case 'adsr length ms': {
           dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(props.index, val));
+          return;
+        }
+        case 'log scale': {
+          dispatch(actionCreators.synthDesigner.SET_GAIN_LOG_SCALE(props.index, val));
           return;
         }
         case 'pitch multiplier': {
@@ -331,7 +340,7 @@ const SynthModuleCompInner: React.FC<{
   index: number;
   synth: SynthModule;
   stateKey: string;
-}> = ({ index, synth, stateKey, children = null, ...rest }) => {
+}> = ({ index, synth, stateKey, children = null }) => {
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
   const filterEnvelope = useMemo(
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
@@ -374,7 +383,7 @@ const SynthModuleCompInner: React.FC<{
         <WavetableControlPanel synth={synth} dispatch={dispatch} index={index} />
       ) : null}
       {synth.waveform === Waveform.FM && synth.fmSynth ? (
-        <ConnectedFMSynthUI synth={synth.fmSynth} />
+        <ConnectedFMSynthUI synth={synth.fmSynth} synthID={`${stateKey}_${index}`} />
       ) : null}
 
       <FilterModule

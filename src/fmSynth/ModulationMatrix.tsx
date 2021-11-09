@@ -110,6 +110,7 @@ interface OutputWeightSquareProps {
   isSelected: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  synthID: string;
 }
 
 const OutputWeightSquare: React.FC<OutputWeightSquareProps> = ({
@@ -119,6 +120,7 @@ const OutputWeightSquare: React.FC<OutputWeightSquareProps> = ({
   isSelected,
   onMouseEnter,
   onMouseLeave,
+  synthID,
 }) => {
   const val = outputWeights[operatorIx];
   const operatorWeight = val.type === 'constant' ? val.value : null;
@@ -142,6 +144,7 @@ const OutputWeightSquare: React.FC<OutputWeightSquareProps> = ({
       onClick={onClick}
       data-operator-ix={operatorIx}
       data-selected={isSelected ? 'true' : 'false'}
+      data-synth-id={synthID}
       key='output'
       className='operator-square output-weight'
       onMouseEnter={onMouseEnter}
@@ -173,6 +176,7 @@ interface ModulationMatrixProps {
   operatorConfigs: OperatorConfig[];
   outputWeights: ParamSource[];
   onOutputWeightSelected: (operatorIx: number) => void;
+  synthID: string;
 }
 
 export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
@@ -184,6 +188,7 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
   operatorConfigs,
   outputWeights,
   onOutputWeightSelected,
+  synthID,
 }) => {
   const [hoveredColIx, setHoveredColIx] = useState<number | null>(null);
   const [hoveredModulationEntity, setHoveredModulationEntity] = useState<string | null>(null);
@@ -228,6 +233,7 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
                 className={`operator-square${
                   srcOperatorIx === dstOperatorIx ? ' operator-square-feedback' : ''
                 }`}
+                data-synth-id={synthID}
                 key={dstOperatorIx}
                 onClick={() => onModulationIndexSelected(srcOperatorIx, dstOperatorIx)}
                 onMouseEnter={() => {
@@ -265,6 +271,7 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
                   setHoveredModulationEntity(null);
                 }
               }}
+              synthID={synthID}
             />
           </div>
         ))}

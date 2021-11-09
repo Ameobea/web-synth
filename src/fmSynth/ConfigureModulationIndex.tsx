@@ -12,8 +12,17 @@ const ConfigureModulationIndex: React.FC<{
   onChange: (srcOperatorIx: number, dstOperatorIx: number, newModulationIndex: ParamSource) => void;
   adsrs: Adsr[];
   onAdsrChange: AdsrChangeHandler;
-}> = ({ srcOperatorIx, dstOperatorIx, modulationIndices, onChange, adsrs, onAdsrChange }) => (
-  <div className='configure-modulation-index'>
+  synthID: string;
+}> = ({
+  srcOperatorIx,
+  dstOperatorIx,
+  modulationIndices,
+  onChange,
+  adsrs,
+  onAdsrChange,
+  synthID,
+}) => (
+  <div className='configure-modulation-index' data-synth-id={synthID}>
     <ConfigureParamSource
       title={
         <>

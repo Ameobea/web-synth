@@ -20,6 +20,7 @@ import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones'
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import { uuid4 } from '@sentry/utils';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -137,6 +138,7 @@ interface FMSynthUIProps {
   getFMSynthOutput: () => Promise<AudioNode>;
   midiNode: MIDINode;
   midiControlValuesCache: MIDIControlValuesCache;
+  synthID: string;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -158,6 +160,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   getFMSynthOutput,
   midiNode,
   midiControlValuesCache,
+  synthID,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -246,6 +249,11 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
         return;
       }
 
+      const id = operatorElem.getAttribute('data-synth-id');
+      if (id !== synthID) {
+        return;
+      }
+
       if (classNameIncludes(operatorElem.className, 'output-weight')) {
         const operatorIx = +operatorElem.getAttribute('data-operator-ix')!;
         setState(
@@ -278,7 +286,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
 
     window.addEventListener('wheel', handler, { passive: false });
     return () => window.removeEventListener('wheel', handler);
-  }, [state, updateBackendModulation, updateBackendOutput]);
+  }, [state, synthID, updateBackendModulation, updateBackendOutput]);
 
   const handleMainEffectChainChange = (effectIx: number, newEffect: Effect | null) => {
     const newMainEffectChain = [...state.mainEffectChain];
@@ -374,6 +382,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             (operatorIx: number) => setSelectedUI({ type: 'outputWeight', operatorIx }),
             [setSelectedUI]
           )}
+          synthID={synthID}
         />
 
         <div className='bottom-button-wrapper'>
@@ -489,6 +498,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             onChange={onModulationIndexChange}
             adsrs={state.adsrs}
             onAdsrChange={handleAdsrChange}
+            synthID={synthID}
           />
         ) : null}
         {selectedUI?.type === 'outputWeight' ? (
@@ -500,6 +510,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             onChange={newOutputWeight =>
               onOutputWeightChange(selectedUI.operatorIx, newOutputWeight)
             }
+            synthID={synthID}
           />
         ) : null}
         <div
@@ -515,7 +526,8 @@ export const ConnectedFMSynthUI: React.FC<{
   synth: FMSynth;
   getFMSynthOutput: () => Promise<AudioNode>;
   midiNode: MIDINode;
-}> = React.memo(({ synth, getFMSynthOutput, midiNode }) => (
+  synthID: string;
+}> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID }) => (
   <FMSynthUI
     updateBackendModulation={useCallback(
       (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
@@ -557,6 +569,7 @@ export const ConnectedFMSynthUI: React.FC<{
     getFMSynthOutput={getFMSynthOutput}
     midiNode={midiNode}
     midiControlValuesCache={synth.midiControlValuesCache}
+    synthID={synthID}
   />
 ));
 

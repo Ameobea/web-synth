@@ -141,11 +141,24 @@ pub unsafe extern "C" fn process_adsr(
     ctx: *mut AdsrContext,
     output_range_min: f32,
     output_range_max: f32,
+    log_scale: bool,
 ) -> f32 {
     let shift = output_range_min;
     let scale = output_range_max - output_range_min;
     for adsr in &mut (*ctx).adsrs {
-        adsr.render_frame(scale, shift);
+        let log_scale = if log_scale {
+            Some([
+                if output_range_min == 0. {
+                    0.01
+                } else {
+                    output_range_min
+                },
+                output_range_max,
+            ])
+        } else {
+            None
+        };
+        adsr.render_frame(scale, shift, log_scale);
     }
 
     (*ctx).adsrs[(*ctx).most_recent_gated_ix].phase

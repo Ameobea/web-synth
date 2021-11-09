@@ -10,6 +10,7 @@ import {
   midiKeyboardCtxByStateKey,
 } from 'src/midiKeyboard';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
+import { mkLinearToLog } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -30,6 +31,7 @@ export interface MidiKeyboardMappedOutputDescriptor {
   controlIndex: number;
   scale: number;
   shift: number;
+  logScale: boolean;
 }
 
 export interface MidiKeyboardStateItem {
@@ -54,7 +56,22 @@ export const computeMappedOutputValue = (
   outputDescriptor: MidiKeyboardMappedOutputDescriptor,
   rawValue: number
 ): number => {
-  return rawValue * outputDescriptor.scale + outputDescriptor.shift;
+  if (!outputDescriptor.logScale) {
+    return rawValue * outputDescriptor.scale + outputDescriptor.shift;
+  }
+
+  let [logmin, logmax] = [
+    0 * outputDescriptor.scale + outputDescriptor.shift,
+    127 * outputDescriptor.scale + outputDescriptor.shift,
+  ] as const;
+  if (logmin === 0) {
+    logmin = Math.sign(logmax) * 1e-6;
+  }
+  if (logmax === 0) {
+    logmax = Math.sign(logmin) * 1e-6;
+  }
+  const logValue = mkLinearToLog(logmin, logmax, 1)((rawValue / 127) * 100);
+  return logValue;
 };
 
 /**
@@ -281,7 +298,12 @@ const actionGroups = {
       );
 
       const inst = state[stateKey];
-      const newOutput: MidiKeyboardMappedOutputDescriptor = { controlIndex, scale: 1, shift: 0 };
+      const newOutput: MidiKeyboardMappedOutputDescriptor = {
+        controlIndex,
+        scale: 1,
+        shift: 0,
+        logScale: false,
+      };
       const newInst = { ...inst, mappedOutputs: [...inst.mappedOutputs, newOutput] };
 
       midiKeyboardCtx.outputDescriptorsByControlIndex = buildFreshOutputDescriptorsByControlIndex(
@@ -292,28 +314,36 @@ const actionGroups = {
       return { ...state, [stateKey]: newInst };
     },
   }),
-  SET_MAPPED_OUTPUT_SCALE_AND_SHIFT: buildActionGroup({
-    actionCreator: (stateKey: string, outputIx: number, scale: number, shift: number) => ({
-      type: 'SET_MAPPED_OUTPUT_SCALE_AND_SHIFT',
+  SET_MAPPED_OUTPUT_PARAMS: buildActionGroup({
+    actionCreator: (
+      stateKey: string,
+      outputIx: number,
+      scale: number,
+      shift: number,
+      logScale: boolean
+    ) => ({
+      type: 'SET_MAPPED_OUTPUT_PARAMS',
       outputIx,
       stateKey,
       scale,
       shift,
+      logScale,
     }),
-    subReducer: (state: MidiKeyboardState, { stateKey, outputIx, scale, shift }) => {
-      const outputDescriptor = state[stateKey].mappedOutputs[outputIx];
-      updateMappedOutputCSN(stateKey, outputIx, outputDescriptor);
+    subReducer: (state: MidiKeyboardState, { stateKey, outputIx, scale, shift, logScale }) => {
+      const newOutputDescriptor = {
+        ...state[stateKey].mappedOutputs[outputIx],
+        scale,
+        shift,
+        logScale,
+      };
+      updateMappedOutputCSN(stateKey, outputIx, newOutputDescriptor);
       const ctx = getMidiKeyboardCtx(stateKey);
 
       const newInst = {
         ...state[stateKey],
         mappedOutputs: R.set(
           R.lensIndex(outputIx),
-          {
-            ...state[stateKey].mappedOutputs[outputIx],
-            scale,
-            shift,
-          },
+          newOutputDescriptor,
           state[stateKey].mappedOutputs
         ),
       };

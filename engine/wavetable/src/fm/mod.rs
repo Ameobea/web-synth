@@ -469,7 +469,7 @@ impl FMSynthVoice {
 
         // Update and pre-render all ADSRs
         for adsr in &mut self.adsrs {
-            adsr.render_frame(1., 0.);
+            adsr.render_frame(1., 0., /* Some([0.01, 1.]) */ None);
             // for val in adsr.get_cur_frame_output() {
             //     if *val != 0. && !val.is_normal() {
             //         panic!();
@@ -1328,6 +1328,7 @@ pub unsafe extern "C" fn set_adsr(
     len_samples: f32,
     release_start_phase: f32,
     loop_point: f32,
+    log_scale: bool,
 ) {
     let shared_buffer = box [0.0f32; RENDERED_BUFFER_SIZE];
     let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
