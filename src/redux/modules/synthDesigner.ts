@@ -429,6 +429,7 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
       lengthMs: 2000,
       steps: buildDefaultADSR2Envelope({ phaseIndex: 0 }).steps,
       releaseStartPhase: 0.8,
+      logScale: true,
     },
     VOICE_COUNT
   );

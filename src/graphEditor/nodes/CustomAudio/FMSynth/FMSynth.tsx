@@ -197,6 +197,7 @@ export default class FMSynth implements ForeignNode {
       lenSamples: adsr.lenSamples,
       releasePoint: adsr.releasePoint,
       loopPoint: adsr.loopPoint,
+      logScale: adsr.logScale ?? false,
     };
   }
 

@@ -506,6 +506,7 @@ class ADSR2Instance {
   public app: PIXI.Application | undefined;
   private lengthMs = 1000;
   private outputRange: readonly [number, number] = [0, 1];
+  private logScale: boolean = false;
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
@@ -590,6 +591,7 @@ class ADSR2Instance {
     }
 
     this.outputRange = [...outputRange];
+    this.logScale = state.logScale ?? false;
     this.audioThreadData = state.audioThreadData;
     this.scaleMarkings.update(this.lengthMs, this.outputRange);
   }
@@ -676,6 +678,7 @@ class ADSR2Instance {
     this.onChange = onChange;
     this.ctx = ctx;
     this.outputRange = [...outputRange];
+    this.logScale = initialState.logScale ?? false;
 
     this.vizContainer = new PIXI.Container();
     this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
@@ -833,6 +836,7 @@ class ADSR2Instance {
       releasePoint: this.releasePoint,
       audioThreadData: this.audioThreadData!,
       outputRange: this.outputRange,
+      logScale: this.logScale,
     };
   }
 

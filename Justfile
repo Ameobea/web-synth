@@ -23,11 +23,11 @@ debug-sinsy:
   cp src/vocalSynthesis/build/sinsy.* ./public
 
 build-sinsy:
-  cd src/vocalSynthesis && just build
-  cp src/vocalSynthesis/build/sinsy.* ./public
+  # cd src/vocalSynthesis && just build
+  # cp src/vocalSynthesis/build/sinsy.* ./public
 
 remove-annoying-litegraph-warning:
-  sed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
+  gsed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
 
 build-all:
   just remove-annoying-litegraph-warning

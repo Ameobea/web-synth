@@ -171,10 +171,10 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
             max: 20_000,
             scale: 'log',
           },
-          // {
-          //   type: 'checkbox',
-          //   label: 'log scale',
-          // },
+          {
+            type: 'checkbox',
+            label: 'log scale',
+          },
           {
             type: 'button',
             label: 'add adsr',

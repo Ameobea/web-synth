@@ -14,20 +14,19 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
 
     this.isShutdown = false;
     this.outputRange = [0, 1];
-    this.logScale = false;
 
     this.port.onmessage = async evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
           this.outputRange = evt.data.outputRange;
-          this.logScale = evt.data.logScale;
           await this.initWasm(
             evt.data.wasmBytes,
             evt.data.encodedSteps,
             evt.data.loopPoint,
             evt.data.lenMs,
             evt.data.releaseStartPhase,
-            evt.data.outputRange
+            evt.data.outputRange,
+            evt.data.logScale
           );
           break;
         }
@@ -68,7 +67,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
           break;
         }
         case 'setLogScale': {
-          this.logScale = evt.data.logScale;
+          this.wasmInstance.exports.adsr_set_log_scale(this.ctxPtr, evt.data.logScale);
           break;
         }
         case 'shutdown': {
@@ -125,7 +124,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     stepBuf.set(encodedSteps);
   }
 
-  async initWasm(wasmBytes, encodedSteps, loopPoint, lenMs, releaseStartPhase) {
+  async initWasm(wasmBytes, encodedSteps, loopPoint, lenMs, releaseStartPhase, logScale) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule);
 
@@ -135,7 +134,8 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
       loopPoint ?? -1,
       lenMs,
       releaseStartPhase,
-      this.adsrInstanceCount
+      this.adsrInstanceCount,
+      logScale
     );
     this.outputBufPtrs = new Array(this.adsrInstanceCount)
       .fill(null)
@@ -165,8 +165,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     const curPhase = this.wasmInstance.exports.process_adsr(
       this.ctxPtr,
       this.outputRange[0],
-      this.outputRange[1],
-      this.logScale
+      this.outputRange[1]
     );
     // Record the current phase of the most recently gated ADSR which will be displayed
     // in the UI as an indicator on the ADSR UI

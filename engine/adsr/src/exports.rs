@@ -75,6 +75,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
     len_ms: f32,
     release_start_phase: f32,
     adsr_count: usize,
+    log_scale: bool,
 ) -> *mut AdsrContext {
     let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> =
         Rc::new(std::mem::MaybeUninit::uninit().assume_init());
@@ -95,6 +96,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
             release_start_phase,
             Rc::clone(&rendered),
             crate::EarlyReleaseConfig::default(),
+            log_scale,
         ));
     }
     adsrs[0].render();
@@ -141,24 +143,11 @@ pub unsafe extern "C" fn process_adsr(
     ctx: *mut AdsrContext,
     output_range_min: f32,
     output_range_max: f32,
-    log_scale: bool,
 ) -> f32 {
     let shift = output_range_min;
     let scale = output_range_max - output_range_min;
     for adsr in &mut (*ctx).adsrs {
-        let log_scale = if log_scale {
-            Some([
-                if output_range_min == 0. {
-                    0.01
-                } else {
-                    output_range_min
-                },
-                output_range_max,
-            ])
-        } else {
-            None
-        };
-        adsr.render_frame(scale, shift, log_scale);
+        adsr.render_frame(scale, shift);
     }
 
     (*ctx).adsrs[(*ctx).most_recent_gated_ix].phase
@@ -183,6 +172,11 @@ pub unsafe extern "C" fn adsr_set_release_start_phase(
     for adsr in &mut (*ctx).adsrs {
         adsr.set_release_start_phase(new_release_start_phase);
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn adsr_set_log_scale(ctx: *mut AdsrContext, index: usize, log_scale: bool) {
+    (*ctx).adsrs[index].log_scale = log_scale;
 }
 
 #[no_mangle]

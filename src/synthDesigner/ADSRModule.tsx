@@ -103,6 +103,7 @@ export class ADSR2Module {
       loopPoint: this.params.loopPoint,
       lenMs: this.params.lengthMs,
       outputRange: this.outputRange,
+      logScale: this.params.logScale ?? false,
     });
     this.onInitializedCbs.forEach(cb => cb());
     this.onInitializedCbs = [];
@@ -175,7 +176,6 @@ export class ADSR2Module {
     if (!this.awp) {
       return;
     }
-
     this.awp.port.postMessage({ type: 'setLogScale', logScale });
   }
 

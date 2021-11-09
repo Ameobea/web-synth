@@ -469,7 +469,7 @@ impl FMSynthVoice {
 
         // Update and pre-render all ADSRs
         for adsr in &mut self.adsrs {
-            adsr.render_frame(1., 0., /* Some([0.01, 1.]) */ None);
+            adsr.render_frame(1., 0.);
             // for val in adsr.get_cur_frame_output() {
             //     if *val != 0. && !val.is_normal() {
             //         panic!();
@@ -1345,6 +1345,7 @@ pub unsafe extern "C" fn set_adsr(
             release_start_phase,
             shared_buffer.clone(),
             EarlyReleaseConfig::default(),
+            log_scale,
         );
         if voice.adsrs.get(adsr_ix).is_some() {
             let old_phase = voice.adsrs[adsr_ix].phase;

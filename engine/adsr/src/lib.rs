@@ -142,6 +142,7 @@ pub struct Adsr {
     /// pointer.  This is used to facilitate rendering of ADSRs in the UI by sharing some memory
     /// containing the current phase of all active ADSRs.
     pub store_phase_to: Option<*mut f32>,
+    pub log_scale: bool,
 }
 
 const DEFAULT_FIRST_STEP: AdsrStep = AdsrStep {
@@ -158,6 +159,7 @@ impl Adsr {
         release_start_phase: f32,
         rendered: Rc<[f32; RENDERED_BUFFER_SIZE]>,
         early_release_config: EarlyReleaseConfig,
+        log_scale: bool,
     ) -> Self {
         Adsr {
             phase: 0.,
@@ -174,6 +176,7 @@ impl Adsr {
             len_samples,
             cached_phase_diff_per_sample: (1. / len_samples),
             store_phase_to: None,
+            log_scale,
         }
     }
 
@@ -349,20 +352,22 @@ impl Adsr {
     }
 
     /// Populates `self.cur_frame_output` with samples for the current frame
-    pub fn render_frame(&mut self, scale: f32, shift: f32, log_scale: Option<[f32; 2]>) {
+    pub fn render_frame(&mut self, scale: f32, shift: f32) {
         match self.gate_status {
             GateStatus::Gated
                 if self.loop_point.is_none() && self.phase >= self.release_start_phase =>
             {
                 // No loop point, so we freeze the output value and avoid re-rendering until after
                 // ungating
-                let mut frozen_output = self.get_sample()
-                    * if log_scale.is_some() {
-                        100.
-                    } else {
-                        scale + shift
-                    };
-                if let Some([min, max]) = log_scale {
+                let mut frozen_output =
+                    self.get_sample() * if self.log_scale { 100. } else { scale + shift };
+                if self.log_scale {
+                    let mut min = shift;
+                    let max = min + scale;
+                    if shift == 0. {
+                        min = if max > 0. { 0.01 } else { -0.01 };
+                    }
+
                     frozen_output = mk_linear_to_log(min, max, max.signum())(frozen_output);
                 }
                 for i in 0..FRAME_SIZE {
@@ -371,7 +376,7 @@ impl Adsr {
                 self.gate_status = GateStatus::GatedFrozen;
                 self.maybe_write_cur_phase();
                 return;
-            }
+            },
             GateStatus::Releasing if self.phase >= 1. => {
                 // If we are done, we output our final value forever and freeze the output buffer,
                 // not requiring any further rendering until we are re-gated
@@ -383,7 +388,7 @@ impl Adsr {
             _ => (),
         }
 
-        if log_scale.is_some() {
+        if self.log_scale {
             for i in 0..FRAME_SIZE {
                 self.cur_frame_output[i] = self.get_sample() * 100.;
             }
@@ -394,7 +399,12 @@ impl Adsr {
         }
         self.maybe_write_cur_phase();
 
-        if let Some([min, max]) = log_scale {
+        if self.log_scale {
+            let mut min = shift;
+            let max = min + scale;
+            if shift == 0. {
+                min = if max > 0. { 0.01 } else { -0.01 };
+            }
             let linear_to_log = mk_linear_to_log(min, max, max.signum());
 
             for i in 0..FRAME_SIZE {
