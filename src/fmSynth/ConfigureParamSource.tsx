@@ -5,7 +5,7 @@ import ControlPanel from 'react-control-panel';
 import ADSR2, { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
-import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { msToSamples, samplesToMs } from 'src/util';
@@ -89,7 +89,7 @@ export const buildDefaultParamSource = (
   }
 };
 
-export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): Adsr => ({
+export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): AdsrParams => ({
   steps: [
     { x: 0, y: 0, ramper: { type: 'linear' } }, // start
     { x: 0.05, y: 0.865, ramper: { type: 'exponential', exponent: 1 / 2 } }, // attack
@@ -97,10 +97,11 @@ export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): Adsr => ({
     { x: 0.93, y: 0.8, ramper: { type: 'exponential', exponent: 1 / 2 } }, // release
     { x: 1, y: 0, ramper: { type: 'exponential', exponent: 1 / 2 } }, // end
   ],
-  lenSamples: 44100,
+  lenSamples: { type: 'constant', value: 44100 },
   loopPoint: null,
   releasePoint: 0.7,
   audioThreadData: audioThreadData ?? { phaseIndex: 0 },
+  logScale: false,
 });
 
 interface ConfigureParamSourceProps {
@@ -108,7 +109,7 @@ interface ConfigureParamSourceProps {
   theme?: { [key: string]: any };
   state: ParamSource;
   onChange: (newState: ParamSource) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   min?: number;
   max?: number;
@@ -164,13 +165,13 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
             label: 'adsr index',
             options: new Array(adsrs.length).fill(0).map((_i, i) => i),
           },
-          {
-            type: 'range',
-            label: 'adsr length ms',
-            min: 1,
-            max: 20_000,
-            scale: 'log',
-          },
+          // {
+          //   type: 'range',
+          //   label: 'adsr length ms',
+          //   min: 1,
+          //   max: 20_000,
+          //   scale: 'log',
+          // },
           {
             type: 'checkbox',
             label: 'log scale',
@@ -264,26 +265,26 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
     }
   }, [state, excludedTypes, min, max, scale, step, adsrs, onAdsrChange, midiNode, onChange]);
 
+  const adsr = state.type === 'adsr' ? adsrs[state['adsr index']] : undefined;
+  console.log(adsr);
+
   return (
     <>
       <ControlPanel
         title={title}
         theme={theme}
-        style={{ width: 500 }}
+        width={500}
         settings={settings}
         state={{
           ...state,
           'buffer index':
             state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
           'output range':
-            state.type === 'adsr' || state.type === 'midi control'
+            (adsr && state.type === 'adsr') || state.type === 'midi control'
               ? [state.shift, state.shift + state.scale]
               : undefined,
-          adsr: state.type === 'adsr' ? adsrs[state['adsr index']] : undefined,
-          'log scale':
-            state.type === 'adsr' ? adsrs[state['adsr index']].logScale ?? false : undefined,
-          'adsr length ms':
-            state.type === 'adsr' ? samplesToMs(adsrs[state['adsr index']].lenSamples) : undefined,
+          adsr: adsr ? adsr : undefined,
+          'log scale': adsr ? adsr.logScale ?? false : undefined,
         }}
         onChange={(key: string, value: any) => {
           switch (key) {
@@ -317,11 +318,6 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
               onChange(updateState(state, { scale, shift }));
               break;
             }
-            case 'adsr length ms': {
-              const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-              onAdsrChange(adsrIx, { ...adsrs[adsrIx], lenSamples: msToSamples(value) });
-              break;
-            }
             case 'log scale': {
               const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
               onAdsrChange(adsrIx, { ...adsrs[adsrIx], logScale: value ?? false });
@@ -340,19 +336,56 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
           }
         }}
       />
-      {state.type === 'adsr' ? (
-        <ADSR2
-          width={490}
-          height={320}
-          initialState={{
-            ...adsrs[state['adsr index']],
-            outputRange: [state.shift, state.shift + state.scale],
-          }}
-          onChange={newAdsr => {
-            const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-            onAdsrChange(adsrIx, newAdsr);
-          }}
-        />
+      {state.type === 'adsr' && adsr ? (
+        <>
+          <ConfigureParamSource
+            title='adsr length ms'
+            adsrs={[]}
+            onAdsrChange={() => {
+              throw new UnreachableException('Cannot use ADSRs when configuring `adsr_length_ms`');
+            }}
+            state={
+              adsr.lenSamples.type === 'constant'
+                ? { type: 'constant', value: samplesToMs(adsr.lenSamples.value) }
+                : adsr.lenSamples
+            }
+            min={1}
+            max={20_000}
+            scale='log'
+            onChange={newLenMs => {
+              const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+              const lenSamples =
+                newLenMs.type === 'constant'
+                  ? { type: 'constant' as const, value: msToSamples(newLenMs.value) }
+                  : newLenMs;
+              onAdsrChange(adsrIx, {
+                ...adsrs[adsrIx],
+                lenSamples,
+              });
+            }}
+            excludedTypes={['adsr', 'base frequency multiplier']}
+            theme={theme}
+          />
+          <ADSR2
+            width={490}
+            height={320}
+            initialState={{
+              ...adsrs[state['adsr index']],
+              lenSamples:
+                adsrs[state['adsr index']].lenSamples.type === 'constant'
+                  ? (adsrs[state['adsr index']].lenSamples as any).value
+                  : 1000,
+              outputRange: [state.shift, state.shift + state.scale],
+            }}
+            onChange={newAdsr => {
+              const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+              onAdsrChange(adsrIx, {
+                ...newAdsr,
+                lenSamples: adsrs[state['adsr index']].lenSamples,
+              });
+            }}
+          />
+        </>
       ) : null}
     </>
   );

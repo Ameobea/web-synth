@@ -5,7 +5,7 @@ import { Option } from 'funfix-core';
 
 import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import FlatButton from 'src/misc/FlatButton';
-import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { getSentry } from 'src/sentry';
 import HelpIcon from 'src/misc/HelpIcon';
 
@@ -177,7 +177,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
 type EffectConfigurator<T> = React.FC<{
   state: Extract<Effect, { type: T }>;
   onChange: (newState: Effect | null) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
 }>;
 
@@ -458,7 +458,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
       onAdsrChange={onAdsrChange}
       theme={moogFilterTheme}
       min={1}
-      max={7000}
+      max={41_000 / 2 - 2000}
       scale='log'
       state={state.cutoffFrequency}
       onChange={cutoffFrequency => onChange({ ...state, cutoffFrequency })}
@@ -538,14 +538,14 @@ const EffectManagement: React.FC<{
   );
 };
 
-export type AdsrChangeHandler = (adsrIx: number, newValue: Adsr) => void;
+export type AdsrChangeHandler = (adsrIx: number, newValue: AdsrParams) => void;
 
 const EFFECT_BYPASS_SETTINGS = [{ type: 'checkbox', label: 'bypass' }];
 
 const ConfigureEffectSpecific: React.FC<{
   state: Effect;
   onChange: (newEffect: Effect | null) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
 }> = ({ state, onChange, adsrs, onAdsrChange }) => {
   const Comp: EffectConfigurator<any> = useMemo(
@@ -584,7 +584,7 @@ const ConfigureEffect: React.FC<{
   onChange: (newEffect: Effect | null) => void;
   operatorEffects: (Effect | null)[];
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
 }> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects, adsrs, onAdsrChange }) => (
   <div className='configure-effect'>
@@ -608,7 +608,7 @@ const ConfigureEffects: React.FC<{
   state: (Effect | null)[];
   onChange: (ix: number, newState: Effect | null) => void;
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   operatorIx: number | null;
 }> = ({ state, onChange, setOperatorEffects, operatorIx, adsrs, onAdsrChange }) => {

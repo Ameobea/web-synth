@@ -81,7 +81,16 @@ export interface Adsr {
   logScale?: boolean;
 }
 
-const serializeADSR = (adsr: Adsr) => ({ ...adsr, audioThreadData: undefined });
+export interface AdsrParams {
+  steps: AdsrStep[];
+  lenSamples: ParamSource;
+  loopPoint: number | null; // TODO: ParamSource
+  releasePoint: number; // TODO: ParamSource
+  logScale?: boolean;
+  audioThreadData: AudioThreadData;
+}
+
+const serializeADSR = (adsr: AdsrParams) => ({ ...adsr, audioThreadData: undefined });
 
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
@@ -99,7 +108,7 @@ export default class FMSynth implements ForeignNode {
     .fill(null as any)
     .map(() => new Array(16).fill(null));
   private mainEffectChain: (Effect | null)[] = new Array(16).fill(null);
-  private adsrs: Adsr[] = [buildDefaultAdsr()];
+  private adsrs: AdsrParams[] = [buildDefaultAdsr()];
   public selectedUI: UISelection | null = null;
   private onInitialized: ((inst: FMSynth) => void) | undefined;
   private audioThreadDataBuffer: Float32Array | null = null;
@@ -190,11 +199,11 @@ export default class FMSynth implements ForeignNode {
     return { x: step.x, y: step.y, ramper, param };
   }
 
-  private encodeAdsr(adsr: Adsr, adsrIx: number) {
+  private encodeAdsr(adsr: AdsrParams, adsrIx: number) {
     return {
       adsrIx,
       steps: adsr.steps.map(step => this.encodeAdsrStep(step)),
-      lenSamples: adsr.lenSamples,
+      lenSamples: this.encodeParamSource(adsr.lenSamples),
       releasePoint: adsr.releasePoint,
       loopPoint: adsr.loopPoint,
       logScale: adsr.logScale ?? false,
@@ -439,14 +448,14 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public handleAdsrChange(adsrIx: number, newAdsrRaw: Omit<Adsr, 'audioThreadData'>) {
+  public handleAdsrChange(adsrIx: number, newAdsrRaw: AdsrParams) {
     if (!this.awpHandle) {
       console.error('Tried to set ADSR before AWP initialization');
       return;
     }
 
     const isLenOnlyChange =
-      this.adsrs[adsrIx] && this.adsrs[adsrIx].lenSamples !== newAdsrRaw.lenSamples;
+      this.adsrs[adsrIx] && !R.equals(this.adsrs[adsrIx].lenSamples, newAdsrRaw.lenSamples);
     const newAdsr = R.clone({ ...newAdsrRaw, audioThreadData: undefined });
     this.adsrs[adsrIx] = {
       ...newAdsr,
@@ -460,14 +469,14 @@ export default class FMSynth implements ForeignNode {
       this.awpHandle.port.postMessage({
         type: 'setAdsrLength',
         adsrIx,
-        lenSamples: newAdsr.lenSamples,
+        lenSamples: this.encodeParamSource(newAdsr.lenSamples),
       });
     } else {
       this.awpHandle.port.postMessage({
         type: 'setAdsr',
         adsrIx,
         steps: newAdsr.steps.map(step => this.encodeAdsrStep(step)),
-        lenSamples: newAdsr.lenSamples,
+        lenSamples: this.encodeParamSource(newAdsr.lenSamples),
         releasePoint: newAdsr.releasePoint,
         loopPoint: newAdsr.loopPoint,
         logScale: newAdsr.logScale ?? false,
@@ -640,9 +649,14 @@ export default class FMSynth implements ForeignNode {
     }
     if (params.adsrs) {
       this.adsrs = params.adsrs.map(
-        (adsr: Exclude<Adsr, 'audioThreadData'>, i: number): Adsr => ({
+        (adsr: Exclude<Adsr, 'audioThreadData'>, i: number): AdsrParams => ({
           ...adsr,
           audioThreadData: { phaseIndex: i },
+          lenSamples:
+            adsr.lenSamples && typeof adsr.lenSamples === 'object'
+              ? adsr.lenSamples
+              : { type: 'constant' as const, value: adsr.lenSamples },
+          logScale: adsr.logScale ?? false,
         })
       );
     }

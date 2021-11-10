@@ -6,6 +6,7 @@ import ControlPanel from 'react-control-panel';
 
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { makeDraggable } from 'src/controls/pixiUtils';
+import { mkLinearToLog } from 'src/util';
 
 const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
@@ -401,6 +402,7 @@ class ScaleMarkings {
   private inst: ADSR2Instance;
   private g!: PIXI.Graphics;
   private lenMs: number;
+  private logScale = false;
   private outputRange: readonly [number, number];
   private texts: PIXI.Text[] = [];
 
@@ -412,12 +414,17 @@ class ScaleMarkings {
     this.render();
   }
 
-  public update(lenMs: number, outputRange: readonly [number, number]) {
-    if (lenMs === this.lenMs && R.equals(outputRange, this.outputRange)) {
+  public update(lenMs: number, outputRange: readonly [number, number], logScale: boolean) {
+    if (
+      lenMs === this.lenMs &&
+      R.equals(outputRange, this.outputRange) &&
+      this.logScale === logScale
+    ) {
       return;
     }
 
     this.outputRange = outputRange;
+    this.logScale = logScale;
 
     this.render();
   }
@@ -458,16 +465,21 @@ class ScaleMarkings {
 
     const horizontalAxisLineCount = this.computeHorizontalAxisLineCount();
     const horizontalAxisLineSpacing = this.inst.height / (horizontalAxisLineCount + 1);
+    const linearToLog = mkLinearToLog(0.001, 1, 1);
+    const scale = this.outputRange[1] - this.outputRange[0];
+    const shift = this.outputRange[0];
     for (let i = 0; i < horizontalAxisLineCount + 1; i++) {
       if (i !== horizontalAxisLineCount) {
         g.moveTo(1, (i + 1) * horizontalAxisLineSpacing);
         g.lineTo(this.inst.width - 2, (i + 1) * horizontalAxisLineSpacing);
       }
 
-      const scaledY =
-        this.outputRange[0] +
-        ((horizontalAxisLineCount + 1 - (i + 1)) / (horizontalAxisLineCount + 1)) *
-          (this.outputRange[1] - this.outputRange[0]);
+      const yPct = (horizontalAxisLineCount + 1 - (i + 1)) / (horizontalAxisLineCount + 1);
+      console.log({ yPct, log: linearToLog(yPct * 100) });
+      const scaledY = this.logScale
+        ? linearToLog(yPct * 100) * scale + shift
+        : yPct * scale + shift;
+
       const text = createText(scaledY);
       text.y = TOP_GUTTER_WIDTH_PX + (i + 1) * horizontalAxisLineSpacing - 12;
 
@@ -506,7 +518,7 @@ class ADSR2Instance {
   public app: PIXI.Application | undefined;
   private lengthMs = 1000;
   private outputRange: readonly [number, number] = [0, 1];
-  private logScale: boolean = false;
+  private logScale = false;
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
@@ -544,7 +556,7 @@ class ADSR2Instance {
 
   public onUpdated() {
     this.onChange(this.serialize());
-    this.scaleMarkings.update(this.lengthMs, this.outputRange);
+    this.scaleMarkings.update(this.lengthMs, this.outputRange, this.logScale);
   }
 
   private setSteps(newSteps: AdsrStep[]) {
@@ -593,7 +605,7 @@ class ADSR2Instance {
     this.outputRange = [...outputRange];
     this.logScale = state.logScale ?? false;
     this.audioThreadData = state.audioThreadData;
-    this.scaleMarkings.update(this.lengthMs, this.outputRange);
+    this.scaleMarkings.update(this.lengthMs, this.outputRange, this.logScale);
   }
 
   public setLengthMs(newLengthMs: number) {

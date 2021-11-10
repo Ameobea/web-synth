@@ -18,6 +18,8 @@ pub struct MoogFilter {
     cutoff: ParamSource,
     resonance: ParamSource,
     drive: ParamSource,
+
+    last_sample: f32,
 }
 
 impl MoogFilter {
@@ -30,6 +32,7 @@ impl MoogFilter {
             cutoff,
             resonance,
             drive,
+            last_sample: 0.,
         }
     }
 }
@@ -47,10 +50,10 @@ impl Effect for MoogFilter {
         _base_frequencies: &[f32; FRAME_SIZE],
         samples: &mut [f32; FRAME_SIZE],
     ) {
-        let mut dV0 = 0.;
-        let mut dV1 = 0.;
-        let mut dV2 = 0.;
-        let mut dV3 = 0.;
+        let mut dV0;
+        let mut dV1;
+        let mut dV2;
+        let mut dV3;
 
         // Param orderings:
         // [cutoff, resonance, drive]
@@ -58,37 +61,56 @@ impl Effect for MoogFilter {
         let resonances = &rendered_params[1];
         let drives = &rendered_params[2];
 
+        let mut last_sample = self.last_sample;
         for i in 0..samples.len() {
-            let cutoff = dsp::clamp(1., 22_100., cutoffs[i]);
-            let resonance = dsp::clamp(0., 20., resonances[i]);
-            let drive = drives[i];
+            let mut out_sample = 0.;
 
-            let x = (PI * cutoff) / SAMPLE_RATE as f32;
-            let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
+            if i > 0 {
+                last_sample = samples[i - 1];
+            }
 
-            dV0 =
-                -g * (tanh((drive * samples[i] + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
-            self.V[0] += (dV0 + self.dV[0]) / (2.0 * SAMPLE_RATE as f32);
-            self.dV[0] = dV0;
-            self.tV[0] = tanh(self.V[0] / (2.0 * VT));
+            // 2x oversampling
+            for j in 0..=1 {
+                let sample = if j == 0 {
+                    dsp::mix(0.5, last_sample, samples[i])
+                } else {
+                    samples[i]
+                };
 
-            dV1 = g * (self.tV[0] - self.tV[1]);
-            self.V[1] += (dV1 + self.dV[1]) / (2.0 * SAMPLE_RATE as f32);
-            self.dV[1] = dV1;
-            self.tV[1] = tanh(self.V[1] / (2.0 * VT));
+                let cutoff = dsp::clamp(1., 22_100., cutoffs[i]);
+                let resonance = dsp::clamp(0., 20., resonances[i]);
+                let drive = drives[i];
 
-            dV2 = g * (self.tV[1] - self.tV[2]);
-            self.V[2] += (dV2 + self.dV[2]) / (2.0 * SAMPLE_RATE as f32);
-            self.dV[2] = dV2;
-            self.tV[2] = tanh(self.V[2] / (2.0 * VT));
+                let x = (PI * cutoff) / SAMPLE_RATE as f32;
+                let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
-            dV3 = g * (self.tV[2] - self.tV[3]);
-            self.V[3] += (dV3 + self.dV[3]) / (2.0 * SAMPLE_RATE as f32);
-            self.dV[3] = dV3;
-            self.tV[3] = tanh(self.V[3] / (2.0 * VT));
+                dV0 =
+                    -g * (tanh((drive * sample + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
+                self.V[0] += (dV0 + self.dV[0]) / (2.0 * SAMPLE_RATE as f32);
+                self.dV[0] = dV0;
+                self.tV[0] = tanh(self.V[0] / (2.0 * VT));
 
-            samples[i] = self.V[3];
+                dV1 = g * (self.tV[0] - self.tV[1]);
+                self.V[1] += (dV1 + self.dV[1]) / (2.0 * SAMPLE_RATE as f32);
+                self.dV[1] = dV1;
+                self.tV[1] = tanh(self.V[1] / (2.0 * VT));
+
+                dV2 = g * (self.tV[1] - self.tV[2]);
+                self.V[2] += (dV2 + self.dV[2]) / (2.0 * SAMPLE_RATE as f32);
+                self.dV[2] = dV2;
+                self.tV[2] = tanh(self.V[2] / (2.0 * VT));
+
+                dV3 = g * (self.tV[2] - self.tV[3]);
+                self.V[3] += (dV3 + self.dV[3]) / (2.0 * SAMPLE_RATE as f32);
+                self.dV[3] = dV3;
+                self.tV[3] = tanh(self.V[3] / (2.0 * VT));
+
+                out_sample += self.V[3];
+            }
+
+            samples[i] = out_sample / 2.;
         }
+        self.last_sample = last_sample;
     }
 
     fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {

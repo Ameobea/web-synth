@@ -381,9 +381,15 @@ impl OscillatorSource {
 }
 
 #[derive(Clone)]
+pub struct AdsrParams {
+    len_samples: ParamSource,
+}
+
+#[derive(Clone)]
 pub struct FMSynthVoice {
     pub output: f32,
     pub adsrs: Vec<Adsr>,
+    pub adsr_params: Vec<AdsrParams>,
     pub operators: [Operator; OPERATOR_COUNT],
     pub last_samples: [f32; OPERATOR_COUNT],
     pub last_sample_frequencies_per_operator: [f32; OPERATOR_COUNT],
@@ -396,6 +402,7 @@ impl Default for FMSynthVoice {
         FMSynthVoice {
             output: 0.,
             adsrs: Vec::new(),
+            adsr_params: Vec::new(),
             operators: [
                 Operator::default(),
                 Operator::default(),
@@ -468,13 +475,15 @@ impl FMSynthVoice {
             unsafe { &mut *frequencies_per_operator_bufs.as_mut_ptr().add(1) };
 
         // Update and pre-render all ADSRs
-        for adsr in &mut self.adsrs {
+        for (adsr_ix, adsr) in self.adsrs.iter_mut().enumerate() {
+            // Compute derived length for the ADSR for this frame and set it in.  We only support
+            // k-rate ADSR length params for now; I don't think it will be a problem
+            let len_samples = self.adsr_params[adsr_ix]
+                .len_samples
+                // Cannot use ADSR or base frequency as param sources for ADSR length
+                .get(param_buffers, &[], 0, 0.);
+            adsr.set_len_samples(len_samples);
             adsr.render_frame(1., 0.);
-            // for val in adsr.get_cur_frame_output() {
-            //     if *val != 0. && !val.is_normal() {
-            //         panic!();
-            //     }
-            // }
         }
 
         // If necessary, compute detuned base frequency based off of detune param
@@ -1325,7 +1334,10 @@ pub unsafe extern "C" fn set_adsr(
     ctx: *mut FMSynthContext,
     adsr_ix: usize,
     step_count: usize,
-    len_samples: f32,
+    len_samples_type: usize,
+    len_samples_int_val: usize,
+    len_samples_float_val: f32,
+    len_samples_float_val_2: f32,
     release_start_phase: f32,
     loop_point: f32,
     log_scale: bool,
@@ -1341,12 +1353,20 @@ pub unsafe extern "C" fn set_adsr(
             } else {
                 Some(loop_point)
             },
-            len_samples,
+            0., // This will be overridden when ADSRs are rendered
             release_start_phase,
             shared_buffer.clone(),
             EarlyReleaseConfig::default(),
             log_scale,
         );
+        let params = AdsrParams {
+            len_samples: ParamSource::new(ParamSourceType::from_parts(
+                len_samples_type,
+                len_samples_int_val,
+                len_samples_float_val,
+                len_samples_float_val_2,
+            )),
+        };
         if voice.adsrs.get(adsr_ix).is_some() {
             let old_phase = voice.adsrs[adsr_ix].phase;
             let gate_status = voice.adsrs[adsr_ix].gate_status;
@@ -1366,6 +1386,7 @@ pub unsafe extern "C" fn set_adsr(
             };
             adsr.store_phase_to = store_phase_to;
             voice.adsrs[adsr_ix] = adsr;
+            voice.adsr_params[adsr_ix] = params;
         } else if voice.adsrs.len() != adsr_ix {
             panic!(
                 "Tried to set ADSR index {} but only {} adsrs exist",
@@ -1374,6 +1395,7 @@ pub unsafe extern "C" fn set_adsr(
             );
         } else {
             voice.adsrs.push(adsr);
+            voice.adsr_params.push(params);
         }
     }
     // Render the ADSR's shared buffer
@@ -1384,9 +1406,19 @@ pub unsafe extern "C" fn set_adsr(
 pub unsafe extern "C" fn set_adsr_length(
     ctx: *mut FMSynthContext,
     adsr_ix: usize,
-    adsr_len_samples: f32,
+    len_samples_type: usize,
+    len_samples_int_val: usize,
+    len_samples_float_val: f32,
+    len_samples_float_val_2: f32,
 ) {
+    let param = ParamSource::new(ParamSourceType::from_parts(
+        len_samples_type,
+        len_samples_int_val,
+        len_samples_float_val,
+        len_samples_float_val_2,
+    ));
+
     for voice in &mut (*ctx).voices {
-        voice.adsrs[adsr_ix].set_len_samples(adsr_len_samples);
+        voice.adsr_params[adsr_ix].len_samples = param.clone();
     }
 }

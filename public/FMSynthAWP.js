@@ -151,12 +151,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
           steps.forEach(({ x, y, ramper, param }, stepIx) => {
             this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
           });
-          console.log({ backend: logScale });
           this.wasmInstance.exports.set_adsr(
             this.ctxPtr,
             adsrIx,
             steps.length,
-            lenSamples,
+            lenSamples.valueType,
+            lenSamples.valParamInt,
+            lenSamples.valParamFloat,
+            lenSamples.valParamFloat2,
             releasePoint,
             loopPoint ?? -1.0,
             logScale ?? false
@@ -168,10 +170,14 @@ class FMSynthAWP extends AudioWorkletProcessor {
             console.error('Tried setting adsr length before Wasm instance loaded');
             return;
           }
+          const lenSamples = evt.data.lenSamples;
           this.wasmInstance.exports.set_adsr_length(
             this.ctxPtr,
             evt.data.adsrIx,
-            evt.data.lenSamples
+            lenSamples.valueType,
+            lenSamples.valParamInt,
+            lenSamples.valParamFloat,
+            lenSamples.valParamFloat2
           );
 
           break;
@@ -255,7 +261,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
         this.ctxPtr,
         adsrIx,
         steps.length,
-        lenSamples,
+        lenSamples.valueType,
+        lenSamples.valParamInt,
+        lenSamples.valParamFloat,
+        lenSamples.valParamFloat2,
         releasePoint,
         loopPoint ?? -1.0,
         logScale
