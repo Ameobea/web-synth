@@ -22,6 +22,10 @@ impl Bitcrusher {
     }
 
     fn discretize_sample(bit_depth: f32, sample: f32) -> f32 {
+        if bit_depth == 1. {
+            return sample;
+        }
+
         let amplitude_bucket_count = even_faster_pow2(bit_depth);
         let bucket_size = 2. / amplitude_bucket_count;
 

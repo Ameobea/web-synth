@@ -40,8 +40,57 @@ impl MoogFilter {
 fn tanh(x: f32) -> f32 { fastapprox::fast::tanh(x) }
 
 impl Effect for MoogFilter {
-    fn apply(&mut self, rendered_params: &[f32], base_frequency: f32, sample: f32) -> f32 {
-        todo!()
+    fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+        let cutoff = rendered_params[0];
+        let resonance = rendered_params[1];
+        let drive = rendered_params[2];
+
+        let mut dV0;
+        let mut dV1;
+        let mut dV2;
+        let mut dV3;
+
+        let mut out_sample = 0.;
+        // 2x oversampling
+        for j in 0..=1 {
+            let sample = if j == 0 {
+                dsp::mix(0.5, self.last_sample, sample)
+            } else {
+                sample
+            };
+
+            let cutoff = dsp::clamp(1., 22_100., cutoff);
+            let resonance = dsp::clamp(0., 20., resonance);
+            let drive = drive;
+
+            let x = (PI * cutoff) / SAMPLE_RATE as f32;
+            let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
+
+            dV0 = -g * (tanh((drive * sample + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
+            self.V[0] += (dV0 + self.dV[0]) / (2.0 * SAMPLE_RATE as f32);
+            self.dV[0] = dV0;
+            self.tV[0] = tanh(self.V[0] / (2.0 * VT));
+
+            dV1 = g * (self.tV[0] - self.tV[1]);
+            self.V[1] += (dV1 + self.dV[1]) / (2.0 * SAMPLE_RATE as f32);
+            self.dV[1] = dV1;
+            self.tV[1] = tanh(self.V[1] / (2.0 * VT));
+
+            dV2 = g * (self.tV[1] - self.tV[2]);
+            self.V[2] += (dV2 + self.dV[2]) / (2.0 * SAMPLE_RATE as f32);
+            self.dV[2] = dV2;
+            self.tV[2] = tanh(self.V[2] / (2.0 * VT));
+
+            dV3 = g * (self.tV[2] - self.tV[3]);
+            self.V[3] += (dV3 + self.dV[3]) / (2.0 * SAMPLE_RATE as f32);
+            self.dV[3] = dV3;
+            self.tV[3] = tanh(self.V[3] / (2.0 * VT));
+
+            out_sample += self.V[3];
+        }
+        self.last_sample = out_sample;
+
+        out_sample
     }
 
     fn apply_all(

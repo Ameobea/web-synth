@@ -365,7 +365,7 @@ impl Adsr {
                     let mut min = shift;
                     let max = min + scale;
                     if shift == 0. {
-                        min = if max > 0. { 0.001 } else { -0.001 };
+                        min = if max > 0. { 0.01 } else { -0.01 };
                     }
 
                     frozen_output = mk_linear_to_log(min, max, max.signum())(frozen_output);
@@ -376,7 +376,7 @@ impl Adsr {
                 self.gate_status = GateStatus::GatedFrozen;
                 self.maybe_write_cur_phase();
                 return;
-            },
+            }
             GateStatus::Releasing if self.phase >= 1. => {
                 // If we are done, we output our final value forever and freeze the output buffer,
                 // not requiring any further rendering until we are re-gated
@@ -403,7 +403,7 @@ impl Adsr {
             let mut min = shift;
             let max = min + scale;
             if shift == 0. {
-                min = if max > 0. { 0.001 } else { -0.001 };
+                min = if max > 0. { 0.01 } else { -0.01 };
             }
             let linear_to_log = mk_linear_to_log(min, max, max.signum());
 
