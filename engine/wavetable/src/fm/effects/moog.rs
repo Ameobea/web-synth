@@ -41,9 +41,9 @@ fn tanh(x: f32) -> f32 { fastapprox::fast::tanh(x) }
 
 impl Effect for MoogFilter {
     fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
-        let cutoff = rendered_params[0];
-        let resonance = rendered_params[1];
-        let drive = rendered_params[2];
+        let cutoff = unsafe { *rendered_params.get_unchecked(0) };
+        let resonance = unsafe { *rendered_params.get_unchecked(1) };
+        let drive = unsafe { *rendered_params.get_unchecked(2) };
 
         let mut dV0;
         let mut dV1;
@@ -106,9 +106,9 @@ impl Effect for MoogFilter {
 
         // Param orderings:
         // [cutoff, resonance, drive]
-        let cutoffs = &rendered_params[0];
-        let resonances = &rendered_params[1];
-        let drives = &rendered_params[2];
+        let cutoffs = unsafe { rendered_params.get_unchecked(0) };
+        let resonances = unsafe { rendered_params.get_unchecked(1) };
+        let drives = unsafe { rendered_params.get_unchecked(2) };
 
         let mut last_sample = self.last_sample;
         for i in 0..samples.len() {

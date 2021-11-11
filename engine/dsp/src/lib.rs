@@ -31,7 +31,15 @@ pub fn smooth(state: &mut f32, new_val: f32, smooth_factor: f32) {
 }
 
 #[inline]
-pub fn clamp(min: f32, max: f32, val: f32) -> f32 { val.max(min).min(max) }
+pub fn clamp(min: f32, max: f32, val: f32) -> f32 {
+    if val > max {
+        max
+    } else if val < min {
+        min
+    } else {
+        val
+    }
+}
 
 #[inline]
 pub fn mix(v1_pct: f32, v1: f32, v2: f32) -> f32 { (v1_pct * v1) + (1. - v1_pct) * v2 }

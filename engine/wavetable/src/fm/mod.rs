@@ -481,7 +481,7 @@ impl FMSynthVoice {
             let len_samples = self.adsr_params[adsr_ix]
                 .len_samples
                 // Cannot use ADSR or base frequency as param sources for ADSR length
-                .get(param_buffers, &[], 0, 0.);
+                .get_raw(param_buffers, &[], 0, 0.);
             adsr.set_len_samples(len_samples);
             adsr.render_frame(1., 0.);
         }
@@ -859,8 +859,9 @@ impl ParamSourceType {
                 scale,
                 shift,
             } => {
-                let value =
-                    unsafe { f32x4_splat(MIDI_CONTROL_VALUES[*control_index] * scale + shift) };
+                let value = unsafe {
+                    f32x4_splat(*MIDI_CONTROL_VALUES.get_unchecked(*control_index) * scale + shift)
+                };
 
                 let base_output_ptr = output_buf.as_ptr() as *mut v128;
                 for i in 0..FRAME_SIZE / 4 {
