@@ -15,9 +15,9 @@ pub struct MoogFilter {
     dV: [f32; 4],
     tV: [f32; 4],
 
-    cutoff: ParamSource,
-    resonance: ParamSource,
-    drive: ParamSource,
+    pub cutoff: ParamSource,
+    pub resonance: ParamSource,
+    pub drive: ParamSource,
 
     last_sample: f32,
 }

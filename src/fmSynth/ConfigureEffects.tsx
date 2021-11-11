@@ -57,6 +57,13 @@ export type EffectInner =
       cutoffFrequency: ParamSource;
       resonance: ParamSource;
       drive: ParamSource;
+    }
+  | {
+      type: 'comb filter';
+      delaySamples: ParamSource;
+      feedbackDelaySamples: ParamSource;
+      feedbackGain: ParamSource;
+      feedforwardGain: ParamSource;
     };
 
 export type Effect = EffectInner & {
@@ -75,6 +82,7 @@ const EFFECT_TYPE_SETTING = {
     'butterworth filter',
     'delay',
     'moog filter',
+    'comb filter',
   ] as Effect['type'][],
 };
 
@@ -143,6 +151,15 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         drive: { type: 'constant', value: 0.5 },
       };
     }
+    case 'comb filter': {
+      return {
+        type,
+        delaySamples: { type: 'constant', value: 4100 },
+        feedbackDelaySamples: { type: 'constant', value: 4100 },
+        feedforwardGain: { type: 'constant', value: 0.8 },
+        feedbackGain: { type: 'constant', value: 0.65 },
+      };
+    }
   }
 };
 
@@ -162,6 +179,7 @@ const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
 const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
 const moogFilterTheme = { ...baseTheme, background2: 'rgb(49,69,120)' };
+const combFilterTheme = { ...baseTheme, background2: 'rgb(148, 128, 79)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -172,6 +190,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'butterworth filter': butterworthFilterTheme,
   delay: delayTheme,
   'moog filter': moogFilterTheme,
+  'comb filter': combFilterTheme,
 };
 
 type EffectConfigurator<T> = React.FC<{
@@ -486,6 +505,58 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
   </>
 );
 
+const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => (
+  <>
+    <ConfigureParamSource
+      title='delay (samples)'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={combFilterTheme}
+      min={1}
+      max={44_100 * 4 - 1}
+      scale='log'
+      state={state.delaySamples}
+      onChange={delaySamples => onChange({ ...state, delaySamples })}
+    />
+    <ConfigureParamSource
+      title='feedforward gain'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={combFilterTheme}
+      min={0}
+      max={1}
+      state={state.feedforwardGain}
+      onChange={feedforwardGain => onChange({ ...state, feedforwardGain })}
+    />
+    <ConfigureParamSource
+      title='feedback delay (samples)'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={combFilterTheme}
+      min={1}
+      max={44_100 * 4 - 1}
+      scale='log'
+      state={state.feedbackDelaySamples}
+      onChange={feedbackDelaySamples => onChange({ ...state, feedbackDelaySamples })}
+    />
+    <ConfigureParamSource
+      title='feedback gain'
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      theme={combFilterTheme}
+      min={0}
+      max={1}
+      state={state.feedbackGain}
+      onChange={feedbackGain => onChange({ ...state, feedbackGain })}
+    />
+  </>
+);
+
 const EffectManagement: React.FC<{
   effectIx: number;
   operatorEffects: (Effect | null)[];
@@ -559,6 +630,7 @@ const ConfigureEffectSpecific: React.FC<{
         'butterworth filter': ConfigureButterworthFilter,
         delay: ConfigureDelay,
         'moog filter': ConfigureMoogFilter,
+        'comb filter': ConfigureCombFilter,
       }[state.type]),
     [state.type]
   );

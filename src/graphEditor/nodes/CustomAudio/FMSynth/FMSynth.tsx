@@ -572,6 +572,15 @@ export default class FMSynth implements ForeignNode {
           null,
         ];
       }
+      case 'comb filter': {
+        return [
+          8,
+          this.encodeParamSource(effect.delaySamples),
+          this.encodeParamSource(effect.feedbackDelaySamples),
+          this.encodeParamSource(effect.feedbackGain),
+          this.encodeParamSource(effect.feedforwardGain),
+        ];
+      }
       default: {
         throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);
       }

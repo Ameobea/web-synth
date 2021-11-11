@@ -475,7 +475,6 @@ class ScaleMarkings {
       }
 
       const yPct = (horizontalAxisLineCount + 1 - (i + 1)) / (horizontalAxisLineCount + 1);
-      console.log({ yPct, log: linearToLog(yPct * 100) });
       const scaledY = this.logScale
         ? linearToLog(yPct * 100) * scale + shift
         : yPct * scale + shift;

@@ -2,10 +2,13 @@ use dsp::circular_buffer::CircularBuffer;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
+use crate::fm::effects::comb_filter::CombFilter;
+
 use super::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod butterworth_filter;
+pub mod comb_filter;
 pub mod delay;
 pub mod moog;
 pub mod soft_clipper;
@@ -75,6 +78,7 @@ pub enum EffectInstance {
     ButterworthFilter(ButterworthFilter),
     Delay(Delay),
     MoogFilter(MoogFilter),
+    CombFilter(CombFilter),
 }
 
 impl EffectInstance {
@@ -267,6 +271,38 @@ impl EffectInstance {
 
                 EffectInstance::MoogFilter(moog_filter)
             },
+            8 => {
+                let comb_filter = CombFilter {
+                    input_buffer: box CircularBuffer::new(),
+                    feedback_buffer: box CircularBuffer::new(),
+                    delay_samples: ParamSource::new(ParamSourceType::from_parts(
+                        param_1_type,
+                        param_1_int_val,
+                        param_1_float_val,
+                        param_1_float_val_2,
+                    )),
+                    feedback_delay_samples: ParamSource::new(ParamSourceType::from_parts(
+                        param_2_type,
+                        param_2_int_val,
+                        param_2_float_val,
+                        param_2_float_val_2,
+                    )),
+                    feedback_gain: ParamSource::new(ParamSourceType::from_parts(
+                        param_3_type,
+                        param_3_int_val,
+                        param_3_float_val,
+                        param_3_float_val_2,
+                    )),
+                    feedforward_gain: ParamSource::new(ParamSourceType::from_parts(
+                        param_4_type,
+                        param_4_int_val,
+                        param_4_float_val,
+                        param_4_float_val_2,
+                    )),
+                };
+
+                EffectInstance::CombFilter(comb_filter)
+            },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
     }
@@ -433,6 +469,64 @@ impl EffectInstance {
                 ));
                 return true;
             },
+            7 => {
+                let moog_filter = match self {
+                    EffectInstance::MoogFilter(moog_filter) => moog_filter,
+                    _ => return false,
+                };
+
+                moog_filter.cutoff = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                    param_1_float_val_2,
+                ));
+                moog_filter.resonance = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                    param_2_float_val_2,
+                ));
+                moog_filter.drive = ParamSource::new(ParamSourceType::from_parts(
+                    param_3_type,
+                    param_3_int_val,
+                    param_3_float_val,
+                    param_3_float_val_2,
+                ));
+                return true;
+            },
+            8 => {
+                let comb_filter = match self {
+                    EffectInstance::CombFilter(comb_filter) => comb_filter,
+                    _ => return false,
+                };
+
+                comb_filter.delay_samples = ParamSource::new(ParamSourceType::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                    param_1_float_val_2,
+                ));
+                comb_filter.feedback_delay_samples = ParamSource::new(ParamSourceType::from_parts(
+                    param_2_type,
+                    param_2_int_val,
+                    param_2_float_val,
+                    param_2_float_val_2,
+                ));
+                comb_filter.feedback_gain = ParamSource::new(ParamSourceType::from_parts(
+                    param_3_type,
+                    param_3_int_val,
+                    param_3_float_val,
+                    param_3_float_val_2,
+                ));
+                comb_filter.feedforward_gain = ParamSource::new(ParamSourceType::from_parts(
+                    param_4_type,
+                    param_4_int_val,
+                    param_4_float_val,
+                    param_4_float_val_2,
+                ));
+                return true;
+            },
             _ => false,
         }
     }
@@ -450,6 +544,7 @@ impl Effect for EffectInstance {
                 e.apply(rendered_params, base_frequency, sample),
             EffectInstance::Delay(e) => e.apply(rendered_params, base_frequency, sample),
             EffectInstance::MoogFilter(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::CombFilter(e) => e.apply(rendered_params, base_frequency, sample),
         }
     }
 
@@ -475,6 +570,8 @@ impl Effect for EffectInstance {
             EffectInstance::Delay(e) => e.apply_all(rendered_params, base_frequencies, samples),
             EffectInstance::MoogFilter(e) =>
                 e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::CombFilter(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
         }
     }
 
@@ -488,6 +585,7 @@ impl Effect for EffectInstance {
             EffectInstance::ButterworthFilter(e) => e.get_params(buf),
             EffectInstance::Delay(e) => e.get_params(buf),
             EffectInstance::MoogFilter(e) => e.get_params(buf),
+            EffectInstance::CombFilter(e) => e.get_params(buf),
         }
     }
 }
