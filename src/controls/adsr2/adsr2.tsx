@@ -379,9 +379,9 @@ class DragBar {
   public handleDrag(newPosition: PIXI.Point) {
     // We're a child of the root container since we need to display outside of the main ADSR space, so
     // we have to manually constrain our x position to keep it inside of that range
-    const x = R.clamp(LEFT_GUTTER_WIDTH_PX, this.inst.width + RIGHT_GUTTER_WIDTH_PX, newPosition.x);
+    const x = R.clamp(LEFT_GUTTER_WIDTH_PX, LEFT_GUTTER_WIDTH_PX + this.inst.width, newPosition.x);
     this.g.x = x;
-    const newVal = (x - LEFT_GUTTER_WIDTH_PX) / this.inst.width;
+    const newVal = R.clamp(0, 1, (x - LEFT_GUTTER_WIDTH_PX) / this.inst.width);
     this.onDrag(newVal);
   }
 

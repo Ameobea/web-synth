@@ -312,6 +312,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
       return true;
     }
 
+    if (globalThis.globalTempoBPM) {
+      this.wasmInstance.exports.set_cur_bpm(globalThis.globalTempoBPM);
+    }
+
     let wasmMemory = this.getWasmMemoryBuffer();
     const baseFrequencyInputBufPtr = this.wasmInstance.exports.get_base_frequency_input_buffer_ptr(
       this.ctxPtr

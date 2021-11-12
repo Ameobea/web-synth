@@ -650,6 +650,9 @@ pub enum ParamSourceType {
         scale: f32,
         shift: f32,
     },
+    /// Converts the provided number of beats into samples.  If the cur BPM is 60, that equates to
+    /// 1 beat per second which comes out to 44_100 samples.
+    BeatsToSamples(f32),
 }
 
 #[derive(Clone)]
@@ -764,6 +767,13 @@ impl ParamSourceType {
                 scale,
                 shift,
             } => unsafe { MIDI_CONTROL_VALUES[*control_index] * *scale + *shift },
+            ParamSourceType::BeatsToSamples(beats) => {
+                let cur_bpm = crate::get_cur_bpm();
+                let cur_bps = cur_bpm / 60.;
+                let seconds_per_beat = 1. / cur_bps;
+                let samples_per_beat = seconds_per_beat * SAMPLE_RATE as f32;
+                samples_per_beat * *beats
+            },
         }
     }
 
@@ -787,6 +797,7 @@ impl ParamSourceType {
                 scale: value_param_float,
                 shift: value_param_float_2,
             },
+            5 => ParamSourceType::BeatsToSamples(value_param_float),
             _ => panic!("Invalid value type; expected [0,4]"),
         }
     }
@@ -868,6 +879,19 @@ impl ParamSourceType {
                     unsafe {
                         v128_store(base_output_ptr.add(i), value);
                     }
+                }
+            },
+            ParamSourceType::BeatsToSamples(beats) => {
+                let cur_bpm = crate::get_cur_bpm();
+                let cur_bps = cur_bpm / 60.;
+                let seconds_per_beat = 1. / cur_bps;
+                let samples_per_beat = seconds_per_beat * SAMPLE_RATE as f32;
+                let samples = samples_per_beat * *beats;
+
+                let splat = f32x4_splat(samples);
+                let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                for i in 0..FRAME_SIZE / 4 {
+                    unsafe { v128_store(base_output_ptr.add(i), splat) };
                 }
             },
         }

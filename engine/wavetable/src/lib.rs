@@ -11,6 +11,13 @@ use std::mem::{self, transmute};
 pub mod fm;
 pub mod lookup_tables;
 
+pub static mut CUR_BPM: f32 = 0.;
+
+#[no_mangle]
+pub unsafe extern "C" fn set_cur_bpm(bpm: f32) { CUR_BPM = bpm; }
+
+pub fn get_cur_bpm() -> f32 { unsafe { CUR_BPM } }
+
 pub struct WaveTableSettings {
     /// Number of `f32` samples in a single waveform
     pub waveform_length: usize,

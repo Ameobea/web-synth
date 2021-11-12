@@ -339,6 +339,14 @@ export default class FMSynth implements ForeignNode {
           valParamFloat2: source.shift,
         };
       }
+      case 'beats to samples': {
+        return {
+          valueType: 5,
+          valParamInt: 0,
+          valParamFloat: source.value,
+          valParamFloat2: 0,
+        };
+      }
       default: {
         throw new UnimplementedError(
           `frequency source not yet implemented: ${(source as any).type}`

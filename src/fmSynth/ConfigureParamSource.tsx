@@ -1,6 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import * as R from 'ramda';
 
 import ADSR2, { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
@@ -46,7 +47,8 @@ export type ParamSource =
       dstMIDINode: MIDINode;
       scale: number;
       shift: number;
-    };
+    }
+  | { type: 'beats to samples'; value: number };
 
 const buildTypeSetting = (excludedTypes?: ParamSource['type'][]) => ({
   type: 'select',
@@ -103,6 +105,67 @@ export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): AdsrParams 
   audioThreadData: audioThreadData ?? { phaseIndex: 0 },
   logScale: false,
 });
+
+const ADSRLengthTypePicker: React.FC<{
+  value: ParamSource;
+  onChange: (value: ParamSource) => void;
+  theme?: { [key: string]: any };
+}> = ({ value, onChange, theme }) => {
+  const state = useMemo(
+    () => ({ 'length type': value.type === 'beats to samples' ? [false, true] : [true, false] }),
+    [value.type]
+  );
+
+  return (
+    <ControlPanel
+      width={500}
+      theme={theme}
+      state={useMemo(() => R.clone(state), [state])}
+      settings={useMemo(
+        () => [{ type: 'multibox', label: 'length type', names: ['milliseconds', 'beats'] }],
+        []
+      )}
+      onChange={useCallback(
+        (_key: string, val: [boolean, boolean], _state: any) => {
+          const millisecondsToggled = state['length type'][0] !== val[0];
+          const beatsToggled = state['length type'][1] !== val[1];
+
+          if (!millisecondsToggled && !beatsToggled) {
+            return;
+          }
+
+          const nowIsMilliseconds = millisecondsToggled ? val[0] : !val[1];
+
+          if (nowIsMilliseconds) {
+            onChange({ type: 'constant', value: 1000 });
+          } else {
+            onChange({ type: 'beats to samples', value: 1 });
+          }
+        },
+        [onChange, state]
+      )}
+    />
+  );
+};
+
+const ADSRBeatLengthPicker: React.FC<{
+  value: Extract<ParamSource, { type: 'beats to samples' }>;
+  onChange: (value: ParamSource) => void;
+  theme?: { [key: string]: any };
+}> = ({ value, onChange, theme }) => (
+  <ControlPanel
+    width={500}
+    theme={theme}
+    settings={useMemo(() => [{ type: 'range', label: 'beats', min: 0, max: 32, step: 1 / 16 }], [])}
+    state={useMemo(() => ({ beats: value.value }), [value.value])}
+    onChange={useCallback(
+      (_key: string, value: number, _state: any) => {
+        onChange({ type: 'beats to samples', value });
+      },
+      [onChange]
+    )}
+  />
+);
 
 interface ConfigureParamSourceProps {
   title?: React.ReactNode;
@@ -337,34 +400,62 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
       />
       {state.type === 'adsr' && adsr ? (
         <>
-          <ConfigureParamSource
-            title='adsr length ms'
-            adsrs={[]}
-            onAdsrChange={() => {
-              throw new UnreachableException('Cannot use ADSRs when configuring `adsr_length_ms`');
-            }}
-            state={
-              adsr.lenSamples.type === 'constant'
-                ? { type: 'constant', value: samplesToMs(adsr.lenSamples.value) }
-                : adsr.lenSamples
-            }
-            min={1}
-            max={20_000}
-            scale='log'
-            onChange={newLenMs => {
+          <ADSRLengthTypePicker
+            value={adsr.lenSamples}
+            onChange={newLenSamples => {
               const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-              const lenSamples =
-                newLenMs.type === 'constant'
-                  ? { type: 'constant' as const, value: msToSamples(newLenMs.value) }
-                  : newLenMs;
+              console.log({ newLenSamples });
               onAdsrChange(adsrIx, {
                 ...adsrs[adsrIx],
-                lenSamples,
+                lenSamples: newLenSamples,
               });
             }}
-            excludedTypes={['adsr', 'base frequency multiplier']}
             theme={theme}
           />
+          {adsr.lenSamples.type === 'beats to samples' ? (
+            <ADSRBeatLengthPicker
+              value={adsr.lenSamples}
+              onChange={newLenSamples => {
+                const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+                onAdsrChange(adsrIx, {
+                  ...adsrs[adsrIx],
+                  lenSamples: newLenSamples,
+                });
+              }}
+              theme={theme}
+            />
+          ) : (
+            <ConfigureParamSource
+              title='adsr length ms'
+              adsrs={[]}
+              onAdsrChange={() => {
+                throw new UnreachableException(
+                  'Cannot use ADSRs when configuring `adsr_length_ms`'
+                );
+              }}
+              state={
+                adsr.lenSamples.type === 'constant'
+                  ? { type: 'constant', value: samplesToMs(adsr.lenSamples.value) }
+                  : adsr.lenSamples
+              }
+              min={1}
+              max={20_000}
+              scale='log'
+              onChange={newLenMs => {
+                const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+                const lenSamples =
+                  newLenMs.type === 'constant'
+                    ? { type: 'constant' as const, value: msToSamples(newLenMs.value) }
+                    : newLenMs;
+                onAdsrChange(adsrIx, {
+                  ...adsrs[adsrIx],
+                  lenSamples,
+                });
+              }}
+              excludedTypes={['adsr', 'base frequency multiplier']}
+              theme={theme}
+            />
+          )}
           <ADSR2
             width={490}
             height={320}

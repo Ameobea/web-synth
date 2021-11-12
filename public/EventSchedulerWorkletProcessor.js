@@ -108,6 +108,8 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
   }
 
   updateGlobalBeats(globalTempoBPM) {
+    globalThis.globalTempoBPM = globalTempoBPM;
+
     if (this.isStarted) {
       const passedTime = currentTime - this.lastRecordedTime;
       const passedBeats = (globalTempoBPM / 60) * passedTime;
