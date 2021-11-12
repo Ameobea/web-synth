@@ -952,6 +952,19 @@ impl ParamSourceType {
                     }
                 }
             },
+            ParamSourceType::BeatsToSamples(beats) => {
+                let cur_bpm = crate::get_cur_bpm();
+                let cur_bps = cur_bpm / 60.;
+                let seconds_per_beat = 1. / cur_bps;
+                let samples_per_beat = seconds_per_beat * SAMPLE_RATE as f32;
+                let samples = samples_per_beat * *beats;
+
+                for i in 0..FRAME_SIZE {
+                    unsafe {
+                        *output_buf.get_unchecked_mut(i) = samples;
+                    };
+                }
+            },
         }
     }
 }
