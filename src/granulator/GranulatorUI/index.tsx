@@ -24,6 +24,8 @@ export interface GranulatorControlPanelState {
   voice_2_movement_samples_per_sample: number;
 }
 
+const GRANULATOR_CONTROL_PANEL_STYLE = { marginTop: 20, width: 800 };
+
 const GranularControlPanel: React.FC<{
   vcId: string;
   initialState: GranulatorControlPanelState;
@@ -95,90 +97,103 @@ const GranularControlPanel: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onChange]);
 
+  const settings = useMemo(
+    () => [
+      {
+        label: 'grain_size',
+        type: 'range',
+        min: 0.1,
+        max: 44100,
+        scale: 'log',
+        initial: initialState.grain_size,
+      },
+      {
+        label: 'voice_1_samples_between_grains',
+        type: 'range',
+        min: 1,
+        max: 20_000,
+        scale: 'log',
+        initial: initialState.voice_1_samples_between_grains,
+      },
+      {
+        label: 'voice_2_samples_between_grains',
+        type: 'range',
+        min: 1,
+        max: 20_000,
+        scale: 'log',
+        initial: initialState.voice_2_samples_between_grains,
+      },
+      {
+        label: 'sample_speed_ratio',
+        type: 'range',
+        min: 0.1,
+        max: 10,
+        step: 0.1,
+        initial: initialState.sample_speed_ratio,
+      },
+      {
+        label: 'voice_1_filter_cutoff',
+        type: 'range',
+        min: -4000,
+        max: 4000,
+        initial: initialState.voice_1_filter_cutoff,
+        step: 10,
+      },
+      {
+        label: 'voice_2_filter_cutoff',
+        type: 'range',
+        min: -4000,
+        max: 4000,
+        initial: initialState.voice_2_filter_cutoff,
+        step: 10,
+      },
+      {
+        label: 'linear_slope_length',
+        type: 'range',
+        min: 0,
+        max: 1,
+        initial: initialState.linear_slope_length,
+        step: 0.01,
+      },
+      {
+        label: 'slope_linearity',
+        type: 'range',
+        min: 0,
+        max: 1,
+        initial: initialState.slope_linearity,
+        step: 0.01,
+      },
+      {
+        label: 'voice_1_movement_samples_per_sample',
+        type: 'range',
+        min: 0.0,
+        max: 4,
+        initial: initialState.voice_1_movement_samples_per_sample,
+      },
+      {
+        label: 'voice_2_movement_samples_per_sample',
+        type: 'range',
+        min: 0.0,
+        max: 4,
+        initial: initialState.voice_2_movement_samples_per_sample,
+      },
+    ],
+    [
+      initialState.grain_size,
+      initialState.linear_slope_length,
+      initialState.sample_speed_ratio,
+      initialState.slope_linearity,
+      initialState.voice_1_filter_cutoff,
+      initialState.voice_1_movement_samples_per_sample,
+      initialState.voice_1_samples_between_grains,
+      initialState.voice_2_filter_cutoff,
+      initialState.voice_2_movement_samples_per_sample,
+      initialState.voice_2_samples_between_grains,
+    ]
+  );
+
   return (
-    <ControlPanel
-      style={{ marginTop: 20, width: 800 }}
-      settings={[
-        {
-          label: 'grain_size',
-          type: 'range',
-          min: 0.1,
-          max: 44100,
-          scale: 'log',
-          initial: initialState.grain_size,
-        },
-        {
-          label: 'voice_1_samples_between_grains',
-          type: 'range',
-          min: 1,
-          max: 20_000,
-          scale: 'log',
-          initial: initialState.voice_1_samples_between_grains,
-        },
-        {
-          label: 'voice_2_samples_between_grains',
-          type: 'range',
-          min: 1,
-          max: 20_000,
-          scale: 'log',
-          initial: initialState.voice_2_samples_between_grains,
-        },
-        {
-          label: 'sample_speed_ratio',
-          type: 'range',
-          min: 0.01,
-          max: 10,
-          initial: initialState.sample_speed_ratio,
-        },
-        {
-          label: 'voice_1_filter_cutoff',
-          type: 'range',
-          min: -4000,
-          max: 4000,
-          initial: initialState.voice_1_filter_cutoff,
-          step: 10,
-        },
-        {
-          label: 'voice_2_filter_cutoff',
-          type: 'range',
-          min: -4000,
-          max: 4000,
-          initial: initialState.voice_2_filter_cutoff,
-          step: 10,
-        },
-        {
-          label: 'linear_slope_length',
-          type: 'range',
-          min: 0,
-          max: 1,
-          initial: initialState.linear_slope_length,
-          step: 0.01,
-        },
-        {
-          label: 'slope_linearity',
-          type: 'range',
-          min: 0,
-          max: 1,
-          initial: initialState.slope_linearity,
-          step: 0.01,
-        },
-        {
-          label: 'voice_1_movement_samples_per_sample',
-          type: 'range',
-          min: 0.0,
-          max: 4,
-          initial: initialState.voice_1_movement_samples_per_sample,
-        },
-        {
-          label: 'voice_2_movement_samples_per_sample',
-          type: 'range',
-          min: 0.0,
-          max: 4,
-          initial: initialState.voice_2_movement_samples_per_sample,
-        },
-      ]}
-      onChange={onChange}
-    />
+    <ControlPanel style={GRANULATOR_CONTROL_PANEL_STYLE} settings={settings} onChange={onChange} />
   );
 };
 

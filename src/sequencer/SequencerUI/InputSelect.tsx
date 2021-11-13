@@ -139,7 +139,7 @@ const SampleInput: React.FC<InputCompCommonProps<'sample'>> = ({
           const descriptor = await selectSample();
           const sampleData = await getSample(descriptor);
           dispatch(actionCreators.sequencer.ADD_SAMPLE(voiceIx, descriptor, sampleData));
-          dispatch(actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, { type: 'sample' }));
+          dispatch(actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, { type: 'sample', gain: 1 }));
         },
       },
     ],
@@ -194,13 +194,18 @@ const GateInput: React.FC<InputCompCommonProps<'gate'>> = ({
 
   return (
     <ControlPanel
-      style={{ width: 500 }}
+      width={500}
       title='configure gate'
       settings={settings}
       onChange={mkInputOnChange({ voiceIx, dispatch, actionCreators }, (key, val, _state) => {
         if (key === 'gate output index') {
           dispatch(
-            actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, { type: 'gate', gateIx: val })
+            actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
+              type: 'gate',
+              gateIx: val,
+              outputValue: 1,
+              ungate: true,
+            })
           );
         }
       })}
@@ -212,8 +217,8 @@ const GetDefaultVoiceTargetByTargetType: {
   [K in VoiceTarget['type']]: () => Extract<VoiceTarget, { type: K }>;
 } = {
   midi: () => ({ type: 'midi', synthIx: null, note: 40, editState: null }),
-  sample: () => ({ type: 'sample', sampleIx: null }),
-  gate: () => ({ type: 'gate', gateIx: null }),
+  sample: () => ({ type: 'sample', sampleIx: null, gain: 1 }),
+  gate: () => ({ type: 'gate', gateIx: null, outputValue: 1, ungate: true }),
 };
 
 const InputCompByTargetType: {

@@ -9,13 +9,20 @@ import { genRandomStringID } from 'src/util';
 import { setConnectionFlowingStatus } from 'src/graphEditor/GraphEditor';
 
 export type VoiceTarget =
-  | { type: 'sample' }
+  | {
+      type: 'sample';
+      gain: number;
+    }
   | {
       type: 'midi';
       synthIx: number | null;
-      note: number;
     }
-  | { type: 'gate'; gateIx: number | null };
+  | {
+      type: 'gate';
+      gateIx: number | null;
+      outputValue: number;
+      ungate: boolean;
+    };
 
 export enum SchedulerScheme {
   Stable,
@@ -24,18 +31,18 @@ export enum SchedulerScheme {
 }
 
 export type SequencerMark =
-  | { type: 'gate' }
   | { type: 'sample'; gain: number }
-  | { type: 'midi'; note: number; gain: number };
+  | { type: 'midi'; note: number }
+  | { type: 'gate'; outputValue: number; ungate: boolean };
 
 const buildDefaultSequencerMark = (voice: VoiceTarget): SequencerMark => {
   switch (voice.type) {
-    case 'gate':
-      return { type: 'gate' };
-    case 'midi':
-      return { type: 'midi', gain: 1, note: 60 };
     case 'sample':
-      return { type: 'sample', gain: 1 };
+      return { type: 'sample', gain: voice.gain };
+    case 'midi':
+      return { type: 'midi', note: 60 };
+    case 'gate':
+      return { type: 'gate', outputValue: voice.outputValue, ungate: voice.ungate };
   }
 };
 
@@ -104,6 +111,13 @@ interface SequencerInst extends SequencerReduxInfra {
 
 export const SequencerInstancesMap: Map<string, SequencerInst> = new Map();
 
+(window as any).getSequencer = () => {
+  if (SequencerInstancesMap.size === 1) {
+    return SequencerInstancesMap.get([...SequencerInstancesMap.keys()][0]);
+  }
+  return SequencerInstancesMap;
+};
+
 const actionGroups = {
   SET_STATE: buildActionGroup({
     actionCreator: (newState: SequencerReduxState) => ({ type: 'SET_STATE', newState }),
@@ -118,7 +132,7 @@ const actionGroups = {
           ...state.marks,
           { marks: R.times(() => null, state.marks[0]!.marks.length), rowID: genRandomStringID() },
         ],
-        voices: [...state.voices, { type: 'sample' as const, name: 'sample' }],
+        voices: [...state.voices, { type: 'sample' as const, name: 'sample', gain: 1 }],
       }),
   }),
   REMOVE_VOICE: buildActionGroup({
@@ -153,6 +167,10 @@ const actionGroups = {
       reschedule({
         ...state,
         marks: R.set(R.lensPath([rowIx, 'marks', colIx]), null, state.marks),
+        markEditState:
+          state.markEditState?.voiceIx === rowIx && state.markEditState?.editingMarkIx === colIx
+            ? null
+            : state.markEditState,
       }),
   }),
   TOGGLE_IS_PLAYING: buildActionGroup({
@@ -188,6 +206,16 @@ const actionGroups = {
         R.lensIndex(voiceIx),
         { ...newTarget, name: state.voices[voiceIx].name },
         state.voices
+      ),
+      marks: R.set(
+        R.lensIndex(voiceIx),
+        {
+          ...state.marks[voiceIx],
+          marks: state.marks[voiceIx].marks.map(mark =>
+            mark ? buildDefaultSequencerMark(newTarget) : null
+          ),
+        },
+        state.marks
       ),
     }),
   }),
@@ -448,7 +476,7 @@ export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
 export const buildInitialState = (vcId: string): SequencerReduxState => ({
   currentEditingVoiceIx: 0,
   activeBeats: [0],
-  voices: [{ type: 'sample' as const, name: 'sample' }],
+  voices: [{ type: 'sample' as const, name: 'sample', gain: 1 }],
   sampleBank: {},
   marks: [{ marks: R.times(() => null, DEFAULT_WIDTH), rowID: genRandomStringID() }],
   bpm: 80,

@@ -5,7 +5,8 @@
   "editor.lineHeight": 24,
   "workbench.colorTheme": "Gray Matter Dark",
   "[markdown]": {
-    "editor.quickSuggestions": true
+    "editor.quickSuggestions": true,
+    "editor.formatOnSave": false
   },
   "files.exclude": {
     "**/node_modules": true

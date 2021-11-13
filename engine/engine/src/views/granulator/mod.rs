@@ -33,7 +33,7 @@ impl ViewContext for Granulator {
     }
 
     fn get_audio_connectables(&self) -> JsValue {
-        js::get_granulator_audio_connectables(&self.get_state_key())
+        js::build_granulator_audio_connectables(&self.get_state_key())
     }
 
     fn list_used_samples(&self) -> Vec<JsValue> {

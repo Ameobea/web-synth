@@ -203,7 +203,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_SAMPLES(sampleBank));
   });
 
-  const state = {
+  const state: SequencerReduxState = {
     currentEditingVoiceIx,
     activeBeats: voices.map(() => 0),
     voices: voices.map(voice => ({ ...voice, name: voice.name ?? 'untitled' })),

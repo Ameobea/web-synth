@@ -175,3 +175,7 @@ debug-note-container:
   cd ./engine/note_container && cargo build --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/note_container.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/note_container* ./src/
+
+build-granular:
+  cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/granular.wasm ../../public

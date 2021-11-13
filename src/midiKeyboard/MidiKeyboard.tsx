@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useReducer, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import * as R from 'ramda';
 import { createSelector } from 'reselect';
 import { Piano, Keyboard } from 'react-piano';
@@ -83,7 +83,7 @@ export const MidiKeyboard: React.FC<{
   onRelease: (midiNumber: number) => void;
   style?: React.CSSProperties;
 }> = ({ octaveOffset, onOctaveOffsetChange, onAttack, onRelease, style }) => {
-  const [alreadyDownNotes, setAlreadyDownNotes] = useReducer(
+  const reducer = useCallback(
     (
       state: ImmSet<number>,
       action: { type: 'ADD' | 'REMOVE'; midiNumber: number } | { type: 'CLEAR' }
@@ -109,8 +109,9 @@ export const MidiKeyboard: React.FC<{
         throw new UnreachableException();
       }
     },
-    ImmSet()
+    [onAttack, onRelease]
   );
+  const [alreadyDownNotes, setAlreadyDownNotes] = useReducer(reducer, ImmSet());
 
   const playNote = useMemo(
     () => (midiNumber: number) => setAlreadyDownNotes({ type: 'ADD', midiNumber }),
@@ -154,14 +155,14 @@ export const MidiKeyboard: React.FC<{
         return;
       }
 
-      setAlreadyDownNotes({ type: 'ADD', midiNumber });
+      playNote(midiNumber);
     };
     const handleUp = (evt: KeyboardEvent) => {
       const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
       if (R.isNil(keyMap[evt.key.toLowerCase()])) {
         return;
       }
-      setAlreadyDownNotes({ type: 'REMOVE', midiNumber });
+      releaseNote(midiNumber);
     };
 
     document.addEventListener('keydown', handleDown);
@@ -211,8 +212,8 @@ export const MidiKeyboard: React.FC<{
             last: START_NOTE + 16 + octaveOffset * MIDI_NOTES_PER_OCTAVE + 1,
           }}
           activeNotes={activeNotes}
-          playNote={onAttack}
-          stopNote={onRelease}
+          playNote={playNote}
+          stopNote={releaseNote}
           renderNoteLabel={({
             midiNumber,
           }: {
@@ -290,6 +291,20 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
   );
 
   const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
+  const onOctaveOffsetChange = useCallback(
+    (newOctaveOffset: number) =>
+      dispatch(actionCreators.midiKeyboard.SET_OCTAVE_OFFSET(stateKey, newOctaveOffset)),
+    [stateKey]
+  );
+  const onAttack = useCallback(
+    midiNumber => midiNode?.outputCbs.forEach(cbs => cbs.onAttack(midiNumber, 255)),
+    [midiNode?.outputCbs]
+  );
+  const onRelease = useCallback(
+    midiNumber => midiNode?.outputCbs.forEach(cbs => cbs.onRelease(midiNumber, 255)),
+    [midiNode?.outputCbs]
+  );
+
   if (!midiNode) {
     return <Loading />;
   }
@@ -321,11 +336,9 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
       <MidiKeyboardModePicker stateKey={stateKey} />
       <MidiKeyboard
         octaveOffset={octaveOffset}
-        onOctaveOffsetChange={(newOctaveOffset: number) =>
-          dispatch(actionCreators.midiKeyboard.SET_OCTAVE_OFFSET(stateKey, newOctaveOffset))
-        }
-        onAttack={midiNumber => midiNode.outputCbs.forEach(cbs => cbs.onAttack(midiNumber, 255))}
-        onRelease={midiNumber => midiNode.outputCbs.forEach(cbs => cbs.onRelease(midiNumber, 255))}
+        onOctaveOffsetChange={onOctaveOffsetChange}
+        onAttack={onAttack}
+        onRelease={onRelease}
       />
     </div>
   );

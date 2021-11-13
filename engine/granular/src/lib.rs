@@ -448,13 +448,16 @@ pub fn render_granular(
         ctx.last_end_sample_ix = ctx.last_start_sample_ix;
     }
 
+    let linear_slope_length = clamp(0.001, 1.0, linear_slope_length);
+    let slope_linearity = clamp(0.001, 1.0, slope_linearity);
+
     for i in 0..FRAME_SIZE {
         let sample = ctx.get_sample(
             selection_start_sample_ix,
             selection_end_sample_ix,
             ctx.last_grain_size,
-            clamp(0.001, 1.0, linear_slope_length),
-            clamp(0.001, 1.0, slope_linearity),
+            linear_slope_length,
+            slope_linearity,
             voice_1_filter_cutoff,
             voice_2_filter_cutoff,
             voice_1_samples_between_grains,

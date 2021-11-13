@@ -80,6 +80,6 @@ export const SequencerBeatPlayerByVoiceType: {
     const holdDurationMS = beatDurationMS * 0.72;
 
     dstGate.offset.setValueAtTime(1.0, ctx.currentTime);
-    dstGate.offset.setValueAtTime(0.0, ctx.currentTime + holdDurationMS / 1000);
+    dstGate.offset.setValueAtTime(0.0, ctx.currentTime + holdDurationMS / 1000 - 0.0001);
   },
 };

@@ -160,7 +160,7 @@ extern "C" {
     pub fn cleanup_granulator(state_key: &str);
     pub fn hide_granulator(state_key: &str);
     pub fn unhide_granulator(state_key: &str);
-    pub fn get_granulator_audio_connectables(state_key: &str) -> JsValue;
+    pub fn build_granulator_audio_connectables(state_key: &str) -> JsValue;
     pub fn granulator_list_used_samples(vc_id: &str) -> Vec<JsValue>;
 }
 

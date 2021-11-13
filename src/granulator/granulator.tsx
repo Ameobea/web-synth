@@ -25,25 +25,24 @@ const GranulatorRegistered = new AsyncOnce(() =>
   )
 );
 
-export const GranulatorInstancesById = new Map<
-  string,
-  {
-    node: AudioWorkletNode;
-    startSample: OverridableAudioParam;
-    endSample: OverridableAudioParam;
-    grainSize: OverridableAudioParam;
-    voice1SamplesBetweenGrains: OverridableAudioParam;
-    voice2SamplesBetweenGrains: OverridableAudioParam;
-    sampleSpeedRatio: OverridableAudioParam;
-    voice1FilterCutoff: OverridableAudioParam;
-    voice2FilterCutoff: OverridableAudioParam;
-    linearSlopeLength: OverridableAudioParam;
-    slopeLinearity: OverridableAudioParam;
-    voice1MovementSamplesPerSample: OverridableAudioParam;
-    voice2MovementSamplesPerSample: OverridableAudioParam;
-    selectedSample: SampleDescriptor | null;
-  }
->();
+interface GranulatorInstance {
+  node: AudioWorkletNode;
+  startSample: OverridableAudioParam;
+  endSample: OverridableAudioParam;
+  grainSize: OverridableAudioParam;
+  voice1SamplesBetweenGrains: OverridableAudioParam;
+  voice2SamplesBetweenGrains: OverridableAudioParam;
+  sampleSpeedRatio: OverridableAudioParam;
+  voice1FilterCutoff: OverridableAudioParam;
+  voice2FilterCutoff: OverridableAudioParam;
+  linearSlopeLength: OverridableAudioParam;
+  slopeLinearity: OverridableAudioParam;
+  voice1MovementSamplesPerSample: OverridableAudioParam;
+  voice2MovementSamplesPerSample: OverridableAudioParam;
+  selectedSample: SampleDescriptor | null;
+}
+
+export const GranulatorInstancesById = new Map<string, GranulatorInstance>();
 
 const GranulatorUI = React.lazy(() => import('./GranulatorUI'));
 
@@ -126,7 +125,7 @@ const LazyGranulatorUI: React.FC<{
   </Suspense>
 );
 
-export const get_granulator_audio_connectables = (vcId: string): AudioConnectables => {
+export const build_granulator_audio_connectables = (vcId: string): AudioConnectables => {
   const inst = GranulatorInstancesById.get(vcId);
   if (!inst) {
     return {
@@ -134,6 +133,9 @@ export const get_granulator_audio_connectables = (vcId: string): AudioConnectabl
       inputs: ImmMap<string, ConnectableInput>()
         .set('start_sample', { type: 'number', node: new DummyNode() })
         .set('end sample', { type: 'number', node: new DummyNode() })
+        .set('filter cutoff', { type: 'number', node: new DummyNode() })
+        .set('sample speed ratio', { type: 'number', node: new DummyNode() })
+        .set('playhead movement speed ratio', { type: 'number', node: new DummyNode() })
         .set('recording_input', { type: 'customAudio', node: new DummyNode() }),
       outputs: ImmMap<string, ConnectableOutput>().set('output', {
         type: 'customAudio',
@@ -147,6 +149,12 @@ export const get_granulator_audio_connectables = (vcId: string): AudioConnectabl
     inputs: ImmMap<string, ConnectableInput>()
       .set('start_sample', { type: 'number', node: inst.startSample })
       .set('end sample', { type: 'number', node: inst.endSample })
+      .set('filter cutoff', { type: 'number', node: inst.voice1FilterCutoff })
+      .set('sample speed ratio', { type: 'number', node: inst.sampleSpeedRatio })
+      .set('playhead movement speed ratio', {
+        type: 'number',
+        node: inst.voice1MovementSamplesPerSample,
+      })
       .set('recording_input', { type: 'customAudio', node: inst.node }),
     outputs: ImmMap<string, ConnectableOutput>().set('output', {
       type: 'customAudio',
@@ -222,11 +230,11 @@ export const init_granulator = async (stateKey: string) => {
       inst.endSample.manualControl.offset.value = -1;
     }
     GranulatorInstancesById.set(vcId, inst);
-    updateConnectables(vcId, get_granulator_audio_connectables(vcId));
+    updateConnectables(vcId, build_granulator_audio_connectables(vcId));
   });
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
-  updateConnectables(vcId, get_granulator_audio_connectables(vcId));
+  updateConnectables(vcId, build_granulator_audio_connectables(vcId));
 
   mkContainerRenderHelper({
     Comp: LazyGranulatorUI,
