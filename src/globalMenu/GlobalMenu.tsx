@@ -49,8 +49,10 @@ const GlobalTempoControl: React.FC = () => {
           if (!Number.isNaN(parsed)) {
             parsed = R.clamp(0.5, 1200, parsed);
             setGlobalTempo(parsed);
+            setTempo(parsed.toFixed(1));
+          } else {
+            setTempo(value);
           }
-          setTempo(value);
         }}
       />
     </div>

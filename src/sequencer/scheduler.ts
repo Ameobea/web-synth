@@ -64,7 +64,7 @@ export const SequencerBeatPlayerByVoiceType: {
     state: SequencerReduxState,
     _voiceIx: number,
     voice: Extract<VoiceTarget, { type: 'gate' }>,
-    _mark?: Extract<SequencerMark, { type: 'gate' }>
+    mark?: Extract<SequencerMark, { type: 'gate' }>
   ) => {
     if (R.isNil(voice.gateIx)) {
       return;
@@ -72,14 +72,20 @@ export const SequencerBeatPlayerByVoiceType: {
 
     const dstGate = state.gateOutputs[voice.gateIx! as number];
     if (!dstGate) {
-      throw new Error(`No gate ix ${voice.gateIx} in state, but voice has it`);
+      console.error(`No gate ix ${voice.gateIx} in state, but voice has it`);
     }
 
     // TODO: Make the duration of the beat that the gate is activated for configurable
     const beatDurationMS = (state.bpm * 1000) / 60;
     const holdDurationMS = beatDurationMS * 0.72;
 
-    dstGate.offset.setValueAtTime(1.0, ctx.currentTime);
-    dstGate.offset.setValueAtTime(0.0, ctx.currentTime + holdDurationMS / 1000 - 0.0001);
+    dstGate?.offset.setValueAtTime(
+      mark?.params?.outputValue ?? voice.outputValue ?? 1.0,
+      ctx.currentTime
+    );
+    const ungate = mark?.params?.ungate ?? voice.ungate ?? true;
+    if (ungate !== false) {
+      dstGate?.offset.setValueAtTime(0.0, ctx.currentTime + holdDurationMS / 1000 - 0.0001);
+    }
   },
 };

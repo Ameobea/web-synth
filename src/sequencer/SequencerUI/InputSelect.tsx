@@ -10,6 +10,7 @@ import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
 import { VoiceTarget, SequencerReduxInfra } from '../redux';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { truncateWithElipsis } from 'src/util';
+import { UnreachableException } from 'ameo-utils';
 
 interface InputCompCommonProps<T> extends SequencerReduxInfra {
   voiceIx: number;
@@ -170,17 +171,35 @@ const GateInput: React.FC<InputCompCommonProps<'gate'>> = ({
   dispatch,
   voiceIx,
 }) => {
-  const gateOutputCount = useSelector(state => state.sequencer.gateOutputs.length);
+  const { gateOutputCount, voice } = useSelector(
+    ({ sequencer: state }) => ({
+      gateOutputCount: state.gateOutputs.length,
+      voice: state.voices[voiceIx],
+    }),
+    shallowEqual
+  );
+
+  if (voice.type !== 'gate') {
+    throw new UnreachableException();
+  }
 
   const settings = useMemo(
     () => [
       buildInputTypeSetting('gate'),
       {
+        type: 'text',
+        label: 'default output value',
+      },
+      {
+        type: 'checkbox',
+        label: 'ungate by default',
+      },
+      {
         type: 'select',
         label: 'gate output index',
         options: {
           none: 'None',
-          ...Object.fromEntries(R.times(i => i, gateOutputCount).map(i => [i, i + 1])),
+          ...Object.fromEntries(R.times(i => i, gateOutputCount).map(i => [i, i])),
         },
       },
       {
@@ -192,21 +211,50 @@ const GateInput: React.FC<InputCompCommonProps<'gate'>> = ({
     [actionCreators.sequencer, dispatch, gateOutputCount]
   );
 
+  const state = useMemo(
+    () => ({
+      'voice type': voice.type,
+      'gate output index': voice.gateIx,
+      'ungate by default': voice.ungate,
+      'default output value': voice.outputValue,
+    }),
+    [voice.gateIx, voice.outputValue, voice.type, voice.ungate]
+  );
+
   return (
     <ControlPanel
       width={500}
       title='configure gate'
       settings={settings}
+      state={state}
       onChange={mkInputOnChange({ voiceIx, dispatch, actionCreators }, (key, val, _state) => {
-        if (key === 'gate output index') {
-          dispatch(
-            actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
-              type: 'gate',
-              gateIx: val,
-              outputValue: 1,
-              ungate: true,
-            })
-          );
+        switch (key) {
+          case 'gate output index':
+            dispatch(
+              actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
+                ...voice,
+                gateIx: Number.isNaN(+val) ? null : +val,
+              })
+            );
+            break;
+          case 'default output value':
+            dispatch(
+              actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
+                ...voice,
+                outputValue: Number.isNaN(+val) ? voice.outputValue : +val,
+              })
+            );
+            break;
+          case 'ungate by default':
+            dispatch(
+              actionCreators.sequencer.SET_VOICE_TARGET(voiceIx, {
+                ...voice,
+                ungate: val,
+              })
+            );
+            break;
+          default:
+            throw new UnreachableException('Unhandled setting label: ' + key);
         }
       })}
     />

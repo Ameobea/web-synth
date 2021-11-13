@@ -279,6 +279,11 @@ export const get_sequencer_audio_connectables = (vcId: string): AudioConnectable
       acc.set(`midi_output_${i + 1}`, { node, type: 'midi' }),
     outputs
   );
+  outputs = reduxState.sequencer.gateOutputs.reduce(
+    (acc: ImmMap<string, ConnectableOutput>, node: ConstantSourceNode, i: number) =>
+      acc.set(`gate_output_${i}`, { node, type: 'number' }),
+    outputs
+  );
 
   return {
     vcId,

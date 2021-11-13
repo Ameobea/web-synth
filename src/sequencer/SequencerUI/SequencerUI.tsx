@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { shallowEqual } from 'react-redux';
 
 import FlatButton from 'src/misc/FlatButton';
+import ConfigureMark from 'src/sequencer/SequencerUI/ConfigureMark';
 import { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
@@ -171,11 +173,18 @@ const SequencerGrid: React.FC<SequencerGridProps> = ({ rows, ...reduxInfra }) =>
 };
 
 const SequencerUI: React.FC<SequencerReduxInfra> = reduxInfra => {
-  const marks = reduxInfra.useSelector(state => state.sequencer.marks);
+  const { marks, markEditState } = reduxInfra.useSelector(
+    state => ({ marks: state.sequencer.marks, markEditState: state.sequencer.markEditState }),
+    shallowEqual
+  );
 
   return (
     <div className='sequencer'>
       <SequencerGrid rows={marks} {...reduxInfra} />
+
+      {markEditState && markEditState.editingMarkIx !== null ? (
+        <ConfigureMark {...reduxInfra} />
+      ) : null}
 
       <SequencerSettings {...reduxInfra} />
 

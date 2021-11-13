@@ -31,18 +31,18 @@ export enum SchedulerScheme {
 }
 
 export type SequencerMark =
-  | { type: 'sample'; gain: number }
+  | { type: 'sample'; params: { gain: number } | null }
   | { type: 'midi'; note: number }
-  | { type: 'gate'; outputValue: number; ungate: boolean };
+  | { type: 'gate'; params: { outputValue: number; ungate: boolean } | null };
 
 const buildDefaultSequencerMark = (voice: VoiceTarget): SequencerMark => {
   switch (voice.type) {
     case 'sample':
-      return { type: 'sample', gain: voice.gain };
+      return { type: 'sample', params: null };
     case 'midi':
       return { type: 'midi', note: 60 };
     case 'gate':
-      return { type: 'gate', outputValue: voice.outputValue, ungate: voice.ungate };
+      return { type: 'gate', params: null };
   }
 };
 
@@ -207,16 +207,19 @@ const actionGroups = {
         { ...newTarget, name: state.voices[voiceIx].name },
         state.voices
       ),
-      marks: R.set(
-        R.lensIndex(voiceIx),
-        {
-          ...state.marks[voiceIx],
-          marks: state.marks[voiceIx].marks.map(mark =>
-            mark ? buildDefaultSequencerMark(newTarget) : null
-          ),
-        },
-        state.marks
-      ),
+      marks:
+        newTarget.type !== state.voices[voiceIx].type
+          ? R.set(
+              R.lensIndex(voiceIx),
+              {
+                ...state.marks[voiceIx],
+                marks: state.marks[voiceIx].marks.map(mark =>
+                  mark ? buildDefaultSequencerMark(newTarget) : null
+                ),
+              },
+              state.marks
+            )
+          : state.marks,
     }),
   }),
   ADD_MIDI_OUTPUT: buildActionGroup({
@@ -328,12 +331,6 @@ const actionGroups = {
       beatIx,
     }),
     subReducer: (state: SequencerReduxState, { voiceIx, beatIx }) => {
-      const voice = state.voices[voiceIx];
-      if (voice.type !== 'midi') {
-        console.error('Tried to toggle editing state on non-MIDI voice');
-        return state;
-      }
-
       const firstMarkedBeatIx = state.marks[voiceIx].marks.findIndex(R.identity);
       return {
         ...state,
@@ -445,8 +442,13 @@ export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
   const inputCbs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
       const reduxInfra = SequencerInstancesMap.get(vcId);
-      const state = reduxInfra?.getState();
-      if (R.isNil(state?.sequencer.markEditState?.editingMarkIx)) {
+      const state = reduxInfra?.getState()?.sequencer;
+      if (
+        !state ||
+        !state.markEditState ||
+        R.isNil(state.markEditState.editingMarkIx) ||
+        state.voices[state.markEditState.editingMarkIx].type !== 'midi'
+      ) {
         return;
       }
 
@@ -454,15 +456,10 @@ export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
       reduxInfra!.dispatch(reduxInfra!.actionCreators.sequencer.SET_MARK_STATE(newMark, true));
 
       // Play a single beat of the voice now if the sequencer isn't currently playing
-      if (!state!.sequencer.isPlaying) {
-        const voiceIx = state!.sequencer.markEditState!.voiceIx;
-        const voice = state!.sequencer.voices[voiceIx];
-        SequencerBeatPlayerByVoiceType[voice.type](
-          state!.sequencer,
-          voiceIx,
-          voice as any,
-          newMark as any
-        );
+      if (!state!.isPlaying) {
+        const voiceIx = state!.markEditState!.voiceIx;
+        const voice = state!.voices[voiceIx];
+        SequencerBeatPlayerByVoiceType[voice.type](state!, voiceIx, voice as any, newMark as any);
       }
     },
     onRelease: () => void 0,

@@ -47,3 +47,33 @@
     margin-top: 8px;
   }
 }
+
+.sample-editor-stats {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  background-color: #232323;
+
+  .sample-editor-stats-item {
+    display: flex;
+    flex-direction: row;
+    margin-right: 6px;
+    margin-bottom: 6px;
+    padding: 2px;
+
+    .sample-editor-stats-item-label {
+      display: block;
+      margin-right: 10px;
+      font-weight: bold;
+
+      ::after {
+        content: ':';
+      }
+    }
+
+    .sample-editor-stats-item-value {
+      display: block;
+    }
+  }
+}

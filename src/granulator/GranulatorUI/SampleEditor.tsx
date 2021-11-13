@@ -36,6 +36,28 @@ const computeClickPosMs = (
   return startMs + widthMs * xPercent;
 };
 
+interface SampleEditorStatsProps {
+  startMarkPosMs: number | null;
+  endMarkPosMs: number | null;
+}
+
+const SampleEditorStats: React.FC<SampleEditorStatsProps> = ({ startMarkPosMs, endMarkPosMs }) => (
+  <div className='sample-editor-stats'>
+    <div className='sample-editor-stats-item'>
+      <span className='sample-editor-stats-item-label'>Start</span>
+      <span className='sample-editor-stats-item-value'>
+        {startMarkPosMs !== null ? (startMarkPosMs * (44_100 / 1000)).toFixed(0) + ' samples' : '-'}
+      </span>
+    </div>
+    <div className='sample-editor-stats-item'>
+      <span className='sample-editor-stats-item-label'>End</span>
+      <span className='sample-editor-stats-item-value'>
+        {endMarkPosMs !== null ? (endMarkPosMs * (44_100 / 1000)).toFixed(0) + ' samples' : '-'}
+      </span>
+    </div>
+  </div>
+);
+
 const SampleEditorOverlay: React.FC<{
   width: number;
   height: number;
@@ -61,28 +83,30 @@ const SampleEditorOverlay: React.FC<{
 
       const selection = waveformRenderer.getSelection();
       if (startMarkElem.current) {
-        const x = (R.isNil(selection.startMarkPosMs)
-          ? 0
-          : posToPx(
-              waveformRenderer.getWidthPx(),
-              bounds.startMs,
-              bounds.endMs,
-              selection.startMarkPosMs ?? 0
-            )
+        const x = (
+          R.isNil(selection.startMarkPosMs)
+            ? 0
+            : posToPx(
+                waveformRenderer.getWidthPx(),
+                bounds.startMs,
+                bounds.endMs,
+                selection.startMarkPosMs ?? 0
+              )
         ).toString();
         startMarkElem.current.setAttribute('x1', x);
         startMarkElem.current.setAttribute('x2', x);
         startMarkElem.current.style.display = R.isNil(selection.startMarkPosMs) ? 'none' : 'inline';
       }
       if (endMarkElem.current) {
-        const x = (R.isNil(selection.endMarkPosMs)
-          ? 0
-          : posToPx(
-              waveformRenderer.getWidthPx(),
-              bounds.startMs,
-              bounds.endMs,
-              selection.endMarkPosMs ?? 0
-            )
+        const x = (
+          R.isNil(selection.endMarkPosMs)
+            ? 0
+            : posToPx(
+                waveformRenderer.getWidthPx(),
+                bounds.startMs,
+                bounds.endMs,
+                selection.endMarkPosMs ?? 0
+              )
         ).toString();
         endMarkElem.current.setAttribute('x1', x);
         endMarkElem.current.setAttribute('x2', x);
@@ -307,7 +331,7 @@ const SampleEditorOverlay: React.FC<{
           waveformRenderer.getSelection().endMarkPosMs ?? 0
         ).toString();
 
-  return (
+  const overlay = (
     <svg
       className='granulator-overlay'
       onClick={evt => {
@@ -426,13 +450,23 @@ const SampleEditorOverlay: React.FC<{
       />
     </svg>
   );
+
+  return (
+    <>
+      {overlay}
+      <SampleEditorStats
+        startMarkPosMs={waveformRenderer.getSelection().startMarkPosMs}
+        endMarkPosMs={waveformRenderer.getSelection().endMarkPosMs}
+      />
+    </>
+  );
 };
 
 const SampleEditor: React.FC<{
   waveformRenderer: WaveformRenderer;
 }> = ({ waveformRenderer }) => (
   <div
-    style={{ width: waveformRenderer.getWidthPx(), height: waveformRenderer.getHeightPx() }}
+    style={{ width: waveformRenderer.getWidthPx(), height: waveformRenderer.getHeightPx() + 140 }}
     className='granulator-wrapper'
   >
     <canvas
