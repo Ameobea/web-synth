@@ -7,7 +7,7 @@ import ConfigureParamSource, {
   buildDefaultParamSource,
   ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
-import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 /**
  * The algorithm used to produce the output for the operator.
@@ -50,16 +50,18 @@ export const buildDefaultOperatorConfig = (
   }
 };
 
-const ConfigureOperator: React.FC<{
+interface ConfigureOperatorProps {
   config: OperatorConfig;
   onChange: (newConfig: OperatorConfig) => void;
   effects: (Effect | null)[];
   onEffectsChange: (effectIx: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
   operatorIx: number;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
-}> = ({
+}
+
+const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   config,
   onChange,
   effects,

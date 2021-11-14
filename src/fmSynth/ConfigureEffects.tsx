@@ -1,5 +1,5 @@
 import { filterNils } from 'ameo-utils';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Option } from 'funfix-core';
 
@@ -193,9 +193,19 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'comb filter': combFilterTheme,
 };
 
+const EMPTY_ADSRS: AdsrParams[] = [];
+
+const adsrsMemoHelper = (param: ParamSource, adsrs: AdsrParams[]): AdsrParams[] => {
+  // If the effect doesn't deal with ADSRs, don't bother re-rendering when ADSRs change
+  if (param.type !== 'adsr') {
+    return EMPTY_ADSRS;
+  }
+  return adsrs;
+};
+
 type EffectConfigurator<T> = React.FC<{
   state: Extract<Effect, { type: T }>;
-  onChange: (newState: Effect | null) => void;
+  onChange: (newState: Partial<Effect> | null) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
 }>;
@@ -209,21 +219,21 @@ const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({
   <>
     <ConfigureParamSource
       theme={spectralWarpTheme}
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.frequency, adsrs)}
       onAdsrChange={onAdsrChange}
       title='frequency'
       state={state.frequency}
-      onChange={newFrequency => onChange({ ...state, frequency: newFrequency })}
+      onChange={useCallback(newFrequency => onChange({ frequency: newFrequency }), [onChange])}
       min={0}
       max={20_000}
     />
     <ConfigureParamSource
       theme={spectralWarpTheme}
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.warpFactor, adsrs)}
       onAdsrChange={onAdsrChange}
       title='warp factor'
       state={state.warpFactor}
-      onChange={newWarpFactor => onChange({ ...state, warpFactor: newWarpFactor })}
+      onChange={useCallback(newWarpFactor => onChange({ warpFactor: newWarpFactor }), [onChange])}
       min={0}
       max={1}
     />
@@ -239,41 +249,41 @@ const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
   <>
     <ConfigureParamSource
       theme={wavecruncherTheme}
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.topFoldPosition, adsrs)}
       onAdsrChange={onAdsrChange}
       title='top fold position'
       state={state.topFoldPosition}
-      onChange={topFoldPosition => onChange({ ...state, topFoldPosition })}
+      onChange={useCallback(topFoldPosition => onChange({ topFoldPosition }), [onChange])}
       min={0}
       max={1}
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.topFoldWidth, adsrs)}
       onAdsrChange={onAdsrChange}
       title='top fold width'
       state={state.topFoldWidth}
-      onChange={topFoldWidth => onChange({ ...state, topFoldWidth })}
+      onChange={useCallback(topFoldWidth => onChange({ topFoldWidth }), [onChange])}
       min={0}
       max={1}
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.bottomFoldPosition, adsrs)}
       onAdsrChange={onAdsrChange}
       title='bottom fold position'
       state={state.bottomFoldPosition}
-      onChange={bottomFoldPosition => onChange({ ...state, bottomFoldPosition })}
+      onChange={useCallback(bottomFoldPosition => onChange({ bottomFoldPosition }), [onChange])}
       min={-1}
       max={0}
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.bottomFoldWidth, adsrs)}
       onAdsrChange={onAdsrChange}
       title='bottom fold width'
       state={state.bottomFoldWidth}
-      onChange={bottomFoldWidth => onChange({ ...state, bottomFoldWidth })}
+      onChange={useCallback(bottomFoldWidth => onChange({ bottomFoldWidth }), [onChange])}
       min={0}
       max={1}
     />
@@ -289,25 +299,25 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
   <>
     <ConfigureParamSource
       title='sample rate'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.sampleRate, adsrs)}
       scale='log'
       onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
       min={100}
       max={44_100}
       state={state.sampleRate}
-      onChange={sampleRate => onChange({ ...state, sampleRate })}
+      onChange={useCallback(sampleRate => onChange({ sampleRate }), [onChange])}
     />
     <ConfigureParamSource
       title='bit depth'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.bitDepth, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
       min={1}
-      max={16}
+      max={32}
       scale='log'
       state={state.bitDepth}
-      onChange={bitDepth => onChange({ ...state, bitDepth })}
+      onChange={useCallback(bitDepth => onChange({ bitDepth }), [onChange])}
     />
   </>
 );
@@ -321,23 +331,23 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
   <>
     <ConfigureParamSource
       title='gain'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.gain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={wavefolderTheme}
       min={0}
       max={16}
       state={state.gain}
-      onChange={gain => onChange({ ...state, gain })}
+      onChange={useCallback(gain => onChange({ gain }), [onChange])}
     />
     <ConfigureParamSource
       title='offset'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.offset, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={wavefolderTheme}
       min={0}
       max={8}
       state={state.offset}
-      onChange={offset => onChange({ ...state, offset })}
+      onChange={useCallback(offset => onChange({ offset }), [onChange])}
     />
   </>
 );
@@ -359,31 +369,34 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
   <>
     <ControlPanel
       theme={softClipperTheme}
-      style={{ width: 500 }}
+      width={500}
       settings={SOFT_CLIPPER_ALGORITHM_SETTINGS}
-      state={{ algorithm: state.algorithm }}
-      onChange={(_key: string, val: SoftClipperAlgorithm) => onChange({ ...state, algorithm: val })}
+      state={useMemo(() => ({ algorithm: state.algorithm }), [state.algorithm])}
+      onChange={useCallback(
+        (_key: string, val: SoftClipperAlgorithm) => onChange({ algorithm: val }),
+        [onChange]
+      )}
     />
     <ConfigureParamSource
       title='pre gain'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.preGain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={softClipperTheme}
       min={0.1}
       max={50}
       scale='log'
       state={state.preGain}
-      onChange={preGain => onChange({ ...state, preGain })}
+      onChange={useCallback(preGain => onChange({ preGain }), [onChange])}
     />
     <ConfigureParamSource
       title='post gain'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.postGain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={softClipperTheme}
       min={0.1}
       max={5}
       state={state.postGain}
-      onChange={postGain => onChange({ ...state, postGain })}
+      onChange={useCallback(postGain => onChange({ postGain }), [onChange])}
     />
   </>
 );
@@ -406,7 +419,7 @@ const ConfigureButterworthFilter: EffectConfigurator<'butterworth filter'> = ({
     />
     <ConfigureParamSource
       title='cutoff frequency'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.cutoffFrequency, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={butterworthFilterTheme}
       min={10}
@@ -422,7 +435,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
   <>
     <ConfigureParamSource
       title='delay_samples'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.delaySamples, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={delayTheme}
       min={1}
@@ -433,7 +446,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
     />
     <ConfigureParamSource
       title='wet'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.wet, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={delayTheme}
       min={0}
@@ -443,7 +456,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
     />
     <ConfigureParamSource
       title='dry'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.dry, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={delayTheme}
       min={0}
@@ -453,7 +466,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
     />
     <ConfigureParamSource
       title='feedback'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.feedback, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={delayTheme}
       min={0}
@@ -473,34 +486,34 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
   <>
     <ConfigureParamSource
       title='cutoff frequency'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.cutoffFrequency, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={moogFilterTheme}
       min={1}
       max={41_000 / 2 - 2000}
       scale='log'
       state={state.cutoffFrequency}
-      onChange={cutoffFrequency => onChange({ ...state, cutoffFrequency })}
+      onChange={useCallback(cutoffFrequency => onChange({ cutoffFrequency }), [onChange])}
     />
     <ConfigureParamSource
       title='resonance'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.resonance, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={moogFilterTheme}
       min={0.3}
       max={4.5}
       state={state.resonance}
-      onChange={resonance => onChange({ ...state, resonance })}
+      onChange={useCallback(resonance => onChange({ resonance }), [onChange])}
     />
     <ConfigureParamSource
       title='drive'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.drive, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={moogFilterTheme}
       min={0}
       max={5}
       state={state.drive}
-      onChange={drive => onChange({ ...state, drive })}
+      onChange={useCallback(drive => onChange({ drive }), [onChange])}
     />
   </>
 );
@@ -514,45 +527,45 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
   <>
     <ConfigureParamSource
       title='delay (samples)'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.delaySamples, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={combFilterTheme}
       min={1}
       max={44_100 * 4 - 1}
       scale='log'
       state={state.delaySamples}
-      onChange={delaySamples => onChange({ ...state, delaySamples })}
+      onChange={useCallback(delaySamples => onChange({ delaySamples }), [onChange])}
     />
     <ConfigureParamSource
       title='feedforward gain'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.feedforwardGain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={combFilterTheme}
       min={0}
       max={1}
       state={state.feedforwardGain}
-      onChange={feedforwardGain => onChange({ ...state, feedforwardGain })}
+      onChange={useCallback(feedforwardGain => onChange({ feedforwardGain }), [onChange])}
     />
     <ConfigureParamSource
       title='feedback delay (samples)'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.feedbackDelaySamples, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={combFilterTheme}
       min={1}
       max={44_100 * 4 - 1}
       scale='log'
       state={state.feedbackDelaySamples}
-      onChange={feedbackDelaySamples => onChange({ ...state, feedbackDelaySamples })}
+      onChange={useCallback(feedbackDelaySamples => onChange({ feedbackDelaySamples }), [onChange])}
     />
     <ConfigureParamSource
       title='feedback gain'
-      adsrs={adsrs}
+      adsrs={adsrsMemoHelper(state.feedbackGain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={combFilterTheme}
       min={0}
       max={1}
       state={state.feedbackGain}
-      onChange={feedbackGain => onChange({ ...state, feedbackGain })}
+      onChange={useCallback(feedbackGain => onChange({ feedbackGain }), [onChange])}
     />
   </>
 );
@@ -613,52 +626,71 @@ export type AdsrChangeHandler = (adsrIx: number, newValue: AdsrParams) => void;
 
 const EFFECT_BYPASS_SETTINGS = [{ type: 'checkbox', label: 'bypass' }];
 
-const ConfigureEffectSpecific: React.FC<{
+const EFFECT_CONFIGURATOR_BY_EFFECT_TYPE: { [K in Effect['type']]: EffectConfigurator<K> } = {
+  'spectral warping': React.memo(ConfigureSpectralWarping),
+  wavecruncher: React.memo(ConfigureWavecruncher),
+  bitcrusher: React.memo(ConfigureBitcrusher),
+  wavefolder: React.memo(ConfigureWavefolder),
+  'soft clipper': React.memo(ConfigureSoftClipper),
+  'butterworth filter': React.memo(ConfigureButterworthFilter),
+  delay: React.memo(ConfigureDelay),
+  'moog filter': React.memo(ConfigureMoogFilter),
+  'comb filter': React.memo(ConfigureCombFilter),
+};
+
+interface ConfigureEffectSpecificProps {
   state: Effect;
-  onChange: (newEffect: Effect | null) => void;
+  onChange: (newEffect: Partial<Effect> | null) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
-}> = ({ state, onChange, adsrs, onAdsrChange }) => {
+}
+
+const ConfigureEffectSpecific: React.FC<ConfigureEffectSpecificProps> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+}) => {
   const Comp: EffectConfigurator<any> = useMemo(
-    () =>
-      ({
-        'spectral warping': ConfigureSpectralWarping,
-        wavecruncher: ConfigureWavecruncher,
-        bitcrusher: ConfigureBitcrusher,
-        wavefolder: ConfigureWavefolder,
-        'soft clipper': ConfigureSoftClipper,
-        'butterworth filter': ConfigureButterworthFilter,
-        delay: ConfigureDelay,
-        'moog filter': ConfigureMoogFilter,
-        'comb filter': ConfigureCombFilter,
-      }[state.type]),
+    () => EFFECT_CONFIGURATOR_BY_EFFECT_TYPE[state.type],
     [state.type]
   );
 
   return (
     <>
       <ControlPanel
-        style={{ width: 500 }}
+        width={500}
         settings={EFFECT_BYPASS_SETTINGS}
-        state={{ bypass: state.isBypassed ?? false }}
-        onChange={(_key: string, val: boolean) => {
-          onChange({ ...state, isBypassed: val });
-        }}
+        state={useMemo(() => ({ bypass: state.isBypassed ?? false }), [state.isBypassed])}
+        onChange={useCallback(
+          (_key: string, val: boolean) => onChange({ ...state, isBypassed: val }),
+          [onChange, state]
+        )}
       />
       <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />
     </>
   );
 };
 
-const ConfigureEffect: React.FC<{
+interface ConfigureEffectProps {
   effectIx: number;
   state: Effect;
-  onChange: (newEffect: Effect | null) => void;
+  onChange: (newEffect: Partial<Effect> | null) => void;
   operatorEffects: (Effect | null)[];
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
-}> = ({ effectIx, operatorEffects, state, onChange, setOperatorEffects, adsrs, onAdsrChange }) => (
+}
+
+const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
+  effectIx,
+  operatorEffects,
+  state,
+  onChange,
+  setOperatorEffects,
+  adsrs,
+  onAdsrChange,
+}) => (
   <div className='configure-effect'>
     <EffectManagement
       effectIx={effectIx}
@@ -676,70 +708,94 @@ const ConfigureEffect: React.FC<{
   </div>
 );
 
-const ConfigureEffects: React.FC<{
+interface ConfigureEffectsProps {
   state: (Effect | null)[];
-  onChange: (ix: number, newState: Effect | null) => void;
+  onChange: (ix: number, newState: Partial<Effect> | null) => void;
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   operatorIx: number | null;
-}> = ({ state, onChange, setOperatorEffects, operatorIx, adsrs, onAdsrChange }) => {
-  const [selectedEffectType, setSelectedEffectType] = useState<Effect['type']>('spectral warping');
+}
 
-  return (
-    <div className='configure-effects'>
-      <ControlPanel
-        title={
-          operatorIx === null ? (
-            <>
-              {'main effect chain '}
-              <HelpIcon link='fm-synth-main-effect-chain' color='rgb(161, 161, 161)' size={12} />
-            </>
-          ) : (
-            `operator ${operatorIx + 1} effects`
-          )
-        }
-        style={{ width: 500 }}
-      />
-      <div className='effects-controls'>
-        {filterNils(state).map((effect, i) => (
-          <ConfigureEffect
-            effectIx={i}
-            key={i}
-            state={effect}
-            onChange={newEffect => onChange(i, newEffect)}
-            operatorEffects={state}
-            setOperatorEffects={setOperatorEffects}
-            adsrs={adsrs}
-            onAdsrChange={onAdsrChange}
-          />
-        ))}
-      </div>
+interface ConfigureEffectsState {
+  selectedEffectType: Effect['type'];
+}
 
-      <ControlPanel
-        state={{ 'effect type': selectedEffectType }}
-        style={{ width: 470 }}
-        onChange={(_key: string, val: any) => setSelectedEffectType(val)}
-        settings={[
-          EFFECT_TYPE_SETTING,
-          {
-            type: 'button',
-            label: 'add effect',
-            action: () => {
-              getSentry()?.captureMessage('Add FM Synth Effect', { extra: { selectedEffectType } });
-              const activeEffectCount = state.filter(e => e).length;
-              if (activeEffectCount === state.length) {
-                // Max effect count reached
-                return;
-              }
+const MAX_EFFECT_COUNT = 16;
 
-              onChange(activeEffectCount, buildDefaultEffect(selectedEffectType));
+class ConfigureEffects extends React.Component<ConfigureEffectsProps, ConfigureEffectsState> {
+  constructor(props: ConfigureEffectsProps) {
+    super(props);
+
+    this.state = { selectedEffectType: 'moog filter' };
+
+    this.effectChangeHandlers = new Array(MAX_EFFECT_COUNT)
+      .fill(null)
+      .map((_, i) => effectUpdate => this.props.onChange(i, effectUpdate));
+  }
+
+  private effectChangeHandlers: ((newEffect: Partial<Effect> | null) => void)[];
+
+  public render() {
+    const { state, onChange, setOperatorEffects, operatorIx, adsrs, onAdsrChange } = this.props;
+
+    return (
+      <div className='configure-effects'>
+        <ControlPanel
+          title={
+            operatorIx === null ? (
+              <>
+                {'main effect chain '}
+                <HelpIcon link='fm-synth-main-effect-chain' color='rgb(161, 161, 161)' size={12} />
+              </>
+            ) : (
+              `operator ${operatorIx + 1} effects`
+            )
+          }
+          style={{ width: 500 }}
+        />
+        <div className='effects-controls'>
+          {filterNils(state).map((effect, i) => (
+            <ConfigureEffect
+              effectIx={i}
+              key={i}
+              state={effect}
+              onChange={this.effectChangeHandlers[i]}
+              operatorEffects={state}
+              setOperatorEffects={setOperatorEffects}
+              adsrs={adsrs}
+              onAdsrChange={onAdsrChange}
+            />
+          ))}
+        </div>
+
+        <ControlPanel
+          state={{ 'effect type': this.state.selectedEffectType }}
+          width={470}
+          onChange={(_key: string, val: any) => this.setState({ selectedEffectType: val })}
+          settings={[
+            EFFECT_TYPE_SETTING,
+            {
+              type: 'button',
+              label: 'add effect',
+              action: () => {
+                getSentry()?.captureMessage('Add FM Synth Effect', {
+                  extra: { selectedEffectType: this.state.selectedEffectType },
+                });
+                const activeEffectCount = state.filter(e => e).length;
+                if (activeEffectCount === state.length) {
+                  // Max effect count reached
+                  return;
+                }
+
+                onChange(activeEffectCount, buildDefaultEffect(this.state.selectedEffectType));
+              },
             },
-          },
-        ]}
-      />
-    </div>
-  );
-};
+          ]}
+        />
+      </div>
+    );
+  }
+}
 
 export default ConfigureEffects;

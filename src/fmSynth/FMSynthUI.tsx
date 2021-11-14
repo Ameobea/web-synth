@@ -6,7 +6,7 @@ import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
 import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
-import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import ConfigureParamSource, {
@@ -20,7 +20,6 @@ import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones'
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
-import { uuid4 } from '@sentry/utils';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -28,7 +27,7 @@ interface FMSynthState {
   operatorConfigs: OperatorConfig[];
   operatorEffects: (Effect | null)[][];
   mainEffectChain: (Effect | null)[];
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   detune: ParamSource | null;
 }
 
@@ -92,7 +91,7 @@ const ConfigureMainEffectChain: React.FC<{
   mainEffectChain: (Effect | null)[];
   onChange: (ix: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
 }> = ({ mainEffectChain, onChange, setEffects, adsrs, onAdsrChange }) => (
   <ConfigureEffects
@@ -131,7 +130,7 @@ interface FMSynthUIProps {
   setEffect: (operatorIx: number | null, effectIx: number, effect: Effect | null) => void;
   initialSelectedUI?: UISelection | null;
   onSelectedUIChange: (newSelectedUI: UISelection | null) => void;
-  adsrs: Adsr[];
+  adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   detune: ParamSource | null;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
@@ -288,7 +287,10 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     return () => window.removeEventListener('wheel', handler);
   }, [state, synthID, updateBackendModulation, updateBackendOutput]);
 
-  const handleMainEffectChainChange = (effectIx: number, newEffect: Effect | null) => {
+  const handleMainEffectChainChange = (effectIx: number, effectUpdate: Partial<Effect> | null) => {
+    const oldEffect = state.mainEffectChain[effectIx] ?? {};
+    const newEffect = effectUpdate ? { ...oldEffect, ...(effectUpdate as any) } : effectUpdate;
+
     const newMainEffectChain = [...state.mainEffectChain];
     newMainEffectChain[effectIx] = newEffect;
     if (!newEffect) {
@@ -308,12 +310,17 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     setState({ ...state, mainEffectChain: newMainEffectChain });
   };
 
-  const handleEffectChange = (effectIx: number, newEffect: Effect | null) => {
+  const handleEffectChange = (effectIx: number, effectUpdate: Partial<Effect> | null) => {
     if (selectedUI?.type !== 'operator') {
       console.warn('UI invariant in handleEffectChange');
       return;
     }
     const { index: selectedOperatorIx } = selectedUI;
+
+    const oldEffect = state.operatorEffects[selectedOperatorIx][effectIx] ?? {};
+    const newEffect: Effect | null = effectUpdate
+      ? { ...oldEffect, ...(effectUpdate as any) }
+      : effectUpdate;
 
     setEffect(selectedOperatorIx, effectIx, newEffect);
     const newState = { ...state };
@@ -338,14 +345,19 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     setState(newState);
   };
 
-  const handleAdsrChange = (adsrIx: number, newAdsr: Adsr) => {
-    onAdsrChange(adsrIx, newAdsr);
-    if (!state.adsrs[adsrIx]) {
-      setState({ ...state, adsrs: [...state.adsrs, newAdsr] });
-    } else {
-      setState({ ...state, adsrs: R.set(R.lensIndex(adsrIx), newAdsr, state.adsrs) });
-    }
-  };
+  const handleAdsrChange = useCallback(
+    (adsrIx: number, newAdsr: AdsrParams) => {
+      onAdsrChange(adsrIx, newAdsr);
+      setState(state => {
+        if (!state.adsrs[adsrIx]) {
+          return { ...state, adsrs: [...state.adsrs, newAdsr] };
+        } else {
+          return { ...state, adsrs: R.set(R.lensIndex(adsrIx), newAdsr, state.adsrs) };
+        }
+      });
+    },
+    [onAdsrChange]
+  );
 
   return (
     <TrainingMIDIControlIndexContext.Provider value={{ midiNode, midiControlValuesCache }}>
@@ -366,13 +378,13 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
           )}
           resetModulationIndex={useCallback(
             (srcOperatorIx: number, dstOperatorIx: number) =>
-              setState(
+              setState(state =>
                 setModulation(state, srcOperatorIx, dstOperatorIx, updateBackendModulation, () => ({
                   type: 'constant',
                   value: 0,
                 }))
               ),
-            [state, updateBackendModulation]
+            [updateBackendModulation]
           )}
           modulationIndices={state.modulationMatrix}
           operatorConfigs={state.operatorConfigs}

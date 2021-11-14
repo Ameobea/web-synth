@@ -167,6 +167,199 @@ const ADSRBeatLengthPicker: React.FC<{
   />
 );
 
+const ADSR_LEN_EXCLUDED_TYPES: ParamSource['type'][] = ['adsr', 'base frequency multiplier'];
+const EMPTY_ADSRS: AdsrParams[] = [];
+
+interface ConfigureADSRLengthMSProps {
+  adsr: AdsrParams;
+  adsrIx: number;
+  onAdsrChange: AdsrChangeHandler;
+  theme?: { [key: string]: any };
+}
+
+const ConfigureADSRLengthMS: React.FC<ConfigureADSRLengthMSProps> = ({
+  adsr,
+  adsrIx,
+  theme,
+  onAdsrChange,
+}) => {
+  return (
+    <ConfigureParamSource
+      title='adsr length ms'
+      adsrs={EMPTY_ADSRS}
+      onAdsrChange={useCallback(() => {
+        throw new UnreachableException('Cannot use ADSRs when configuring `adsr_length_ms`');
+      }, [])}
+      state={useMemo(
+        () =>
+          adsr.lenSamples.type === 'constant'
+            ? { type: 'constant', value: samplesToMs(adsr.lenSamples.value) }
+            : adsr.lenSamples,
+        [adsr.lenSamples]
+      )}
+      min={1}
+      max={20_000}
+      scale='log'
+      onChange={useCallback(
+        newLenMs => {
+          const lenSamples =
+            newLenMs.type === 'constant'
+              ? { type: 'constant' as const, value: msToSamples(newLenMs.value) }
+              : newLenMs;
+          onAdsrChange(adsrIx, { ...adsr, lenSamples });
+        },
+        [adsr, adsrIx, onAdsrChange]
+      )}
+      excludedTypes={ADSR_LEN_EXCLUDED_TYPES}
+      theme={theme}
+    />
+  );
+};
+
+type BuildConfigureParamSourceSettingsArgs = Pick<
+  ConfigureParamSourceInnerProps,
+  | 'state'
+  | 'excludedTypes'
+  | 'min'
+  | 'max'
+  | 'scale'
+  | 'step'
+  | 'adsrs'
+  | 'onAdsrChange'
+  | 'midiNode'
+  | 'onChange'
+>;
+
+const buildConfigureParamSourceSettings = ({
+  state,
+  excludedTypes,
+  min,
+  max,
+  scale,
+  step,
+  adsrs,
+  onAdsrChange,
+  midiNode,
+  onChange,
+}: BuildConfigureParamSourceSettingsArgs) => {
+  switch (state.type) {
+    case 'param buffer': {
+      return [
+        buildTypeSetting(excludedTypes),
+        {
+          type: 'select',
+          label: 'buffer index',
+          options: new Array(PARAM_BUFFER_COUNT).fill(0).map((_i, i) => i),
+        },
+      ];
+    }
+    case 'constant': {
+      return [
+        buildTypeSetting(excludedTypes),
+        { type: 'range', label: 'value', min, max, scale, step },
+      ];
+    }
+    case 'adsr': {
+      return [
+        buildTypeSetting(excludedTypes),
+        {
+          type: 'select',
+          label: 'adsr index',
+          options: new Array(adsrs.length).fill(0).map((_i, i) => i),
+        },
+        {
+          type: 'checkbox',
+          label: 'log scale',
+        },
+        {
+          type: 'button',
+          label: 'add adsr',
+          action: () => {
+            onAdsrChange(
+              adsrs.length,
+              buildDefaultAdsr({ ...adsrs[0].audioThreadData, phaseIndex: adsrs.length })
+            );
+          },
+        },
+        {
+          label: 'output range',
+          type: 'interval',
+          min,
+          max,
+        },
+      ];
+    }
+    case 'base frequency multiplier': {
+      return [
+        buildTypeSetting(excludedTypes),
+        {
+          type: 'range',
+          label: 'multiplier',
+          min: 0,
+          max: 16,
+          step: 0.125,
+        },
+      ];
+    }
+    case 'midi control': {
+      return [
+        buildTypeSetting(excludedTypes),
+        {
+          type: 'button',
+          label: state.midiControlIndex === 'LEARNING' ? 'cancel learning' : 'learn midi',
+          action: () => {
+            if (state.midiControlIndex === 'LEARNING') {
+              midiNode.disconnect(state.dstMIDINode);
+              onChange({ ...state, midiControlIndex: null, dstMIDINode: undefined });
+            } else {
+              const cbs: MIDIInputCbs = {
+                onAttack: () => {
+                  /* ignore */
+                },
+                onRelease: () => {
+                  /* ignore */
+                },
+                onPitchBend: () => {
+                  /* ignore */
+                },
+                onClearAll: () => {
+                  /* ignore */
+                },
+                onGenericControl: (controlIndex, _controlValue) => {
+                  console.log('Assigning MIDI control index: ', controlIndex);
+
+                  onChange({
+                    ...state,
+                    midiControlIndex: controlIndex,
+                    dstMIDINode: undefined,
+                  });
+                  midiNode.disconnect(dstMIDINode);
+                },
+              };
+              const dstMIDINode = new MIDINode(() => cbs);
+              midiNode.connect(dstMIDINode);
+              onChange({
+                ...state,
+                midiControlIndex: 'LEARNING' as const,
+                dstMIDINode,
+              });
+            }
+          },
+        },
+        {
+          label: 'output range',
+          type: 'interval',
+          min,
+          max,
+        },
+      ];
+    }
+    default: {
+      console.error('Invalid operator state type: ', (state as any).type);
+    }
+  }
+};
+
 interface ConfigureParamSourceProps {
   title?: React.ReactNode;
   theme?: { [key: string]: any };
@@ -184,10 +377,9 @@ interface ConfigureParamSourceProps {
 
 interface ConfigureParamSourceInnerProps extends ConfigureParamSourceProps {
   midiNode: MIDINode;
-  midiControlValuesCache: MIDIControlValuesCache;
 }
 
-const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
+const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> = ({
   title,
   adsrs,
   onAdsrChange,
@@ -202,131 +394,22 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
   excludedTypes,
   midiNode,
 }) => {
-  const settings = useMemo(() => {
-    switch (state.type) {
-      case 'param buffer': {
-        return [
-          buildTypeSetting(excludedTypes),
-          {
-            type: 'select',
-            label: 'buffer index',
-            options: new Array(PARAM_BUFFER_COUNT).fill(0).map((_i, i) => i),
-          },
-        ];
-      }
-      case 'constant': {
-        return [
-          buildTypeSetting(excludedTypes),
-          { type: 'range', label: 'value', min, max, scale, step },
-        ];
-      }
-      case 'adsr': {
-        return [
-          buildTypeSetting(excludedTypes),
-          {
-            type: 'select',
-            label: 'adsr index',
-            options: new Array(adsrs.length).fill(0).map((_i, i) => i),
-          },
-          // {
-          //   type: 'range',
-          //   label: 'adsr length ms',
-          //   min: 1,
-          //   max: 20_000,
-          //   scale: 'log',
-          // },
-          {
-            type: 'checkbox',
-            label: 'log scale',
-          },
-          {
-            type: 'button',
-            label: 'add adsr',
-            action: () => {
-              onAdsrChange(
-                adsrs.length,
-                buildDefaultAdsr({ ...adsrs[0].audioThreadData, phaseIndex: adsrs.length })
-              );
-            },
-          },
-          {
-            label: 'output range',
-            type: 'interval',
-            min,
-            max,
-          },
-        ];
-      }
-      case 'base frequency multiplier': {
-        return [
-          buildTypeSetting(excludedTypes),
-          {
-            type: 'range',
-            label: 'multiplier',
-            min: 0,
-            max: 16,
-            step: 0.125,
-          },
-        ];
-      }
-      case 'midi control': {
-        return [
-          buildTypeSetting(excludedTypes),
-          {
-            type: 'button',
-            label: state.midiControlIndex === 'LEARNING' ? 'cancel learning' : 'learn midi',
-            action: () => {
-              if (state.midiControlIndex === 'LEARNING') {
-                midiNode.disconnect(state.dstMIDINode);
-                onChange({ ...state, midiControlIndex: null, dstMIDINode: undefined });
-              } else {
-                const cbs: MIDIInputCbs = {
-                  onAttack: () => {
-                    /* ignore */
-                  },
-                  onRelease: () => {
-                    /* ignore */
-                  },
-                  onPitchBend: () => {
-                    /* ignore */
-                  },
-                  onClearAll: () => {
-                    /* ignore */
-                  },
-                  onGenericControl: (controlIndex, _controlValue) => {
-                    console.log('Assigning MIDI control index: ', controlIndex);
-
-                    onChange({
-                      ...state,
-                      midiControlIndex: controlIndex,
-                      dstMIDINode: undefined,
-                    });
-                    midiNode.disconnect(dstMIDINode);
-                  },
-                };
-                const dstMIDINode = new MIDINode(() => cbs);
-                midiNode.connect(dstMIDINode);
-                onChange({
-                  ...state,
-                  midiControlIndex: 'LEARNING' as const,
-                  dstMIDINode,
-                });
-              }
-            },
-          },
-          {
-            label: 'output range',
-            type: 'interval',
-            min,
-            max,
-          },
-        ];
-      }
-      default: {
-        console.error('Invalid operator state type: ', (state as any).type);
-      }
-    }
-  }, [state, excludedTypes, min, max, scale, step, adsrs, onAdsrChange, midiNode, onChange]);
+  const settings = useMemo(
+    () =>
+      buildConfigureParamSourceSettings({
+        state,
+        excludedTypes,
+        min,
+        max,
+        scale,
+        step,
+        adsrs,
+        onAdsrChange,
+        midiNode,
+        onChange,
+      }),
+    [state, excludedTypes, min, max, scale, step, adsrs, onAdsrChange, midiNode, onChange]
+  );
 
   const adsr = state.type === 'adsr' ? adsrs[state['adsr index']] : undefined;
 
@@ -337,17 +420,20 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
         theme={theme}
         width={500}
         settings={settings}
-        state={{
-          ...state,
-          'buffer index':
-            state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
-          'output range':
-            (adsr && state.type === 'adsr') || state.type === 'midi control'
-              ? [state.shift, state.shift + state.scale]
-              : undefined,
-          adsr: adsr ? adsr : undefined,
-          'log scale': adsr ? adsr.logScale ?? false : undefined,
-        }}
+        state={useMemo(
+          () => ({
+            ...state,
+            'buffer index':
+              state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
+            'output range':
+              (adsr && state.type === 'adsr') || state.type === 'midi control'
+                ? [state.shift, state.shift + state.scale]
+                : undefined,
+            adsr: adsr ? adsr : undefined,
+            'log scale': adsr ? adsr.logScale ?? false : undefined,
+          }),
+          [adsr, state]
+        )}
         onChange={(key: string, value: any) => {
           switch (key) {
             case 'type': {
@@ -425,35 +511,10 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
               theme={theme}
             />
           ) : (
-            <ConfigureParamSource
-              title='adsr length ms'
-              adsrs={[]}
-              onAdsrChange={() => {
-                throw new UnreachableException(
-                  'Cannot use ADSRs when configuring `adsr_length_ms`'
-                );
-              }}
-              state={
-                adsr.lenSamples.type === 'constant'
-                  ? { type: 'constant', value: samplesToMs(adsr.lenSamples.value) }
-                  : adsr.lenSamples
-              }
-              min={1}
-              max={20_000}
-              scale='log'
-              onChange={newLenMs => {
-                const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-                const lenSamples =
-                  newLenMs.type === 'constant'
-                    ? { type: 'constant' as const, value: msToSamples(newLenMs.value) }
-                    : newLenMs;
-                onAdsrChange(adsrIx, {
-                  ...adsrs[adsrIx],
-                  lenSamples,
-                });
-              }}
-              excludedTypes={['adsr', 'base frequency multiplier']}
-              theme={theme}
+            <ConfigureADSRLengthMS
+              adsr={adsr}
+              adsrIx={(state as Extract<typeof state, { type: 'adsr' }>)['adsr index']}
+              onAdsrChange={onAdsrChange}
             />
           )}
           <ADSR2
@@ -481,16 +542,18 @@ const ConfigureParamSourceInner: React.FC<ConfigureParamSourceInnerProps> = ({
   );
 };
 
-const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = props => (
-  <TrainingMIDIControlIndexContext.Consumer>
-    {({ midiNode, midiControlValuesCache }) => (
-      <ConfigureParamSourceInner
-        {...props}
-        midiNode={midiNode}
-        midiControlValuesCache={midiControlValuesCache}
-      />
-    )}
-  </TrainingMIDIControlIndexContext.Consumer>
-);
+const ConfigureParamSourceInner = React.memo(ConfigureParamSourceInnerInner);
+
+const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = props => {
+  if (props.state.type !== 'midi control') {
+    return <ConfigureParamSourceInner {...props} midiNode={null as any} />;
+  }
+
+  return (
+    <TrainingMIDIControlIndexContext.Consumer>
+      {({ midiNode }) => <ConfigureParamSourceInner {...props} midiNode={midiNode} />}
+    </TrainingMIDIControlIndexContext.Consumer>
+  );
+};
 
 export default ConfigureParamSource;

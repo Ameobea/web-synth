@@ -81,11 +81,14 @@ const GlobalMenu: React.FC<{
         Save to File
       </GlobalMenuItem>
       <GlobalMenuItem
-        onClick={() =>
-          document
-            .getElementById('load-composition-uploader')!
-            .dispatchEvent(new MouseEvent('click'))
-        }
+        onClick={() => {
+          const uploader = document.getElementById(
+            'load-composition-uploader'
+          )! as HTMLInputElement;
+          uploader.value = '';
+
+          uploader.dispatchEvent(new MouseEvent('click'));
+        }}
       >
         <>
           <input
@@ -94,7 +97,10 @@ const GlobalMenu: React.FC<{
             style={{ display: 'none' }}
             onChange={async evt => {
               const { fileContent } = await parseUploadedFileAsText(evt);
-              loadComposition(fileContent, engine, allViewContextIds);
+              const res = loadComposition(fileContent, engine, allViewContextIds);
+              if (res.value) {
+                alert('Error loading composition: ' + res.value);
+              }
               closeMenu();
             }}
           />

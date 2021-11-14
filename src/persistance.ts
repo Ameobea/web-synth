@@ -1,7 +1,9 @@
 import download from 'downloadjs';
 import { Either } from 'funfix-core';
 import Dexie from 'dexie';
+
 import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
+import { stopAll } from 'src/eventScheduler/eventScheduler';
 
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
@@ -18,6 +20,9 @@ export const loadComposition = (
   } catch (err) {
     return Either.left('Failed to parse provided JSON');
   }
+
+  // Stop any playback
+  stopAll();
 
   // Tear down current application state
   allViewContextIds.forEach(engine.delete_vc_by_id);

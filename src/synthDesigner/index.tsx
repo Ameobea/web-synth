@@ -200,7 +200,7 @@ const getMidiNode = (stateKey: string): MIDINode => {
   }
 
   const midiNode = new MIDINode(() => {
-    const { dispatch, getState, actionCreators } = getReduxInfra(stateKey);
+    const { getState } = getReduxInfra(stateKey);
 
     const onAttack = (note: number, velocity: number) => {
       const polysynthCtx = getState().synthDesigner.polysynthCtx;
