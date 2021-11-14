@@ -125,7 +125,6 @@ const ConfigureMark: React.FC<ConfigureMarkProps> = ({ dispatch, useSelector, ac
     () => buildConfigureMarksControlPanelState(selectorOutput?.voice, selectorOutput?.markState),
     [selectorOutput?.markState, selectorOutput?.voice]
   );
-  console.log(controlPanelState);
   const handleChange = useMemo(
     () =>
       buildConfigureMarksControlPanelChangeHandler(selectorOutput?.voice, dispatch, actionCreators),

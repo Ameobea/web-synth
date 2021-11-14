@@ -63,34 +63,34 @@ impl Effect for MoogFilter {
             let resonance = dsp::clamp(0., 20., resonance);
             let drive = drive;
 
-            let x = (PI * cutoff) / SAMPLE_RATE as f32;
+            let x = (PI * cutoff) / (SAMPLE_RATE * 2) as f32;
             let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
             dV0 = -g * (tanh((drive * sample + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
-            self.V[0] += (dV0 + self.dV[0]) / (2.0 * SAMPLE_RATE as f32);
+            self.V[0] += (dV0 + self.dV[0]) / (2.0 * (SAMPLE_RATE * 2) as f32);
             self.dV[0] = dV0;
             self.tV[0] = tanh(self.V[0] / (2.0 * VT));
 
             dV1 = g * (self.tV[0] - self.tV[1]);
-            self.V[1] += (dV1 + self.dV[1]) / (2.0 * SAMPLE_RATE as f32);
+            self.V[1] += (dV1 + self.dV[1]) / (2.0 * (SAMPLE_RATE * 2) as f32);
             self.dV[1] = dV1;
             self.tV[1] = tanh(self.V[1] / (2.0 * VT));
 
             dV2 = g * (self.tV[1] - self.tV[2]);
-            self.V[2] += (dV2 + self.dV[2]) / (2.0 * SAMPLE_RATE as f32);
+            self.V[2] += (dV2 + self.dV[2]) / (2.0 * (SAMPLE_RATE * 2) as f32);
             self.dV[2] = dV2;
             self.tV[2] = tanh(self.V[2] / (2.0 * VT));
 
             dV3 = g * (self.tV[2] - self.tV[3]);
-            self.V[3] += (dV3 + self.dV[3]) / (2.0 * SAMPLE_RATE as f32);
+            self.V[3] += (dV3 + self.dV[3]) / (2.0 * (SAMPLE_RATE * 2) as f32);
             self.dV[3] = dV3;
             self.tV[3] = tanh(self.V[3] / (2.0 * VT));
 
             out_sample += self.V[3];
         }
-        self.last_sample = out_sample;
+        self.last_sample = sample;
 
-        out_sample
+        out_sample / 2.
     }
 
     fn apply_all(
@@ -99,6 +99,19 @@ impl Effect for MoogFilter {
         _base_frequencies: &[f32; FRAME_SIZE],
         samples: &mut [f32; FRAME_SIZE],
     ) {
+        // if !self.last_sample.is_finite() {
+        //     self.last_sample = 0.;
+        // }
+        // if self.V.iter().any(|x| !x.is_finite()) {
+        //     self.V = [0.0; 4];
+        // }
+        // if self.dV.iter().any(|x| !x.is_finite()) {
+        //     self.dV = [0.0; 4];
+        // }
+        // if self.tV.iter().any(|x| !x.is_finite()) {
+        //     self.tV = [0.0; 4];
+        // }
+
         let mut dV0;
         let mut dV1;
         let mut dV2;
@@ -130,27 +143,27 @@ impl Effect for MoogFilter {
                 let resonance = dsp::clamp(0., 20., resonances[i]);
                 let drive = drives[i];
 
-                let x = (PI * cutoff) / SAMPLE_RATE as f32;
+                let x = (PI * cutoff) / (2 * SAMPLE_RATE) as f32;
                 let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
                 dV0 =
                     -g * (tanh((drive * sample + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
-                self.V[0] += (dV0 + self.dV[0]) / (2.0 * SAMPLE_RATE as f32);
+                self.V[0] += (dV0 + self.dV[0]) / (2.0 * (2 * SAMPLE_RATE) as f32);
                 self.dV[0] = dV0;
                 self.tV[0] = tanh(self.V[0] / (2.0 * VT));
 
                 dV1 = g * (self.tV[0] - self.tV[1]);
-                self.V[1] += (dV1 + self.dV[1]) / (2.0 * SAMPLE_RATE as f32);
+                self.V[1] += (dV1 + self.dV[1]) / (2.0 * (2 * SAMPLE_RATE) as f32);
                 self.dV[1] = dV1;
                 self.tV[1] = tanh(self.V[1] / (2.0 * VT));
 
                 dV2 = g * (self.tV[1] - self.tV[2]);
-                self.V[2] += (dV2 + self.dV[2]) / (2.0 * SAMPLE_RATE as f32);
+                self.V[2] += (dV2 + self.dV[2]) / (2.0 * (2 * SAMPLE_RATE) as f32);
                 self.dV[2] = dV2;
                 self.tV[2] = tanh(self.V[2] / (2.0 * VT));
 
                 dV3 = g * (self.tV[2] - self.tV[3]);
-                self.V[3] += (dV3 + self.dV[3]) / (2.0 * SAMPLE_RATE as f32);
+                self.V[3] += (dV3 + self.dV[3]) / (2.0 * (2 * SAMPLE_RATE) as f32);
                 self.dV[3] = dV3;
                 self.tV[3] = tanh(self.V[3] / (2.0 * VT));
 

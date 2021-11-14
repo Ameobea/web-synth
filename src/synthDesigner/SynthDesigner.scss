@@ -54,6 +54,7 @@
   .configure-effects {
     max-height: 80vh;
     overflow-y: auto;
+    overflow-x: hidden;
 
     .control-panel {
       width: 488px !important;

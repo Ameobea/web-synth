@@ -156,7 +156,7 @@ const ADSRBeatLengthPicker: React.FC<{
   <ControlPanel
     width={500}
     theme={theme}
-    settings={useMemo(() => [{ type: 'range', label: 'beats', min: 0, max: 32, step: 1 / 16 }], [])}
+    settings={useMemo(() => [{ type: 'range', label: 'beats', min: 0, max: 16, step: 1 / 16 }], [])}
     state={useMemo(() => ({ beats: value.value }), [value.value])}
     onChange={useCallback(
       (_key: string, value: number, _state: any) => {

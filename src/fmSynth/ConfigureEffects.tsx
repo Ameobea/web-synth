@@ -304,7 +304,7 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
       onAdsrChange={onAdsrChange}
       theme={bitcrusherTheme}
       min={1}
-      max={32}
+      max={16}
       scale='log'
       state={state.bitDepth}
       onChange={bitDepth => onChange({ ...state, bitDepth })}
@@ -488,7 +488,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
       onAdsrChange={onAdsrChange}
       theme={moogFilterTheme}
       min={0.3}
-      max={7}
+      max={4.5}
       state={state.resonance}
       onChange={resonance => onChange({ ...state, resonance })}
     />
@@ -498,7 +498,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
       onAdsrChange={onAdsrChange}
       theme={moogFilterTheme}
       min={0}
-      max={3}
+      max={5}
       state={state.drive}
       onChange={drive => onChange({ ...state, drive })}
     />
