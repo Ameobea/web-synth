@@ -107,7 +107,7 @@ extern "C" {
 
 #[wasm_bindgen(raw_module = "./synthDesigner")]
 extern "C" {
-    pub fn init_synth_designer(state_key: &str);
+    pub fn init_synth_designer(state_key: &str, initial_waveform: Option<&str>);
     pub fn hide_synth_designer(vc_id: &str);
     pub fn unhide_synth_designer(vc_id: &str);
     pub fn cleanup_synth_designer(state_key: &str) -> String;

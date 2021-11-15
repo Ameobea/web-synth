@@ -149,7 +149,7 @@ const DEFAULT_MIDI_KEYBOARD_STATE_ITEM: MidiKeyboardStateItem = {
   mode: MidiKeyboardMode.ComputerKeyboard,
   midiInput: undefined,
   midiInputName: undefined,
-  octaveOffset: 0,
+  octaveOffset: 2,
   mappedOutputs: [],
 };
 

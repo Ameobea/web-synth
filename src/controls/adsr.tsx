@@ -21,11 +21,11 @@ export interface ADSRValues {
   release: ADSRValue;
 }
 
-export const defaultAdsrEnvelope: ADSRValues = {
-  attack: { pos: 0.04, magnitude: 0.35 },
-  decay: { pos: 0.14, magnitude: 0.35 },
-  release: { pos: 0.9, magnitude: 0.35 },
-};
+export const buildDefaultAdsrEnvelope = (): ADSRValues => ({
+  attack: { pos: 0.01, magnitude: 0.55 },
+  decay: { pos: 0.14, magnitude: 0.5 },
+  release: { pos: 0.94, magnitude: 0.5 },
+});
 
 interface MousePos {
   x: number;

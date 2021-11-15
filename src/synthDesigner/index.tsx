@@ -53,7 +53,10 @@ export const getReduxInfra = (stateKey: string) => {
   return reduxInfra;
 };
 
-export const init_synth_designer = (stateKey: string) => {
+export const init_synth_designer = (
+  stateKey: string,
+  initialWaveform: string | null | undefined
+) => {
   // Create a fresh Redux store just for this instance.  It makes things a lot simpler on the Redux side due to the
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
   // everything in a big map.
@@ -91,8 +94,19 @@ export const init_synth_designer = (stateKey: string) => {
       return getInitialSynthDesignerState(true, vcId);
     });
 
+  // This is a hack used by first-time setup to force setting an initial waveform without having to store an entire serialized synth designer
+  if (initialWaveform && !initialState) {
+    reduxInfra.dispatch(
+      reduxInfra.actionCreators.synthDesigner.SET_WAVEFORM(
+        0,
+        initialWaveform as Waveform,
+        reduxInfra.dispatch
+      )
+    );
+  }
+
   PolysynthMod.get().then(mod => {
-    const playNote = (voiceIx: number, note: number, velocity: number, offset?: number) =>
+    const playNote = (voiceIx: number, note: number, _velocity: number, offset?: number) =>
       reduxInfra.dispatch(
         reduxInfra.actionCreators.synthDesigner.GATE(
           midiToFrequency(note),

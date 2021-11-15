@@ -11,16 +11,28 @@ use crate::{js, view_context::ViewContext};
 #[derive(Serialize, Deserialize)]
 pub struct SynthDesigner {
     pub uuid: Uuid,
+    #[serde(default)]
+    pub initial_waveform: Option<String>,
 }
 
 impl SynthDesigner {
-    pub fn new(uuid: Uuid) -> Self { SynthDesigner { uuid } }
+    pub fn new(uuid: Uuid) -> Self {
+        SynthDesigner {
+            uuid,
+            initial_waveform: None,
+        }
+    }
 
     pub fn get_state_key(&self) -> String { format!("synthDesigner_{}", self.uuid) }
 }
 
 impl ViewContext for SynthDesigner {
-    fn init(&mut self) { js::init_synth_designer(&self.get_state_key()); }
+    fn init(&mut self) {
+        js::init_synth_designer(
+            &self.get_state_key(),
+            self.initial_waveform.as_ref().map(String::as_str),
+        );
+    }
 
     fn cleanup(&mut self) {
         let state_key = self.get_state_key();

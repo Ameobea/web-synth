@@ -7,7 +7,7 @@ import { Option } from 'funfix-core';
 
 import { SynthModule, Waveform } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
-import { defaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
+import { buildDefaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import {
   getReduxInfra,
   get_synth_designer_audio_connectables,
@@ -20,7 +20,6 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const WavetableControlPanel: React.FC<{
   synth: SynthModule;
@@ -241,7 +240,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         {
           type: 'custom',
           label: 'adsr',
-          initial: defaultAdsrEnvelope,
+          initial: buildDefaultAdsrEnvelope(),
           Comp: ControlPanelADSR,
         },
       ]),

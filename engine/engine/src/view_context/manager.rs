@@ -15,7 +15,7 @@ use crate::{
         sample_library::mk_sample_library,
         sequencer::mk_sequencer,
         sinsy::mk_sinsy,
-        synth_designer::mk_synth_designer,
+        synth_designer::{mk_synth_designer, SynthDesigner},
     },
     ViewContext,
 };
@@ -235,8 +235,22 @@ impl ViewContextManager {
             graph_editor_view_context,
         );
 
+        // MIDI Keyboard
         let uuid = uuid_v4();
-        // Create a MIDI Editor view context
+        let mut midi_keyboard_view_context = build_view("midi_keyboard", None, uuid);
+        midi_keyboard_view_context.init();
+        midi_keyboard_view_context.hide();
+        self.add_view_context_inner(
+            MinimalViewContextDefinition {
+                uuid,
+                name: "midi_keyboard".into(),
+                title: Some("MIDI Keyboard".into()),
+            },
+            midi_keyboard_view_context,
+        );
+
+        // MIDI Editor
+        let uuid = uuid_v4();
         let mut view_context = build_view("midi_editor", None, uuid);
         view_context.init();
         view_context.hide();
@@ -249,8 +263,12 @@ impl ViewContextManager {
             view_context,
         );
 
+        // Synth Designer
         let uuid = uuid_v4();
-        let mut synth_designer_context = build_view("synth_designer", None, uuid);
+        let mut synth_designer_context = box SynthDesigner {
+            uuid,
+            initial_waveform: Some(String::from("triangle")),
+        };
         synth_designer_context.init();
         synth_designer_context.hide();
         self.add_view_context_inner(
@@ -262,10 +280,16 @@ impl ViewContextManager {
             synth_designer_context,
         );
 
-        // Create a Faust Editor view context
+        // Faust Editor
         let uuid = uuid_v4();
         let faust_editor = FaustEditor { uuid };
         let state_key = faust_editor.get_state_key();
+
+        let faust_editor_content =
+            serde_json::json!({ "editorContent": include_str!("../../static/flanger.dsp"), "isRunning": true, "language": "faust" })
+                .to_string();
+        js::set_localstorage_key(&state_key, &faust_editor_content);
+
         let mut view_context = build_view(
             "faust_editor",
             Some(&serde_json::to_string(&faust_editor).unwrap()),
@@ -281,8 +305,6 @@ impl ViewContextManager {
             },
             view_context,
         );
-        let faust_editor_content = include_str!("../../static/rain.dsp");
-        js::set_localstorage_key(&state_key, faust_editor_content);
 
         let destination_id = 1;
         self.foreign_connectables.push(ForeignConnectable {
@@ -291,16 +313,27 @@ impl ViewContextManager {
             serialized_state: None,
         });
 
-        // Connect the MIDI editor to the Synth Designer and the Synth Designer to the Faust Editor
-        let (midi_id, synth_id, faust_id) = (
+        // Connect MIDI Keyboard -> MIDI Editor -> Synth Designer -> Faust Editor
+        let (midi_keyboard_id, midi_editor_id, synth_id, faust_id) = (
             self.contexts[1].definition.uuid,
             self.contexts[2].definition.uuid,
             self.contexts[3].definition.uuid,
+            self.contexts[4].definition.uuid,
         );
         self.connections.push((
             ConnectionDescriptor {
-                vc_id: midi_id.to_string(),
-                name: "midi_output".into(),
+                vc_id: midi_keyboard_id.to_string(),
+                name: "midi out".to_string(),
+            },
+            ConnectionDescriptor {
+                vc_id: midi_editor_id.to_string(),
+                name: "midi_in".to_string(),
+            },
+        ));
+        self.connections.push((
+            ConnectionDescriptor {
+                vc_id: midi_editor_id.to_string(),
+                name: "midi_out".into(),
             },
             ConnectionDescriptor {
                 vc_id: synth_id.to_string(),

@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
-import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
+import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
 import { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
@@ -240,7 +240,7 @@ export class ADSRModule extends ConstantSourceNode {
   public minValue: number;
   public maxValue: number;
   public lengthMs = 1000;
-  public envelope: ADSRValues = defaultAdsrEnvelope;
+  public envelope: ADSRValues = buildDefaultAdsrEnvelope();
 
   constructor(
     ctx: AudioContext,

@@ -1,5 +1,5 @@
 import { saveSynthVoicePreset } from 'src/api';
-import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
+import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
 import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import {
@@ -102,7 +102,7 @@ export const Presets: { [name: string]: SerializedFMSynthDemoState } = {
 //     filter: preset.filterParams,
 //     masterGain: 0.2,
 //     selectedEffectType: EffectType.Bitcrusher,
-//     gainEnvelope: defaultAdsrEnvelope,
+//     gainEnvelope: buildDefaultAdsrEnvelope(),
 //     gainADSRLength: 1000,
 //     filterEnvelope: normalizeEnvelope(preset.filterEnvelope),
 //     filterADSRLength: normalizedFilterEnvelope.lenSamples * 44_100,

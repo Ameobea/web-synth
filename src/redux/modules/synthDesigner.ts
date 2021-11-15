@@ -9,7 +9,7 @@ import {
 } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
-import { ADSRValues, defaultAdsrEnvelope } from 'src/controls/adsr';
+import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
 import { ADSR2Module, ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import WaveTable, {
@@ -495,7 +495,7 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
     wavetableInputControls: null,
     masterGain,
     selectedEffectType: EffectType.Reverb,
-    gainEnvelope: defaultAdsrEnvelope,
+    gainEnvelope: buildDefaultAdsrEnvelope(),
     gainADSRLength: 1000,
     filterEnvelope: buildDefaultADSR2Envelope({ phaseIndex: 0 }),
     filterADSRLength: 1000,
