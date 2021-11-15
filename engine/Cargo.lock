@@ -98,6 +98,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "delay"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dsp",
+ "log",
+]
+
+[[package]]
 name = "distortion"
 version = "0.1.0"
 dependencies = [

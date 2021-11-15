@@ -97,6 +97,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
 
   just debug-sinsy
 
@@ -179,3 +180,11 @@ debug-note-container:
 build-granular:
   cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/granular.wasm ../../public
+
+build-delay:
+  cd ./engine/delay && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/delay.wasm ../../public
+
+build-noise:
+  cd ./engine/noise_gen && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/noise_gen.wasm ../../public

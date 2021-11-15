@@ -173,7 +173,7 @@ pub fn iter_notes_with_cb(
                 );
             },
             NoteEntry::NoteEnd { note_id } => {
-                let existing = unreleased_notes.remove(note_id);
+                let existing = unreleased_notes.remove(&note_id);
                 if existing.is_some() {
                     events.push((false, line_ix, pos));
                 }
@@ -183,7 +183,7 @@ pub fn iter_notes_with_cb(
                 end_note_id,
             } => {
                 // release before attack
-                let existing = unreleased_notes.remove(end_note_id);
+                let existing = unreleased_notes.remove(&end_note_id);
                 if existing.is_some() {
                     events.push((false, line_ix, pos));
                 }

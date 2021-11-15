@@ -5,7 +5,6 @@ import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import type { UISelection } from 'src/fmSynth/FMSynthUI';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const formatOperatorConfig = (config: OperatorConfig) => {
   if (
@@ -195,18 +194,6 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
   const [hoveredModulationEntity, setHoveredModulationEntity] = useState<string | null>(null);
 
   const selectedOperatorIx = selectedUI?.type === 'operator' ? selectedUI.index : null;
-
-  useWhyDidYouUpdate('ModulationMatrix', {
-    selectedUI,
-    onOperatorSelected,
-    resetModulationIndex,
-    onModulationIndexSelected,
-    modulationIndices,
-    operatorConfigs,
-    outputWeights,
-    onOutputWeightSelected,
-    synthID,
-  });
 
   return (
     <>

@@ -1,6 +1,6 @@
 [package]
 authors = ["Casey Primozic <casey@cprimozic.net>"]
-edition = "2018"
+edition = "2021"
 name = "dsp"
 version = "0.1.0"
 

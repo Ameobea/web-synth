@@ -1,5 +1,5 @@
 import { filterNils } from 'ameo-utils';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import type { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer/mixer';
@@ -43,22 +43,19 @@ const buildSettings = (
 
 const MixerSmallView: React.FC<MixerSmallViewProps> = ({ mixer }) => {
   const [inputCount, setInputCount] = useState(mixer.gainParams.length);
-  const settings = useMemo(() => buildSettings(mixer, inputCount, setInputCount), [
-    mixer,
-    inputCount,
-  ]);
-
-  return (
-    <ControlPanel
-      settings={settings}
-      style={{ width: 500 }}
-      onChange={(key: string, val: number) => {
-        const inputIx = +key.split('_')[1];
-        console.log(inputIx);
-        mixer.gainParams[inputIx].manualControl.offset.value = val;
-      }}
-    />
+  const settings = useMemo(
+    () => buildSettings(mixer, inputCount, setInputCount),
+    [mixer, inputCount]
   );
+  const handleChange = useCallback(
+    (key: string, val: number) => {
+      const inputIx = +key.split('_')[1];
+      mixer.gainParams[inputIx].manualControl.offset.value = val;
+    },
+    [mixer.gainParams]
+  );
+
+  return <ControlPanel settings={settings} width={500} onChange={handleChange} />;
 };
 
 export default MixerSmallView;

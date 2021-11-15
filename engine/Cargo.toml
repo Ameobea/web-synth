@@ -14,7 +14,8 @@ members = [
   "distortion",
   "adsr",
   "note_container",
-  "sample_editor"
+  "sample_editor",
+  "delay"
 ]
 
 [profile.release]

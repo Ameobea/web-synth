@@ -33,6 +33,7 @@ import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
 import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio/CustomCompressorSmallViewRenderer';
+import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 
 const ctx = new AudioContext();
 
@@ -71,9 +72,7 @@ interface EnhanceAudioNodeParams<T> {
   ) => Omit<AudioConnectables, 'vcId'> & {
     node: ForeignNode<T>;
   };
-  getOverridableParams: (
-    node: T
-  ) => {
+  getOverridableParams: (node: T) => {
     name: string;
     param: AudioParam;
     defaultValue?: number;
@@ -465,6 +464,9 @@ export const audioNodeGetters: {
   },
   'customAudio/distortion': {
     nodeGetter: DistortionNode,
+  },
+  'customAudio/delay': {
+    nodeGetter: CustomDelayNode,
   },
 };
 

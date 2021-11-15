@@ -13,9 +13,12 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { filterNils } from 'ameo-utils';
 
 const NoiseGenAWPRegistered = new AsyncOnce(() =>
-  new AudioContext().audioWorklet.addModule(
-    '/NoiseGenAWP.js?cacheBust=' + btoa(Math.random().toString())
-  )
+  new AudioContext().audioWorklet
+    .addModule(
+      '/NoiseGenAWP.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    )
+    .catch(console.error)
 );
 const NoiseGenWasm = new AsyncOnce(() => fetch('/noise_gen.wasm').then(res => res.arrayBuffer()));
 
@@ -68,7 +71,7 @@ const NoiseGenSmallView: React.FC<{
 
         onChange(key, val);
       }}
-      style={{ width: 500 }}
+      width={500}
     />
   );
 };
@@ -192,14 +195,16 @@ export class NoiseGenNode {
   }
 
   private async init() {
-    const [sidechainWasm] = await Promise.all([
+    const [noiseGenWasm] = await Promise.all([
       NoiseGenWasm.get(),
       NoiseGenAWPRegistered.get(),
     ] as const);
-    this.awpNode = new AudioWorkletNode(this.ctx, 'noise-generator-audio-worklet-node-processor');
+    this.awpNode = new AudioWorkletNode(this.ctx, 'noise-generator-audio-worklet-node-processor', {
+      numberOfOutputs: 1,
+    });
     this.awpNode.port.postMessage({
       type: 'setWasmBytes',
-      wasmBytes: sidechainWasm,
+      wasmBytes: noiseGenWasm,
       noiseType: this.noiseType,
       updateFreqSamples: this.updateFreqSamples,
       smoothingCoefficient: this.enableSmoothing ? this.smoothingCoefficient : 0,

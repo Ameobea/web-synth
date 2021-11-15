@@ -83,7 +83,11 @@ pub unsafe extern "C" fn generate() -> *const f32 {
         _ => unimplemented!(), // TODO
     };
     for out in &mut OUTPUT {
-        dsp::one_pole(&mut LAST_VAL, generator() * GAIN, SMOOTHING_COEFFICIENT);
+        if SMOOTHING_COEFFICIENT != 0. {
+            dsp::one_pole(&mut LAST_VAL, generator() * GAIN, SMOOTHING_COEFFICIENT);
+        } else {
+            LAST_VAL = generator() * GAIN;
+        }
         *out = LAST_VAL;
     }
 

@@ -27,6 +27,7 @@ public/adsr.wasm
 public/sinsy.*
 public/note_container.wasm
 public/sample_editor.wasm
+public/delay.wasm
 src/note_container*
 !src/midiUtils.ts
 .ipynb_checkpoints
