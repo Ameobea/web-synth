@@ -63,9 +63,8 @@ pub extern "C" fn process_delay(ctx: *mut DelayCtx) {
 
         let delay_samples = delay_ms * (1. / 1000.) * SAMPLE_RATE as f32;
         let delayed_sample = ctx.delay_line.read_interpolated(-delay_samples);
-        let with_delay = sample + delayed_sample * delay_gain;
         ctx.delay_line.set(sample + delayed_sample * feedback);
         ctx.delay_output_buffer[sample_ix] = delayed_sample;
-        ctx.main_io_buffer[sample_ix] = with_delay;
+        ctx.main_io_buffer[sample_ix] = sample + delayed_sample * delay_gain;
     }
 }
