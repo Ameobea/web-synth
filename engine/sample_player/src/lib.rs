@@ -9,11 +9,20 @@ pub struct Playhead {
     pub playback_speed: f32,
 }
 
-#[derive(Default)]
 pub struct SampleDescriptor {
     pub sample_buffer: Vec<f32>,
     pub is_gated: bool,
     pub playheads: Vec<Playhead>,
+}
+
+impl Default for SampleDescriptor {
+    fn default() -> Self {
+        SampleDescriptor {
+            sample_buffer: Vec::new(),
+            is_gated: true,
+            playheads: Vec::new(),
+        }
+    }
 }
 
 impl SampleDescriptor {

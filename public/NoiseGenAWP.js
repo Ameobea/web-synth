@@ -12,6 +12,7 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
           this.wasmInstance.exports.set_gain(evt.data.gain);
           this.wasmInstance.exports.set_smoothing_coefficient(evt.data.smoothingCoefficient);
           this.wasmInstance.exports.set_noise_type(evt.data.noiseType, evt.data.updateFreqSamples);
+          this.wasmInstance.exports.set_quantization_factor(evt.data.quantizationFactor);
           break;
         }
         case 'setGain': {
@@ -26,6 +27,13 @@ class NoiseGeneratorWorkletProcessor extends AudioWorkletProcessor {
             return;
           }
           this.wasmInstance.exports.set_smoothing_coefficient(evt.data.smoothingCoefficient);
+          break;
+        }
+        case 'setQuantizationFactor': {
+          if (!this.wasmInstance) {
+            return;
+          }
+          this.wasmInstance.exports.set_quantization_factor(evt.data.quantizationFactor);
           break;
         }
         case 'setNoiseType': {

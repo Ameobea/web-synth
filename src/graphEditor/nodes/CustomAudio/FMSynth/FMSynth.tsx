@@ -90,7 +90,14 @@ export interface AdsrParams {
   audioThreadData: AudioThreadData;
 }
 
-const serializeADSR = (adsr: AdsrParams) => ({ ...adsr, audioThreadData: undefined });
+const serializeADSR = (adsr: AdsrParams) => ({
+  ...adsr,
+  lenSamples:
+    typeof adsr.lenSamples === 'number'
+      ? { type: 'constant', value: adsr.lenSamples }
+      : adsr.lenSamples,
+  audioThreadData: undefined,
+});
 
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
@@ -462,6 +469,10 @@ export default class FMSynth implements ForeignNode {
       return;
     }
 
+    if (typeof newAdsrRaw.lenSamples === 'number') {
+      newAdsrRaw.lenSamples = { type: 'constant', value: newAdsrRaw.lenSamples };
+    }
+
     const isLenOnlyChange =
       this.adsrs[adsrIx] && !R.equals(this.adsrs[adsrIx].lenSamples, newAdsrRaw.lenSamples);
     const newAdsr = R.clone({ ...newAdsrRaw, audioThreadData: undefined });
@@ -477,7 +488,11 @@ export default class FMSynth implements ForeignNode {
       this.awpHandle.port.postMessage({
         type: 'setAdsrLength',
         adsrIx,
-        lenSamples: this.encodeParamSource(newAdsr.lenSamples),
+        lenSamples: this.encodeParamSource(
+          typeof newAdsr.lenSamples === 'number'
+            ? { type: 'constant', value: newAdsr.lenSamples }
+            : newAdsr.lenSamples
+        ),
       });
     } else {
       this.awpHandle.port.postMessage({
@@ -666,15 +681,19 @@ export default class FMSynth implements ForeignNode {
     }
     if (params.adsrs) {
       this.adsrs = params.adsrs.map(
-        (adsr: Exclude<Adsr, 'audioThreadData'>, i: number): AdsrParams => ({
-          ...adsr,
-          audioThreadData: { phaseIndex: i },
-          lenSamples:
+        (adsr: Exclude<Adsr, 'audioThreadData'>, i: number): AdsrParams => {
+          const lenSamples =
             adsr.lenSamples && typeof adsr.lenSamples === 'object'
               ? adsr.lenSamples
-              : { type: 'constant' as const, value: adsr.lenSamples },
-          logScale: adsr.logScale ?? false,
-        })
+              : { type: 'constant' as const, value: adsr.lenSamples };
+
+          return {
+            ...adsr,
+            audioThreadData: { phaseIndex: i },
+            lenSamples,
+            logScale: adsr.logScale ?? false,
+          };
+        }
       );
     }
     if (params.detune) {

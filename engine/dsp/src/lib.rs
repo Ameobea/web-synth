@@ -83,3 +83,25 @@ pub fn mk_log_to_linear(logmin: f32, logmax: f32, logsign: f32) -> impl Fn(f32) 
         ((fast::ln(y * logsign) - fast::ln(logmin)) * 100.) / (fast::ln(logmax) - fast::ln(logmin))
     }
 }
+
+pub fn quantize(min: f32, max: f32, steps: f32, val: f32) -> f32 {
+    let step_size = (max - min) / steps;
+    let quantized = (val - min) / step_size;
+    let quantized_int = quantized.round() as usize;
+    min + (quantized_int as f32) * step_size
+}
+
+#[test]
+fn test_quantize() {
+    assert_eq!(quantize(0., 100., 10., 0.2), 0.);
+    assert_eq!(quantize(0., 100., 10., 10.2), 10.);
+    assert_eq!(quantize(0., 100., 10., 51.), 50.);
+    assert_eq!(quantize(0., 100., 10., 100.), 100.);
+    assert_eq!(quantize(0., 100., 10., 101.), 100.);
+
+    assert_eq!(quantize(-1., 1., 20., -0.23), -0.19999999);
+    assert_eq!(quantize(-1., 1., 20., 0.98), 1.);
+
+    assert_eq!(quantize(0., 1., 1., 0.4), 0.);
+    assert_eq!(quantize(0., 1., 1., 0.6), 1.);
+}

@@ -13,6 +13,7 @@ static mut NOISE_TYPE: NoiseType = NoiseType::White;
 pub static mut OUTPUT: [f32; 128] = [0.; 128];
 static mut GAIN: f32 = 1.;
 static mut SMOOTHING_COEFFICIENT: f32 = 0.;
+static mut QUANTIZATION_FACTOR: usize = 0;
 
 #[no_mangle]
 pub unsafe extern "C" fn set_noise_type(noise_type: u32, update_freq_samples: u32) {
@@ -33,6 +34,11 @@ pub unsafe extern "C" fn set_gain(gain: f32) { GAIN = gain; }
 #[no_mangle]
 pub unsafe extern "C" fn set_smoothing_coefficient(smoothing_cofficient: f32) {
     SMOOTHING_COEFFICIENT = smoothing_cofficient;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_quantization_factor(quantize_factor: usize) {
+    QUANTIZATION_FACTOR = quantize_factor;
 }
 
 fn gen_white_noise() -> f32 { rng().gen_range(-1., 1.) }
@@ -80,13 +86,18 @@ pub unsafe extern "C" fn generate() -> *const f32 {
             STEPPED_RANDOM_STATE.update_freq_samples = update_freq_samples;
             gen_stepped_random
         },
-        _ => unimplemented!(), // TODO
+        NoiseType::Pink => todo!(),
+        NoiseType::Brown => todo!(),
     };
     for out in &mut OUTPUT {
-        if SMOOTHING_COEFFICIENT != 0. {
-            dsp::one_pole(&mut LAST_VAL, generator() * GAIN, SMOOTHING_COEFFICIENT);
+        if QUANTIZATION_FACTOR > 0 {
+            LAST_VAL = dsp::quantize(-1., 1., QUANTIZATION_FACTOR as f32, generator() * GAIN);
         } else {
-            LAST_VAL = generator() * GAIN;
+            if SMOOTHING_COEFFICIENT != 0. {
+                dsp::one_pole(&mut LAST_VAL, generator() * GAIN, SMOOTHING_COEFFICIENT);
+            } else {
+                LAST_VAL = generator() * GAIN;
+            }
         }
         *out = LAST_VAL;
     }

@@ -58,6 +58,16 @@ const NoiseGenSmallView: React.FC<{
               initial: node.smoothingCoefficient,
             }
           : null,
+        !enableSmoothing
+          ? {
+              type: 'range',
+              label: 'quantization_factor',
+              min: 0,
+              max: 150,
+              step: 1,
+              initial: node.quantizationFactor,
+            }
+          : null,
         { type: 'range', label: 'gain', min: 0, max: 1, initial: node.gain },
       ])}
       onChange={(key: string, val: any) => {
@@ -84,6 +94,7 @@ export class NoiseGenNode {
   public updateFreqSamples = 10_000;
   public enableSmoothing = false;
   public smoothingCoefficient = 0.99;
+  public quantizationFactor = 0;
   public gain = 1;
 
   private ctx: AudioContext;
@@ -151,6 +162,14 @@ export class NoiseGenNode {
               });
               break;
             }
+            case 'quantization_factor': {
+              this.quantizationFactor = val;
+              this.awpNode.port.postMessage({
+                type: 'setQuantizationFactor',
+                quantizationFactor: val,
+              });
+              break;
+            }
             case 'gain': {
               this.gain = val;
               this.awpNode.port.postMessage({
@@ -192,6 +211,9 @@ export class NoiseGenNode {
     if (!R.isNil(params.gain)) {
       this.gain = params.gain;
     }
+    if (!R.isNil(params.quantizationFactor)) {
+      this.quantizationFactor = params.quantizationFactor;
+    }
   }
 
   private async init() {
@@ -209,6 +231,7 @@ export class NoiseGenNode {
       updateFreqSamples: this.updateFreqSamples,
       smoothingCoefficient: this.enableSmoothing ? this.smoothingCoefficient : 0,
       gain: this.gain,
+      quantizationFactor: this.quantizationFactor,
     });
 
     // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
@@ -239,6 +262,7 @@ export class NoiseGenNode {
       enableSmoothing: this.enableSmoothing,
       smoothingCoefficient: this.smoothingCoefficient,
       gain: this.gain,
+      quantizationFactor: this.quantizationFactor,
     };
   }
 }
