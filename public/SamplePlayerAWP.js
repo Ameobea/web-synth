@@ -65,6 +65,7 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
   }
 
   addSample(gain) {
+    console.log({ addSample: this.activeSampleCount });
     if (this.activeSampleCount >= MAX_SAMPLE_COUNT) {
       throw new Error(
         'Tried to add more samples than max to sample player AWP; should have been prevented in the UI'
@@ -93,6 +94,7 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
   }
 
   setSampleData(voiceIx, sampleData) {
+    console.log({ setSampleData: voiceIx });
     const sampleBufPtr = this.wasmInstance.exports.get_sample_buf_ptr(
       this.ctxPtr,
       voiceIx,
@@ -124,19 +126,19 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
         break;
       }
       case 'addSample': {
-        this.addSample(evt.data.sample);
+        this.addSample(data.sample);
         break;
       }
       case 'removeSample': {
-        this.removeSample(evt.data.voiceIx);
+        this.removeSample(data.voiceIx);
         break;
       }
       case 'setSampleData': {
-        this.setSampleData(evt.data.voiceIx, evt.data.sampleData);
+        this.setSampleData(data.voiceIx, data.sampleData);
         break;
       }
       default: {
-        console.error('Unhandled message type in sample player AWP: ', evt.data.type);
+        console.error('Unhandled message type in sample player AWP: ', data.type);
       }
     }
   }

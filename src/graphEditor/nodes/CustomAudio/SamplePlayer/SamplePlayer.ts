@@ -1,21 +1,21 @@
 import type { ArrayElementOf } from 'ameo-utils/types';
 import { Map as ImmMap } from 'immutable';
-import { updateConnectables } from 'index';
 import * as R from 'ramda';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import SamplePlayerUI from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayerUI';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { AsyncOnce } from 'src/util';
 
-export const DelayWasmBytes = new AsyncOnce(() =>
+export const SamplePlayerWasmBytes = new AsyncOnce(() =>
   fetch(
-    '/sample_player.wasm?cacheBust=' + window.location.host.includes('localhost')
-      ? ''
-      : btoa(Math.random().toString())
+    '/sample_player.wasm?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   ).then(res => res.arrayBuffer())
 );
 
@@ -34,7 +34,7 @@ export default class SamplePlayerNode implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
   private sampleDescriptors: SamplePlayerSampleDescriptor[] = [];
-  private inputGainNodes: { param: OverridableAudioParam; node: GainNode }[] = [];
+  private inputGainNodes: { param: OverridableAudioParam }[] = [];
   private awpHandle: AudioWorkletNode | null = null;
 
   static typeName = 'Sample Player';
@@ -52,16 +52,15 @@ export default class SamplePlayerNode implements ForeignNode {
       this.deserialize(params);
     }
 
-    const props = {
-      addSample: this.addSample.bind(this),
-      removeSample: this.removeSample.bind(this),
-      setSampleGain: this.setSampleGain.bind(this),
-      setSampleDescriptor: this.setSampleDescriptor.bind(this),
-      initialState: [...this.sampleDescriptors],
-    };
     this.renderSmallView = mkContainerRenderHelper({
       Comp: SamplePlayerUI,
-      getProps: () => props,
+      getProps: () => ({
+        addSample: this.addSample.bind(this),
+        removeSample: this.removeSample.bind(this),
+        setSampleGain: this.setSampleGain.bind(this),
+        setSampleDescriptor: this.setSampleDescriptor.bind(this),
+        initialState: [...this.sampleDescriptors],
+      }),
     });
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
 
@@ -70,7 +69,7 @@ export default class SamplePlayerNode implements ForeignNode {
 
   private async init() {
     const [wasmBytes] = await Promise.all([
-      DelayWasmBytes.get(),
+      SamplePlayerWasmBytes.get(),
       this.ctx.audioWorklet.addModule(
         '/SamplePlayerAWP.js?cacheBust=' +
           (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
@@ -78,8 +77,18 @@ export default class SamplePlayerNode implements ForeignNode {
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'sample-player-awp', { numberOfOutputs: 1 });
 
+    this.sampleDescriptors.forEach((sampleDescriptor, i) => {
+      const gainOAP = new OverridableAudioParam(
+        this.ctx,
+        (this.awpHandle!.parameters as Map<string, AudioParam>).get(`sample_${i}_gain`)
+      );
+      gainOAP.manualControl.offset.value = sampleDescriptor.gain ?? 1;
+      this.inputGainNodes.push({ param: gainOAP });
+    });
+
     this.awpHandle.port.postMessage({
       type: 'setWasmBytes',
+      wasmBytes,
       initialSampleDescriptors: this.sampleDescriptors.map(slot => ({
         gain: slot.gain,
         sampleData: slot.sample?.getChannelData(0),
@@ -91,31 +100,37 @@ export default class SamplePlayerNode implements ForeignNode {
     }
   }
 
-  private fetchAndSetSample(descriptor: SampleDescriptor) {
-    getSample(descriptor).then(sample =>
-      this.sampleDescriptors
-        .map((slot, i) => [slot, i] as const)
-        .filter(([slot]) => R.propEq('descriptor', descriptor, slot))
-        .forEach(([slot, slotIx]) => {
-          slot.sample = sample;
-          this.awpHandle?.port.postMessage({
-            type: 'setSampleData',
-            voiceIx: slotIx,
-            sampleData: sample.getChannelData(0),
-          });
-        })
-    );
+  private async fetchAndSetSample(descriptor: SampleDescriptor) {
+    const sample = await getSample(descriptor);
+
+    this.sampleDescriptors
+      .map((slot, i) => [slot, i] as const)
+      .filter(([slot]) => R.propEq('descriptor', descriptor, slot))
+      .forEach(([slot, slotIx]) => {
+        slot.sample = sample;
+        this.awpHandle?.port.postMessage({
+          type: 'setSampleData',
+          voiceIx: slotIx,
+          sampleData: sample.getChannelData(0),
+        });
+      });
   }
 
   private addSample(descriptor: SampleDescriptor, id: string, gain?: number) {
     this.sampleDescriptors.push({ id, descriptor, sample: null, gain: gain ?? 1 });
 
-    const gainNode = this.ctx.createGain();
-    gainNode.gain.value = 0;
-    const gainOAP = new OverridableAudioParam(this.ctx, gainNode.gain);
-    gainOAP.manualControl.offset.value = gain ?? 1;
-    this.inputGainNodes.push();
-    this.inputGainNodes.push({ param: gainOAP, node: gainNode });
+    if (this.awpHandle) {
+      const gainOAP = new OverridableAudioParam(
+        this.ctx,
+        (this.awpHandle.parameters as Map<string, AudioParam>).get(
+          `sample_${this.sampleDescriptors.length - 1}_gain`
+        )
+      );
+      gainOAP.manualControl.offset.value = gain ?? 1;
+      this.inputGainNodes.push({ param: gainOAP });
+
+      this.awpHandle.port.postMessage({ type: 'addSample', sample: { gain: gain ?? 1 } });
+    }
 
     this.fetchAndSetSample(descriptor);
     if (!R.isNil(this.vcId)) {
@@ -125,6 +140,9 @@ export default class SamplePlayerNode implements ForeignNode {
 
   private removeSample(index: number) {
     this.sampleDescriptors = R.remove(index, 1, this.sampleDescriptors);
+
+    this.awpHandle?.port.postMessage({ type: 'removeSample', voiceIx: index });
+
     if (!R.isNil(this.vcId)) {
       updateConnectables(this.vcId, this.buildConnectables());
     }
@@ -155,13 +173,29 @@ export default class SamplePlayerNode implements ForeignNode {
   }
 
   public buildConnectables() {
+    const outputs = ImmMap<string, ConnectableOutput>().set('output', {
+      type: 'customAudio',
+      node: this.awpHandle ?? new DummyNode(),
+    });
+
     return {
-      inputs: this.inputGainNodes.reduce(
-        (acc, inputGain, i) =>
-          acc.set(`sample_${i}_gain`, { type: 'number', node: inputGain.param }),
+      inputs: R.range(0, this.sampleDescriptors.length).reduce(
+        (acc, i) =>
+          acc
+            .set(`sample_${i}_gain`, {
+              type: 'number',
+              node: this.inputGainNodes[i]?.param ?? new DummyNode(),
+            })
+            .set(`sample_${i}_gate`, {
+              type: 'number',
+              node:
+                (this.awpHandle?.parameters as Map<string, AudioParam> | undefined)?.get(
+                  `sample_${i}_gate`
+                ) ?? new DummyNode(),
+            }),
         ImmMap<string, ConnectableInput>()
       ),
-      outputs: ImmMap<string, ConnectableOutput>(),
+      outputs,
       vcId: this.vcId!,
       node: this,
     };

@@ -1,6 +1,6 @@
 #![feature(box_syntax)]
 
-const MAX_SAMPLE_COUNT: usize = 8;
+const MAX_VOICE_COUNT: usize = 8;
 const FRAME_SIZE: usize = 128;
 
 #[derive(Clone, Copy)]
@@ -20,7 +20,7 @@ impl SampleDescriptor {
     pub fn get_sample(&mut self) -> f32 {
         let mut sample = 0.;
 
-        let mut i = self.playheads.len();
+        let mut i = 0;
         while i < self.playheads.len() {
             let mut new_playhead = self.playheads[i];
             new_playhead.pos += new_playhead.playback_speed;
@@ -39,25 +39,25 @@ impl SampleDescriptor {
 }
 
 pub struct SamplePlayerCtx {
-    pub samples: Vec<SampleDescriptor>,
-    pub gain_inputs: Vec<[f32; FRAME_SIZE]>,
-    pub gate_inputs: Vec<[f32; FRAME_SIZE]>,
+    pub voices: Vec<SampleDescriptor>,
+    pub gain_inputs: Box<[[f32; FRAME_SIZE]; MAX_VOICE_COUNT]>,
+    pub gate_inputs: Box<[[f32; FRAME_SIZE]; MAX_VOICE_COUNT]>,
     pub output_buffer: Box<[f32; FRAME_SIZE]>,
 }
 
 impl Default for SamplePlayerCtx {
     fn default() -> Self {
         SamplePlayerCtx {
-            samples: Vec::with_capacity(MAX_SAMPLE_COUNT),
-            gain_inputs: Vec::with_capacity(MAX_SAMPLE_COUNT),
-            gate_inputs: Vec::with_capacity(MAX_SAMPLE_COUNT),
+            voices: Vec::with_capacity(MAX_VOICE_COUNT),
+            gain_inputs: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            gate_inputs: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
             output_buffer: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
         }
     }
 }
 
 #[no_mangle]
-pub extern "C" fn create_sample_player_ctx() -> *mut SamplePlayerCtx {
+pub extern "C" fn init_sample_player_ctx() -> *mut SamplePlayerCtx {
     Box::into_raw(box SamplePlayerCtx::default())
 }
 
@@ -81,10 +81,10 @@ pub extern "C" fn process_sample_player(ctx: *mut SamplePlayerCtx) {
     let ctx = unsafe { &mut *ctx };
     ctx.output_buffer.fill(0.);
 
-    for voice_ix in 0..ctx.samples.len() {
-        let gain_inputs = &ctx.gate_inputs[voice_ix];
+    for voice_ix in 0..ctx.voices.len() {
+        let gain_inputs = &ctx.gain_inputs[voice_ix];
         let gate_inputs = &ctx.gate_inputs[voice_ix];
-        let voice = &mut ctx.samples[voice_ix];
+        let voice = &mut ctx.voices[voice_ix];
         if voice.sample_buffer.len() <= 5 {
             continue;
         }
@@ -112,36 +112,36 @@ pub extern "C" fn process_sample_player(ctx: *mut SamplePlayerCtx) {
 pub extern "C" fn add_sample(ctx: *mut SamplePlayerCtx, gain: f32) {
     let ctx = unsafe { &mut *ctx };
 
-    if ctx.samples.len() > MAX_SAMPLE_COUNT {
+    if ctx.voices.len() > MAX_VOICE_COUNT {
         panic!("Tried to add more samples than the maximum");
     }
 
-    ctx.samples.push(Default::default());
+    ctx.voices.push(Default::default());
 }
 
 #[no_mangle]
 pub extern "C" fn remove_sample(ctx: *mut SamplePlayerCtx, voice_ix: usize) {
     let ctx = unsafe { &mut *ctx };
 
-    if ctx.samples.get(voice_ix).is_none() {
+    if ctx.voices.get(voice_ix).is_none() {
         panic!(
             "Tried to remove sample at index={} but only {} samples exist",
             voice_ix,
-            ctx.samples.len()
+            ctx.voices.len()
         );
     }
 
-    todo!();
+    ctx.voices.remove(voice_ix);
 }
 
 #[no_mangle]
-pub extern "C" fn get_sample_buf_ptf(
+pub extern "C" fn get_sample_buf_ptr(
     ctx: *mut SamplePlayerCtx,
     sample_ix: usize,
     sample_len_samples: usize,
 ) -> *mut f32 {
     let ctx = unsafe { &mut *ctx };
-    let sample = &mut ctx.samples[sample_ix];
+    let sample = &mut ctx.voices[sample_ix];
 
     if sample.sample_buffer.len() < sample_len_samples {
         sample
@@ -149,6 +149,7 @@ pub extern "C" fn get_sample_buf_ptf(
             .reserve(sample_len_samples - sample.sample_buffer.len());
     }
     unsafe { sample.sample_buffer.set_len(sample_len_samples) };
+    sample.playheads.clear();
 
     sample.sample_buffer.as_mut_ptr()
 }

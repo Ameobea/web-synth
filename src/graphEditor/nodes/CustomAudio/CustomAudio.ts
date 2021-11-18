@@ -34,6 +34,7 @@ import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
 import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio/CustomCompressorSmallViewRenderer';
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
+import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
 
 const ctx = new AudioContext();
 
@@ -467,6 +468,9 @@ export const audioNodeGetters: {
   },
   'customAudio/delay': {
     nodeGetter: CustomDelayNode,
+  },
+  'customAudio/samplePlayer': {
+    nodeGetter: SamplePlayerNode,
   },
 };
 

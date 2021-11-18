@@ -110,7 +110,14 @@ const ConfigureSample: React.FC<ConfigureSampleProps> = ({ index, descriptor, di
   );
 
   return (
-    <ControlPanel initialState={initialState.current} settings={settings} onChange={handleChange} />
+    <div>
+      Selected Sample: {descriptor.descriptor.name}
+      <ControlPanel
+        initialState={initialState.current}
+        settings={settings}
+        onChange={handleChange}
+      />
+    </div>
   );
 };
 
