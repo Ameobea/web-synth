@@ -59,6 +59,8 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -98,6 +100,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
 
   just debug-sinsy
 
@@ -188,3 +191,7 @@ build-delay:
 build-noise:
   cd ./engine/noise_gen && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/noise_gen.wasm ../../public
+
+build-sample-player:
+  cd ./engine/sample_player && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/sample_player.wasm ../../public

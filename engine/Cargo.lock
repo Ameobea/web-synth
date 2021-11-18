@@ -759,6 +759,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sample_player"
+version = "0.1.0"
+dependencies = [
+ "dsp",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.117"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -11,7 +11,11 @@ import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtil
 import { AsyncOnce } from 'src/util';
 
 export const DelayWasmBytes = new AsyncOnce(() =>
-  fetch('/delay.wasm').then(res => res.arrayBuffer())
+  fetch(
+    '/delay.wasm?cacheBust=' + window.location.host.includes('localhost')
+      ? ''
+      : btoa(Math.random().toString())
+  ).then(res => res.arrayBuffer())
 );
 
 interface DelayParams {
@@ -102,7 +106,10 @@ export default class DelayNode implements ForeignNode {
   private async init() {
     const [wasmBytes] = await Promise.all([
       DelayWasmBytes.get(),
-      this.ctx.audioWorklet.addModule('/DelayAWP.js?cacheBust=' + btoa(Math.random().toString())),
+      this.ctx.audioWorklet.addModule(
+        '/DelayAWP.js?cacheBust=' +
+          (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+      ),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'delay-awp', { numberOfOutputs: 2 });
     this.awpHandle.connect(this.delayOutput, 1);
@@ -125,7 +132,7 @@ export default class DelayNode implements ForeignNode {
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
 
-    if (this.vcId) {
+    if (!isNil(this.vcId)) {
       updateConnectables(this.vcId, this.buildConnectables());
     }
   }

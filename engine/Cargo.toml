@@ -15,7 +15,8 @@ members = [
   "adsr",
   "note_container",
   "sample_editor",
-  "delay"
+  "delay",
+  "sample_player"
 ]
 
 [profile.release]

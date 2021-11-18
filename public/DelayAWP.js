@@ -70,7 +70,7 @@ class DelayAWP extends AudioWorkletProcessor {
         break;
       }
       default: {
-        console.error('Unhandled message type in distortion AWP: ', evt.data.type);
+        console.error('Unhandled message type in delay AWP: ', evt.data.type);
       }
     }
   }

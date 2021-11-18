@@ -33,3 +33,4 @@ src/note_container*
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 src/polysynth_bg.wasm.d.ts
+public/sample_player.wasm
