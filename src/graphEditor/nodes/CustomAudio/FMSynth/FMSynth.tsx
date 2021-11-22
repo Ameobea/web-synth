@@ -3,7 +3,14 @@ import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { ConnectedFMSynthUI, UISelection } from 'src/fmSynth/FMSynthUI';
-import { buildDefaultOperatorConfig, OperatorConfig } from 'src/fmSynth/ConfigureOperator';
+import {
+  buildDefaultOperatorConfig,
+  deserializeWavetableState,
+  OperatorConfig,
+  serializeWavetableState,
+  WavetableBank,
+  WavetableState,
+} from 'src/fmSynth/ConfigureOperator';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -121,6 +128,8 @@ export default class FMSynth implements ForeignNode {
   private audioThreadDataBuffer: Float32Array | null = null;
   private detune: ParamSource | null = null;
   public midiControlValuesCache: MIDIControlValuesCache;
+  private wavetableState: WavetableState = { wavetableBanks: [] };
+  private wavetableBackendIxByName: string[] = [];
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -149,6 +158,12 @@ export default class FMSynth implements ForeignNode {
   }
   public getDetune() {
     return this.detune;
+  }
+  public getWavetableState() {
+    return this.wavetableState;
+  }
+  public setWavetableState(newState: WavetableState) {
+    this.wavetableState = newState;
   }
 
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
@@ -241,6 +256,23 @@ export default class FMSynth implements ForeignNode {
       adsrs: this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
     });
 
+    // this.operatorConfigs.forEach((operator, operatorIx) => {
+    //   if (operator.type !== 'wavetable' || operator.wavetableName === null) {
+    //     return;
+    //   }
+
+    //   const bank = this.wavetableState.wavetableBanks.find(
+    //     R.propEq('name', operator.wavetableName)
+    //   );
+    //   if (!bank) {
+    //     console.error(
+    //       `Wavetable bank ${operator.wavetableName} not found in wavetable state but was referenced by operator ix=${operatorIx}`
+    //     );
+    //     return;
+    //   }
+    //   this.maybeLoadWavetableIntoBackend(bank);
+    // });
+
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'wasmInitialized': {
@@ -282,6 +314,31 @@ export default class FMSynth implements ForeignNode {
     if (this.vcId) {
       updateConnectables(this.vcId, this.buildConnectables());
     }
+  }
+
+  private maybeLoadWavetableIntoBackend(bank: WavetableBank) {
+    const isAlreadyLoaded = this.wavetableBackendIxByName.includes(bank.name);
+    if (isAlreadyLoaded) {
+      return;
+    }
+
+    const newBackendIx = this.wavetableBackendIxByName.length;
+    this.wavetableBackendIxByName.push(bank.name);
+    if (!this.awpHandle) {
+      console.error('Tried to load wavetable into backend before AWP initialized');
+      return;
+    }
+
+    console.log('Loading wavetable into backend');
+
+    this.awpHandle.port.postMessage({
+      type: 'setWavetableData',
+      wavetableIx: newBackendIx,
+      waveformsPerDimension: bank.waveformsPerDimension,
+      waveformLength: bank.samplesPerWaveform,
+      baseFrequency: bank.baseFrequency,
+      samples: bank.samples,
+    });
   }
 
   public onGate(voiceIx: number) {
@@ -381,6 +438,17 @@ export default class FMSynth implements ForeignNode {
       return;
     }
 
+    if (config.type === 'wavetable' && config.wavetableName !== null) {
+      const bank = this.wavetableState.wavetableBanks.find(R.propEq('name', config.wavetableName));
+      if (!bank) {
+        console.error(
+          `Wavetable bank ${config.wavetableName} not found in wavetable state but was referenced by operator ix=${operatorIx}`
+        );
+      } else {
+        this.maybeLoadWavetableIntoBackend(bank);
+      }
+    }
+
     // Set the operator config along with any hyperparam config
     this.awpHandle.port.postMessage({
       type: 'setOperatorConfig',
@@ -396,12 +464,20 @@ export default class FMSynth implements ForeignNode {
       }[config.type],
       ...(() => {
         switch (config.type) {
-          case 'exponential oscillator': {
-            return this.encodeParamSource(config.stretchFactor);
-          }
-          default: {
-            return { valueType: 0, valParamInt: 0, valParamFloat: 0, valParamFloat2: 0 };
-          }
+          case 'exponential oscillator':
+            return { param1: this.encodeParamSource(config.stretchFactor) };
+          case 'wavetable':
+            return {
+              param1: {
+                valParamInt:
+                  this.wavetableBackendIxByName.findIndex(x => x === config.wavetableName) ?? 1000,
+              },
+              param2: this.encodeParamSource(config.dim0IntraMix),
+              param3: this.encodeParamSource(config.dim1IntraMix),
+              param4: this.encodeParamSource(config.interDimMix),
+            };
+          default:
+            return {};
         }
       })(),
     });
@@ -699,6 +775,9 @@ export default class FMSynth implements ForeignNode {
     if (params.detune) {
       this.detune = params.detune;
     }
+    if (params.wavetableState) {
+      this.wavetableState = deserializeWavetableState(params.wavetableState);
+    }
   }
 
   public serialize() {
@@ -712,6 +791,7 @@ export default class FMSynth implements ForeignNode {
       adsrs: this.adsrs.map(serializeADSR),
       detune: this.detune,
       lastSeenMIDIControlValues: this.midiControlValuesCache.serialize(),
+      wavetableState: serializeWavetableState(this.wavetableState),
     };
   }
 

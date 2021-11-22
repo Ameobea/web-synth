@@ -26,13 +26,13 @@ document.addEventListener('touchstart', () => ctx.resume(), { once: true });
 document.addEventListener('touchend', () => ctx.resume(), { once: true });
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
-  ReactDOM.unstable_createRoot(document.getElementById('view-context-manager')).render(
+  ReactDOM.createRoot(document.getElementById('view-context-manager')!).render(
     <Provider store={store}>
       <ViewContextManager engine={engine} />
     </Provider>
   );
 
-  ReactDOM.unstable_createRoot(document.getElementById('view-context-switcher')).render(
+  ReactDOM.createRoot(document.getElementById('view-context-switcher')!).render(
     <Provider store={store}>
       <ViewContextSwitcher engine={engine} />
     </Provider>
@@ -45,7 +45,7 @@ const createBrowserNotSupportedMessage = () => {
     body.children[0].remove();
   }
 
-  ReactDOM.unstable_createRoot(body).render(<BrowserNotSupported />);
+  ReactDOM.createRoot(body).render(<BrowserNotSupported />);
 };
 
 export const init_view_contexts = (

@@ -1,0 +1,26 @@
+.upload-wavetable-modal {
+  width: 800px;
+
+  .buttons-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    margin-top: 20px;
+
+    button {
+      margin-left: 8px;
+      margin-right: 8px;
+      width: 180px;
+    }
+  }
+
+  input {
+    background-color: #151515;
+    color: #bababa;
+    border: 1px solid #888;
+    outline: none;
+    width: 220px;
+    height: 21px;
+    font-size: 16px;
+  }
+}

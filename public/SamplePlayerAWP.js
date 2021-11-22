@@ -65,7 +65,6 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
   }
 
   addSample(gain) {
-    console.log({ addSample: this.activeSampleCount });
     if (this.activeSampleCount >= MAX_SAMPLE_COUNT) {
       throw new Error(
         'Tried to add more samples than max to sample player AWP; should have been prevented in the UI'
@@ -94,7 +93,6 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
   }
 
   setSampleData(voiceIx, sampleData) {
-    console.log({ setSampleData: voiceIx });
     const sampleBufPtr = this.wasmInstance.exports.get_sample_buf_ptr(
       this.ctxPtr,
       voiceIx,

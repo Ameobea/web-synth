@@ -6,8 +6,6 @@
     get_mut_unchecked
 )]
 
-use std::mem::{self, transmute};
-
 pub mod fm;
 pub mod lookup_tables;
 
@@ -194,13 +192,13 @@ pub fn get_data_table_ptr(handle_ptr: *mut WaveTable) -> *mut f32 {
 pub fn drop_wavetable(table: *mut WaveTable) { drop(unsafe { Box::from_raw(table) }) }
 
 #[no_mangle]
-pub fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
-    Box::into_raw(box WaveTableHandle::new(unsafe { transmute(table) }))
+pub unsafe fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
+    Box::into_raw(box WaveTableHandle::new(std::mem::transmute(table)))
 }
 
 #[no_mangle]
 pub fn get_mixes_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
-    let mut handle = unsafe { Box::from_raw(handle_ptr) };
+    let handle = unsafe { &mut *handle_ptr };
 
     while handle.sample_buffer.len() < sample_count {
         handle.sample_buffer.push(0.0);
@@ -212,14 +210,12 @@ pub fn get_mixes_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *
 
     let mixes_ptr = handle.mixes.as_mut_ptr();
 
-    mem::forget(handle);
-
     mixes_ptr
 }
 
 #[no_mangle]
 pub fn get_frequencies_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
-    let mut handle = unsafe { Box::from_raw(handle_ptr) };
+    let handle = unsafe { &mut *handle_ptr };
 
     while handle.frequencies_buffer.len() < sample_count {
         handle.frequencies_buffer.push(440.0);
@@ -227,14 +223,12 @@ pub fn get_frequencies_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize
 
     let frequencies_ptr = handle.frequencies_buffer.as_mut_ptr();
 
-    mem::forget(handle);
-
     frequencies_ptr
 }
 
 #[no_mangle]
 pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *const f32 {
-    let mut handle = unsafe { Box::from_raw(handle_ptr) };
+    let handle = unsafe { &mut *handle_ptr };
 
     while handle.sample_buffer.len() < sample_count {
         handle.sample_buffer.push(0.0);
@@ -253,8 +247,6 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
     }
 
     let sample_buf_ptr = handle.sample_buffer.as_ptr();
-
-    mem::forget(handle);
 
     sample_buf_ptr
 }

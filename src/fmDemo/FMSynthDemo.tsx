@@ -73,7 +73,7 @@ const GlobalState: {
   lastLoadedPreset: undefined,
 };
 
-const root = (ReactDOM as any).unstable_createRoot(document.getElementById('root')!);
+const root = (ReactDOM as any).createRoot(document.getElementById('root')!);
 
 const environmentIsValid =
   typeof AudioWorkletNode !== 'undefined' && typeof ConstantSourceNode !== 'undefined';

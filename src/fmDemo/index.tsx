@@ -5,7 +5,7 @@ import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { getSentry, initSentry } from 'src/sentry';
 
 initSentry();
-const root = (ReactDOM as any).unstable_createRoot(document.getElementById('root')!);
+const root = (ReactDOM as any).createRoot(document.getElementById('root')!);
 
 const environmentIsValid =
   typeof AudioWorkletNode !== 'undefined' && typeof ConstantSourceNode !== 'undefined';

@@ -89,6 +89,7 @@ const config = {
   },
   experiments: {
     syncWebAssembly: true,
+    backCompat: false,
   },
 };
 

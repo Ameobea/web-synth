@@ -985,6 +985,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wav_decoder"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "hound",
+ "log",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "waveform_renderer"
 version = "0.1.0"
 dependencies = [

@@ -147,7 +147,7 @@ export const init_synth_designer = (
   // Mount the newly created Faust editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(synthDesignerBase);
 
-  const reactRoot = ReactDOM.unstable_createRoot(synthDesignerBase);
+  const reactRoot = ReactDOM.createRoot(synthDesignerBase);
   reactRoot.render(
     <Provider store={reduxInfra.store}>
       <SynthDesigner stateKey={stateKey} />

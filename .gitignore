@@ -34,3 +34,4 @@ src/note_container*
 */.ipynb_checkpoints/*
 src/polysynth_bg.wasm.d.ts
 public/sample_player.wasm
+src/wav_decoder*

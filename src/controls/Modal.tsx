@@ -20,7 +20,7 @@ export function renderModalWithControls<T>(
   const modalNode = document.createElement('div');
   bodyNode.appendChild(modalNode);
   modalNode.setAttribute('class', 'input-modal');
-  const root = ReactDOM.unstable_createRoot(modalNode);
+  const root = ReactDOM.createRoot(modalNode);
 
   const unmount = () => {
     root.unmount();

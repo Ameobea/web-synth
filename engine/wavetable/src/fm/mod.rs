@@ -6,6 +6,8 @@ use adsr::{Adsr, AdsrStep, EarlyReleaseConfig, GateStatus, RampFn, RENDERED_BUFF
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
+use crate::{WaveTable, WaveTableSettings};
+
 use self::effects::EffectChain;
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
@@ -271,6 +273,56 @@ impl ExponentialOscillator {
     }
 }
 
+#[derive(Clone)]
+pub struct WaveTableHandle {
+    wavetable_index: usize,
+    phase: f32,
+    dim_0_intra_mix: ParamSource,
+    dim_1_intra_mix: ParamSource,
+    inter_dim_mix: ParamSource,
+}
+
+impl WaveTableHandle {
+    pub fn gen_sample(
+        &mut self,
+        frequency: f32,
+        wavetables: &[WaveTable],
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[Adsr],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+    ) -> f32 {
+        let wavetable = match wavetables.get(self.wavetable_index) {
+            Some(wavetable) => wavetable,
+            None => return 0.,
+        };
+
+        // dim_0_intra, unused, dim_1_intra, inter
+        let mixes: [f32; 4] = [
+            self.dim_0_intra_mix
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency),
+            unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            self.dim_1_intra_mix
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency),
+            self.inter_dim_mix
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency),
+        ];
+
+        // TODO: Oversampling
+        self.update_phase(frequency);
+        wavetable.get_sample(
+            self.phase * wavetable.settings.waveform_length as f32,
+            &mixes,
+        )
+    }
+}
+
+impl PhasedOscillator for WaveTableHandle {
+    fn get_phase(&self) -> f32 { self.phase }
+
+    fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
+}
+
 #[inline(always)]
 fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
 
@@ -285,7 +337,7 @@ impl Operator {
     pub fn gen_sample(
         &mut self,
         frequency: f32,
-        wavetables: &mut [()],
+        wavetables: &[WaveTable],
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
@@ -312,7 +364,7 @@ impl Operator {
 #[derive(Clone)]
 pub enum OscillatorSource {
     Sine(SineOscillator),
-    Wavetable(usize),
+    Wavetable(WaveTableHandle),
     ParamBuffer(usize),
     ExponentialOscillator(ExponentialOscillator),
     Square(SquareOscillator),
@@ -325,7 +377,7 @@ impl OscillatorSource {
     /// where we're switching oscillator type.
     pub fn get_phase(&self) -> Option<f32> {
         match self {
-            OscillatorSource::Wavetable(_) => todo!(),
+            OscillatorSource::Wavetable(handle) => Some(handle.phase),
             OscillatorSource::ParamBuffer(_) => None,
             OscillatorSource::Sine(osc) => Some(osc.get_phase()),
             OscillatorSource::ExponentialOscillator(osc) => Some(osc.get_phase()),
@@ -344,17 +396,21 @@ impl OscillatorSource {
     pub fn gen_sample(
         &mut self,
         frequency: f32,
-        _wavetables: &mut [()],
+        wavetables: &[WaveTable],
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
     ) -> f32 {
         match self {
-            OscillatorSource::Wavetable(_wavetable_ix) => {
-                // TODO
-                -1.0
-            },
+            OscillatorSource::Wavetable(handle) => handle.gen_sample(
+                frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            ),
             OscillatorSource::ParamBuffer(buf_ix) =>
                 if cfg!(debug_assertions) {
                     param_buffers[*buf_ix][sample_ix_within_frame]
@@ -453,7 +509,7 @@ impl FMSynthVoice {
     pub fn gen_samples(
         &mut self,
         modulation_matrix: &mut ModulationMatrix,
-        wavetables: &mut [()],
+        wavetables: &[WaveTable],
         param_buffers: &[[f32; FRAME_SIZE]],
         operator_base_frequency_sources: &[ParamSource; OPERATOR_COUNT],
         raw_base_frequencies: &[f32; FRAME_SIZE],
@@ -1018,6 +1074,7 @@ pub struct FMSynthContext {
     pub most_recent_gated_voice_ix: usize,
     pub adsr_phase_buf: [f32; 256],
     pub detune: Option<ParamSource>,
+    pub wavetables: Vec<WaveTable>,
 }
 
 impl FMSynthContext {
@@ -1037,7 +1094,7 @@ impl FMSynthContext {
 
             voice.gen_samples(
                 &mut self.modulation_matrix,
-                &mut [],
+                &self.wavetables,
                 &self.param_buffers,
                 &self.operator_base_frequency_sources,
                 base_frequency_buffer,
@@ -1094,6 +1151,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         most_recent_gated_voice_ix: 0,
         adsr_phase_buf: [0.; 256],
         detune: None,
+        wavetables: Vec::new(),
     });
     for i in 0..OPERATOR_COUNT {
         (*ctx)
@@ -1172,25 +1230,58 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
 
 fn build_oscillator_source(
     operator_type: usize,
-    param_value_type: usize,
-    param_val_int: usize,
-    param_val_float: f32,
-    val_param_float_2: f32,
+    param_0_value_type: usize,
+    param_0_val_int: usize,
+    param_0_val_float: f32,
+    param_0_val_float_2: f32,
+    param_1_value_type: usize,
+    param_1_val_int: usize,
+    param_1_val_float: f32,
+    param_1_val_float_2: f32,
+    param_2_value_type: usize,
+    param_2_val_int: usize,
+    param_2_val_float: f32,
+    param_2_val_float_2: f32,
+    param_3_value_type: usize,
+    param_3_val_int: usize,
+    param_3_val_float: f32,
+    param_3_val_float_2: f32,
     phase_opt: Option<f32>,
 ) -> OscillatorSource {
     match operator_type {
-        0 => OscillatorSource::Wavetable(param_val_int),
-        1 => OscillatorSource::ParamBuffer(param_val_int),
+        0 => OscillatorSource::Wavetable(WaveTableHandle {
+            wavetable_index: param_0_val_int,
+            phase: phase_opt.unwrap_or_default(),
+            dim_0_intra_mix: ParamSource::new(ParamSourceType::from_parts(
+                param_1_value_type,
+                param_1_val_int,
+                param_1_val_float,
+                param_1_val_float_2,
+            )),
+            dim_1_intra_mix: ParamSource::new(ParamSourceType::from_parts(
+                param_2_value_type,
+                param_2_val_int,
+                param_2_val_float,
+                param_2_val_float_2,
+            )),
+            inter_dim_mix: ParamSource::new(ParamSourceType::from_parts(
+                param_3_value_type,
+                param_3_val_int,
+                param_3_val_float,
+                param_3_val_float_2,
+            )),
+        }),
+        1 => OscillatorSource::ParamBuffer(param_0_val_int),
         2 => OscillatorSource::Sine(SineOscillator {
             phase: phase_opt.unwrap_or_default(),
         }),
         3 => OscillatorSource::ExponentialOscillator(ExponentialOscillator {
             phase: phase_opt.unwrap_or_default(),
             stretch_factor: ParamSource::new(ParamSourceType::from_parts(
-                param_value_type,
-                param_val_int,
-                param_val_float,
-                val_param_float_2,
+                param_0_value_type,
+                param_0_val_int,
+                param_0_val_float,
+                param_0_val_float_2,
             )),
         }),
         4 => OscillatorSource::Square(SquareOscillator {
@@ -1211,19 +1302,43 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     ctx: *mut FMSynthContext,
     operator_ix: usize,
     operator_type: usize,
-    param_value_type: usize,
-    param_val_int: usize,
-    param_val_float: f32,
-    param_val_float_2: f32,
+    param_0_value_type: usize,
+    param_0_val_int: usize,
+    param_0_val_float: f32,
+    param_0_val_float_2: f32,
+    param_1_value_type: usize,
+    param_1_val_int: usize,
+    param_1_val_float: f32,
+    param_1_val_float_2: f32,
+    param_2_value_type: usize,
+    param_2_val_int: usize,
+    param_2_val_float: f32,
+    param_2_val_float_2: f32,
+    param_3_value_type: usize,
+    param_3_val_int: usize,
+    param_3_val_float: f32,
+    param_3_val_float_2: f32,
 ) {
     for voice in &mut (*ctx).voices {
         let old_phase = voice.operators[operator_ix].oscillator_source.get_phase();
         voice.operators[operator_ix].oscillator_source = build_oscillator_source(
             operator_type,
-            param_value_type,
-            param_val_int,
-            param_val_float,
-            param_val_float_2,
+            param_0_value_type,
+            param_0_val_int,
+            param_0_val_float,
+            param_0_val_float_2,
+            param_1_value_type,
+            param_1_val_int,
+            param_1_val_float,
+            param_1_val_float_2,
+            param_2_value_type,
+            param_2_val_int,
+            param_2_val_float,
+            param_2_val_float_2,
+            param_3_value_type,
+            param_3_val_int,
+            param_3_val_float,
+            param_3_val_float_2,
             old_phase,
         );
     }
@@ -1459,4 +1574,33 @@ pub unsafe extern "C" fn set_adsr_length(
     for voice in &mut (*ctx).voices {
         voice.adsr_params[adsr_ix].len_samples = param.clone();
     }
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_get_wavetable_data_ptr(
+    ctx: *mut FMSynthContext,
+    wavetable_ix: usize,
+    waveforms_per_dimension: usize,
+    waveform_length: usize,
+    base_frequency: f32,
+) -> *mut f32 {
+    let ctx = unsafe { &mut *ctx };
+    let new_wavetable = WaveTable::new(WaveTableSettings {
+        waveform_length,
+        dimension_count: 2,
+        waveforms_per_dimension,
+        base_frequency,
+    });
+    if ctx.wavetables.get(wavetable_ix).is_some() {
+        ctx.wavetables[wavetable_ix] = new_wavetable;
+    } else if ctx.wavetables.len() != wavetable_ix {
+        panic!(
+            "Tried to set wavetable index {} but only {} wavetables exist",
+            wavetable_ix,
+            ctx.wavetables.len()
+        );
+    } else {
+        ctx.wavetables.push(new_wavetable);
+    }
+    ctx.wavetables[wavetable_ix].samples.as_mut_ptr()
 }

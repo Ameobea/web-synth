@@ -118,7 +118,7 @@ pub extern "C" fn process_sample_player(ctx: *mut SamplePlayerCtx) {
 }
 
 #[no_mangle]
-pub extern "C" fn add_sample(ctx: *mut SamplePlayerCtx, gain: f32) {
+pub extern "C" fn add_sample(ctx: *mut SamplePlayerCtx, _gain: f32) {
     let ctx = unsafe { &mut *ctx };
 
     if ctx.voices.len() > MAX_VOICE_COUNT {

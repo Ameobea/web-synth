@@ -83,14 +83,27 @@ class FMSynthAWP extends AudioWorkletProcessor {
             console.error('Tried setting operator config before Wasm instance loaded');
             return;
           }
+          const { operatorIx, operatorType, param1, param2, param3, param4 } = evt.data;
           this.wasmInstance.exports.fm_synth_set_operator_config(
             this.ctxPtr,
-            evt.data.operatorIx,
-            evt.data.operatorType,
-            evt.data.valueType,
-            evt.data.valParamInt,
-            evt.data.valParamFloat,
-            evt.data.valParamFloat2
+            operatorIx,
+            operatorType,
+            param1?.valueType ?? 0,
+            param1?.valParamInt ?? 0,
+            param1?.valParamFloat ?? 0,
+            param1?.valParamFloat2 ?? 0,
+            param2?.valueType ?? 0,
+            param2?.valParamInt ?? 0,
+            param2?.valParamFloat ?? 0,
+            param2?.valParamFloat2 ?? 0,
+            param3?.valueType ?? 0,
+            param3?.valParamInt ?? 0,
+            param3?.valParamFloat ?? 0,
+            param3?.valParamFloat2 ?? 0,
+            param4?.valueType ?? 0,
+            param4?.valParamInt ?? 0,
+            param4?.valParamFloat ?? 0,
+            param4?.valParamFloat2 ?? 0
           );
           break;
         }
@@ -225,6 +238,38 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.controlIndex,
             evt.data.controlValue
           );
+          break;
+        }
+        case 'setWavetableData': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set wavetable data before Wasm instance loaded');
+            return;
+          }
+
+          const { wavetableIx, waveformsPerDimension, waveformLength, baseFrequency, samples } =
+            evt.data;
+          const wavetableDataPtr = this.wasmInstance.exports.fm_synth_get_wavetable_data_ptr(
+            this.ctxPtr,
+            wavetableIx,
+            waveformsPerDimension,
+            waveformLength,
+            baseFrequency
+          );
+          const sampleCount = waveformLength * waveformsPerDimension * 2;
+          if (samples.length !== sampleCount && samples.length * 2 !== sampleCount) {
+            console.error(
+              `Wavetable data length ${samples.length} does not match expected length ${sampleCount}`
+            );
+            return;
+          }
+          const dataBuf = this.getWasmMemoryBuffer().subarray(
+            wavetableDataPtr / BYTES_PER_F32,
+            wavetableDataPtr / BYTES_PER_F32 + sampleCount
+          );
+          dataBuf.set(samples);
+          if (sampleCount === samples.length * 2) {
+            dataBuf.set(samples, samples.length);
+          }
           break;
         }
         default: {

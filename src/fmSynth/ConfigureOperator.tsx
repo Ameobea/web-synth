@@ -1,19 +1,31 @@
 import { UnreachableException } from 'ameo-utils';
-import React, { useMemo } from 'react';
+import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import { Map as ImmMap } from 'immutable';
+import * as R from 'ramda';
 
 import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, {
   buildDefaultParamSource,
   ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
-import { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { renderModalWithControls } from 'src/controls/Modal';
+import type { UploadWavetableModalProps } from 'src/fmSynth/UploadWavetable';
+import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
 
 /**
  * The algorithm used to produce the output for the operator.
  */
 export type OperatorConfig =
-  | { type: 'wavetable'; wavetableIx: number }
+  | {
+      type: 'wavetable';
+      wavetableName: string | null;
+      frequency: ParamSource;
+      dim0IntraMix: ParamSource;
+      dim1IntraMix: ParamSource;
+      interDimMix: ParamSource;
+    }
   | { type: 'sine oscillator'; frequency: ParamSource }
   | { type: 'exponential oscillator'; frequency: ParamSource; stretchFactor: ParamSource }
   | { type: 'param buffer'; bufferIx: number }
@@ -44,10 +56,191 @@ export const buildDefaultOperatorConfig = (
     case 'param buffer': {
       return { type, bufferIx: 0 };
     }
+    case 'wavetable': {
+      return {
+        type,
+        wavetableName: null,
+        frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
+        dim0IntraMix: buildDefaultParamSource('constant', 0, 1, 0.5),
+        dim1IntraMix: buildDefaultParamSource('constant', 0, 1, 0.5),
+        interDimMix: buildDefaultParamSource('constant', 0, 1, 0.5),
+      };
+    }
     default: {
       throw new UnreachableException('Unhandled type in `buildDefaultOperatorConfig`: ' + type);
     }
   }
+};
+
+export interface WavetableBank {
+  name: string;
+  samples: Float32Array;
+  samplesPerWaveform: number;
+  waveformsPerDimension: number;
+  baseFrequency: number;
+}
+
+export interface WavetableState {
+  wavetableBanks: WavetableBank[];
+}
+
+export const serializeWavetableState = (state: WavetableState) => {
+  return {
+    wavetableBanks: state.wavetableBanks.map(bank => ({
+      ...bank,
+      samples: base64ArrayBuffer(bank.samples.buffer),
+    })),
+  };
+};
+
+export const deserializeWavetableState = (
+  serialized: ReturnType<typeof serializeWavetableState>
+): WavetableState => {
+  return {
+    wavetableBanks: serialized.wavetableBanks.map(bank => ({
+      ...bank,
+      samples: new Float32Array(base64ToArrayBuffer(bank.samples)),
+    })),
+  };
+};
+
+interface ConfigureWavetableIndexProps {
+  selectedWavetableName: string | null;
+  wavetableState: WavetableState;
+  setWavetableState: (newState: WavetableState) => void;
+  setSelectedWavetableName: (newName: string | null) => void;
+}
+
+const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
+  selectedWavetableName,
+  wavetableState,
+  setWavetableState,
+  setSelectedWavetableName,
+}) => {
+  const state = useMemo(
+    () => ({ wavetable: selectedWavetableName ?? '' }),
+    [selectedWavetableName]
+  );
+  const settings = useMemo(
+    () => [
+      {
+        type: 'select',
+        label: 'wavetable',
+        options: ['', ...wavetableState.wavetableBanks.map(R.prop('name'))],
+      },
+      {
+        type: 'button',
+        label: 'delete wavetable',
+        action: () => {
+          const shouldDelete = confirm('Really delete this wavetable?');
+          if (!shouldDelete) {
+            return;
+          }
+
+          // TODO: Check to see if the wavetable is in use by any operators and prevent if so
+          setWavetableState({
+            ...wavetableState,
+            wavetableBanks: wavetableState.wavetableBanks.filter(
+              bank => bank.name !== state.wavetable
+            ),
+          });
+        },
+      },
+      {
+        type: 'button',
+        label: 'import wavetable',
+        action: async () => {
+          const LazyUploadWavetableModal = React.lazy(() =>
+            import('src/fmSynth/UploadWavetable').then(mod => ({
+              default: mod.mkUploadWavetableModal(
+                wavetableState.wavetableBanks.map(R.prop('name'))
+              ),
+            }))
+          );
+          const WrappedUploadWavetableModal: React.FC<UploadWavetableModalProps> = props => (
+            <Suspense fallback={<>Loading...</>}>
+              <LazyUploadWavetableModal {...props} />
+            </Suspense>
+          );
+          try {
+            const wavetableBank = await renderModalWithControls(WrappedUploadWavetableModal);
+            console.log('Wavetable bank constructed successfully: ', wavetableBank);
+            setWavetableState({
+              ...wavetableState,
+              wavetableBanks: [...wavetableState.wavetableBanks, wavetableBank],
+            });
+          } catch (err) {
+            // pass
+          }
+        },
+      },
+    ],
+    [setWavetableState, state.wavetable, wavetableState]
+  );
+  const handleChange = useCallback(
+    (_key: string, wavetableName: string, _state: any) => setSelectedWavetableName(wavetableName),
+    [setSelectedWavetableName]
+  );
+
+  return <ControlPanel width={500} settings={settings} state={state} onChange={handleChange} />;
+};
+
+interface ConfigureWavetableProps {
+  config: Extract<OperatorConfig, { type: 'wavetable' }>;
+  onChange: (newConfig: OperatorConfig) => void;
+  adsrs: AdsrParams[];
+  onAdsrChange: AdsrChangeHandler;
+  wavetableState: WavetableState;
+  setWavetableState: (newState: WavetableState) => void;
+}
+
+const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
+  config,
+  onChange,
+  adsrs,
+  onAdsrChange,
+  wavetableState,
+  setWavetableState,
+}) => {
+  return (
+    <>
+      <ConfigureWavetableIndex
+        selectedWavetableName={config.wavetableName}
+        wavetableState={wavetableState}
+        setWavetableState={setWavetableState}
+        setSelectedWavetableName={newSelectedWavetableName =>
+          onChange({ ...config, wavetableName: newSelectedWavetableName })
+        }
+      />
+      <ConfigureParamSource
+        title='dim 0 intra mix'
+        state={config.dim0IntraMix}
+        onChange={newDim0IntraMix => onChange({ ...config, dim0IntraMix: newDim0IntraMix })}
+        min={0}
+        max={1}
+        adsrs={adsrs}
+        onAdsrChange={onAdsrChange}
+      />
+      <ConfigureParamSource
+        title='dim 1 intra mix'
+        state={config.dim1IntraMix}
+        onChange={newDim1IntraMix => onChange({ ...config, dim1IntraMix: newDim1IntraMix })}
+        min={0}
+        max={1}
+        adsrs={adsrs}
+        onAdsrChange={onAdsrChange}
+      />
+      <ConfigureParamSource
+        title='inter dim mix'
+        state={config.interDimMix}
+        onChange={newInterDimMix => onChange({ ...config, interDimMix: newInterDimMix })}
+        min={0}
+        max={1}
+        adsrs={adsrs}
+        onAdsrChange={onAdsrChange}
+      />
+    </>
+  );
 };
 
 interface ConfigureOperatorProps {
@@ -59,6 +252,8 @@ interface ConfigureOperatorProps {
   operatorIx: number;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
+  wavetableState: WavetableState;
+  setWavetableState: (newState: WavetableState) => void;
 }
 
 const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
@@ -70,6 +265,8 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   operatorIx,
   adsrs,
   onAdsrChange,
+  wavetableState,
+  setWavetableState,
 }) => {
   const operatorTypeSettings = useMemo(
     () => [
@@ -82,6 +279,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           'triangle oscillator',
           'sawtooth oscillator',
           'exponential oscillator',
+          'wavetable',
           'param buffer',
         ] as OperatorConfig['type'][],
       },
@@ -93,7 +291,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   return (
     <div className='operator-config'>
       <ControlPanel
-        style={{ width: 470 }}
+        width={500}
         settings={operatorTypeSettings}
         title={`configure operator ${operatorIx + 1}`}
         state={operatorTypeState}
@@ -136,6 +334,16 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           max={1}
           adsrs={adsrs}
           onAdsrChange={onAdsrChange}
+        />
+      ) : null}
+      {config.type === 'wavetable' ? (
+        <ConfigureWavetable
+          config={config}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+          wavetableState={wavetableState}
+          setWavetableState={setWavetableState}
         />
       ) : null}
       <ConfigureEffects

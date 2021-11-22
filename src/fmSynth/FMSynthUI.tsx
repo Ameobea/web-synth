@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
-import ConfigureOperator, { OperatorConfig } from './ConfigureOperator';
+import ConfigureOperator, { OperatorConfig, WavetableState } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
 import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
@@ -29,6 +29,7 @@ interface FMSynthState {
   mainEffectChain: (Effect | null)[];
   adsrs: AdsrParams[];
   detune: ParamSource | null;
+  wavetableState: WavetableState;
 }
 
 type BackendModulationUpdater = (
@@ -133,6 +134,8 @@ interface FMSynthUIProps {
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   detune: ParamSource | null;
+  wavetableState: WavetableState;
+  setWavetableState: (newState: WavetableState) => void;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
   getFMSynthOutput: () => Promise<AudioNode>;
   midiNode: MIDINode;
@@ -156,6 +159,8 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   onAdsrChange,
   handleDetuneChange,
   detune,
+  wavetableState,
+  setWavetableState,
   getFMSynthOutput,
   midiNode,
   midiControlValuesCache,
@@ -169,6 +174,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     mainEffectChain,
     adsrs,
     detune,
+    wavetableState,
   });
   const [selectedUI, setSelectedUIInner] = useState<UISelection | null>(initialSelectedUI ?? null);
   const setSelectedUI = useCallback(
@@ -498,6 +504,11 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                   }}
                   adsrs={state.adsrs}
                   onAdsrChange={handleAdsrChange}
+                  wavetableState={state.wavetableState}
+                  setWavetableState={newWavetableState => {
+                    setState(state => ({ ...state, wavetableState: newWavetableState }));
+                    setWavetableState(newWavetableState);
+                  }}
                 />
               );
             })()
@@ -582,6 +593,11 @@ export const ConnectedFMSynthUI: React.FC<{
     midiNode={midiNode}
     midiControlValuesCache={synth.midiControlValuesCache}
     synthID={synthID}
+    wavetableState={synth.getWavetableState()}
+    setWavetableState={useCallback(
+      (newState: WavetableState) => synth.setWavetableState(newState),
+      [synth]
+    )}
   />
 ));
 

@@ -12,7 +12,8 @@ const formatOperatorConfig = (config: OperatorConfig) => {
       config.type === 'exponential oscillator' ||
       config.type === 'triangle oscillator' ||
       config.type === 'square oscillator' ||
-      config.type === 'sawtooth oscillator') &&
+      config.type === 'sawtooth oscillator' ||
+      config.type === 'wavetable') &&
     config.frequency.type === 'base frequency multiplier'
   ) {
     const abbrev = {
@@ -21,6 +22,7 @@ const formatOperatorConfig = (config: OperatorConfig) => {
       'triangle oscillator': 'TRI',
       'square oscillator': 'SQR',
       'sawtooth oscillator': 'SAW',
+      wavetable: 'TABL',
     }[config.type];
     return (
       <>

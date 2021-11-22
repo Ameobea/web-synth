@@ -63,7 +63,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
         );
       }
     } else {
-      root = ReactDOM.unstable_createRoot(node);
+      root = ReactDOM.createRoot(node);
       const rootID = genRandomStringID();
       node.setAttribute('data-react-root-id', rootID);
       RootsByID.set(rootID, root);
@@ -98,71 +98,72 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
  * Complement of `mkContainerRenderHelper`.  HOF that tears down the React component rendered into the container
  * pointed to by the id passed into the returned function.
  */
-export const mkContainerCleanupHelper = ({
-  preserveRoot,
-  predicate,
-}: {
-  predicate?: (domID: string, node: HTMLElement) => void;
-  /**
-   * If `true`, the DOM element will not be deleted.  If `false` or not provided, it will be deleted.
-   */
-  preserveRoot?: boolean;
-} = {}) => (domId: string) => {
-  const node = document.getElementById(domId);
-  if (!node) {
-    console.error(`No node with id ${domId} found when trying to clean up small view`);
-    return;
-  }
-  if (predicate) {
-    predicate(domId, node);
-  }
+export const mkContainerCleanupHelper =
+  ({
+    preserveRoot,
+    predicate,
+  }: {
+    predicate?: (domID: string, node: HTMLElement) => void;
+    /**
+     * If `true`, the DOM element will not be deleted.  If `false` or not provided, it will be deleted.
+     */
+    preserveRoot?: boolean;
+  } = {}) =>
+  (domId: string) => {
+    const node = document.getElementById(domId);
+    if (!node) {
+      console.error(`No node with id ${domId} found when trying to clean up small view`);
+      return;
+    }
+    if (predicate) {
+      predicate(domId, node);
+    }
 
-  const rootID = node.getAttribute('data-react-root-id');
-  if (!rootID) {
-    return;
-  }
-  const root = RootsByID.get(rootID);
-  if (!root) {
-    console.error('No root in map in container render helper when cleaning up');
-    return;
-  }
+    const rootID = node.getAttribute('data-react-root-id');
+    if (!rootID) {
+      return;
+    }
+    const root = RootsByID.get(rootID);
+    if (!root) {
+      console.error('No root in map in container render helper when cleaning up');
+      return;
+    }
 
-  if (preserveRoot) {
-    root.render(null);
-  } else {
-    node.remove();
-    RootsByID.delete(rootID);
-    root.unmount();
-  }
-};
+    if (preserveRoot) {
+      root.render(null);
+    } else {
+      node.remove();
+      RootsByID.delete(rootID);
+      root.unmount();
+    }
+  };
 
-export const mkContainerHider = (getContainerID: (vcId: string) => string) => (
-  stateKey: string
-) => {
-  const vcId = stateKey.split('_')[1]!;
-  const elemID = getContainerID(vcId);
-  const elem = document.getElementById(elemID);
-  if (!elem) {
-    console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
-    return;
-  }
+export const mkContainerHider =
+  (getContainerID: (vcId: string) => string) => (stateKey: string) => {
+    const vcId = stateKey.split('_')[1]!;
+    const elemID = getContainerID(vcId);
+    const elem = document.getElementById(elemID);
+    if (!elem) {
+      console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
+      return;
+    }
 
-  elem.style.display = 'none';
-};
+    elem.style.display = 'none';
+  };
 
-export const mkContainerUnhider = (getContainerID: (vcId: string) => string, display = 'block') => (
-  stateKey: string
-) => {
-  const vcId = stateKey.split('_')[1]!;
-  const elemID = getContainerID(vcId);
-  const elem = document.getElementById(elemID);
-  if (!elem) {
-    console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't unhide.`);
-    return;
-  }
+export const mkContainerUnhider =
+  (getContainerID: (vcId: string) => string, display = 'block') =>
+  (stateKey: string) => {
+    const vcId = stateKey.split('_')[1]!;
+    const elemID = getContainerID(vcId);
+    const elem = document.getElementById(elemID);
+    if (!elem) {
+      console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't unhide.`);
+      return;
+    }
 
-  elem.style.display = display;
-};
+    elem.style.display = display;
+  };
 
 // Taken from: https://usehooks.com/useWindowSize/
 export function useWindowSize() {

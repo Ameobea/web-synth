@@ -16,7 +16,8 @@ members = [
   "note_container",
   "sample_editor",
   "delay",
-  "sample_player"
+  "sample_player",
+  "wav_decoder"
 ]
 
 [profile.release]
