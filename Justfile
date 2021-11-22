@@ -49,7 +49,7 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public

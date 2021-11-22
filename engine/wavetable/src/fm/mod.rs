@@ -308,12 +308,16 @@ impl WaveTableHandle {
                 .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency),
         ];
 
-        // TODO: Oversampling
-        self.update_phase(frequency);
-        wavetable.get_sample(
-            self.phase * wavetable.settings.waveform_length as f32,
-            &mixes,
-        )
+        // 4x oversampling to avoid aliasing
+        let mut sample = 0.;
+        for _ in 0..4 {
+            self.update_phase_oversampled(4., frequency);
+            sample += wavetable.get_sample(
+                self.phase * wavetable.settings.waveform_length as f32,
+                &mixes,
+            );
+        }
+        sample * 0.25
     }
 }
 

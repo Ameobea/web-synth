@@ -3,12 +3,22 @@
  */
 
 import { Map } from 'immutable';
+import { buildStore, buildActionGroup, buildModule } from 'jantix';
+import { AsyncOnce } from 'ameo-utils';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import StatisticsNodeUI from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNodeUI';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+
+const ctx = new AudioContext();
+
+const StatisticsAWPRegistered = new AsyncOnce(() =>
+  ctx.audioWorklet.addModule(
+    '/StatisticsNodeProcessor.js?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+  )
+);
 
 export type Settings = {
   framesToSample: number;
@@ -83,9 +93,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
   }
 
   private async initWorklet() {
-    await this.ctx.audioWorklet.addModule(
-      '/StatisticsNodeProcessor.js?cacheBust=' + btoa(Math.random().toString())
-    );
+    await StatisticsAWPRegistered.get();
     this.workletHandle = new AudioWorkletNode(this.ctx, 'statistics-node-processor');
     this.connect((this.workletHandle.parameters as any).get('input'));
     this.workletHandle.connect(this.gainNode);
