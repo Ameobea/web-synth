@@ -1,12 +1,7 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import {
-  filterNils,
-  PromiseResolveType,
-  UnimplementedError,
-  UnreachableException,
-} from 'ameo-utils';
+import { PromiseResolveType, UnimplementedError, UnreachableException } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
@@ -18,7 +13,7 @@ import WaveTable, {
   getWavetableWasmInstance,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { AsyncOnce, base64ArrayBuffer } from 'src/util';
+import { AsyncOnce, base64ArrayBuffer, normalizeEnvelope } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -353,33 +348,6 @@ const buildDefaultFilterCSNs = (): FilterCSNs => ({
   gain: new OverridableAudioParam(ctx),
   detune: new OverridableAudioParam(ctx),
 });
-
-export const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
-  if (Object.keys(envelope).every(k => ['attack', 'decay', 'release'].includes(k))) {
-    const env = envelope as ADSRValues;
-    const normalizedSteps = filterNils([
-      env.attack.pos === 0
-        ? null
-        : { x: 0, y: 0, ramper: { type: 'exponential' as const, exponent: 1 } },
-      ...[env.attack, env.decay, env.release].map(s => ({
-        x: s.pos,
-        y: s.magnitude,
-        ramper: { type: 'exponential' as const, exponent: 1 },
-      })),
-      env.release.pos === 1
-        ? null
-        : { x: 1, y: 0, ramper: { type: 'exponential' as const, exponent: 1 } },
-    ]);
-    return {
-      steps: normalizedSteps,
-      lenSamples: 44_100,
-      loopPoint: null,
-      releasePoint: env.release.pos ?? 0.9,
-      audioThreadData: { phaseIndex: 0 },
-    };
-  }
-  return envelope as Adsr;
-};
 
 const buildDefaultFilterModule = (
   filterType: FilterType,

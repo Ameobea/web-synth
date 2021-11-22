@@ -25,3 +25,4 @@ export const updateConnectables = (vcId: string, newConnectables: AudioConnectab
 
   dispatch(actionCreators.viewContextManager.UPDATE_CONNECTABLES(vcId, newConnectables));
 };
+(window as any).updateConnectables = updateConnectables;

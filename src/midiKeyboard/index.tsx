@@ -12,7 +12,7 @@ import {
   MidiKeyboardVC,
   MidiKeyboardVCProps,
   mkMidiKeyboardSmallView,
-} from 'src/midiKeyboard/MidiKeyboard';
+} from 'src/midiKeyboard/MidiKeyboardVC';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
 import {
   buildFreshOutputDescriptorsByControlIndex,

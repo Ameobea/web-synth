@@ -1,6 +1,9 @@
-import { UnreachableException } from 'ameo-utils';
+import { filterNils, UnreachableException } from 'ameo-utils';
 import { Option, Try } from 'funfix-core';
 import * as R from 'ramda';
+
+import type { ADSRValues } from 'src/controls/adsr';
+import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
 
@@ -239,3 +242,30 @@ export const mkLinearToLog = (logmin: number, logmax: number, logsign: number) =
 
 export const mkLogToLinear = (logmin: number, logmax: number, logsign: number) => (y: number) =>
   ((Math.log(y * logsign) - Math.log(logmin)) * 100) / (Math.log(logmax) - Math.log(logmin));
+
+export const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
+  if (Object.keys(envelope).every(k => ['attack', 'decay', 'release'].includes(k))) {
+    const env = envelope as ADSRValues;
+    const normalizedSteps = filterNils([
+      env.attack.pos === 0
+        ? null
+        : { x: 0, y: 0, ramper: { type: 'exponential' as const, exponent: 1 } },
+      ...[env.attack, env.decay, env.release].map(s => ({
+        x: s.pos,
+        y: s.magnitude,
+        ramper: { type: 'exponential' as const, exponent: 1 },
+      })),
+      env.release.pos === 1
+        ? null
+        : { x: 1, y: 0, ramper: { type: 'exponential' as const, exponent: 1 } },
+    ]);
+    return {
+      steps: normalizedSteps,
+      lenSamples: 44_100,
+      loopPoint: null,
+      releasePoint: env.release.pos ?? 0.9,
+      audioThreadData: { phaseIndex: 0 },
+    };
+  }
+  return envelope as Adsr;
+};

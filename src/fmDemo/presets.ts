@@ -5,10 +5,10 @@ import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import {
   EffectType,
   FilterParams,
-  normalizeEnvelope,
   serializeSynthModule,
   Waveform,
 } from 'src/redux/modules/synthDesigner';
+import { normalizeEnvelope } from 'src/util';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();
 

@@ -15,7 +15,7 @@ import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { updateConnectables } from 'src/patchNetwork/interface';
+// import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ParamSource, buildDefaultAdsr } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
@@ -312,7 +312,7 @@ export default class FMSynth implements ForeignNode {
     };
 
     if (this.vcId) {
-      updateConnectables(this.vcId, this.buildConnectables());
+      (window as any).updateConnectables(this.vcId, this.buildConnectables());
     }
   }
 
