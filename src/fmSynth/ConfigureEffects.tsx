@@ -68,6 +68,7 @@ export type EffectInner =
 
 export type Effect = EffectInner & {
   isBypassed?: boolean;
+  isCollapsed?: boolean;
 };
 
 const EFFECT_TYPE_SETTING = {
@@ -179,7 +180,7 @@ const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
 const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
 const moogFilterTheme = { ...baseTheme, background2: 'rgb(49,69,120)' };
-const combFilterTheme = { ...baseTheme, background2: 'rgb(148, 128, 79)' };
+const combFilterTheme = { ...baseTheme, background2: 'rgb(36 64 21)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -570,19 +571,35 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
   </>
 );
 
-const EffectManagement: React.FC<{
+interface EffectManagementProps {
   effectIx: number;
+  isBypassed: boolean;
   operatorEffects: (Effect | null)[];
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
-  onChange: (newEffect: Effect | null) => void;
-}> = ({ effectIx, operatorEffects, setOperatorEffects, onChange }) => {
+  onChange: (newEffect: Partial<Effect> | null) => void;
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+}
+
+const EffectManagement: React.FC<EffectManagementProps> = ({
+  effectIx,
+  isBypassed,
+  operatorEffects,
+  setOperatorEffects,
+  onChange,
+  collapsed,
+  setCollapsed,
+}) => {
   const theme = Option.of(operatorEffects[effectIx]?.type)
     .map(type => ThemesByType[type])
     .orUndefined();
 
   return (
     <>
-      <div className='effect-management' style={{ backgroundColor: theme?.background1 }}>
+      <div
+        className='effect-management'
+        style={{ backgroundColor: theme?.background1, paddingBottom: collapsed ? 20 : 0 }}
+      >
         <FlatButton onClick={() => onChange(null)}>×</FlatButton>
         {effectIx !== 0 ? (
           <FlatButton
@@ -616,7 +633,21 @@ const EffectManagement: React.FC<{
             ↓
           </FlatButton>
         ) : null}
+        {effectIx === 0 || !operatorEffects[effectIx + 1] ? (
+          <div className='button-placeholder' />
+        ) : null}
+
+        <input
+          className='bypass-checkbox'
+          type='checkbox'
+          checked={isBypassed}
+          onChange={() => onChange({ isBypassed: !isBypassed })}
+        />
+        <label style={{ fontSize: 10, color: '#888' }}>bypass</label>
         <div className='effect-title'>{operatorEffects[effectIx]?.type}</div>
+        <FlatButton className='toggle-collapsed' onClick={() => setCollapsed(!collapsed)}>
+          {collapsed ? '>' : 'v'}
+        </FlatButton>
       </div>
     </>
   );
@@ -625,6 +656,7 @@ const EffectManagement: React.FC<{
 export type AdsrChangeHandler = (adsrIx: number, newValue: AdsrParams) => void;
 
 const EFFECT_BYPASS_SETTINGS = [{ type: 'checkbox', label: 'bypass' }];
+const EFFECT_BYPASS_STYLE = { paddingBottom: 0, paddingTop: 10 };
 
 const EFFECT_CONFIGURATOR_BY_EFFECT_TYPE: { [K in Effect['type']]: EffectConfigurator<K> } = {
   'spectral warping': React.memo(ConfigureSpectralWarping),
@@ -656,20 +688,7 @@ const ConfigureEffectSpecific: React.FC<ConfigureEffectSpecificProps> = ({
     [state.type]
   );
 
-  return (
-    <>
-      <ControlPanel
-        width={500}
-        settings={EFFECT_BYPASS_SETTINGS}
-        state={useMemo(() => ({ bypass: state.isBypassed ?? false }), [state.isBypassed])}
-        onChange={useCallback(
-          (_key: string, val: boolean) => onChange({ ...state, isBypassed: val }),
-          [onChange, state]
-        )}
-      />
-      <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />
-    </>
-  );
+  return <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />;
 };
 
 interface ConfigureEffectProps {
@@ -690,23 +709,32 @@ const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
   setOperatorEffects,
   adsrs,
   onAdsrChange,
-}) => (
-  <div className='configure-effect'>
-    <EffectManagement
-      effectIx={effectIx}
-      operatorEffects={operatorEffects}
-      setOperatorEffects={setOperatorEffects}
-      onChange={onChange}
-    />
+}) => {
+  return (
+    <div className='configure-effect'>
+      <EffectManagement
+        effectIx={effectIx}
+        operatorEffects={operatorEffects}
+        setOperatorEffects={setOperatorEffects}
+        onChange={onChange}
+        collapsed={state.isCollapsed ?? false}
+        setCollapsed={useCallback(
+          () => onChange({ isCollapsed: !state.isCollapsed }),
+          [onChange, state.isCollapsed]
+        )}
+      />
 
-    <ConfigureEffectSpecific
-      state={state}
-      onChange={onChange}
-      adsrs={adsrs}
-      onAdsrChange={onAdsrChange}
-    />
-  </div>
-);
+      {state.isCollapsed ? null : (
+        <ConfigureEffectSpecific
+          state={state}
+          onChange={onChange}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+        />
+      )}
+    </div>
+  );
+};
 
 interface ConfigureEffectsProps {
   state: (Effect | null)[];

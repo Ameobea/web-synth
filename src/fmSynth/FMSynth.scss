@@ -225,12 +225,25 @@
     flex-direction: column;
 
     .configure-effect {
+      border-bottom: 1px solid #494949;
+
       .effect-management {
         display: flex;
         flex-direction: row;
         text-transform: uppercase;
-        font-family: 'Hack', monospace;
+        font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
         opacity: 0.95;
+        align-items: center;
+
+        .bypass-checkbox {
+          margin-left: 16px;
+          filter: invert(1);
+          cursor: pointer;
+        }
+
+        .button-placeholder {
+          width: 20px;
+        }
 
         button {
           width: 20px;
@@ -240,10 +253,17 @@
           font-weight: bold;
         }
 
+        button.toggle-collapsed {
+          height: 20px;
+          padding-left: 2px;
+          width: 24px;
+          margin-right: 3px;
+        }
+
         .effect-title {
           width: 500px;
           text-align: center;
-          margin-left: 8px;
+          margin-left: -55px;
           margin-right: 28px;
           font-size: 14px;
           padding-top: 4px;
