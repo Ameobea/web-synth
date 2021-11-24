@@ -592,7 +592,7 @@ export default class MIDIEditorUIInstance {
 
   /**
    * Quantizes all notes' start and end points to the nearest `beatSnapInterval`, handling conflicts and
-   * performing some other special-case operations.  See https://notes.ameo.design/docs/2021-04-18
+   * performing some other special-case operations.  See https://synth.ameo.dev/docs/2021-04-18
    * for design, algorithm, and implementation details.
    */
   public snapAllSelectedNotes() {

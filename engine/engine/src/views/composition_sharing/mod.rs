@@ -23,11 +23,11 @@ impl ViewContext for CompositionSharing {
 
     fn get_id(&self) -> String { self.uuid.to_string() }
 
-    fn cleanup(&mut self) { js::cleanup_composition_sharing(); }
+    fn cleanup(&mut self) { js::cleanup_composition_sharing(&self.get_state_key()); }
 
-    fn hide(&mut self) { js::hide_composition_sharing(&self.get_id()); }
+    fn hide(&mut self) { js::hide_composition_sharing(&self.get_state_key()); }
 
-    fn unhide(&mut self) { js::unhide_composition_sharing(&self.get_id()); }
+    fn unhide(&mut self) { js::unhide_composition_sharing(&self.get_state_key()); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 

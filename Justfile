@@ -83,6 +83,7 @@ run:
     && cp ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/note_container.wasm /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/release/wav_decoder.wasm /tmp/wasm \
     && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
@@ -112,29 +113,29 @@ run-frontend:
   yarn start
 
 deploy:
-  cd backend && just docker-build
-  docker tag ameo/notes-backend:latest $BACKEND_IMAGE_NAME
-  docker push $BACKEND_IMAGE_NAME
+  # cd backend && just docker-build
+  # docker tag ameo/notes-backend:latest $BACKEND_IMAGE_NAME
+  # docker push $BACKEND_IMAGE_NAME
 
-  cd faust-compiler && just docker-build
-  docker tag ameo/faust-compiler-server:latest $FAUST_COMPILER_IMAGE_NAME
-  docker push $FAUST_COMPILER_IMAGE_NAME
+  # cd faust-compiler && just docker-build
+  # docker tag ameo/faust-compiler-server:latest $FAUST_COMPILER_IMAGE_NAME
+  # docker push $FAUST_COMPILER_IMAGE_NAME
 
-  gcloud config set run/region $GCLOUD_REGION
+  # gcloud config set run/region $GCLOUD_REGION
 
-  gcloud beta run deploy $BACKEND_SERVICE_NAME \
-    --platform managed \
-    --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES,AUTH_TOKEN=$AUTH_TOKEN,ROCKET_ADDRESS=0.0.0.0" \
-    --image $BACKEND_IMAGE_NAME
+  # gcloud beta run deploy $BACKEND_SERVICE_NAME \
+  #   --platform managed \
+  #   --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES,AUTH_TOKEN=$AUTH_TOKEN,ROCKET_ADDRESS=0.0.0.0" \
+  #   --image $BACKEND_IMAGE_NAME
 
-  gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
-    --platform managed \
-    --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js,SOUL_WORKLET_TEMPLATE_FILE_NAME=/opt/SoulAWP.template.js,AUTH_TOKEN=$AUTH_TOKEN" \
-    --image $FAUST_COMPILER_IMAGE_NAME
+  # gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
+  #   --platform managed \
+  #   --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js,SOUL_WORKLET_TEMPLATE_FILE_NAME=/opt/SoulAWP.template.js,AUTH_TOKEN=$AUTH_TOKEN" \
+  #   --image $FAUST_COMPILER_IMAGE_NAME
 
-  just build-all
-  phost update notes patch ./dist
-  rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" --delete ./dist/* debian@synth.ameo.design:/var/www/synth/
+  # just build-all
+  # phost update notes patch ./dist
+  rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" --delete ./dist/* debian@synth.ameo.dev:/var/www/synth.ameo.dev/
 
 loc:
   tokei --exclude src/vocalSynthesis/hts_engine_API --exclude src/vocalSynthesis/sinsy .

@@ -7,42 +7,59 @@ import CompositionSharing from './CompositionSharing';
 import { getEngine } from 'src/util';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 
-const ROOT_NODE_ID = 'composition-sharing-react-root' as const;
+interface CompositionSharingCtx {
+  root: ReactDOM.Root;
+}
 
-export const init_composition_sharing = (_stateKey: string) => {
-  // Create the base dom node for the faust editor
-  const faustEditorBase = document.createElement('div');
-  faustEditorBase.id = ROOT_NODE_ID;
-  faustEditorBase.setAttribute(
+const CtxsByVcId: Map<string, CompositionSharingCtx> = new Map();
+
+const buildCompositionSharingDOMNodeID = (vcId: string) => `compositionSharing-${vcId}`;
+
+export const init_composition_sharing = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  // Create the base dom node to render the composition sharing interface
+  const compositionSharingBase = document.createElement('div');
+  compositionSharingBase.id = buildCompositionSharingDOMNodeID(vcId);
+  compositionSharingBase.setAttribute(
     'style',
     'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0;'
   );
 
-  // Mount the newly created Faust editor and all of its accompanying components to the DOM
-  document.getElementById('content')!.appendChild(faustEditorBase);
+  document.getElementById('content')!.appendChild(compositionSharingBase);
 
   const engine = getEngine();
   if (!engine) {
     throw new Error('`engine` is unset');
   }
-  ReactDOM.render(
+  const root = ReactDOM.createRoot(compositionSharingBase);
+  root.render(
     <Provider store={store}>
       <CompositionSharing engine={engine} />
-    </Provider>,
-    faustEditorBase
+    </Provider>
   );
+
+  const ctx = { root };
+  CtxsByVcId.set(vcId, ctx);
 };
 
-export const hide_composition_sharing = mkContainerHider(() => ROOT_NODE_ID);
+export const hide_composition_sharing = mkContainerHider(buildCompositionSharingDOMNodeID);
 
-export const unhide_composition_sharing = mkContainerUnhider(() => ROOT_NODE_ID);
+export const unhide_composition_sharing = mkContainerUnhider(buildCompositionSharingDOMNodeID);
 
-export const cleanup_composition_sharing = (): string => {
-  const compositionSharingRootNode = document.getElementById(ROOT_NODE_ID);
-  if (compositionSharingRootNode) {
-    ReactDOM.unmountComponentAtNode(compositionSharingRootNode);
-    compositionSharingRootNode.remove();
+export const cleanup_composition_sharing = (stateKey: string): string => {
+  const vcId = stateKey.split('_')[1]!;
+  const ctx = CtxsByVcId.get(vcId);
+  if (!ctx) {
+    console.error(`No composition sharing ctx found for stateKey=${stateKey} when cleaning up`);
+    return '';
   }
+
+  ctx.root.unmount();
+  const compositionSharingRootNode = document.getElementById(
+    buildCompositionSharingDOMNodeID(stateKey)
+  );
+  compositionSharingRootNode?.remove();
+  CtxsByVcId.delete(vcId);
 
   return '';
 };

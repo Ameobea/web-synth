@@ -35,3 +35,4 @@ src/note_container*
 src/polysynth_bg.wasm.d.ts
 public/sample_player.wasm
 src/wav_decoder*
+**/.DS_Store

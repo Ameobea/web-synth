@@ -41,8 +41,10 @@ const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 /**
  * Global map of state key to Redux infrastructure
  */
-let STATE_MAP: ImmMap<string, ReturnType<typeof buildSynthDesignerRedux> & { reactRoot: unknown }> =
-  ImmMap();
+let STATE_MAP: ImmMap<
+  string,
+  ReturnType<typeof buildSynthDesignerRedux> & { reactRoot: ReactDOM.Root | 'NOT_LOADED' }
+> = ImmMap();
 
 export const getReduxInfra = (stateKey: string) => {
   const reduxInfra = STATE_MAP.get(stateKey);
@@ -199,7 +201,11 @@ export const cleanup_synth_designer = (stateKey: string): string => {
       'Missing state map entry for synth designer when cleaning up, stateKey=' + stateKey
     );
   } else {
-    state.reactRoot.unmount();
+    if (state.reactRoot === 'NOT_LOADED') {
+      console.warn('React root not loaded when synth designer cleaned up');
+    } else {
+      state.reactRoot.unmount();
+    }
   }
   rootNode.remove();
   return designerState;
@@ -251,7 +257,6 @@ const getMidiNode = (stateKey: string): MIDINode => {
 
 export const getVoicePreset = (stateKey: string, synthIx: number) => {
   const voiceState = getReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];
-  // TODO: Handle wavetable bodies as well
   return { type: 'standard', ...serializeSynthModule(voiceState) };
 };
 

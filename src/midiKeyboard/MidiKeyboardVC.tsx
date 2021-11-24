@@ -89,7 +89,6 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
   );
 
   const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
-  console.log({ midiNode });
   const onOctaveOffsetChange = useCallback(
     (newOctaveOffset: number) =>
       dispatch(actionCreators.midiKeyboard.SET_OCTAVE_OFFSET(stateKey, newOctaveOffset)),

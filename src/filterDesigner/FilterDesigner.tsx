@@ -1,6 +1,6 @@
 import { ArrayElementOf, filterNils } from 'ameo-utils';
 import type { ScaleLogarithmic, Selection } from 'd3';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
@@ -104,64 +104,92 @@ const Presets: { name: string; preset: SerializedFilterDesigner }[] = [
   },
 ];
 
-const FilterInst: React.FC<{
+interface FilterInstProps {
+  filterIx: number;
   lockedFrequency: number | null;
   filter: ArrayElementOf<FilterDesignerState['filters']>;
-  onChange: (newParams: FilterParams) => void;
+  onChange: (filterIx: number, newParams: FilterParams) => void;
   onDelete: () => void;
-}> = ({ lockedFrequency, filter: { params, filter }, onChange, onDelete }) => {
+}
+
+const FilterInst: React.FC<FilterInstProps> = ({
+  filterIx,
+  lockedFrequency,
+  filter: { params, filter },
+  onChange,
+  onDelete,
+}) => {
   const settings = useMemo(() => {
     const settings = getSettingsForFilterType(params.type, false, false);
     return !R.isNil(lockedFrequency)
       ? settings.filter(setting => setting.label !== 'frequency')
       : settings;
   }, [params.type, lockedFrequency]);
+  const state = useMemo(
+    () => ({
+      type: params.type,
+      frequency: params.frequency,
+      Q: params.Q,
+      detune: params.detune,
+      gain: params.gain,
+    }),
+    [params.Q, params.detune, params.frequency, params.gain, params.type]
+  );
+  const handleChange = useCallback(
+    (key: string, val: any) => {
+      const newParams: FilterParams = { ...params, [key]: val };
+      setFilter(filter, newParams, lockedFrequency);
+      onChange(filterIx, newParams);
+    },
+    [filter, filterIx, lockedFrequency, onChange, params]
+  );
 
   return (
     <div className='filter-inst'>
       <FlatButton onClick={onDelete}>×</FlatButton>
-      <ControlPanel
-        style={{ width: 500 }}
-        settings={settings}
-        onChange={(key: string, val: any) => {
-          const newParams: FilterParams = { ...params, [key]: val };
-          setFilter(filter, newParams, lockedFrequency);
-          onChange(newParams);
-        }}
-        state={{
-          type: params.type,
-          frequency: params.frequency,
-          Q: params.Q,
-          detune: params.detune,
-          gain: params.gain,
-        }}
-      />
+      <ControlPanel width={500} settings={settings} onChange={handleChange} state={state} />
     </div>
   );
 };
 
-const FilterParamsEditor: React.FC<{
+interface FilterParamsEditorProps {
   lockedFrequency: number | null;
   state: FilterDesignerState;
-  onChange: (newState: FilterDesignerState) => void;
+  onChange: (mapState: (state: FilterDesignerState) => FilterDesignerState) => void;
   onDelete: (filterIx: number) => void;
-}> = ({ lockedFrequency, state, onChange, onDelete }) => (
-  <div className='filter-params'>
-    {state.filters.map((filter, i) => (
-      <FilterInst
-        onDelete={() => onDelete(i)}
-        key={filter.id}
-        lockedFrequency={lockedFrequency}
-        filter={filter}
-        onChange={newParams => {
-          const newFilters = [...state.filters];
-          newFilters[i] = { ...newFilters[i], params: newParams };
-          onChange({ ...state, filters: newFilters });
-        }}
-      />
-    ))}
-  </div>
-);
+}
+
+const FilterParamsEditor: React.FC<FilterParamsEditorProps> = ({
+  lockedFrequency,
+  state,
+  onChange,
+  onDelete,
+}) => {
+  const onInstChange = useCallback(
+    (filterIx: number, newParams: FilterParams) =>
+      onChange((state: FilterDesignerState): FilterDesignerState => {
+        const newFilters = [...state.filters];
+        newFilters[filterIx] = { ...newFilters[filterIx], params: newParams };
+        return { ...state, filters: newFilters };
+      }),
+    [onChange]
+  );
+
+  return (
+    <div className='filter-params'>
+      {state.filters.map((filter, i) => (
+        <FilterInst
+          filterIx={i}
+          onDelete={() => onDelete(i)}
+          key={filter.id}
+          lockedFrequency={lockedFrequency}
+          filter={filter}
+          onChange={onInstChange}
+        />
+      ))}
+    </div>
+  );
+};
 
 class FilterDesigner {
   private state: FilterDesignerState;
@@ -178,8 +206,12 @@ class FilterDesigner {
     this.onUpdated(this.state);
   }
 
-  public onUpdated(newState: FilterDesignerState) {
+  public onUpdated(
+    update: FilterDesignerState | ((oldState: FilterDesignerState) => FilterDesignerState)
+  ) {
+    const newState = typeof update === 'function' ? update(this.state) : update;
     this.state = newState;
+
     const frequencyResponses = this.state.filters.map(({ filter }) => {
       const responses = new Float32Array(DATA_SIZE);
       filter.getFrequencyResponse(FREQUENCIES, responses, new Float32Array(DATA_SIZE));

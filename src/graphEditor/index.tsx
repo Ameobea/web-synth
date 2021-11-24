@@ -7,9 +7,25 @@ import { store } from 'src/redux';
 import { retryAsync } from 'src/util';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
-export const LGraphHandlesByVcId: Map<string, any> = new Map();
+interface GraphEditorCtx {
+  lgraphHandle: any;
+  root: ReactDOM.Root;
+}
+
+export const GraphEditorCtxsByVcId: Map<string, GraphEditorCtx> = new Map();
+
+export const setLGraphHandle = (vcId: string, lgraphHandle: any) => {
+  const ctx = GraphEditorCtxsByVcId.get(vcId);
+  if (!ctx) {
+    console.error(`No graph editor ctx found with vcId=${vcId} when trying to set lgraph handle`);
+    return;
+  }
+
+  ctx.lgraphHandle = lgraphHandle;
+};
 
 export const init_graph_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
   // Create the base dom node for the faust editor
   const graphEditorBaseNode = document.createElement('div');
   graphEditorBaseNode.id = stateKey;
@@ -22,17 +38,19 @@ export const init_graph_editor = (stateKey: string) => {
   document.getElementById('content')!.appendChild(graphEditorBaseNode);
   // Using non-concurrent mode here because concurrent mode makes the canvas dissappear for an
   // instant when changing small views sometimes
-  ReactDOM.render(
+  const root = ReactDOM.createRoot(graphEditorBaseNode);
+  root.render(
     <Provider store={store}>
       <GraphEditor stateKey={stateKey} />
-    </Provider>,
-    graphEditorBaseNode
+    </Provider>
   );
+  const ctx = { lgraphHandle: null, root };
+  GraphEditorCtxsByVcId.set(vcId, ctx);
 };
 
 export const hide_graph_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
-  const inst = LGraphHandlesByVcId.get(vcId);
+  const { lgraphHandle: inst } = GraphEditorCtxsByVcId.get(vcId)!;
   // Stop rendering when not visible to save resources
   inst?.list_of_graphcanvas?.forEach((canvas: any) => {
     canvas.stopRendering();
@@ -43,7 +61,7 @@ export const hide_graph_editor = (stateKey: string) => {
 
 export const unhide_graph_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
-  const inst = LGraphHandlesByVcId.get(vcId);
+  const { lgraphHandle: inst } = GraphEditorCtxsByVcId.get(vcId)!;
   // Resume rendering now that the graph editor is visible
   inst?.list_of_graphcanvas?.forEach((canvas: any) => {
     canvas.startRendering();
@@ -53,24 +71,32 @@ export const unhide_graph_editor = (stateKey: string) => {
 };
 
 export const cleanup_graph_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1];
   const graphEditorReactRootNode = document.getElementById(stateKey);
   // Trigger the graph editor to save its state before its destruction.  `unmountComponentAtNode`
   // doesn't seem to trigger lifecycle methods/execute the return value of `useEffect` so we have
   // to handle this explicitly.
   saveStateForInstance(stateKey);
-  if (graphEditorReactRootNode) {
-    ReactDOM.unmountComponentAtNode(graphEditorReactRootNode);
-    graphEditorReactRootNode.remove();
+
+  const ctx = GraphEditorCtxsByVcId.get(vcId);
+  if (!ctx) {
+    console.error(`No graph editor ctx found with vcId=${vcId} when trying to set lgraph handle`);
+    return;
   }
+
+  ctx.root.unmount();
+  graphEditorReactRootNode?.remove();
+
+  GraphEditorCtxsByVcId.delete(vcId);
 };
 
 export const arrange_graph_editor = (vcId: string) => {
   const inner = async () => {
-    const instance = LGraphHandlesByVcId.get(vcId);
-    if (!instance) {
-      throw `Tried to arrange lgraph with vcId=${vcId} but no entry is registered`;
+    const ctx = GraphEditorCtxsByVcId.get(vcId);
+    if (!ctx) {
+      throw new Error(`Tried to arrange lgraph with vcId=${vcId} but no entry is registered`);
     }
-    instance.arrange();
+    ctx.lgraphHandle.arrange();
   };
   // It takes a little bit of time for the graph editor to initialize and the instance to be registered after
   // committing from the VCM, so we account for that here.

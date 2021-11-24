@@ -100,9 +100,9 @@ extern "C" {
 #[wasm_bindgen(raw_module = "./compositionSharing")]
 extern "C" {
     pub fn init_composition_sharing(state_key: &str);
-    pub fn hide_composition_sharing(vc_id: &str);
-    pub fn unhide_composition_sharing(vc_id: &str);
-    pub fn cleanup_composition_sharing();
+    pub fn hide_composition_sharing(state_key: &str);
+    pub fn unhide_composition_sharing(state_key: &str);
+    pub fn cleanup_composition_sharing(state_key: &str);
 }
 
 #[wasm_bindgen(raw_module = "./synthDesigner")]

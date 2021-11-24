@@ -1,16 +1,18 @@
 # Web Synth and Digial Audio Workstation
 
-Live version updated automatically via continuous deployment: https://notes.ameo.design/
+Try it yourself:
+
+ * Full application: <https://synth.ameo.dev>
+ * Standalone FM Synthesizer Demo: <https://synth.ameo.dev/fm.html>
+ * Documentation and Development Notes: <https://synth.ameo.dev/docs/>
 
 [Watch demo video on YouTube](https://www.youtube.com/watch?v=kgkpJk0P7Uo)
 
 This is a web-based DAW (Digital Audio Workstation) written in Rust/WebAssembly and TypeScript. Its goal is to provide tools for creating unique sounds and audio compositions within the context of the web browser. It makes use of the latest modern WebAudio API with `AudioWorkletProcessor` for executing custom DSP code written in WebAssembly.
 
-This project is still in very active development. At the time of writing this, a lot of functionality has been completed and it's possible to actually do interesting things with it! There are many bugs and rough edges, and much of the UI has very little polish or documentation. That being said, it's absolutely a functional tool and getting more usable + useful all the time!
+This project is still in very active development. At the time of writing this, a lot of functionality has been completed and it's possible to actually do interesting things with it! There are many bugs and rough edges, and much of the UI lacks some polish and documentation. That being said, it's absolutely a functional tool and getting more usable + useful all the time!
 
 ## Using the Tool
-
-Live latest version: https://notes.ameo.design/
 
 Google Chrome is highly recommended. Although other browsers (Firefox + Safari) technically support the WebAudio APIs that this tool makes use of, I've found their support to be spotty. There are also some other bleeding-edge web APIs (WebMIDI and Native Filesystem) that the tool makes use of for some features which are, at this time, only supported in Google Chrome. Last I tried, the app loads and runs in the latest Firefox for the most part though.
 
