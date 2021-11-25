@@ -9,7 +9,13 @@ docker-push:
 docker-run:
   docker kill faust-compiler-server || true
   docker rm faust-compiler-server || true
-  docker run -p 4565:4565 -d --name faust-compiler-server ameo/faust-compiler-server:latest
+  docker run -p 4565:4565 -d --name faust-compiler-server \
+    -e "GOOGLE_APPLICATION_CREDENTIALS=/opt/faust-compiler-server-service-account-creds.json" \
+    -e "FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js" \
+    -e "SOUL_WORKLET_TEMPLATE_FILE_NAME=/opt/SoulAWP.template.js" \
+    -e "AUTH_TOKEN=${AUTH_TOKEN}" \
+    -v /opt/faust-compiler-server-service-account-creds.json:/opt/faust-compiler-server-service-account-creds.json \
+    ameo/faust-compiler-server:latest
 
 run:
   go build && ./faust-compiler-server

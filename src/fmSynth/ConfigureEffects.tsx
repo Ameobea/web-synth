@@ -655,9 +655,6 @@ const EffectManagement: React.FC<EffectManagementProps> = ({
 
 export type AdsrChangeHandler = (adsrIx: number, newValue: AdsrParams) => void;
 
-const EFFECT_BYPASS_SETTINGS = [{ type: 'checkbox', label: 'bypass' }];
-const EFFECT_BYPASS_STYLE = { paddingBottom: 0, paddingTop: 10 };
-
 const EFFECT_CONFIGURATOR_BY_EFFECT_TYPE: { [K in Effect['type']]: EffectConfigurator<K> } = {
   'spectral warping': React.memo(ConfigureSpectralWarping),
   wavecruncher: React.memo(ConfigureWavecruncher),
@@ -722,6 +719,7 @@ const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
           () => onChange({ isCollapsed: !state.isCollapsed }),
           [onChange, state.isCollapsed]
         )}
+        isBypassed={state.isBypassed ?? false}
       />
 
       {state.isCollapsed ? null : (

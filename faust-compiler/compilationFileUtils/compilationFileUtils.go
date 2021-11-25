@@ -36,9 +36,9 @@ func WasmOptFile(outWasmFileName string, resWriter http.ResponseWriter) bool {
 	}
 
 	cmd := exec.Command("wasm-opt", outWasmFileName, "-O4", "-c", "--vacuum", "-o", outWasmFileName)
-	optError := cmd.Run()
+	out, optError := cmd.CombinedOutput()
 	if optError != nil {
-		log.Printf("Error while trying to optimize output Wasm file: %s", optError)
+		log.Printf("Error while trying to optimize output Wasm file: out=%s; err=%s", out, optError)
 		resWriter.WriteHeader(500)
 		resWriter.Write([]byte("Error optimizing output soul Wasm module"))
 		return false

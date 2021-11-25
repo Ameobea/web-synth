@@ -33,6 +33,7 @@ COPY --from=builder /usr/local/lib/libOSCFaust.a /usr/local/lib/libOSCFaust.a
 COPY --from=builder /usr/local/share/faust/ /usr/local/share/faust/
 COPY --from=builder /build/faust-compiler-server /usr/local/bin/faust-compiler-server
 COPY --from=builder /usr/local/bin/wasm-opt /usr/local/bin/wasm-opt
+COPY --from=builder /usr/local/lib/libbinaryen.so /usr/local/lib/libbinaryen.so
 
 RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates && curl https://get.wasmer.io -sSfL | sh && rm -rf /root/.wasmer/bin /root/.wasmer/lib/libwasmer.a
 ENV LD_LIBRARY_PATH=/root/.wasmer/lib
