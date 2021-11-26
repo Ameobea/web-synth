@@ -318,7 +318,23 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
     updateGraph(lGraphInstance, patchNetwork, activeViewContexts);
     lastPatchNetwork.current = patchNetwork;
-  }, [patchNetwork, lGraphInstance, activeViewContexts]);
+
+    // If there is a currently selected node, it may have been de-selected as a result of being modified.  Try
+    // to re-select it if it still exists.
+    if (R.isNil(selectedNodeVCID)) {
+      return;
+    }
+
+    const node = lGraphInstance._nodes.find(node => node.connectables?.vcId === selectedNodeVCID);
+    if (!node) {
+      setSelectedNodeVCID(null);
+      return;
+    }
+
+    setCurSelectedNode(node);
+    lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
+    lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected(node);
+  }, [patchNetwork, lGraphInstance, activeViewContexts, selectedNodeVCID]);
 
   // Set node from serialized state when we first render
   useEffect(() => {

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+
 import { getReduxInfra } from 'src/synthDesigner';
 
 interface EffectModuleProps {
@@ -23,11 +24,10 @@ const EffectModuleComp: React.FC<EffectModuleProps> = ({
   effectName,
   stateKey,
 }) => {
-  const mergedState = useMemo(() => ({ ...params, wetness, bypass: isBypassed }), [
-    params,
-    wetness,
-    isBypassed,
-  ]);
+  const mergedState = useMemo(
+    () => ({ ...params, wetness, bypass: isBypassed }),
+    [params, wetness, isBypassed]
+  );
 
   const combinedSettings = useMemo(
     () => [

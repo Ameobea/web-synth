@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { connect } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 
@@ -32,7 +32,7 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       }
 
       return mkCompileButtonClickHandler({
-        faustCode,
+        code: faustCode,
         optimize,
         setErrMessage: msg => setCompileErr(!!msg),
         vcId,
@@ -51,35 +51,36 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       });
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [instance]);
+    const settings = useMemo(
+      () => [
+        { type: 'checkbox', label: 'optimize', initial: true },
+        {
+          type: 'button',
+          label: 'compile + start',
+          action: () => {
+            setCompileErr(false);
+            start();
+          },
+        },
+      ],
+      [start]
+    );
+    const handleChange = useCallback((key: string, val: any) => {
+      switch (key) {
+        case 'optimize': {
+          setOptimize(val);
+          break;
+        }
+        default: {
+          console.warn('Unhandled key in faust editor small view RCP: ', key);
+        }
+      }
+    }, []);
 
     if (!instance) {
       return (
         <div>
-          <ControlPanel
-            style={{ width: 500 }}
-            settings={[
-              { type: 'checkbox', label: 'optimize', initial: true },
-              {
-                type: 'button',
-                label: 'compile + start',
-                action: () => {
-                  setCompileErr(false);
-                  start();
-                },
-              },
-            ]}
-            onChange={(key: string, val: any) => {
-              switch (key) {
-                case 'optimize': {
-                  setOptimize(val);
-                  break;
-                }
-                default: {
-                  console.warn('Unhandled key in faust editor small view RCP: ', key);
-                }
-              }
-            }}
-          />
+          <ControlPanel width={500} settings={settings} onChange={handleChange} />
 
           {compileErr ? (
             <>

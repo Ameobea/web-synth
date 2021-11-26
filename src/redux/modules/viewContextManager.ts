@@ -270,11 +270,11 @@ const actionGroups = {
       // Inputs and outputs that aren't present on the new connectables must be disconnected and deleted completely
       const deletedInputNames: Set<string> = [...oldConnectables.inputs.keys()].reduce(
         (acc, key) => (newConnectablesForNode.inputs.get(key) ? acc : acc.add(key)),
-        Set()
+        Set<string>()
       );
       const deletedOutputNames: Set<string> = [...oldConnectables.outputs.keys()].reduce(
         (acc, key) => (newConnectablesForNode.outputs.get(key) ? acc : acc.add(key)),
-        Set()
+        Set<string>()
       );
 
       const newConnections = connections.filter(([from, to]) => {

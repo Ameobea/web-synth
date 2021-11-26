@@ -183,91 +183,89 @@ type CodeCompiler = (
   context: ValueOf<typeof faustEditorContextMap>
 ) => Promise<DynamicCodeWorkletNode>;
 
-export const mkCompileButtonClickHandler = ({
-  code,
-  optimize,
-  setErrMessage,
-  vcId,
-  analyzerNode,
-  compiler = compileFaustInstance,
-}: {
-  code: string;
-  optimize: boolean;
-  setErrMessage: (errMsg: string) => void;
-  vcId: string;
-  analyzerNode: AnalyserNode;
-  compiler?: CodeCompiler;
-}) => async () => {
-  const context = faustEditorContextMap[vcId];
-  let codeNode: DynamicCodeWorkletNode;
-  try {
-    codeNode = await compiler(code, optimize, context);
-  } catch (err) {
-    console.error(err);
-    setErrMessage(err.toString());
-    return;
-  }
-  setErrMessage('');
+export const mkCompileButtonClickHandler =
+  ({
+    code,
+    optimize,
+    setErrMessage,
+    vcId,
+    analyzerNode,
+    compiler = compileFaustInstance,
+  }: {
+    code: string;
+    optimize: boolean;
+    setErrMessage: (errMsg: string) => void;
+    vcId: string;
+    analyzerNode: AnalyserNode;
+    compiler?: CodeCompiler;
+  }) =>
+  async () => {
+    const context = faustEditorContextMap[vcId];
+    let codeNode: DynamicCodeWorkletNode;
+    try {
+      codeNode = await compiler(code, optimize, context);
+    } catch (err) {
+      console.error(err);
+      setErrMessage(`${err}`);
+      return;
+    }
+    setErrMessage('');
 
-  if (!context) {
-    throw new Error(`No context found for code editor vcId ${vcId}`);
-  }
-  const settings = codeNode.getParamSettings(context.paramDefaultValues);
+    if (!context) {
+      throw new Error(`No context found for code editor vcId ${vcId}`);
+    }
+    const settings = codeNode.getParamSettings(context.paramDefaultValues);
 
-  codeNode.connect(analyzerNode);
+    codeNode.connect(analyzerNode);
 
-  faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode: codeNode };
-  context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(
-      settings.map(R.prop('label')) as string[]
-    )
-  );
+    faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode: codeNode };
+    context.reduxInfra.dispatch(
+      context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(
+        settings.map(R.prop('label')) as string[]
+      )
+    );
 
-  // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
-  const newConnectables = get_faust_editor_connectables(vcId);
-  updateConnectables(vcId, newConnectables);
+    // Since we now have an audio node that we can connect to things, trigger a new audio connectables to be created
+    const newConnectables = get_faust_editor_connectables(vcId);
+    updateConnectables(vcId, newConnectables);
 
-  context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.SET_FAUST_INSTANCE(codeNode, vcId)
-  );
-};
+    context.reduxInfra.dispatch(
+      context.reduxInfra.actionCreators.faustEditor.SET_FAUST_INSTANCE(codeNode, vcId)
+    );
+  };
 
 /**
  * Returns a function that stops the currently running Faust editor instance, setting Redux and `faustEditorContextMap`
  * to reflect this new state;
  */
-export const mkStopInstanceHandler = ({
-  vcId,
-  context,
-}: {
-  vcId: string;
-  context: ValueOf<typeof faustEditorContextMap>;
-}) => () => {
-  context.reduxInfra.dispatch(
-    context.reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
-  );
-
-  // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
-  if (!context.faustNode) {
-    throw new Error(
-      `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
+export const mkStopInstanceHandler =
+  ({ vcId, context }: { vcId: string; context: ValueOf<typeof faustEditorContextMap> }) =>
+  () => {
+    context.reduxInfra.dispatch(
+      context.reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
     );
-  }
-  context.faustNode.disconnect(context.analyzerNode);
-  context.faustNode.shutdown();
-  delete context.faustNode;
 
-  context.paramDefaultValues = Object.fromEntries(
-    Object.entries(context.overrideableParams).map(([address, param]) => [
-      address,
-      param.manualControl.offset.value,
-    ])
-  );
+    // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
+    if (!context.faustNode) {
+      throw new Error(
+        `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
+      );
+    }
+    context.faustNode.disconnect(context.analyzerNode);
+    context.faustNode.shutdown();
+    delete context.faustNode;
 
-  // Create new audio connectables using a passthrough node
-  updateConnectables(vcId, get_faust_editor_connectables(vcId));
-  context.overrideableParams = {};
-};
+    context.paramDefaultValues = Object.fromEntries(
+      Object.entries(context.overrideableParams).map(([address, param]) => [
+        address,
+        param.manualControl.offset.value,
+      ])
+    );
+
+    // Create new audio connectables using a passthrough node
+    updateConnectables(vcId, get_faust_editor_connectables(vcId));
+    context.overrideableParams = {};
+  };
 
 const FaustEditor: React.FC<{
   vcId: string;

@@ -348,6 +348,13 @@ const SynthModuleCompInner: React.FC<{
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
     [synth.filterEnvelope]
   );
+  const getFMSynthOutput = useCallback(async () => {
+    const output = get_synth_designer_audio_connectables(stateKey).outputs.get('masterOutput');
+    if (!output || output.type !== 'customAudio') {
+      throw new UnreachableException('Missing `masterGain` on synth designer audio connectables');
+    }
+    return output.node as AudioNode;
+  }, [stateKey]);
 
   return (
     <div className='synth-module'>
@@ -385,7 +392,11 @@ const SynthModuleCompInner: React.FC<{
         <WavetableControlPanel synth={synth} dispatch={dispatch} index={index} />
       ) : null}
       {synth.waveform === Waveform.FM && synth.fmSynth ? (
-        <ConnectedFMSynthUI synth={synth.fmSynth} synthID={`${stateKey}_${index}`} />
+        <ConnectedFMSynthUI
+          synth={synth.fmSynth}
+          synthID={`${stateKey}_${index}`}
+          getFMSynthOutput={getFMSynthOutput}
+        />
       ) : null}
 
       <FilterModule
