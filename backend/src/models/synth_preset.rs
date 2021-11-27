@@ -29,11 +29,6 @@ pub enum SynthType {
     Fm,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct WavetableSettings {
-    // TODO?
-}
-
 // Lowpass = 'lowpass',
 // LP4 = 'order 4 lowpass',
 // LP8 = 'order 8 lowpass',
@@ -250,14 +245,6 @@ pub enum VoiceDefinition {
         pitch_multiplier: f32,
         #[serde(default)]
         unison_spread_cents: f32,
-    },
-    #[serde(rename = "wavetable")]
-    #[serde(rename_all = "camelCase")]
-    Wavetable {
-        settings: WavetableSettings,
-        dimensions: Vec<Waveform>,
-        mixes: Vec<f32>,
-        // TODO
     },
 }
 

@@ -9,7 +9,6 @@
   flex-direction: row;
   padding-bottom: 2px;
   padding-top: 2px;
-  max-width: calc(100vw - 44px);
   overflow-x: scroll;
   max-height: 80vh;
   overflow-y: auto;
@@ -38,12 +37,6 @@
       flex-direction: column;
       justify-content: center;
     }
-  }
-
-  .presets {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
   }
 
   .filter-control-panel svg.adsr-viz {

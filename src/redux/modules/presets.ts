@@ -9,19 +9,10 @@ export interface SynthPresetEntry {
   id: number;
   title: string;
   description: string;
-  body: { voices: (StandardSynthVoicePreset | WaveTableSynthVoicePreset)[] };
+  body: { voices: SynthVoicePreset[] };
 }
 
-export type StandardSynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
-  type: 'standard';
-};
-
-export type WaveTableSynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
-  type: 'wavetable';
-  // TODO
-};
-
-export type SynthVoicePreset = StandardSynthVoicePreset | WaveTableSynthVoicePreset;
+export type SynthVoicePreset = ReturnType<typeof serializeSynthModule>;
 
 export interface SynthVoicePresetEntry {
   id: number;

@@ -297,32 +297,3 @@ export default class WaveTable implements ForeignNode {
     this.workletHandle?.port.postMessage('shutdown');
   }
 }
-
-export const decodeWavetableDef = ({
-  encodedWavetableDef,
-  dimensionCount,
-  waveformsPerDimension,
-  samplesPerWaveform,
-}: {
-  encodedWavetableDef: string;
-  dimensionCount: number;
-  waveformsPerDimension: number;
-  samplesPerWaveform: number;
-}): Float32Array[][] => {
-  const packed = new Float32Array(base64ToArrayBuffer(encodedWavetableDef));
-  const samplesPerDimension = waveformsPerDimension * samplesPerWaveform;
-
-  const wavetableDef: Float32Array[][] = [];
-  for (let dimIx = 0; dimIx < dimensionCount; dimIx++) {
-    wavetableDef.push([]);
-    for (let waveformIx = 0; waveformIx < waveformsPerDimension; waveformIx++) {
-      wavetableDef[dimIx].push(new Float32Array(samplesPerWaveform));
-      for (let sampleIx = 0; sampleIx < samplesPerWaveform; sampleIx++) {
-        wavetableDef[dimIx][waveformIx][sampleIx] =
-          packed[dimIx * samplesPerDimension + waveformIx * samplesPerWaveform + sampleIx];
-      }
-    }
-  }
-
-  return wavetableDef;
-};

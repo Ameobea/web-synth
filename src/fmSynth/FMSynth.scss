@@ -205,6 +205,10 @@
 .operator-config {
   display: flex;
   flex-direction: column;
+  max-height: 75vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 20px;
 }
 
 .configure-modulation-index {

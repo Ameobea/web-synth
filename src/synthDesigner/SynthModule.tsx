@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Provider } from 'react-redux';
+import { Provider, shallowEqual } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { filterNils, PropTypesOf, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
@@ -81,14 +81,19 @@ const WavetableControlPanel: React.FC<{
   );
 };
 
+const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
+
 const PresetsControlPanel: React.FC<{
   index: number;
   stateKey: string;
 }> = ({ index, stateKey }) => {
   const controlPanelContext = useRef<{ preset: string } | null>(null);
-  const voicePresetIds = useSelector(voicePresetIdsSelector);
+  const voicePresetIds = useSelector(voicePresetIdsSelector, shallowEqual);
   const { dispatch, actionCreators } = getReduxInfra(stateKey);
 
+  const ctxCb = useCallback((ctx: { preset: string }) => {
+    controlPanelContext.current = ctx;
+  }, []);
   const settings = useMemo(
     () => [
       {
@@ -145,14 +150,7 @@ const PresetsControlPanel: React.FC<{
   );
 
   return (
-    <ControlPanel
-      proxy
-      contextCb={(ctx: { preset: string }) => {
-        controlPanelContext.current = ctx;
-      }}
-      style={{ height: 97 }}
-      settings={settings}
-    />
+    <ControlPanel proxy contextCb={ctxCb} style={PRESETS_CONTROL_PANEL_STYLE} settings={settings} />
   );
 };
 
@@ -327,13 +325,16 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
   );
 
   return (
-    <ControlPanel
-      title='SYNTH'
-      settings={settings}
-      onChange={handleSynthChange}
-      state={state}
-      width={470}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <ControlPanel
+        title='SYNTH'
+        settings={settings}
+        onChange={handleSynthChange}
+        state={state}
+        width={400}
+      />
+      <PresetsControlPanel index={props.index} stateKey={props.stateKey} />
+    </div>
   );
 };
 const SynthControlPanel = React.memo(SynthControlPanelInner);
@@ -408,10 +409,6 @@ const SynthModuleCompInner: React.FC<{
       />
 
       <div className='effects'>{children}</div>
-
-      <div className='presets'>
-        <PresetsControlPanel index={index} stateKey={stateKey} />
-      </div>
     </div>
   );
 };

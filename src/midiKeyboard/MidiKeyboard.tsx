@@ -108,11 +108,12 @@ export const MidiKeyboard: React.FC<{
 
       // Work around incredibly annoying Firefox functionality where the slash key opens
       // a "quick find" thing and takes focus away from the page
-      const isEditing = (['input', 'textarea'] as (string | undefined)[]).includes(
-        document.activeElement?.tagName.toLowerCase()
-      );
-      if (!isEditing) {
-        evt.preventDefault();
+      const isEditing =
+        document.activeElement &&
+        ['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase()) &&
+        (document.activeElement as HTMLInputElement).type !== 'range';
+      if (isEditing) {
+        return;
       }
 
       if (evt.repeat) {

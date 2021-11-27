@@ -1,24 +1,18 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup } from 'jantix';
 import { Option } from 'funfix-core';
-import { PromiseResolveType, UnimplementedError, UnreachableException } from 'ameo-utils';
+import { PromiseResolveType, UnreachableException } from 'ameo-utils';
 
 import { EffectNode } from 'src/synthDesigner/effects';
 import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
 import { ADSR2Module, ADSRModule } from 'src/synthDesigner/ADSRModule';
 import { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
-import WaveTable, {
-  decodeWavetableDef,
-  getDefaultWavetableDef,
-  getWavetableWasmInstance,
-} from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { AsyncOnce, base64ArrayBuffer, normalizeEnvelope } from 'src/util';
+import { AsyncOnce, normalizeEnvelope } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import {
   AbstractFilterModule,
   buildAbstractFilterModule,
@@ -26,21 +20,11 @@ import {
 } from 'src/synthDesigner/biquadFilterModule';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
-const disposeSynthModule = (synthModule: SynthModule) => {
-  synthModule.voices.forEach(voice => {
-    voice.outerGainNode.disconnect();
-    if (voice.wavetable) {
-      voice.wavetable.shutdown();
-    }
-  });
-};
-
 export enum Waveform {
   Sine = 'sine',
   Square = 'square',
   Sawtooth = 'sawtooth',
   Triangle = 'triangle',
-  Wavetable = 'wavetable',
   FM = 'fm',
 }
 
@@ -77,7 +61,6 @@ export interface FilterParams {
 
 export interface Voice {
   oscillators: OscillatorNode[];
-  wavetable: WaveTable | null;
   effects: EffectModule[];
   // The node that is connected to whatever the synth module as a whole is connected to.  Its
   // source is either the end of the effects chain or the inner gain node.
@@ -94,12 +77,6 @@ interface PolysynthContext {
   ctxPtr: number;
 }
 
-interface FMSynthConfig {
-  modulationIndices: number[][];
-  outputWeights: number[];
-  operatorConfigs: OperatorConfig[];
-}
-
 export enum FilterFrequencySource {
   CSNs,
   ADSR,
@@ -111,11 +88,6 @@ export interface SynthModule {
   detuneCSN: ConstantSourceNode;
   filterBypassed: boolean;
   voices: Voice[];
-  wavetableConf: WavetableConfig | null;
-  wavetableInputControls: {
-    intraDimMixes: OverridableAudioParam[];
-    interDimMixes: OverridableAudioParam[];
-  } | null;
   fmSynth: FMSynth | null;
   filterParams: FilterParams;
   /**
@@ -179,56 +151,9 @@ function updateFilterNode<K extends keyof FilterParams>(
   }
 }
 
-const packWavetableDefs = (
-  wavetableDefs: Float32Array[][]
-): {
-  dimensionCount: number;
-  waveformsPerDimension: number;
-  samplesPerWaveform: number;
-  packed: Float32Array;
-} => {
-  const totalSize = wavetableDefs.reduce(
-    (acc, dim) => dim.reduce((acc, waveform) => acc + waveform.length, acc),
-    0
-  );
-  const packed = new Float32Array(totalSize);
-
-  let totalSet = 0;
-  wavetableDefs.forEach(dim =>
-    dim.forEach(waveform => {
-      packed.set(waveform, totalSet);
-      totalSet += waveform.length;
-    })
-  );
-
-  return {
-    dimensionCount: wavetableDefs.length,
-    waveformsPerDimension: wavetableDefs[0].length,
-    samplesPerWaveform: wavetableDefs[0][0].length,
-    packed,
-  };
-};
-
 export const serializeSynthModule = (synth: SynthModule) => ({
   unison: synth.voices[0].oscillators.length,
   unisonSpreadCents: synth.unisonSpreadCents,
-  wavetableConfig: Option.of(synth.wavetableConf?.wavetableDef)
-    .map((wavetableDefs): Omit<WavetableConfig, 'onInitialized'> => {
-      const { dimensionCount, waveformsPerDimension, samplesPerWaveform, packed } =
-        packWavetableDefs(wavetableDefs);
-
-      const encodedWavetableDef = base64ArrayBuffer(packed.buffer);
-
-      return {
-        encodedWavetableDef,
-        dimensionCount: dimensionCount,
-        waveformsPerDimension,
-        samplesPerWaveform,
-        intraDimMixes: synth.wavetableConf!.intraDimMixes,
-        interDimMixes: synth.wavetableConf!.interDimMixes,
-      };
-    })
-    .orNull(),
   fmSynthConfig: synth.fmSynth?.serialize(),
   waveform: synth.waveform,
   detune: synth.detune,
@@ -240,71 +165,16 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   filterEnvelope: synth.filterEnvelope,
   filterADSRLength: synth.filterADSRLength,
   pitchMultiplier: synth.pitchMultiplier,
-  type: synth.waveform === Waveform.Wavetable ? ('wavetable' as const) : ('standard' as const),
   filterBypassed: synth.filterBypassed,
 });
-
-const connectWavetableInputControls = (
-  inputControls: NonNullable<SynthModule['wavetableInputControls']>,
-  voice: Voice
-) => {
-  inputControls.intraDimMixes.forEach((param, dimIx) => {
-    const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}_mix`];
-    param.outputCSN!.connect(voiceParam.param);
-    // Never overridden because we handle that control above the voice level
-    voiceParam.param.setIsOverridden(false);
-  });
-  inputControls.interDimMixes.forEach((param, dimIx) => {
-    const voiceParam = voice.wavetable!.paramOverrides[`dimension_${dimIx}x${dimIx + 1}_mix`];
-    param.outputCSN!.connect(voiceParam.param);
-    // Never overridden because we handle that control above the voice level
-    voiceParam.param.setIsOverridden(false);
-  });
-};
-
-const buildWavetableInputControls = (
-  wavetableConf: WavetableConfig
-): NonNullable<SynthModule['wavetableInputControls']> => {
-  const inputControls = {
-    intraDimMixes: wavetableConf.intraDimMixes.map(mix => {
-      const param = new OverridableAudioParam(ctx, undefined, undefined, true);
-      param.manualControl.offset.value = mix;
-      return param;
-    }),
-    interDimMixes: wavetableConf.interDimMixes.map(mix => {
-      const param = new OverridableAudioParam(ctx, undefined, undefined, true);
-      param.manualControl.offset.value = mix;
-      return param;
-    }),
-  };
-
-  return inputControls;
-};
-
-const disconnectWavetableInputControls = (
-  inputControls: NonNullable<SynthModule['wavetableInputControls']>
-) => {
-  inputControls.intraDimMixes.forEach(param => param.dispose());
-  inputControls.interDimMixes.forEach(param => param.dispose());
-};
 
 const connectOscillators = (connect: boolean, synth: SynthModule) =>
   synth.voices.forEach((voice, voiceIx) => {
     const voiceDst = synth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput();
 
-    const wavetableOutput = voice.wavetable?.buildConnectables().outputs.get('output')?.node as
-      | AudioNode
-      | undefined;
-
     const fmSynthAWPNode = synth.fmSynth?.getAWPNode();
 
     if (!connect) {
-      try {
-        wavetableOutput?.disconnect();
-      } catch (_err) {
-        // pass
-      }
-
       try {
         fmSynthAWPNode?.disconnect();
       } catch (_err) {
@@ -322,9 +192,7 @@ const connectOscillators = (connect: boolean, synth: SynthModule) =>
       return;
     }
 
-    if (synth.waveform === Waveform.Wavetable) {
-      wavetableOutput?.connect(voiceDst);
-    } else if (synth.waveform === Waveform.FM) {
+    if (synth.waveform === Waveform.FM) {
       if (synth.fmSynth) {
         fmSynthAWPNode?.connect(voiceDst, voiceIx);
       }
@@ -445,7 +313,6 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
 
       return {
         oscillators: [osc],
-        wavetable: null,
         fmSynth: null,
         effects: [],
         outerGainNode,
@@ -455,12 +322,10 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
         lastGateOrUngateTime: 0,
       };
     }),
-    wavetableConf: buildDefaultWavetableConfig(),
     fmSynth: null,
     filterParams,
     filterCSNs,
     filterFrequencySource: FilterFrequencySource.CSNs,
-    wavetableInputControls: null,
     masterGain,
     selectedEffectType: EffectType.Reverb,
     gainEnvelope: buildDefaultAdsrEnvelope(),
@@ -477,30 +342,9 @@ const buildDefaultSynthModule = (filterType: FilterType): SynthModule => {
   return inst;
 };
 
-interface WavetableConfig {
-  wavetableDef?: Float32Array[][];
-  // This is a Base64-encoded representation of the wavetable's constituent waveforms.  It can be decoded using a Wasm function.
-  encodedWavetableDef?: string;
-  dimensionCount: number;
-  waveformsPerDimension: number;
-  samplesPerWaveform: number;
-  intraDimMixes: number[];
-  interDimMixes: number[];
-}
-
-const buildDefaultWavetableConfig = (): WavetableConfig => ({
-  dimensionCount: 2,
-  waveformsPerDimension: 2,
-  samplesPerWaveform: 1470,
-  wavetableDef: getDefaultWavetableDef(),
-  intraDimMixes: [0, 0],
-  interDimMixes: [0],
-});
-
 export const deserializeSynthModule = (
   {
     waveform,
-    wavetableConfig: baseWavetableConfig,
     unison,
     detune,
     filter: filterParams,
@@ -514,34 +358,13 @@ export const deserializeSynthModule = (
     filterBypassed = true,
     unisonSpreadCents = 0,
     fmSynthConfig,
-  }: {
-    waveform: Waveform;
-    wavetableConfig: Omit<WavetableConfig, 'onInitialized'> | null;
-    unison: number;
-    detune: number;
-    filter: FilterParams;
-    masterGain: number;
-    selectedEffectType: EffectType;
-    gainEnvelope: ADSRValues;
-    gainADSRLength?: number;
-    filterEnvelope: ADSRValues | Adsr;
-    filterADSRLength?: number;
-    pitchMultiplier?: number;
-    filterBypassed?: boolean;
-    unisonSpreadCents?: number;
-    fmSynthConfig?: FMSynthConfig | null;
-  },
-  dispatch: ((action: { type: 'CONNECT_WAVETABLE'; synthIx: number; voiceIx: number }) => void) &
-    ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void),
+  }: SynthVoicePreset,
+  dispatch: (action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void,
   synthIx: number
 ): SynthModule => {
   const base = buildDefaultSynthModule(filterParams.type);
-  const wavetableConf = {
-    ...buildDefaultWavetableConfig(),
-    ...baseWavetableConfig,
-  };
 
-  const voices = base.voices.map((voice, voiceIx) => {
+  const voices = base.voices.map(voice => {
     voice.oscillators.forEach(osc => {
       osc.stop();
       osc.disconnect();
@@ -569,31 +392,17 @@ export const deserializeSynthModule = (
       ...voice,
       oscillators: R.range(0, unison).map(() => {
         const osc = new OscillatorNode(ctx);
-        osc.type =
-          waveform === Waveform.Wavetable || waveform === Waveform.FM ? Waveform.Sine : waveform;
+        osc.type = waveform === Waveform.FM ? Waveform.Sine : waveform;
         osc.detune.setValueAtTime(0, ctx.currentTime);
         base.detuneCSN.connect(osc.detune);
         osc.start();
         osc.connect(filterBypassed ? voice.outerGainNode : voice.filterNode.getInput());
         return osc;
       }),
-      wavetable:
-        waveform === Waveform.Wavetable
-          ? new WaveTable(ctx, '', {
-              ...wavetableConf,
-              onInitialized: () => dispatch({ type: 'CONNECT_WAVETABLE', synthIx, voiceIx }),
-              frequency: 0,
-              detune: 0,
-            })
-          : null,
+
       effects: [], // TODO
     };
   });
-
-  if (baseWavetableConfig?.encodedWavetableDef) {
-    wavetableConf.wavetableDef = decodeWavetableDef(baseWavetableConfig as any);
-    base.wavetableInputControls = buildWavetableInputControls(wavetableConf);
-  }
 
   const synthModule = {
     ...base,
@@ -601,7 +410,6 @@ export const deserializeSynthModule = (
     detune,
     filterBypassed,
     voices,
-    wavetableConf,
     fmSynth:
       waveform === Waveform.FM
         ? new FMSynth(ctx, undefined, {
@@ -704,12 +512,7 @@ const actionGroups = {
     actionCreator: (
       index: number,
       waveform: Waveform,
-      dispatch: ((action: {
-        type: 'CONNECT_WAVETABLE';
-        synthIx: number;
-        voiceIx: number;
-      }) => void) &
-        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void)
+      dispatch: (action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void
     ) => ({
       type: 'SET_WAVEFORM',
       index,
@@ -717,72 +520,10 @@ const actionGroups = {
       dispatch,
     }),
     subReducer: (state: SynthDesignerState, { index, waveform, dispatch }): SynthDesignerState => {
-      // We need to make sure this is loaded for later when we save
-      getWavetableWasmInstance();
-
       const targetSynth = getSynth(index, state.synths);
 
       if (targetSynth.waveform === waveform) {
         return state;
-      }
-
-      let needsConnectablesUpdate = false;
-      // WAVETABLE
-      if (waveform === Waveform.Wavetable) {
-        if (!targetSynth.wavetableConf) {
-          targetSynth.wavetableConf = buildDefaultWavetableConfig();
-        }
-        targetSynth.wavetableInputControls = buildWavetableInputControls(
-          targetSynth.wavetableConf!
-        );
-
-        // We're switching from a normal oscillator to a wavetable.  If we never had one
-        // before, we have to lazy-init one
-        connectOscillators(false, targetSynth);
-        targetSynth.voices.forEach((voice, voiceIx) => {
-          if (!voice.wavetable) {
-            voice.wavetable = new WaveTable(
-              ctx,
-              '',
-              {
-                ...targetSynth.wavetableConf,
-                onInitialized: () =>
-                  dispatch({ type: 'CONNECT_WAVETABLE', synthIx: index, voiceIx }),
-                frequency: 0,
-              }!
-            );
-          } else {
-            setTimeout(() => dispatch({ type: 'CONNECT_WAVETABLE', synthIx: index, voiceIx }));
-          }
-        });
-
-        return R.set(R.lensPath(['synths', index, 'waveform']), waveform, state);
-      }
-      if (targetSynth.waveform === Waveform.Wavetable) {
-        disconnectWavetableInputControls(targetSynth.wavetableInputControls!);
-        targetSynth.wavetableInputControls = null;
-
-        connectOscillators(true, targetSynth);
-        targetSynth.voices.forEach(voice => {
-          const workletHandle = voice.wavetable!.workletHandle;
-          if (!workletHandle) {
-            // I guess they weren't initialized yet...
-            console.warn('`workletHandle` not initialized yet');
-            return R.set(R.lensPath(['synths', index, 'waveform']), waveform, state);
-          }
-
-          try {
-            workletHandle.disconnect(
-              targetSynth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput()
-            );
-            voice.wavetable!.shutdown();
-            voice.wavetable = null;
-          } catch (err) {
-            console.error('Error disconnecting wavetable worklet from filter: ', err);
-          }
-        });
-
-        needsConnectablesUpdate = true;
       }
 
       // FM SYNTH
@@ -809,13 +550,6 @@ const actionGroups = {
         }
       }
 
-      if (needsConnectablesUpdate) {
-        const newConnectables = get_synth_designer_audio_connectables(
-          `synthDesigner_${state.vcId}`
-        );
-        updateConnectables(state.vcId, newConnectables);
-      }
-
       targetSynth.voices.flatMap(R.prop('oscillators')).forEach(osc => (osc.type = waveform));
       return R.set(R.lensPath(['synths', index, 'waveform']), waveform, state);
     },
@@ -839,8 +573,6 @@ const actionGroups = {
         console.error(`Tried to remove synth ix ${index} but we only have ${state.synths.length}`);
         return state;
       }
-
-      disposeSynthModule(removedModule);
 
       return {
         ...state,
@@ -962,14 +694,7 @@ const actionGroups = {
           // We edit state directly w/o updating references because this is only needed internally
           targetVoice.lastGateOrUngateTime = ctx.currentTime;
 
-          if (synth.waveform === Waveform.Wavetable && targetVoice.wavetable) {
-            targetVoice.wavetable.paramOverrides.frequency.override.offset.setValueAtTime(
-              frequency,
-              Option.of(offset)
-                .map(offset => ctx.currentTime + offset)
-                .getOrElse(ctx.currentTime)
-            );
-          } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
+          if (synth.waveform === Waveform.FM && synth.fmSynth) {
             synth.fmSynth.setFrequency(voiceIx, frequency);
           } else {
             const setFreqForOsc = mkSetFreqForOsc(frequency, offset);
@@ -996,16 +721,7 @@ const actionGroups = {
         targetVoice.gainADSRModule.gate();
         targetVoice.filterADSRModule.gate(voiceIx);
 
-        if (targetSynth.waveform === Waveform.Wavetable && targetVoice.wavetable) {
-          targetVoice.wavetable.paramOverrides.frequency.override.offset.setValueAtTime(
-            frequency,
-            Option.of(offset)
-              .map(offset => ctx.currentTime + offset)
-              .getOrElse(ctx.currentTime)
-          );
-        } else {
-          targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
-        }
+        targetVoice.oscillators.forEach(osc => setFreqForOsc(osc));
       }
 
       return state;
@@ -1120,10 +836,7 @@ const actionGroups = {
         while (voice.oscillators.length < unison) {
           const osc = new OscillatorNode(ctx);
           osc.frequency.value = voice.oscillators[0].frequency.value;
-          osc.type =
-            targetSynth.waveform === Waveform.Wavetable || targetSynth.waveform === Waveform.FM
-              ? Waveform.Sine
-              : targetSynth.waveform;
+          osc.type = targetSynth.waveform === Waveform.FM ? Waveform.Sine : targetSynth.waveform;
           voice.oscillators.push(osc);
           targetSynth.detuneCSN.connect(osc.detune);
           osc.start();
@@ -1344,12 +1057,7 @@ const actionGroups = {
     actionCreator: (
       synthIx: number,
       preset: SynthVoicePreset | null,
-      dispatch: ((action: {
-        type: 'CONNECT_WAVETABLE';
-        synthIx: number;
-        voiceIx: number;
-      }) => void) &
-        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void)
+      dispatch: (action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void
     ) => ({
       type: 'SET_VOICE_STATE',
       synthIx,
@@ -1357,10 +1065,6 @@ const actionGroups = {
       dispatch,
     }),
     subReducer: (state: SynthDesignerState, { synthIx, preset, dispatch }) => {
-      if (preset && preset.type !== 'standard') {
-        throw new UnimplementedError();
-      }
-
       synthIx = synthIx === -1 ? state.synths.length - 1 : synthIx;
       const oldSynthModule = state.synths[synthIx];
       if (!oldSynthModule) {
@@ -1369,7 +1073,6 @@ const actionGroups = {
         );
         return state;
       }
-      disposeSynthModule(oldSynthModule);
 
       const builtVoice: SynthModule = preset
         ? deserializeSynthModule(preset, dispatch, synthIx)
@@ -1381,58 +1084,6 @@ const actionGroups = {
   SET_SYNTH_DESIGNER_IS_HIDDEN: buildActionGroup({
     actionCreator: (isHidden: boolean) => ({ type: 'SET_SYNTH_DESIGNER_IS_HIDDEN', isHidden }),
     subReducer: (state: SynthDesignerState, { isHidden }) => ({ ...state, isHidden }),
-  }),
-  CONNECT_WAVETABLE: buildActionGroup({
-    actionCreator: (synthIx: number, voiceIx: number) => ({
-      type: 'CONNECT_WAVETABLE',
-      synthIx,
-      voiceIx,
-    }),
-    subReducer: (state: SynthDesignerState, { synthIx, voiceIx }) => {
-      // WaveTable initialization can be async, so we need to asynchronously re-connect it once it's been initialized
-      const targetSynth = state.synths[synthIx];
-      if (targetSynth.waveform !== Waveform.Wavetable) {
-        // Maybe user switched off of wavetable before we finished initializing.  In any case, we'll properly re-connect if
-        // the user switches back, so nothing to do here
-        return state;
-      }
-
-      // Connect the master wavetable control inputs to this newly initialized voice
-      const targetVoice = targetSynth.voices[voiceIx];
-      if (!targetSynth.wavetableConf) {
-        console.error('Connecting wavetable but no `wavetableConf` present');
-        return state;
-      }
-      connectWavetableInputControls(targetSynth.wavetableInputControls!, targetVoice);
-
-      if (!targetVoice.wavetable) {
-        console.warn('No `wavetable` but waveform was `wavetable`');
-        return state;
-      } else if (!targetVoice.wavetable.workletHandle) {
-        console.error('No `workletHandle` but wavetable said it was initialized');
-        return state;
-      }
-
-      targetVoice.oscillators.forEach(osc => {
-        try {
-          osc.disconnect();
-        } catch (err) {
-          console.error('Error disconnecting oscillator and filter: ', err);
-        }
-      });
-
-      targetSynth.detuneCSN.connect(targetVoice.wavetable.paramOverrides.detune.param);
-
-      try {
-        targetVoice.wavetable.workletHandle.connect(
-          targetSynth.filterBypassed ? targetVoice.outerGainNode : targetVoice.filterNode.getInput()
-        );
-      } catch (err) {
-        console.error('Error connecting wavetable to `filterNode`: ', err);
-      }
-
-      return state;
-    },
   }),
   CONNECT_FM_SYNTH: buildActionGroup({
     actionCreator: (synthIx: number) => ({
@@ -1458,48 +1109,6 @@ const actionGroups = {
       return state;
     },
   }),
-  SET_WAVETABLE_INTRA_DIM_MIX: buildActionGroup({
-    actionCreator: (synthIx: number, dimIx: number, mix: number) => ({
-      type: 'SET_WAVETABLE_INTRA_DIM_MIX',
-      synthIx,
-      dimIx,
-      mix,
-    }),
-    subReducer: (state: SynthDesignerState, { synthIx, dimIx, mix }) => {
-      const synth = getSynth(synthIx, state.synths);
-      synth.wavetableInputControls!.intraDimMixes[dimIx].manualControl.offset.setValueAtTime(
-        mix,
-        ctx.currentTime
-      );
-
-      return setSynth(
-        synthIx,
-        R.set(R.lensPath(['wavetableConf', 'intraDimMixes', dimIx]), mix, synth),
-        state
-      );
-    },
-  }),
-  SET_WAVETABLE_INTER_DIM_MIX: buildActionGroup({
-    actionCreator: (synthIx: number, baseDimIx: number, mix: number) => ({
-      type: 'SET_WAVETABLE_INTER_DIM_MIX',
-      synthIx,
-      baseDimIx,
-      mix,
-    }),
-    subReducer: (state: SynthDesignerState, { synthIx, baseDimIx, mix }) => {
-      const synth = getSynth(synthIx, state.synths);
-      synth.wavetableInputControls!.interDimMixes[baseDimIx].manualControl.offset.setValueAtTime(
-        mix,
-        ctx.currentTime
-      );
-
-      return setSynth(
-        synthIx,
-        R.set(R.lensPath(['wavetableConf', 'interDimMixes', baseDimIx]), mix, synth),
-        state
-      );
-    },
-  }),
   SET_PITCH_MULTIPLIER: buildActionGroup({
     actionCreator: (synthIx: number, pitchMultiplier: number) => ({
       type: 'SET_PITCH_MULTIPLIER',
@@ -1514,12 +1123,7 @@ const actionGroups = {
   SET_SYNTH_PRESET: buildActionGroup({
     actionCreator: (
       preset: SynthPresetEntry,
-      dispatch: ((action: {
-        type: 'CONNECT_WAVETABLE';
-        synthIx: number;
-        voiceIx: number;
-      }) => void) &
-        ((action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void)
+      dispatch: (action: { type: 'CONNECT_FM_SYNTH'; synthIx: number }) => void
     ) => ({ type: 'SET_SYNTH_PRESET', preset, dispatch }),
     subReducer: (state: SynthDesignerState, { preset, dispatch }) => {
       if (state.synths.length !== 0) {
