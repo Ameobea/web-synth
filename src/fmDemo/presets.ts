@@ -1,14 +1,17 @@
-import { saveSynthVoicePreset } from 'src/api';
-import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
+// import { saveSynthVoicePreset } from 'src/api';
+import type {
+  ADSRValues,
+  //buildDefaultAdsrEnvelope
+} from 'src/controls/adsr';
 import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import {
-  EffectType,
+import type {
+  // EffectType,
   FilterParams,
-  serializeSynthModule,
-  Waveform,
+  // serializeSynthModule,
+  // Waveform,
 } from 'src/redux/modules/synthDesigner';
-import { normalizeEnvelope } from 'src/util';
+// import { normalizeEnvelope } from 'src/util';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();
 
@@ -92,13 +95,8 @@ export const Presets: { [name: string]: SerializedFMSynthDemoState } = {
 //   const normalizedFilterEnvelope = normalizeEnvelope(preset.filterEnvelope);
 
 //   return {
-//     type: 'standard',
-//     unison: 1,
-//     unisonSpreadCents: 0,
 //     wavetableConfig: null,
 //     fmSynthConfig: preset.synth,
-//     waveform: Waveform.FM,
-//     detune: 0,
 //     filter: preset.filterParams,
 //     masterGain: 0.2,
 //     selectedEffectType: EffectType.Bitcrusher,

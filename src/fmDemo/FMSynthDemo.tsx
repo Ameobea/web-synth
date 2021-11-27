@@ -12,7 +12,7 @@ import { AsyncOnce, midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs
 import './fmDemo.scss';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
-import { FilterParams } from 'src/redux/modules/synthDesigner';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import { getSentry } from 'src/sentry';
 import { Presets, SerializedFMSynthDemoState } from 'src/fmDemo/presets';

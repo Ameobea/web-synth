@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 
-import { FilterParams } from 'src/redux/modules/synthDesigner';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 
 const ctx = new AudioContext();
 

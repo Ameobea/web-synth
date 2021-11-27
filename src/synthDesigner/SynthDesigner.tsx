@@ -4,11 +4,10 @@ import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 import { UnreachableException } from 'ameo-utils';
 
-import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
+import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import {
   SynthDesignerReduxStore,
-  getReduxInfra,
   get_synth_designer_audio_connectables,
   SynthDesignerReduxInfra,
 } from 'src/synthDesigner';
@@ -68,11 +67,7 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
           const vcId = stateKey.split('_')[1]!;
           synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           synthDesignerDispatch(
-            synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(
-              -1,
-              selectedVoicePreset,
-              synthDesignerDispatch
-            )
+            synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, selectedVoicePreset)
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           updateConnectables(vcId, newConnectables);
@@ -159,8 +154,7 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
 
           dispatch(
             actionCreators.synthDesigner.SET_SYNTH_PRESET(
-              synthPresets.find(preset => preset.id === state.preset)!,
-              dispatch
+              synthPresets.find(preset => preset.id === state.preset)!
             )
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
@@ -222,7 +216,7 @@ const AddAndPresetControls = React.memo(AddAndPresetControlsInner);
 
 const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
-  const { dispatch, actionCreators, getState } = getReduxInfra(stateKey);
+  const { dispatch, actionCreators, getState } = getSynthDesignerReduxInfra(stateKey);
   const { synths, synthCount, wavyJonesInstanceInitialized, spectrumNode, isHidden } = useSelector(
     (state: SynthDesignerReduxStore) => ({
       synths: state.synthDesigner.synths,

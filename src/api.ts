@@ -27,7 +27,7 @@ export const saveSynthPreset = (preset: {
   title: string;
   description: string;
   body: {
-    voices: (ReturnType<typeof serializeSynthModule> & { type: 'wavetable' | 'standard' })[];
+    voices: ReturnType<typeof serializeSynthModule>[];
   };
 }) =>
   fetch(buildURL('/synth_presets'), {

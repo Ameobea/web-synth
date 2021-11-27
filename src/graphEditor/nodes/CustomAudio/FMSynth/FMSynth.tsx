@@ -101,7 +101,7 @@ const serializeADSR = (adsr: AdsrParams) => ({
   ...adsr,
   lenSamples:
     typeof adsr.lenSamples === 'number'
-      ? { type: 'constant', value: adsr.lenSamples }
+      ? { type: 'constant' as const, value: adsr.lenSamples }
       : adsr.lenSamples,
   audioThreadData: undefined,
 });
@@ -328,8 +328,6 @@ export default class FMSynth implements ForeignNode {
       console.error('Tried to load wavetable into backend before AWP initialized');
       return;
     }
-
-    console.log('Loading wavetable into backend');
 
     this.awpHandle.port.postMessage({
       type: 'setWavetableData',

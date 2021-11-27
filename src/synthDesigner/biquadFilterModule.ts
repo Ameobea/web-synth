@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
 
 import { FilterType } from 'src/synthDesigner/filterHelpers';
-import { FilterParams } from 'src/redux/modules/synthDesigner';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { linearToDb } from 'src/util';
 import { connectFilterChain } from 'src/filterDesigner/util';

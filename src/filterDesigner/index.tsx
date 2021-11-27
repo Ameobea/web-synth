@@ -13,7 +13,7 @@ import {
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import { FilterParams } from 'src/redux/modules/synthDesigner';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import { FilterType } from 'src/synthDesigner/filterHelpers';
 import {

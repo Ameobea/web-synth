@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
-import { FilterParams } from 'src/redux/modules/synthDesigner';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import {
   buildDefaultFilter,
   FilterType,

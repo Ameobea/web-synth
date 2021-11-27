@@ -6,7 +6,7 @@ import ConfigureOperator, { OperatorConfig, WavetableState } from './ConfigureOp
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
 import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
-import FMSynth, { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import ConfigureParamSource, {
@@ -18,7 +18,7 @@ import HelpIcon from 'src/misc/HelpIcon';
 import { WaveformIcon } from 'src/misc/Icons';
 import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
-import { MIDINode } from 'src/patchNetwork/midiNode';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 
 interface FMSynthState {
@@ -138,7 +138,7 @@ interface FMSynthUIProps {
   setWavetableState: (newState: WavetableState) => void;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
   getFMSynthOutput: () => Promise<AudioNode>;
-  midiNode: MIDINode;
+  midiNode?: MIDINode | null;
   midiControlValuesCache: MIDIControlValuesCache;
   synthID: string;
 }
@@ -548,7 +548,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
 export const ConnectedFMSynthUI: React.FC<{
   synth: FMSynth;
   getFMSynthOutput: () => Promise<AudioNode>;
-  midiNode: MIDINode;
+  midiNode?: MIDINode | null;
   synthID: string;
 }> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID }) => (
   <FMSynthUI
@@ -581,7 +581,7 @@ export const ConnectedFMSynthUI: React.FC<{
     )}
     adsrs={synth.getAdsrs()}
     onAdsrChange={useCallback(
-      (adsrIx: number, newAdsr: Adsr) => synth.handleAdsrChange(adsrIx, newAdsr),
+      (adsrIx: number, newAdsr: AdsrParams) => synth.handleAdsrChange(adsrIx, newAdsr),
       [synth]
     )}
     detune={synth.getDetune()}

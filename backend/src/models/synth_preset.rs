@@ -1,9 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{
-    models::waveform::Waveform,
-    schema::{synth_presets, voice_presets},
-};
+use crate::schema::{synth_presets, voice_presets};
 
 #[derive(Serialize, Deserialize)]
 pub struct SynthPreset {
@@ -94,21 +89,6 @@ pub struct FilterParams {
     pub detune: f64,
 }
 
-// export enum EffectType {
-//   Bitcrusher = 'bitcrusher',
-//   Distortion = 'distortion',
-//   Reverb = 'reverb',
-// }
-#[derive(Serialize, Deserialize)]
-pub enum EffectType {
-    #[serde(rename = "bitcrusher")]
-    Bitcrusher,
-    #[serde(rename = "distortion")]
-    Distortion,
-    #[serde(rename = "reverb")]
-    Reverb,
-}
-
 // export interface ADSRValue {
 //   // Number [0,1] indicating how far the level is from the left to the right
 //   pos: number;
@@ -196,20 +176,10 @@ pub struct Adsr {
     audio_thread_data: AudioThreadData,
 }
 
-// {
-//   type: FilterType;
-//   frequency: number;
-//   Q?: number;
-//   gain: number;
-//   detune: number;
-// };
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum VoiceDefinition {
+#[serde(rename_all = "camelCase")]
+pub struct VoiceDefinition {
     // {
-    //     unison: number;
-    //     waveform: Waveform;
-    //     detune: number;
     //     filter: {
     //       type: FilterType;
     //       frequency: number;
@@ -218,50 +188,23 @@ pub enum VoiceDefinition {
     //       detune: number;
     //     };
     //     masterGain: number;
-    //     selectedEffectType: EffectType;
     //     gainEnvelope: ADSRValues;
     //     gainADSRLength: number;
     //     filterEnvelope: ADSRValues;
     //     filterADSRLength: number;
     //     pitchMultiplier: number;
     // }
-    #[serde(rename = "standard")]
-    #[serde(rename_all = "camelCase")]
-    Standard {
-        unison: usize,
-        waveform: SynthType,
-        detune: f32,
-        fm_synth_config: serde_json::Value,
-        filter: FilterParams,
-        master_gain: f32,
-        selected_effect_type: EffectType,
-        gain_envelope: ADSRValues,
-        #[serde(rename = "gainADSRLength")]
-        gain_adsr_length: f32,
-        filter_envelope: Adsr,
-        #[serde(rename = "filterADSRLength")]
-        filter_adsr_length: f32,
-        #[serde(default = "default_pitch_multiplier")]
-        pitch_multiplier: f32,
-        #[serde(default)]
-        unison_spread_cents: f32,
-    },
-}
-
-pub enum Effect {
-    Reverb {
-        intensity: f32,
-    },
-    Delay {
-        duration_samples: f32,
-    },
-    Distortion {
-        intensity: f32,
-    },
-    Faust {
-        module_id: String,
-        params: HashMap<String, serde_json::Value>,
-    },
+    fm_synth_config: serde_json::Value,
+    filter: FilterParams,
+    master_gain: f32,
+    gain_envelope: ADSRValues,
+    #[serde(rename = "gainADSRLength")]
+    gain_adsr_length: f32,
+    filter_envelope: Adsr,
+    #[serde(rename = "filterADSRLength")]
+    filter_adsr_length: f32,
+    #[serde(default = "default_pitch_multiplier")]
+    pitch_multiplier: f32,
 }
 
 #[derive(Serialize)]

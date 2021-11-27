@@ -2,8 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { Try, Option } from 'funfix-core';
-import { buildStore } from 'jantix';
-import { reducer as formReducer } from 'redux-form';
 import { Map as ImmMap } from 'immutable';
 
 import {
@@ -11,24 +9,18 @@ import {
   serializeSynthModule,
   deserializeSynthModule,
   getInitialSynthDesignerState,
-  Waveform,
-  PolysynthMod,
+  getSynthDesignerReduxInfra,
+  SynthDesignerStateByStateKey,
+  gateSynthDesigner,
+  ungateSynthDesigner,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import buildSynthDesignerReduxModule from 'src/redux/modules/synthDesigner';
+import buildSynthDesignerRedux from 'src/redux/modules/synthDesigner';
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import { midiToFrequency } from 'src/util';
+import { AsyncOnce, midiToFrequency } from 'src/util';
 import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-
-const buildSynthDesignerRedux = (vcId: string) => {
-  const modules = {
-    synthDesigner: buildSynthDesignerReduxModule(vcId),
-  };
-
-  return buildStore<typeof modules>(modules, undefined, { form: formReducer });
-};
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
 
@@ -36,35 +28,17 @@ export type SynthDesignerReduxStore = ReturnType<
   ReturnType<typeof buildSynthDesignerRedux>['getState']
 >;
 
+const PolysynthMod = new AsyncOnce(() => import('src/polysynth'));
+
 const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 
-/**
- * Global map of state key to Redux infrastructure
- */
-let STATE_MAP: ImmMap<
-  string,
-  ReturnType<typeof buildSynthDesignerRedux> & { reactRoot: ReactDOM.Root | 'NOT_LOADED' }
-> = ImmMap();
-
-export const getReduxInfra = (stateKey: string) => {
-  const reduxInfra = STATE_MAP.get(stateKey);
-  if (!reduxInfra) {
-    throw new Error(`No Redux state entry for state key "${stateKey}"`);
-  }
-
-  return reduxInfra;
-};
-
-export const init_synth_designer = (
-  stateKey: string,
-  initialWaveform: string | null | undefined
-) => {
+export const init_synth_designer = (stateKey: string) => {
   // Create a fresh Redux store just for this instance.  It makes things a lot simpler on the Redux side due to the
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
   // everything in a big map.
   const vcId = stateKey.split('_')[1]!;
   const reduxInfra = buildSynthDesignerRedux(vcId);
-  STATE_MAP = STATE_MAP.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
+  SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
 
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
   const initialState = Try.of(() =>
@@ -73,9 +47,7 @@ export const init_synth_designer = (
       .map(
         ({ synths, ...rest }) =>
           ({
-            synths: (synths as any[]).map((synth, i) =>
-              deserializeSynthModule(synth, reduxInfra.dispatch, i)
-            ),
+            synths: (synths as any[]).map((synth, i) => deserializeSynthModule(synth, stateKey, i)),
             spectrumNode: new AnalyserNode(new AudioContext()),
             ...rest,
             isHidden: false,
@@ -93,39 +65,15 @@ export const init_synth_designer = (
     })
     .getOrElseL(() => {
       localStorage.removeItem(stateKey);
-      return getInitialSynthDesignerState(true, vcId);
+      return getInitialSynthDesignerState(vcId);
     });
 
-  // This is a hack used by first-time setup to force setting an initial waveform without having to store an entire serialized synth designer
-  if (initialWaveform && !initialState) {
-    reduxInfra.dispatch(
-      reduxInfra.actionCreators.synthDesigner.SET_WAVEFORM(
-        0,
-        initialWaveform as Waveform,
-        reduxInfra.dispatch
-      )
-    );
-  }
-
   PolysynthMod.get().then(mod => {
-    const playNote = (voiceIx: number, note: number, _velocity: number, offset?: number) =>
-      reduxInfra.dispatch(
-        reduxInfra.actionCreators.synthDesigner.GATE(
-          midiToFrequency(note),
-          voiceIx,
-          undefined,
-          offset
-        )
-      );
+    const playNote = (voiceIx: number, note: number, _velocity: number) =>
+      gateSynthDesigner(reduxInfra.getState().synthDesigner, midiToFrequency(note), voiceIx);
 
     const releaseNote = (voiceIx: number, _note: number, _velocity: number) =>
-      reduxInfra.dispatch(
-        reduxInfra.actionCreators.synthDesigner.UNGATE(
-          () => reduxInfra.getState().synthDesigner,
-          voiceIx,
-          undefined
-        )
-      );
+      ungateSynthDesigner(reduxInfra.getState, voiceIx);
 
     const ctxPtr = mod.create_polysynth_context(playNote, releaseNote);
     reduxInfra.dispatch(
@@ -155,12 +103,12 @@ export const init_synth_designer = (
       <SynthDesigner stateKey={stateKey} />
     </Provider>
   );
-  STATE_MAP.get(stateKey)!.reactRoot = reactRoot;
+  SynthDesignerStateByStateKey.get(stateKey)!.reactRoot = reactRoot;
 };
 
 export const hide_synth_designer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-  const reduxInfra = getReduxInfra(stateKey);
+  const reduxInfra = getSynthDesignerReduxInfra(stateKey);
   reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_SYNTH_DESIGNER_IS_HIDDEN(true));
 
   const rootNode = document.getElementById(getRootNodeId(vcId));
@@ -174,7 +122,7 @@ export const hide_synth_designer = (stateKey: string) => {
 
 export const unhide_synth_designer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-  const reduxInfra = getReduxInfra(stateKey);
+  const reduxInfra = getSynthDesignerReduxInfra(stateKey);
   reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_SYNTH_DESIGNER_IS_HIDDEN(false));
 
   const rootNode = document.getElementById(getRootNodeId(vcId));
@@ -187,7 +135,7 @@ export const unhide_synth_designer = (stateKey: string) => {
 };
 
 export const cleanup_synth_designer = (stateKey: string): string => {
-  const { synths } = getReduxInfra(stateKey).getState().synthDesigner;
+  const { synths } = getSynthDesignerReduxInfra(stateKey).getState().synthDesigner;
   const designerState = JSON.stringify({ synths: synths.map(serializeSynthModule) });
   const vcId = stateKey.split('_')[1]!;
   const rootNode = document.getElementById(getRootNodeId(vcId));
@@ -195,7 +143,7 @@ export const cleanup_synth_designer = (stateKey: string): string => {
     return designerState;
   }
 
-  const state = STATE_MAP.get(stateKey);
+  const state = SynthDesignerStateByStateKey.get(stateKey);
   if (!state) {
     console.error(
       'Missing state map entry for synth designer when cleaning up, stateKey=' + stateKey
@@ -220,7 +168,7 @@ const getMidiNode = (stateKey: string): MIDINode => {
   }
 
   const midiNode = new MIDINode(() => {
-    const { getState } = getReduxInfra(stateKey);
+    const { getState } = getSynthDesignerReduxInfra(stateKey);
 
     const onAttack = (note: number, velocity: number) => {
       const polysynthCtx = getState().synthDesigner.polysynthCtx;
@@ -256,19 +204,18 @@ const getMidiNode = (stateKey: string): MIDINode => {
 };
 
 export const getVoicePreset = (stateKey: string, synthIx: number) => {
-  const voiceState = getReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];
-  return { type: 'standard', ...serializeSynthModule(voiceState) };
+  const voiceState = getSynthDesignerReduxInfra(stateKey).getState().synthDesigner.synths[synthIx];
+  return serializeSynthModule(voiceState);
 };
 
 export const get_synth_designer_audio_connectables = (stateKey: string): AudioConnectables => {
-  const { synths, spectrumNode } = getReduxInfra(stateKey).getState().synthDesigner;
+  const { synths, spectrumNode } = getSynthDesignerReduxInfra(stateKey).getState().synthDesigner;
 
   return {
     vcId: stateKey.split('_')[1]!,
     inputs: synths
       .reduce((acc, synth, voiceIx) => {
         const inputsForSynth = acc
-          .set(`synth_${voiceIx}_detune`, { node: synth.detuneCSN.offset, type: 'number' })
           .set(`synth_${voiceIx}_filter_frequency`, {
             node: synth.filterCSNs.frequency,
             type: 'number',
@@ -279,29 +226,17 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
             type: 'number',
           });
 
-        if (synth.waveform === Waveform.Wavetable) {
-          const withIntraMixInputs = synth.wavetableInputControls!.intraDimMixes.reduce(
-            (acc, param, dimIx) => acc.set(`dim_${dimIx}_mix`, { node: param, type: 'number' }),
-            inputsForSynth
-          );
-          return synth.wavetableInputControls!.interDimMixes.reduce(
-            (acc, param, dimIx) =>
-              acc.set(`dim_${dimIx}x${dimIx + 1}_mix`, { node: param, type: 'number' }),
-            withIntraMixInputs
-          );
-        } else if (synth.waveform === Waveform.FM && synth.fmSynth) {
-          const awpNode = synth.fmSynth!.getAWPNode();
-          return new Array(PARAM_BUFFER_COUNT).fill(null as any).reduce(
-            (acc, _i, i) =>
-              acc.set(`synth_${voiceIx}_fm_input_${i}`, {
-                type: 'number',
-                node: awpNode
-                  ? (awpNode.parameters as Map<string, AudioParam>).get(i.toString())
-                  : new DummyNode(),
-              }),
-            inputsForSynth
-          );
-        }
+        const awpNode = synth.fmSynth!.getAWPNode();
+        return new Array(PARAM_BUFFER_COUNT).fill(null as any).reduce(
+          (acc, _i, i) =>
+            acc.set(`synth_${voiceIx}_fm_input_${i}`, {
+              type: 'number',
+              node: awpNode
+                ? (awpNode.parameters as Map<string, AudioParam>).get(i.toString())
+                : new DummyNode(),
+            }),
+          inputsForSynth
+        );
 
         return inputsForSynth;
       }, ImmMap<string, ConnectableInput>())

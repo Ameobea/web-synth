@@ -2,8 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
-import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import { getReduxInfra } from 'src/synthDesigner';
+import { FilterParams, getSynthDesignerReduxInfra } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
@@ -30,7 +29,7 @@ const Filter: React.FC<FilterProps> = ({ params, synthIx, filterEnvelope, bypass
     }
     return state;
   }, [params, filterEnvelope, bypass]);
-  const { dispatch, actionCreators } = getReduxInfra(stateKey);
+  const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const handleChange = useCallback(
     (key: string, val: any) => {
       if (key === 'adsr') {
