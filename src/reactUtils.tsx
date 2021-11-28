@@ -30,7 +30,7 @@ interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<an
   enableReactQuery?: boolean;
 }
 
-const RootsByID: Map<string, unknown> = new Map();
+const RootsByID: Map<string, ReactDOM.Root> = new Map();
 
 /**
  * Higher order function that returns a function that handles rendering the provided `Comp` into the container with the
@@ -53,7 +53,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
     const props = getProps();
 
     // Check to see if we've already created a root for this node
-    let root;
+    let root: ReactDOM.Root;
     const existingRootID = node.getAttribute('data-react-root-id');
     if (existingRootID) {
       root = RootsByID.get(existingRootID);
@@ -130,7 +130,7 @@ export const mkContainerCleanupHelper =
     }
 
     if (preserveRoot) {
-      root.render(null);
+      root.render(<></>);
     } else {
       node.remove();
       RootsByID.delete(rootID);

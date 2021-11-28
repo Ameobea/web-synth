@@ -1,6 +1,10 @@
 import { buildActionGroup, buildModule } from 'jantix';
-import { Option } from 'funfix-core';
 import * as R from 'ramda';
+import { buildControlPanelAudioConnectables } from 'src/controlPanel';
+import type { ConnectableDescriptor } from 'src/patchNetwork';
+import { connect, updateConnectables } from 'src/patchNetwork/interface';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import { getState } from 'src/redux';
 
 export interface ControlPanelState {
   stateByPanelInstance: {
@@ -29,18 +33,31 @@ export const buildDefaultControlPanelInfo = (type: ControlInfo['type'] = 'range'
   }
 };
 
-export const buildDefaultControl = (name: string): Control => ({
+export const maybeSnapToGrid = (
+  pos: { x: number; y: number },
+  snapToGrid: boolean
+): { x: number; y: number } => {
+  if (!snapToGrid) {
+    return pos;
+  }
+
+  const snap = (v: number, grid: number) => Math.round(v / grid) * grid;
+  return {
+    x: snap(pos.x, 10),
+    y: snap(pos.y, 10),
+  };
+};
+
+export const buildDefaultControl = (): Control => ({
   data: buildDefaultControlPanelInfo(),
   value: 0,
-  label: name,
-  color: '#361',
-  position: { x: 0, y: 0 },
+  color: '#361', // TODO: Random color or something out of a scale would be cool
+  position: { x: window.innerWidth / 2 - 300, y: window.innerHeight / 2 - Math.random() * 300 },
 });
 
 export interface Control {
   data: ControlInfo;
   value: number;
-  label: string;
   color: string;
   position: { x: number; y: number };
 }
@@ -52,12 +69,23 @@ export interface ControlPanelConnection {
   control: Control;
 }
 
+export interface ControlPanelMidiKeyboardDescriptor {
+  octaveOffset: number;
+  position: { x: number; y: number };
+  name: string;
+  midiNode: MIDINode;
+}
+
 export interface ControlPanelInstanceState {
   controls: ControlPanelConnection[];
+  midiKeyboards: ControlPanelMidiKeyboardDescriptor[];
   presets: {
     name: string;
+    midiKeyboards: ControlPanelMidiKeyboardDescriptor[];
     controls: Omit<ControlPanelConnection, 'node'>[];
+    snapToGrid: boolean;
   }[];
+  snapToGrid: boolean;
 }
 
 const initialState: ControlPanelState = { stateByPanelInstance: {} };
@@ -104,21 +132,78 @@ const hydrateConnection = (conn: Omit<ControlPanelConnection, 'node'>): ControlP
   return { ...conn, node };
 };
 
-const disconnectControl = (control: ControlPanelConnection) => control.node.disconnect();
+const setControlNameSubReducer = (
+  state: ControlPanelState,
+  { controlPanelVcId, name, newName }: { controlPanelVcId: string; name: string; newName: string }
+) => {
+  if (name === newName) {
+    return state;
+  }
+
+  const instState = state.stateByPanelInstance[controlPanelVcId];
+  if (instState.controls.some(conn => conn.name === newName)) {
+    alert('Control name already exists: ' + newName);
+    return state;
+  }
+
+  const controlIx = instState.controls.findIndex(conn => conn.name === name);
+  if (controlIx === -1) {
+    console.error('Could not find control to rename: ', { controlPanelVcId, name });
+    return state;
+  }
+
+  const newControls = [...instState.controls];
+  newControls[controlIx] = { ...newControls[controlIx], name: newName };
+
+  const newInstState = { ...instState, controls: newControls };
+  setTimeout(() => {
+    const oldName = name;
+    const allConnectedDestinations = getState().viewContextManager.patchNetwork.connections.filter(
+      ([from, _to]) => from.vcId === controlPanelVcId && from.name === oldName
+    );
+
+    // Updating connectables will disconnect everything connected to the output
+    updateConnectables(
+      controlPanelVcId,
+      buildControlPanelAudioConnectables(controlPanelVcId, newInstState)
+    );
+
+    // Re-connect everything to the output with the new name
+    const newFromDescriptor: ConnectableDescriptor = { vcId: controlPanelVcId, name: newName };
+    allConnectedDestinations.forEach(([_from, to]) => {
+      connect(newFromDescriptor, to);
+    });
+  });
+
+  return {
+    ...state,
+    stateByPanelInstance: {
+      ...state.stateByPanelInstance,
+      [controlPanelVcId]: newInstState,
+    },
+  };
+};
 
 const actionGroups = {
   ADD_CONTROL_PANEL_INSTANCE: buildActionGroup({
     actionCreator: (
       vcId: string,
       initialConnections?: Omit<ControlPanelConnection, 'node'>[],
-      presets?: { name: string; controls: Omit<ControlPanelConnection, 'node'>[] }[]
+      initialMidiKeyboards?: ControlPanelMidiKeyboardDescriptor[],
+      presets?: ControlPanelInstanceState['presets'],
+      snapToGrid?: boolean
     ) => ({
       type: 'ADD_CONTROL_PANEL_INSTANCE',
       vcId,
       initialConnections,
+      initialMidiKeyboards,
       presets,
+      snapToGrid,
     }),
-    subReducer: (state: ControlPanelState, { vcId, initialConnections, presets }) => {
+    subReducer: (
+      state: ControlPanelState,
+      { vcId, initialConnections, initialMidiKeyboards, presets, snapToGrid }
+    ) => {
       const connections = initialConnections ? initialConnections.map(hydrateConnection) : [];
 
       return {
@@ -126,7 +211,9 @@ const actionGroups = {
           ...state.stateByPanelInstance,
           [vcId]: {
             controls: connections,
-            presets: presets || [],
+            midiKeyboards: initialMidiKeyboards ?? [],
+            presets: presets ?? [],
+            snapToGrid: snapToGrid ?? false,
           },
         },
       };
@@ -151,22 +238,24 @@ const actionGroups = {
       node.offset.value = 0;
       node.start();
 
+      const newInstState = {
+        ...state.stateByPanelInstance[controlPanelVcId],
+        controls: [
+          ...state.stateByPanelInstance[controlPanelVcId].controls,
+          {
+            vcId,
+            name,
+            node,
+            control: buildDefaultControl(),
+          },
+        ],
+      };
+
       return {
         ...state,
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
-          [controlPanelVcId]: {
-            ...state.stateByPanelInstance[controlPanelVcId],
-            controls: [
-              ...state.stateByPanelInstance[controlPanelVcId].controls,
-              {
-                vcId,
-                name,
-                node,
-                control: buildDefaultControl(name),
-              },
-            ],
-          },
+          [controlPanelVcId]: newInstState,
         },
       };
     },
@@ -187,16 +276,20 @@ const actionGroups = {
       if (removedConns.length !== 1) {
         console.error('Expected to find one conn to remove, found these: ', removedConns);
       }
-      removedConns.forEach(disconnectControl);
+
+      const newInstState = { ...instance, controls: retainedConns };
+      setTimeout(() =>
+        updateConnectables(
+          controlPanelVcId,
+          buildControlPanelAudioConnectables(controlPanelVcId, newInstState)
+        )
+      );
 
       return {
         ...state,
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
-          [controlPanelVcId]: {
-            ...instance,
-            controls: retainedConns,
-          },
+          [controlPanelVcId]: newInstState,
         },
       };
     },
@@ -208,8 +301,10 @@ const actionGroups = {
       name: string,
       position: { left?: number; top?: number }
     ) => ({ type: 'SET_CONTROL_POSITION', controlPanelVcId, vcId, name, position }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, position }) =>
-      mapConnection(
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, position }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return mapConnection(
         controlPanelVcId,
         vcId,
         name,
@@ -217,31 +312,28 @@ const actionGroups = {
           ...conn,
           control: {
             ...conn.control,
-            position: {
-              x: Option.of(position.left).getOrElse(10),
-              y: Option.of(position.top).getOrElse(10),
-            },
+            position: maybeSnapToGrid(
+              {
+                x: position.left ?? 10,
+                y: position.top ?? 10,
+              },
+              instState.snapToGrid
+            ),
           },
         }),
         state
-      ),
+      );
+    },
   }),
-  SET_CONTROL_LABEL: buildActionGroup({
-    actionCreator: (controlPanelVcId: string, vcId: string, name: string, label: string) => ({
-      type: 'SET_CONTROL_LABEL',
+  SET_CONTROL_NAME: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, vcId: string, name: string, newName: string) => ({
+      type: 'SET_CONTROL_NAME',
       controlPanelVcId,
       vcId,
       name,
-      label,
+      newName,
     }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, label }) =>
-      mapConnection(
-        controlPanelVcId,
-        vcId,
-        name,
-        (conn: ControlPanelConnection) => ({ ...conn, control: { ...conn.control, label } }),
-        state
-      ),
+    subReducer: (state: ControlPanelState, action) => setControlNameSubReducer(state, action),
   }),
   SET_CONTROL_PANEL_VALUE: buildActionGroup({
     actionCreator: (controlPanelVcId: string, vcId: string, name: string, value: number) => ({
@@ -268,21 +360,37 @@ const actionGroups = {
       ),
   }),
   SET_CONTROL_PANEL_CONTROL: buildActionGroup({
-    actionCreator: (controlPanelVcId: string, vcId: string, name: string, newControl: Control) => ({
+    actionCreator: (
+      controlPanelVcId: string,
+      vcId: string,
+      name: string,
+      newControl: Control,
+      newName: string
+    ) => ({
       type: 'SET_CONTROL_PANEL_CONTROL',
       controlPanelVcId,
       vcId,
       name,
       newControl,
+      newName,
     }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name, newControl }) =>
-      mapConnection(
+    subReducer: (
+      state: ControlPanelState,
+      { controlPanelVcId, vcId, name, newControl, newName }
+    ) => {
+      const maybeRenamedState =
+        name === newName
+          ? state
+          : setControlNameSubReducer(state, { controlPanelVcId, name, newName });
+
+      return mapConnection(
         controlPanelVcId,
         vcId,
-        name,
+        newName,
         conn => ({ ...conn, control: newControl }),
-        state
-      ),
+        maybeRenamedState
+      );
+    },
   }),
   SAVE_PRESET: buildActionGroup({
     actionCreator: (controlPanelVcId: string, name: string) => ({
@@ -290,25 +398,31 @@ const actionGroups = {
       controlPanelVcId,
       name,
     }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, name }): ControlPanelState => ({
-      stateByPanelInstance: {
-        ...state.stateByPanelInstance,
-        [controlPanelVcId]: {
-          ...state.stateByPanelInstance[controlPanelVcId],
-          presets: [
-            ...state.stateByPanelInstance[controlPanelVcId].presets,
-            {
-              name,
-              controls: state.stateByPanelInstance[controlPanelVcId].controls.map(R.omit(['node'])),
-            },
-          ],
+    subReducer: (state: ControlPanelState, { controlPanelVcId, name }): ControlPanelState => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: {
+            ...instState,
+            presets: [
+              ...instState.presets,
+              {
+                name,
+                midiKeyboards: instState.midiKeyboards,
+                controls: instState.controls.map(R.omit(['node'])),
+                snapToGrid: instState.snapToGrid,
+              },
+            ],
+          },
         },
-      },
-    }),
+      };
+    },
   }),
   LOAD_PRESET: buildActionGroup({
     actionCreator: (controlPanelVcId: string, name: string) => ({
-      type: 'LOAD_PRESET',
+      type: 'LOAD_PRESET' as const,
       controlPanelVcId,
       name,
     }),
@@ -320,15 +434,14 @@ const actionGroups = {
         return state;
       }
 
-      // Disconnect all of the old controls and build new ones
-      instanceState.controls.forEach(disconnectControl);
-
       return {
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
           [controlPanelVcId]: {
             presets: instanceState.presets,
+            midiKeyboards: preset.midiKeyboards,
             controls: preset.controls.map(hydrateConnection),
+            snapToGrid: preset.snapToGrid,
           },
         },
       };
@@ -336,7 +449,7 @@ const actionGroups = {
   }),
   DELETE_PRESET: buildActionGroup({
     actionCreator: (controlPanelVcId: string, name: string) => ({
-      type: 'DELETE_PRESET',
+      type: 'DELETE_PRESET' as const,
       controlPanelVcId,
       name,
     }),
@@ -352,6 +465,122 @@ const actionGroups = {
         },
       },
     }),
+  }),
+  ADD_CONTROL_PANEL_MIDI_KEYBOARD: buildActionGroup({
+    actionCreator: (controlPanelVcId: string) => ({
+      type: 'ADD_CONTROL_PANEL_MIDI_KEYBOARD' as const,
+      controlPanelVcId,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      let name = `midi keyboard ${instState.midiKeyboards.length + 1}`;
+      while (instState.midiKeyboards.some(R.propEq('name', name))) {
+        name = `midi keyboard ${instState.midiKeyboards.length + 1}`;
+      }
+
+      const newKb: ControlPanelMidiKeyboardDescriptor = {
+        name,
+        octaveOffset: 0,
+        position: { x: 300, y: 300 + Math.random() * 200 },
+        midiNode: new MIDINode(),
+      };
+
+      const newInstState = { ...instState, midiKeyboards: [...instState.midiKeyboards, newKb] };
+      setTimeout(() =>
+        updateConnectables(
+          controlPanelVcId,
+          buildControlPanelAudioConnectables(controlPanelVcId, newInstState)
+        )
+      );
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: newInstState,
+        },
+      };
+    },
+  }),
+  DELETE_CONTROL_PANEL_MIDI_KEYBOARD: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, name: string) => ({
+      type: 'DELETE_CONTROL_PANEL_MIDI_KEYBOARD' as const,
+      controlPanelVcId,
+      name,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, name }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      const newInstState = {
+        ...instState,
+        midiKeyboards: instState.midiKeyboards.filter(keyboard => keyboard.name !== name),
+      };
+      setTimeout(() =>
+        updateConnectables(
+          controlPanelVcId,
+          buildControlPanelAudioConnectables(controlPanelVcId, newInstState)
+        )
+      );
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: newInstState,
+        },
+      };
+    },
+  }),
+  UPDATE_CONTROL_PANEL_MIDI_KEYBOARD: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      name: string,
+      newProps: Partial<ControlPanelMidiKeyboardDescriptor>
+    ) => ({
+      type: 'UPDATE_CONTROL_PANEL_MIDI_KEYBOARD' as const,
+      controlPanelVcId,
+      name,
+      newProps,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, name, newProps }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: {
+            ...instState,
+            midiKeyboards: instState.midiKeyboards.map(keyboard => {
+              if (keyboard.name !== name) {
+                return keyboard;
+              }
+
+              return { ...keyboard, ...newProps };
+            }),
+          },
+        },
+      };
+    },
+  }),
+  SET_CONTROL_PANEL_SNAP_TO_GRID: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, snapToGrid: boolean) => ({
+      type: 'SET_CONTROL_PANEL_SNAP_TO_GRID' as const,
+      controlPanelVcId,
+      snapToGrid,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, snapToGrid }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: { ...instState, snapToGrid },
+        },
+      };
+    },
   }),
 };
 

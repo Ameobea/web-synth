@@ -1,4 +1,8 @@
 .control-panel-root-node {
+  .main-control-panel {
+    margin-left: 1px;
+  }
+
   .control {
     .control-panel {
       .configure-input-button {
@@ -15,6 +19,10 @@
         left: 16px;
         cursor: pointer;
         font-size: 12px;
+      }
+
+      .container {
+        margin-top: 6px;
       }
     }
   }
@@ -33,5 +41,43 @@
     button {
       margin-top: 6px;
     }
+  }
+}
+
+.control-panel-setting-label {
+  cursor: text;
+  border: 1px solid #888;
+  padding: 2px;
+  margin-top: 1px;
+}
+
+.control-panel-midi-keyboard {
+  position: absolute;
+  transform: scale(0.85);
+  margin-left: -5px;
+
+  .top-drag-bar {
+    display: flex;
+    flex-direction: row;
+
+    .delete-input-button {
+      flex: 0;
+      cursor: pointer;
+    }
+
+    .midi-keyboard-name {
+      flex: 1;
+      text-align: center;
+    }
+
+    cursor: grab;
+    background-color: #27a0b4;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    font-size: 18px;
+    margin-right: -20px;
+    margin-bottom: -1px;
+    user-select: none;
+    font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
   }
 }

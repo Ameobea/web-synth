@@ -7,7 +7,7 @@ import { useOnce } from 'ameo-utils/util/react';
 
 import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
-import { loadComposition } from '../persistance';
+import { loadComposition, onBeforeUnload } from '../persistance';
 import { getEngine } from 'src/util';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { renderModalWithControls, ModalCompProps } from 'src/controls/Modal';
@@ -108,13 +108,21 @@ const CompositionListing: React.FC<{ engine: typeof import('../engine') }> = ({ 
   );
 };
 
-const FieldRenderer: React.FC<{
+interface FieldRendererProps {
   input: { [key: string]: any };
   label?: string;
   type: string;
   meta: { touched: boolean; error?: string; warning?: string };
   ComponentOverride?: React.ComponentType<any>;
-}> = ({ input, label, type, meta: { touched, error, warning }, ComponentOverride }) => (
+}
+
+const FieldRenderer: React.FC<FieldRendererProps> = ({
+  input,
+  label,
+  type,
+  meta: { touched, error, warning },
+  ComponentOverride,
+}) => (
   <div className='custom-field-renderer'>
     <label>{label}</label>
     <div>
@@ -234,6 +242,52 @@ const updateSamplesInSave = (
   );
 };
 
+const removeCompositionSharingFromVCMState = (serializedVcmState: any) => {
+  const vcmState = JSON.parse(serializedVcmState);
+
+  // Select control panel, graph editor, synth designer in that order if exist as the default active view
+  let bestScore = 0;
+  for (let i = 0; i < vcmState.view_context_ids.length; i++) {
+    const vcId = vcmState.view_context_ids[i];
+    const state = localStorage[`vc_${vcId}`];
+    try {
+      const parsedState = JSON.parse(state);
+      const score =
+        (
+          {
+            control_panel: 10,
+            graph_editor: 9,
+            synth_designer: 8,
+          } as { [key: string]: number }
+        )[`${parsedState?.minimal_def?.name}`] ?? 0;
+
+      if (score >= bestScore) {
+        bestScore = score;
+        vcmState.active_view_ix = i;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  return JSON.stringify({
+    ...vcmState,
+    view_context_ids: vcmState.view_context_ids.filter((vcId: string) => {
+      const state = localStorage[`vc_${vcId}`];
+      if (!state) {
+        return true;
+      }
+
+      try {
+        const parsedState = JSON.parse(state);
+        return parsedState?.minimal_def?.name !== 'composition_sharing';
+      } catch (e) {
+        return true;
+      }
+    }),
+  });
+};
+
 const serializeAndSaveComposition = async ({
   title,
   description,
@@ -245,8 +299,12 @@ const serializeAndSaveComposition = async ({
   // the user whether or not they should be uploaded and handle converting them to remote samples.
   const samples = await checkForLocalSamples();
 
-  // TODO: Trigger all VCs to save to localStorage
+  // Trigger all VCs to save to localStorage, tearing them down in the process.
+  const engine = getEngine()!;
+  onBeforeUnload(engine);
+
   let compositionData = R.clone({ ...localStorage } as any);
+  compositionData.vcmState = removeCompositionSharingFromVCMState(compositionData.vcmState);
   if (samples) {
     const [jsonEntries, passthruEntries] = R.partition(([_key, val]) => {
       try {
@@ -268,10 +326,18 @@ const serializeAndSaveComposition = async ({
     };
   }
 
-  const res = await saveComposition(title, description, compositionData);
-
-  if (!res.ok) {
-    throw new Error(`Error while submitting composition: ${await res.text()}`);
+  try {
+    const res = await saveComposition(title, description, compositionData);
+    if (!res.ok) {
+      console.error(`Error while submitting composition: ${await res.text()}`);
+      alert(`Error while submitting composition: ${await res.text()}`);
+    }
+  } catch (err) {
+    console.error('Error saving composition: ', err);
+    alert('Error saving composition: ' + `${err}`);
+  } finally {
+    // Re-initialize
+    engine.init();
   }
 };
 

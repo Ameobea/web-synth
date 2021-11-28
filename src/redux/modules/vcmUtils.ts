@@ -65,7 +65,27 @@ export const disconnectNodes = (
     dst.setIsOverridden(true);
   }
 
-  (src as any).disconnect(dst, src instanceof PlaceholderInput ? dstDescriptor : undefined);
+  try {
+    (src as any).disconnect(dst, src instanceof PlaceholderInput ? dstDescriptor : undefined);
+  } catch (err) {
+    if (
+      err instanceof DOMException &&
+      err.message.includes('is not connected to the given destination')
+    ) {
+      console.warn("Tried to disconnect two nodes that aren't connected; ", {
+        src,
+        dst,
+        dstDescriptor,
+      });
+    } else {
+      console.error('Some error occurred while disconnecting nodes: ', {
+        err,
+        src,
+        dst,
+        dstDescriptor,
+      });
+    }
+  }
 };
 
 /**
@@ -105,7 +125,7 @@ export const maybeUpdateVCM = (
     if (!foreignConnectablesUnchanged) {
       commitForeignConnectables(engine, newForeignConnectables);
     }
-  }, 0);
+  });
 };
 
 export const getConnectedPair = (

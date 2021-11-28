@@ -256,15 +256,6 @@ const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         />
       </div>
 
-      <button
-        onMouseDown={() => dispatch(actionCreators.synthDesigner.GATE(440, 0))}
-        onMouseUp={() =>
-          dispatch(actionCreators.synthDesigner.UNGATE(() => getState().synthDesigner, 0))
-        }
-      >
-        Gate
-      </button>
-
       <div id='synth-designer-oscilloscope' ref={oscilloscopeNode}></div>
 
       {spectrumNode ? (

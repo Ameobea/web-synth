@@ -22,7 +22,7 @@ export const init_composition_sharing = (stateKey: string) => {
   compositionSharingBase.id = buildCompositionSharingDOMNodeID(vcId);
   compositionSharingBase.setAttribute(
     'style',
-    'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0;'
+    'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; display: none'
   );
 
   document.getElementById('content')!.appendChild(compositionSharingBase);

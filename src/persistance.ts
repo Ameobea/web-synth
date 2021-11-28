@@ -4,6 +4,8 @@ import Dexie from 'dexie';
 
 import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { stopAll } from 'src/eventScheduler/eventScheduler';
+import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
+import { getState } from 'src/redux';
 
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
@@ -43,6 +45,17 @@ localCompDbClient.version(1).stores({
 });
 const localCompositionTable = localCompDbClient.table('localComposition');
 const currentLoadedCompositionIdTable = localCompDbClient.table('currentLoadedCompositionId');
+
+export const onBeforeUnload = (engine: typeof import('src/engine')) => {
+  // Commit the whole patch network's foreign connectables, serializing + saving their state in the process
+  commitForeignConnectables(
+    engine,
+    getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
+  );
+
+  // Cleanup all VCs and save their state
+  engine.handle_window_close();
+};
 
 export const loadSharedComposition = async (composition: CompositionDefinition) => {
   // If we already have a local composition saved in the DB, we don't want to overwrite it.

@@ -11,8 +11,8 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import {
   ControlPanelInstanceState,
   ControlPanelConnection,
-  Control,
   buildDefaultControl,
+  ControlPanelMidiKeyboardDescriptor,
 } from 'src/redux/modules/controlPanel';
 import {
   mkContainerCleanupHelper,
@@ -20,10 +20,18 @@ import {
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
 const getRootNodeID = (vcId: string) => `${BASE_ROOT_NODE_ID}${vcId}`;
+
+interface SerializedControlPanelState {
+  connections: Omit<ControlPanelConnection, 'node'>[];
+  midiKeyboards: Omit<ControlPanelMidiKeyboardDescriptor, 'midiNode'>[];
+  presets: ControlPanelInstanceState['presets'];
+  snapToGrid: boolean;
+}
 
 const saveStateForInstance = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
@@ -31,10 +39,15 @@ const saveStateForInstance = (stateKey: string) => {
   const serializableConnections = instanceState.controls.map(conn =>
     R.omit(['node' as const], conn)
   );
-  const serializedConnections = JSON.stringify({
+
+  const serialized: SerializedControlPanelState = {
     connections: serializableConnections,
+    midiKeyboards: instanceState.midiKeyboards,
     presets: instanceState.presets,
-  });
+    snapToGrid: instanceState.snapToGrid ?? false,
+  };
+
+  const serializedConnections = JSON.stringify(serialized);
   localStorage.setItem(stateKey, serializedConnections);
 };
 
@@ -45,26 +58,21 @@ export const init_control_panel = (stateKey: string) => {
   rootNode.id = getRootNodeID(vcId);
   document.getElementById('content')!.append(rootNode);
 
-  const serialized:
-    | { connections: ControlPanelConnection[]; presets: ControlPanelInstanceState['presets'] }
-    | undefined = Option.of(localStorage.getItem(stateKey))
+  const serialized = Option.of(localStorage.getItem(stateKey))
     .flatMap(serialized => {
       try {
-        const {
-          connections,
-          presets,
-        }: {
-          connections: (ControlPanelConnection & { control: Control | undefined })[];
-          presets: ControlPanelInstanceState['presets'];
-        } = JSON.parse(serialized);
+        const { connections, presets, midiKeyboards, snapToGrid }: SerializedControlPanelState =
+          JSON.parse(serialized);
         return Option.some({
           connections: connections.map(conn => {
             if (!conn.control) {
-              conn.control = buildDefaultControl(conn.name);
+              conn.control = buildDefaultControl();
             }
             return conn as ControlPanelConnection;
           }),
-          presets,
+          midiKeyboards: (midiKeyboards ?? []).map(kb => ({ ...kb, midiNode: new MIDINode() })),
+          presets: presets ?? [],
+          snapToGrid: snapToGrid ?? false,
         });
       } catch (err) {
         console.warn('Failed to parse serialized control panel state; defaulting.');
@@ -75,8 +83,10 @@ export const init_control_panel = (stateKey: string) => {
   dispatch(
     actionCreators.controlPanel.ADD_CONTROL_PANEL_INSTANCE(
       vcId,
-      serialized?.connections || undefined,
-      serialized?.presets || undefined
+      serialized?.connections,
+      serialized?.midiKeyboards,
+      serialized?.presets,
+      serialized?.snapToGrid ?? false
     )
   );
 
@@ -133,11 +143,21 @@ export class PlaceholderInput extends GainNode implements AudioNode {
           dstDescriptor
         )
       );
+
+      let outputName = dstDescriptor.name;
+      while (
+        getState().controlPanel.stateByPanelInstance[this.controlPanelVcId].controls.some(
+          control => control.name === outputName
+        )
+      ) {
+        outputName += '_1';
+      }
+
       dispatch(
         actionCreators.controlPanel.ADD_CONNECTION(
           this.controlPanelVcId,
           dstDescriptor.vcId,
-          dstDescriptor.name
+          outputName
         )
       );
       updateConnectables(
@@ -146,7 +166,7 @@ export class PlaceholderInput extends GainNode implements AudioNode {
       );
       dispatch(
         actionCreators.viewContextManager.CONNECT(
-          { vcId: this.controlPanelVcId, name: dstDescriptor.name },
+          { vcId: this.controlPanelVcId, name: outputName },
           dstDescriptor
         )
       );
@@ -164,9 +184,13 @@ export const buildControlPanelAudioConnectables = (
   vcId: string,
   instState: ControlPanelInstanceState
 ): AudioConnectables => {
-  const existingConnections = instState.controls.reduce(
+  let existingConnections = instState.controls.reduce(
     (acc, conn) => acc.set(conn.name, { type: 'number', node: conn.node }),
     ImmMap() as ImmMap<string, ConnectableOutput>
+  );
+  existingConnections = instState.midiKeyboards.reduce(
+    (acc, conn) => acc.set(conn.name, { type: 'midi', node: conn.midiNode }),
+    existingConnections
   );
 
   const outputs = existingConnections.set('Add a new control...', {

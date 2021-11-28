@@ -104,7 +104,7 @@ const OutputMappingRow: React.FC<OutputMappingRowProps> = ({
                   ([from, _to]) => from.vcId === vcId && from.name === oldName
                 );
 
-              // Store in Redux + update connectables.
+              // Store in Redux + update connectables. This disconnects everything connected to the old connectable.
               ctx.mappedOutputs[outputIx].name = editingName;
               updateConnectables(vcId, get_midi_keyboard_audio_connectables(stateKey));
 

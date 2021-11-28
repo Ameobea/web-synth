@@ -66,7 +66,7 @@ async fn main() {
         println!("Unable to parse .env file; continuing.");
     }
 
-    rocket::build()
+    let mut ship = rocket::build()
         .attach(WebSynthDbConn::fairing())
         .mount("/", routes![
             routes::index,
@@ -84,9 +84,13 @@ async fn main() {
             routes::save_midi_composition,
             routes::get_midi_compositions,
         ])
-        .attach(CorsFairing)
-        .attach(rocket_async_compression::Compression::fairing())
-        .ignite()
+        .attach(CorsFairing);
+
+    if cfg!(not(debug_assertions)) {
+        ship = ship.attach(rocket_async_compression::Compression::fairing());
+    }
+
+    ship.ignite()
         .await
         .expect("Error starting Rocket")
         .launch()

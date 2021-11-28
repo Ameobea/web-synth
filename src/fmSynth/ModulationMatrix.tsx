@@ -100,6 +100,8 @@ const FormattedParamSource: React.FC<{ param: ParamSource }> = ({ param }) => {
     } else {
       return <>{'...'}</>;
     }
+  } else if (param.type === 'param buffer') {
+    return <>{`IN ${param['buffer index']}`}</>;
   } else {
     return <>{'-'}</>;
   }

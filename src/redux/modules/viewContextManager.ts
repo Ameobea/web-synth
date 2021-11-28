@@ -348,13 +348,13 @@ const actionGroups = {
         return true;
       });
 
-      return {
-        ...state,
-        patchNetwork: {
-          connectables: newConnectables,
-          connections: newConnections,
-        },
+      const newPatchNetwork = {
+        connectables: newConnectables,
+        connections: newConnections,
       };
+      maybeUpdateVCM(getEngine()!, state.patchNetwork, newPatchNetwork);
+
+      return { ...state, patchNetwork: newPatchNetwork };
     },
   }),
   ADD_VIEW_CONTEXT: buildActionGroup({

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
@@ -14,11 +14,14 @@ import {
 } from 'src/redux/modules/controlPanel';
 import BasicModal from 'src/misc/BasicModal';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';
 
-const ConfigureInputInner: React.FC<{
+interface ConfigureInputInnerProps {
   info: ControlInfo;
   onChange: (newInfo: ControlInfo) => void;
-}> = ({ info, onChange }) => {
+}
+
+const ConfigureInputInner: React.FC<ConfigureInputInnerProps> = ({ info, onChange }) => {
   switch (info.type) {
     case 'gate':
       return (
@@ -72,13 +75,18 @@ const ConfigureInputInner: React.FC<{
 };
 
 const mkConfigureInput = (
-  providedControl: Control
+  providedControl: Control,
+  providedName: string
 ): React.FC<{
-  onSubmit: (val: Control) => void;
+  onSubmit: (val: { control: Control; name: string }) => void;
   onCancel?: () => void;
 }> => {
-  const ConfigureInput: React.FC<ModalCompProps<Control>> = ({ onSubmit, onCancel }) => {
+  const ConfigureInput: React.FC<ModalCompProps<{ control: Control; name: string }>> = ({
+    onSubmit,
+    onCancel,
+  }) => {
     const [control, setControl] = useState(providedControl);
+    const [name, setName] = useState(providedName);
 
     return (
       <BasicModal>
@@ -97,6 +105,11 @@ const mkConfigureInput = (
                 initial: control.color,
                 format: 'hex',
               },
+              {
+                type: 'text',
+                label: 'name',
+                initial: name,
+              },
             ]}
             onChange={(key: string, val: ControlInfo['type']) => {
               switch (key) {
@@ -112,6 +125,10 @@ const mkConfigureInput = (
                   setControl({ ...control, color: val });
                   break;
                 }
+                case 'name': {
+                  setName(val);
+                  break;
+                }
                 default: {
                   throw new UnreachableException(`Unhandled key in control panel: ${key}`);
                 }
@@ -124,7 +141,7 @@ const mkConfigureInput = (
           />
 
           <div className='buttons'>
-            <button onClick={() => onSubmit(control)}>Save</button>
+            <button onClick={() => onSubmit({ control, name })}>Save</button>
             <button onClick={onCancel}>Close</button>
           </div>
         </div>
@@ -134,24 +151,34 @@ const mkConfigureInput = (
   return ConfigureInput;
 };
 
-const ConfigureInputButtons: React.FC<{
+interface ConfigureInputButtonsProps {
   controlPanelVcId: string;
   vcId: string;
   name: string;
   control: Control;
-}> = ({ controlPanelVcId, vcId, name, control }) => (
+}
+
+const ConfigureInputButtons: React.FC<ConfigureInputButtonsProps> = ({
+  controlPanelVcId,
+  vcId,
+  name,
+  control,
+}) => (
   <>
     <div
       className='configure-input-button'
       onClick={async () => {
         try {
-          const newControl = await renderModalWithControls(mkConfigureInput(control));
+          const { control: newControl, name: newName } = await renderModalWithControls(
+            mkConfigureInput(control, name)
+          );
           dispatch(
             actionCreators.controlPanel.SET_CONTROL_PANEL_CONTROL(
               controlPanelVcId,
               vcId,
               name,
-              newControl
+              newControl,
+              newName
             )
           );
         } catch (_err) {
@@ -163,7 +190,7 @@ const ConfigureInputButtons: React.FC<{
     </div>
     <div
       className='delete-input-button'
-      onClick={async () => {
+      onClick={() => {
         const shouldDelete = confirm(`Really delete this control named "${name}"?`);
         if (!shouldDelete) {
           return;
@@ -176,23 +203,25 @@ const ConfigureInputButtons: React.FC<{
   </>
 );
 
-const SettingLabel: React.FC<{
+interface SettingLabelProps {
   label: string;
   onChange: (newLabel: string) => void;
-}> = ({ label, onChange }) => {
+}
+
+const SettingLabel: React.FC<SettingLabelProps> = ({ label, onChange }) => {
   const [editingValue, setEditingValue] = useState<string | null>(null);
 
   if (editingValue === null) {
     return (
-      <span style={{ cursor: 'text' }} onDoubleClick={() => setEditingValue(label)}>
+      <div className='control-panel-setting-label' onDoubleClick={() => setEditingValue(label)}>
         {label}
-      </span>
+      </div>
     );
   }
 
   return (
     <input
-      style={{ width: 86 }}
+      style={{ width: 160 }}
       value={editingValue}
       onChange={evt => setEditingValue(evt.target.value)}
       onKeyDown={evt => {
@@ -214,7 +243,7 @@ const mkLabelComponent = (controlPanelVcId: string, vcId: string, name: string) 
       label={label}
       onChange={(newLabel: string) =>
         dispatch(
-          actionCreators.controlPanel.SET_CONTROL_LABEL(controlPanelVcId, vcId, name, newLabel)
+          actionCreators.controlPanel.SET_CONTROL_NAME(controlPanelVcId, vcId, name, newLabel)
         )
       }
     />
@@ -224,7 +253,6 @@ const mkLabelComponent = (controlPanelVcId: string, vcId: string, name: string) 
 
 const buildSettingForControl = (
   info: ControlInfo,
-  labelValue: string,
   controlPanelVcId: string,
   vcId: string,
   name: string
@@ -237,7 +265,7 @@ const buildSettingForControl = (
         type: 'range',
         min: info.min,
         max: info.max,
-        label: labelValue,
+        label: name,
         LabelComponent,
       };
     }
@@ -262,7 +290,7 @@ const buildSettingForControl = (
               info.offValue
             )
           ),
-        label: labelValue,
+        label: name,
         LabelComponent,
       };
     }
@@ -279,12 +307,16 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
 }) => (
   <div className='control'>
     <div className='label' style={{ color: control.color }}>
-      <>
-        <ControlPanel
-          position={{ top: control.position.y, left: control.position.x }}
-          draggable
-          state={{ [control.label]: control.value }}
-          onChange={(_key: string, value: any) =>
+      <ControlPanel
+        position={useMemo(
+          () => ({ top: control.position.y, left: control.position.x }),
+          [control.position.x, control.position.y]
+        )}
+        draggable
+        dragSnapPx={10}
+        state={useMemo(() => ({ [name]: control.value }), [control.value, name])}
+        onChange={useCallback(
+          (_key: string, value: any) =>
             dispatch(
               actionCreators.controlPanel.SET_CONTROL_PANEL_VALUE(
                 controlPanelVcId,
@@ -292,9 +324,11 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
                 name,
                 value
               )
-            )
-          }
-          onDrag={(newPosition: { top?: number; left?: number }) =>
+            ),
+          [controlPanelVcId, name, vcId]
+        )}
+        onDrag={useCallback(
+          (newPosition: { top?: number; left?: number }) =>
             dispatch(
               actionCreators.controlPanel.SET_CONTROL_POSITION(
                 controlPanelVcId,
@@ -302,41 +336,54 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
                 name,
                 newPosition
               )
-            )
-          }
-          settings={[
-            buildSettingForControl(control.data, control.label, controlPanelVcId, vcId, name),
-          ]}
-          theme={{
+            ),
+          [controlPanelVcId, name, vcId]
+        )}
+        settings={useMemo(
+          () => [buildSettingForControl(control.data, controlPanelVcId, vcId, name)],
+          [control.data, controlPanelVcId, name, vcId]
+        )}
+        theme={useMemo(
+          () => ({
             background1: control.color,
             background2: 'rgb(54,54,54)',
             background2hover: 'rgb(58,58,58)',
             foreground1: 'rgb(112,112,112)',
             text1: 'rgb(235,235,235)',
             text2: 'rgb(161,161,161)',
-          }}
-          width={500}
-        >
-          <ConfigureInputButtons
-            controlPanelVcId={controlPanelVcId}
-            vcId={vcId}
-            name={name}
-            control={control}
-          />
-        </ControlPanel>
-      </>
+          }),
+          [control.color]
+        )}
+        width={500}
+      >
+        <ConfigureInputButtons
+          controlPanelVcId={controlPanelVcId}
+          vcId={vcId}
+          name={name}
+          control={control}
+        />
+      </ControlPanel>
     </div>
   </div>
 );
 
 const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const vcId = stateKey.split('_')[1];
-  const { controls, presets } = useSelector(
+  const { controls, midiKeyboards, presets, snapToGrid } = useSelector(
     (state: ReduxStore) => state.controlPanel.stateByPanelInstance[vcId]
   );
   const panelCtx = useRef<any>(null);
   const presetPanelSettings = useMemo(
     () => [
+      {
+        type: 'button',
+        label: 'add midi keyboard',
+        action: () => dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_MIDI_KEYBOARD(vcId)),
+      },
+      {
+        type: 'checkbox',
+        label: 'snap to grid',
+      },
       { type: 'select', label: 'preset', options: presets.map(R.prop('name')) },
       {
         type: 'button',
@@ -394,17 +441,28 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     ],
     [presets, vcId]
   );
+  const ctxCb = useCallback((ctx: any) => {
+    panelCtx.current = ctx;
+  }, []);
 
   return (
     <div>
       <ControlPanel
+        className='main-control-panel'
         position='top-left'
         draggable
         settings={presetPanelSettings}
-        contextCb={(ctx: any) => {
-          panelCtx.current = ctx;
-        }}
+        state={useMemo(() => ({ 'snap to grid': snapToGrid }), [snapToGrid])}
+        onChange={useCallback(
+          (_key: string, value: any) =>
+            dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_SNAP_TO_GRID(vcId, value)),
+          [vcId]
+        )}
+        contextCb={ctxCb}
       />
+      {midiKeyboards.map(kb => (
+        <ControlPanelMidiKeyboard vcId={vcId} key={kb.name} {...kb} />
+      ))}
       {controls.map(conn => (
         <ControlComp key={`${conn.vcId}${conn.name}`} {...conn} controlPanelVcId={vcId} />
       ))}

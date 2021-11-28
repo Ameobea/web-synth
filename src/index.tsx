@@ -11,8 +11,11 @@ import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
-import { loadSharedComposition, maybeRestoreLocalComposition } from 'src/persistance';
-import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
+import {
+  loadSharedComposition,
+  maybeRestoreLocalComposition,
+  onBeforeUnload,
+} from 'src/persistance';
 import { initSentry } from 'src/sentry';
 
 const ctx = new AudioContext();
@@ -145,16 +148,7 @@ if (typeof AudioWorkletNode === 'undefined') {
 
     engine.init();
 
-    window.addEventListener('beforeunload', () => {
-      // Commit the whole patch network's foreign connectables, serializing + saving their state in the process
-      commitForeignConnectables(
-        engine,
-        getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
-      );
-
-      // Cleanup all VCs and save their state
-      engine.handle_window_close();
-    });
+    window.addEventListener('beforeunload', () => onBeforeUnload(engine));
 
     createViewContextManagerUI(engine);
   });
