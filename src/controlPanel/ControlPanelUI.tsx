@@ -16,6 +16,7 @@ import BasicModal from 'src/misc/BasicModal';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';
 import ControlPanelSpectrogram from 'src/controlPanel/ControlPanelSpectrogram';
+import ControlPanelNote from 'src/controlPanel/ControlPanelNote';
 
 interface ConfigureInputInnerProps {
   info: ControlInfo;
@@ -93,57 +94,62 @@ const mkConfigureInput = (
   }) => {
     const [control, setControl] = useState(providedControl);
     const [name, setName] = useState(providedName);
+    const handleChange = useCallback(
+      (key: string, val: ControlInfo['type']) => {
+        switch (key) {
+          case 'input type': {
+            if (val === control.data.type) {
+              return;
+            }
+
+            setControl(control => ({ ...control, data: buildDefaultControlPanelInfo(val) }));
+            break;
+          }
+          case 'color': {
+            setControl(control => ({ ...control, color: val }));
+            break;
+          }
+          case 'name': {
+            setName(val);
+            break;
+          }
+          default: {
+            throw new UnreachableException(`Unhandled key in control panel: ${key}`);
+          }
+        }
+      },
+      [control.data.type]
+    );
+    const settings = useMemo(
+      () => [
+        {
+          type: 'select',
+          label: 'input type',
+          options: ['gate', 'range'],
+          initial: control.data.type,
+        },
+        {
+          type: 'color',
+          label: 'color',
+          initial: control.color,
+          format: 'hex',
+        },
+        {
+          type: 'text',
+          label: 'name',
+          initial: name,
+        },
+      ],
+      [control.color, control.data.type, name]
+    );
 
     return (
       <BasicModal>
         <div className='control-panel-input-configurator'>
-          <ControlPanel
-            settings={[
-              {
-                type: 'select',
-                label: 'input type',
-                options: ['gate', 'range'],
-                initial: control.data.type,
-              },
-              {
-                type: 'color',
-                label: 'color',
-                initial: control.color,
-                format: 'hex',
-              },
-              {
-                type: 'text',
-                label: 'name',
-                initial: name,
-              },
-            ]}
-            onChange={(key: string, val: ControlInfo['type']) => {
-              switch (key) {
-                case 'input type': {
-                  if (val === control.data.type) {
-                    return;
-                  }
-
-                  setControl({ ...control, data: buildDefaultControlPanelInfo(val) });
-                  break;
-                }
-                case 'color': {
-                  setControl({ ...control, color: val });
-                  break;
-                }
-                case 'name': {
-                  setName(val);
-                  break;
-                }
-                default: {
-                  throw new UnreachableException(`Unhandled key in control panel: ${key}`);
-                }
-              }
-            }}
-          />
+          <ControlPanel settings={settings} onChange={handleChange} />
           <ConfigureInputInner
             info={control.data}
-            onChange={newData => setControl({ ...control, data: newData })}
+            onChange={newData => setControl(control => ({ ...control, data: newData }))}
           />
 
           <div className='buttons'>
@@ -382,7 +388,7 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       {
         type: 'select',
         label: 'element type',
-        options: ['midi keyboard', 'spectrogram', 'slider', 'button'],
+        options: ['midi keyboard', 'spectrogram', 'slider', 'button', 'note'],
       },
       {
         type: 'button',
@@ -409,6 +415,9 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
               dispatch(
                 actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(vcId, '', 'gate', 'gate')
               );
+              break;
+            case 'note':
+              dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_VIZ(vcId, 'note'));
               break;
             default:
               console.error('Unhandled element type when adding to control panel: ', elementType);
@@ -514,6 +523,8 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
             break;
           case 'spectrogram':
             return <ControlPanelSpectrogram key={viz.type + viz.name} vcId={vcId} {...viz} />;
+          case 'note':
+            return <ControlPanelNote key={viz.type + viz.name} vcId={vcId} {...viz} />;
         }
       })}
       <ControlPanel

@@ -16,24 +16,24 @@
     margin-left: 1px;
   }
 
+  .configure-input-button {
+    position: absolute;
+    top: 2px;
+    left: 1px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .delete-input-button {
+    position: absolute;
+    top: 2px;
+    left: 16px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
   .control {
     .control-panel {
-      .configure-input-button {
-        position: absolute;
-        top: 2px;
-        left: 1px;
-        cursor: pointer;
-        font-size: 12px;
-      }
-
-      .delete-input-button {
-        position: absolute;
-        top: 2px;
-        left: 16px;
-        cursor: pointer;
-        font-size: 12px;
-      }
-
       .container {
         margin-top: 6px;
       }
@@ -103,4 +103,35 @@
 
 .control-panel-spectrogram {
   transform: scale(0.6);
+}
+
+.control-panel-note {
+  position: absolute;
+  border: 1px solid #888;
+  color: #eee;
+  background-color: #242424;
+  padding: 3px;
+
+  .control-panel-note-drag-bar {
+    width: 100%;
+    height: 14px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #ffffff21;
+  }
+
+  .control-panel-note-content {
+    cursor: pointer;
+    width: 100%;
+    height: calc(100% - 14px);
+    /* Display newlines */
+    white-space: pre-line;
+  }
+
+  textarea {
+    width: 100%;
+    height: calc(100% - 18px);
+    box-sizing: border-box;
+    background-color: #121212;
+    color: #eee;
+  }
 }

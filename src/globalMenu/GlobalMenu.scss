@@ -15,7 +15,7 @@
   width: 240px;
   height: 100vh;
   z-index: 10000000;
-  background-color: #555;
+  background-color: #121212;
   transition: right 200ms;
 
   .global-menu-item {
@@ -53,13 +53,13 @@
     font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
     background: #252525;
     color: #eee;
-    outline: none;
-    border: none;
     padding: 4px;
-    height: 16px;
-    width: 118px;
+    height: 24px;
+    width: 126px;
     text-align: center;
     margin-left: 12px;
+    border: 1px solid #6a6a6a;
+    box-sizing: border-box;
   }
 }
 

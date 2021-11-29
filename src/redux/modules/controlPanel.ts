@@ -83,11 +83,19 @@ export type ControlPanelVisualizationDescriptor =
       position: { x: number; y: number };
       name: string;
       analyser: AnalyserNode;
+    }
+  | {
+      type: 'note';
+      position: { x: number; y: number };
+      name: string;
+      content: string;
+      style: { fontSize: number; width: number; height: number };
     };
 
 export type SerializedControlPanelVisualizationDescriptor =
   | { type: 'oscilloscope'; position: { x: number; y: number }; name: string }
-  | { type: 'spectrogram'; position: { x: number; y: number }; name: string };
+  | { type: 'spectrogram'; position: { x: number; y: number }; name: string }
+  | Extract<ControlPanelVisualizationDescriptor, { type: 'note' }>;
 
 export const serializeControlPanelVisualizationDescriptor = (
   viz: ControlPanelVisualizationDescriptor
@@ -105,6 +113,8 @@ export const serializeControlPanelVisualizationDescriptor = (
         position: viz.position,
         name: viz.name,
       };
+    case 'note':
+      return viz;
   }
 };
 
@@ -113,18 +123,14 @@ export const deserializeControlPanelVisualizationDescriptor = (
 ): ControlPanelVisualizationDescriptor => {
   switch (viz.type) {
     case 'oscilloscope':
-      return {
-        type: 'oscilloscope',
-        position: viz.position,
-        name: viz.name,
-      };
+      return viz;
     case 'spectrogram':
       return {
-        type: 'spectrogram',
-        position: viz.position,
-        name: viz.name,
+        ...viz,
         analyser: ctx.createAnalyser(),
       };
+    case 'note':
+      return viz;
   }
 };
 
@@ -688,6 +694,8 @@ const actionGroups = {
         type: vizType,
         position: { x: 300, y: 300 + Math.random() * 200 },
         analyser: ctx.createAnalyser(),
+        content: 'Double-click to edit note',
+        style: { width: 300, height: 200, fontSize: 14 },
       };
 
       const newInstState = { ...instState, visualizations: [...instState.visualizations, newViz] };
@@ -733,6 +741,38 @@ const actionGroups = {
               }
 
               return { ...viz, position: maybeSnapToGrid(newPos, instState.snapToGrid) };
+            }),
+          },
+        },
+      };
+    },
+  }),
+  UPDATE_CONTROL_PANEL_VIZ: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      vizName: string,
+      newViz: ControlPanelVisualizationDescriptor
+    ) => ({
+      type: 'UPDATE_CONTROL_PANEL_VIZ' as const,
+      controlPanelVcId,
+      vizName,
+      newViz,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vizName, newViz }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: {
+            ...instState,
+            visualizations: instState.visualizations.map(viz => {
+              if (viz.name !== vizName) {
+                return viz;
+              }
+
+              return newViz;
             }),
           },
         },

@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import * as R from 'ramda';
+
 import { getEngine } from 'src/util';
 
 import './GlobalVolume.scss';
 
-const viewContexts: {
+export const ViewContextDescriptors: {
   children: string;
   name: string;
   displayName: string;
@@ -25,11 +27,18 @@ const viewContexts: {
 ];
 
 const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [selectedModule, setSelectedModule] = useState(viewContexts[0].displayName);
+  const [selectedModule, setSelectedModule] = useState(ViewContextDescriptors[0].displayName);
 
   const settings = useMemo(
     () => [
-      { type: 'select', label: 'module', options: viewContexts.map(vc => vc.displayName) },
+      {
+        type: 'select',
+        label: 'module',
+        options: R.sortBy(
+          R.toLower,
+          ViewContextDescriptors.map(vc => vc.displayName)
+        ),
+      },
       {
         type: 'button',
         label: 'add',
@@ -40,7 +49,7 @@ const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             return;
           }
 
-          const vc = viewContexts.find(vc => vc.displayName === selectedModule);
+          const vc = ViewContextDescriptors.find(vc => vc.displayName === selectedModule);
           if (!vc) {
             console.error('Tried to add unknown VC: ', selectedModule);
             return;
@@ -73,7 +82,8 @@ const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           }, [])}
         />
         <div className='module-description'>
-          {viewContexts.find(vc => vc.displayName === selectedModule)?.description ?? null}
+          {ViewContextDescriptors.find(vc => vc.displayName === selectedModule)?.description ??
+            null}
         </div>
       </div>
     </>

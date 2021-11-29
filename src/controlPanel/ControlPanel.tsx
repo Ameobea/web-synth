@@ -232,6 +232,10 @@ export const buildControlPanelAudioConnectables = (
           throw new UnimplementedError();
         case 'spectrogram':
           return acc.set(viz.name, { type: 'customAudio', node: viz.analyser });
+        case 'note':
+          return acc;
+        default:
+          throw new Error(`Unknown viz type: ${(viz as any).type}`);
       }
     }, ImmMap<string, ConnectableInput>()),
     outputs,

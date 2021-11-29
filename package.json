@@ -49,7 +49,7 @@
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --browser chrome --record --key 58905cf6-d1cb-43de-b6cd-b55954039c1a",
-    "cypress:serve": "serve -p 9000 dist"
+    "cypress:serve": "serve -C -s -p 9000 dist"
   },
   "dependencies": {
     "@sentry/react": "^6.14.0",

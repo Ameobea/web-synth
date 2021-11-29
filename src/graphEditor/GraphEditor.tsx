@@ -21,6 +21,7 @@ import { getEngine } from 'src/util';
 import FlatButton from 'src/misc/FlatButton';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { LiteGraph as LiteGraphInstance } from 'src/graphEditor/LiteGraphTypes';
+import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 
 /**
  * Mapping of `stateKey`s to the graph instances that that they manage
@@ -162,7 +163,11 @@ const GraphControls: React.FC<{
     const nodeEntries = Object.entries(LiteGraph.registered_node_types)
       .filter(([key]) => key.startsWith('customAudio/'))
       .map(([key, NodeClass]) => [NodeClass.typeName as string, key] as const);
-    const sortedNodeEntries = R.sortBy(([name]) => name, nodeEntries);
+    const vcEntries = ViewContextDescriptors.map(vc => [vc.displayName, vc.name] as const);
+    const sortedNodeEntries = R.sortBy(
+      ([name]) => name.toLowerCase(),
+      [...nodeEntries, ...vcEntries]
+    );
 
     return filterNils([
       lGraphInstance
@@ -178,6 +183,17 @@ const GraphControls: React.FC<{
         type: 'button',
         label: 'add node',
         action: () => {
+          const isVc = !selectedNodeType.current.startsWith('customAudio/');
+          if (isVc) {
+            const engine = getEngine();
+            if (!engine) {
+              return;
+            }
+
+            engine.create_view_context(selectedNodeType.current);
+            return;
+          }
+
           if (!lGraphInstance) {
             return;
           }
