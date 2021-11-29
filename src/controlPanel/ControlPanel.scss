@@ -1,5 +1,6 @@
 .control-panel-root-node {
   .main-control-panel {
+    margin-top: 1px;
     margin-left: 1px;
   }
 
@@ -80,4 +81,8 @@
     user-select: none;
     font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
   }
+}
+
+.control-panel-spectrogram {
+  transform: scale(0.6);
 }

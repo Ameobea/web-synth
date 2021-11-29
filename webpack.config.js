@@ -77,9 +77,7 @@ const config = {
   ],
   devServer: {
     port: 9000,
-    contentBase: './public/',
     historyApiFallback: true,
-    disableHostCheck: true,
     host: '0.0.0.0',
     headers: {
       // Support sending `SharedArrayBuffer` between threads

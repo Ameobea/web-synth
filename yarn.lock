@@ -1968,9 +1968,9 @@ camelcase@^6.2.0:
   integrity sha512-tVI4q5jjFV5CavAU8DXfza/TJcZutVKo/5Foskmsqcm0MsL91moHvwiGNnqaa2o6PF/7yT5ikDRcVcl8Rj6LCA==
 
 caniuse-lite@^1.0.30001219:
-  version "1.0.30001237"
-  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001237.tgz#4b7783661515b8e7151fc6376cfd97f0e427b9e5"
-  integrity sha512-pDHgRndit6p1NR2GhzMbQ6CkRrp4VKuSsqbcLeOQppYPKOYkKT/6ZvZDvKJUqcmtyWIAHuZq3SVS2vc1egCZzw==
+  version "1.0.30001283"
+  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001283.tgz"
+  integrity sha512-9RoKo841j1GQFSJz/nCXOj0sD7tHBtlowjYlrqIUS812x9/emfBLBt6IyMz1zIaYc/eRL8Cs6HPUVi2Hzq4sIg==
 
 caseless@~0.12.0:
   version "0.12.0"
@@ -5760,10 +5760,10 @@ react-ace@^9.5.0:
     lodash.isequal "^4.5.0"
     prop-types "^15.7.2"
 
-react-control-panel@>=0.8.8:
-  version "0.8.8"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.8.8.tgz#6e6a6e7fc1ff72403b9b08cf672229938c70883f"
-  integrity sha512-oycBtt9fT7mxaFdNrW2MpibiZzrsfEdYlS74AHtnWc+5pKw6EoKQs4xEirG7NCFfnURNViD5683j9upVu5RMtQ==
+react-control-panel@>=0.8.9:
+  version "0.8.9"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.8.9.tgz#9c37517dec79f015b79b48ce5574453f686783a3"
+  integrity sha512-B3x4HN+pOiz45r3oHKb5oozxDT216gfb+MqRtU06Nc5pb3zXfMuBTB0TqPjjcqXC5rc+vmoLZqIKMD7UhoG9AA==
   dependencies:
     is-numeric "0.0.9"
     is-string "^1.0.5"

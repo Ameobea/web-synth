@@ -36,10 +36,12 @@
       globalContext.globalVolume.gain.value = 1;
       globalContext.globalVolume.connect(globalContext.destination);
 
-      const globalVolume = localStorage.getItem('globalVolume');
-      if (globalVolume !== null) {
-        globalContext.globalVolume.gain.value = +globalVolume / 100;
+      let globalVolume = localStorage.getItem('globalVolume');
+      if (globalVolume === null || globalVolume === undefined) {
+        globalVolume = 20;
       }
+
+      globalContext.globalVolume.gain.value = +globalVolume / 100;
 
       globalThis.AudioContext = function SingletonAudioContext() {
         return globalContext;

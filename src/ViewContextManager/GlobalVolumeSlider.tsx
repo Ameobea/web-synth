@@ -29,7 +29,7 @@ const GlobalVolumeSlider: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             const value = +evt.target.value;
             localStorage.setItem('globalVolume', value.toString());
             setValue(value);
-            (((ctx as unknown) as any).globalVolume as GainNode).gain.value = value / 100;
+            ((ctx as any).globalVolume as GainNode).gain.value = value / 100;
           }}
         />
       </div>

@@ -39,6 +39,7 @@ interface SpectrumVisualizationProps {
   analyzerNode: AnalyserNode;
   paused?: boolean;
   height?: number;
+  children?: React.ReactNode;
 }
 
 const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
@@ -47,6 +48,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
   analyzerNode,
   paused = false,
   height = 1024,
+  children,
 }) => {
   const [spectrumSettingsDefinition, setSpectrumSettingsDefinition] = useState<{
     color_functions: SettingDefinition[];
@@ -94,7 +96,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
       return;
     }
 
-    const ctxPtr = spectrumModule.current.new_context(0, 0);
+    const ctxPtr = spectrumModule.current.new_context(2, 1);
     if (initialConf) {
       spectrumModule.current!.set_conf(ctxPtr, initialConf.color_fn, initialConf.scaler_fn);
     }
@@ -207,6 +209,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
         <ControlPanel onChange={onSettingChange} settings={settings} draggable />
       )}
 
+      {children}
       <canvas
         ref={ref => {
           if (ref !== canvasRef) {
@@ -215,7 +218,6 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
         }}
         width={WIDTH}
         height={lockedHeight.current}
-        id='spectrum-visualizer'
         style={{
           backgroundColor: '#000',
           imageRendering: 'crisp-edges',

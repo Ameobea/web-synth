@@ -4,7 +4,12 @@ import * as R from 'ramda';
 
 import { actionCreators, dispatch, getState, store } from 'src/redux';
 import ControlPanelUI from 'src/controlPanel/ControlPanelUI';
-import type { AudioConnectables, ConnectableDescriptor, ConnectableOutput } from 'src/patchNetwork';
+import type {
+  AudioConnectables,
+  ConnectableDescriptor,
+  ConnectableInput,
+  ConnectableOutput,
+} from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import './ControlPanel.scss';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -13,6 +18,9 @@ import {
   ControlPanelConnection,
   buildDefaultControl,
   ControlPanelMidiKeyboardDescriptor,
+  SerializedControlPanelVisualizationDescriptor,
+  deserializeControlPanelVisualizationDescriptor,
+  serializeControlPanelVisualizationDescriptor,
 } from 'src/redux/modules/controlPanel';
 import {
   mkContainerCleanupHelper,
@@ -21,6 +29,7 @@ import {
   mkContainerUnhider,
 } from 'src/reactUtils';
 import { MIDINode } from 'src/patchNetwork/midiNode';
+import { UnimplementedError } from 'ameo-utils';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
@@ -29,6 +38,7 @@ const getRootNodeID = (vcId: string) => `${BASE_ROOT_NODE_ID}${vcId}`;
 interface SerializedControlPanelState {
   connections: Omit<ControlPanelConnection, 'node'>[];
   midiKeyboards: Omit<ControlPanelMidiKeyboardDescriptor, 'midiNode'>[];
+  visualizations: SerializedControlPanelVisualizationDescriptor[];
   presets: ControlPanelInstanceState['presets'];
   snapToGrid: boolean;
 }
@@ -43,6 +53,7 @@ const saveStateForInstance = (stateKey: string) => {
   const serialized: SerializedControlPanelState = {
     connections: serializableConnections,
     midiKeyboards: instanceState.midiKeyboards,
+    visualizations: instanceState.visualizations.map(serializeControlPanelVisualizationDescriptor),
     presets: instanceState.presets,
     snapToGrid: instanceState.snapToGrid ?? false,
   };
@@ -61,8 +72,13 @@ export const init_control_panel = (stateKey: string) => {
   const serialized = Option.of(localStorage.getItem(stateKey))
     .flatMap(serialized => {
       try {
-        const { connections, presets, midiKeyboards, snapToGrid }: SerializedControlPanelState =
-          JSON.parse(serialized);
+        const {
+          connections,
+          presets,
+          midiKeyboards,
+          visualizations,
+          snapToGrid,
+        }: SerializedControlPanelState = JSON.parse(serialized);
         return Option.some({
           connections: connections.map(conn => {
             if (!conn.control) {
@@ -71,7 +87,8 @@ export const init_control_panel = (stateKey: string) => {
             return conn as ControlPanelConnection;
           }),
           midiKeyboards: (midiKeyboards ?? []).map(kb => ({ ...kb, midiNode: new MIDINode() })),
-          presets: presets ?? [],
+          visualizations,
+          presets: Array.isArray(presets) ? presets : [],
           snapToGrid: snapToGrid ?? false,
         });
       } catch (err) {
@@ -85,6 +102,7 @@ export const init_control_panel = (stateKey: string) => {
       vcId,
       serialized?.connections,
       serialized?.midiKeyboards,
+      serialized?.visualizations.map(deserializeControlPanelVisualizationDescriptor),
       serialized?.presets,
       serialized?.snapToGrid ?? false
     )
@@ -154,7 +172,7 @@ export class PlaceholderInput extends GainNode implements AudioNode {
       }
 
       dispatch(
-        actionCreators.controlPanel.ADD_CONNECTION(
+        actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(
           this.controlPanelVcId,
           dstDescriptor.vcId,
           outputName
@@ -200,7 +218,14 @@ export const buildControlPanelAudioConnectables = (
 
   return {
     vcId,
-    inputs: ImmMap(),
+    inputs: instState.visualizations.reduce((acc, viz) => {
+      switch (viz.type) {
+        case 'oscilloscope':
+          throw new UnimplementedError();
+        case 'spectrogram':
+          return acc.set(viz.name, { type: 'customAudio', node: viz.analyser });
+      }
+    }, ImmMap<string, ConnectableInput>()),
     outputs,
   };
 };

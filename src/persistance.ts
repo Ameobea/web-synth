@@ -78,7 +78,9 @@ export const loadSharedComposition = async (composition: CompositionDefinition) 
 
   const deserialized = JSON.parse(composition.content);
   localStorage.clear();
-  Object.entries(deserialized).forEach(([key, val]) => localStorage.setItem(key, val as any));
+  Object.entries(deserialized)
+    .filter(([key]) => key !== 'globalVolume')
+    .forEach(([key, val]) => localStorage.setItem(key, val as any));
 };
 
 export const maybeRestoreLocalComposition = async () => {

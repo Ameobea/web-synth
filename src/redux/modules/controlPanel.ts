@@ -13,8 +13,8 @@ export interface ControlPanelState {
 }
 
 export type ControlInfo =
-  | { type: 'range'; min: number; max: number }
-  | { type: 'gate'; offValue: number; gateValue: number };
+  | { type: 'range'; min: number; max: number; width?: number }
+  | { type: 'gate'; offValue: number; gateValue: number; width?: number };
 
 export const buildDefaultControlPanelInfo = (type: ControlInfo['type'] = 'range'): ControlInfo => {
   switch (type) {
@@ -48,8 +48,8 @@ export const maybeSnapToGrid = (
   };
 };
 
-export const buildDefaultControl = (): Control => ({
-  data: buildDefaultControlPanelInfo(),
+export const buildDefaultControl = (type: ControlInfo['type'] = 'range'): Control => ({
+  data: buildDefaultControlPanelInfo(type),
   value: 0,
   color: '#361', // TODO: Random color or something out of a scale would be cool
   position: { x: window.innerWidth / 2 - 300, y: window.innerHeight / 2 - Math.random() * 300 },
@@ -76,12 +76,66 @@ export interface ControlPanelMidiKeyboardDescriptor {
   midiNode: MIDINode;
 }
 
+export type ControlPanelVisualizationDescriptor =
+  | { type: 'oscilloscope'; position: { x: number; y: number }; name: string }
+  | {
+      type: 'spectrogram';
+      position: { x: number; y: number };
+      name: string;
+      analyser: AnalyserNode;
+    };
+
+export type SerializedControlPanelVisualizationDescriptor =
+  | { type: 'oscilloscope'; position: { x: number; y: number }; name: string }
+  | { type: 'spectrogram'; position: { x: number; y: number }; name: string };
+
+export const serializeControlPanelVisualizationDescriptor = (
+  viz: ControlPanelVisualizationDescriptor
+): SerializedControlPanelVisualizationDescriptor => {
+  switch (viz.type) {
+    case 'oscilloscope':
+      return {
+        type: 'oscilloscope',
+        position: viz.position,
+        name: viz.name,
+      };
+    case 'spectrogram':
+      return {
+        type: 'spectrogram',
+        position: viz.position,
+        name: viz.name,
+      };
+  }
+};
+
+export const deserializeControlPanelVisualizationDescriptor = (
+  viz: SerializedControlPanelVisualizationDescriptor
+): ControlPanelVisualizationDescriptor => {
+  switch (viz.type) {
+    case 'oscilloscope':
+      return {
+        type: 'oscilloscope',
+        position: viz.position,
+        name: viz.name,
+      };
+    case 'spectrogram':
+      return {
+        type: 'spectrogram',
+        position: viz.position,
+        name: viz.name,
+        analyser: ctx.createAnalyser(),
+      };
+  }
+};
+
 export interface ControlPanelInstanceState {
   controls: ControlPanelConnection[];
   midiKeyboards: ControlPanelMidiKeyboardDescriptor[];
+  visualizations: ControlPanelVisualizationDescriptor[];
   presets: {
     name: string;
     midiKeyboards: ControlPanelMidiKeyboardDescriptor[];
+    visualizations: SerializedControlPanelVisualizationDescriptor[];
     controls: Omit<ControlPanelConnection, 'node'>[];
     snapToGrid: boolean;
   }[];
@@ -190,6 +244,7 @@ const actionGroups = {
       vcId: string,
       initialConnections?: Omit<ControlPanelConnection, 'node'>[],
       initialMidiKeyboards?: ControlPanelMidiKeyboardDescriptor[],
+      initialVisualizations?: ControlPanelVisualizationDescriptor[],
       presets?: ControlPanelInstanceState['presets'],
       snapToGrid?: boolean
     ) => ({
@@ -197,12 +252,13 @@ const actionGroups = {
       vcId,
       initialConnections,
       initialMidiKeyboards,
+      initialVisualizations,
       presets,
       snapToGrid,
     }),
     subReducer: (
       state: ControlPanelState,
-      { vcId, initialConnections, initialMidiKeyboards, presets, snapToGrid }
+      { vcId, initialConnections, initialMidiKeyboards, initialVisualizations, presets, snapToGrid }
     ) => {
       const connections = initialConnections ? initialConnections.map(hydrateConnection) : [];
 
@@ -212,6 +268,7 @@ const actionGroups = {
           [vcId]: {
             controls: connections,
             midiKeyboards: initialMidiKeyboards ?? [],
+            visualizations: initialVisualizations ?? [],
             presets: presets ?? [],
             snapToGrid: snapToGrid ?? false,
           },
@@ -226,17 +283,35 @@ const actionGroups = {
       return { stateByPanelInstance: { ...state.stateByPanelInstance } };
     },
   }),
-  ADD_CONNECTION: buildActionGroup({
-    actionCreator: (controlPanelVcId: string, vcId: string, name: string) => ({
-      type: 'ADD_CONNECTION',
+  ADD_CONTROL_PANEL_CONNECTION: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      vcId: string,
+      name: string,
+      controlType?: ControlInfo['type']
+    ) => ({
+      type: 'ADD_CONTROL_PANEL_CONNECTION',
       controlPanelVcId,
       vcId,
       name,
+      controlType,
     }),
-    subReducer: (state: ControlPanelState, { controlPanelVcId, vcId, name }) => {
+    subReducer: (
+      state: ControlPanelState,
+      { controlPanelVcId, vcId, name: providedName, controlType }
+    ) => {
       const node = new ConstantSourceNode(ctx);
       node.offset.value = 0;
       node.start();
+
+      let name = providedName;
+      let i = 1;
+      while (
+        state.stateByPanelInstance[controlPanelVcId].controls.some(conn => conn.name === name)
+      ) {
+        name = `${providedName} ${i}`;
+        i += 1;
+      }
 
       const newInstState = {
         ...state.stateByPanelInstance[controlPanelVcId],
@@ -246,7 +321,7 @@ const actionGroups = {
             vcId,
             name,
             node,
-            control: buildDefaultControl(),
+            control: buildDefaultControl(controlType),
           },
         ],
       };
@@ -411,6 +486,7 @@ const actionGroups = {
               {
                 name,
                 midiKeyboards: instState.midiKeyboards,
+                visualizations: instState.visualizations,
                 controls: instState.controls.map(R.omit(['node'])),
                 snapToGrid: instState.snapToGrid,
               },
@@ -440,6 +516,9 @@ const actionGroups = {
           [controlPanelVcId]: {
             presets: instanceState.presets,
             midiKeyboards: preset.midiKeyboards,
+            visualizations: preset.visualizations.map(
+              deserializeControlPanelVisualizationDescriptor
+            ),
             controls: preset.controls.map(hydrateConnection),
             snapToGrid: preset.snapToGrid,
           },
@@ -578,6 +657,108 @@ const actionGroups = {
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
           [controlPanelVcId]: { ...instState, snapToGrid },
+        },
+      };
+    },
+  }),
+  ADD_CONTROL_PANEL_VIZ: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      vizType: ControlPanelVisualizationDescriptor['type']
+    ) => ({
+      type: 'ADD_CONTROL_PANEL_VIZ' as const,
+      controlPanelVcId,
+      vizType,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vizType }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      let name = `${vizType} ${instState.visualizations.length + 1}`;
+      while (instState.visualizations.some(R.propEq('name', name))) {
+        name = `${vizType} ${instState.visualizations.length + 1}`;
+      }
+
+      const newViz: ControlPanelVisualizationDescriptor = {
+        name,
+        type: vizType,
+        position: { x: 300, y: 300 + Math.random() * 200 },
+        analyser: ctx.createAnalyser(),
+      };
+
+      const newInstState = { ...instState, visualizations: [...instState.visualizations, newViz] };
+      setTimeout(() =>
+        updateConnectables(
+          controlPanelVcId,
+          buildControlPanelAudioConnectables(controlPanelVcId, newInstState)
+        )
+      );
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: newInstState,
+        },
+      };
+    },
+  }),
+  SET_CONTROL_PANEL_VIZ_POS: buildActionGroup({
+    actionCreator: (
+      controlPanelVcId: string,
+      vizName: string,
+      newPos: { x: number; y: number }
+    ) => ({
+      type: 'SET_CONTROL_PANEL_VIZ_POS' as const,
+      controlPanelVcId,
+      vizName,
+      newPos,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, vizName, newPos }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: {
+            ...instState,
+            visualizations: instState.visualizations.map(viz => {
+              if (viz.name !== vizName) {
+                return viz;
+              }
+
+              return { ...viz, position: maybeSnapToGrid(newPos, instState.snapToGrid) };
+            }),
+          },
+        },
+      };
+    },
+  }),
+  DELETE_CONTROL_PANEL_VIZ: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, name: string) => ({
+      type: 'DELETE_CONTROL_PANEL_VIZ' as const,
+      controlPanelVcId,
+      name,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, name }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      const newInstState = {
+        ...instState,
+        visualizations: instState.visualizations.filter(viz => viz.name !== name),
+      };
+      setTimeout(() =>
+        updateConnectables(
+          controlPanelVcId,
+          buildControlPanelAudioConnectables(controlPanelVcId, newInstState)
+        )
+      );
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: newInstState,
         },
       };
     },

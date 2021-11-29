@@ -15,6 +15,7 @@ import {
 import BasicModal from 'src/misc/BasicModal';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';
+import ControlPanelSpectrogram from 'src/controlPanel/ControlPanelSpectrogram';
 
 interface ConfigureInputInnerProps {
   info: ControlInfo;
@@ -49,12 +50,13 @@ const ConfigureInputInner: React.FC<ConfigureInputInnerProps> = ({ info, onChang
     case 'range':
       return (
         <ControlPanel
-          state={info}
+          state={{ ...info, width: info.width ?? 500 }}
           onChange={(_key: string, _val: any, state: any) =>
             onChange({
               type: 'range',
               min: Number.isNaN(+state.min) ? info.min : +state.min,
               max: Number.isNaN(+state.max) ? info.max : +state.max,
+              width: Number.isNaN(+state.width) ? undefined : +state.width,
             })
           }
           settings={[
@@ -65,6 +67,10 @@ const ConfigureInputInner: React.FC<ConfigureInputInnerProps> = ({ info, onChang
             {
               type: 'text',
               label: 'max',
+            },
+            {
+              type: 'text',
+              label: 'width',
             },
           ]}
         />
@@ -354,7 +360,7 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
           }),
           [control.color]
         )}
-        width={500}
+        width={control.data.width ?? 500}
       >
         <ConfigureInputButtons
           controlPanelVcId={controlPanelVcId}
@@ -368,17 +374,49 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
 );
 
 const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+  const [elementType, setElementType] = useState('midi keyboard');
   const vcId = stateKey.split('_')[1];
-  const { controls, midiKeyboards, presets, snapToGrid } = useSelector(
+  const { controls, midiKeyboards, presets, visualizations, snapToGrid } = useSelector(
     (state: ReduxStore) => state.controlPanel.stateByPanelInstance[vcId]
   );
   const panelCtx = useRef<any>(null);
   const presetPanelSettings = useMemo(
     () => [
       {
+        type: 'select',
+        label: 'element type',
+        options: ['midi keyboard', 'spectrogram', 'slider', 'button'],
+      },
+      {
         type: 'button',
-        label: 'add midi keyboard',
-        action: () => dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_MIDI_KEYBOARD(vcId)),
+        label: 'add element',
+        action: () => {
+          switch (elementType) {
+            case 'midi keyboard':
+              dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_MIDI_KEYBOARD(vcId));
+              break;
+            case 'spectrogram':
+              dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_VIZ(vcId, 'spectrogram'));
+              break;
+            case 'slider':
+              dispatch(
+                actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(
+                  vcId,
+                  '',
+                  'slider',
+                  'range'
+                )
+              );
+              break;
+            case 'button':
+              dispatch(
+                actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(vcId, '', 'gate', 'gate')
+              );
+              break;
+            default:
+              console.error('Unhandled element type when adding to control panel: ', elementType);
+          }
+        },
       },
       {
         type: 'checkbox',
@@ -439,7 +477,7 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         },
       },
     ],
-    [presets, vcId]
+    [elementType, presets, vcId]
   );
   const ctxCb = useCallback((ctx: any) => {
     panelCtx.current = ctx;
@@ -447,15 +485,37 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
   return (
     <div>
+      {visualizations.map(viz => {
+        switch (viz.type) {
+          case 'oscilloscope':
+            throw new UnimplementedError();
+            break;
+          case 'spectrogram':
+            return <ControlPanelSpectrogram key={viz.type + viz.name} vcId={vcId} {...viz} />;
+        }
+      })}
       <ControlPanel
         className='main-control-panel'
         position='top-left'
         draggable
         settings={presetPanelSettings}
-        state={useMemo(() => ({ 'snap to grid': snapToGrid }), [snapToGrid])}
+        state={useMemo(
+          () => ({ 'snap to grid': snapToGrid, 'element type': elementType }),
+          [elementType, snapToGrid]
+        )}
         onChange={useCallback(
-          (_key: string, value: any) =>
-            dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_SNAP_TO_GRID(vcId, value)),
+          (key: string, value: any) => {
+            switch (key) {
+              case 'element type':
+                setElementType(value);
+                break;
+              case 'snap to grid':
+                dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_SNAP_TO_GRID(vcId, value));
+                break;
+              default:
+                console.error('Unhandled key in preset panel: ', key);
+            }
+          },
           [vcId]
         )}
         contextCb={ctxCb}

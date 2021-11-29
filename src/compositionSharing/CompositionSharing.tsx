@@ -341,12 +341,18 @@ const serializeAndSaveComposition = async ({
   }
 };
 
-const ShareCompositionInner: React.FC<
-  InjectedFormProps<{
-    title: string;
-    description: string;
-  }>
-> = ({ handleSubmit, submitting, submitSucceeded, submitFailed, error }) => (
+type ShareCompositionInnerProps = InjectedFormProps<{
+  title: string;
+  description: string;
+}>;
+
+const ShareCompositionInner: React.FC<ShareCompositionInnerProps> = ({
+  handleSubmit,
+  submitting,
+  submitSucceeded,
+  submitFailed,
+  error,
+}) => (
   <>
     <form className='share-composition-form' onSubmit={handleSubmit(serializeAndSaveComposition)}>
       <h2>Share Composition</h2>
@@ -362,7 +368,9 @@ const ShareCompositionInner: React.FC<
         Submit
       </button>
     </form>
-    {submitSucceeded ? 'Successfully submitted!' : null}
+    {submitSucceeded
+      ? 'Successfully submitted!  You may need to refresh the page if this process caused any issues.'
+      : null}
     {submitFailed && error ? 'Submission Failed' : null}
     {error ? <span style={{ color: '#bb2312' }}>{error}</span> : null}
   </>

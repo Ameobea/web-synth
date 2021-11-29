@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Store } from 'redux';
 import { Provider } from 'react-redux';
@@ -246,3 +246,55 @@ export function withReactQueryClient<T extends Record<string, any>>(
   );
   return WithReactQueryClient;
 }
+
+export const useDraggable = (
+  onDrag: (newPos: { x: number; y: number }) => void,
+  position: { x: number; y: number }
+) => {
+  const dragDownPos = useRef<{
+    originalPos: { x: number; y: number };
+    downPos: { x: number; y: number };
+  }>({
+    originalPos: { x: 0, y: 0 },
+    downPos: { x: 0, y: 0 },
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  useEffect(() => {
+    if (!isDragging) {
+      return;
+    }
+
+    const upCb = () => setIsDragging(false);
+    const moveCb = (e: MouseEvent) => {
+      const { originalPos, downPos } = dragDownPos.current;
+      const deltaX = e.clientX - downPos.x;
+      const deltaY = e.clientY - downPos.y;
+      const newPos = { x: originalPos.x + deltaX, y: originalPos.y + deltaY };
+
+      onDrag(newPos);
+    };
+    window.addEventListener('mousemove', moveCb);
+    window.addEventListener('mouseup', upCb);
+
+    return () => {
+      window.removeEventListener('mousemove', moveCb);
+      window.removeEventListener('mouseup', upCb);
+    };
+  }, [isDragging, onDrag]);
+
+  const onMouseDown = useCallback(
+    (evt: React.MouseEvent) => {
+      if (evt.button !== 0) {
+        return;
+      }
+
+      dragDownPos.current = {
+        originalPos: position,
+        downPos: { x: evt.clientX, y: evt.clientY },
+      };
+      setIsDragging(true);
+    },
+    [position]
+  );
+  return { isDragging, onMouseDown };
+};

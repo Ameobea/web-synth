@@ -16,6 +16,7 @@ const CtxsByVcId: Map<string, CompositionSharingCtx> = new Map();
 const buildCompositionSharingDOMNodeID = (vcId: string) => `compositionSharing-${vcId}`;
 
 export const init_composition_sharing = (stateKey: string) => {
+  console.log('init compo sharing');
   const vcId = stateKey.split('_')[1]!;
   // Create the base dom node to render the composition sharing interface
   const compositionSharingBase = document.createElement('div');
@@ -47,6 +48,7 @@ export const hide_composition_sharing = mkContainerHider(buildCompositionSharing
 export const unhide_composition_sharing = mkContainerUnhider(buildCompositionSharingDOMNodeID);
 
 export const cleanup_composition_sharing = (stateKey: string): string => {
+  console.log('cleanup compo sharing');
   const vcId = stateKey.split('_')[1]!;
   const ctx = CtxsByVcId.get(vcId);
   if (!ctx) {
@@ -56,7 +58,7 @@ export const cleanup_composition_sharing = (stateKey: string): string => {
 
   ctx.root.unmount();
   const compositionSharingRootNode = document.getElementById(
-    buildCompositionSharingDOMNodeID(stateKey)
+    buildCompositionSharingDOMNodeID(vcId)
   );
   compositionSharingRootNode?.remove();
   CtxsByVcId.delete(vcId);
