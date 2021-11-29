@@ -4,6 +4,7 @@ import { Piano, Keyboard } from 'react-piano';
 import 'react-piano/dist/styles.css';
 import { Set as ImmSet } from 'immutable';
 import { UnreachableException } from 'ameo-utils';
+
 import './MidiKeyboard.scss';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
@@ -40,13 +41,21 @@ declare global {
   }
 }
 
-export const MidiKeyboard: React.FC<{
+interface MidiKeyboardProps {
   octaveOffset: number;
   onOctaveOffsetChange: (newOctaveOffset: number) => void;
   onAttack: (midiNumber: number) => void;
   onRelease: (midiNumber: number) => void;
   style?: React.CSSProperties;
-}> = ({ octaveOffset, onOctaveOffsetChange, onAttack, onRelease, style }) => {
+}
+
+export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
+  octaveOffset,
+  onOctaveOffsetChange,
+  onAttack,
+  onRelease,
+  style,
+}) => {
   const reducer = useCallback(
     (
       state: ImmSet<number>,
@@ -181,6 +190,7 @@ export const MidiKeyboard: React.FC<{
           stopNote={releaseNote}
           renderNoteLabel={({
             midiNumber,
+            isAccidental,
           }: {
             keyboardShortcut: string | null | undefined;
             midiNumber: number;
@@ -191,7 +201,13 @@ export const MidiKeyboard: React.FC<{
             const index = midiNumber - octaveBase;
             return (
               <div
-                style={{ paddingLeft: 2, paddingRight: 2, color: '#353535', userSelect: 'none' }}
+                style={{
+                  paddingLeft: 4,
+                  paddingRight: 4,
+                  paddingBottom: 2,
+                  color: isAccidental ? '#eee' : '#353535',
+                  userSelect: 'none',
+                }}
               >
                 {keys[index]?.toUpperCase() || ''}
               </div>

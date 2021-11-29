@@ -25,6 +25,7 @@ const mkConfigureViz = (
       switch (control.type) {
         case 'note':
           return [
+            { type: 'text', label: 'title' },
             { type: 'range', label: 'width', min: 50, max: 1000, step: 5 },
             { type: 'range', label: 'height', min: 50, max: 1000, step: 5 },
             { type: 'text', label: 'font size' },
@@ -44,6 +45,7 @@ const mkConfigureViz = (
               switch (control.type) {
                 case 'note':
                   return {
+                    title: control.title,
                     width: control.style.width,
                     height: control.style.height,
                     'font size': control.style.fontSize,
@@ -59,6 +61,9 @@ const mkConfigureViz = (
                     case 'width':
                     case 'height':
                       setControl({ ...control, style: { ...control.style, [key]: +val } });
+                      break;
+                    case 'title':
+                      setControl({ ...control, title: val });
                       break;
                     case 'font size':
                       setControl({
@@ -139,6 +144,7 @@ const DragBar: React.FC<{
       >
         🗑️
       </div>
+      {control.title}
     </div>
   );
 };

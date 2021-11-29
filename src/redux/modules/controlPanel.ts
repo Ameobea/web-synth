@@ -88,6 +88,7 @@ export type ControlPanelVisualizationDescriptor =
       type: 'note';
       position: { x: number; y: number };
       name: string;
+      title: string;
       content: string;
       style: { fontSize: number; width: number; height: number };
     };
@@ -695,6 +696,7 @@ const actionGroups = {
         position: { x: 300, y: 300 + Math.random() * 200 },
         analyser: ctx.createAnalyser(),
         content: 'Double-click to edit note',
+        title: 'note',
         style: { width: 300, height: 200, fontSize: 14 },
       };
 
