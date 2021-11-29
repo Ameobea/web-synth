@@ -15,6 +15,7 @@ import {
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
+import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -32,26 +33,11 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-const viewContexts: { children: string; name: string; displayName: string }[] = [
-  { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor' },
-  { children: 'E', name: 'faust_editor', displayName: 'Faust Code Editor' },
-  { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },
-  { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
-  { children: 'D', name: 'synth_designer', displayName: 'Synth Designer' },
-  { children: 'K', name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
-  { children: '𝍖', name: 'sequencer', displayName: 'Sequencer' },
-  { children: 'L', name: 'sample_library', displayName: 'Sample Library' },
-  { children: 'P', name: 'control_panel', displayName: 'Control Panel' },
-  { children: '⋱', name: 'granulator', displayName: 'Granular Synthesizer' },
-  { children: 'F', name: 'filter_designer', displayName: 'Filter Designer' },
-  { children: 'V', name: 'sinsy', displayName: 'Sinsy' },
-];
-
 interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> {
   name: string;
   displayName: string | undefined;
   style?: React.CSSProperties;
-  onClick: () => void;
+  onClick: (evt: React.MouseEvent) => void;
 }
 
 const ViewContextIcon: React.FC<ViewContextIconProps> = ({
@@ -66,7 +52,7 @@ const ViewContextIcon: React.FC<ViewContextIconProps> = ({
     title={displayName}
     className='view-context-icon'
     onClick={evt => {
-      onClick();
+      onClick(evt);
       evt.preventDefault();
       evt.stopPropagation();
     }}
@@ -81,6 +67,7 @@ export const ViewContextManager: React.FC<{
   engine: typeof import('src/engine');
 }> = ({ engine }) => {
   const [volumeSliderOpen, setVolumeSliderOpen] = useState(false);
+  const [modulePickerOpen, setModulePickerOpen] = useState(false);
   const [globalBeatCounterStarted, setGlobalBeatCounterStarted] = useState(
     getIsGlobalBeatCounterStarted()
   );
@@ -101,7 +88,7 @@ export const ViewContextManager: React.FC<{
     <div style={styles.root}>
       <GlobalMenuButton engine={engine} />
       <ViewContextIcon
-        displayName='Reset View Context Manager'
+        displayName='Reset Everything'
         onClick={() => {
           const confirmed = confirm('Really clear EVERYTHING and reset to scratch?');
           if (!confirmed) {
@@ -115,7 +102,7 @@ export const ViewContextManager: React.FC<{
         ×
       </ViewContextIcon>
       <ViewContextIcon
-        displayName={globalBeatCounterStarted ? 'Stop' : 'Start'}
+        displayName={globalBeatCounterStarted ? 'Stop Global Playback' : 'Start Global Playback'}
         onClick={() => {
           if (globalBeatCounterStarted) {
             stopAll();
@@ -149,17 +136,21 @@ export const ViewContextManager: React.FC<{
           ) : null}
         </>
       </ViewContextIcon>
-      {viewContexts.map(({ ...props }) => (
-        <ViewContextIcon
-          {...props}
-          key={props.name}
-          onClick={() => engine.create_view_context(props.name)}
-          style={{ justifyContent: 'space-around' }}
-        />
-      ))}
+      <ViewContextIcon
+        displayName='Add Module'
+        name='Add Module'
+        onClick={evt => {
+          if ((evt.target as HTMLElement).tagName.toLowerCase() === 'button') {
+            return;
+          }
 
-      <br />
-      <br />
+          setModulePickerOpen(true);
+        }}
+        style={{ justifyContent: 'space-around', fontSize: 36 }}
+      >
+        <b>+</b>
+        {modulePickerOpen ? <AddModulePicker onClose={() => setModulePickerOpen(false)} /> : null}
+      </ViewContextIcon>
     </div>
   );
 };

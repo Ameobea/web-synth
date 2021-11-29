@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Option } from 'funfix-core';
 
 import './GlobalVolume.scss';
 
 const ctx = new AudioContext();
 
 const GlobalVolumeSlider: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [value, setValue] = useState(Option.of(localStorage.getItem('globalVolume')).getOrElse(20));
+  const [value, setValue] = useState(localStorage.getItem('globalVolume') ?? 20);
 
   return (
     <>

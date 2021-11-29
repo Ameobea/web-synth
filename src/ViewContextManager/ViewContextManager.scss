@@ -2,10 +2,9 @@
 
 #view-context-manager {
   position: absolute;
-  top: 85;
   right: 0;
   padding: 6px;
-  z-index: 6;
+  z-index: 7;
 }
 
 #view-context-switcher {
@@ -71,4 +70,19 @@ input.view-context-switcher-tab-renamer {
   width: 44px;
   padding-top: 20px;
   padding-bottom: 9px;
+}
+
+.add-module-picker-container {
+  z-index: 10000000;
+  position: absolute;
+  right: 41px;
+  background-color: #181818;
+
+  .module-description {
+    font-size: 13.5px;
+    font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
+    padding: 6px 2px;
+    min-height: 28px;
+    box-sizing: border-box;
+  }
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
@@ -305,12 +305,9 @@ const buildSettingForControl = (
   }
 };
 
-const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string }> = ({
-  controlPanelVcId,
-  vcId,
-  name,
-  control,
-}) => (
+const ControlComp: React.FC<
+  ControlPanelConnection & { controlPanelVcId: string; snapToGrid: boolean }
+> = ({ controlPanelVcId, vcId, name, control, snapToGrid }) => (
   <div className='control'>
     <div className='label' style={{ color: control.color }}>
       <ControlPanel
@@ -319,7 +316,7 @@ const ControlComp: React.FC<ControlPanelConnection & { controlPanelVcId: string 
           [control.position.x, control.position.y]
         )}
         draggable
-        dragSnapPx={10}
+        dragSnapPx={snapToGrid ? 10 : undefined}
         state={useMemo(() => ({ [name]: control.value }), [control.value, name])}
         onChange={useCallback(
           (_key: string, value: any) =>
@@ -483,8 +480,33 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     panelCtx.current = ctx;
   }, []);
 
+  const [containerSize, setContainerSize] = useState({ height: 0, width: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    // Measure positions of all children and calculate width of the container
+    let maxEndHorizontal = 0;
+    let maxEndVertical = 0;
+    for (const child of Array.from(containerRef.current.children)) {
+      const rect = child.getBoundingClientRect();
+      const endHorizontal = rect.left + rect.width;
+      const endVertical = rect.top + rect.height;
+      maxEndHorizontal = Math.max(maxEndHorizontal, endHorizontal);
+      maxEndVertical = Math.max(maxEndVertical, endVertical);
+    }
+
+    setContainerSize({ height: maxEndVertical, width: maxEndHorizontal });
+  }, [controls, midiKeyboards, visualizations]);
+
   return (
-    <div>
+    <div
+      ref={containerRef}
+      className='control-panel-content'
+      style={{ width: containerSize.width, height: containerSize.height }}
+    >
       {visualizations.map(viz => {
         switch (viz.type) {
           case 'oscilloscope':
@@ -498,6 +520,7 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         className='main-control-panel'
         position='top-left'
         draggable
+        dragSnapPx={snapToGrid ? 10 : undefined}
         settings={presetPanelSettings}
         state={useMemo(
           () => ({ 'snap to grid': snapToGrid, 'element type': elementType }),
@@ -524,7 +547,12 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         <ControlPanelMidiKeyboard vcId={vcId} key={kb.name} {...kb} />
       ))}
       {controls.map(conn => (
-        <ControlComp key={`${conn.vcId}${conn.name}`} {...conn} controlPanelVcId={vcId} />
+        <ControlComp
+          key={`${conn.vcId}${conn.name}`}
+          {...conn}
+          controlPanelVcId={vcId}
+          snapToGrid={snapToGrid}
+        />
       ))}
     </div>
   );

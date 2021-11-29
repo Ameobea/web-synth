@@ -1,4 +1,16 @@
 .control-panel-root-node {
+  display: block;
+  width: 100vw;
+  max-width: 100vw;
+  height: calc(100vh - 34px);
+  max-height: calc(100vh - 34px);
+  overflow: auto;
+
+  .control-panel-content {
+    /* \/ This makes the absolute positioned elements inside of it work when this is scrolled. */
+    position: relative;
+  }
+
   .main-control-panel {
     margin-top: 1px;
     margin-left: 1px;
@@ -52,10 +64,16 @@
   margin-top: 1px;
 }
 
+@media (min-width: 800px) {
+  .control-panel-midi-keyboard {
+    margin-left: -5px !important;
+  }
+}
+
 .control-panel-midi-keyboard {
   position: absolute;
   transform: scale(0.85);
-  margin-left: -5px;
+  margin-left: 40px;
 
   .top-drag-bar {
     display: flex;

@@ -5,10 +5,11 @@
   margin-bottom: 3px;
   cursor: pointer;
   background-color: #333;
+  z-index: 3;
 }
 
 .global-menu {
-  position: fixed;
+  position: absolute;
   top: 0;
   right: 0;
   width: 240px;
@@ -22,10 +23,7 @@
     font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
     font-size: 14px;
     border-bottom: 1px solid #333;
-    padding-bottom: 2px;
-    padding-top: 2px;
-    padding-left: 2px;
-    padding-right: 2px;
+    padding: 4px 2px;
   }
 
   .global-menu-item:hover {
@@ -45,17 +43,22 @@
   border-bottom: 1px solid #333;
 
   p {
-    margin-top: 0;
-    margin-bottom: 2px;
+    font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
+    font-size: 13.5px;
+    margin: 0;
+    padding: 4px 2px;
   }
 
   input {
+    font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
     background: #252525;
     color: #eee;
     outline: none;
     border: none;
     padding: 4px;
-    width: 80px;
+    height: 16px;
+    width: 118px;
+    text-align: center;
     margin-left: 12px;
   }
 }
