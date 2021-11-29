@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useDispatch } from 'react-redux';
 
 import { useDraggable } from 'src/reactUtils';
-import { actionCreators } from 'src/redux';
+import { actionCreators, useSelector } from 'src/redux';
 import { ControlPanelVisualizationDescriptor } from 'src/redux/modules/controlPanel';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
@@ -25,6 +25,7 @@ const ControlPanelSpectrogram: React.FC<ControlPanelSpectrogramProps> = ({
     [dispatch, name, vcId]
   );
   const { onMouseDown, isDragging } = useDraggable(onDrag, position);
+  const isHidden = useSelector(state => state.controlPanel.stateByPanelInstance[vcId]?.hidden);
 
   return (
     <div
@@ -39,7 +40,7 @@ const ControlPanelSpectrogram: React.FC<ControlPanelSpectrogramProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <SpectrumVisualization analyzerNode={analyser}>
+      <SpectrumVisualization paused={isHidden} analyzerNode={analyser}>
         {isHovered ? (
           <div
             className='delete-input-button'

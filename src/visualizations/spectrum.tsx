@@ -37,7 +37,7 @@ interface SpectrumVisualizationProps {
   initialConf?: SpectrumVizSettings;
   canvasStyle?: React.CSSProperties;
   analyzerNode: AnalyserNode;
-  paused?: boolean;
+  paused: boolean;
   height?: number;
   children?: React.ReactNode;
 }
@@ -46,7 +46,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
   initialConf,
   canvasStyle,
   analyzerNode,
-  paused = false,
+  paused,
   height = 1024,
   children,
 }) => {
@@ -187,7 +187,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
           (acc, { id, name }) => ({ ...acc, [name]: id }),
           {}
         ),
-        initial: spectrumSettingsDefinition.scaler_functions[initialConf?.scaler_fn ?? 0].id,
+        initial: 1,
       },
       {
         type: 'select',
@@ -196,10 +196,10 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
           (acc, { id, name }) => ({ ...acc, [name]: id }),
           {}
         ),
-        initial: spectrumSettingsDefinition.color_functions[initialConf?.color_fn ?? 0].id,
+        initial: 2,
       },
     ];
-  }, [initialConf?.color_fn, initialConf?.scaler_fn, spectrumSettingsDefinition]);
+  }, [spectrumSettingsDefinition]);
 
   return (
     <>

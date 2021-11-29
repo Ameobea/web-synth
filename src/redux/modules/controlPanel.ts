@@ -140,6 +140,7 @@ export interface ControlPanelInstanceState {
     snapToGrid: boolean;
   }[];
   snapToGrid: boolean;
+  hidden: boolean;
 }
 
 const initialState: ControlPanelState = { stateByPanelInstance: {} };
@@ -262,16 +263,19 @@ const actionGroups = {
     ) => {
       const connections = initialConnections ? initialConnections.map(hydrateConnection) : [];
 
+      const instState: ControlPanelInstanceState = {
+        controls: connections,
+        midiKeyboards: initialMidiKeyboards ?? [],
+        visualizations: initialVisualizations ?? [],
+        presets: presets ?? [],
+        snapToGrid: snapToGrid ?? false,
+        hidden: false,
+      };
+
       return {
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
-          [vcId]: {
-            controls: connections,
-            midiKeyboards: initialMidiKeyboards ?? [],
-            visualizations: initialVisualizations ?? [],
-            presets: presets ?? [],
-            snapToGrid: snapToGrid ?? false,
-          },
+          [vcId]: instState,
         },
       };
     },
@@ -521,6 +525,7 @@ const actionGroups = {
             ),
             controls: preset.controls.map(hydrateConnection),
             snapToGrid: preset.snapToGrid,
+            hidden: false,
           },
         },
       };
@@ -759,6 +764,24 @@ const actionGroups = {
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
           [controlPanelVcId]: newInstState,
+        },
+      };
+    },
+  }),
+  SET_CONTROL_PANEL_HIDDEN: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, hidden: boolean) => ({
+      type: 'SET_CONTROL_PANEL_HIDDEN' as const,
+      controlPanelVcId,
+      hidden,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, hidden }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: { ...instState, hidden },
         },
       };
     },

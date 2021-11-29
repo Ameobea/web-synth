@@ -113,9 +113,17 @@ export const init_control_panel = (stateKey: string) => {
   );
 };
 
-export const hide_control_panel = mkContainerHider(getRootNodeID);
+export const hide_control_panel = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1];
+  dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_HIDDEN(vcId, true));
+  mkContainerHider(getRootNodeID)(stateKey);
+};
 
-export const unhide_control_panel = mkContainerUnhider(getRootNodeID);
+export const unhide_control_panel = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1];
+  dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_HIDDEN(vcId, false));
+  mkContainerUnhider(getRootNodeID)(stateKey);
+};
 
 export const cleanup_control_panel = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
