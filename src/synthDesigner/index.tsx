@@ -91,7 +91,7 @@ export const init_synth_designer = (stateKey: string) => {
   synthDesignerBase.id = getRootNodeId(vcId);
   synthDesignerBase.setAttribute(
     'style',
-    'z-index: 2; width: 100%; height: 100vh; position: absolute; top: 0; left: 0;'
+    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0;'
   );
 
   // Mount the newly created Faust editor and all of its accompanying components to the DOM

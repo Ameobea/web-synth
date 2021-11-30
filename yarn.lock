@@ -5793,10 +5793,10 @@ react-ace@^9.5.0:
     lodash.isequal "^4.5.0"
     prop-types "^15.7.2"
 
-react-control-panel@>=0.8.9:
-  version "0.8.9"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.8.9.tgz#9c37517dec79f015b79b48ce5574453f686783a3"
-  integrity sha512-B3x4HN+pOiz45r3oHKb5oozxDT216gfb+MqRtU06Nc5pb3zXfMuBTB0TqPjjcqXC5rc+vmoLZqIKMD7UhoG9AA==
+react-control-panel@>=0.8.10:
+  version "0.8.10"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.8.10.tgz#6b4e036885c2233f5ef9330c21e5217fe119476b"
+  integrity sha512-9UTQOeMHfZN56hz571rEj+PeCbtM9irKib3+AbX/tgZlI3N8PajH8JF+ARZvW2sTM81ArpIHf/O8or43Jum71g==
   dependencies:
     is-numeric "0.0.9"
     is-string "^1.0.5"

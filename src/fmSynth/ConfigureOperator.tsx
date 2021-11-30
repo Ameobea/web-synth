@@ -1,7 +1,6 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
 import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
@@ -25,13 +24,25 @@ export type OperatorConfig =
       dim0IntraMix: ParamSource;
       dim1IntraMix: ParamSource;
       interDimMix: ParamSource;
+      unison: number;
+      unisonDetune: ParamSource;
     }
-  | { type: 'sine oscillator'; frequency: ParamSource }
+  | { type: 'sine oscillator'; frequency: ParamSource; unison: number; unisonDetune: ParamSource }
   | { type: 'exponential oscillator'; frequency: ParamSource; stretchFactor: ParamSource }
   | { type: 'param buffer'; bufferIx: number }
-  | { type: 'square oscillator'; frequency: ParamSource }
-  | { type: 'triangle oscillator'; frequency: ParamSource }
-  | { type: 'sawtooth oscillator'; frequency: ParamSource };
+  | { type: 'square oscillator'; frequency: ParamSource; unison: number; unisonDetune: ParamSource }
+  | {
+      type: 'triangle oscillator';
+      frequency: ParamSource;
+      unison: number;
+      unisonDetune: ParamSource;
+    }
+  | {
+      type: 'sawtooth oscillator';
+      frequency: ParamSource;
+      unison: number;
+      unisonDetune: ParamSource;
+    };
 
 export const buildDefaultOperatorConfig = (
   type: OperatorConfig['type'] = 'sine oscillator'
@@ -44,6 +55,8 @@ export const buildDefaultOperatorConfig = (
       return {
         type,
         frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
+        unison: 1,
+        unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
       };
     }
     case 'exponential oscillator': {
@@ -64,6 +77,8 @@ export const buildDefaultOperatorConfig = (
         dim0IntraMix: buildDefaultParamSource('constant', 0, 1, 0.5),
         dim1IntraMix: buildDefaultParamSource('constant', 0, 1, 0.5),
         interDimMix: buildDefaultParamSource('constant', 0, 1, 0.5),
+        unison: 1,
+        unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
       };
     }
     default: {
@@ -256,6 +271,24 @@ interface ConfigureOperatorProps {
   setWavetableState: (newState: WavetableState) => void;
 }
 
+const OperatorTypeSettings = [
+  {
+    type: 'select',
+    label: 'operator type',
+    options: [
+      'sine oscillator',
+      'square oscillator',
+      'triangle oscillator',
+      'sawtooth oscillator',
+      'exponential oscillator',
+      'wavetable',
+      'param buffer',
+    ] as OperatorConfig['type'][],
+  },
+];
+
+const OperatorUnisonSettings = [{ type: 'range', label: 'unison', min: 0, max: 32, step: 1 }];
+
 const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   config,
   onChange,
@@ -268,31 +301,13 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   wavetableState,
   setWavetableState,
 }) => {
-  const operatorTypeSettings = useMemo(
-    () => [
-      {
-        type: 'select',
-        label: 'operator type',
-        options: [
-          'sine oscillator',
-          'square oscillator',
-          'triangle oscillator',
-          'sawtooth oscillator',
-          'exponential oscillator',
-          'wavetable',
-          'param buffer',
-        ] as OperatorConfig['type'][],
-      },
-    ],
-    []
-  );
   const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
   return (
     <div className='operator-config'>
       <ControlPanel
         width={500}
-        settings={operatorTypeSettings}
+        settings={OperatorTypeSettings}
         title={`configure operator ${operatorIx + 1}`}
         state={operatorTypeState}
         onChange={(key: string, val: any) => {
@@ -324,6 +339,42 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           adsrs={adsrs}
           onAdsrChange={onAdsrChange}
         />
+      ) : null}
+      {config.type === 'sine oscillator' ||
+      config.type === 'square oscillator' ||
+      config.type === 'triangle oscillator' ||
+      config.type === 'sawtooth oscillator' ||
+      config.type === 'wavetable' ? (
+        <>
+          <ControlPanel
+            width={500}
+            settings={OperatorUnisonSettings}
+            state={{ unison: config.unison }}
+            onChange={(key: string, val: any) => {
+              switch (key) {
+                case 'unison': {
+                  onChange({ ...config, unison: val });
+                  break;
+                }
+                default: {
+                  console.error('Unhandled key in operator unison control panel: ', key);
+                }
+              }
+            }}
+          />
+          {config.unison > 1 ? (
+            <ConfigureParamSource
+              title='unison detune'
+              state={config.unisonDetune}
+              onChange={newUnisonDetune => onChange({ ...config, unisonDetune: newUnisonDetune })}
+              min={0.5}
+              max={800}
+              scale='log'
+              adsrs={adsrs}
+              onAdsrChange={onAdsrChange}
+            />
+          ) : null}
+        </>
       ) : null}
       {config.type === 'exponential oscillator' ? (
         <ConfigureParamSource

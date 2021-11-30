@@ -28,6 +28,10 @@ pub struct AdsrState {
     pub shift: f32,
 }
 
+pub trait Oscillator {
+    fn gen_sample(&mut self, frequency: f32) -> f32;
+}
+
 #[derive(Clone, Default)]
 pub struct SineOscillator {
     pub phase: f32,
@@ -39,10 +43,8 @@ impl PhasedOscillator for SineOscillator {
     fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
 }
 
-impl SineOscillator {
-    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
-        // self.update_phase(frequency);
-
+impl Oscillator for SineOscillator {
+    fn gen_sample(&mut self, frequency: f32) -> f32 {
         let sine_lookup_table = crate::lookup_tables::get_sine_lookup_table();
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
@@ -78,8 +80,8 @@ impl PhasedOscillator for SquareOscillator {
     fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
 }
 
-impl SquareOscillator {
-    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
+impl Oscillator for SquareOscillator {
+    fn gen_sample(&mut self, frequency: f32) -> f32 {
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
             return if self.phase < 0.5 { 1. } else { -1. };
@@ -111,8 +113,8 @@ impl PhasedOscillator for TriangleOscillator {
     fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
 }
 
-impl TriangleOscillator {
-    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
+impl Oscillator for TriangleOscillator {
+    fn gen_sample(&mut self, frequency: f32) -> f32 {
         self.update_phase(frequency);
 
         let triangle_lookup_table = crate::lookup_tables::get_triangle_lookup_table();
@@ -134,8 +136,8 @@ impl PhasedOscillator for SawtoothOscillator {
     fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
 }
 
-impl SawtoothOscillator {
-    pub fn gen_sample(&mut self, frequency: f32) -> f32 {
+impl Oscillator for SawtoothOscillator {
+    fn gen_sample(&mut self, frequency: f32) -> f32 {
         let sawtooth_lookup_table = crate::lookup_tables::get_sawtooth_lookup_table();
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
@@ -193,6 +195,122 @@ impl PhasedOscillator for ExponentialOscillator {
     fn set_phase(&mut self, new_phase: f32) { self.phase = new_phase; }
 }
 
+#[derive(Clone)]
+pub struct UnisonOscillator<T> {
+    pub oscillators: Vec<T>,
+    pub unison_detune_range_semitones: ParamSource,
+}
+
+impl<T: PhasedOscillator> UnisonOscillator<T> {
+    pub fn set_phase(&mut self, new_phase: f32) {
+        let osc_count = self.oscillators.len() as f32;
+        for (i, osc) in self.oscillators.iter_mut().enumerate() {
+            // osc.set_phase((*rng()).gen_range(0., 1.));
+            // osc.set_phase(new_phase);
+            osc.set_phase((i as f32) * (i as f32 / osc_count));
+        }
+    }
+}
+
+impl<T: Clone + Oscillator + PhasedOscillator> UnisonOscillator<T> {
+    fn gen_sample(
+        &mut self,
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[Adsr],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+        frequency: f32,
+    ) -> f32 {
+        let mut out = 0.;
+        let unison_detune_range_semitones = self.unison_detune_range_semitones.get_raw(
+            param_buffers,
+            adsrs,
+            sample_ix_within_frame,
+            base_frequency,
+        );
+        let unison_detune_semitones_start =
+            -dsp::clamp(0., 1200., unison_detune_range_semitones / 2.);
+        let unison_detune_step_semitones =
+            unison_detune_range_semitones / (self.oscillators.len() - 1) as f32;
+
+        // TODO: This may need to be optimized
+        let middle_oscillator_ix = self.oscillators.len() as f32 / 2.;
+        let middle_count = if self.oscillators.len() % 2 == 0 {
+            2
+        } else {
+            1
+        };
+        let outer_count = self.oscillators.len() - middle_count;
+        let total_middle_gain_pct = if self.oscillators.len() == 2 {
+            1.
+        } else {
+            0.83
+        }; // TODO: Make configurable
+        let middle_gain_pct = total_middle_gain_pct / middle_count as f32;
+        let total_outer_gain_pct = 1. - total_middle_gain_pct;
+        let outer_gain_pct = if outer_count > 0 {
+            total_outer_gain_pct / outer_count as f32
+        } else {
+            0.
+        };
+
+        for (i, osc) in self.oscillators.iter_mut().enumerate() {
+            let frequency = compute_detune(
+                frequency,
+                unison_detune_semitones_start + i as f32 * unison_detune_step_semitones,
+            );
+            let is_middle = ((i as f32) - middle_oscillator_ix).abs() < 1.;
+            let gain = if is_middle {
+                middle_gain_pct
+            } else {
+                outer_gain_pct
+            };
+            out += osc.gen_sample(frequency) * gain;
+        }
+        out
+    }
+}
+
+impl UnisonOscillator<WaveTableHandle> {
+    fn gen_sample(
+        &mut self,
+        wavetables: &[WaveTable],
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[Adsr],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+        frequency: f32,
+    ) -> f32 {
+        let mut out = 0.;
+        let unison_detune_range_semitones = self.unison_detune_range_semitones.get_raw(
+            param_buffers,
+            adsrs,
+            sample_ix_within_frame,
+            base_frequency,
+        );
+        let unison_detune_semitones_start =
+            dsp::clamp(0., 1200., -unison_detune_range_semitones / 2.);
+        let unison_detune_step_semitones =
+            unison_detune_range_semitones / (self.oscillators.len() - 1) as f32;
+
+        for (i, osc) in self.oscillators.iter_mut().enumerate() {
+            let frequency = compute_detune(
+                frequency,
+                unison_detune_semitones_start + i as f32 * unison_detune_step_semitones,
+            );
+            out += osc.gen_sample(
+                frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            );
+        }
+        out / self.oscillators.len() as f32
+    }
+}
+
 /// Taken from `fastapprox::fast` but with some checks/extra work removed since we know things
 /// statically that the compiler can't seem to figure out even with some coaxing
 mod fast {
@@ -225,7 +343,7 @@ mod fast {
 }
 
 impl ExponentialOscillator {
-    pub fn gen_sample_with_stretch_factor(&mut self, frequency: f32, stretch_factor: f32) -> f32 {
+    fn gen_sample_with_stretch_factor(&mut self, frequency: f32, stretch_factor: f32) -> f32 {
         self.update_phase(frequency);
         let stretch_factor = dsp::clamp(0., 1., stretch_factor);
 
@@ -374,6 +492,11 @@ pub enum OscillatorSource {
     Square(SquareOscillator),
     Triangle(TriangleOscillator),
     Sawtooth(SawtoothOscillator),
+    UnisonSine(UnisonOscillator<SineOscillator>),
+    UnisonWavetable(UnisonOscillator<WaveTableHandle>),
+    UnisonSquare(UnisonOscillator<SquareOscillator>),
+    UnisonTriangle(UnisonOscillator<TriangleOscillator>),
+    UnisonSawtooth(UnisonOscillator<SawtoothOscillator>),
 }
 
 impl OscillatorSource {
@@ -388,6 +511,28 @@ impl OscillatorSource {
             OscillatorSource::Square(osc) => Some(osc.get_phase()),
             OscillatorSource::Triangle(osc) => Some(osc.get_phase()),
             OscillatorSource::Sawtooth(osc) => Some(osc.get_phase()),
+            OscillatorSource::UnisonSine(_) => None,
+            OscillatorSource::UnisonWavetable(_) => None,
+            OscillatorSource::UnisonSquare(_) => None,
+            OscillatorSource::UnisonTriangle(_) => None,
+            OscillatorSource::UnisonSawtooth(_) => None,
+        }
+    }
+
+    pub fn set_phase(&mut self, new_phase: f32) {
+        match self {
+            OscillatorSource::Wavetable(handle) => handle.phase = new_phase,
+            OscillatorSource::ParamBuffer(_) => (),
+            OscillatorSource::Sine(osc) => osc.set_phase(new_phase),
+            OscillatorSource::ExponentialOscillator(osc) => osc.set_phase(new_phase),
+            OscillatorSource::Square(osc) => osc.set_phase(new_phase),
+            OscillatorSource::Triangle(osc) => osc.set_phase(new_phase),
+            OscillatorSource::Sawtooth(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonSine(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonWavetable(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonSquare(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonTriangle(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonSawtooth(osc) => osc.set_phase(new_phase),
         }
     }
 }
@@ -436,6 +581,42 @@ impl OscillatorSource {
             OscillatorSource::Square(osc) => osc.gen_sample(frequency),
             OscillatorSource::Triangle(osc) => osc.gen_sample(frequency),
             OscillatorSource::Sawtooth(osc) => osc.gen_sample(frequency),
+            OscillatorSource::UnisonSine(osc) => osc.gen_sample(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                frequency,
+            ),
+            OscillatorSource::UnisonWavetable(osc) => osc.gen_sample(
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                frequency,
+            ),
+            OscillatorSource::UnisonSquare(osc) => osc.gen_sample(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                frequency,
+            ),
+            OscillatorSource::UnisonTriangle(osc) => osc.gen_sample(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                frequency,
+            ),
+            OscillatorSource::UnisonSawtooth(osc) => osc.gen_sample(
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+                frequency,
+            ),
         }
     }
 }
@@ -509,6 +690,14 @@ fn compute_modulated_frequency(
     output_freq
 }
 
+/// Based off of WebAudio's detune:
+/// https://www.w3.org/TR/webaudio/#computedfrequency
+///
+/// computedFrequency(t) = frequency(t) * pow(2, detune(t) / 1200)
+fn compute_detune(freq: f32, detune_semitones: f32) -> f32 {
+    freq * fastapprox::fast::pow2(detune_semitones / 1200.)
+}
+
 impl FMSynthVoice {
     pub fn gen_samples(
         &mut self,
@@ -560,16 +749,12 @@ impl FMSynthVoice {
                     &mut detune_outputs,
                 );
 
-                // Based off of WebAudio's detune:
-                // https://www.w3.org/TR/webaudio/#computedfrequency
-                //
-                // computedFrequency(t) = frequency(t) * pow(2, detune(t) / 1200)
                 for i in 0..FRAME_SIZE {
                     unsafe {
-                        let freq = raw_base_frequencies.get_unchecked(i);
-                        let detune = detune_outputs.get_unchecked(i);
+                        let freq = *raw_base_frequencies.get_unchecked(i);
+                        let detune = *detune_outputs.get_unchecked(i);
                         *detuned_base_frequencies.get_unchecked_mut(i) =
-                            freq * fastapprox::fast::pow2(detune / 1200.);
+                            compute_detune(freq, detune);
                     }
                 }
 
@@ -1232,6 +1417,13 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
     (*ctx).update_operator_enabled_statuses();
 }
 
+fn randomize_phases<T: PhasedOscillator>(mut oscs: Vec<T>) -> Vec<T> {
+    // for (i, osc) in oscs.iter_mut().enumerate() {
+    //     osc.set_phase(((i as f32) * 0.8389).fract());
+    // }
+    oscs
+}
+
 fn build_oscillator_source(
     operator_type: usize,
     param_0_value_type: usize,
@@ -1250,6 +1442,7 @@ fn build_oscillator_source(
     param_3_val_int: usize,
     param_3_val_float: f32,
     param_3_val_float_2: f32,
+    // TODO: Support setting phases for unison oscillators
     phase_opt: Option<f32>,
 ) -> OscillatorSource {
     match operator_type {
@@ -1296,6 +1489,63 @@ fn build_oscillator_source(
         }),
         6 => OscillatorSource::Sawtooth(SawtoothOscillator {
             phase: phase_opt.unwrap_or_default(),
+        }),
+        52 => OscillatorSource::UnisonSine(UnisonOscillator {
+            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
+                param_1_value_type,
+                param_1_val_int,
+                param_1_val_float,
+                param_1_val_float_2,
+            )),
+            oscillators: randomize_phases(vec![
+                SineOscillator {
+                    phase: phase_opt.unwrap_or_default(),
+                };
+                param_0_val_int
+            ]),
+        }),
+        50 => OscillatorSource::UnisonWavetable(todo!()),
+        54 => OscillatorSource::UnisonSquare(UnisonOscillator {
+            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
+                param_1_value_type,
+                param_1_val_int,
+                param_1_val_float,
+                param_1_val_float_2,
+            )),
+            oscillators: randomize_phases(vec![
+                SquareOscillator {
+                    phase: phase_opt.unwrap_or_default(),
+                };
+                param_0_val_int
+            ]),
+        }),
+        55 => OscillatorSource::UnisonTriangle(UnisonOscillator {
+            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
+                param_1_value_type,
+                param_1_val_int,
+                param_1_val_float,
+                param_1_val_float_2,
+            )),
+            oscillators: randomize_phases(vec![
+                TriangleOscillator {
+                    phase: phase_opt.unwrap_or_default(),
+                };
+                param_0_val_int
+            ]),
+        }),
+        56 => OscillatorSource::UnisonSawtooth(UnisonOscillator {
+            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
+                param_1_value_type,
+                param_1_val_int,
+                param_1_val_float,
+                param_1_val_float_2,
+            )),
+            oscillators: randomize_phases(vec![
+                SawtoothOscillator {
+                    phase: phase_opt.unwrap_or_default(),
+                };
+                param_0_val_int
+            ]),
         }),
         _ => panic!("Invalid operator type: {}", operator_type),
     }
@@ -1462,6 +1712,10 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
     for (i, adsr) in (*ctx).voices[voice_ix].adsrs.iter_mut().enumerate() {
         adsr.store_phase_to = Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(i));
         adsr.gate();
+    }
+
+    for operator in &mut (*ctx).voices[voice_ix].operators {
+        operator.oscillator_source.set_phase(0.);
     }
 }
 

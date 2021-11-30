@@ -551,7 +551,7 @@ const ConfigureControlPanel: React.FC<ConfigureControlPanelProps> = ({ vcId }) =
         <div className='global-menu-backdrop' onClick={() => setIsOpen(false)} />
         <ControlPanel
           className='main-control-panel'
-          position='top-left'
+          position='bottom-left'
           settings={settings}
           state={state}
           onChange={handleChange}

@@ -17,7 +17,11 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 // import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { ParamSource, buildDefaultAdsr } from 'src/fmSynth/ConfigureParamSource';
+import {
+  ParamSource,
+  buildDefaultAdsr,
+  buildDefaultParamSource,
+} from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import { AsyncOnce, getHasSIMDSupport } from 'src/util';
 import { AudioThreadData } from 'src/controls/adsr2/adsr2';
@@ -447,19 +451,26 @@ export default class FMSynth implements ForeignNode {
       }
     }
 
+    const unisonEnabled = !R.isNil((config as any).unison) && +(config as any).unison > 1;
+    const { unison, unisonDetune }: { unison: number | null; unisonDetune: ParamSource | null } =
+      unisonEnabled
+        ? { unison: (config as any).unison, unisonDetune: (config as any).unisonDetune }
+        : { unison: null, unisonDetune: null };
+
     // Set the operator config along with any hyperparam config
     this.awpHandle.port.postMessage({
       type: 'setOperatorConfig',
       operatorIx,
-      operatorType: {
-        wavetable: 0,
-        'sine oscillator': 2,
-        'exponential oscillator': 3,
-        'param buffer': 1,
-        'square oscillator': 4,
-        'triangle oscillator': 5,
-        'sawtooth oscillator': 6,
-      }[config.type],
+      operatorType:
+        {
+          wavetable: 0,
+          'sine oscillator': 2,
+          'exponential oscillator': 3,
+          'param buffer': 1,
+          'square oscillator': 4,
+          'triangle oscillator': 5,
+          'sawtooth oscillator': 6,
+        }[config.type] + (unisonEnabled ? 50 : 0),
       ...(() => {
         switch (config.type) {
           case 'exponential oscillator':
@@ -473,9 +484,18 @@ export default class FMSynth implements ForeignNode {
               param2: this.encodeParamSource(config.dim0IntraMix),
               param3: this.encodeParamSource(config.dim1IntraMix),
               param4: this.encodeParamSource(config.interDimMix),
+              param5: unisonDetune ? this.encodeParamSource(unisonDetune) : null,
             };
-          default:
-            return {};
+          default: {
+            if (!unisonDetune) {
+              return {};
+            }
+
+            return {
+              param1: { valParamInt: unison },
+              param2: this.encodeParamSource(unisonDetune),
+            };
+          }
         }
       })(),
     });
@@ -739,7 +759,23 @@ export default class FMSynth implements ForeignNode {
       }
     }
     if (params.operatorConfigs) {
-      this.operatorConfigs = params.operatorConfigs;
+      this.operatorConfigs = (params.operatorConfigs as OperatorConfig[]).map(op => {
+        // Backwards compat
+        if (
+          [
+            'sine oscillator',
+            'triangle oscillator',
+            'sawtooth oscillator',
+            'square oscillator',
+            'wavetable',
+          ].includes(op.type)
+        ) {
+          (op as any).unison = (op as any).unison ?? 1;
+          (op as any).unisonDetune =
+            (op as any).unisonDetune ?? buildDefaultParamSource('constant', 0, 300, 0);
+        }
+        return op;
+      });
     }
     if (params.onInitialized) {
       this.onInitialized = params.onInitialized;

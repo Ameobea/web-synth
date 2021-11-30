@@ -135,7 +135,7 @@ deploy:
 
   # just build-all
   # phost update notes patch ./dist
-  rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" --delete ./dist/* debian@synth.ameo.dev:/var/www/synth.ameo.dev/
+  rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" ./dist/* debian@synth.ameo.dev:/var/www/synth.ameo.dev/
 
 loc:
   tokei --exclude src/vocalSynthesis/hts_engine_API --exclude src/vocalSynthesis/sinsy .
