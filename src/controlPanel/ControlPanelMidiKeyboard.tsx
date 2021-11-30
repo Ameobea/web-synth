@@ -10,6 +10,7 @@ import { useDraggable } from 'src/reactUtils';
 
 interface ControlPanelMidiKeyboardProps extends ControlPanelMidiKeyboardDescriptor {
   vcId: string;
+  isEditing: boolean;
 }
 
 const ControlPanelMidiKeyboard: React.FC<ControlPanelMidiKeyboardProps> = ({
@@ -18,6 +19,7 @@ const ControlPanelMidiKeyboard: React.FC<ControlPanelMidiKeyboardProps> = ({
   octaveOffset,
   position,
   midiNode,
+  isEditing,
 }) => {
   const onDrag = useCallback(
     (newPos: { x: number; y: number }) =>
@@ -48,9 +50,11 @@ const ControlPanelMidiKeyboard: React.FC<ControlPanelMidiKeyboardProps> = ({
   return (
     <div className='control-panel-midi-keyboard' style={{ top: position.y, left: position.x }}>
       <div
-        onMouseDown={onMouseDown}
+        onMouseDown={isEditing ? onMouseDown : undefined}
         className='top-drag-bar'
-        style={isDragging ? { cursor: 'grabbing' } : undefined}
+        style={
+          isEditing ? (isDragging ? { cursor: 'grabbing' } : undefined) : { cursor: 'default' }
+        }
       >
         <div
           className='delete-input-button'

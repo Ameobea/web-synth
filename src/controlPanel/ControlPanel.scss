@@ -6,38 +6,59 @@
   max-height: calc(100vh - 34px);
   overflow: auto;
 
+  .control-panel-settings-button {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    line-height: 0;
+    position: absolute;
+    left: 3px;
+    border: 1px solid #333;
+    cursor: pointer;
+  }
+
   .control-panel-content {
     /* \/ This makes the absolute positioned elements inside of it work when this is scrolled. */
     position: relative;
   }
 
+  .control-panel-content-locked {
+    .configure-input-button,
+    .delete-input-button {
+      display: none !important;
+    }
+  }
+
   .main-control-panel {
-    margin-top: 1px;
     margin-left: 1px;
+    z-index: 10000000;
+    position: absolute;
   }
 
   .configure-input-button {
     position: absolute;
-    top: 2px;
+    top: 0px;
     left: 1px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 9px;
   }
 
   .delete-input-button {
     position: absolute;
-    top: 2px;
+    top: 0px;
     left: 16px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 9px;
   }
 
-  .control {
-    .control-panel {
-      .container {
-        margin-top: 6px;
-      }
-    }
+  .control .control-panel {
+    padding-top: 15px !important;
+    padding-bottom: 10px !important;
+    border: 1px solid #444;
+    box-sizing: border-box;
   }
 }
 
@@ -62,6 +83,7 @@
   border: 1px solid #888;
   padding: 2px;
   margin-top: 1px;
+  margin-left: -5px;
 }
 
 @media (min-width: 800px) {
@@ -107,10 +129,9 @@
 
 .control-panel-note {
   position: absolute;
-  border: 1px solid #888;
+  border: 1px solid #333;
   color: #eee;
   background-color: #242424;
-  padding: 3px;
 
   .control-panel-note-drag-bar {
     width: 100%;
@@ -125,11 +146,46 @@
   }
 
   .control-panel-note-content {
-    cursor: pointer;
     width: 100%;
-    height: calc(100% - 14px);
+    height: calc(100% - 18px);
     /* Display newlines */
     white-space: pre-line;
+    overflow: auto;
+    background-color: #121212;
+    padding: 3px;
+    box-sizing: border-box;
+
+    h2 {
+      margin-top: 2px;
+      margin-bottom: 4px;
+    }
+    h3 {
+      margin-top: 2px;
+      margin-bottom: 2px;
+    }
+    p {
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+    pre {
+      display: block;
+      padding: 10px 8px;
+      background-color: #222;
+      border-radius: 4px;
+      margin: 8px 5px;
+
+      > code {
+        margin: 0;
+        padding: 0;
+      }
+    }
+    code {
+      background-color: #222;
+      border-radius: 4px;
+      color: #e0b3a7;
+      padding: 1px 4px;
+      margin: 2px 0;
+    }
   }
 
   textarea {

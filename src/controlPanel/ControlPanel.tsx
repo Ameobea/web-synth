@@ -41,6 +41,7 @@ interface SerializedControlPanelState {
   visualizations: SerializedControlPanelVisualizationDescriptor[];
   presets: ControlPanelInstanceState['presets'];
   snapToGrid: boolean;
+  isEditing: boolean;
 }
 
 const saveStateForInstance = (stateKey: string) => {
@@ -56,6 +57,7 @@ const saveStateForInstance = (stateKey: string) => {
     visualizations: instanceState.visualizations.map(serializeControlPanelVisualizationDescriptor),
     presets: instanceState.presets,
     snapToGrid: instanceState.snapToGrid ?? false,
+    isEditing: instanceState.isEditing,
   };
 
   const serializedConnections = JSON.stringify(serialized);
@@ -78,6 +80,7 @@ export const init_control_panel = (stateKey: string) => {
           midiKeyboards,
           visualizations,
           snapToGrid,
+          isEditing,
         }: SerializedControlPanelState = JSON.parse(serialized);
         return Option.some({
           connections: connections.map(conn => {
@@ -90,6 +93,7 @@ export const init_control_panel = (stateKey: string) => {
           visualizations,
           presets: Array.isArray(presets) ? presets : [],
           snapToGrid: snapToGrid ?? false,
+          isEditing: isEditing ?? true,
         });
       } catch (err) {
         console.warn('Failed to parse serialized control panel state; defaulting.');
@@ -104,7 +108,8 @@ export const init_control_panel = (stateKey: string) => {
       serialized?.midiKeyboards,
       serialized?.visualizations.map(deserializeControlPanelVisualizationDescriptor),
       serialized?.presets,
-      serialized?.snapToGrid ?? false
+      serialized?.snapToGrid ?? false,
+      serialized?.isEditing
     )
   );
 

@@ -1,13 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import ControlPanel from 'react-control-panel';
+import { UnimplementedError } from 'ameo-utils';
+import showdown from 'showdown';
+import showdownXssFilter from 'showdown-xss-filter';
+
+const MarkdownRenderer = new showdown.Converter({ extensions: [showdownXssFilter] });
+MarkdownRenderer.setFlavor('github');
 
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import { useDraggable } from 'src/reactUtils';
 import { actionCreators } from 'src/redux';
 import { ControlPanelVisualizationDescriptor } from 'src/redux/modules/controlPanel';
-import { UnimplementedError } from 'ameo-utils';
 
 const mkConfigureViz = (
   providedControl: ControlPanelVisualizationDescriptor,
@@ -26,6 +31,7 @@ const mkConfigureViz = (
         case 'note':
           return [
             { type: 'text', label: 'title' },
+            { type: 'checkbox', label: 'markdown' },
             { type: 'range', label: 'width', min: 50, max: 1000, step: 5 },
             { type: 'range', label: 'height', min: 50, max: 1000, step: 5 },
             { type: 'text', label: 'font size' },
@@ -46,6 +52,7 @@ const mkConfigureViz = (
                 case 'note':
                   return {
                     title: control.title,
+                    markdown: control.markdown,
                     width: control.style.width,
                     height: control.style.height,
                     'font size': control.style.fontSize,
@@ -64,6 +71,9 @@ const mkConfigureViz = (
                       break;
                     case 'title':
                       setControl({ ...control, title: val });
+                      break;
+                    case 'markdown':
+                      setControl({ ...control, markdown: !!val });
                       break;
                     case 'font size':
                       setControl({
@@ -96,10 +106,27 @@ const mkConfigureViz = (
   return ConfigureControlPanelViz;
 };
 
-const DragBar: React.FC<{
+const renderMarkdown = (
+  content: string
+): { type: 'html'; content: string } | { type: 'react'; content: React.ReactNode } => {
+  try {
+    const rendered = MarkdownRenderer.makeHtml(content);
+    return { type: 'html', content: rendered };
+  } catch (err) {
+    return {
+      type: 'react',
+      content: <span style={{ color: 'red' }}>Error rendering markdown: {`${err}`}</span>,
+    };
+  }
+};
+
+interface DragBarProps {
   vcId: string;
   control: Extract<ControlPanelVisualizationDescriptor, { type: 'note' }>;
-}> = ({ vcId, control }) => {
+  isEditing: boolean;
+}
+
+const DragBar: React.FC<DragBarProps> = ({ vcId, control, isEditing }) => {
   const dispatch = useDispatch();
   const onDrag = useCallback(
     (newPos: { x: number; y: number }) =>
@@ -110,8 +137,8 @@ const DragBar: React.FC<{
 
   return (
     <div
-      onMouseDown={onMouseDown}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      onMouseDown={isEditing ? onMouseDown : undefined}
+      style={isEditing ? { cursor: isDragging ? 'grabbing' : 'grab' } : undefined}
       className='control-panel-note-drag-bar'
     >
       <div
@@ -152,9 +179,14 @@ const DragBar: React.FC<{
 interface ControlPanelNoteProps
   extends Extract<ControlPanelVisualizationDescriptor, { type: 'note' }> {
   vcId: string;
+  isEditing: boolean;
 }
 
-const ControlPanelNote: React.FC<ControlPanelNoteProps> = ({ vcId, ...control }) => {
+const ControlPanelNote: React.FC<ControlPanelNoteProps> = ({
+  vcId,
+  isEditing: isEditingControlPanel,
+  ...control
+}) => {
   const { content, style, position } = control;
   const [isEditing, setIsEditing] = useState(false);
   const [editingContent, setEditingContent] = useState(content);
@@ -198,10 +230,41 @@ const ControlPanelNote: React.FC<ControlPanelNoteProps> = ({ vcId, ...control })
       textAreaRef.current.selectionStart = textAreaRef.current.value.length;
     }
   }, [isEditing]);
+  const renderedContent = useMemo(() => {
+    if (isEditing) {
+      return null;
+    }
+
+    const rendered = control.markdown
+      ? renderMarkdown(control.content)
+      : { type: 'react' as const, content: control.content };
+
+    const style = isEditingControlPanel ? { cursor: 'pointer' } : undefined;
+    return rendered.type === 'react' ? (
+      <div
+        onDoubleClick={isEditingControlPanel ? () => setIsEditing(true) : undefined}
+        className='control-panel-note-content'
+        style={style}
+      >
+        {rendered.content}
+      </div>
+    ) : (
+      <div
+        onDoubleClick={isEditingControlPanel ? () => setIsEditing(true) : undefined}
+        className='control-panel-note-content'
+        style={style}
+      >
+        <div
+          style={{ paddingBottom: 6, whiteSpace: 'normal', overflow: 'hidden' }}
+          dangerouslySetInnerHTML={{ __html: rendered.content }}
+        />
+      </div>
+    );
+  }, [control.content, control.markdown, isEditing, isEditingControlPanel]);
 
   return (
     <div className='control-panel-note' style={{ ...style, top: position.y, left: position.x }}>
-      <DragBar vcId={vcId} control={control} />
+      <DragBar vcId={vcId} control={control} isEditing={isEditingControlPanel} />
       {isEditing ? (
         <textarea
           ref={textAreaRef}
@@ -210,9 +273,7 @@ const ControlPanelNote: React.FC<ControlPanelNoteProps> = ({ vcId, ...control })
           style={{ fontSize: style.fontSize }}
         />
       ) : (
-        <div onDoubleClick={() => setIsEditing(true)} className='control-panel-note-content'>
-          {content}
-        </div>
+        renderedContent
       )}
     </div>
   );

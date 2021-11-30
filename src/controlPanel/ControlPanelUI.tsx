@@ -1,9 +1,8 @@
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
 
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import {
@@ -11,6 +10,7 @@ import {
   ControlInfo,
   Control,
   ControlPanelConnection,
+  ControlPanelInstanceState,
 } from 'src/redux/modules/controlPanel';
 import BasicModal from 'src/misc/BasicModal';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
@@ -311,9 +311,20 @@ const buildSettingForControl = (
   }
 };
 
-const ControlComp: React.FC<
-  ControlPanelConnection & { controlPanelVcId: string; snapToGrid: boolean }
-> = ({ controlPanelVcId, vcId, name, control, snapToGrid }) => (
+interface ControlCompProps extends ControlPanelConnection {
+  controlPanelVcId: string;
+  snapToGrid: boolean;
+  isEditing: boolean;
+}
+
+const ControlComp: React.FC<ControlCompProps> = ({
+  controlPanelVcId,
+  vcId,
+  name,
+  control,
+  snapToGrid,
+  isEditing,
+}) => (
   <div className='control'>
     <div className='label' style={{ color: control.color }}>
       <ControlPanel
@@ -321,7 +332,7 @@ const ControlComp: React.FC<
           () => ({ top: control.position.y, left: control.position.x }),
           [control.position.x, control.position.y]
         )}
-        draggable
+        draggable={isEditing}
         dragSnapPx={snapToGrid ? 10 : undefined}
         state={useMemo(() => ({ [name]: control.value }), [control.value, name])}
         onChange={useCallback(
@@ -336,8 +347,8 @@ const ControlComp: React.FC<
             ),
           [controlPanelVcId, name, vcId]
         )}
-        onDrag={useCallback(
-          (newPosition: { top?: number; left?: number }) =>
+        onDrag={useMemo(
+          () => (newPosition: { top?: number; left?: number }) =>
             dispatch(
               actionCreators.controlPanel.SET_CONTROL_POSITION(
                 controlPanelVcId,
@@ -376,118 +387,197 @@ const ControlComp: React.FC<
   </div>
 );
 
-const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+const buildConfigureControlPanelSettings = (
+  vcId: string,
+  elementType: string,
+  presets: ControlPanelInstanceState['presets'],
+  panelCtx: React.MutableRefObject<any>,
+  setIsOpen: (isEditing: boolean) => void
+) => [
+  {
+    type: 'select',
+    label: 'element type',
+    options: ['midi keyboard', 'spectrogram', 'slider', 'button', 'note'],
+  },
+  {
+    type: 'button',
+    label: 'add element',
+    action: () => {
+      switch (elementType) {
+        case 'midi keyboard':
+          dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_MIDI_KEYBOARD(vcId));
+          break;
+        case 'spectrogram':
+          dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_VIZ(vcId, 'spectrogram'));
+          break;
+        case 'slider':
+          dispatch(
+            actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(vcId, '', 'slider', 'range')
+          );
+          break;
+        case 'button':
+          dispatch(
+            actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(vcId, '', 'gate', 'gate')
+          );
+          break;
+        case 'note':
+          dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_VIZ(vcId, 'note'));
+          break;
+        default:
+          console.error('Unhandled element type when adding to control panel: ', elementType);
+      }
+    },
+  },
+  {
+    type: 'checkbox',
+    label: 'enable editing',
+  },
+  {
+    type: 'checkbox',
+    label: 'snap to grid',
+  },
+  { type: 'select', label: 'preset', options: presets.map(R.prop('name')) },
+  {
+    type: 'button',
+    label: 'load preset',
+    action: () => {
+      if (!panelCtx.current) {
+        console.error("Tried to load preset, but panel context isn't set");
+        return;
+      }
+      if (R.isEmpty(presets)) {
+        alert('No preset to load!');
+        return;
+      }
+      const presetName = panelCtx.current.preset || presets[0].name;
+      dispatch(actionCreators.controlPanel.LOAD_PRESET(vcId, presetName));
+    },
+  },
+  {
+    type: 'button',
+    label: 'delete preset',
+    action: () => {
+      if (!panelCtx.current) {
+        console.error("Tried to delete preset, but panel context isn't set");
+        return;
+      }
+      if (R.isEmpty(presets)) {
+        alert('No preset to delete!');
+        return;
+      }
+      const presetName = panelCtx.current.preset ?? presets[0].name;
+      const shouldDelete = confirm(`Really delete the preset named "${presetName}"?`);
+      if (!shouldDelete) {
+        return;
+      }
+      dispatch(actionCreators.controlPanel.DELETE_PRESET(vcId, presetName));
+    },
+  },
+  { type: 'text', label: 'preset name' },
+  {
+    type: 'button',
+    label: 'save preset',
+    action: () => {
+      if (!panelCtx.current) {
+        console.error("Tried to save preset, but panel context isn't set");
+        return;
+      }
+      const presetName = panelCtx.current['preset name'];
+      if (presets.find(R.propEq('name' as const, presetName))) {
+        alert('A preset already exists with that name; choose a unique name');
+        return;
+      }
+      dispatch(actionCreators.controlPanel.SAVE_PRESET(vcId, presetName));
+    },
+  },
+  {
+    type: 'button',
+    label: 'close settings',
+    action: () => setIsOpen(false),
+  },
+];
+
+interface ConfigureControlPanelProps {
+  vcId: string;
+}
+
+const ConfigureControlPanel: React.FC<ConfigureControlPanelProps> = ({ vcId }) => {
+  const [isOpen, setIsOpen] = useState(false);
   const [elementType, setElementType] = useState('midi keyboard');
-  const vcId = stateKey.split('_')[1];
-  const { controls, midiKeyboards, presets, visualizations, snapToGrid } = useSelector(
-    (state: ReduxStore) => state.controlPanel.stateByPanelInstance[vcId]
-  );
   const panelCtx = useRef<any>(null);
-  const presetPanelSettings = useMemo(
-    () => [
-      {
-        type: 'select',
-        label: 'element type',
-        options: ['midi keyboard', 'spectrogram', 'slider', 'button', 'note'],
-      },
-      {
-        type: 'button',
-        label: 'add element',
-        action: () => {
-          switch (elementType) {
-            case 'midi keyboard':
-              dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_MIDI_KEYBOARD(vcId));
-              break;
-            case 'spectrogram':
-              dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_VIZ(vcId, 'spectrogram'));
-              break;
-            case 'slider':
-              dispatch(
-                actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(
-                  vcId,
-                  '',
-                  'slider',
-                  'range'
-                )
-              );
-              break;
-            case 'button':
-              dispatch(
-                actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(vcId, '', 'gate', 'gate')
-              );
-              break;
-            case 'note':
-              dispatch(actionCreators.controlPanel.ADD_CONTROL_PANEL_VIZ(vcId, 'note'));
-              break;
-            default:
-              console.error('Unhandled element type when adding to control panel: ', elementType);
-          }
-        },
-      },
-      {
-        type: 'checkbox',
-        label: 'snap to grid',
-      },
-      { type: 'select', label: 'preset', options: presets.map(R.prop('name')) },
-      {
-        type: 'button',
-        label: 'load preset',
-        action: () => {
-          if (!panelCtx.current) {
-            console.error("Tried to load preset, but panel context isn't set");
-            return;
-          }
-          if (R.isEmpty(presets)) {
-            alert('No preset to load!');
-            return;
-          }
-          const presetName = panelCtx.current.preset || presets[0].name;
-          dispatch(actionCreators.controlPanel.LOAD_PRESET(vcId, presetName));
-        },
-      },
-      {
-        type: 'button',
-        label: 'delete preset',
-        action: () => {
-          if (!panelCtx.current) {
-            console.error("Tried to delete preset, but panel context isn't set");
-            return;
-          }
-          if (R.isEmpty(presets)) {
-            alert('No preset to delete!');
-            return;
-          }
-          const presetName = Option.of(panelCtx.current.preset).getOrElse(presets[0].name);
-          const shouldDelete = confirm(`Really delete the preset named "${presetName}"?`);
-          if (!shouldDelete) {
-            return;
-          }
-          dispatch(actionCreators.controlPanel.DELETE_PRESET(vcId, presetName));
-        },
-      },
-      { type: 'text', label: 'preset name' },
-      {
-        type: 'button',
-        label: 'save preset',
-        action: () => {
-          if (!panelCtx.current) {
-            console.error("Tried to save preset, but panel context isn't set");
-            return;
-          }
-          const presetName = panelCtx.current['preset name'];
-          if (presets.find(R.propEq('name' as const, presetName))) {
-            alert('A preset already exists with that name; choose a unique name');
-            return;
-          }
-          dispatch(actionCreators.controlPanel.SAVE_PRESET(vcId, presetName));
-        },
-      },
-    ],
+  const { presets, snapToGrid, isEditing } = useSelector(
+    (state: ReduxStore) =>
+      R.pick(['presets', 'snapToGrid', 'isEditing'], state.controlPanel.stateByPanelInstance[vcId]),
+    shallowEqual
+  );
+
+  const settings = useMemo(
+    () => buildConfigureControlPanelSettings(vcId, elementType, presets, panelCtx, setIsOpen),
     [elementType, presets, vcId]
+  );
+  const state = useMemo(
+    () => ({
+      'snap to grid': snapToGrid,
+      'element type': elementType,
+      'enable editing': isEditing,
+    }),
+    [elementType, isEditing, snapToGrid]
+  );
+  const handleChange = useCallback(
+    (key: string, value: any) => {
+      switch (key) {
+        case 'element type':
+          setElementType(value);
+          break;
+        case 'snap to grid':
+          dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_SNAP_TO_GRID(vcId, value));
+          break;
+        case 'enable editing':
+          dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_IS_EDITING(vcId, !!value));
+          break;
+        default:
+          console.error('Unhandled key in preset panel: ', key);
+      }
+    },
+    [vcId]
   );
   const ctxCb = useCallback((ctx: any) => {
     panelCtx.current = ctx;
   }, []);
+
+  if (isOpen) {
+    return (
+      <>
+        <div className='global-menu-backdrop' onClick={() => setIsOpen(false)} />
+        <ControlPanel
+          className='main-control-panel'
+          position='top-left'
+          settings={settings}
+          state={state}
+          onChange={handleChange}
+          contextCb={ctxCb}
+        />
+      </>
+    );
+  }
+
+  return (
+    <div className='control-panel-settings-button' onClick={() => setIsOpen(true)}>
+      ⚙
+    </div>
+  );
+};
+
+const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+  const vcId = stateKey.split('_')[1];
+  const { controls, midiKeyboards, visualizations, snapToGrid, isEditing } = useSelector(
+    (state: ReduxStore) =>
+      R.pick(
+        ['controls', 'midiKeyboards', 'visualizations', 'snapToGrid', 'isEditing'],
+        state.controlPanel.stateByPanelInstance[vcId]
+      ),
+    shallowEqual
+  );
 
   const [containerSize, setContainerSize] = useState({ height: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -507,55 +597,42 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       maxEndVertical = Math.max(maxEndVertical, endVertical);
     }
 
-    setContainerSize({ height: maxEndVertical, width: maxEndHorizontal });
+    setContainerSize({ height: maxEndVertical - 34, width: maxEndHorizontal });
   }, [controls, midiKeyboards, visualizations]);
 
   return (
     <div
       ref={containerRef}
-      className='control-panel-content'
+      className={`control-panel-content${isEditing ? '' : ' control-panel-content-locked'}`}
       style={{ width: containerSize.width, height: containerSize.height }}
     >
       {visualizations.map(viz => {
         switch (viz.type) {
           case 'oscilloscope':
             throw new UnimplementedError();
-            break;
           case 'spectrogram':
-            return <ControlPanelSpectrogram key={viz.type + viz.name} vcId={vcId} {...viz} />;
+            return (
+              <ControlPanelSpectrogram
+                key={viz.type + viz.name}
+                vcId={vcId}
+                isEditing={isEditing}
+                {...viz}
+              />
+            );
           case 'note':
-            return <ControlPanelNote key={viz.type + viz.name} vcId={vcId} {...viz} />;
+            return (
+              <ControlPanelNote
+                key={viz.type + viz.name}
+                vcId={vcId}
+                isEditing={isEditing}
+                {...viz}
+              />
+            );
         }
       })}
-      <ControlPanel
-        className='main-control-panel'
-        position='top-left'
-        draggable
-        dragSnapPx={snapToGrid ? 10 : undefined}
-        settings={presetPanelSettings}
-        state={useMemo(
-          () => ({ 'snap to grid': snapToGrid, 'element type': elementType }),
-          [elementType, snapToGrid]
-        )}
-        onChange={useCallback(
-          (key: string, value: any) => {
-            switch (key) {
-              case 'element type':
-                setElementType(value);
-                break;
-              case 'snap to grid':
-                dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_SNAP_TO_GRID(vcId, value));
-                break;
-              default:
-                console.error('Unhandled key in preset panel: ', key);
-            }
-          },
-          [vcId]
-        )}
-        contextCb={ctxCb}
-      />
+      <ConfigureControlPanel vcId={vcId} />
       {midiKeyboards.map(kb => (
-        <ControlPanelMidiKeyboard vcId={vcId} key={kb.name} {...kb} />
+        <ControlPanelMidiKeyboard vcId={vcId} key={kb.name} isEditing={isEditing} {...kb} />
       ))}
       {controls.map(conn => (
         <ControlComp
@@ -563,6 +640,7 @@ const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           {...conn}
           controlPanelVcId={vcId}
           snapToGrid={snapToGrid}
+          isEditing={isEditing}
         />
       ))}
     </div>

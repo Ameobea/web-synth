@@ -9,6 +9,7 @@ import { SpectrumVisualization } from 'src/visualizations/spectrum';
 interface ControlPanelSpectrogramProps
   extends Extract<ControlPanelVisualizationDescriptor, { type: 'spectrogram' }> {
   vcId: string;
+  isEditing: boolean;
 }
 
 const ControlPanelSpectrogram: React.FC<ControlPanelSpectrogramProps> = ({
@@ -16,6 +17,7 @@ const ControlPanelSpectrogram: React.FC<ControlPanelSpectrogramProps> = ({
   analyser,
   position,
   name,
+  isEditing,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const dispatch = useDispatch();
@@ -30,12 +32,12 @@ const ControlPanelSpectrogram: React.FC<ControlPanelSpectrogramProps> = ({
   return (
     <div
       className='control-panel-spectrogram'
-      onMouseDown={onMouseDown}
+      onMouseDown={isEditing ? onMouseDown : undefined}
       style={{
         position: 'absolute',
         top: position.y,
         left: position.x,
-        cursor: isDragging ? 'grabbing' : 'grab',
+        cursor: isEditing ? (isDragging ? 'grabbing' : 'grab') : 'default',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

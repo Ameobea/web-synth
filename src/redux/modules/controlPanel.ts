@@ -90,6 +90,7 @@ export type ControlPanelVisualizationDescriptor =
       name: string;
       title: string;
       content: string;
+      markdown: boolean;
       style: { fontSize: number; width: number; height: number };
     };
 
@@ -97,6 +98,35 @@ export type SerializedControlPanelVisualizationDescriptor =
   | { type: 'oscilloscope'; position: { x: number; y: number }; name: string }
   | { type: 'spectrogram'; position: { x: number; y: number }; name: string }
   | Extract<ControlPanelVisualizationDescriptor, { type: 'note' }>;
+
+const buildDefaultVizDescriptor = (
+  vizType: ControlPanelVisualizationDescriptor['type'],
+  name: string
+): ControlPanelVisualizationDescriptor => {
+  const position = { x: 300, y: 300 + Math.random() * 200 };
+
+  switch (vizType) {
+    case 'note':
+      return {
+        name,
+        position,
+        type: vizType,
+        content: 'Double-click to edit note',
+        markdown: false,
+        title: 'note',
+        style: { width: 300, height: 200, fontSize: 14 },
+      };
+    case 'oscilloscope':
+      return { name, position, type: vizType };
+    case 'spectrogram':
+      return {
+        name,
+        position,
+        type: vizType,
+        analyser: ctx.createAnalyser(),
+      };
+  }
+};
 
 export const serializeControlPanelVisualizationDescriptor = (
   viz: ControlPanelVisualizationDescriptor
@@ -148,6 +178,7 @@ export interface ControlPanelInstanceState {
   }[];
   snapToGrid: boolean;
   hidden: boolean;
+  isEditing: boolean;
 }
 
 const initialState: ControlPanelState = { stateByPanelInstance: {} };
@@ -254,7 +285,8 @@ const actionGroups = {
       initialMidiKeyboards?: ControlPanelMidiKeyboardDescriptor[],
       initialVisualizations?: ControlPanelVisualizationDescriptor[],
       presets?: ControlPanelInstanceState['presets'],
-      snapToGrid?: boolean
+      snapToGrid?: boolean,
+      isEditing?: boolean
     ) => ({
       type: 'ADD_CONTROL_PANEL_INSTANCE',
       vcId,
@@ -263,10 +295,19 @@ const actionGroups = {
       initialVisualizations,
       presets,
       snapToGrid,
+      isEditing,
     }),
     subReducer: (
       state: ControlPanelState,
-      { vcId, initialConnections, initialMidiKeyboards, initialVisualizations, presets, snapToGrid }
+      {
+        vcId,
+        initialConnections,
+        initialMidiKeyboards,
+        initialVisualizations,
+        presets,
+        snapToGrid,
+        isEditing,
+      }
     ) => {
       const connections = initialConnections ? initialConnections.map(hydrateConnection) : [];
 
@@ -277,6 +318,7 @@ const actionGroups = {
         presets: presets ?? [],
         snapToGrid: snapToGrid ?? false,
         hidden: false,
+        isEditing: isEditing ?? true,
       };
 
       return {
@@ -533,6 +575,7 @@ const actionGroups = {
             controls: preset.controls.map(hydrateConnection),
             snapToGrid: preset.snapToGrid,
             hidden: false,
+            isEditing: false,
           },
         },
       };
@@ -690,15 +733,7 @@ const actionGroups = {
         name = `${vizType} ${instState.visualizations.length + 1}`;
       }
 
-      const newViz: ControlPanelVisualizationDescriptor = {
-        name,
-        type: vizType,
-        position: { x: 300, y: 300 + Math.random() * 200 },
-        analyser: ctx.createAnalyser(),
-        content: 'Double-click to edit note',
-        title: 'note',
-        style: { width: 300, height: 200, fontSize: 14 },
-      };
+      const newViz: ControlPanelVisualizationDescriptor = buildDefaultVizDescriptor(vizType, name);
 
       const newInstState = { ...instState, visualizations: [...instState.visualizations, newViz] };
       setTimeout(() =>
@@ -824,6 +859,24 @@ const actionGroups = {
         stateByPanelInstance: {
           ...state.stateByPanelInstance,
           [controlPanelVcId]: { ...instState, hidden },
+        },
+      };
+    },
+  }),
+  SET_CONTROL_PANEL_IS_EDITING: buildActionGroup({
+    actionCreator: (controlPanelVcId: string, isEditing: boolean) => ({
+      type: 'SET_CONTROL_PANEL_IS_EDITING' as const,
+      controlPanelVcId,
+      isEditing,
+    }),
+    subReducer: (state: ControlPanelState, { controlPanelVcId, isEditing }) => {
+      const instState = state.stateByPanelInstance[controlPanelVcId];
+
+      return {
+        ...state,
+        stateByPanelInstance: {
+          ...state.stateByPanelInstance,
+          [controlPanelVcId]: { ...instState, isEditing },
         },
       };
     },
