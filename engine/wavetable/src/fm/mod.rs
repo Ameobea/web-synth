@@ -29,7 +29,15 @@ pub struct AdsrState {
 }
 
 pub trait Oscillator {
-    fn gen_sample(&mut self, frequency: f32) -> f32;
+    fn gen_sample(
+        &mut self,
+        frequency: f32,
+        wavetables: &[WaveTable],
+        param_buffers: &[[f32; FRAME_SIZE]],
+        adsrs: &[Adsr],
+        sample_ix_within_frame: usize,
+        base_frequency: f32,
+    ) -> f32;
 }
 
 #[derive(Clone, Default)]
@@ -44,7 +52,15 @@ impl PhasedOscillator for SineOscillator {
 }
 
 impl Oscillator for SineOscillator {
-    fn gen_sample(&mut self, frequency: f32) -> f32 {
+    fn gen_sample(
+        &mut self,
+        frequency: f32,
+        _wavetables: &[WaveTable],
+        _param_buffers: &[[f32; FRAME_SIZE]],
+        _adsrs: &[Adsr],
+        _sample_ix_within_frame: usize,
+        _base_frequency: f32,
+    ) -> f32 {
         let sine_lookup_table = crate::lookup_tables::get_sine_lookup_table();
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
@@ -81,7 +97,15 @@ impl PhasedOscillator for SquareOscillator {
 }
 
 impl Oscillator for SquareOscillator {
-    fn gen_sample(&mut self, frequency: f32) -> f32 {
+    fn gen_sample(
+        &mut self,
+        frequency: f32,
+        _wavetables: &[WaveTable],
+        _param_buffers: &[[f32; FRAME_SIZE]],
+        _adsrs: &[Adsr],
+        _sample_ix_within_frame: usize,
+        _base_frequency: f32,
+    ) -> f32 {
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
             return if self.phase < 0.5 { 1. } else { -1. };
@@ -114,7 +138,15 @@ impl PhasedOscillator for TriangleOscillator {
 }
 
 impl Oscillator for TriangleOscillator {
-    fn gen_sample(&mut self, frequency: f32) -> f32 {
+    fn gen_sample(
+        &mut self,
+        frequency: f32,
+        _wavetables: &[WaveTable],
+        _param_buffers: &[[f32; FRAME_SIZE]],
+        _adsrs: &[Adsr],
+        _sample_ix_within_frame: usize,
+        _base_frequency: f32,
+    ) -> f32 {
         self.update_phase(frequency);
 
         let triangle_lookup_table = crate::lookup_tables::get_triangle_lookup_table();
@@ -137,7 +169,15 @@ impl PhasedOscillator for SawtoothOscillator {
 }
 
 impl Oscillator for SawtoothOscillator {
-    fn gen_sample(&mut self, frequency: f32) -> f32 {
+    fn gen_sample(
+        &mut self,
+        frequency: f32,
+        _wavetables: &[WaveTable],
+        _param_buffers: &[[f32; FRAME_SIZE]],
+        _adsrs: &[Adsr],
+        _sample_ix_within_frame: usize,
+        _base_frequency: f32,
+    ) -> f32 {
         let sawtooth_lookup_table = crate::lookup_tables::get_sawtooth_lookup_table();
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
@@ -149,26 +189,13 @@ impl Oscillator for SawtoothOscillator {
 
         // 4x oversampling to avoid aliasing
         let mut out = 0.;
-        self.update_phase_oversampled(4., frequency);
-        out += dsp::read_interpolated(
-            sawtooth_lookup_table,
-            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-        ) * 0.25;
-        self.update_phase_oversampled(4., frequency);
-        out += dsp::read_interpolated(
-            sawtooth_lookup_table,
-            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-        ) * 0.25;
-        self.update_phase_oversampled(4., frequency);
-        out += dsp::read_interpolated(
-            sawtooth_lookup_table,
-            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-        ) * 0.25;
-        self.update_phase_oversampled(4., frequency);
-        out += dsp::read_interpolated(
-            sawtooth_lookup_table,
-            self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-        ) * 0.25;
+        for _ in 0..4 {
+            self.update_phase_oversampled(4., frequency);
+            out += dsp::read_interpolated(
+                sawtooth_lookup_table,
+                self.phase * (sawtooth_lookup_table.len() - 2) as f32,
+            ) * 0.25;
+        }
 
         out
     }
@@ -202,27 +229,33 @@ pub struct UnisonOscillator<T> {
 }
 
 impl<T: PhasedOscillator> UnisonOscillator<T> {
-    pub fn set_phase(&mut self, new_phase: f32) {
-        let osc_count = self.oscillators.len() as f32;
+    pub fn set_phases(&mut self, new_phases: &[f32]) {
         for (i, osc) in self.oscillators.iter_mut().enumerate() {
-            // osc.set_phase((*rng()).gen_range(0., 1.));
-            // osc.set_phase(new_phase);
-            osc.set_phase((i as f32) * (i as f32 / osc_count));
+            osc.set_phase(new_phases.get(i).copied().unwrap_or_default());
         }
+    }
+
+    pub fn get_phases(&self) -> Vec<f32> {
+        let mut phases = Vec::with_capacity(self.oscillators.len());
+        for i in 0..self.oscillators.len() {
+            phases.push(self.oscillators[i].get_phase());
+        }
+        phases
     }
 }
 
-impl<T: Clone + Oscillator + PhasedOscillator> UnisonOscillator<T> {
+impl<T: Oscillator + PhasedOscillator> UnisonOscillator<T> {
     fn gen_sample(
         &mut self,
+        frequency: f32,
+        wavetables: &[WaveTable],
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
-        frequency: f32,
     ) -> f32 {
         let mut out = 0.;
-        let unison_detune_range_semitones = self.unison_detune_range_semitones.get_raw(
+        let unison_detune_range_semitones = self.unison_detune_range_semitones.get(
             param_buffers,
             adsrs,
             sample_ix_within_frame,
@@ -265,39 +298,6 @@ impl<T: Clone + Oscillator + PhasedOscillator> UnisonOscillator<T> {
             } else {
                 outer_gain_pct
             };
-            out += osc.gen_sample(frequency) * gain;
-        }
-        out
-    }
-}
-
-impl UnisonOscillator<WaveTableHandle> {
-    fn gen_sample(
-        &mut self,
-        wavetables: &[WaveTable],
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-        frequency: f32,
-    ) -> f32 {
-        let mut out = 0.;
-        let unison_detune_range_semitones = self.unison_detune_range_semitones.get_raw(
-            param_buffers,
-            adsrs,
-            sample_ix_within_frame,
-            base_frequency,
-        );
-        let unison_detune_semitones_start =
-            dsp::clamp(0., 1200., -unison_detune_range_semitones / 2.);
-        let unison_detune_step_semitones =
-            unison_detune_range_semitones / (self.oscillators.len() - 1) as f32;
-
-        for (i, osc) in self.oscillators.iter_mut().enumerate() {
-            let frequency = compute_detune(
-                frequency,
-                unison_detune_semitones_start + i as f32 * unison_detune_step_semitones,
-            );
             out += osc.gen_sample(
                 frequency,
                 wavetables,
@@ -305,9 +305,9 @@ impl UnisonOscillator<WaveTableHandle> {
                 adsrs,
                 sample_ix_within_frame,
                 base_frequency,
-            );
+            ) * gain;
         }
-        out / self.oscillators.len() as f32
+        out
     }
 }
 
@@ -343,6 +343,7 @@ mod fast {
 }
 
 impl ExponentialOscillator {
+    #[inline(never)]
     fn gen_sample_with_stretch_factor(&mut self, frequency: f32, stretch_factor: f32) -> f32 {
         self.update_phase(frequency);
         let stretch_factor = dsp::clamp(0., 1., stretch_factor);
@@ -400,8 +401,8 @@ pub struct WaveTableHandle {
     inter_dim_mix: ParamSource,
 }
 
-impl WaveTableHandle {
-    pub fn gen_sample(
+impl Oscillator for WaveTableHandle {
+    fn gen_sample(
         &mut self,
         frequency: f32,
         wavetables: &[WaveTable],
@@ -502,24 +503,25 @@ pub enum OscillatorSource {
 impl OscillatorSource {
     /// Returns the current phase of the oscillator, if it has one.  Used to preserve phase in cases
     /// where we're switching oscillator type.
-    pub fn get_phase(&self) -> Option<f32> {
+    pub fn get_phase(&self) -> Vec<f32> {
         match self {
-            OscillatorSource::Wavetable(handle) => Some(handle.phase),
-            OscillatorSource::ParamBuffer(_) => None,
-            OscillatorSource::Sine(osc) => Some(osc.get_phase()),
-            OscillatorSource::ExponentialOscillator(osc) => Some(osc.get_phase()),
-            OscillatorSource::Square(osc) => Some(osc.get_phase()),
-            OscillatorSource::Triangle(osc) => Some(osc.get_phase()),
-            OscillatorSource::Sawtooth(osc) => Some(osc.get_phase()),
-            OscillatorSource::UnisonSine(_) => None,
-            OscillatorSource::UnisonWavetable(_) => None,
-            OscillatorSource::UnisonSquare(_) => None,
-            OscillatorSource::UnisonTriangle(_) => None,
-            OscillatorSource::UnisonSawtooth(_) => None,
+            OscillatorSource::Wavetable(handle) => vec![handle.phase],
+            OscillatorSource::ParamBuffer(_) => Vec::new(),
+            OscillatorSource::Sine(osc) => vec![osc.get_phase()],
+            OscillatorSource::ExponentialOscillator(osc) => vec![osc.get_phase()],
+            OscillatorSource::Square(osc) => vec![osc.get_phase()],
+            OscillatorSource::Triangle(osc) => vec![osc.get_phase()],
+            OscillatorSource::Sawtooth(osc) => vec![osc.get_phase()],
+            OscillatorSource::UnisonSine(osc) => osc.get_phases(),
+            OscillatorSource::UnisonWavetable(osc) => osc.get_phases(),
+            OscillatorSource::UnisonSquare(osc) => osc.get_phases(),
+            OscillatorSource::UnisonTriangle(osc) => osc.get_phases(),
+            OscillatorSource::UnisonSawtooth(osc) => osc.get_phases(),
         }
     }
 
-    pub fn set_phase(&mut self, new_phase: f32) {
+    pub fn set_phase(&mut self, new_phases: &[f32]) {
+        let new_phase = new_phases.get(0).copied().unwrap_or_default();
         match self {
             OscillatorSource::Wavetable(handle) => handle.phase = new_phase,
             OscillatorSource::ParamBuffer(_) => (),
@@ -528,11 +530,11 @@ impl OscillatorSource {
             OscillatorSource::Square(osc) => osc.set_phase(new_phase),
             OscillatorSource::Triangle(osc) => osc.set_phase(new_phase),
             OscillatorSource::Sawtooth(osc) => osc.set_phase(new_phase),
-            OscillatorSource::UnisonSine(osc) => osc.set_phase(new_phase),
-            OscillatorSource::UnisonWavetable(osc) => osc.set_phase(new_phase),
-            OscillatorSource::UnisonSquare(osc) => osc.set_phase(new_phase),
-            OscillatorSource::UnisonTriangle(osc) => osc.set_phase(new_phase),
-            OscillatorSource::UnisonSawtooth(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonSine(osc) => osc.set_phases(new_phases),
+            OscillatorSource::UnisonWavetable(osc) => osc.set_phases(new_phases),
+            OscillatorSource::UnisonSquare(osc) => osc.set_phases(new_phases),
+            OscillatorSource::UnisonTriangle(osc) => osc.set_phases(new_phases),
+            OscillatorSource::UnisonSawtooth(osc) => osc.set_phases(new_phases),
         }
     }
 }
@@ -570,7 +572,14 @@ impl OscillatorSource {
                             .get_unchecked(sample_ix_within_frame)
                     }
                 },
-            OscillatorSource::Sine(osc) => osc.gen_sample(frequency),
+            OscillatorSource::Sine(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            ),
             OscillatorSource::ExponentialOscillator(osc) => osc.gen_sample(
                 frequency,
                 param_buffers,
@@ -578,44 +587,69 @@ impl OscillatorSource {
                 sample_ix_within_frame,
                 base_frequency,
             ),
-            OscillatorSource::Square(osc) => osc.gen_sample(frequency),
-            OscillatorSource::Triangle(osc) => osc.gen_sample(frequency),
-            OscillatorSource::Sawtooth(osc) => osc.gen_sample(frequency),
-            OscillatorSource::UnisonSine(osc) => osc.gen_sample(
-                param_buffers,
-                adsrs,
-                sample_ix_within_frame,
-                base_frequency,
+            OscillatorSource::Square(osc) => osc.gen_sample(
                 frequency,
-            ),
-            OscillatorSource::UnisonWavetable(osc) => osc.gen_sample(
                 wavetables,
                 param_buffers,
                 adsrs,
                 sample_ix_within_frame,
                 base_frequency,
+            ),
+            OscillatorSource::Triangle(osc) => osc.gen_sample(
                 frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            ),
+            OscillatorSource::Sawtooth(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            ),
+            OscillatorSource::UnisonSine(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
+            ),
+            OscillatorSource::UnisonWavetable(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
+                param_buffers,
+                adsrs,
+                sample_ix_within_frame,
+                base_frequency,
             ),
             OscillatorSource::UnisonSquare(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
                 param_buffers,
                 adsrs,
                 sample_ix_within_frame,
                 base_frequency,
-                frequency,
             ),
             OscillatorSource::UnisonTriangle(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
                 param_buffers,
                 adsrs,
                 sample_ix_within_frame,
                 base_frequency,
-                frequency,
             ),
             OscillatorSource::UnisonSawtooth(osc) => osc.gen_sample(
+                frequency,
+                wavetables,
                 param_buffers,
                 adsrs,
                 sample_ix_within_frame,
                 base_frequency,
-                frequency,
             ),
         }
     }
@@ -730,7 +764,7 @@ impl FMSynthVoice {
             let len_samples = self.adsr_params[adsr_ix]
                 .len_samples
                 // Cannot use ADSR or base frequency as param sources for ADSR length
-                .get_raw(param_buffers, &[], 0, 0.);
+                .get(param_buffers, &[], 0, 0.);
             adsr.set_len_samples(len_samples);
             adsr.render_frame(1., 0.);
         }
@@ -881,11 +915,15 @@ impl FMSynthVoice {
 }
 
 #[derive(Clone, PartialEq)]
-pub enum ParamSourceType {
+pub enum ParamSource {
     /// Each sample, the value for this param is pulled out of the parameter buffer of this index.
     /// These buffers are populated externally every frame.
     ParamBuffer(usize),
-    Constant(f32),
+    /// Built-in smoothing to prevent clicks and pops when sliders are dragged around in the UI
+    Constant {
+        last_val: f32,
+        cur_val: f32,
+    },
     /// The value of this parameter is determined by the output of a per-voice ADSR that is
     /// triggered every time that voice is triggered.
     PerVoiceADSR(AdsrState),
@@ -900,10 +938,31 @@ pub enum ParamSourceType {
     BeatsToSamples(f32),
 }
 
-#[derive(Clone)]
-pub struct ParamSource {
-    pub source_type: ParamSourceType,
-    pub value: f32,
+impl ParamSource {
+    pub fn new_constant(val: f32) -> Self {
+        ParamSource::Constant {
+            last_val: val,
+            cur_val: val,
+        }
+    }
+
+    pub fn replace(&mut self, new: Self) {
+        match new {
+            ParamSource::Constant {
+                cur_val: new_val, ..
+            } => match self {
+                ParamSource::Constant {
+                    last_val: old_last_val,
+                    cur_val: old_cur_val,
+                } => {
+                    *old_last_val = *old_cur_val;
+                    *old_cur_val = new_val;
+                },
+                other => *other = new,
+            },
+            _ => *self = new,
+        }
+    }
 }
 
 pub struct RenderRawParams<'a> {
@@ -912,55 +971,53 @@ pub struct RenderRawParams<'a> {
     pub base_frequencies: &'a [f32; FRAME_SIZE],
 }
 
-impl ParamSource {
-    pub fn new(source_type: ParamSourceType) -> Self {
-        ParamSource {
-            source_type,
-            value: 0.,
-        }
-    }
+// impl ParamSource {
+//     pub fn new(source_type: ParamSource) -> Self { ParamSource { source_type } }
 
-    pub fn get_raw(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-    ) -> f32 {
-        self.source_type
-            .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
-    }
+//     pub fn get_raw(
+//         &mut self,
+//         param_buffers: &[[f32; FRAME_SIZE]],
+//         adsrs: &[Adsr],
+//         sample_ix_within_frame: usize,
+//         base_frequency: f32,
+//     ) -> f32 {
+//         self.source_type
+//             .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
+//     }
 
-    pub fn get(
-        &mut self,
-        param_buffers: &[[f32; FRAME_SIZE]],
-        adsrs: &[Adsr],
-        sample_ix_within_frame: usize,
-        base_frequency: f32,
-    ) -> f32 {
-        let output =
-            self.source_type
-                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-        // Apply smoothing to avoid clicks/pops/other audio artifacts caused by jumping between
-        // param values quickly
-        dsp::one_pole(&mut self.value, output, 0.995)
-    }
+//     pub fn render_raw<'a>(&self, params: &RenderRawParams<'a>, output_buf: &mut [f32;
+// FRAME_SIZE]) {         self.source_type.render_raw(params, output_buf);
+//     }
 
-    pub fn render_raw<'a>(&self, params: &RenderRawParams<'a>, output_buf: &mut [f32; FRAME_SIZE]) {
-        self.source_type.render_raw(params, output_buf);
-    }
-
-    /// Replaces the param generator while preserving the previous value used for smoothing
-    pub fn replace(&mut self, new_source_type: ParamSourceType) {
-        self.source_type = new_source_type;
-    }
-}
+//     /// Replaces the param generator while preserving the previous value used for smoothing
+//     pub fn replace(&mut self, new_source_type: ParamSource) {
+//         match (&mut self.source_type, &new_source_type) {
+//             (
+//                 ParamSource::Constant { last_val, cur_val },
+//                 ParamSource::Constant {
+//                     cur_val: new_val, ..
+//                 },
+//             ) => {
+//                 *last_val = *cur_val;
+//                 *cur_val = *new_val;
+//                 return;
+//             },
+//             _ => (),
+//         }
+//         self.source_type = new_source_type;
+//     }
+// }
 
 impl Default for ParamSource {
-    fn default() -> Self { Self::new(ParamSourceType::Constant(0.0)) }
+    fn default() -> Self {
+        ParamSource::Constant {
+            last_val: 0.,
+            cur_val: 0.,
+        }
+    }
 }
 
-impl ParamSourceType {
+impl ParamSource {
     pub fn get(
         &self,
         param_buffers: &[[f32; FRAME_SIZE]],
@@ -969,7 +1026,7 @@ impl ParamSourceType {
         base_frequency: f32,
     ) -> f32 {
         match self {
-            ParamSourceType::ParamBuffer(buf_ix) => {
+            ParamSource::ParamBuffer(buf_ix) => {
                 let raw = if cfg!(debug_assertions) {
                     param_buffers[*buf_ix][sample_ix_within_frame]
                 } else {
@@ -987,8 +1044,12 @@ impl ParamSourceType {
                 // }
                 raw
             },
-            ParamSourceType::Constant(val) => *val,
-            ParamSourceType::PerVoiceADSR(AdsrState {
+            ParamSource::Constant { last_val, cur_val } => dsp::one_pole(
+                unsafe { std::mem::transmute(last_val as *const _) },
+                *cur_val,
+                0.995,
+            ),
+            ParamSource::PerVoiceADSR(AdsrState {
                 adsr_ix,
                 scale,
                 shift,
@@ -1006,13 +1067,13 @@ impl ParamSourceType {
                 }) * scale
                     + shift
             },
-            ParamSourceType::BaseFrequencyMultiplier(multiplier) => base_frequency * multiplier,
-            ParamSourceType::MIDIControlValue {
+            ParamSource::BaseFrequencyMultiplier(multiplier) => base_frequency * multiplier,
+            ParamSource::MIDIControlValue {
                 control_index,
                 scale,
                 shift,
             } => unsafe { MIDI_CONTROL_VALUES[*control_index] * *scale + *shift },
-            ParamSourceType::BeatsToSamples(beats) => {
+            ParamSource::BeatsToSamples(beats) => {
                 let cur_bpm = crate::get_cur_bpm();
                 let cur_bps = cur_bpm / 60.;
                 let seconds_per_beat = 1. / cur_bps;
@@ -1029,20 +1090,23 @@ impl ParamSourceType {
         value_param_float_2: f32,
     ) -> Self {
         match value_type {
-            0 => ParamSourceType::ParamBuffer(value_param_int),
-            1 => ParamSourceType::Constant(value_param_float),
-            2 => ParamSourceType::PerVoiceADSR(AdsrState {
+            0 => ParamSource::ParamBuffer(value_param_int),
+            1 => ParamSource::Constant {
+                last_val: value_param_float,
+                cur_val: value_param_float,
+            },
+            2 => ParamSource::PerVoiceADSR(AdsrState {
                 adsr_ix: value_param_int,
                 scale: value_param_float,
                 shift: value_param_float_2,
             }),
-            3 => ParamSourceType::BaseFrequencyMultiplier(value_param_float),
-            4 => ParamSourceType::MIDIControlValue {
+            3 => ParamSource::BaseFrequencyMultiplier(value_param_float),
+            4 => ParamSource::MIDIControlValue {
                 control_index: value_param_int,
                 scale: value_param_float,
                 shift: value_param_float_2,
             },
-            5 => ParamSourceType::BeatsToSamples(value_param_float),
+            5 => ParamSource::BeatsToSamples(value_param_float),
             _ => panic!("Invalid value type; expected [0,4]"),
         }
     }
@@ -1058,14 +1122,22 @@ impl ParamSourceType {
         output_buf: &mut [f32; FRAME_SIZE],
     ) {
         match self {
-            ParamSourceType::Constant(val) => unsafe {
-                let splat = f32x4_splat(*val);
-                let base_output_ptr = output_buf.as_ptr() as *mut v128;
-                for i in 0..FRAME_SIZE / 4 {
-                    v128_store(base_output_ptr.add(i), splat);
+            ParamSource::Constant { last_val, cur_val } => unsafe {
+                let diff = (*cur_val - *last_val).abs();
+                if diff < 0.000001 {
+                    let splat = f32x4_splat(*cur_val);
+                    let base_output_ptr = output_buf.as_ptr() as *mut v128;
+                    for i in 0..FRAME_SIZE / 4 {
+                        v128_store(base_output_ptr.add(i), splat);
+                    }
+                } else {
+                    for i in 0..FRAME_SIZE {
+                        output_buf[i] =
+                            dsp::one_pole(&mut *(last_val as *const _ as *mut _), *cur_val, 0.995);
+                    }
                 }
             },
-            ParamSourceType::ParamBuffer(buffer_ix) => {
+            ParamSource::ParamBuffer(buffer_ix) => {
                 let param_buf = unsafe { param_buffers.get_unchecked(*buffer_ix) };
                 let base_input_ptr = param_buf.as_ptr() as *const v128;
                 let base_output_ptr = output_buf.as_ptr() as *mut v128;
@@ -1076,7 +1148,7 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::BaseFrequencyMultiplier(multiplier) => {
+            ParamSource::BaseFrequencyMultiplier(multiplier) => {
                 let base_input_ptr = base_frequencies.as_ptr() as *const v128;
                 let base_output_ptr = output_buf.as_ptr() as *mut v128;
                 let multiplier = f32x4_splat(*multiplier);
@@ -1089,7 +1161,7 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::PerVoiceADSR(AdsrState {
+            ParamSource::PerVoiceADSR(AdsrState {
                 adsr_ix,
                 scale,
                 shift,
@@ -1110,7 +1182,7 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::MIDIControlValue {
+            ParamSource::MIDIControlValue {
                 control_index,
                 scale,
                 shift,
@@ -1126,7 +1198,7 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::BeatsToSamples(beats) => {
+            ParamSource::BeatsToSamples(beats) => {
                 let cur_bpm = crate::get_cur_bpm();
                 let cur_bps = cur_bpm / 60.;
                 let seconds_per_beat = 1. / cur_bps;
@@ -1153,23 +1225,35 @@ impl ParamSourceType {
         output_buf: &mut [f32; FRAME_SIZE],
     ) {
         match self {
-            ParamSourceType::Constant(val) =>
-                for i in 0..FRAME_SIZE {
-                    unsafe {
-                        *output_buf.get_unchecked_mut(i) = *val;
-                    };
-                },
-            ParamSourceType::ParamBuffer(buffer_ix) => {
+            ParamSource::Constant { last_val, cur_val } => {
+                let diff = (*cur_val - *last_val).abs();
+                if diff < 0.000001 {
+                    for i in 0..FRAME_SIZE {
+                        unsafe {
+                            *output_buf.get_unchecked_mut(i) = *cur_val;
+                        };
+                    }
+                } else {
+                    for i in 0..FRAME_SIZE {
+                        output_buf[i] = dsp::one_pole(
+                            unsafe { &mut *(last_val as *const _ as *mut _) },
+                            *cur_val,
+                            0.995,
+                        );
+                    }
+                }
+            },
+            ParamSource::ParamBuffer(buffer_ix) => {
                 output_buf.clone_from_slice(unsafe { param_buffers.get_unchecked(*buffer_ix) });
             },
-            ParamSourceType::BaseFrequencyMultiplier(multiplier) =>
+            ParamSource::BaseFrequencyMultiplier(multiplier) =>
                 for i in 0..FRAME_SIZE {
                     unsafe {
                         *output_buf.get_unchecked_mut(i) =
                             (*base_frequencies.get_unchecked(i)) * *multiplier;
                     };
                 },
-            ParamSourceType::PerVoiceADSR(AdsrState {
+            ParamSource::PerVoiceADSR(AdsrState {
                 adsr_ix,
                 scale,
                 shift,
@@ -1184,7 +1268,7 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::MIDIControlValue {
+            ParamSource::MIDIControlValue {
                 control_index,
                 scale,
                 shift,
@@ -1197,7 +1281,7 @@ impl ParamSourceType {
                     }
                 }
             },
-            ParamSourceType::BeatsToSamples(beats) => {
+            ParamSource::BeatsToSamples(beats) => {
                 let cur_bpm = crate::get_cur_bpm();
                 let cur_bps = cur_bpm / 60.;
                 let seconds_per_beat = 1. / cur_bps;
@@ -1298,14 +1382,16 @@ impl FMSynthContext {
         for operator_ix in 0..OPERATOR_COUNT {
             // operator is disabled if it doesn't output anything and doesn't modulate any other
             // operators
-            let disabled = self.modulation_matrix.output_weights[operator_ix].source_type
-                == ParamSourceType::Constant(0.)
-                && (0..OPERATOR_COUNT).all(|dst_operator_ix| {
+            let disabled = matches!(
+                self.modulation_matrix.output_weights[operator_ix],
+                ParamSource::Constant { cur_val, .. } if cur_val.abs() < 0.0001
+            ) && (0..OPERATOR_COUNT).all(|dst_operator_ix| {
+                matches!(
                     self.modulation_matrix
-                        .get_operator_modulation_index(operator_ix, dst_operator_ix)
-                        .source_type
-                        == ParamSourceType::Constant(0.)
-                });
+                        .get_operator_modulation_index(operator_ix, dst_operator_ix),
+                    ParamSource::Constant { cur_val, .. } if cur_val.abs() < 0.0001
+                )
+            });
 
             for voice_ix in 0..self.voices.len() {
                 let was_disabled = !self.voices[voice_ix].operators[operator_ix].enabled;
@@ -1347,9 +1433,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
             .operator_base_frequency_sources
             .as_mut_ptr()
             .add(i)
-            .write(ParamSource::new(ParamSourceType::BaseFrequencyMultiplier(
-                1.,
-            )));
+            .write(ParamSource::BaseFrequencyMultiplier(1.));
     }
     for _ in 0..voice_count {
         (*ctx).voices.push(FMSynthVoice::default());
@@ -1386,13 +1470,13 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
     val_param_float: f32,
     val_param_float_2: f32,
 ) {
-    let param = ParamSource::new(ParamSourceType::from_parts(
+    let param = ParamSource::from_parts(
         value_type,
         val_param_int,
         val_param_float,
         val_param_float_2,
-    ));
-    (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix] = param;
+    );
+    (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix].replace(param);
 
     (*ctx).update_operator_enabled_statuses();
 }
@@ -1406,26 +1490,27 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
     val_param_float: f32,
     val_param_float_2: f32,
 ) {
-    let param = ParamSource::new(ParamSourceType::from_parts(
+    let param = ParamSource::from_parts(
         value_type,
         val_param_int,
         val_param_float,
         val_param_float_2,
-    ));
-    (*ctx).modulation_matrix.output_weights[operator_ix] = param;
+    );
+    (*ctx).modulation_matrix.output_weights[operator_ix].replace(param);
 
     (*ctx).update_operator_enabled_statuses();
 }
 
-fn randomize_phases<T: PhasedOscillator>(mut oscs: Vec<T>) -> Vec<T> {
-    // for (i, osc) in oscs.iter_mut().enumerate() {
-    //     osc.set_phase(((i as f32) * 0.8389).fract());
-    // }
+fn initialize_phases<T: PhasedOscillator>(old_phases: &[f32], mut oscs: Vec<T>) -> Vec<T> {
+    for (i, osc) in oscs.iter_mut().enumerate() {
+        osc.set_phase(old_phases.get(i).copied().unwrap_or_default())
+    }
     oscs
 }
 
 fn build_oscillator_source(
     operator_type: usize,
+    unison: usize,
     param_0_value_type: usize,
     param_0_val_int: usize,
     param_0_val_float: f32,
@@ -1442,109 +1527,133 @@ fn build_oscillator_source(
     param_3_val_int: usize,
     param_3_val_float: f32,
     param_3_val_float_2: f32,
-    // TODO: Support setting phases for unison oscillators
-    phase_opt: Option<f32>,
+    param_4_value_type: usize,
+    param_4_val_int: usize,
+    param_4_val_float: f32,
+    param_4_val_float_2: f32,
+    old_phases: &[f32],
 ) -> OscillatorSource {
     match operator_type {
         0 => OscillatorSource::Wavetable(WaveTableHandle {
             wavetable_index: param_0_val_int,
-            phase: phase_opt.unwrap_or_default(),
-            dim_0_intra_mix: ParamSource::new(ParamSourceType::from_parts(
+            phase: old_phases.get(0).copied().unwrap_or_default(),
+            dim_0_intra_mix: ParamSource::from_parts(
                 param_1_value_type,
                 param_1_val_int,
                 param_1_val_float,
                 param_1_val_float_2,
-            )),
-            dim_1_intra_mix: ParamSource::new(ParamSourceType::from_parts(
+            ),
+            dim_1_intra_mix: ParamSource::from_parts(
                 param_2_value_type,
                 param_2_val_int,
                 param_2_val_float,
                 param_2_val_float_2,
-            )),
-            inter_dim_mix: ParamSource::new(ParamSourceType::from_parts(
+            ),
+            inter_dim_mix: ParamSource::from_parts(
                 param_3_value_type,
                 param_3_val_int,
                 param_3_val_float,
                 param_3_val_float_2,
-            )),
+            ),
         }),
         1 => OscillatorSource::ParamBuffer(param_0_val_int),
         2 => OscillatorSource::Sine(SineOscillator {
-            phase: phase_opt.unwrap_or_default(),
+            phase: old_phases.get(0).copied().unwrap_or_default(),
         }),
         3 => OscillatorSource::ExponentialOscillator(ExponentialOscillator {
-            phase: phase_opt.unwrap_or_default(),
-            stretch_factor: ParamSource::new(ParamSourceType::from_parts(
+            phase: old_phases.get(0).copied().unwrap_or_default(),
+            stretch_factor: ParamSource::from_parts(
                 param_0_value_type,
                 param_0_val_int,
                 param_0_val_float,
                 param_0_val_float_2,
-            )),
+            ),
         }),
         4 => OscillatorSource::Square(SquareOscillator {
-            phase: phase_opt.unwrap_or_default(),
+            phase: old_phases.get(0).copied().unwrap_or_default(),
         }),
         5 => OscillatorSource::Triangle(TriangleOscillator {
-            phase: phase_opt.unwrap_or_default(),
+            phase: old_phases.get(0).copied().unwrap_or_default(),
         }),
         6 => OscillatorSource::Sawtooth(SawtoothOscillator {
-            phase: phase_opt.unwrap_or_default(),
+            phase: old_phases.get(0).copied().unwrap_or_default(),
         }),
         52 => OscillatorSource::UnisonSine(UnisonOscillator {
-            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
-                param_1_value_type,
-                param_1_val_int,
-                param_1_val_float,
-                param_1_val_float_2,
-            )),
-            oscillators: randomize_phases(vec![
-                SineOscillator {
-                    phase: phase_opt.unwrap_or_default(),
+            unison_detune_range_semitones: ParamSource::from_parts(
+                param_4_value_type,
+                param_4_val_int,
+                param_4_val_float,
+                param_4_val_float_2,
+            ),
+            oscillators: initialize_phases(old_phases, vec![SineOscillator { phase: 0. }; unison]),
+        }),
+        50 => OscillatorSource::UnisonWavetable(UnisonOscillator {
+            unison_detune_range_semitones: ParamSource::from_parts(
+                param_4_value_type,
+                param_4_val_int,
+                param_4_val_float,
+                param_4_val_float_2,
+            ),
+            oscillators: initialize_phases(old_phases, vec![
+                WaveTableHandle {
+                    wavetable_index: param_0_val_int,
+                    phase: old_phases.get(0).copied().unwrap_or_default(),
+                    dim_0_intra_mix: ParamSource::from_parts(
+                        param_1_value_type,
+                        param_1_val_int,
+                        param_1_val_float,
+                        param_1_val_float_2,
+                    ),
+                    dim_1_intra_mix: ParamSource::from_parts(
+                        param_2_value_type,
+                        param_2_val_int,
+                        param_2_val_float,
+                        param_2_val_float_2,
+                    ),
+                    inter_dim_mix: ParamSource::from_parts(
+                        param_3_value_type,
+                        param_3_val_int,
+                        param_3_val_float,
+                        param_3_val_float_2,
+                    ),
                 };
-                param_0_val_int
+                unison
             ]),
         }),
-        50 => OscillatorSource::UnisonWavetable(todo!()),
         54 => OscillatorSource::UnisonSquare(UnisonOscillator {
-            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
-                param_1_value_type,
-                param_1_val_int,
-                param_1_val_float,
-                param_1_val_float_2,
-            )),
-            oscillators: randomize_phases(vec![
-                SquareOscillator {
-                    phase: phase_opt.unwrap_or_default(),
-                };
-                param_0_val_int
+            unison_detune_range_semitones: ParamSource::from_parts(
+                param_4_value_type,
+                param_4_val_int,
+                param_4_val_float,
+                param_4_val_float_2,
+            ),
+            oscillators: initialize_phases(old_phases, vec![
+                SquareOscillator { phase: 0. };
+                unison
             ]),
         }),
         55 => OscillatorSource::UnisonTriangle(UnisonOscillator {
-            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
-                param_1_value_type,
-                param_1_val_int,
-                param_1_val_float,
-                param_1_val_float_2,
-            )),
-            oscillators: randomize_phases(vec![
-                TriangleOscillator {
-                    phase: phase_opt.unwrap_or_default(),
-                };
-                param_0_val_int
+            unison_detune_range_semitones: ParamSource::from_parts(
+                param_4_value_type,
+                param_4_val_int,
+                param_4_val_float,
+                param_4_val_float_2,
+            ),
+            oscillators: initialize_phases(old_phases, vec![
+                TriangleOscillator { phase: 0. };
+                unison
             ]),
         }),
         56 => OscillatorSource::UnisonSawtooth(UnisonOscillator {
-            unison_detune_range_semitones: ParamSource::new(ParamSourceType::from_parts(
-                param_1_value_type,
-                param_1_val_int,
-                param_1_val_float,
-                param_1_val_float_2,
-            )),
-            oscillators: randomize_phases(vec![
-                SawtoothOscillator {
-                    phase: phase_opt.unwrap_or_default(),
-                };
-                param_0_val_int
+            unison_detune_range_semitones: ParamSource::from_parts(
+                param_4_value_type,
+                param_4_val_int,
+                param_4_val_float,
+                param_4_val_float_2,
+            ),
+            oscillators: initialize_phases(old_phases, vec![
+                SawtoothOscillator { phase: 0. };
+                unison
             ]),
         }),
         _ => panic!("Invalid operator type: {}", operator_type),
@@ -1556,6 +1665,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     ctx: *mut FMSynthContext,
     operator_ix: usize,
     operator_type: usize,
+    unison: usize,
     param_0_value_type: usize,
     param_0_val_int: usize,
     param_0_val_float: f32,
@@ -1572,11 +1682,16 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     param_3_val_int: usize,
     param_3_val_float: f32,
     param_3_val_float_2: f32,
+    param_4_value_type: usize,
+    param_4_val_int: usize,
+    param_4_val_float: f32,
+    param_4_val_float_2: f32,
 ) {
     for voice in &mut (*ctx).voices {
-        let old_phase = voice.operators[operator_ix].oscillator_source.get_phase();
+        let old_phases = voice.operators[operator_ix].oscillator_source.get_phase();
         voice.operators[operator_ix].oscillator_source = build_oscillator_source(
             operator_type,
+            unison,
             param_0_value_type,
             param_0_val_int,
             param_0_val_float,
@@ -1593,7 +1708,11 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
             param_3_val_int,
             param_3_val_float,
             param_3_val_float_2,
-            old_phase,
+            param_4_value_type,
+            param_4_val_int,
+            param_4_val_float,
+            param_4_val_float_2,
+            &old_phases,
         );
     }
 }
@@ -1607,12 +1726,12 @@ pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
     value_param_float: f32,
     val_param_float_2: f32,
 ) {
-    let param = ParamSource::new(ParamSourceType::from_parts(
+    let param = ParamSource::from_parts(
         value_type,
         value_param_int,
         value_param_float,
         val_param_float_2,
-    ));
+    );
     (*ctx).operator_base_frequency_sources[operator_ix] = param;
 }
 
@@ -1628,13 +1747,16 @@ pub unsafe extern "C" fn fm_synth_set_detune(
         (*ctx).detune = None;
         return;
     }
-    let param = ParamSourceType::from_parts(
+    let param = ParamSource::from_parts(
         param_type as usize,
         param_int_val,
         param_float_val,
         param_float_val_2,
     );
-    (*ctx).detune = Some(ParamSource::new(param));
+    match &mut (*ctx).detune {
+        Some(old_detune) => old_detune.replace(param),
+        None => (*ctx).detune = Some(param),
+    }
 }
 
 #[no_mangle]
@@ -1715,7 +1837,9 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
     }
 
     for operator in &mut (*ctx).voices[voice_ix].operators {
-        operator.oscillator_source.set_phase(0.);
+        // TODO: Make the way this is produced configurable
+        let initial_phases = &[0.];
+        operator.oscillator_source.set_phase(initial_phases);
     }
 }
 
@@ -1771,12 +1895,12 @@ pub unsafe extern "C" fn set_adsr(
             log_scale,
         );
         let params = AdsrParams {
-            len_samples: ParamSource::new(ParamSourceType::from_parts(
+            len_samples: ParamSource::from_parts(
                 len_samples_type,
                 len_samples_int_val,
                 len_samples_float_val,
                 len_samples_float_val_2,
-            )),
+            ),
         };
         if voice.adsrs.get(adsr_ix).is_some() {
             let old_phase = voice.adsrs[adsr_ix].phase;
@@ -1822,12 +1946,12 @@ pub unsafe extern "C" fn set_adsr_length(
     len_samples_float_val: f32,
     len_samples_float_val_2: f32,
 ) {
-    let param = ParamSource::new(ParamSourceType::from_parts(
+    let param = ParamSource::from_parts(
         len_samples_type,
         len_samples_int_val,
         len_samples_float_val,
         len_samples_float_val_2,
-    ));
+    );
 
     for voice in &mut (*ctx).voices {
         voice.adsr_params[adsr_ix].len_samples = param.clone();

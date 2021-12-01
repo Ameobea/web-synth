@@ -471,6 +471,7 @@ export default class FMSynth implements ForeignNode {
           'triangle oscillator': 5,
           'sawtooth oscillator': 6,
         }[config.type] + (unisonEnabled ? 50 : 0),
+      unison: unison ?? 1,
       ...(() => {
         switch (config.type) {
           case 'exponential oscillator':
@@ -492,8 +493,7 @@ export default class FMSynth implements ForeignNode {
             }
 
             return {
-              param1: { valParamInt: unison },
-              param2: this.encodeParamSource(unisonDetune),
+              param5: this.encodeParamSource(unisonDetune),
             };
           }
         }

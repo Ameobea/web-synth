@@ -1,7 +1,7 @@
 use dsp::filters::dc_blocker::DCBlocker;
 
 use super::Effect;
-use crate::fm::{ParamSource, ParamSourceType, FRAME_SIZE};
+use crate::fm::{ParamSource, FRAME_SIZE};
 
 #[derive(Clone)]
 pub struct Wavecruncher {
@@ -14,10 +14,10 @@ pub struct Wavecruncher {
 impl Default for Wavecruncher {
     fn default() -> Self {
         Wavecruncher {
-            top_fold_position: ParamSource::new(ParamSourceType::Constant(1.)),
-            top_fold_width: ParamSource::new(ParamSourceType::Constant(0.)),
-            bottom_fold_position: ParamSource::new(ParamSourceType::Constant(-1.)),
-            bottom_fold_width: ParamSource::new(ParamSourceType::Constant(0.)),
+            top_fold_position: ParamSource::new_constant(1.),
+            top_fold_width: ParamSource::new_constant(0.),
+            bottom_fold_position: ParamSource::new_constant(-1.),
+            bottom_fold_width: ParamSource::new_constant(0.),
         }
     }
 }

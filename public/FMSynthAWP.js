@@ -83,11 +83,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
             console.error('Tried setting operator config before Wasm instance loaded');
             return;
           }
-          const { operatorIx, operatorType, param1, param2, param3, param4 } = evt.data;
+          const { operatorIx, operatorType, unison, param1, param2, param3, param4, param5 } =
+            evt.data;
           this.wasmInstance.exports.fm_synth_set_operator_config(
             this.ctxPtr,
             operatorIx,
             operatorType,
+            unison,
             param1?.valueType ?? 0,
             param1?.valParamInt ?? 0,
             param1?.valParamFloat ?? 0,
@@ -103,7 +105,11 @@ class FMSynthAWP extends AudioWorkletProcessor {
             param4?.valueType ?? 0,
             param4?.valParamInt ?? 0,
             param4?.valParamFloat ?? 0,
-            param4?.valParamFloat2 ?? 0
+            param4?.valParamFloat2 ?? 0,
+            param5?.valueType ?? 0,
+            param5?.valParamInt ?? 0,
+            param5?.valParamFloat ?? 0,
+            param5?.valParamFloat2 ?? 0
           );
           break;
         }

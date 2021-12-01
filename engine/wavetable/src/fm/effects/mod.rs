@@ -4,7 +4,7 @@ use spectral_warping::SpectralWarpingParams;
 
 use crate::fm::effects::comb_filter::CombFilter;
 
-use super::{ParamSource, ParamSourceType, RenderRawParams, FRAME_SIZE};
+use super::{ParamSource, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod butterworth_filter;
@@ -104,18 +104,18 @@ impl EffectInstance {
     ) -> Self {
         match effect_type {
             0 => {
-                let frequency = ParamSource::new(ParamSourceType::from_parts(
+                let frequency = ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
-                ));
-                let warp_factor = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let warp_factor = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
+                );
                 let params = SpectralWarpingParams {
                     frequency,
                     warp_factor,
@@ -124,30 +124,30 @@ impl EffectInstance {
                 EffectInstance::SpectralWarping(SpectralWarping::new(params))
             },
             1 => {
-                let top_fold_position = ParamSource::new(ParamSourceType::from_parts(
+                let top_fold_position = ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
-                ));
-                let top_fold_width = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let top_fold_width = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
-                let bottom_fold_position = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let bottom_fold_position = ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
-                ));
-                let bottom_fold_width = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let bottom_fold_width = ParamSource::from_parts(
                     param_4_type,
                     param_4_int_val,
                     param_4_float_val,
                     param_4_float_val_2,
-                ));
+                );
 
                 EffectInstance::Wavecruncher(Wavecruncher {
                     top_fold_position,
@@ -157,116 +157,116 @@ impl EffectInstance {
                 })
             },
             2 => {
-                let sample_rate = ParamSource::new(ParamSourceType::from_parts(
+                let sample_rate = ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
-                ));
-                let bit_depth = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let bit_depth = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
+                );
 
                 EffectInstance::Bitcrusher(Bitcrusher::new(sample_rate, bit_depth))
             },
             3 => {
-                let gain = ParamSource::new(ParamSourceType::from_parts(
+                let gain = ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
-                ));
-                let offset = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let offset = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
+                );
 
                 EffectInstance::Wavefolder(Wavefolder::new(gain, offset))
             },
             4 => {
-                let pre_gain = ParamSource::new(ParamSourceType::from_parts(
+                let pre_gain = ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
-                ));
-                let post_gain = ParamSource::new(ParamSourceType::from_parts(
+                );
+                let post_gain = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
+                );
                 let algorithm = param_3_int_val;
 
                 EffectInstance::SoftClipper(SoftClipper::new(pre_gain, post_gain, algorithm))
             },
             5 => {
                 let mode = ButterworthFilterMode::from(param_1_int_val);
-                let cutoff_freq = ParamSource::new(ParamSourceType::from_parts(
+                let cutoff_freq = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
+                );
 
                 EffectInstance::ButterworthFilter(ButterworthFilter::new(mode, cutoff_freq))
             },
             6 => {
                 let delay = Delay {
                     buffer: box CircularBuffer::new(),
-                    delay_samples: ParamSource::new(ParamSourceType::from_parts(
+                    delay_samples: ParamSource::from_parts(
                         param_1_type,
                         param_1_int_val,
                         param_1_float_val,
                         param_1_float_val_2,
-                    )),
-                    wet: ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    wet: ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
-                    )),
-                    dry: ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    dry: ParamSource::from_parts(
                         param_3_type,
                         param_3_int_val,
                         param_3_float_val,
                         param_3_float_val_2,
-                    )),
-                    feedback: ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    feedback: ParamSource::from_parts(
                         param_4_type,
                         param_4_int_val,
                         param_4_float_val,
                         param_4_float_val_2,
-                    )),
+                    ),
                 };
 
                 EffectInstance::Delay(delay)
             },
             7 => {
                 let moog_filter = MoogFilter::new(
-                    ParamSource::new(ParamSourceType::from_parts(
+                    ParamSource::from_parts(
                         param_1_type,
                         param_1_int_val,
                         param_1_float_val,
                         param_1_float_val_2,
-                    )),
-                    ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
-                    )),
-                    ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    ParamSource::from_parts(
                         param_3_type,
                         param_3_int_val,
                         param_3_float_val,
                         param_3_float_val_2,
-                    )),
+                    ),
                 );
 
                 EffectInstance::MoogFilter(moog_filter)
@@ -275,30 +275,30 @@ impl EffectInstance {
                 let comb_filter = CombFilter {
                     input_buffer: box CircularBuffer::new(),
                     feedback_buffer: box CircularBuffer::new(),
-                    delay_samples: ParamSource::new(ParamSourceType::from_parts(
+                    delay_samples: ParamSource::from_parts(
                         param_1_type,
                         param_1_int_val,
                         param_1_float_val,
                         param_1_float_val_2,
-                    )),
-                    feedback_delay_samples: ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    feedback_delay_samples: ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
-                    )),
-                    feedback_gain: ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    feedback_gain: ParamSource::from_parts(
                         param_3_type,
                         param_3_int_val,
                         param_3_float_val,
                         param_3_float_val_2,
-                    )),
-                    feedforward_gain: ParamSource::new(ParamSourceType::from_parts(
+                    ),
+                    feedforward_gain: ParamSource::from_parts(
                         param_4_type,
                         param_4_int_val,
                         param_4_float_val,
                         param_4_float_val_2,
-                    )),
+                    ),
                 };
 
                 EffectInstance::CombFilter(comb_filter)
@@ -334,18 +334,16 @@ impl EffectInstance {
                     EffectInstance::SpectralWarping(spectral_warping) => spectral_warping,
                     _ => return false,
                 };
-                spectral_warping
-                    .frequency
-                    .replace(ParamSourceType::from_parts(
-                        param_1_type,
-                        param_1_int_val,
-                        param_1_float_val,
-                        param_1_float_val_2,
-                    ));
+                spectral_warping.frequency.replace(ParamSource::from_parts(
+                    param_1_type,
+                    param_1_int_val,
+                    param_1_float_val,
+                    param_1_float_val_2,
+                ));
                 spectral_warping
                     .osc
                     .stretch_factor
-                    .replace(ParamSourceType::from_parts(
+                    .replace(ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
@@ -364,13 +362,13 @@ impl EffectInstance {
                     _ => return false,
                 };
 
-                bitcrusher.sample_rate.replace(ParamSourceType::from_parts(
+                bitcrusher.sample_rate.replace(ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
                 ));
-                bitcrusher.bit_depth.replace(ParamSourceType::from_parts(
+                bitcrusher.bit_depth.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
@@ -384,13 +382,13 @@ impl EffectInstance {
                     _ => return false,
                 };
 
-                wavefolder.gain.replace(ParamSourceType::from_parts(
+                wavefolder.gain.replace(ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
                 ));
-                wavefolder.offset.replace(ParamSourceType::from_parts(
+                wavefolder.offset.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
@@ -404,13 +402,13 @@ impl EffectInstance {
                     _ => return false,
                 };
 
-                soft_clipper.pre_gain.replace(ParamSourceType::from_parts(
+                soft_clipper.pre_gain.replace(ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
                 ));
-                soft_clipper.post_gain.replace(ParamSourceType::from_parts(
+                soft_clipper.post_gain.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
@@ -426,15 +424,15 @@ impl EffectInstance {
                 };
 
                 let mode = ButterworthFilterMode::from(param_1_int_val);
-                let cutoff_freq = ParamSource::new(ParamSourceType::from_parts(
+                let cutoff_freq = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
-                ));
+                );
 
                 butterworth_filter.mode = mode;
-                butterworth_filter.cutoff_freq = cutoff_freq;
+                butterworth_filter.cutoff_freq.replace(cutoff_freq);
                 return true;
             },
             6 => {
@@ -443,25 +441,25 @@ impl EffectInstance {
                     _ => return false,
                 };
 
-                delay.delay_samples = ParamSource::new(ParamSourceType::from_parts(
+                delay.delay_samples.replace(ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
                 ));
-                delay.wet = ParamSource::new(ParamSourceType::from_parts(
+                delay.wet.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
-                delay.dry = ParamSource::new(ParamSourceType::from_parts(
+                delay.dry.replace(ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
                 ));
-                delay.feedback = ParamSource::new(ParamSourceType::from_parts(
+                delay.feedback.replace(ParamSource::from_parts(
                     param_4_type,
                     param_4_int_val,
                     param_4_float_val,
@@ -475,19 +473,19 @@ impl EffectInstance {
                     _ => return false,
                 };
 
-                moog_filter.cutoff = ParamSource::new(ParamSourceType::from_parts(
+                moog_filter.cutoff.replace(ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
                 ));
-                moog_filter.resonance = ParamSource::new(ParamSourceType::from_parts(
+                moog_filter.resonance.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
                 ));
-                moog_filter.drive = ParamSource::new(ParamSourceType::from_parts(
+                moog_filter.drive.replace(ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
@@ -501,30 +499,34 @@ impl EffectInstance {
                     _ => return false,
                 };
 
-                comb_filter.delay_samples = ParamSource::new(ParamSourceType::from_parts(
+                comb_filter.delay_samples.replace(ParamSource::from_parts(
                     param_1_type,
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
                 ));
-                comb_filter.feedback_delay_samples = ParamSource::new(ParamSourceType::from_parts(
-                    param_2_type,
-                    param_2_int_val,
-                    param_2_float_val,
-                    param_2_float_val_2,
-                ));
-                comb_filter.feedback_gain = ParamSource::new(ParamSourceType::from_parts(
+                comb_filter
+                    .feedback_delay_samples
+                    .replace(ParamSource::from_parts(
+                        param_2_type,
+                        param_2_int_val,
+                        param_2_float_val,
+                        param_2_float_val_2,
+                    ));
+                comb_filter.feedback_gain.replace(ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
                 ));
-                comb_filter.feedforward_gain = ParamSource::new(ParamSourceType::from_parts(
-                    param_4_type,
-                    param_4_int_val,
-                    param_4_float_val,
-                    param_4_float_val_2,
-                ));
+                comb_filter
+                    .feedforward_gain
+                    .replace(ParamSource::from_parts(
+                        param_4_type,
+                        param_4_int_val,
+                        param_4_float_val,
+                        param_4_float_val_2,
+                    ));
                 return true;
             },
             _ => false,
