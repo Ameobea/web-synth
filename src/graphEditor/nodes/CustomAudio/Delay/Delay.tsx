@@ -12,9 +12,8 @@ import { AsyncOnce } from 'src/util';
 
 export const DelayWasmBytes = new AsyncOnce(() =>
   fetch(
-    '/delay.wasm?cacheBust=' + window.location.host.includes('localhost')
-      ? ''
-      : btoa(Math.random().toString())
+    '/delay.wasm?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   ).then(res => res.arrayBuffer())
 );
 

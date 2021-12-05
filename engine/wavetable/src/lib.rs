@@ -64,7 +64,10 @@ impl WaveTable {
             + (waveform_ix * self.settings.waveform_length);
 
         let sample_mix = sample_ix.fract();
-        let (sample_low_ix, sample_hi_ix) = (sample_ix.floor() as usize, sample_ix.ceil() as usize);
+        let (sample_low_ix, sample_hi_ix) = (
+            sample_ix.floor() as usize,
+            (sample_ix.ceil() as usize).min(self.samples.len() - 1),
+        );
         let (low_sample, high_sample) = (
             self.samples[waveform_offset_samples + sample_low_ix],
             self.samples[waveform_offset_samples + sample_hi_ix],

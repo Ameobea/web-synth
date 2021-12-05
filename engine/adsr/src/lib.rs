@@ -376,7 +376,7 @@ impl Adsr {
                 self.gate_status = GateStatus::GatedFrozen;
                 self.maybe_write_cur_phase();
                 return;
-            }
+            },
             GateStatus::Releasing if self.phase >= 1. => {
                 // If we are done, we output our final value forever and freeze the output buffer,
                 // not requiring any further rendering until we are re-gated

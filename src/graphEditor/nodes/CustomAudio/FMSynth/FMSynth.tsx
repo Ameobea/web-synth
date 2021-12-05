@@ -23,7 +23,7 @@ import {
   buildDefaultParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
-import { AsyncOnce, getHasSIMDSupport } from 'src/util';
+import { AsyncOnce, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
 import { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { getSentry } from 'src/sentry';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
@@ -134,6 +134,19 @@ export default class FMSynth implements ForeignNode {
   public midiControlValuesCache: MIDIControlValuesCache;
   private wavetableState: WavetableState = { wavetableBanks: [] };
   private wavetableBackendIxByName: string[] = [];
+  public gainEnvelope: AdsrParams & { lenSamples: { type: 'constant'; value: number } } = {
+    steps: [
+      { x: 0, y: 0, ramper: { type: 'instant' } },
+      { x: 0.02, y: 0.65, ramper: { type: 'exponential', exponent: 1 } },
+      { x: 0.09, y: 0.6, ramper: { type: 'exponential', exponent: 1 } },
+      { x: 0.98, y: 0.6, ramper: { type: 'exponential', exponent: 1 } },
+      { x: 1, y: 0, ramper: { type: 'exponential', exponent: 1 } },
+    ],
+    lenSamples: { type: 'constant', value: 44_100 / 2 },
+    loopPoint: null,
+    releasePoint: 0.98,
+    audioThreadData: { phaseIndex: 0 },
+  };
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -249,6 +262,7 @@ export default class FMSynth implements ForeignNode {
       numberOfOutputs: VOICE_COUNT,
     });
 
+    console.log(this.gainEnvelope);
     this.awpHandle.port.postMessage({
       type: 'setWasmBytes',
       logScale: this.logScale,
@@ -257,25 +271,11 @@ export default class FMSynth implements ForeignNode {
         row.map(cell => this.encodeParamSource(cell))
       ),
       outputWeights: this.outputWeights.map(ps => this.encodeParamSource(ps)),
-      adsrs: this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
+      adsrs: [
+        this.encodeAdsr(this.gainEnvelope, -1),
+        ...this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
+      ],
     });
-
-    // this.operatorConfigs.forEach((operator, operatorIx) => {
-    //   if (operator.type !== 'wavetable' || operator.wavetableName === null) {
-    //     return;
-    //   }
-
-    //   const bank = this.wavetableState.wavetableBanks.find(
-    //     R.propEq('name', operator.wavetableName)
-    //   );
-    //   if (!bank) {
-    //     console.error(
-    //       `Wavetable bank ${operator.wavetableName} not found in wavetable state but was referenced by operator ix=${operatorIx}`
-    //     );
-    //     return;
-    //   }
-    //   this.maybeLoadWavetableIntoBackend(bank);
-    // });
 
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -567,16 +567,25 @@ export default class FMSynth implements ForeignNode {
       newAdsrRaw.lenSamples = { type: 'constant', value: newAdsrRaw.lenSamples };
     }
 
-    const isLenOnlyChange =
-      this.adsrs[adsrIx] && !R.equals(this.adsrs[adsrIx].lenSamples, newAdsrRaw.lenSamples);
-    const newAdsr = R.clone({ ...newAdsrRaw, audioThreadData: undefined });
-    this.adsrs[adsrIx] = {
-      ...newAdsr,
+    const oldAdsr = adsrIx < 0 ? this.gainEnvelope : this.adsrs[adsrIx];
+
+    const isLenOnlyChange = oldAdsr && !R.equals(oldAdsr.lenSamples, newAdsrRaw.lenSamples);
+    const newAdsr = {
+      ...R.clone({ ...newAdsrRaw, audioThreadData: undefined }),
       audioThreadData: {
         phaseIndex: adsrIx,
         buffer: this.audioThreadDataBuffer ?? undefined,
       },
     };
+    if (adsrIx < 0) {
+      const newLenSamples = newAdsr.lenSamples;
+      if (newLenSamples.type !== 'constant') {
+        throw new UnreachableException('Only constant gain envelope length is supported');
+      }
+      this.gainEnvelope = { ...newAdsr, lenSamples: newLenSamples };
+    } else {
+      this.adsrs[adsrIx] = newAdsr;
+    }
 
     if (isLenOnlyChange) {
       this.awpHandle.port.postMessage({
@@ -812,6 +821,16 @@ export default class FMSynth implements ForeignNode {
     if (params.wavetableState) {
       this.wavetableState = deserializeWavetableState(params.wavetableState);
     }
+    if (params.gainEnvelope && params.gainEnvelope.steps.length > 0) {
+      const gainEnvelope = normalizeEnvelope(params.gainEnvelope);
+      this.gainEnvelope = {
+        ...gainEnvelope,
+        lenSamples:
+          typeof gainEnvelope.lenSamples === 'number'
+            ? { type: 'constant', value: gainEnvelope.lenSamples }
+            : gainEnvelope.lenSamples,
+      };
+    }
   }
 
   public serialize() {
@@ -826,6 +845,7 @@ export default class FMSynth implements ForeignNode {
       detune: this.detune,
       lastSeenMIDIControlValues: this.midiControlValuesCache.serialize(),
       wavetableState: serializeWavetableState(this.wavetableState),
+      gainEnvelope: this.gainEnvelope,
     };
   }
 

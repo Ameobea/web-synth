@@ -5,7 +5,7 @@ use wasm_bindgen::JsValue;
 
 use crate::{js, view_context::ViewContext};
 
-/// This is just a shim to the JS-based Faust editor.  Since there really aren't any complicated
+/// This is just a shim to the JS-based Code editor.  Since there really aren't any complicated
 /// interactive or graphical components of this view context, the actual implementation for this
 /// is done in JS.
 #[derive(Serialize, Deserialize)]

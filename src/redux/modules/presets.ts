@@ -2,6 +2,7 @@ import { buildActionGroup, buildModule } from 'jantix';
 import { createSelector } from 'reselect';
 
 import { BACKEND_BASE_URL } from 'src/conf';
+import type { ADSRValues } from 'src/controls/adsr';
 import { dispatch, actionCreators, ReduxStore } from 'src/redux';
 import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 
@@ -12,7 +13,10 @@ export interface SynthPresetEntry {
   body: { voices: SynthVoicePreset[] };
 }
 
-export type SynthVoicePreset = ReturnType<typeof serializeSynthModule>;
+export type SynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
+  gainEnvelope?: ADSRValues;
+  gainADSRLength?: number;
+};
 
 export interface SynthVoicePresetEntry {
   id: number;

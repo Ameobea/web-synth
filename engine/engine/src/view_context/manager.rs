@@ -301,7 +301,7 @@ impl ViewContextManager {
             MinimalViewContextDefinition {
                 uuid,
                 name: "faust_editor".into(),
-                title: Some("Faust Editor".into()),
+                title: Some("Code Editor".into()),
             },
             view_context,
         );

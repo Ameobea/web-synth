@@ -3,11 +3,10 @@ import { buildModule, buildActionGroup, buildStore } from 'jantix';
 import { reducer as formReducer } from 'redux-form';
 import type { Root as ReactDOMRoot } from 'react-dom';
 
-import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
-import { ADSR2Module, ADSRModule } from 'src/synthDesigner/ADSRModule';
-import { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
-import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { normalizeEnvelope } from 'src/util';
+import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
+import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
+import FMSynth, { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -32,7 +31,6 @@ export interface Voice {
   // source is the inner gain node.
   outerGainNode: GainNode;
   filterNode: AbstractFilterModule;
-  gainADSRModule: ADSRModule;
   filterADSRModule: ADSR2Module;
   lastGateOrUngateTime: number;
 }
@@ -62,8 +60,6 @@ export interface SynthModule {
   filterCSNs: FilterCSNs;
   filterFrequencySource: FilterFrequencySource;
   masterGain: number;
-  gainEnvelope: ADSRValues;
-  gainADSRLength: number;
   filterEnvelope: Adsr;
   filterADSRLength: number;
   pitchMultiplier: number;
@@ -118,8 +114,6 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   fmSynthConfig: synth.fmSynth?.serialize(),
   filter: synth.filterParams,
   masterGain: synth.masterGain,
-  gainEnvelope: synth.gainEnvelope,
-  gainADSRLength: synth.gainADSRLength,
   filterEnvelope: synth.filterEnvelope,
   filterADSRLength: synth.filterADSRLength,
   pitchMultiplier: synth.pitchMultiplier,
@@ -183,7 +177,6 @@ export const gateSynthDesigner = (
     }
 
     // Trigger gain and filter ADSRs
-    targetVoice.gainADSRModule.gate();
     targetVoice.filterADSRModule.gate(voiceIx);
     // We edit state directly w/o updating references because this is only needed internally
     targetVoice.lastGateOrUngateTime = ctx.currentTime;
@@ -197,13 +190,14 @@ export const ungateSynthDesigner = (
   getState: () => { synthDesigner: SynthDesignerState },
   voiceIx: number
 ) =>
-  getState().synthDesigner.synths.forEach(({ voices, gainADSRLength, fmSynth }, synthIx) => {
+  getState().synthDesigner.synths.forEach(({ voices, fmSynth }, synthIx) => {
     fmSynth?.onUnGate(voiceIx);
     const targetVoice = voices[voiceIx];
     // We edit state directly w/o updating references because this is only needed internally
     const ungateTime = ctx.currentTime;
     targetVoice.lastGateOrUngateTime = ungateTime;
-    const releaseLengthMs = (1 - targetVoice.gainADSRModule.envelope.release.pos) * gainADSRLength;
+    const releaseLengthMs =
+      (1 - fmSynth.gainEnvelope.releasePoint) * samplesToMs(fmSynth.gainEnvelope.lenSamples.value);
 
     setTimeout(
       () => {
@@ -232,7 +226,6 @@ export const ungateSynthDesigner = (
     );
 
     // Trigger release of gain and filter ADSRs
-    targetVoice.gainADSRModule.ungate();
     targetVoice.filterADSRModule.ungate(voiceIx);
   });
 
@@ -303,16 +296,11 @@ const buildDefaultSynthModule = (
     filterBypassed: true,
     voices: new Array(VOICE_COUNT).fill(null).map((_, voiceIndex) => {
       const outerGainNode = new GainNode(ctx);
-      outerGainNode.gain.setValueAtTime(0, ctx.currentTime);
+      outerGainNode.gain.setValueAtTime(1, ctx.currentTime);
 
       const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs);
       // TODO: Connect ADSR once we can do so intelligently
       filterNode.getOutput().connect(outerGainNode);
-
-      // Start the gain ADSR module and configure it to modulate the voice's gain node
-      const gainADSRModule = new ADSRModule(ctx, { minValue: 0, maxValue: 1.0, lengthMs: 1000 });
-      gainADSRModule.start();
-      gainADSRModule.connect(outerGainNode.gain);
 
       // We connect the ADSR modules to a dummy output in order to drive them for a while so that
       // they can initialize.
@@ -320,18 +308,15 @@ const buildDefaultSynthModule = (
       // If we don't do this, they will start off in an invalid state and, naturally, make
       // horrifically loud noises.
       filterADSRModule.getOutput().then(output => output.connect(dummyGain, voiceIndex));
-      gainADSRModule.connect(dummyGain);
 
       setTimeout(() => {
         filterADSRModule.getOutput().then(output => output.disconnect(dummyGain, voiceIndex));
-        gainADSRModule.disconnect(dummyGain);
         dummyGain.disconnect();
       }, 1000);
 
       return {
         outerGainNode,
         filterNode,
-        gainADSRModule,
         filterADSRModule,
         lastGateOrUngateTime: 0,
       };
@@ -343,8 +328,6 @@ const buildDefaultSynthModule = (
     filterCSNs,
     filterFrequencySource: FilterFrequencySource.CSNs,
     masterGain,
-    gainEnvelope: buildDefaultAdsrEnvelope(),
-    gainADSRLength: 1000,
     filterEnvelope: buildDefaultADSR2Envelope({ phaseIndex: 0 }),
     filterADSRLength: 1000,
     pitchMultiplier: 1,
@@ -378,10 +361,6 @@ export const deserializeSynthModule = (
         updateFilterNode([voice.filterNode], base.filterCSNs, key, val)
       );
 
-    voice.gainADSRModule.setEnvelope(gainEnvelope);
-    voice.gainADSRModule.setLengthMs(gainADSRLength ?? 1000);
-    voice.gainADSRModule.setMaxValue(1 + masterGain);
-
     if ((filterEnvelope as any).attack) {
       filterEnvelope = buildDefaultADSR2Envelope({ phaseIndex: 0 });
     }
@@ -398,11 +377,12 @@ export const deserializeSynthModule = (
     voices,
     fmSynth: new FMSynth(ctx, undefined, {
       ...(fmSynthConfig || {}),
+      gainEnvelope: gainEnvelope
+        ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
+        : fmSynthConfig.gainEnvelope,
       onInitialized: () => connectFMSynth(stateKey, synthIx),
     }),
     masterGain,
-    gainEnvelope,
-    gainADSRLength: gainADSRLength ?? 1000,
     filterEnvelope: normalizeEnvelope(filterEnvelope),
     filterADSRLength: filterADSRLength ?? 1000,
     filterParams,
@@ -478,17 +458,17 @@ const actionGroups = {
       };
     },
   }),
+  // TODO: Should not be a Redux action
   SET_GAIN_ADSR: buildActionGroup({
-    actionCreator: (envelope: ADSRValues, synthIx: number) => ({
+    actionCreator: (envelope: AdsrParams, synthIx: number) => ({
       type: 'SET_GAIN_ADSR',
       envelope,
       synthIx,
     }),
     subReducer: (state: SynthDesignerState, { envelope, synthIx }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.voices.forEach(voice => voice.gainADSRModule.setEnvelope(envelope));
-
-      return setSynth(synthIx, { ...targetSynth, gainEnvelope: envelope }, state);
+      targetSynth.fmSynth.handleAdsrChange(-1, envelope);
+      return state;
     },
   }),
   SET_FILTER_ADSR: buildActionGroup({
@@ -551,9 +531,8 @@ const actionGroups = {
       gain,
     }),
     subReducer: (state: SynthDesignerState, { synthIx, gain }) => {
-      const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.voices.forEach(voice => voice.gainADSRModule.setMaxValue(1 + gain));
-      return setSynth(synthIx, { ...targetSynth, masterGain: gain }, state);
+      // TODO
+      return state;
     },
   }),
   SET_VOICE_STATE: buildActionGroup({
@@ -628,6 +607,7 @@ const actionGroups = {
       return setSynth(synthIx, newSynth, state);
     },
   }),
+  // TODO: Does not need to be a Redux action
   SET_GAIN_ADSR_LENGTH: buildActionGroup({
     actionCreator: (synthIx: number, lengthMs: number) => ({
       type: 'SET_GAIN_ADSR_LENGTH',
@@ -636,10 +616,14 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { synthIx, lengthMs }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.voices.forEach(voice => voice.gainADSRModule.setLengthMs(lengthMs));
-      return setSynth(synthIx, { ...targetSynth, gainADSRLength: lengthMs }, state);
+      targetSynth.fmSynth.handleAdsrChange(-1, {
+        ...targetSynth.fmSynth.gainEnvelope,
+        lenSamples: { type: 'constant', value: msToSamples(lengthMs) },
+      });
+      return state;
     },
   }),
+  // TODO: Does not need to be a Redux action
   SET_GAIN_LOG_SCALE: buildActionGroup({
     actionCreator: (synthIx: number, logScale: boolean) => ({
       type: 'SET_GAIN_LOG_SCALE',
@@ -647,7 +631,11 @@ const actionGroups = {
       logScale,
     }),
     subReducer: (state: SynthDesignerState, { synthIx, logScale }) => {
-      // Not currently implemented since ADSR1 doesn't support log scale
+      const targetSynth = getSynth(synthIx, state.synths);
+      targetSynth.fmSynth.handleAdsrChange(-1, {
+        ...targetSynth.fmSynth.gainEnvelope,
+        logScale,
+      });
       return state;
     },
   }),

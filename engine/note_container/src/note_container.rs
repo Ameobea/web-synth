@@ -535,7 +535,8 @@ impl NoteContainer {
         real_new_start_point
     }
 
-    pub fn iter_notes(&self, acc: &mut HashSet<u32>, start_point: f64, end_point: f64) {
+    pub fn iter_notes(&self, acc: &mut HashSet<u32>, mut start_point: f64, end_point: f64) {
+        start_point = start_point.max(0.);
         let iterator = self.inner.range((
             Bound::Included(FloatOrd(start_point)),
             Bound::Included(FloatOrd(end_point)),

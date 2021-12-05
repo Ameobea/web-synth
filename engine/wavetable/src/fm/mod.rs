@@ -2,7 +2,10 @@
 use core::arch::wasm32::*;
 use std::rc::Rc;
 
-use adsr::{Adsr, AdsrStep, EarlyReleaseConfig, GateStatus, RampFn, RENDERED_BUFFER_SIZE};
+use adsr::{
+    Adsr, AdsrStep, EarlyReleaseConfig, EarlyReleaseStrategy, GateStatus, RampFn,
+    RENDERED_BUFFER_SIZE,
+};
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
@@ -255,30 +258,26 @@ impl<T: Oscillator + PhasedOscillator> UnisonOscillator<T> {
         base_frequency: f32,
     ) -> f32 {
         let mut out = 0.;
-        let unison_detune_range_semitones = self.unison_detune_range_semitones.get(
-            param_buffers,
-            adsrs,
-            sample_ix_within_frame,
-            base_frequency,
+        let unison_detune_range_semitones = dsp::clamp(
+            0.,
+            1200.,
+            self.unison_detune_range_semitones
+                .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
+                .abs(),
         );
-        let unison_detune_semitones_start =
-            -dsp::clamp(0., 1200., unison_detune_range_semitones / 2.);
+        let unison_detune_semitones_start = -unison_detune_range_semitones / 2.;
         let unison_detune_step_semitones =
             unison_detune_range_semitones / (self.oscillators.len() - 1) as f32;
 
         // TODO: This may need to be optimized
-        let middle_oscillator_ix = self.oscillators.len() as f32 / 2.;
+        let middle_oscillator_ix = (self.oscillators.len() - 1) as f32 / 2.;
         let middle_count = if self.oscillators.len() % 2 == 0 {
             2
         } else {
             1
         };
         let outer_count = self.oscillators.len() - middle_count;
-        let total_middle_gain_pct = if self.oscillators.len() == 2 {
-            1.
-        } else {
-            0.83
-        }; // TODO: Make configurable
+        let total_middle_gain_pct = if self.oscillators.len() == 2 { 1. } else { 0.2 }; // TODO: Make configurable
         let middle_gain_pct = total_middle_gain_pct / middle_count as f32;
         let total_outer_gain_pct = 1. - total_middle_gain_pct;
         let outer_gain_pct = if outer_count > 0 {
@@ -670,30 +669,7 @@ pub struct FMSynthVoice {
     pub last_sample_frequencies_per_operator: [f32; OPERATOR_COUNT],
     pub effect_chain: EffectChain,
     cached_modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
-}
-
-impl Default for FMSynthVoice {
-    fn default() -> Self {
-        FMSynthVoice {
-            output: 0.,
-            adsrs: Vec::new(),
-            adsr_params: Vec::new(),
-            operators: [
-                Operator::default(),
-                Operator::default(),
-                Operator::default(),
-                Operator::default(),
-                Operator::default(),
-                Operator::default(),
-                Operator::default(),
-                Operator::default(),
-            ],
-            last_samples: [0.0; OPERATOR_COUNT],
-            last_sample_frequencies_per_operator: [0.0; OPERATOR_COUNT],
-            effect_chain: EffectChain::default(),
-            cached_modulation_indices: [[[0.0; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
-        }
-    }
+    pub gain_envelope: Adsr,
 }
 
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
@@ -732,7 +708,57 @@ fn compute_detune(freq: f32, detune_semitones: f32) -> f32 {
     freq * fastapprox::fast::pow2(detune_semitones / 1200.)
 }
 
+fn build_default_gain_adsr_steps() -> Vec<AdsrStep> {
+    vec![
+        AdsrStep {
+            x: 0.,
+            y: 1.,
+            ramper: RampFn::Linear,
+        },
+        AdsrStep {
+            x: 1.,
+            y: 1.,
+            ramper: RampFn::Linear,
+        },
+    ]
+}
+
 impl FMSynthVoice {
+    #[cold]
+    fn new(shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]>) -> Self {
+        FMSynthVoice {
+            output: 0.,
+            adsrs: Vec::new(),
+            adsr_params: Vec::new(),
+            operators: [
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+                Operator::default(),
+            ],
+            last_samples: [0.0; OPERATOR_COUNT],
+            last_sample_frequencies_per_operator: [0.0; OPERATOR_COUNT],
+            effect_chain: EffectChain::default(),
+            cached_modulation_indices: [[[0.0; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
+            gain_envelope: Adsr::new(
+                build_default_gain_adsr_steps(),
+                None,
+                44_100.,
+                0.975,
+                shared_gain_adsr_rendered_buffer,
+                EarlyReleaseConfig {
+                    strategy: EarlyReleaseStrategy::FastEnvelopeFollow,
+                    len_samples: 3_400,
+                },
+                false,
+            ),
+        }
+    }
+
     pub fn gen_samples(
         &mut self,
         modulation_matrix: &mut ModulationMatrix,
@@ -970,43 +996,6 @@ pub struct RenderRawParams<'a> {
     pub adsrs: &'a [Adsr],
     pub base_frequencies: &'a [f32; FRAME_SIZE],
 }
-
-// impl ParamSource {
-//     pub fn new(source_type: ParamSource) -> Self { ParamSource { source_type } }
-
-//     pub fn get_raw(
-//         &mut self,
-//         param_buffers: &[[f32; FRAME_SIZE]],
-//         adsrs: &[Adsr],
-//         sample_ix_within_frame: usize,
-//         base_frequency: f32,
-//     ) -> f32 {
-//         self.source_type
-//             .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
-//     }
-
-//     pub fn render_raw<'a>(&self, params: &RenderRawParams<'a>, output_buf: &mut [f32;
-// FRAME_SIZE]) {         self.source_type.render_raw(params, output_buf);
-//     }
-
-//     /// Replaces the param generator while preserving the previous value used for smoothing
-//     pub fn replace(&mut self, new_source_type: ParamSource) {
-//         match (&mut self.source_type, &new_source_type) {
-//             (
-//                 ParamSource::Constant { last_val, cur_val },
-//                 ParamSource::Constant {
-//                     cur_val: new_val, ..
-//                 },
-//             ) => {
-//                 *last_val = *cur_val;
-//                 *cur_val = *new_val;
-//                 return;
-//             },
-//             _ => (),
-//         }
-//         self.source_type = new_source_type;
-//     }
-// }
 
 impl Default for ParamSource {
     fn default() -> Self {
@@ -1374,6 +1363,13 @@ impl FMSynthContext {
                 output_buffer,
                 self.detune.as_ref(),
             );
+
+            voice.gain_envelope.render_frame(1., 0.);
+            // TODO: SIMD-ify
+            let gain_adsr_output = voice.gain_envelope.get_cur_frame_output();
+            for i in 0..FRAME_SIZE {
+                output_buffer[i] *= gain_adsr_output[i];
+            }
         }
     }
 
@@ -1435,9 +1431,18 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
             .add(i)
             .write(ParamSource::BaseFrequencyMultiplier(1.));
     }
+    let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> = box uninit();
+    let shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
+        shared_gain_adsr_rendered_buffer.into();
+
     for _ in 0..voice_count {
-        (*ctx).voices.push(FMSynthVoice::default());
+        (*ctx).voices.push(FMSynthVoice::new(Rc::clone(
+            &shared_gain_adsr_rendered_buffer,
+        )));
     }
+    // Render the default gain envelope for all voices
+    (*ctx).voices[0].gain_envelope.render();
+
     (*ctx).base_frequency_input_buffer.set_len(voice_count);
     (*ctx).output_buffers.set_len(voice_count);
 
@@ -1831,23 +1836,30 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
     }
     (*ctx).most_recent_gated_voice_ix = voice_ix;
 
-    for (i, adsr) in (*ctx).voices[voice_ix].adsrs.iter_mut().enumerate() {
+    let voice = &mut (*ctx).voices[voice_ix];
+    for (i, adsr) in voice.adsrs.iter_mut().enumerate() {
         adsr.store_phase_to = Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(i));
         adsr.gate();
     }
 
-    for operator in &mut (*ctx).voices[voice_ix].operators {
-        // TODO: Make the way this is produced configurable
-        let initial_phases = &[0.];
-        operator.oscillator_source.set_phase(initial_phases);
-    }
+    voice.gain_envelope.gate();
+
+    // for operator in &mut voice.operators {
+    //     // TODO: Make the way this is produced configurable
+    //     let initial_phases = &[0.];
+    //     operator.oscillator_source.set_phase(initial_phases);
+    // }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ungate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
-    for adsr in &mut (*ctx).voices[voice_ix].adsrs {
+    let voice = &mut (*ctx).voices[voice_ix];
+
+    for adsr in &mut voice.adsrs {
         adsr.ungate();
     }
+
+    voice.gain_envelope.ungate();
 }
 
 static mut ADSR_STEP_BUFFER: [AdsrStep; 512] = [AdsrStep {
@@ -1867,7 +1879,7 @@ pub unsafe extern "C" fn set_adsr_step_buffer(i: usize, x: f32, y: f32, ramper: 
 #[no_mangle]
 pub unsafe extern "C" fn set_adsr(
     ctx: *mut FMSynthContext,
-    adsr_ix: usize,
+    adsr_ix: isize,
     step_count: usize,
     len_samples_type: usize,
     len_samples_int_val: usize,
@@ -1881,7 +1893,7 @@ pub unsafe extern "C" fn set_adsr(
     let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
 
     for voice in &mut (*ctx).voices {
-        let mut adsr = Adsr::new(
+        let mut new_adsr = Adsr::new(
             ADSR_STEP_BUFFER[..step_count].to_owned(),
             if loop_point < 0. {
                 None
@@ -1902,45 +1914,60 @@ pub unsafe extern "C" fn set_adsr(
                 len_samples_float_val_2,
             ),
         };
-        if voice.adsrs.get(adsr_ix).is_some() {
-            let old_phase = voice.adsrs[adsr_ix].phase;
-            let gate_status = voice.adsrs[adsr_ix].gate_status;
-            let store_phase_to = voice.adsrs[adsr_ix].store_phase_to;
 
-            adsr.phase = match gate_status {
+        let old_adsr = if adsr_ix < 0 {
+            Some(&mut voice.gain_envelope)
+        } else {
+            voice.adsrs.get_mut(adsr_ix as usize)
+        };
+
+        if let Some(old_adsr) = old_adsr {
+            let old_phase = old_adsr.phase;
+            let gate_status = old_adsr.gate_status;
+            let store_phase_to = old_adsr.store_phase_to;
+
+            new_adsr.phase = match gate_status {
                 GateStatus::GatedFrozen => release_start_phase,
                 GateStatus::Done => 1.,
                 _ => old_phase,
             };
             // Switch out of frozen states into active ones to trigger one frame of samples to be
             // generated for the new ADSR
-            adsr.gate_status = match gate_status {
+            new_adsr.gate_status = match gate_status {
                 GateStatus::GatedFrozen => GateStatus::Gated,
                 GateStatus::Done => GateStatus::Releasing,
                 other => other,
             };
-            adsr.store_phase_to = store_phase_to;
-            voice.adsrs[adsr_ix] = adsr;
-            voice.adsr_params[adsr_ix] = params;
-        } else if voice.adsrs.len() != adsr_ix {
+            new_adsr.store_phase_to = store_phase_to;
+            *old_adsr = new_adsr;
+            if adsr_ix >= 0 {
+                voice.adsr_params[adsr_ix as usize] = params;
+            } else {
+                old_adsr.set_len_samples(len_samples_float_val);
+            }
+        } else if voice.adsrs.len() != adsr_ix as usize {
             panic!(
                 "Tried to set ADSR index {} but only {} adsrs exist",
                 adsr_ix,
                 voice.adsrs.len()
             );
         } else {
-            voice.adsrs.push(adsr);
+            voice.adsrs.push(new_adsr);
             voice.adsr_params.push(params);
         }
     }
     // Render the ADSR's shared buffer
-    (*ctx).voices[0].adsrs[adsr_ix].render();
+    if adsr_ix < 0 {
+        (*ctx).voices[0].gain_envelope.render();
+    } else {
+        (*ctx).voices[0].adsrs[adsr_ix as usize].render();
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn set_adsr_length(
     ctx: *mut FMSynthContext,
-    adsr_ix: usize,
+    adsr_ix: isize,
     len_samples_type: usize,
     len_samples_int_val: usize,
     len_samples_float_val: f32,
@@ -1952,6 +1979,15 @@ pub unsafe extern "C" fn set_adsr_length(
         len_samples_float_val,
         len_samples_float_val_2,
     );
+
+    if adsr_ix < 0 {
+        // gain envelope
+        for voice in &mut (*ctx).voices {
+            voice.gain_envelope.set_len_samples(len_samples_float_val);
+        }
+        return;
+    }
+    let adsr_ix = adsr_ix as usize;
 
     for voice in &mut (*ctx).voices {
         voice.adsr_params[adsr_ix].len_samples = param.clone();

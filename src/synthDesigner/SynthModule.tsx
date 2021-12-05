@@ -7,7 +7,6 @@ import { Option } from 'funfix-core';
 
 import { getSynthDesignerReduxInfra, SynthModule } from 'src/redux/modules/synthDesigner';
 import FilterModule from './Filter';
-import { buildDefaultAdsrEnvelope, ControlPanelADSR } from 'src/controls/adsr';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, getState, useSelector } from 'src/redux';
@@ -16,6 +15,9 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
+import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
+import { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { msToSamples, samplesToMs } from 'src/util';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
@@ -86,10 +88,11 @@ const PresetsControlPanel: React.FC<{
   );
 };
 
-interface SynthControlPanelProps
-  extends Pick<SynthModule, 'masterGain' | 'gainADSRLength' | 'gainEnvelope' | 'pitchMultiplier'> {
+interface SynthControlPanelProps extends Pick<SynthModule, 'masterGain' | 'pitchMultiplier'> {
   stateKey: string;
   index: number;
+  gainEnvelope: AdsrParams;
+  gainADSRLength: number;
 }
 
 const SYNTH_CONTROL_PANEL_SETTINGS = [
@@ -97,38 +100,38 @@ const SYNTH_CONTROL_PANEL_SETTINGS = [
     type: 'range',
     label: 'volume',
     min: -1,
-    initial: 0.1,
     max: 1,
     step: 0.008,
   },
   {
     type: 'text',
     label: 'pitch multiplier',
-    initial: '1',
   },
   {
     type: 'range',
     label: 'adsr length ms',
     min: 50,
     max: 10000,
-    initial: 1000,
   },
   {
     type: 'checkbox',
     label: 'log scale',
-    initial: false,
   },
   {
     type: 'custom',
-    label: 'adsr',
-    initial: buildDefaultAdsrEnvelope(),
-    Comp: ControlPanelADSR,
+    label: 'gain envelope',
+    Comp: mkControlPanelADSR2WithSize(380, 200),
   },
 ];
 
 const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
   const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(props.stateKey);
+  const [gainADSRLengthMs, setGainADSRLengthMs] = useState<number>(props.gainADSRLength);
+  const [gainEnvelope, setGainEnvelope] = useState<Adsr>({
+    ...props.gainEnvelope,
+    lenSamples: msToSamples(gainADSRLengthMs),
+  });
 
   const handleSynthChange = useCallback(
     (key: string, val: any) => {
@@ -137,11 +140,13 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
           dispatch(actionCreators.synthDesigner.SET_SYNTH_MASTER_GAIN(props.index, val));
           return;
         }
-        case 'adsr': {
+        case 'gain envelope': {
+          setGainEnvelope(val);
           dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, props.index));
           return;
         }
         case 'adsr length ms': {
+          setGainADSRLengthMs(val);
           dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(props.index, val));
           return;
         }
@@ -169,19 +174,17 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
   const state = useMemo(
     () => ({
       volume: props.masterGain,
-      'adsr length ms': props.gainADSRLength,
-      adsr: props.gainEnvelope,
+      'adsr length ms': gainADSRLengthMs,
+      'gain envelope': {
+        ...gainEnvelope,
+        lenSamples: msToSamples(gainADSRLengthMs),
+        outputRange: [0, 1],
+      },
       'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
         () => props.pitchMultiplier?.toString() ?? 1
       ),
     }),
-    [
-      props.masterGain,
-      props.gainADSRLength,
-      props.gainEnvelope,
-      props.pitchMultiplier,
-      localPitchMultiplier,
-    ]
+    [props.masterGain, gainADSRLengthMs, gainEnvelope, props.pitchMultiplier, localPitchMultiplier]
   );
 
   return (
@@ -238,6 +241,8 @@ const SynthModuleCompInner: React.FC<{
         )}
         stateKey={stateKey}
         index={index}
+        gainEnvelope={synth.fmSynth.gainEnvelope}
+        gainADSRLength={samplesToMs(synth.fmSynth.gainEnvelope.lenSamples.value)}
       />
 
       <ConnectedFMSynthUI

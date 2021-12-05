@@ -13,7 +13,7 @@ export const ViewContextDescriptors: {
   description?: string;
 }[] = [
   { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor', description: 'test' },
-  { children: 'E', name: 'faust_editor', displayName: 'Faust Code Editor' },
+  { children: 'E', name: 'faust_editor', displayName: 'Code Editor' },
   { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },
   { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
   { children: 'D', name: 'synth_designer', displayName: 'Synth Designer' },

@@ -304,7 +304,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
         paramSource.valParamFloat2
       )
     );
-    adsrs.forEach(({ steps, lenSamples, releasePoint, loopPoint, logScale }, adsrIx) => {
+    adsrs.forEach(({ steps, lenSamples, releasePoint, loopPoint, logScale, adsrIx }) => {
       steps.forEach(({ x, y, ramper, param }, stepIx) => {
         this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
       });

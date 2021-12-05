@@ -209,7 +209,7 @@ dependencies = [
 name = "event_scheduler"
 version = "0.1.0"
 dependencies = [
- "float-ord",
+ "float-ord 0.2.0",
  "heapless",
 ]
 
@@ -224,6 +224,12 @@ name = "float-ord"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
+
+[[package]]
+name = "float-ord"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ce81f49ae8a0482e4c55ea62ebbd7e5a686af544c00b9d090bba3ff9be97b3d"
 
 [[package]]
 name = "fnv"
@@ -479,7 +485,7 @@ name = "note_container"
 version = "0.1.0"
 dependencies = [
  "common",
- "float-ord",
+ "float-ord 0.3.2",
  "js-sys",
  "log",
  "wasm-bindgen",
@@ -754,7 +760,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 name = "sample_editor"
 version = "0.1.0"
 dependencies = [
- "float-ord",
+ "float-ord 0.2.0",
  "slotmap",
 ]
 
