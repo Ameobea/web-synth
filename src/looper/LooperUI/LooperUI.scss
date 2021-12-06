@@ -1,3 +1,44 @@
 .looper {
-  /* TODO */
+  .looper-banks {
+    display: flex;
+    flex-direction: column;
+
+    .looper-bank {
+      display: grid;
+      grid-template-columns: 0 400px 0.2fr 1fr;
+      border-bottom: 1px solid black;
+
+      .active-composition-name {
+        text-align: center;
+        font-size: 13.5px;
+        color: #cccccc88;
+
+        b {
+          color: #cccccc;
+          font-size: 16px;
+        }
+      }
+
+      .delete-looper-bank-button {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 17px;
+        height: 17px;
+        z-index: 2;
+        color: #991111;
+        padding: 0;
+        font-size: 18px;
+        line-height: 0;
+      }
+    }
+
+    .looper-bank[data-active='true'] {
+      background-color: rgba(14, 14, 148, 0.2);
+    }
+  }
+
+  .looper-main-control-panel {
+    margin-top: 20px;
+  }
 }

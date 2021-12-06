@@ -1,4 +1,6 @@
-import { LooperInstState } from 'src/redux/modules/looper';
+import type { SavedMIDIComposition } from 'src/api';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
+import type { LooperInstState } from 'src/redux/modules/looper';
 import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
@@ -17,12 +19,18 @@ const LooperWasm = new AsyncOnce(() =>
   ).then(res => res.arrayBuffer())
 );
 
-export class LooperNode extends AudioWorkletNode {
+export class LooperNode {
   private vcId: string;
+  /**
+   * Sends output MIDI events created by the looper to connected destination modules
+   */
+  private midiNode: MIDINode;
+  private workletNode: AudioWorkletNode | null = null;
+  private queuedMessages: any[] = [];
 
-  constructor(vcId: string, serialized?: LooperInstState) {
-    super(ctx, 'looper-awp');
+  constructor(vcId: string, midiNode: MIDINode, serialized?: Omit<LooperInstState, 'looperNode'>) {
     this.vcId = vcId;
+    this.midiNode = midiNode;
 
     if (serialized) {
       this.deserialize(serialized);
@@ -31,35 +39,83 @@ export class LooperNode extends AudioWorkletNode {
     this.init();
   }
 
-  private deserialize(serialized: LooperInstState) {
-    this.setActiveBankIx(serialized.activeBankIx);
-
+  private deserialize(serialized: Omit<LooperInstState, 'looperNode'>) {
     serialized.banks?.forEach((bank, bankIx) => {
-      // TODO
+      if (!bank.loadedComposition) {
+        return;
+      }
+
+      this.setCompositionForBank(bankIx, bank.loadedComposition);
+    });
+
+    this.setActiveBankIx(serialized.activeBankIx);
+  }
+
+  private postMessage(msg: any) {
+    if (this.workletNode) {
+      this.workletNode.port.postMessage(msg);
+    } else {
+      this.queuedMessages.push(msg);
+    }
+  }
+
+  public setCompositionForBank(bankIx: number, composition: SavedMIDIComposition) {
+    const notes: { note: number; isGate: boolean; beat: number }[] = [];
+
+    const lineCount = composition.composition.lines.length;
+    const lineIxToNote = (lineIx: number): number => lineCount - lineIx;
+
+    composition.composition.lines.forEach((line, lineIx) => {
+      line.notes.forEach(note => {
+        notes.push({
+          note: lineIxToNote(lineIx),
+          isGate: true,
+          beat: note.startPoint,
+        });
+        notes.push({
+          note: lineIxToNote(lineIx),
+          isGate: false,
+          beat: note.startPoint + note.length,
+        });
+      });
+    });
+
+    this.postMessage({
+      type: 'setCompositionForBank',
+      bankIx,
+      notes,
     });
   }
 
   public setActiveBankIx(bankIx: number | null) {
-    this.port.postMessage({ type: 'setActiveBankIx', bankIx });
+    this.postMessage({ type: 'setActiveBankIx', bankIx });
+  }
+
+  public setNextBankIx(nextBankIx: number) {
+    this.postMessage({ type: 'setNextBankIx', nextBankIx });
   }
 
   private async init() {
-    const looperWasm = await LooperWasm.get();
-    this.port.postMessage(
-      {
-        type: 'setWasmBytes',
-        wasmBytes: looperWasm,
-      },
-      [looperWasm]
-    );
+    const [looperWasm] = await Promise.all([LooperWasm.get(), LooperAWPRegistered.get()]);
+    this.workletNode = new AudioWorkletNode(ctx, 'looper-awp');
+    this.workletNode.port.postMessage({
+      type: 'setWasmBytes',
+      wasmBytes: looperWasm,
+    });
+    this.workletNode.port.onmessage = evt => {
+      switch (evt.data.type) {
+        case 'playNote':
+          this.midiNode.onAttack(evt.data.note, 255);
+          break;
+        case 'releaseNote':
+          this.midiNode.onRelease(evt.data.note, 255);
+          break;
+        default:
+          console.error('Unknown message from looper:', evt.data);
+      }
+    };
+
+    this.queuedMessages.forEach(msg => this.postMessage(msg));
+    this.queuedMessages = [];
   }
 }
-
-export const buildLooperNode = async (vcId: string, serialized?: LooperInstState) => {
-  // Eagerly start fetching looper wasm
-  LooperWasm.get();
-
-  await LooperAWPRegistered.get();
-  const node = new LooperNode(vcId, serialized);
-  return node;
-};

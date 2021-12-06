@@ -5,6 +5,7 @@ class LooperAWP extends AudioWorkletProcessor {
   constructor() {
     super();
 
+    this.didReleaseAfterStop = false;
     this.pendingEvents = [];
 
     this.port.onmessage = async evt => {
@@ -27,16 +28,20 @@ class LooperAWP extends AudioWorkletProcessor {
         break;
       }
       case 'setNextBankIx': {
-        this.wasmInstance.exports.looper_set_next_bank_ix(data.bankIx);
+        this.wasmInstance.exports.looper_set_next_bank_ix(data.nextBankIx);
         break;
       }
       case 'setLoopLenBeats': {
         this.wasmInstance.exports.looper_set_loop_len_beats(data.loopLenBeats);
         break;
       }
-      case 'setBank': {
+      case 'setCompositionForBank': {
         const { notes, bankIx } = data;
-        throw new Error('Not implemented');
+        this.wasmInstance.exports.looper_clear_bank(bankIx);
+        notes.forEach(note =>
+          this.wasmInstance.exports.looper_add_evt(bankIx, note.note, note.beat, note.isGate)
+        );
+        this.wasmInstance.exports.looper_finalize_bank(bankIx);
         break;
       }
       default: {
@@ -60,8 +65,13 @@ class LooperAWP extends AudioWorkletProcessor {
 
   process(_inputs, _outputs, _params) {
     if (!this.wasmInstance || globalThis.curBeat === 0) {
+      if (this.wasmInstance && !this.didReleaseAfterStop) {
+        this.wasmInstance.exports.looper_on_playback_stop();
+        this.didReleaseAfterStop = true;
+      }
       return true;
     }
+    this.didReleaseAfterStop = false;
 
     this.wasmInstance.exports.looper_process(globalThis.curBeat);
 

@@ -1,7 +1,6 @@
 import { filterNils } from 'ameo-utils';
 import React, { useEffect, useRef, useState } from 'react';
 import * as R from 'ramda';
-import { useQuery } from 'react-query';
 import ControlPanel from 'react-control-panel';
 
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
@@ -12,13 +11,14 @@ import MIDIEditorUIInstance, {
 import './MIDIEditor.scss';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import { mkSavePresetModal } from 'src/synthDesigner/SavePresetModal';
-import { getSavedMIDICompositions, SavedMIDIComposition, saveMIDIComposition } from 'src/api';
+import { saveMIDIComposition } from 'src/api';
 import BasicModal from 'src/misc/BasicModal';
 import { withReactQueryClient } from 'src/reactUtils';
 import FileUploader, { Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { AsyncOnce } from 'src/util';
 import { MidiFileInfo, getMidiImportSettings } from 'src/controls/MidiImportDialog';
 import download from 'downloadjs';
+import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 
 const ctx = new AudioContext();
 
@@ -84,87 +84,6 @@ const SnapControls: React.FC<{
         </div>
       ))}
     </div>
-  );
-};
-
-const LoadMIDICompositionModalContent: React.FC<{
-  midiCompositions: SavedMIDIComposition[] | undefined;
-  onSubmit: (args: { composition: SavedMIDIComposition }) => void;
-  onCancel: (() => void) | undefined;
-}> = ({ midiCompositions, onSubmit, onCancel }) => {
-  const controlPanelCtx = useRef<null | any>(null);
-  if (!midiCompositions) {
-    return (
-      <>
-        <i>Loading MIDI Compositions...</i>
-        <br />
-        {onCancel ? (
-          <ControlPanel settings={[{ type: 'button', label: 'cancel', action: onCancel }]} />
-        ) : null}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <ControlPanel
-        contextCb={(ctx: any) => {
-          controlPanelCtx.current = ctx;
-        }}
-        settings={filterNils([
-          {
-            label: 'composition',
-            type: 'select',
-            options: R.zipObj(
-              midiCompositions.map(R.prop('name')),
-              midiCompositions.map(R.prop('id'))
-            ),
-            initial: midiCompositions[0].id,
-          },
-          {
-            type: 'button',
-            label: 'load',
-            action: () => {
-              if (!controlPanelCtx.current) {
-                console.warn('Submitted w/o control panel ctx being set');
-                return;
-              }
-              const proceed = confirm('Really clear current composition and load new one?');
-              if (!proceed) {
-                return;
-              }
-
-              const compositionID = controlPanelCtx.current.composition;
-              const composition = midiCompositions.find(comp => comp.id == compositionID);
-              if (!composition) {
-                console.error('Selected composition not loaded, id=' + compositionID);
-                return;
-              }
-              onSubmit({ composition });
-            },
-          },
-          onCancel ? { type: 'button', label: 'cancel', action: onCancel } : null,
-        ])}
-      />
-    </>
-  );
-};
-
-const LoadMIDICompositionModal: React.FC<ModalCompProps<{ composition: SavedMIDIComposition }>> = ({
-  onSubmit,
-  onCancel,
-}) => {
-  const { data: midiCompositions } = useQuery(['midiCompositions'], getSavedMIDICompositions);
-
-  return (
-    <BasicModal className='midi-modal'>
-      <h2>Load MIDI Composition</h2>
-      <LoadMIDICompositionModalContent
-        midiCompositions={midiCompositions}
-        onSubmit={onSubmit}
-        onCancel={onCancel}
-      />
-    </BasicModal>
   );
 };
 
@@ -450,7 +369,11 @@ const MIDIEditorControls: React.FC<{
           try {
             const {
               composition: { composition },
-            } = await renderModalWithControls(withReactQueryClient(LoadMIDICompositionModal));
+            } = await renderModalWithControls(
+              withReactQueryClient(
+                mkLoadMIDICompositionModal('Really clear current composition and load new one?')
+              )
+            );
             inst.current.reInitialize(composition);
           } catch (_err) {
             return;
@@ -474,10 +397,8 @@ const MIDIEditorControls: React.FC<{
             ] as const);
             const bytes = new Uint8Array(uploadedFile.fileContent);
 
-            const notesByMIDINumber: Map<
-              number,
-              { startPoint: number; length: number }[]
-            > = new Map();
+            const notesByMIDINumber: Map<number, { startPoint: number; length: number }[]> =
+              new Map();
             for (let i = 0; i < 127; i++) {
               notesByMIDINumber.set(i, []);
             }

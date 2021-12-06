@@ -46,6 +46,10 @@ static mut CTX: LooperCtx = LooperCtx {
     next_bank_ix: None,
 };
 
+static mut PLAYING_NOTES: [bool; 1024] = [false; 1024];
+
+fn playing_notes() -> &'static mut [bool] { unsafe { &mut PLAYING_NOTES } }
+
 fn ctx() -> &'static mut LooperCtx { unsafe { &mut CTX } }
 
 const BANK_COUNT: usize = 128;
@@ -119,6 +123,22 @@ pub extern "C" fn looper_activate_bank(bank_ix: usize, cur_beat: f32) {
 pub extern "C" fn looper_set_next_bank_ix(bank_ix: usize) { ctx().next_bank_ix = Some(bank_ix); }
 
 #[no_mangle]
+pub extern "C" fn looper_on_playback_stop() {
+    for (note, is_playing) in playing_notes().iter_mut().enumerate() {
+        if *is_playing {
+            unsafe { release_note(note as u8) };
+            *is_playing = false;
+        }
+    }
+
+    let ctx = ctx();
+    if let Some(next_bank_ix) = ctx.next_bank_ix {
+        ctx.active_bank_ix = next_bank_ix;
+        ctx.next_bank_ix = None;
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn looper_process(cur_beat: f32) {
     let ctx = ctx();
     let loop_beat = cur_beat % ctx.loop_len_beats;
@@ -127,10 +147,7 @@ pub extern "C" fn looper_process(cur_beat: f32) {
         ctx.last_beat = loop_beat;
         ctx.next_evt_ix = Some(0);
 
-        if let Some(next_bank_ix) = ctx.next_bank_ix {
-            ctx.active_bank_ix = next_bank_ix;
-            ctx.next_bank_ix = None;
-        }
+        looper_on_playback_stop();
     }
 
     let bank = &midi_banks()[ctx.active_bank_ix];
@@ -144,8 +161,10 @@ pub extern "C" fn looper_process(cur_beat: f32) {
             break;
         }
         if evt.is_gate {
+            playing_notes()[evt.note as usize] = true;
             unsafe { play_note(evt.note) };
         } else {
+            playing_notes()[evt.note as usize] = false;
             unsafe { release_note(evt.note) };
         }
 

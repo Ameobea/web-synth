@@ -35,9 +35,9 @@ export const {
   looper: looperSlice.reducer,
 });
 
-type GetStateOutput = ReturnType<typeof getStateInner> & { looper: LooperState };
+export type ReduxStore = ReturnType<typeof getStateInner> & { looper: LooperState };
 
-export const getState = (): GetStateOutput => getStateInner() as any;
+export const getState = (): ReduxStore => getStateInner() as any;
 
 // Fixing the types isn't worth my time
 export const looperDispatch = (action: ReturnType<ValueOf<typeof looperActions>>) =>
@@ -48,5 +48,3 @@ fetchSynthPresets();
 fetchSynthVoicePresets();
 
 (window as any).getState = getState;
-
-export type ReduxStore = ReturnType<typeof getState>;

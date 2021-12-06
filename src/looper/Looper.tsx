@@ -18,8 +18,8 @@ import {
   LooperInstState,
   SerializedLooperInstState,
 } from 'src/redux/modules/looper';
-import { getState, looperDispatch } from 'src/redux';
-import { buildLooperNode, LooperNode } from 'src/looper/LooperNode';
+import { getState, looperDispatch, store } from 'src/redux';
+import { LooperNode } from 'src/looper/LooperNode';
 
 const LazyLooperUI = React.lazy(() => import('src/looper/LooperUI/LooperUI'));
 
@@ -31,12 +31,12 @@ const LooperUI: React.FC<LooperUIProps> = props => (
 
 interface LooperCtx {
   midiNode: MIDINode;
-  looperNode: LooperNode | null;
+  looperNode: LooperNode;
 }
 
-const deserializeLooper = (serialized: string): LooperInstState => {
+const deserializeLooper = (serialized: string): Omit<LooperInstState, 'looperNode'> => {
   const parsed: SerializedLooperInstState = JSON.parse(serialized);
-  return parsed;
+  return { ...parsed };
 };
 
 const serializeLooper = (looperState: LooperInstState): string => {
@@ -48,7 +48,7 @@ const getLooperDOMElementId = (vcId: string) => `looper_${vcId}`;
 
 const LooperCtxsByVcId: Map<string, LooperCtx> = new Map();
 
-export const init_looper = async (stateKey: string) => {
+export const init_looper = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const domId = getLooperDOMElementId(vcId);
@@ -61,7 +61,7 @@ export const init_looper = async (stateKey: string) => {
   document.getElementById('content')!.appendChild(elem);
 
   const serialized = localStorage.getItem(stateKey);
-  const initialState: LooperInstState = Option.of(serialized)
+  const initialState: Omit<LooperInstState, 'looperNode'> = Option.of(serialized)
     .map(s => {
       try {
         return deserializeLooper(s);
@@ -71,23 +71,21 @@ export const init_looper = async (stateKey: string) => {
       }
     })
     .getOrElseL(buildDefaultLooperInstState);
-  buildLooperNode(vcId, initialState).then(looperNode => {
-    const ctx = LooperCtxsByVcId.get(vcId);
-    if (!ctx) {
-      console.error('Looper context not found for vcId', vcId);
-      return;
-    }
-    ctx.looperNode = looperNode;
-  });
 
-  const ctx: LooperCtx = { midiNode: new MIDINode(), looperNode: null };
+  const midiNode = new MIDINode();
+  const looperNode = new LooperNode(vcId, midiNode, initialState);
+
+  const ctx: LooperCtx = { midiNode, looperNode };
   LooperCtxsByVcId.set(vcId, ctx);
 
-  looperDispatch(looperActions.setLooperInstState({ vcId, state: initialState }));
+  looperDispatch(
+    looperActions.setLooperInstState({ vcId, state: { ...initialState, looperNode } })
+  );
 
   mkContainerRenderHelper({
     Comp: LooperUI,
     getProps: () => ({ vcId }),
+    store,
   })(domId);
 };
 
