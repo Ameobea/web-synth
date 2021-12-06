@@ -1,8 +1,5 @@
 use float_ord::FloatOrd;
-use heapless::{
-    binary_heap::{BinaryHeap, Min},
-    consts::U1048576,
-};
+use heapless::binary_heap::{BinaryHeap, Min};
 
 extern "C" {
     fn run_callback(cb_id: i32);
@@ -28,10 +25,8 @@ impl PartialOrd for ScheduledEvent {
     }
 }
 
-static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, U1048576, Min> =
-    BinaryHeap(heapless::i::BinaryHeap::new());
-static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, U1048576, Min> =
-    BinaryHeap(heapless::i::BinaryHeap::new());
+static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, Min, 1048576> = BinaryHeap::new();
+static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, Min, 1048576> = BinaryHeap::new();
 
 #[no_mangle]
 pub unsafe extern "C" fn stop() { SCHEDULED_EVENTS.clear(); }

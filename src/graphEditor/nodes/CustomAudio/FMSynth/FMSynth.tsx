@@ -262,7 +262,6 @@ export default class FMSynth implements ForeignNode {
       numberOfOutputs: VOICE_COUNT,
     });
 
-    console.log(this.gainEnvelope);
     this.awpHandle.port.postMessage({
       type: 'setWasmBytes',
       logScale: this.logScale,

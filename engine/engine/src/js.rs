@@ -181,3 +181,12 @@ extern "C" {
     pub fn cleanup_sinsy(state_key: &str);
     pub fn get_sinsy_audio_connectables(vc_id: &str) -> JsValue;
 }
+
+#[wasm_bindgen(raw_module = "./looper/Looper")]
+extern "C" {
+    pub fn init_looper(state_key: &str);
+    pub fn hide_looper(vc_id: &str);
+    pub fn unhide_looper(vc_id: &str);
+    pub fn cleanup_looper(state_key: &str);
+    pub fn get_looper_audio_connectables(vc_id: &str) -> JsValue;
+}

@@ -4,6 +4,7 @@ pub mod faust_editor;
 pub mod filter_designer;
 pub mod granulator;
 pub mod graph_editor;
+pub mod looper;
 pub mod midi_editor;
 pub mod midi_keyboard;
 pub mod sample_library;

@@ -8,5 +8,5 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-heapless = "0.5"
-float-ord = "0.2"
+heapless = { version = "0.7", default-features = false }
+float-ord = "0.3"

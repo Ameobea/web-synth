@@ -6,24 +6,36 @@ import { getEngine } from 'src/util';
 
 import './GlobalVolume.scss';
 
-export const ViewContextDescriptors: {
-  children: string;
+interface ViewContextDescriptor {
   name: string;
   displayName: string;
   description?: string;
-}[] = [
-  { children: 'M', name: 'midi_editor', displayName: 'MIDI Editor', description: 'test' },
-  { children: 'E', name: 'faust_editor', displayName: 'Code Editor' },
-  { children: 'G', name: 'graph_editor', displayName: 'Graph Editor' },
-  { children: 'S', name: 'composition_sharing', displayName: 'Composition Sharing' },
-  { children: 'D', name: 'synth_designer', displayName: 'Synth Designer' },
-  { children: 'K', name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
-  { children: '𝍖', name: 'sequencer', displayName: 'Sequencer' },
-  { children: 'L', name: 'sample_library', displayName: 'Sample Library' },
-  { children: 'P', name: 'control_panel', displayName: 'Control Panel' },
-  { children: '⋱', name: 'granulator', displayName: 'Granular Synthesizer' },
-  { children: 'F', name: 'filter_designer', displayName: 'Filter Designer' },
-  { children: 'V', name: 'sinsy', displayName: 'Sinsy' },
+}
+
+export const ViewContextDescriptors: ViewContextDescriptor[] = [
+  {
+    name: 'midi_editor',
+    displayName: 'MIDI Editor',
+    description:
+      'Fully-featured MIDI editor that can be used to create MIDI compositions that emit MIDI events.  Useful in combination with a module that accepts MIDI input such as the Synth Designer.',
+  },
+  {
+    name: 'faust_editor',
+    displayName: 'Code Editor',
+    description:
+      "Compile code written in either Faust or Soul into WebAssembly on the fly and load into the audio graph live.  Produces working UIs based off of the code's params, connectables for modulation, and preset saving/loading.",
+  },
+  { name: 'graph_editor', displayName: 'Graph Editor' },
+  { name: 'composition_sharing', displayName: 'Composition Sharing' },
+  { name: 'synth_designer', displayName: 'Synth Designer' },
+  { name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
+  { name: 'sequencer', displayName: 'Sequencer' },
+  { name: 'sample_library', displayName: 'Sample Library' },
+  { name: 'control_panel', displayName: 'Control Panel' },
+  { name: 'granulator', displayName: 'Granular Synthesizer' },
+  { name: 'filter_designer', displayName: 'Filter Designer' },
+  { name: 'sinsy', displayName: 'Sinsy' },
+  { name: 'looper', displayName: 'Looper' },
 ];
 
 const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {

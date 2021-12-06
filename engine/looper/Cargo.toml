@@ -1,5 +1,5 @@
 [package]
-name = "noise_gen"
+name = "looper"
 version = "0.1.0"
 authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2021"
@@ -8,7 +8,5 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rand_pcg = "0.3"
-rand = "0.7"
 common = { path = "../common", default_features = false }
-dsp = { path = "../dsp" }
+float-ord = "0.3"

@@ -17,7 +17,8 @@ members = [
   "sample_editor",
   "delay",
   "sample_player",
-  "wav_decoder"
+  "wav_decoder",
+  "looper"
 ]
 
 [profile.release]

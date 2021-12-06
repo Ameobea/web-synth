@@ -62,6 +62,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -104,6 +105,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
 
   just debug-sinsy
 
@@ -203,3 +205,11 @@ build-wav-decoder:
   cd ./engine/wav_decoder && cargo build --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/wav_decoder.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/wav_decoder* ./src/
+
+build-event-scheduler:
+  cd ./engine/event_scheduler && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/event_scheduler.wasm ../../public
+
+build-looper:
+  cd ./engine/looper && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/looper.wasm ../../public

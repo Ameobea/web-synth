@@ -10,6 +10,7 @@ use crate::{
         filter_designer::mk_filter_designer,
         granulator::mk_granulator,
         graph_editor::mk_graph_editor,
+        looper::mk_looper,
         midi_editor::mk_midi_editor,
         midi_keyboard::mk_midi_keyboard,
         sample_library::mk_sample_library,
@@ -584,6 +585,7 @@ pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewCon
         "granulator" => mk_granulator(conf, uuid),
         "filter_designer" => mk_filter_designer(conf, uuid),
         "sinsy" => mk_sinsy(conf, uuid),
+        "looper" => mk_looper(conf, uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

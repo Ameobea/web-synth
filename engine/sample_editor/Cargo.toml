@@ -9,4 +9,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 slotmap = "1.0"
-float-ord = "0.2"
+float-ord = "0.3"

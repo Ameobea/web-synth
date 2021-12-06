@@ -53,6 +53,7 @@
     "cypress:serve": "serve -C -s -p 9000 dist"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^1.6.2",
     "@sentry/react": "^6.14.0",
     "@sentry/tracing": "^6.14.0",
     "@types/ramda": "^0.27.50",
