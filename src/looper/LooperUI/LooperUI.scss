@@ -31,10 +31,16 @@
         font-size: 18px;
         line-height: 0;
       }
+
+      .looper-viz {
+        margin-top: auto;
+        margin-bottom: auto;
+        display: block;
+      }
     }
 
     .looper-bank[data-active='true'] {
-      background-color: rgba(14, 14, 148, 0.2);
+      background-color: rgba(62, 192, 231, 0.4);
     }
   }
 

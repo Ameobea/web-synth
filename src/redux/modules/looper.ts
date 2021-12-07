@@ -13,6 +13,7 @@ export interface LooperInstState {
   activeBankIx: number | null;
   banks: LooperBank[];
   looperNode: LooperNode;
+  phaseSAB: Float32Array | null;
 }
 
 export interface LooperState {
@@ -27,6 +28,7 @@ export interface SerializedLooperInstState {
 export const buildDefaultLooperInstState = (): Omit<LooperInstState, 'looperNode'> => ({
   activeBankIx: null,
   banks: [],
+  phaseSAB: null,
 });
 
 const buildDefaultLooperState = (): LooperState => ({
@@ -79,6 +81,13 @@ const looperSlice = createSlice({
       } else {
         instState.looperNode.setActiveBankIx(bankIx);
       }
+    },
+    setPhaseSAB: (
+      state,
+      { payload: { vcId, phaseSAB } }: PayloadAction<{ vcId: string; phaseSAB: Float32Array }>
+    ) => {
+      const instState = state.stateByVcId[vcId];
+      instState.phaseSAB = phaseSAB;
     },
   },
 });

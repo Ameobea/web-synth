@@ -6,6 +6,7 @@ extern "C" {
     fn play_note(note: u8);
 
     fn release_note(note: u8);
+
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -120,6 +121,9 @@ pub extern "C" fn looper_activate_bank(bank_ix: usize, cur_beat: f32) {
 }
 
 #[no_mangle]
+pub extern "C" fn looper_get_playing_bank_ix() -> usize { ctx().active_bank_ix }
+
+#[no_mangle]
 pub extern "C" fn looper_set_next_bank_ix(bank_ix: usize) { ctx().next_bank_ix = Some(bank_ix); }
 
 #[no_mangle]
@@ -139,7 +143,7 @@ pub extern "C" fn looper_on_playback_stop() {
 }
 
 #[no_mangle]
-pub extern "C" fn looper_process(cur_beat: f32) {
+pub extern "C" fn looper_process(cur_beat: f32) -> f32 {
     let ctx = ctx();
     let loop_beat = cur_beat % ctx.loop_len_beats;
 
@@ -152,7 +156,7 @@ pub extern "C" fn looper_process(cur_beat: f32) {
 
     let bank = &midi_banks()[ctx.active_bank_ix];
     if bank.is_empty() {
-        return;
+        return 0.;
     }
 
     while let Some(next_evt_ix) = ctx.next_evt_ix {
@@ -176,4 +180,5 @@ pub extern "C" fn looper_process(cur_beat: f32) {
     }
 
     ctx.last_beat = loop_beat;
+    loop_beat / ctx.loop_len_beats
 }

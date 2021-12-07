@@ -27,10 +27,18 @@ export class LooperNode {
   private midiNode: MIDINode;
   private workletNode: AudioWorkletNode | null = null;
   private queuedMessages: any[] = [];
+  private phaseSAB: Float32Array | null = null;
+  private onPhaseSABReceived?: (phaseSAB: Float32Array) => void;
 
-  constructor(vcId: string, midiNode: MIDINode, serialized?: Omit<LooperInstState, 'looperNode'>) {
+  constructor(
+    vcId: string,
+    midiNode: MIDINode,
+    serialized?: Omit<LooperInstState, 'looperNode'>,
+    onPhaseSABReceived?: (phaseSAB: Float32Array) => void
+  ) {
     this.vcId = vcId;
     this.midiNode = midiNode;
+    this.onPhaseSABReceived = onPhaseSABReceived;
 
     if (serialized) {
       this.deserialize(serialized);
@@ -109,6 +117,10 @@ export class LooperNode {
           break;
         case 'releaseNote':
           this.midiNode.onRelease(evt.data.note, 255);
+          break;
+        case 'phaseSAB':
+          this.phaseSAB = new Float32Array(evt.data.phaseSAB);
+          this.onPhaseSABReceived?.(this.phaseSAB);
           break;
         default:
           console.error('Unknown message from looper:', evt.data);

@@ -36,7 +36,7 @@ interface LooperCtx {
 
 const deserializeLooper = (serialized: string): Omit<LooperInstState, 'looperNode'> => {
   const parsed: SerializedLooperInstState = JSON.parse(serialized);
-  return { ...parsed };
+  return { ...parsed, phaseSAB: null };
 };
 
 const serializeLooper = (looperState: LooperInstState): string => {
@@ -73,7 +73,9 @@ export const init_looper = (stateKey: string) => {
     .getOrElseL(buildDefaultLooperInstState);
 
   const midiNode = new MIDINode();
-  const looperNode = new LooperNode(vcId, midiNode, initialState);
+  const onPhaseSABReceived = (phaseSAB: Float32Array) =>
+    looperDispatch(looperActions.setPhaseSAB({ vcId, phaseSAB }));
+  const looperNode = new LooperNode(vcId, midiNode, initialState, onPhaseSABReceived);
 
   const ctx: LooperCtx = { midiNode, looperNode };
   LooperCtxsByVcId.set(vcId, ctx);

@@ -9,6 +9,7 @@ import './LooperUI.scss';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { withReactQueryClient } from 'src/reactUtils';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
+import LooperViz from 'src/looper/LooperUI/LooperViz';
 
 const DeleteBankButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button className='delete-looper-bank-button' onClick={onClick}>
@@ -22,6 +23,7 @@ interface LooperBankCompProps {
   bank: LooperBank;
   bankIx: number;
   isLast: boolean;
+  phaseSAB: Float32Array | null;
 }
 
 const LooperBankComp: React.FC<LooperBankCompProps> = ({
@@ -30,6 +32,7 @@ const LooperBankComp: React.FC<LooperBankCompProps> = ({
   isActive,
   bank,
   bankIx,
+  phaseSAB,
 }) => {
   const settings = useMemo(
     () => [
@@ -79,7 +82,11 @@ const LooperBankComp: React.FC<LooperBankCompProps> = ({
         <br />
         <b>{bank.loadedComposition ? bank.loadedComposition.name : 'NONE'}</b>
       </div>
-      <div>TODO</div>
+      <div>
+        {phaseSAB ? (
+          <LooperViz bankIx={bankIx} phaseSAB={phaseSAB} width={500} height={100} />
+        ) : null}
+      </div>
     </div>
   );
 };
@@ -108,8 +115,8 @@ export interface LooperUIProps {
 }
 
 const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
-  const { banks, activeBankIx } = useSelector((state: ReduxStore) =>
-    R.pick(['banks', 'activeBankIx'], state.looper.stateByVcId[vcId])
+  const { banks, activeBankIx, phaseSAB } = useSelector((state: ReduxStore) =>
+    R.pick(['banks', 'activeBankIx', 'phaseSAB'], state.looper.stateByVcId[vcId])
   );
 
   return (
@@ -123,6 +130,7 @@ const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
             bank={bank}
             bankIx={bankIx}
             isLast={bankIx === banks.length - 1}
+            phaseSAB={phaseSAB}
           />
         ))}
       </div>

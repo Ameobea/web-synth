@@ -1,12 +1,12 @@
-const FRAME_SIZE = 128;
-const BYTES_PER_F32 = 32 / 8;
-
 class LooperAWP extends AudioWorkletProcessor {
   constructor() {
     super();
 
     this.didReleaseAfterStop = false;
     this.pendingEvents = [];
+    const curPhaseSAB =
+      typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(8) : undefined;
+    this.curPhaseBuffer = curPhaseSAB ? new Float32Array(curPhaseSAB) : undefined;
 
     this.port.onmessage = async evt => {
       if (!this.wasmInstance && evt.data.type !== 'setWasmBytes') {
@@ -15,6 +15,10 @@ class LooperAWP extends AudioWorkletProcessor {
         this.handleMessage(evt.data);
       }
     };
+
+    if (this.curPhaseBuffer) {
+      this.port.postMessage({ type: 'phaseSAB', phaseSAB: this.curPhaseBuffer.buffer });
+    }
   }
 
   handleMessage = async data => {
@@ -54,8 +58,20 @@ class LooperAWP extends AudioWorkletProcessor {
 
   releaseNote = note => this.port.postMessage({ type: 'releaseNote', note });
 
+  setPlayingBankIx = playingBankIx => {
+    if (this.curPhaseBuffer) {
+      console.log({ playingBankIx });
+      this.curPhaseBuffer[1] = playingBankIx;
+    }
+  };
+
   async initWasm(wasmBytes) {
-    const importObject = { env: { play_note: this.playNote, release_note: this.releaseNote } };
+    const importObject = {
+      env: {
+        play_note: this.playNote,
+        release_note: this.releaseNote,
+      },
+    };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
 
@@ -67,13 +83,20 @@ class LooperAWP extends AudioWorkletProcessor {
     if (!this.wasmInstance || globalThis.curBeat === 0) {
       if (this.wasmInstance && !this.didReleaseAfterStop) {
         this.wasmInstance.exports.looper_on_playback_stop();
+        if (this.curPhaseBuffer) {
+          this.curPhaseBuffer[1] = -1;
+        }
         this.didReleaseAfterStop = true;
       }
       return true;
     }
     this.didReleaseAfterStop = false;
 
-    this.wasmInstance.exports.looper_process(globalThis.curBeat);
+    const phase = this.wasmInstance.exports.looper_process(globalThis.curBeat);
+    if (this.curPhaseBuffer) {
+      this.curPhaseBuffer[0] = phase;
+      this.curPhaseBuffer[1] = this.wasmInstance.exports.looper_get_playing_bank_ix();
+    }
 
     return true;
   }
