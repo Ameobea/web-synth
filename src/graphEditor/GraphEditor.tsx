@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LiteGraph } from 'litegraph.js';
+import { LGraph, LGraphCanvas, LGraphNode, LiteGraph } from 'litegraph.js';
 import 'litegraph.js/css/litegraph.css';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
@@ -20,13 +20,50 @@ import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode
 import { getEngine } from 'src/util';
 import FlatButton from 'src/misc/FlatButton';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
-import { LiteGraph as LiteGraphInstance } from 'src/graphEditor/LiteGraphTypes';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
+
+LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
+const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;
+LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
+  const options = oldGetNodeMenuOptions.apply(this, [node]);
+  const OptionsToRemove = [
+    'Title',
+    'Clone',
+    'Inputs',
+    'Outputs',
+    'Properties',
+    'Mode',
+    'Pin',
+    'Resize',
+  ];
+  const filteredOptions = options.filter(item => {
+    if (!item) {
+      return true;
+    }
+    if (OptionsToRemove.includes(item.content)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  while (filteredOptions[0] === null) {
+    filteredOptions.splice(0, 1);
+  }
+
+  // Remove duplicate subsequent nulls which map to dividers in the menu
+  return filteredOptions.filter((opt, i) => {
+    if (i > 0 && opt === null && filteredOptions[i - 1] === null) {
+      return false;
+    }
+    return true;
+  });
+};
 
 /**
  * Mapping of `stateKey`s to the graph instances that that they manage
  */
-const GraphEditorInstances: Map<string, LiteGraphInstance> = new Map();
+const GraphEditorInstances: Map<string, LGraph> = new Map();
 (window as any).GraphEditorInstances = GraphEditorInstances;
 (window as any).LiteGraph = LiteGraph;
 
@@ -154,9 +191,11 @@ const handleNodeSelectAction = async ({
   }
 };
 
-const GraphControls: React.FC<{
-  lGraphInstance: LiteGraphInstance | null;
-}> = ({ lGraphInstance }) => {
+interface GraphControlsProps {
+  lGraphInstance: LGraph | null;
+}
+
+const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
   const selectedNodeType = useRef<string>('customAudio/LFO');
 
   const settings = useMemo(() => {
@@ -226,7 +265,7 @@ const GraphControls: React.FC<{
 const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [lGraphInstance, setLGraphInstance] = useState<LiteGraphInstance | null>(null);
+  const [lGraphInstance, setLGraphInstance] = useState<LGraph | null>(null);
   const [selectedNodeVCID, setSelectedNodeVCID] = useState<string | null>(null);
   const [curSelectedNode, setCurSelectedNode] = useState<any>(null);
   const { patchNetwork, activeViewContexts, isLoaded } = useSelector((state: ReduxStore) =>
@@ -265,8 +304,8 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       // Register custom node types
       await registerAllCustomNodes();
 
-      const graph: LiteGraphInstance = new LiteGraph.LGraph();
-      Object.keys((LiteGraph as any).registered_node_types)
+      const graph = new LGraph();
+      Object.keys(LiteGraph.registered_node_types)
         .filter(
           nodeType =>
             !nodeType.startsWith('customAudio') &&
@@ -274,7 +313,10 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
             !nodeType.includes('audioConnectables')
         )
         .forEach(nodeType => (LiteGraph as any).unregisterNodeType(nodeType));
-      const canvas = new LiteGraph.LGraphCanvas(`#${stateKey}_canvas`, graph);
+      Object.keys(LiteGraph.searchbox_extras).forEach(
+        key => delete LiteGraph.searchbox_extras[key]
+      );
+      const canvas = new LGraphCanvas(`#${stateKey}_canvas`, graph);
 
       canvas.onNodeSelected = node => {
         if (curSelectedNode) {
@@ -349,7 +391,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
     setCurSelectedNode(node);
     lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
-    lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected(node);
+    lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
   }, [patchNetwork, lGraphInstance, activeViewContexts, selectedNodeVCID]);
 
   // Set node from serialized state when we first render
