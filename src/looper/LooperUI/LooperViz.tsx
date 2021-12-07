@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import { ReduxStore } from 'src/redux';
 
 const Conf = {
   disabledColor: '#292929',
@@ -80,14 +82,28 @@ class LooperVizInst {
 }
 
 interface LooperVizProps {
+  vcId: string;
   bankIx: number;
   phaseSAB: Float32Array;
   width: number;
   height: number;
 }
 
-const LooperViz: React.FC<LooperVizProps> = ({ bankIx, phaseSAB, width, height }) => {
+const LooperViz: React.FC<LooperVizProps> = ({ vcId, bankIx, phaseSAB, width, height }) => {
+  const isHidden = useSelector((state: ReduxStore) => state.looper.stateByVcId[vcId].isHidden);
   const inst = useRef<LooperVizInst | null>(null);
+
+  useEffect(() => {
+    if (!inst.current) {
+      return;
+    }
+
+    if (isHidden) {
+      inst.current.stop();
+    } else {
+      inst.current.start();
+    }
+  }, [isHidden]);
 
   useEffect(() => () => inst.current?.stop(), []);
 

@@ -490,6 +490,7 @@ const actionGroups = {
       if (state.spectrumNode) {
         instance.connect(state.spectrumNode);
       }
+      (instance as any).isPaused = state.isHidden;
 
       return { ...state, wavyJonesInstance: instance };
     },
@@ -561,7 +562,13 @@ const actionGroups = {
   }),
   SET_SYNTH_DESIGNER_IS_HIDDEN: buildActionGroup({
     actionCreator: (isHidden: boolean) => ({ type: 'SET_SYNTH_DESIGNER_IS_HIDDEN', isHidden }),
-    subReducer: (state: SynthDesignerState, { isHidden }) => ({ ...state, isHidden }),
+    subReducer: (state: SynthDesignerState, { isHidden }) => {
+      if (state.wavyJonesInstance) {
+        (state.wavyJonesInstance as any).isPaused = isHidden;
+      }
+
+      return { ...state, isHidden };
+    },
   }),
   SET_PITCH_MULTIPLIER: buildActionGroup({
     actionCreator: (synthIx: number, pitchMultiplier: number) => ({

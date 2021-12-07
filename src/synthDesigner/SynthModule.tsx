@@ -206,7 +206,8 @@ const SynthModuleCompInner: React.FC<{
   index: number;
   synth: SynthModule;
   stateKey: string;
-}> = ({ index, synth, stateKey, children = null }) => {
+  isHidden: boolean;
+}> = ({ index, synth, stateKey, children = null, isHidden }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const filterEnvelope = useMemo(
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
@@ -249,6 +250,7 @@ const SynthModuleCompInner: React.FC<{
         synth={synth.fmSynth}
         synthID={`${stateKey}_${index}`}
         getFMSynthOutput={getFMSynthOutput}
+        isHidden={isHidden}
       />
 
       <FilterModule

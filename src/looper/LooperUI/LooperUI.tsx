@@ -84,7 +84,7 @@ const LooperBankComp: React.FC<LooperBankCompProps> = ({
       </div>
       <div>
         {phaseSAB ? (
-          <LooperViz bankIx={bankIx} phaseSAB={phaseSAB} width={500} height={100} />
+          <LooperViz vcId={vcId} bankIx={bankIx} phaseSAB={phaseSAB} width={500} height={100} />
         ) : null}
       </div>
     </div>

@@ -2,6 +2,7 @@ export declare class WavyJones extends AnalyserNode {
   public lineColor: string;
   public lineThickness: number;
   public animationFrameHandle: number;
+  public isPaused: boolean;
   constructor(ctx: AudioContext, nodeId: string, overrideWidth: number, overrideHeight: number);
 }
 

@@ -141,6 +141,7 @@ interface FMSynthUIProps {
   midiNode?: MIDINode | null;
   midiControlValuesCache: MIDIControlValuesCache;
   synthID: string;
+  isHidden: boolean;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -165,6 +166,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   midiNode,
   midiControlValuesCache,
   synthID,
+  isHidden,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -213,11 +215,26 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     setState(setOutput(state, operatorIx, updateBackendOutput, newOutputWeight));
 
   useEffect(() => {
+    if (!wavyJonesInstance.current) {
+      return;
+    }
+
+    wavyJonesInstance.current.isPaused = wavyJonesInstance.current.isPaused || isHidden;
+  }, [isHidden]);
+
+  useEffect(() => {
     if (selectedUI?.type === 'oscilloscope') {
       if (!wavyJonesInstance.current) {
         wavyJonesInstance.current = initializeWavyJones(getFMSynthOutput);
+        wavyJonesInstance.current.isPaused = false || isHidden;
+      } else {
+        wavyJonesInstance.current.isPaused = false || isHidden;
       }
       return;
+    } else {
+      if (wavyJonesInstance.current) {
+        wavyJonesInstance.current.isPaused = true;
+      }
     }
 
     // Free wavyjones instances when not displayed
@@ -242,7 +259,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
         vizElem.removeChild(vizElem.firstChild);
       }
     }
-  }, [getFMSynthOutput, selectedUI?.type]);
+  }, [getFMSynthOutput, isHidden, selectedUI?.type]);
 
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
@@ -550,7 +567,8 @@ export const ConnectedFMSynthUI: React.FC<{
   getFMSynthOutput: () => Promise<AudioNode>;
   midiNode?: MIDINode | null;
   synthID: string;
-}> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID }) => (
+  isHidden: boolean;
+}> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID, isHidden }) => (
   <FMSynthUI
     updateBackendModulation={useCallback(
       (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
@@ -598,6 +616,7 @@ export const ConnectedFMSynthUI: React.FC<{
       (newState: WavetableState) => synth.setWavetableState(newState),
       [synth]
     )}
+    isHidden={isHidden}
   />
 ));
 

@@ -14,6 +14,7 @@ export interface LooperInstState {
   banks: LooperBank[];
   looperNode: LooperNode;
   phaseSAB: Float32Array | null;
+  isHidden: boolean;
 }
 
 export interface LooperState {
@@ -29,6 +30,7 @@ export const buildDefaultLooperInstState = (): Omit<LooperInstState, 'looperNode
   activeBankIx: null,
   banks: [],
   phaseSAB: null,
+  isHidden: true,
 });
 
 const buildDefaultLooperState = (): LooperState => ({
@@ -88,6 +90,13 @@ const looperSlice = createSlice({
     ) => {
       const instState = state.stateByVcId[vcId];
       instState.phaseSAB = phaseSAB;
+    },
+    setIsHidden: (
+      state,
+      { payload: { vcId, isHidden } }: PayloadAction<{ vcId: string; isHidden: boolean }>
+    ) => {
+      const instState = state.stateByVcId[vcId];
+      instState.isHidden = isHidden;
     },
   },
 });

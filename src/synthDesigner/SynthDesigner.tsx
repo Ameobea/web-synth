@@ -245,7 +245,13 @@ const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     <>
       <div className='synth-designer'>
         {synths.map((synth, i) => (
-          <SynthModuleComp key={i} synth={synth} index={i} stateKey={stateKey} />
+          <SynthModuleComp
+            key={i}
+            synth={synth}
+            index={i}
+            stateKey={stateKey}
+            isHidden={isHidden}
+          />
         ))}
 
         <AddAndPresetControls

@@ -68,6 +68,12 @@ window.WavyJones = function (context, elem, width, height) {
       freqData = new Uint8Array(analyser.frequencyBinCount);
 
     var drawLine = function () {
+      // console.log({ paused: analyser.isPaused });
+      if (analyser.isPaused) {
+        analyser.animationFrameHandle = requestAnimationFrame(drawLine);
+        return;
+      }
+
       analyser.getByteTimeDomainData(freqData);
 
       var graphPoints = [],

@@ -36,7 +36,7 @@ interface LooperCtx {
 
 const deserializeLooper = (serialized: string): Omit<LooperInstState, 'looperNode'> => {
   const parsed: SerializedLooperInstState = JSON.parse(serialized);
-  return { ...parsed, phaseSAB: null };
+  return { ...parsed, phaseSAB: null, isHidden: true };
 };
 
 const serializeLooper = (looperState: LooperInstState): string => {
@@ -112,9 +112,17 @@ export const cleanup_looper = (stateKey: string) => {
   mkContainerCleanupHelper()(getLooperDOMElementId(vcId));
 };
 
-export const hide_looper = mkContainerHider(getLooperDOMElementId);
+export const hide_looper = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  looperDispatch(looperActions.setIsHidden({ vcId, isHidden: true }));
+  mkContainerHider(getLooperDOMElementId)(stateKey);
+};
 
-export const unhide_looper = mkContainerUnhider(getLooperDOMElementId);
+export const unhide_looper = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  looperDispatch(looperActions.setIsHidden({ vcId, isHidden: false }));
+  mkContainerUnhider(getLooperDOMElementId)(stateKey);
+};
 
 export const get_looper_audio_connectables = (vcId: string): AudioConnectables => {
   const ctx = LooperCtxsByVcId.get(vcId);
