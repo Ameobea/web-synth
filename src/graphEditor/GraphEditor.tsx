@@ -9,7 +9,7 @@ import 'litegraph.js/css/litegraph.css';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 import { useSelector } from 'react-redux';
-import { filterNils } from 'ameo-utils';
+import { filterNils, UnreachableException } from 'ameo-utils';
 
 import { registerAllCustomNodes } from './nodes';
 import './GraphEditor.scss';
@@ -58,6 +58,29 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
     }
     return true;
   });
+};
+LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
+  const options = ['Delete'];
+
+  const innerClicked = (label: any, _options: unknown, _e: unknown) => {
+    switch (label) {
+      case 'Delete':
+        this.graph.removeLink(link.id);
+        break;
+      case null:
+        break;
+      default:
+        throw new UnreachableException(`Unknown menu option: ${label}`);
+    }
+  };
+
+  new LiteGraph.ContextMenu(options as any, {
+    event: e,
+    title: link.data != null ? link.data.constructor.name : null,
+    callback: innerClicked,
+  });
+
+  return false;
 };
 
 /**

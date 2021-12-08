@@ -197,9 +197,9 @@ pub struct VoiceDefinition {
     fm_synth_config: serde_json::Value,
     filter: FilterParams,
     master_gain: f32,
-    gain_envelope: ADSRValues,
+    gain_envelope: Option<ADSRValues>,
     #[serde(rename = "gainADSRLength")]
-    gain_adsr_length: f32,
+    gain_adsr_length: Option<f32>,
     filter_envelope: Adsr,
     #[serde(rename = "filterADSRLength")]
     filter_adsr_length: f32,

@@ -17,9 +17,6 @@ RUN cmake . && make install
 WORKDIR /
 RUN rm -rf /tmp/binaryen
 
-# Install soul
-RUN curl https://ameo.link/u/8qf.soul > /usr/bin/soul && chmod +x /usr/bin/soul
-
 RUN mkdir /build
 WORKDIR /build
 ADD . /build
@@ -35,7 +32,10 @@ COPY --from=builder /build/faust-compiler-server /usr/local/bin/faust-compiler-s
 COPY --from=builder /usr/local/bin/wasm-opt /usr/local/bin/wasm-opt
 COPY --from=builder /usr/local/lib/libbinaryen.so /usr/local/lib/libbinaryen.so
 
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates && curl https://get.wasmer.io -sSfL | sh && rm -rf /root/.wasmer/bin /root/.wasmer/lib/libwasmer.a
+# Install soul
+RUN curl https://ameo.link/u/8qf.soul > /usr/bin/soul && chmod +x /usr/bin/soul
+
+RUN apt-get update && apt-get install -y ca-certificates libncurses5 libasound2 libfreetype6 && update-ca-certificates && curl https://get.wasmer.io -sSfL | sh && rm -rf /root/.wasmer/bin /root/.wasmer/lib/libwasmer.a
 ENV LD_LIBRARY_PATH=/root/.wasmer/lib
 
 COPY ./FaustWorkletModuleTemplate.template.js /opt/faustWorkletTemplate.template.js

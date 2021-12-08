@@ -1,5 +1,5 @@
 import type { SavedMIDIComposition } from 'src/api';
-import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 import type { LooperInstState } from 'src/redux/modules/looper';
 import { AsyncOnce } from 'src/util';
 
@@ -24,7 +24,7 @@ export class LooperNode {
   /**
    * Sends output MIDI events created by the looper to connected destination modules
    */
-  private midiNode: MIDINode;
+  public midiNodes: MIDINode[] = [];
   private workletNode: AudioWorkletNode | null = null;
   private queuedMessages: any[] = [];
   private phaseSAB: Float32Array | null = null;
@@ -32,12 +32,10 @@ export class LooperNode {
 
   constructor(
     vcId: string,
-    midiNode: MIDINode,
     serialized?: Omit<LooperInstState, 'looperNode'>,
     onPhaseSABReceived?: (phaseSAB: Float32Array) => void
   ) {
     this.vcId = vcId;
-    this.midiNode = midiNode;
     this.onPhaseSABReceived = onPhaseSABReceived;
 
     if (serialized) {
@@ -48,15 +46,22 @@ export class LooperNode {
   }
 
   private deserialize(serialized: Omit<LooperInstState, 'looperNode'>) {
-    serialized.banks?.forEach((bank, bankIx) => {
-      if (!bank.loadedComposition) {
-        return;
-      }
+    this.midiNodes = [];
 
-      this.setCompositionForBank(bankIx, bank.loadedComposition);
+    serialized.modules?.forEach((module, moduleIx) => {
+      this.midiNodes.push(new MIDINode());
+
+      module.banks?.forEach((bank, bankIx) => {
+        if (!bank.loadedComposition) {
+          return;
+        }
+
+        this.setCompositionForBank(moduleIx, bankIx, bank.loadedComposition, bank.lenBeats);
+      });
+
+      this.setActiveBankIx(moduleIx, module.activeBankIx);
     });
-
-    this.setActiveBankIx(serialized.activeBankIx);
+    this.setActiveModuleIx(serialized.activeModuleIx);
   }
 
   private postMessage(msg: any) {
@@ -67,7 +72,12 @@ export class LooperNode {
     }
   }
 
-  public setCompositionForBank(bankIx: number, composition: SavedMIDIComposition) {
+  public setCompositionForBank(
+    moduleIx: number,
+    bankIx: number,
+    composition: SavedMIDIComposition,
+    lenBeats: number
+  ) {
     const notes: { note: number; isGate: boolean; beat: number }[] = [];
 
     const lineCount = composition.composition.lines.length;
@@ -90,17 +100,27 @@ export class LooperNode {
 
     this.postMessage({
       type: 'setCompositionForBank',
+      moduleIx,
       bankIx,
       notes,
+      lenBeats,
     });
   }
 
-  public setActiveBankIx(bankIx: number | null) {
-    this.postMessage({ type: 'setActiveBankIx', bankIx });
+  public setActiveBankIx(moduleIx: number, bankIx: number | null) {
+    this.postMessage({ type: 'setActiveBankIx', moduleIx, bankIx });
   }
 
-  public setNextBankIx(nextBankIx: number) {
-    this.postMessage({ type: 'setNextBankIx', nextBankIx });
+  public setNextBankIx(moduleIx: number, nextBankIx: number) {
+    this.postMessage({ type: 'setNextBankIx', moduleIx, nextBankIx });
+  }
+
+  public setActiveModuleIx(moduleIx: number) {
+    while (this.midiNodes.length <= moduleIx) {
+      this.midiNodes.push(new MIDINode());
+    }
+
+    this.postMessage({ type: 'setActiveModuleIx', moduleIx });
   }
 
   private async init() {
@@ -113,10 +133,10 @@ export class LooperNode {
     this.workletNode.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'playNote':
-          this.midiNode.onAttack(evt.data.note, 255);
+          this.midiNodes[evt.data.moduleIx]?.onAttack(evt.data.note, 255);
           break;
         case 'releaseNote':
-          this.midiNode.onRelease(evt.data.note, 255);
+          this.midiNodes[evt.data.moduleIx]?.onRelease(evt.data.note, 255);
           break;
         case 'phaseSAB':
           this.phaseSAB = new Float32Array(evt.data.phaseSAB);

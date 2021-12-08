@@ -3,9 +3,9 @@
 use float_ord::FloatOrd;
 
 extern "C" {
-    fn play_note(note: u8);
+    fn play_note(module_ix: usize, note: u8);
 
-    fn release_note(note: u8);
+    fn release_note(module_ix: usize, note: u8);
 
 }
 
@@ -30,61 +30,89 @@ impl PartialOrd for MIDIEvent {
     }
 }
 
-struct LooperCtx {
-    pub loop_len_beats: f32,
-    pub last_beat: f32,
-    pub next_evt_ix: Option<usize>,
-    pub active_bank_ix: usize,
-    /// Index of the bank to switch to when the current loop finishes
-    pub next_bank_ix: Option<usize>,
+struct LooperBank {
+    pub events: Vec<MIDIEvent>,
+    pub len_beats: f32,
 }
 
-static mut CTX: LooperCtx = LooperCtx {
-    loop_len_beats: 8.,
-    last_beat: 0.0,
-    next_evt_ix: None,
-    active_bank_ix: 0,
-    next_bank_ix: None,
-};
+impl LooperBank {
+    pub fn clear(&mut self) { self.events.clear(); }
+}
 
-static mut PLAYING_NOTES: [bool; 1024] = [false; 1024];
-
-fn playing_notes() -> &'static mut [bool] { unsafe { &mut PLAYING_NOTES } }
-
-fn ctx() -> &'static mut LooperCtx { unsafe { &mut CTX } }
-
-const BANK_COUNT: usize = 128;
-
-#[no_mangle]
-pub extern "C" fn looper_set_loop_len_beats(len_beats: f32) { ctx().loop_len_beats = len_beats; }
-
-static mut MIDI_BANKS: *mut [Vec<MIDIEvent>; BANK_COUNT] = std::ptr::null_mut();
-
-fn midi_banks() -> &'static mut [Vec<MIDIEvent>; BANK_COUNT] { unsafe { &mut *MIDI_BANKS } }
-
-#[inline(always)]
-fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
-
-#[no_mangle]
-pub extern "C" fn looper_init() {
-    unsafe {
-        MIDI_BANKS = Box::into_raw(box uninit());
-        for i in 0..BANK_COUNT {
-            std::ptr::write((*MIDI_BANKS).as_mut_ptr().add(i), Vec::new());
+impl Default for LooperBank {
+    fn default() -> Self {
+        LooperBank {
+            events: Vec::new(),
+            len_beats: 8.0,
         }
     }
 }
 
+struct LooperCtx {
+    pub playing_notes: [bool; 1024],
+    pub last_beat: f32,
+    pub next_evt_ix: Option<usize>,
+    pub active_bank_ix: Option<usize>,
+    /// Index of the bank to switch to when the current loop finishes
+    pub next_bank_ix: Option<usize>,
+    pub banks: Vec<LooperBank>,
+}
+
+impl Default for LooperCtx {
+    fn default() -> Self {
+        LooperCtx {
+            playing_notes: [false; 1024],
+            last_beat: 0.0,
+            next_evt_ix: None,
+            active_bank_ix: None,
+            next_bank_ix: None,
+            banks: Vec::new(),
+        }
+    }
+}
+
+static mut CTXS: *mut Vec<LooperCtx> = std::ptr::null_mut();
+
+fn ctxs() -> &'static mut Vec<LooperCtx> { unsafe { &mut *CTXS } }
+
+fn ctx(module_ix: usize) -> &'static mut LooperCtx {
+    while ctxs().len() <= module_ix {
+        ctxs().push(LooperCtx::default());
+    }
+    &mut ctxs()[module_ix]
+}
+
 #[no_mangle]
-pub extern "C" fn looper_clear_bank(bank_ix: usize) {
-    let bank = &mut midi_banks()[bank_ix];
+pub extern "C" fn looper_init() {
+    unsafe {
+        CTXS = Box::into_raw(box Vec::new());
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn looper_clear_bank(module_ix: usize, bank_ix: usize) {
+    let ctx = ctx(module_ix);
+    while ctx.banks.len() <= bank_ix {
+        ctx.banks.push(Default::default());
+    }
+    while ctxs().len() <= module_ix {
+        ctxs().push(LooperCtx::default());
+    }
+
+    let bank = &mut ctx.banks[bank_ix];
     bank.clear();
 }
 
 #[no_mangle]
-pub extern "C" fn looper_add_evt(bank_ix: usize, note: u8, beat: f32, is_gate: bool) {
-    let bank = &mut midi_banks()[bank_ix];
-    bank.push(MIDIEvent {
+pub extern "C" fn looper_add_evt(
+    module_ix: usize,
+    bank_ix: usize,
+    note: u8,
+    beat: f32,
+    is_gate: bool,
+) {
+    let bank = &mut ctx(module_ix).banks[bank_ix];
+    bank.events.push(MIDIEvent {
         note,
         beat,
         is_gate,
@@ -92,27 +120,47 @@ pub extern "C" fn looper_add_evt(bank_ix: usize, note: u8, beat: f32, is_gate: b
 }
 
 #[no_mangle]
-pub extern "C" fn looper_finalize_bank(bank_ix: usize) {
-    let bank = &mut midi_banks()[bank_ix];
-    bank.sort_unstable();
+pub extern "C" fn looper_finalize_bank(module_ix: usize, bank_ix: usize, len_beats: f32) {
+    let bank = &mut ctx(module_ix).banks[bank_ix];
+    bank.len_beats = len_beats;
+    bank.events.sort_unstable();
 }
 
 /// Switch immediately to the next bank, skipping ahead in the new one to match the current beat
 #[no_mangle]
-pub extern "C" fn looper_activate_bank(bank_ix: usize, cur_beat: f32) {
-    let ctx = ctx();
-    let bank = &mut midi_banks()[bank_ix];
-    let loop_beat = cur_beat % ctx.loop_len_beats;
+pub extern "C" fn looper_activate_bank(module_ix: usize, bank_ix: isize, cur_beat: f32) {
+    let bank_ix = if bank_ix < 0 {
+        None
+    } else {
+        Some(bank_ix as usize)
+    };
 
-    ctx.last_beat = loop_beat;
+    let ctx = ctx(module_ix);
     ctx.active_bank_ix = bank_ix;
-    ctx.next_evt_ix = if bank.is_empty() { None } else { Some(0) };
+
+    let bank_ix = match bank_ix {
+        Some(bank_ix) => bank_ix,
+        None => return,
+    };
+    while ctx.banks.len() <= bank_ix {
+        ctx.banks.push(Default::default());
+    }
+
+    let bank = &mut ctx.banks[bank_ix];
+    let loop_beat = cur_beat % bank.len_beats;
+    ctx.last_beat = loop_beat;
+    ctx.next_evt_ix = if bank.events.is_empty() {
+        None
+    } else {
+        Some(0)
+    };
+
     while let Some(next_evt_ix) = ctx.next_evt_ix {
-        let evt = &bank[next_evt_ix];
+        let evt = &bank.events[next_evt_ix];
         if evt.beat > loop_beat {
             break;
         }
-        ctx.next_evt_ix = if next_evt_ix + 1 < bank.len() {
+        ctx.next_evt_ix = if next_evt_ix + 1 < bank.events.len() {
             Some(next_evt_ix + 1)
         } else {
             None
@@ -121,64 +169,90 @@ pub extern "C" fn looper_activate_bank(bank_ix: usize, cur_beat: f32) {
 }
 
 #[no_mangle]
-pub extern "C" fn looper_get_playing_bank_ix() -> usize { ctx().active_bank_ix }
+pub extern "C" fn looper_get_playing_bank_ix(module_ix: usize) -> isize {
+    match ctx(module_ix).active_bank_ix {
+        Some(bank_ix) => bank_ix as isize,
+        None => -1,
+    }
+}
 
 #[no_mangle]
-pub extern "C" fn looper_set_next_bank_ix(bank_ix: usize) { ctx().next_bank_ix = Some(bank_ix); }
+pub extern "C" fn looper_set_next_bank_ix(module_ix: usize, bank_ix: usize) {
+    ctx(module_ix).next_bank_ix = Some(bank_ix);
+}
 
 #[no_mangle]
 pub extern "C" fn looper_on_playback_stop() {
-    for (note, is_playing) in playing_notes().iter_mut().enumerate() {
-        if *is_playing {
-            unsafe { release_note(note as u8) };
-            *is_playing = false;
+    for (module_ix, ctx) in ctxs().iter_mut().enumerate() {
+        for (note, is_playing) in ctx.playing_notes.iter_mut().enumerate() {
+            if *is_playing {
+                unsafe { release_note(module_ix, note as u8) };
+                *is_playing = false;
+            }
         }
     }
 
-    let ctx = ctx();
-    if let Some(next_bank_ix) = ctx.next_bank_ix {
-        ctx.active_bank_ix = next_bank_ix;
-        ctx.next_bank_ix = None;
+    for ctx in ctxs() {
+        if let Some(next_bank_ix) = ctx.next_bank_ix {
+            ctx.active_bank_ix = Some(next_bank_ix);
+            ctx.next_bank_ix = None;
+        }
     }
 }
 
 #[no_mangle]
-pub extern "C" fn looper_process(cur_beat: f32) -> f32 {
-    let ctx = ctx();
-    let loop_beat = cur_beat % ctx.loop_len_beats;
+pub extern "C" fn looper_process(module_ix_for_which_to_report_phase: usize, cur_beat: f32) -> f32 {
+    let mut phase = 0.;
 
-    if loop_beat < ctx.last_beat {
-        ctx.last_beat = loop_beat;
-        ctx.next_evt_ix = Some(0);
-
-        looper_on_playback_stop();
-    }
-
-    let bank = &midi_banks()[ctx.active_bank_ix];
-    if bank.is_empty() {
-        return 0.;
-    }
-
-    while let Some(next_evt_ix) = ctx.next_evt_ix {
-        let evt = &bank[next_evt_ix];
-        if evt.beat > loop_beat {
-            break;
-        }
-        if evt.is_gate {
-            playing_notes()[evt.note as usize] = true;
-            unsafe { play_note(evt.note) };
-        } else {
-            playing_notes()[evt.note as usize] = false;
-            unsafe { release_note(evt.note) };
-        }
-
-        ctx.next_evt_ix = if next_evt_ix + 1 < bank.len() {
-            Some(next_evt_ix + 1)
-        } else {
-            None
+    for (module_ix, ctx) in ctxs().iter_mut().enumerate() {
+        let active_bank_ix = match ctx.active_bank_ix {
+            Some(bank_ix) => bank_ix,
+            None => continue,
         };
+
+        let active_bank = &ctx.banks[active_bank_ix];
+        let loop_beat = cur_beat % active_bank.len_beats;
+
+        if loop_beat < ctx.last_beat {
+            ctx.last_beat = loop_beat;
+            ctx.next_evt_ix = Some(0);
+
+            looper_on_playback_stop();
+        }
+
+        if active_bank.events.is_empty() {
+            ctx.last_beat = loop_beat;
+            if module_ix == module_ix_for_which_to_report_phase {
+                phase = loop_beat / active_bank.len_beats;
+            }
+            continue;
+        }
+
+        while let Some(next_evt_ix) = ctx.next_evt_ix {
+            let evt = &active_bank.events[next_evt_ix];
+            if evt.beat > loop_beat {
+                break;
+            }
+            if evt.is_gate {
+                ctx.playing_notes[evt.note as usize] = true;
+                unsafe { play_note(module_ix, evt.note) };
+            } else {
+                ctx.playing_notes[evt.note as usize] = false;
+                unsafe { release_note(module_ix, evt.note) };
+            }
+
+            ctx.next_evt_ix = if next_evt_ix + 1 < active_bank.events.len() {
+                Some(next_evt_ix + 1)
+            } else {
+                None
+            };
+        }
+
+        ctx.last_beat = loop_beat;
+        if module_ix == module_ix_for_which_to_report_phase {
+            phase = loop_beat / active_bank.len_beats;
+        }
     }
 
-    ctx.last_beat = loop_beat;
-    loop_beat / ctx.loop_len_beats
+    phase
 }

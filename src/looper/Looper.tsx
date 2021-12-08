@@ -10,7 +10,6 @@ import {
   mkContainerUnhider,
 } from 'src/reactUtils';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { MIDINode } from 'src/patchNetwork/midiNode';
 import { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
 import {
   buildDefaultLooperInstState,
@@ -30,7 +29,6 @@ const LooperUI: React.FC<LooperUIProps> = props => (
 );
 
 interface LooperCtx {
-  midiNode: MIDINode;
   looperNode: LooperNode;
 }
 
@@ -72,12 +70,11 @@ export const init_looper = (stateKey: string) => {
     })
     .getOrElseL(buildDefaultLooperInstState);
 
-  const midiNode = new MIDINode();
   const onPhaseSABReceived = (phaseSAB: Float32Array) =>
     looperDispatch(looperActions.setPhaseSAB({ vcId, phaseSAB }));
-  const looperNode = new LooperNode(vcId, midiNode, initialState, onPhaseSABReceived);
+  const looperNode = new LooperNode(vcId, initialState, onPhaseSABReceived);
 
-  const ctx: LooperCtx = { midiNode, looperNode };
+  const ctx: LooperCtx = { looperNode };
   LooperCtxsByVcId.set(vcId, ctx);
 
   looperDispatch(
@@ -133,9 +130,9 @@ export const get_looper_audio_connectables = (vcId: string): AudioConnectables =
   return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>(),
-    outputs: ImmMap<string, ConnectableOutput>().set('output', {
-      type: 'midi',
-      node: ctx.midiNode,
-    }),
+    outputs: ctx.looperNode.midiNodes.reduce((acc, midiNode, moduleIx) => {
+      const moduleName = getState().looper.stateByVcId[vcId].modules[moduleIx].name;
+      return acc.set(moduleName, { type: 'midi', node: midiNode });
+    }, ImmMap<string, ConnectableOutput>()),
   };
 };

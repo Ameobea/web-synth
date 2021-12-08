@@ -18,7 +18,7 @@ import (
 	"cloud.google.com/go/storage"
 	compilationFileUtils "github.com/ameobea/web-synth/faust-compiler-server/compilationFileUtils"
 	"github.com/gorilla/mux"
-	wasmer "github.com/wasmerio/go-ext-wasm/wasmer"
+	wasmer "github.com/wasmerio/wasmer-go/wasmer"
 )
 
 type soulCompileHandler struct {
@@ -38,32 +38,56 @@ func readJSONDefFromWasm(fileHandle *os.File) ([]byte, error) {
 	}
 
 	// Instantiates the WebAssembly module.
-	instance, _ := wasmer.NewInstance(wasmBytes.Bytes())
+	engine := wasmer.NewEngine()
+	store := wasmer.NewStore(engine)
+	module, err := wasmer.NewModule(store, wasmBytes.Bytes())
+	if err != nil {
+		log.Printf("Error instantiating WebAssembly module: %s", err)
+		return nil, err
+	}
+	instance, _ := wasmer.NewInstance(module, wasmer.NewImportObject())
 
 	// Close the WebAssembly instance later.
 	defer instance.Close()
 
 	// Gets the `sum` exported function from the WebAssembly instance.
-	getDescription := instance.Exports["getDescription"]
-	getDescriptionLength := instance.Exports["getDescriptionLength"]
+	getDescription, err := instance.Exports.GetFunction("getDescription")
+	if err != nil {
+		log.Printf("Error getting getDescription function: %s", err)
+		return nil, err
+	}
+	getDescriptionLength, err := instance.Exports.GetFunction("getDescriptionLength")
+	if err != nil {
+		log.Printf("Error getting getDescriptionLength function: %s", err)
+		return nil, err
+	}
 
 	descriptionPtrVal, err := getDescription()
 	if err != nil {
 		log.Printf("Error getting description ptr from Wasm: %s", err)
 		return nil, err
 	}
-	descriptionPtr := descriptionPtrVal.ToI32()
+	descriptionPtr := descriptionPtrVal.(int32)
 
 	descriptionLenVal, err := getDescriptionLength()
 	if err != nil {
 		log.Printf("Error getting description length from Wasm: %s", err)
 		return nil, err
 	}
-	descriptionLen := descriptionLenVal.ToI32()
+	descriptionLen := descriptionLenVal.(int32)
 
-	jsonDef := instance.Memory.Data()[descriptionPtr:(descriptionPtr + descriptionLen)]
-	log.Println("Successfully read JSON def out of Wasm")
-	return jsonDef, nil
+	memory, err := instance.Exports.GetMemory("memory")
+	if err != nil {
+		log.Printf("Error getting memory from Wasm: %s", err)
+		return nil, err
+	}
+
+	jsonDef := memory.Data()[descriptionPtr:(descriptionPtr + descriptionLen)]
+	log.Printf("Successfully read JSON def out of Wasm")
+	jsonDefClone := make([]byte, len(jsonDef))
+	// Things segfault if I don't do this :shrug:
+	copy(jsonDefClone, jsonDef)
+	return jsonDefClone, nil
 }
 
 func hashSoulCode(soulCode []byte) string {
