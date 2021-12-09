@@ -35,6 +35,7 @@ import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distort
 import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio/CustomCompressorSmallViewRenderer';
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
+import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 
 const ctx = new AudioContext();
 
@@ -471,6 +472,9 @@ export const audioNodeGetters: {
   },
   'customAudio/samplePlayer': {
     nodeGetter: SamplePlayerNode,
+  },
+  'customAudio/bandSplitter': {
+    nodeGetter: BandSplitterNode,
   },
 };
 
