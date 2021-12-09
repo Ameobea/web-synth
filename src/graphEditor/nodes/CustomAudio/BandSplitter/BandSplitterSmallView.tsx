@@ -63,7 +63,7 @@ const BandSplitterSmallView: React.FC<BandSplitterSmallViewProps> = ({
     <div className='band-splitter-small-view'>
       <p>
         This node splits the incoming signal into 3 output bands. The splits are hard-coded at
-        0-400hz, 400-4000hz, and 4000-∞hz. This is useful for effects such as multi-band compression
+        0-400hz, 400-3000hz, and 3000-∞hz. This is useful for effects such as multi-band compression
         or multi-band distortion.
       </p>
       <ControlPanel

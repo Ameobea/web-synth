@@ -5,6 +5,7 @@ const buildDelaySettings = (initialParams: {
   delayMs: number;
   delayGain: number;
   feedback: number;
+  highpassCutoff: number;
 }) => [
   {
     type: 'range',
@@ -16,6 +17,14 @@ const buildDelaySettings = (initialParams: {
   },
   { type: 'range', label: 'delay gain', min: 0, max: 1, initial: initialParams.delayGain },
   { type: 'range', label: 'feedback', min: 0, max: 1, initial: initialParams.feedback },
+  {
+    type: 'range',
+    label: 'highpass cutoff freq',
+    min: 10,
+    max: 44_100 / 2,
+    initial: initialParams.highpassCutoff,
+    scale: 'log',
+  },
 ];
 
 interface DelaySmallViewProps {
@@ -23,6 +32,7 @@ interface DelaySmallViewProps {
     delayMs: number;
     delayGain: number;
     feedback: number;
+    highpassCutoff: number;
   };
   onChange: (key: 'delay ms' | 'delay gain' | 'feedback', value: number) => void;
 }

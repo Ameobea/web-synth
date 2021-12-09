@@ -25,6 +25,13 @@ class DelayAWP extends AudioWorkletProcessor {
         maxValue: 1,
         automationRate: 'a-rate',
       },
+      {
+        name: 'highpass cutoff freq',
+        defaultValue: 0,
+        minValue: 0,
+        maxValue: 44_100 / 2,
+        automationRate: 'a-rate',
+      },
     ];
   }
 
@@ -39,6 +46,7 @@ class DelayAWP extends AudioWorkletProcessor {
       delayMs: 0,
       delayGain: 0,
       feedback: 0,
+      highpassCutoff: 0,
     };
 
     this.port.onmessage = evt => this.handleMessage(evt.data);
@@ -57,6 +65,9 @@ class DelayAWP extends AudioWorkletProcessor {
     this.paramPointers.delayMs = this.wasmInstance.exports.get_delay_ms_ptr(this.ctxPtr);
     this.paramPointers.delayGain = this.wasmInstance.exports.get_delay_gain_ptr(this.ctxPtr);
     this.paramPointers.feedback = this.wasmInstance.exports.get_feedback_ptr(this.ctxPtr);
+    this.paramPointers.highpassCutoff = this.wasmInstance.exports.get_highpass_cutoff_ptr(
+      this.ctxPtr
+    );
   }
 
   handleMessage(data) {
@@ -111,9 +122,11 @@ class DelayAWP extends AudioWorkletProcessor {
     const delayMs = params['delay ms'];
     const delayGain = params['delay gain'];
     const feedback = params['feedback'];
+    const highpassCutoff = params['highpass cutoff freq'];
     this.copyParam(delayMs, this.paramPointers.delayMs);
     this.copyParam(delayGain, this.paramPointers.delayGain);
     this.copyParam(feedback, this.paramPointers.feedback);
+    this.copyParam(highpassCutoff, this.paramPointers.highpassCutoff);
 
     // Process delay, overwriting the main IO buffer in Wasm and populating the delay output buffer
     this.wasmInstance.exports.process_delay(this.ctxPtr);

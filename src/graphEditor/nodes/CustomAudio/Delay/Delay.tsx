@@ -21,6 +21,7 @@ interface DelayParams {
   delayMs: OverridableAudioParam | DummyNode;
   delayGain: OverridableAudioParam | DummyNode;
   feedback: OverridableAudioParam | DummyNode;
+  highpassCutoff: OverridableAudioParam | DummyNode;
 }
 
 export default class DelayNode implements ForeignNode {
@@ -32,11 +33,13 @@ export default class DelayNode implements ForeignNode {
     delayMs: 800,
     delayGain: 0.9,
     feedback: 0.2,
+    highpassCutoff: 80,
   };
   private params: DelayParams = {
     delayMs: new DummyNode(),
     delayGain: new DummyNode(),
     feedback: new DummyNode(),
+    highpassCutoff: new DummyNode(),
   };
 
   static typeName = 'Delay';
@@ -76,6 +79,7 @@ export default class DelayNode implements ForeignNode {
       'delay ms': 'delayMs' as const,
       'delay gain': 'delayGain' as const,
       feedback: 'feedback' as const,
+      'highpass cutoff freq': 'highpassCutoff' as const,
     }[rawKey];
 
     this.cachedParamValues[key] = value;
@@ -83,9 +87,15 @@ export default class DelayNode implements ForeignNode {
     if (maybeOAP instanceof OverridableAudioParam) {
       maybeOAP.manualControl.offset.value = value;
     }
+    console.log(this.cachedParamValues);
   };
 
-  private getManualParamValues = (): { delayMs: number; delayGain: number; feedback: number } => {
+  private getManualParamValues = (): {
+    delayMs: number;
+    delayGain: number;
+    feedback: number;
+    highpassCutoff: number;
+  } => {
     return {
       delayMs:
         this.params.delayMs instanceof OverridableAudioParam
@@ -99,6 +109,10 @@ export default class DelayNode implements ForeignNode {
         this.params.feedback instanceof OverridableAudioParam
           ? this.params.feedback.manualControl.offset.value
           : this.cachedParamValues.feedback,
+      highpassCutoff:
+        this.params.highpassCutoff instanceof OverridableAudioParam
+          ? this.params.highpassCutoff.manualControl.offset.value
+          : this.cachedParamValues.highpassCutoff,
     };
   };
 
@@ -128,6 +142,11 @@ export default class DelayNode implements ForeignNode {
       (this.awpHandle.parameters as Map<string, AudioParam>).get('feedback')!
     );
     this.params.feedback.manualControl.offset.value = this.cachedParamValues.feedback;
+    this.params.highpassCutoff = new OverridableAudioParam(
+      this.ctx,
+      (this.awpHandle.parameters as Map<string, AudioParam>).get('highpass cutoff freq')!
+    );
+    this.params.highpassCutoff.manualControl.offset.value = this.cachedParamValues.highpassCutoff;
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
 
@@ -145,6 +164,9 @@ export default class DelayNode implements ForeignNode {
     }
     if (!isNil(params.feedback)) {
       this.cachedParamValues.feedback = params.feedback;
+    }
+    if (!isNil(params.highpassCutoff)) {
+      this.cachedParamValues.highpassCutoff = params.highpassCutoff;
     }
   }
 
@@ -170,6 +192,10 @@ export default class DelayNode implements ForeignNode {
         .set('feedback', {
           type: 'number',
           node: this.params.feedback,
+        })
+        .set('highpass cutoff freq', {
+          type: 'number',
+          node: this.params.highpassCutoff,
         }),
       outputs: ImmMap<string, ConnectableOutput>()
         .set('output', {

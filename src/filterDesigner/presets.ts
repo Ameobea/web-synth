@@ -9,7 +9,7 @@ interface FilterDesignerPreset {
 
 export const BandSplitterPreset = (() => {
   const lowBandCutoff = 400;
-  const midBandCutoff = 4000;
+  const midBandCutoff = 3000;
 
   const lowBand = computeHigherOrderBiquadQFactors(16).map(q =>
     buildDefaultFilter(FilterType.Lowpass, q, lowBandCutoff)
@@ -18,7 +18,7 @@ export const BandSplitterPreset = (() => {
     buildDefaultFilter(FilterType.Highpass, q, lowBandCutoff + 32)
   );
   const midBandTop = computeHigherOrderBiquadQFactors(16).map(q =>
-    buildDefaultFilter(FilterType.Lowpass, q, midBandCutoff - 284.8)
+    buildDefaultFilter(FilterType.Lowpass, q, midBandCutoff - 214.8)
   );
   const highBand = computeHigherOrderBiquadQFactors(16).map(q =>
     buildDefaultFilter(FilterType.Highpass, q, midBandCutoff)
@@ -26,7 +26,7 @@ export const BandSplitterPreset = (() => {
 
   return {
     filterGroups: [lowBand, [...midBandBottom, ...midBandTop], highBand],
-    lockedFrequencyByGroup: [400, null, 4000],
+    lockedFrequencyByGroup: [lowBandCutoff, null, midBandCutoff],
   };
 })();
 

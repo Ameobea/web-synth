@@ -1,3 +1,5 @@
+use dsp::filters::butterworth::ButterworthFilter;
+
 const SAMPLE_RATE: usize = 44_100;
 const FRAME_SIZE: usize = 128;
 const MAX_DELAY_MS: usize = 60 * 1000;
@@ -11,6 +13,8 @@ pub struct DelayCtx {
     pub delay_ms: Box<[f32; FRAME_SIZE]>,
     pub delay_gain: Box<[f32; FRAME_SIZE]>,
     pub feedback: Box<[f32; FRAME_SIZE]>,
+    pub highpass_cutoff: Box<[f32; FRAME_SIZE]>,
+    pub highpass_filter: ButterworthFilter,
 }
 
 #[no_mangle]
@@ -22,6 +26,8 @@ pub extern "C" fn init_delay_ctx() -> *mut DelayCtx {
         delay_ms: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
         delay_gain: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
         feedback: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+        highpass_cutoff: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+        highpass_filter: ButterworthFilter::default(),
     };
     Box::into_raw(Box::new(delay_ctx))
 }
@@ -52,6 +58,11 @@ pub unsafe extern "C" fn get_feedback_ptr(ctx: *mut DelayCtx) -> *mut f32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn get_highpass_cutoff_ptr(ctx: *mut DelayCtx) -> *mut f32 {
+    (*(*ctx).highpass_cutoff).as_mut_ptr()
+}
+
+#[no_mangle]
 pub extern "C" fn process_delay(ctx: *mut DelayCtx) {
     let ctx = unsafe { &mut *ctx };
 
@@ -60,10 +71,13 @@ pub extern "C" fn process_delay(ctx: *mut DelayCtx) {
         let delay_ms = ctx.delay_ms[sample_ix];
         let delay_gain = ctx.delay_gain[sample_ix];
         let feedback = ctx.feedback[sample_ix];
+        let highpass_cutoff = ctx.highpass_cutoff[sample_ix];
 
         let delay_samples = delay_ms * (1. / 1000.) * SAMPLE_RATE as f32;
         let delayed_sample = ctx.delay_line.read_interpolated(-delay_samples);
-        ctx.delay_line.set(sample + delayed_sample * feedback);
+        let highpassed_sample = ctx.highpass_filter.highpass(highpass_cutoff, sample);
+        ctx.delay_line
+            .set(highpassed_sample + delayed_sample * feedback);
         ctx.delay_output_buffer[sample_ix] = delayed_sample;
         ctx.main_io_buffer[sample_ix] = sample + delayed_sample * delay_gain;
     }
