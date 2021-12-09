@@ -42,16 +42,18 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
     { type: FilterType.Lowpass, frequency: 8800, Q: 11.71, gain: 0, detune: 0 },
   ];
 
-  const filters = filterParams.map(params => {
-    const filter = new BiquadFilterNode(ctx);
-    setFilter(filter, params, null);
-    return { params, filter, id: btoa(Math.random().toString()) };
-  });
-  connectFilterChain(filters.map(R.prop('filter')));
+  const filterGroups = [
+    filterParams.map(params => {
+      const filter = new BiquadFilterNode(ctx);
+      setFilter(filter, params, null);
+      return { params, filter, id: btoa(Math.random().toString()) };
+    }),
+  ];
+  connectFilterChain(filterGroups[0].map(R.prop('filter')));
 
   return {
-    filters,
-    lockedFrequency: null,
+    filterGroups,
+    lockedFrequencyByGroup: [null],
   };
 };
 
@@ -118,19 +120,31 @@ export const get_filter_designer_audio_connectables = (
   if (!state) {
     throw new UnreachableException('Missing state for filter designer vcId=' + vcId);
   }
-  if (state.filters.length === 0 || !state.filters[0]) {
+  if (
+    state.filterGroups.length === 0 ||
+    !state.filterGroups[0] ||
+    state.filterGroups.every(group => group.length === 0 || !group[0])
+  ) {
     return create_empty_audio_connectables(vcId);
   }
 
   return {
     vcId,
-    inputs: ImmMap<string, ConnectableInput>().set('input', {
-      type: 'customAudio',
-      node: state.filters[0].filter,
-    }),
-    outputs: ImmMap<string, ConnectableOutput>().set('output', {
-      type: 'customAudio',
-      node: state.filters[state.filters.length - 1].filter,
-    }),
+    inputs: state.filterGroups.reduce(
+      (acc, group) =>
+        acc.set('input', {
+          type: 'customAudio',
+          node: group[0].filter,
+        }),
+      ImmMap<string, ConnectableInput>()
+    ),
+    outputs: state.filterGroups.reduce(
+      (acc, group) =>
+        acc.set('input', {
+          type: 'customAudio',
+          node: group[group.length - 1].filter,
+        }),
+      ImmMap<string, ConnectableOutput>()
+    ),
   };
 };

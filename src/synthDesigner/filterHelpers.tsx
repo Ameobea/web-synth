@@ -78,7 +78,7 @@ const filterSettings = {
     min: -200,
     max: 200,
     initial: 0,
-    stepSize: 5,
+    step: 1,
   },
   frequency: {
     type: 'range',
@@ -87,14 +87,14 @@ const filterSettings = {
     max: 24000,
     initial: 4400,
     scale: 'log',
-    steps: 250,
+    steps: 1000,
   },
   gain: {
     type: 'range',
     label: 'gain',
     min: -20,
     max: 40,
-    step: 0.2,
+    step: 0.01,
     initial: 0,
   },
   q: {
@@ -103,6 +103,7 @@ const filterSettings = {
     Comp: React.memo(CustomQSetting),
     renderContainer: false,
     initial: 1,
+    steps: 1000,
   },
   adsr: {
     type: 'custom',
@@ -157,9 +158,13 @@ export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
     {}
   ) as FilterParams;
 
-export const buildDefaultFilter = (type: FilterType.Lowpass | FilterType.Highpass, Q: number) => ({
+export const buildDefaultFilter = (
+  type: FilterType.Lowpass | FilterType.Highpass,
+  Q: number,
+  frequency?: number
+) => ({
   type,
-  frequency: 440,
+  frequency: frequency ?? 440,
   detune: 0,
   gain: 0,
   Q,

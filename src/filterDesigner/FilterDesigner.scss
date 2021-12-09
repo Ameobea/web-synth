@@ -10,6 +10,16 @@
     font-weight: bold;
   }
 
+  .filter-group {
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 10px;
+    padding-bottom: 2px;
+  }
+
+  .filter-group:nth-child(odd) .control-panel {
+    background-color: #555 !important;
+  }
+
   .filter-inst {
     margin-bottom: 14px;
     display: flex;
@@ -46,6 +56,9 @@
     list-style-type: none;
   }
 
+  svg {
+    position: fixed;
+  }
   svg .x-axis,
   svg .y-axis {
     text {

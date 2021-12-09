@@ -1,4 +1,4 @@
-import { ArrayElementOf, filterNils } from 'ameo-utils';
+import { filterNils } from 'ameo-utils';
 import type { ScaleLogarithmic, Selection } from 'd3';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -18,11 +18,13 @@ import {
   connectFilterChain,
   deserializeFilterDesigner,
   disconnectFilterChain,
+  FilterDescriptor,
   FilterDesignerState,
-  SerializedFilterDesigner,
+  FilterGroup,
   setFilter,
 } from 'src/filterDesigner/util';
-import { computeHigherOrderBiquadQFactors } from 'src/synthDesigner/biquadFilterModule';
+import Presets from './presets';
+import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const ctx = new AudioContext();
 const DATA_SIZE = 512;
@@ -40,79 +42,17 @@ const scaleValue = (x: number) =>
   Math.exp(Math.log(min) + ((Math.log(max) - Math.log(min)) * (x / DATA_SIZE) * 100) / 100);
 const FREQUENCIES = new Float32Array(DATA_SIZE).map((_, i) => scaleValue(i));
 
-const Presets: { name: string; preset: SerializedFilterDesigner }[] = [
-  {
-    name: 'init',
-    preset: {
-      filters: [buildDefaultFilter(FilterType.Lowpass, computeHigherOrderBiquadQFactors(2)[0])],
-      lockedFrequency: null,
-    },
-  },
-  {
-    name: 'order 4 LP',
-    preset: {
-      filters: computeHigherOrderBiquadQFactors(4).map(q =>
-        buildDefaultFilter(FilterType.Lowpass, q)
-      ),
-      lockedFrequency: 440,
-    },
-  },
-  {
-    name: 'order 8 LP',
-    preset: {
-      filters: computeHigherOrderBiquadQFactors(8).map(q =>
-        buildDefaultFilter(FilterType.Lowpass, q)
-      ),
-      lockedFrequency: 440,
-    },
-  },
-  {
-    name: 'order 16 LP',
-    preset: {
-      filters: computeHigherOrderBiquadQFactors(16).map(q =>
-        buildDefaultFilter(FilterType.Lowpass, q)
-      ),
-      lockedFrequency: 440,
-    },
-  },
-  {
-    name: 'order 4 HP',
-    preset: {
-      filters: computeHigherOrderBiquadQFactors(4).map(q =>
-        buildDefaultFilter(FilterType.Highpass, q)
-      ),
-      lockedFrequency: 440,
-    },
-  },
-  {
-    name: 'order 8 HP',
-    preset: {
-      filters: computeHigherOrderBiquadQFactors(8).map(q =>
-        buildDefaultFilter(FilterType.Highpass, q)
-      ),
-      lockedFrequency: 440,
-    },
-  },
-  {
-    name: 'order 16 HP',
-    preset: {
-      filters: computeHigherOrderBiquadQFactors(16).map(q =>
-        buildDefaultFilter(FilterType.Highpass, q)
-      ),
-      lockedFrequency: 440,
-    },
-  },
-];
-
 interface FilterInstProps {
+  groupIx: number;
   filterIx: number;
   lockedFrequency: number | null;
-  filter: ArrayElementOf<FilterDesignerState['filters']>;
-  onChange: (filterIx: number, newParams: FilterParams) => void;
-  onDelete: () => void;
+  filter: FilterDescriptor;
+  onChange: (groupIx: number, filterIx: number, newParams: FilterParams) => void;
+  onDelete: (filterIx: number) => void;
 }
 
-const FilterInst: React.FC<FilterInstProps> = ({
+const FilterInstInner: React.FC<FilterInstProps> = ({
+  groupIx,
   filterIx,
   lockedFrequency,
   filter: { params, filter },
@@ -139,48 +79,67 @@ const FilterInst: React.FC<FilterInstProps> = ({
     (key: string, val: any) => {
       const newParams: FilterParams = { ...params, [key]: val };
       setFilter(filter, newParams, lockedFrequency);
-      onChange(filterIx, newParams);
+      onChange(groupIx, filterIx, newParams);
     },
-    [filter, filterIx, lockedFrequency, onChange, params]
+    [filter, groupIx, filterIx, lockedFrequency, onChange, params]
   );
 
   return (
     <div className='filter-inst'>
-      <FlatButton onClick={onDelete}>×</FlatButton>
-      <ControlPanel width={500} settings={settings} onChange={handleChange} state={state} />
+      <FlatButton onClick={() => onDelete(filterIx)}>×</FlatButton>
+      <ControlPanel width={700} settings={settings} onChange={handleChange} state={state} />
     </div>
   );
 };
 
+const FilterInst = React.memo(FilterInstInner);
+
 interface FilterParamsEditorProps {
   lockedFrequency: number | null;
-  state: FilterDesignerState;
+  group: FilterGroup;
+  groupIx: number;
   onChange: (mapState: (state: FilterDesignerState) => FilterDesignerState) => void;
   onDelete: (filterIx: number) => void;
 }
 
-const FilterParamsEditor: React.FC<FilterParamsEditorProps> = ({
+const FilterParamsEditorInner: React.FC<FilterParamsEditorProps> = ({
   lockedFrequency,
-  state,
+  group,
+  groupIx,
   onChange,
   onDelete,
 }) => {
+  useWhyDidYouUpdate(
+    'FiltereParamsEditorComponent',
+    groupIx === 0
+      ? {
+          lockedFrequency,
+          group,
+          groupIx,
+          onChange,
+          onDelete,
+        }
+      : {}
+  );
   const onInstChange = useCallback(
-    (filterIx: number, newParams: FilterParams) =>
+    (groupIx: number, filterIx: number, newParams: FilterParams) =>
       onChange((state: FilterDesignerState): FilterDesignerState => {
-        const newFilters = [...state.filters];
-        newFilters[filterIx] = { ...newFilters[filterIx], params: newParams };
-        return { ...state, filters: newFilters };
+        const newFilterGroups = [...state.filterGroups];
+        const newFiltersForGroup = [...newFilterGroups[groupIx]];
+        newFiltersForGroup[filterIx] = { ...newFiltersForGroup[filterIx], params: newParams };
+        newFilterGroups[groupIx] = newFiltersForGroup;
+        return { ...state, filterGroups: newFilterGroups };
       }),
     [onChange]
   );
 
   return (
     <div className='filter-params'>
-      {state.filters.map((filter, i) => (
+      {group.map((filter, filterIx) => (
         <FilterInst
-          filterIx={i}
-          onDelete={() => onDelete(i)}
+          groupIx={groupIx}
+          filterIx={filterIx}
+          onDelete={onDelete}
           key={filter.id}
           lockedFrequency={lockedFrequency}
           filter={filter}
@@ -190,6 +149,8 @@ const FilterParamsEditor: React.FC<FilterParamsEditorProps> = ({
     </div>
   );
 };
+
+const FilterParamsEditor = React.memo(FilterParamsEditorInner);
 
 class FilterDesigner {
   private state: FilterDesignerState;
@@ -212,18 +173,32 @@ class FilterDesigner {
     const newState = typeof update === 'function' ? update(this.state) : update;
     this.state = newState;
 
-    const frequencyResponses = this.state.filters.map(({ filter }) => {
-      const responses = new Float32Array(DATA_SIZE);
-      filter.getFrequencyResponse(FREQUENCIES, responses, new Float32Array(DATA_SIZE));
-      return responses;
-    });
-    const aggResponses = frequencyResponses.reduce((acc, res) => {
+    const individualFrequencyResponsesByGroup = this.state.filterGroups.map(group =>
+      group.map(({ filter }) => {
+        const responses = new Float32Array(DATA_SIZE);
+        filter.getFrequencyResponse(FREQUENCIES, responses, new Float32Array(DATA_SIZE));
+        return responses;
+      })
+    );
+    // Filters within eacn group are applied in series
+    const aggregateResponsesByGroup = individualFrequencyResponsesByGroup.map(responesForGroup =>
+      responesForGroup.reduce((acc, res) => {
+        acc.forEach((y, i) => {
+          const val = Number.isNaN(res[i]) ? 0 : res[i];
+          acc[i] = y * val;
+        });
+        return acc;
+      }, new Float32Array(DATA_SIZE).fill(1))
+    );
+    // Filter groups are then routed in parallel
+    const aggResponses = aggregateResponsesByGroup.reduce((acc, res) => {
       acc.forEach((y, i) => {
         const val = Number.isNaN(res[i]) ? 0 : res[i];
-        acc[i] = y * val;
+        acc[i] = y + val;
       });
       return acc;
-    }, new Float32Array(DATA_SIZE).fill(1));
+    }, new Float32Array(DATA_SIZE).fill(0));
+
     this.render(FREQUENCIES, aggResponses);
   }
 
@@ -309,12 +284,105 @@ class FilterDesigner {
 
 const StateByVcId: Map<string, FilterDesigner> = new Map();
 
-const FilterDesignerUI: React.FC<{
+interface ConfigureFilterGroupProps {
+  state: FilterDesignerState;
+  setState: React.Dispatch<React.SetStateAction<FilterDesignerState>>;
+  groupIx: number;
+  inst: FilterDesigner;
+  updateConnectables?: (newState?: FilterDesignerState) => void;
+}
+
+const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
+  state,
+  setState,
+  groupIx,
+  inst,
+  updateConnectables,
+}) => {
+  const onDelete = useCallback(
+    filterIx =>
+      setState((state): FilterDesignerState => {
+        const group = state.filterGroups[groupIx];
+        // can't delete all filters
+        if (group.length === 1) {
+          return state;
+        }
+
+        disconnectFilterChain(group.map(R.prop('filter')));
+        const newState = {
+          ...state,
+          filters: group.filter((_, i) => i !== filterIx),
+        };
+        connectFilterChain(newState.filters.map(R.prop('filter')));
+        updateConnectables?.(newState);
+        return newState;
+      }),
+    [groupIx, setState, updateConnectables]
+  );
+  const onChange = useCallback(
+    newState => {
+      inst.onUpdated(newState);
+      setState(newState);
+    },
+    [inst, setState]
+  );
+
+  const settings = useMemo(
+    () => [
+      {
+        type: 'button',
+        label: 'add filter',
+        action: () => {
+          setState(state => {
+            disconnectFilterChain(state.filterGroups[groupIx].map(R.prop('filter')));
+            const newFilter = new BiquadFilterNode(ctx);
+            const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
+            setFilter(newFilter, params, state.lockedFrequencyByGroup[groupIx]);
+            const newState = R.set(
+              R.lensPath(['filterGroups', groupIx]),
+              [
+                ...state.filterGroups[groupIx],
+                { filter: newFilter, params, id: btoa(Math.random().toString()) },
+              ],
+              state
+            );
+            connectFilterChain(newState.filterGroups[groupIx].map(R.prop('filter')));
+            updateConnectables?.(newState);
+            return newState;
+          });
+        },
+      },
+    ],
+    [groupIx, setState, updateConnectables]
+  );
+
+  return (
+    <div className='filter-group' key={groupIx}>
+      <FilterParamsEditor
+        lockedFrequency={state.lockedFrequencyByGroup[groupIx] ?? null}
+        group={state.filterGroups[groupIx]}
+        groupIx={groupIx}
+        onChange={onChange}
+        onDelete={onDelete}
+      />
+      <ControlPanel width={700} settings={settings} />
+    </div>
+  );
+};
+
+interface FilterDesignerUIProps {
   vcId: string;
   initialState: FilterDesignerState;
   onChange: (newState: FilterDesignerState) => void;
   updateConnectables?: (newState?: FilterDesignerState) => void;
-}> = ({ vcId, initialState, onChange, updateConnectables }) => {
+}
+
+const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
+  vcId,
+  initialState,
+  onChange,
+  updateConnectables,
+}) => {
   const containerId = useMemo(() => btoa(vcId).replace(/=/g, ''), [vcId]);
   const inst = useMemo(() => {
     const inst = StateByVcId.get(vcId);
@@ -332,115 +400,129 @@ const FilterDesignerUI: React.FC<{
   useEffect(() => inst.onUpdated(state), [inst, state]);
   const topSettings = useMemo(() => {
     return filterNils([
-      { type: 'checkbox', label: 'lock frequency' },
-      R.isNil(state.lockedFrequency)
-        ? null
-        : { type: 'range', label: 'frequency', min: 10, max: 44_040 / 2, scale: 'log' },
+      { type: 'multibox', label: 'lock frequency' },
+      ...filterNils(
+        state.lockedFrequencyByGroup.map((lockedFrequency, groupIx) =>
+          R.isNil(lockedFrequency)
+            ? null
+            : {
+                type: 'range',
+                label: `group ${groupIx + 1} frequency`,
+                min: 10,
+                max: 44_040 / 2,
+                scale: 'log',
+                steps: 1000,
+              }
+        )
+      ),
       { type: 'select', label: 'preset', options: Presets.map(R.prop('name')) },
       {
         type: 'button',
         label: 'load preset',
         action: () => {
-          disconnectFilterChain(state.filters.map(R.prop('filter')));
-          const { preset } = Presets.find(R.propEq('name', selectedPresetName))!;
-          const newState = deserializeFilterDesigner(preset);
-          connectFilterChain(newState.filters.map(R.prop('filter')));
-          setState(newState);
-          updateConnectables?.(newState);
+          setState(state => {
+            state.filterGroups.forEach(group => disconnectFilterChain(group.map(R.prop('filter'))));
+            const { preset } = Presets.find(R.propEq('name', selectedPresetName))!;
+            const newState = deserializeFilterDesigner(preset);
+            updateConnectables?.(newState);
+            return newState;
+          });
         },
       },
     ]);
-  }, [selectedPresetName, state.filters, state.lockedFrequency, updateConnectables]);
+  }, [selectedPresetName, state.lockedFrequencyByGroup, updateConnectables]);
   useEffect(() => {
-    if (R.isNil(state.lockedFrequency)) {
-      return;
-    }
+    state.filterGroups.forEach((group, groupIx) => {
+      const lockedFrequencyForGroup = state.lockedFrequencyByGroup[groupIx];
+      if (R.isNil(lockedFrequencyForGroup)) {
+        return;
+      }
 
-    state.filters.forEach(filter => {
-      filter.filter.frequency.value = state.lockedFrequency!;
+      group.forEach(filter => {
+        filter.filter.frequency.value = lockedFrequencyForGroup!;
+      });
     });
-  }, [state.lockedFrequency, state.filters]);
+  }, [state.filterGroups, state.lockedFrequencyByGroup]);
+
+  const controlPanelState = useMemo(() => {
+    const acc = {
+      'lock frequency': new Array(state.filterGroups.length)
+        .fill(null)
+        .map((_, groupIx) => !R.isNil(state.lockedFrequencyByGroup[groupIx])),
+      selectedPresetName,
+    };
+
+    return state.filterGroups.reduce((acc, group, groupIx) => {
+      if (R.isNil(state.lockedFrequencyByGroup)) {
+        return acc;
+      }
+
+      return { ...acc, [`group ${groupIx + 1} frequency`]: state.lockedFrequencyByGroup[groupIx] };
+    }, acc);
+  }, [selectedPresetName, state.filterGroups, state.lockedFrequencyByGroup]);
+  const handleChange = useCallback((key: string, val: any) => {
+    switch (key) {
+      case 'lock frequency': {
+        const newLockStatusByGroup: boolean[] = val;
+
+        setState(state => {
+          const newLockedFrequenciesByGroup = state.filterGroups.map((group, groupIx) => {
+            const shouldLock = !!newLockStatusByGroup[groupIx];
+            const wasLocked = !R.isNil(state.lockedFrequencyByGroup[groupIx]);
+
+            group.forEach(filter =>
+              setFilter(filter.filter, filter.params, shouldLock ? 440 : null)
+            );
+
+            if (!shouldLock) {
+              return null;
+            }
+
+            return wasLocked ? state.lockedFrequencyByGroup[groupIx] : 440;
+          });
+          return { ...state, lockedFrequencyByGroup: newLockedFrequenciesByGroup };
+        });
+
+        break;
+      }
+      case 'preset': {
+        setSelectedPresetName(val);
+        break;
+      }
+      default: {
+        if (key.startsWith('group ')) {
+          const groupIx = +key.split(' ')[1] - 1;
+          setState(state => ({
+            ...state,
+            lockedFrequencyByGroup: R.set(R.lensIndex(groupIx), val, state.lockedFrequencyByGroup),
+          }));
+          return;
+        }
+
+        console.error('Unhandled key in top settings for filter designer: ', key);
+      }
+    }
+  }, []);
 
   return (
     <div className='filter-designer'>
       <div style={{ margin: 20 }}>
         <ControlPanel
-          style={{ width: 500, marginBottom: 14 }}
+          width={700}
           settings={topSettings}
-          state={{
-            'lock frequency': !R.isNil(state.lockedFrequency),
-            frequency: state.lockedFrequency,
-            selectedPresetName,
-          }}
-          onChange={(key: string, val: any) => {
-            switch (key) {
-              case 'lock frequency': {
-                setState({ ...state, lockedFrequency: val ? 440 : null });
-                state.filters.forEach(filter =>
-                  setFilter(filter.filter, filter.params, val ? 440 : null)
-                );
-                break;
-              }
-              case 'frequency': {
-                setState({ ...state, lockedFrequency: val });
-                state.filters.forEach(filter => setFilter(filter.filter, filter.params, val));
-                break;
-              }
-              case 'preset': {
-                setSelectedPresetName(val);
-                break;
-              }
-              default: {
-                console.error('Unhandled key in top settings for filter designer: ', key);
-              }
-            }
-          }}
+          state={controlPanelState}
+          onChange={handleChange}
         />
-        <FilterParamsEditor
-          lockedFrequency={state.lockedFrequency}
-          state={state}
-          onChange={newState => {
-            inst.onUpdated(newState);
-            setState(newState);
-          }}
-          onDelete={filterIx => {
-            // can't delete all filters
-            if (state.filters.length === 1) {
-              return;
-            }
-
-            disconnectFilterChain(state.filters.map(R.prop('filter')));
-            const newState = { ...state, filters: state.filters.filter((_, i) => i !== filterIx) };
-            connectFilterChain(newState.filters.map(R.prop('filter')));
-            setState(newState);
-            updateConnectables?.(newState);
-          }}
-        />
-        <ControlPanel
-          style={{ width: 500 }}
-          settings={[
-            {
-              type: 'button',
-              label: 'add filter',
-              action: () => {
-                disconnectFilterChain(state.filters.map(R.prop('filter')));
-                const newFilter = new BiquadFilterNode(ctx);
-                const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
-                setFilter(newFilter, params, state.lockedFrequency);
-                const newState = {
-                  ...state,
-                  filters: [
-                    ...state.filters,
-                    { filter: newFilter, params, id: btoa(Math.random().toString()) },
-                  ],
-                };
-                connectFilterChain(newState.filters.map(R.prop('filter')));
-                setState(newState);
-                updateConnectables?.(newState);
-              },
-            },
-          ]}
-        />
+        {state.filterGroups.map((group, groupIx) => (
+          <ConfigureFilterGroup
+            state={state}
+            setState={setState}
+            inst={inst}
+            groupIx={groupIx}
+            key={groupIx}
+            updateConnectables={updateConnectables}
+          />
+        ))}
       </div>
 
       <div style={{ width: WIDTH }} className='frequency-response-container'>
