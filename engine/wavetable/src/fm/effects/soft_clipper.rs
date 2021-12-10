@@ -25,7 +25,7 @@ impl SoftClipperAlgorithm {
                 } else {
                     sample - (sample * sample * sample) / 3.
                 },
-            SoftClipperAlgorithm::Tanh => fastapprox::faster::tanh(sample),
+            SoftClipperAlgorithm::Tanh => fastapprox::fast::tanh(sample),
             SoftClipperAlgorithm::XOverOnePlusAbsX => sample / (1. + sample.abs()),
             SoftClipperAlgorithm::HardClipper => dsp::clamp(-1., 1., sample),
         }
@@ -45,7 +45,7 @@ impl SoftClipperAlgorithm {
                 },
             SoftClipperAlgorithm::Tanh =>
                 for sample in samples {
-                    *sample = fastapprox::faster::tanh(*sample);
+                    *sample = fastapprox::fast::tanh(*sample);
                 },
             SoftClipperAlgorithm::XOverOnePlusAbsX =>
                 for sample in samples {

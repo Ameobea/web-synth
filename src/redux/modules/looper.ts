@@ -34,8 +34,17 @@ export interface LooperState {
 export interface SerializedLooperInstState {
   modules: LooperModule[];
   activeModuleIx: number;
-  isHidden: boolean;
 }
+
+export const deserializeLooper = (serialized: string): Omit<LooperInstState, 'looperNode'> => {
+  const parsed: SerializedLooperInstState = JSON.parse(serialized);
+  return { ...parsed, phaseSAB: null, isHidden: true };
+};
+
+export const serializeLooper = (looperState: LooperInstState): string => {
+  const serialized: SerializedLooperInstState = { ...looperState };
+  return JSON.stringify(serialized);
+};
 
 const buildDefaultLooperBank = (): LooperBank => ({
   id: genRandomStringID(),
@@ -111,7 +120,7 @@ const looperSlice = createSlice({
       state,
       {
         payload: { vcId, moduleIx, bankIx },
-      }: PayloadAction<{ vcId: string; moduleIx: number; bankIx: number }>
+      }: PayloadAction<{ vcId: string; moduleIx: number; bankIx: number | null }>
     ) => {
       const instState = state.stateByVcId[vcId];
       const modulestate = instState.modules[moduleIx];
@@ -119,7 +128,9 @@ const looperSlice = createSlice({
 
       const isGlobalPlaying = getIsGlobalBeatCounterStarted();
       if (isGlobalPlaying) {
-        instState.looperNode.setNextBankIx(moduleIx, bankIx);
+        if (bankIx !== null) {
+          instState.looperNode.setNextBankIx(moduleIx, bankIx);
+        }
       } else {
         instState.looperNode.setActiveBankIx(moduleIx, bankIx);
       }
@@ -157,11 +168,12 @@ const looperSlice = createSlice({
     },
     removeModule: (state, action: PayloadAction<{ vcId: string; moduleIx: number }>) => {
       const instState = state.stateByVcId[action.payload.vcId];
-      if (instState.modules.length === 1) {
-        return;
-      }
 
       instState.modules.splice(action.payload.moduleIx, 1);
+      if (instState.modules.length <= 1) {
+        updateLooperConnectables(action.payload.vcId);
+        return;
+      }
 
       let i = action.payload.moduleIx;
       while (i >= 0) {

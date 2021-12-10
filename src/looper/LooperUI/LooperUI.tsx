@@ -1,15 +1,30 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
-import { ReduxStore, looperDispatch } from 'src/redux';
-import { looperActions, LooperBank } from 'src/redux/modules/looper';
+import { ReduxStore, looperDispatch, getState } from 'src/redux';
+import {
+  deserializeLooper,
+  looperActions,
+  LooperBank,
+  LooperModule,
+  SerializedLooperInstState,
+  serializeLooper,
+} from 'src/redux/modules/looper';
 import './LooperUI.scss';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { withReactQueryClient } from 'src/reactUtils';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import LooperViz from 'src/looper/LooperUI/LooperViz';
+import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import {
+  fetchLooperPresets,
+  getExistingLooperPresetTags,
+  getLooperPreset,
+  saveLooperPreset,
+} from 'src/api';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 
 const DeleteBankButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button className='delete-looper-bank-button' onClick={onClick}>
@@ -141,6 +156,44 @@ const LooperTab: React.FC<LooperTabProps> = ({ vcId, name, ix, isActive }) => {
   );
 };
 
+const loadLooperPreset = (vcId: string, preset: SerializedLooperInstState) => {
+  const oldState = getState().looper.stateByVcId[vcId];
+
+  // Tear down existing state, deleting all banks and all modules
+  oldState.modules.forEach((mod, moduleIx) => {
+    looperDispatch(looperActions.removeModule({ vcId, moduleIx }));
+  });
+
+  // Load the new state
+  preset.modules.forEach((mod, moduleIx) => {
+    looperDispatch(looperActions.addModule({ vcId }));
+    // Delete the default bank that is created
+    looperDispatch(
+      looperActions.deleteBank({
+        vcId,
+        moduleIx,
+        bankId: getState().looper.stateByVcId[vcId].modules[moduleIx].banks[0].id,
+      })
+    );
+    looperDispatch(looperActions.setModuleName({ vcId, moduleIx, name: mod.name }));
+    mod.banks.forEach((bank, bankIx) => {
+      looperDispatch(looperActions.addBank({ vcId, moduleIx }));
+      if (bank.loadedComposition) {
+        looperDispatch(
+          looperActions.setLoadedComposition({
+            vcId,
+            moduleIx,
+            bankIx,
+            composition: bank.loadedComposition,
+          })
+        );
+      }
+    });
+    looperDispatch(looperActions.setActiveBankIx({ vcId, moduleIx, bankIx: mod.activeBankIx }));
+  });
+  looperDispatch(looperActions.setActiveModuleIx({ vcId, moduleIx: preset.activeModuleIx }));
+};
+
 interface LooperTabSwitcherProps {
   vcId: string;
   activeSubModuleIx: number;
@@ -170,18 +223,91 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
         />
       ))}
       <LooperTab vcId={vcId} name={'+'} ix={null} isActive={false} key='+' />
+      <div className='looper-preset-buttons'>
+        <button
+          onClick={async () => {
+            const wrappedFetchLooperPresets = () =>
+              fetchLooperPresets().then(presets =>
+                presets.map(preset => ({
+                  id: preset.id,
+                  name: preset.name,
+                  description: preset.description,
+                  tags: preset.tags,
+                  preset: preset,
+                }))
+              );
+
+            try {
+              const selectedPreset = (await pickPresetWithModal(wrappedFetchLooperPresets)).preset;
+              console.log('Selected looper preset: ', selectedPreset);
+              const preset = await getLooperPreset(selectedPreset.id);
+              console.log('Loaded looper preset: ', preset);
+              loadLooperPreset(vcId, preset);
+            } catch (err) {
+              // pass
+            }
+          }}
+          style={{ marginTop: 10 }}
+        >
+          Load Preset
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              const preset = await renderGenericPresetSaverWithModal({
+                description: true,
+                getExistingTags: getExistingLooperPresetTags,
+              });
+              console.log('User provided preset descriptor: ', preset);
+              const id = await saveLooperPreset({
+                name: preset.name,
+                description: preset.description ?? '',
+                tags: preset.tags ?? [],
+                serializedLooperInstState: deserializeLooper(
+                  serializeLooper(getState().looper.stateByVcId[vcId])
+                ),
+              });
+              console.log('Successfully created preset with id: ', id);
+            } catch (err) {
+              // pass
+            }
+          }}
+        >
+          Save Preset
+        </button>
+      </div>
     </div>
   );
 };
 
 interface ModuleInfoProps {
+  vcId: string;
   name: string;
+  moduleIx: number;
 }
 
-const ModuleInfo: React.FC<ModuleInfoProps> = ({ name }) => {
+const ModuleInfo: React.FC<ModuleInfoProps> = ({ name, moduleIx, vcId }) => {
+  const [editingName, setEditingName] = useState<string | null>(null);
+
   return (
     <div className='looper-module-info'>
-      <h2>{name}</h2>
+      {editingName === null ? (
+        <h2 onDoubleClick={() => setEditingName(name)}>{name}</h2>
+      ) : (
+        <input
+          type='text'
+          value={editingName}
+          onChange={evt => setEditingName(evt.target.value)}
+          onKeyDown={evt => {
+            if (evt.key === 'Enter') {
+              looperDispatch(looperActions.setModuleName({ vcId, moduleIx, name: editingName }));
+              setEditingName(null);
+            } else if (evt.key === 'Escape') {
+              setEditingName(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -196,7 +322,7 @@ const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
 
     return {
       ...R.pick(['activeModuleIx', 'phaseSAB'], instState),
-      activeModule: instState.modules[instState.activeModuleIx],
+      activeModule: instState.modules[instState.activeModuleIx] as LooperModule | undefined,
     };
   }, shallowEqual);
 
@@ -204,9 +330,11 @@ const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
     <div className='looper'>
       <LooperTabSwitcher vcId={vcId} activeSubModuleIx={activeModuleIx} />
       <div className='looper-banks-wrapper'>
-        <ModuleInfo name={activeModule.name} />
+        {activeModule ? (
+          <ModuleInfo name={activeModule.name} vcId={vcId} moduleIx={activeModuleIx} />
+        ) : null}
         <div className='looper-banks'>
-          {activeModule.banks.map((bank, bankIx) => (
+          {activeModule?.banks.map((bank, bankIx) => (
             <LooperBankComp
               vcId={vcId}
               isActive={bankIx === activeModule.activeBankIx}
@@ -217,7 +345,7 @@ const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
               phaseSAB={phaseSAB}
               moduleIx={activeModuleIx}
             />
-          ))}
+          )) ?? null}
         </div>
 
         <LooperMainControlPanel moduleIx={activeModuleIx} vcId={vcId} />

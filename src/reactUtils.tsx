@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Store } from 'redux';
+import { AnyAction, Store } from 'redux';
 import { Provider } from 'react-redux';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import * as R from 'ramda';
@@ -236,15 +236,25 @@ const ReactQueryClient = new QueryClient();
 
 export const getReactQueryClient = (): QueryClient => ReactQueryClient;
 
-export function withReactQueryClient<T extends Record<string, any>>(
-  Comp: React.ComponentType<T>
-): React.ComponentType<T> {
+export function withReactQueryClient<T>(Comp: React.ComponentType<T>): React.ComponentType<T> {
   const WithReactQueryClient: React.FC<T> = ({ ...props }) => (
     <QueryClientProvider client={ReactQueryClient}>
       <Comp {...props} />
     </QueryClientProvider>
   );
   return WithReactQueryClient;
+}
+
+export function withReduxProvider<T>(
+  store: Store<any, AnyAction>,
+  Comp: React.ComponentType<T>
+): React.ComponentType<T> {
+  const WithReduxProvider: React.FC<T> = ({ ...props }) => (
+    <Provider store={store}>
+      <Comp {...props} />
+    </Provider>
+  );
+  return WithReduxProvider;
 }
 
 export const useDraggable = (

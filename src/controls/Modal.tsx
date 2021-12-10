@@ -14,18 +14,26 @@ export interface ModalCompProps<T> {
  * and the returned value will be passed back to the caller.
  */
 export function renderModalWithControls<T>(
-  Comp: React.ComponentType<ModalCompProps<T>>
+  Comp: React.ComponentType<ModalCompProps<T>>,
+  clickBackdropToClose = true
 ): Promise<T> {
   const bodyNode = document.getElementsByTagName('body')[0]!;
   const modalNode = document.createElement('div');
   bodyNode.appendChild(modalNode);
   modalNode.setAttribute('class', 'input-modal');
-  const root = ReactDOM.createRoot(modalNode);
 
   const unmount = () => {
     root.unmount();
     bodyNode.removeChild(modalNode);
   };
+  if (clickBackdropToClose) {
+    modalNode.addEventListener('click', (e: MouseEvent) => {
+      if (e.target === modalNode) {
+        unmount();
+      }
+    });
+  }
+  const root = ReactDOM.createRoot(modalNode);
 
   // Render the component into the modal and wait for its callback to be triggered
   return new Promise((resolve, reject) => {

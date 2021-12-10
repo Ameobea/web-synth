@@ -4,6 +4,7 @@ import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing
 import { BACKEND_BASE_URL } from 'src/conf';
 import { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 import { Effect } from 'src/redux/modules/effects';
+import { SerializedLooperInstState } from 'src/redux/modules/looper';
 import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { SampleDescriptor } from 'src/sampleLibrary';
 
@@ -119,4 +120,51 @@ export const saveMIDIComposition = async (
   fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
     body: JSON.stringify({ name, description, composition }),
     method: 'POST',
+  });
+
+export interface LooperPreset {
+  id: number;
+  name: string;
+  description: string;
+  tags: string[];
+}
+
+export const fetchLooperPresets = async (): Promise<LooperPreset[]> =>
+  fetch(`${BACKEND_BASE_URL}/looper_presets`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const saveLooperPreset = async (preset: {
+  name: string;
+  description: string;
+  tags: string[];
+  serializedLooperInstState: SerializedLooperInstState;
+}) =>
+  fetch(`${BACKEND_BASE_URL}/looper_preset`, {
+    body: JSON.stringify(preset),
+    method: 'POST',
+  }).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getExistingLooperPresetTags = async (): Promise<{ name: string; count: number }[]> =>
+  fetch(`${BACKEND_BASE_URL}/looper_preset_tags`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getLooperPreset = async (id: number): Promise<SerializedLooperInstState> =>
+  fetch(`${BACKEND_BASE_URL}/looper_preset/${id}`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
   });

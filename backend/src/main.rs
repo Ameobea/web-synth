@@ -25,6 +25,7 @@ use rocket::{
 };
 
 pub mod conf;
+pub mod db_util;
 pub mod models;
 pub mod routes;
 pub mod schema;
@@ -83,6 +84,10 @@ async fn main() {
             routes::store_remote_sample,
             routes::save_midi_composition,
             routes::get_midi_compositions,
+            routes::get_looper_presets,
+            routes::get_looper_preset_by_id,
+            routes::create_looper_preset,
+            routes::get_looper_preset_tags
         ])
         .attach(CorsFairing);
 

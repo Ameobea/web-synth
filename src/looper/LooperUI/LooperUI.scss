@@ -2,12 +2,15 @@
   display: flex;
   flex-direction: row;
   margin: 6px;
+  height: calc(100vh - 52px);
+  overflow: hidden;
 
   .looper-tabs {
     display: flex;
     flex-direction: column;
     min-width: 120px;
     margin-right: 10px;
+    background-color: #121212;
 
     .looper-tab {
       display: flex;
@@ -28,56 +31,88 @@
     }
   }
 
-  .looper-module-info {
-    h2 {
-      margin: 0px 2px 6px 2px;
-      font-size: 20px;
-      font-weight: bold;
-    }
-  }
-
-  .looper-banks {
+  .looper-preset-buttons {
     display: flex;
     flex-direction: column;
 
-    .looper-bank {
-      display: grid;
-      grid-template-columns: 0 400px 0.2fr 1fr;
-      border-bottom: 1px solid black;
+    > button {
+      margin-bottom: 4px;
+    }
+  }
 
-      .active-composition-name {
-        text-align: center;
-        font-size: 13.5px;
-        color: #cccccc88;
+  .looper-module-info {
+    display: flex;
 
-        b {
-          color: #cccccc;
-          font-size: 16px;
+    h2 {
+      display: flex;
+      padding: 2px 4px;
+      margin: 0px 2px 6px 0px;
+      font-size: 20px;
+      font-weight: bold;
+      border: 1px solid #666;
+      cursor: pointer;
+      height: 24px;
+    }
+
+    input[type='text'] {
+      display: flex;
+      padding: 2px 4px;
+      margin: 0px 2px 6px 2px;
+      font-size: 20px;
+      height: 24px;
+    }
+  }
+
+  .looper-banks-wrapper {
+    display: flex;
+    flex-direction: column;
+
+    .looper-banks {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      background-color: #121212;
+
+      .looper-bank {
+        display: grid;
+        grid-template-columns: 0 400px 0.2fr 1fr;
+        border-bottom: 1px solid black;
+
+        .active-composition-name {
+          text-align: center;
+          font-size: 13.5px;
+          color: #cccccc88;
+
+          b {
+            color: #cccccc;
+            font-size: 16px;
+          }
+        }
+
+        .delete-looper-bank-button {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 17px;
+          height: 17px;
+          z-index: 2;
+          color: #991111;
+          padding: 0;
+          font-size: 18px;
+          line-height: 0;
+        }
+
+        .looper-viz {
+          margin-top: auto;
+          margin-bottom: auto;
+          display: block;
         }
       }
 
-      .delete-looper-bank-button {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 17px;
-        height: 17px;
-        z-index: 2;
-        color: #991111;
-        padding: 0;
-        font-size: 18px;
-        line-height: 0;
+      .looper-bank[data-active='true'] {
+        background-color: rgba(62, 192, 231, 0.4);
       }
-
-      .looper-viz {
-        margin-top: auto;
-        margin-bottom: auto;
-        display: block;
-      }
-    }
-
-    .looper-bank[data-active='true'] {
-      background-color: rgba(62, 192, 231, 0.4);
     }
   }
 

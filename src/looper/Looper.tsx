@@ -13,9 +13,10 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
 import {
   buildDefaultLooperInstState,
+  deserializeLooper,
   looperActions,
   LooperInstState,
-  SerializedLooperInstState,
+  serializeLooper,
 } from 'src/redux/modules/looper';
 import { getState, looperDispatch, store } from 'src/redux';
 import { LooperNode } from 'src/looper/LooperNode';
@@ -31,16 +32,6 @@ const LooperUI: React.FC<LooperUIProps> = props => (
 interface LooperCtx {
   looperNode: LooperNode;
 }
-
-const deserializeLooper = (serialized: string): Omit<LooperInstState, 'looperNode'> => {
-  const parsed: SerializedLooperInstState = JSON.parse(serialized);
-  return { ...parsed, phaseSAB: null, isHidden: true };
-};
-
-const serializeLooper = (looperState: LooperInstState): string => {
-  const serialized: SerializedLooperInstState = { ...looperState };
-  return JSON.stringify(serialized);
-};
 
 const getLooperDOMElementId = (vcId: string) => `looper_${vcId}`;
 
@@ -126,11 +117,16 @@ export const get_looper_audio_connectables = (vcId: string): AudioConnectables =
   if (!ctx) {
     throw new UnreachableException('Missing state for looper vcId=' + vcId);
   }
+  const moduleCount = getState().looper.stateByVcId[vcId].modules.length;
 
   return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>(),
-    outputs: ctx.looperNode.midiNodes.reduce((acc, midiNode, moduleIx) => {
+    outputs: new Array(moduleCount).fill(null).reduce((acc, _, moduleIx) => {
+      const midiNode = ctx.looperNode.midiNodes[moduleIx];
+      if (!midiNode) {
+        return acc;
+      }
       const moduleName = getState().looper.stateByVcId[vcId].modules[moduleIx].name;
       return acc.set(moduleName, { type: 'midi', node: midiNode });
     }, ImmMap<string, ConnectableOutput>()),

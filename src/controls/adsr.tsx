@@ -97,6 +97,7 @@ const ADSRControls: React.FC<ADSRControlPropTypes> = ({
   handleRadius = 6,
   style,
 }) => {
+  console.error('This component is deprecated; use ADSR2 instead');
   const svgElement = useRef<null | SVGSVGElement>(null);
   const combinedStyle = useMemo(
     () => ({

@@ -33,6 +33,24 @@ table! {
 }
 
 table! {
+    looper_presets (id) {
+        id -> Bigint,
+        author -> Nullable<Bigint>,
+        name -> Text,
+        description -> Text,
+        serialized_looper_inst_state -> Longtext,
+    }
+}
+
+table! {
+    looper_presets_tags (id) {
+        id -> Bigint,
+        looper_preset_id -> Bigint,
+        tag_id -> Bigint,
+    }
+}
+
+table! {
     midi_compositions (id) {
         id -> Bigint,
         name -> Text,
@@ -59,6 +77,13 @@ table! {
 }
 
 table! {
+    tags (id) {
+        id -> Bigint,
+        tag -> Text,
+    }
+}
+
+table! {
     users (id) {
         id -> Bigint,
         username -> Text,
@@ -76,14 +101,21 @@ table! {
     }
 }
 
+joinable!(looper_presets -> users (author));
+joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
+joinable!(looper_presets_tags -> tags (tag_id));
+
 allow_tables_to_appear_in_same_query!(
     compositions,
     composition_tags,
     composition_tags_join,
     effects,
+    looper_presets,
+    looper_presets_tags,
     midi_compositions,
     remote_sample_urls,
     synth_presets,
+    tags,
     users,
     voice_presets,
 );

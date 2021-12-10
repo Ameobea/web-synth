@@ -120,7 +120,8 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
       const isEditing =
         document.activeElement &&
         ['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase()) &&
-        (document.activeElement as HTMLInputElement).type !== 'range';
+        (document.activeElement as HTMLInputElement).type !== 'range' &&
+        (document.activeElement as HTMLInputElement).type !== 'checkbox';
       if (isEditing) {
         return;
       }

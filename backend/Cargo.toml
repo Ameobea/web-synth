@@ -11,6 +11,8 @@ diesel = "1.4.5"
 
 hex = "0.4"
 
+itertools = "0.10"
+
 lazy_static = "1.4.0"
 
 chrono = "0.4.19"

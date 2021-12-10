@@ -39,36 +39,6 @@ svg.notes {
   left: 0;
 }
 
-.grid-line-1 {
-  fill: rgb(39, 39, 39);
-}
-
-.grid-line-2 {
-  fill: rgb(62, 62, 62);
-}
-
-.measure-line {
-  stroke: #666;
-  stroke-width: 1px;
-  z-index: 4;
-}
-
-.beat-line {
-  stroke: rgba(150, 150, 150, 0.15);
-  stroke-width: 1px;
-  z-index: 4;
-}
-
-.note {
-  fill: rgb(116, 100, 225);
-}
-
-.note.selected {
-  fill: rgb(170, 100, 225);
-  stroke-width: 1px;
-  stroke: #661166;
-}
-
 main#content {
   left: 0;
   top: 32px;
@@ -83,28 +53,6 @@ main#content {
 
 #canvases-wrapper {
   position: relative;
-}
-
-.selection-box {
-  stroke: #222;
-  stroke-width: 1;
-  fill: rgba(200, 200, 200, 0.2);
-}
-
-.cursor-gutter {
-  fill: #616;
-}
-
-.cursor {
-  stroke: rgba(222, 222, 222, 0.8);
-}
-
-.loop-start-marker {
-  stroke: rgba(18, 222, 18, 0.8);
-}
-
-.loop-end-marker {
-  stroke: rgba(222, 18, 18, 0.8);
 }
 
 a {
@@ -125,7 +73,18 @@ button {
   padding: 3px 8px;
 }
 
+input[type='text'],
+textarea {
+  border: 1px solid #666;
+  background-color: #191919;
+  border: 1px solid #979797;
+  outline: none;
+  color: #ccc;
+}
+
 button:disabled {
+  background-color: rgb(78, 78, 78);
+  color: rgb(133, 133, 133);
   cursor: default;
 }
 
