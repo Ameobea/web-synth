@@ -10,15 +10,14 @@ import MIDIEditorUIInstance, {
 } from 'src/midiEditor/MIDIEditorUIInstance';
 import './MIDIEditor.scss';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
-import { mkSavePresetModal } from 'src/synthDesigner/SavePresetModal';
-import { saveMIDIComposition } from 'src/api';
+import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import BasicModal from 'src/misc/BasicModal';
-import { withReactQueryClient } from 'src/reactUtils';
 import FileUploader, { Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { AsyncOnce } from 'src/util';
 import { MidiFileInfo, getMidiImportSettings } from 'src/controls/MidiImportDialog';
 import download from 'downloadjs';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 
 const ctx = new AudioContext();
 
@@ -346,11 +345,12 @@ const MIDIEditorControls: React.FC<{
           }
 
           try {
-            const { title, description } = await renderModalWithControls(
-              mkSavePresetModal(<h2>Save MIDI Composition</h2>)
-            );
+            const { name, description, tags } = await renderGenericPresetSaverWithModal({
+              description: true,
+              getExistingTags: getExistingMIDICompositionTags,
+            });
             const composition = inst.current!.serialize();
-            await saveMIDIComposition(title, description, composition);
+            await saveMIDIComposition(name, description ?? '', composition, tags ?? []);
           } catch (err) {
             return;
           }
@@ -368,12 +368,9 @@ const MIDIEditorControls: React.FC<{
 
           try {
             const {
-              composition: { composition },
-            } = await renderModalWithControls(
-              withReactQueryClient(
-                mkLoadMIDICompositionModal('Really clear current composition and load new one?')
-              )
-            );
+              preset: { composition },
+            } = await mkLoadMIDICompositionModal();
+
             inst.current.reInitialize(composition);
           } catch (_err) {
             return;

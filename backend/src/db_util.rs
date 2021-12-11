@@ -2,8 +2,12 @@ use std::collections::HashMap;
 
 use diesel::{prelude::*, QueryResult};
 use itertools::Itertools;
+use rocket::serde::json::Json;
 
-use crate::models::tags::{NewTag, Tag};
+use crate::{
+    models::tags::{EntityIdTag, NewTag, Tag, TagCount},
+    WebSynthDbConn,
+};
 
 // Facilitate getting the primary key of the last inserted item
 //
@@ -44,4 +48,33 @@ pub fn get_and_create_tag_ids(conn: &MysqlConnection, tags: Vec<String>) -> Quer
 
     let tag_ids: Vec<i64> = tags.into_iter().map(|tag| tag_ids_by_name[&tag]).collect();
     Ok(tag_ids)
+}
+
+pub async fn build_tags_with_counts(
+    conn: WebSynthDbConn,
+    get_all_entity_id_tags: impl FnOnce(&mut MysqlConnection) -> QueryResult<Vec<EntityIdTag>>
+        + Send
+        + 'static,
+) -> Result<Json<Vec<TagCount>>, String> {
+    let all_looper_preset_tags: Vec<EntityIdTag> =
+        conn.run(get_all_entity_id_tags).await.map_err(|err| {
+            error!("DB error loading preset tags from DB: {}", err);
+            String::from("DB error loading preset tags from DB")
+        })?;
+
+    let mut counts_by_tag: HashMap<String, i64> = HashMap::new();
+    for looper_preset_tag in all_looper_preset_tags {
+        let tag = looper_preset_tag.tag.clone();
+        let count = counts_by_tag.entry(tag).or_insert(0);
+        *count += 1;
+    }
+
+    let counts: Vec<TagCount> = counts_by_tag
+        .into_iter()
+        .map(|(tag_name, count)| TagCount {
+            name: tag_name,
+            count,
+        })
+        .collect();
+    Ok(Json(counts))
 }

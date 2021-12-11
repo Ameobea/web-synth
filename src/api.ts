@@ -107,6 +107,7 @@ export interface SavedMIDIComposition {
   name: string;
   description: string;
   composition: SerializedMIDIEditorState;
+  tags: string[];
 }
 
 export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]> =>
@@ -115,11 +116,22 @@ export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]
 export const saveMIDIComposition = async (
   name: string,
   description: string,
-  composition: SerializedMIDIEditorState
+  composition: SerializedMIDIEditorState,
+  tags: string[]
 ) =>
   fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
-    body: JSON.stringify({ name, description, composition }),
+    body: JSON.stringify({ name, description, composition, tags }),
     method: 'POST',
+  });
+
+export const getExistingMIDICompositionTags = async (): Promise<
+  { name: string; count: number }[]
+> =>
+  fetch(`${BACKEND_BASE_URL}/midi_composition_tags`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
   });
 
 export interface LooperPreset {

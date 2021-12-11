@@ -284,6 +284,7 @@ const buildConfigureParamSourceSettings = ({
         {
           label: 'output range',
           type: 'interval',
+          steps: 1000,
           min,
           max,
         },

@@ -15,11 +15,10 @@ import { ReduxStore, store } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import SynthModuleComp from './SynthModule';
 import './SynthDesigner.scss';
-import { renderModalWithControls } from 'src/controls/Modal';
-import SavePresetModal from 'src/synthDesigner/SavePresetModal';
 import { saveSynthPreset } from 'src/api';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { buildWavyJonesInstance } from 'src/visualizations/WavyJones';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 
 interface AddModuleControlsProps {
   stateKey: string;
@@ -166,9 +165,15 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
         type: 'button',
         label: 'save full preset',
         action: async () => {
-          const { title, description } = await renderModalWithControls(SavePresetModal);
+          const { name: title, description } = await renderGenericPresetSaverWithModal({
+            description: true,
+          });
           const presetBody = getState().synthDesigner.synths.map(serializeSynthModule);
-          await saveSynthPreset({ title, description, body: { voices: presetBody } });
+          await saveSynthPreset({
+            title,
+            description: description ?? '',
+            body: { voices: presetBody },
+          });
         },
       },
     ];

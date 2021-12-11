@@ -38,12 +38,6 @@ pub struct LooperPresetDescriptor {
     pub tags: Vec<String>,
 }
 
-#[derive(Queryable)]
-pub struct LooperPresetTag {
-    pub looper_preset_id: i64,
-    pub tag: String,
-}
-
 #[derive(Insertable)]
 #[table_name = "looper_presets"]
 pub struct NewLooperPreset {

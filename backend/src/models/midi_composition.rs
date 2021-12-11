@@ -1,4 +1,4 @@
-use crate::schema::midi_compositions;
+use crate::schema::{midi_compositions, midi_compositions_tags};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +58,7 @@ pub struct NewMIDIComposition {
     pub name: String,
     pub description: String,
     pub composition: SerializedMIDIEditorState,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -67,4 +68,12 @@ pub struct MIDIComposition {
     pub name: String,
     pub description: String,
     pub composition: SerializedMIDIEditorState,
+    pub tags: Vec<String>,
+}
+
+#[derive(Insertable)]
+#[table_name = "midi_compositions_tags"]
+pub struct NewMidiCompositionTag {
+    pub midi_composition_id: i64,
+    pub tag_id: i64,
 }

@@ -1,17 +1,15 @@
-use std::collections::HashMap;
-
 use diesel::prelude::*;
 use itertools::Itertools;
 use rocket::serde::json::Json;
 
 use crate::{
-    db_util::{get_and_create_tag_ids, last_insert_id},
+    db_util::{build_tags_with_counts, get_and_create_tag_ids, last_insert_id},
     models::{
         looper_preset::{
-            LooperPresetDescriptor, LooperPresetTag, NewLooperPreset, NewLooperPresetTag,
-            SaveLooperPresetRequest, SerializedLooperInstState,
+            LooperPresetDescriptor, NewLooperPreset, NewLooperPresetTag, SaveLooperPresetRequest,
+            SerializedLooperInstState,
         },
-        tags::TagCount,
+        tags::{EntityIdTag, TagCount},
     },
     WebSynthDbConn,
 };
@@ -32,7 +30,7 @@ pub async fn get_looper_presets(
                 ))
                 .load::<(i64, String, String)>(conn)?;
 
-            let preset_tags: Vec<LooperPresetTag> = looper_presets_tags::table
+            let preset_tags: Vec<EntityIdTag> = looper_presets_tags::table
                 .inner_join(tags::table)
                 .select((looper_presets_tags::dsl::looper_preset_id, tags::dsl::tag))
                 .load(conn)?;
@@ -47,7 +45,7 @@ pub async fn get_looper_presets(
 
     let mut tags_by_preset_id = preset_tags
         .into_iter()
-        .into_group_map_by(|tag| tag.looper_preset_id);
+        .into_group_map_by(|tag| tag.entity_id);
 
     let looper_presets = looper_presets
         .into_iter()
@@ -167,32 +165,11 @@ pub async fn create_looper_preset(
 pub async fn get_looper_preset_tags(conn: WebSynthDbConn) -> Result<Json<Vec<TagCount>>, String> {
     use crate::schema::{looper_presets_tags, tags};
 
-    let all_looper_preset_tags: Vec<LooperPresetTag> = conn
-        .run(move |conn| -> QueryResult<Vec<_>> {
-            looper_presets_tags::table
-                .inner_join(tags::table)
-                .select((looper_presets_tags::dsl::looper_preset_id, tags::dsl::tag))
-                .load(conn)
-        })
-        .await
-        .map_err(|err| {
-            error!("DB error loading looper preset tags from DB: {}", err);
-            String::from("DB error loading looper preset tags from DB")
-        })?;
-
-    let mut counts_by_tag: HashMap<String, i64> = HashMap::new();
-    for looper_preset_tag in all_looper_preset_tags {
-        let tag = looper_preset_tag.tag.clone();
-        let count = counts_by_tag.entry(tag).or_insert(0);
-        *count += 1;
-    }
-
-    let counts: Vec<TagCount> = counts_by_tag
-        .into_iter()
-        .map(|(tag_name, count)| TagCount {
-            name: tag_name,
-            count,
-        })
-        .collect();
-    Ok(Json(counts))
+    build_tags_with_counts(conn, move |conn| -> QueryResult<Vec<_>> {
+        looper_presets_tags::table
+            .inner_join(tags::table)
+            .select((looper_presets_tags::dsl::looper_preset_id, tags::dsl::tag))
+            .load(conn)
+    })
+    .await
 }

@@ -751,7 +751,7 @@ impl FMSynthVoice {
                 0.975,
                 shared_gain_adsr_rendered_buffer,
                 EarlyReleaseConfig {
-                    strategy: EarlyReleaseStrategy::FastEnvelopeFollow,
+                    strategy: EarlyReleaseStrategy::LinearMix,
                     len_samples: 3_400,
                 },
                 false,

@@ -87,7 +87,8 @@ async fn main() {
             routes::get_looper_presets,
             routes::get_looper_preset_by_id,
             routes::create_looper_preset,
-            routes::get_looper_preset_tags
+            routes::get_looper_preset_tags,
+            routes::get_midi_composition_tags
         ])
         .attach(CorsFairing);
 

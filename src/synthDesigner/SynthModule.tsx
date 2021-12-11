@@ -11,13 +11,12 @@ import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synth
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, getState, useSelector } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
-import { renderModalWithControls } from 'src/controls/Modal';
-import SavePresetModal from './SavePresetModal';
 import { saveSynthVoicePreset } from 'src/api';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { msToSamples, samplesToMs } from 'src/util';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
@@ -74,9 +73,11 @@ const PresetsControlPanel: React.FC<{
         label: 'save preset',
         type: 'button',
         action: async () => {
-          const { title, description } = await renderModalWithControls(SavePresetModal);
+          const { name: title, description } = await renderGenericPresetSaverWithModal({
+            description: true,
+          });
           const presetBody = getVoicePreset(stateKey, index);
-          await saveSynthVoicePreset({ title, description, body: presetBody });
+          await saveSynthVoicePreset({ title, description: description ?? '', body: presetBody });
         },
       },
     ],

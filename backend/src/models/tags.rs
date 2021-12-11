@@ -17,3 +17,9 @@ pub struct TagCount {
     pub name: String,
     pub count: i64,
 }
+
+#[derive(Queryable)]
+pub struct EntityIdTag {
+    pub entity_id: i64,
+    pub tag: String,
+}

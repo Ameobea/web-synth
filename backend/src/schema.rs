@@ -60,6 +60,14 @@ table! {
 }
 
 table! {
+    midi_compositions_tags (id) {
+        id -> Bigint,
+        midi_composition_id -> Bigint,
+        tag_id -> Bigint,
+    }
+}
+
+table! {
     remote_sample_urls (id, name) {
         id -> Varchar,
         name -> Varchar,
@@ -104,6 +112,8 @@ table! {
 joinable!(looper_presets -> users (author));
 joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
 joinable!(looper_presets_tags -> tags (tag_id));
+joinable!(midi_compositions_tags -> midi_compositions (midi_composition_id));
+joinable!(midi_compositions_tags -> tags (tag_id));
 
 allow_tables_to_appear_in_same_query!(
     compositions,
@@ -113,6 +123,7 @@ allow_tables_to_appear_in_same_query!(
     looper_presets,
     looper_presets_tags,
     midi_compositions,
+    midi_compositions_tags,
     remote_sample_urls,
     synth_presets,
     tags,

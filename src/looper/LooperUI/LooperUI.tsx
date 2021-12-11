@@ -13,8 +13,6 @@ import {
   serializeLooper,
 } from 'src/redux/modules/looper';
 import './LooperUI.scss';
-import { renderModalWithControls } from 'src/controls/Modal';
-import { withReactQueryClient } from 'src/reactUtils';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import LooperViz from 'src/looper/LooperUI/LooperViz';
 import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
@@ -58,9 +56,7 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
         label: 'select midi sequence',
         action: async () => {
           try {
-            const { composition } = await renderModalWithControls(
-              withReactQueryClient(mkLoadMIDICompositionModal(undefined))
-            );
+            const { preset: composition } = await mkLoadMIDICompositionModal();
             looperDispatch(
               looperActions.setLoadedComposition({ vcId, moduleIx, bankIx, composition })
             );
