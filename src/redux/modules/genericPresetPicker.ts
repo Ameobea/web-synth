@@ -1,17 +1,17 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface GenericPresetPickerState {
-  selectedPresetIx: number | null;
+  selectedPresetID: string | number | null | undefined;
 }
 
-const buildInitialState = (): GenericPresetPickerState => ({ selectedPresetIx: null });
+const buildInitialState = (): GenericPresetPickerState => ({ selectedPresetID: null });
 
 const genericPresetPickerSlice = createSlice({
   name: 'genericPresetPicker',
   initialState: buildInitialState(),
   reducers: {
-    setSelectedPresetIx: (state, action: PayloadAction<number | null>) => {
-      state.selectedPresetIx = action.payload;
+    setSelectedPresetID: (state, action: PayloadAction<number | string | null>) => {
+      state.selectedPresetID = action.payload;
     },
   },
 });

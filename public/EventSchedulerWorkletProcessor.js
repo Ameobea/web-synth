@@ -37,6 +37,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
 
           globalThis.curBeat = 0;
           this.lastRecordedTime = currentTime;
+          globalThis.globalBeatCounterStarted = true;
           this.isStarted = true;
           break;
         }
@@ -47,6 +48,7 @@ class ValueRecorderWorkletProcessor extends AudioWorkletProcessor {
           }
 
           globalThis.curBeat = 0;
+          globalThis.globalBeatCounterStarted = false;
           this.wasmInstance.exports.stop();
           this.isStarted = false;
           break;

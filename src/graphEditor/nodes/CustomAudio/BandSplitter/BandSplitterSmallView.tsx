@@ -9,7 +9,7 @@ export interface BandSplitterSmallViewProps {
   onChange: (newState: SerializedBandSplitterNode) => void;
 }
 
-const BAND_SPLITTER_SETTINGS = ['low', 'mid', 'high'].map((bandName, i) => ({
+const BAND_SPLITTER_SETTINGS = ['low', 'mid', 'high'].map(bandName => ({
   type: 'range',
   label: `${bandName} band gain`,
   min: 0,
@@ -25,9 +25,9 @@ const BandSplitterSmallView: React.FC<BandSplitterSmallViewProps> = ({
 
   const controlPanelState = useMemo(
     () => ({
-      'low band gain': state.gains[0],
-      'mid band gain': state.gains[1],
-      'high band gain': state.gains[2],
+      'low band gain': Math.round(state.gains[0] * 1000) / 1000,
+      'mid band gain': Math.round(state.gains[1] * 1000) / 1000,
+      'high band gain': Math.round(state.gains[2] * 1000) / 1000,
     }),
     [state]
   );
@@ -61,16 +61,17 @@ const BandSplitterSmallView: React.FC<BandSplitterSmallViewProps> = ({
 
   return (
     <div className='band-splitter-small-view'>
-      <p>
-        This node splits the incoming signal into 3 output bands. The splits are hard-coded at
-        0-400hz, 400-3000hz, and 3000-∞hz. This is useful for effects such as multi-band compression
-        or multi-band distortion.
-      </p>
       <ControlPanel
+        width={500}
         settings={BAND_SPLITTER_SETTINGS}
         state={controlPanelState}
         onChange={handleChange}
       />
+      <p style={{ paddingLeft: 8, paddingRight: 8 }}>
+        This node splits the incoming signal into 3 output bands. The splits are hard-coded at
+        0-400hz, 400-3000hz, and 3000-∞hz. This is useful for effects such as multi-band compression
+        or multi-band distortion.
+      </p>
     </div>
   );
 };

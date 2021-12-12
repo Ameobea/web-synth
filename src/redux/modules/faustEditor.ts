@@ -15,6 +15,7 @@ export interface SerializedFaustEditor {
   paramDefaultValues?: { [paramName: string]: number };
   isRunning: boolean;
   language?: CodeEditorLanguage;
+  optimize?: boolean;
 }
 
 export interface FaustEditorPolyphonyState {
@@ -45,6 +46,7 @@ export interface FaustEditorState {
   polyphonyState: FaustEditorPolyphonyState;
   cachedInputNames: string[] | undefined;
   language: CodeEditorLanguage;
+  optimize?: boolean;
 }
 
 const buildInitialState = (): FaustEditorState => ({
@@ -54,6 +56,7 @@ const buildInitialState = (): FaustEditorState => ({
   polyphonyState: buildDefaultFaustEditorPolyphonyState(),
   cachedInputNames: undefined,
   language: 'faust',
+  optimize: true,
 });
 
 const getFaustModuleParam = (vcId: string, path: string): OverridableAudioParam | undefined => {
@@ -96,7 +99,12 @@ const actionGroups = {
   }),
   CLEAR_ACTIVE_INSTANCE: buildActionGroup({
     actionCreator: () => ({ type: 'CLEAR_ACTIVE_INSTANCE' }),
-    subReducer: (state: FaustEditorState) => ({ ...state, controlPanel: null, instance: null }),
+    subReducer: (state: FaustEditorState) => ({
+      ...state,
+      controlPanel: null,
+      instance: null,
+      ControlPanelComponent: undefined,
+    }),
   }),
   SET_EDITOR_CONTENT: buildActionGroup({
     actionCreator: (content: string) => ({ type: 'SET_EDITOR_CONTENT', content }),
@@ -126,6 +134,10 @@ const actionGroups = {
       language,
     }),
     subReducer: (state: FaustEditorState, { language }) => ({ ...state, language }),
+  }),
+  FAUST_EDITOR_TOGGLE_OPTIMIZE: buildActionGroup({
+    actionCreator: () => ({ type: 'FAUST_EDITOR_TOGGLE_OPTIMIZE' }),
+    subReducer: (state: FaustEditorState) => ({ ...state, optimize: !state.optimize }),
   }),
 };
 

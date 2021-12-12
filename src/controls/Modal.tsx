@@ -27,7 +27,7 @@ export function renderModalWithControls<T>(
     bodyNode.removeChild(modalNode);
   };
   if (clickBackdropToClose) {
-    modalNode.addEventListener('click', (e: MouseEvent) => {
+    modalNode.addEventListener('mousedown', (e: MouseEvent) => {
       if (e.target === modalNode) {
         unmount();
       }

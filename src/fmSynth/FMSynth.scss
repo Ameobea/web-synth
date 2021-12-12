@@ -73,6 +73,10 @@
     margin-left: auto;
     margin-right: auto;
 
+    * {
+      user-select: none;
+    }
+
     .operator-row {
       display: flex;
       flex-direction: row;
@@ -156,6 +160,7 @@
       margin: 2px 0px;
       border: 1px solid #181818;
       flex: 1;
+      user-select: none;
     }
     .main-effect-chain-selector[data-active='true'] {
       background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);

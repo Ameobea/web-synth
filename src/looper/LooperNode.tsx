@@ -20,7 +20,6 @@ const LooperWasm = new AsyncOnce(() =>
 );
 
 export class LooperNode {
-  private vcId: string;
   /**
    * Sends output MIDI events created by the looper to connected destination modules
    */
@@ -31,11 +30,9 @@ export class LooperNode {
   private onPhaseSABReceived?: (phaseSAB: Float32Array) => void;
 
   constructor(
-    vcId: string,
     serialized?: Omit<LooperInstState, 'looperNode'>,
     onPhaseSABReceived?: (phaseSAB: Float32Array) => void
   ) {
-    this.vcId = vcId;
     this.onPhaseSABReceived = onPhaseSABReceived;
 
     if (serialized) {
@@ -75,15 +72,15 @@ export class LooperNode {
   public setCompositionForBank(
     moduleIx: number,
     bankIx: number,
-    composition: SavedMIDIComposition,
+    composition: SavedMIDIComposition | null,
     lenBeats: number
   ) {
     const notes: { note: number; isGate: boolean; beat: number }[] = [];
 
-    const lineCount = composition.composition.lines.length;
+    const lineCount = composition?.composition.lines.length ?? 0;
     const lineIxToNote = (lineIx: number): number => lineCount - lineIx;
 
-    composition.composition.lines.forEach((line, lineIx) => {
+    composition?.composition.lines.forEach((line, lineIx) => {
       line.notes.forEach(note => {
         notes.push({
           note: lineIxToNote(lineIx),
@@ -107,6 +104,10 @@ export class LooperNode {
     });
   }
 
+  public setLoopLenBeats(moduleIx: number, bankIx: number, lenBeats: number) {
+    this.postMessage({ type: 'setLoopLenBeats', moduleIx, bankIx, lenBeats });
+  }
+
   public setActiveBankIx(moduleIx: number, bankIx: number | null) {
     this.postMessage({ type: 'setActiveBankIx', moduleIx, bankIx });
   }
@@ -121,6 +122,10 @@ export class LooperNode {
     }
 
     this.postMessage({ type: 'setActiveModuleIx', moduleIx });
+  }
+
+  public deleteModule(moduleIx: number) {
+    this.postMessage({ type: 'deleteModule', moduleIx });
   }
 
   private async init() {

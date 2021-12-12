@@ -36,6 +36,8 @@ const WasmModule = new AsyncOnce(() => import('src/spectrum_viz'));
 interface SpectrumVisualizationProps {
   initialConf?: SpectrumVizSettings;
   canvasStyle?: React.CSSProperties;
+  controlPanelStyle?: React.CSSProperties;
+  controlPanelDraggable?: boolean;
   analyzerNode: AnalyserNode;
   paused: boolean;
   height?: number;
@@ -45,6 +47,8 @@ interface SpectrumVisualizationProps {
 const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
   initialConf,
   canvasStyle,
+  controlPanelStyle,
+  controlPanelDraggable,
   analyzerNode,
   paused,
   height = 1024,
@@ -206,7 +210,12 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
       {!spectrumSettingsDefinition || !spectrumModule.current || ctxPtr === null ? (
         <Loading />
       ) : (
-        <ControlPanel onChange={onSettingChange} settings={settings} draggable />
+        <ControlPanel
+          onChange={onSettingChange}
+          settings={settings}
+          draggable={controlPanelDraggable ?? true}
+          style={controlPanelStyle}
+        />
       )}
 
       {children}

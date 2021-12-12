@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { AnyAction, Store } from 'redux';
-import { Provider } from 'react-redux';
+import { Provider, useStore } from 'react-redux';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import * as R from 'ramda';
 
@@ -237,8 +237,9 @@ const ReactQueryClient = new QueryClient();
 export const getReactQueryClient = (): QueryClient => ReactQueryClient;
 
 export function withReactQueryClient<T>(Comp: React.ComponentType<T>): React.ComponentType<T> {
+  const client = new QueryClient();
   const WithReactQueryClient: React.FC<T> = ({ ...props }) => (
-    <QueryClientProvider client={ReactQueryClient}>
+    <QueryClientProvider client={client}>
       <Comp {...props} />
     </QueryClientProvider>
   );
@@ -308,3 +309,7 @@ export const useDraggable = (
   );
   return { isDragging, onMouseDown };
 };
+
+export function useGetState<T>(): () => T {
+  return useStore().getState;
+}

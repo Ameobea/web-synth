@@ -92,6 +92,14 @@ export const listRemoteSamples = async (): Promise<RemoteSample[]> =>
     return res.json();
   });
 
+export const fetchEffects = (): Promise<Effect[]> =>
+  fetch(`${BACKEND_BASE_URL}/effects`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
 export const saveEffect = (effect: Without<Effect, 'id'>) =>
   fetch(`${BACKEND_BASE_URL}/effects`, {
     method: 'POST',

@@ -62,7 +62,7 @@ impl Default for LooperCtx {
     fn default() -> Self {
         LooperCtx {
             playing_notes: [false; 1024],
-            last_beat: 0.0,
+            last_beat: std::f32::INFINITY,
             next_evt_ix: None,
             active_bank_ix: None,
             next_bank_ix: None,
@@ -200,59 +200,94 @@ pub extern "C" fn looper_on_playback_stop() {
     }
 }
 
+fn process_looper_module(cur_beat: f32, module_ix: usize, ctx: &mut LooperCtx) -> f32 {
+    let active_bank_ix = match ctx.active_bank_ix {
+        Some(bank_ix) => bank_ix,
+        None => return 0.,
+    };
+
+    let active_bank = &ctx.banks[active_bank_ix];
+    let loop_beat = cur_beat % active_bank.len_beats;
+
+    if loop_beat < ctx.last_beat {
+        ctx.last_beat = loop_beat;
+        ctx.next_evt_ix = Some(0);
+
+        for (note, is_playing) in ctx.playing_notes.iter_mut().enumerate() {
+            if *is_playing {
+                unsafe { release_note(module_ix, note as u8) };
+                *is_playing = false;
+            }
+        }
+
+        if let Some(next_bank_ix) = ctx.next_bank_ix {
+            ctx.active_bank_ix = Some(next_bank_ix);
+            ctx.next_bank_ix = None;
+        }
+
+        return process_looper_module(cur_beat, module_ix, ctx);
+    }
+
+    if active_bank.events.is_empty() {
+        ctx.last_beat = loop_beat;
+        return loop_beat / active_bank.len_beats;
+    }
+
+    while let Some(next_evt_ix) = ctx.next_evt_ix {
+        let evt = &active_bank.events[next_evt_ix];
+        if evt.beat > loop_beat {
+            break;
+        }
+        if evt.is_gate {
+            ctx.playing_notes[evt.note as usize] = true;
+            unsafe { play_note(module_ix, evt.note) };
+        } else {
+            ctx.playing_notes[evt.note as usize] = false;
+            unsafe { release_note(module_ix, evt.note) };
+        }
+
+        ctx.next_evt_ix = if next_evt_ix + 1 < active_bank.events.len() {
+            Some(next_evt_ix + 1)
+        } else {
+            None
+        };
+    }
+
+    ctx.last_beat = loop_beat;
+
+    loop_beat / active_bank.len_beats
+}
+
 #[no_mangle]
 pub extern "C" fn looper_process(module_ix_for_which_to_report_phase: usize, cur_beat: f32) -> f32 {
     let mut phase = 0.;
 
     for (module_ix, ctx) in ctxs().iter_mut().enumerate() {
-        let active_bank_ix = match ctx.active_bank_ix {
-            Some(bank_ix) => bank_ix,
-            None => continue,
-        };
-
-        let active_bank = &ctx.banks[active_bank_ix];
-        let loop_beat = cur_beat % active_bank.len_beats;
-
-        if loop_beat < ctx.last_beat {
-            ctx.last_beat = loop_beat;
-            ctx.next_evt_ix = Some(0);
-
-            looper_on_playback_stop();
-        }
-
-        if active_bank.events.is_empty() {
-            ctx.last_beat = loop_beat;
-            if module_ix == module_ix_for_which_to_report_phase {
-                phase = loop_beat / active_bank.len_beats;
-            }
-            continue;
-        }
-
-        while let Some(next_evt_ix) = ctx.next_evt_ix {
-            let evt = &active_bank.events[next_evt_ix];
-            if evt.beat > loop_beat {
-                break;
-            }
-            if evt.is_gate {
-                ctx.playing_notes[evt.note as usize] = true;
-                unsafe { play_note(module_ix, evt.note) };
-            } else {
-                ctx.playing_notes[evt.note as usize] = false;
-                unsafe { release_note(module_ix, evt.note) };
-            }
-
-            ctx.next_evt_ix = if next_evt_ix + 1 < active_bank.events.len() {
-                Some(next_evt_ix + 1)
-            } else {
-                None
-            };
-        }
-
-        ctx.last_beat = loop_beat;
+        let module_phase = process_looper_module(cur_beat, module_ix, ctx);
         if module_ix == module_ix_for_which_to_report_phase {
-            phase = loop_beat / active_bank.len_beats;
+            phase = module_phase;
         }
     }
 
     phase
+}
+
+#[no_mangle]
+pub extern "C" fn looper_delete_module(module_ix: usize) {
+    if ctxs().len() <= module_ix {
+        return;
+    }
+    ctxs().remove(module_ix);
+}
+
+#[no_mangle]
+pub extern "C" fn looper_set_loop_len_beats(module_ix: usize, bank_ix: usize, len_beats: f32) {
+    let ctx = ctx(module_ix);
+
+    while ctx.banks.len() <= bank_ix {
+        ctx.banks.push(Default::default());
+    }
+
+    let bank = &mut ctx.banks[bank_ix];
+    bank.len_beats = len_beats;
 }

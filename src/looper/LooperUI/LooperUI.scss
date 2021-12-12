@@ -42,11 +42,24 @@
 
   .looper-module-info {
     display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+
+    .delete-looper-module-button {
+      height: 24px;
+      width: 24px;
+      margin-right: 4px;
+      color: #991111;
+      font-size: 24px;
+      line-height: 10px;
+      padding: 0;
+    }
 
     h2 {
       display: flex;
       padding: 2px 4px;
-      margin: 0px 2px 6px 0px;
+      margin: 0;
       font-size: 20px;
       font-weight: bold;
       border: 1px solid #666;
@@ -57,7 +70,6 @@
     input[type='text'] {
       display: flex;
       padding: 2px 4px;
-      margin: 0px 2px 6px 2px;
       font-size: 20px;
       height: 24px;
     }
@@ -76,17 +88,61 @@
 
       .looper-bank {
         display: grid;
-        grid-template-columns: 0 400px 0.2fr 1fr;
+        grid-template-columns: 0 400px 0.3fr 0.3fr 1fr;
         border-bottom: 1px solid black;
+        max-height: 100px;
+        overflow-y: hidden;
 
         .active-composition-name {
+          border-right: 1px solid #555;
+        }
+
+        .loop-length {
+          justify-content: space-between;
+
+          .loop-length-value {
+            padding: 2px 4px;
+            font-weight: bold;
+            border: 1px solid #666;
+            background-color: #121212;
+          }
+
+          input[type='text'] {
+            box-sizing: border-box;
+            width: 100%;
+            height: 26px;
+            margin-top: 8px;
+            padding: 4px 8px;
+            background-color: #121212;
+          }
+
+          > div {
+            display: flex;
+            flex-direction: column;
+          }
+        }
+
+        .active-composition-name,
+        .loop-length {
+          padding: 2px 8px;
+          display: flex;
+          flex-direction: column;
+          cursor: pointer;
           text-align: center;
           font-size: 13.5px;
           color: #cccccc88;
+          user-select: none;
+
+          * {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
 
           b {
+            margin-top: 4px;
             color: #cccccc;
-            font-size: 16px;
+            font-size: 15px;
           }
         }
 
@@ -101,6 +157,7 @@
           padding: 0;
           font-size: 18px;
           line-height: 0;
+          user-select: none;
         }
 
         .looper-viz {
@@ -108,10 +165,20 @@
           margin-bottom: auto;
           display: block;
         }
+
+        .control-panel,
+        .looper-viz,
+        .active-composition-name {
+          cursor: pointer;
+        }
       }
 
       .looper-bank[data-active='true'] {
         background-color: rgba(62, 192, 231, 0.4);
+
+        .control-panel {
+          background-color: rgba(35, 35, 35, 0.8) !important;
+        }
       }
     }
   }

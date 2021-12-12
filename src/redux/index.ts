@@ -3,7 +3,6 @@ import { reducer as formReducer } from 'redux-form';
 
 import viewContextManagerModule from 'src/redux/modules/viewContextManager';
 import midiKeyboardModule from 'src/redux/modules/midiKeyboard';
-import effectsModule from 'src/redux/modules/effects';
 import presetsModule, {
   fetchSynthPresets,
   fetchSynthVoicePresets,
@@ -21,7 +20,6 @@ import genericPresetPickerSlice, {
 const modules = {
   viewContextManager: viewContextManagerModule,
   midiKeyboard: midiKeyboardModule,
-  effects: effectsModule,
   presets: presetsModule,
   controlPanel: controlPanelModule,
   equalizer: equalizerModule,

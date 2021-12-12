@@ -11,6 +11,7 @@ export interface LooperBank {
   id: string;
   loadedComposition: SavedMIDIComposition | null;
   lenBeats: number;
+  compositionLenBeats: number | null;
 }
 
 export interface LooperModule {
@@ -50,6 +51,7 @@ const buildDefaultLooperBank = (): LooperBank => ({
   id: genRandomStringID(),
   loadedComposition: null,
   lenBeats: 8,
+  compositionLenBeats: null,
 });
 
 const buildDefaultLooperModule = (moduleIx: number): LooperModule => ({
@@ -69,8 +71,18 @@ const buildDefaultLooperState = (): LooperState => ({
   stateByVcId: {},
 });
 
-const updateLooperConnectables = (vcId: string) =>
-  setTimeout(() => updateConnectables(vcId, get_looper_audio_connectables(vcId)));
+const updateLooperConnectables = (vcId: string, afterUpdateConnectables?: () => void) =>
+  setTimeout(() => {
+    updateConnectables(vcId, get_looper_audio_connectables(vcId));
+    afterUpdateConnectables?.();
+  });
+
+const computeCompositionLenBeats = (composition: SavedMIDIComposition): number =>
+  composition.composition.lines.reduce(
+    (acc, line) =>
+      line.notes.reduce((acc, event) => Math.max(acc, event.startPoint + event.length), acc),
+    0
+  );
 
 const looperSlice = createSlice({
   name: 'looper',
@@ -92,8 +104,16 @@ const looperSlice = createSlice({
         payload: { vcId, moduleIx, bankId },
       }: PayloadAction<{ vcId: string; moduleIx: number; bankId: string }>
     ) => {
-      const modulestate = state.stateByVcId[vcId].modules[moduleIx];
-      modulestate.banks = modulestate.banks.filter(bank => bank.id !== bankId);
+      const instState = state.stateByVcId[vcId];
+      const moduleState = instState.modules[moduleIx];
+      const bankIx = moduleState.banks.findIndex(bank => bank.id === bankId);
+      const isActive = moduleState.activeBankIx === bankIx;
+      moduleState.banks = moduleState.banks.filter(bank => bank.id !== bankId);
+      if (isActive) {
+        moduleState.activeBankIx = null;
+        instState.looperNode.setActiveBankIx(moduleIx, null);
+        instState.looperNode.setCompositionForBank(moduleIx, bankIx, null, 8);
+      }
     },
     setLoadedComposition: (
       state,
@@ -109,12 +129,24 @@ const looperSlice = createSlice({
       const instState = state.stateByVcId[vcId];
       const modulestate = instState.modules[moduleIx];
       modulestate.banks[bankIx].loadedComposition = composition;
+      modulestate.banks[bankIx].compositionLenBeats = computeCompositionLenBeats(composition);
       instState.looperNode.setCompositionForBank(
         moduleIx,
         bankIx,
         composition,
         modulestate.banks[bankIx].lenBeats
       );
+    },
+    setLoopLenBeats: (
+      state,
+      {
+        payload: { vcId, moduleIx, bankIx, lenBeats },
+      }: PayloadAction<{ vcId: string; moduleIx: number; bankIx: number; lenBeats: number }>
+    ) => {
+      const instState = state.stateByVcId[vcId];
+      const modulestate = instState.modules[moduleIx];
+      modulestate.banks[bankIx].lenBeats = lenBeats;
+      instState.looperNode.setLoopLenBeats(moduleIx, bankIx, lenBeats);
     },
     setActiveBankIx: (
       state,
@@ -160,7 +192,14 @@ const looperSlice = createSlice({
     addModule: (state, action: PayloadAction<{ vcId: string }>) => {
       const instState = state.stateByVcId[action.payload.vcId];
       const newModuleIx = instState.modules.length;
-      instState.modules.push(buildDefaultLooperModule(newModuleIx));
+      const newModule = buildDefaultLooperModule(newModuleIx);
+      let i = 1;
+      while (instState.modules.some(module => module.name === newModule.name)) {
+        newModule.name = `${newModule.name}_${i}`;
+        i++;
+      }
+
+      instState.modules.push(newModule);
       instState.looperNode.setActiveModuleIx(newModuleIx);
       instState.activeModuleIx = newModuleIx;
 
@@ -168,8 +207,16 @@ const looperSlice = createSlice({
     },
     removeModule: (state, action: PayloadAction<{ vcId: string; moduleIx: number }>) => {
       const instState = state.stateByVcId[action.payload.vcId];
+      const moduleToDelete = instState.modules[action.payload.moduleIx];
+      if (!moduleToDelete) {
+        return;
+      }
 
       instState.modules.splice(action.payload.moduleIx, 1);
+
+      // This has the effect of shifting down modules in the backend, so states should match
+      instState.looperNode.deleteModule(instState.modules.length);
+
       if (instState.modules.length <= 1) {
         updateLooperConnectables(action.payload.vcId);
         return;
@@ -190,13 +237,18 @@ const looperSlice = createSlice({
     setModuleName: (
       state,
       {
-        payload: { vcId, moduleIx, name },
-      }: PayloadAction<{ vcId: string; moduleIx: number; name: string }>
+        payload: { vcId, moduleIx, name, afterUpdateConnectables },
+      }: PayloadAction<{
+        vcId: string;
+        moduleIx: number;
+        name: string;
+        afterUpdateConnectables?: () => void;
+      }>
     ) => {
       const instState = state.stateByVcId[vcId];
       instState.modules[moduleIx].name = name;
 
-      updateLooperConnectables(vcId);
+      updateLooperConnectables(vcId, afterUpdateConnectables);
     },
   },
 });

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
@@ -23,12 +23,80 @@ import {
   saveLooperPreset,
 } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { ConnectableDescriptor } from 'src/patchNetwork/patchNetwork';
+import { connect } from 'src/patchNetwork/interface';
 
 const DeleteBankButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button className='delete-looper-bank-button' onClick={onClick}>
     ×
   </button>
 );
+
+interface LoopLengthProps {
+  vcId: string;
+  moduleIx: number;
+  bankIx: number;
+  loopLenBeats: number;
+  compositionLenBeats: number | null;
+}
+
+const LoopLength: React.FC<LoopLengthProps> = ({
+  vcId,
+  moduleIx,
+  bankIx,
+  loopLenBeats,
+  compositionLenBeats,
+}) => {
+  const [editingValue, setEditingValue] = useState<string | null>(null);
+
+  return (
+    <div className='loop-length'>
+      <div>
+        <div>Loop Length:</div>
+        {editingValue === null ? (
+          <b className='loop-length-value' onDoubleClick={() => setEditingValue(`${loopLenBeats}`)}>
+            {loopLenBeats} Beats
+          </b>
+        ) : (
+          <input
+            type='text'
+            value={editingValue}
+            onChange={e => setEditingValue(e.target.value)}
+            ref={input => input?.focus()}
+            onKeyDown={evt => {
+              if (evt.key === 'Enter') {
+                const lenBeats = +editingValue;
+                if (isNaN(lenBeats)) {
+                  alert('Please enter a number');
+                  return;
+                }
+
+                looperDispatch(
+                  looperActions.setLoopLenBeats({
+                    vcId,
+                    moduleIx,
+                    bankIx,
+                    lenBeats,
+                  })
+                );
+
+                setEditingValue(null);
+              } else if (evt.key === 'Escape') {
+                setEditingValue(null);
+              }
+            }}
+          />
+        )}
+      </div>
+      <div>
+        <div>Composition Length:</div>
+        <b style={{ marginTop: 0 }}>
+          {R.isNil(compositionLenBeats) ? '-' : `${compositionLenBeats} Beats`}
+        </b>
+      </div>
+    </div>
+  );
+};
 
 interface LooperBankCompProps {
   vcId: string;
@@ -75,12 +143,43 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
   );
 
   return (
-    <div className='looper-bank' data-active={`${isActive}`}>
+    <div
+      className='looper-bank'
+      data-active={`${isActive}`}
+      onClick={evt => {
+        if (!evt.target) {
+          return;
+        }
+        const target = evt.target as HTMLElement;
+        if (target.classList.contains('loop-length-value')) {
+          return;
+        }
+
+        if (
+          Array.from(target.classList || []).some(cls =>
+            [
+              'looper-viz',
+              'control-panel',
+              'draggable',
+              'active-composition-name',
+              'loop-length',
+            ].includes(cls)
+          ) ||
+          Array.from(target.parentElement?.classList ?? []).some(cls =>
+            ['active-composition-name', 'loop-length'].includes(cls)
+          )
+        ) {
+          looperDispatch(looperActions.setActiveBankIx({ moduleIx, vcId, bankIx }));
+        }
+      }}
+    >
       {isLast ? (
         <div style={{ position: 'relative', background: 'red' }}>
           <DeleteBankButton
             onClick={() => {
-              const proceed = window.confirm('Are you sure you want to delete this bank?');
+              const proceed =
+                !bank.loadedComposition ||
+                window.confirm('Are you sure you want to delete this bank?');
               if (!proceed) {
                 return;
               }
@@ -89,14 +188,21 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
           />
         </div>
       ) : (
+        // Still need to render a div for css grid layout
         <div />
       )}
       <ControlPanel width={400} settings={settings} />
       <div className='active-composition-name'>
-        Loaded Sequence:
-        <br />
+        <div>Loaded Sequence:</div>
         <b>{bank.loadedComposition ? bank.loadedComposition.name : 'NONE'}</b>
       </div>
+      <LoopLength
+        vcId={vcId}
+        loopLenBeats={bank.lenBeats}
+        compositionLenBeats={bank.compositionLenBeats}
+        moduleIx={moduleIx}
+        bankIx={bankIx}
+      />
       <div>
         {phaseSAB ? (
           <LooperViz vcId={vcId} bankIx={bankIx} phaseSAB={phaseSAB} width={500} height={100} />
@@ -113,7 +219,7 @@ interface LooperMainControlPanelProps {
   moduleIx: number;
 }
 
-const LooperMainControlPanel: React.FC<LooperMainControlPanelProps> = ({ vcId, moduleIx }) => {
+const AddBankControlPanel: React.FC<LooperMainControlPanelProps> = ({ vcId, moduleIx }) => {
   const settings = useMemo(
     () => [
       {
@@ -280,23 +386,63 @@ interface ModuleInfoProps {
   vcId: string;
   name: string;
   moduleIx: number;
+  totalModuleCount: number;
 }
 
-const ModuleInfo: React.FC<ModuleInfoProps> = ({ name, moduleIx, vcId }) => {
+const ModuleInfo: React.FC<ModuleInfoProps> = ({ name, moduleIx, vcId, totalModuleCount }) => {
   const [editingName, setEditingName] = useState<string | null>(null);
+  useEffect(() => setEditingName(null), [moduleIx]);
 
   return (
     <div className='looper-module-info'>
+      {totalModuleCount > 1 ? (
+        <button
+          className='delete-looper-module-button'
+          onClick={() => {
+            const shouldDelete =
+              getState().looper.stateByVcId[vcId].modules[moduleIx].banks.every(
+                bank => !bank.loadedComposition
+              ) || window.confirm(`Are you sure you want to delete module ${name}?`);
+            if (!shouldDelete) {
+              return;
+            }
+
+            looperDispatch(looperActions.removeModule({ vcId, moduleIx }));
+          }}
+        >
+          ×
+        </button>
+      ) : null}
       {editingName === null ? (
         <h2 onDoubleClick={() => setEditingName(name)}>{name}</h2>
       ) : (
         <input
+          ref={input => input?.focus()}
           type='text'
           value={editingName}
           onChange={evt => setEditingName(evt.target.value)}
           onKeyDown={evt => {
             if (evt.key === 'Enter') {
-              looperDispatch(looperActions.setModuleName({ vcId, moduleIx, name: editingName }));
+              // Re-connect everything previously connected the old name to the new name
+              const allConnectedDestinations =
+                getState().viewContextManager.patchNetwork.connections.filter(
+                  ([from, _to]) => from.vcId === vcId && from.name === name
+                );
+
+              looperDispatch(
+                looperActions.setModuleName({
+                  vcId,
+                  moduleIx,
+                  name: editingName,
+                  afterUpdateConnectables: () => {
+                    const newFromDescriptor: ConnectableDescriptor = { vcId, name: editingName };
+                    allConnectedDestinations.forEach(([_from, to]) =>
+                      connect(newFromDescriptor, to)
+                    );
+                  },
+                })
+              );
+
               setEditingName(null);
             } else if (evt.key === 'Escape') {
               setEditingName(null);
@@ -313,21 +459,30 @@ export interface LooperUIProps {
 }
 
 const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
-  const { activeModule, activeModuleIx, phaseSAB } = useSelector((state: ReduxStore) => {
-    const instState = state.looper.stateByVcId[vcId];
+  const { activeModule, activeModuleIx, phaseSAB, totalModuleCount } = useSelector(
+    (state: ReduxStore) => {
+      const instState = state.looper.stateByVcId[vcId];
 
-    return {
-      ...R.pick(['activeModuleIx', 'phaseSAB'], instState),
-      activeModule: instState.modules[instState.activeModuleIx] as LooperModule | undefined,
-    };
-  }, shallowEqual);
+      return {
+        ...R.pick(['activeModuleIx', 'phaseSAB'], instState),
+        activeModule: instState.modules[instState.activeModuleIx] as LooperModule | undefined,
+        totalModuleCount: instState.modules.length,
+      };
+    },
+    shallowEqual
+  );
 
   return (
     <div className='looper'>
       <LooperTabSwitcher vcId={vcId} activeSubModuleIx={activeModuleIx} />
       <div className='looper-banks-wrapper'>
         {activeModule ? (
-          <ModuleInfo name={activeModule.name} vcId={vcId} moduleIx={activeModuleIx} />
+          <ModuleInfo
+            name={activeModule.name}
+            vcId={vcId}
+            moduleIx={activeModuleIx}
+            totalModuleCount={totalModuleCount}
+          />
         ) : null}
         <div className='looper-banks'>
           {activeModule?.banks.map((bank, bankIx) => (
@@ -342,9 +497,8 @@ const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
               moduleIx={activeModuleIx}
             />
           )) ?? null}
+          {activeModule ? <AddBankControlPanel moduleIx={activeModuleIx} vcId={vcId} /> : null}
         </div>
-
-        <LooperMainControlPanel moduleIx={activeModuleIx} vcId={vcId} />
       </div>
     </div>
   );

@@ -32,7 +32,7 @@ class LooperAWP extends AudioWorkletProcessor {
         this.wasmInstance.exports.looper_activate_bank(
           data.moduleIx,
           data.bankIx ?? -1,
-          globalThis.curBeat
+          globalThis.globalBeatCounterStarted ? globalThis.curBeat : -1
         );
         break;
       }
@@ -55,8 +55,20 @@ class LooperAWP extends AudioWorkletProcessor {
         this.wasmInstance.exports.looper_finalize_bank(moduleIx, bankIx, lenBeats);
         break;
       }
+      case 'setLoopLenBeats': {
+        this.wasmInstance.exports.looper_set_loop_len_beats(
+          data.moduleIx,
+          data.bankIx,
+          data.lenBeats
+        );
+        break;
+      }
       case 'setActiveModuleIx': {
         this.moduleIxForWhichToReportPhase = data.moduleIx;
+        break;
+      }
+      case 'deleteModule': {
+        this.wasmInstance.exports.looper_delete_module(data.moduleIx);
         break;
       }
       default: {
@@ -84,7 +96,7 @@ class LooperAWP extends AudioWorkletProcessor {
   }
 
   process(_inputs, _outputs, _params) {
-    if (!this.wasmInstance || globalThis.curBeat === 0) {
+    if (!this.wasmInstance || !globalThis.globalBeatCounterStarted) {
       if (this.wasmInstance && !this.didReleaseAfterStop) {
         this.wasmInstance.exports.looper_on_playback_stop();
         if (this.curPhaseBuffer) {

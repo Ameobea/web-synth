@@ -1844,11 +1844,11 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
 
     voice.gain_envelope.gate();
 
-    // for operator in &mut voice.operators {
-    //     // TODO: Make the way this is produced configurable
-    //     let initial_phases = &[0.];
-    //     operator.oscillator_source.set_phase(initial_phases);
-    // }
+    for operator in &mut voice.operators {
+        // TODO: Make the way this is produced configurable
+        let initial_phases = &[0.];
+        operator.oscillator_source.set_phase(initial_phases);
+    }
 }
 
 #[no_mangle]

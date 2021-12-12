@@ -1,22 +1,24 @@
-import React, { useState, Suspense, useMemo, useRef, useEffect } from 'react';
-import { Provider, useSelector } from 'react-redux';
-import ControlPanel, { Button, Custom } from 'react-control-panel';
+import React, { useState, Suspense, useMemo, useRef, useEffect, useCallback } from 'react';
+import { shallowEqual, useSelector } from 'react-redux';
+import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
-import { Without, PropTypesOf, ValueOf, filterNils } from 'ameo-utils';
+import { Without, ValueOf, filterNils, useWindowSize } from 'ameo-utils';
 
 import { Effect } from 'src/redux/modules/effects';
-import { EffectPickerCustomInput } from 'src/controls/faustEditor';
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
-import { faustEditorContextMap, get_faust_editor_connectables } from 'src/faustEditor';
+import {
+  faustEditorContextMap,
+  FaustEditorReduxInfra,
+  get_faust_editor_connectables,
+} from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { ReduxStore, store } from 'src/redux';
-import { saveEffect } from 'src/api';
+import { fetchEffects, saveEffect } from 'src/api';
 import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
-// import PolyphonyControls from './PolyphonyControls';
-// import { FaustEditorPolyphonyState } from 'src/redux/modules/faustEditor';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 
 type FaustEditorReduxStore = ReturnType<typeof faustEditorContextMap.key.reduxInfra.getState>;
 
@@ -45,10 +47,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundColor: 'rgba(44,44,44,0.3)',
     maxWidth: 'calc(50vw - 40px)',
   },
-  bottomContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    padding: 8,
+  controlPanel: {
+    position: 'absolute',
+  },
+  spectrumVizStyle: {
+    marginBottom: -23,
   },
 };
 
@@ -103,80 +106,6 @@ export const compileSoulInstance = async (
   return buildSoulWorkletNode(ctx, wasmInstanceArrayBuffer, moduleID, context);
 };
 
-/**
- * Creates a control panel that contains controls for browsing + loading shared/saved effects
- */
-const EffectsPickerPanelInner: React.FC<{
-  state: { [key: string]: any };
-  setState: (newState: any) => void;
-  loadEffect: (effect: Effect) => void;
-}> = ({ state, setState, loadEffect }) => {
-  const effects = useSelector(({ effects: { sharedEffects } }: ReduxStore) => sharedEffects);
-
-  return (
-    <ControlPanel
-      state={state}
-      onChange={(_label: string, _newValue: any, newState: any) => setState(newState)}
-      position={{ bottom: 60, right: 44 }}
-      draggable
-    >
-      <Custom label='load program' renderContainer Comp={EffectPickerCustomInput} />
-      <Button
-        label='Load'
-        action={() => loadEffect(effects.find(R.propEq('id', state['load program']))!)}
-      />
-    </ControlPanel>
-  );
-};
-
-const EffectsPickerPanel: React.FC<PropTypesOf<typeof EffectsPickerPanelInner>> = ({
-  ...props
-}) => (
-  <Provider store={store}>
-    <EffectsPickerPanelInner {...props} />
-  </Provider>
-);
-
-const SaveControls = ({ editorContent }: { editorContent: string }) => {
-  const initialState = { title: '', description: '', saveStatus: '' };
-  const [state, setState] = useState(initialState);
-
-  const saveCode = async (effect: Without<Effect, 'id'>) => {
-    try {
-      await saveEffect(effect);
-      setState({ ...initialState, saveStatus: 'Successfully saved!' });
-    } catch (err) {
-      console.error('Error saving effect: ', err);
-    }
-  };
-
-  return (
-    <div>
-      <h2>Save Program</h2>
-
-      <p>
-        Title{' '}
-        <input
-          type='text'
-          value={state.title}
-          onChange={evt => setState({ ...state, title: evt.target.value })}
-        />
-      </p>
-
-      <p>
-        Description{' '}
-        <textarea
-          value={state.description}
-          onChange={evt => setState({ ...state, description: evt.target.value })}
-        />
-      </p>
-
-      <button onClick={() => saveCode({ code: editorContent, ...state })}>Save</button>
-      {state.saveStatus}
-    </div>
-  );
-};
-
 type CodeCompiler = (
   code: string,
   optimize: boolean,
@@ -185,29 +114,26 @@ type CodeCompiler = (
 
 export const mkCompileButtonClickHandler =
   ({
-    code,
-    optimize,
     setErrMessage,
     vcId,
     analyzerNode,
     compiler = compileFaustInstance,
   }: {
-    code: string;
-    optimize: boolean;
     setErrMessage: (errMsg: string) => void;
     vcId: string;
     analyzerNode: AnalyserNode;
     compiler?: CodeCompiler;
   }) =>
-  async () => {
+  async (): Promise<boolean> => {
     const context = faustEditorContextMap[vcId];
     let codeNode: DynamicCodeWorkletNode;
     try {
-      codeNode = await compiler(code, optimize, context);
+      const { editorContent: code, optimize } = context.reduxInfra.getState().faustEditor;
+      codeNode = await compiler(code, optimize ?? false, context);
     } catch (err) {
       console.error(err);
       setErrMessage(`${err}`);
-      return;
+      return false;
     }
     setErrMessage('');
 
@@ -218,7 +144,8 @@ export const mkCompileButtonClickHandler =
 
     codeNode.connect(analyzerNode);
 
-    faustEditorContextMap[vcId] = { ...context, analyzerNode, faustNode: codeNode };
+    faustEditorContextMap[vcId].analyzerNode = analyzerNode;
+    faustEditorContextMap[vcId].faustNode = codeNode;
     context.reduxInfra.dispatch(
       context.reduxInfra.actionCreators.faustEditor.SET_CACHED_INPUT_NAMES(
         settings.map(R.prop('label')) as string[]
@@ -232,81 +159,213 @@ export const mkCompileButtonClickHandler =
     context.reduxInfra.dispatch(
       context.reduxInfra.actionCreators.faustEditor.SET_FAUST_INSTANCE(codeNode, vcId)
     );
+    return true;
   };
 
 /**
  * Returns a function that stops the currently running Faust editor instance, setting Redux and `faustEditorContextMap`
  * to reflect this new state;
  */
-export const mkStopInstanceHandler =
-  ({ vcId, context }: { vcId: string; context: ValueOf<typeof faustEditorContextMap> }) =>
-  () => {
-    context.reduxInfra.dispatch(
-      context.reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
+export const mkStopInstanceHandler = (vcId: string) => () => {
+  const context = faustEditorContextMap[vcId];
+  context.reduxInfra.dispatch(
+    context.reduxInfra.actionCreators.faustEditor.CLEAR_ACTIVE_INSTANCE()
+  );
+
+  // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
+  if (!context.faustNode) {
+    throw new Error(
+      `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
     );
+  }
+  context.faustNode.disconnect(context.analyzerNode);
+  context.faustNode.shutdown();
+  delete context.faustNode;
 
-    // Disconnect the internal connection between the nodes so that the nodes can be garbage collected
-    if (!context.faustNode) {
-      throw new Error(
-        `\`faustNode\` should have been set by now since the Faust editor is now being stopped for vcId ${vcId} but they haven't`
-      );
-    }
-    context.faustNode.disconnect(context.analyzerNode);
-    context.faustNode.shutdown();
-    delete context.faustNode;
+  context.paramDefaultValues = Object.fromEntries(
+    Object.entries(context.overrideableParams).map(([address, param]) => [
+      address,
+      param.manualControl.offset.value,
+    ])
+  );
 
-    context.paramDefaultValues = Object.fromEntries(
-      Object.entries(context.overrideableParams).map(([address, param]) => [
-        address,
-        param.manualControl.offset.value,
-      ])
-    );
+  // Create new audio connectables using a passthrough node
+  updateConnectables(vcId, get_faust_editor_connectables(vcId));
+  context.overrideableParams = {};
+};
 
-    // Create new audio connectables using a passthrough node
-    updateConnectables(vcId, get_faust_editor_connectables(vcId));
-    context.overrideableParams = {};
-  };
+const buildFaustEditorControlPanelSettings = ({
+  isRunning,
+  language,
+  stopInstance,
+  compile,
+  reduxInfra,
+  saveCode,
+}: {
+  isRunning: boolean;
+  language: string;
+  stopInstance: () => void;
+  compile: () => void;
+  reduxInfra: FaustEditorReduxInfra;
+  saveCode: (args: { code: string; title: string; description: string }) => void;
+}) =>
+  filterNils([
+    { type: 'select', label: 'language', options: ['faust', 'soul'] },
+    {
+      type: 'button',
+      label: isRunning ? 'stop' : 'compile',
+      action: isRunning ? stopInstance : compile,
+    },
+    language === 'faust' ? { type: 'checkbox', label: 'optimize' } : null,
+    {
+      type: 'button',
+      label: 'save program',
+      action: async () => {
+        try {
+          const { name, description } = await renderGenericPresetSaverWithModal({
+            description: true,
+          });
+          const code = reduxInfra.getState().faustEditor.editorContent;
+          saveCode({ code, title: name, description: description ?? '' });
+        } catch (_err) {
+          // pass
+        }
+      },
+    },
+    {
+      type: 'button',
+      label: 'load program',
+      action: async () => {
+        try {
+          const { preset: effect } = await pickPresetWithModal(async () => {
+            const effects = await fetchEffects();
+            return effects.map(effect => ({
+              id: effect.id,
+              name: effect.title,
+              description: effect.description,
+              preset: effect,
+            }));
+          });
+          reduxInfra.dispatch(
+            reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
+          );
+        } catch (err) {
+          // pass
+        }
+      },
+    },
+  ]);
 
-const FaustEditor: React.FC<{
+interface FaustEditorControlPanelProps {
   vcId: string;
-}> = ({ vcId }) => {
+  compile: () => Promise<boolean>;
+}
+
+const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({ vcId, compile }) => {
+  const context = faustEditorContextMap[vcId];
+  const [isRunning, setIsRunning] = useState(!!context.faustNode);
+  const { language, optimize } = useSelector(
+    ({ faustEditor }: FaustEditorReduxStore) => R.pick(['language', 'optimize'], faustEditor),
+    shallowEqual
+  );
+
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const stopInstance = useMemo(() => mkStopInstanceHandler(vcId), [vcId]);
+  const saveCode = useCallback(async (effect: Without<Effect, 'id'>) => {
+    try {
+      await saveEffect(effect);
+      setSaveStatus('Successfully saved!');
+    } catch (err) {
+      console.error('Error saving effect: ', err);
+    }
+  }, []);
+
+  const settings = useMemo(
+    () =>
+      buildFaustEditorControlPanelSettings({
+        isRunning,
+        language,
+        stopInstance: () => {
+          setIsRunning(false);
+          stopInstance();
+        },
+        compile: () => {
+          compile()
+            .then(setIsRunning)
+            .catch(() => setIsRunning(false));
+        },
+        saveCode,
+        reduxInfra: context.reduxInfra,
+      }),
+    [compile, context.reduxInfra, isRunning, language, saveCode, stopInstance]
+  );
+
+  const onChange = useCallback(
+    (key: string, val: any) => {
+      switch (key) {
+        case 'language': {
+          context.reduxInfra.dispatch(
+            context.reduxInfra.actionCreators.faustEditor.SET_CODE_EDITOR_LANGUAGE(val)
+          );
+          break;
+        }
+        case 'optimize': {
+          context.reduxInfra.dispatch(
+            context.reduxInfra.actionCreators.faustEditor.FAUST_EDITOR_TOGGLE_OPTIMIZE()
+          );
+          break;
+        }
+        default: {
+          console.error('Unhandled key in faust editor settings: ', key);
+        }
+      }
+    },
+    [context.reduxInfra]
+  );
+  const controlPanelState = useMemo(
+    () => ({ language, optimize: language === 'faust' && optimize }),
+    [language, optimize]
+  );
+
+  return (
+    <>
+      <ControlPanel
+        state={controlPanelState}
+        onChange={onChange}
+        settings={settings}
+        style={styles.controlPanel}
+      />
+      {saveStatus ? <>{saveStatus}</> : null}
+    </>
+  );
+};
+
+const FaustEditor: React.FC<{ vcId: string }> = ({ vcId }) => {
   const {
-    instance,
     ControlPanelComponent: FaustInstanceControlPanelComponent,
     editorContent,
     isHidden,
-    // polyphonyState,
     language,
-  } = useSelector(({ faustEditor }: FaustEditorReduxStore) =>
-    R.pick(
-      [
-        'instance',
-        'ControlPanelComponent',
-        'editorContent',
-        'isHidden',
-        'polyphonyState',
-        'language',
-      ],
-      faustEditor
-    )
+  } = useSelector(
+    ({ faustEditor }: FaustEditorReduxStore) =>
+      R.pick(['ControlPanelComponent', 'editorContent', 'isHidden', 'language'], faustEditor),
+    shallowEqual
   );
-  const [optimize, setOptimize] = useState(true);
-  const [compileErrMsg, setCompileErrMsg] = useState('');
-  const [controlPanelState, setControlPanelState] = useState<{ [key: string]: any }>({});
-  const context = faustEditorContextMap[vcId];
+  const windowSize = useWindowSize();
 
+  const [compileErrMsg, setCompileErrMsg] = useState('');
+  const context = faustEditorContextMap[vcId];
   const compile = useMemo(
     () =>
       mkCompileButtonClickHandler({
-        code: editorContent,
-        optimize,
         setErrMessage: setCompileErrMsg,
         vcId,
         analyzerNode: context.analyzerNode,
         compiler: language === 'faust' ? compileFaustInstance : compileSoulInstance,
       }),
-    [context.analyzerNode, editorContent, language, optimize, vcId]
+    [context.analyzerNode, language, vcId]
   );
+
   const didCompileOnMount = useRef(false);
   useEffect(() => {
     if (context.compileOnMount && !didCompileOnMount.current) {
@@ -315,75 +374,33 @@ const FaustEditor: React.FC<{
     }
   }, [compile, context.compileOnMount]);
 
-  const stopInstance = useMemo(() => mkStopInstanceHandler({ vcId, context }), [context, vcId]);
-
   return (
     <Suspense fallback={<span>Loading...</span>}>
       <div style={styles.root}>
         <CodeEditor
-          onChange={newValue =>
-            context.reduxInfra.dispatch(
-              context.reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue)
-            )
-          }
+          onChange={useCallback(
+            newValue =>
+              context.reduxInfra.dispatch(
+                context.reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(newValue)
+              ),
+            [context.reduxInfra]
+          )}
           value={editorContent}
         />
 
         <div style={styles.errorConsole}>{compileErrMsg}</div>
       </div>
-      <ControlPanel
-        state={{ language, optimize: language === 'faust' && optimize }}
-        onChange={(key: string, val: any) => {
-          switch (key) {
-            case 'language': {
-              context.reduxInfra.dispatch(
-                context.reduxInfra.actionCreators.faustEditor.SET_CODE_EDITOR_LANGUAGE(val)
-              );
-              break;
-            }
-            case 'optimize': {
-              setOptimize(!optimize);
-              break;
-            }
-            default: {
-              console.error('Unhandled key in faust editor settings: ', key);
-            }
-          }
-        }}
-        settings={filterNils([
-          { type: 'select', label: 'language', options: ['faust', 'soul'] },
-          {
-            type: 'button',
-            label: instance ? 'stop' : 'compile',
-            action: instance ? stopInstance : compile,
-          },
-          language === 'faust' ? { type: 'checkbox', label: 'optimize' } : null,
-        ])}
+      <FaustEditorControlPanel vcId={vcId} compile={compile} />
+
+      {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
+
+      <SpectrumVisualization
+        paused={isHidden}
+        analyzerNode={context.analyzerNode}
+        height={windowSize.height - 34 - 500 - 2}
+        canvasStyle={styles.spectrumVizStyle}
+        controlPanelDraggable={false}
       />
-      <div style={styles.bottomContent}>
-        {/* <PolyphonyControls
-          state={polyphonyState}
-          setState={(newState: FaustEditorPolyphonyState) =>
-            reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_POLYPHONY_STATE(newState))
-          }
-        /> */}
-
-        <SaveControls editorContent={editorContent} />
-
-        {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
-
-        <EffectsPickerPanel
-          state={controlPanelState}
-          setState={setControlPanelState}
-          loadEffect={(effect: Effect) =>
-            context.reduxInfra.dispatch(
-              context.reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
-            )
-          }
-        />
-      </div>
-
-      <SpectrumVisualization paused={isHidden} analyzerNode={context.analyzerNode} />
     </Suspense>
   );
 };

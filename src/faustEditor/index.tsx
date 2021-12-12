@@ -20,17 +20,18 @@ const buildRootNodeId = (vcId: string) => `faust-editor-react-root_${vcId}`;
 
 export type FaustEditorReduxInfra = ReturnType<typeof buildFaustEditorReduxInfra>;
 
-export const faustEditorContextMap: {
-  [vcId: string]: {
-    reduxInfra: FaustEditorReduxInfra;
-    analyzerNode: AnalyserNode;
-    faustNode?: DynamicCodeWorkletNode;
-    overrideableParams: { [key: string]: OverridableAudioParam };
-    isHidden: boolean;
-    paramDefaultValues: { [paramName: string]: number };
-    compileOnMount: boolean;
-  };
-} = {};
+interface FaustEditorCtx {
+  reduxInfra: FaustEditorReduxInfra;
+  analyzerNode: AnalyserNode;
+  faustNode?: DynamicCodeWorkletNode;
+  overrideableParams: { [key: string]: OverridableAudioParam };
+  isHidden: boolean;
+  paramDefaultValues: { [paramName: string]: number };
+  compileOnMount: boolean;
+  optimize?: boolean;
+}
+
+export const faustEditorContextMap: { [vcId: string]: FaustEditorCtx } = {};
 
 const getReduxInfra = (vcId: string) => {
   const context = faustEditorContextMap[vcId];
@@ -151,7 +152,7 @@ export const cleanup_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const instanceCtx = faustEditorContextMap[vcId];
-  const { cachedInputNames, polyphonyState, language } =
+  const { cachedInputNames, polyphonyState, language, optimize } =
     instanceCtx.reduxInfra.getState().faustEditor;
 
   const editorContent = get_faust_editor_content(vcId);
@@ -180,6 +181,7 @@ export const cleanup_faust_editor = (stateKey: string) => {
       : instanceCtx.paramDefaultValues,
     isRunning: !!instanceCtx.faustNode,
     language,
+    optimize,
   };
   localStorage.setItem(stateKey, JSON.stringify(serializedState));
 };
