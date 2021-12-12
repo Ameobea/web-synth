@@ -63,7 +63,7 @@ export const init_looper = (stateKey: string) => {
 
   const onPhaseSABReceived = (phaseSAB: Float32Array) =>
     looperDispatch(looperActions.setPhaseSAB({ vcId, phaseSAB }));
-  const looperNode = new LooperNode(initialState, onPhaseSABReceived);
+  const looperNode = new LooperNode(vcId, initialState, onPhaseSABReceived);
 
   const ctx: LooperCtx = { looperNode };
   LooperCtxsByVcId.set(vcId, ctx);

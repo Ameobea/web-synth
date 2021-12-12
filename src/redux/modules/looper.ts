@@ -14,10 +14,27 @@ export interface LooperBank {
   compositionLenBeats: number | null;
 }
 
+export type LooperTransitionAlgorithm =
+  | { type: 'constant'; bankIx: number }
+  | { type: 'staticPattern'; pattern: number[] };
+
+export interface LooperTransitionAlgorithmUIState {
+  type: LooperTransitionAlgorithm['type'];
+  constant: Record<string, never>;
+  staticPattern: { pattern: string };
+  error?: string | null;
+}
+
+export interface LooperTransitionAlgorithmState {
+  transitionAlgorithm: LooperTransitionAlgorithm;
+  uiState: LooperTransitionAlgorithmUIState;
+}
+
 export interface LooperModule {
   name: string;
   activeBankIx: number | null;
   banks: LooperBank[];
+  transitionAlgorithm: LooperTransitionAlgorithmState;
 }
 
 export interface LooperInstState {
@@ -26,6 +43,7 @@ export interface LooperInstState {
   isHidden: boolean;
   looperNode: LooperNode;
   phaseSAB: Float32Array | null;
+  configureTransitionAlgorithmExpanded: boolean;
 }
 
 export interface LooperState {
@@ -35,11 +53,20 @@ export interface LooperState {
 export interface SerializedLooperInstState {
   modules: LooperModule[];
   activeModuleIx: number;
+  configureTransitionAlgorithmExpanded: boolean;
 }
 
 export const deserializeLooper = (serialized: string): Omit<LooperInstState, 'looperNode'> => {
   const parsed: SerializedLooperInstState = JSON.parse(serialized);
-  return { ...parsed, phaseSAB: null, isHidden: true };
+  return {
+    ...parsed,
+    modules: parsed.modules.map(mod => ({
+      ...mod,
+      transitionAlgorithm: mod.transitionAlgorithm ?? buildDefaultLooperTransitionAlgorithmState(),
+    })),
+    phaseSAB: null,
+    isHidden: true,
+  };
 };
 
 export const serializeLooper = (looperState: LooperInstState): string => {
@@ -54,10 +81,16 @@ const buildDefaultLooperBank = (): LooperBank => ({
   compositionLenBeats: null,
 });
 
+const buildDefaultLooperTransitionAlgorithmState = (): LooperTransitionAlgorithmState => ({
+  transitionAlgorithm: { type: 'constant', bankIx: 0 },
+  uiState: { type: 'constant', constant: {}, staticPattern: { pattern: '' } },
+});
+
 const buildDefaultLooperModule = (moduleIx: number): LooperModule => ({
   name: `Module ${moduleIx + 1}`,
   activeBankIx: null,
   banks: [buildDefaultLooperBank()],
+  transitionAlgorithm: buildDefaultLooperTransitionAlgorithmState(),
 });
 
 export const buildDefaultLooperInstState = (): Omit<LooperInstState, 'looperNode'> => ({
@@ -65,6 +98,7 @@ export const buildDefaultLooperInstState = (): Omit<LooperInstState, 'looperNode
   activeModuleIx: 0,
   phaseSAB: null,
   isHidden: true,
+  configureTransitionAlgorithmExpanded: false,
 });
 
 const buildDefaultLooperState = (): LooperState => ({
@@ -83,6 +117,31 @@ const computeCompositionLenBeats = (composition: SavedMIDIComposition): number =
       line.notes.reduce((acc, event) => Math.max(acc, event.startPoint + event.length), acc),
     0
   );
+
+export const parseLooperTransitionAlgorithmUIState = (
+  uiState: LooperTransitionAlgorithmUIState,
+  activeBankIx: number | null
+): { type: 'success'; value: LooperTransitionAlgorithm } | { type: 'error'; value: string } => {
+  switch (uiState.type) {
+    case 'constant':
+      return { type: 'success', value: { type: 'constant', bankIx: activeBankIx ?? -1 } };
+    case 'staticPattern':
+      let spl = uiState.staticPattern.pattern.split(',').map(v => Number.parseInt(v));
+      if (spl.some(Number.isNaN)) {
+        return {
+          type: 'error',
+          value: 'Static pattern must be a comma-separated list of integers.',
+        };
+      }
+      spl = spl.filter(v => !Number.isNaN(v));
+      if (spl.length === 0) {
+        return { type: 'error', value: 'Static pattern must have at least one bank index' };
+      }
+      return { type: 'success', value: { type: 'staticPattern', pattern: spl.map(Number) } };
+    default:
+      return { type: 'error', value: 'Invalid transition algorithm type' };
+  }
+};
 
 const looperSlice = createSlice({
   name: 'looper',
@@ -151,20 +210,27 @@ const looperSlice = createSlice({
     setActiveBankIx: (
       state,
       {
-        payload: { vcId, moduleIx, bankIx },
-      }: PayloadAction<{ vcId: string; moduleIx: number; bankIx: number | null }>
+        payload: { vcId, moduleIx, bankIx, updateBackend = true },
+      }: PayloadAction<{
+        vcId: string;
+        moduleIx: number;
+        bankIx: number | null;
+        updateBackend?: boolean;
+      }>
     ) => {
       const instState = state.stateByVcId[vcId];
       const modulestate = instState.modules[moduleIx];
       modulestate.activeBankIx = bankIx;
 
-      const isGlobalPlaying = getIsGlobalBeatCounterStarted();
-      if (isGlobalPlaying) {
-        if (bankIx !== null) {
-          instState.looperNode.setNextBankIx(moduleIx, bankIx);
+      if (updateBackend) {
+        const isGlobalPlaying = getIsGlobalBeatCounterStarted();
+        if (isGlobalPlaying) {
+          if (bankIx !== null) {
+            instState.looperNode.setNextBankIx(moduleIx, bankIx);
+          }
+        } else {
+          instState.looperNode.setActiveBankIx(moduleIx, bankIx);
         }
-      } else {
-        instState.looperNode.setActiveBankIx(moduleIx, bankIx);
       }
     },
     setPhaseSAB: (
@@ -249,6 +315,55 @@ const looperSlice = createSlice({
       instState.modules[moduleIx].name = name;
 
       updateLooperConnectables(vcId, afterUpdateConnectables);
+    },
+    setShowConfigureTransitionAlgorithm: (
+      state,
+      { payload: { vcId, show } }: PayloadAction<{ vcId: string; show: boolean }>
+    ) => {
+      const instState = state.stateByVcId[vcId];
+      instState.configureTransitionAlgorithmExpanded = show;
+    },
+    setTransitionAlgorithmUIState: (
+      state,
+      {
+        payload: { vcId, newUIState },
+      }: PayloadAction<{ vcId: string; newUIState: Partial<LooperTransitionAlgorithmUIState> }>
+    ) => {
+      const instState = state.stateByVcId[vcId];
+      if (!instState.modules[instState.activeModuleIx]) {
+        return;
+      }
+
+      instState.modules[instState.activeModuleIx].transitionAlgorithm.uiState = {
+        ...instState.modules[instState.activeModuleIx].transitionAlgorithm.uiState,
+        ...newUIState,
+      };
+    },
+    commitTransitionAlgorithm: (
+      state,
+      {
+        payload: { vcId, moduleIx: providedModuleIx },
+      }: PayloadAction<{ vcId: string; moduleIx?: number | null | undefined }>
+    ) => {
+      const instState = state.stateByVcId[vcId];
+      const moduleIx = providedModuleIx ?? instState.activeModuleIx;
+      if (!instState.modules[moduleIx]) {
+        return;
+      }
+
+      const parsed = parseLooperTransitionAlgorithmUIState(
+        instState.modules[moduleIx].transitionAlgorithm.uiState,
+        instState.modules[moduleIx].activeBankIx
+      );
+      if (parsed.type === 'error') {
+        instState.modules[moduleIx].transitionAlgorithm.uiState.error = parsed.value;
+        return;
+      }
+      console.log(parsed.value);
+
+      instState.modules[moduleIx].transitionAlgorithm.uiState.error = null;
+      instState.modules[moduleIx].transitionAlgorithm.transitionAlgorithm = parsed.value;
+      instState.looperNode.setTransitionAlgorithm(moduleIx, parsed.value);
     },
   },
 });

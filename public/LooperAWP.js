@@ -1,8 +1,11 @@
+const BYTES_PER_F32 = 4;
+
 class LooperAWP extends AudioWorkletProcessor {
   constructor() {
     super();
 
     this.didReleaseAfterStop = false;
+    this.isStarted = false;
     this.moduleIxForWhichToReportPhase = 0;
     this.pendingEvents = [];
     const curPhaseSAB =
@@ -71,8 +74,25 @@ class LooperAWP extends AudioWorkletProcessor {
         this.wasmInstance.exports.looper_delete_module(data.moduleIx);
         break;
       }
+      case 'setTransitionAlgorithm': {
+        this.wasmInstance.exports.looper_init_transition_algorithm_buffer(data.data.length);
+        const transitionAlgorithmBufferPtr =
+          this.wasmInstance.exports.looper_get_transition_algorithm_buffer_ptr();
+        const transitionAlgorithmBuffer = new Float32Array(
+          this.wasmInstance.exports.memory.buffer
+        ).subarray(
+          transitionAlgorithmBufferPtr / BYTES_PER_F32,
+          transitionAlgorithmBufferPtr / BYTES_PER_F32 + data.data.length
+        );
+        transitionAlgorithmBuffer.set(data.data);
+        this.wasmInstance.exports.looper_set_transition_algorithm(
+          data.moduleIx,
+          data.transitionAlgorithmType
+        );
+        break;
+      }
       default: {
-        console.warn('Unhandled message type in Looper AWP: ', evt.data.type);
+        console.error('Unhandled message type in Looper AWP: ', evt.data.type);
       }
     }
   };
@@ -81,11 +101,15 @@ class LooperAWP extends AudioWorkletProcessor {
 
   releaseNote = (moduleIx, note) => this.port.postMessage({ type: 'releaseNote', moduleIx, note });
 
+  setActiveBankIx = (moduleIx, bankIx) =>
+    this.port.postMessage({ type: 'setActiveBankIx', moduleIx, bankIx });
+
   async initWasm(wasmBytes) {
     const importObject = {
       env: {
         play_note: this.playNote,
         release_note: this.releaseNote,
+        set_active_bank_ix: this.setActiveBankIx,
       },
     };
     const compiledModule = await WebAssembly.compile(wasmBytes);
@@ -97,6 +121,9 @@ class LooperAWP extends AudioWorkletProcessor {
 
   process(_inputs, _outputs, _params) {
     if (!this.wasmInstance || !globalThis.globalBeatCounterStarted) {
+      if (!globalThis.globalBeatCounterStarted) {
+        this.isStarted = false;
+      }
       if (this.wasmInstance && !this.didReleaseAfterStop) {
         this.wasmInstance.exports.looper_on_playback_stop();
         if (this.curPhaseBuffer) {
@@ -107,6 +134,10 @@ class LooperAWP extends AudioWorkletProcessor {
       return true;
     }
     this.didReleaseAfterStop = false;
+    if (!this.isStarted) {
+      this.isStarted = true;
+      this.wasmInstance.exports.looper_on_playback_start();
+    }
 
     const phase = this.wasmInstance.exports.looper_process(
       this.moduleIxForWhichToReportPhase,

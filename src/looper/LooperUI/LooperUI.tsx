@@ -25,6 +25,7 @@ import {
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { ConnectableDescriptor } from 'src/patchNetwork/patchNetwork';
 import { connect } from 'src/patchNetwork/interface';
+import ConfigureTransitionAlgorithm from 'src/looper/LooperUI/ConfigureTransitionAlgorithm';
 
 const DeleteBankButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button className='delete-looper-bank-button' onClick={onClick}>
@@ -51,8 +52,8 @@ const LoopLength: React.FC<LoopLengthProps> = ({
 
   return (
     <div className='loop-length'>
-      <div>
-        <div>Loop Length:</div>
+      <div className='click-to-activate'>
+        <div className='click-to-activate'>Loop Length:</div>
         {editingValue === null ? (
           <b className='loop-length-value' onDoubleClick={() => setEditingValue(`${loopLenBeats}`)}>
             {loopLenBeats} Beats
@@ -88,8 +89,8 @@ const LoopLength: React.FC<LoopLengthProps> = ({
           />
         )}
       </div>
-      <div>
-        <div>Composition Length:</div>
+      <div className='click-to-activate'>
+        <div className='click-to-activate'>Composition Length:</div>
         <b style={{ marginTop: 0 }}>
           {R.isNil(compositionLenBeats) ? '-' : `${compositionLenBeats} Beats`}
         </b>
@@ -166,7 +167,7 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
             ].includes(cls)
           ) ||
           Array.from(target.parentElement?.classList ?? []).some(cls =>
-            ['active-composition-name', 'loop-length'].includes(cls)
+            ['active-composition-name', 'loop-length', 'click-to-activate'].includes(cls)
           )
         ) {
           looperDispatch(looperActions.setActiveBankIx({ moduleIx, vcId, bankIx }));
@@ -174,7 +175,7 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
       }}
     >
       {isLast ? (
-        <div style={{ position: 'relative', background: 'red' }}>
+        <div style={{ position: 'relative' }}>
           <DeleteBankButton
             onClick={() => {
               const proceed =
@@ -191,9 +192,12 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
         // Still need to render a div for css grid layout
         <div />
       )}
+      <div style={{ position: 'relative' }}>
+        <div className='looper-bank-number'>{bankIx}</div>
+      </div>
       <ControlPanel width={400} settings={settings} />
       <div className='active-composition-name'>
-        <div>Loaded Sequence:</div>
+        <div className='click-to-activate'>Loaded Sequence:</div>
         <b>{bank.loadedComposition ? bank.loadedComposition.name : 'NONE'}</b>
       </div>
       <LoopLength
@@ -349,7 +353,7 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
               // pass
             }
           }}
-          style={{ marginTop: 10 }}
+          style={{ marginTop: 'auto' }}
         >
           Load Preset
         </button>
@@ -499,6 +503,7 @@ const LooperUI: React.FC<LooperUIProps> = ({ vcId }) => {
           )) ?? null}
           {activeModule ? <AddBankControlPanel moduleIx={activeModuleIx} vcId={vcId} /> : null}
         </div>
+        {activeModule ? <ConfigureTransitionAlgorithm vcId={vcId} /> : null}
       </div>
     </div>
   );

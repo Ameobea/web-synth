@@ -1,6 +1,12 @@
 import type { SavedMIDIComposition } from 'src/api';
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import type { LooperInstState } from 'src/redux/modules/looper';
+import { looperDispatch } from 'src/redux';
+import {
+  looperActions,
+  LooperInstState,
+  LooperTransitionAlgorithm,
+  parseLooperTransitionAlgorithmUIState,
+} from 'src/redux/modules/looper';
 import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
@@ -20,6 +26,7 @@ const LooperWasm = new AsyncOnce(() =>
 );
 
 export class LooperNode {
+  private vcId: string;
   /**
    * Sends output MIDI events created by the looper to connected destination modules
    */
@@ -30,9 +37,11 @@ export class LooperNode {
   private onPhaseSABReceived?: (phaseSAB: Float32Array) => void;
 
   constructor(
+    vcId: string,
     serialized?: Omit<LooperInstState, 'looperNode'>,
     onPhaseSABReceived?: (phaseSAB: Float32Array) => void
   ) {
+    this.vcId = vcId;
     this.onPhaseSABReceived = onPhaseSABReceived;
 
     if (serialized) {
@@ -54,9 +63,21 @@ export class LooperNode {
         }
 
         this.setCompositionForBank(moduleIx, bankIx, bank.loadedComposition, bank.lenBeats);
+        this.setLoopLenBeats(moduleIx, bankIx, bank.lenBeats);
       });
 
       this.setActiveBankIx(moduleIx, module.activeBankIx);
+
+      // Try to parse + set the UI transition algorithm, falling back to the last good applied algorithm otherwise
+      const parsed = parseLooperTransitionAlgorithmUIState(
+        module.transitionAlgorithm.uiState,
+        module.activeBankIx
+      );
+      if (parsed.type === 'success') {
+        this.setTransitionAlgorithm(moduleIx, parsed.value);
+      } else {
+        this.setTransitionAlgorithm(moduleIx, module.transitionAlgorithm.transitionAlgorithm);
+      }
     });
     this.setActiveModuleIx(serialized.activeModuleIx);
   }
@@ -128,6 +149,28 @@ export class LooperNode {
     this.postMessage({ type: 'deleteModule', moduleIx });
   }
 
+  private encodeTransitionAlgorithm(transitionAlgorithm: LooperTransitionAlgorithm): {
+    transitionAlgorithmType: number;
+    data: Float32Array;
+  } {
+    switch (transitionAlgorithm.type) {
+      case 'constant':
+        return { transitionAlgorithmType: 0, data: new Float32Array([transitionAlgorithm.bankIx]) };
+      case 'staticPattern':
+        return { transitionAlgorithmType: 1, data: new Float32Array(transitionAlgorithm.pattern) };
+      default:
+        throw new Error('Unknown transition algorithm type: ' + (transitionAlgorithm as any).type);
+    }
+  }
+
+  public setTransitionAlgorithm(moduleIx: number, transitionAlgorithm: LooperTransitionAlgorithm) {
+    this.postMessage({
+      type: 'setTransitionAlgorithm',
+      moduleIx,
+      ...this.encodeTransitionAlgorithm(transitionAlgorithm),
+    });
+  }
+
   private async init() {
     const [looperWasm] = await Promise.all([LooperWasm.get(), LooperAWPRegistered.get()]);
     this.workletNode = new AudioWorkletNode(ctx, 'looper-awp');
@@ -146,6 +189,16 @@ export class LooperNode {
         case 'phaseSAB':
           this.phaseSAB = new Float32Array(evt.data.phaseSAB);
           this.onPhaseSABReceived?.(this.phaseSAB);
+          break;
+        case 'setActiveBankIx':
+          looperDispatch(
+            looperActions.setActiveBankIx({
+              vcId: this.vcId,
+              moduleIx: evt.data.moduleIx,
+              bankIx: evt.data.bankIx < 0 ? null : evt.data.bankIx,
+              updateBackend: false,
+            })
+          );
           break;
         default:
           console.error('Unknown message from looper:', evt.data);
