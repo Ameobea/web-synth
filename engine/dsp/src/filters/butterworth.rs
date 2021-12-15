@@ -8,6 +8,7 @@ pub struct ButterworthFilter {
     /// Holds the last 2 samples of output with index 0 being 2 samples ago and index 1 being 1
     /// sample ago
     delayed_outputs: [f32; 2],
+    last_cutoff_freq: f32,
 }
 
 impl ButterworthFilter {
@@ -37,7 +38,11 @@ impl ButterworthFilter {
     // Adapted from code at the bottom of this page: http://basicsynth.com/index.php?page=filters
     #[inline]
     pub fn lowpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        debug_assert!(cutoff_freq.is_normal());
+        let cutoff_freq = crate::one_pole(
+            &mut self.last_cutoff_freq,
+            crate::clamp_normalize(1., 18_000., cutoff_freq),
+            0.995,
+        );
         let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let c2 = c * c;
         let csqr2 = std::f32::consts::SQRT_2 * c;
@@ -58,7 +63,11 @@ impl ButterworthFilter {
 
     #[inline]
     pub fn highpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        debug_assert!(cutoff_freq.is_normal());
+        let cutoff_freq = crate::one_pole(
+            &mut self.last_cutoff_freq,
+            crate::clamp_normalize(1., 18_000., cutoff_freq),
+            0.995,
+        );
         let mut c = ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         if c.abs() < 0.002 {
             c = c.signum() * 0.002;
@@ -83,7 +92,11 @@ impl ButterworthFilter {
 
     #[inline]
     pub fn bandpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        debug_assert!(cutoff_freq.is_normal());
+        let cutoff_freq = crate::one_pole(
+            &mut self.last_cutoff_freq,
+            crate::clamp_normalize(1., 18_000., cutoff_freq),
+            0.995,
+        );
         let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let d = 1. + c;
         let amp_in0 = 1. / d;

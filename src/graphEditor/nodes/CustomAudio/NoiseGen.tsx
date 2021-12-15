@@ -53,9 +53,10 @@ const NoiseGenSmallView: React.FC<{
           ? {
               type: 'range',
               label: 'smoothing_coefficient',
-              min: 0.99,
-              max: 0.99999,
+              min: 0.95,
+              max: 0.999999,
               initial: node.smoothingCoefficient,
+              steps: 1000,
             }
           : null,
         !enableSmoothing
@@ -68,7 +69,7 @@ const NoiseGenSmallView: React.FC<{
               initial: node.quantizationFactor,
             }
           : null,
-        { type: 'range', label: 'gain', min: 0, max: 1, initial: node.gain },
+        { type: 'range', label: 'gain', min: 0, max: 1, initial: node.gain, steps: 1000 },
       ])}
       onChange={(key: string, val: any) => {
         if (key === 'enable_smoothing') {
@@ -151,6 +152,7 @@ export class NoiseGenNode {
               this.awpNode.port.postMessage({
                 type: 'setSmoothingCoefficient',
                 smoothingCoefficient: this.enableSmoothing ? this.smoothingCoefficient : 0,
+                quantizationFactor: this.quantizationFactor,
               });
               break;
             }
@@ -159,6 +161,7 @@ export class NoiseGenNode {
               this.awpNode.port.postMessage({
                 type: 'setSmoothingCoefficient',
                 smoothingCoefficient: this.enableSmoothing ? this.smoothingCoefficient : 0,
+                quantizationFactor: 0,
               });
               break;
             }
@@ -231,7 +234,7 @@ export class NoiseGenNode {
       updateFreqSamples: this.updateFreqSamples,
       smoothingCoefficient: this.enableSmoothing ? this.smoothingCoefficient : 0,
       gain: this.gain,
-      quantizationFactor: this.quantizationFactor,
+      quantizationFactor: this.enableSmoothing ? 0 : this.quantizationFactor,
     });
 
     // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state

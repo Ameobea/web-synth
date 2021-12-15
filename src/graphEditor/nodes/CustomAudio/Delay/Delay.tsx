@@ -87,7 +87,6 @@ export default class DelayNode implements ForeignNode {
     if (maybeOAP instanceof OverridableAudioParam) {
       maybeOAP.manualControl.offset.value = value;
     }
-    console.log(this.cachedParamValues);
   };
 
   private getManualParamValues = (): {

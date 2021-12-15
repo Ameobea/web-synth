@@ -82,6 +82,12 @@ LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
 
   return false;
 };
+LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
+  const nodeID = node.id as string | number;
+  if (nodeID && typeof nodeID === 'string' && nodeID.length === 36) {
+    getEngine()!.switch_view_context(nodeID);
+  }
+};
 
 /**
  * Mapping of `stateKey`s to the graph instances that that they manage

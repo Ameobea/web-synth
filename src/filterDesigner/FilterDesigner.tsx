@@ -1,6 +1,6 @@
 import { filterNils } from 'ameo-utils';
 import type { ScaleLogarithmic, Selection } from 'd3';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
@@ -24,7 +24,6 @@ import {
   setFilter,
 } from 'src/filterDesigner/util';
 import Presets from './presets';
-import { useWhyDidYouUpdate } from 'src/reactUtils';
 
 const ctx = new AudioContext();
 const DATA_SIZE = 512;
@@ -45,7 +44,8 @@ const FREQUENCIES = new Float32Array(DATA_SIZE).map((_, i) => scaleValue(i));
 interface FilterInstProps {
   groupIx: number;
   filterIx: number;
-  lockedFrequency: number | null;
+  frequencyLocked: boolean;
+  getLockedFrequency: () => number | null;
   filter: FilterDescriptor;
   onChange: (groupIx: number, filterIx: number, newParams: FilterParams) => void;
   onDelete: (filterIx: number) => void;
@@ -54,17 +54,16 @@ interface FilterInstProps {
 const FilterInstInner: React.FC<FilterInstProps> = ({
   groupIx,
   filterIx,
-  lockedFrequency,
+  frequencyLocked,
+  getLockedFrequency,
   filter: { params, filter },
   onChange,
   onDelete,
 }) => {
   const settings = useMemo(() => {
     const settings = getSettingsForFilterType(params.type, false, false);
-    return !R.isNil(lockedFrequency)
-      ? settings.filter(setting => setting.label !== 'frequency')
-      : settings;
-  }, [params.type, lockedFrequency]);
+    return frequencyLocked ? settings.filter(setting => setting.label !== 'frequency') : settings;
+  }, [params.type, frequencyLocked]);
   const state = useMemo(
     () => ({
       type: params.type,
@@ -78,10 +77,10 @@ const FilterInstInner: React.FC<FilterInstProps> = ({
   const handleChange = useCallback(
     (key: string, val: any) => {
       const newParams: FilterParams = { ...params, [key]: val };
-      setFilter(filter, newParams, lockedFrequency);
+      setFilter(filter, newParams, getLockedFrequency());
       onChange(groupIx, filterIx, newParams);
     },
-    [filter, groupIx, filterIx, lockedFrequency, onChange, params]
+    [filter, groupIx, filterIx, getLockedFrequency, onChange, params]
   );
 
   return (
@@ -95,7 +94,8 @@ const FilterInstInner: React.FC<FilterInstProps> = ({
 const FilterInst = React.memo(FilterInstInner);
 
 interface FilterParamsEditorProps {
-  lockedFrequency: number | null;
+  frequencyLocked: boolean;
+  getLockedFrequency: () => number | null;
   group: FilterGroup;
   groupIx: number;
   onChange: (mapState: (state: FilterDesignerState) => FilterDesignerState) => void;
@@ -103,24 +103,13 @@ interface FilterParamsEditorProps {
 }
 
 const FilterParamsEditorInner: React.FC<FilterParamsEditorProps> = ({
-  lockedFrequency,
+  frequencyLocked,
+  getLockedFrequency,
   group,
   groupIx,
   onChange,
   onDelete,
 }) => {
-  useWhyDidYouUpdate(
-    'FiltereParamsEditorComponent',
-    groupIx === 0
-      ? {
-          lockedFrequency,
-          group,
-          groupIx,
-          onChange,
-          onDelete,
-        }
-      : {}
-  );
   const onInstChange = useCallback(
     (groupIx: number, filterIx: number, newParams: FilterParams) =>
       onChange((state: FilterDesignerState): FilterDesignerState => {
@@ -141,7 +130,8 @@ const FilterParamsEditorInner: React.FC<FilterParamsEditorProps> = ({
           filterIx={filterIx}
           onDelete={onDelete}
           key={filter.id}
-          lockedFrequency={lockedFrequency}
+          frequencyLocked={frequencyLocked}
+          getLockedFrequency={getLockedFrequency}
           filter={filter}
           onChange={onInstChange}
         />
@@ -299,6 +289,11 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
   inst,
   updateConnectables,
 }) => {
+  const staticLockedFrequency = useRef(R.clone(state.lockedFrequencyByGroup));
+  useEffect(() => {
+    staticLockedFrequency.current = R.clone(state.lockedFrequencyByGroup);
+  }, [state.lockedFrequencyByGroup]);
+
   const onDelete = useCallback(
     filterIx =>
       setState((state): FilterDesignerState => {
@@ -311,9 +306,13 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
         disconnectFilterChain(group.map(R.prop('filter')));
         const newState = {
           ...state,
-          filters: group.filter((_, i) => i !== filterIx),
+          filterGroups: R.set(
+            R.lensIndex(groupIx),
+            R.remove(filterIx, 1, group),
+            state.filterGroups
+          ),
         };
-        connectFilterChain(newState.filters.map(R.prop('filter')));
+        connectFilterChain(newState.filterGroups[groupIx].map(R.prop('filter')));
         updateConnectables?.(newState);
         return newState;
       }),
@@ -356,10 +355,19 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
     [groupIx, setState, updateConnectables]
   );
 
+  // Locked frequency isn't actually depended upon by the individual filter instances' UIs, but its value is needed
+  // when toggling params so we pass through a static function that gets the current value to avoid re-rendering
+  // all filter instances every time locked frequency changes
+  const getLockedFrequency = useCallback(
+    () => staticLockedFrequency.current[groupIx] ?? null,
+    [groupIx]
+  );
+
   return (
     <div className='filter-group' key={groupIx}>
       <FilterParamsEditor
-        lockedFrequency={state.lockedFrequencyByGroup[groupIx] ?? null}
+        frequencyLocked={!R.isNil(state.lockedFrequencyByGroup[groupIx])}
+        getLockedFrequency={getLockedFrequency}
         group={state.filterGroups[groupIx]}
         groupIx={groupIx}
         onChange={onChange}

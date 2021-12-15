@@ -12,6 +12,7 @@ export interface FilterDescriptor {
 export type FilterGroup = FilterDescriptor[];
 
 export interface FilterDesignerState {
+  input: GainNode;
   filterGroups: FilterGroup[];
   lockedFrequencyByGroup: (number | null | undefined)[];
 }
@@ -32,6 +33,9 @@ export const serializeFilterDesigner = (state: FilterDesignerState): string => {
 export const deserializeFilterDesigner = (
   parsed: SerializedFilterDesigner
 ): FilterDesignerState => {
+  const input = ctx.createGain();
+  input.gain.value = 1;
+
   const filterGroups = parsed.filterGroups.map((group, groupIx) => {
     const activatedGroup = group.map(params => {
       const filter = new BiquadFilterNode(ctx);
@@ -40,10 +44,12 @@ export const deserializeFilterDesigner = (
     });
 
     connectFilterChain(activatedGroup.map(R.prop('filter')));
+    input.connect(activatedGroup[0].filter);
     return activatedGroup;
   });
 
   return {
+    input,
     filterGroups,
     lockedFrequencyByGroup: parsed.lockedFrequencyByGroup ?? [],
   };

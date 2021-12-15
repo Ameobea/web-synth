@@ -58,12 +58,12 @@ export class LooperNode {
       this.midiNodes.push(new MIDINode());
 
       module.banks?.forEach((bank, bankIx) => {
+        this.setLoopLenBeats(moduleIx, bankIx, bank.lenBeats);
         if (!bank.loadedComposition) {
           return;
         }
 
         this.setCompositionForBank(moduleIx, bankIx, bank.loadedComposition, bank.lenBeats);
-        this.setLoopLenBeats(moduleIx, bankIx, bank.lenBeats);
       });
 
       this.setActiveBankIx(moduleIx, module.activeBankIx);

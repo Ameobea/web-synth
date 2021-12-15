@@ -397,7 +397,7 @@ const FaustEditor: React.FC<{ vcId: string }> = ({ vcId }) => {
       <SpectrumVisualization
         paused={isHidden}
         analyzerNode={context.analyzerNode}
-        height={windowSize.height - 34 - 500 - 2}
+        height={(windowSize.height - 34 - 500 - 2) * 2}
         canvasStyle={styles.spectrumVizStyle}
         controlPanelDraggable={false}
       />

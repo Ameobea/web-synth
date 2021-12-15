@@ -90,13 +90,15 @@ pub unsafe extern "C" fn generate() -> *const f32 {
         NoiseType::Brown => todo!(),
     };
     for out in &mut OUTPUT {
+        let sample = generator() * GAIN;
+
         if QUANTIZATION_FACTOR > 0 {
-            LAST_VAL = dsp::quantize(-1., 1., QUANTIZATION_FACTOR as f32, generator() * GAIN);
+            LAST_VAL = dsp::quantize(-1., 1., QUANTIZATION_FACTOR as f32, sample);
         } else {
             if SMOOTHING_COEFFICIENT != 0. {
-                dsp::one_pole(&mut LAST_VAL, generator() * GAIN, SMOOTHING_COEFFICIENT);
+                dsp::one_pole(&mut LAST_VAL, sample, 1. - SMOOTHING_COEFFICIENT);
             } else {
-                LAST_VAL = generator() * GAIN;
+                LAST_VAL = sample;
             }
         }
         *out = LAST_VAL;

@@ -37,6 +37,9 @@ const ctx = new AudioContext();
 const StatesByVcId = new Map<string, FilterDesignerState>();
 
 const buildDefaultFilterDesignerState = (): FilterDesignerState => {
+  const input = ctx.createGain();
+  input.gain.value = 1;
+
   const filterParams: FilterParams[] = [
     { type: FilterType.Lowpass, frequency: 1000, Q: 0.71, gain: 0, detune: 0 },
     { type: FilterType.Lowpass, frequency: 8800, Q: 11.71, gain: 0, detune: 0 },
@@ -50,8 +53,10 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
     }),
   ];
   connectFilterChain(filterGroups[0].map(R.prop('filter')));
+  input.connect(filterGroups[0][0].filter);
 
   return {
+    input,
     filterGroups,
     lockedFrequencyByGroup: [null],
   };
@@ -130,17 +135,13 @@ export const get_filter_designer_audio_connectables = (
 
   return {
     vcId,
-    inputs: state.filterGroups.reduce(
-      (acc, group) =>
-        acc.set('input', {
-          type: 'customAudio',
-          node: group[0].filter,
-        }),
-      ImmMap<string, ConnectableInput>()
-    ),
+    inputs: ImmMap<string, ConnectableInput>().set('input', {
+      type: 'customAudio',
+      node: state.input,
+    }),
     outputs: state.filterGroups.reduce(
-      (acc, group) =>
-        acc.set('input', {
+      (acc, group, groupIx) =>
+        acc.set(`group ${groupIx + 1} output`, {
           type: 'customAudio',
           node: group[group.length - 1].filter,
         }),

@@ -29,7 +29,7 @@ class DelayAWP extends AudioWorkletProcessor {
         name: 'highpass cutoff freq',
         defaultValue: 0,
         minValue: 0,
-        maxValue: 44_100 / 2,
+        maxValue: 18_000,
         automationRate: 'a-rate',
       },
     ];
