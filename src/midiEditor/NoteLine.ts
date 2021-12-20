@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
-import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
 
+import * as PIXI from 'src/controls/pixi';
 import MIDIEditorUIInstance, { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox';
 import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';

@@ -1,12 +1,10 @@
-export RUSTFLAGS="-Ctarget-feature=+simd128"
-
 cd engine && cargo build --target wasm32-unknown-unknown &&
   cd ../midi && cargo build --target wasm32-unknown-unknown &&
   cd ../polysynth && cargo build --target wasm32-unknown-unknown --features wasm-bindgen-exports &&
-  cd ../wavetable && RUSTFLAGS="" cargo build --release --target wasm32-unknown-unknown --no-default-features &&
+  cd ../wavetable && cargo build --release --target wasm32-unknown-unknown --no-default-features &&
   mv ../target/wasm32-unknown-unknown/release/wavetable.wasm ../target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm &&
   cd ../spectrum_viz && cargo build --release --target wasm32-unknown-unknown &&
-  cd ../wavetable && cargo build --release --target wasm32-unknown-unknown &&
+  cd ../wavetable && RUSTFLAGS="-Ctarget-feature=+simd128" cargo build --release --target wasm32-unknown-unknown &&
   cd ../waveform_renderer && cargo build --release --target wasm32-unknown-unknown &&
   cd ../granular && cargo build --release --target wasm32-unknown-unknown &&
   cd ../event_scheduler && cargo build --release --target wasm32-unknown-unknown &&

@@ -1,5 +1,4 @@
-import * as PIXI from 'pixi.js';
-
+import * as PIXI from 'src/controls/pixi';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import type NoteLine from 'src/midiEditor/NoteLine';

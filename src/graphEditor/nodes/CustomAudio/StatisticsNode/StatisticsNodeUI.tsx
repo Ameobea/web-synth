@@ -1,15 +1,13 @@
-import React, { useRef, useEffect, Suspense } from 'react';
-import { connect } from 'react-redux';
+import React, { useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import 'chartist/dist/chartist.min.css';
+import * as Chartist from 'chartist';
 import { useUniqueId } from 'ameo-utils/util/react';
 
 import { ReduxStore } from '.';
-import Loading from 'src/misc/Loading';
 
-const mapHistogramStateToProps = (state: ReduxStore) => ({ data: state.statisticsNode.data });
-const HistogramInner: React.FC<
-  { Chartist: typeof import('chartist') } & ReturnType<typeof mapHistogramStateToProps>
-> = ({ data, Chartist }) => {
+const Histogram: React.FC = () => {
+  const { data } = useSelector((state: ReduxStore) => ({ data: state.statisticsNode.data }));
   const histogramContainer = useRef<null | HTMLDivElement>(null);
   const chartHandle = useRef<Chartist.IChartistBarChart | null>(null);
 
@@ -23,7 +21,7 @@ const HistogramInner: React.FC<
 
     chartHandle.current = new Chartist.Bar(`#${histogramContainerId}`, { series: [] }, {});
     return () => chartHandle.current!.detach();
-  }, [histogramContainer, Chartist.Bar, histogramContainerId]);
+  }, [histogramContainer, histogramContainerId]);
 
   useEffect(() => {
     if (!chartHandle.current) {
@@ -31,7 +29,7 @@ const HistogramInner: React.FC<
     }
 
     chartHandle.current.update({ series: [data.buckets] });
-  }, [chartHandle, Chartist.Bar, data]);
+  }, [chartHandle, data]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -45,18 +43,5 @@ const HistogramInner: React.FC<
     </div>
   );
 };
-const ConnectedHistogram = connect(mapHistogramStateToProps)(HistogramInner);
-const Histogram = React.lazy(() =>
-  import('chartist').then(Chartist => {
-    const InnerHistogram: React.FC = () => <ConnectedHistogram Chartist={Chartist} />;
-    return { default: InnerHistogram };
-  })
-);
 
-const StatisticsNodeUI: React.FC = () => (
-  <Suspense fallback={<Loading />}>
-    <Histogram />
-  </Suspense>
-);
-
-export default StatisticsNodeUI;
+export default Histogram;

@@ -1,6 +1,6 @@
 import { UnreachableException } from 'ameo-utils';
-import * as PIXI from 'pixi.js';
 
+import * as PIXI from 'src/controls/pixi';
 import { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';

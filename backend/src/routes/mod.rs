@@ -1,17 +1,23 @@
 use std::collections::HashMap;
 
 use diesel::{self, prelude::*};
+use itertools::Itertools;
 use rocket::serde::json::Json;
 
 use crate::{
+    db_util::{build_tags_with_counts, get_and_create_tag_ids, last_insert_id},
     models::{
-        compositions::{Composition, NewComposition, NewCompositionRequest},
+        compositions::{
+            Composition, CompositionDescriptor, NewComposition, NewCompositionRequest,
+            NewCompositionTag,
+        },
         effects::{Effect, InsertableEffect},
         synth_preset::{
             InlineSynthPreset, InlineSynthPresetEntry, NewSynthPresetEntry,
             NewSynthVoicePresetEntry, ReceivedSynthPresetEntry, SynthPreset, SynthVoicePresetEntry,
             UserProvidedNewSynthVoicePreset, VoiceDefinition,
         },
+        tags::{EntityIdTag, TagCount},
     },
     schema, WebSynthDbConn,
 };
@@ -62,8 +68,8 @@ pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, Str
 #[post("/compositions", data = "<composition>")]
 pub async fn save_composition(
     conn: WebSynthDbConn,
-    composition: Json<NewCompositionRequest>,
-) -> Result<String, String> {
+    mut composition: Json<NewCompositionRequest>,
+) -> Result<Json<i64>, String> {
     let new_composition = NewComposition {
         author: 0, // TODO: Make dynamic once user system is in place
         title: composition.0.title,
@@ -73,12 +79,36 @@ pub async fn save_composition(
             format!("Failed to serialize composition to JSON string")
         })?,
     };
+    let tags: Vec<String> = std::mem::take(&mut composition.0.tags);
 
-    let inserted_rows = conn
+    let saved_composition_id = conn
         .run(move |conn| {
-            diesel::insert_into(schema::compositions::table)
-                .values(&new_composition)
-                .execute(conn)
+            conn.transaction(|| -> QueryResult<i64> {
+                diesel::insert_into(schema::compositions::table)
+                    .values(&new_composition)
+                    .execute(conn)?;
+
+                let saved_comp_id = diesel::select(last_insert_id).first(conn)?;
+
+                // Insert tags
+                let tag_count = tags.len();
+                let tag_ids = get_and_create_tag_ids(conn, tags)?;
+                assert_eq!(tag_count, tag_ids.len());
+
+                let new_tags: Vec<NewCompositionTag> = tag_ids
+                    .into_iter()
+                    .map(|tag_id| NewCompositionTag {
+                        composition_id: saved_comp_id,
+                        tag_id,
+                    })
+                    .collect();
+
+                diesel::insert_into(schema::compositions_tags::table)
+                    .values(new_tags)
+                    .execute(conn)?;
+
+                Ok(saved_comp_id)
+            })
         })
         .await
         .map_err(|err| -> String {
@@ -86,7 +116,11 @@ pub async fn save_composition(
             "Error inserting row into database".into()
         })?;
 
-    Ok(format!("Inserted {} row(s).", inserted_rows))
+    info!(
+        "Successfully saved new composition with id={}",
+        saved_composition_id
+    );
+    Ok(Json(saved_composition_id))
 }
 
 #[get("/compositions/<composition_id>")]
@@ -112,17 +146,74 @@ pub async fn get_composition_by_id(
 }
 
 #[get("/compositions")]
-pub async fn get_compositions(conn: WebSynthDbConn) -> Result<Json<Vec<Composition>>, String> {
-    use crate::schema::compositions::dsl::*;
+pub async fn get_compositions(
+    conn: WebSynthDbConn,
+) -> Result<Json<Vec<CompositionDescriptor>>, String> {
+    use crate::schema::{compositions, compositions_tags, tags};
 
-    let all_compos = conn
-        .run(|conn| compositions.load(conn))
+    let (all_compos, all_compos_tags) = conn
+        .run(
+            |conn| -> QueryResult<(Vec<(_, _, _, _)>, Vec<EntityIdTag>)> {
+                let all_compos = compositions::table
+                    .select((
+                        compositions::dsl::id,
+                        compositions::dsl::author,
+                        compositions::dsl::title,
+                        compositions::dsl::description,
+                    ))
+                    .load(conn)?;
+
+                let all_compos_tags: Vec<EntityIdTag> = compositions_tags::table
+                    .inner_join(tags::table)
+                    .select((compositions_tags::dsl::composition_id, tags::dsl::tag))
+                    .load(conn)?;
+                Ok((all_compos, all_compos_tags))
+            },
+        )
         .await
         .map_err(|err| {
             error!("Error querying compositions: {:?}", err);
             "Error querying compositions from the database".to_string()
         })?;
+
+    let mut tags_by_compo_id = all_compos_tags
+        .into_iter()
+        .into_group_map_by(|tag| tag.entity_id);
+
+    let all_compos = all_compos
+        .into_iter()
+        .map(|(id, author, title, description)| {
+            let tags = tags_by_compo_id
+                .remove(&id)
+                .unwrap_or_default()
+                .iter()
+                .map(|tag| tag.tag.clone())
+                .collect_vec();
+
+            CompositionDescriptor {
+                id,
+                title,
+                description,
+                author,
+                tags,
+            }
+        })
+        .collect_vec();
+
     Ok(Json(all_compos))
+}
+
+#[get("/composition_tags")]
+pub async fn get_composition_tags(conn: WebSynthDbConn) -> Result<Json<Vec<TagCount>>, String> {
+    use crate::schema::{compositions_tags, tags};
+
+    build_tags_with_counts(conn, move |conn| -> QueryResult<Vec<_>> {
+        compositions_tags::table
+            .inner_join(tags::table)
+            .select((compositions_tags::dsl::composition_id, tags::dsl::tag))
+            .load(conn)
+    })
+    .await
 }
 
 #[get("/synth_presets")]

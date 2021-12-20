@@ -1,6 +1,5 @@
 import * as R from 'ramda';
 import { buildModule, buildActionGroup, buildStore } from 'jantix';
-import { reducer as formReducer } from 'redux-form';
 import type { Root as ReactDOMRoot } from 'react-dom';
 
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
@@ -690,7 +689,7 @@ const buildSynthDesignerReduxInfra = (vcId: string) => {
     synthDesigner: mod,
   };
 
-  return buildStore<typeof modules>(modules, undefined, { form: formReducer });
+  return buildStore<typeof modules>(modules, undefined, {});
 };
 
 export default buildSynthDesignerReduxInfra;

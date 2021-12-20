@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { ListRowRenderer } from 'react-virtualized';
+import type { ListChildComponentProps } from 'react-window';
 
 import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import BasicModal from 'src/misc/BasicModal';
@@ -23,17 +23,12 @@ const mkSampleListingRowRenderer = ({
   togglePlaying,
   selectedSample,
   setSelectedSample,
-}: MkSampleListingRowRendererArgs): ListRowRenderer => {
-  const SampleListingRowRenderer: React.FC<{
-    style?: any;
-    index: number;
-    key: string;
-  }> = ({ style, index, key }) => (
+}: MkSampleListingRowRendererArgs): React.FC<ListChildComponentProps> => {
+  const SampleListingRowRenderer: React.FC<ListChildComponentProps> = ({ style, index }) => (
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
       isPlaying={sampleDescriptors[index].name === playingSample?.name}
       descriptor={sampleDescriptors[index]}
-      key={key}
       style={{
         ...(style || {}),
         ...(selectedSample?.sample === sampleDescriptors[index]
@@ -57,12 +52,14 @@ const mkSampleListingRowRenderer = ({
   return SampleListingRowRenderer;
 };
 
-const SelectSample: React.FC<{
+interface SelectSampleProps {
   selectedSample: { sample: SampleDescriptor; index: number } | null;
   setSelectedSample: (
     newSelectedSample: { sample: SampleDescriptor; index: number } | null
   ) => void;
-}> = ({ selectedSample, setSelectedSample }) => {
+}
+
+const SelectSample: React.FC<SelectSampleProps> = ({ selectedSample, setSelectedSample }) => {
   const {
     allSamples,
     includeLocalSamples,
@@ -92,10 +89,12 @@ const SelectSample: React.FC<{
   );
 };
 
-const SampleSelectDialog: React.FC<{
+interface SampleSelectDialogProps {
   onSubmit: (val: SampleDescriptor) => void;
   onCancel?: () => void;
-}> = ({ onSubmit, onCancel }) => {
+}
+
+const SampleSelectDialog: React.FC<SampleSelectDialogProps> = ({ onSubmit, onCancel }) => {
   const [selectedSample, setSelectedSample] = useState<{
     sample: SampleDescriptor;
     index: number;
@@ -120,7 +119,6 @@ const SampleSelectDialog: React.FC<{
   );
 };
 
-export const selectSample = (): Promise<SampleDescriptor> =>
-  renderModalWithControls(SampleSelectDialog);
+export const selectSample = () => renderModalWithControls(SampleSelectDialog);
 
 export default SampleSelectDialog;

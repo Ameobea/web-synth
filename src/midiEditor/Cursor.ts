@@ -1,5 +1,4 @@
-import * as PIXI from 'pixi.js';
-
+import * as PIXI from 'src/controls/pixi';
 import { makeDraggable } from 'src/controls/pixiUtils';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import * as conf from './conf';

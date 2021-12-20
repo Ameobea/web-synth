@@ -40,8 +40,16 @@ export const saveSynthPreset = (preset: {
     }
   });
 
-export const fetchAllSharedCompositions = (): Promise<CompositionDefinition[]> =>
+export const fetchAllSharedCompositions = (): Promise<Omit<CompositionDefinition, 'content'>[]> =>
   fetch(`${BACKEND_BASE_URL}/compositions`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getExistingCompositionTags = async (): Promise<{ name: string; count: number }[]> =>
+  fetch(`${BACKEND_BASE_URL}/composition_tags`).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }
@@ -51,14 +59,20 @@ export const fetchAllSharedCompositions = (): Promise<CompositionDefinition[]> =
 export const saveComposition = async (
   title: string,
   description: string,
-  serializedComposition: { [key: string]: string }
-) =>
+  serializedComposition: { [key: string]: string },
+  tags: string[]
+): Promise<number> =>
   fetch(`${BACKEND_BASE_URL}/compositions`, {
     method: 'POST',
-    body: JSON.stringify({ title, description, user: 0, content: serializedComposition }),
+    body: JSON.stringify({ title, description, content: serializedComposition, tags }),
     headers: {
       'Content-Type': 'application/json',
     },
+  }).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
   });
 
 export interface RemoteSample {

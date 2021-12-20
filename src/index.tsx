@@ -115,7 +115,7 @@ export const delete_view_context = (id: string) => {
 export const set_active_vc_ix = (newActiveVxIx: number) =>
   dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
 
-const fetchAndLoadSharedComposition = async (compositionId: string) => {
+export const fetchAndLoadSharedComposition = async (compositionId: string | number) => {
   console.log(`Loading composition id=${compositionId}`);
   const res = await fetch(`${BACKEND_BASE_URL}/compositions/${compositionId}`);
   if (res.status === 404) {

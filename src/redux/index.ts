@@ -1,5 +1,5 @@
 import { buildStore } from 'jantix';
-import { reducer as formReducer } from 'redux-form';
+import type { ValueOf } from 'ameo-utils';
 
 import viewContextManagerModule from 'src/redux/modules/viewContextManager';
 import midiKeyboardModule from 'src/redux/modules/midiKeyboard';
@@ -11,7 +11,6 @@ import controlPanelModule from 'src/redux/modules/controlPanel';
 import equalizerModule from 'src/redux/modules/equalizer';
 import sinsyModule from 'src/redux/modules/sinsy';
 import looperSlice, { looperActions, LooperState } from 'src/redux/modules/looper';
-import { ValueOf } from 'ameo-utils';
 import genericPresetPickerSlice, {
   genericPresetPickerActions,
   GenericPresetPickerState,
@@ -33,7 +32,6 @@ export const {
   actionCreators,
   useSelector,
 } = buildStore<typeof modules>(modules, undefined, {
-  form: formReducer,
   looper: looperSlice.reducer,
   genericPresetPicker: genericPresetPickerSlice.reducer,
 });

@@ -9,17 +9,10 @@ table! {
 }
 
 table! {
-    composition_tags (id) {
+    compositions_tags (id) {
         id -> Bigint,
-        tag -> Text,
-    }
-}
-
-table! {
-    composition_tags_join (id) {
-        id -> Bigint,
-        tag -> Bigint,
-        composition -> Bigint,
+        composition_id -> Bigint,
+        tag_id -> Bigint,
     }
 }
 
@@ -109,6 +102,8 @@ table! {
     }
 }
 
+joinable!(compositions_tags -> compositions (composition_id));
+joinable!(compositions_tags -> tags (tag_id));
 joinable!(looper_presets -> users (author));
 joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
 joinable!(looper_presets_tags -> tags (tag_id));
@@ -117,8 +112,7 @@ joinable!(midi_compositions_tags -> tags (tag_id));
 
 allow_tables_to_appear_in_same_query!(
     compositions,
-    composition_tags,
-    composition_tags_join,
+    compositions_tags,
     effects,
     looper_presets,
     looper_presets_tags,

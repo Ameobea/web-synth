@@ -1,60 +1,26 @@
 .composition-sharing {
   padding-left: 8px;
   padding-right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 
-  .share-composition-form {
-    display: flex;
-    flex-direction: column;
-
-    button {
-      width: 100px;
-    }
+  h2 {
+    text-align: center;
+    font-size: 32px;
+    margin-bottom: 8px;
   }
 
-  .custom-field-renderer {
-    display: flex;
-    flex-direction: row;
-    padding-bottom: 12px;
-
-    label {
-      padding-right: 6px;
-    }
-
-    span {
-      padding-left: 6px;
-    }
+  p {
+    font-size: 18px;
   }
 
-  .shared-composition-listing {
-    max-width: 800px;
-
-    .composition-item {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 4px;
-      border-bottom: 1px solid #444;
-
-      > div {
-        display: flex;
-        flex-direction: row;
-        flex: 1;
-      }
-
-      .composition-title {
-        font-weight: bold;
-      }
-
-      .composition-description {
-        flex: 2;
-      }
-
-      button {
-        height: 18px;
-        width: 60px;
-        margin-right: 20px;
-      }
-    }
+  button {
+    margin-top: 200px;
+    margin-left: 50px;
+    margin-right: 50px;
+    height: 40px;
+    width: 400px;
+    font-size: 20px;
   }
 }

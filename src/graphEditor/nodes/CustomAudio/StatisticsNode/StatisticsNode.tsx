@@ -2,14 +2,15 @@
  * Analyzes the input signal and periodically samples it, recording statistics about the distribution of input signals.
  */
 
-import { Map } from 'immutable';
+import React, { Suspense } from 'react';
+import { Map as ImmMap } from 'immutable';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { AsyncOnce } from 'ameo-utils';
 
 import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import StatisticsNodeUI from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNodeUI';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import Loading from 'src/misc/Loading';
 
 const ctx = new AudioContext();
 
@@ -47,6 +48,13 @@ const createReduxInfra = (initialState: StatisticsNodeState) => {
 export type ReduxInfra = ReturnType<typeof createReduxInfra>;
 export type ReduxStore = ReturnType<ReduxInfra['getState']>;
 
+const Histogram = React.lazy(() => import('./StatisticsNodeUI'));
+const LazyStatisticsNodeUI: React.FC = () => (
+  <Suspense fallback={<Loading />}>
+    <Histogram />
+  </Suspense>
+);
+
 class StatisticsNode extends ConstantSourceNode implements ForeignNode {
   private vcId: string;
   private ctx: AudioContext;
@@ -79,7 +87,7 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
     this.initWorklet();
 
     this.renderSmallView = mkContainerRenderHelper({
-      Comp: StatisticsNodeUI,
+      Comp: LazyStatisticsNodeUI,
       store: this.reduxInfra.store,
       // TODO: Look into whether or not this is bad for performance?
       predicate: () => this.gainNode.connect(this.ctx.destination),
@@ -125,8 +133,11 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
   public buildConnectables() {
     return {
       vcId: this.vcId,
-      inputs: Map<string, ConnectableInput>().set('input', { node: this.offset, type: 'number' }),
-      outputs: Map<string, ConnectableOutput>().set('passthru', { node: this, type: 'number' }),
+      inputs: ImmMap<string, ConnectableInput>().set('input', {
+        node: this.offset,
+        type: 'number',
+      }),
+      outputs: ImmMap<string, ConnectableOutput>().set('passthru', { node: this, type: 'number' }),
       node: this,
     };
   }

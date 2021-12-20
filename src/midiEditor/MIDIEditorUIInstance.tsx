@@ -1,8 +1,8 @@
 import { UnreachableException } from 'ameo-utils';
-import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
+import * as PIXI from 'src/controls/pixi';
 import { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
 import { NoteBox } from 'src/midiEditor/NoteBox';

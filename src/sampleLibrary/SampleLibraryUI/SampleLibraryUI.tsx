@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as R from 'ramda';
-import { List, ListRowRenderer } from 'react-virtualized';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
 import { parse as parsePath } from 'path-browserify';
 
 import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
@@ -68,7 +68,7 @@ const mkDefaultSampleListingRowRenderer = ({
   sampleDescriptors,
   playingSample,
   togglePlaying,
-}: MkSampleListingRowRendererArgs): ListRowRenderer => {
+}: MkSampleListingRowRendererArgs): React.FC<ListChildComponentProps> => {
   const DefaultSampleListingRowRenderer: React.FC<any> = ({ style, index, key }) => (
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
@@ -111,7 +111,7 @@ const SampleSearch: React.FC<SampleSearchProps> = ({ value, onChange }) => (
 
 interface SampleListingProps {
   sampleDescriptors: SampleDescriptor[];
-  mkRowRenderer?: (args: MkSampleListingRowRendererArgs) => ListRowRenderer;
+  mkRowRenderer?: (args: MkSampleListingRowRendererArgs) => React.FC<ListChildComponentProps>;
   height?: number;
   width?: number;
   selectedSample: { sample: SampleDescriptor; index: number } | null;
@@ -259,12 +259,13 @@ export const SampleListing: React.FC<SampleListingProps> = ({
       <SampleSearch value={sampleSearch} onChange={setSampleSearch} />
       <List
         height={height}
-        rowHeight={20}
-        rowCount={filteredSamples.length}
+        itemSize={20}
+        itemCount={filteredSamples.length}
         width={width}
-        rowRenderer={RowRenderer}
-        scrollToIndex={selectedSample?.index}
-      />
+        // scrollToIndex={selectedSample?.index} // TODO
+      >
+        {RowRenderer}
+      </List>
     </>
   );
 };

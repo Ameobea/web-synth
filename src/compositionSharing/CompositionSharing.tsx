@@ -1,143 +1,33 @@
 import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
-import { Field, reduxForm, InjectedFormProps } from 'redux-form';
 import * as R from 'ramda';
-import { Table } from 'react-virtualized';
-import { useOnce } from 'ameo-utils/util/react';
 
-import { ReduxStore } from '../redux';
 import './CompositionSharing.scss';
-import { loadComposition, onBeforeUnload } from '../persistance';
+import { onBeforeUnload } from '../persistance';
 import { getEngine } from 'src/util';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { renderModalWithControls, ModalCompProps } from 'src/controls/Modal';
 import FlatButton from 'src/misc/FlatButton';
 import BasicModal from 'src/misc/BasicModal';
-import { fetchAllSharedCompositions, saveComposition, storeRemoteSample } from 'src/api';
+import {
+  fetchAllSharedCompositions,
+  getExistingCompositionTags,
+  saveComposition,
+  storeRemoteSample,
+} from 'src/api';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import {
+  pickPresetWithModal,
+  PresetDescriptor,
+} from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { fetchAndLoadSharedComposition } from 'src';
 
 export interface CompositionDefinition {
   id: number;
-  title: React.ReactNode;
+  title: string;
   author: number;
-  description: React.ReactNode;
+  description: string;
   content: string;
 }
-
-const CompositionItem: React.FC<
-  {
-    composition: CompositionDefinition;
-    engine: typeof import('../engine');
-    allViewContextIds: string[];
-    showButton?: boolean;
-  } & React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>
-> = ({ composition, engine, allViewContextIds, showButton = true, className, ...props }) => (
-  <div className={`composition-item${className ? ' ' + className : ''}`} {...props}>
-    <div className='composition-title'>{composition.title}</div>
-    <div className='composition-description'>{composition.description}</div>
-    {showButton ? (
-      <button onClick={() => loadComposition(composition.content, engine, allViewContextIds)}>
-        Load
-      </button>
-    ) : (
-      <div style={{ maxWidth: 60 }} />
-    )}
-  </div>
-);
-
-const CompositionListing: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
-  const [allSharedCompositions, setAllSharedCompositions] = useState<
-    null | CompositionDefinition[]
-  >(null);
-  const [errorMessage, setErrorMessage] = useState<null | string>(null);
-  useOnce(async () => {
-    fetchAllSharedCompositions()
-      .then(setAllSharedCompositions)
-      .catch(err => setErrorMessage(`Failed to fetch shared compositions: ${err.message}`));
-  });
-  const allViewContextIds = useSelector((state: ReduxStore) =>
-    state.viewContextManager.activeViewContexts.map(R.prop('uuid'))
-  );
-
-  if (!allSharedCompositions) {
-    if (errorMessage) {
-      return <>{errorMessage}</>;
-    } else {
-      return <span>Loading...</span>;
-    }
-  }
-
-  return (
-    <div className='shared-composition-listing'>
-      <h2>Browse Shared Compositions</h2>
-      <Table
-        headerHeight={26}
-        height={600}
-        rowCount={allSharedCompositions.length}
-        rowGetter={({ index }) => allSharedCompositions[index]}
-        rowRenderer={({ className, style, rowData, key }) => (
-          <CompositionItem
-            composition={rowData}
-            engine={engine}
-            allViewContextIds={allViewContextIds}
-            className={className}
-            style={style}
-            key={key}
-          />
-        )}
-        headerRowRenderer={({ className, style }) => (
-          <CompositionItem
-            showButton={false}
-            composition={{
-              id: -1,
-              content: '',
-              author: -1,
-              title: <b>Title</b>,
-              description: <b>Description</b>,
-            }}
-            engine={engine}
-            allViewContextIds={allViewContextIds}
-            className={className}
-            style={{ ...style, borderBottom: '1px solid #999', marginBottom: 6 }}
-          />
-        )}
-        rowHeight={140}
-        width={window.innerWidth - 80}
-        row
-      />
-    </div>
-  );
-};
-
-interface FieldRendererProps {
-  input: { [key: string]: any };
-  label?: string;
-  type: string;
-  meta: { touched: boolean; error?: string; warning?: string };
-  ComponentOverride?: React.ComponentType<any>;
-}
-
-const FieldRenderer: React.FC<FieldRendererProps> = ({
-  input,
-  label,
-  type,
-  meta: { touched, error, warning },
-  ComponentOverride,
-}) => (
-  <div className='custom-field-renderer'>
-    <label>{label}</label>
-    <div>
-      {ComponentOverride ? <ComponentOverride {...input} /> : <input {...input} type={type} />}
-    </div>
-    <div>
-      {touched ? (
-        <>
-          {error ? <span style={{ color: '#bb2312' }}>{error}</span> : null}
-          {warning ? <span style={{ color: '#bb7302' }}>{warning}</span> : null}
-        </>
-      ) : null}
-    </div>
-  </div>
-);
 
 const mkLocalSamplesConfirmation = (localSamples: SampleDescriptor[]) => {
   const LocalSamplesConfirmation: React.FC<ModalCompProps<void>> = ({
@@ -291,10 +181,12 @@ const removeCompositionSharingFromVCMState = (serializedVcmState: any) => {
 const serializeAndSaveComposition = async ({
   title,
   description,
+  tags,
 }: {
   title: string;
   description: string;
-}) => {
+  tags: string[];
+}): Promise<number> => {
   // Check to see if any local compositions are in use by the composition.  If so, check confirm with
   // the user whether or not they should be uploaded and handle converting them to remote samples.
   const samples = await checkForLocalSamples();
@@ -326,76 +218,106 @@ const serializeAndSaveComposition = async ({
     };
   }
 
+  let compositionID: number | null = null;
+  let saveCompositionError: any = null;
   try {
-    const res = await saveComposition(title, description, compositionData);
-    if (!res.ok) {
-      console.error(`Error while submitting composition: ${await res.text()}`);
-      alert(`Error while submitting composition: ${await res.text()}`);
-    }
+    compositionID = await saveComposition(title, description, compositionData, tags);
   } catch (err) {
     console.error('Error saving composition: ', err);
-    alert('Error saving composition: ' + `${err}`);
+    saveCompositionError = err;
   } finally {
     // Re-initialize
     engine.init();
   }
+
+  if (compositionID !== null) {
+    return compositionID;
+  }
+  throw saveCompositionError;
 };
 
-type ShareCompositionInnerProps = InjectedFormProps<{
-  title: string;
-  description: string;
-}>;
+const ShareComposition: React.FC = () => {
+  const [savedCompositionID, setSavedCompositionID] = useState<number | null>(null);
 
-const ShareCompositionInner: React.FC<ShareCompositionInnerProps> = ({
-  handleSubmit,
-  submitting,
-  submitSucceeded,
-  submitFailed,
-  error,
-}) => (
-  <>
-    <form className='share-composition-form' onSubmit={handleSubmit(serializeAndSaveComposition)}>
-      <h2>Share Composition</h2>
-      <Field name='title' component={FieldRenderer} type='text' label='Title' />
-      <Field
-        name='description'
-        component={FieldRenderer}
-        ComponentOverride={({ ...args }) => <textarea {...args} />}
-        type='text'
-        label='Description'
-      />
-      <button disabled={submitting} type='submit'>
-        Submit
+  return (
+    <>
+      <button
+        onClick={async () => {
+          try {
+            const {
+              name: title,
+              description,
+              tags,
+            } = await renderGenericPresetSaverWithModal({
+              description: true,
+              getExistingTags: getExistingCompositionTags,
+            });
+
+            const savedCompositionID = await serializeAndSaveComposition({
+              title,
+              description: description ?? '',
+              tags: tags ?? [],
+            });
+            setSavedCompositionID(savedCompositionID);
+          } catch (err) {
+            if (!err) {
+              return;
+            }
+
+            alert('Error saving composition: ' + err);
+          }
+        }}
+      >
+        Share Current Composition
       </button>
-    </form>
-    {submitSucceeded
-      ? 'Successfully submitted!  You may need to refresh the page if this process caused any issues.'
-      : null}
-    {submitFailed && error ? 'Submission Failed' : null}
-    {error ? <span style={{ color: '#bb2312' }}>{error}</span> : null}
-  </>
-);
+      {savedCompositionID !== null ? (
+        <span style={{ color: 'green' }}>Composition {savedCompositionID} saved successfully!</span>
+      ) : null}
+    </>
+  );
+};
 
-const ShareComposition = reduxForm<{ title: string; description: string }>({
-  form: 'compositionSharing',
-  validate: ({ title, description }) => {
-    const errors: { [key: string]: string } = {};
-
-    if (!title) {
-      errors.title = 'You must supply a title';
-    }
-    if (!description) {
-      errors.description = 'You must supply a description';
-    }
-
-    return errors;
-  },
-})(ShareCompositionInner);
-
-const CompositionSharing: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => (
+const CompositionSharing: React.FC = () => (
   <div className='composition-sharing'>
-    <ShareComposition />
-    <CompositionListing engine={engine} />
+    <h2>Share or Load Online Composition</h2>
+    <p>
+      Browse and load compositions created by other users or share your own composition for others
+      to try out
+    </p>
+
+    <div className='buttons-container'>
+      <ShareComposition />
+      <button
+        onClick={async () => {
+          const wrappedGetAllSharedCompositions = (): Promise<PresetDescriptor<any>[]> =>
+            fetchAllSharedCompositions().then(compositions =>
+              compositions.map(comp => ({ ...comp, name: comp.title, preset: null }))
+            );
+
+          let compID: string | number = '';
+          try {
+            const pickedComp = await pickPresetWithModal(wrappedGetAllSharedCompositions);
+            compID = pickedComp.id;
+          } catch (err) {
+            if (!err) {
+              return;
+            }
+            console.error(
+              'Error picking composition or getting list of shared compositions from the API: ',
+              err
+            );
+            alert(
+              'Error getting list of compositions from the API or rendering preset picker: ' + err
+            );
+            return;
+          }
+
+          fetchAndLoadSharedComposition(compID);
+        }}
+      >
+        Load Composition
+      </button>
+    </div>
   </div>
 );
 

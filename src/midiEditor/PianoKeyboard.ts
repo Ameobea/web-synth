@@ -1,5 +1,4 @@
-import * as PIXI from 'pixi.js';
-
+import * as PIXI from 'src/controls/pixi';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import { midiNumberToNoteName } from 'src/midiUtils';
 import * as conf from './conf';

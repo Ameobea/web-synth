@@ -32,6 +32,16 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
 
+const ctx = new AudioContext();
+
+const RegisterFMSynthAWP = new AsyncOnce(() =>
+  ctx.audioWorklet.addModule(
+    window.location.href.includes('localhost')
+      ? '/FMSynthAWP.js'
+      : '/FMSynthAWP.js?randId=' + btoa(Math.random().toString())
+  )
+);
+
 const buildDefaultModulationIndices = (): ParamSource[][] => {
   const indices = new Array(OPERATOR_COUNT).fill(null);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -226,6 +236,7 @@ export default class FMSynth implements ForeignNode {
           throw new UnimplementedError();
         },
         synthID: vcId ?? '',
+        isHidden: false,
       }),
     });
 
@@ -252,11 +263,7 @@ export default class FMSynth implements ForeignNode {
   public async init() {
     const [wasmBytes] = await Promise.all([
       WavetableWasmBytes.get(),
-      this.ctx.audioWorklet.addModule(
-        window.location.href.includes('localhost')
-          ? '/FMSynthAWP.js'
-          : '/FMSynthAWP.js?randId=' + btoa(Math.random().toString())
-      ),
+      RegisterFMSynthAWP.get(),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       numberOfOutputs: VOICE_COUNT,

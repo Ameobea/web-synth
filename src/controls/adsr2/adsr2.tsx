@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import * as PIXI from 'pixi.js';
 import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
 import ControlPanel from 'react-control-panel';
 
+import * as PIXI from 'src/controls/pixi';
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { makeDraggable } from 'src/controls/pixiUtils';
 import { mkLinearToLog } from 'src/util';
