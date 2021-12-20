@@ -17,7 +17,11 @@ interface FilterProps {
 }
 
 const Filter: React.FC<FilterProps> = ({ params, synthIx, filterEnvelope, bypass, stateKey }) => {
-  const settings = useMemo(() => getSettingsForFilterType(params.type), [params.type]);
+  const vcId = stateKey.split('_')[1];
+  const settings = useMemo(
+    () => getSettingsForFilterType(params.type, undefined, undefined, vcId),
+    [params.type, vcId]
+  );
   if (!filterEnvelope.outputRange) {
     console.error('Missing `outputRange` on `filterEnvelope` provided to `<Filter />`');
   }

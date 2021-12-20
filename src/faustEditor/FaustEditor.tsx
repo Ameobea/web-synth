@@ -259,11 +259,18 @@ const buildFaustEditorControlPanelSettings = ({
 interface FaustEditorControlPanelProps {
   vcId: string;
   compile: () => Promise<boolean>;
+  isRunning: boolean;
+  setIsRunning: (isRunning: boolean) => void;
 }
 
-const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({ vcId, compile }) => {
+const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({
+  isRunning,
+  setIsRunning,
+  vcId,
+  compile,
+}) => {
   const context = faustEditorContextMap[vcId];
-  const [isRunning, setIsRunning] = useState(!!context.faustNode);
+
   const { language, optimize } = useSelector(
     ({ faustEditor }: FaustEditorReduxStore) => R.pick(['language', 'optimize'], faustEditor),
     shallowEqual
@@ -297,7 +304,7 @@ const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({ vcId,
         saveCode,
         reduxInfra: context.reduxInfra,
       }),
-    [compile, context.reduxInfra, isRunning, language, saveCode, stopInstance]
+    [compile, context.reduxInfra, isRunning, language, saveCode, setIsRunning, stopInstance]
   );
 
   const onChange = useCallback(
@@ -353,8 +360,9 @@ const FaustEditor: React.FC<{ vcId: string }> = ({ vcId }) => {
   );
   const windowSize = useWindowSize();
 
-  const [compileErrMsg, setCompileErrMsg] = useState('');
   const context = faustEditorContextMap[vcId];
+  const [isRunning, setIsRunning] = useState(!!context.faustNode);
+  const [compileErrMsg, setCompileErrMsg] = useState('');
   const compile = useMemo(
     () =>
       mkCompileButtonClickHandler({
@@ -370,7 +378,7 @@ const FaustEditor: React.FC<{ vcId: string }> = ({ vcId }) => {
   useEffect(() => {
     if (context.compileOnMount && !didCompileOnMount.current) {
       didCompileOnMount.current = true;
-      compile();
+      compile().then(() => setIsRunning(true));
     }
   }, [compile, context.compileOnMount]);
 
@@ -390,7 +398,12 @@ const FaustEditor: React.FC<{ vcId: string }> = ({ vcId }) => {
 
         <div style={styles.errorConsole}>{compileErrMsg}</div>
       </div>
-      <FaustEditorControlPanel vcId={vcId} compile={compile} />
+      <FaustEditorControlPanel
+        vcId={vcId}
+        compile={compile}
+        isRunning={isRunning}
+        setIsRunning={setIsRunning}
+      />
 
       {FaustInstanceControlPanelComponent ? <FaustInstanceControlPanelComponent /> : null}
 

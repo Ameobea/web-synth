@@ -11,7 +11,11 @@ export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
 };
 
-export const loadComposition = (
+/**
+ * Resets the current state of the application, tearing down + cleaning up all modules and VCs and re-initializes
+ * with the provided composition.
+ */
+export const reinitializeWithComposition = (
   compositionBody: string,
   engine: typeof import('./engine'),
   allViewContextIds: string[]
@@ -57,7 +61,15 @@ export const onBeforeUnload = (engine: typeof import('src/engine')) => {
   engine.handle_window_close();
 };
 
-export const loadSharedComposition = async (composition: CompositionDefinition) => {
+/**
+ * Populates localstorage with the contents of the provided composition.  This function does NOT handle
+ * re-initializing the application, destroying + recreacting VCs, etc. and is designed to be used before the
+ * application is first loaded.
+ */
+export const loadSharedComposition = async (
+  composition: CompositionDefinition,
+  force?: boolean
+) => {
   // If we already have a local composition saved in the DB, we don't want to overwrite it.
   const hasSavedLocalComposition = (await localCompositionTable.count()) > 0;
   if (!hasSavedLocalComposition) {
@@ -68,7 +80,7 @@ export const loadSharedComposition = async (composition: CompositionDefinition) 
   // If the shared composition is already loaded, we will use whatever forked version the user
   // has locally rather than refresh again.
   const [prevLoadedCompId] = await currentLoadedCompositionIdTable.toArray();
-  if (prevLoadedCompId === composition.id) {
+  if (prevLoadedCompId === composition.id && !force) {
     console.log('Loaded comp id matches existing; not refreshing from scratch');
     return;
   }

@@ -56,6 +56,19 @@ export const getExistingCompositionTags = async (): Promise<{ name: string; coun
     return res.json();
   });
 
+export const getLoadedComposition = async (compositionID: string | number) => {
+  const res = await fetch(`${BACKEND_BASE_URL}/compositions/${compositionID}`);
+  if (res.status === 404) {
+    alert(`Composition with id "${compositionID}" not found`);
+    return;
+  } else if (!res.ok) {
+    alert(`Error loading composition: ${await res.text()}`);
+    return;
+  }
+  const composition: CompositionDefinition = await res.json();
+  return composition;
+};
+
 export const saveComposition = async (
   title: string,
   description: string,

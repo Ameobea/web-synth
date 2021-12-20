@@ -119,7 +119,7 @@ const handleFilterChange = (
   return newState;
 };
 
-const FilterConfig: React.FC<{
+interface FilterConfigProps {
   initialState: {
     params: FilterParams;
     envelope: Adsr;
@@ -129,12 +129,21 @@ const FilterConfig: React.FC<{
   filters: FilterContainer[];
   adsrs: ADSR2Module;
   onChange: (params: FilterParams, envelope: Adsr, bypass: boolean, enableADSR: boolean) => void;
-}> = ({ initialState, filters, adsrs, onChange }) => {
+  vcId: string | undefined;
+}
+
+const FilterConfig: React.FC<FilterConfigProps> = ({
+  initialState,
+  filters,
+  adsrs,
+  onChange,
+  vcId,
+}) => {
   const [state, setState] = useState(initialState);
 
   const settings = useMemo(
     () =>
-      getSettingsForFilterType(state.params.type, true, true)
+      getSettingsForFilterType(state.params.type, true, true, vcId)
         .filter(s => {
           if (!state.enableADSR && (s.label === 'adsr' || s.label === 'adsr length ms')) {
             return false;
@@ -147,7 +156,7 @@ const FilterConfig: React.FC<{
           delete (s as any).initial;
           return s;
         }),
-    [state.enableADSR, state.params.type]
+    [state.enableADSR, state.params.type, vcId]
   );
   const controlPanelState = useMemo(
     () => ({

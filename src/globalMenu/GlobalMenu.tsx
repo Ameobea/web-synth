@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
 import * as R from 'ramda';
 
-import { serializeAndDownloadComposition, loadComposition } from 'src/persistance';
+import { serializeAndDownloadComposition, reinitializeWithComposition } from 'src/persistance';
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
-import { ReduxStore } from 'src/redux';
+import { getState } from 'src/redux';
 import './GlobalMenu.scss';
 
 const ctx = new AudioContext();
@@ -59,57 +58,54 @@ const GlobalTempoControl: React.FC = () => {
   );
 };
 
-const GlobalMenu: React.FC<{
+interface GlobalMenuProps {
   closeMenu: () => void;
   engine: typeof import('../engine');
   isOpen: boolean;
-}> = ({ closeMenu, engine, isOpen }) => {
-  const allViewContextIds = useSelector((state: ReduxStore) =>
-    state.viewContextManager.activeViewContexts.map(R.prop('uuid'))
-  );
+}
 
-  return (
-    <div className='global-menu' role='menu' style={isOpen ? undefined : { right: -300 }}>
-      <RetractGlobalMenuButton onClose={closeMenu} />
-      <GlobalTempoControl />
-      <GlobalMenuItem
-        onClick={() => {
-          serializeAndDownloadComposition();
-          closeMenu();
-        }}
-      >
-        Save to File
-      </GlobalMenuItem>
-      <GlobalMenuItem
-        onClick={() => {
-          const uploader = document.getElementById(
-            'load-composition-uploader'
-          )! as HTMLInputElement;
-          uploader.value = '';
+const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) => (
+  <div className='global-menu' role='menu' style={isOpen ? undefined : { right: -300 }}>
+    <RetractGlobalMenuButton onClose={closeMenu} />
+    <GlobalTempoControl />
+    <GlobalMenuItem
+      onClick={() => {
+        serializeAndDownloadComposition();
+        closeMenu();
+      }}
+    >
+      Save to File
+    </GlobalMenuItem>
+    <GlobalMenuItem
+      onClick={() => {
+        const uploader = document.getElementById('load-composition-uploader')! as HTMLInputElement;
+        uploader.value = '';
 
-          uploader.dispatchEvent(new MouseEvent('click'));
-        }}
-      >
-        <>
-          <input
-            type='file'
-            id='load-composition-uploader'
-            style={{ display: 'none' }}
-            onChange={async evt => {
-              const { fileContent } = await parseUploadedFileAsText(evt);
-              const res = loadComposition(fileContent, engine, allViewContextIds);
-              if (res.value) {
-                alert('Error loading composition: ' + res.value);
-              }
-              closeMenu();
-            }}
-          />
-          Load from File
-        </>
-      </GlobalMenuItem>
-    </div>
-  );
-};
+        uploader.dispatchEvent(new MouseEvent('click'));
+      }}
+    >
+      <>
+        <input
+          type='file'
+          id='load-composition-uploader'
+          style={{ display: 'none' }}
+          onChange={async evt => {
+            const { fileContent } = await parseUploadedFileAsText(evt);
+            const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
+              R.prop('uuid')
+            );
+            const res = reinitializeWithComposition(fileContent, engine, allViewContextIds);
+            if (res.value) {
+              alert('Error loading composition: ' + res.value);
+            }
+            closeMenu();
+          }}
+        />
+        Load from File
+      </>
+    </GlobalMenuItem>
+  </div>
+);
 
 const GlobalMenuButton: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
   const [isOpen, setIsOpen] = useState(false);

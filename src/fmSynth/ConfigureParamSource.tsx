@@ -175,6 +175,7 @@ interface ConfigureADSRLengthMSProps {
   adsrIx: number;
   onAdsrChange: AdsrChangeHandler;
   theme?: { [key: string]: any };
+  vcId: string | undefined;
 }
 
 const ConfigureADSRLengthMS: React.FC<ConfigureADSRLengthMSProps> = ({
@@ -182,6 +183,7 @@ const ConfigureADSRLengthMS: React.FC<ConfigureADSRLengthMSProps> = ({
   adsrIx,
   theme,
   onAdsrChange,
+  vcId,
 }) => {
   return (
     <ConfigureParamSource
@@ -212,6 +214,7 @@ const ConfigureADSRLengthMS: React.FC<ConfigureADSRLengthMSProps> = ({
       )}
       excludedTypes={ADSR_LEN_EXCLUDED_TYPES}
       theme={theme}
+      vcId={vcId}
     />
   );
 };
@@ -374,6 +377,7 @@ interface ConfigureParamSourceProps {
   defaultVal?: number;
   scale?: 'log';
   excludedTypes?: ParamSource['type'][];
+  vcId: string | undefined;
 }
 
 interface ConfigureParamSourceInnerProps extends ConfigureParamSourceProps {
@@ -394,6 +398,7 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
   scale,
   excludedTypes,
   midiNode,
+  vcId,
 }) => {
   const settings = useMemo(
     () =>
@@ -412,6 +417,9 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
     [state, excludedTypes, min, max, scale, step, adsrs, onAdsrChange, midiNode, onChange]
   );
 
+  if (!vcId) {
+    console.trace({ vcId });
+  }
   const adsr = state.type === 'adsr' ? adsrs[state['adsr index']] : undefined;
 
   return (
@@ -516,6 +524,7 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
               adsr={adsr}
               adsrIx={(state as Extract<typeof state, { type: 'adsr' }>)['adsr index']}
               onAdsrChange={onAdsrChange}
+              vcId={vcId}
             />
           )}
           <ADSR2
@@ -536,6 +545,7 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
                 lenSamples: adsrs[state['adsr index']].lenSamples,
               });
             }}
+            vcId={vcId}
           />
         </>
       ) : null}

@@ -9,14 +9,17 @@ import type { VCMState } from 'src/redux/modules/viewContextManager';
 import { getEngine, setEngine, tryParseJson } from 'src/util';
 import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
-import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
-import { BACKEND_BASE_URL } from 'src/conf';
 import {
   loadSharedComposition,
   maybeRestoreLocalComposition,
   onBeforeUnload,
 } from 'src/persistance';
 import { initSentry } from 'src/sentry';
+import { getLoadedComposition } from 'src/api';
+import {
+  onVcHideStatusChange,
+  registerMainReduxGetState,
+} from 'src/ViewContextManager/VcHideStatusRegistry';
 
 const ctx = new AudioContext();
 
@@ -112,22 +115,33 @@ export const delete_view_context = (id: string) => {
   dispatch(actionCreators.viewContextManager.DELETE_VIEW_CONTEXT(id));
 };
 
-export const set_active_vc_ix = (newActiveVxIx: number) =>
-  dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
+export const set_active_vc_ix = (newActiveVxIx: number) => {
+  const oldActiveVcIx = getState().viewContextManager.activeViewContextIx;
+  const oldActiveVcId = getState().viewContextManager.activeViewContexts[oldActiveVcIx].uuid;
+  onVcHideStatusChange(oldActiveVcId, true);
 
-export const fetchAndLoadSharedComposition = async (compositionId: string | number) => {
-  console.log(`Loading composition id=${compositionId}`);
-  const res = await fetch(`${BACKEND_BASE_URL}/compositions/${compositionId}`);
-  if (res.status === 404) {
-    alert(`Composition with id "${compositionId}" not found`);
-    return;
-  } else if (!res.ok) {
-    alert(`Error loading composition: ${await res.text()}`);
+  const newActiveVcId = getState().viewContextManager.activeViewContexts[newActiveVxIx].uuid;
+  onVcHideStatusChange(newActiveVcId, false);
+
+  dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
+};
+
+/**
+ * Fetches the shared composition with the provided ID, deserializes it, and populates localstorage with its contents.
+ * This function does NOT handle re-initializing the application, destroying + recreacting VCs, etc. and is designed
+ * to be used before the application is first loaded.
+ */
+export const fetchAndLoadSharedComposition = async (
+  compositionID: string | number,
+  force?: boolean
+) => {
+  console.log(`Loading composition id=${compositionID}`);
+
+  const composition = await getLoadedComposition(compositionID);
+  if (!composition) {
     return;
   }
-
-  const composition: CompositionDefinition = await res.json();
-  await loadSharedComposition(composition);
+  await loadSharedComposition(composition, force);
 };
 
 if (typeof AudioWorkletNode === 'undefined') {
@@ -145,6 +159,8 @@ if (typeof AudioWorkletNode === 'undefined') {
     } else {
       await maybeRestoreLocalComposition();
     }
+
+    registerMainReduxGetState(getState);
 
     engine.init();
 

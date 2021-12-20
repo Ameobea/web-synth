@@ -458,12 +458,21 @@ const MIDIEditorControls: React.FC<{
   );
 };
 
-const MIDIEditor: React.FC<{
+interface MIDIEditorProps {
   initialState: SerializedMIDIEditorState;
   width: number;
   height: number;
   instance: MIDIEditorInstance;
-}> = ({ initialState, width, height, instance: parentInstance }) => {
+  vcId: string;
+}
+
+const MIDIEditor: React.FC<MIDIEditorProps> = ({
+  initialState,
+  width,
+  height,
+  instance: parentInstance,
+  vcId,
+}) => {
   const instance = useRef<MIDIEditorUIInstance | undefined>();
   useEffect(() => {
     return () => {
@@ -506,7 +515,8 @@ const MIDIEditor: React.FC<{
             height,
             ref,
             initialState,
-            parentInstance
+            parentInstance,
+            vcId
           );
           parentInstance.registerUI(instance.current);
         }}

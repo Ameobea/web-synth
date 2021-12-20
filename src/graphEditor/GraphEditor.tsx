@@ -21,6 +21,11 @@ import { getEngine } from 'src/util';
 import FlatButton from 'src/misc/FlatButton';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
+import {
+  getIsVcHidden,
+  registerVcHideCb,
+  unregisterVcHideCb,
+} from 'src/ViewContextManager/VcHideStatusRegistry';
 
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
 const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;
@@ -305,6 +310,25 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const smallViewDOMId = `graph-editor_${vcId}_small-view-dom-id`;
 
   useEffect(() => {
+    if (!lGraphInstance) {
+      return;
+    }
+
+    const cb = (isHidden: boolean) => {
+      if (isHidden) {
+        console.log('Stopping lgraph');
+        lGraphInstance.stop();
+      } else {
+        console.log('Starting lgraph');
+        lGraphInstance.start();
+      }
+    };
+
+    registerVcHideCb(vcId, cb);
+    return () => unregisterVcHideCb(vcId, cb);
+  }, [vcId, lGraphInstance]);
+
+  useEffect(() => {
     if (lGraphInstance) {
       setLGraphHandle(vcId, lGraphInstance);
 
@@ -388,7 +412,13 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         });
       };
 
-      graph.start();
+      const isHidden = getIsVcHidden(vcId);
+
+      if (!isHidden) {
+        graph.start();
+      } else {
+        graph.stop();
+      }
 
       setLGraphInstance(graph);
 

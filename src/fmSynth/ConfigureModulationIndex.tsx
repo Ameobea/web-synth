@@ -12,7 +12,7 @@ const TITLE = (
   </>
 );
 
-const ConfigureModulationIndex: React.FC<{
+interface ConfigureModulationIndexProps {
   srcOperatorIx: number;
   dstOperatorIx: number;
   modulationIndices: ParamSource[][];
@@ -20,7 +20,10 @@ const ConfigureModulationIndex: React.FC<{
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   synthID: string;
-}> = ({
+  vcId: string | undefined;
+}
+
+const ConfigureModulationIndex: React.FC<ConfigureModulationIndexProps> = ({
   srcOperatorIx,
   dstOperatorIx,
   modulationIndices,
@@ -28,6 +31,7 @@ const ConfigureModulationIndex: React.FC<{
   adsrs,
   onAdsrChange,
   synthID,
+  vcId,
 }) => (
   <div className='configure-modulation-index' data-synth-id={synthID}>
     <ConfigureParamSource
@@ -42,6 +46,7 @@ const ConfigureModulationIndex: React.FC<{
       excludedTypes={EXCLUDED_TYPES}
       adsrs={adsrs}
       onAdsrChange={onAdsrChange}
+      vcId={vcId}
     />
   </div>
 );

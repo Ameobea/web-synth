@@ -3,7 +3,11 @@ import React from 'react';
 import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
-export const mkControlPanelADSR2WithSize = (widthPx: number | undefined, heightPx = 350) => {
+export const mkControlPanelADSR2WithSize = (
+  widthPx: number | undefined,
+  heightPx = 350,
+  vcId?: string
+) => {
   const ControlPanelADSR2: React.FC<{
     value: Adsr & { outputRange: [number, number] };
     onChange: (newState: Adsr & { outputRange: [number, number] }) => void;
@@ -16,7 +20,15 @@ export const mkControlPanelADSR2WithSize = (widthPx: number | undefined, heightP
         value
       );
     }
-    return <ADSR2 initialState={value} onChange={onChange} height={heightPx} width={widthPx} />;
+    return (
+      <ADSR2
+        initialState={value}
+        onChange={onChange}
+        height={heightPx}
+        width={widthPx}
+        vcId={vcId}
+      />
+    );
   };
   return ControlPanelADSR2;
 };

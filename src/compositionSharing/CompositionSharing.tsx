@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import * as R from 'ramda';
 
 import './CompositionSharing.scss';
-import { onBeforeUnload } from '../persistance';
+import { onBeforeUnload, reinitializeWithComposition } from '../persistance';
 import { getEngine } from 'src/util';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { renderModalWithControls, ModalCompProps } from 'src/controls/Modal';
@@ -11,6 +11,7 @@ import BasicModal from 'src/misc/BasicModal';
 import {
   fetchAllSharedCompositions,
   getExistingCompositionTags,
+  getLoadedComposition,
   saveComposition,
   storeRemoteSample,
 } from 'src/api';
@@ -19,7 +20,7 @@ import {
   pickPresetWithModal,
   PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
-import { fetchAndLoadSharedComposition } from 'src';
+import { getState } from 'src/redux';
 
 export interface CompositionDefinition {
   id: number;
@@ -312,7 +313,14 @@ const CompositionSharing: React.FC = () => (
             return;
           }
 
-          fetchAndLoadSharedComposition(compID);
+          const composition = await getLoadedComposition(compID);
+          if (!composition) {
+            return;
+          }
+          const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
+            R.prop('uuid')
+          );
+          reinitializeWithComposition(composition.content, getEngine()!, allViewContextIds);
         }}
       >
         Load Composition

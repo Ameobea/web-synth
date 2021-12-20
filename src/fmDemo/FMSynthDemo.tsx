@@ -768,6 +768,8 @@ const FMSynthDemo: React.FC = () => {
               getFMSynthOutput={async () => mainGain}
               midiNode={midiInputNode}
               synthID='demo'
+              vcId={undefined}
+              isHidden={false}
             />
             <FilterConfig
               filters={filters}
@@ -798,6 +800,7 @@ const FMSynthDemo: React.FC = () => {
                 }
                 GlobalState.filterBypassed = bypass;
               }}
+              vcId={undefined}
             />
           </>
         )}

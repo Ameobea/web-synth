@@ -207,6 +207,7 @@ interface ConfigureWavetableProps {
   onAdsrChange: AdsrChangeHandler;
   wavetableState: WavetableState;
   setWavetableState: (newState: WavetableState) => void;
+  vcId: string | undefined;
 }
 
 const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
@@ -216,47 +217,49 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
   onAdsrChange,
   wavetableState,
   setWavetableState,
-}) => {
-  return (
-    <>
-      <ConfigureWavetableIndex
-        selectedWavetableName={config.wavetableName}
-        wavetableState={wavetableState}
-        setWavetableState={setWavetableState}
-        setSelectedWavetableName={newSelectedWavetableName =>
-          onChange({ ...config, wavetableName: newSelectedWavetableName })
-        }
-      />
-      <ConfigureParamSource
-        title='dim 0 intra mix'
-        state={config.dim0IntraMix}
-        onChange={newDim0IntraMix => onChange({ ...config, dim0IntraMix: newDim0IntraMix })}
-        min={0}
-        max={1}
-        adsrs={adsrs}
-        onAdsrChange={onAdsrChange}
-      />
-      <ConfigureParamSource
-        title='dim 1 intra mix'
-        state={config.dim1IntraMix}
-        onChange={newDim1IntraMix => onChange({ ...config, dim1IntraMix: newDim1IntraMix })}
-        min={0}
-        max={1}
-        adsrs={adsrs}
-        onAdsrChange={onAdsrChange}
-      />
-      <ConfigureParamSource
-        title='inter dim mix'
-        state={config.interDimMix}
-        onChange={newInterDimMix => onChange({ ...config, interDimMix: newInterDimMix })}
-        min={0}
-        max={1}
-        adsrs={adsrs}
-        onAdsrChange={onAdsrChange}
-      />
-    </>
-  );
-};
+  vcId,
+}) => (
+  <>
+    <ConfigureWavetableIndex
+      selectedWavetableName={config.wavetableName}
+      wavetableState={wavetableState}
+      setWavetableState={setWavetableState}
+      setSelectedWavetableName={newSelectedWavetableName =>
+        onChange({ ...config, wavetableName: newSelectedWavetableName })
+      }
+    />
+    <ConfigureParamSource
+      title='dim 0 intra mix'
+      state={config.dim0IntraMix}
+      onChange={newDim0IntraMix => onChange({ ...config, dim0IntraMix: newDim0IntraMix })}
+      min={0}
+      max={1}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='dim 1 intra mix'
+      state={config.dim1IntraMix}
+      onChange={newDim1IntraMix => onChange({ ...config, dim1IntraMix: newDim1IntraMix })}
+      min={0}
+      max={1}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='inter dim mix'
+      state={config.interDimMix}
+      onChange={newInterDimMix => onChange({ ...config, interDimMix: newInterDimMix })}
+      min={0}
+      max={1}
+      adsrs={adsrs}
+      onAdsrChange={onAdsrChange}
+      vcId={vcId}
+    />
+  </>
+);
 
 interface ConfigureOperatorProps {
   config: OperatorConfig;
@@ -269,6 +272,7 @@ interface ConfigureOperatorProps {
   onAdsrChange: AdsrChangeHandler;
   wavetableState: WavetableState;
   setWavetableState: (newState: WavetableState) => void;
+  vcId: string | undefined;
 }
 
 const OperatorTypeSettings = [
@@ -300,6 +304,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   onAdsrChange,
   wavetableState,
   setWavetableState,
+  vcId,
 }) => {
   const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
@@ -338,6 +343,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           max={20000}
           adsrs={adsrs}
           onAdsrChange={onAdsrChange}
+          vcId={vcId}
         />
       ) : null}
       {config.type === 'sine oscillator' ||
@@ -372,6 +378,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
               scale='log'
               adsrs={adsrs}
               onAdsrChange={onAdsrChange}
+              vcId={vcId}
             />
           ) : null}
         </>
@@ -385,6 +392,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           max={1}
           adsrs={adsrs}
           onAdsrChange={onAdsrChange}
+          vcId={vcId}
         />
       ) : null}
       {config.type === 'wavetable' ? (
@@ -395,6 +403,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           onAdsrChange={onAdsrChange}
           wavetableState={wavetableState}
           setWavetableState={setWavetableState}
+          vcId={vcId}
         />
       ) : null}
       <ConfigureEffects
@@ -404,6 +413,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
         setOperatorEffects={setEffects}
         adsrs={adsrs}
         onAdsrChange={onAdsrChange}
+        vcId={vcId}
       />
     </div>
   );

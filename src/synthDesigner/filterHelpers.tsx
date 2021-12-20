@@ -116,7 +116,8 @@ const filterSettings = {
 export const getSettingsForFilterType = (
   filterType: FilterType,
   includeADSR = true,
-  includeBypass = true
+  includeBypass = true,
+  vcId?: string
 ) =>
   R.clone(
     filterNils([
@@ -148,7 +149,9 @@ export const getSettingsForFilterType = (
             initial: 1000,
           }
         : null,
-      includeADSR ? filterSettings.adsr : null,
+      includeADSR
+        ? { ...filterSettings.adsr, Comp: mkControlPanelADSR2WithSize(500, 320, vcId) }
+        : null,
     ])
   );
 

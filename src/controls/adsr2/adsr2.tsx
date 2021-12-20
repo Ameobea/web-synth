@@ -7,6 +7,11 @@ import * as PIXI from 'src/controls/pixi';
 import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { makeDraggable } from 'src/controls/pixiUtils';
 import { mkLinearToLog } from 'src/util';
+import {
+  getIsVcHidden,
+  registerVcHideCb,
+  unregisterVcHideCb,
+} from 'src/ViewContextManager/VcHideStatusRegistry';
 
 const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
@@ -110,7 +115,7 @@ class RampHandle {
       Math.max((1 - this.startStep.y) * this.inst.height, (1 - this.endStep.y) * this.inst.height),
       newPos.y
     );
-    this.graphics.position = newPos;
+    this.graphics.position.set(newPos.x, newPos.y);
 
     this.computeNewEndPoint(newPos);
 
@@ -125,7 +130,7 @@ class RampHandle {
     g.beginFill(RAMP_HANDLE_COLOR);
     g.drawCircle(0, 0, STEP_HANDLE_WIDTH);
     g.endFill();
-    g.position = this.computeInitialPos();
+    g.position.copyFrom(this.computeInitialPos());
     g.zIndex = 2;
     g.interactive = true;
     g.cursor = 'pointer';
@@ -257,7 +262,7 @@ class StepHandle {
   public step: AdsrStep;
 
   private handleMove(newPos: PIXI.Point, thisHandleIx: number) {
-    this.graphics.position = newPos;
+    this.graphics.position.copyFrom(newPos);
     this.inst.sortAndUpdateMarks(thisHandleIx);
     this.inst.onUpdated();
   }
@@ -529,6 +534,7 @@ class ADSR2Instance {
   private ctx: AudioContext;
   private audioThreadData: AudioThreadData;
   private scaleMarkings!: ScaleMarkings;
+  private vcId?: string;
   /**
    * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
    */
@@ -669,7 +675,8 @@ class ADSR2Instance {
     onChange: (newState: Adsr) => void,
     ctx: AudioContext,
     initialState: Adsr,
-    outputRange: readonly [number, number]
+    outputRange: readonly [number, number],
+    vcId?: string
   ) {
     try {
       this.app = new PIXI.Application({
@@ -683,6 +690,11 @@ class ADSR2Instance {
       });
     } catch (err) {
       console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
+    }
+
+    if (vcId) {
+      this.vcId = vcId;
+      this.registerVcHideCb();
     }
 
     this.audioThreadData = initialState.audioThreadData;
@@ -839,6 +851,28 @@ class ADSR2Instance {
     this.releasePoint = state.releasePoint;
   }
 
+  /**
+   * Registers callbacks
+   */
+  private registerVcHideCb = () => {
+    if (!this.vcId) {
+      return;
+    }
+
+    registerVcHideCb(this.vcId, this.onHiddenStatusChanged);
+    // If the VC we belong to is currently hidden, then stop ticker immediately
+    const ourVcIsHidden = getIsVcHidden(this.vcId);
+    this.onHiddenStatusChanged(ourVcIsHidden);
+  };
+
+  public onHiddenStatusChanged = (isHidden: boolean) => {
+    if (isHidden) {
+      this.app?.ticker.stop();
+    } else {
+      this.app?.ticker.start();
+    }
+  };
+
   public serialize(): Adsr & { outputRange: readonly [number, number] } {
     return {
       steps: this.steps.map(R.prop('step')),
@@ -853,6 +887,9 @@ class ADSR2Instance {
 
   public destroy() {
     this.app?.destroy(false);
+    if (this.vcId) {
+      unregisterVcHideCb(this.vcId, this.onHiddenStatusChanged);
+    }
   }
 }
 
@@ -861,6 +898,7 @@ interface ADSR2Props {
   height?: number;
   initialState: Adsr & { outputRange: readonly [number, number] };
   onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void;
+  vcId?: string;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -877,7 +915,13 @@ export const buildDefaultADSR2Envelope = (audioThreadData: AudioThreadData): Ads
   audioThreadData,
 });
 
-const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, onChange }) => {
+const ADSR2: React.FC<ADSR2Props> = ({
+  width = 600,
+  height = 480,
+  initialState,
+  onChange,
+  vcId,
+}) => {
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
 
@@ -921,10 +965,16 @@ const ADSR2: React.FC<ADSR2Props> = ({ width = 600, height = 480, initialState, 
             return;
           }
 
-          instance.current = new ADSR2Instance(width, height, canvas, onChange, ctx, initialState, [
-            outputRangeStart,
-            outputRangeEnd,
-          ]);
+          instance.current = new ADSR2Instance(
+            width,
+            height,
+            canvas,
+            onChange,
+            ctx,
+            initialState,
+            [outputRangeStart, outputRangeEnd],
+            vcId
+          );
         }}
       />
     </div>

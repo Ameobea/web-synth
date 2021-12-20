@@ -96,7 +96,7 @@ interface SynthControlPanelProps extends Pick<SynthModule, 'masterGain' | 'pitch
   gainADSRLength: number;
 }
 
-const SYNTH_CONTROL_PANEL_SETTINGS = [
+const buildSynthControlPanelSettings = (vcId: string) => [
   {
     type: 'range',
     label: 'volume',
@@ -121,7 +121,7 @@ const SYNTH_CONTROL_PANEL_SETTINGS = [
   {
     type: 'custom',
     label: 'gain envelope',
-    Comp: mkControlPanelADSR2WithSize(380, 200),
+    Comp: mkControlPanelADSR2WithSize(380, 200, vcId),
   },
 ];
 
@@ -187,12 +187,14 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
     }),
     [props.masterGain, gainADSRLengthMs, gainEnvelope, props.pitchMultiplier, localPitchMultiplier]
   );
+  const vcId = props.stateKey.split('_')[1];
+  const settings = useMemo(() => buildSynthControlPanelSettings(vcId), [vcId]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <ControlPanel
         title='SYNTH'
-        settings={SYNTH_CONTROL_PANEL_SETTINGS}
+        settings={settings}
         onChange={handleSynthChange}
         state={state}
         width={400}
@@ -208,7 +210,8 @@ const SynthModuleCompInner: React.FC<{
   synth: SynthModule;
   stateKey: string;
   isHidden: boolean;
-}> = ({ index, synth, stateKey, children = null, isHidden }) => {
+  vcId: string;
+}> = ({ index, synth, stateKey, children = null, isHidden, vcId }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const filterEnvelope = useMemo(
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
@@ -252,6 +255,7 @@ const SynthModuleCompInner: React.FC<{
         synthID={`${stateKey}_${index}`}
         getFMSynthOutput={getFMSynthOutput}
         isHidden={isHidden}
+        vcId={vcId}
       />
 
       <FilterModule

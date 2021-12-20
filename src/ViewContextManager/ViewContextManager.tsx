@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { connect } from 'react-redux';
-import * as R from 'ramda';
+import { useSelector } from 'react-redux';
 
 import { ReduxStore } from 'src/redux';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
@@ -63,9 +62,11 @@ const ViewContextIcon: React.FC<ViewContextIconProps> = ({
   </div>
 );
 
-export const ViewContextManager: React.FC<{
+interface VCMProps {
   engine: typeof import('src/engine');
-}> = ({ engine }) => {
+}
+
+export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
   const [volumeSliderOpen, setVolumeSliderOpen] = useState(false);
   const [modulePickerOpen, setModulePickerOpen] = useState(false);
   const [globalBeatCounterStarted, setGlobalBeatCounterStarted] = useState(
@@ -164,11 +165,13 @@ interface ViewContextTabProps {
   i: number;
 }
 
-const ViewContextTabRenamer: React.FC<{
+interface VCMTabRenamerProps {
   value: string;
   setValue: (newValue: string) => void;
   submit: () => void;
-}> = ({ value, setValue, submit }) => {
+}
+
+const ViewContextTabRenamer: React.FC<VCMTabRenamerProps> = ({ value, setValue, submit }) => {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (ref.current) {
@@ -200,7 +203,7 @@ const VCTabCloseIcon: React.FC<{
   </div>
 );
 
-const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabProps) => {
+const ViewContextTab: React.FC<ViewContextTabProps> = ({ engine, name, uuid, title, active }) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renamingTitle, setRenamingTitle] = useState(title || '');
 
@@ -246,29 +249,32 @@ const ViewContextTab = ({ engine, name, uuid, title, active }: ViewContextTabPro
   );
 };
 
-const mapStateToProps = (state: ReduxStore) => R.pick(['viewContextManager'], state);
+interface ViewContextSwitcherProps {
+  engine: typeof import('src/engine');
+}
 
 /**
  * Creates a list of tabs on the top of the screen that allow switching between the list of active
  * VCs.  It is kept up to date via Redux, which is in turn updated automatically by the VCM on the
  * backend every time there is a change.
  */
-const ViewContextSwitcherInner: React.FC<
-  {
-    engine: typeof import('src/engine');
-  } & ReturnType<typeof mapStateToProps>
-> = ({ engine, viewContextManager }) => (
-  <div style={styles.viewContextSwitcher}>
-    {viewContextManager.activeViewContexts.map((props, i) => (
-      <ViewContextTab
-        engine={engine}
-        {...props}
-        i={i}
-        key={i}
-        active={viewContextManager.activeViewContextIx === i}
-      />
-    ))}
-  </div>
-);
+export const ViewContextSwitcher: React.FC<ViewContextSwitcherProps> = ({ engine }) => {
+  const { activeViewContexts, activeViewContextIx } = useSelector((state: ReduxStore) => ({
+    activeViewContexts: state.viewContextManager.activeViewContexts,
+    activeViewContextIx: state.viewContextManager.activeViewContextIx,
+  }));
 
-export const ViewContextSwitcher = connect(mapStateToProps)(ViewContextSwitcherInner);
+  return (
+    <div style={styles.viewContextSwitcher}>
+      {activeViewContexts.map((props, i) => (
+        <ViewContextTab
+          engine={engine}
+          {...props}
+          i={i}
+          key={i}
+          active={activeViewContextIx === i}
+        />
+      ))}
+    </div>
+  );
+};

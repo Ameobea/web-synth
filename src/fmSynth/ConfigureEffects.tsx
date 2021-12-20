@@ -209,6 +209,7 @@ type EffectConfigurator<T> = React.FC<{
   onChange: (newState: Partial<Effect> | null) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
+  vcId?: string;
 }>;
 
 const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({
@@ -216,6 +217,7 @@ const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ConfigureParamSource
@@ -227,6 +229,7 @@ const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({
       onChange={useCallback(newFrequency => onChange({ frequency: newFrequency }), [onChange])}
       min={0}
       max={20_000}
+      vcId={vcId}
     />
     <ConfigureParamSource
       theme={spectralWarpTheme}
@@ -237,6 +240,7 @@ const ConfigureSpectralWarping: EffectConfigurator<'spectral warping'> = ({
       onChange={useCallback(newWarpFactor => onChange({ warpFactor: newWarpFactor }), [onChange])}
       min={0}
       max={1}
+      vcId={vcId}
     />
   </>
 );
@@ -246,6 +250,7 @@ const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ConfigureParamSource
@@ -257,6 +262,7 @@ const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
       onChange={useCallback(topFoldPosition => onChange({ topFoldPosition }), [onChange])}
       min={0}
       max={1}
+      vcId={vcId}
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
@@ -267,6 +273,7 @@ const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
       onChange={useCallback(topFoldWidth => onChange({ topFoldWidth }), [onChange])}
       min={0}
       max={1}
+      vcId={vcId}
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
@@ -277,6 +284,7 @@ const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
       onChange={useCallback(bottomFoldPosition => onChange({ bottomFoldPosition }), [onChange])}
       min={-1}
       max={0}
+      vcId={vcId}
     />
     <ConfigureParamSource
       theme={wavecruncherTheme}
@@ -287,6 +295,7 @@ const ConfigureWavecruncher: EffectConfigurator<'wavecruncher'> = ({
       onChange={useCallback(bottomFoldWidth => onChange({ bottomFoldWidth }), [onChange])}
       min={0}
       max={1}
+      vcId={vcId}
     />
   </>
 );
@@ -296,6 +305,7 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ConfigureParamSource
@@ -308,6 +318,7 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
       max={44_100}
       state={state.sampleRate}
       onChange={useCallback(sampleRate => onChange({ sampleRate }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='bit depth'
@@ -319,6 +330,7 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
       scale='log'
       state={state.bitDepth}
       onChange={useCallback(bitDepth => onChange({ bitDepth }), [onChange])}
+      vcId={vcId}
     />
   </>
 );
@@ -328,6 +340,7 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ConfigureParamSource
@@ -339,6 +352,7 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
       max={16}
       state={state.gain}
       onChange={useCallback(gain => onChange({ gain }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='offset'
@@ -349,6 +363,7 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
       max={8}
       state={state.offset}
       onChange={useCallback(offset => onChange({ offset }), [onChange])}
+      vcId={vcId}
     />
   </>
 );
@@ -366,6 +381,7 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ControlPanel
@@ -388,6 +404,7 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
       scale='log'
       state={state.preGain}
       onChange={useCallback(preGain => onChange({ preGain }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='post gain'
@@ -398,6 +415,7 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
       max={5}
       state={state.postGain}
       onChange={useCallback(postGain => onChange({ postGain }), [onChange])}
+      vcId={vcId}
     />
   </>
 );
@@ -411,6 +429,7 @@ const ConfigureButterworthFilter: EffectConfigurator<'butterworth filter'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ControlPanel
@@ -428,11 +447,18 @@ const ConfigureButterworthFilter: EffectConfigurator<'butterworth filter'> = ({
       scale='log'
       state={state.cutoffFrequency}
       onChange={cutoffFrequency => onChange({ ...state, cutoffFrequency })}
+      vcId={vcId}
     />
   </>
 );
 
-const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, onAdsrChange }) => (
+const ConfigureDelay: EffectConfigurator<'delay'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+  vcId,
+}) => (
   <>
     <ConfigureParamSource
       title='delay_samples'
@@ -444,6 +470,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
       scale='log'
       state={state.delaySamples}
       onChange={delaySamples => onChange({ ...state, delaySamples })}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='wet'
@@ -454,6 +481,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
       max={1}
       state={state.wet}
       onChange={wet => onChange({ ...state, wet })}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='dry'
@@ -464,6 +492,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
       max={1}
       state={state.dry}
       onChange={dry => onChange({ ...state, dry })}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='feedback'
@@ -474,6 +503,7 @@ const ConfigureDelay: EffectConfigurator<'delay'> = ({ state, onChange, adsrs, o
       max={1}
       state={state.feedback}
       onChange={feedback => onChange({ ...state, feedback })}
+      vcId={vcId}
     />
   </>
 );
@@ -483,6 +513,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ConfigureParamSource
@@ -495,6 +526,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
       scale='log'
       state={state.cutoffFrequency}
       onChange={useCallback(cutoffFrequency => onChange({ cutoffFrequency }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='resonance'
@@ -505,6 +537,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
       max={4.5}
       state={state.resonance}
       onChange={useCallback(resonance => onChange({ resonance }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='drive'
@@ -515,6 +548,7 @@ const ConfigureMoogFilter: EffectConfigurator<'moog filter'> = ({
       max={5}
       state={state.drive}
       onChange={useCallback(drive => onChange({ drive }), [onChange])}
+      vcId={vcId}
     />
   </>
 );
@@ -524,6 +558,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => (
   <>
     <ConfigureParamSource
@@ -536,6 +571,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
       scale='log'
       state={state.delaySamples}
       onChange={useCallback(delaySamples => onChange({ delaySamples }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='feedforward gain'
@@ -546,6 +582,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
       max={1}
       state={state.feedforwardGain}
       onChange={useCallback(feedforwardGain => onChange({ feedforwardGain }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='feedback delay (samples)'
@@ -557,6 +594,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
       scale='log'
       state={state.feedbackDelaySamples}
       onChange={useCallback(feedbackDelaySamples => onChange({ feedbackDelaySamples }), [onChange])}
+      vcId={vcId}
     />
     <ConfigureParamSource
       title='feedback gain'
@@ -567,6 +605,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
       max={1}
       state={state.feedbackGain}
       onChange={useCallback(feedbackGain => onChange({ feedbackGain }), [onChange])}
+      vcId={vcId}
     />
   </>
 );
@@ -672,6 +711,7 @@ interface ConfigureEffectSpecificProps {
   onChange: (newEffect: Partial<Effect> | null) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
+  vcId?: string;
 }
 
 const ConfigureEffectSpecific: React.FC<ConfigureEffectSpecificProps> = ({
@@ -679,13 +719,16 @@ const ConfigureEffectSpecific: React.FC<ConfigureEffectSpecificProps> = ({
   onChange,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => {
   const Comp: EffectConfigurator<any> = useMemo(
     () => EFFECT_CONFIGURATOR_BY_EFFECT_TYPE[state.type],
     [state.type]
   );
 
-  return <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} />;
+  return (
+    <Comp state={state} onChange={onChange} adsrs={adsrs} onAdsrChange={onAdsrChange} vcId={vcId} />
+  );
 };
 
 interface ConfigureEffectProps {
@@ -696,6 +739,7 @@ interface ConfigureEffectProps {
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
+  vcId?: string;
 }
 
 const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
@@ -706,6 +750,7 @@ const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
   setOperatorEffects,
   adsrs,
   onAdsrChange,
+  vcId,
 }) => {
   return (
     <div className='configure-effect'>
@@ -728,6 +773,7 @@ const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
           onChange={onChange}
           adsrs={adsrs}
           onAdsrChange={onAdsrChange}
+          vcId={vcId}
         />
       )}
     </div>
@@ -741,6 +787,7 @@ interface ConfigureEffectsProps {
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   operatorIx: number | null;
+  vcId: string | undefined;
 }
 
 interface ConfigureEffectsState {
@@ -763,7 +810,8 @@ class ConfigureEffects extends React.Component<ConfigureEffectsProps, ConfigureE
   private effectChangeHandlers: ((newEffect: Partial<Effect> | null) => void)[];
 
   public render() {
-    const { state, onChange, setOperatorEffects, operatorIx, adsrs, onAdsrChange } = this.props;
+    const { state, onChange, setOperatorEffects, operatorIx, adsrs, onAdsrChange, vcId } =
+      this.props;
 
     return (
       <div className='configure-effects'>
@@ -791,6 +839,7 @@ class ConfigureEffects extends React.Component<ConfigureEffectsProps, ConfigureE
               setOperatorEffects={setOperatorEffects}
               adsrs={adsrs}
               onAdsrChange={onAdsrChange}
+              vcId={vcId}
             />
           ))}
         </div>

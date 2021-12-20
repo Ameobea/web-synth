@@ -88,13 +88,23 @@ const setOutput = (
   return { ...state, outputWeights: newOutputWeights };
 };
 
-const ConfigureMainEffectChain: React.FC<{
+interface ConfigureMainEffectChainProps {
   mainEffectChain: (Effect | null)[];
   onChange: (ix: number, newEffect: Effect | null) => void;
   setEffects: (newEffects: (Effect | null)[]) => void;
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
-}> = ({ mainEffectChain, onChange, setEffects, adsrs, onAdsrChange }) => (
+  vcId: string | undefined;
+}
+
+const ConfigureMainEffectChain: React.FC<ConfigureMainEffectChainProps> = ({
+  mainEffectChain,
+  onChange,
+  setEffects,
+  adsrs,
+  onAdsrChange,
+  vcId,
+}) => (
   <ConfigureEffects
     operatorIx={null}
     state={mainEffectChain}
@@ -102,6 +112,7 @@ const ConfigureMainEffectChain: React.FC<{
     setOperatorEffects={setEffects}
     adsrs={adsrs}
     onAdsrChange={onAdsrChange}
+    vcId={vcId}
   />
 );
 
@@ -142,6 +153,7 @@ interface FMSynthUIProps {
   midiControlValuesCache: MIDIControlValuesCache;
   synthID: string;
   isHidden: boolean;
+  vcId: string | undefined;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -167,6 +179,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   midiControlValuesCache,
   synthID,
   isHidden,
+  vcId,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -479,6 +492,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             onAdsrChange={handleAdsrChange}
             min={-1200}
             max={1200}
+            vcId={vcId}
           />
         ) : null}
       </div>
@@ -493,6 +507,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             }}
             adsrs={state.adsrs}
             onAdsrChange={handleAdsrChange}
+            vcId={vcId}
           />
         ) : null}
         {selectedUI?.type === 'operator'
@@ -526,6 +541,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                     setState(state => ({ ...state, wavetableState: newWavetableState }));
                     setWavetableState(newWavetableState);
                   }}
+                  vcId={vcId}
                 />
               );
             })()
@@ -539,6 +555,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             adsrs={state.adsrs}
             onAdsrChange={handleAdsrChange}
             synthID={synthID}
+            vcId={vcId}
           />
         ) : null}
         {selectedUI?.type === 'outputWeight' ? (
@@ -551,6 +568,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
               onOutputWeightChange(selectedUI.operatorIx, newOutputWeight)
             }
             synthID={synthID}
+            vcId={vcId}
           />
         ) : null}
         <div
@@ -568,7 +586,8 @@ export const ConnectedFMSynthUI: React.FC<{
   midiNode?: MIDINode | null;
   synthID: string;
   isHidden: boolean;
-}> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID, isHidden }) => (
+  vcId: string | undefined;
+}> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID, isHidden, vcId }) => (
   <FMSynthUI
     updateBackendModulation={useCallback(
       (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
@@ -617,6 +636,7 @@ export const ConnectedFMSynthUI: React.FC<{
       [synth]
     )}
     isHidden={isHidden}
+    vcId={vcId}
   />
 ));
 

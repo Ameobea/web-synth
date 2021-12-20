@@ -14,6 +14,11 @@ import MIDINoteBox, {
   NoteDragHandle,
   NoteDragHandleSide,
 } from 'src/midiEditor/NoteBox/MIDINoteBox';
+import {
+  getIsVcHidden,
+  registerVcHideCb,
+  unregisterVcHideCb,
+} from 'src/ViewContextManager/VcHideStatusRegistry';
 
 export interface Note {
   id: number;
@@ -90,15 +95,16 @@ export default class MIDIEditorUIInstance {
   public localBPM: number;
   public loopCursor: LoopCursor | null;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
-  private isHidden = true;
   public noteMetadataByNoteID: Map<number, any> = new Map();
+  private vcId: string;
 
   constructor(
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
     initialState: SerializedMIDIEditorState,
-    parentInstance: MIDIEditorInstance
+    parentInstance: MIDIEditorInstance,
+    vcId: string
   ) {
     this.width = width;
     this.height = height;
@@ -109,6 +115,7 @@ export default class MIDIEditorUIInstance {
       .map(loopPoint => new LoopCursor(this, loopPoint))
       .orNull();
     this.parentInstance = parentInstance;
+    this.vcId = vcId;
 
     this.app = new PIXI.Application({
       antialias: true,
@@ -121,6 +128,10 @@ export default class MIDIEditorUIInstance {
     });
     const interactionManager: PIXI.InteractionManager = this.app.renderer.plugins.interaction;
     interactionManager.cursorStyles['ew-resize'] = 'ew-resize';
+
+    registerVcHideCb(this.vcId, this.onHiddenStatusChanged);
+    const isHidden = getIsVcHidden(this.vcId);
+    this.onHiddenStatusChanged(isHidden);
 
     this.initEventHandlers();
     this.linesContainer = new PIXI.Container();
@@ -1107,14 +1118,12 @@ export default class MIDIEditorUIInstance {
     document.removeEventListener('wheel', this.eventHandlerCBs.wheel);
   }
 
-  public onUnhidden() {
-    // Activates clipboard event listeners
-    this.isHidden = false;
-  }
-
-  public onHidden() {
-    // De-activates clipboard event listeners
-    this.isHidden = true;
+  public onHiddenStatusChanged(isHidden: boolean) {
+    if (isHidden) {
+      this.app.ticker.stop();
+    } else {
+      this.app.ticker.start();
+    }
   }
 
   public destroy() {
@@ -1124,5 +1133,6 @@ export default class MIDIEditorUIInstance {
     } catch (err) {
       console.warn('Error destroying MIDI editor PIXI instance: ', err);
     }
+    unregisterVcHideCb(this.vcId, this.onHiddenStatusChanged);
   }
 }
