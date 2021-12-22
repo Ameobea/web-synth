@@ -12,7 +12,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   buildDefaultQuantizerNodeUIState,
   type QuantizerNodeUIState,
-} from 'src/graphEditor/nodes/CustomAudio/Quantizer/store';
+} from 'src/graphEditor/nodes/CustomAudio/Quantizer/types';
 import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 
 const QuantizerWasmBytes = new AsyncOnce(() =>
@@ -25,7 +25,7 @@ const QuantizerWasmBytes = new AsyncOnce(() =>
 const ctx = new AudioContext();
 const QuantizerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    'QuantizerAWP.js?cacheBust=' +
+    '/QuantizerAWP.js?cacheBust=' +
       (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );
@@ -51,7 +51,7 @@ export default class QuantizerNode implements ForeignNode {
       this.deserialize(params as QuantizerNodeUIState);
     }
 
-    this.init();
+    this.init().catch(err => console.error({ err }));
 
     this.store.subscribe(this.onChange);
 
@@ -86,9 +86,11 @@ export default class QuantizerNode implements ForeignNode {
     }
   };
 
-  private onChange = (newState: QuantizerNodeUIState) => {
-    this.awpHandle?.port.postMessage({ type: 'setState', state: newState });
-  };
+  private onChange = (newState: QuantizerNodeUIState) =>
+    this.awpHandle?.port.postMessage({
+      type: 'setState',
+      state: { quantizationInterval: newState.quantizationInterval.value, mode: newState.mode },
+    });
 
   private deserialize(params: QuantizerNodeUIState) {
     this.store.set(params);
@@ -106,7 +108,7 @@ export default class QuantizerNode implements ForeignNode {
           ? (this.awpHandle.parameters as Map<string, AudioParam>).get('input')!
           : new DummyNode(),
       }),
-      outputs: ImmMap<string, ConnectableOutput>().set('midi', {
+      outputs: ImmMap<string, ConnectableOutput>().set('output', {
         type: 'number',
         node: this.awpHandle ? this.awpHandle : new DummyNode(),
       }),

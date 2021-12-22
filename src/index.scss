@@ -91,3 +91,12 @@ button:disabled {
 .control-panel button {
   font-size: 13.25px;
 }
+
+select {
+  height: 20px;
+  border: none;
+  border-radius: 0px;
+  outline: none;
+  background-color: rgb(54, 54, 54);
+  color: rgb(161, 161, 161);
+}

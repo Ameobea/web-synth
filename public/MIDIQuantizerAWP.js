@@ -16,7 +16,7 @@ class MIDIQuantizerAWP extends AudioWorkletProcessor {
 
     this.pendingMessages = [];
 
-    this.port.onmessage = async evt => {
+    this.port.onmessage = evt => {
       if (!this.wasmInstance && evt.data.type !== 'setWasmBytes') {
         this.pendingMessages.push(evt.data);
         return;

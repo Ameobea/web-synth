@@ -1,4 +1,3 @@
-import { useWindowSize } from 'ameo-utils/dist/util/react';
 import React, { useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 import { useSelector } from 'react-redux';
@@ -8,7 +7,7 @@ import * as R from 'ramda';
 import { Tag } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
-import { withReactQueryClient, withReduxProvider } from 'src/reactUtils';
+import { useWindowSize, withReactQueryClient, withReduxProvider } from 'src/reactUtils';
 import { genericPresetDispatch, ReduxStore, store } from 'src/redux';
 import { genericPresetPickerActions } from 'src/redux/modules/genericPresetPicker';
 import './GenericPresetPicker.scss';

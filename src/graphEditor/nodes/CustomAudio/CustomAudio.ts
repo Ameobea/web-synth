@@ -37,6 +37,7 @@ import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
+import QuantizerNode from 'src/graphEditor/nodes/CustomAudio/Quantizer/QuantizerNode';
 
 const ctx = new AudioContext();
 
@@ -479,6 +480,9 @@ export const audioNodeGetters: {
   },
   'customAudio/midiQuantizer': {
     nodeGetter: MIDIQuantizerNode,
+  },
+  'customAudio/quantizer': {
+    nodeGetter: QuantizerNode,
   },
 };
 

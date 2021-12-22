@@ -1,10 +1,4 @@
-<script lang="ts">
-  import type { Writable } from 'svelte/store';
-
-  import type { MIDIQuantizerNodeUIState } from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/types';
-  import Note from './Note.svelte';
-  import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
-
+<script context="module">
   const WHITE_NOTES = [
     { name: 'C', index: 0 },
     { name: 'D', index: 2 },
@@ -22,6 +16,14 @@
     { name: 'A♭', index: 8 },
     { name: 'B♭', index: 10 },
   ];
+</script>
+
+<script lang="ts">
+  import type { Writable } from 'svelte/store';
+
+  import type { MIDIQuantizerNodeUIState } from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/types';
+  import Note from './Note.svelte';
+  import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 
   export let store: Writable<MIDIQuantizerNodeUIState>;
 

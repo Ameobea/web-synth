@@ -26,7 +26,7 @@ const MIDIQuantizerWasmBytes = new AsyncOnce(() =>
 const ctx = new AudioContext();
 const MIDIQuantizerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    'MIDIQuantizerAWP.js?cacheBust=' +
+    '/MIDIQuantizerAWP.js?cacheBust=' +
       (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );

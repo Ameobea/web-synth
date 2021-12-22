@@ -2,7 +2,7 @@ import React, { useState, Suspense, useMemo, useRef, useEffect, useCallback } fr
 import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
-import { Without, ValueOf, filterNils, useWindowSize } from 'ameo-utils';
+import { Without, ValueOf, filterNils } from 'ameo-utils';
 
 import { Effect } from 'src/redux/modules/effects';
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
@@ -19,6 +19,7 @@ import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { useWindowSize } from 'src/reactUtils';
 
 type FaustEditorReduxStore = ReturnType<typeof faustEditorContextMap.key.reduxInfra.getState>;
 

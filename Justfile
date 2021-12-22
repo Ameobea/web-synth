@@ -219,3 +219,7 @@ build-looper:
 build-midi-quantizer:
   cd ./engine/midi_quantizer && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/midi_quantizer.wasm ../../public
+
+build-quantizer:
+  cd ./engine/quantizer && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/quantizer.wasm ../../public

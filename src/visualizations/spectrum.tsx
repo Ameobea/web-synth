@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ControlPanel from 'react-control-panel';
-import { useOnce } from 'ameo-utils';
 
 import Loading from 'src/misc/Loading';
 import { AsyncOnce, elemInView } from 'src/util';
@@ -87,86 +86,94 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
     }
   }, [mkUpdateViz, canvasRef, paused]);
 
-  useOnce(async () => {
-    const [spectrumVizRawModule, spectrumVizModule] = await Promise.all([
-      RawWasmModule.get(),
-      WasmModule.get(),
-    ] as const);
-    spectrumModule.current = spectrumVizModule;
-    try {
-      setSpectrumSettingsDefinition(JSON.parse(spectrumModule.current.get_config_definition()));
-    } catch (err) {
-      console.error('Error while deserializing config from spectrum module: ', err);
+  const didInit = useRef(false);
+  useEffect(() => {
+    if (didInit.current) {
       return;
     }
+    didInit.current = true;
 
-    const ctxPtr = spectrumModule.current.new_context(2, 1);
-    if (initialConf) {
-      spectrumModule.current!.set_conf(ctxPtr, initialConf.color_fn, initialConf.scaler_fn);
-    }
-    setCtxPtr(ctxPtr);
+    (async () => {
+      const [spectrumVizRawModule, spectrumVizModule] = await Promise.all([
+        RawWasmModule.get(),
+        WasmModule.get(),
+      ] as const);
+      spectrumModule.current = spectrumVizModule;
+      try {
+        setSpectrumSettingsDefinition(JSON.parse(spectrumModule.current.get_config_definition()));
+      } catch (err) {
+        console.error('Error while deserializing config from spectrum module: ', err);
+        return;
+      }
 
-    let curIx = 0;
-    const pixelDataPtr = spectrumVizModule.get_pixel_data_ptr(ctxPtr);
-    const ctx = {
-      rawSpectrumViz: spectrumVizRawModule,
-      spectrumViz: spectrumVizModule,
-      wasmMemory: spectrumVizRawModule.wasmMemory,
-      byteFrequencyData: new Uint8Array(BUFFER_SIZE),
-      byteFrequencyDataPtr: spectrumVizModule.get_byte_frequency_data_ptr(ctxPtr),
-      pixelDataPtr,
-      pixelDataBuf: new Uint8ClampedArray(
-        spectrumVizRawModule.memory.buffer.slice(pixelDataPtr, pixelDataPtr + BUFFER_SIZE * 4)
-      ),
-    };
+      const ctxPtr = spectrumModule.current.new_context(2, 1);
+      if (initialConf) {
+        spectrumModule.current!.set_conf(ctxPtr, initialConf.color_fn, initialConf.scaler_fn);
+      }
+      setCtxPtr(ctxPtr);
 
-    analyzerNode.fftSize = FFT_SIZE;
-
-    const mkUpdateVisualization = (ctx2D: CanvasRenderingContext2D) => {
-      isInView.current = elemInView(ctx2D.canvas);
-
-      const updateViz = () => {
-        if (ctx === null || !isInView.current) {
-          animationFrameHandle.current = requestAnimationFrame(updateViz);
-          return;
-        }
-
-        curIx += 1;
-        if (curIx >= WIDTH) {
-          curIx = 0;
-        }
-
-        analyzerNode.getByteFrequencyData(ctx.byteFrequencyData);
-        ctx.spectrumViz.process_viz_data(ctxPtr);
-        if (ctx.wasmMemory.buffer !== ctx.rawSpectrumViz.memory.buffer) {
-          // Memory grown/re-allocated?
-          ctx.wasmMemory = new Uint8Array(ctx.rawSpectrumViz.memory.buffer);
-        }
-        ctx.wasmMemory.set(ctx.byteFrequencyData, ctx.byteFrequencyDataPtr);
-
-        if (ctx.pixelDataBuf.buffer !== ctx.rawSpectrumViz.memory.buffer) {
-          // Memory grown/re-allocated?
-          ctx.pixelDataBuf = new Uint8ClampedArray(
-            spectrumVizRawModule.memory.buffer.slice(
-              pixelDataPtr + (BUFFER_SIZE - lockedHeight.current) * 4,
-              pixelDataPtr + (BUFFER_SIZE - lockedHeight.current) * 4 + lockedHeight.current * 4
-            )
-          );
-        }
-        const imageData = new ImageData(ctx.pixelDataBuf, 1, lockedHeight.current);
-        ctx2D.putImageData(imageData, curIx, 0, 0, 0, 1, lockedHeight.current);
-
-        animationFrameHandle.current = requestAnimationFrame(updateViz);
+      let curIx = 0;
+      const pixelDataPtr = spectrumVizModule.get_pixel_data_ptr(ctxPtr);
+      const ctx = {
+        rawSpectrumViz: spectrumVizRawModule,
+        spectrumViz: spectrumVizModule,
+        wasmMemory: spectrumVizRawModule.wasmMemory,
+        byteFrequencyData: new Uint8Array(BUFFER_SIZE),
+        byteFrequencyDataPtr: spectrumVizModule.get_byte_frequency_data_ptr(ctxPtr),
+        pixelDataPtr,
+        pixelDataBuf: new Uint8ClampedArray(
+          spectrumVizRawModule.memory.buffer.slice(pixelDataPtr, pixelDataPtr + BUFFER_SIZE * 4)
+        ),
       };
 
-      return updateViz;
-    };
+      analyzerNode.fftSize = FFT_SIZE;
 
-    // If the state being set is a function, it is called to produce the new state value.
-    // Since we actually want to store the function as state, we use this wrapper function
-    // in order to prevent our function from getting called rather than set.
-    setMkUpdateViz(() => mkUpdateVisualization);
-  });
+      const mkUpdateVisualization = (ctx2D: CanvasRenderingContext2D) => {
+        isInView.current = elemInView(ctx2D.canvas);
+
+        const updateViz = () => {
+          if (ctx === null || !isInView.current) {
+            animationFrameHandle.current = requestAnimationFrame(updateViz);
+            return;
+          }
+
+          curIx += 1;
+          if (curIx >= WIDTH) {
+            curIx = 0;
+          }
+
+          analyzerNode.getByteFrequencyData(ctx.byteFrequencyData);
+          ctx.spectrumViz.process_viz_data(ctxPtr);
+          if (ctx.wasmMemory.buffer !== ctx.rawSpectrumViz.memory.buffer) {
+            // Memory grown/re-allocated?
+            ctx.wasmMemory = new Uint8Array(ctx.rawSpectrumViz.memory.buffer);
+          }
+          ctx.wasmMemory.set(ctx.byteFrequencyData, ctx.byteFrequencyDataPtr);
+
+          if (ctx.pixelDataBuf.buffer !== ctx.rawSpectrumViz.memory.buffer) {
+            // Memory grown/re-allocated?
+            ctx.pixelDataBuf = new Uint8ClampedArray(
+              spectrumVizRawModule.memory.buffer.slice(
+                pixelDataPtr + (BUFFER_SIZE - lockedHeight.current) * 4,
+                pixelDataPtr + (BUFFER_SIZE - lockedHeight.current) * 4 + lockedHeight.current * 4
+              )
+            );
+          }
+          const imageData = new ImageData(ctx.pixelDataBuf, 1, lockedHeight.current);
+          ctx2D.putImageData(imageData, curIx, 0, 0, 0, 1, lockedHeight.current);
+
+          animationFrameHandle.current = requestAnimationFrame(updateViz);
+        };
+
+        return updateViz;
+      };
+
+      // If the state being set is a function, it is called to produce the new state value.
+      // Since we actually want to store the function as state, we use this wrapper function
+      // in order to prevent our function from getting called rather than set.
+      setMkUpdateViz(() => mkUpdateVisualization);
+    })();
+  }, [analyzerNode, initialConf]);
 
   const onSettingChange = useCallback(
     (_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
