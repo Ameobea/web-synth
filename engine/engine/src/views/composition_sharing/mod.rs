@@ -7,7 +7,6 @@ use crate::{js, view_context::ViewContext};
 /// This is just a shim to the JS-based composition sharing UI.  Since there really aren't any
 /// complicated interactive or graphical components of this view context, the actual implementation
 /// for this is done in JS.
-#[derive(Serialize, Deserialize)]
 pub struct CompositionSharing {
     pub uuid: Uuid,
 }
@@ -30,17 +29,8 @@ impl ViewContext for CompositionSharing {
     fn unhide(&mut self) { js::unhide_composition_sharing(&self.get_state_key()); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
-
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `CompositionSharing` to String")
-    }
 }
 
-pub fn mk_composition_sharing(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let composition_sharing: CompositionSharing = match definition_opt {
-        Some(definition) => serde_json::from_str(definition)
-            .expect("Error while deserializing `CompositionSharing`"),
-        None => CompositionSharing::new(uuid),
-    };
-    box composition_sharing
+pub fn mk_composition_sharing(uuid: Uuid) -> Box<dyn ViewContext> {
+    box CompositionSharing::new(uuid)
 }

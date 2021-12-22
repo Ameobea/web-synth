@@ -7,7 +7,6 @@ use crate::{js, view_context::ViewContext};
 /// This is just a shim to the JS-based graph editor.  Since there really aren't any complicated
 /// interactive or graphical components of this view context, the actual implementation for this
 /// is done in JS.
-#[derive(Serialize, Deserialize)]
 pub struct GraphEditor {
     pub uuid: Uuid,
 }
@@ -30,17 +29,6 @@ impl ViewContext for GraphEditor {
     fn unhide(&mut self) { js::unhide_graph_editor(&self.get_state_key()); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
-
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `GraphEditor` to String")
-    }
 }
 
-pub fn mk_graph_editor(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let graph_editor: GraphEditor = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `GraphEditor`"),
-        None => GraphEditor::new(uuid),
-    };
-    box graph_editor
-}
+pub fn mk_graph_editor(uuid: Uuid) -> Box<dyn ViewContext> { box GraphEditor::new(uuid) }

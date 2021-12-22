@@ -44,6 +44,4 @@ impl ViewContext for MIDIKeyboard {
     }
 }
 
-pub fn mk_midi_keyboard(_definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    box MIDIKeyboard { uuid }
-}
+pub fn mk_midi_keyboard(uuid: Uuid) -> Box<dyn ViewContext> { box MIDIKeyboard { uuid } }

@@ -2,27 +2,35 @@
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate serde_derive;
 
 use std::{convert::TryFrom, io::BufReader, u64};
 
 use futures::prelude::*;
 use js_sys::{Function, Promise, Uint8Array};
+use miniserde::{json, Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 
-use common::RawNoteData;
 use rimd::{AbsoluteEvent, Event, MidiMessage, SMFWriter, Status, TrackEvent, SMF};
 
 pub mod streaming;
 
 const NO_PLAYING_NOTE: u64 = u64::MAX;
 
+#[repr(packed)]
+#[derive(Clone, Copy, Debug)]
+pub struct RawNoteData {
+    pub line_ix: u32,
+    pub padding: u32,
+    pub start_beat: f64,
+    pub width: f64,
+}
+
 #[wasm_bindgen]
 pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
     let ticks_per_beat = 256.;
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     let notes: &[RawNoteData] = unsafe {
         std::slice::from_raw_parts(
@@ -107,7 +115,8 @@ pub fn load_midi_to_raw_note_bytes(
     info_cb: Function,
     note_cb: Function,
 ) -> Option<Promise> {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     let mut reader = BufReader::new(file_bytes);
     let midi_file = SMF::from_reader(&mut reader).expect("Failed to parse supplied SMF file");
@@ -140,8 +149,7 @@ pub fn load_midi_to_raw_note_bytes(
 
     // Call the callback function and await the promise that it returns
     let file_info: MIDIFileInfo = MIDIFileInfo::from(&midi_file);
-    let serialized_file_info: String =
-        serde_json::to_string(&file_info).expect("Failed to serialize `file_info` to JSON");
+    let serialized_file_info: String = json::to_string(&file_info);
     let promise: Promise =
         match info_cb.call1(&JsValue::NULL, &JsValue::from_str(&serialized_file_info)) {
             Ok(res_js_value) => match Promise::try_from(res_js_value) {

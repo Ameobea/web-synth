@@ -5,8 +5,8 @@ import * as R from 'ramda';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   get_midi_keyboard_audio_connectables,
-  MappedOutput,
-  MIDIKeyboardCtx,
+  type MappedOutput,
+  type MIDIKeyboardCtx,
   midiKeyboardCtxByStateKey,
 } from 'src/midiKeyboard';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';

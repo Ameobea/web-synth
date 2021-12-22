@@ -3,8 +3,8 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { looperDispatch } from 'src/redux';
 import {
   looperActions,
-  LooperInstState,
-  LooperTransitionAlgorithm,
+  type LooperInstState,
+  type LooperTransitionAlgorithm,
   parseLooperTransitionAlgorithmUIState,
 } from 'src/redux/modules/looper';
 import { AsyncOnce } from 'src/util';

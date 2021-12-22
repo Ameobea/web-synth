@@ -1,10 +1,8 @@
-use serde_json;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
 use crate::{js, view_context::ViewContext};
 
-#[derive(Serialize, Deserialize)]
 pub struct Granulator {
     pub uuid: Uuid,
 }
@@ -28,10 +26,6 @@ impl ViewContext for Granulator {
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `Granulator` to String")
-    }
-
     fn get_audio_connectables(&self) -> JsValue {
         js::build_granulator_audio_connectables(&self.get_state_key())
     }
@@ -41,11 +35,4 @@ impl ViewContext for Granulator {
     }
 }
 
-pub fn mk_granulator(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let granulator: Granulator = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `Granulator`"),
-        None => Granulator::new(uuid),
-    };
-    box granulator
-}
+pub fn mk_granulator(uuid: Uuid) -> Box<dyn ViewContext> { box Granulator::new(uuid) }

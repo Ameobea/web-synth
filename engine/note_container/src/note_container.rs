@@ -31,7 +31,7 @@ impl NoteEntry {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct NoteContainer {
     pub inner: BTreeMap<FloatOrd<f64>, NoteEntry>,
 }

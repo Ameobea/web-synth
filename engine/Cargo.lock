@@ -64,15 +64,9 @@ checksum = "4bfbf56724aa9eca8afa4fcfadeb479e722935bb2a0900c2d37e0cc477af0688"
 name = "common"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
- "log",
  "rand",
  "rand_pcg 0.2.1",
- "serde",
- "serde_derive",
  "uuid",
- "wasm-bindgen",
- "wasm-logger",
 ]
 
 [[package]]
@@ -89,7 +83,6 @@ dependencies = [
 name = "delay"
 version = "0.1.0"
 dependencies = [
- "common",
  "dsp",
  "log",
 ]
@@ -181,16 +174,14 @@ dependencies = [
  "console_error_panic_hook",
  "fnv",
  "log",
+ "miniserde",
  "polysynth",
  "rand",
  "rand_pcg 0.2.1",
- "serde",
- "serde_derive",
- "serde_json",
  "slab",
  "uuid",
  "wasm-bindgen",
- "wasm-logger",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -430,14 +421,12 @@ dependencies = [
  "futures",
  "js-sys",
  "log",
+ "miniserde",
  "polysynth",
  "rimd",
- "serde",
- "serde_derive",
- "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-logger",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -445,6 +434,28 @@ name = "midi_quantizer"
 version = "0.1.0"
 dependencies = [
  "dsp",
+]
+
+[[package]]
+name = "mini-internal"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "926fbf1cd8695183e4712d1c77cdf2c5f7916f9f73ba103dca78ff2e6755ab47"
+dependencies = [
+ "proc-macro2 1.0.27",
+ "quote 1.0.7",
+ "syn 1.0.73",
+]
+
+[[package]]
+name = "miniserde"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0767e42acf28c5e08fee73cb657bcb23432c3769cbdf3881a8cb69d8df5020df"
+dependencies = [
+ "itoa",
+ "mini-internal",
+ "ryu",
 ]
 
 [[package]]
@@ -466,6 +477,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -587,13 +599,12 @@ name = "polysynth"
 version = "0.1.0"
 dependencies = [
  "common",
- "console_error_panic_hook",
  "js-sys",
  "log",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-logger",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -630,6 +641,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0d8caf72986c1a598726adc988bb5984792ef84f5ee5aa50209145ee8077038"
 dependencies = [
  "unicode-xid 0.2.1",
+]
+
+[[package]]
+name = "quantizer"
+version = "0.1.0"
+dependencies = [
+ "dsp",
 ]
 
 [[package]]
@@ -755,37 +773,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
-name = "serde"
-version = "1.0.117"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b88fa983de7720629c9387e9f517353ed404164b1e482c970a90c1a4aaf7dc1a"
-dependencies = [
- "serde_derive",
-]
-
-[[package]]
-name = "serde_derive"
-version = "1.0.117"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd1ae72adb44aab48f325a02444a5fc079349a8d804c1fc922aed3f7454c74e"
-dependencies = [
- "proc-macro2 1.0.27",
- "quote 1.0.7",
- "syn 1.0.73",
-]
-
-[[package]]
-name = "serde_json"
-version = "1.0.59"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcac07dbffa1c65e7f816ab9eba78eb142c6d44410f4eeba1e26e4f5dfa56b95"
-dependencies = [
- "itoa",
- "ryu",
- "serde",
-]
-
-[[package]]
 name = "sidechain"
 version = "0.1.0"
 dependencies = [
@@ -818,15 +805,12 @@ name = "spectrum_viz"
 version = "0.1.0"
 dependencies = [
  "common",
- "console_error_panic_hook",
  "lazy_static",
  "log",
+ "miniserde",
  "palette",
- "serde",
- "serde_derive",
- "serde_json",
  "wasm-bindgen",
- "wasm-logger",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -883,9 +867,6 @@ name = "uuid"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fde2f6a4bea1d6e007c4ad38c6839fa71cbb63b6dbf5b595aa38dc9b1093c11"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "version_check"
@@ -984,6 +965,7 @@ dependencies = [
  "hound",
  "log",
  "wasm-bindgen",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -993,6 +975,7 @@ dependencies = [
  "common",
  "log",
  "wasm-bindgen",
+ "wbg_logging",
 ]
 
 [[package]]
@@ -1002,6 +985,16 @@ dependencies = [
  "adsr",
  "dsp",
  "fastapprox",
+]
+
+[[package]]
+name = "wbg_logging"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "log",
+ "wasm-bindgen",
+ "wasm-logger",
 ]
 
 [[package]]

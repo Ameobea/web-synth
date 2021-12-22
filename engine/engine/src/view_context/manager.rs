@@ -1,4 +1,6 @@
-use serde_json;
+use std::str::FromStr;
+
+use miniserde::{json, Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
@@ -30,14 +32,15 @@ use crate::{
 /// updated without having to re-serialize all of the others as well.
 pub const VCM_STATE_KEY: &str = "vcmState";
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MinimalViewContextDefinition {
     pub name: String,
-    pub uuid: Uuid,
+    pub uuid: String,
     pub title: Option<String>,
 }
 
 pub struct ViewContextEntry {
+    pub id: Uuid,
     pub definition: MinimalViewContextDefinition,
     pub context: Box<dyn ViewContext>,
     /// A flag indicating if this entry has received any actions since it was last saved
@@ -60,7 +63,7 @@ pub struct ForeignConnectable {
     pub _type: String,
     pub id: String,
     #[serde(rename = "serializedState")]
-    pub serialized_state: Option<serde_json::Value>,
+    pub serialized_state: Option<json::Value>,
 }
 
 pub struct ViewContextManager {
@@ -84,14 +87,12 @@ impl Default for ViewContextManager {
 #[derive(Serialize, Deserialize)]
 pub struct ViewContextDefinition {
     pub minimal_def: MinimalViewContextDefinition,
-    pub conf: String,
 }
 
 impl<'a> Into<ViewContextDefinition> for &'a mut ViewContextEntry {
     fn into(self) -> ViewContextDefinition {
         ViewContextDefinition {
             minimal_def: self.definition.clone(),
-            conf: self.context.save(),
         }
     }
 }
@@ -111,7 +112,7 @@ pub struct ConnectionDescriptor {
 struct ViewContextManagerState {
     /// This contains the IDs of all managed VCs.  The actual `ViewContextDefinition`s for each of
     /// them are found in separate `localStorage` entries.
-    pub view_context_ids: Vec<Uuid>,
+    pub view_context_ids: Vec<String>,
     pub active_view_ix: usize,
     pub patch_network_connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)>,
     pub foreign_connectables: Vec<ForeignConnectable>,
@@ -127,6 +128,7 @@ impl ViewContextManager {
         view_context: Box<dyn ViewContext>,
     ) -> usize {
         self.contexts.push(ViewContextEntry {
+            id: Uuid::from_str(&definition.uuid).expect("Invalid UUID in `ViewContextEntry`"),
             definition,
             context: view_context,
             touched: false,
@@ -144,7 +146,7 @@ impl ViewContextManager {
     ) -> usize {
         let created_ix = self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid,
+                uuid: uuid.to_string(),
                 name: name.clone(),
                 title: None,
             },
@@ -195,7 +197,7 @@ impl ViewContextManager {
                     continue;
                 },
             };
-            let definition: ViewContextDefinition = match serde_json::from_str(&definition_str) {
+            let definition: ViewContextDefinition = match json::from_str(&definition_str) {
                 Ok(definition) => definition,
                 Err(err) => {
                     error!("Error deserializing `ViewContextDefinition`: {:?}", err);
@@ -205,8 +207,7 @@ impl ViewContextManager {
 
             let mut view_context = build_view(
                 &definition.minimal_def.name,
-                Some(&definition.conf),
-                definition.minimal_def.uuid,
+                Uuid::from_str(&definition.minimal_def.uuid).unwrap(),
             );
 
             view_context.init();
@@ -224,12 +225,12 @@ impl ViewContextManager {
     /// of the graph editor that is created.
     fn init_default_state(&mut self) -> Uuid {
         let graph_editor_vc_id = uuid_v4();
-        let mut graph_editor_view_context = build_view("graph_editor", None, graph_editor_vc_id);
+        let mut graph_editor_view_context = build_view("graph_editor", graph_editor_vc_id);
         graph_editor_view_context.init();
         graph_editor_view_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid: graph_editor_vc_id,
+                uuid: graph_editor_vc_id.to_string(),
                 name: "graph_editor".into(),
                 title: Some("Graph Editor".into()),
             },
@@ -238,12 +239,12 @@ impl ViewContextManager {
 
         // MIDI Keyboard
         let uuid = uuid_v4();
-        let mut midi_keyboard_view_context = build_view("midi_keyboard", None, uuid);
+        let mut midi_keyboard_view_context = build_view("midi_keyboard", uuid);
         midi_keyboard_view_context.init();
         midi_keyboard_view_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid,
+                uuid: uuid.to_string(),
                 name: "midi_keyboard".into(),
                 title: Some("MIDI Keyboard".into()),
             },
@@ -252,12 +253,12 @@ impl ViewContextManager {
 
         // MIDI Editor
         let uuid = uuid_v4();
-        let mut view_context = build_view("midi_editor", None, uuid);
+        let mut view_context = build_view("midi_editor", uuid);
         view_context.init();
         view_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid,
+                uuid: uuid.to_string(),
                 name: "midi_editor".into(),
                 title: Some("MIDI Editor".into()),
             },
@@ -266,15 +267,12 @@ impl ViewContextManager {
 
         // Synth Designer
         let uuid = uuid_v4();
-        let mut synth_designer_context = box SynthDesigner {
-            uuid,
-            initial_waveform: Some(String::from("triangle")),
-        };
+        let mut synth_designer_context = box SynthDesigner { uuid };
         synth_designer_context.init();
         synth_designer_context.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid,
+                uuid: uuid.to_string(),
                 name: "synth_designer".into(),
                 title: Some("Synth Designer".into()),
             },
@@ -283,47 +281,43 @@ impl ViewContextManager {
 
         // Faust Editor
         let uuid = uuid_v4();
-        let faust_editor = FaustEditor { uuid };
-        let state_key = faust_editor.get_state_key();
+        let mut faust_editor_ctx = box FaustEditor { uuid };
+        let state_key = faust_editor_ctx.get_state_key();
 
-        let faust_editor_content =
-            serde_json::json!({ "editorContent": include_str!("../../static/flanger.dsp"), "isRunning": true, "language": "faust" })
-                .to_string();
+        let faust_editor_content = format!(
+            r#"{{"editorContent": {}, "isRunning": true, "language": "faust" }}"#,
+            include_str!("../../static/flanger.dsp")
+        );
         js::set_localstorage_key(&state_key, &faust_editor_content);
 
-        let mut view_context = build_view(
-            "faust_editor",
-            Some(&serde_json::to_string(&faust_editor).unwrap()),
-            uuid,
-        );
-        view_context.init();
-        view_context.hide();
+        faust_editor_ctx.init();
+        faust_editor_ctx.hide();
         self.add_view_context_inner(
             MinimalViewContextDefinition {
-                uuid,
+                uuid: uuid.to_string(),
                 name: "faust_editor".into(),
                 title: Some("Code Editor".into()),
             },
-            view_context,
+            faust_editor_ctx,
         );
 
         let destination_id = 1;
         self.foreign_connectables.push(ForeignConnectable {
             _type: "customAudio/destination".into(),
-            id: destination_id.to_string(),
+            id: format!("{}", destination_id),
             serialized_state: None,
         });
 
         // Connect MIDI Keyboard -> MIDI Editor -> Synth Designer -> Faust Editor
         let (midi_keyboard_id, midi_editor_id, synth_id, faust_id) = (
-            self.contexts[1].definition.uuid,
-            self.contexts[2].definition.uuid,
-            self.contexts[3].definition.uuid,
-            self.contexts[4].definition.uuid,
+            self.contexts[1].definition.uuid.clone(),
+            self.contexts[2].definition.uuid.clone(),
+            self.contexts[3].definition.uuid.clone(),
+            self.contexts[4].definition.uuid.clone(),
         );
         self.connections.push((
             ConnectionDescriptor {
-                vc_id: midi_keyboard_id.to_string(),
+                vc_id: midi_keyboard_id,
                 name: "midi out".to_string(),
             },
             ConnectionDescriptor {
@@ -333,7 +327,7 @@ impl ViewContextManager {
         ));
         self.connections.push((
             ConnectionDescriptor {
-                vc_id: midi_editor_id.to_string(),
+                vc_id: midi_editor_id,
                 name: "midi_out".into(),
             },
             ConnectionDescriptor {
@@ -343,7 +337,7 @@ impl ViewContextManager {
         ));
         self.connections.push((
             ConnectionDescriptor {
-                vc_id: synth_id.to_string(),
+                vc_id: synth_id,
                 name: "masterOutput".into(),
             },
             ConnectionDescriptor {
@@ -353,7 +347,7 @@ impl ViewContextManager {
         ));
         self.connections.push((
             ConnectionDescriptor {
-                vc_id: faust_id.to_string(),
+                vc_id: faust_id,
                 name: "output".into(),
             },
             ConnectionDescriptor {
@@ -368,7 +362,7 @@ impl ViewContextManager {
 
     fn load_vcm_state() -> Option<ViewContextManagerState> {
         let vcm_state_str_opt = js::get_localstorage_key(VCM_STATE_KEY);
-        vcm_state_str_opt.and_then(|vcm_state_str| match serde_json::from_str(&vcm_state_str) {
+        vcm_state_str_opt.and_then(|vcm_state_str| match json::from_str(&vcm_state_str) {
             Ok(vcm_state) => Some(vcm_state),
             Err(err) => {
                 error!("Error deserializing stored VCM state: {:?}", err);
@@ -424,12 +418,9 @@ impl ViewContextManager {
             .iter()
             .map(|vc_entry| vc_entry.definition.clone())
             .collect();
-        let definitions_str = serde_json::to_string(&minimal_view_context_definitions)
-            .expect("Error serializing `MinimalViewContextDefinition`s into JSON string");
-        let connections_json = serde_json::to_string(&self.connections)
-            .expect("Failed to JSON serialize patch network connections");
-        let foreign_connectables_json = serde_json::to_string(&self.foreign_connectables)
-            .expect("Failed to JSON serialize foreign connectables");
+        let definitions_str = json::to_string(&minimal_view_context_definitions);
+        let connections_json = json::to_string(&self.connections);
+        let foreign_connectables_json = json::to_string(&self.foreign_connectables);
 
         js::init_view_contexts(
             self.active_context_ix,
@@ -442,9 +433,7 @@ impl ViewContextManager {
     }
 
     pub fn get_vc_position(&self, id: Uuid) -> Option<usize> {
-        self.contexts
-            .iter()
-            .position(|vc_entry| vc_entry.definition.uuid == id)
+        self.contexts.iter().position(|vc_entry| vc_entry.id == id)
     }
 
     /// Removes the view context with the supplied ID, calling its `.cleanup()` function, deleting
@@ -497,12 +486,12 @@ impl ViewContextManager {
         let mut view_context_ids = Vec::new();
 
         for entry in &mut self.contexts {
-            view_context_ids.push(entry.definition.uuid);
+            view_context_ids.push(entry.definition.uuid.clone());
+            let vc_id = entry.id;
             let view_context_definition: ViewContextDefinition = entry.into();
             js::set_localstorage_key(
-                &get_vc_key(view_context_definition.minimal_def.uuid),
-                &serde_json::to_string(&view_context_definition)
-                    .expect("Error while serializing `ViewContextDefinition`"),
+                &get_vc_key(vc_id),
+                &json::to_string(&view_context_definition),
             );
             view_context_definitions.push(view_context_definition);
         }
@@ -514,8 +503,7 @@ impl ViewContextManager {
             foreign_connectables: self.foreign_connectables.clone(),
         };
 
-        let serialized_state: String = serde_json::to_string(&state)
-            .expect("Error while serializing `ViewContextManagerState` to string");
+        let serialized_state: String = json::to_string(&state);
 
         js::set_localstorage_key(VCM_STATE_KEY, &serialized_state);
     }
@@ -551,11 +539,7 @@ impl ViewContextManager {
     /// Resets the VCM to its initial state, deleting all existing VCs.
     pub fn reset(&mut self) {
         // Delete + dispose all stored VCs
-        let contexts_to_delete: Vec<Uuid> = self
-            .contexts
-            .iter()
-            .map(|entry| entry.definition.uuid)
-            .collect();
+        let contexts_to_delete: Vec<Uuid> = self.contexts.iter().map(|entry| entry.id).collect();
         for uuid in contexts_to_delete {
             self.delete_vc_by_id(uuid);
         }
@@ -571,21 +555,21 @@ impl ViewContextManager {
     }
 }
 
-pub fn build_view(name: &str, conf: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
+pub fn build_view(name: &str, uuid: Uuid) -> Box<dyn ViewContext> {
     match name {
-        "midi_editor" => mk_midi_editor(conf, uuid),
-        "faust_editor" => mk_faust_editor(conf, uuid),
-        "graph_editor" => mk_graph_editor(conf, uuid),
-        "composition_sharing" => mk_composition_sharing(conf, uuid),
-        "synth_designer" => mk_synth_designer(conf, uuid),
-        "midi_keyboard" => mk_midi_keyboard(conf, uuid),
-        "sequencer" => mk_sequencer(conf, uuid),
-        "sample_library" => mk_sample_library(conf, uuid),
-        "control_panel" => mk_control_panel(conf, uuid),
-        "granulator" => mk_granulator(conf, uuid),
-        "filter_designer" => mk_filter_designer(conf, uuid),
-        "sinsy" => mk_sinsy(conf, uuid),
-        "looper" => mk_looper(conf, uuid),
+        "midi_editor" => mk_midi_editor(uuid),
+        "faust_editor" => mk_faust_editor(uuid),
+        "graph_editor" => mk_graph_editor(uuid),
+        "composition_sharing" => mk_composition_sharing(uuid),
+        "synth_designer" => mk_synth_designer(uuid),
+        "midi_keyboard" => mk_midi_keyboard(uuid),
+        "sequencer" => mk_sequencer(uuid),
+        "sample_library" => mk_sample_library(uuid),
+        "control_panel" => mk_control_panel(uuid),
+        "granulator" => mk_granulator(uuid),
+        "filter_designer" => mk_filter_designer(uuid),
+        "sinsy" => mk_sinsy(uuid),
+        "looper" => mk_looper(uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

@@ -3,12 +3,11 @@
 
 extern crate wasm_bindgen;
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate log;
 
 use std::{ptr, str::FromStr};
 
+use miniserde::json;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
@@ -35,7 +34,8 @@ pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEX
 /// the last saved composition from the user.
 #[wasm_bindgen]
 pub fn init() {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     // Check if we have an existing VCM and drop it if we do
     if unsafe { !VIEW_CONTEXT_MANAGER.is_null() } {
@@ -59,7 +59,7 @@ pub fn init() {
 pub fn create_view_context(vc_name: String) {
     let uuid = uuid_v4();
     debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
-    let mut view_context = build_view(&vc_name, None, uuid);
+    let mut view_context = build_view(&vc_name, uuid);
     view_context.init();
     let vcm = get_vcm();
     let new_vc_ix = vcm.add_view_context(uuid, vc_name, view_context);
@@ -129,7 +129,7 @@ pub fn get_vc_connectables(vc_id: &str) -> JsValue {
 #[wasm_bindgen]
 pub fn set_connections(connections_json: &str) {
     let connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)> =
-        match serde_json::from_str(connections_json) {
+        match json::from_str(connections_json) {
             Ok(conns) => conns,
             Err(err) => {
                 error!("Failed to deserialize provided connections JSON: {:?}", err);
@@ -143,7 +143,7 @@ pub fn set_connections(connections_json: &str) {
 #[wasm_bindgen]
 pub fn set_foreign_connectables(foreign_connectables_json: &str) {
     let foreign_connectables: Vec<ForeignConnectable> =
-        match serde_json::from_str(foreign_connectables_json) {
+        match json::from_str(foreign_connectables_json) {
             Ok(conns) => conns,
             Err(err) => {
                 error!(

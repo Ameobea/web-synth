@@ -20,6 +20,8 @@ members = [
   "wav_decoder",
   "looper",
   "midi_quantizer",
+  "quantizer",
+  "wbg_logging"
 ]
 
 [profile.release]

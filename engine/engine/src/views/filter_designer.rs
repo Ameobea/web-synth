@@ -1,10 +1,8 @@
-use serde_json;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
 use crate::{js, view_context::ViewContext};
 
-#[derive(Serialize, Deserialize)]
 pub struct FilterDesigner {
     pub uuid: Uuid,
 }
@@ -34,17 +32,6 @@ impl ViewContext for FilterDesigner {
     fn unhide(&mut self) { js::unhide_filter_designer(&self.get_state_key()); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
-
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `FilterDesigner` to String")
-    }
 }
 
-pub fn mk_filter_designer(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let filter_designer: FilterDesigner = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `FilterDesigner`"),
-        None => FilterDesigner::new(uuid),
-    };
-    box filter_designer
-}
+pub fn mk_filter_designer(uuid: Uuid) -> Box<dyn ViewContext> { box FilterDesigner::new(uuid) }

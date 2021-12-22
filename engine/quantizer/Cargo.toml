@@ -1,5 +1,5 @@
 [package]
-name = "delay"
+name = "quantizer"
 version = "0.1.0"
 authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2021"
@@ -8,5 +8,4 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-log = { version = "0.4", features = ["release_max_level_off"] }
 dsp = { path = "../dsp" }

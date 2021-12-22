@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
+import { genRandomStringID } from 'src/util';
 
 let PendingEvents: { time: number | null; beats: number | null; cbId: number }[] = [];
 
@@ -136,8 +137,14 @@ export const getCurGlobalBPM = () => {
 
 // Init the scheduler AWP instance
 Promise.all([
-  fetch('/event_scheduler.wasm').then(res => res.arrayBuffer()),
-  ctx.audioWorklet.addModule('/EventSchedulerWorkletProcessor.js'),
+  fetch(
+    '/event_scheduler.wasm?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : genRandomStringID())
+  ).then(res => res.arrayBuffer()),
+  ctx.audioWorklet.addModule(
+    '/EventSchedulerWorkletProcessor.js?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : genRandomStringID())
+  ),
 ] as const).then(([wasmArrayBuffer]) => {
   SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
   globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));

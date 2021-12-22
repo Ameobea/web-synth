@@ -8,7 +8,6 @@ use crate::{js, view_context::ViewContext};
 /// This is just a shim to the JS-based Code editor.  Since there really aren't any complicated
 /// interactive or graphical components of this view context, the actual implementation for this
 /// is done in JS.
-#[derive(Serialize, Deserialize)]
 pub struct FaustEditor {
     pub uuid: Uuid,
 }
@@ -32,10 +31,6 @@ impl ViewContext for FaustEditor {
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `FaustEditor` to String")
-    }
-
     fn get_audio_connectables(&self) -> JsValue {
         js::get_faust_editor_connectables(&self.get_id())
     }
@@ -49,11 +44,4 @@ impl ViewContext for FaustEditor {
     }
 }
 
-pub fn mk_faust_editor(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let faust_editor: FaustEditor = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `FaustEditor`"),
-        None => FaustEditor::new(uuid),
-    };
-    box faust_editor
-}
+pub fn mk_faust_editor(uuid: Uuid) -> Box<dyn ViewContext> { box FaustEditor::new(uuid) }

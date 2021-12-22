@@ -6,26 +6,26 @@ import { Map as ImmMap } from 'immutable';
 import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
-import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import {
   MidiKeyboardVC,
-  MidiKeyboardVCProps,
+  type MidiKeyboardVCProps,
   mkMidiKeyboardSmallView,
 } from 'src/midiKeyboard/MidiKeyboardVC';
 import { store, dispatch, actionCreators, getState } from 'src/redux';
 import {
   buildFreshOutputDescriptorsByControlIndex,
   computeMappedOutputValue,
-  MidiKeyboardMappedOutputDescriptor,
+  type MidiKeyboardMappedOutputDescriptor,
   MidiKeyboardMode,
-  MidiKeyboardStateItem,
+  type MidiKeyboardStateItem,
 } from 'src/redux/modules/midiKeyboard';
 import { tryParseJson } from 'src/util';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
+import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 
 const ctx = new AudioContext();
 

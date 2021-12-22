@@ -1,9 +1,9 @@
 import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
-import { ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
-import { AudioThreadData } from 'src/controls/adsr2/adsr2';
-import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { type ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import type { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
 
 const ADSR2AWPRegistered = new AsyncOnce(() =>

@@ -2,29 +2,28 @@ import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
-import { ConnectedFMSynthUI, UISelection } from 'src/fmSynth/FMSynthUI';
+import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
 import {
   buildDefaultOperatorConfig,
   deserializeWavetableState,
-  OperatorConfig,
+  type OperatorConfig,
   serializeWavetableState,
-  WavetableBank,
-  WavetableState,
+  type WavetableBank,
+  type WavetableState,
 } from 'src/fmSynth/ConfigureOperator';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-// import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import {
-  ParamSource,
+  type ParamSource,
   buildDefaultAdsr,
   buildDefaultParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/ConfigureEffects';
-import { AsyncOnce, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
-import { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import { AsyncOnce, genRandomStringID, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { getSentry } from 'src/sentry';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import { MIDINode } from 'src/patchNetwork/midiNode';
@@ -69,7 +68,11 @@ const WavetableWasmBytes = new AsyncOnce(async (): Promise<ArrayBuffer> => {
       simdStatusElem.setAttribute('style', 'display:block; color: #cfeb1e;');
     }
   }
-  const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
+  let path = hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm';
+  if (!window.location.host.includes('localhost')) {
+    path += `?cacheBust=${genRandomStringID()}`;
+  }
+  const res = fetch(path);
   return res.then(res => res.arrayBuffer());
 });
 
@@ -237,6 +240,7 @@ export default class FMSynth implements ForeignNode {
         },
         synthID: vcId ?? '',
         isHidden: false,
+        vcId,
       }),
     });
 

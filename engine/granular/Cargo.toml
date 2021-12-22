@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dsp = { path = "../dsp" }
-common = { path = "../common", default_features = false }
+common = { path = "../common" }
 rand = "0.7"
 hound = "3.4"
 claxon = "0.4"

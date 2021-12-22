@@ -32,6 +32,4 @@ impl ViewContext for Sinsy {
     }
 }
 
-pub fn mk_sinsy(_definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    box Sinsy { uuid }
-}
+pub fn mk_sinsy(uuid: Uuid) -> Box<dyn ViewContext> { box Sinsy { uuid } }

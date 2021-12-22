@@ -58,7 +58,7 @@ class MIDIQuantizerAWP extends AudioWorkletProcessor {
 
   async initWasm(wasmBytes) {
     const importObject = {
-      env: { play_note: this.playNote, release_note: this.releaseNote, debug: console.log },
+      env: { play_note: this.playNote, release_note: this.releaseNote },
     };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);

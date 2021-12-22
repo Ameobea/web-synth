@@ -3,7 +3,7 @@
 
 pub use wasm_bindgen::prelude::*;
 
-pub use common::{rng, uuid_v4, RNG};
+pub use common::{rng, uuid_v4};
 
 pub use super::{
     constants::*,

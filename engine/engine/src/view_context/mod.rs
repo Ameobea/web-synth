@@ -31,17 +31,6 @@ pub trait ViewContext {
     /// interact with it.
     fn unhide(&mut self) {}
 
-    /// This is called to indicate that a `ViewContext` should serialize itself into a persistant
-    /// format that can be called later to re-create it in its current state from scratch.
-    ///
-    /// This serialized format should include all settings, configuration, and UI state for the
-    /// view context, but it shouldn't include the VC's *data* directly, where data is things like
-    /// the content of a text editor or the notes on a grid.  That data should be stored separately
-    /// and referenced by a `localStorage` key or something similar.  The reason for this is that
-    /// these definitions are created, read, and transferred between WebAssembly and JavaScript
-    /// regularly, and storing large data in them will cause that to become slow.
-    fn save(&mut self) -> String { "".into() }
-
     // input handlers
     fn handle_key_down(&mut self, _key: &str, _control_pressed: bool, _shift_pressed: bool) {}
     fn handle_key_up(&mut self, _key: &str, _control_pressed: bool, _shift_pressed: bool) {}

@@ -2,12 +2,12 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { AsyncOnce, base64ToArrayBuffer, getHasSIMDSupport } from 'src/util';
+import { AsyncOnce, genRandomStringID, getHasSIMDSupport } from 'src/util';
 
 // Manually generate some waveforms... for science
 
@@ -67,7 +67,12 @@ const WavetableWasmBytes = new AsyncOnce(async () => {
         : 'Wasm SIMD support NOT detected; using fallback Wasm'
     );
   }
-  const res = fetch(hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm');
+
+  let path = hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm';
+  if (!window.location.href.includes('localhost')) {
+    path += `?cacheBust=${genRandomStringID()}`;
+  }
+  const res = fetch(path);
   return res.then(res => res.arrayBuffer());
 });
 

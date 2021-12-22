@@ -377,7 +377,7 @@ impl GranularCtx {
 
 #[no_mangle]
 pub fn create_granular_instance() -> *mut GranularCtx {
-    common::maybe_init();
+    common::maybe_init(None);
     let ctx = box GranularCtx::default();
     Box::into_raw(ctx)
 }

@@ -22,7 +22,8 @@ pub fn create_waveform_renderer_ctx(
     width_px: u32,
     height_px: u32,
 ) -> *mut WaveformRendererCtx {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     let mut ctx = box WaveformRendererCtx {
         sample_rate,

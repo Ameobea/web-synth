@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Map as ImmMap } from 'immutable';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
+import { filterNils } from 'ameo-utils';
 
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { AsyncOnce } from 'src/util';
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import { AsyncOnce, genRandomStringID } from 'src/util';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { filterNils } from 'ameo-utils';
 
 const NoiseGenAWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet
@@ -20,18 +20,25 @@ const NoiseGenAWPRegistered = new AsyncOnce(() =>
     )
     .catch(console.error)
 );
-const NoiseGenWasm = new AsyncOnce(() => fetch('/noise_gen.wasm').then(res => res.arrayBuffer()));
+const NoiseGenWasm = new AsyncOnce(() =>
+  fetch(
+    '/noise_gen.wasm?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : genRandomStringID())
+  ).then(res => res.arrayBuffer())
+);
 
-const NoiseGenSmallView: React.FC<{
+interface NoiseGenSmallViewProps {
   onChange: (key: string, val: number) => void;
   node: NoiseGenNode;
-}> = ({ onChange, node }) => {
+}
+
+const NoiseGenSmallView: React.FC<NoiseGenSmallViewProps> = ({ onChange, node }) => {
   const [enableSmoothing, setEnableSmoothing] = useState(node.enableSmoothing);
   const [enableUpdateFreq, setEnableUpdateFreq] = useState(node.noiseType === 3);
 
-  return (
-    <ControlPanel
-      settings={filterNils([
+  const settings = useMemo(
+    () =>
+      filterNils([
         {
           type: 'select',
           label: 'noise_type',
@@ -70,7 +77,22 @@ const NoiseGenSmallView: React.FC<{
             }
           : null,
         { type: 'range', label: 'gain', min: 0, max: 1, initial: node.gain, steps: 1000 },
-      ])}
+      ]),
+    [
+      enableSmoothing,
+      enableUpdateFreq,
+      node.enableSmoothing,
+      node.gain,
+      node.noiseType,
+      node.quantizationFactor,
+      node.smoothingCoefficient,
+      node.updateFreqSamples,
+    ]
+  );
+
+  return (
+    <ControlPanel
+      settings={settings}
       onChange={(key: string, val: any) => {
         if (key === 'enable_smoothing') {
           setEnableSmoothing(val);

@@ -31,7 +31,8 @@ pub fn create_msg_handler_context(
     mod_wheel: Option<Function>,
     generic_control_handler: Option<Function>,
 ) -> usize {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     let mut ctx = box MsgHandlerContext {
         play_note,

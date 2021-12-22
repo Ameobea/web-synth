@@ -1,7 +1,7 @@
 import { Map as ImmMap } from 'immutable';
 import { isNil } from 'ramda';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { DelaySmallView } from 'src/graphEditor/nodes/CustomAudio/Delay/DelayUI';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';

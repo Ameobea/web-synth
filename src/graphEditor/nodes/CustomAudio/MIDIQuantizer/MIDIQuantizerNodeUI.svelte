@@ -3,6 +3,7 @@
 
   import type { MIDIQuantizerNodeUIState } from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/types';
   import Note from './Note.svelte';
+  import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 
   const WHITE_NOTES = [
     { name: 'C', index: 0 },
@@ -34,9 +35,30 @@
     new MIDI note is emitted every time the input changes with a configurable threshold for minimum
     duration between notes.
   </p>
-  <button class="start-stop-button" on:click={() => ($store.isRunning = !$store.isRunning)}>
-    {$store.isRunning ? 'Stop' : 'Start'}
-  </button>
+  <div style="display: flex; flex-direction: row; align-items: center;">
+    <div style="margin-right: 16px;">
+      Obey Global Start/Stop
+      <input
+        type="checkbox"
+        checked={$store.startOnGlobalStart}
+        on:change={evt => {
+          const newStartOnGlobalStart = !$store.startOnGlobalStart;
+          $store.startOnGlobalStart = newStartOnGlobalStart;
+          if (newStartOnGlobalStart) {
+            const globalBeatCountStarted = getIsGlobalBeatCounterStarted();
+            $store.isRunning = globalBeatCountStarted;
+          } else {
+            $store.isRunning = false;
+          }
+        }}
+      />
+    </div>
+    {#if !$store.startOnGlobalStart}
+      <button class="start-stop-button" on:click={() => ($store.isRunning = !$store.isRunning)}>
+        {$store.isRunning ? 'Stop' : 'Start'}
+      </button>
+    {/if}
+  </div>
   <h3>Octave Range</h3>
   <div class="octave-range">
     <div class="octave-button-group">

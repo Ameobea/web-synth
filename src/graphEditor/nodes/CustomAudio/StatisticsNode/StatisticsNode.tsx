@@ -7,7 +7,7 @@ import { Map as ImmMap } from 'immutable';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { AsyncOnce } from 'ameo-utils';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import Loading from 'src/misc/Loading';

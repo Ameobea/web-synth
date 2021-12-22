@@ -7,10 +7,13 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, genRandomStringID } from 'src/util';
 
 export const DistortionWasmBytes = new AsyncOnce(() =>
-  fetch('/distortion.wasm').then(res => res.arrayBuffer())
+  fetch(
+    '/distortion.wasm?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : genRandomStringID())
+  ).then(res => res.arrayBuffer())
 );
 
 export default class DistortionNode implements ForeignNode {

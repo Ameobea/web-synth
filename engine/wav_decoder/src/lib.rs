@@ -10,7 +10,8 @@ pub fn get_error_message() -> String { unsafe { ERROR_MESSAGE.clone() } }
 
 #[wasm_bindgen]
 pub fn decode_wav(data: Vec<u8>) -> Vec<f32> {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     let mut reader = match hound::WavReader::new(data.as_slice()) {
         Ok(r) => r,

@@ -1,17 +1,12 @@
 [package]
-name = "note_container"
+name = "wbg_logging"
 version = "0.1.0"
 authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
-wasm-bindgen = "=0.2.78"
+console_error_panic_hook = "0.1.6"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-common = { path = "../common" }
-wbg_logging = { path = "../wbg_logging" }
-float-ord = "0.3"
-js-sys = "0.3"
+wasm-bindgen = { version = "=0.2.78", features = ["nightly"] }
+wasm-logger = "0.2"

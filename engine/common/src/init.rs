@@ -57,30 +57,21 @@ pub fn init_rng(rng_seed: Option<u64>) {
 static mut IS_INITIALIZED: bool = false;
 
 #[cfg(all(feature = "bindgen", debug_assertions))]
-pub fn maybe_init() {
+pub fn maybe_init(rng_seed: Option<u64>) {
     if unsafe { IS_INITIALIZED } {
         return;
     }
     unsafe { IS_INITIALIZED = true };
 
-    console_error_panic_hook::set_once();
-
-    let log_level = if cfg!(debug_assertions) {
-        log::Level::Trace
-    } else {
-        log::Level::Info
-    };
-    wasm_logger::init(wasm_logger::Config::new(log_level));
-
-    init_rng(None);
+    init_rng(rng_seed);
 }
 
 #[cfg(any(not(feature = "bindgen"), not(debug_assertions)))]
-pub fn maybe_init() {
+pub fn maybe_init(rng_seed: Option<u64>) {
     if unsafe { IS_INITIALIZED } {
         return;
     }
     unsafe { IS_INITIALIZED = true };
 
-    init_rng(None);
+    init_rng(rng_seed);
 }

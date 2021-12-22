@@ -1,10 +1,8 @@
-use serde_json;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
 use crate::{js, view_context::ViewContext};
 
-#[derive(Serialize, Deserialize)]
 pub struct Looper {
     pub uuid: Uuid,
 }
@@ -34,17 +32,6 @@ impl ViewContext for Looper {
     fn unhide(&mut self) { js::unhide_looper(&self.get_state_key()); }
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
-
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `Looper` to String")
-    }
 }
 
-pub fn mk_looper(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let looper: Looper = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `Looper`"),
-        None => Looper::new(uuid),
-    };
-    box looper
-}
+pub fn mk_looper(uuid: Uuid) -> Box<dyn ViewContext> { box Looper::new(uuid) }

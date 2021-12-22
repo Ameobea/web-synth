@@ -11,11 +11,11 @@ import {
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import Loading from 'src/misc/Loading';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, genRandomStringID } from 'src/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { ActiveSamplesByVcId, GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
-import { SampleDescriptor } from 'src/sampleLibrary';
+import { ActiveSamplesByVcId, type GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
+import type { SampleDescriptor } from 'src/sampleLibrary';
 
 const ctx = new AudioContext();
 
@@ -163,7 +163,12 @@ export const build_granulator_audio_connectables = (vcId: string): AudioConnecta
   };
 };
 
-const GranularWasm = new AsyncOnce(() => fetch('/granular.wasm').then(res => res.arrayBuffer()));
+const GranularWasm = new AsyncOnce(() =>
+  fetch(
+    '/granular.wasm?cacheBust=' +
+      (window.location.host.includes('localhost') ? '' : genRandomStringID())
+  ).then(res => res.arrayBuffer())
+);
 
 export const init_granulator = async (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;

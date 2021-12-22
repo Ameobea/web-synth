@@ -48,7 +48,7 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
-  cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/*.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
@@ -62,6 +62,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -76,10 +77,10 @@ run:
   just remove-annoying-litegraph-warning
 
   cd engine \
-    && ./build.sh \
+    && ./release.sh \
     && rm -rf /tmp/wasm \
     && mkdir /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/debug/*.wasm /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/release/*.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/note_container.wasm /tmp/wasm \
@@ -106,6 +107,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
 
   just debug-sinsy
 

@@ -7,42 +7,37 @@ import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
-import MIDIQuantizerNodeUI from './MIDIQuantizerNodeUI.svelte';
-import { buildDefaultMIDIQuantizerNodeUIState, type MIDIQuantizerNodeUIState } from './types';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { MIDINode } from 'src/patchNetwork/midiNode';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import {
-  registerStartCB,
-  registerStopCB,
-  unregisterStartCB,
-  unregisterStopCB,
-} from 'src/eventScheduler';
+  buildDefaultQuantizerNodeUIState,
+  type QuantizerNodeUIState,
+} from 'src/graphEditor/nodes/CustomAudio/Quantizer/store';
+import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 
-const MIDIQuantizerWasmBytes = new AsyncOnce(() =>
-  fetch('/midi_quantizer.wasm').then(res => res.arrayBuffer())
+const QuantizerWasmBytes = new AsyncOnce(() =>
+  fetch(
+    '/quantizer.wasm?cacheBust=' +
+      (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
+  ).then(res => res.arrayBuffer())
 );
 
 const ctx = new AudioContext();
-const MIDIQuantizerAWPRegistered = new AsyncOnce(() =>
+const QuantizerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    'MIDIQuantizerAWP.js?cacheBust=' +
+    'QuantizerAWP.js?cacheBust=' +
       (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );
 
-export default class MIDIQuantizerNode implements ForeignNode {
+export default class QuantizerNode implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
   private awpHandle: AudioWorkletNode | null = null;
-  private store: Writable<MIDIQuantizerNodeUIState> = writable(
-    buildDefaultMIDIQuantizerNodeUIState()
-  );
-  private midiNode = new MIDINode();
-  private globalStartCBsRegistered = false;
+  private store: Writable<QuantizerNodeUIState> = writable(buildDefaultQuantizerNodeUIState());
 
-  static typeName = 'MIDI Quantizer';
-  public nodeType = 'customAudio/midiQuantizer';
+  static typeName = 'Quantizer';
+  public nodeType = 'customAudio/quantizer';
 
   public paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
@@ -53,7 +48,7 @@ export default class MIDIQuantizerNode implements ForeignNode {
     this.vcId = vcId;
 
     if (params) {
-      this.deserialize(params as MIDIQuantizerNodeUIState);
+      this.deserialize(params as QuantizerNodeUIState);
     }
 
     this.init();
@@ -61,7 +56,7 @@ export default class MIDIQuantizerNode implements ForeignNode {
     this.store.subscribe(this.onChange);
 
     this.renderSmallView = mkSvelteContainerRenderHelper({
-      Comp: MIDIQuantizerNodeUI,
+      Comp: QuantizerNodeUI,
       getProps: () => ({ store: this.store }),
     });
 
@@ -70,10 +65,10 @@ export default class MIDIQuantizerNode implements ForeignNode {
 
   private async init() {
     const [wasmBytes] = await Promise.all([
-      MIDIQuantizerWasmBytes.get(),
-      MIDIQuantizerAWPRegistered.get(),
+      QuantizerWasmBytes.get(),
+      QuantizerAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'midi-quantizer');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'quantizer');
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     this.awpHandle.port.onmessage = evt => this.handleMessage(evt.data);
@@ -86,67 +81,34 @@ export default class MIDIQuantizerNode implements ForeignNode {
 
   private handleMessage = (data: Record<string, any>) => {
     switch (data.type) {
-      case 'playNote':
-        this.midiNode.onAttack(data.note, 255);
-        break;
-      case 'releaseNote':
-        this.midiNode.onRelease(data.note, 255);
-        break;
       default:
-        console.error(`Unhandled message type in MIDIQuantizerNode: ${data.type}`);
+        console.error(`Unhandled message type in \`QuantizerNode\`: ${data.type}`);
     }
   };
 
-  private onChange = (newState: MIDIQuantizerNodeUIState) => {
-    if (this.globalStartCBsRegistered !== newState.startOnGlobalStart) {
-      if (newState.startOnGlobalStart) {
-        this.registerGlobalStartCBs();
-      } else {
-        this.deregisterGlobalStartCBs();
-      }
-    }
-
+  private onChange = (newState: QuantizerNodeUIState) => {
     this.awpHandle?.port.postMessage({ type: 'setState', state: newState });
   };
 
-  private deserialize(params: MIDIQuantizerNodeUIState) {
-    if (!params.activeNotes || !params.octaveRange) {
-      return;
-    }
+  private deserialize(params: QuantizerNodeUIState) {
     this.store.set(params);
   }
 
-  private registerGlobalStartCBs = () => {
-    this.globalStartCBsRegistered = true;
-    registerStartCB(this.start);
-    registerStopCB(this.stop);
-  };
-
-  private deregisterGlobalStartCBs = () => {
-    this.globalStartCBsRegistered = false;
-    unregisterStartCB(this.start);
-    unregisterStopCB(this.stop);
-  };
-
-  public start = () => this.store.update(state => ({ ...state, isRunning: true }));
-
-  public stop = () => this.store.update(state => ({ ...state, isRunning: false }));
-
-  public serialize(): MIDIQuantizerNodeUIState {
+  public serialize(): QuantizerNodeUIState {
     return R.clone(get(this.store));
   }
 
   public buildConnectables() {
     return {
-      inputs: ImmMap<string, ConnectableInput>().set('control', {
+      inputs: ImmMap<string, ConnectableInput>().set('input', {
         type: 'number',
         node: this.awpHandle
-          ? (this.awpHandle.parameters as Map<string, AudioParam>).get('control')!
+          ? (this.awpHandle.parameters as Map<string, AudioParam>).get('input')!
           : new DummyNode(),
       }),
       outputs: ImmMap<string, ConnectableOutput>().set('midi', {
-        type: 'midi',
-        node: this.midiNode,
+        type: 'number',
+        node: this.awpHandle ? this.awpHandle : new DummyNode(),
       }),
       vcId: this.vcId!,
       node: this,

@@ -2,8 +2,6 @@ extern "C" {
     fn play_note(note: usize);
 
     fn release_note(note: usize);
-
-    fn debug(val: f32);
 }
 
 const NOTES_PER_OCTAVE: usize = 12;

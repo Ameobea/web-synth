@@ -32,6 +32,4 @@ impl ViewContext for MIDIEditor {
     }
 }
 
-pub fn mk_midi_editor(_definition_opt: Option<&str>, vc_id: Uuid) -> Box<dyn ViewContext> {
-    box MIDIEditor { vc_id }
-}
+pub fn mk_midi_editor(vc_id: Uuid) -> Box<dyn ViewContext> { box MIDIEditor { vc_id } }

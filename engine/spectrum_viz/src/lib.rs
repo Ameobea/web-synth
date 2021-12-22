@@ -181,13 +181,15 @@ lazy_static! {
 /// Returns a JSON-serialized array of scaler function definitions
 #[wasm_bindgen]
 pub fn get_config_definition() -> String {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
     String::from(crate::conf::CONFIG_JSON)
 }
 
 #[wasm_bindgen]
 pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
-    common::maybe_init();
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
 
     Box::into_raw(box Context {
         byte_frequency_data: [255u8; BUFFER_SIZE],

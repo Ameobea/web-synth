@@ -11,10 +11,13 @@ use crate::{
 
 #[wasm_bindgen]
 pub fn create_note_lines(line_count: usize) -> *mut NoteLines {
-    common::maybe_init();
-    Box::into_raw(box NoteLines {
-        lines: vec![NoteContainer::default(); line_count],
-    })
+    common::maybe_init(None);
+    wbg_logging::maybe_init();
+    let mut lines = Vec::with_capacity(line_count);
+    for _ in 0..line_count {
+        lines.push(NoteContainer::default())
+    }
+    Box::into_raw(box NoteLines { lines })
 }
 
 #[wasm_bindgen]

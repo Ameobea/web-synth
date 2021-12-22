@@ -3,7 +3,6 @@ use wasm_bindgen::JsValue;
 
 use crate::{js, view_context::ViewContext};
 
-#[derive(Serialize, Deserialize)]
 pub struct ControlPanel {
     pub uuid: Uuid,
 }
@@ -27,20 +26,9 @@ impl ViewContext for ControlPanel {
 
     fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
-    fn save(&mut self) -> String {
-        serde_json::to_string(self).expect("Error serializing `ControlPanel` to String")
-    }
-
     fn get_audio_connectables(&self) -> JsValue {
         js::get_control_panel_audio_connectables(&self.get_state_key())
     }
 }
 
-pub fn mk_control_panel(definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    let control_panel: ControlPanel = match definition_opt {
-        Some(definition) =>
-            serde_json::from_str(definition).expect("Error while deserializing `ControlPanel`"),
-        None => ControlPanel::new(uuid),
-    };
-    box control_panel
-}
+pub fn mk_control_panel(uuid: Uuid) -> Box<dyn ViewContext> { box ControlPanel::new(uuid) }

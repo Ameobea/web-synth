@@ -2,14 +2,14 @@ import type { ArrayElementOf } from 'ameo-utils/types';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import SamplePlayerUI from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayerUI';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { getSample, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { AsyncOnce } from 'src/util';
 
 export const SamplePlayerWasmBytes = new AsyncOnce(() =>

@@ -8,5 +8,5 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-common = { path = "../common", default_features = false }
+common = { path = "../common" }
 float-ord = "0.3"

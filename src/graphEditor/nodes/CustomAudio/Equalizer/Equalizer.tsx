@@ -1,13 +1,13 @@
 import { Map } from 'immutable';
 
 import EqualizerSmallView from './EqualizerUI';
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { actionCreators, dispatch, getState } from 'src/redux';
-import { EqualizerPoint } from 'src/redux/modules/equalizer';
+import type { EqualizerPoint } from 'src/redux/modules/equalizer';
 import { AsyncOnce } from 'src/util';
 import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';

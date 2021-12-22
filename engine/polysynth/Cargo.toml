@@ -10,13 +10,13 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-uuid = { version = "0.8", features = ["serde"] }
+uuid = { version = "0.8" }
 wasm-bindgen = { version = "=0.2.78", optional = true }
-wasm-logger = "0.2"
 wasm-bindgen-futures = { version = "0.4.14", optional = true }
-common = { path = "../common", optional = true }
-console_error_panic_hook = "0.1.6"
+common = { path = "../common" }
+wbg_logging = { path = "../wbg_logging", optional = true }
 js-sys = "^0.3.36"
 
 [features]
-wasm-bindgen-exports = ["wasm-bindgen", "wasm-bindgen-futures", "common"]
+default = ["wasm-bindgen-exports"]
+wasm-bindgen-exports = ["wasm-bindgen", "wasm-bindgen-futures", "wbg_logging"]

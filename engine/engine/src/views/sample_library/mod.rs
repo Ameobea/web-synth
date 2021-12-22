@@ -32,6 +32,4 @@ impl ViewContext for SampleLibrary {
     }
 }
 
-pub fn mk_sample_library(_definition_opt: Option<&str>, uuid: Uuid) -> Box<dyn ViewContext> {
-    box SampleLibrary { uuid }
-}
+pub fn mk_sample_library(uuid: Uuid) -> Box<dyn ViewContext> { box SampleLibrary { uuid } }

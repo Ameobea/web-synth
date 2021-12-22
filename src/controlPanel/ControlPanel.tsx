@@ -1,9 +1,9 @@
+import React, { Suspense } from 'react';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
 import { actionCreators, dispatch, getState, store } from 'src/redux';
-import ControlPanelUI from 'src/controlPanel/ControlPanelUI';
 import type {
   AudioConnectables,
   ConnectableDescriptor,
@@ -14,11 +14,11 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import './ControlPanel.scss';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import {
-  ControlPanelInstanceState,
-  ControlPanelConnection,
+  type ControlPanelInstanceState,
+  type ControlPanelConnection,
   buildDefaultControl,
-  ControlPanelMidiKeyboardDescriptor,
-  SerializedControlPanelVisualizationDescriptor,
+  type ControlPanelMidiKeyboardDescriptor,
+  type SerializedControlPanelVisualizationDescriptor,
   deserializeControlPanelVisualizationDescriptor,
   serializeControlPanelVisualizationDescriptor,
 } from 'src/redux/modules/controlPanel';
@@ -30,6 +30,7 @@ import {
 } from 'src/reactUtils';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { UnimplementedError } from 'ameo-utils';
+import Loading from 'src/misc/Loading';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
@@ -63,6 +64,12 @@ const saveStateForInstance = (stateKey: string) => {
   const serializedConnections = JSON.stringify(serialized);
   localStorage.setItem(stateKey, serializedConnections);
 };
+const LazyControlPanelUI = React.lazy(() => import('src/controlPanel/ControlPanelUI'));
+const ControlPanelUI: React.FC<{ stateKey: string }> = ({ stateKey }) => (
+  <Suspense fallback={<Loading />}>
+    <LazyControlPanelUI stateKey={stateKey} />
+  </Suspense>
+);
 
 export const init_control_panel = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];

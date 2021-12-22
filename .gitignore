@@ -38,3 +38,11 @@ src/wav_decoder*
 **/.DS_Store
 public/looper.wasm
 public/midi_quantizer.wasm
+public/dsp.wasm
+public/engine.wasm
+public/midi.wasm
+public/polysynth.wasm
+public/quantizer.wasm
+public/spectrum_viz.wasm
+public/wav_decoder.wasm
+public/waveform_renderer.wasm

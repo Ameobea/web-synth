@@ -13,5 +13,5 @@ dsp = { path = "../dsp" }
 fastapprox = "0.3"
 
 [features]
-default = ["simd"]
+default = []
 simd = []
