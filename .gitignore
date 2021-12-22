@@ -37,3 +37,4 @@ public/sample_player.wasm
 src/wav_decoder*
 **/.DS_Store
 public/looper.wasm
+public/midi_quantizer.wasm

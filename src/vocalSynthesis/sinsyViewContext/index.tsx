@@ -1,4 +1,4 @@
-import { PropTypesOf } from 'ameo-utils/dist/util/react';
+import type { PropTypesOf } from 'ameo-utils/dist/util/react';
 import React, { Suspense } from 'react';
 
 import { actionCreators, dispatch, getState, store } from 'src/redux';
@@ -12,7 +12,8 @@ import {
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import Loading from 'src/misc/Loading';
 import { Option } from 'funfix-core';
-import { buildDefaultSinsyState, SinsyState } from 'src/redux/modules/sinsy';
+import { buildDefaultSinsyState } from 'src/redux/modules/sinsy';
+import type { SinsyState } from 'src/redux/modules/sinsy';
 import { AsyncOnce } from 'src/util';
 import { UnimplementedError } from 'ameo-utils';
 

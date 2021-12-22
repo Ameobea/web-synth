@@ -17,4 +17,5 @@ cd engine && cargo build --target wasm32-unknown-unknown --release &&
   cd ../delay && cargo build --release --target wasm32-unknown-unknown &&
   cd ../sample_player && cargo build --release --target wasm32-unknown-unknown &&
   cd ../wav_decoder && cargo build --release --target wasm32-unknown-unknown &&
-  cd ../looper && cargo build --release --target wasm32-unknown-unknown
+  cd ../looper && cargo build --release --target wasm32-unknown-unknown &&
+  cd ../midi_quantizer && cargo build --release --target wasm32-unknown-unknown

@@ -3,9 +3,9 @@ import * as R from 'ramda';
 import { Option } from 'funfix-core';
 
 import * as PIXI from 'src/controls/pixi';
-import { MIDIEditorInstance } from 'src/midiEditor';
+import type { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
-import { NoteBox } from 'src/midiEditor/NoteBox';
+import type { NoteBox } from 'src/midiEditor/NoteBox';
 import NoteLine from 'src/midiEditor/NoteLine';
 import PianoKeys from 'src/midiEditor/PianoKeyboard';
 import SelectionBox from 'src/midiEditor/SelectionBox';
@@ -97,6 +97,7 @@ export default class MIDIEditorUIInstance {
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
   public noteMetadataByNoteID: Map<number, any> = new Map();
   private vcId: string;
+  private isHidden: boolean;
 
   constructor(
     width: number,
@@ -130,8 +131,8 @@ export default class MIDIEditorUIInstance {
     interactionManager.cursorStyles['ew-resize'] = 'ew-resize';
 
     registerVcHideCb(this.vcId, this.onHiddenStatusChanged);
-    const isHidden = getIsVcHidden(this.vcId);
-    this.onHiddenStatusChanged(isHidden);
+    this.isHidden = getIsVcHidden(this.vcId);
+    this.onHiddenStatusChanged(this.isHidden);
 
     this.initEventHandlers();
     this.linesContainer = new PIXI.Container();
@@ -1030,6 +1031,10 @@ export default class MIDIEditorUIInstance {
   private initEventHandlers() {
     this.eventHandlerCBs = {
       keyDown: (evt: KeyboardEvent) => {
+        if (this.isHidden) {
+          return;
+        }
+
         switch (evt.code) {
           case 'ControlLeft':
           case 'ControlRight': {
@@ -1069,6 +1074,10 @@ export default class MIDIEditorUIInstance {
         }
       },
       keyUp: (evt: KeyboardEvent) => {
+        if (this.isHidden) {
+          return;
+        }
+
         if (evt.key === 'Control') {
           this.multiSelectEnabled = false;
         } else if (evt.key === 'Shift') {
@@ -1076,6 +1085,10 @@ export default class MIDIEditorUIInstance {
         }
       },
       mouseUp: (evt: MouseEvent) => {
+        if (this.isHidden) {
+          return;
+        }
+
         if (evt.button === 0) {
           this.mouseUpCBs.forEach(cb => cb());
           this.mouseUpCBs = [];
@@ -1092,6 +1105,10 @@ export default class MIDIEditorUIInstance {
         }
       },
       wheel: (evt: WheelEvent) => {
+        if (this.isHidden) {
+          return;
+        }
+
         if (evt.target !== this.app.renderer.view || this.panningData) {
           return;
         }
@@ -1118,13 +1135,14 @@ export default class MIDIEditorUIInstance {
     document.removeEventListener('wheel', this.eventHandlerCBs.wheel);
   }
 
-  public onHiddenStatusChanged(isHidden: boolean) {
+  public onHiddenStatusChanged = (isHidden: boolean) => {
+    this.isHidden = isHidden;
     if (isHidden) {
       this.app.ticker.stop();
     } else {
       this.app.ticker.start();
     }
-  }
+  };
 
   public destroy() {
     this.cleanupEventHandlers();

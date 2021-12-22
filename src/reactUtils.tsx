@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { AnyAction, Store } from 'redux';
+import type { AnyAction, Store } from 'redux';
 import { Provider, useStore } from 'react-redux';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import * as R from 'ramda';
@@ -43,10 +43,10 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
   getProps,
   enableReactQuery,
 }: ContainerRenderHelperArgs<P>) {
-  return (domId: string) => {
-    const node = document.getElementById(domId);
+  return (domID: string) => {
+    const node = document.getElementById(domID);
     if (!node) {
-      console.error(`No node with id ${domId} found when trying to render up small view`);
+      console.error(`No node with id ${domID} found when trying to render up small view`);
       return;
     }
 
@@ -56,7 +56,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
     let root: ReactDOM.Root;
     const existingRootID = node.getAttribute('data-react-root-id');
     if (existingRootID) {
-      root = RootsByID.get(existingRootID);
+      root = RootsByID.get(existingRootID)!;
       if (!root) {
         throw new Error(
           'Node was marked as having a root, but entry has been removed from the roots map'
@@ -70,13 +70,13 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
     }
 
     const wrap = R.compose(
-      (rendered: React.ReactNode) => {
+      (rendered: React.ReactChild) => {
         if (store) {
           return <Provider store={store}>{rendered}</Provider>;
         }
         return rendered;
       },
-      (rendered: React.ReactNode) => {
+      (rendered: React.ReactChild) => {
         if (enableReactQuery) {
           return (
             <QueryClientProvider client={getReactQueryClient()}>{rendered}</QueryClientProvider>
@@ -89,9 +89,17 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
     root.render(rendered);
 
     if (predicate) {
-      predicate(domId, node);
+      predicate(domID, node);
     }
   };
+}
+
+interface MkContainerCleanupHelperArgs {
+  predicate?: (domID: string, node: HTMLElement) => void;
+  /**
+   * If `true`, the DOM element will not be deleted.  If `false` or not provided, it will be deleted.
+   */
+  preserveRoot?: boolean;
 }
 
 /**
@@ -99,25 +107,15 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
  * pointed to by the id passed into the returned function.
  */
 export const mkContainerCleanupHelper =
-  ({
-    preserveRoot,
-    predicate,
-  }: {
-    predicate?: (domID: string, node: HTMLElement) => void;
-    /**
-     * If `true`, the DOM element will not be deleted.  If `false` or not provided, it will be deleted.
-     */
-    preserveRoot?: boolean;
-  } = {}) =>
-  (domId: string) => {
-    const node = document.getElementById(domId);
+  ({ preserveRoot, predicate }: MkContainerCleanupHelperArgs = {}) =>
+  (domID: string) => {
+    const node = document.getElementById(domID);
     if (!node) {
-      console.error(`No node with id ${domId} found when trying to clean up small view`);
+      console.error(`No node with id ${domID} found when trying to clean up small view`);
       return;
     }
-    if (predicate) {
-      predicate(domId, node);
-    }
+
+    predicate?.(domID, node);
 
     const rootID = node.getAttribute('data-react-root-id');
     if (!rootID) {

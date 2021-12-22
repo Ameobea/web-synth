@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { connect } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 
-import { FaustEditorPolyphonyState, FaustEditorState } from 'src/redux/modules/faustEditor';
+import type { FaustEditorPolyphonyState, FaustEditorState } from 'src/redux/modules/faustEditor';
 
 const mapStateToProps = (state: { faustEditor: FaustEditorState }) => ({
   cachedInputNames: state.faustEditor.cachedInputNames,

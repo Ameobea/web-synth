@@ -61,6 +61,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -104,6 +105,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
 
   just debug-sinsy
 
@@ -211,3 +213,7 @@ build-event-scheduler:
 build-looper:
   cd ./engine/looper && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/looper.wasm ../../public
+
+build-midi-quantizer:
+  cd ./engine/midi_quantizer && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/midi_quantizer.wasm ../../public

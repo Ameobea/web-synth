@@ -441,6 +441,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "midi_quantizer"
+version = "0.1.0"
+dependencies = [
+ "dsp",
+]
+
+[[package]]
 name = "noise_gen"
 version = "0.1.0"
 dependencies = [

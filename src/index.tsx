@@ -7,7 +7,8 @@ import { actionCreators, dispatch, store, getState } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
 import { getEngine, setEngine, tryParseJson } from 'src/util';
-import { ConnectableDescriptor, initPatchNetwork } from 'src/patchNetwork';
+import { initPatchNetwork } from 'src/patchNetwork';
+import type { ConnectableDescriptor } from 'src/patchNetwork';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import {
   loadSharedComposition,

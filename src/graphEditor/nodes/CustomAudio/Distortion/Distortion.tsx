@@ -1,6 +1,6 @@
 import { Map as ImmMap } from 'immutable';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DistortionUI from 'src/graphEditor/nodes/CustomAudio/Distortion/DistortionUI';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';

@@ -1,7 +1,8 @@
 {
+  "extends": "@tsconfig/svelte/tsconfig.json",
   "compilerOptions": {
-    "module": "amd",
-    "target": "es6",
+    "module": "es2020",
+    "target": "es2020",
     "resolveJsonModule": true,
     "allowJs": true,
     "moduleResolution": "node",
@@ -18,7 +19,7 @@
     "suppressImplicitAnyIndexErrors": false,
     "noUnusedLocals": true,
     "typeRoots": ["./node_modules/@types"],
-    "types": ["react/next", "react-dom/next"],
+    "types": ["react/next", "react-dom/next", "svelte"],
     "jsx": "react",
     "baseUrl": ".",
     "paths": {
@@ -39,6 +40,7 @@
     "deprecated",
     "backend",
     "faust-compiler",
-    "engine"
+    "engine",
+    "src/vocalSynthesis"
   ]
 }

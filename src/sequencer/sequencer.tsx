@@ -13,17 +13,20 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { updateConnectables } from 'src/patchNetwork/interface';
 import Loading from 'src/misc/Loading';
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import { SampleDescriptor, getSample } from 'src/sampleLibrary';
+import { getSample } from 'src/sampleLibrary';
+import type { SampleDescriptor } from 'src/sampleLibrary';
 import {
   buildSequencerReduxInfra,
   buildInitialState,
-  SequencerReduxState,
-  VoiceTarget,
   SchedulerScheme,
   buildSequencerConfig,
-  SequencerMark,
   SequencerInstancesMap,
   buildSequencerInputMIDINode,
+} from './redux';
+import type {
+  SequencerMark,
+  SequencerReduxState,
+  VoiceTarget,
   SequencerEditState,
   SequencerReduxInfra,
 } from './redux';

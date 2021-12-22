@@ -4,7 +4,7 @@
  * at the patch network level.
  */
 
-import React from 'react';
+import type React from 'react';
 import { Map } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
@@ -36,6 +36,7 @@ import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
+import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
 
 const ctx = new AudioContext();
 
@@ -475,6 +476,9 @@ export const audioNodeGetters: {
   },
   'customAudio/bandSplitter': {
     nodeGetter: BandSplitterNode,
+  },
+  'customAudio/midiQuantizer': {
+    nodeGetter: MIDIQuantizerNode,
   },
 };
 
