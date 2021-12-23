@@ -1,6 +1,9 @@
 {
-  "extends": "@tsconfig/svelte/tsconfig.json",
   "compilerOptions": {
+    "importsNotUsedAsValues": "error",
+    "preserveValueImports": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
     "module": "es2020",
     "target": "es2020",
     "resolveJsonModule": true,

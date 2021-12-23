@@ -27,6 +27,13 @@ import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { getSentry } from 'src/sentry';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import { MIDINode } from 'src/patchNetwork/midiNode';
+import { get, writable, type Writable } from 'svelte/store';
+import {
+  buildDefaultSampleMappingState,
+  deserializeSampleMappingState,
+  serializeSampleMappingState,
+  type SampleMappingState,
+} from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -147,6 +154,9 @@ export default class FMSynth implements ForeignNode {
   public midiControlValuesCache: MIDIControlValuesCache;
   private wavetableState: WavetableState = { wavetableBanks: [] };
   private wavetableBackendIxByName: string[] = [];
+  private sampleMappingStore: Writable<SampleMappingState> = writable(
+    buildDefaultSampleMappingState()
+  );
   public gainEnvelope: AdsrParams & { lenSamples: { type: 'constant'; value: number } } = {
     steps: [
       { x: 0, y: 0, ramper: { type: 'instant' } },
@@ -443,6 +453,10 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
+  public getSampleMappingStore(): Writable<SampleMappingState> {
+    return this.sampleMappingStore;
+  }
+
   public handleOperatorConfigChange(operatorIx: number, config: OperatorConfig) {
     this.operatorConfigs[operatorIx] = R.clone(config);
     if (!this.awpHandle) {
@@ -480,6 +494,8 @@ export default class FMSynth implements ForeignNode {
           'square oscillator': 4,
           'triangle oscillator': 5,
           'sawtooth oscillator': 6,
+          'sample mapping': 7,
+          'tuned sample': 8,
         }[config.type] + (unisonEnabled ? 50 : 0),
       unison: unison ?? 1,
       ...(() => {
@@ -841,6 +857,9 @@ export default class FMSynth implements ForeignNode {
             : gainEnvelope.lenSamples,
       };
     }
+    if (params.sampleMappingState) {
+      this.sampleMappingStore.set(deserializeSampleMappingState(params.sampleMappingState));
+    }
   }
 
   public serialize() {
@@ -856,6 +875,7 @@ export default class FMSynth implements ForeignNode {
       lastSeenMIDIControlValues: this.midiControlValuesCache.serialize(),
       wavetableState: serializeWavetableState(this.wavetableState),
       gainEnvelope: this.gainEnvelope,
+      sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
     };
   }
 

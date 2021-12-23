@@ -8,7 +8,7 @@
   <slot />
 </div>
 
-<style type="text/scss">
+<style lang="scss">
   .note {
     box-sizing: border-box;
     display: flex;

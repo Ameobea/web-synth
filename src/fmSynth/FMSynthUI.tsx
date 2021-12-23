@@ -2,16 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
-import ConfigureOperator, { OperatorConfig, WavetableState } from './ConfigureOperator';
+import ConfigureOperator, { type OperatorConfig, type WavetableState } from './ConfigureOperator';
 import './FMSynth.scss';
 import { classNameIncludes } from 'src/util';
-import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
-import FMSynth, { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import ConfigureEffects, {
+  type AdsrChangeHandler,
+  type Effect,
+} from 'src/fmSynth/ConfigureEffects';
+import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import ConfigureParamSource, {
   buildDefaultParamSource,
-  ParamSource,
+  type ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
 import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
 import HelpIcon from 'src/misc/HelpIcon';
@@ -19,7 +23,9 @@ import { WaveformIcon } from 'src/misc/Icons';
 import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import type { Writable } from 'svelte/store';
+import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -154,6 +160,7 @@ interface FMSynthUIProps {
   synthID: string;
   isHidden: boolean;
   vcId: string | undefined;
+  sampleMappingStore: Writable<SampleMappingState>;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -180,6 +187,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   synthID,
   isHidden,
   vcId,
+  sampleMappingStore,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -542,6 +550,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                     setWavetableState(newWavetableState);
                   }}
                   vcId={vcId}
+                  sampleMappingStore={sampleMappingStore}
                 />
               );
             })()
@@ -637,6 +646,7 @@ export const ConnectedFMSynthUI: React.FC<{
     )}
     isHidden={isHidden}
     vcId={vcId}
+    sampleMappingStore={synth.getSampleMappingStore()}
   />
 ));
 

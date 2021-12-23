@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Provider, shallowEqual } from 'react-redux';
 import ControlPanel from 'react-control-panel';
-import { PropTypesOf, UnreachableException } from 'ameo-utils';
+import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 
 import { getSynthDesignerReduxInfra, SynthModule } from 'src/redux/modules/synthDesigner';
@@ -205,13 +205,22 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
 };
 const SynthControlPanel = React.memo(SynthControlPanelInner);
 
-const SynthModuleCompInner: React.FC<{
+interface SynthModuleCompProps {
   index: number;
   synth: SynthModule;
   stateKey: string;
   isHidden: boolean;
   vcId: string;
-}> = ({ index, synth, stateKey, children = null, isHidden, vcId }) => {
+}
+
+const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
+  index,
+  synth,
+  stateKey,
+  children = null,
+  isHidden,
+  vcId,
+}) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const filterEnvelope = useMemo(
     () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
@@ -271,7 +280,7 @@ const SynthModuleCompInner: React.FC<{
   );
 };
 
-const SynthModuleComp: React.FC<PropTypesOf<typeof SynthModuleCompInner>> = ({ ...props }) => (
+const SynthModuleComp: React.FC<SynthModuleCompProps> = ({ ...props }) => (
   <Provider store={store}>
     <SynthModuleCompInner {...props} />
   </Provider>

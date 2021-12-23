@@ -3,15 +3,22 @@ import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
-import ConfigureEffects, { AdsrChangeHandler, Effect } from 'src/fmSynth/ConfigureEffects';
+import ConfigureEffects, {
+  type AdsrChangeHandler,
+  type Effect,
+} from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, {
   buildDefaultParamSource,
-  ParamSource,
+  type ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { renderModalWithControls } from 'src/controls/Modal';
 import type { UploadWavetableModalProps } from 'src/fmSynth/UploadWavetable';
 import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
+import { mkSvelteComponentShim } from 'src/svelteUtils';
+import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
+import type { Writable } from 'svelte/store';
+import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 
 /**
  * The algorithm used to produce the output for the operator.
@@ -42,6 +49,12 @@ export type OperatorConfig =
       frequency: ParamSource;
       unison: number;
       unisonDetune: ParamSource;
+    }
+  | {
+      type: 'sample mapping';
+    }
+  | {
+      type: 'tuned sample';
     };
 
 export const buildDefaultOperatorConfig = (
@@ -80,6 +93,9 @@ export const buildDefaultOperatorConfig = (
         unison: 1,
         unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
       };
+    }
+    case 'sample mapping': {
+      return { type };
     }
     default: {
       throw new UnreachableException('Unhandled type in `buildDefaultOperatorConfig`: ' + type);
@@ -273,6 +289,7 @@ interface ConfigureOperatorProps {
   wavetableState: WavetableState;
   setWavetableState: (newState: WavetableState) => void;
   vcId: string | undefined;
+  sampleMappingStore: Writable<SampleMappingState>;
 }
 
 const OperatorTypeSettings = [
@@ -287,11 +304,16 @@ const OperatorTypeSettings = [
       'exponential oscillator',
       'wavetable',
       'param buffer',
+      'sample mapping',
     ] as OperatorConfig['type'][],
   },
 ];
 
 const OperatorUnisonSettings = [{ type: 'range', label: 'unison', min: 0, max: 32, step: 1 }];
+
+const ConfigureSampleMapping = mkSvelteComponentShim<{
+  store: Writable<SampleMappingState>;
+}>(ConfigureSampleMappingInner as any);
 
 const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   config,
@@ -305,6 +327,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   wavetableState,
   setWavetableState,
   vcId,
+  sampleMappingStore,
 }) => {
   const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
@@ -405,6 +428,9 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           setWavetableState={setWavetableState}
           vcId={vcId}
         />
+      ) : null}
+      {config.type === 'sample mapping' ? (
+        <ConfigureSampleMapping store={sampleMappingStore} />
       ) : null}
       <ConfigureEffects
         operatorIx={operatorIx}

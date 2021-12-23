@@ -9,9 +9,13 @@ use adsr::{
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
+mod sample_player;
 use crate::{WaveTable, WaveTableSettings};
 
-use self::effects::EffectChain;
+use self::{
+    effects::EffectChain,
+    sample_player::{SampleMappingEmitter, TunedSampleEmitter},
+};
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
 
@@ -497,6 +501,8 @@ pub enum OscillatorSource {
     UnisonSquare(UnisonOscillator<SquareOscillator>),
     UnisonTriangle(UnisonOscillator<TriangleOscillator>),
     UnisonSawtooth(UnisonOscillator<SawtoothOscillator>),
+    SampleMapping(SampleMappingEmitter),
+    TunedSample(TunedSampleEmitter),
 }
 
 impl OscillatorSource {
@@ -516,6 +522,8 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.get_phases(),
             OscillatorSource::UnisonTriangle(osc) => osc.get_phases(),
             OscillatorSource::UnisonSawtooth(osc) => osc.get_phases(),
+            OscillatorSource::SampleMapping(_) => todo!(),
+            OscillatorSource::TunedSample(_) => todo!(),
         }
     }
 
@@ -534,6 +542,8 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonTriangle(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonSawtooth(osc) => osc.set_phases(new_phases),
+            OscillatorSource::SampleMapping(_) => todo!(),
+            OscillatorSource::TunedSample(_) => todo!(),
         }
     }
 }
@@ -650,6 +660,8 @@ impl OscillatorSource {
                 sample_ix_within_frame,
                 base_frequency,
             ),
+            OscillatorSource::SampleMapping(_) => todo!(),
+            OscillatorSource::TunedSample(_) => todo!(),
         }
     }
 }
@@ -1583,6 +1595,8 @@ fn build_oscillator_source(
         6 => OscillatorSource::Sawtooth(SawtoothOscillator {
             phase: old_phases.get(0).copied().unwrap_or_default(),
         }),
+        7 => OscillatorSource::SampleMapping(SampleMappingEmitter {}),
+        8 => OscillatorSource::TunedSample(TunedSampleEmitter {}),
         52 => OscillatorSource::UnisonSine(UnisonOscillator {
             unison_detune_range_semitones: ParamSource::from_parts(
                 param_4_value_type,

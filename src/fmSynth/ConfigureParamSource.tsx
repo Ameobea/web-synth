@@ -3,12 +3,11 @@ import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
-import ADSR2, { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import ADSR2, { type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
-import { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
-import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { msToSamples, samplesToMs } from 'src/util';
 
 export const PARAM_BUFFER_COUNT = 8;

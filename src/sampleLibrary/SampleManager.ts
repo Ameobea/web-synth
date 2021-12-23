@@ -1,4 +1,4 @@
-import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 
 const buildSampleKey = ({ isLocal, name }: SampleDescriptor): string =>
   `${isLocal ? 'local' : 'remote'}-${name}`;

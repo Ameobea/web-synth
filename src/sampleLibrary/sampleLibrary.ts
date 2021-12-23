@@ -11,7 +11,7 @@ import {
 } from 'src/reactUtils';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 import { cacheSample, getCachedSample, getAllCachedSamples } from 'src/sampleLibrary/sampleCache';
-import { FileSystemDirectoryHandle } from 'src/fsAccess/drivers/nativeFS/NativeFSTypes';
+import type { FileSystemDirectoryHandle } from 'src/fsAccess/drivers/nativeFS/NativeFSTypes';
 import { listRemoteSamples as listRemoteSamplesFromServer } from 'src/api';
 
 export interface SampleDescriptor {

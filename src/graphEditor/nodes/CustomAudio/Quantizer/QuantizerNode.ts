@@ -6,7 +6,7 @@ import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, genRandomStringID } from 'src/util';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import {
@@ -18,7 +18,7 @@ import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 const QuantizerWasmBytes = new AsyncOnce(() =>
   fetch(
     '/quantizer.wasm?cacheBust=' +
-      (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
+      (window.location.href.includes('localhost') ? '' : genRandomStringID())
   ).then(res => res.arrayBuffer())
 );
 
@@ -26,7 +26,7 @@ const ctx = new AudioContext();
 const QuantizerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
     '/QuantizerAWP.js?cacheBust=' +
-      (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
+      (window.location.href.includes('localhost') ? '' : genRandomStringID())
   )
 );
 
@@ -71,20 +71,12 @@ export default class QuantizerNode implements ForeignNode {
     this.awpHandle = new AudioWorkletNode(this.ctx, 'quantizer');
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
-    this.awpHandle.port.onmessage = evt => this.handleMessage(evt.data);
     this.onChange(get(this.store));
 
     if (this.vcId) {
       updateConnectables(this.vcId, this.buildConnectables());
     }
   }
-
-  private handleMessage = (data: Record<string, any>) => {
-    switch (data.type) {
-      default:
-        console.error(`Unhandled message type in \`QuantizerNode\`: ${data.type}`);
-    }
-  };
 
   private onChange = (newState: QuantizerNodeUIState) =>
     this.awpHandle?.port.postMessage({

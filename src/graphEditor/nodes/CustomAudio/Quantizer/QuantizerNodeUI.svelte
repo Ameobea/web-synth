@@ -116,7 +116,7 @@
   </div>
 </div>
 
-<style type="text/scss">
+<style lang="scss">
   .root {
     display: flex;
     flex-direction: column;

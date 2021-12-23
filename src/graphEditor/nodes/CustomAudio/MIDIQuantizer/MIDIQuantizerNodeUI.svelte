@@ -125,7 +125,7 @@
   </div>
 </div>
 
-<style type="text/scss">
+<style lang="scss">
   .midi-quantizer-node-ui {
     width: 500px;
     display: flex;

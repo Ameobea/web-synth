@@ -108,6 +108,12 @@ const config = {
     historyApiFallback: true,
     host: '0.0.0.0',
     hot: true,
+    client: {
+      overlay: {
+        warnings: false,
+        errors: true,
+      },
+    },
     headers: {
       // Support sending `SharedArrayBuffer` between threads
       'Cross-Origin-Opener-Policy': 'same-origin',

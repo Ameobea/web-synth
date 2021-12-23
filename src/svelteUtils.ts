@@ -1,4 +1,8 @@
-import type { SvelteComponent } from 'svelte';
+import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
+import type { Store, Unsubscribe as ReduxUnsubscribe } from 'redux';
+import type { SvelteComponent, SvelteComponentTyped } from 'svelte';
+
+import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
 const RenderedSvelteComponentsByDomID = new Map<string, SvelteComponent>();
 
@@ -58,3 +62,133 @@ export const mkSvelteContainerCleanupHelper =
       }
     }
   };
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// The following is adapted from the real Svelte `writable` implementation:
+// https://github.com/sveltejs/svelte/blob/master/src/runtime/store/index.ts
+//
+/////////////////////////////////////////////////////////////////////////////
+
+/** Cleanup logic callback. */
+type Invalidator<T> = (value?: T) => void;
+
+/** Pair of subscriber and invalidator. */
+type SubscribeInvalidateTuple<T> = [Subscriber<T>, Invalidator<T>];
+
+const noop = () => {
+  // noop
+};
+
+export function buildSvelteReduxStoreBridge<State, Slice>(
+  reduxStore: Store<State>,
+  selector: (state: State) => Slice,
+  dispatchUpdateAction: (newSlice: Slice) => void
+) {
+  const subscribers: Set<SubscribeInvalidateTuple<Slice>> = new Set();
+
+  let reduxUnsubscribe: ReduxUnsubscribe | null = null;
+  const getValue = () => selector(reduxStore.getState());
+  let lastSeenSlice: Slice | null = null;
+  const onReduxChanged = () => {
+    if (subscribers.size === 0) {
+      return;
+    }
+
+    const newSlice = getValue();
+    if (lastSeenSlice === newSlice) {
+      return;
+    }
+    lastSeenSlice = newSlice;
+
+    for (const [subscriber, invalidate] of subscribers) {
+      invalidate();
+      // Svelte `writable` has some queueing logic here I don't fully understand
+      subscriber(newSlice);
+    }
+  };
+  const maybeReduxSubscribe = () => {
+    if (reduxUnsubscribe) {
+      // already subscribed
+      return;
+    }
+
+    reduxUnsubscribe = reduxStore.subscribe(onReduxChanged);
+  };
+
+  const set = (newVal: Slice) => {
+    const val = lastSeenSlice;
+    if (val !== newVal) {
+      dispatchUpdateAction(newVal);
+    }
+  };
+
+  const update = (fn: Updater<Slice>) => set(fn(lastSeenSlice ?? getValue()));
+
+  const subscribe = (
+    run: Subscriber<Slice>,
+    invalidate: Invalidator<Slice> = noop
+  ): Unsubscriber => {
+    const subscriber: SubscribeInvalidateTuple<Slice> = [run, invalidate];
+    subscribers.add(subscriber);
+    run(lastSeenSlice ?? getValue());
+
+    maybeReduxSubscribe();
+
+    return () => {
+      subscribers.delete(subscriber);
+      if (subscribers.size === 0) {
+        // No more subscribers; unsub from Redux store to avoid memory leaks or whatever
+        if (reduxUnsubscribe) {
+          reduxUnsubscribe();
+        } else {
+          console.error('No `reduxUnsubscribe` set but we had a Svelte subscription');
+        }
+        reduxUnsubscribe = null;
+      }
+    };
+  };
+
+  return { set, update, subscribe };
+}
+
+// Adapted from: https://github.com/Rich-Harris/react-svelte/blob/master/index.js
+export function mkSvelteComponentShim<Props extends Record<string, any>>(
+  Comp: new (args: { target: Element; props: Props }) => SvelteComponentTyped<Props>
+) {
+  class SvelteComponentShim extends React.Component<Props> {
+    private instance: SvelteComponentTyped<Props> | null = null;
+    private container: RefObject<ReactElement<Record<string, never>>>;
+    private div: ReactElement<{
+      ref: RefObject<ReactElement<Record<string, never>, string | JSXElementConstructor<any>>>;
+    }>;
+
+    constructor(props: Props) {
+      super(props);
+
+      this.container = React.createRef();
+      this.div = React.createElement('div', { ref: this.container });
+    }
+
+    componentDidMount() {
+      this.instance = new Comp({
+        target: this.container.current! as any,
+        props: this.props,
+      });
+    }
+
+    componentDidUpdate() {
+      this.instance!.$set(this.props);
+    }
+
+    componentWillUnmount() {
+      this.instance!.$destroy();
+    }
+
+    render() {
+      return this.div;
+    }
+  }
+
+  return SvelteComponentShim;
+}

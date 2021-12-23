@@ -290,12 +290,11 @@ const buildDefaultSynthModule = (
   dummyGain.gain.value = 0;
   dummyGain.connect(ctx.destination);
 
-  const masterGain = 0.0;
   const inst: SynthModule = {
     filterBypassed: true,
     voices: new Array(VOICE_COUNT).fill(null).map((_, voiceIndex) => {
       const outerGainNode = new GainNode(ctx);
-      outerGainNode.gain.setValueAtTime(1, ctx.currentTime);
+      outerGainNode.gain.value = 1;
 
       const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs);
       // TODO: Connect ADSR once we can do so intelligently
@@ -326,7 +325,7 @@ const buildDefaultSynthModule = (
     filterParams,
     filterCSNs,
     filterFrequencySource: FilterFrequencySource.CSNs,
-    masterGain,
+    masterGain: 0,
     filterEnvelope: buildDefaultADSR2Envelope({ phaseIndex: 0 }),
     filterADSRLength: 1000,
     pitchMultiplier: 1,
@@ -353,6 +352,7 @@ export const deserializeSynthModule = (
   const base = buildDefaultSynthModule(stateKey, filterParams.type, synthIx);
 
   const voices = base.voices.map(voice => {
+    voice.outerGainNode.gain.value = masterGain + 1;
     voice.filterNode.getOutput().connect(voice.outerGainNode);
     Object.entries(filterParams)
       .filter(([k, _v]) => k !== 'type')
@@ -531,8 +531,12 @@ const actionGroups = {
       gain,
     }),
     subReducer: (state: SynthDesignerState, { synthIx, gain }) => {
-      // TODO
-      return state;
+      const targetSynth = getSynth(synthIx, state.synths);
+      const newTargetSynth: SynthModule = { ...targetSynth, masterGain: gain };
+      newTargetSynth.voices.forEach(voice => {
+        voice.outerGainNode.gain.value = gain + 1;
+      });
+      return setSynth(synthIx, newTargetSynth, state);
     },
   }),
   SET_VOICE_STATE: buildActionGroup({
