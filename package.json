@@ -64,6 +64,7 @@
     "@pixi/graphics": "^6.2.1",
     "@pixi/interaction": "^6.2.1",
     "@pixi/math": "^6.2.1",
+    "@pixi/mixin-cache-as-bitmap": "^6.2.1",
     "@pixi/runner": "^6.2.1",
     "@pixi/settings": "^6.2.1",
     "@pixi/sprite": "^6.2.1",

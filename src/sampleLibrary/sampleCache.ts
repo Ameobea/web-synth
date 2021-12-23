@@ -112,6 +112,12 @@ export const getCachedSample = async (
   return row.sampleData;
 };
 
+export const getIsSampleCached = async (descriptor: SampleDescriptor): Promise<boolean> => {
+  const whereClause = buildWhereClause(descriptor);
+  const row = await samplesTable.where(whereClause).first();
+  return !!row;
+};
+
 export const getAllCachedSamples = async (): Promise<SampleDescriptor[]> => {
   const allSamples = await samplesTable.toArray();
   return allSamples.map(buildDescriptor);

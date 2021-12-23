@@ -90,7 +90,7 @@ export class NoteDragHandle {
       this.side === NoteDragHandleSide.Left
         ? 0
         : Math.max(parentNoteWidthPx - this.computeWidth(), 0);
-    this.graphics.scale = new PIXI.Point(this.computeWidth() / 20, 1);
+    this.graphics.scale.set(this.computeWidth() / 20, 1);
   }
 
   public destroy() {

@@ -16,10 +16,11 @@ import {
 import useAllSamples from './useAllSamples';
 import { renderModalWithControls } from 'src/controls/Modal';
 import FlatButton from 'src/misc/FlatButton';
+import { withReactQueryClient } from 'src/reactUtils';
 
 const mkSampleListingRowRenderer = ({
   sampleDescriptors,
-  playingSample,
+  playingSampleName,
   togglePlaying,
   selectedSample,
   setSelectedSample,
@@ -27,7 +28,7 @@ const mkSampleListingRowRenderer = ({
   const SampleListingRowRenderer: React.FC<ListChildComponentProps> = ({ style, index }) => (
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
-      isPlaying={sampleDescriptors[index].name === playingSample?.name}
+      isPlaying={sampleDescriptors[index].name === playingSampleName}
       descriptor={sampleDescriptors[index]}
       style={{
         ...(style || {}),
@@ -60,21 +61,13 @@ interface SelectSampleProps {
 }
 
 const SelectSample: React.FC<SelectSampleProps> = ({ selectedSample, setSelectedSample }) => {
-  const {
-    allSamples,
-    includeLocalSamples,
-    setIncludeLocalSamples,
-    setIncludeRemoteSamples,
-    includeRemoteSamples,
-  } = useAllSamples();
+  const { allSamples, includeLocalSamples, setIncludeLocalSamples } = useAllSamples();
 
   return (
     <>
       <LoadSamplesButtons
         localSamplesLoaded={includeLocalSamples}
         loadLocalSamples={() => setIncludeLocalSamples(true)}
-        remoteSamplesLoaded={includeRemoteSamples}
-        loadRemoteSamples={() => setIncludeRemoteSamples(true)}
       />
 
       <SampleListing
@@ -107,18 +100,16 @@ const SampleSelectDialog: React.FC<SampleSelectDialogProps> = ({ onSubmit, onCan
         setSelectedSample={sample => setSelectedSample(sample)}
       />
 
-      <FlatButton
-        disabled={!selectedSample}
-        onClick={() => onSubmit(selectedSample!.sample)}
-        style={{ marginTop: 10 }}
-      >
-        Submit
-      </FlatButton>
-      {onCancel ? <FlatButton onClick={onCancel}>Cancel</FlatButton> : null}
+      <div className='sample-select-dialog-buttons-container'>
+        {onCancel ? <FlatButton onClick={onCancel}>Cancel</FlatButton> : null}
+        <FlatButton disabled={!selectedSample} onClick={() => onSubmit(selectedSample!.sample)}>
+          Submit
+        </FlatButton>
+      </div>
     </BasicModal>
   );
 };
 
-export const selectSample = () => renderModalWithControls(SampleSelectDialog);
+export const selectSample = () => renderModalWithControls(withReactQueryClient(SampleSelectDialog));
 
 export default SampleSelectDialog;

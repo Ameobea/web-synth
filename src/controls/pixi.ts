@@ -10,6 +10,7 @@ export * from '@pixi/core';
 export * from '@pixi/sprite';
 export * from '@pixi/app';
 export * from '@pixi/graphics';
+import '@pixi/mixin-cache-as-bitmap';
 export * from '@pixi/text';
 export * from '@pixi/interaction';
 

@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as R from 'ramda';
 import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
-import { parse as parsePath } from 'path-browserify';
 
 import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import Loading from 'src/misc/Loading';
-import useAllSamples from './useAllSamples';
+import useAllSamples, { getSampleDisplayName } from './useAllSamples';
 import './SampleLibraryUI.scss';
+import { getIsSampleCached } from 'src/sampleLibrary/sampleCache';
 
 interface PlaySampleIconProps {
   onClick: () => void;
@@ -34,29 +34,27 @@ export const SampleRow: React.FC<SampleRowProps> = ({
   isPlaying,
   ...rest
 }) => {
-  const parsedName = (() => {
-    try {
-      const parsed = parsePath(descriptor.name);
-      return parsed.name;
-    } catch (err) {
-      return descriptor.name;
-    }
-  })();
+  const parsedName = getSampleDisplayName(descriptor);
+  const [isCached, setIsCached] = useState<string>('?');
+  useEffect(() => {
+    getIsSampleCached(descriptor).then(isCached => setIsCached(isCached ? 'Yes' : 'No'));
+  }, [descriptor]);
 
   return (
     <div className='sample-row' {...rest} style={style}>
       <PlaySampleIcon isPlaying={isPlaying} onClick={togglePlaying} />
-      <span title={descriptor.name}>{parsedName}</span>
+      <div className='sample-name' title={descriptor.name}>
+        {parsedName}
+      </div>
+      <div className='sample-local'>{descriptor.isLocal ? 'Local' : 'Remote'}</div>
+      <div className='sample-cached'>{isCached}</div>
     </div>
   );
 };
 
 export interface MkSampleListingRowRendererArgs {
   sampleDescriptors: SampleDescriptor[];
-  playingSample: {
-    name: string;
-    bufSrc: Promise<AudioBufferSourceNode>;
-  } | null;
+  playingSampleName: string | null;
   togglePlaying: (descriptor: SampleDescriptor) => void;
   selectedSample: { sample: SampleDescriptor; index: number } | null;
   setSelectedSample: (
@@ -66,15 +64,14 @@ export interface MkSampleListingRowRendererArgs {
 
 const mkDefaultSampleListingRowRenderer = ({
   sampleDescriptors,
-  playingSample,
+  playingSampleName,
   togglePlaying,
 }: MkSampleListingRowRendererArgs): React.FC<ListChildComponentProps> => {
-  const DefaultSampleListingRowRenderer: React.FC<any> = ({ style, index, key }) => (
+  const DefaultSampleListingRowRenderer: React.FC<ListChildComponentProps> = ({ style, index }) => (
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
-      isPlaying={sampleDescriptors[index].name === playingSample?.name}
+      isPlaying={sampleDescriptors[index].name === playingSampleName}
       descriptor={sampleDescriptors[index]}
-      key={key}
       style={style}
     />
   );
@@ -83,7 +80,7 @@ const mkDefaultSampleListingRowRenderer = ({
 
 const ctx = new AudioContext();
 
-const playSample = async (
+const buildSampleBufferSourceNode = async (
   descriptor: SampleDescriptor,
   onFinished: () => void
 ): Promise<AudioBufferSourceNode> => {
@@ -92,7 +89,6 @@ const playSample = async (
   bufSrc.buffer = buffer;
   bufSrc.connect((ctx as any).globalVolume);
   bufSrc.onended = onFinished;
-  bufSrc.start();
 
   return bufSrc;
 };
@@ -108,6 +104,56 @@ const SampleSearch: React.FC<SampleSearchProps> = ({ value, onChange }) => (
     <input value={value} onChange={evt => onChange(evt.target.value)} />
   </div>
 );
+
+class PlayingSampleManager {
+  private setPlayingSampleName: (name: string | null) => void;
+  private playingSampleDescriptor: SampleDescriptor | null = null;
+  private playingSample: AudioBufferSourceNode | null = null;
+
+  constructor(setPlayingSampleName: (name: string | null) => void) {
+    this.setPlayingSampleName = setPlayingSampleName;
+  }
+
+  private startPlaying = (desc: SampleDescriptor) => {
+    this.playingSampleDescriptor = desc;
+    this.setPlayingSampleName(desc.name);
+    buildSampleBufferSourceNode(desc, () => {
+      if (this.playingSampleDescriptor?.name === desc.name) {
+        this.playingSample = null;
+        this.setPlayingSampleName(null);
+      }
+    }).then(bufSrc => {
+      // If the playing sample has changed before we fetched this, don't start playing it
+      if (this.playingSampleDescriptor?.name !== desc.name) {
+        return;
+      }
+      bufSrc.start();
+      if (this.playingSample) {
+        console.error('Invariant violation; playing sample buffer was set before fetch completed');
+        this.playingSample.stop();
+      }
+      this.playingSample = bufSrc;
+    });
+  };
+
+  public togglePlaying(desc: SampleDescriptor) {
+    this.playingSample?.stop();
+    this.playingSample = null;
+
+    if (desc.name === this.playingSampleDescriptor?.name) {
+      this.playingSampleDescriptor = null;
+      return;
+    }
+
+    this.startPlaying(desc);
+  }
+
+  public dispose() {
+    this.playingSample?.stop();
+    this.playingSample = null;
+    this.playingSampleDescriptor = null;
+  }
+}
 
 interface SampleListingProps {
   sampleDescriptors: SampleDescriptor[];
@@ -128,44 +174,18 @@ export const SampleListing: React.FC<SampleListingProps> = ({
   selectedSample,
   setSelectedSample,
 }) => {
-  const [playingSample, setPlayingSample] = useState<{
-    name: string;
-    bufSrc: Promise<AudioBufferSourceNode>;
-  } | null>(null);
+  const [playingSampleName, setPlayingSampleName] = useState<string | null>(null);
+  const playingSampleManager = useRef(new PlayingSampleManager(setPlayingSampleName));
 
-  const togglePlaying = useMemo(
-    () => (descriptor: SampleDescriptor) => {
-      if (playingSample?.name === descriptor.name) {
-        if (playingSample) {
-          playingSample.bufSrc.then(bufSrc => bufSrc.stop());
-        }
-        setPlayingSample(null);
-      } else {
-        if (playingSample !== null) {
-          playingSample.bufSrc.then(bufSrc => bufSrc.stop());
-        }
-        setPlayingSample({
-          name: descriptor.name,
-          bufSrc: playSample(descriptor, () => setPlayingSample(null)),
-        });
-      }
-    },
-    [playingSample, setPlayingSample]
-  );
+  useEffect(() => () => playingSampleManager.current.dispose(), []);
 
   const [sampleSearch, setSampleSearch] = useState('');
   const lowerSampleSearch = sampleSearch.toLowerCase();
   const filteredSamples = useMemo(
     () =>
-      typeof sampleDescriptors === 'string'
-        ? []
-        : (sampleDescriptors || []).filter(sample => {
-            if (!sampleSearch) {
-              return true;
-            }
-
-            return sample.name.toLowerCase().includes(lowerSampleSearch);
-          }),
+      sampleSearch
+        ? sampleDescriptors.filter(sample => sample.name.toLowerCase().includes(lowerSampleSearch))
+        : sampleDescriptors,
     [sampleDescriptors, lowerSampleSearch, sampleSearch]
   );
   useEffect(() => {
@@ -202,7 +222,7 @@ export const SampleListing: React.FC<SampleListingProps> = ({
           return;
         }
 
-        togglePlaying(filteredSamples[selectedSample.index - 1]);
+        playingSampleManager.current.togglePlaying(filteredSamples[selectedSample.index - 1]);
         setSelectedSample({
           sample: filteredSamples[selectedSample.index - 1],
           index: selectedSample.index - 1,
@@ -212,13 +232,13 @@ export const SampleListing: React.FC<SampleListingProps> = ({
           return;
         }
 
-        togglePlaying(filteredSamples[selectedSample.index + 1]);
+        playingSampleManager.current.togglePlaying(filteredSamples[selectedSample.index + 1]);
         setSelectedSample({
           sample: filteredSamples[selectedSample.index + 1],
           index: selectedSample.index + 1,
         });
       } else if (evt.key === ' ') {
-        togglePlaying(selectedSample.sample);
+        playingSampleManager.current.togglePlaying(selectedSample.sample);
       } else {
         return;
       }
@@ -229,26 +249,21 @@ export const SampleListing: React.FC<SampleListingProps> = ({
     document.addEventListener('keydown', handleKeydown);
 
     return () => document.removeEventListener('keydown', handleKeydown);
-  }, [filteredSamples, selectedSample, setSelectedSample, togglePlaying]);
+  }, [filteredSamples, selectedSample, setSelectedSample]);
 
-  const RowRenderer = useMemo(() => {
-    const mkRowRendererArgs: MkSampleListingRowRendererArgs = {
-      sampleDescriptors: filteredSamples,
-      playingSample,
-      togglePlaying,
-      selectedSample,
-      setSelectedSample,
-    };
-
-    return mkRowRenderer(mkRowRendererArgs);
-  }, [
-    filteredSamples,
-    playingSample,
-    togglePlaying,
-    selectedSample,
-    setSelectedSample,
-    mkRowRenderer,
-  ]);
+  const RowRenderer = useMemo(
+    () =>
+      mkRowRenderer({
+        sampleDescriptors: filteredSamples,
+        playingSampleName,
+        togglePlaying: playingSampleManager.current.togglePlaying.bind(
+          playingSampleManager.current
+        ),
+        selectedSample,
+        setSelectedSample,
+      }),
+    [filteredSamples, playingSampleName, selectedSample, setSelectedSample, mkRowRenderer]
+  );
 
   if (R.isEmpty(sampleDescriptors)) {
     return <>No available samples; no local or remote samples were found.</>;
@@ -257,13 +272,13 @@ export const SampleListing: React.FC<SampleListingProps> = ({
   return (
     <>
       <SampleSearch value={sampleSearch} onChange={setSampleSearch} />
-      <List
-        height={height}
-        itemSize={20}
-        itemCount={filteredSamples.length}
-        width={width}
-        // scrollToIndex={selectedSample?.index} // TODO
-      >
+      <div className='sample-row' style={{ width: '100%', borderBottom: '1px solid #888' }}>
+        <div />
+        <div className='sample-name'>Name</div>
+        <div className='sample-local'>Location</div>
+        <div className='sample-cached'>Cached</div>
+      </div>
+      <List height={height} itemSize={20} itemCount={filteredSamples.length} width={width}>
         {RowRenderer}
       </List>
     </>
@@ -274,15 +289,11 @@ interface LoadSamplesButtonsProps
   extends React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement> {
   localSamplesLoaded: boolean;
   loadLocalSamples: () => void;
-  remoteSamplesLoaded: boolean;
-  loadRemoteSamples: () => void;
 }
 
 export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
   localSamplesLoaded,
   loadLocalSamples,
-  remoteSamplesLoaded,
-  loadRemoteSamples,
   ...rest
 }) => (
   <div className='load-samples-buttons' {...rest}>
@@ -291,22 +302,11 @@ export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
         Load Local Samples
       </button>
     ) : null}
-    {!remoteSamplesLoaded ? (
-      <button style={{ width: 120 }} onClick={loadRemoteSamples}>
-        Load Remote Samples
-      </button>
-    ) : null}
   </div>
 );
 
 const SampleLibraryUI: React.FC = () => {
-  const {
-    includeLocalSamples,
-    setIncludeLocalSamples,
-    includeRemoteSamples,
-    setIncludeRemoteSamples,
-    allSamples,
-  } = useAllSamples();
+  const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
 
   const [selectedSample, setSelectedSample] = useState<{
     sample: SampleDescriptor;
@@ -329,8 +329,6 @@ const SampleLibraryUI: React.FC = () => {
       <LoadSamplesButtons
         localSamplesLoaded={includeLocalSamples}
         loadLocalSamples={() => setIncludeLocalSamples(true)}
-        remoteSamplesLoaded={includeRemoteSamples}
-        loadRemoteSamples={() => setIncludeRemoteSamples(true)}
         style={{ marginBottom: 14 }}
       />
 

@@ -1,17 +1,44 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from 'react-query';
+import * as R from 'ramda';
+import { parse as parsePath } from 'path-browserify';
 
 import { SampleDescriptor, listSamples } from 'src/sampleLibrary/sampleLibrary';
+
+const buildSampleDescriptorKey = (desc: SampleDescriptor): string =>
+  `${desc.id ?? ''}${desc.isLocal}${desc.name}`;
+
+const dedupSampleDescriptors = (descriptors: SampleDescriptor[]): SampleDescriptor[] => {
+  const seenKeys = new Set();
+  return descriptors.filter(desc => {
+    const key = buildSampleDescriptorKey(desc);
+    const exists = seenKeys.has(key);
+    if (exists) {
+      return false;
+    }
+    seenKeys.add(key);
+    return true;
+  });
+};
+
+export const getSampleDisplayName = (descriptor: SampleDescriptor) => {
+  try {
+    const parsed = parsePath(descriptor.name);
+    return parsed.name;
+  } catch (err) {
+    return descriptor.name;
+  }
+};
 
 export const useAllSamples = () => {
   const [cachedSamples, setCachedSamples] = useState<SampleDescriptor[] | 'FETCHING' | null>(null);
   const [localSamples, setLocalSamples] = useState<
     SampleDescriptor[] | null | 'FETCHING' | 'FETCH_ERROR'
   >(null);
-  const [remoteSamples, setRemoteSamples] = useState<
-    SampleDescriptor[] | null | 'FETCHING' | 'FETCH_ERROR'
-  >(null);
+  const { data: remoteSamples } = useQuery('remoteSamples', () =>
+    listSamples({ includeRemote: true })
+  );
   const [includeLocalSamples, setIncludeLocalSamples] = useState(false);
-  const [includeRemoteSamples, setIncludeRemoteSamples] = useState(false);
 
   useEffect(() => {
     if (!cachedSamples) {
@@ -29,37 +56,26 @@ export const useAllSamples = () => {
         }
       });
     }
-    if (includeRemoteSamples && !remoteSamples) {
-      setRemoteSamples('FETCHING');
-      new Promise(async () => {
-        try {
-          setRemoteSamples(await listSamples({ includeRemote: true }));
-        } catch (err) {
-          console.error('Error fetching remote samples: ', err);
-          setRemoteSamples('FETCH_ERROR');
-        }
-      });
-    }
-  }, [includeLocalSamples, includeRemoteSamples, localSamples, remoteSamples, cachedSamples]);
+  }, [includeLocalSamples, localSamples, remoteSamples, cachedSamples]);
 
   const allSamples = useMemo(
-    () => [
-      ...(includeLocalSamples && localSamples && typeof localSamples !== 'string'
-        ? localSamples
-        : []),
-      ...(includeRemoteSamples && remoteSamples && typeof remoteSamples !== 'string'
-        ? remoteSamples
-        : []),
-      ...(cachedSamples && typeof cachedSamples !== 'string' ? cachedSamples : []),
-    ],
-    [includeLocalSamples, localSamples, includeRemoteSamples, remoteSamples, cachedSamples]
+    () =>
+      R.sortWith(
+        [R.ascend(getSampleDisplayName), R.ascend(R.prop('isLocal'))],
+        dedupSampleDescriptors([
+          ...(includeLocalSamples && localSamples && typeof localSamples !== 'string'
+            ? localSamples
+            : []),
+          ...(remoteSamples ? remoteSamples : []),
+          ...(cachedSamples && typeof cachedSamples !== 'string' ? cachedSamples : []),
+        ])
+      ),
+    [includeLocalSamples, localSamples, remoteSamples, cachedSamples]
   );
 
   return {
     includeLocalSamples,
     setIncludeLocalSamples,
-    includeRemoteSamples,
-    setIncludeRemoteSamples,
     allSamples,
   };
 };

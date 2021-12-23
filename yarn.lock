@@ -456,6 +456,11 @@
   resolved "https://registry.yarnpkg.com/@pixi/math/-/math-6.2.1.tgz#86a4c1d25ea6c03f9b4d3ec33bc925151f61b7e5"
   integrity sha512-ejAHHbJSRtAhpFVFOQ4niavCDkjISWBxjFQoqznManDZKXBH0vf8EQBWSth5Cp9wXXAG0mAt4gzlwYXEf7Axkg==
 
+"@pixi/mixin-cache-as-bitmap@^6.2.1":
+  version "6.2.1"
+  resolved "https://registry.yarnpkg.com/@pixi/mixin-cache-as-bitmap/-/mixin-cache-as-bitmap-6.2.1.tgz#92a7a87166bcbd252ac8048d17239992204fc969"
+  integrity sha512-+KsDxCrlvWK2S4ExaKMWFp5RPiFxbBZS2rQ3yrA5GTUC4uZUWm3QptVjHmWb1kjgD5l/QOGF40ZFTu8FfqXtlg==
+
 "@pixi/runner@^6.2.1":
   version "6.2.1"
   resolved "https://registry.yarnpkg.com/@pixi/runner/-/runner-6.2.1.tgz#ee2bc3554b7e77647139728cb17f1833c84b588c"

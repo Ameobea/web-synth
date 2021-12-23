@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
-import type { MIDINode } from 'src/patchNetwork/midiNode';
+import type { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 
 const noop = () => {};
 
@@ -13,6 +13,23 @@ export default class DummyNode extends GainNode implements AudioNode, MIDINode {
   }
 
   public outputCbs = [];
+  private outputCbs_: MIDIInputCbs[] = [];
+
+  private cachedInputCbs = {
+    onAttack: () => {},
+    onRelease: () => {},
+    onPitchBend: () => {},
+    onClearAll: () => {},
+  };
+  private inputCbs = {
+    onAttack: () => {},
+    onRelease: () => {},
+    onPitchBend: () => {},
+    onClearAll: () => {},
+  };
+  public onAttack = () => {};
+  public onRelease = () => {};
+  public clearAll = () => {};
 
   public getInputCbs = () => ({
     onAttack: noop,

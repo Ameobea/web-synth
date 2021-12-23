@@ -99,7 +99,7 @@ const checkForLocalSamples = async () => {
     activeSamples,
     remoteSamples.map(sample => ({
       isLocal: false,
-      name: sample.id,
+      name: sample.name,
       url: sample.sampleUrl,
       id: sample.id,
     })),
