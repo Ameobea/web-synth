@@ -281,6 +281,9 @@ pub mod exports {
         play_note: js_sys::Function,
         release_note: js_sys::Function,
     ) -> *mut PolySynthContext {
+        common::maybe_init(None);
+        wbg_logging::maybe_init();
+
         let context = PolySynthContext {
             synth: PolySynth::new(common::uuid_v4(), true, SynthCallbacks {
                 init_synth: box |_, _| 0usize,

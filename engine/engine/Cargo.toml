@@ -11,15 +11,10 @@ crate-type = ["cdylib", "rlib"]
 wasm-bindgen = { version = "=0.2.78", features = ["nightly"] }
 rand = "0.7"
 rand_pcg = "0.2.1"
-slab = "0.4"
-fnv = "1.0"
-base64 = "0.13"
 miniserde = "0.1.16"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-console_error_panic_hook = "0.1.6"
 uuid = { version = "0.8" }
 
 common = { path = "../common" }
 wbg_logging = { path = "../wbg_logging" }
-polysynth = { path = "../polysynth", default_features = false }
