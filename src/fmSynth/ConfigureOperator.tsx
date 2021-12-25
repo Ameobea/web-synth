@@ -19,6 +19,7 @@ import { mkSvelteComponentShim } from 'src/svelteUtils';
 import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
 import type { Writable } from 'svelte/store';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 
 /**
  * The algorithm used to produce the output for the operator.
@@ -290,6 +291,7 @@ interface ConfigureOperatorProps {
   setWavetableState: (newState: WavetableState) => void;
   vcId: string | undefined;
   sampleMappingStore: Writable<SampleMappingState>;
+  registerGateUngateCallbacks: GateUngateCallbackRegistrar;
 }
 
 const OperatorTypeSettings = [
@@ -313,6 +315,8 @@ const OperatorUnisonSettings = [{ type: 'range', label: 'unison', min: 0, max: 3
 
 const ConfigureSampleMapping = mkSvelteComponentShim<{
   store: Writable<SampleMappingState>;
+  operatorIx: number;
+  registerGateUngateCallbacks: GateUngateCallbackRegistrar;
 }>(ConfigureSampleMappingInner as any);
 
 const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
@@ -328,6 +332,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   setWavetableState,
   vcId,
   sampleMappingStore,
+  registerGateUngateCallbacks,
 }) => {
   const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
@@ -430,7 +435,11 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
         />
       ) : null}
       {config.type === 'sample mapping' ? (
-        <ConfigureSampleMapping store={sampleMappingStore} />
+        <ConfigureSampleMapping
+          store={sampleMappingStore}
+          operatorIx={operatorIx}
+          registerGateUngateCallbacks={registerGateUngateCallbacks}
+        />
       ) : null}
       <ConfigureEffects
         operatorIx={operatorIx}

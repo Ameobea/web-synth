@@ -5,13 +5,14 @@
 
   export let midiNumber: number;
   export let mappedSamples: MappedSampleData[] | undefined;
+  export let isGated: boolean;
   let mappedSampleCount: number;
   $: {
     mappedSampleCount = mappedSamples?.length ?? 0;
   }
 </script>
 
-<div class="note-row" data-color={getNoteColor(midiNumber)} on:click>
+<div class="note-row" data-color={getNoteColor(midiNumber)} data-gated={`${isGated}`} on:click>
   <div class="midi-number">{midiNumber}<br />{midiNumberToNoteName(midiNumber)}</div>
   <div class="content">
     {#if mappedSampleCount > 0}
@@ -29,6 +30,15 @@
     font-size: 14px;
     padding: 2px 4px;
     cursor: pointer;
+  }
+
+  .note-row[data-gated='true'] {
+    background-color: rgb(250, 82, 250) !important;
+    color: #121212 !important;
+
+    .no-mapped-samples {
+      color: #222 !important;
+    }
   }
 
   .midi-number {

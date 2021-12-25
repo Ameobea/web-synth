@@ -136,6 +136,10 @@ export const listSamples = async ({
   return [...allSamples.values()];
 };
 
+/**
+ * This is the main entrypoint for loading sample from descriptors.  It will check both layers of cache first and
+ * if the sample is not available, it will attempt to load it from its source (local filesystem or remote URL).
+ */
 export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuffer> => {
   // First we check the highest level of cache, the in-memory sample manager
   const cachedSample = GLOBAL_SAMPLE_MANAGER.getSample(descriptor);

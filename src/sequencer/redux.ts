@@ -1,8 +1,8 @@
 import * as R from 'ramda';
 import { buildStore, buildActionGroup, buildModule } from 'jantix';
 
-import { SampleDescriptor } from 'src/sampleLibrary';
-import { MIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
+import type { SampleDescriptor } from 'src/sampleLibrary';
+import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { buildGateOutput } from 'src/sequencer';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 import { genRandomStringID } from 'src/util';

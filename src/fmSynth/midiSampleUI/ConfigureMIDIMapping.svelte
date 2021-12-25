@@ -26,7 +26,7 @@
   >
     Add Mapped Sample
   </button>
-  <button class="close-button" on:click={onClose}>Close</button>
+  <button class="close-button" on:click={onClose}>Collapse</button>
 </div>
 
 <style lang="scss">
@@ -41,7 +41,6 @@
   }
 
   .mapped-samples-container {
-    min-height: 50px;
     display: flex;
     flex-direction: column;
   }

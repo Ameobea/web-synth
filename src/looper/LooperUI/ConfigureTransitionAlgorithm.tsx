@@ -2,11 +2,11 @@ import React, { useCallback, useMemo } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 
-import { looperDispatch, ReduxStore } from 'src/redux';
+import { looperDispatch, type ReduxStore } from 'src/redux';
 import {
   looperActions,
-  LooperTransitionAlgorithmState,
-  LooperTransitionAlgorithmUIState,
+  type LooperTransitionAlgorithmState,
+  type LooperTransitionAlgorithmUIState,
 } from 'src/redux/modules/looper';
 
 type ConfigureTransitionAlgorithmTypeProps<

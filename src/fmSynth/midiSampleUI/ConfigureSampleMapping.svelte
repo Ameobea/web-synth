@@ -1,22 +1,59 @@
 <script lang="ts">
   import type { Writable } from 'svelte/store';
 
-  import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+  import {
+    buildDefaultSampleMappingOperatorState,
+    type SampleMappingState,
+  } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import MappedSamplesListing from './MappedSamplesListing.svelte';
+  import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 
+  export let registerGateUngateCallbacks: GateUngateCallbackRegistrar;
   export let store: Writable<SampleMappingState>;
+  export let operatorIx: number;
+  $: {
+    if (!$store.stateByOperatorIx[operatorIx]) {
+      $store.stateByOperatorIx[operatorIx] = buildDefaultSampleMappingOperatorState();
+    }
+  }
 </script>
 
 <div class="root">
-  <MappedSamplesListing
-    bind:selectedMIDINumber={$store.selectedMIDINumber}
-    bind:mappedSamplesByMIDINumber={$store.mappedSamplesByMIDINumber}
-  />
+  <div
+    class="mapped-samples-listing-header"
+    on:click={() =>
+      ($store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded =
+        !$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded)}
+  >
+    {$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded ? '∨' : '›'} Mapped Samples
+  </div>
+  {#if $store.stateByOperatorIx[operatorIx] && $store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded}
+    <MappedSamplesListing
+      bind:selectedMIDINumber={$store.stateByOperatorIx[operatorIx].selectedMIDINumber}
+      state={$store.stateByOperatorIx[operatorIx]}
+      {registerGateUngateCallbacks}
+    />
+  {/if}
 </div>
 
 <style lang="scss">
   .root {
     display: flex;
     flex-direction: column;
+  }
+
+  .mapped-samples-listing-header {
+    background-color: #1b1b1b;
+    border: 1px solid #555;
+    display: flex;
+    align-items: center;
+    padding-left: 6px;
+    max-height: 25px;
+    font-size: 17px;
+    color: #b6b6b6;
+    box-sizing: border-box;
+    user-select: none;
+    cursor: pointer;
+    background-color: #2c2c2c;
   }
 </style>

@@ -101,6 +101,10 @@ pub fn quantize(min: f32, max: f32, steps: f32, val: f32) -> f32 {
     min + (quantized_int as f32) * step_size
 }
 
+pub fn midi_number_to_frequency(midi_number: usize) -> f32 {
+    (2.0f32).powf((midi_number as f32 - 69.) / 12.) * 440.
+}
+
 #[test]
 fn test_quantize() {
     assert_eq!(quantize(0., 100., 10., 0.2), 0.);

@@ -5,7 +5,7 @@ import { Try, Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 
 import {
-  SynthDesignerState,
+  type SynthDesignerState,
   serializeSynthModule,
   deserializeSynthModule,
   getInitialSynthDesignerState,
@@ -18,7 +18,7 @@ import SynthDesigner from './SynthDesigner';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import buildSynthDesignerRedux from 'src/redux/modules/synthDesigner';
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import { AsyncOnce, midiToFrequency } from 'src/util';
+import { AsyncOnce } from 'src/util';
 import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
@@ -70,10 +70,10 @@ export const init_synth_designer = (stateKey: string) => {
 
   PolysynthMod.get().then(mod => {
     const playNote = (voiceIx: number, note: number, _velocity: number) =>
-      gateSynthDesigner(reduxInfra.getState().synthDesigner, midiToFrequency(note), voiceIx);
+      gateSynthDesigner(reduxInfra.getState().synthDesigner, note, voiceIx);
 
-    const releaseNote = (voiceIx: number, _note: number, _velocity: number) =>
-      ungateSynthDesigner(reduxInfra.getState, voiceIx);
+    const releaseNote = (voiceIx: number, note: number, _velocity: number) =>
+      ungateSynthDesigner(reduxInfra.getState, voiceIx, note);
 
     const ctxPtr = mod.create_polysynth_context(playNote, releaseNote);
     reduxInfra.dispatch(

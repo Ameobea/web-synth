@@ -26,6 +26,7 @@ import type { MIDINode } from 'src/patchNetwork/midiNode';
 import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import type { Writable } from 'svelte/store';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];
@@ -161,6 +162,7 @@ interface FMSynthUIProps {
   isHidden: boolean;
   vcId: string | undefined;
   sampleMappingStore: Writable<SampleMappingState>;
+  registerGateUngateCallbacks: GateUngateCallbackRegistrar;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -188,6 +190,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   isHidden,
   vcId,
   sampleMappingStore,
+  registerGateUngateCallbacks,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -551,6 +554,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                   }}
                   vcId={vcId}
                   sampleMappingStore={sampleMappingStore}
+                  registerGateUngateCallbacks={registerGateUngateCallbacks}
                 />
               );
             })()
@@ -647,6 +651,7 @@ export const ConnectedFMSynthUI: React.FC<{
     isHidden={isHidden}
     vcId={vcId}
     sampleMappingStore={synth.getSampleMappingStore()}
+    registerGateUngateCallbacks={synth.registerGateUngateCallbacks}
   />
 ));
 

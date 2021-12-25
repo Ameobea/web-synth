@@ -4,9 +4,15 @@ import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
 import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import type { UISelection } from 'src/fmSynth/FMSynthUI';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
-import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 
 const formatOperatorConfig = (config: OperatorConfig) => {
+  if (config.type === 'sample mapping') {
+    return 'S-MAP';
+  } else if (config.type === 'tuned sample') {
+    return 'SAMP';
+  }
+
   if (
     (config.type === 'sine oscillator' ||
       config.type === 'exponential oscillator' ||
@@ -23,6 +29,7 @@ const formatOperatorConfig = (config: OperatorConfig) => {
       'square oscillator': 'SQR',
       'sawtooth oscillator': 'SAW',
       wavetable: 'TABL',
+      'sample mapping': 'SAMP',
     }[config.type];
     return (
       <>

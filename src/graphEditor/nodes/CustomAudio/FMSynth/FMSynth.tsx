@@ -1,6 +1,7 @@
 import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
+import { get, writable, type Writable } from 'svelte/store';
 
 import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
 import {
@@ -27,13 +28,15 @@ import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { getSentry } from 'src/sentry';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import { get, writable, type Writable } from 'svelte/store';
 import {
   buildDefaultSampleMappingState,
   deserializeSampleMappingState,
   serializeSampleMappingState,
   type SampleMappingState,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
+import type SampleManager from 'src/sampleLibrary/SampleManager';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -170,6 +173,9 @@ export default class FMSynth implements ForeignNode {
     releasePoint: 0.98,
     audioThreadData: { phaseIndex: 0 },
   };
+  private gateCallbacks: Set<(midiNumber: number) => void> = new Set();
+  private ungateCallbacks: Set<(midiNumber: number) => void> = new Set();
+  private fetchedSampleDescriptorHashes: Set<string> = new Set();
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -322,6 +328,7 @@ export default class FMSynth implements ForeignNode {
             this.setEffect(null, effectIx, effect)
           );
           this.handleDetuneChange(this.detune);
+          this.sampleMappingStore.subscribe(this.handleSampleMappingStateChange);
 
           if (this.onInitialized) {
             this.onInitialized(this);
@@ -363,21 +370,38 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public onGate(voiceIx: number) {
+  public onGate(voiceIx: number, midiNumber: number) {
     if (!this.awpHandle) {
       console.warn('Tried gating before AWP initialized');
       return;
     }
+    for (const cb of this.gateCallbacks) {
+      cb(midiNumber);
+    }
     this.awpHandle.port.postMessage({ type: 'gate', voiceIx });
   }
 
-  public onUnGate(voiceIx: number) {
+  public onUnGate(voiceIx: number, midiNumber: number) {
     if (!this.awpHandle) {
       console.warn('Tried ungating before AWP initialized');
       return;
     }
+    for (const cb of this.ungateCallbacks) {
+      cb(midiNumber);
+    }
     this.awpHandle.port.postMessage({ type: 'ungate', voiceIx });
   }
+
+  public registerGateUngateCallbacks: GateUngateCallbackRegistrar = (onGate, onUngate) => {
+    this.gateCallbacks.add(onGate);
+    this.ungateCallbacks.add(onUngate);
+
+    const unregister = () => {
+      this.gateCallbacks.delete(onGate);
+      this.ungateCallbacks.delete(onUngate);
+    };
+    return { unregister };
+  };
 
   private encodeParamSource(source: ParamSource | null | undefined) {
     if (!source) {
@@ -899,6 +923,53 @@ export default class FMSynth implements ForeignNode {
 
     this.awpHandle.port.postMessage({ type: 'setDetune', ...this.encodeParamSource(newDetune) });
   }
+
+  private fetchAndSetSample = async (descriptor: SampleDescriptor) => {
+    this.fetchedSampleDescriptorHashes.add(hashSampleDescriptor(descriptor));
+
+    try {
+      const loadedSample = await getSample(descriptor);
+      const data = loadedSample.getChannelData(0);
+      this.awpHandle!.port.postMessage({ type: 'setSample', descriptor, data });
+      // Re-initialize sample mapping state so that this newly loaded sample is picked up
+      this.handleSampleMappingStateChange(get(this.sampleMappingStore));
+    } catch (err) {
+      console.error('Error loading sample: ', { descriptor, err });
+    }
+  };
+
+  public handleSampleMappingStateChange = (sampleMappingState: SampleMappingState) => {
+    if (!this.awpHandle) {
+      console.warn('Tried to set sample mapping state before AWP initialized');
+      return;
+    }
+
+    this.awpHandle.port.postMessage({ type: 'setSampleMappingState', sampleMappingState });
+
+    // This function will be called after AWP initialization, so don't worry about this yet.  Technically we delay
+    // loading samples needlessly a bit and could optimize that if we want
+    if (!this.awpHandle) {
+      return;
+    }
+
+    for (const opState of Object.values(sampleMappingState.stateByOperatorIx)) {
+      for (const mappedSamples of Object.values(opState.mappedSamplesByMIDINumber)) {
+        mappedSamples.forEach(data => {
+          if (!data.descriptor) {
+            return;
+          }
+
+          const descriptorHash = hashSampleDescriptor(data.descriptor);
+          const isFetched = this.fetchedSampleDescriptorHashes.has(descriptorHash);
+          if (isFetched) {
+            return;
+          }
+
+          this.fetchAndSetSample(data.descriptor);
+        });
+      }
+    }
+  };
 
   public setMIDIControlValue(controlIndex: number, controlValue: number) {
     if (!this.awpHandle) {

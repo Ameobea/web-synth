@@ -36,6 +36,7 @@
   .root {
     margin-left: -2px;
     margin-right: -2px;
+    margin-top: -2px;
     display: flex;
     flex-direction: column;
     padding: 8px;
@@ -45,6 +46,7 @@
   .selected-sample {
     display: flex;
     flex-direction: row;
+    margin-bottom: -1px;
 
     .label {
       margin-right: 8px;

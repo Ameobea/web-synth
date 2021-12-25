@@ -21,3 +21,15 @@ pub fn uuid_v4() -> Uuid {
     let entropy: (u64, i64) = rng().gen();
     unsafe { mem::transmute(entropy) }
 }
+
+pub fn set_raw_panic_hook(log_err: unsafe extern "C" fn(ptr: *const u8, len: usize)) {
+    let hook = move |info: &std::panic::PanicInfo| {
+        let msg = format!("PANIC: {}", info.to_string());
+        let bytes = msg.into_bytes();
+        let len = bytes.len();
+        let ptr = bytes.as_ptr();
+        unsafe { log_err(ptr, len) }
+    };
+
+    std::panic::set_hook(box hook)
+}

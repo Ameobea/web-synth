@@ -1,11 +1,11 @@
-import { filterNils, PromiseResolveType } from 'ameo-utils';
+import { filterNils, type PromiseResolveType } from 'ameo-utils';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
 
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import FMSynth, { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, { type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { AsyncOnce, midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
@@ -15,7 +15,7 @@ import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import { getSentry } from 'src/sentry';
-import { Presets, SerializedFMSynthDemoState } from 'src/fmDemo/presets';
+import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { useWindowSize } from 'src/reactUtils';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
@@ -306,15 +306,15 @@ const synth = new FMSynth(ctx, undefined, {
     voiceGains.forEach((voiceGain, voiceIx) => awpNode.connect(voiceGain, voiceIx));
 
     PolysynthMod.get().then(mod => {
-      const playNote = (voiceIx: number, note: number, _velocity: number) => {
-        const frequency = midiToFrequency(note);
+      const playNote = (voiceIx: number, midiNumber: number, _velocity: number) => {
+        const frequency = midiToFrequency(midiNumber);
         (awpNode.parameters as Map<string, AudioParam>).get(
           `voice_${voiceIx}_base_frequency`
         )!.value = frequency;
 
         adsrs.gate(voiceIx);
         filterAdsrs.gate(voiceIx);
-        inst.onGate(voiceIx);
+        inst.onGate(voiceIx, midiNumber);
         LastGateTimeByVoice[voiceIx] = ctx.currentTime;
       };
 
@@ -325,7 +325,7 @@ const synth = new FMSynth(ctx, undefined, {
       // user-configurable
       const releaseLengthMs =
         (1 - adsrs.getReleaseStartPhase()) * adsrs.getLengthMs() + (2_640 / 44_100) * 1000 + 60;
-      const releaseNote = (voiceIx: number, _note: number, _velocity: number) => {
+      const releaseNote = (voiceIx: number, midiNumber: number, _velocity: number) => {
         const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
         setTimeout(() => {
           // If the voice has been re-gated since releasing, don't disconnect
@@ -341,7 +341,7 @@ const synth = new FMSynth(ctx, undefined, {
 
         adsrs.ungate(voiceIx);
         filterAdsrs.ungate(voiceIx);
-        inst.onUnGate(voiceIx);
+        inst.onUnGate(voiceIx, midiNumber);
       };
 
       polysynthCtxPtr = mod.create_polysynth_context(playNote, releaseNote);

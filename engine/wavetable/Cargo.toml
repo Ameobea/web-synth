@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 adsr = { path = "../adsr" }
 dsp = { path = "../dsp" }
 fastapprox = "0.3"
+common = { path = "../common" }
 
 [features]
 default = []

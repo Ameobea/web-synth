@@ -9,13 +9,20 @@ use adsr::{
 use dsp::{even_faster_pow, oscillator::PhasedOscillator};
 
 pub mod effects;
-mod sample_player;
+mod samples;
 use crate::{WaveTable, WaveTableSettings};
 
 use self::{
     effects::EffectChain,
-    sample_player::{SampleMappingEmitter, TunedSampleEmitter},
+    samples::{
+        init_sample_manager, sample_manager, SampleMappingEmitter, SampleMappingManager,
+        SampleMappingOperatorConfig, TunedSampleEmitter,
+    },
 };
+
+extern "C" {
+    fn log_err(ptr: *const u8, len: usize);
+}
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
 
@@ -468,6 +475,7 @@ impl Operator {
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
+        sample_mapping_config: &SampleMappingOperatorConfig,
     ) -> f32 {
         if !self.enabled {
             return 0.;
@@ -480,6 +488,7 @@ impl Operator {
             adsrs,
             sample_ix_within_frame,
             base_frequency,
+            sample_mapping_config,
         );
 
         self.effect_chain
@@ -522,8 +531,8 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.get_phases(),
             OscillatorSource::UnisonTriangle(osc) => osc.get_phases(),
             OscillatorSource::UnisonSawtooth(osc) => osc.get_phases(),
-            OscillatorSource::SampleMapping(_) => todo!(),
-            OscillatorSource::TunedSample(_) => todo!(),
+            OscillatorSource::SampleMapping(_) => Vec::new(),
+            OscillatorSource::TunedSample(_) => Vec::new(),
         }
     }
 
@@ -542,8 +551,8 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonTriangle(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonSawtooth(osc) => osc.set_phases(new_phases),
-            OscillatorSource::SampleMapping(_) => todo!(),
-            OscillatorSource::TunedSample(_) => todo!(),
+            OscillatorSource::SampleMapping(_) => (),
+            OscillatorSource::TunedSample(_) => (),
         }
     }
 }
@@ -561,6 +570,7 @@ impl OscillatorSource {
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
         base_frequency: f32,
+        sample_mapping_config: &SampleMappingOperatorConfig,
     ) -> f32 {
         match self {
             OscillatorSource::Wavetable(handle) => handle.gen_sample(
@@ -660,7 +670,8 @@ impl OscillatorSource {
                 sample_ix_within_frame,
                 base_frequency,
             ),
-            OscillatorSource::SampleMapping(_) => todo!(),
+            OscillatorSource::SampleMapping(emitter) =>
+                emitter.gen_sample(base_frequency, sample_mapping_config),
             OscillatorSource::TunedSample(_) => todo!(),
         }
     }
@@ -780,6 +791,7 @@ impl FMSynthVoice {
         raw_base_frequencies: &[f32; FRAME_SIZE],
         output_buffer: &mut [f32; FRAME_SIZE],
         detune: Option<&ParamSource>,
+        sample_mapping_manager: &SampleMappingManager,
     ) {
         let mut samples_per_operator_bufs: [[f32; OPERATOR_COUNT]; 2] =
             [self.last_samples, uninit()];
@@ -918,6 +930,7 @@ impl FMSynthVoice {
                     &self.adsrs,
                     sample_ix_within_frame,
                     base_frequency,
+                    &sample_mapping_manager.config_by_operator[operator_ix],
                 );
 
                 *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
@@ -1349,6 +1362,7 @@ pub struct FMSynthContext {
     pub adsr_phase_buf: [f32; 256],
     pub detune: Option<ParamSource>,
     pub wavetables: Vec<WaveTable>,
+    pub sample_mapping_manager: SampleMappingManager,
 }
 
 impl FMSynthContext {
@@ -1374,6 +1388,7 @@ impl FMSynthContext {
                 base_frequency_buffer,
                 output_buffer,
                 self.detune.as_ref(),
+                &self.sample_mapping_manager,
             );
 
             voice.gain_envelope.render_frame(1., 0.);
@@ -1423,6 +1438,8 @@ impl FMSynthContext {
 #[cold]
 pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthContext {
     crate::lookup_tables::maybe_init_lookup_tables();
+    init_sample_manager();
+    common::set_raw_panic_hook(log_err);
 
     let ctx = Box::into_raw(box FMSynthContext {
         voices: Vec::with_capacity(voice_count),
@@ -1435,6 +1452,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         adsr_phase_buf: [0.; 256],
         detune: None,
         wavetables: Vec::new(),
+        sample_mapping_manager: SampleMappingManager::default(),
     });
     for i in 0..OPERATOR_COUNT {
         (*ctx)
@@ -1595,7 +1613,7 @@ fn build_oscillator_source(
         6 => OscillatorSource::Sawtooth(SawtoothOscillator {
             phase: old_phases.get(0).copied().unwrap_or_default(),
         }),
-        7 => OscillatorSource::SampleMapping(SampleMappingEmitter {}),
+        7 => OscillatorSource::SampleMapping(SampleMappingEmitter::new()),
         8 => OscillatorSource::TunedSample(TunedSampleEmitter {}),
         52 => OscillatorSource::UnisonSine(UnisonOscillator {
             unison_detune_range_semitones: ParamSource::from_parts(
@@ -1862,6 +1880,12 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
         // TODO: Make the way this is produced configurable
         let initial_phases = &[0.];
         operator.oscillator_source.set_phase(initial_phases);
+
+        match &mut operator.oscillator_source {
+            OscillatorSource::SampleMapping(emitter) => emitter.cur_ix = 0,
+            OscillatorSource::TunedSample(_) => todo!(),
+            _ => (),
+        }
     }
 }
 
@@ -2035,4 +2059,69 @@ pub extern "C" fn fm_synth_get_wavetable_data_ptr(
         ctx.wavetables.push(new_wavetable);
     }
     ctx.wavetables[wavetable_ix].samples.as_mut_ptr()
+}
+
+/// Allocates space for a new sample to be loaded into Wasm memory, returning its index in the
+/// samples list
+#[no_mangle]
+pub extern "C" fn fm_synth_add_sample(len_samples: usize) -> usize {
+    let sample_manager = sample_manager();
+    let ix = sample_manager.samples.len();
+    let mut buf = Vec::with_capacity(len_samples);
+    unsafe { buf.set_len(len_samples) };
+    sample_manager.samples.push(buf);
+    ix
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_get_sample_buf_ptr(sample_ix: usize) -> *const f32 {
+    sample_manager().samples[sample_ix].as_mut_ptr()
+}
+
+/// Set the number of MIDI numbers that have been mapped for a given operator
+#[no_mangle]
+pub extern "C" fn fm_synth_set_mapped_sample_midi_number_count(
+    ctx: *mut FMSynthContext,
+    operator_ix: usize,
+    mapped_midi_number_count: usize,
+) {
+    let ctx = unsafe { &mut *ctx };
+    ctx.sample_mapping_manager.config_by_operator[operator_ix]
+        .set_mapped_sample_midi_number_count(mapped_midi_number_count);
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_mapped_sample_data_for_midi_number_slot(
+    ctx: *mut FMSynthContext,
+    operator_ix: usize,
+    midi_number_slot_ix: usize,
+    midi_number: usize,
+    mapped_sample_count: usize,
+) {
+    let ctx = unsafe { &mut *ctx };
+    ctx.sample_mapping_manager.config_by_operator[operator_ix]
+        .set_mapped_sample_data_for_midi_number(
+            midi_number_slot_ix,
+            midi_number,
+            mapped_sample_count,
+        );
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_mapped_sample_config(
+    ctx: *mut FMSynthContext,
+    operator_ix: usize,
+    midi_number_ix: usize,
+    mapped_sample_ix: usize,
+    sample_data_ix: isize,
+    do_loop: bool,
+) {
+    let ctx = unsafe { &mut *ctx };
+    ctx.sample_mapping_manager.config_by_operator[operator_ix]
+        .set_mapped_sample_config_for_midi_number(
+            midi_number_ix,
+            mapped_sample_ix,
+            sample_data_ix,
+            do_loop,
+        )
 }

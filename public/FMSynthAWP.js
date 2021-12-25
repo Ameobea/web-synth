@@ -11,6 +11,9 @@ for (let i = 0; i < VOICE_COUNT; i++) {
   BASE_FREQUENCY_PARAM_NAMES[i] = `voice_${i}_base_frequency`;
 }
 
+const hashSampleDescriptor = descriptor =>
+  `${descriptor.name}${descriptor.isLocal}${descriptor.id}`;
+
 class FMSynthAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
@@ -35,6 +38,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.wasmInstance = null;
     this.ctxPtr = 0;
     this.wasmMemoryBuffer = null;
+    this.sampleDataIxByHashedSampleDescriptor = new Map();
 
     this.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -278,6 +282,62 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
           break;
         }
+        case 'setSampleMappingState': {
+          const { stateByOperatorIx } = evt.data.sampleMappingState;
+          Object.entries(stateByOperatorIx).forEach(
+            ([operatorIxStr, { mappedSamplesByMIDINumber }]) => {
+              const operatorIx = +operatorIxStr;
+              const entries = Object.entries(mappedSamplesByMIDINumber);
+              this.wasmInstance.exports.fm_synth_set_mapped_sample_midi_number_count(
+                this.ctxPtr,
+                operatorIx,
+                entries.length
+              );
+              entries.forEach(([midiNumberStr, mappedSampleDataForMIDINumber], slotIx) => {
+                const midiNumber = +midiNumberStr;
+                this.wasmInstance.exports.fm_synth_set_mapped_sample_data_for_midi_number_slot(
+                  this.ctxPtr,
+                  operatorIx,
+                  slotIx,
+                  midiNumber,
+                  mappedSampleDataForMIDINumber.length
+                );
+
+                mappedSampleDataForMIDINumber.forEach(({ doLoop, descriptor }, mappedSampleIx) => {
+                  const sampleDescriptorHash = descriptor ? hashSampleDescriptor(descriptor) : null;
+                  const sampleDataIx = sampleDescriptorHash
+                    ? this.sampleDataIxByHashedSampleDescriptor.get(sampleDescriptorHash)
+                    : null;
+
+                  this.wasmInstance.exports.fm_synth_set_mapped_sample_config(
+                    this.ctxPtr,
+                    operatorIx,
+                    slotIx,
+                    mappedSampleIx,
+                    sampleDataIx ?? -1,
+                    doLoop ?? false
+                  );
+                });
+              });
+            }
+          );
+          break;
+        }
+        case 'setSample': {
+          const { descriptor, data } = evt.data;
+          const descriptorHash = hashSampleDescriptor(descriptor);
+          const sampleDataIx = this.wasmInstance.exports.fm_synth_add_sample(data.length);
+          const sampleDataBufPtr =
+            this.wasmInstance.exports.fm_synth_get_sample_buf_ptr(sampleDataIx);
+          const memory = this.getWasmMemoryBuffer();
+          const sampleBuffer = memory.subarray(
+            sampleDataBufPtr / BYTES_PER_F32,
+            sampleDataBufPtr / BYTES_PER_F32 + data.length
+          );
+          sampleBuffer.set(data);
+          this.sampleDataIxByHashedSampleDescriptor.set(descriptorHash, sampleDataIx);
+          break;
+        }
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }
@@ -285,8 +345,15 @@ class FMSynthAWP extends AudioWorkletProcessor {
     };
   }
 
+  handleWasmPanic = (ptr, len) => {
+    const mem = new Uint8Array(this.getWasmMemoryBuffer().buffer);
+    const slice = mem.subarray(ptr, ptr + len);
+    const str = String.fromCharCode(...slice);
+    throw new Error(str);
+  };
+
   async initWasm(wasmBytes, modulationMatrix, outputWeights, adsrs) {
-    const importObject = { env: { debug1: (...args) => console.log(...args) } };
+    const importObject = { env: { log_err: this.handleWasmPanic } };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
     this.wasmInstance.exports.memory.grow(1024 * 4);

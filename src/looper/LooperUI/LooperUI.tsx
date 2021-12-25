@@ -3,13 +3,13 @@ import { shallowEqual, useSelector } from 'react-redux';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
-import { ReduxStore, looperDispatch, getState } from 'src/redux';
+import { type ReduxStore, looperDispatch, getState } from 'src/redux';
 import {
   deserializeLooper,
   looperActions,
-  LooperBank,
-  LooperModule,
-  SerializedLooperInstState,
+  type LooperBank,
+  type LooperModule,
+  type SerializedLooperInstState,
   serializeLooper,
 } from 'src/redux/modules/looper';
 import './LooperUI.scss';
@@ -23,7 +23,7 @@ import {
   saveLooperPreset,
 } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
-import { ConnectableDescriptor } from 'src/patchNetwork/patchNetwork';
+import type { ConnectableDescriptor } from 'src/patchNetwork/patchNetwork';
 import { connect } from 'src/patchNetwork/interface';
 import ConfigureTransitionAlgorithm from 'src/looper/LooperUI/ConfigureTransitionAlgorithm';
 

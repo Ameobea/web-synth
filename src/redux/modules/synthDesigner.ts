@@ -4,8 +4,11 @@ import type { Root as ReactDOMRoot } from 'react-dom';
 
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
-import FMSynth, { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import FMSynth, {
+  type Adsr,
+  type AdsrParams,
+} from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -13,7 +16,7 @@ import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelp
 import {
   AbstractFilterModule,
   buildAbstractFilterModule,
-  FilterCSNs,
+  type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
@@ -163,12 +166,15 @@ const connectFMSynth = (stateKey: string, synthIx: number) => {
 
 export const gateSynthDesigner = (
   state: SynthDesignerState,
-  baseFrequency: number,
+  midiNumber: number,
   voiceIx: number
-) =>
+) => {
+  const baseFrequency = midiToFrequency(midiNumber);
+
   state.synths.forEach(synth => {
-    synth.fmSynth?.onGate(voiceIx);
     const frequency = baseFrequency * synth.pitchMultiplier;
+    synth.fmSynth.setFrequency(voiceIx, frequency);
+    synth.fmSynth?.onGate(voiceIx, midiNumber);
 
     const targetVoice = synth.voices[voiceIx];
     if (!state.wavyJonesInstance) {
@@ -180,17 +186,17 @@ export const gateSynthDesigner = (
     // We edit state directly w/o updating references because this is only needed internally
     targetVoice.lastGateOrUngateTime = ctx.currentTime;
 
-    synth.fmSynth.setFrequency(voiceIx, frequency);
-
     targetVoice.outerGainNode.connect(state.wavyJonesInstance);
   });
+};
 
 export const ungateSynthDesigner = (
   getState: () => { synthDesigner: SynthDesignerState },
-  voiceIx: number
+  voiceIx: number,
+  midiNumber: number
 ) =>
   getState().synthDesigner.synths.forEach(({ voices, fmSynth }, synthIx) => {
-    fmSynth?.onUnGate(voiceIx);
+    fmSynth?.onUnGate(voiceIx, midiNumber);
     const targetVoice = voices[voiceIx];
     // We edit state directly w/o updating references because this is only needed internally
     const ungateTime = ctx.currentTime;
