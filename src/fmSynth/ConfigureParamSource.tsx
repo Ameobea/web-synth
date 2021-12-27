@@ -498,7 +498,6 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
             value={adsr.lenSamples}
             onChange={newLenSamples => {
               const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-              console.log({ newLenSamples });
               onAdsrChange(adsrIx, {
                 ...adsrs[adsrIx],
                 lenSamples: newLenSamples,

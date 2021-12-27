@@ -8,6 +8,7 @@ extern crate log;
 use std::{ptr, str::FromStr};
 
 use miniserde::json;
+use prelude::js::js_random;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
@@ -34,7 +35,7 @@ pub fn get_vcm() -> &'static mut ViewContextManager { unsafe { &mut *VIEW_CONTEX
 /// the last saved composition from the user.
 #[wasm_bindgen]
 pub fn init() {
-    common::maybe_init(None);
+    common::maybe_init(Some(unsafe { std::mem::transmute(js_random()) }));
     wbg_logging::maybe_init();
 
     // Check if we have an existing VCM and drop it if we do

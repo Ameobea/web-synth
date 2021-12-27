@@ -4,6 +4,7 @@ opt:
   wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
   svgo -p 1 --multipass -f ./dist -o ./dist
+  svgo -p 1 --multipass -f ./dist/icons/music_notes -o ./dist/icons/music_notes
 
 opt-public:
   # for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done

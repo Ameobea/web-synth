@@ -1071,6 +1071,16 @@ export default class MIDIEditorUIInstance {
             }
             break;
           }
+          case 'ArrowLeft': {
+            this.view.scrollHorizontalBeats = Math.max(this.view.scrollHorizontalBeats - 1, 0);
+            this.handleViewChange();
+            break;
+          }
+          case 'ArrowRight': {
+            this.view.scrollHorizontalBeats += 1;
+            this.handleViewChange();
+            break;
+          }
         }
       },
       keyUp: (evt: KeyboardEvent) => {

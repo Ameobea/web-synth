@@ -59,6 +59,9 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = localStorage)]
     fn removeItem(key: &str);
+
+    #[wasm_bindgen(js_namespace = Math)]
+    fn random() -> f64;
 }
 
 pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
@@ -66,6 +69,8 @@ pub fn get_localstorage_key(key: &str) -> Option<String> { getItem(key) }
 pub fn set_localstorage_key(key: &str, val: &str) { setItem(key, val); }
 
 pub fn delete_localstorage_key(key: &str) { removeItem(key); }
+
+pub fn js_random() -> f64 { random() }
 
 #[wasm_bindgen(raw_module = "./faustEditor")]
 extern "C" {

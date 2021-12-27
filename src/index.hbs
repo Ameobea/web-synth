@@ -3,6 +3,36 @@
   <head>
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv='content-language' content='en-us'>
+    <meta name="description" content="A web-based platform for realtime sound synthesis, music production, and audio experimentation using modern web tech (Rust, WebAssembly, Web Audio, and more)">
+
+    <!-- Opengraph -->
+    <meta property="og:title" content="Web Synth">
+    <meta property="og:site_name" content="{{ htmlWebpackPlugin.options.title }}">
+    <meta property="og:url" content="https://synth.ameo.dev/">
+    <meta property="og:description" content="A web-based platform for realtime sound synthesis, music production, and audio experimentation using modern web tech (Rust, WebAssembly, Web Audio, and more)">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://synth.ameo.dev/web-synth.jpeg">
+    <meta property="og:image:alt" content="Combined screenshots of the Web Synth application showing the graph editor for the audio patch network and a part of the synth designer UI with envelope generators, param controls, and the FM modulatin matrix">
+    <meta name="twitter:site" content="ameobea10" />
+    <meta name="twitter:creator" content="ameobea10" />
+    <meta
+      name="twitter:title"
+      content="Web Synth"
+    />
+    <meta
+      name="twitter:card"
+      content="summary_large_image"
+    />
+    <meta
+      name="twitter:image"
+      content="https://synth.ameo.dev/web-synth.jpeg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Combined screenshots of the Web Synth application showing the graph editor for the audio patch network and a part of the synth designer UI with envelope generators, param controls, and the FM modulatin matrix"
+    />
+
     <title>{{ htmlWebpackPlugin.options.title }}</title>
     <script type="text/javascript">
       // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each

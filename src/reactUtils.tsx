@@ -311,3 +311,29 @@ export const useDraggable = (
 export function useGetState<T>(): () => T {
   return useStore().getState;
 }
+
+type ImageLoadPlaceholderProps = React.DetailedHTMLProps<
+  React.ImgHTMLAttributes<HTMLImageElement>,
+  HTMLImageElement
+>;
+
+export const mkImageLoadPlaceholder = (
+  placeholder: React.ReactChild,
+  props: ImageLoadPlaceholderProps
+): React.FC<ImageLoadPlaceholderProps> => {
+  const ImageLoadPlaceholder = () => {
+    const [loaded, setLoaded] = useState(false);
+
+    return (
+      <>
+        <img
+          style={{ visibility: loaded ? 'visible' : 'hidden' }}
+          onLoad={() => setLoaded(true)}
+          {...props}
+        />
+        {!loaded ? placeholder : null}
+      </>
+    );
+  };
+  return ImageLoadPlaceholder;
+};

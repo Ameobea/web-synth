@@ -118,8 +118,10 @@ export const delete_view_context = (id: string) => {
 
 export const set_active_vc_ix = (newActiveVxIx: number) => {
   const oldActiveVcIx = getState().viewContextManager.activeViewContextIx;
-  const oldActiveVcId = getState().viewContextManager.activeViewContexts[oldActiveVcIx].uuid;
-  onVcHideStatusChange(oldActiveVcId, true);
+  const oldActiveVcId = getState().viewContextManager.activeViewContexts[oldActiveVcIx]?.uuid;
+  if (oldActiveVcId) {
+    onVcHideStatusChange(oldActiveVcId, true);
+  }
 
   const newActiveVcId = getState().viewContextManager.activeViewContexts[newActiveVxIx].uuid;
   onVcHideStatusChange(newActiveVcId, false);

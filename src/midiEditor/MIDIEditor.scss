@@ -51,7 +51,7 @@
     .midi-editor-beat-snap-controls {
       display: flex;
       flex-direction: row;
-      max-width: 69px;
+      max-width: 90px;
       flex-wrap: wrap;
 
       .midi-editor-beat-snap-control-button {
@@ -69,11 +69,11 @@
       .midi-editor-beat-snap-control-button:hover {
         background-color: rgba(255, 255, 255, 0.1);
       }
-      .midi-editor-beat-snap-control-button:nth-child(n + 4) {
+      .midi-editor-beat-snap-control-button:nth-child(n + 5) {
         border-top: none;
       }
       .midi-editor-beat-snap-control-button[data-active='true'] {
-        color: magenta;
+        background-color: #820082;
       }
     }
   }

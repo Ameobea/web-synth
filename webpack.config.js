@@ -87,14 +87,14 @@ const config = {
   plugins: [
     new HtmlWebpackPlugin({
       alwaysWriteToDisk: true,
-      title: 'Web Synth',
+      title: 'Web Synth - Realtime Browser Audio Synthesis Plaform',
       minify: true,
       template: 'src/index.hbs',
       chunks: ['index'],
     }),
     new HtmlWebpackPlugin({
       alwaysWriteToDisk: true,
-      title: 'Rust+Wasm-powered FM Synth',
+      title: 'Rust + Wasm-powered FM Synthesizer',
       minify: true,
       template: 'src/fm-synth-demo.hbs',
       filename: 'fm.html',

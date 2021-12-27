@@ -1,23 +1,24 @@
 import { filterNils } from 'ameo-utils';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as R from 'ramda';
 import ControlPanel from 'react-control-panel';
 
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
-import { MIDIEditorInstance } from 'src/midiEditor';
+import type { MIDIEditorInstance } from 'src/midiEditor';
 import MIDIEditorUIInstance, {
-  SerializedMIDIEditorState,
+  type SerializedMIDIEditorState,
 } from 'src/midiEditor/MIDIEditorUIInstance';
 import './MIDIEditor.scss';
-import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import BasicModal from 'src/misc/BasicModal';
-import FileUploader, { Value as FileUploaderValue } from 'src/controls/FileUploader';
+import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { AsyncOnce } from 'src/util';
-import { MidiFileInfo, getMidiImportSettings } from 'src/controls/MidiImportDialog';
+import { type MidiFileInfo, getMidiImportSettings } from 'src/controls/MidiImportDialog';
 import download from 'downloadjs';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { mkImageLoadPlaceholder } from 'src/reactUtils';
 
 const ctx = new AudioContext();
 
@@ -50,24 +51,72 @@ interface MIDIEditorControlsState {
   metronomeEnabled: boolean;
 }
 
-const SNAP_INTERVALS: { label: React.ReactNode; beats: number; title: string }[] = [
+const NOTE_ICON_STYLE = { height: 24, marginTop: -3 };
+const SNAP_INTERVALS: { label: React.ReactNode | React.FC; beats: number; title: string }[] = [
   { label: '⍉', beats: 0, title: 'no snapping' },
-  { label: <>&#119135;</>, beats: 1, title: '1 beat' },
-  { label: <>&#119136;</>, beats: 0.5, title: 'half a beat' },
-  { label: <>&#119137;</>, beats: 1 / 4, title: 'one quarter beat' },
-  { label: <>&#119138;</>, beats: 1 / 8, title: 'one eighth beat' },
-  { label: <>&#119139;</>, beats: 1 / 16, title: 'one sixteenth beat' },
+  {
+    label: mkImageLoadPlaceholder('𝅘𝅥', {
+      src: '/icons/music_notes/quarter_note.svg',
+      style: { ...NOTE_ICON_STYLE, height: 16, marginTop: 2 },
+    }),
+    beats: 1,
+    title: '1 beat',
+  },
+  {
+    label: mkImageLoadPlaceholder('𝅘𝅥𝅮', {
+      src: '/icons/music_notes/eigth_note.svg',
+      style: NOTE_ICON_STYLE,
+    }),
+    beats: 0.5,
+    title: 'half a beat',
+  },
+  {
+    label: '⅓',
+    beats: 1 / 3,
+    title: '1/3 beat',
+  },
+  {
+    label: mkImageLoadPlaceholder('𝅘𝅥𝅯', {
+      src: '/icons/music_notes/sixteenth_note.svg',
+      style: NOTE_ICON_STYLE,
+    }),
+    beats: 1 / 4,
+    title: 'one quarter beat',
+  },
+  {
+    label: '⅙',
+    beats: 1 / 6,
+    title: '1/6 beat',
+  },
+  {
+    label: mkImageLoadPlaceholder('𝅘𝅥𝅰', {
+      src: '/icons/music_notes/thirtysecond_note.svg',
+      style: NOTE_ICON_STYLE,
+    }),
+    beats: 1 / 8,
+    title: 'one eighth beat',
+  },
+  {
+    label: mkImageLoadPlaceholder('𝅘𝅥𝅱', {
+      src: '/icons/music_notes/sixtyfourth_note.svg',
+      style: NOTE_ICON_STYLE,
+    }),
+    beats: 1 / 16,
+    title: 'one sixteenth beat',
+  },
 ];
 
-const SnapControls: React.FC<{
+interface SnapControlsProps {
   onChange: (newBeatSnapInterval: number) => void;
   initialBeatSnapInterval: number;
-}> = ({ onChange, initialBeatSnapInterval }) => {
+}
+
+const SnapControls: React.FC<SnapControlsProps> = ({ onChange, initialBeatSnapInterval }) => {
   const [beatSnapInterval, setBeatSnapInterval] = useState(initialBeatSnapInterval);
 
   return (
     <div className='midi-editor-beat-snap-controls'>
-      {SNAP_INTERVALS.map(({ label, beats, title }) => (
+      {SNAP_INTERVALS.map(({ label: Label, beats, title }) => (
         <div
           key={beats}
           className='midi-editor-beat-snap-control-button'
@@ -79,18 +128,18 @@ const SnapControls: React.FC<{
           title={title}
           data-active={beatSnapInterval === beats ? 'true' : undefined}
         >
-          {label}
+          {typeof Label === 'function' ? <Label /> : Label}
         </div>
       ))}
     </div>
   );
 };
 
-const UploadMIDIFileModal: React.FC<
-  ModalCompProps<{
-    uploadedFile: FileUploaderValue;
-  }>
-> = ({ onSubmit, onCancel }) => {
+type UploadMIDIFileModalProps = ModalCompProps<{
+  uploadedFile: FileUploaderValue;
+}>;
+
+const UploadMIDIFileModal: React.FC<UploadMIDIFileModalProps> = ({ onSubmit, onCancel }) => {
   const [uploadedFile, setUploadedFile] = useState<FileUploaderValue | null>(null);
 
   return (
@@ -119,11 +168,72 @@ const UploadMIDIFileModal: React.FC<
   );
 };
 
-const MIDIEditorControls: React.FC<{
+const handleMIDIFileUpload = async (
+  inst: React.MutableRefObject<MIDIEditorUIInstance | undefined>
+) => {
+  if (!inst.current) {
+    return;
+  }
+
+  try {
+    const [{ uploadedFile }, midiModule] = await Promise.all([
+      renderModalWithControls(UploadMIDIFileModal),
+      MIDIWasmModule.get(),
+    ] as const);
+    const bytes = new Uint8Array(uploadedFile.fileContent);
+
+    const notesByMIDINumber: Map<number, { startPoint: number; length: number }[]> = new Map();
+    for (let i = 0; i < 127; i++) {
+      notesByMIDINumber.set(i, []);
+    }
+
+    await midiModule.load_midi_to_raw_note_bytes(
+      bytes,
+      (rawInfo: string): Promise<number> => {
+        const fileInfo: MidiFileInfo = JSON.parse(rawInfo);
+        // TODO: eventually we'll probably want to pass back a more complicated type than this
+        return getMidiImportSettings(fileInfo).then(settings => settings.track);
+      },
+      (midiNumber: number, startBeat: number, length: number) => {
+        const entries = notesByMIDINumber.get(midiNumber);
+        if (!entries) {
+          console.error('Invalid MIDI number from Wasm: ', midiNumber);
+          return;
+        }
+
+        entries.push({ startPoint: startBeat, length });
+      }
+    );
+
+    const curState = inst.current.serialize();
+    const lines = [...notesByMIDINumber.entries()].map(([midiNumber, notes]) => ({
+      midiNumber,
+      notes,
+    }));
+    inst.current.reInitialize({
+      ...curState,
+      lines,
+      view: { ...curState.view, scrollHorizontalBeats: 0 },
+    });
+  } catch (err) {
+    if (err) {
+      console.error('Error importing MIDI: ', err);
+      // TODO: Display to user?
+    }
+  }
+};
+
+interface MIDIEditorControlsProps {
   inst: React.MutableRefObject<MIDIEditorUIInstance | undefined>;
   initialState: MIDIEditorControlsState;
   onChange: (newState: MIDIEditorControlsState) => void;
-}> = ({ inst, initialState, onChange: onChangeInner }) => {
+}
+
+const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
+  inst,
+  initialState,
+  onChange: onChangeInner,
+}) => {
   const isGlobalBeatCounterStarted = useIsGlobalBeatCounterStarted();
   const [state, setStateInner] = useState(initialState);
   const [isRecording, setIsRecording] = useState(false);
@@ -233,7 +343,11 @@ const MIDIEditorControls: React.FC<{
             return;
           }
 
-          // TODO
+          if (!inst.current || inst.current.parentInstance.playbackHandler?.isPlaying !== false) {
+            return;
+          }
+
+          inst.current.copySelection();
         }}
         label={
           // Adapted from: https://stackoverflow.com/a/60023353/3833068
@@ -256,11 +370,11 @@ const MIDIEditorControls: React.FC<{
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+          if (!inst.current || inst.current.parentInstance.playbackHandler?.isPlaying !== false) {
             return;
           }
 
-          // TODO
+          inst.current.cutSelection();
         }}
         label='✂️'
         title='Cut selection'
@@ -268,11 +382,11 @@ const MIDIEditorControls: React.FC<{
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+          if (!inst.current || inst.current.parentInstance.playbackHandler?.isPlaying !== false) {
             return;
           }
 
-          // TODO
+          inst.current.pasteSelection();
         }}
         label='📋'
         title='Paste selection'
@@ -382,59 +496,7 @@ const MIDIEditorControls: React.FC<{
         active={state.loopEnabled}
       />
       <MIDIEditorControlButton
-        onClick={async () => {
-          if (!inst.current) {
-            return;
-          }
-
-          try {
-            const [{ uploadedFile }, midiModule] = await Promise.all([
-              renderModalWithControls(UploadMIDIFileModal),
-              MIDIWasmModule.get(),
-            ] as const);
-            const bytes = new Uint8Array(uploadedFile.fileContent);
-
-            const notesByMIDINumber: Map<number, { startPoint: number; length: number }[]> =
-              new Map();
-            for (let i = 0; i < 127; i++) {
-              notesByMIDINumber.set(i, []);
-            }
-
-            await midiModule.load_midi_to_raw_note_bytes(
-              bytes,
-              (rawInfo: string): Promise<number> => {
-                const fileInfo: MidiFileInfo = JSON.parse(rawInfo);
-                // TODO: eventually we'll probably want to pass back a more complicated type than this
-                return getMidiImportSettings(fileInfo).then(settings => settings.track);
-              },
-              (midiNumber: number, startBeat: number, length: number) => {
-                const entries = notesByMIDINumber.get(midiNumber);
-                if (!entries) {
-                  console.error('Invalid MIDI number from Wasm: ', midiNumber);
-                  return;
-                }
-
-                entries.push({ startPoint: startBeat, length });
-              }
-            );
-
-            const curState = inst.current.serialize();
-            const lines = [...notesByMIDINumber.entries()].map(([midiNumber, notes]) => ({
-              midiNumber,
-              notes,
-            }));
-            inst.current.reInitialize({
-              ...curState,
-              lines,
-              view: { ...curState.view, scrollHorizontalBeats: 0 },
-            });
-          } catch (err) {
-            if (err) {
-              console.error('Error importing MIDI: ', err);
-              // TODO: Display to user?
-            }
-          }
-        }}
+        onClick={() => handleMIDIFileUpload(inst)}
         title='Upload MIDI File'
         label='⭱'
         style={{ fontSize: 29, textAlign: 'center' }}
@@ -458,6 +520,8 @@ const MIDIEditorControls: React.FC<{
   );
 };
 
+const MIDIEditorControls = React.memo(MIDIEditorControlsInner);
+
 interface MIDIEditorProps {
   initialState: SerializedMIDIEditorState;
   width: number;
@@ -474,32 +538,31 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   vcId,
 }) => {
   const instance = useRef<MIDIEditorUIInstance | undefined>();
-  useEffect(() => {
-    return () => {
-      if (!instance.current) {
-        return;
+  useEffect(() => () => instance.current?.destroy(), []);
+  const initialStateForControls = useRef({
+    bpm: initialState.localBPM ?? 120,
+    loopEnabled: !R.isNil(initialState.loopPoint),
+    beatsPerMeasure: initialState.view.beatsPerMeasure,
+    beatSnapInterval: initialState.beatSnapInterval,
+    metronomeEnabled: initialState.metronomeEnabled,
+  });
+
+  const handleChange = useCallback(
+    ({ bpm, loopEnabled }) => {
+      parentInstance.uiInstance!.localBPM = bpm;
+      if (loopEnabled === R.isNil(parentInstance.uiInstance!.loopCursor)) {
+        parentInstance.uiInstance!.toggleLoop();
       }
-      instance.current.destroy();
-    };
-  }, []);
+    },
+    [parentInstance.uiInstance]
+  );
 
   return (
     <div className='midi-editor'>
       <MIDIEditorControls
         inst={instance}
-        initialState={{
-          bpm: initialState.localBPM ?? 120,
-          loopEnabled: !R.isNil(initialState.loopPoint),
-          beatsPerMeasure: initialState.view.beatsPerMeasure,
-          beatSnapInterval: initialState.beatSnapInterval,
-          metronomeEnabled: initialState.metronomeEnabled,
-        }}
-        onChange={({ bpm, loopEnabled }) => {
-          parentInstance.uiInstance!.localBPM = bpm;
-          if (loopEnabled === R.isNil(parentInstance.uiInstance!.loopCursor)) {
-            parentInstance.uiInstance!.toggleLoop();
-          }
-        }}
+        initialState={initialStateForControls.current}
+        onChange={handleChange}
       />
       <canvas
         style={{ width, height }}
