@@ -82,7 +82,7 @@
     "ameo-utils": "^0.8.0",
     "chartist": "^0.11.4",
     "d3": "^7.2.1",
-    "dexie": "^3.2.0",
+    "dexie": "^3.2.2",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",
     "immutable": "^4.0.0",
