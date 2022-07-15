@@ -104,6 +104,6 @@
     "reselect": "^4.1.5",
     "showdown": "^1.9.1",
     "showdown-xss-filter": "^0.2.0",
-    "svelte": "^3.44.3"
+    "svelte": "^3.49.0"
   }
 }
