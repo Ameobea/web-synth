@@ -8,7 +8,7 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = { version = "=0.2.78", features = ["nightly"] }
+wasm-bindgen = { version = "=0.2.82" }
 rand = "0.7"
 rand_pcg = "0.2.1"
 miniserde = "0.1.16"

@@ -13,7 +13,7 @@ futures = "0.3"
 log = { version = "0.4", features = ["release_max_level_off"] }
 miniserde = "0.1.16"
 js-sys = "0.3"
-wasm-bindgen = "=0.2.78"
+wasm-bindgen = "=0.2.82"
 wasm-bindgen-futures = "0.4"
 
 polysynth = { path = "../polysynth", default_features = false }

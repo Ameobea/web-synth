@@ -1,7 +1,7 @@
 //! Synth state management.  Handles keeping track of what each voice of each polyphonic synth
 //! is playing and passing the correct commands through to the WebAudio synths.
 
-#![feature(nll, box_syntax)]
+#![feature(box_syntax)]
 
 #[cfg(feature = "wasm-bindgen")]
 #[macro_use]

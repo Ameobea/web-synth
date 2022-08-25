@@ -8,5 +8,5 @@ edition = "2021"
 console_error_panic_hook = "0.1.6"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-wasm-bindgen = { version = "=0.2.78", features = ["nightly"] }
+wasm-bindgen = { version = "=0.2.82" }
 wasm-logger = "0.2"

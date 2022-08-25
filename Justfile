@@ -75,6 +75,8 @@ build-all:
   just build-docs
 
 run:
+  #!/bin/bash
+
   just remove-annoying-litegraph-warning
 
   cd engine \

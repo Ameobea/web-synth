@@ -1,4 +1,4 @@
-#![feature(nll, box_syntax)]
+#![feature(box_syntax)]
 
 #[macro_use]
 extern crate lazy_static;

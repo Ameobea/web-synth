@@ -1,5 +1,4 @@
 #![feature(
-    nll,
     box_syntax,
     stdsimd,
     const_maybe_uninit_assume_init,
