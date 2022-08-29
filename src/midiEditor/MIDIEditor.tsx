@@ -56,7 +56,7 @@ const SNAP_INTERVALS: { label: React.ReactNode | React.FC; beats: number; title:
   { label: '⍉', beats: 0, title: 'no snapping' },
   {
     label: mkImageLoadPlaceholder('𝅘𝅥', {
-      src: '/icons/music_notes/quarter_note.svg',
+      src: `${process.env.ASSET_PATH}icons/music_notes/quarter_note.svg`,
       style: { ...NOTE_ICON_STYLE, height: 16, marginTop: 2 },
     }),
     beats: 1,
@@ -64,7 +64,7 @@ const SNAP_INTERVALS: { label: React.ReactNode | React.FC; beats: number; title:
   },
   {
     label: mkImageLoadPlaceholder('𝅘𝅥𝅮', {
-      src: '/icons/music_notes/eigth_note.svg',
+      src: `${process.env.ASSET_PATH}icons/music_notes/eigth_note.svg`,
       style: NOTE_ICON_STYLE,
     }),
     beats: 0.5,
@@ -77,7 +77,7 @@ const SNAP_INTERVALS: { label: React.ReactNode | React.FC; beats: number; title:
   },
   {
     label: mkImageLoadPlaceholder('𝅘𝅥𝅯', {
-      src: '/icons/music_notes/sixteenth_note.svg',
+      src: `${process.env.ASSET_PATH}icons/music_notes/sixteenth_note.svg`,
       style: NOTE_ICON_STYLE,
     }),
     beats: 1 / 4,
@@ -90,7 +90,7 @@ const SNAP_INTERVALS: { label: React.ReactNode | React.FC; beats: number; title:
   },
   {
     label: mkImageLoadPlaceholder('𝅘𝅥𝅰', {
-      src: '/icons/music_notes/thirtysecond_note.svg',
+      src: `${process.env.ASSET_PATH}icons/music_notes/thirtysecond_note.svg`,
       style: NOTE_ICON_STYLE,
     }),
     beats: 1 / 8,
@@ -98,7 +98,7 @@ const SNAP_INTERVALS: { label: React.ReactNode | React.FC; beats: number; title:
   },
   {
     label: mkImageLoadPlaceholder('𝅘𝅥𝅱', {
-      src: '/icons/music_notes/sixtyfourth_note.svg',
+      src: `${process.env.ASSET_PATH}icons/music_notes/sixtyfourth_note.svg`,
       style: NOTE_ICON_STYLE,
     }),
     beats: 1 / 16,
@@ -308,7 +308,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         }}
         label={
           <img
-            src='/metronome.svg'
+            src={`${process.env.ASSET_PATH}metronome.svg`}
             style={{
               filter: 'invert(1)',
               marginTop: 3,

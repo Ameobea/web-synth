@@ -7,17 +7,17 @@ import { UnreachableException } from 'ameo-utils';
 import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import {
-  SynthDesignerReduxStore,
+  type SynthDesignerReduxStore,
   get_synth_designer_audio_connectables,
-  SynthDesignerReduxInfra,
+  type SynthDesignerReduxInfra,
 } from 'src/synthDesigner';
-import { ReduxStore, store } from 'src/redux';
+import { type ReduxStore, store } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import SynthModuleComp from './SynthModule';
 import './SynthDesigner.scss';
 import { saveSynthPreset } from 'src/api';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { buildWavyJonesInstance } from 'src/visualizations/WavyJones';
+import { buildWavyJonesInstance, type WavyJones } from 'src/visualizations/WavyJones';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 
 interface AddModuleControlsProps {
@@ -238,12 +238,9 @@ const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       return;
     }
 
-    const newWavyJonesInstance = buildWavyJonesInstance(
-      new AudioContext(),
-      'oscilloscope',
-      490,
-      240
-    );
+    const ctx = new AudioContext();
+    const newWavyJonesInstance =
+      buildWavyJonesInstance(ctx, 'oscilloscope', 490, 240) ?? (new AnalyserNode(ctx) as WavyJones);
     dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(newWavyJonesInstance));
   }, [actionCreators.synthDesigner, dispatch, synthCount, wavyJonesInstanceInitialized]);
 

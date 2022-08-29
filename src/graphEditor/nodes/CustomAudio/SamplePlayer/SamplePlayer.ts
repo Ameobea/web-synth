@@ -14,7 +14,8 @@ import { AsyncOnce } from 'src/util';
 
 export const SamplePlayerWasmBytes = new AsyncOnce(() =>
   fetch(
-    '/sample_player.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'sample_player.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   ).then(res => res.arrayBuffer())
 );
@@ -71,7 +72,8 @@ export default class SamplePlayerNode implements ForeignNode {
     const [wasmBytes] = await Promise.all([
       SamplePlayerWasmBytes.get(),
       this.ctx.audioWorklet.addModule(
-        '/SamplePlayerAWP.js?cacheBust=' +
+        process.env.ASSET_PATH +
+          'SamplePlayerAWP.js?cacheBust=' +
           (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
       ),
     ] as const);

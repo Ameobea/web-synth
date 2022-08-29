@@ -5,14 +5,14 @@ import FaustEditor from './FaustEditor';
 import type { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
 import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import {
-  SerializedFaustEditor,
+  type SerializedFaustEditor,
   buildDefaultFaustEditorPolyphonyState,
   buildFaustEditorReduxInfra,
 } from 'src/redux/modules/faustEditor';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 
 const ctx = new AudioContext();
 

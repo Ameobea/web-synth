@@ -11,7 +11,8 @@ import { AsyncOnce, genRandomStringID } from 'src/util';
 
 export const DistortionWasmBytes = new AsyncOnce(() =>
   fetch(
-    '/distortion.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'distortion.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : genRandomStringID())
   ).then(res => res.arrayBuffer())
 );
@@ -61,7 +62,7 @@ export default class DistortionNode implements ForeignNode {
     const [wasmBytes] = await Promise.all([
       DistortionWasmBytes.get(),
       this.ctx.audioWorklet.addModule(
-        '/DistortionAWP.js?cacheBust=' + btoa(Math.random().toString())
+        process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + btoa(Math.random().toString())
       ),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'distortion-awp');

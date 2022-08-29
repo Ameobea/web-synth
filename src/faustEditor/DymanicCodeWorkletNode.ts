@@ -1,6 +1,6 @@
-import { ValueOf } from 'ameo-utils';
+import type { ValueOf } from 'ameo-utils';
 
-import { faustEditorContextMap } from 'src/faustEditor';
+import type { faustEditorContextMap } from 'src/faustEditor';
 
 export declare class DynamicCodeWorkletNode extends AudioWorkletNode {
   constructor(ctx: AudioContext, moduleId: string, workletNameOverride?: string);

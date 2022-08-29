@@ -2,20 +2,24 @@ import React from 'react';
 import { Map as ImmMap } from 'immutable';
 import ControlPanel from 'react-control-panel';
 
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const SidechainAWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet.addModule(
-    '/SidechainWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+    process.env.ASSET_PATH +
+      'SidechainWorkletProcessor.js?cacheBust=' +
+      btoa(Math.random().toString())
   )
 );
-const SidechainWasm = new AsyncOnce(() => fetch('/sidechain.wasm').then(res => res.arrayBuffer()));
+const SidechainWasm = new AsyncOnce(() =>
+  fetch(process.env.ASSET_PATH + 'sidechain.wasm').then(res => res.arrayBuffer())
+);
 
 const SidechainSmallView: React.FC<{
   onChange: (key: string, val: number) => void;

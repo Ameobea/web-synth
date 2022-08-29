@@ -2,7 +2,7 @@
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(raw_module = "./index")]
+#[wasm_bindgen(raw_module = "./vcInterop")]
 extern "C" {
     pub fn init_view_contexts(
         active_context_ix: usize,

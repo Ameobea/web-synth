@@ -2,20 +2,20 @@ import React, { useState, Suspense, useMemo, useRef, useEffect, useCallback } fr
 import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
-import { Without, ValueOf, filterNils } from 'ameo-utils';
+import { type Without, type ValueOf, filterNils } from 'ameo-utils';
 
-import { Effect } from 'src/redux/modules/effects';
+import type { Effect } from 'src/redux/modules/effects';
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import {
   faustEditorContextMap,
-  FaustEditorReduxInfra,
+  type FaustEditorReduxInfra,
   get_faust_editor_connectables,
 } from 'src/faustEditor';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { fetchEffects, saveEffect } from 'src/api';
-import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';

@@ -134,11 +134,16 @@ export const initPatchNetwork = (
     }
 
     // Perform the connection
-    (connectedPair[0].node as any).connect(
-      connectedPair[1].node,
-      connectedPair[0].node instanceof PlaceholderInput ? to : undefined
-    );
-    connectNodes(connectedPair[0].node, connectedPair[1].node, to);
+    try {
+      (connectedPair[0].node as any).connect(
+        connectedPair[1].node,
+        connectedPair[0].node instanceof PlaceholderInput ? to : undefined
+      );
+      connectNodes(connectedPair[0].node, connectedPair[1].node, to);
+    } catch (err) {
+      console.error('Error connecting nodes: ', err);
+      console.error({ connectedPair, from, to });
+    }
     return true;
   });
 

@@ -16,7 +16,8 @@ const ctx = new AudioContext();
 
 const StatisticsAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/StatisticsNodeProcessor.js?cacheBust=' +
+    process.env.ASSET_PATH +
+      'StatisticsNodeProcessor.js?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );

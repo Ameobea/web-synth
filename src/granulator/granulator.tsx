@@ -21,7 +21,9 @@ const ctx = new AudioContext();
 
 const GranulatorRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/GranulatorWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+    process.env.ASSET_PATH +
+      'GranulatorWorkletProcessor.js?cacheBust=' +
+      btoa(Math.random().toString())
   )
 );
 
@@ -165,7 +167,8 @@ export const build_granulator_audio_connectables = (vcId: string): AudioConnecta
 
 const GranularWasm = new AsyncOnce(() =>
   fetch(
-    '/granular.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'granular.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : genRandomStringID())
   ).then(res => res.arrayBuffer())
 );

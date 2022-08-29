@@ -36,7 +36,6 @@ import {
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
-import type SampleManager from 'src/sampleLibrary/SampleManager';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -45,9 +44,10 @@ const ctx = new AudioContext();
 
 const RegisterFMSynthAWP = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    window.location.href.includes('localhost')
-      ? '/FMSynthAWP.js'
-      : '/FMSynthAWP.js?randId=' + btoa(Math.random().toString())
+    process.env.ASSET_PATH +
+      (window.location.href.includes('localhost')
+        ? 'FMSynthAWP.js'
+        : 'FMSynthAWP.js?randId=' + btoa(Math.random().toString()))
   )
 );
 
@@ -78,7 +78,8 @@ const WavetableWasmBytes = new AsyncOnce(async (): Promise<ArrayBuffer> => {
       simdStatusElem.setAttribute('style', 'display:block; color: #cfeb1e;');
     }
   }
-  let path = hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm';
+  let path =
+    process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
   if (!window.location.host.includes('localhost')) {
     path += `?cacheBust=${genRandomStringID()}`;
   }

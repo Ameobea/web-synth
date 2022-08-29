@@ -15,7 +15,7 @@ opt-public-profiling:
   for file in `ls ./public | grep "\\.wasm"`; do echo $file && wasm-opt ./public/$file -O4 --enable-simd --precompute-propagate --fast-math --detect-features -g -c -o ./public/$file; done
 
 build-docs:
-  cd docs/_layouts && yarn build
+  cd docs/_layouts && NODE_OPTIONS=--openssl-legacy-provider yarn build
   rm -rf ./dist/docs
   cp -r ./docs/_layouts/public ./dist/docs
 
@@ -49,6 +49,8 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
+
+  cd -
   cp ./engine/target/wasm32-unknown-unknown/release/*.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
@@ -68,11 +70,16 @@ build-all:
 
   just build-sinsy
 
-  yarn build || npm build
+  NODE_OPTIONS=--openssl-legacy-provider yarn build || NODE_OPTIONS=--openssl-legacy-provider npm build
+
+  just build-headless
 
   just opt
 
   just build-docs
+
+build-headless:
+  NODE_OPTIONS=--openssl-legacy-provider yarn build-headless || NODE_OPTIONS=--openssl-legacy-provider npm build-headless
 
 run:
   #!/bin/bash
@@ -95,6 +102,8 @@ run:
     && wasm-bindgen /tmp/wasm/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/note_container.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
+
+  cd -
   cp ./engine/build/* ./src/
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
@@ -114,10 +123,10 @@ run:
 
   just debug-sinsy
 
-  yarn start
+  NODE_OPTIONS=--openssl-legacy-provider yarn start
 
 run-frontend:
-  yarn start
+  NODE_OPTIONS=--openssl-legacy-provider yarn start
 
 deploy:
   # cd backend && just docker-build

@@ -8,7 +8,8 @@ import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
 
 const ADSR2AWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet.addModule(
-    '/ADSR2AWP.js' +
+    process.env.ASSET_PATH +
+      'ADSR2AWP.js' +
       (window.location.href.includes('localhost')
         ? ''
         : '?cacheBust=' + btoa(Math.random().toString()))
@@ -16,7 +17,8 @@ const ADSR2AWPRegistered = new AsyncOnce(() =>
 );
 const ADSRWasm = new AsyncOnce(() => {
   const url =
-    '/adsr.wasm' +
+    process.env.ASSET_PATH +
+    'adsr.wasm' +
     (window.location.href.includes('localhost')
       ? ''
       : `?cacheBust=${btoa(Math.random().toString())}`);

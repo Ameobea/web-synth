@@ -13,14 +13,16 @@ const ctx = new AudioContext();
 
 const LooperAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/LooperAWP.js?cacheBust=' +
+    process.env.ASSET_PATH +
+      'LooperAWP.js?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );
 
 const LooperWasm = new AsyncOnce(() =>
   fetch(
-    '/looper.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'looper.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   ).then(res => res.arrayBuffer())
 );

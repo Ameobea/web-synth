@@ -22,7 +22,9 @@ const DEFAULT_POINTS: EqualizerPoint[] = [
 const ctx = new AudioContext();
 const EqualizerRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/EqualizerWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+    process.env.ASSET_PATH +
+      'EqualizerWorkletProcessor.js?cacheBust=' +
+      btoa(Math.random().toString())
   )
 );
 

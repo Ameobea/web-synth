@@ -138,11 +138,13 @@ export const getCurGlobalBPM = () => {
 // Init the scheduler AWP instance
 Promise.all([
   fetch(
-    '/event_scheduler.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'event_scheduler.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : genRandomStringID())
   ).then(res => res.arrayBuffer()),
   ctx.audioWorklet.addModule(
-    '/EventSchedulerWorkletProcessor.js?cacheBust=' +
+    process.env.ASSET_PATH +
+      'EventSchedulerWorkletProcessor.js?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : genRandomStringID())
   ),
 ] as const).then(([wasmArrayBuffer]) => {

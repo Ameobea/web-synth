@@ -12,7 +12,8 @@ import { AsyncOnce } from 'src/util';
 
 export const DelayWasmBytes = new AsyncOnce(() =>
   fetch(
-    '/delay.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'delay.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   ).then(res => res.arrayBuffer())
 );
@@ -119,7 +120,8 @@ export default class DelayNode implements ForeignNode {
     const [wasmBytes] = await Promise.all([
       DelayWasmBytes.get(),
       this.ctx.audioWorklet.addModule(
-        '/DelayAWP.js?cacheBust=' +
+        process.env.ASSET_PATH +
+          'DelayAWP.js?cacheBust=' +
           (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
       ),
     ] as const);

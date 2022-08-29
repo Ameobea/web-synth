@@ -2,10 +2,11 @@ import download from 'downloadjs';
 import { Either } from 'funfix-core';
 import Dexie from 'dexie';
 
-import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
+import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { stopAll } from 'src/eventScheduler/eventScheduler';
 import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
 import { getState } from 'src/redux';
+import { getLoadedComposition } from 'src/api';
 
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
@@ -108,4 +109,22 @@ export const maybeRestoreLocalComposition = async () => {
 
   await currentLoadedCompositionIdTable.clear();
   await localCompositionTable.clear();
+};
+
+/**
+ * Fetches the shared composition with the provided ID, deserializes it, and populates localstorage with its contents.
+ * This function does NOT handle re-initializing the application, destroying + recreacting VCs, etc. and is designed
+ * to be used before the application is first loaded.
+ */
+export const fetchAndLoadSharedComposition = async (
+  compositionID: string | number,
+  force?: boolean
+) => {
+  console.log(`Loading composition id=${compositionID}`);
+
+  const composition = await getLoadedComposition(compositionID);
+  if (!composition) {
+    return;
+  }
+  await loadSharedComposition(composition, force);
 };

@@ -5,7 +5,8 @@ const ctx = new AudioContext();
 
 const SampleEditorAWPWasm = new AsyncOnce(() =>
   fetch(
-    '/sample_editor.wasm' +
+    process.env.ASSET_PATH +
+      'sample_editor.wasm' +
       (window.location.href.includes('localhost')
         ? ''
         : '?cacheBust=' + btoa(Math.random().toString()))
@@ -13,7 +14,11 @@ const SampleEditorAWPWasm = new AsyncOnce(() =>
 );
 
 const AWPModuleAdded = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule('/EventSchedulerWorkletProcessor.js')
+  ctx.audioWorklet.addModule(
+    process.env.ASSET_PATH +
+      'EventSchedulerWorkletProcessor.js' +
+      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+  )
 );
 
 export default class SampleEditorAWP extends AudioWorkletNode {

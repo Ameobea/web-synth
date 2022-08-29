@@ -15,14 +15,16 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 const NoiseGenAWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet
     .addModule(
-      '/NoiseGenAWP.js?cacheBust=' +
+      process.env.ASSET_PATH +
+        'NoiseGenAWP.js?cacheBust=' +
         (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
     )
     .catch(console.error)
 );
 const NoiseGenWasm = new AsyncOnce(() =>
   fetch(
-    '/noise_gen.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'noise_gen.wasm?cacheBust=' +
       (window.location.host.includes('localhost') ? '' : genRandomStringID())
   ).then(res => res.arrayBuffer())
 );

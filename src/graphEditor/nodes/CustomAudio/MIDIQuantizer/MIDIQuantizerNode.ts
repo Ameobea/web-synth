@@ -20,13 +20,14 @@ import {
 } from 'src/eventScheduler';
 
 const MIDIQuantizerWasmBytes = new AsyncOnce(() =>
-  fetch('/midi_quantizer.wasm').then(res => res.arrayBuffer())
+  fetch(process.env.ASSET_PATH + 'midi_quantizer.wasm').then(res => res.arrayBuffer())
 );
 
 const ctx = new AudioContext();
 const MIDIQuantizerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/MIDIQuantizerAWP.js?cacheBust=' +
+    process.env.ASSET_PATH +
+      'MIDIQuantizerAWP.js?cacheBust=' +
       (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );

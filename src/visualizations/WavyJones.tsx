@@ -12,6 +12,9 @@ export const buildWavyJonesInstance = (
   width: number,
   height: number
 ) => {
+  if (typeof WavyJones === 'undefined') {
+    return null;
+  }
   const wavyJonesInstance = new WavyJones(ctx, nodeID, width, height);
 
   wavyJonesInstance.lineColor = '#FFF';

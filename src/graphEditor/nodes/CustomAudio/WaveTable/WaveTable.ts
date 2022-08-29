@@ -68,7 +68,8 @@ const WavetableWasmBytes = new AsyncOnce(async () => {
     );
   }
 
-  let path = hasSIMDSupport ? '/wavetable.wasm' : '/wavetable_no_simd.wasm';
+  let path =
+    process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
   if (!window.location.href.includes('localhost')) {
     path += `?cacheBust=${genRandomStringID()}`;
   }
@@ -244,7 +245,9 @@ export default class WaveTable implements ForeignNode {
 
   private async initWorklet() {
     await this.ctx.audioWorklet.addModule(
-      '/WaveTableNodeProcessor.js?cacheBust=' + btoa(Math.random().toString())
+      process.env.ASSET_PATH +
+        'WaveTableNodeProcessor.js?cacheBust=' +
+        btoa(Math.random().toString())
     );
     this.workletHandle = new AudioWorkletNode(this.ctx, 'wavetable-node-processor');
 

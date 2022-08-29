@@ -125,6 +125,9 @@ const ConfigureMainEffectChain: React.FC<ConfigureMainEffectChainProps> = ({
 
 const initializeWavyJones = (getFMSynthOutput: () => Promise<AudioNode>) => {
   const inst = buildWavyJonesInstance(ctx, 'fm-synth-oscilloscope', 490, 240);
+  if (!inst) {
+    return new AnalyserNode(ctx) as WavyJones;
+  }
   getFMSynthOutput().then(fmSynthOutput => fmSynthOutput.connect(inst));
   inst.connect(muted);
   return inst;

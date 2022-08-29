@@ -17,7 +17,8 @@ import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 
 const QuantizerWasmBytes = new AsyncOnce(() =>
   fetch(
-    '/quantizer.wasm?cacheBust=' +
+    process.env.ASSET_PATH +
+      'quantizer.wasm?cacheBust=' +
       (window.location.href.includes('localhost') ? '' : genRandomStringID())
   ).then(res => res.arrayBuffer())
 );
@@ -25,7 +26,8 @@ const QuantizerWasmBytes = new AsyncOnce(() =>
 const ctx = new AudioContext();
 const QuantizerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/QuantizerAWP.js?cacheBust=' +
+    process.env.ASSET_PATH +
+      'QuantizerAWP.js?cacheBust=' +
       (window.location.href.includes('localhost') ? '' : genRandomStringID())
   )
 );

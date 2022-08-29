@@ -106,7 +106,9 @@ export const buildGateOutput = (): ConstantSourceNode => {
 
 const SequencerAWPRegistered = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
-    '/SequencerWorkletProcessor.js?cacheBust=' + btoa(Math.random().toString())
+    process.env.ASSET_PATH +
+      'SequencerWorkletProcessor.js?cacheBust=' +
+      btoa(Math.random().toString())
   )
 );
 
