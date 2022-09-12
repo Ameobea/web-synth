@@ -77,14 +77,14 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2021-11-02
+          toolchain: nightly-2022-08-10
       - name: Use Rust nightly
-        run: rustup default nightly-2021-11-02
+        run: rustup default nightly-2022-08-10
       - name: Install Rust Wasm support
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v1
         with:
-          node-version: '14.5'
+          node-version: '17.4'
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v7
         with:
@@ -97,8 +97,10 @@ jobs:
 
       - name: Create custom binaries directory
         run: mkdir ~/bin
+        # Built with `cargo install --target x86_64-unknown-linux-musl -f just`
       - name: Install `just`
         run: curl https://web-synth-ci-binaries.ameo.design/just -o ~/bin/just && chmod +x ~/bin/just
+        # Downloaded from Github like https://github.com/rustwasm/wasm-bindgen/releases/tag/0.2.82
       - name: Install `wasm-bindgen-cli`
         run: curl https://web-synth-ci-binaries.ameo.design/wasm-bindgen -o ~/bin/wasm-bindgen && chmod +x ~/bin/wasm-bindgen
       - name: Install `wasm-opt`
