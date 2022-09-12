@@ -4,6 +4,7 @@ import { getState, dispatch } from 'src/redux';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { fetchAndLoadSharedComposition } from 'src/persistance';
 import { startAll, stopAll } from 'src/eventScheduler/eventScheduler';
+import { connect, disconnect } from 'src/patchNetwork/interface';
 
 const ctx = new AudioContext();
 
@@ -30,10 +31,10 @@ export const initHeadlessWebSynth = async ({
   registerMainReduxGetState(getState);
 
   if (compositionIDToLoad) {
-    await fetchAndLoadSharedComposition(compositionIDToLoad, true);
+    await fetchAndLoadSharedComposition(compositionIDToLoad, true, true);
   }
 
   engine.init();
 
-  return { getState, dispatch, startAll, stopAll };
+  return { getState, dispatch, startAll, stopAll, disconnect, connect };
 };

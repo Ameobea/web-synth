@@ -6,7 +6,11 @@ const wasm = import('./engine');
 import { store, getState } from './redux';
 import { setEngine } from 'src/util';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
-import { maybeRestoreLocalComposition, onBeforeUnload } from 'src/persistance';
+import {
+  fetchAndLoadSharedComposition,
+  maybeRestoreLocalComposition,
+  onBeforeUnload,
+} from 'src/persistance';
 import { initSentry } from 'src/sentry';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';

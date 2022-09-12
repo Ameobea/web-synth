@@ -69,7 +69,8 @@ export const onBeforeUnload = (engine: typeof import('src/engine')) => {
  */
 export const loadSharedComposition = async (
   composition: CompositionDefinition,
-  force?: boolean
+  force?: boolean,
+  retainLocalStorage?: boolean
 ) => {
   // If we already have a local composition saved in the DB, we don't want to overwrite it.
   const hasSavedLocalComposition = (await localCompositionTable.count()) > 0;
@@ -90,10 +91,19 @@ export const loadSharedComposition = async (
   await currentLoadedCompositionIdTable.add(composition.id, ['']);
 
   const deserialized = JSON.parse(composition.content);
-  localStorage.clear();
+  const keysToRetain = ['globalVolume'];
+  const retainedValues = keysToRetain.map(key => [key, localStorage.getItem(key)]);
+  if (!retainLocalStorage) {
+    localStorage.clear();
+  }
   Object.entries(deserialized)
-    .filter(([key]) => key !== 'globalVolume')
+    .filter(([key]) => !keysToRetain.includes(key))
     .forEach(([key, val]) => localStorage.setItem(key, val as any));
+  retainedValues.forEach(([key, val]) => {
+    if (key && val !== null && val !== undefined) {
+      localStorage.setItem(key, val as any);
+    }
+  });
 };
 
 export const maybeRestoreLocalComposition = async () => {
@@ -118,13 +128,15 @@ export const maybeRestoreLocalComposition = async () => {
  */
 export const fetchAndLoadSharedComposition = async (
   compositionID: string | number,
-  force?: boolean
+  force?: boolean,
+  retainLocalStorage?: boolean
 ) => {
   console.log(`Loading composition id=${compositionID}`);
 
   const composition = await getLoadedComposition(compositionID);
   if (!composition) {
+    console.error(`Failed to load composition id=${compositionID}; not found?`);
     return;
   }
-  await loadSharedComposition(composition, force);
+  await loadSharedComposition(composition, force, retainLocalStorage);
 };

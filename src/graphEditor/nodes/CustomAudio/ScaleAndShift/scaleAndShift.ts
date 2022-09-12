@@ -1,10 +1,10 @@
 import { Map } from 'immutable';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import ScaleAndShiftSmallView, {
-  ScaleAndShiftUIState,
+  type ScaleAndShiftUIState,
 } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 

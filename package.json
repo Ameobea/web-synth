@@ -90,7 +90,7 @@
     "immutable": "^4.1.0",
     "jantix": "^0.3.0",
     "litegraph.js": "^0.7.10",
-    "node-sass": "^7.0.1",
+    "node-sass": "nschonni/node-sass#d02b7b4bf0b12f042ff97cb031bd4351507e58f3",
     "path-browserify": "^1.0.1",
     "ramda": "^0.28.0",
     "react": "next",

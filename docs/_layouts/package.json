@@ -4,10 +4,10 @@
   "description": "",
   "version": "1.0.0",
   "dependencies": {
-    "gatsby": "^2.21.22",
+    "gatsby": "^3.0",
     "gatsby-plugin-gtag": "^1.0.13",
     "gatsby-plugin-plausible": "^0.0.7",
-    "gatsby-theme-garden": "=0.1.58",
+    "gatsby-theme-garden": "=0.1.66",
     "react": "^16.3",
     "react-dom": "^16.3"
   },

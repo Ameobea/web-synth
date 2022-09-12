@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import { PromiseResolveType, UnreachableException } from 'ameo-utils';
+import { type PromiseResolveType, UnreachableException } from 'ameo-utils';
 
 /**
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.

@@ -15,7 +15,7 @@ opt-public-profiling:
   for file in `ls ./public | grep "\\.wasm"`; do echo $file && wasm-opt ./public/$file -O4 --enable-simd --precompute-propagate --fast-math --detect-features -g -c -o ./public/$file; done
 
 build-docs:
-  cd docs/_layouts && NODE_OPTIONS=--openssl-legacy-provider yarn build
+  cd docs/_layouts && yarn build
   rm -rf ./dist/docs
   cp -r ./docs/_layouts/public ./dist/docs
 
@@ -70,7 +70,7 @@ build-all:
 
   just build-sinsy
 
-  NODE_OPTIONS=--openssl-legacy-provider yarn build || NODE_OPTIONS=--openssl-legacy-provider npm build
+  yarn build || npm build
 
   just build-headless
 
@@ -79,7 +79,7 @@ build-all:
   just build-docs
 
 build-headless:
-  NODE_OPTIONS=--openssl-legacy-provider yarn build-headless || NODE_OPTIONS=--openssl-legacy-provider npm build-headless
+  yarn build-headless || npm build-headless
 
 run:
   #!/bin/bash
@@ -123,10 +123,10 @@ run:
 
   just debug-sinsy
 
-  NODE_OPTIONS=--openssl-legacy-provider yarn start
+  yarn start
 
 run-frontend:
-  NODE_OPTIONS=--openssl-legacy-provider yarn start
+  yarn start
 
 deploy:
   # cd backend && just docker-build
