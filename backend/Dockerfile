@@ -1,10 +1,10 @@
-FROM debian:jessie AS builder
+FROM debian:11.5-slim AS builder
 
-RUN apt-get update && apt-get install -y curl libmysqlclient-dev build-essential pkg-config libssl-dev
+RUN apt-get update && apt-get install -y curl libmariadbclient-dev-compat build-essential pkg-config libssl-dev
 
 # Install rust
 RUN curl https://sh.rustup.rs/ -sSf | \
-  sh -s -- -y --default-toolchain nightly-2021-11-26
+  sh -s -- -y --default-toolchain nightly-2022-08-10
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
@@ -12,9 +12,9 @@ ADD . ./
 
 RUN cargo build --release
 
-FROM debian:jessie
+FROM debian:11.5-slim
 
-RUN apt-get update && apt-get install -y libmysqlclient-dev libssl-dev ca-certificates && update-ca-certificates
+RUN apt-get update && apt-get install -y libmariadbclient-dev-compat libssl-dev ca-certificates && update-ca-certificates
 
 COPY --from=builder \
   /target/release/web-synth-backend \
@@ -24,3 +24,4 @@ COPY --from=builder \
   /root/Rocket.toml
 WORKDIR /root
 CMD ROCKET_PORT=$PORT /usr/local/bin/web-synth-backend
+
