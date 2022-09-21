@@ -1,10 +1,10 @@
-import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
-import { setEngine } from 'src/util';
-import { getState, dispatch } from 'src/redux';
-import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
-import { fetchAndLoadSharedComposition } from 'src/persistance';
 import { startAll, stopAll } from 'src/eventScheduler/eventScheduler';
+import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
 import { connect, disconnect } from 'src/patchNetwork/interface';
+import { fetchAndLoadSharedComposition } from 'src/persistance';
+import { dispatch, getState } from 'src/redux';
+import { setEngine } from 'src/util';
+import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 
 const ctx = new AudioContext();
 

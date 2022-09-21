@@ -1,20 +1,20 @@
+import { Option } from 'funfix-core';
 import { Map, Set } from 'immutable';
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
 
 import type {
-  PatchNetwork,
-  ConnectableDescriptor,
   AudioConnectables,
+  ConnectableDescriptor,
+  PatchNetwork,
 } from 'src/patchNetwork/patchNetwork';
-import { getEngine } from 'src/util';
 import {
   connectNodes,
   disconnectNodes,
   getConnectedPair,
   maybeUpdateVCM,
 } from 'src/redux/modules/vcmUtils';
+import { getEngine } from 'src/util';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string }[];

@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createSelector } from 'reselect';
 import ControlPanel from 'react-control-panel';
+import { createSelector } from 'reselect';
 
-import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
-import Loading from 'src/misc/Loading';
-import { useSelector, ReduxStore, dispatch, actionCreators } from 'src/redux';
-import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
 import { midiKeyboardCtxByStateKey } from 'src/midiKeyboard';
-import MidiKeyboardOutputMappingConfigurator from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
+import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
+import MidiKeyboardOutputMappingConfigurator from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
+import Loading from 'src/misc/Loading';
+import { actionCreators, dispatch, ReduxStore, useSelector } from 'src/redux';
+import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
 
 const mkOctaveCountSelector = () =>
   createSelector(

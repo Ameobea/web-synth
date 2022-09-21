@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import Loading from 'src/misc/Loading';
-import { AsyncOnce, elemInView } from 'src/util';
 import { getSentry } from 'src/sentry';
+import { AsyncOnce, elemInView } from 'src/util';
 
 export interface SpectrumVizSettings {
   color_fn: number;

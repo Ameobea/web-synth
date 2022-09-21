@@ -1,7 +1,6 @@
 import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
-import type { Store, Unsubscribe as ReduxUnsubscribe } from 'redux';
+import type { Unsubscribe as ReduxUnsubscribe, Store } from 'redux';
 import type { SvelteComponent, SvelteComponentTyped } from 'svelte';
-
 import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
 const RenderedSvelteComponentsByDomID = new Map<string, SvelteComponent>();

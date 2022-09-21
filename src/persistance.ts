@@ -1,12 +1,12 @@
+import Dexie from 'dexie';
 import download from 'downloadjs';
 import { Either } from 'funfix-core';
-import Dexie from 'dexie';
 
+import { getLoadedComposition } from 'src/api';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { stopAll } from 'src/eventScheduler/eventScheduler';
-import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
 import { getState } from 'src/redux';
-import { getLoadedComposition } from 'src/api';
+import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
 
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');

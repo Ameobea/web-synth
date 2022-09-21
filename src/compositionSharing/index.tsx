@@ -4,8 +4,8 @@ import { Provider } from 'react-redux';
 
 import { store } from '../redux';
 import CompositionSharing from './CompositionSharing';
-import { getEngine } from 'src/util';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
+import { getEngine } from 'src/util';
 
 interface CompositionSharingCtx {
   root: ReactDOM.Root;

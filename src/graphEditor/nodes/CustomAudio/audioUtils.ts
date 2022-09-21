@@ -1,7 +1,7 @@
 import { Map } from 'immutable';
 
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 
 const ctx = new AudioContext();
 

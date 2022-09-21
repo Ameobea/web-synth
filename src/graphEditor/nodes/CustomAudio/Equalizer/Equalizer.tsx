@@ -1,16 +1,16 @@
 import { Map } from 'immutable';
 
 import EqualizerSmallView from './EqualizerUI';
+import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { actionCreators, dispatch, getState } from 'src/redux';
 import type { EqualizerPoint } from 'src/redux/modules/equalizer';
 import { AsyncOnce } from 'src/util';
-import { FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 export const NEGATIVE_VALUE_DIVIDER_INTERVAL = 0.65;
 

@@ -1,9 +1,9 @@
 import { UnreachableException } from 'ameo-utils';
 
+import * as conf from '../conf';
 import * as PIXI from 'src/controls/pixi';
 import { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import NoteLine from 'src/midiEditor/NoteLine';
-import * as conf from '../conf';
 
 export class NoteBox {
   public line: NoteLine;

@@ -2,18 +2,21 @@
  * View context that creates a MIDI keyboard that is controllable via the normal keyboard and capable of being
  * connected to MIDI modules.
  */
-import { Map as ImmMap } from 'immutable';
 import { UnreachableException } from 'ameo-utils';
+import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
-import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { MIDIInput } from 'src/midiKeyboard/midiInput';
+import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 import {
   MidiKeyboardVC,
   type MidiKeyboardVCProps,
   mkMidiKeyboardSmallView,
 } from 'src/midiKeyboard/MidiKeyboardVC';
-import { store, dispatch, actionCreators, getState } from 'src/redux';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { actionCreators, dispatch, getState, store } from 'src/redux';
 import {
   buildFreshOutputDescriptorsByControlIndex,
   computeMappedOutputValue,
@@ -21,11 +24,8 @@ import {
   MidiKeyboardMode,
   type MidiKeyboardStateItem,
 } from 'src/redux/modules/midiKeyboard';
-import { tryParseJson } from 'src/util';
-import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
+import { tryParseJson } from 'src/util';
 
 const ctx = new AudioContext();
 

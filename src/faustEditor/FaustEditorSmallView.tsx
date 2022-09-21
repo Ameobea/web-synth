@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { connect } from 'react-redux';
 import ControlPanel from 'react-control-panel';
+import { connect } from 'react-redux';
 
 import { faustEditorContextMap, FaustEditorReduxInfra } from 'src/faustEditor';
-import { mkStopInstanceHandler, mkCompileButtonClickHandler } from 'src/faustEditor/FaustEditor';
+import { mkCompileButtonClickHandler, mkStopInstanceHandler } from 'src/faustEditor/FaustEditor';
 import FlatButton from 'src/misc/FlatButton';
 
 const mapSmallViewCompStateToProps = (state: ReturnType<FaustEditorReduxInfra['getState']>) => ({

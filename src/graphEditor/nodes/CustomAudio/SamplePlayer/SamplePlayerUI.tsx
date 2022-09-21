@@ -1,6 +1,6 @@
+import * as R from 'ramda';
 import React, { useCallback, useMemo, useReducer, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
 import type { SamplePlayerSampleDescriptor } from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
 import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';

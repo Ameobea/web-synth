@@ -1,9 +1,10 @@
-import { Map as ImmMap } from 'immutable';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
+import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
-import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import {
   buildDefaultOperatorConfig,
   deserializeWavetableState,
@@ -12,30 +13,29 @@ import {
   type WavetableBank,
   type WavetableState,
 } from 'src/fmSynth/ConfigureOperator';
-import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import {
-  type ParamSource,
   buildDefaultAdsr,
   buildDefaultParamSource,
+  type ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
-import type { Effect } from 'src/fmSynth/ConfigureEffects';
-import { AsyncOnce, genRandomStringID, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
-import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
-import { getSentry } from 'src/sentry';
+import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
+import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
-import { MIDINode } from 'src/patchNetwork/midiNode';
 import {
   buildDefaultSampleMappingState,
   deserializeSampleMappingState,
-  serializeSampleMappingState,
   type SampleMappingState,
+  serializeSampleMappingState,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
-import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
+import { getSentry } from 'src/sentry';
+import { AsyncOnce, genRandomStringID, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;

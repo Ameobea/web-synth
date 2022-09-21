@@ -31,9 +31,7 @@ const TrackInputItem: React.FC<{ onSelect: () => void; isSelected: boolean } & M
   </div>
 );
 
-const mkMidiImportDialog: (
-  fileInfo: MidiFileInfo
-) => React.FC<{
+const mkMidiImportDialog: (fileInfo: MidiFileInfo) => React.FC<{
   onSubmit: (settings: MidiImportSettings) => void;
 }> = fileInfo => {
   const MidiImportDialog: React.FC<{

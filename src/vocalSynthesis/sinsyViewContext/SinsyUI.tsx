@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import ControlPanel from 'react-control-panel';
 import downloadjs from 'downloadjs';
+import React, { useMemo } from 'react';
+import ControlPanel from 'react-control-panel';
+import { useSelector } from 'react-redux';
 
-import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import './SinsyUI.scss';
 import FileUploader, { Value as FileUploaderValue } from 'src/controls/FileUploader';
+import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import { loadHTSVoice } from 'src/vocalSynthesis/sinsyViewContext';
 
 const SinsyUI: React.FC<{ vcId: string }> = ({ vcId }) => {

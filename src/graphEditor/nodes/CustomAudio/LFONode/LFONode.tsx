@@ -1,11 +1,11 @@
 import { Map } from 'immutable';
 import * as R from 'ramda';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import LFOSmallView, { ALL_WAVEFORMS } from './LFONodeUI';
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 
 export interface LFOParams {
   frequency: number;

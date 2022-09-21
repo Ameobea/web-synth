@@ -1,19 +1,19 @@
 import { UnreachableException } from 'ameo-utils';
-import { Map as ImmMap } from 'immutable';
 import { Option } from 'funfix-core';
+import { Map as ImmMap } from 'immutable';
 
+import MIDIEditor from 'src/midiEditor/MIDIEditor';
+import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
+import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkBuildPasthroughInputCBs, type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { type MIDIInputCbs, MIDINode, mkBuildPasthroughInputCBs } from 'src/patchNetwork/midiNode';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
-import MIDIEditor from 'src/midiEditor/MIDIEditor';
-import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 
 export class MIDIEditorInstance {
   public vcId: string;

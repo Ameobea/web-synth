@@ -1,16 +1,16 @@
-import React, { useMemo } from 'react';
-import { shallowEqual, useSelector } from 'react-redux';
-import * as R from 'ramda';
-import { Option } from 'funfix-core';
-import ControlPanel from 'react-control-panel';
-
-import { getSample } from 'src/sampleLibrary';
-import { updateConnectables } from 'src/patchNetwork/interface';
-import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
-import type { VoiceTarget, SequencerReduxInfra } from '../redux';
-import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
-import { truncateWithElipsis } from 'src/util';
 import { UnreachableException } from 'ameo-utils';
+import { Option } from 'funfix-core';
+import * as R from 'ramda';
+import React, { useMemo } from 'react';
+import ControlPanel from 'react-control-panel';
+import { shallowEqual, useSelector } from 'react-redux';
+
+import type { SequencerReduxInfra, VoiceTarget } from '../redux';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import { getSample } from 'src/sampleLibrary';
+import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
+import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
+import { truncateWithElipsis } from 'src/util';
 
 interface InputCompCommonProps<T> extends SequencerReduxInfra {
   voiceIx: number;

@@ -1,7 +1,7 @@
+import * as conf from './conf';
 import * as PIXI from 'src/controls/pixi';
 import { makeDraggable } from 'src/controls/pixiUtils';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import * as conf from './conf';
 
 export class CursorGutter {
   private app: MIDIEditorUIInstance;

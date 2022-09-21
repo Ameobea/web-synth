@@ -1,9 +1,9 @@
 import * as R from 'ramda';
 
+import { FileSystemDirectoryHandle, FileSystemFileHandle, NativeFSShim } from './NativeFSTypes';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { FSAccessDriver } from 'src/fsAccess/driver';
 import FSAccessDialog from 'src/fsAccess/drivers/nativeFS/FSAccessDialog';
-import { FileSystemDirectoryHandle, NativeFSShim, FileSystemFileHandle } from './NativeFSTypes';
 
 const patchedWindow: Window & NativeFSShim = window as any;
 

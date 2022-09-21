@@ -2,24 +2,23 @@
  * Defines an interactive graph editor that can be used to route connections between different
  * components of an audio composition.
  */
-
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { filterNils, UnreachableException } from 'ameo-utils';
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph } from 'litegraph.js';
 import 'litegraph.js/css/litegraph.css';
-import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ControlPanel from 'react-control-panel';
 import { useSelector } from 'react-redux';
-import { filterNils, UnreachableException } from 'ameo-utils';
 
-import { registerAllCustomNodes } from './nodes';
 import './GraphEditor.scss';
-import { getState, ReduxStore } from 'src/redux';
-import { updateGraph } from 'src/graphEditor/graphDiffing';
-import { tryParseJson } from 'src/util';
-import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
-import { getEngine } from 'src/util';
-import FlatButton from 'src/misc/FlatButton';
+import { registerAllCustomNodes } from './nodes';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
+import { updateGraph } from 'src/graphEditor/graphDiffing';
+import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
+import FlatButton from 'src/misc/FlatButton';
+import { getState, ReduxStore } from 'src/redux';
+import { tryParseJson } from 'src/util';
+import { getEngine } from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 import {
   getIsVcHidden,

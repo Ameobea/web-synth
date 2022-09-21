@@ -1,19 +1,19 @@
 import { Map as ImmMap } from 'immutable';
-import { get, writable, type Writable } from 'svelte/store';
 import * as R from 'ramda';
+import { get, writable, type Writable } from 'svelte/store';
 
+import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce, genRandomStringID } from 'src/util';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   buildDefaultQuantizerNodeUIState,
   type QuantizerNodeUIState,
 } from 'src/graphEditor/nodes/CustomAudio/Quantizer/types';
-import QuantizerNodeUI from './QuantizerNodeUI.svelte';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { AsyncOnce, genRandomStringID } from 'src/util';
 
 const QuantizerWasmBytes = new AsyncOnce(() =>
   fetch(

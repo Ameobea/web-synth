@@ -1,16 +1,15 @@
 // import { saveSynthVoicePreset } from 'src/api';
 import type {
-  ADSRValues,
-  //buildDefaultAdsrEnvelope
+  ADSRValues, //buildDefaultAdsrEnvelope
 } from 'src/controls/adsr';
 import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type {
   // EffectType,
-  FilterParams,
-  // serializeSynthModule,
+  FilterParams, // serializeSynthModule,
   // Waveform,
 } from 'src/redux/modules/synthDesigner';
+
 // import { normalizeEnvelope } from 'src/util';
 
 const _getSerializeType = (synth: FMSynth) => synth.serialize();

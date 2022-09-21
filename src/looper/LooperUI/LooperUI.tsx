@@ -1,9 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { shallowEqual, useSelector } from 'react-redux';
 import * as R from 'ramda';
+import React, { useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import { shallowEqual, useSelector } from 'react-redux';
 
-import { type ReduxStore, looperDispatch, getState } from 'src/redux';
+import './LooperUI.scss';
+import {
+  fetchLooperPresets,
+  getExistingLooperPresetTags,
+  getLooperPreset,
+  saveLooperPreset,
+} from 'src/api';
+import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import ConfigureTransitionAlgorithm from 'src/looper/LooperUI/ConfigureTransitionAlgorithm';
+import LooperViz from 'src/looper/LooperUI/LooperViz';
+import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
+import { connect } from 'src/patchNetwork/interface';
+import type { ConnectableDescriptor } from 'src/patchNetwork/patchNetwork';
+import { getState, looperDispatch, type ReduxStore } from 'src/redux';
 import {
   deserializeLooper,
   looperActions,
@@ -12,20 +26,6 @@ import {
   type SerializedLooperInstState,
   serializeLooper,
 } from 'src/redux/modules/looper';
-import './LooperUI.scss';
-import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
-import LooperViz from 'src/looper/LooperUI/LooperViz';
-import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
-import {
-  fetchLooperPresets,
-  getExistingLooperPresetTags,
-  getLooperPreset,
-  saveLooperPreset,
-} from 'src/api';
-import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
-import type { ConnectableDescriptor } from 'src/patchNetwork/patchNetwork';
-import { connect } from 'src/patchNetwork/interface';
-import ConfigureTransitionAlgorithm from 'src/looper/LooperUI/ConfigureTransitionAlgorithm';
 
 const DeleteBankButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button className='delete-looper-bank-button' onClick={onClick}>

@@ -2,7 +2,6 @@ import { UnreachableException } from 'ameo-utils';
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
 
-import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   get_midi_keyboard_audio_connectables,
   type MappedOutput,
@@ -10,6 +9,7 @@ import {
   midiKeyboardCtxByStateKey,
 } from 'src/midiKeyboard';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkLinearToLog } from 'src/util';
 
 const ctx = new AudioContext();

@@ -1,9 +1,22 @@
 import { filterNils } from 'ameo-utils';
 import type { ScaleLogarithmic, Selection } from 'd3';
+import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
+import d3 from './d3';
+import './FilterDesigner.scss';
+import Presets from './presets';
+import {
+  connectFilterChain,
+  deserializeFilterDesigner,
+  disconnectFilterChain,
+  type FilterDescriptor,
+  type FilterDesignerState,
+  type FilterGroup,
+  setFilter,
+} from 'src/filterDesigner/util';
+import FlatButton from 'src/misc/FlatButton';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import {
   buildDefaultFilter,
@@ -11,19 +24,6 @@ import {
   getSettingsForFilterType,
 } from 'src/synthDesigner/filterHelpers';
 import { linearToDb } from 'src/util';
-import d3 from './d3';
-import './FilterDesigner.scss';
-import FlatButton from 'src/misc/FlatButton';
-import {
-  connectFilterChain,
-  deserializeFilterDesigner,
-  disconnectFilterChain,
-  FilterDescriptor,
-  FilterDesignerState,
-  FilterGroup,
-  setFilter,
-} from 'src/filterDesigner/util';
-import Presets from './presets';
 
 const ctx = new AudioContext();
 const DATA_SIZE = 512;

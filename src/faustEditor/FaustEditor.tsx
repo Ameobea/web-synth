@@ -1,25 +1,25 @@
-import React, { useState, Suspense, useMemo, useRef, useEffect, useCallback } from 'react';
-import { shallowEqual, useSelector } from 'react-redux';
-import ControlPanel from 'react-control-panel';
+import { filterNils, type ValueOf, type Without } from 'ameo-utils';
 import * as R from 'ramda';
-import { type Without, type ValueOf, filterNils } from 'ameo-utils';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ControlPanel from 'react-control-panel';
+import { shallowEqual, useSelector } from 'react-redux';
 
-import type { Effect } from 'src/redux/modules/effects';
+import { fetchEffects, saveEffect } from 'src/api';
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
-import { SpectrumVisualization } from 'src/visualizations/spectrum';
-import { FaustWorkletNode, buildFaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
+import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import {
   faustEditorContextMap,
   type FaustEditorReduxInfra,
   get_faust_editor_connectables,
 } from 'src/faustEditor';
-import { updateConnectables } from 'src/patchNetwork/interface';
-import { fetchEffects, saveEffect } from 'src/api';
 import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import { buildFaustWorkletNode, FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
-import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
-import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { useWindowSize } from 'src/reactUtils';
+import type { Effect } from 'src/redux/modules/effects';
+import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 type FaustEditorReduxStore = ReturnType<typeof faustEditorContextMap.key.reduxInfra.getState>;
 

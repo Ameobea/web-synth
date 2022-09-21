@@ -1,13 +1,13 @@
 import { filterNils } from 'ameo-utils';
 import React, { useMemo, useRef, useState } from 'react';
-import { Provider } from 'react-redux';
 import ControlPanel from 'react-control-panel';
+import { Provider } from 'react-redux';
 
-import { ReduxStore, store, useSelector } from 'src/redux';
+import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
-import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
+import { ReduxStore, store, useSelector } from 'src/redux';
 import { addLocalSample } from 'src/sampleLibrary';
 
 const NoInput: React.FC = () => (

@@ -2,18 +2,19 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 
-const wasm = import('./engine');
-import { store, getState } from './redux';
-import { setEngine } from 'src/util';
+import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
 import {
   fetchAndLoadSharedComposition,
   maybeRestoreLocalComposition,
   onBeforeUnload,
 } from 'src/persistance';
 import { initSentry } from 'src/sentry';
+import { setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
-import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
+
+const wasm = import('./engine');
 
 const ctx = new AudioContext();
 

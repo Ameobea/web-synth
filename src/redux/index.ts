@@ -1,20 +1,20 @@
-import { buildStore } from 'jantix';
 import type { ValueOf } from 'ameo-utils';
+import { buildStore } from 'jantix';
 
-import viewContextManagerModule from 'src/redux/modules/viewContextManager';
+import controlPanelModule from 'src/redux/modules/controlPanel';
+import equalizerModule from 'src/redux/modules/equalizer';
+import genericPresetPickerSlice, {
+  genericPresetPickerActions,
+  GenericPresetPickerState,
+} from 'src/redux/modules/genericPresetPicker';
+import looperSlice, { looperActions, LooperState } from 'src/redux/modules/looper';
 import midiKeyboardModule from 'src/redux/modules/midiKeyboard';
 import presetsModule, {
   fetchSynthPresets,
   fetchSynthVoicePresets,
 } from 'src/redux/modules/presets';
-import controlPanelModule from 'src/redux/modules/controlPanel';
-import equalizerModule from 'src/redux/modules/equalizer';
 import sinsyModule from 'src/redux/modules/sinsy';
-import looperSlice, { looperActions, LooperState } from 'src/redux/modules/looper';
-import genericPresetPickerSlice, {
-  genericPresetPickerActions,
-  GenericPresetPickerState,
-} from 'src/redux/modules/genericPresetPicker';
+import viewContextManagerModule from 'src/redux/modules/viewContextManager';
 
 const modules = {
   viewContextManager: viewContextManagerModule,

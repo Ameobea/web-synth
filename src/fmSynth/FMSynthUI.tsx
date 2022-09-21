@@ -1,32 +1,32 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as R from 'ramda';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import type { Writable } from 'svelte/store';
 
 import ConfigureOperator, { type OperatorConfig, type WavetableState } from './ConfigureOperator';
 import './FMSynth.scss';
-import { classNameIncludes } from 'src/util';
 import ConfigureEffects, {
   type AdsrChangeHandler,
   type Effect,
 } from 'src/fmSynth/ConfigureEffects';
-import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
+import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
 import ConfigureParamSource, {
   buildDefaultParamSource,
   type ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
-import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
+import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
+import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
+import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import HelpIcon from 'src/misc/HelpIcon';
 import { WaveformIcon } from 'src/misc/Icons';
-import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
-import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
-import type { Writable } from 'svelte/store';
-import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
-import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import { classNameIncludes } from 'src/util';
+import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];

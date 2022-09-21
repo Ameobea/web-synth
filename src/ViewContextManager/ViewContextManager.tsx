@@ -1,8 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import { ReduxStore } from 'src/redux';
-import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import GlobalVolumeSlider from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
 import {
@@ -14,6 +12,8 @@ import {
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
+import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
+import { ReduxStore } from 'src/redux';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
 
 const styles: { [key: string]: React.CSSProperties } = {

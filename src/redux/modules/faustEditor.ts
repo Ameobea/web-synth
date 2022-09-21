@@ -1,9 +1,9 @@
-import { buildActionGroup, buildModule, buildStore as buildJantixStore } from 'jantix';
+import { buildActionGroup, buildStore as buildJantixStore, buildModule } from 'jantix';
 
-import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
 import { faustEditorContextMap } from 'src/faustEditor';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 /**
  * Structure of the JSON stored in `localStorage` for the Faust editor.

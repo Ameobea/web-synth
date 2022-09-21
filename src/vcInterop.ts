@@ -1,9 +1,9 @@
-import type { VCMState } from 'src/redux/modules/viewContextManager';
-import { getEngine, tryParseJson } from 'src/util';
+import { actionCreators, dispatch, getState } from './redux';
 import { initPatchNetwork } from 'src/patchNetwork';
 import type { ConnectableDescriptor } from 'src/patchNetwork';
+import type { VCMState } from 'src/redux/modules/viewContextManager';
+import { getEngine, tryParseJson } from 'src/util';
 import { onVcHideStatusChange } from 'src/ViewContextManager/VcHideStatusRegistry';
-import { actionCreators, dispatch, getState } from './redux';
 
 const ctx = new AudioContext();
 

@@ -1,16 +1,18 @@
-import React, { Suspense } from 'react';
 import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
+import React, { Suspense } from 'react';
 
+import { LooperNode } from 'src/looper/LooperNode';
+import { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
+import { getState, looperDispatch, store } from 'src/redux';
 import {
   buildDefaultLooperInstState,
   deserializeLooper,
@@ -18,8 +20,6 @@ import {
   LooperInstState,
   serializeLooper,
 } from 'src/redux/modules/looper';
-import { getState, looperDispatch, store } from 'src/redux';
-import { LooperNode } from 'src/looper/LooperNode';
 
 const LazyLooperUI = React.lazy(() => import('src/looper/LooperUI/LooperUI'));
 

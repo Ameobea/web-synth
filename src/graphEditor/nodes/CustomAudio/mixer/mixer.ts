@@ -1,11 +1,11 @@
 import { Map } from 'immutable';
 
+import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
-import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView';
 
 export class MixerNode {
   private gainNodes: GainNode[];

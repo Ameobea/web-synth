@@ -1,13 +1,13 @@
 import { ArrayElementOf } from 'ameo-utils';
-import * as R from 'ramda';
-import { Map, Set } from 'immutable';
 import { Option } from 'funfix-core';
+import { Map, Set } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
+import * as R from 'ramda';
 
 import {
+  LiteGraphConnectablesNode,
   LiteGraph as LiteGraphInstance,
   LiteGraphNode,
-  LiteGraphConnectablesNode,
 } from 'src/graphEditor/LiteGraphTypes';
 import type { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
 import { ReduxStore } from 'src/redux';

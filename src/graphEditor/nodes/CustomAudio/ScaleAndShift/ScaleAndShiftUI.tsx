@@ -1,6 +1,6 @@
+import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ReactControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
 import './RangeInput.scss';
 

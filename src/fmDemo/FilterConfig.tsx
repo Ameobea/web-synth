@@ -1,9 +1,10 @@
+import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import HelpIcon from 'src/misc/HelpIcon';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import {
@@ -13,7 +14,6 @@ import {
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 import { msToSamples, samplesToMs } from 'src/util';
-import HelpIcon from 'src/misc/HelpIcon';
 
 export class FilterContainer {
   private ctx: AudioContext;

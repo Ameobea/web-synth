@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
-import * as R from 'ramda';
-import { Piano, Keyboard } from 'react-piano';
-import 'react-piano/dist/styles.css';
-import { Set as ImmSet } from 'immutable';
 import { UnreachableException } from 'ameo-utils';
+import { Set as ImmSet } from 'immutable';
+import * as R from 'ramda';
+import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { Keyboard, Piano } from 'react-piano';
+import 'react-piano/dist/styles.css';
 
 import './MidiKeyboard.scss';
 

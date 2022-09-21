@@ -1,24 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Provider, shallowEqual, useSelector } from 'react-redux';
-import * as R from 'ramda';
-import ControlPanel from 'react-control-panel';
 import { UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ControlPanel from 'react-control-panel';
+import { Provider, shallowEqual, useSelector } from 'react-redux';
 
-import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
-import { SpectrumVisualization } from 'src/visualizations/spectrum';
-import {
-  type SynthDesignerReduxStore,
-  get_synth_designer_audio_connectables,
-  type SynthDesignerReduxInfra,
-} from 'src/synthDesigner';
+import './SynthDesigner.scss';
+import SynthModuleComp from './SynthModule';
+import { saveSynthPreset } from 'src/api';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { type ReduxStore, store } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
-import SynthModuleComp from './SynthModule';
-import './SynthDesigner.scss';
-import { saveSynthPreset } from 'src/api';
-import { updateConnectables } from 'src/patchNetwork/interface';
+import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
+import {
+  get_synth_designer_audio_connectables,
+  type SynthDesignerReduxInfra,
+  type SynthDesignerReduxStore,
+} from 'src/synthDesigner';
+import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { buildWavyJonesInstance, type WavyJones } from 'src/visualizations/WavyJones';
-import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 
 interface AddModuleControlsProps {
   stateKey: string;

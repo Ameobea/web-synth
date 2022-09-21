@@ -1,9 +1,12 @@
-import React, { Suspense } from 'react';
+import { UnimplementedError } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
+import React, { Suspense } from 'react';
 
-import { actionCreators, dispatch, getState, store } from 'src/redux';
+import './ControlPanel.scss';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import Loading from 'src/misc/Loading';
 import type {
   AudioConnectables,
   ConnectableDescriptor,
@@ -11,26 +14,23 @@ import type {
   ConnectableOutput,
 } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import './ControlPanel.scss';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import {
-  type ControlPanelInstanceState,
-  type ControlPanelConnection,
-  buildDefaultControl,
-  type ControlPanelMidiKeyboardDescriptor,
-  type SerializedControlPanelVisualizationDescriptor,
-  deserializeControlPanelVisualizationDescriptor,
-  serializeControlPanelVisualizationDescriptor,
-} from 'src/redux/modules/controlPanel';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import { MIDINode } from 'src/patchNetwork/midiNode';
-import { UnimplementedError } from 'ameo-utils';
-import Loading from 'src/misc/Loading';
+import { actionCreators, dispatch, getState, store } from 'src/redux';
+import {
+  buildDefaultControl,
+  type ControlPanelConnection,
+  type ControlPanelInstanceState,
+  type ControlPanelMidiKeyboardDescriptor,
+  deserializeControlPanelVisualizationDescriptor,
+  serializeControlPanelVisualizationDescriptor,
+  type SerializedControlPanelVisualizationDescriptor,
+} from 'src/redux/modules/controlPanel';
 
 const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';

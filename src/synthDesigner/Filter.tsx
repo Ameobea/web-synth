@@ -1,10 +1,10 @@
+import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
+import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { FilterParams, getSynthDesignerReduxInfra } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
-import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 const style = { width: 600 };
 

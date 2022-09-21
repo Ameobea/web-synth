@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
 import * as R from 'ramda';
+import React, { useState } from 'react';
 
-import { serializeAndDownloadComposition, reinitializeWithComposition } from 'src/persistance';
-import { parseUploadedFileAsText } from 'src/controls/FileUploader';
-import { getState } from 'src/redux';
 import './GlobalMenu.scss';
+import { parseUploadedFileAsText } from 'src/controls/FileUploader';
+import { reinitializeWithComposition, serializeAndDownloadComposition } from 'src/persistance';
+import { getState } from 'src/redux';
 
 const ctx = new AudioContext();
 

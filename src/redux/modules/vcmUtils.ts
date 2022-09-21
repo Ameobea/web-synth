@@ -1,6 +1,6 @@
 import { Option } from 'funfix-core';
-import * as R from 'ramda';
 import { Map } from 'immutable';
+import * as R from 'ramda';
 
 import { PlaceholderInput } from 'src/controlPanel';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';

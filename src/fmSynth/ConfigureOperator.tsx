@@ -1,8 +1,11 @@
 import { UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
+import type { Writable } from 'svelte/store';
 
+import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
+import { renderModalWithControls } from 'src/controls/Modal';
 import ConfigureEffects, {
   type AdsrChangeHandler,
   type Effect,
@@ -11,15 +14,12 @@ import ConfigureParamSource, {
   buildDefaultParamSource,
   type ParamSource,
 } from 'src/fmSynth/ConfigureParamSource';
-import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { renderModalWithControls } from 'src/controls/Modal';
-import type { UploadWavetableModalProps } from 'src/fmSynth/UploadWavetable';
-import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
-import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
-import type { Writable } from 'svelte/store';
-import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import type { UploadWavetableModalProps } from 'src/fmSynth/UploadWavetable';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
 
 /**
  * The algorithm used to produce the output for the operator.

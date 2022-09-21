@@ -11,6 +11,7 @@
     "@babel/plugin-syntax-dynamic-import": "^7.8.3",
     "@babel/preset-react": "^7.18.6",
     "@babel/preset-typescript": "^7.18.6",
+    "@trivago/prettier-plugin-sort-imports": "^3.3.0",
     "@types/chartist": "^0.11.1",
     "@types/d3": "^7.1.0",
     "@types/downloadjs": "^1.4.2",
@@ -52,6 +53,7 @@
     "build": "rm -rf dist/* && NODE_OPTIONS=--experimental-worker BACKEND_BASE_URL=\"https://web-synth-api.ameo.design\" webpack --config webpack.prod.js && cp -r ./public/* ./dist",
     "build-headless": "rm -rf dist/headless/* && NODE_OPTIONS=--experimental-worker BACKEND_BASE_URL=\"https://web-synth-api.ameo.design\" webpack --config webpack.headless.js && cp -r ./public/* ./dist/headless",
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
+    "prettier": "prettier --write \"src/**/*.{ts,js,tsx}\"",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --browser chrome --record --key 58905cf6-d1cb-43de-b6cd-b55954039c1a",
     "cypress:serve": "serve -C -s -p 9000 dist"

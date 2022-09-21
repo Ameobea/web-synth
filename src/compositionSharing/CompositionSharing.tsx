@@ -1,13 +1,8 @@
-import React, { useState } from 'react';
 import * as R from 'ramda';
+import React, { useState } from 'react';
 
-import './CompositionSharing.scss';
 import { onBeforeUnload, reinitializeWithComposition } from '../persistance';
-import { getEngine } from 'src/util';
-import { getSample, SampleDescriptor } from 'src/sampleLibrary';
-import { renderModalWithControls, ModalCompProps } from 'src/controls/Modal';
-import FlatButton from 'src/misc/FlatButton';
-import BasicModal from 'src/misc/BasicModal';
+import './CompositionSharing.scss';
 import {
   fetchAllSharedCompositions,
   getExistingCompositionTags,
@@ -15,12 +10,17 @@ import {
   saveComposition,
   storeRemoteSample,
 } from 'src/api';
-import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import {
   pickPresetWithModal,
   PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import BasicModal from 'src/misc/BasicModal';
+import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
+import { getSample, SampleDescriptor } from 'src/sampleLibrary';
+import { getEngine } from 'src/util';
 
 export interface CompositionDefinition {
   id: number;

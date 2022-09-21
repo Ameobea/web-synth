@@ -1,8 +1,8 @@
-import { Option } from 'funfix-core';
 import { IterableValueOf, UnreachableException } from 'ameo-utils';
+import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
-import { MIDINode, MIDIAccess } from 'src/patchNetwork/midiNode';
+import { MIDIAccess, MIDINode } from 'src/patchNetwork/midiNode';
 
 export type BulitinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 

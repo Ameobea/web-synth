@@ -1,14 +1,14 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { useQuery } from 'react-query';
 import { Set as ImmSet } from 'immutable';
-import ControlPanel from 'react-control-panel';
 import * as R from 'ramda';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import ControlPanel from 'react-control-panel';
+import { useQuery } from 'react-query';
 
+import './GenericPresetPicker.scss';
 import type { PresetDescriptor } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import { withReactQueryClient } from 'src/reactUtils';
-import './GenericPresetPicker.scss';
 
 interface GenericPresetSaverArgs {
   getExistingTags?: () => Promise<{ name: string; count?: number }[]>;

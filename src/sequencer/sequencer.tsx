@@ -1,44 +1,44 @@
-import React, { Suspense } from 'react';
+import { filterNils, UnreachableException } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
-import { filterNils, UnreachableException } from 'ameo-utils';
+import React, { Suspense } from 'react';
 
 import {
-  mkContainerRenderHelper,
-  mkContainerCleanupHelper,
-  mkContainerHider,
-  mkContainerUnhider,
-} from 'src/reactUtils';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { updateConnectables } from 'src/patchNetwork/interface';
-import Loading from 'src/misc/Loading';
-import { MIDINode } from 'src/patchNetwork/midiNode';
-import { getSample } from 'src/sampleLibrary';
-import type { SampleDescriptor } from 'src/sampleLibrary';
-import {
-  buildSequencerReduxInfra,
   buildInitialState,
-  SchedulerScheme,
   buildSequencerConfig,
-  SequencerInstancesMap,
   buildSequencerInputMIDINode,
+  buildSequencerReduxInfra,
+  SchedulerScheme,
+  SequencerInstancesMap,
 } from './redux';
 import type {
+  SequencerEditState,
   SequencerMark,
+  SequencerReduxInfra,
   SequencerReduxState,
   VoiceTarget,
-  SequencerEditState,
-  SequencerReduxInfra,
 } from './redux';
-import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
-import { AsyncOnce } from 'src/util';
-import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 import {
   registerStartCB,
   registerStopCB,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
+import Loading from 'src/misc/Loading';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import {
+  mkContainerCleanupHelper,
+  mkContainerHider,
+  mkContainerRenderHelper,
+  mkContainerUnhider,
+} from 'src/reactUtils';
+import { getSample } from 'src/sampleLibrary';
+import type { SampleDescriptor } from 'src/sampleLibrary';
+import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
+import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
+import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
 

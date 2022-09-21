@@ -1,24 +1,24 @@
+import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import * as R from 'ramda';
-import { buildModule, buildActionGroup, buildStore } from 'jantix';
 import type { Root as ReactDOMRoot } from 'react-dom';
 
-import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
-import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 import FMSynth, {
   type Adsr,
   type AdsrParams,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
-import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
-import { updateConnectables } from 'src/patchNetwork/interface';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
+import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
+import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import {
   AbstractFilterModule,
   buildAbstractFilterModule,
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
-import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
+import { midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;

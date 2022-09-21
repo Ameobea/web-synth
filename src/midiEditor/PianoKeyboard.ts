@@ -1,7 +1,7 @@
+import * as conf from './conf';
 import * as PIXI from 'src/controls/pixi';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import { midiNumberToNoteName } from 'src/midiUtils';
-import * as conf from './conf';
 
 const ActiveNoteMarker = new PIXI.Graphics()
   .beginFill(conf.NOTE_SELECTED_COLOR, 0.8)

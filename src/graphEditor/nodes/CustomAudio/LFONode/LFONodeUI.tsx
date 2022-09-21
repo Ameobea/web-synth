@@ -1,6 +1,6 @@
+import * as R from 'ramda';
 import React from 'react';
 import ControlPanel, { Range, Select } from 'react-control-panel';
-import * as R from 'ramda';
 
 import { LFOParams } from 'src/graphEditor/nodes/CustomAudio/LFONode/LFONode';
 

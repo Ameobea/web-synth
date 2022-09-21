@@ -1,23 +1,23 @@
 import { Map as ImmMap } from 'immutable';
-import { get, writable, type Writable } from 'svelte/store';
 import * as R from 'ramda';
+import { get, writable, type Writable } from 'svelte/store';
 
-import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce } from 'src/util';
 import MIDIQuantizerNodeUI from './MIDIQuantizerNodeUI.svelte';
 import { buildDefaultMIDIQuantizerNodeUIState, type MIDIQuantizerNodeUIState } from './types';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { MIDINode } from 'src/patchNetwork/midiNode';
-import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   registerStartCB,
   registerStopCB,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { AsyncOnce } from 'src/util';
 
 const MIDIQuantizerWasmBytes = new AsyncOnce(() =>
   fetch(process.env.ASSET_PATH + 'midi_quantizer.wasm').then(res => res.arrayBuffer())

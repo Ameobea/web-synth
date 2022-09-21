@@ -1,22 +1,22 @@
-import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { shallowEqual, useSelector } from 'react-redux';
-import ControlPanel from 'react-control-panel';
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import ControlPanel from 'react-control-panel';
+import { shallowEqual, useSelector } from 'react-redux';
 
+import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';
+import ControlPanelNote from 'src/controlPanel/ControlPanelNote';
+import ControlPanelSpectrogram from 'src/controlPanel/ControlPanelSpectrogram';
+import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import BasicModal from 'src/misc/BasicModal';
 import { actionCreators, dispatch, ReduxStore } from 'src/redux';
 import {
   buildDefaultControlPanelInfo,
-  ControlInfo,
   Control,
+  ControlInfo,
   ControlPanelConnection,
   ControlPanelInstanceState,
 } from 'src/redux/modules/controlPanel';
-import BasicModal from 'src/misc/BasicModal';
-import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
-import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';
-import ControlPanelSpectrogram from 'src/controlPanel/ControlPanelSpectrogram';
-import ControlPanelNote from 'src/controlPanel/ControlPanelNote';
 
 interface ConfigureInputInnerProps {
   info: ControlInfo;

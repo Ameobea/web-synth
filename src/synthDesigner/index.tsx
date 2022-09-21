@@ -1,26 +1,26 @@
+import { Option, Try } from 'funfix-core';
+import { Map as ImmMap } from 'immutable';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
-import { Try, Option } from 'funfix-core';
-import { Map as ImmMap } from 'immutable';
 
-import {
-  type SynthDesignerState,
-  serializeSynthModule,
-  deserializeSynthModule,
-  getInitialSynthDesignerState,
-  getSynthDesignerReduxInfra,
-  SynthDesignerStateByStateKey,
-  gateSynthDesigner,
-  ungateSynthDesigner,
-} from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import buildSynthDesignerRedux from 'src/redux/modules/synthDesigner';
-import { MIDINode } from 'src/patchNetwork/midiNode';
-import { AsyncOnce } from 'src/util';
 import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { MIDINode } from 'src/patchNetwork/midiNode';
+import {
+  deserializeSynthModule,
+  gateSynthDesigner,
+  getInitialSynthDesignerState,
+  getSynthDesignerReduxInfra,
+  serializeSynthModule,
+  type SynthDesignerState,
+  SynthDesignerStateByStateKey,
+  ungateSynthDesigner,
+} from 'src/redux/modules/synthDesigner';
+import buildSynthDesignerRedux from 'src/redux/modules/synthDesigner';
+import { AsyncOnce } from 'src/util';
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
 

@@ -1,24 +1,24 @@
 import { filterNils } from 'ameo-utils';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import download from 'downloadjs';
 import * as R from 'ramda';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
+import './MIDIEditor.scss';
+import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
+import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
+import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 import type { MIDIEditorInstance } from 'src/midiEditor';
+import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import MIDIEditorUIInstance, {
   type SerializedMIDIEditorState,
 } from 'src/midiEditor/MIDIEditorUIInstance';
-import './MIDIEditor.scss';
-import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
-import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import BasicModal from 'src/misc/BasicModal';
-import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
-import { AsyncOnce } from 'src/util';
-import { type MidiFileInfo, getMidiImportSettings } from 'src/controls/MidiImportDialog';
-import download from 'downloadjs';
-import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
-import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { mkImageLoadPlaceholder } from 'src/reactUtils';
+import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
 

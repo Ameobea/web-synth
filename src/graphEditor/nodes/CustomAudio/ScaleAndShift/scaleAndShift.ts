@@ -1,12 +1,12 @@
 import { Map } from 'immutable';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import ScaleAndShiftSmallView, {
   type ScaleAndShiftUIState,
 } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 
 export const computeScaleAndShift = ({
   input_range: inputRange,

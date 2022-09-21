@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 
-import { ModalCompProps } from 'src/controls/Modal';
-import { AsyncOnce } from 'src/util';
-import BasicModal from 'src/misc/BasicModal';
 import './UploadWavetable.scss';
+import { ModalCompProps } from 'src/controls/Modal';
 import type { WavetableBank } from 'src/fmSynth/ConfigureOperator';
+import BasicModal from 'src/misc/BasicModal';
+import { AsyncOnce } from 'src/util';
 
 const SAMPLE_RATE = 44_100;
 

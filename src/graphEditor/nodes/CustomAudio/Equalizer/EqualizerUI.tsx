@@ -1,13 +1,13 @@
-import React, { useMemo, useRef } from 'react';
-import { Provider, useSelector } from 'react-redux';
+import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
+import React, { useMemo, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
+import { Provider, useSelector } from 'react-redux';
 
+import './Equalizer.scss';
 import { NEGATIVE_VALUE_DIVIDER_INTERVAL } from 'src/graphEditor/nodes/CustomAudio/Equalizer/Equalizer';
 import { actionCreators, dispatch, ReduxStore, store } from 'src/redux';
-import { EqualizerPoint, EQUALIZER_LEVEL_COUNT } from 'src/redux/modules/equalizer';
-import './Equalizer.scss';
-import { UnreachableException } from 'ameo-utils';
+import { EQUALIZER_LEVEL_COUNT, EqualizerPoint } from 'src/redux/modules/equalizer';
 
 const EqualizerLine: React.FC<{
   points: EqualizerPoint[];

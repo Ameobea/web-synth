@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
-import { shallowEqual } from 'react-redux';
-import ControlPanel from 'react-control-panel';
 import { UnreachableException } from 'ameo-utils';
+import React, { useMemo } from 'react';
+import ControlPanel from 'react-control-panel';
+import { shallowEqual } from 'react-redux';
 
 import type { SequencerMark, SequencerReduxInfra, VoiceTarget } from 'src/sequencer/redux';
 

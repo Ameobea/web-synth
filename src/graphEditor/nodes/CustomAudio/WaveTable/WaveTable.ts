@@ -1,12 +1,12 @@
+import { UnreachableException } from 'ameo-utils';
 import { Map } from 'immutable';
 import * as R from 'ramda';
-import { UnreachableException } from 'ameo-utils';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { AsyncOnce, genRandomStringID, getHasSIMDSupport } from 'src/util';
 
 // Manually generate some waveforms... for science

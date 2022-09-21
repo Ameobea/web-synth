@@ -1,4 +1,5 @@
 import * as R from 'ramda';
+
 import { getEngine } from 'src/util';
 
 // The number of pixels from the top of the page that the main content (canvases, editor, etc.)
@@ -110,26 +111,30 @@ export const get_active_attr = (key: string): string | null => ACTIVE_SHAPE.getA
  */
 export const set_active_attr = (key: string, val: string) => ACTIVE_SHAPE.setAttribute(key, val);
 
-const renderHelper = (
-  fn: (...args: any[]) => { name: string; attrs: { [key: string]: string }; idOverride?: number }
-) => (canvasIndex: number, ...args: any[]): number => {
-  const { name, attrs, idOverride } = fn(...args);
+const renderHelper =
+  (
+    fn: (...args: any[]) => { name: string; attrs: { [key: string]: string }; idOverride?: number }
+  ) =>
+  (canvasIndex: number, ...args: any[]): number => {
+    const { name, attrs, idOverride } = fn(...args);
 
-  const shape = document.createElementNS('http://www.w3.org/2000/svg', name);
-  const id = idOverride || ATTR_COUNTER;
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', name);
+    const id = idOverride || ATTR_COUNTER;
 
-  Object.entries({ ...attrs, id: `e-${id}` }).forEach(([key, val]) => shape.setAttribute(key, val));
+    Object.entries({ ...attrs, id: `e-${id}` }).forEach(([key, val]) =>
+      shape.setAttribute(key, val)
+    );
 
-  const svg = SVGS[canvasIndex];
-  svg.appendChild(shape);
-  ACTIVE_SHAPE = shape;
+    const svg = SVGS[canvasIndex];
+    svg.appendChild(shape);
+    ACTIVE_SHAPE = shape;
 
-  if (R.isNil(idOverride)) {
-    ATTR_COUNTER += 1;
-  }
+    if (R.isNil(idOverride)) {
+      ATTR_COUNTER += 1;
+    }
 
-  return id;
-};
+    return id;
+  };
 
 const getElem = (id: number): HTMLElement => document.getElementById(`e-${id}`)!;
 

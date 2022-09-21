@@ -1,5 +1,5 @@
-import ReactDOM from 'react-dom';
 import React from 'react';
+import ReactDOM from 'react-dom';
 
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { getSentry, initSentry } from 'src/sentry';

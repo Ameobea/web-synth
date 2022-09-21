@@ -1,11 +1,11 @@
-import * as R from 'ramda';
 import { UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
 
-import { FilterType } from 'src/synthDesigner/filterHelpers';
-import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { linearToDb } from 'src/util';
 import { connectFilterChain } from 'src/filterDesigner/util';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { FilterType } from 'src/synthDesigner/filterHelpers';
+import { linearToDb } from 'src/util';
 
 // higher-order filter Q factors determined using this: https://www.earlevel.com/main/2016/09/29/cascading-filters/
 export const computeHigherOrderBiquadQFactors = (order: number): number[] => {

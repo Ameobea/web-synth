@@ -1,19 +1,19 @@
 import { UnreachableException } from 'ameo-utils';
-import * as R from 'ramda';
 import { Option } from 'funfix-core';
+import * as R from 'ramda';
 
+import * as conf from './conf';
 import * as PIXI from 'src/controls/pixi';
 import type { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
 import type { NoteBox } from 'src/midiEditor/NoteBox';
-import NoteLine from 'src/midiEditor/NoteLine';
-import PianoKeys from 'src/midiEditor/PianoKeyboard';
-import SelectionBox from 'src/midiEditor/SelectionBox';
-import * as conf from './conf';
 import MIDINoteBox, {
   NoteDragHandle,
   NoteDragHandleSide,
 } from 'src/midiEditor/NoteBox/MIDINoteBox';
+import NoteLine from 'src/midiEditor/NoteLine';
+import PianoKeys from 'src/midiEditor/PianoKeyboard';
+import SelectionBox from 'src/midiEditor/SelectionBox';
 import {
   getIsVcHidden,
   registerVcHideCb,

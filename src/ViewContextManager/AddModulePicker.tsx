@@ -1,10 +1,9 @@
+import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
-
-import { getEngine } from 'src/util';
 
 import './GlobalVolume.scss';
+import { getEngine } from 'src/util';
 
 interface ViewContextDescriptor {
   name: string;

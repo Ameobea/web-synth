@@ -1,13 +1,13 @@
 import { filterNils } from 'ameo-utils';
+import { Option } from 'funfix-core';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import { Option } from 'funfix-core';
 
-import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import ConfigureParamSource, { type ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import FlatButton from 'src/misc/FlatButton';
-import { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { getSentry } from 'src/sentry';
 import HelpIcon from 'src/misc/HelpIcon';
+import { getSentry } from 'src/sentry';
 
 export enum ButterworthFilterMode {
   Lowpass = 0,

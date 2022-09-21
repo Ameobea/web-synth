@@ -1,12 +1,12 @@
 import React, { useCallback } from 'react';
 
-import { actionCreators, dispatch, getState } from 'src/redux';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
+import { useDraggable } from 'src/reactUtils';
+import { actionCreators, dispatch, getState } from 'src/redux';
 import {
   ControlPanelMidiKeyboardDescriptor,
   maybeSnapToGrid,
 } from 'src/redux/modules/controlPanel';
-import { useDraggable } from 'src/reactUtils';
 
 interface ControlPanelMidiKeyboardProps extends ControlPanelMidiKeyboardDescriptor {
   vcId: string;

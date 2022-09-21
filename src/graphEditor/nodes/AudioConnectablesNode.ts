@@ -1,17 +1,16 @@
 /**
  * Defines a graph node that wraps an `AudioConnectables` instance.  It
  */
-
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 
-import type { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
 import {
-  LiteGraphNodeInput,
   LiteGraphLink,
+  LiteGraphNodeInput,
   LiteGraph as LiteGraphType,
 } from 'src/graphEditor/LiteGraphTypes';
-import { dispatch, actionCreators } from 'src/redux';
+import type { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
+import { actionCreators, dispatch } from 'src/redux';
 
 export function LGAudioConnectables(this: any) {
   // Default Properties

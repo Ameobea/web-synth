@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
+import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
 import ADSR2, { type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';

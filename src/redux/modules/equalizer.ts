@@ -2,8 +2,8 @@ import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
 
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { actionCreators, dispatch, getState } from 'src/redux';
 import { updateConnectables } from 'src/patchNetwork/interface';
+import { actionCreators, dispatch, getState } from 'src/redux';
 
 export interface EqualizerPoint {
   index: number;

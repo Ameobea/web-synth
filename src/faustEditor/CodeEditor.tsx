@@ -1,6 +1,6 @@
+import 'ace-builds/src-min-noconflict/theme-twilight';
 import React from 'react';
 import ReactAce from 'react-ace';
-import 'ace-builds/src-min-noconflict/theme-twilight';
 
 const CodeEditor: React.FC<{
   value: string;

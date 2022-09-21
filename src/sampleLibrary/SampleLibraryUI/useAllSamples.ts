@@ -1,9 +1,9 @@
+import { parse as parsePath } from 'path-browserify';
+import * as R from 'ramda';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
-import * as R from 'ramda';
-import { parse as parsePath } from 'path-browserify';
 
-import { SampleDescriptor, listSamples } from 'src/sampleLibrary/sampleLibrary';
+import { listSamples, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 
 const buildSampleDescriptorKey = (desc: SampleDescriptor): string =>
   `${desc.id ?? ''}${desc.isLocal}${desc.name}`;

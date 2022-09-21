@@ -1,12 +1,12 @@
-import React, { useCallback } from 'react';
 import { filterNils } from 'ameo-utils';
 import * as R from 'ramda';
+import React, { useCallback } from 'react';
 import { Range } from 'react-control-panel';
 
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
-import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
-import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 
 export enum FilterType {
   Lowpass = 'lowpass',

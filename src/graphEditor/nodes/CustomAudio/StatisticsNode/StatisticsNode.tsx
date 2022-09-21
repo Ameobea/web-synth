@@ -1,16 +1,15 @@
 /**
  * Analyzes the input signal and periodically samples it, recording statistics about the distribution of input signals.
  */
-
-import React, { Suspense } from 'react';
-import { Map as ImmMap } from 'immutable';
-import { buildStore, buildActionGroup, buildModule } from 'jantix';
 import { AsyncOnce } from 'ameo-utils';
+import { Map as ImmMap } from 'immutable';
+import { buildActionGroup, buildModule, buildStore } from 'jantix';
+import React, { Suspense } from 'react';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
 import Loading from 'src/misc/Loading';
+import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 
 const ctx = new AudioContext();
 

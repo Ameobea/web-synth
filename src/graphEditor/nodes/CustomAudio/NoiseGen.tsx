@@ -1,16 +1,16 @@
-import React, { useMemo, useState } from 'react';
-import { Map as ImmMap } from 'immutable';
-import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 import { filterNils } from 'ameo-utils';
+import { Map as ImmMap } from 'immutable';
+import * as R from 'ramda';
+import React, { useMemo, useState } from 'react';
+import ControlPanel from 'react-control-panel';
 
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce, genRandomStringID } from 'src/util';
-import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const NoiseGenAWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet

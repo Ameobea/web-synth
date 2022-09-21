@@ -3,41 +3,40 @@
  * are managed outside of the mode - connecting them in LiteGraph is a no-op.  Connections between these nodes are managed
  * at the patch network level.
  */
-
-import type React from 'react';
+import { Option } from 'funfix-core';
 import { Map } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
-import { Option } from 'funfix-core';
+import type React from 'react';
 
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { addNode, removeNode } from 'src/patchNetwork/interface';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
-import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
-import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
-import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
-import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
-import { getState } from 'src/redux';
-import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
-import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
+import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
+import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
+import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio/CustomCompressorSmallViewRenderer';
+import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
+import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
+import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
 import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
-import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
-import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
-import { Sidechain } from 'src/graphEditor/nodes/CustomAudio/Sidechain';
-import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
-import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio/CustomCompressorSmallViewRenderer';
-import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
-import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
-import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
+import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
+import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
+import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
+import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
+import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import QuantizerNode from 'src/graphEditor/nodes/CustomAudio/Quantizer/QuantizerNode';
+import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
+import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
+import { Sidechain } from 'src/graphEditor/nodes/CustomAudio/Sidechain';
+import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
+import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { addNode, removeNode } from 'src/patchNetwork/interface';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { getState } from 'src/redux';
 
 const ctx = new AudioContext();
 

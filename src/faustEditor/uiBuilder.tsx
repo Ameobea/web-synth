@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useRef } from 'react';
-import * as R from 'ramda';
-import ControlPanel from 'react-control-panel';
-import { filterNils, ValueOf, UnimplementedError, ArrayElementOf } from 'ameo-utils';
+import { ArrayElementOf, filterNils, UnimplementedError, ValueOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
+import * as R from 'ramda';
+import React, { useCallback, useMemo, useRef } from 'react';
+import ControlPanel from 'react-control-panel';
+
 import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 
 interface BaseUiDef {

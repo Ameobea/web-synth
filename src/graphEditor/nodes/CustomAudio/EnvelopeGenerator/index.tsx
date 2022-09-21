@@ -1,18 +1,18 @@
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { ADSRValues } from 'src/controls/adsr';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
+import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
+import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
-import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
-import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { updateConnectables } from 'src/patchNetwork/interface';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { normalizeEnvelope } from 'src/util';
 
 interface SerializedState {

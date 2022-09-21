@@ -1,6 +1,6 @@
+import * as conf from './conf';
 import * as PIXI from 'src/controls/pixi';
 import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import * as conf from './conf';
 
 export default class SelectionBox {
   private app: MIDIEditorUIInstance;

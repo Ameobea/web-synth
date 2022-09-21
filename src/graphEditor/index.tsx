@@ -2,10 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 
+import GraphEditor, { saveStateForInstance } from './GraphEditor';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { store } from 'src/redux';
 import { retryAsync } from 'src/util';
-import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
 interface GraphEditorCtx {
   lgraphHandle: any;

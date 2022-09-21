@@ -2,7 +2,6 @@
  * Implements a cache for samples that are stored directly in the browser via IndexedDB.  This removes the need for
  * samples to be re-fetched via the internet or loaded from local disk which requires permissions and user action.
  */
-
 import Dexie from 'dexie';
 import * as R from 'ramda';
 

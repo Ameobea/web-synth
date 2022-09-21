@@ -1,18 +1,18 @@
-import { Map as ImmMap } from 'immutable';
 import { Option } from 'funfix-core';
+import { Map as ImmMap } from 'immutable';
 
 import FaustEditor from './FaustEditor';
-import type { AudioConnectables, ConnectableOutput, ConnectableInput } from 'src/patchNetwork';
-import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import {
-  type SerializedFaustEditor,
-  buildDefaultFaustEditorPolyphonyState,
-  buildFaustEditorReduxInfra,
-} from 'src/redux/modules/faustEditor';
-import { mkContainerRenderHelper, mkContainerCleanupHelper } from 'src/reactUtils';
+import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import {
+  buildDefaultFaustEditorPolyphonyState,
+  buildFaustEditorReduxInfra,
+  type SerializedFaustEditor,
+} from 'src/redux/modules/faustEditor';
 
 const ctx = new AudioContext();
 

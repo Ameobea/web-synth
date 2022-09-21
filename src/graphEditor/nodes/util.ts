@@ -1,5 +1,5 @@
-import * as R from 'ramda';
 import { Option } from 'funfix-core';
+import * as R from 'ramda';
 
 (window as any).dbg = <T>(arg: T) => {
   console.trace(arg);

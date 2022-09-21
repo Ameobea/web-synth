@@ -1,16 +1,16 @@
+import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 import { useSelector } from 'react-redux';
 import { FixedSizeList as List } from 'react-window';
-import * as R from 'ramda';
 
+import './GenericPresetPicker.scss';
 import { Tag } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import { useWindowSize, withReactQueryClient, withReduxProvider } from 'src/reactUtils';
 import { genericPresetDispatch, ReduxStore, store } from 'src/redux';
 import { genericPresetPickerActions } from 'src/redux/modules/genericPresetPicker';
-import './GenericPresetPicker.scss';
 
 const SEARCH_BAR_HEIGHT = 38;
 

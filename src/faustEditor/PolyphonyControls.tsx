@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { connect } from 'react-redux';
 import ControlPanel from 'react-control-panel';
+import { connect } from 'react-redux';
 
 import type { FaustEditorPolyphonyState, FaustEditorState } from 'src/redux/modules/faustEditor';
 

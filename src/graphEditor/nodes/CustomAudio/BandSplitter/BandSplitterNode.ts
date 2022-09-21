@@ -1,7 +1,7 @@
 import { Map as ImmMap } from 'immutable';
+
 import { BandSplitterPreset } from 'src/filterDesigner/presets';
 import { connectFilterChain, setFilter } from 'src/filterDesigner/util';
-
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import BandSplitterSmallView, {
   BandSplitterSmallViewProps,

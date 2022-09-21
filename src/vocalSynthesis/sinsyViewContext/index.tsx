@@ -1,7 +1,9 @@
+import { UnimplementedError } from 'ameo-utils';
 import type { PropTypesOf } from 'ameo-utils/dist/util/react';
+import { Option } from 'funfix-core';
 import React, { Suspense } from 'react';
 
-import { actionCreators, dispatch, getState, store } from 'src/redux';
+import Loading from 'src/misc/Loading';
 import type { AudioConnectables } from 'src/patchNetwork';
 import {
   mkContainerCleanupHelper,
@@ -9,13 +11,11 @@ import {
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import Loading from 'src/misc/Loading';
-import { Option } from 'funfix-core';
+import { actionCreators, dispatch, getState, store } from 'src/redux';
 import { buildDefaultSinsyState } from 'src/redux/modules/sinsy';
 import type { SinsyState } from 'src/redux/modules/sinsy';
+import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import { AsyncOnce } from 'src/util';
-import { UnimplementedError } from 'ameo-utils';
 
 const SinsyUI = React.lazy(() => import('./SinsyUI'));
 

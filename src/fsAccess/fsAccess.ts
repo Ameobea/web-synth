@@ -1,5 +1,5 @@
-import NativeFSDriver from 'src/fsAccess/drivers/nativeFS/nativeFS';
 import { FSAccessDriver } from 'src/fsAccess/driver';
+import NativeFSDriver from 'src/fsAccess/drivers/nativeFS/nativeFS';
 
 const fsDriversByName: { [driverName: string]: new () => FSAccessDriver } = {
   nativeFS: NativeFSDriver,

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
-import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanel from 'react-control-panel';
+import { shallowEqual, useSelector } from 'react-redux';
 
 import { looperDispatch, type ReduxStore } from 'src/redux';
 import {

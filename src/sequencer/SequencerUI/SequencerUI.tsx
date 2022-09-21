@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { shallowEqual } from 'react-redux';
 
-import FlatButton from 'src/misc/FlatButton';
-import ConfigureMark from 'src/sequencer/SequencerUI/ConfigureMark';
 import type { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
+import FlatButton from 'src/misc/FlatButton';
+import ConfigureMark from 'src/sequencer/SequencerUI/ConfigureMark';
 
 const CELL_SIZE_PX = 40 as const;
 

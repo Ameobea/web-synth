@@ -1,14 +1,14 @@
-import React from 'react';
 import { Map as ImmMap } from 'immutable';
+import React from 'react';
 import ControlPanel from 'react-control-panel';
 
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
-import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import DummyNode from 'src/graphEditor/nodes/DummyNode';
 
 const SidechainAWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet.addModule(

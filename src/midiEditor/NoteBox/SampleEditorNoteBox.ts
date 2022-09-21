@@ -1,9 +1,8 @@
 import * as PIXI from 'src/controls/pixi';
-
+import * as conf from 'src/midiEditor/conf';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import type NoteLine from 'src/midiEditor/NoteLine';
-import * as conf from 'src/midiEditor/conf';
 
 class SampleEditorNoteBoxLabel {
   private noteBox: NoteBox;

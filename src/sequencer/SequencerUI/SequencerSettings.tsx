@@ -4,23 +4,25 @@ import ControlPanel from 'react-control-panel';
 
 import { SequencerReduxInfra } from 'src/sequencer/redux';
 
-const mkHandleChange = ({
-  dispatch,
-  actionCreators,
-}: {
-  actionCreators: SequencerReduxInfra['actionCreators'];
-  dispatch: SequencerReduxInfra['dispatch'];
-}) => (key: string, val: any, _state: { [key: string]: any }) => {
-  switch (key) {
-    case 'beat count': {
-      dispatch(actionCreators.sequencer.SET_BEAT_COUNT(val));
-      break;
+const mkHandleChange =
+  ({
+    dispatch,
+    actionCreators,
+  }: {
+    actionCreators: SequencerReduxInfra['actionCreators'];
+    dispatch: SequencerReduxInfra['dispatch'];
+  }) =>
+  (key: string, val: any, _state: { [key: string]: any }) => {
+    switch (key) {
+      case 'beat count': {
+        dispatch(actionCreators.sequencer.SET_BEAT_COUNT(val));
+        break;
+      }
+      default: {
+        console.error(`Unhandled key in SequencerSettings: "${key}"`);
+      }
     }
-    default: {
-      console.error(`Unhandled key in SequencerSettings: "${key}"`);
-    }
-  }
-};
+  };
 
 const getSequencerSettings = ({
   actionCreators,

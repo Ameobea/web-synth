@@ -1,10 +1,10 @@
-import * as R from 'ramda';
 import { Map } from 'immutable';
+import * as R from 'ramda';
 
-import { MIDINode, MIDIInputCbs } from 'src/patchNetwork/midiNode';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { midiToFrequency } from 'src/util';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { midiToFrequency } from 'src/util';
 
 export class MIDIToFrequencyNode {
   public vcId: string;

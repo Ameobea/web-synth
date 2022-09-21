@@ -1,9 +1,9 @@
+import { ANewTab } from 'ameo-utils';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
-import { ANewTab } from 'ameo-utils';
 
-import 'src/index.scss';
 import './BrowserNotSupported.scss';
+import 'src/index.scss';
 
 const BrowserNotSupported: React.FC<{ mobileSupported?: boolean }> = ({
   mobileSupported = false,

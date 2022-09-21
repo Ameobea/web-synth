@@ -1,12 +1,19 @@
-import React, { Suspense } from 'react';
 import { PropTypesOf, UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
+import React, { Suspense } from 'react';
 
+import {
+  connectFilterChain,
+  deserializeFilterDesigner,
+  FilterDesignerState,
+  serializeFilterDesigner,
+  setFilter,
+} from 'src/filterDesigner/util';
 import Loading from 'src/misc/Loading';
 import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-
+import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
@@ -16,14 +23,6 @@ import {
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import { FilterType } from 'src/synthDesigner/filterHelpers';
-import {
-  FilterDesignerState,
-  deserializeFilterDesigner,
-  serializeFilterDesigner,
-  setFilter,
-  connectFilterChain,
-} from 'src/filterDesigner/util';
-import { updateConnectables } from 'src/patchNetwork/interface';
 
 const FilterDesigner = React.lazy(() => import('./FilterDesigner'));
 

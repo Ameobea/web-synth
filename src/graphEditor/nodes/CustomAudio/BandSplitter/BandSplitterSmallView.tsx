@@ -1,6 +1,6 @@
+import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import * as R from 'ramda';
 
 import { SerializedBandSplitterNode } from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 

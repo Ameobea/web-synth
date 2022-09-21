@@ -2,14 +2,14 @@ import { UnreachableException } from 'ameo-utils';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
+import './Granulator.scss';
 import { GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
+import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';
+import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { delay, retryWithDelay } from 'src/util';
-import './Granulator.scss';
-import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';
-import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 
 export interface GranulatorControlPanelState {
   grain_size: number;

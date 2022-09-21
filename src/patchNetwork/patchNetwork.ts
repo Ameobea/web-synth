@@ -1,12 +1,12 @@
-import { Map } from 'immutable';
 import { Option } from 'funfix-core';
+import { Map } from 'immutable';
 
-import type { VCMState } from 'src/redux/modules/viewContextManager';
-import { getEngine } from 'src/util';
-import { audioNodeGetters, ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import type { MIDINode } from './midiNode';
 import { PlaceholderInput } from 'src/controlPanel';
+import { audioNodeGetters, ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { connectNodes, disconnectNodes, getConnectedPair } from 'src/redux/modules/vcmUtils';
+import type { VCMState } from 'src/redux/modules/viewContextManager';
+import { getEngine } from 'src/util';
 
 export type ConnectableType = 'midi' | 'number' | 'customAudio';
 export interface ConnectableInput {
