@@ -5,6 +5,7 @@ import type { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '..
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
 import './SequencerUI.scss';
+
 import FlatButton from 'src/misc/FlatButton';
 import ConfigureMark from 'src/sequencer/SequencerUI/ConfigureMark';
 

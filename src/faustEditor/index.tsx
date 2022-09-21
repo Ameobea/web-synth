@@ -1,7 +1,6 @@
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 
-import FaustEditor from './FaustEditor';
 import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -13,6 +12,7 @@ import {
   buildFaustEditorReduxInfra,
   type SerializedFaustEditor,
 } from 'src/redux/modules/faustEditor';
+import FaustEditor from './FaustEditor';
 
 const ctx = new AudioContext();
 

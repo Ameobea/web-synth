@@ -1,6 +1,6 @@
-import { ANewTab } from 'ameo-utils';
+import { ANewTab } from 'ameo-utils/dist/util/react';
 import React from 'react';
-import * as ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import './BrowserNotSupported.scss';
 import 'src/index.scss';
@@ -37,7 +37,7 @@ export const createBrowserNotSupportedMessage = () => {
     body.children[0].remove();
   }
 
-  ReactDOM.createRoot(body).render(<BrowserNotSupported />);
+  createRoot(body).render(<BrowserNotSupported />);
 };
 
 export default BrowserNotSupported;

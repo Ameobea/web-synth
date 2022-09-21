@@ -5,6 +5,7 @@ import ControlPanel from 'react-control-panel';
 import { Provider, useSelector } from 'react-redux';
 
 import './Equalizer.scss';
+
 import { NEGATIVE_VALUE_DIVIDER_INTERVAL } from 'src/graphEditor/nodes/CustomAudio/Equalizer/Equalizer';
 import { actionCreators, dispatch, ReduxStore, store } from 'src/redux';
 import { EQUALIZER_LEVEL_COUNT, EqualizerPoint } from 'src/redux/modules/equalizer';

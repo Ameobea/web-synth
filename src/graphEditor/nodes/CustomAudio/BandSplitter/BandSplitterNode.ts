@@ -4,7 +4,7 @@ import { BandSplitterPreset } from 'src/filterDesigner/presets';
 import { connectFilterChain, setFilter } from 'src/filterDesigner/util';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import BandSplitterSmallView, {
-  BandSplitterSmallViewProps,
+  type BandSplitterSmallViewProps,
 } from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterSmallView';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -59,7 +59,7 @@ export default class BandSplitterNode implements ForeignNode {
     this.filterChains = BandSplitterPreset.filterGroups.map((group, bandIx) => {
       const constructedFilters = group.map(params => {
         const filter = new BiquadFilterNode(ctx);
-        setFilter(filter, params, params.frequency);
+        setFilter(filter, undefined, params, params.frequency);
         return filter;
       });
 

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
+
 import type { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 
 const noop = () => {};

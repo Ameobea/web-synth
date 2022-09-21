@@ -1,8 +1,8 @@
-import { PropTypesOf } from 'ameo-utils';
+import type { PropTypesOf } from 'ameo-utils/dist/util/react';
 import React from 'react';
 import { Tooltip } from 'react-tippy';
-import 'react-tippy/dist/tippy.css';
 
+import 'react-tippy/dist/tippy.css';
 import './HelpIcon.scss';
 
 // From: https://icons.mono.company/, MIT license

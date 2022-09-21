@@ -1,11 +1,11 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { getSentry, initSentry } from 'src/sentry';
 
 initSentry();
-const root = (ReactDOM as any).createRoot(document.getElementById('root')!);
+const root = createRoot(document.getElementById('root')!);
 
 const environmentIsValid =
   typeof AudioWorkletNode !== 'undefined' && typeof ConstantSourceNode !== 'undefined';

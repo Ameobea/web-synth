@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './Granulator.scss';
+
 import { GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';

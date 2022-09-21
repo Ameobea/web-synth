@@ -2,8 +2,6 @@ import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
-import MIDIQuantizerNodeUI from './MIDIQuantizerNodeUI.svelte';
-import { buildDefaultMIDIQuantizerNodeUIState, type MIDIQuantizerNodeUIState } from './types';
 import {
   registerStartCB,
   registerStopCB,
@@ -18,6 +16,8 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
+import MIDIQuantizerNodeUI from './MIDIQuantizerNodeUI.svelte';
+import { buildDefaultMIDIQuantizerNodeUIState, type MIDIQuantizerNodeUIState } from './types';
 
 const MIDIQuantizerWasmBytes = new AsyncOnce(() =>
   fetch(process.env.ASSET_PATH + 'midi_quantizer.wasm').then(res => res.arrayBuffer())

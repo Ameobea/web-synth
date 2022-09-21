@@ -2,7 +2,6 @@ import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
-import * as conf from './conf';
 import * as PIXI from 'src/controls/pixi';
 import type { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
@@ -19,6 +18,7 @@ import {
   registerVcHideCb,
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
+import * as conf from './conf';
 
 export interface Note {
   id: number;

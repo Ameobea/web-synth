@@ -3,8 +3,8 @@ import { Set as ImmSet } from 'immutable';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { Keyboard, Piano } from 'react-piano';
-import 'react-piano/dist/styles.css';
 
+import 'react-piano/dist/styles.css';
 import './MidiKeyboard.scss';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;

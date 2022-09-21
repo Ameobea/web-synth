@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ControlPanelCustomComponentProps } from '../types';
+import type { ControlPanelCustomComponentProps } from '../types';
 import './FileUploader.scss';
 
 export interface Value<T = ArrayBuffer> {

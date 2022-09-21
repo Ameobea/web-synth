@@ -3,10 +3,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
 
 import './SampleLibraryUI.scss';
-import useAllSamples, { getSampleDisplayName } from './useAllSamples';
+
 import Loading from 'src/misc/Loading';
 import { getIsSampleCached } from 'src/sampleLibrary/sampleCache';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import useAllSamples, { getSampleDisplayName } from './useAllSamples';
 
 interface PlaySampleIconProps {
   onClick: () => void;

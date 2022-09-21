@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 
 import { onBeforeUnload, reinitializeWithComposition } from '../persistance';
 import './CompositionSharing.scss';
+
 import {
   fetchAllSharedCompositions,
   getExistingCompositionTags,

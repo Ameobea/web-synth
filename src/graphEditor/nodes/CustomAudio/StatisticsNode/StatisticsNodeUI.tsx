@@ -1,5 +1,6 @@
 import { useUniqueId } from 'ameo-utils/util/react';
 import * as Chartist from 'chartist';
+
 import 'chartist/dist/chartist.min.css';
 import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';

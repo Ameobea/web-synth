@@ -6,7 +6,7 @@ import ControlPanel from 'react-control-panel';
 
 import d3 from './d3';
 import './FilterDesigner.scss';
-import Presets from './presets';
+
 import {
   connectFilterChain,
   deserializeFilterDesigner,
@@ -16,6 +16,7 @@ import {
   type FilterGroup,
   setFilter,
 } from 'src/filterDesigner/util';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import FlatButton from 'src/misc/FlatButton';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import {
@@ -24,6 +25,7 @@ import {
   getSettingsForFilterType,
 } from 'src/synthDesigner/filterHelpers';
 import { linearToDb } from 'src/util';
+import Presets from './presets';
 
 const ctx = new AudioContext();
 const DATA_SIZE = 512;
@@ -56,7 +58,7 @@ const FilterInstInner: React.FC<FilterInstProps> = ({
   filterIx,
   frequencyLocked,
   getLockedFrequency,
-  filter: { params, filter },
+  filter: { params, filter, oaps },
   onChange,
   onDelete,
 }) => {
@@ -77,10 +79,10 @@ const FilterInstInner: React.FC<FilterInstProps> = ({
   const handleChange = useCallback(
     (key: string, val: any) => {
       const newParams: FilterParams = { ...params, [key]: val };
-      setFilter(filter, newParams, getLockedFrequency());
+      setFilter(filter, oaps, newParams, getLockedFrequency());
       onChange(groupIx, filterIx, newParams);
     },
-    [filter, groupIx, filterIx, getLockedFrequency, onChange, params]
+    [filter, oaps, groupIx, filterIx, getLockedFrequency, onChange, params]
   );
 
   return (
@@ -142,6 +144,8 @@ const FilterParamsEditorInner: React.FC<FilterParamsEditorProps> = ({
 
 const FilterParamsEditor = React.memo(FilterParamsEditorInner);
 
+const ScratchFilter = ctx.createBiquadFilter();
+
 class FilterDesigner {
   private state: FilterDesignerState;
   private containerId: string;
@@ -164,9 +168,14 @@ class FilterDesigner {
     this.state = newState;
 
     const individualFrequencyResponsesByGroup = this.state.filterGroups.map(group =>
-      group.map(({ filter }) => {
+      group.map(({ filter, oaps }) => {
         const responses = new Float32Array(DATA_SIZE);
-        filter.getFrequencyResponse(FREQUENCIES, responses, new Float32Array(DATA_SIZE));
+        ScratchFilter.frequency.value = oaps.frequency.manualControl.offset.value;
+        ScratchFilter.Q.value = oaps.Q.manualControl.offset.value;
+        ScratchFilter.detune.value = oaps.detune.manualControl.offset.value;
+        ScratchFilter.gain.value = oaps.gain.manualControl.offset.value;
+        ScratchFilter.type = filter.type;
+        ScratchFilter.getFrequencyResponse(FREQUENCIES, responses, new Float32Array(DATA_SIZE));
         return responses;
       })
     );
@@ -336,7 +345,13 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
             disconnectFilterChain(state.filterGroups[groupIx].map(R.prop('filter')));
             const newFilter = new BiquadFilterNode(ctx);
             const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
-            setFilter(newFilter, params, state.lockedFrequencyByGroup[groupIx]);
+            const oaps = {
+              frequency: new OverridableAudioParam(ctx, newFilter.frequency, undefined, true),
+              detune: new OverridableAudioParam(ctx, newFilter.detune, undefined, true),
+              Q: new OverridableAudioParam(ctx, newFilter.Q, undefined, true),
+              gain: new OverridableAudioParam(ctx, newFilter.gain, undefined, true),
+            };
+            setFilter(newFilter, oaps, params, state.lockedFrequencyByGroup[groupIx]);
             const newState = R.set(
               R.lensPath(['filterGroups', groupIx]),
               [
@@ -479,7 +494,7 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
             const wasLocked = !R.isNil(state.lockedFrequencyByGroup[groupIx]);
 
             group.forEach(filter =>
-              setFilter(filter.filter, filter.params, shouldLock ? 440 : null)
+              setFilter(filter.filter, filter.oaps, filter.params, shouldLock ? 440 : null)
             );
 
             if (!shouldLock) {

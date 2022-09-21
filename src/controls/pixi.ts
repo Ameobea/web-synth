@@ -4,6 +4,7 @@ import { Application } from '@pixi/app';
 import { Renderer } from '@pixi/core';
 import { BatchRenderer } from '@pixi/core';
 import { InteractionManager } from '@pixi/interaction';
+
 import '@pixi/mixin-cache-as-bitmap';
 import { TickerPlugin } from '@pixi/ticker';
 import * as utils from '@pixi/utils';

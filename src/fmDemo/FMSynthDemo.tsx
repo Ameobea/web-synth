@@ -2,15 +2,17 @@ import { filterNils, type PromiseResolveType } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import './fmDemo.scss';
+
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import FMSynth, { type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
+
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
@@ -73,7 +75,7 @@ const GlobalState: {
   lastLoadedPreset: undefined,
 };
 
-const root = (ReactDOM as any).createRoot(document.getElementById('root')!);
+const root = createRoot(document.getElementById('root')!);
 
 const environmentIsValid =
   typeof AudioWorkletNode !== 'undefined' && typeof ConstantSourceNode !== 'undefined';

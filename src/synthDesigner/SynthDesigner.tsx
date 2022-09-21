@@ -5,7 +5,7 @@ import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useSelector } from 'react-redux';
 
 import './SynthDesigner.scss';
-import SynthModuleComp from './SynthModule';
+
 import { saveSynthPreset } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { updateConnectables } from 'src/patchNetwork/interface';
@@ -19,6 +19,7 @@ import {
 } from 'src/synthDesigner';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { buildWavyJonesInstance, type WavyJones } from 'src/visualizations/WavyJones';
+import SynthModuleComp from './SynthModule';
 
 interface AddModuleControlsProps {
   stateKey: string;

@@ -4,8 +4,11 @@
   "singleQuote": true,
   "trailingComma": "es5",
   "arrowParens": "avoid",
-  "importOrder": ["<THIRD_PARTY_MODULES>", "(?:src/(.*))|(?:^[./].*$)"],
-  "importOrderSeparation": true,
+  "importOrder": ["<THIRD_PARTY_MODULES>", "", "src/(.*)", "^[./].*$"],
+  "importOrderSeparation": false,
   "importOrderSortSpecifiers": true,
-  "importOrderCaseInsensitive": true
+  "importOrderCaseInsensitive": true,
+  "importOrderMergeDuplicateImports": true,
+  "importOrderParserPlugins": ["typescript", "jsx", "decorators-legacy"],
+  "importOrderBuiltinModulesToTop": true
 }

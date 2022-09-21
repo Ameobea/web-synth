@@ -1,4 +1,5 @@
-import { PropTypesOf, UnreachableException } from 'ameo-utils';
+import { UnreachableException } from 'ameo-utils';
+import type { PropTypesOf } from 'ameo-utils/dist/util/react';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
@@ -7,12 +8,13 @@ import React, { Suspense } from 'react';
 import {
   connectFilterChain,
   deserializeFilterDesigner,
-  FilterDesignerState,
+  type FilterDesignerState,
   serializeFilterDesigner,
   setFilter,
 } from 'src/filterDesigner/util';
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import Loading from 'src/misc/Loading';
-import { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import {
   mkContainerCleanupHelper,
@@ -47,8 +49,18 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
   const filterGroups = [
     filterParams.map(params => {
       const filter = new BiquadFilterNode(ctx);
-      setFilter(filter, params, null);
-      return { params, filter, id: btoa(Math.random().toString()) };
+      filter.frequency.value = 0;
+      filter.detune.value = 0;
+      filter.Q.value = 0;
+      filter.gain.value = 0;
+      const oaps = {
+        frequency: new OverridableAudioParam(ctx, filter.frequency, undefined, true),
+        detune: new OverridableAudioParam(ctx, filter.detune, undefined, true),
+        Q: new OverridableAudioParam(ctx, filter.Q, undefined, true),
+        gain: new OverridableAudioParam(ctx, filter.gain, undefined, true),
+      };
+      setFilter(filter, oaps, params, null);
+      return { params, filter, oaps, id: btoa(Math.random().toString()) };
     }),
   ];
   connectFilterChain(filterGroups[0].map(R.prop('filter')));
@@ -132,12 +144,35 @@ export const get_filter_designer_audio_connectables = (
     return create_empty_audio_connectables(vcId);
   }
 
+  let inputs = ImmMap<string, ConnectableInput>().set('input', {
+    type: 'customAudio',
+    node: state.input,
+  });
+  for (const [groupIx, group] of state.filterGroups.entries()) {
+    // acc
+    //       .set(`synth_${voiceIx}_filter_frequency`, {
+    //         node: synth.filterCSNs.frequency,
+    //         type: 'number',
+    //       })
+    //       .set(`synth_${voiceIx}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' })
+    //       .set(`synth_${voiceIx}_filter_detune`, {
+    //         node: synth.filterCSNs.detune,
+    //         type: 'number',
+    //       })
+    for (const [filterIx, { filter }] of group.entries()) {
+      inputs = inputs
+        .set(`group_${groupIx}_filter_${filterIx}_frequency`, {
+          node: filter.frequency,
+          type: 'number',
+        })
+        .set(`group_${groupIx}_filter_${filterIx}_q`, { node: filter.Q, type: 'number' })
+        .set(`group_${groupIx}_filter_${filterIx}_detune`, { node: filter.detune, type: 'number' });
+    }
+  }
+
   return {
     vcId,
-    inputs: ImmMap<string, ConnectableInput>().set('input', {
-      type: 'customAudio',
-      node: state.input,
-    }),
+    inputs,
     outputs: state.filterGroups.reduce(
       (acc, group, groupIx) =>
         acc.set(`group ${groupIx + 1} output`, {

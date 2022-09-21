@@ -1,11 +1,17 @@
-import 'ace-builds/src-min-noconflict/theme-twilight';
 import React from 'react';
 import ReactAce from 'react-ace';
 
-const CodeEditor: React.FC<{
+// Need to import ace first, so prevent import sorting
+// prettier-ignore
+import 'ace-builds/src-noconflict/ace';
+import 'ace-builds/src-min-noconflict/theme-twilight';
+
+interface CodeEditorProps {
   value: string;
   onChange: (newContent: string) => void;
-}> = ({ value, onChange }) => (
+}
+
+const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange }) => (
   <ReactAce
     theme='twilight'
     mode='text'

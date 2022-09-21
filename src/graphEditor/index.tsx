@@ -1,15 +1,15 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
-import GraphEditor, { saveStateForInstance } from './GraphEditor';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { store } from 'src/redux';
 import { retryAsync } from 'src/util';
+import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
 interface GraphEditorCtx {
   lgraphHandle: any;
-  root: ReactDOM.Root;
+  root: Root;
 }
 
 export const GraphEditorCtxsByVcId: Map<string, GraphEditorCtx> = new Map();
@@ -38,7 +38,7 @@ export const init_graph_editor = (stateKey: string) => {
   document.getElementById('content')!.appendChild(graphEditorBaseNode);
   // Using non-concurrent mode here because concurrent mode makes the canvas dissappear for an
   // instant when changing small views sometimes
-  const root = ReactDOM.createRoot(graphEditorBaseNode);
+  const root = createRoot(graphEditorBaseNode);
   root.render(
     <Provider store={store}>
       <GraphEditor stateKey={stateKey} />

@@ -9,7 +9,6 @@ import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 import type React from 'react';
 
-import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
@@ -37,6 +36,7 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { addNode, removeNode } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getState } from 'src/redux';
+import { LGAudioConnectables } from '../AudioConnectablesNode';
 
 const ctx = new AudioContext();
 

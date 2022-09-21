@@ -4,21 +4,6 @@ import * as R from 'ramda';
 import React, { Suspense } from 'react';
 
 import {
-  buildInitialState,
-  buildSequencerConfig,
-  buildSequencerInputMIDINode,
-  buildSequencerReduxInfra,
-  SchedulerScheme,
-  SequencerInstancesMap,
-} from './redux';
-import type {
-  SequencerEditState,
-  SequencerMark,
-  SequencerReduxInfra,
-  SequencerReduxState,
-  VoiceTarget,
-} from './redux';
-import {
   registerStartCB,
   registerStopCB,
   unregisterStartCB,
@@ -39,6 +24,21 @@ import type { SampleDescriptor } from 'src/sampleLibrary';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
+import {
+  buildInitialState,
+  buildSequencerConfig,
+  buildSequencerInputMIDINode,
+  buildSequencerReduxInfra,
+  SchedulerScheme,
+  SequencerInstancesMap,
+} from './redux';
+import type {
+  SequencerEditState,
+  SequencerMark,
+  SequencerReduxInfra,
+  SequencerReduxState,
+  VoiceTarget,
+} from './redux';
 
 const ctx = new AudioContext();
 

@@ -2,7 +2,6 @@ import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
-import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import {
   buildDefaultQuantizerNodeUIState,
@@ -14,6 +13,7 @@ import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { AsyncOnce, genRandomStringID } from 'src/util';
+import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 
 const QuantizerWasmBytes = new AsyncOnce(() =>
   fetch(

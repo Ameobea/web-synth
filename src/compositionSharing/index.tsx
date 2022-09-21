@@ -1,14 +1,13 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
+import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { store } from '../redux';
 import CompositionSharing from './CompositionSharing';
-import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
-import { getEngine } from 'src/util';
 
 interface CompositionSharingCtx {
-  root: ReactDOM.Root;
+  root: Root;
 }
 
 const CtxsByVcId: Map<string, CompositionSharingCtx> = new Map();
@@ -27,14 +26,10 @@ export const init_composition_sharing = (stateKey: string) => {
 
   document.getElementById('content')!.appendChild(compositionSharingBase);
 
-  const engine = getEngine();
-  if (!engine) {
-    throw new Error('`engine` is unset');
-  }
-  const root = ReactDOM.createRoot(compositionSharingBase);
+  const root = createRoot(compositionSharingBase);
   root.render(
     <Provider store={store}>
-      <CompositionSharing engine={engine} />
+      <CompositionSharing />
     </Provider>
   );
 

@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 
 import GlobalVolumeSlider from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
+
 import {
   getIsGlobalBeatCounterStarted,
   registerStartCB,

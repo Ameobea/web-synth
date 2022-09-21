@@ -1,4 +1,5 @@
 import { startAll, stopAll } from 'src/eventScheduler/eventScheduler';
+import { getGlobalBpm, setGlobalBpm } from 'src/globalMenu/GlobalMenu';
 import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
 import { connect, disconnect } from 'src/patchNetwork/interface';
 import { fetchAndLoadSharedComposition } from 'src/persistance';
@@ -36,5 +37,5 @@ export const initHeadlessWebSynth = async ({
 
   engine.init();
 
-  return { getState, dispatch, startAll, stopAll, disconnect, connect };
+  return { getState, dispatch, startAll, stopAll, disconnect, connect, getGlobalBpm, setGlobalBpm };
 };

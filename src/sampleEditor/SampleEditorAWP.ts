@@ -1,5 +1,5 @@
-import type { SerializedSampleEditorState } from './SampleEditor';
 import { AsyncOnce } from 'src/util';
+import type { SerializedSampleEditorState } from './SampleEditor';
 
 const ctx = new AudioContext();
 

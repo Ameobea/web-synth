@@ -4,7 +4,6 @@ import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import type { Writable } from 'svelte/store';
 
-import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
 import { renderModalWithControls } from 'src/controls/Modal';
 import ConfigureEffects, {
   type AdsrChangeHandler,
@@ -20,6 +19,7 @@ import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSyn
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
+import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
 
 /**
  * The algorithm used to produce the output for the operator.

@@ -1,9 +1,7 @@
 import * as React from 'react';
-import * as ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
-import { getState, store } from './redux';
-import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
 import {
   fetchAndLoadSharedComposition,
@@ -13,6 +11,8 @@ import {
 import { initSentry } from 'src/sentry';
 import { setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
+import { getState, store } from './redux';
+import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 
 const wasm = import('./engine');
 
@@ -27,13 +27,13 @@ document.addEventListener('touchstart', () => ctx.resume(), { once: true });
 document.addEventListener('touchend', () => ctx.resume(), { once: true });
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
-  ReactDOM.createRoot(document.getElementById('view-context-manager')!).render(
+  createRoot(document.getElementById('view-context-manager')!).render(
     <Provider store={store}>
       <ViewContextManager engine={engine} />
     </Provider>
   );
 
-  ReactDOM.createRoot(document.getElementById('view-context-switcher')!).render(
+  createRoot(document.getElementById('view-context-switcher')!).render(
     <Provider store={store}>
       <ViewContextSwitcher engine={engine} />
     </Provider>

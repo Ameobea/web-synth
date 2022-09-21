@@ -84,7 +84,7 @@ const filterSettings = {
     type: 'range',
     label: 'frequency',
     min: 10,
-    max: 24000,
+    max: 22050,
     initial: 4400,
     scale: 'log',
     steps: 1000,

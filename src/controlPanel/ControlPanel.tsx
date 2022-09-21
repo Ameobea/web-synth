@@ -5,6 +5,7 @@ import * as R from 'ramda';
 import React, { Suspense } from 'react';
 
 import './ControlPanel.scss';
+
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import Loading from 'src/misc/Loading';
 import type {

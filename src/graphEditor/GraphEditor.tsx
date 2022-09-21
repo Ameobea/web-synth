@@ -4,6 +4,7 @@
  */
 import { filterNils, UnreachableException } from 'ameo-utils';
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph } from 'litegraph.js';
+
 import 'litegraph.js/css/litegraph.css';
 import * as R from 'ramda';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import ControlPanel from 'react-control-panel';
 import { useSelector } from 'react-redux';
 
 import './GraphEditor.scss';
-import { registerAllCustomNodes } from './nodes';
+
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
@@ -25,6 +26,7 @@ import {
   registerVcHideCb,
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
+import { registerAllCustomNodes } from './nodes';
 
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
 const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;

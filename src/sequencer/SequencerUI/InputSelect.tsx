@@ -5,12 +5,12 @@ import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import { shallowEqual, useSelector } from 'react-redux';
 
-import type { SequencerReduxInfra, VoiceTarget } from '../redux';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { getSample } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
 import { truncateWithElipsis } from 'src/util';
+import type { SequencerReduxInfra, VoiceTarget } from '../redux';
 
 interface InputCompCommonProps<T> extends SequencerReduxInfra {
   voiceIx: number;

@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
+
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';

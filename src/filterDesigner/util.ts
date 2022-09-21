@@ -1,12 +1,20 @@
 import * as R from 'ramda';
 
+import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { FilterType } from 'src/synthDesigner/filterHelpers';
 
 const ctx = new AudioContext();
 
 export interface FilterDescriptor {
   params: FilterParams;
   filter: BiquadFilterNode;
+  oaps: {
+    frequency: OverridableAudioParam;
+    detune: OverridableAudioParam;
+    Q: OverridableAudioParam;
+    gain: OverridableAudioParam;
+  };
   id: string;
 }
 export type FilterGroup = FilterDescriptor[];
@@ -39,8 +47,18 @@ export const deserializeFilterDesigner = (
   const filterGroups = parsed.filterGroups.map((group, groupIx) => {
     const activatedGroup = group.map(params => {
       const filter = new BiquadFilterNode(ctx);
-      setFilter(filter, params, parsed.lockedFrequencyByGroup?.[groupIx] ?? params.frequency);
-      return { params, filter, id: btoa(Math.random().toString()) };
+      filter.frequency.value = 0;
+      filter.detune.value = 0;
+      filter.Q.value = 0;
+      filter.gain.value = 0;
+      const oaps = {
+        frequency: new OverridableAudioParam(ctx, filter.frequency, undefined, true),
+        detune: new OverridableAudioParam(ctx, filter.detune, undefined, true),
+        Q: new OverridableAudioParam(ctx, filter.Q, undefined, true),
+        gain: new OverridableAudioParam(ctx, filter.gain, undefined, true),
+      };
+      setFilter(filter, oaps, params, parsed.lockedFrequencyByGroup?.[groupIx] ?? params.frequency);
+      return { params, filter, oaps, id: btoa(Math.random().toString()) };
     });
 
     connectFilterChain(activatedGroup.map(R.prop('filter')));
@@ -57,17 +75,45 @@ export const deserializeFilterDesigner = (
 
 export const setFilter = (
   filter: BiquadFilterNode,
+  oaps: FilterDescriptor['oaps'] | undefined,
   params: FilterParams,
   lockedFrequency: number | null | undefined
 ) => {
-  filter.type = params.type;
-  filter.Q.value = params.Q ?? 0;
-  filter.detune.value = params.detune;
-  filter.gain.value = params.gain;
-  if (!R.isNil(lockedFrequency)) {
-    filter.frequency.value = lockedFrequency;
+  if (
+    params.type === FilterType.HP4 ||
+    params.type === FilterType.HP8 ||
+    params.type === FilterType.HP16 ||
+    params.type === FilterType.LP4 ||
+    params.type === FilterType.LP8 ||
+    params.type === FilterType.LP16
+  ) {
+    console.error('Filter type not supported', params.type);
   } else {
-    filter.frequency.value = params.frequency;
+    filter.type = params.type;
+  }
+
+  if (oaps) {
+    oaps.detune.manualControl.offset.value = params.detune;
+    oaps.Q.manualControl.offset.value = params.Q ?? 1;
+    oaps.gain.manualControl.offset.value = params.gain;
+  } else {
+    filter.detune.value = params.detune;
+    filter.Q.value = params.Q ?? 1;
+    filter.gain.value = params.gain;
+  }
+
+  if (!R.isNil(lockedFrequency)) {
+    if (oaps) {
+      oaps.frequency.manualControl.offset.value = lockedFrequency;
+    } else {
+      filter.frequency.value = lockedFrequency;
+    }
+  } else {
+    if (oaps) {
+      oaps.frequency.manualControl.offset.value = params.frequency;
+    } else {
+      filter.frequency.value = params.frequency;
+    }
   }
 };
 

@@ -2,6 +2,7 @@ import * as R from 'ramda';
 import React, { useState } from 'react';
 
 import './GlobalMenu.scss';
+
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
 import { reinitializeWithComposition, serializeAndDownloadComposition } from 'src/persistance';
 import { getState } from 'src/redux';
@@ -27,7 +28,7 @@ globalTempoCSN.start();
 
 export const getGlobalBpm = () => globalTempoCSN.offset.value;
 
-const setGlobalTempo = (newGlobalTempo: number) => {
+export const setGlobalBpm = (newGlobalTempo: number) => {
   globalTempoCSN.offset.value = newGlobalTempo;
   localStorage.globalTempo = newGlobalTempo.toFixed(1);
 };
@@ -47,7 +48,7 @@ const GlobalTempoControl: React.FC = () => {
 
           if (!Number.isNaN(parsed)) {
             parsed = R.clamp(0.5, 1200, parsed);
-            setGlobalTempo(parsed);
+            setGlobalBpm(parsed);
             setTempo(parsed.toFixed(1));
           } else {
             setTempo(value);

@@ -1,5 +1,5 @@
 import React from 'react';
-import * as ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import './Modal.scss';
 
@@ -33,7 +33,7 @@ export function renderModalWithControls<T>(
       }
     });
   }
-  const root = ReactDOM.createRoot(modalNode);
+  const root = createRoot(modalNode);
 
   // Render the component into the modal and wait for its callback to be triggered
   return new Promise((resolve, reject) => {

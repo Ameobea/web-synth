@@ -5,6 +5,7 @@ import type { Writable } from 'svelte/store';
 
 import ConfigureOperator, { type OperatorConfig, type WavetableState } from './ConfigureOperator';
 import './FMSynth.scss';
+
 import ConfigureEffects, {
   type AdsrChangeHandler,
   type Effect,

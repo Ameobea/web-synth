@@ -126,7 +126,8 @@ export const parseLooperTransitionAlgorithmUIState = (
     case 'constant':
       return { type: 'success', value: { type: 'constant', bankIx: activeBankIx ?? -1 } };
     case 'staticPattern':
-      let spl = uiState.staticPattern.pattern.split(',').map(v => Number.parseInt(v));
+      // split at commas and spaces
+      let spl = uiState.staticPattern.pattern.split(/[\s,]+/).map(v => Number.parseInt(v));
       if (spl.some(Number.isNaN)) {
         return {
           type: 'error',

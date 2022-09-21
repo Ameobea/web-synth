@@ -27,7 +27,7 @@ build-sinsy:
   # cd src/vocalSynthesis && just build
   # cp src/vocalSynthesis/build/sinsy.* ./public
 
-remove-annoying-litegraph-warning:
+fix-litegraph:
   #!/usr/bin/env bash
   set -euxo pipefail
   if ! command -v gsed &> /dev/null
@@ -37,8 +37,18 @@ remove-annoying-litegraph-warning:
       gsed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
   fi
 
+  # https://github.com/jagenjo/litegraph.js/pull/287
+  if ! command -v gsed &> /dev/null
+  then
+      sed -i '/e.deltaX = e.localX - this.last_mouse_position\[0\];/c\// e.deltaX = e.localX - this.last_mouse_position[0];' node_modules/litegraph.js/build/litegraph.js
+      sed -i '/e.deltaY = e.localY - this.last_mouse_position\[1\];/c\// e.deltaY = e.localY - this.last_mouse_position[1];' node_modules/litegraph.js/build/litegraph.js
+  else
+      gsed -i '/e.deltaX = e.localX - this.last_mouse_position\[0\];/c\// e.deltaX = e.localX - this.last_mouse_position[0];' node_modules/litegraph.js/build/litegraph.js
+      gsed -i '/e.deltaY = e.localY - this.last_mouse_position\[1\];/c\// e.deltaY = e.localY - this.last_mouse_position[1];' node_modules/litegraph.js/build/litegraph.js
+  fi
+
 build-all:
-  just remove-annoying-litegraph-warning
+  just fix-litegraph
 
   cd engine \
     && ./release.sh \
@@ -84,7 +94,7 @@ build-headless:
 run:
   #!/bin/bash
 
-  just remove-annoying-litegraph-warning
+  just fix-litegraph
 
   cd engine \
     && ./release.sh \

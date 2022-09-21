@@ -1,10 +1,9 @@
 import { Option, Try } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
-import SynthDesigner from './SynthDesigner';
 import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -21,6 +20,7 @@ import {
 } from 'src/redux/modules/synthDesigner';
 import buildSynthDesignerRedux from 'src/redux/modules/synthDesigner';
 import { AsyncOnce } from 'src/util';
+import SynthDesigner from './SynthDesigner';
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
 
@@ -97,7 +97,7 @@ export const init_synth_designer = (stateKey: string) => {
   // Mount the newly created Faust editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(synthDesignerBase);
 
-  const reactRoot = ReactDOM.createRoot(synthDesignerBase);
+  const reactRoot = createRoot(synthDesignerBase);
   reactRoot.render(
     <Provider store={reduxInfra.store}>
       <SynthDesigner stateKey={stateKey} />

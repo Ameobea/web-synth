@@ -5,7 +5,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual } from 'react-redux';
 
-import FilterModule from './Filter';
 import { saveSynthVoicePreset } from 'src/api';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
@@ -17,6 +16,7 @@ import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { getSynthDesignerReduxInfra, SynthModule } from 'src/redux/modules/synthDesigner';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
 import { msToSamples, samplesToMs } from 'src/util';
+import FilterModule from './Filter';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 

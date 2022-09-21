@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Provider, useStore } from 'react-redux';
 import type { AnyAction, Store } from 'redux';
@@ -30,7 +30,7 @@ interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<an
   enableReactQuery?: boolean;
 }
 
-const RootsByID: Map<string, ReactDOM.Root> = new Map();
+const RootsByID: Map<string, Root> = new Map();
 
 /**
  * Higher order function that returns a function that handles rendering the provided `Comp` into the container with the
@@ -53,7 +53,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
     const props = getProps();
 
     // Check to see if we've already created a root for this node
-    let root: ReactDOM.Root;
+    let root: Root;
     const existingRootID = node.getAttribute('data-react-root-id');
     if (existingRootID) {
       root = RootsByID.get(existingRootID)!;
@@ -63,7 +63,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
         );
       }
     } else {
-      root = ReactDOM.createRoot(node);
+      root = createRoot(node);
       const rootID = genRandomStringID();
       node.setAttribute('data-react-root-id', rootID);
       RootsByID.set(rootID, root);

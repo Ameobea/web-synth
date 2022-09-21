@@ -4,6 +4,11 @@
 import React, { useState } from 'react';
 import type { ListChildComponentProps } from 'react-window';
 
+import { renderModalWithControls } from 'src/controls/Modal';
+import BasicModal from 'src/misc/BasicModal';
+import FlatButton from 'src/misc/FlatButton';
+import { withReactQueryClient } from 'src/reactUtils';
+import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import {
   LoadSamplesButtons,
   MkSampleListingRowRendererArgs,
@@ -11,11 +16,6 @@ import {
   SampleRow,
 } from './SampleLibraryUI';
 import useAllSamples from './useAllSamples';
-import { renderModalWithControls } from 'src/controls/Modal';
-import BasicModal from 'src/misc/BasicModal';
-import FlatButton from 'src/misc/FlatButton';
-import { withReactQueryClient } from 'src/reactUtils';
-import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 
 const mkSampleListingRowRenderer = ({
   sampleDescriptors,
