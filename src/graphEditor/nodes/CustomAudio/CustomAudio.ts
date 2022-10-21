@@ -36,6 +36,7 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { addNode, removeNode } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getState } from 'src/redux';
+import type { SampleDescriptor } from 'src/sampleLibrary';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 
 const ctx = new AudioContext();
@@ -62,6 +63,7 @@ export interface ForeignNode<T = any> {
   };
   renderSmallView?: (domId: string) => void;
   cleanupSmallView?: (domId: string) => void;
+  listUsedSamples?: () => SampleDescriptor[];
 }
 
 interface EnhanceAudioNodeParams<T> {
@@ -82,6 +84,7 @@ interface EnhanceAudioNodeParams<T> {
   }[];
   paramKeys: string[];
   SmallViewRenderer?: React.FC<{ node: ForeignNode<T> }>;
+  listUsedSamples?: (node: T) => SampleDescriptor[];
 }
 
 /**
@@ -106,6 +109,7 @@ const enhanceAudioNode = <T>({
   getOverridableParams,
   paramKeys,
   SmallViewRenderer,
+  listUsedSamples,
 }: EnhanceAudioNodeParams<T>): (new (
   ctx: AudioContext,
   vcId: string,
@@ -119,6 +123,7 @@ const enhanceAudioNode = <T>({
     static typeName = name;
     public node: T;
     public lgNode?: any;
+    public listUsedSamples: () => SampleDescriptor[] = () => [];
 
     public paramOverrides: {
       [name: string]: {
@@ -148,6 +153,10 @@ const enhanceAudioNode = <T>({
       this.lgNode = lgNode;
       this.ctx = ctx;
 
+      if ((this.node as any).start) {
+        (this.node as any).start();
+      }
+
       if (SmallViewRenderer) {
         this.renderSmallView = mkContainerRenderHelper({
           Comp: SmallViewRenderer,
@@ -155,6 +164,7 @@ const enhanceAudioNode = <T>({
         });
         this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
       }
+      this.listUsedSamples = listUsedSamples ? () => listUsedSamples(this.node) : () => [];
 
       this.paramOverrides = getOverridableParams(this.node).reduce(
         (acc, { name, param, defaultValue }) => {
@@ -164,6 +174,7 @@ const enhanceAudioNode = <T>({
           }
           override.start();
           const overridableParam = new OverridableAudioParam(this.ctx, param, override);
+          param.value = 0;
 
           return { ...acc, [name]: { param: overridableParam, override } };
         },
@@ -265,7 +276,9 @@ const CustomConstantSourceNode = enhanceAudioNode({
     }),
     node: foreignNode,
   }),
-  getOverridableParams: (node: ConstantSourceNode) => [{ name: 'offset', param: node.offset }],
+  getOverridableParams: (node: ConstantSourceNode) => [
+    { name: 'offset', param: node.offset, defaultValue: 0 },
+  ],
   paramKeys: ['offset'],
   SmallViewRenderer: CSNSmallView,
 });

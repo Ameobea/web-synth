@@ -103,6 +103,11 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
       sampleBufPtr / BYTES_PER_F32 + sampleData.length
     );
     buf.set(sampleData);
+    this.wasmInstance.exports.on_sample_data_set(this.ctxPtr, voiceIx);
+  }
+
+  setSampleCrossfadeParams(voiceIx, enabled, threshold) {
+    this.wasmInstance.exports.set_sample_crossfade_params(this.ctxPtr, voiceIx, enabled, threshold);
   }
 
   handleMessage(data) {
@@ -133,6 +138,10 @@ class SamplePlayerAWP extends AudioWorkletProcessor {
       }
       case 'setSampleData': {
         this.setSampleData(data.voiceIx, data.sampleData);
+        break;
+      }
+      case 'setSampleCrossfadeParams': {
+        this.setSampleCrossfadeParams(data.voiceIx, data.enabled, data.threshold);
         break;
       }
       default: {

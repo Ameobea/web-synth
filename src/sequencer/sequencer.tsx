@@ -414,7 +414,6 @@ export const sequencer_list_used_samples = (stateKey: string): SampleDescriptor[
       );
       return [];
     }
-    return [];
   }
 
   return filterNils(

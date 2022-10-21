@@ -1,6 +1,7 @@
 import { initPatchNetwork } from 'src/patchNetwork';
 import type { ConnectableDescriptor } from 'src/patchNetwork';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
+import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getEngine, tryParseJson } from 'src/util';
 import { onVcHideStatusChange } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { actionCreators, dispatch, getState } from './redux';
@@ -79,4 +80,19 @@ export const set_active_vc_ix = (newActiveVxIx: number) => {
   onVcHideStatusChange(newActiveVcId, false);
 
   dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_IX(newActiveVxIx));
+};
+
+export const list_foreign_node_used_samples = (id: string): SampleDescriptor[] => {
+  const connectables = getState().viewContextManager.patchNetwork.connectables.get(id);
+  if (!connectables) {
+    console.error(`Foreign node connectables with ID ${id} not found.`);
+    return [];
+  }
+
+  if (!connectables.node) {
+    console.error(`Foreign node with ID ${id} connectables has no node.`);
+    return [];
+  }
+
+  return connectables.node.listUsedSamples?.() ?? [];
 };

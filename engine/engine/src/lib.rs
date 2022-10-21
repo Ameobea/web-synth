@@ -188,9 +188,17 @@ pub fn cleanup_small_view(vc_id: &str, target_dom_id: &str) {
 /// can't be due to limitations of the API's use of `JsValue`.
 #[wasm_bindgen]
 pub fn get_active_samples() -> Vec<JsValue> {
-    get_vcm()
+    let vcm = get_vcm();
+    let mut active_samples: Vec<_> = vcm
         .contexts
         .iter()
         .flat_map(|vc| vc.context.list_used_samples().into_iter())
-        .collect()
+        .collect();
+
+    let foreign_connectables_used_samples = vcm
+        .foreign_connectables
+        .iter()
+        .flat_map(|fc| js::list_foreign_node_used_samples(&fc.id));
+    active_samples.extend(foreign_connectables_used_samples);
+    active_samples
 }

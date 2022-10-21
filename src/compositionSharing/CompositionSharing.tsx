@@ -13,14 +13,14 @@ import {
 } from 'src/api';
 import {
   pickPresetWithModal,
-  PresetDescriptor,
+  type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
-import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
-import { getSample, SampleDescriptor } from 'src/sampleLibrary';
+import { getSample, type SampleDescriptor } from 'src/sampleLibrary';
 import { getEngine } from 'src/util';
 
 export interface CompositionDefinition {

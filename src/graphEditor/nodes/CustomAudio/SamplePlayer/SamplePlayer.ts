@@ -20,10 +20,16 @@ export const SamplePlayerWasmBytes = new AsyncOnce(() =>
   ).then(res => res.arrayBuffer())
 );
 
+export interface SampleCrossfadeParams {
+  enabled: boolean;
+  threshold: number;
+}
+
 export interface SamplePlayerSampleDescriptor {
   id: string;
   descriptor: SampleDescriptor;
   sample: AudioBuffer | null;
+  crossfadeParams: SampleCrossfadeParams;
   gain: number;
 }
 
@@ -37,6 +43,9 @@ export default class SamplePlayerNode implements ForeignNode {
   private sampleDescriptors: SamplePlayerSampleDescriptor[] = [];
   private inputGainNodes: { param: OverridableAudioParam }[] = [];
   private awpHandle: AudioWorkletNode | null = null;
+
+  public listUsedSamples: () => SampleDescriptor[] = () =>
+    this.sampleDescriptors.map(d => d.descriptor);
 
   static typeName = 'Sample Player';
   public nodeType = 'customAudio/samplePlayer';
@@ -59,6 +68,7 @@ export default class SamplePlayerNode implements ForeignNode {
         addSample: this.addSample.bind(this),
         removeSample: this.removeSample.bind(this),
         setSampleGain: this.setSampleGain.bind(this),
+        setSampleCrossfadeParams: this.setSampleCrossfadeParams.bind(this),
         setSampleDescriptor: this.setSampleDescriptor.bind(this),
         initialState: [...this.sampleDescriptors],
       }),
@@ -94,7 +104,17 @@ export default class SamplePlayerNode implements ForeignNode {
       initialSampleDescriptors: this.sampleDescriptors.map(slot => ({
         gain: slot.gain,
         sampleData: slot.sample?.getChannelData(0),
+        crossfadeParams: slot.crossfadeParams,
       })),
+    });
+
+    this.sampleDescriptors.forEach((desc, i) => {
+      this.awpHandle!.port.postMessage({
+        type: 'setSampleCrossfadeParams',
+        voiceIx: i,
+        enabled: desc.crossfadeParams.enabled,
+        threshold: desc.crossfadeParams.threshold,
+      });
     });
 
     if (!R.isNil(this.vcId)) {
@@ -118,8 +138,22 @@ export default class SamplePlayerNode implements ForeignNode {
       });
   }
 
-  private addSample(descriptor: SampleDescriptor, id: string, gain?: number) {
-    this.sampleDescriptors.push({ id, descriptor, sample: null, gain: gain ?? 1 });
+  private addSample(
+    descriptor: SampleDescriptor,
+    id: string,
+    gain?: number,
+    crossfadeParams?: SampleCrossfadeParams
+  ) {
+    this.sampleDescriptors.push({
+      id,
+      descriptor,
+      sample: null,
+      gain: gain ?? 1,
+      crossfadeParams: crossfadeParams ?? {
+        enabled: false,
+        threshold: 0,
+      },
+    });
 
     if (this.awpHandle) {
       const gainOAP = new OverridableAudioParam(
@@ -138,6 +172,17 @@ export default class SamplePlayerNode implements ForeignNode {
     if (!R.isNil(this.vcId)) {
       updateConnectables(this.vcId, this.buildConnectables());
     }
+  }
+
+  private setSampleCrossfadeParams(voiceIx: number, crossfadeParams: SampleCrossfadeParams) {
+    this.sampleDescriptors[voiceIx].crossfadeParams = crossfadeParams;
+
+    this.awpHandle?.port.postMessage({
+      type: 'setSampleCrossfadeParams',
+      voiceIx,
+      enabled: crossfadeParams.enabled,
+      threshold: crossfadeParams.threshold,
+    });
   }
 
   private removeSample(index: number) {
@@ -164,8 +209,20 @@ export default class SamplePlayerNode implements ForeignNode {
   private deserialize(params: { [key: string]: any }) {
     if (params.sampleDescriptors) {
       params.sampleDescriptors.forEach(
-        (descriptor: ArrayElementOf<SerializedSamplePlayer['sampleDescriptors']>) =>
-          this.addSample(descriptor.descriptor, btoa(Math.random().toString()), descriptor.gain)
+        (descriptor: ArrayElementOf<SerializedSamplePlayer['sampleDescriptors']>) => {
+          if (!descriptor.crossfadeParams) {
+            descriptor.crossfadeParams = {
+              enabled: false,
+              threshold: 0,
+            };
+          }
+          this.addSample(
+            descriptor.descriptor,
+            btoa(Math.random().toString()),
+            descriptor.gain,
+            descriptor.crossfadeParams
+          );
+        }
       );
     }
   }

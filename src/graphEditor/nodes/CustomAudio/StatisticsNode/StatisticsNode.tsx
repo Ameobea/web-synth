@@ -95,7 +95,13 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
     });
 
     this.cleanupSmallView = mkContainerCleanupHelper({
-      predicate: () => this.gainNode.disconnect(this.ctx.destination),
+      predicate: () => {
+        try {
+          this.gainNode.disconnect(this.ctx.destination);
+        } catch (_err) {
+          /* pass */
+        }
+      },
       preserveRoot: true,
     });
   }

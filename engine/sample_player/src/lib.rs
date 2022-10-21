@@ -9,8 +9,16 @@ pub struct Playhead {
     pub playback_speed: f32,
 }
 
+#[derive(Default)]
+pub struct CrossfadeParams {
+    pub enabled: bool,
+    pub threshold: f32,
+}
+
 pub struct SampleDescriptor {
     pub sample_buffer: Vec<f32>,
+    pub crossfade_params: CrossfadeParams,
+    pub crossfaded_sample_buffer: Vec<f32>,
     pub is_gated: bool,
     pub playheads: Vec<Playhead>,
 }
@@ -19,27 +27,40 @@ impl Default for SampleDescriptor {
     fn default() -> Self {
         SampleDescriptor {
             sample_buffer: Vec::new(),
-            is_gated: true,
+            crossfade_params: CrossfadeParams::default(),
+            crossfaded_sample_buffer: Vec::new(),
+            is_gated: false,
             playheads: Vec::new(),
         }
     }
 }
 
 impl SampleDescriptor {
+    #[inline(never)]
     pub fn get_sample(&mut self) -> f32 {
         let mut sample = 0.;
+
+        let sample_buf = if self.crossfade_params.enabled {
+            &self.crossfaded_sample_buffer
+        } else {
+            &self.sample_buffer
+        };
 
         let mut i = 0;
         while i < self.playheads.len() {
             let mut new_playhead = self.playheads[i];
             new_playhead.pos += new_playhead.playback_speed;
-            if new_playhead.pos > (self.sample_buffer.len() - 1) as f32 {
-                self.playheads.swap_remove(i);
-                continue;
+            if new_playhead.pos > (sample_buf.len() - 2) as f32 {
+                if self.crossfade_params.enabled {
+                    new_playhead.pos = new_playhead.pos - (sample_buf.len() - 2) as f32;
+                } else {
+                    self.playheads.swap_remove(i);
+                    continue;
+                }
             }
 
             self.playheads[i] = new_playhead;
-            sample += dsp::read_interpolated(&self.sample_buffer, new_playhead.pos);
+            sample += dsp::read_interpolated(sample_buf, new_playhead.pos);
             i += 1;
         }
 
@@ -143,6 +164,60 @@ pub extern "C" fn remove_sample(ctx: *mut SamplePlayerCtx, voice_ix: usize) {
     ctx.voices.remove(voice_ix);
 }
 
+fn gen_crossfaded_sample_buffer(sample_buffer: &[f32], threshold: f32) -> Vec<f32> {
+    let half_threshold = threshold / 2.;
+    let mut crossfaded_sample_buffer = Vec::with_capacity(sample_buffer.len());
+    let sample_count = sample_buffer.len() as f32;
+
+    for i in 0..sample_buffer.len() {
+        let sample = if i < (half_threshold * sample_count) as usize {
+            let factor = i as f32 / (half_threshold * sample_count);
+            let base_sample = sample_buffer[i] * factor;
+            let other_end_ix = sample_buffer.len() - i - 1;
+            let other_end_sample = sample_buffer[other_end_ix] * (1. - factor);
+            base_sample + other_end_sample
+        } else if i > (sample_count - half_threshold * sample_count) as usize {
+            let factor = (sample_buffer.len() - i) as f32 / (half_threshold * sample_count);
+            let base_sample = sample_buffer[i] * factor;
+            let other_end_ix = sample_buffer.len() - i - 1;
+            let other_end_sample = sample_buffer[other_end_ix] * (1. - factor);
+            base_sample + other_end_sample
+        } else {
+            sample_buffer[i]
+        };
+        crossfaded_sample_buffer.push(sample);
+    }
+
+    crossfaded_sample_buffer
+}
+
+#[no_mangle]
+pub extern "C" fn set_sample_crossfade_params(
+    ctx: *mut SamplePlayerCtx,
+    voice_ix: usize,
+    enabled: bool,
+    threshold: f32,
+) {
+    let ctx = unsafe { &mut *ctx };
+
+    if ctx.voices.get(voice_ix).is_none() {
+        panic!(
+            "Tried to set crossfade params for sample at index={} but only {} samples exist",
+            voice_ix,
+            ctx.voices.len()
+        );
+    }
+
+    let voice = &mut ctx.voices[voice_ix];
+    voice.crossfade_params.enabled = enabled;
+    voice.crossfade_params.threshold = threshold;
+
+    if enabled && voice.sample_buffer.len() > 0 {
+        voice.crossfaded_sample_buffer =
+            gen_crossfaded_sample_buffer(&voice.sample_buffer, threshold);
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn get_sample_buf_ptr(
     ctx: *mut SamplePlayerCtx,
@@ -161,4 +236,15 @@ pub extern "C" fn get_sample_buf_ptr(
     sample.playheads.clear();
 
     sample.sample_buffer.as_mut_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn on_sample_data_set(ctx: *mut SamplePlayerCtx, sample_ix: usize) {
+    let ctx = unsafe { &mut *ctx };
+    let sample = &mut ctx.voices[sample_ix];
+
+    if sample.crossfade_params.enabled {
+        sample.crossfaded_sample_buffer =
+            gen_crossfaded_sample_buffer(&sample.sample_buffer, sample.crossfade_params.threshold);
+    }
 }

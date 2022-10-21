@@ -225,6 +225,10 @@ build-sample-player:
   cd ./engine/sample_player && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/sample_player.wasm ../../public
 
+debug-sample-player:
+  cd ./engine/sample_player && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/sample_player.wasm ../../public
+
 build-wav-decoder:
   cd ./engine/wav_decoder && cargo build --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/wav_decoder.wasm --browser --remove-producers-section --out-dir ./engine/build

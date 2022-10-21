@@ -13,6 +13,7 @@ extern "C" {
     pub fn add_view_context(id: &str, name: &str);
     pub fn delete_view_context(id: &str);
     pub fn set_active_vc_ix(new_ix: usize);
+    pub fn list_foreign_node_used_samples(id: &str) -> Vec<JsValue>;
 }
 
 #[wasm_bindgen(raw_module = "./grid")]

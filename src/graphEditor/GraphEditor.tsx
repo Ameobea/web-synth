@@ -17,7 +17,7 @@ import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
-import { getState, ReduxStore } from 'src/redux';
+import { getState, type ReduxStore } from 'src/redux';
 import { tryParseJson } from 'src/util';
 import { getEngine } from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
@@ -105,7 +105,7 @@ const GraphEditorInstances: Map<string, LGraph> = new Map();
 export const saveStateForInstance = (stateKey: string) => {
   const instance = GraphEditorInstances.get(stateKey);
   if (!instance) {
-    console.error(`No entry in \`instanceCbs\` for instance with stateKey "${stateKey}"`);
+    console.error(`No entry in \`GraphEditorInstances\` for instance with stateKey "${stateKey}"`);
     return;
   }
 
