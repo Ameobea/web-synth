@@ -5,7 +5,7 @@ import ControlPanel from 'react-control-panel';
 
 import * as PIXI from 'src/controls/pixi';
 import { makeDraggable } from 'src/controls/pixiUtils';
-import { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { mkLinearToLog } from 'src/util';
 import {
   getIsVcHidden,

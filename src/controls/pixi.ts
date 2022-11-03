@@ -1,8 +1,7 @@
 // Application plugins
 import { Application } from '@pixi/app';
 // Renderer plugins
-import { Renderer } from '@pixi/core';
-import { BatchRenderer } from '@pixi/core';
+import { BatchRenderer, Renderer } from '@pixi/core';
 import { InteractionManager } from '@pixi/interaction';
 
 import '@pixi/mixin-cache-as-bitmap';
