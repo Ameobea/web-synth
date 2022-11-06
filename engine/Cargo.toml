@@ -21,7 +21,8 @@ members = [
   "looper",
   "midi_quantizer",
   "quantizer",
-  "wbg_logging"
+  "wbg_logging",
+  "compressor"
 ]
 
 [profile.release]

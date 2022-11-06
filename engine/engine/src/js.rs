@@ -16,40 +16,6 @@ extern "C" {
     pub fn list_foreign_node_used_samples(id: &str) -> Vec<JsValue>;
 }
 
-#[wasm_bindgen(raw_module = "./grid")]
-extern "C" {
-    pub fn render_quad(
-        canvas_index: usize,
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-        class: &str,
-        dom_id: Option<usize>,
-    ) -> usize;
-    pub fn render_line(
-        canvas_index: usize,
-        x1: usize,
-        y1: usize,
-        x2: usize,
-        y2: usize,
-        class: &str,
-    ) -> usize;
-    pub fn get_active_attr(key: &str) -> Option<String>;
-    pub fn set_active_attr(key: &str, val: &str);
-    pub fn set_attr(id: usize, key: &str, val: &str);
-    pub fn get_attr(id: usize, key: &str) -> Option<String>;
-    pub fn del_attr(id: usize, key: &str);
-    pub fn add_class(id: usize, className: &str);
-    pub fn remove_class(id: usize, className: &str);
-    pub fn delete_element(id: usize);
-
-    pub fn init_grid(vc_id: &str);
-    pub fn cleanup_grid(vc_id: &str);
-    pub fn hide_grid(vc_id: &str);
-    pub fn unhide_grid(vc_id: &str);
-}
-
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = localStorage)]

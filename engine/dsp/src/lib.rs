@@ -105,6 +105,21 @@ pub fn midi_number_to_frequency(midi_number: usize) -> f32 {
     (2.0f32).powf((midi_number as f32 - 69.) / 12.) * 440.
 }
 
+pub fn linear_to_db(res: f32) -> f32 {
+    let db = 20. * res.ln() / std::f32::consts::LN_10;
+    if db > 100. {
+        return 100.;
+    } else if db < -100. {
+        return -100.;
+    }
+
+    if db.is_nan() {
+        -100.
+    } else {
+        db
+    }
+}
+
 #[test]
 fn test_quantize() {
     assert_eq!(quantize(0., 100., 10., 0.2), 0.);

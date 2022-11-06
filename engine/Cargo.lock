@@ -58,6 +58,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "compressor"
+version = "0.1.0"
+dependencies = [
+ "dsp",
+]
+
+[[package]]
 name = "console_error_panic_hook"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

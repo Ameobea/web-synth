@@ -76,6 +76,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -130,6 +131,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
 
   just debug-sinsy
 
@@ -249,3 +251,7 @@ build-midi-quantizer:
 build-quantizer:
   cd ./engine/quantizer && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/quantizer.wasm ../../public
+
+build-compressor:
+  cd ./engine/compressor && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/compressor.wasm ../../public

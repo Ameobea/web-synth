@@ -46,3 +46,4 @@ public/quantizer.wasm
 public/spectrum_viz.wasm
 public/wav_decoder.wasm
 public/waveform_renderer.wasm
+public/compressor.wasm
