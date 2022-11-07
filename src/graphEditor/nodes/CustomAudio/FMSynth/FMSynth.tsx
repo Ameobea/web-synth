@@ -523,6 +523,7 @@ export default class FMSynth implements ForeignNode {
           'tuned sample': 8,
         }[config.type] + (unisonEnabled ? 50 : 0),
       unison: unison ?? 1,
+      unisonPhaseRandomizationEnabled: (config as any).unisonPhaseRandomization?.enabled ?? false,
       ...(() => {
         switch (config.type) {
           case 'exponential oscillator':
@@ -825,18 +826,17 @@ export default class FMSynth implements ForeignNode {
       this.operatorConfigs = (params.operatorConfigs as OperatorConfig[]).map(op => {
         // Backwards compat
         if (
-          [
-            'sine oscillator',
-            'triangle oscillator',
-            'sawtooth oscillator',
-            'square oscillator',
-            'wavetable',
-          ].includes(op.type)
+          op.type === 'sine oscillator' ||
+          op.type === 'triangle oscillator' ||
+          op.type === 'sawtooth oscillator' ||
+          op.type === 'square oscillator' ||
+          op.type === 'wavetable'
         ) {
-          (op as any).unison = (op as any).unison ?? 1;
-          (op as any).unisonDetune =
-            (op as any).unisonDetune ?? buildDefaultParamSource('constant', 0, 300, 0);
+          op.unison = op.unison ?? 1;
+          op.unisonDetune = op.unisonDetune ?? buildDefaultParamSource('constant', 0, 300, 0);
+          op.unisonPhaseRandomization = op.unisonPhaseRandomization ?? { enabled: false };
         }
+
         return op;
       });
     }

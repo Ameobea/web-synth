@@ -65,7 +65,6 @@ export interface SynthModule {
   filterEnvelope: Adsr;
   filterADSRLength: number;
   pitchMultiplier: number;
-  unisonSpreadCents?: number;
 }
 
 const ctx = new AudioContext();
@@ -512,7 +511,7 @@ const actionGroups = {
         filterParams: { ...targetSynth.filterParams, ...targetSynth.filterParams, [key]: val },
       };
       const newFilters = updateFilterNode(
-        targetSynth.voices.map(R.prop('filterNode')),
+        targetSynth.voices.map(v => v.filterNode),
         targetSynth.filterCSNs,
         key as keyof FilterParams,
         val

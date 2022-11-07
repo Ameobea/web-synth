@@ -1,1 +1,1 @@
-export * from './FMSynth.tsx';
+export * from './FMSynth';

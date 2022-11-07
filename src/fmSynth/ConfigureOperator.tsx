@@ -1,5 +1,4 @@
 import { UnreachableException } from 'ameo-utils';
-import * as R from 'ramda';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import type { Writable } from 'svelte/store';
@@ -21,6 +20,10 @@ import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
 import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
 
+interface UnisonPhaseRandomizationConfig {
+  enabled: boolean;
+}
+
 /**
  * The algorithm used to produce the output for the operator.
  */
@@ -34,22 +37,42 @@ export type OperatorConfig =
       interDimMix: ParamSource;
       unison: number;
       unisonDetune: ParamSource;
+      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
     }
-  | { type: 'sine oscillator'; frequency: ParamSource; unison: number; unisonDetune: ParamSource }
-  | { type: 'exponential oscillator'; frequency: ParamSource; stretchFactor: ParamSource }
+  | {
+      type: 'sine oscillator';
+      frequency: ParamSource;
+      unison: number;
+      unisonDetune: ParamSource;
+      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
+    }
+  | {
+      type: 'exponential oscillator';
+      frequency: ParamSource;
+      stretchFactor: ParamSource;
+      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
+    }
   | { type: 'param buffer'; bufferIx: number }
-  | { type: 'square oscillator'; frequency: ParamSource; unison: number; unisonDetune: ParamSource }
+  | {
+      type: 'square oscillator';
+      frequency: ParamSource;
+      unison: number;
+      unisonDetune: ParamSource;
+      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
+    }
   | {
       type: 'triangle oscillator';
       frequency: ParamSource;
       unison: number;
       unisonDetune: ParamSource;
+      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
     }
   | {
       type: 'sawtooth oscillator';
       frequency: ParamSource;
       unison: number;
       unisonDetune: ParamSource;
+      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
     }
   | {
       type: 'sample mapping';
@@ -71,6 +94,7 @@ export const buildDefaultOperatorConfig = (
         frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
         unison: 1,
         unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
+        unisonPhaseRandomization: { enabled: false },
       };
     }
     case 'exponential oscillator': {
@@ -78,6 +102,7 @@ export const buildDefaultOperatorConfig = (
         type,
         frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
         stretchFactor: { type: 'constant', value: 0.5 },
+        unisonPhaseRandomization: { enabled: false },
       };
     }
     case 'param buffer': {
@@ -93,6 +118,7 @@ export const buildDefaultOperatorConfig = (
         interDimMix: buildDefaultParamSource('constant', 0, 1, 0.5),
         unison: 1,
         unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
+        unisonPhaseRandomization: { enabled: false },
       };
     }
     case 'sample mapping': {
@@ -158,7 +184,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
       {
         type: 'select',
         label: 'wavetable',
-        options: ['', ...wavetableState.wavetableBanks.map(R.prop('name'))],
+        options: ['', ...wavetableState.wavetableBanks.map(b => b.name)],
       },
       {
         type: 'button',
@@ -184,9 +210,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
         action: async () => {
           const LazyUploadWavetableModal = React.lazy(() =>
             import('src/fmSynth/UploadWavetable').then(mod => ({
-              default: mod.mkUploadWavetableModal(
-                wavetableState.wavetableBanks.map(R.prop('name'))
-              ),
+              default: mod.mkUploadWavetableModal(wavetableState.wavetableBanks.map(b => b.name)),
             }))
           );
           const WrappedUploadWavetableModal: React.FC<UploadWavetableModalProps> = props => (
@@ -319,6 +343,43 @@ const ConfigureSampleMapping = mkSvelteComponentShim<{
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;
 }>(ConfigureSampleMappingInner as any);
 
+const UNISON_DETUNE_PHASE_RANDOMIZATION_SETTINGS = [{ type: 'checkbox', label: 'randomize phase' }];
+
+interface ConfigureUnisonDetunePhaseRandomizationProps {
+  config: Extract<
+    OperatorConfig,
+    {
+      type:
+        | 'sine oscillator'
+        | 'square oscillator'
+        | 'triangle oscillator'
+        | 'sawtooth oscillator'
+        | 'wavetable';
+    }
+  >;
+  onChange: (newConfig: OperatorConfig) => void;
+}
+
+const ConfigureUnisonDetunePhaseRandomization: React.FC<
+  ConfigureUnisonDetunePhaseRandomizationProps
+> = ({ config, onChange }) => (
+  <ControlPanel
+    title='phase randomization'
+    width={500}
+    settings={UNISON_DETUNE_PHASE_RANDOMIZATION_SETTINGS}
+    state={{ 'randomize phase': config.unisonPhaseRandomization.enabled }}
+    onChange={(_key: string, _value: any, state: any) => {
+      onChange({
+        ...config,
+        unisonPhaseRandomization: {
+          ...config.unisonPhaseRandomization,
+          enabled: state['randomize phase'],
+        },
+      });
+    }}
+  />
+);
+
 const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   config,
   onChange,
@@ -397,17 +458,20 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
             }}
           />
           {config.unison > 1 ? (
-            <ConfigureParamSource
-              title='unison detune'
-              state={config.unisonDetune}
-              onChange={newUnisonDetune => onChange({ ...config, unisonDetune: newUnisonDetune })}
-              min={0.5}
-              max={800}
-              scale='log'
-              adsrs={adsrs}
-              onAdsrChange={onAdsrChange}
-              vcId={vcId}
-            />
+            <>
+              <ConfigureParamSource
+                title='unison detune'
+                state={config.unisonDetune}
+                onChange={newUnisonDetune => onChange({ ...config, unisonDetune: newUnisonDetune })}
+                min={0.5}
+                max={800}
+                scale='log'
+                adsrs={adsrs}
+                onAdsrChange={onAdsrChange}
+                vcId={vcId}
+              />
+              <ConfigureUnisonDetunePhaseRandomization config={config} onChange={onChange} />
+            </>
           ) : null}
         </>
       ) : null}

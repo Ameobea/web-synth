@@ -1,5 +1,6 @@
 #[cfg(feature = "simd")]
 use core::arch::wasm32::*;
+use rand::Rng;
 use std::rc::Rc;
 
 use adsr::{
@@ -249,6 +250,10 @@ impl<T: PhasedOscillator> UnisonOscillator<T> {
         }
     }
 
+    pub fn set_phase_at(&mut self, new_phase: f32, ix: usize) {
+        self.oscillators[ix].set_phase(new_phase);
+    }
+
     pub fn get_phases(&self) -> Vec<f32> {
         let mut phases = Vec::with_capacity(self.oscillators.len());
         for i in 0..self.oscillators.len() {
@@ -464,6 +469,7 @@ pub struct Operator {
     pub oscillator_source: OscillatorSource,
     pub effect_chain: EffectChain,
     pub enabled: bool,
+    pub randomize_start_phases: bool,
 }
 
 impl Operator {
@@ -551,6 +557,44 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonTriangle(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonSawtooth(osc) => osc.set_phases(new_phases),
+            OscillatorSource::SampleMapping(_) => (),
+            OscillatorSource::TunedSample(_) => (),
+        }
+    }
+
+    pub fn get_oscillator_count(&self) -> usize {
+        match self {
+            OscillatorSource::Wavetable(_) => 1,
+            OscillatorSource::ParamBuffer(_) => 1,
+            OscillatorSource::Sine(_) => 1,
+            OscillatorSource::ExponentialOscillator(_) => 1,
+            OscillatorSource::Square(_) => 1,
+            OscillatorSource::Triangle(_) => 1,
+            OscillatorSource::Sawtooth(_) => 1,
+            OscillatorSource::UnisonSine(osc) => osc.oscillators.len(),
+            OscillatorSource::UnisonWavetable(osc) => osc.oscillators.len(),
+            OscillatorSource::UnisonSquare(osc) => osc.oscillators.len(),
+            OscillatorSource::UnisonTriangle(osc) => osc.oscillators.len(),
+            OscillatorSource::UnisonSawtooth(osc) => osc.oscillators.len(),
+            OscillatorSource::SampleMapping(_) => 1,
+            OscillatorSource::TunedSample(_) => 1,
+        }
+    }
+
+    pub fn set_phase_at(&mut self, new_phase: f32, ix: usize) {
+        match self {
+            OscillatorSource::Wavetable(_) => (),
+            OscillatorSource::ParamBuffer(_) => (),
+            OscillatorSource::Sine(osc) => osc.set_phase(new_phase),
+            OscillatorSource::ExponentialOscillator(osc) => osc.set_phase(new_phase),
+            OscillatorSource::Square(osc) => osc.set_phase(new_phase),
+            OscillatorSource::Triangle(osc) => osc.set_phase(new_phase),
+            OscillatorSource::Sawtooth(osc) => osc.set_phase(new_phase),
+            OscillatorSource::UnisonSine(osc) => osc.set_phase_at(new_phase, ix),
+            OscillatorSource::UnisonWavetable(osc) => osc.set_phase_at(new_phase, ix),
+            OscillatorSource::UnisonSquare(osc) => osc.set_phase_at(new_phase, ix),
+            OscillatorSource::UnisonTriangle(osc) => osc.set_phase_at(new_phase, ix),
+            OscillatorSource::UnisonSawtooth(osc) => osc.set_phase_at(new_phase, ix),
             OscillatorSource::SampleMapping(_) => (),
             OscillatorSource::TunedSample(_) => (),
         }
@@ -1703,6 +1747,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     operator_ix: usize,
     operator_type: usize,
     unison: usize,
+    unison_phase_randomization_enabled: bool,
     param_0_value_type: usize,
     param_0_val_int: usize,
     param_0_val_float: f32,
@@ -1725,8 +1770,9 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     param_4_val_float_2: f32,
 ) {
     for voice in &mut (*ctx).voices {
-        let old_phases = voice.operators[operator_ix].oscillator_source.get_phase();
-        voice.operators[operator_ix].oscillator_source = build_oscillator_source(
+        let operator = &mut voice.operators[operator_ix];
+        let old_phases = operator.oscillator_source.get_phase();
+        operator.oscillator_source = build_oscillator_source(
             operator_type,
             unison,
             param_0_value_type,
@@ -1751,6 +1797,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
             param_4_val_float_2,
             &old_phases,
         );
+        operator.randomize_start_phases = unison_phase_randomization_enabled;
     }
 }
 
@@ -1857,7 +1904,7 @@ pub unsafe extern "C" fn fm_synth_set_effect(
 
 #[no_mangle]
 pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *const f32 {
-    (*ctx).adsr_phase_buf.as_ptr() as *const _
+    (*ctx).adsr_phase_buf.as_ptr()
 }
 
 #[no_mangle]
@@ -1877,9 +1924,16 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
     voice.gain_envelope.gate();
 
     for operator in &mut voice.operators {
-        // TODO: Make the way this is produced configurable
-        let initial_phases = &[0.];
-        operator.oscillator_source.set_phase(initial_phases);
+        if operator.randomize_start_phases {
+            let oscillator_count = operator.oscillator_source.get_oscillator_count();
+            for osc_ix in 0..oscillator_count {
+                let new_phase = common::rng().gen_range(-1., 1.);
+                operator.oscillator_source.set_phase_at(new_phase, osc_ix)
+            }
+        } else {
+            let initial_phases = &[0.];
+            operator.oscillator_source.set_phase(initial_phases);
+        }
 
         match &mut operator.oscillator_source {
             OscillatorSource::SampleMapping(emitter) => emitter.cur_ix = 0,

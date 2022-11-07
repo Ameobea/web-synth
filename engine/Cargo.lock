@@ -934,6 +934,7 @@ dependencies = [
  "compressor",
  "dsp",
  "fastapprox",
+ "rand",
 ]
 
 [[package]]
