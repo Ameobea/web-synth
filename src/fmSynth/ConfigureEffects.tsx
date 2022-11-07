@@ -64,6 +64,10 @@ export type EffectInner =
       feedbackDelaySamples: ParamSource;
       feedbackGain: ParamSource;
       feedforwardGain: ParamSource;
+    }
+  | {
+      type: 'compressor';
+      // TODO: Params
     };
 
 export type Effect = EffectInner & {
@@ -84,6 +88,7 @@ const EFFECT_TYPE_SETTING = {
     'delay',
     'moog filter',
     'comb filter',
+    'compressor',
   ] as Effect['type'][],
 };
 
@@ -161,6 +166,11 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         feedbackGain: { type: 'constant', value: 0.65 },
       };
     }
+    case 'compressor': {
+      return {
+        type,
+      };
+    }
   }
 };
 
@@ -180,7 +190,8 @@ const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
 const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
 const moogFilterTheme = { ...baseTheme, background2: 'rgb(49,69,120)' };
-const combFilterTheme = { ...baseTheme, background2: 'rgb(36 64 21)' };
+const combFilterTheme = { ...baseTheme, background2: 'rgb(36,64,21)' };
+const compressorTheme = { ...baseTheme, background2: 'rgb(16,24,21)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -192,6 +203,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   delay: delayTheme,
   'moog filter': moogFilterTheme,
   'comb filter': combFilterTheme,
+  compressor: compressorTheme,
 };
 
 const EMPTY_ADSRS: AdsrParams[] = [];
@@ -610,6 +622,14 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
   </>
 );
 
+const ConfigureCompressor: EffectConfigurator<'compressor'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+  vcId,
+}) => <>Compressor params TODO</>;
+
 interface EffectManagementProps {
   effectIx: number;
   isBypassed: boolean;
@@ -704,6 +724,7 @@ const EFFECT_CONFIGURATOR_BY_EFFECT_TYPE: { [K in Effect['type']]: EffectConfigu
   delay: React.memo(ConfigureDelay),
   'moog filter': React.memo(ConfigureMoogFilter),
   'comb filter': React.memo(ConfigureCombFilter),
+  compressor: React.memo(ConfigureCompressor),
 };
 
 interface ConfigureEffectSpecificProps {

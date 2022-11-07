@@ -1,6 +1,6 @@
 import { Map as ImmMap } from 'immutable';
 
-import { BandSplitterPreset } from 'src/filterDesigner/presets';
+import { buildBandSplitterPreset } from 'src/filterDesigner/presets';
 import { connectFilterChain, setFilter } from 'src/filterDesigner/util';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import BandSplitterSmallView, {
@@ -56,7 +56,7 @@ export default class BandSplitterNode implements ForeignNode {
       this.deserialize(params);
     }
 
-    this.filterChains = BandSplitterPreset.filterGroups.map((group, bandIx) => {
+    this.filterChains = buildBandSplitterPreset().filterGroups.map((group, bandIx) => {
       const constructedFilters = group.map(params => {
         const filter = new BiquadFilterNode(ctx);
         setFilter(filter, undefined, params, params.frequency);

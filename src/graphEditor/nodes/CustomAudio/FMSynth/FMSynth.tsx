@@ -8,8 +8,8 @@ import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import {
   buildDefaultOperatorConfig,
   deserializeWavetableState,
-  type OperatorConfig,
   serializeWavetableState,
+  type OperatorConfig,
   type WavetableBank,
   type WavetableState,
 } from 'src/fmSynth/ConfigureOperator';
@@ -25,8 +25,8 @@ import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MI
 import {
   buildDefaultSampleMappingState,
   deserializeSampleMappingState,
-  type SampleMappingState,
   serializeSampleMappingState,
+  type SampleMappingState,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -757,6 +757,9 @@ export default class FMSynth implements ForeignNode {
           this.encodeParamSource(effect.feedbackGain),
           this.encodeParamSource(effect.feedforwardGain),
         ];
+      }
+      case 'compressor': {
+        return [9, null, null, null, null];
       }
       default: {
         throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);

@@ -1,9 +1,11 @@
 use dsp::filters::biquad::{compute_higher_order_biquad_q_factors, BiquadFilter, FilterMode};
 
 const SAMPLE_RATE: usize = 44_100;
+const NYQUIST: f32 = SAMPLE_RATE as f32 / 2.;
 const FRAME_SIZE: usize = 128;
 
 #[repr(u8)]
+#[derive(Clone, Copy)]
 pub enum SensingMethod {
     Peak = 0,
     RMS = 1,
@@ -12,6 +14,7 @@ pub enum SensingMethod {
 const BAND_SPLITTER_FILTER_ORDER: usize = 16;
 const BAND_SPLITTER_FILTER_CHAIN_LENGTH: usize = BAND_SPLITTER_FILTER_ORDER / 2;
 
+#[derive(Clone)]
 pub struct Compressor {
     pub sensing_method: SensingMethod,
     pub input_buffer: [f32; FRAME_SIZE],
@@ -26,7 +29,7 @@ pub struct Compressor {
 
 impl Default for Compressor {
     fn default() -> Self {
-        let low_band_cutoff = 120.;
+        let low_band_cutoff = 88.3;
         let mid_band_cutoff = 2500.;
 
         let q_factors = compute_higher_order_biquad_q_factors(BAND_SPLITTER_FILTER_ORDER);
@@ -42,28 +45,28 @@ impl Default for Compressor {
         for i in 0..q_factors.len() {
             low_band_filter_chain[i].set_coefficients(
                 FilterMode::Lowpass,
-                q_factors[0],
+                q_factors[i],
                 0.,
                 low_band_cutoff,
                 0.,
             );
             mid_band_bottom_filter_chain[i].set_coefficients(
                 FilterMode::Highpass,
-                q_factors[0],
+                q_factors[i],
                 0.,
-                low_band_cutoff + 32., // TODO: Use correct value
+                low_band_cutoff + 7.5,
                 0.,
             );
             mid_band_top_filter_chain[i].set_coefficients(
                 FilterMode::Lowpass,
-                q_factors[0],
+                q_factors[i],
                 0.,
-                mid_band_cutoff - 214.8, // TODO: Use correct value
+                mid_band_cutoff - 184.8,
                 0.,
             );
             high_band_filter_chain[i].set_coefficients(
                 FilterMode::Highpass,
-                q_factors[0],
+                q_factors[i],
                 0.,
                 mid_band_cutoff,
                 0.,
@@ -71,7 +74,7 @@ impl Default for Compressor {
         }
 
         // Mid band is twice as long because it needs top and bottom filters
-        let mut mid_band_filter_chain = [
+        let mid_band_filter_chain = [
             mid_band_bottom_filter_chain[0],
             mid_band_bottom_filter_chain[1],
             mid_band_bottom_filter_chain[2],
@@ -107,7 +110,12 @@ impl Default for Compressor {
 fn apply_filter_chain<const N: usize>(chain: &mut [BiquadFilter; N], sample: f32) -> f32 {
     let mut result = sample;
     for filter in chain.iter_mut() {
-        result = filter.apply(result);
+        let input = result;
+        let output = filter.apply(input);
+        if !input.is_nan() && output.is_nan() {
+            // panic!();
+        }
+        result = output;
     }
     result
 }
@@ -119,11 +127,13 @@ fn apply_filter_chain_full<const N: usize>(
     gain: f32,
 ) {
     for i in 0..FRAME_SIZE {
-        output_buf[i] = apply_filter_chain(chain, input_buf[i]) * gain;
+        let output = apply_filter_chain(chain, input_buf[i]);
+        output_buf[i] = output * gain;
     }
 }
 
 impl Compressor {
+    #[inline]
     pub fn apply_bandsplitting(
         &mut self,
         low_band_gain: f32,
@@ -148,6 +158,33 @@ impl Compressor {
             &mut self.high_band_input_buffer,
             high_band_gain,
         );
+    }
+
+    #[inline]
+    pub fn apply(
+        &mut self,
+        pre_gain: f32,
+        post_gain: f32,
+        low_band_gain: f32,
+        mid_band_gain: f32,
+        high_band_gain: f32,
+    ) {
+        // apply pre gain
+        for i in 0..FRAME_SIZE {
+            self.input_buffer[i] *= pre_gain;
+        }
+
+        self.apply_bandsplitting(low_band_gain, mid_band_gain, high_band_gain);
+
+        // TODO: Actually apply compression
+
+        // Merge bands + apply post gain
+        for i in 0..FRAME_SIZE {
+            self.output_buffer[i] = (self.low_band_input_buffer[i]
+                + self.mid_band_input_buffer[i]
+                + self.high_band_input_buffer[i])
+                * post_gain;
+        }
     }
 }
 
@@ -179,21 +216,11 @@ pub extern "C" fn process_compressor(
     high_band_gain: f32,
 ) {
     let compressor = unsafe { &mut *compressor };
-
-    // apply pre gain
-    for i in 0..FRAME_SIZE {
-        compressor.input_buffer[i] *= pre_gain;
-    }
-
-    compressor.apply_bandsplitting(low_band_gain, mid_band_gain, high_band_gain);
-
-    // TODO: Actually apply compression
-
-    // Merge bands + apply post gain
-    for i in 0..FRAME_SIZE {
-        compressor.output_buffer[i] = (compressor.low_band_input_buffer[i]
-            + compressor.mid_band_input_buffer[i]
-            + compressor.high_band_input_buffer[i])
-            * post_gain;
-    }
+    compressor.apply(
+        pre_gain,
+        post_gain,
+        low_band_gain,
+        mid_band_gain,
+        high_band_gain,
+    );
 }

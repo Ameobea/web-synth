@@ -5,6 +5,7 @@ pub mod filters;
 pub mod oscillator;
 
 pub const SAMPLE_RATE: f32 = 44_100.;
+pub const NYQUIST: f32 = SAMPLE_RATE / 2.;
 pub const FRAME_SIZE: usize = 128;
 
 /// For `coefficient` values between 0 and 1, applies smoothing to a value, interpolating between
@@ -73,6 +74,7 @@ pub fn read_interpolated(buf: &[f32], index: f32) -> f32 {
 
 /// Same as `fastapprox::faster::pow2` except we elide the check for large negative values and
 /// assume that negative values will never be passed to this function
+#[inline]
 pub fn even_faster_pow2(p: f32) -> f32 {
     let v = ((1 << 23) as f32 * (p + 126.94269504_f32)) as u32;
     fastapprox::bits::from_bits(v)
@@ -80,20 +82,24 @@ pub fn even_faster_pow2(p: f32) -> f32 {
 
 /// Same as `fastapprox::faster::pow` except we elide the check for large negative values and
 /// assume that negative values will never be passed to this function
+#[inline]
 pub fn even_faster_pow(x: f32, p: f32) -> f32 { even_faster_pow2(p * fastapprox::faster::log2(x)) }
 
+#[inline]
 pub fn mk_linear_to_log(logmin: f32, logmax: f32, logsign: f32) -> impl Fn(f32) -> f32 {
     move |x| {
         logsign * fast::exp(fast::ln(logmin) + ((fast::ln(logmax) - fast::ln(logmin)) * x) / 100.)
     }
 }
 
+#[inline]
 pub fn mk_log_to_linear(logmin: f32, logmax: f32, logsign: f32) -> impl Fn(f32) -> f32 {
     move |y| {
         ((fast::ln(y * logsign) - fast::ln(logmin)) * 100.) / (fast::ln(logmax) - fast::ln(logmin))
     }
 }
 
+#[inline]
 pub fn quantize(min: f32, max: f32, steps: f32, val: f32) -> f32 {
     let step_size = (max - min) / steps;
     let quantized = (val - min) / step_size;
@@ -101,10 +107,12 @@ pub fn quantize(min: f32, max: f32, steps: f32, val: f32) -> f32 {
     min + (quantized_int as f32) * step_size
 }
 
+#[inline]
 pub fn midi_number_to_frequency(midi_number: usize) -> f32 {
     (2.0f32).powf((midi_number as f32 - 69.) / 12.) * 440.
 }
 
+#[inline]
 pub fn linear_to_db(res: f32) -> f32 {
     let db = 20. * res.ln() / std::f32::consts::LN_10;
     if db > 100. {

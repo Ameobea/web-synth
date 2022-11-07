@@ -931,6 +931,7 @@ version = "0.1.0"
 dependencies = [
  "adsr",
  "common",
+ "compressor",
  "dsp",
  "fastapprox",
 ]

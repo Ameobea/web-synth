@@ -1,3 +1,4 @@
+use ::compressor::Compressor;
 use dsp::circular_buffer::CircularBuffer;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
@@ -9,6 +10,7 @@ use super::{ParamSource, RenderRawParams, FRAME_SIZE};
 pub mod bitcrusher;
 pub mod butterworth_filter;
 pub mod comb_filter;
+pub mod compressor;
 pub mod delay;
 pub mod moog;
 pub mod soft_clipper;
@@ -18,6 +20,7 @@ pub mod wavefolder;
 use self::{
     bitcrusher::Bitcrusher,
     butterworth_filter::{ButterworthFilter, ButterworthFilterMode},
+    compressor::CompressorEffect,
     delay::Delay,
     moog::MoogFilter,
     spectral_warping::SpectralWarping,
@@ -79,6 +82,7 @@ pub enum EffectInstance {
     Delay(Delay),
     MoogFilter(MoogFilter),
     CombFilter(CombFilter),
+    Compressor(CompressorEffect),
 }
 
 impl EffectInstance {
@@ -302,6 +306,15 @@ impl EffectInstance {
                 };
 
                 EffectInstance::CombFilter(comb_filter)
+            },
+            9 => {
+                let compressor = CompressorEffect {
+                    cur_frame_ix: 0,
+                    prev_frame: [0.; FRAME_SIZE],
+                    inner: Compressor::default(),
+                };
+
+                EffectInstance::Compressor(compressor)
             },
             _ => panic!("Invalid effect type: {}", effect_type),
         }
@@ -547,6 +560,7 @@ impl Effect for EffectInstance {
             EffectInstance::Delay(e) => e.apply(rendered_params, base_frequency, sample),
             EffectInstance::MoogFilter(e) => e.apply(rendered_params, base_frequency, sample),
             EffectInstance::CombFilter(e) => e.apply(rendered_params, base_frequency, sample),
+            EffectInstance::Compressor(e) => e.apply(rendered_params, base_frequency, sample),
         }
     }
 
@@ -574,6 +588,8 @@ impl Effect for EffectInstance {
                 e.apply_all(rendered_params, base_frequencies, samples),
             EffectInstance::CombFilter(e) =>
                 e.apply_all(rendered_params, base_frequencies, samples),
+            EffectInstance::Compressor(e) =>
+                e.apply_all(rendered_params, base_frequencies, samples),
         }
     }
 
@@ -588,6 +604,7 @@ impl Effect for EffectInstance {
             EffectInstance::Delay(e) => e.get_params(buf),
             EffectInstance::MoogFilter(e) => e.get_params(buf),
             EffectInstance::CombFilter(e) => e.get_params(buf),
+            EffectInstance::Compressor(e) => e.get_params(buf),
         }
     }
 }

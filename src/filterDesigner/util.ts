@@ -32,7 +32,7 @@ export interface SerializedFilterDesigner {
 
 export const serializeFilterDesigner = (state: FilterDesignerState): string => {
   const serialized: SerializedFilterDesigner = {
-    filterGroups: state.filterGroups.map(filters => filters.map(R.prop('params'))),
+    filterGroups: state.filterGroups.map(filters => filters.map(f => f.params)),
     lockedFrequencyByGroup: state.lockedFrequencyByGroup,
   };
   return JSON.stringify(serialized);
@@ -61,7 +61,7 @@ export const deserializeFilterDesigner = (
       return { params, filter, oaps, id: btoa(Math.random().toString()) };
     });
 
-    connectFilterChain(activatedGroup.map(R.prop('filter')));
+    connectFilterChain(activatedGroup.map(g => g.filter));
     input.connect(activatedGroup[0].filter);
     return activatedGroup;
   });
@@ -92,28 +92,18 @@ export const setFilter = (
     filter.type = params.type;
   }
 
+  const frequency = R.isNil(lockedFrequency) ? params.frequency : lockedFrequency;
+
   if (oaps) {
+    oaps.frequency.manualControl.offset.value = frequency;
     oaps.detune.manualControl.offset.value = params.detune;
     oaps.Q.manualControl.offset.value = params.Q ?? 1;
     oaps.gain.manualControl.offset.value = params.gain;
   } else {
+    filter.frequency.value = frequency;
     filter.detune.value = params.detune;
     filter.Q.value = params.Q ?? 1;
     filter.gain.value = params.gain;
-  }
-
-  if (!R.isNil(lockedFrequency)) {
-    if (oaps) {
-      oaps.frequency.manualControl.offset.value = lockedFrequency;
-    } else {
-      filter.frequency.value = lockedFrequency;
-    }
-  } else {
-    if (oaps) {
-      oaps.frequency.manualControl.offset.value = params.frequency;
-    } else {
-      filter.frequency.value = params.frequency;
-    }
   }
 };
 

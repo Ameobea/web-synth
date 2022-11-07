@@ -6,15 +6,14 @@ import ControlPanel from 'react-control-panel';
 
 import d3 from './d3';
 import './FilterDesigner.scss';
-
 import {
   connectFilterChain,
   deserializeFilterDesigner,
   disconnectFilterChain,
+  setFilter,
   type FilterDescriptor,
   type FilterDesignerState,
   type FilterGroup,
-  setFilter,
 } from 'src/filterDesigner/util';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import FlatButton from 'src/misc/FlatButton';
@@ -25,7 +24,9 @@ import {
   getSettingsForFilterType,
 } from 'src/synthDesigner/filterHelpers';
 import { linearToDb } from 'src/util';
-import Presets from './presets';
+import buildPresets from './presets';
+
+const Presets = buildPresets();
 
 const ctx = new AudioContext();
 const DATA_SIZE = 512;
@@ -179,7 +180,7 @@ class FilterDesigner {
         return responses;
       })
     );
-    // Filters within eacn group are applied in series
+    // Filters within each group are applied in series
     const aggregateResponsesByGroup = individualFrequencyResponsesByGroup.map(responesForGroup =>
       responesForGroup.reduce((acc, res) => {
         acc.forEach((y, i) => {
@@ -304,7 +305,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
   }, [state.lockedFrequencyByGroup]);
 
   const onDelete = useCallback(
-    filterIx =>
+    (filterIx: number) =>
       setState((state): FilterDesignerState => {
         const group = state.filterGroups[groupIx];
         // can't delete all filters
@@ -312,7 +313,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
           return state;
         }
 
-        disconnectFilterChain(group.map(R.prop('filter')));
+        disconnectFilterChain(group.map(g => g.filter));
         const newState = {
           ...state,
           filterGroups: R.set(
@@ -321,14 +322,14 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
             state.filterGroups
           ),
         };
-        connectFilterChain(newState.filterGroups[groupIx].map(R.prop('filter')));
+        connectFilterChain(newState.filterGroups[groupIx].map(g => g.filter));
         updateConnectables?.(newState);
         return newState;
       }),
     [groupIx, setState, updateConnectables]
   );
   const onChange = useCallback(
-    newState => {
+    (newState: FilterDesignerState | ((oldState: FilterDesignerState) => FilterDesignerState)) => {
       inst.onUpdated(newState);
       setState(newState);
     },
@@ -342,7 +343,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
         label: 'add filter',
         action: () => {
           setState(state => {
-            disconnectFilterChain(state.filterGroups[groupIx].map(R.prop('filter')));
+            disconnectFilterChain(state.filterGroups[groupIx].map(g => g.filter));
             const newFilter = new BiquadFilterNode(ctx);
             const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
             const oaps = {
@@ -360,7 +361,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
               ],
               state
             );
-            connectFilterChain(newState.filterGroups[groupIx].map(R.prop('filter')));
+            connectFilterChain(newState.filterGroups[groupIx].map(g => g.filter));
             updateConnectables?.(newState);
             return newState;
           });
@@ -444,7 +445,7 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
         label: 'load preset',
         action: () => {
           setState(state => {
-            state.filterGroups.forEach(group => disconnectFilterChain(group.map(R.prop('filter'))));
+            state.filterGroups.forEach(group => disconnectFilterChain(group.map(g => g.filter)));
             const { preset } = Presets.find(R.propEq('name', selectedPresetName))!;
             const newState = deserializeFilterDesigner(preset);
             updateConnectables?.(newState);
@@ -483,7 +484,7 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
       return { ...acc, [`group ${groupIx + 1} frequency`]: state.lockedFrequencyByGroup[groupIx] };
     }, acc);
   }, [selectedPresetName, state.filterGroups, state.lockedFrequencyByGroup]);
-  const handleChange = useCallback((key: string, val: any) => {
+  const handleChange = useCallback((key: string, val: any, _state: typeof controlPanelState) => {
     switch (key) {
       case 'lock frequency': {
         const newLockStatusByGroup: boolean[] = val;
@@ -515,10 +516,21 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
       default: {
         if (key.startsWith('group ')) {
           const groupIx = +key.split(' ')[1] - 1;
-          setState(state => ({
-            ...state,
-            lockedFrequencyByGroup: R.set(R.lensIndex(groupIx), val, state.lockedFrequencyByGroup),
-          }));
+          setState(state => {
+            const newState = {
+              ...state,
+              lockedFrequencyByGroup: R.set(
+                R.lensIndex(groupIx),
+                val,
+                state.lockedFrequencyByGroup
+              ),
+            };
+
+            const group = newState.filterGroups[groupIx];
+            group.forEach(filter => setFilter(filter.filter, filter.oaps, filter.params, val));
+
+            return newState;
+          });
           return;
         }
 

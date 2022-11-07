@@ -7,7 +7,7 @@ interface FilterDesignerPreset {
   preset: SerializedFilterDesigner;
 }
 
-export const BandSplitterPreset = (() => {
+export const buildBandSplitterPreset = () => {
   const lowBandCutoff = 400;
   const midBandCutoff = 3000;
 
@@ -28,9 +28,32 @@ export const BandSplitterPreset = (() => {
     filterGroups: [lowBand, [...midBandBottom, ...midBandTop], highBand],
     lockedFrequencyByGroup: [lowBandCutoff, null, midBandCutoff],
   };
-})();
+};
 
-const Presets: FilterDesignerPreset[] = [
+export const buildOTTBandSplitterPreset = () => {
+  const lowBandCutoff = 88.3;
+  const midBandCutoff = 2500;
+
+  const lowBand = computeHigherOrderBiquadQFactors(16).map(q =>
+    buildDefaultFilter(FilterType.Lowpass, q, lowBandCutoff)
+  );
+  const midBandBottom = computeHigherOrderBiquadQFactors(16).map(q =>
+    buildDefaultFilter(FilterType.Highpass, q, lowBandCutoff + 7.5)
+  );
+  const midBandTop = computeHigherOrderBiquadQFactors(16).map(q =>
+    buildDefaultFilter(FilterType.Lowpass, q, midBandCutoff - 184.8)
+  );
+  const highBand = computeHigherOrderBiquadQFactors(16).map(q =>
+    buildDefaultFilter(FilterType.Highpass, q, midBandCutoff)
+  );
+
+  return {
+    filterGroups: [lowBand, [...midBandBottom, ...midBandTop], highBand],
+    lockedFrequencyByGroup: [lowBandCutoff, null, midBandCutoff],
+  };
+};
+
+const buildFilterDesignerPresets = (): FilterDesignerPreset[] => [
   {
     name: 'init',
     preset: {
@@ -96,8 +119,12 @@ const Presets: FilterDesignerPreset[] = [
   },
   {
     name: 'band splitter',
-    preset: BandSplitterPreset,
+    preset: buildBandSplitterPreset(),
+  },
+  {
+    name: 'OTT band splitter',
+    preset: buildOTTBandSplitterPreset(),
   },
 ];
 
-export default Presets;
+export default buildFilterDesignerPresets;
