@@ -1,4 +1,4 @@
-use compressor::Compressor;
+use compressor::MultibandCompressor;
 
 use crate::fm::FRAME_SIZE;
 
@@ -6,7 +6,7 @@ use super::Effect;
 
 #[derive(Clone)]
 pub struct CompressorEffect {
-    pub inner: Compressor,
+    pub inner: MultibandCompressor,
     // We add a `FRAME_SIZE` delay in order to allow the compressor to be applied to a whole frame
     // at a time.
     pub prev_frame: [f32; FRAME_SIZE],
@@ -28,12 +28,9 @@ impl Effect for CompressorEffect {
 
         if self.cur_frame_ix == FRAME_SIZE {
             self.cur_frame_ix = 0;
-            self.inner.apply(1., 1., 1., 1., 1.);
+            self.inner
+                .apply(1., 1., 1., 1., 1., 3., 250., -24., 12., 30., 256);
         }
-
-        // if output.is_nan() {
-        //     panic!();
-        // }
 
         output
     }

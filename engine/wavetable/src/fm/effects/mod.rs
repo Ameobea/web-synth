@@ -1,4 +1,4 @@
-use ::compressor::Compressor;
+use ::compressor::MultibandCompressor;
 use dsp::circular_buffer::CircularBuffer;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
@@ -311,7 +311,7 @@ impl EffectInstance {
                 let compressor = CompressorEffect {
                     cur_frame_ix: 0,
                     prev_frame: [0.; FRAME_SIZE],
-                    inner: Compressor::default(),
+                    inner: MultibandCompressor::default(),
                 };
 
                 EffectInstance::Compressor(compressor)
