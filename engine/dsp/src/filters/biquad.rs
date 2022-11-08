@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::{linear_to_db, FRAME_SIZE, NYQUIST, SAMPLE_RATE};
+use crate::{linear_to_db_checked, FRAME_SIZE, NYQUIST, SAMPLE_RATE};
 
 /// Second-order biquad filter
 #[derive(Clone, Copy, Default)]
@@ -154,7 +154,7 @@ pub fn compute_higher_order_biquad_q_factors(order: usize) -> Vec<f32> {
 
     (0..order / 2)
         .map(|i| {
-            linear_to_db(
+            linear_to_db_checked(
                 1. / (2. * (PI / order as f32 / 2. + (PI / order as f32) * i as f32).cos()),
             )
         })

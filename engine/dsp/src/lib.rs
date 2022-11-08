@@ -113,7 +113,7 @@ pub fn midi_number_to_frequency(midi_number: usize) -> f32 {
 }
 
 #[inline]
-pub fn linear_to_db(res: f32) -> f32 {
+pub fn linear_to_db_checked(res: f32) -> f32 {
     let db = 20. * res.ln() / std::f32::consts::LN_10;
     if db > 100. {
         return 100.;
@@ -126,6 +126,36 @@ pub fn linear_to_db(res: f32) -> f32 {
     } else {
         db
     }
+}
+
+#[inline]
+pub fn pow10(x: f32) -> f32 {
+    // TODO: check out fastapprox exp
+    (x * 2.30258509299404568402).exp()
+    // 10f32.powf(x)
+}
+
+#[inline]
+pub fn db_to_gain(db: f32) -> f32 {
+    // 10f32.powf(db / 20.)
+    pow10(db / 20.)
+}
+
+#[inline]
+pub fn gain_to_db(threshold: f32) -> f32 {
+    if threshold == 0. {
+        return -1000.;
+    }
+
+    20. * threshold.log10()
+}
+
+#[test]
+fn db_conversion() {
+    assert_eq!(gain_to_db(1.), 0.);
+    assert_eq!(gain_to_db(0.5), -6.0206003);
+    assert_eq!(gain_to_db(0.25), -12.041201);
+    assert_eq!(gain_to_db(0.125), -18.0618);
 }
 
 #[test]

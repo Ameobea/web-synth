@@ -28,8 +28,9 @@ impl Effect for CompressorEffect {
 
         if self.cur_frame_ix == FRAME_SIZE {
             self.cur_frame_ix = 0;
-            self.inner
-                .apply(1., 1., 1., 1., 1., 3., 250., -24., 12., 30., 256);
+            self.inner.apply(
+                1., 1., 1., 1., 1., 3., 250., 3., 250., 3., 250., -24., 12., 30., 256,
+            );
         }
 
         output

@@ -1,7 +1,8 @@
 use dsp::{
     circular_buffer::CircularBuffer,
+    db_to_gain,
     filters::biquad::{compute_higher_order_biquad_q_factors, BiquadFilter, FilterMode},
-    SAMPLE_RATE,
+    gain_to_db, SAMPLE_RATE,
 };
 
 const FRAME_SIZE: usize = 128;
@@ -150,9 +151,9 @@ fn detect_level_peak(
     let mut max = 0.;
     for i in 0..lookahead_samples {
         let ix = -lookahead_samples - FRAME_SIZE as isize + sample_ix_in_frame as isize + i;
-        let sample = buf.get(ix);
-        if sample.abs() > max {
-            max = sample.abs();
+        let abs_sample = buf.get(ix).abs();
+        if abs_sample > max {
+            max = abs_sample;
         }
     }
     max
@@ -176,7 +177,40 @@ fn compute_release_coefficient(release_time_ms: f32) -> f32 {
     release_coefficient
 }
 
+/// Given a frame of samples, computes the average volume of the frame in decibels.
+fn compute_average_volume(samples: [f32; FRAME_SIZE]) -> f32 {
+    let mut sum = 0.;
+    for sample in samples.iter() {
+        sum += sample * sample;
+    }
+    let average_volume = sum / FRAME_SIZE as f32;
+    average_volume.log10() * 20.
+}
+
 impl Compressor {
+    /// Returns target gain in linear units.
+    fn apply_compression_curve(
+        input_volume_linear: f32,
+        threshold_linear: f32,
+        ratio: f32,
+        knee: f32,
+    ) -> f32 {
+        // TODO: support soft knee
+        if input_volume_linear < threshold_linear {
+            return input_volume_linear;
+        }
+
+        (1. / ratio) * input_volume_linear
+    }
+
+    fn compute_makeup_gain(threshold_linear: f32, ratio: f32, knee: f32) -> f32 {
+        // TODO: support soft knee
+        let full_range_gain = Self::apply_compression_curve(1., threshold_linear, ratio, knee);
+        // inverse of full_range_gain
+        let full_range_makup_gain = 1. / full_range_gain;
+        full_range_makup_gain.powf(0.6)
+    }
+
     pub fn apply(
         &mut self,
         input_buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
@@ -195,52 +229,57 @@ impl Compressor {
         let attack_coefficient = compute_attack_coefficient(attack_ms);
         let release_coefficient = compute_release_coefficient(release_ms);
 
-        let threshold = db_to_linear(threshold_db);
-        let knee = db_to_linear(knee);
+        let threshold_linear = db_to_gain(threshold_db);
+        let makeup_gain = Self::compute_makeup_gain(threshold_linear, ratio, knee);
 
         for i in 0..FRAME_SIZE {
+            // let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
+            // output_buf[i] += input;
+            // continue;
+            // DEBUG END
+
             // run level detection
-            let detected_level = match sensing_method {
-                SensingMethod::Peak => detect_level_peak(input_buf, lookahead_samples, i),
+            let detected_level_linear = match sensing_method {
+                SensingMethod::Peak => detect_level_peak(input_buf, 800, i),
                 SensingMethod::RMS => unimplemented!(),
             };
-
-            let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
-            let input_abs = input.abs();
+            let detected_level_db = gain_to_db(detected_level_linear);
 
             // Compute the envelope
-            if detected_level > envelope {
-                envelope = attack_coefficient * envelope + (1. - attack_coefficient) * input_abs;
+            if detected_level_db > envelope {
+                envelope =
+                    attack_coefficient * envelope + (1. - attack_coefficient) * detected_level_db;
             } else {
-                envelope = release_coefficient * envelope + (1. - release_coefficient) * input_abs;
+                envelope =
+                    release_coefficient * envelope + (1. - release_coefficient) * detected_level_db;
             }
 
-            // Compute the gain
-            let gain = if envelope < threshold - knee {
-                1.
-            } else if envelope < threshold + knee {
-                let x = envelope - (threshold - knee);
-                let a = 1. / (2. * knee);
-                let b = (1. / ratio - 1.) * knee;
-                1. - a * x * x + b * x
+            // Compute the gain.
+            // TODO: Add support for soft knee
+            let gain = if envelope > threshold_db {
+                let target_volume_db = threshold_db + (envelope - threshold_db) / ratio;
+                let target_volume_linear = db_to_gain(target_volume_db);
+                // detected_level_linear * x = target_volume_linear
+                // x = target_volume_linear / detected_level_linear
+                target_volume_linear / detected_level_linear
             } else {
-                1. / ratio
+                1.
             };
 
+            if gain > 5. {
+                panic!(
+                    "gain={}, envelope={}, threshold_db={}, ratio={}",
+                    gain, envelope, threshold_db, ratio
+                );
+            }
+
             // Apply the gain
-            output_buf[i] = input * gain;
+            let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
+            output_buf[i] += input * gain * makeup_gain;
         }
 
         self.envelope = envelope;
     }
-}
-
-// TODO: check out fastapprox exp
-fn pow10(x: f32) -> f32 { (x * 2.30258509299404568402).exp() }
-
-fn db_to_linear(threshold_db: f32) -> f32 {
-    // 10f32.powf(threshold_db / 20.)
-    pow10(threshold_db / 20.)
 }
 
 impl MultibandCompressor {
