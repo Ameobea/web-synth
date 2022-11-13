@@ -20,6 +20,15 @@ const BAND_SPLITTER_FILTER_CHAIN_LENGTH: usize = BAND_SPLITTER_FILTER_ORDER / 2;
 const MAX_LOOKAHEAD_SAMPLES: usize = SAMPLE_RATE as usize / 20;
 const LOW_BAND_CUTOFF: f32 = 88.3;
 const MID_BAND_CUTOFF: f32 = 2500.;
+const SAB_SIZE: usize = 16;
+
+// SAB Layout:
+// 0: low band detected level
+// 1: mid band detected level
+// 2: high band detected level
+// 3: low band envelope level
+// 4: mid band envelope level
+// 5: high band envelope level
 
 #[derive(Clone, Default)]
 pub struct Compressor {
@@ -40,6 +49,7 @@ pub struct MultibandCompressor {
     pub mid_band_compressor: Compressor,
     pub high_band_compressor: Compressor,
     pub output_buffer: [f32; FRAME_SIZE],
+    pub sab: [f32; SAB_SIZE],
 }
 
 impl Default for MultibandCompressor {
@@ -118,6 +128,7 @@ impl Default for MultibandCompressor {
             mid_band_compressor: Compressor::default(),
             high_band_compressor: Compressor::default(),
             output_buffer: [0.0; FRAME_SIZE],
+            sab: [0.0; SAB_SIZE],
         }
     }
 }
@@ -222,7 +233,7 @@ impl Compressor {
         ratio: f32,
         knee: f32,
         sensing_method: SensingMethod,
-    ) {
+    ) -> f32 {
         let mut envelope = self.envelope;
 
         let lookahead_samples = lookahead_samples as isize;
@@ -231,6 +242,7 @@ impl Compressor {
 
         let threshold_linear = db_to_gain(threshold_db);
         let makeup_gain = Self::compute_makeup_gain(threshold_linear, ratio, knee);
+        let mut detected_level_db = 0.;
 
         for i in 0..FRAME_SIZE {
             // let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
@@ -243,7 +255,7 @@ impl Compressor {
                 SensingMethod::Peak => detect_level_peak(input_buf, 800, i),
                 SensingMethod::RMS => unimplemented!(),
             };
-            let detected_level_db = gain_to_db(detected_level_linear);
+            detected_level_db = gain_to_db(detected_level_linear);
 
             // Compute the envelope
             if detected_level_db > envelope {
@@ -279,6 +291,7 @@ impl Compressor {
         }
 
         self.envelope = envelope;
+        detected_level_db
     }
 }
 
@@ -342,7 +355,7 @@ impl MultibandCompressor {
 
         // Apply compression to each band
         let sensing_method = SensingMethod::Peak;
-        self.low_band_compressor.apply(
+        let low_band_detected_level = self.low_band_compressor.apply(
             &self.low_band_lookahead_buffer,
             lookahead_samples,
             &mut self.output_buffer,
@@ -353,7 +366,9 @@ impl MultibandCompressor {
             knee,
             sensing_method,
         );
-        self.mid_band_compressor.apply(
+        self.sab[0] = low_band_detected_level;
+        self.sab[3] = self.low_band_compressor.envelope;
+        let mid_band_detected_level = self.mid_band_compressor.apply(
             &self.mid_band_lookahead_buffer,
             lookahead_samples,
             &mut self.output_buffer,
@@ -364,7 +379,9 @@ impl MultibandCompressor {
             knee,
             sensing_method,
         );
-        self.high_band_compressor.apply(
+        self.sab[1] = mid_band_detected_level;
+        self.sab[4] = self.mid_band_compressor.envelope;
+        let high_band_detected_level = self.high_band_compressor.apply(
             &self.high_band_lookahead_buffer,
             lookahead_samples,
             &mut self.output_buffer,
@@ -375,6 +392,8 @@ impl MultibandCompressor {
             knee,
             sensing_method,
         );
+        self.sab[2] = high_band_detected_level;
+        self.sab[5] = self.high_band_compressor.envelope;
 
         // apply post gain
         if post_gain != 1. {
@@ -401,6 +420,12 @@ pub extern "C" fn get_compressor_input_buf_ptr(compressor: *mut MultibandCompres
 pub extern "C" fn get_compressor_output_buf_ptr(compressor: *mut MultibandCompressor) -> *mut f32 {
     let compressor = unsafe { &mut *compressor };
     compressor.output_buffer.as_mut_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn get_sab_ptr(compressor: *mut MultibandCompressor) -> *mut f32 {
+    let compressor = unsafe { &mut *compressor };
+    compressor.sab.as_mut_ptr()
 }
 
 #[no_mangle]

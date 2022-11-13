@@ -4,7 +4,13 @@
   export let onClick: () => void;
 </script>
 
-<div class="note" data-selected={selected} data-note-type={noteType} on:click={onClick}>
+<div
+  class="note"
+  data-selected={selected}
+  data-note-type={noteType}
+  on:click={onClick}
+  on:keyup={() => {}}
+>
   <slot />
 </div>
 

@@ -154,6 +154,13 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     });
   }
 
+  /**
+   *
+   * @param {Float32Array[][]} _inputs
+   * @param {Float32Array[][]} outputs
+   * @param {{[key: string]: Float32Array}} _params
+   * @returns {boolean}
+   */
   process(_inputs, outputs, _params) {
     const output = outputs[0]?.[0];
     if (!output || !this.wasmInstance) {

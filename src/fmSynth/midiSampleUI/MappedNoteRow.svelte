@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { MappedSampleData } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
-
   import { getNoteColor, midiNumberToNoteName } from 'src/midiUtils';
 
   export let midiNumber: number;
@@ -12,7 +11,13 @@
   }
 </script>
 
-<div class="note-row" data-color={getNoteColor(midiNumber)} data-gated={`${isGated}`} on:click>
+<div
+  class="note-row"
+  data-color={getNoteColor(midiNumber)}
+  data-gated={`${isGated}`}
+  on:click
+  on:keyup={() => {}}
+>
   <div class="midi-number">{midiNumber}<br />{midiNumberToNoteName(midiNumber)}</div>
   <div class="content">
     {#if mappedSampleCount > 0}

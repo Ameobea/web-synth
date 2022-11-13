@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { Writable } from 'svelte/store';
 
+  import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
   import {
     buildDefaultSampleMappingOperatorState,
     type SampleMappingState,
   } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import MappedSamplesListing from './MappedSamplesListing.svelte';
-  import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 
   export let registerGateUngateCallbacks: GateUngateCallbackRegistrar;
   export let store: Writable<SampleMappingState>;
@@ -24,6 +24,7 @@
     on:click={() =>
       ($store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded =
         !$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded)}
+    on:keyup={() => {}}
   >
     {$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded ? '∨' : '›'} Mapped Samples
   </div>

@@ -11,8 +11,8 @@ import type React from 'react';
 
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
+import { CompressorNode } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
-import CustomCompressorSmallViewRenderer from 'src/graphEditor/nodes/CustomAudio/CustomCompressorSmallViewRenderer';
 import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
@@ -317,40 +317,6 @@ const CustomBiquadFilterNode = enhanceAudioNode({
   SmallViewRenderer: CustomBiquadFilterNodeSmallView,
 });
 
-const CustomDynamicsCompressorNode = enhanceAudioNode({
-  AudioNodeClass: DynamicsCompressorNode,
-  nodeType: 'customAudio/compressor',
-  name: 'Compressor',
-  buildConnectables: (
-    foreignNode: ForeignNode<DynamicsCompressorNode> & { node: DynamicsCompressorNode }
-  ) => ({
-    inputs: Map<string, ConnectableInput>(
-      Object.entries({
-        input: { type: 'customAudio', node: foreignNode.node },
-        threshold: { type: 'number', node: foreignNode.paramOverrides.threshold.param },
-        knee: { type: 'number', node: foreignNode.paramOverrides.knee.param },
-        ratio: { type: 'number', node: foreignNode.paramOverrides.ratio.param },
-        attack: { type: 'number', node: foreignNode.paramOverrides.attack.param },
-        release: { type: 'number', node: foreignNode.paramOverrides.release.param },
-      })
-    ),
-    outputs: Map<string, ConnectableOutput>().set('output', {
-      type: 'customAudio',
-      node: foreignNode.node,
-    }),
-    node: foreignNode,
-  }),
-  getOverridableParams: (node: DynamicsCompressorNode) => [
-    { name: 'threshold', param: node.threshold, defaultValue: -14 },
-    { name: 'knee', param: node.knee, defaultValue: 30 },
-    { name: 'ratio', param: node.ratio, defaultValue: 12 },
-    { name: 'attack', param: node.attack, defaultValue: 0.003 },
-    { name: 'release', param: node.release, defaultValue: 0.25 },
-  ],
-  paramKeys: ['threshold', 'knee', 'ratio', 'attack', 'release'],
-  SmallViewRenderer: CustomCompressorSmallViewRenderer,
-});
-
 const CustomAudioBufferSourceNode = enhanceAudioNode({
   AudioNodeClass: AudioBufferSourceNode,
   nodeType: 'customAudio/audioClip',
@@ -429,9 +395,6 @@ export const audioNodeGetters: {
   'customAudio/destination': {
     nodeGetter: CustomDestinationNode,
   },
-  'customAudio/compressor': {
-    nodeGetter: CustomDynamicsCompressorNode,
-  },
   'customAudio/microphone': {
     nodeGetter: MicNode,
   },
@@ -495,6 +458,9 @@ export const audioNodeGetters: {
   },
   'customAudio/quantizer': {
     nodeGetter: QuantizerNode,
+  },
+  'customAudio/compressor': {
+    nodeGetter: CompressorNode,
   },
 };
 

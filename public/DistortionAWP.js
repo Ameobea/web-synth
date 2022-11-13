@@ -54,6 +54,13 @@ class DistortionAWP extends AudioWorkletProcessor {
     this.port.onmessage = evt => this.handleMessage(evt.data);
   }
 
+  /**
+   *
+   * @param {Float32Array[][]} inputs
+   * @param {Float32Array[][]} outputs
+   * @param {{[key: string]: Float32Array}} params
+   * @returns {boolean}
+   */
   process(inputs, outputs, params) {
     if (this.isShutdown) {
       return false;
