@@ -1,12 +1,12 @@
-import { Without } from 'ameo-utils';
+import type { Without } from 'ameo-utils';
 
-import { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
+import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
-import { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
-import { Effect } from 'src/redux/modules/effects';
-import { SerializedLooperInstState } from 'src/redux/modules/looper';
-import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
-import { SampleDescriptor } from 'src/sampleLibrary';
+import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import type { Effect } from 'src/redux/modules/effects';
+import type { SerializedLooperInstState } from 'src/redux/modules/looper';
+import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
+import type { SampleDescriptor } from 'src/sampleLibrary';
 
 const buildURL = (path: string) => `${BACKEND_BASE_URL}${path}`;
 

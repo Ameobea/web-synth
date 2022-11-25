@@ -8,12 +8,12 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { withReactQueryClient } from 'src/reactUtils';
-import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import {
   LoadSamplesButtons,
-  MkSampleListingRowRendererArgs,
   SampleListing,
   SampleRow,
+  type MkSampleListingRowRendererArgs,
 } from './SampleLibraryUI';
 import useAllSamples from './useAllSamples';
 

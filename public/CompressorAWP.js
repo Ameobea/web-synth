@@ -8,105 +8,105 @@ class CompressorAWP extends AudioWorkletProcessor {
     return [
       {
         name: 'pre_gain',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 20,
       },
       {
         name: 'post_gain',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 20,
       },
       {
         name: 'low_band_gain',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 20,
       },
       {
         name: 'mid_band_gain',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 20,
       },
       {
         name: 'high_band_gain',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'low_band_attack_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'low_band_release_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'mid_band_attack_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'mid_band_release_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'high_band_attack_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'high_band_release_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1000,
       },
       {
         name: 'threshold_db',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: -100,
         maxValue: 24,
       },
       {
         name: 'ratio',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0.01,
         maxValue: 1024,
       },
       {
         name: 'knee',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 40,
       },
       {
         name: 'lookahead_ms',
-        defaultValue: 1,
+        defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 100,
@@ -119,6 +119,8 @@ class CompressorAWP extends AudioWorkletProcessor {
 
     this.isShutdown = false;
     this.sab = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(SAB_SIZE) : null;
+    this.sabView = this.sab ? new Float32Array(this.sab) : null;
+    this.sabPtr = 0;
     this.wasmInstance = null;
     this.ctxPtr = 0;
     this.inputBufPtr = 0;
@@ -145,8 +147,17 @@ class CompressorAWP extends AudioWorkletProcessor {
     this.wasmInstance = await WebAssembly.instantiate(compiledModule);
 
     this.ctxPtr = this.wasmInstance.exports.init_compressor();
-    this.inputBufPtr = this.wasmInstance.exports.get_input_buf_ptr(this.ctxPtr);
-    this.outputBufPtr = this.wasmInstance.exports.get_output_buf_ptr(this.ctxPtr);
+    this.inputBufPtr = this.wasmInstance.exports.get_compressor_input_buf_ptr(this.ctxPtr);
+    this.outputBufPtr = this.wasmInstance.exports.get_compressor_output_buf_ptr(this.ctxPtr);
+    this.sabPtr = this.wasmInstance.exports.get_sab_ptr(this.ctxPtr);
+    this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+  }
+
+  getWasmMemoryBuffer() {
+    if (this.wasmMemoryBuffer.buffer !== this.wasmInstance.exports.memory.buffer) {
+      this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+    }
+    return this.wasmMemoryBuffer;
   }
 
   /**
@@ -165,6 +176,13 @@ class CompressorAWP extends AudioWorkletProcessor {
       return false;
     }
 
+    const wasmMemory = this.getWasmMemoryBuffer();
+    const inputBuffer = wasmMemory.subarray(
+      this.inputBufPtr / BYTES_PER_F32,
+      this.inputBufPtr / BYTES_PER_F32 + FRAME_SIZE
+    );
+    inputBuffer.set(input);
+
     const preGain = params.pre_gain[0];
     const postGain = params.post_gain[0];
     const lowBandGain = params.low_band_gain[0];
@@ -182,6 +200,7 @@ class CompressorAWP extends AudioWorkletProcessor {
     const lookaheadSamples = Math.floor(params.lookahead_ms[0] * 0.001 * SAMPLE_RATE);
 
     this.wasmInstance.exports.process_compressor(
+      this.ctxPtr,
       preGain,
       postGain,
       lowBandGain,
@@ -198,6 +217,22 @@ class CompressorAWP extends AudioWorkletProcessor {
       knee,
       lookaheadSamples
     );
+
+    const outputBuffer = wasmMemory.subarray(
+      this.outputBufPtr / BYTES_PER_F32,
+      this.outputBufPtr / BYTES_PER_F32 + FRAME_SIZE
+    );
+    output.set(outputBuffer);
+
+    if (this.sab) {
+      // Copy raw bytes from wasm memory to the SAB
+      this.sabView.set(
+        wasmMemory.subarray(
+          this.sabPtr / BYTES_PER_F32,
+          this.sabPtr / BYTES_PER_F32 + SAB_SIZE / BYTES_PER_F32
+        )
+      );
+    }
 
     return true;
   }

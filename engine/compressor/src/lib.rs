@@ -153,6 +153,7 @@ fn apply_filter_chain_full<const N: usize>(
     }
 }
 
+#[inline(never)]
 fn detect_level_peak(
     buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
     lookahead_samples: isize,
@@ -252,7 +253,7 @@ impl Compressor {
 
             // run level detection
             let detected_level_linear = match sensing_method {
-                SensingMethod::Peak => detect_level_peak(input_buf, 800, i),
+                SensingMethod::Peak => detect_level_peak(input_buf, 1800, i),
                 SensingMethod::RMS => unimplemented!(),
             };
             detected_level_db = gain_to_db(detected_level_linear);

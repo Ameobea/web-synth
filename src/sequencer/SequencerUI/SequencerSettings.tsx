@@ -2,7 +2,7 @@ import { filterNils } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { SequencerReduxInfra } from 'src/sequencer/redux';
+import type { SequencerReduxInfra } from 'src/sequencer/redux';
 
 const mkHandleChange =
   ({

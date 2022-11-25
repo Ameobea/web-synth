@@ -5,7 +5,7 @@
 import Dexie from 'dexie';
 import * as R from 'ramda';
 
-import { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 
 const MAX_CACHE_SIZE_BYTES = 1024 * 1024 * 500; // 500MB
 

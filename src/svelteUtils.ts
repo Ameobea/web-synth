@@ -151,7 +151,11 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
   return { set, update, subscribe };
 }
 
-// Adapted from: https://github.com/Rich-Harris/react-svelte/blob/master/index.js
+/**
+ * Creates a React component that renders the provided Svelte component.
+ *
+ * Adapted from: https://github.com/Rich-Harris/react-svelte/blob/master/index.js
+ */
 export function mkSvelteComponentShim<Props extends Record<string, any>>(
   Comp: new (args: { target: Element; props: Props }) => SvelteComponentTyped<Props>
 ) {

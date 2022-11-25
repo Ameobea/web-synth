@@ -1,12 +1,11 @@
 import * as R from 'ramda';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
+import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
 
 import './SampleLibraryUI.scss';
-
 import Loading from 'src/misc/Loading';
 import { getIsSampleCached } from 'src/sampleLibrary/sampleCache';
-import { getSample, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { getSample, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import useAllSamples, { getSampleDisplayName } from './useAllSamples';
 
 interface PlaySampleIconProps {
