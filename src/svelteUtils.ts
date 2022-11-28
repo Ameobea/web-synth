@@ -8,11 +8,13 @@ const RenderedSvelteComponentsByDomID = new Map<string, SvelteComponent>();
 type MkSvelteContainerRenderHelperArgs = {
   Comp: typeof SvelteComponent;
   getProps: () => Record<string, any>;
+  predicate?: (comp: SvelteComponent) => void;
 };
 
 export function mkSvelteContainerRenderHelper({
   Comp,
   getProps,
+  predicate,
 }: MkSvelteContainerRenderHelperArgs) {
   return (domID: string) => {
     const node = document.getElementById(domID);
@@ -25,6 +27,8 @@ export function mkSvelteContainerRenderHelper({
 
     const BuiltComp = new Comp({ target: node, props });
     RenderedSvelteComponentsByDomID.set(domID, BuiltComp);
+
+    predicate?.(BuiltComp);
   };
 }
 

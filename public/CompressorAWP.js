@@ -119,6 +119,9 @@ class CompressorAWP extends AudioWorkletProcessor {
 
     this.isShutdown = false;
     this.sab = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(SAB_SIZE) : null;
+    if (this.sab) {
+      this.port.postMessage({ type: 'sab', sab: this.sab });
+    }
     this.sabView = this.sab ? new Float32Array(this.sab) : null;
     this.sabPtr = 0;
     this.wasmInstance = null;

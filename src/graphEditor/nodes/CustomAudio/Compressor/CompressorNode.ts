@@ -11,6 +11,8 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import CompressorSmallView from './CompressorSmallView.svelte';
 
+type Invalidator<T> = (value?: T) => void;
+
 export interface CompressorBandState {
   gain: number;
   ratio: number;
@@ -29,6 +31,7 @@ export interface CompressorNodeUIState {
   ratio: number;
   knee: number;
   lookaheadMs: number;
+  sab: Float32Array | null;
 }
 
 const buildDefaultCompressorBandState = (): CompressorBandState => ({
@@ -49,6 +52,7 @@ const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   ratio: 12,
   knee: 30,
   lookaheadMs: 1.2,
+  sab: null,
 });
 
 const CompressorWasmBytes = new AsyncOnce(() =>
@@ -107,15 +111,36 @@ export class CompressorNode implements ForeignNode {
     }
     this.onChange(get(this.store));
 
+    let unsubscribe: (() => void) | undefined;
+
     this.renderSmallView = mkSvelteContainerRenderHelper({
       Comp: CompressorSmallView,
       getProps: () => ({ store: this.store }),
+      predicate: () => {
+        unsubscribe = this.store.subscribe(state => this.onChange(state));
+      },
     });
 
-    this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
+    this.cleanupSmallView = mkSvelteContainerCleanupHelper({
+      preserveRoot: true,
+      predicate: () => unsubscribe?.(),
+    });
 
     this.init();
   }
+
+  private handleMessageFromAWP = (e: MessageEvent) => {
+    const data = e.data as Record<string, any>;
+    switch (data.type) {
+      case 'sab': {
+        const sab = data.sab as SharedArrayBuffer;
+        this.store.update(s => ({ ...s, sab: new Float32Array(sab) }));
+        break;
+      }
+      default:
+        console.warn('Unknown message from AWP', data);
+    }
+  };
 
   private async init() {
     const [wasmBytes] = await Promise.all([
@@ -123,6 +148,7 @@ export class CompressorNode implements ForeignNode {
       CompressorAWPRegistered.get(),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'compressor-awp');
+    this.awpHandle.port.onmessage = (e: MessageEvent) => this.handleMessageFromAWP(e);
 
     const params = this.awpHandle.parameters as Map<string, AudioParam>;
     this.preGain = new OverridableAudioParam(ctx, params.get('pre_gain')!, undefined, true);
@@ -230,11 +256,12 @@ export class CompressorNode implements ForeignNode {
       ratio: params.ratio ?? 4,
       knee: params.knee ?? 0,
       lookaheadMs: params.lookaheadMs ?? 0,
+      sab: null,
     });
   }
 
   public serialize(): CompressorNodeUIState {
-    return R.clone(get(this.store));
+    return R.clone({ ...get(this.store), sab: null });
   }
 
   public buildConnectables() {
