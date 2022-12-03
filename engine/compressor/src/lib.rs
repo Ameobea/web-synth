@@ -29,10 +29,15 @@ const SAB_SIZE: usize = 16;
 // 3: low band envelope level
 // 4: mid band envelope level
 // 5: high band envelope level
+// 6: low band output level
+// 7: mid band output level
+// 8: high band output level
 
 #[derive(Clone, Default)]
 pub struct Compressor {
     pub envelope: f32,
+    pub last_detected_level_linear: f32,
+    pub last_output_level_db: f32,
 }
 
 #[derive(Clone)]
@@ -158,7 +163,19 @@ fn detect_level_peak(
     buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
     lookahead_samples: isize,
     sample_ix_in_frame: usize,
+    old_max: f32,
 ) -> f32 {
+    // Try to fast-path.  If the old max hasn't been removed from the lookahead buffer yet and it's
+    // still the max, then we can just return it.
+    // let cur_sample = buf
+    //     .get(-(FRAME_SIZE as isize) + sample_ix_in_frame as isize)
+    //     .abs();
+    // let removed_sample_ix = -lookahead_samples - FRAME_SIZE as isize + sample_ix_in_frame as
+    // isize; let removed_sample = buf.get(removed_sample_ix);
+    // if removed_sample != old_max {
+    //     return cur_sample.max(old_max);
+    // }
+
     // Might be cool to SIMD-ize this if we can't figure out a more efficient level detection method
     let mut max = 0.;
     for i in 0..lookahead_samples {
@@ -244,16 +261,13 @@ impl Compressor {
         let threshold_linear = db_to_gain(threshold_db);
         let makeup_gain = Self::compute_makeup_gain(threshold_linear, ratio, knee);
         let mut detected_level_db = 0.;
+        let mut detected_level_linear = self.last_detected_level_linear;
+        let mut target_volume_db = 0.;
 
         for i in 0..FRAME_SIZE {
-            // let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
-            // output_buf[i] += input;
-            // continue;
-            // DEBUG END
-
             // run level detection
-            let detected_level_linear = match sensing_method {
-                SensingMethod::Peak => detect_level_peak(input_buf, 1800, i),
+            detected_level_linear = match sensing_method {
+                SensingMethod::Peak => detect_level_peak(input_buf, 1800, i, detected_level_linear),
                 SensingMethod::RMS => unimplemented!(),
             };
             detected_level_db = gain_to_db(detected_level_linear);
@@ -270,12 +284,13 @@ impl Compressor {
             // Compute the gain.
             // TODO: Add support for soft knee
             let gain = if envelope > threshold_db {
-                let target_volume_db = threshold_db + (envelope - threshold_db) / ratio;
+                target_volume_db = threshold_db + (envelope - threshold_db) / ratio;
                 let target_volume_linear = db_to_gain(target_volume_db);
                 // detected_level_linear * x = target_volume_linear
                 // x = target_volume_linear / detected_level_linear
                 target_volume_linear / detected_level_linear
             } else {
+                target_volume_db = envelope;
                 1.
             };
 
@@ -292,6 +307,8 @@ impl Compressor {
         }
 
         self.envelope = envelope;
+        self.last_detected_level_linear = detected_level_linear;
+        self.last_output_level_db = target_volume_db;
         detected_level_db
     }
 }
@@ -338,7 +355,9 @@ impl MultibandCompressor {
         mid_band_release_ms: f32,
         high_band_attack_ms: f32,
         high_band_release_ms: f32,
-        threshold_db: f32,
+        low_band_threshold_db: f32,
+        mid_band_threshold_db: f32,
+        high_band_threshold_db: f32,
         ratio: f32,
         knee: f32,
         lookahead_samples: usize,
@@ -362,39 +381,42 @@ impl MultibandCompressor {
             &mut self.output_buffer,
             low_band_attack_ms,
             low_band_release_ms,
-            threshold_db,
+            low_band_threshold_db,
             ratio,
             knee,
             sensing_method,
         );
         self.sab[0] = low_band_detected_level;
         self.sab[3] = self.low_band_compressor.envelope;
+        self.sab[6] = self.low_band_compressor.last_output_level_db;
         let mid_band_detected_level = self.mid_band_compressor.apply(
             &self.mid_band_lookahead_buffer,
             lookahead_samples,
             &mut self.output_buffer,
             mid_band_attack_ms,
             mid_band_release_ms,
-            threshold_db,
+            mid_band_threshold_db,
             ratio,
             knee,
             sensing_method,
         );
         self.sab[1] = mid_band_detected_level;
         self.sab[4] = self.mid_band_compressor.envelope;
+        self.sab[7] = self.mid_band_compressor.last_output_level_db;
         let high_band_detected_level = self.high_band_compressor.apply(
             &self.high_band_lookahead_buffer,
             lookahead_samples,
             &mut self.output_buffer,
             high_band_attack_ms,
             high_band_release_ms,
-            threshold_db,
+            high_band_threshold_db,
             ratio,
             knee,
             sensing_method,
         );
         self.sab[2] = high_band_detected_level;
         self.sab[5] = self.high_band_compressor.envelope;
+        self.sab[8] = self.high_band_compressor.last_output_level_db;
 
         // apply post gain
         if post_gain != 1. {
@@ -443,7 +465,9 @@ pub extern "C" fn process_compressor(
     mid_band_release_ms: f32,
     high_band_attack_ms: f32,
     high_band_release_ms: f32,
-    threshold_db: f32,
+    low_band_threshold_db: f32,
+    mid_band_threshold_db: f32,
+    high_band_threshold_db: f32,
     ratio: f32,
     knee: f32,
     lookahead_samples: usize,
@@ -461,7 +485,9 @@ pub extern "C" fn process_compressor(
         mid_band_release_ms,
         high_band_attack_ms,
         high_band_release_ms,
-        threshold_db,
+        low_band_threshold_db,
+        mid_band_threshold_db,
+        high_band_threshold_db,
         ratio,
         knee,
         lookahead_samples,

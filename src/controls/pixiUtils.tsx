@@ -1,4 +1,4 @@
-import * as PIXI from 'src/controls/pixi';
+import type * as PIXI from 'src/controls/pixi';
 
 export interface DragState {
   dragData: PIXI.InteractionData | null;

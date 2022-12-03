@@ -84,7 +84,21 @@ class CompressorAWP extends AudioWorkletProcessor {
         maxValue: 1000,
       },
       {
-        name: 'threshold_db',
+        name: 'low_band_threshold_db',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: -100,
+        maxValue: 24,
+      },
+      {
+        name: 'mid_band_threshold_db',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: -100,
+        maxValue: 24,
+      },
+      {
+        name: 'high_band_threshold_db',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: -100,
@@ -197,7 +211,9 @@ class CompressorAWP extends AudioWorkletProcessor {
     const midBandReleaseMs = params.mid_band_release_ms[0];
     const highBandAttackMs = params.high_band_attack_ms[0];
     const highBandReleaseMs = params.high_band_release_ms[0];
-    const thresholdDb = params.threshold_db[0];
+    const lowBandThresholdDb = params.low_band_threshold_db[0];
+    const midBandThresholdDb = params.mid_band_threshold_db[0];
+    const highBandThresholdDb = params.high_band_threshold_db[0];
     const ratio = params.ratio[0];
     const knee = params.knee[0];
     const lookaheadSamples = Math.floor(params.lookahead_ms[0] * 0.001 * SAMPLE_RATE);
@@ -215,7 +231,9 @@ class CompressorAWP extends AudioWorkletProcessor {
       midBandReleaseMs,
       highBandAttackMs,
       highBandReleaseMs,
-      thresholdDb,
+      lowBandThresholdDb,
+      midBandThresholdDb,
+      highBandThresholdDb,
       ratio,
       knee,
       lookaheadSamples

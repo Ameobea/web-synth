@@ -11,13 +11,12 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import CompressorSmallView from './CompressorSmallView.svelte';
 
-type Invalidator<T> = (value?: T) => void;
-
 export interface CompressorBandState {
   gain: number;
   ratio: number;
   attack_ms: number;
   release_ms: number;
+  threshold: number;
 }
 
 export interface CompressorNodeUIState {
@@ -27,7 +26,6 @@ export interface CompressorNodeUIState {
   mid: CompressorBandState;
   high: CompressorBandState;
   postGain: number;
-  thresholdDb: number;
   ratio: number;
   knee: number;
   lookaheadMs: number;
@@ -39,6 +37,7 @@ const buildDefaultCompressorBandState = (): CompressorBandState => ({
   ratio: 12,
   attack_ms: 3,
   release_ms: 250,
+  threshold: -24,
 });
 
 const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
@@ -48,7 +47,6 @@ const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   mid: buildDefaultCompressorBandState(),
   high: buildDefaultCompressorBandState(),
   postGain: 1,
-  thresholdDb: -24,
   ratio: 12,
   knee: 30,
   lookaheadMs: 1.2,
@@ -87,7 +85,9 @@ export class CompressorNode implements ForeignNode {
   private lowBandReleaseMs: OverridableAudioParam | DummyNode = new DummyNode();
   private midBandReleaseMs: OverridableAudioParam | DummyNode = new DummyNode();
   private highBandReleaseMs: OverridableAudioParam | DummyNode = new DummyNode();
-  private thresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
   private ratio: OverridableAudioParam | DummyNode = new DummyNode();
   private knee: OverridableAudioParam | DummyNode = new DummyNode();
   private lookaheadMs: OverridableAudioParam | DummyNode = new DummyNode();
@@ -207,7 +207,24 @@ export class CompressorNode implements ForeignNode {
       undefined,
       true
     );
-    this.thresholdDb = new OverridableAudioParam(ctx, params.get('threshold_db')!, undefined, true);
+    this.lowBandThresholdDb = new OverridableAudioParam(
+      ctx,
+      params.get('low_band_threshold_db')!,
+      undefined,
+      true
+    );
+    this.midBandThresholdDb = new OverridableAudioParam(
+      ctx,
+      params.get('mid_band_threshold_db')!,
+      undefined,
+      true
+    );
+    this.highBandThresholdDb = new OverridableAudioParam(
+      ctx,
+      params.get('high_band_threshold_db')!,
+      undefined,
+      true
+    );
     this.ratio = new OverridableAudioParam(ctx, params.get('ratio')!, undefined, true);
     this.knee = new OverridableAudioParam(ctx, params.get('knee')!, undefined, true);
     this.lookaheadMs = new OverridableAudioParam(ctx, params.get('lookahead_ms')!, undefined, true);
@@ -239,7 +256,12 @@ export class CompressorNode implements ForeignNode {
       newState.mid.release_ms;
     (this.highBandReleaseMs as OverridableAudioParam).manualControl.offset.value =
       newState.high.release_ms;
-    (this.thresholdDb as OverridableAudioParam).manualControl.offset.value = newState.thresholdDb;
+    (this.lowBandThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.low.threshold;
+    (this.midBandThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.threshold;
+    (this.highBandThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.high.threshold;
     (this.ratio as OverridableAudioParam).manualControl.offset.value = newState.ratio;
     (this.knee as OverridableAudioParam).manualControl.offset.value = newState.knee;
     (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lookaheadMs;
@@ -252,7 +274,9 @@ export class CompressorNode implements ForeignNode {
 
     this.store.set({
       ...params,
-      thresholdDb: params.thresholdDb ?? -24,
+      high: { ...params.high, threshold: params.high.threshold ?? -24 },
+      mid: { ...params.mid, threshold: params.mid.threshold ?? -24 },
+      low: { ...params.low, threshold: params.low.threshold ?? -24 },
       ratio: params.ratio ?? 4,
       knee: params.knee ?? 0,
       lookaheadMs: params.lookaheadMs ?? 0,

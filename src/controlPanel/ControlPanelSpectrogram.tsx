@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 
 import { useDraggable } from 'src/reactUtils';
 import { actionCreators, useSelector } from 'src/redux';
-import { ControlPanelVisualizationDescriptor } from 'src/redux/modules/controlPanel';
+import type { ControlPanelVisualizationDescriptor } from 'src/redux/modules/controlPanel';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 interface ControlPanelSpectrogramProps
