@@ -13,7 +13,6 @@
 <SvelteControlPanel
   settings={[
     { label: 'gain', type: 'range', min: 0, max: 2 },
-    { label: 'ratio', type: 'range', min: 1, max: 50, scale: 'log' },
     { label: 'attack_ms', type: 'range', min: 0.1, max: 500, scale: 'log' },
     { label: 'release_ms', type: 'range', min: 0.1, max: 500, scale: 'log' },
   ]}

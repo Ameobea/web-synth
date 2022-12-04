@@ -22,6 +22,23 @@ const LOW_BAND_CUTOFF: f32 = 88.3;
 const MID_BAND_CUTOFF: f32 = 2500.;
 const SAB_SIZE: usize = 16;
 
+#[repr(C)]
+pub enum LogLevel {
+    Error = 0,
+    Warn = 1,
+    Info = 2,
+}
+
+extern "C" {
+    pub fn log_raw(ptr: *const u8, len: usize, level: LogLevel);
+}
+
+fn error(msg: &str) {
+    unsafe {
+        log_raw(msg.as_ptr(), msg.len(), LogLevel::Error);
+    }
+}
+
 // SAB Layout:
 // 0: low band detected level
 // 1: mid band detected level
@@ -35,7 +52,8 @@ const SAB_SIZE: usize = 16;
 
 #[derive(Clone, Default)]
 pub struct Compressor {
-    pub envelope: f32,
+    pub bottom_envelope: f32,
+    pub top_envelope: f32,
     pub last_detected_level_linear: f32,
     pub last_output_level_db: f32,
 }
@@ -138,23 +156,21 @@ impl Default for MultibandCompressor {
     }
 }
 
-fn apply_filter_chain<const N: usize>(chain: &mut [BiquadFilter; N], sample: f32) -> f32 {
-    let mut result = sample;
-    for filter in chain.iter_mut() {
-        result = filter.apply(result);
-    }
-    result
-}
-
 fn apply_filter_chain_full<const N: usize>(
     chain: &mut [BiquadFilter; N],
     input_buf: [f32; FRAME_SIZE],
     output_lookahead_buf: &mut CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
     gain: f32,
 ) {
+    let mut filtered = input_buf;
+    for filter in chain.iter_mut() {
+        for i in 0..FRAME_SIZE {
+            filtered[i] = filter.apply(filtered[i]);
+        }
+    }
+
     for i in 0..FRAME_SIZE {
-        let output = apply_filter_chain(chain, input_buf[i]);
-        output_lookahead_buf.set(output * gain);
+        output_lookahead_buf.set(filtered[i] * gain);
     }
 }
 
@@ -218,7 +234,7 @@ fn compute_average_volume(samples: [f32; FRAME_SIZE]) -> f32 {
 
 impl Compressor {
     /// Returns target gain in linear units.
-    fn apply_compression_curve(
+    fn apply_compression_top_curve(
         input_volume_linear: f32,
         threshold_linear: f32,
         ratio: f32,
@@ -232,9 +248,23 @@ impl Compressor {
         (1. / ratio) * input_volume_linear
     }
 
+    fn apply_compression_bottom_curve(
+        input_volume_linear: f32,
+        threshold_linear: f32,
+        ratio: f32,
+        knee: f32,
+    ) -> f32 {
+        // TODO: support soft knee
+        if input_volume_linear > threshold_linear {
+            return input_volume_linear;
+        }
+
+        (1. / ratio) * input_volume_linear
+    }
+
     fn compute_makeup_gain(threshold_linear: f32, ratio: f32, knee: f32) -> f32 {
         // TODO: support soft knee
-        let full_range_gain = Self::apply_compression_curve(1., threshold_linear, ratio, knee);
+        let full_range_gain = Self::apply_compression_top_curve(1., threshold_linear, ratio, knee);
         // inverse of full_range_gain
         let full_range_makup_gain = 1. / full_range_gain;
         full_range_makup_gain.powf(0.6)
@@ -247,24 +277,33 @@ impl Compressor {
         output_buf: &mut [f32; FRAME_SIZE],
         attack_ms: f32,
         release_ms: f32,
-        threshold_db: f32,
-        ratio: f32,
+        bottom_threshold_db: f32,
+        top_threshold_db: f32,
+        bottom_ratio: f32,
+        top_ratio: f32,
         knee: f32,
         sensing_method: SensingMethod,
     ) -> f32 {
-        let mut envelope = self.envelope;
+        let mut bottom_envelope = self.bottom_envelope;
+        let mut top_envelope = self.top_envelope;
 
         let lookahead_samples = lookahead_samples as isize;
         let attack_coefficient = compute_attack_coefficient(attack_ms);
         let release_coefficient = compute_release_coefficient(release_ms);
 
-        let threshold_linear = db_to_gain(threshold_db);
-        let makeup_gain = Self::compute_makeup_gain(threshold_linear, ratio, knee);
-        let mut detected_level_db = 0.;
+        let top_threshold_linear = db_to_gain(top_threshold_db);
+        let mut makeup_gain = 1.;
+        let mut detected_level_db = self.last_output_level_db;
         let mut detected_level_linear = self.last_detected_level_linear;
-        let mut target_volume_db = 0.;
+        let mut target_volume_db = detected_level_db;
 
         for i in 0..FRAME_SIZE {
+            let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
+            if input < 0.0001 {
+                output_buf[i] += input;
+                continue;
+            }
+
             // run level detection
             detected_level_linear = match sensing_method {
                 SensingMethod::Peak => detect_level_peak(input_buf, 1800, i, detected_level_linear),
@@ -273,40 +312,82 @@ impl Compressor {
             detected_level_db = gain_to_db(detected_level_linear);
 
             // Compute the envelope
-            if detected_level_db > envelope {
-                envelope =
-                    attack_coefficient * envelope + (1. - attack_coefficient) * detected_level_db;
+            if detected_level_db > top_envelope {
+                top_envelope = attack_coefficient * top_envelope
+                    + (1. - attack_coefficient) * detected_level_db;
+                // makeup_gain = Self::compute_makeup_gain(top_threshold_linear, top_ratio, knee);
             } else {
-                envelope =
-                    release_coefficient * envelope + (1. - release_coefficient) * detected_level_db;
+                top_envelope = release_coefficient * top_envelope
+                    + (1. - release_coefficient) * detected_level_db;
+            }
+            if detected_level_db < bottom_envelope {
+                bottom_envelope = attack_coefficient * bottom_envelope
+                    + (1. - attack_coefficient) * detected_level_db;
+            } else {
+                bottom_envelope = release_coefficient * bottom_envelope
+                    + (1. - release_coefficient) * detected_level_db;
+            }
+
+            // TODO: re-check this
+            if detected_level_db < -60. {
+                target_volume_db = detected_level_db;
+                output_buf[i] += input;
+                continue;
             }
 
             // Compute the gain.
             // TODO: Add support for soft knee
-            let gain = if envelope > threshold_db {
-                target_volume_db = threshold_db + (envelope - threshold_db) / ratio;
+            let gain = if top_envelope > top_threshold_db {
+                // Push the volume down towards the top threshold
+                target_volume_db = top_threshold_db + (top_envelope - top_threshold_db) / top_ratio;
                 let target_volume_linear = db_to_gain(target_volume_db);
-                // detected_level_linear * x = target_volume_linear
-                // x = target_volume_linear / detected_level_linear
                 target_volume_linear / detected_level_linear
+            } else if bottom_envelope < bottom_threshold_db {
+                // Push the volume up towards the bottom threshold
+                let diff_db = bottom_threshold_db - bottom_envelope;
+                // if we're 10db below the threshold with a ratio of 0.5, then we want to be 5db
+                // below the threshold
+                target_volume_db = bottom_threshold_db - diff_db * bottom_ratio;
+                let target_volume_linear = db_to_gain(target_volume_db);
+                (target_volume_linear / detected_level_linear).min(2.)
             } else {
-                target_volume_db = envelope;
+                target_volume_db = top_envelope;
                 1.
             };
 
-            if gain > 5. {
-                panic!(
-                    "gain={}, envelope={}, threshold_db={}, ratio={}",
-                    gain, envelope, threshold_db, ratio
-                );
-            }
+            //             if gain > 5. || target_volume_db > -10. {
+            //                 panic!(
+            //                     "gain={}
+            // top_envelope={}
+            // bottom_envelope={}
+            // bottom_threshold_db={}
+            // top_ratio={}
+            // bottom_ratio={}
+            // target_volume_db={}
+            // detected_level_db={}
+            // top_threshold_db={}
+            // top_threshold_linear={}
+            // makeup_gain={}",
+            //                     gain,
+            //                     top_envelope,
+            //                     bottom_envelope,
+            //                     bottom_threshold_db,
+            //                     top_ratio,
+            //                     bottom_ratio,
+            //                     target_volume_db,
+            //                     detected_level_db,
+            //                     top_threshold_db,
+            //                     top_threshold_linear,
+            //                     makeup_gain
+            //                 );
+            //             }
 
             // Apply the gain
-            let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
             output_buf[i] += input * gain * makeup_gain;
         }
 
-        self.envelope = envelope;
+        self.bottom_envelope = bottom_envelope;
+        self.top_envelope = top_envelope;
         self.last_detected_level_linear = detected_level_linear;
         self.last_output_level_db = target_volume_db;
         detected_level_db
@@ -355,10 +436,14 @@ impl MultibandCompressor {
         mid_band_release_ms: f32,
         high_band_attack_ms: f32,
         high_band_release_ms: f32,
-        low_band_threshold_db: f32,
-        mid_band_threshold_db: f32,
-        high_band_threshold_db: f32,
-        ratio: f32,
+        low_band_bottom_threshold_db: f32,
+        mid_band_bottom_threshold_db: f32,
+        high_band_bottom_threshold_db: f32,
+        low_band_top_threshold_db: f32,
+        mid_band_top_threshold_db: f32,
+        high_band_top_threshold_db: f32,
+        bottom_ratio: f32,
+        top_ratio: f32,
         knee: f32,
         lookahead_samples: usize,
     ) {
@@ -381,13 +466,15 @@ impl MultibandCompressor {
             &mut self.output_buffer,
             low_band_attack_ms,
             low_band_release_ms,
-            low_band_threshold_db,
-            ratio,
+            low_band_bottom_threshold_db,
+            low_band_top_threshold_db,
+            bottom_ratio,
+            top_ratio,
             knee,
             sensing_method,
         );
         self.sab[0] = low_band_detected_level;
-        self.sab[3] = self.low_band_compressor.envelope;
+        self.sab[3] = self.low_band_compressor.bottom_envelope;
         self.sab[6] = self.low_band_compressor.last_output_level_db;
         let mid_band_detected_level = self.mid_band_compressor.apply(
             &self.mid_band_lookahead_buffer,
@@ -395,13 +482,15 @@ impl MultibandCompressor {
             &mut self.output_buffer,
             mid_band_attack_ms,
             mid_band_release_ms,
-            mid_band_threshold_db,
-            ratio,
+            mid_band_bottom_threshold_db,
+            mid_band_top_threshold_db,
+            bottom_ratio,
+            top_ratio,
             knee,
             sensing_method,
         );
         self.sab[1] = mid_band_detected_level;
-        self.sab[4] = self.mid_band_compressor.envelope;
+        self.sab[4] = self.mid_band_compressor.bottom_envelope;
         self.sab[7] = self.mid_band_compressor.last_output_level_db;
         let high_band_detected_level = self.high_band_compressor.apply(
             &self.high_band_lookahead_buffer,
@@ -409,13 +498,15 @@ impl MultibandCompressor {
             &mut self.output_buffer,
             high_band_attack_ms,
             high_band_release_ms,
-            high_band_threshold_db,
-            ratio,
+            high_band_bottom_threshold_db,
+            high_band_top_threshold_db,
+            bottom_ratio,
+            top_ratio,
             knee,
             sensing_method,
         );
         self.sab[2] = high_band_detected_level;
-        self.sab[5] = self.high_band_compressor.envelope;
+        self.sab[5] = self.high_band_compressor.bottom_envelope;
         self.sab[8] = self.high_band_compressor.last_output_level_db;
 
         // apply post gain
@@ -429,6 +520,14 @@ impl MultibandCompressor {
 
 #[no_mangle]
 pub extern "C" fn init_compressor() -> *mut MultibandCompressor {
+    use std::fmt::Write;
+    std::panic::set_hook(Box::new(|panic_info| {
+        // log with `error`
+        let mut buf = String::new();
+        let _ = write!(buf, "panic: {:?}", panic_info);
+        error(&buf);
+    }));
+
     let compressor = MultibandCompressor::default();
     Box::into_raw(Box::new(compressor))
 }
@@ -465,10 +564,14 @@ pub extern "C" fn process_compressor(
     mid_band_release_ms: f32,
     high_band_attack_ms: f32,
     high_band_release_ms: f32,
-    low_band_threshold_db: f32,
-    mid_band_threshold_db: f32,
-    high_band_threshold_db: f32,
-    ratio: f32,
+    low_band_bottom_threshold_db: f32,
+    mid_band_bottom_threshold_db: f32,
+    high_band_bottom_threshold_db: f32,
+    low_band_top_threshold_db: f32,
+    mid_band_top_threshold_db: f32,
+    high_band_top_threshold_db: f32,
+    bottom_ratio: f32,
+    top_ratio: f32,
     knee: f32,
     lookahead_samples: usize,
 ) {
@@ -485,10 +588,14 @@ pub extern "C" fn process_compressor(
         mid_band_release_ms,
         high_band_attack_ms,
         high_band_release_ms,
-        low_band_threshold_db,
-        mid_band_threshold_db,
-        high_band_threshold_db,
-        ratio,
+        low_band_bottom_threshold_db,
+        mid_band_bottom_threshold_db,
+        high_band_bottom_threshold_db,
+        low_band_top_threshold_db,
+        mid_band_top_threshold_db,
+        high_band_top_threshold_db,
+        bottom_ratio,
+        top_ratio,
         knee,
         lookahead_samples,
     );

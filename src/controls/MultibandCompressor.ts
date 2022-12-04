@@ -2,6 +2,7 @@ import { get, type Writable } from 'svelte/store';
 
 import { makeDraggable } from 'src/controls/pixiUtils';
 import type { CompressorNodeUIState } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
+import { delay } from 'src/util';
 import * as PIXI from './pixi';
 
 const MARGIN_TOP_PX = 20;
@@ -9,8 +10,8 @@ const COMRESSOR_CONTROLS_HEIGHT_PX = 100;
 const COMPRESSOR_MARGIN_PX = 140;
 const COMPRESSOR_BG_COLOR = 0x141414;
 
-const MIN_VALUE_DB = -80;
-const MAX_VALUE_DB = 0;
+const MIN_VALUE_DB = -60;
+const MAX_VALUE_DB = 4;
 
 // SAB Layout:
 // 0: low band detected level
@@ -27,16 +28,19 @@ class CompressorControls {
   private envelopeSABIx: number;
   private outputSABIx: number;
   private width: number;
-  private threshold: number;
-  private thresholdGraphics: PIXI.Graphics;
-  private onThresholdChange: (threshold: number) => void;
+  private bottomThreshold: number;
+  private bottomThresholdGraphics: PIXI.Graphics;
+  private topThreshold: number;
+  private topThresholdGraphics: PIXI.Graphics;
+  private onThresholdChange: (bottomThreshold: number, topThreshold: number) => void;
 
-  public dragData: PIXI.InteractionData | null = null;
-
-  public handleDrag = (newPos: PIXI.Point) => {
-    this.thresholdGraphics.x = newPos.x;
-    this.threshold = MIN_VALUE_DB + (newPos.x / this.width) * (MAX_VALUE_DB - MIN_VALUE_DB);
-    this.onThresholdChange(this.threshold);
+  private bottomDragHandler: {
+    dragData: PIXI.InteractionData | null;
+    handleDrag: (newPos: PIXI.Point) => void;
+  };
+  private topDragHandler: {
+    dragData: PIXI.InteractionData | null;
+    handleDrag: (newPos: PIXI.Point) => void;
   };
 
   constructor(
@@ -44,15 +48,17 @@ class CompressorControls {
     detectedSABIx: number,
     envelopeSABIx: number,
     outputSABIx: number,
-    initialThreshold: number,
-    onThresholdChange: (newThreshold: number) => void
+    initialBottomThreshold: number,
+    initialTopThreshold: number,
+    onThresholdChange: (newBottomThreshold: number, newTopThreshold: number) => void
   ) {
     this.container = new PIXI.Container();
     this.detectedSABIx = detectedSABIx;
     this.envelopeSABIx = envelopeSABIx;
     this.outputSABIx = outputSABIx;
     this.width = width;
-    this.threshold = initialThreshold;
+    this.bottomThreshold = initialBottomThreshold;
+    this.topThreshold = initialTopThreshold;
     this.onThresholdChange = onThresholdChange;
     const bg = new PIXI.Graphics();
     bg.beginFill(COMPRESSOR_BG_COLOR);
@@ -61,18 +67,61 @@ class CompressorControls {
     bg.cacheAsBitmap = true;
     this.container.addChild(bg);
 
-    // White vertical 2px thick tick line to indicate threshold
-    const thresholdGraphics = new PIXI.Graphics();
-    thresholdGraphics.lineStyle(2, 0xffffff);
-    thresholdGraphics.moveTo(0, 0);
-    thresholdGraphics.lineTo(0, COMRESSOR_CONTROLS_HEIGHT_PX);
-    thresholdGraphics.cacheAsBitmap = true;
-    this.container.addChild(thresholdGraphics);
-    this.thresholdGraphics = thresholdGraphics;
-    this.thresholdGraphics.x =
-      (this.width * (this.threshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+    this.bottomDragHandler = {
+      dragData: null,
+      handleDrag: newPos => {
+        let newBottomThreshold =
+          MIN_VALUE_DB + (newPos.x / this.width) * (MAX_VALUE_DB - MIN_VALUE_DB);
+        newBottomThreshold = Math.min(newBottomThreshold, this.topThreshold - 0.5);
+        // clamp visual position as well
+        this.bottomThresholdGraphics.x =
+          (this.width * (newBottomThreshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+        this.bottomThreshold = newBottomThreshold;
+        this.onThresholdChange(newBottomThreshold, this.topThreshold);
+      },
+    };
 
-    makeDraggable(thresholdGraphics, this);
+    // White vertical 2px thick tick line to indicate threshold
+    const bottomThresholdGraphics = new PIXI.Graphics();
+    bottomThresholdGraphics.lineStyle(2, 0xffffff);
+    bottomThresholdGraphics.moveTo(0, 0);
+    bottomThresholdGraphics.lineTo(0, COMRESSOR_CONTROLS_HEIGHT_PX);
+    bottomThresholdGraphics.cacheAsBitmap = true;
+    bottomThresholdGraphics.cursor = 'ew-resize';
+    this.container.addChild(bottomThresholdGraphics);
+    this.bottomThresholdGraphics = bottomThresholdGraphics;
+    this.bottomThresholdGraphics.x =
+      (this.width * (this.bottomThreshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+
+    makeDraggable(bottomThresholdGraphics, this.bottomDragHandler);
+
+    this.topDragHandler = {
+      dragData: null,
+      handleDrag: newPos => {
+        let newTopThreshold =
+          MIN_VALUE_DB + (newPos.x / this.width) * (MAX_VALUE_DB - MIN_VALUE_DB);
+        newTopThreshold = Math.max(newTopThreshold, this.bottomThreshold + 0.5);
+        this.topThreshold = newTopThreshold;
+        // clamp visual position as well
+        this.topThresholdGraphics.x =
+          (this.width * (this.topThreshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+        this.onThresholdChange(this.bottomThreshold, newTopThreshold);
+      },
+    };
+
+    // White vertical 2px thick tick line to indicate threshold
+    const topThresholdGraphics = new PIXI.Graphics();
+    topThresholdGraphics.lineStyle(2, 0xffffff);
+    topThresholdGraphics.moveTo(0, 0);
+    topThresholdGraphics.lineTo(0, COMRESSOR_CONTROLS_HEIGHT_PX);
+    topThresholdGraphics.cacheAsBitmap = true;
+    topThresholdGraphics.cursor = 'ew-resize';
+    this.container.addChild(topThresholdGraphics);
+    this.topThresholdGraphics = topThresholdGraphics;
+    this.topThresholdGraphics.x =
+      (this.width * (this.topThreshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+
+    makeDraggable(topThresholdGraphics, this.topDragHandler);
   }
 
   public setSAB(sab: Float32Array) {
@@ -87,6 +136,7 @@ class CompressorControls {
     const detectedLevel = this.sab[this.detectedSABIx];
     const envelopeLevel = this.sab[this.envelopeSABIx];
     const outputLevel = this.sab[this.outputSABIx];
+    // console.log({ detectedLevel, envelopeLevel, outputLevel });
 
     // green rectangle to indicate detected level
     // red rectangle to indicate envelope level
@@ -124,7 +174,8 @@ class CompressorControls {
     outputLevelRect.cacheAsBitmap = false;
 
     this.container.removeChildren();
-    this.container.addChild(this.thresholdGraphics);
+    this.container.addChild(this.bottomThresholdGraphics);
+    this.container.addChild(this.topThresholdGraphics);
     this.container.addChild(detectedLevelRect);
     this.container.addChild(envelopeLevelRect);
     this.container.addChild(outputLevelRect);
@@ -150,10 +201,12 @@ export class MultibandCompressorControls {
       2,
       5,
       8,
-      curState.high.threshold,
-      newThreshold => {
+      curState.high.bottom_threshold,
+      curState.high.top_threshold,
+      (newBottomThreshold, newTopThreshold) => {
         store.update(state => {
-          state.high.threshold = newThreshold;
+          state.high.bottom_threshold = newBottomThreshold;
+          state.high.top_threshold = newTopThreshold;
           return state;
         });
       }
@@ -168,10 +221,12 @@ export class MultibandCompressorControls {
       1,
       4,
       7,
-      curState.mid.threshold,
-      newThreshold => {
+      curState.mid.bottom_threshold,
+      curState.mid.top_threshold,
+      (newBottomThreshold, newTopThreshold) => {
         store.update(state => {
-          state.mid.threshold = newThreshold;
+          state.mid.bottom_threshold = newBottomThreshold;
+          state.mid.top_threshold = newTopThreshold;
           return state;
         });
       }
@@ -186,10 +241,12 @@ export class MultibandCompressorControls {
       0,
       3,
       6,
-      curState.low.threshold,
-      newThreshold => {
+      curState.low.bottom_threshold,
+      curState.low.top_threshold,
+      (newBottomThreshold, newTopThreshold) => {
         store.update(state => {
-          state.low.threshold = newThreshold;
+          state.low.bottom_threshold = newBottomThreshold;
+          state.low.top_threshold = newTopThreshold;
           return state;
         });
       }
@@ -210,11 +267,14 @@ export class MultibandCompressorControls {
     });
   }
 
-  private setSAB(sab: Float32Array) {
+  private async setSAB(sab: Float32Array) {
     this.highBand.setSAB(sab);
     this.midBand.setSAB(sab);
     this.lowBand.setSAB(sab);
 
+    while (!this.app.ticker) {
+      await delay(50);
+    }
     this.app.ticker.add(() => this.render());
   }
 

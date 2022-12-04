@@ -84,28 +84,56 @@ class CompressorAWP extends AudioWorkletProcessor {
         maxValue: 1000,
       },
       {
-        name: 'low_band_threshold_db',
+        name: 'low_band_bottom_threshold_db',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: -100,
         maxValue: 24,
       },
       {
-        name: 'mid_band_threshold_db',
+        name: 'mid_band_bottom_threshold_db',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: -100,
         maxValue: 24,
       },
       {
-        name: 'high_band_threshold_db',
+        name: 'high_band_bottom_threshold_db',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: -100,
         maxValue: 24,
       },
       {
-        name: 'ratio',
+        name: 'low_band_top_threshold_db',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: -100,
+        maxValue: 24,
+      },
+      {
+        name: 'mid_band_top_threshold_db',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: -100,
+        maxValue: 24,
+      },
+      {
+        name: 'high_band_top_threshold_db',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: -100,
+        maxValue: 24,
+      },
+      {
+        name: 'bottom_ratio',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0.01,
+        maxValue: 1024,
+      },
+      {
+        name: 'top_ratio',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0.01,
@@ -161,7 +189,9 @@ class CompressorAWP extends AudioWorkletProcessor {
 
   async initWasm(wasmBytes) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
-    this.wasmInstance = await WebAssembly.instantiate(compiledModule);
+    this.wasmInstance = await WebAssembly.instantiate(compiledModule, {
+      env: { log_raw: (ptr, len, level) => this.logFromWasm(ptr, len, level) },
+    });
 
     this.ctxPtr = this.wasmInstance.exports.init_compressor();
     this.inputBufPtr = this.wasmInstance.exports.get_compressor_input_buf_ptr(this.ctxPtr);
@@ -175,6 +205,20 @@ class CompressorAWP extends AudioWorkletProcessor {
       this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
     }
     return this.wasmMemoryBuffer;
+  }
+
+  logFromWasm(ptr, len, level) {
+    const str = String.fromCharCode.apply(
+      null,
+      new Uint8Array(this.wasmMemoryBuffer.buffer).subarray(ptr, ptr + len)
+    );
+    const levelStr =
+      {
+        0: 'error',
+        1: 'warn',
+        2: 'info',
+      }[level] || 'log';
+    console[levelStr](str);
   }
 
   /**
@@ -211,10 +255,14 @@ class CompressorAWP extends AudioWorkletProcessor {
     const midBandReleaseMs = params.mid_band_release_ms[0];
     const highBandAttackMs = params.high_band_attack_ms[0];
     const highBandReleaseMs = params.high_band_release_ms[0];
-    const lowBandThresholdDb = params.low_band_threshold_db[0];
-    const midBandThresholdDb = params.mid_band_threshold_db[0];
-    const highBandThresholdDb = params.high_band_threshold_db[0];
-    const ratio = params.ratio[0];
+    const lowBandThresholdBottomDb = params.low_band_bottom_threshold_db[0];
+    const midBandThresholdBottomDb = params.mid_band_bottom_threshold_db[0];
+    const highBandThresholdBottomDb = params.high_band_bottom_threshold_db[0];
+    const lowBandThresholdTopDb = params.low_band_top_threshold_db[0];
+    const midBandThresholdTopDb = params.mid_band_top_threshold_db[0];
+    const highBandThresholdTopDb = params.high_band_top_threshold_db[0];
+    const bottomRatio = params.bottom_ratio[0];
+    const topRatio = params.top_ratio[0];
     const knee = params.knee[0];
     const lookaheadSamples = Math.floor(params.lookahead_ms[0] * 0.001 * SAMPLE_RATE);
 
@@ -231,10 +279,14 @@ class CompressorAWP extends AudioWorkletProcessor {
       midBandReleaseMs,
       highBandAttackMs,
       highBandReleaseMs,
-      lowBandThresholdDb,
-      midBandThresholdDb,
-      highBandThresholdDb,
-      ratio,
+      lowBandThresholdBottomDb,
+      midBandThresholdBottomDb,
+      highBandThresholdBottomDb,
+      lowBandThresholdTopDb,
+      midBandThresholdTopDb,
+      highBandThresholdTopDb,
+      bottomRatio,
+      topRatio,
       knee,
       lookaheadSamples
     );

@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::{linear_to_db_checked, FRAME_SIZE, NYQUIST, SAMPLE_RATE};
+use crate::{linear_to_db_checked, NYQUIST};
 
 /// Second-order biquad filter
 #[derive(Clone, Copy, Default)]
@@ -125,14 +125,6 @@ impl BiquadFilter {
 
     #[inline]
     pub fn apply(&mut self, input: f32) -> f32 {
-        // let output = self.b0 * input + self.b1 * self.x[0] + self.b2 * self.x[1]
-        //     - self.a1 * self.y[0]
-        //     - self.a2 * self.y[1];
-        // let output = (self.b0 / self.a0) * input
-        //     + (self.b1 / self.a0) * self.x[0]
-        //     + (self.b2 / self.a0) * self.x[1]
-        //     - (self.a1 / self.a0) * self.y[0]
-        //     - (self.a2 / self.a0) * self.y[1];
         let output =
             self.b0_over_a0 * input + self.b1_over_a0 * self.x[0] + self.b2_over_a0 * self.x[1]
                 - self.a1_over_a0 * self.y[0]

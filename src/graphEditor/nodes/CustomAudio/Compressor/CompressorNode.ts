@@ -13,10 +13,12 @@ import CompressorSmallView from './CompressorSmallView.svelte';
 
 export interface CompressorBandState {
   gain: number;
-  ratio: number;
+  bottom_ratio: number;
+  top_ratio: number;
   attack_ms: number;
   release_ms: number;
-  threshold: number;
+  bottom_threshold: number;
+  top_threshold: number;
 }
 
 export interface CompressorNodeUIState {
@@ -26,7 +28,8 @@ export interface CompressorNodeUIState {
   mid: CompressorBandState;
   high: CompressorBandState;
   postGain: number;
-  ratio: number;
+  bottomRatio: number;
+  topRatio: number;
   knee: number;
   lookaheadMs: number;
   sab: Float32Array | null;
@@ -34,10 +37,12 @@ export interface CompressorNodeUIState {
 
 const buildDefaultCompressorBandState = (): CompressorBandState => ({
   gain: 1,
-  ratio: 12,
+  bottom_ratio: 0.2,
+  top_ratio: 12,
   attack_ms: 3,
   release_ms: 250,
-  threshold: -24,
+  bottom_threshold: -34,
+  top_threshold: -24,
 });
 
 const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
@@ -47,7 +52,8 @@ const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   mid: buildDefaultCompressorBandState(),
   high: buildDefaultCompressorBandState(),
   postGain: 1,
-  ratio: 12,
+  bottomRatio: 0.2,
+  topRatio: 12,
   knee: 30,
   lookaheadMs: 1.2,
   sab: null,
@@ -85,10 +91,14 @@ export class CompressorNode implements ForeignNode {
   private lowBandReleaseMs: OverridableAudioParam | DummyNode = new DummyNode();
   private midBandReleaseMs: OverridableAudioParam | DummyNode = new DummyNode();
   private highBandReleaseMs: OverridableAudioParam | DummyNode = new DummyNode();
-  private lowBandThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
-  private midBandThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
-  private highBandThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
-  private ratio: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandBottomThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandBottomThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandBottomThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandTopThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandTopThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandTopThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
+  private bottomRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private topRatio: OverridableAudioParam | DummyNode = new DummyNode();
   private knee: OverridableAudioParam | DummyNode = new DummyNode();
   private lookaheadMs: OverridableAudioParam | DummyNode = new DummyNode();
 
@@ -207,25 +217,44 @@ export class CompressorNode implements ForeignNode {
       undefined,
       true
     );
-    this.lowBandThresholdDb = new OverridableAudioParam(
+    this.lowBandBottomThresholdDb = new OverridableAudioParam(
       ctx,
-      params.get('low_band_threshold_db')!,
+      params.get('low_band_bottom_threshold_db')!,
       undefined,
       true
     );
-    this.midBandThresholdDb = new OverridableAudioParam(
+    this.midBandBottomThresholdDb = new OverridableAudioParam(
       ctx,
-      params.get('mid_band_threshold_db')!,
+      params.get('mid_band_bottom_threshold_db')!,
       undefined,
       true
     );
-    this.highBandThresholdDb = new OverridableAudioParam(
+    this.highBandBottomThresholdDb = new OverridableAudioParam(
       ctx,
-      params.get('high_band_threshold_db')!,
+      params.get('high_band_bottom_threshold_db')!,
       undefined,
       true
     );
-    this.ratio = new OverridableAudioParam(ctx, params.get('ratio')!, undefined, true);
+    this.lowBandTopThresholdDb = new OverridableAudioParam(
+      ctx,
+      params.get('low_band_top_threshold_db')!,
+      undefined,
+      true
+    );
+    this.midBandTopThresholdDb = new OverridableAudioParam(
+      ctx,
+      params.get('mid_band_top_threshold_db')!,
+      undefined,
+      true
+    );
+    this.highBandTopThresholdDb = new OverridableAudioParam(
+      ctx,
+      params.get('high_band_top_threshold_db')!,
+      undefined,
+      true
+    );
+    this.bottomRatio = new OverridableAudioParam(ctx, params.get('bottom_ratio')!, undefined, true);
+    this.topRatio = new OverridableAudioParam(ctx, params.get('top_ratio')!, undefined, true);
     this.knee = new OverridableAudioParam(ctx, params.get('knee')!, undefined, true);
     this.lookaheadMs = new OverridableAudioParam(ctx, params.get('lookahead_ms')!, undefined, true);
 
@@ -256,13 +285,20 @@ export class CompressorNode implements ForeignNode {
       newState.mid.release_ms;
     (this.highBandReleaseMs as OverridableAudioParam).manualControl.offset.value =
       newState.high.release_ms;
-    (this.lowBandThresholdDb as OverridableAudioParam).manualControl.offset.value =
-      newState.low.threshold;
-    (this.midBandThresholdDb as OverridableAudioParam).manualControl.offset.value =
-      newState.mid.threshold;
-    (this.highBandThresholdDb as OverridableAudioParam).manualControl.offset.value =
-      newState.high.threshold;
-    (this.ratio as OverridableAudioParam).manualControl.offset.value = newState.ratio;
+    (this.lowBandBottomThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.low.bottom_threshold;
+    (this.midBandBottomThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.bottom_threshold;
+    (this.highBandBottomThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.high.bottom_threshold;
+    (this.lowBandTopThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.low.top_threshold;
+    (this.midBandTopThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.top_threshold;
+    (this.highBandTopThresholdDb as OverridableAudioParam).manualControl.offset.value =
+      newState.high.top_threshold;
+    (this.bottomRatio as OverridableAudioParam).manualControl.offset.value = newState.bottomRatio;
+    (this.topRatio as OverridableAudioParam).manualControl.offset.value = newState.topRatio;
     (this.knee as OverridableAudioParam).manualControl.offset.value = newState.knee;
     (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lookaheadMs;
   };
@@ -274,10 +310,23 @@ export class CompressorNode implements ForeignNode {
 
     this.store.set({
       ...params,
-      high: { ...params.high, threshold: params.high.threshold ?? -24 },
-      mid: { ...params.mid, threshold: params.mid.threshold ?? -24 },
-      low: { ...params.low, threshold: params.low.threshold ?? -24 },
-      ratio: params.ratio ?? 4,
+      high: {
+        ...params.high,
+        bottom_threshold: params.high.bottom_threshold ?? -34,
+        top_threshold: params.high.top_threshold ?? -24,
+      },
+      mid: {
+        ...params.mid,
+        bottom_threshold: params.mid.bottom_threshold ?? -34,
+        top_threshold: params.mid.top_threshold ?? -24,
+      },
+      low: {
+        ...params.low,
+        bottom_threshold: params.low.bottom_threshold ?? -34,
+        top_threshold: params.low.top_threshold ?? -24,
+      },
+      bottomRatio: params.bottomRatio ?? 0.2,
+      topRatio: params.topRatio ?? 12,
       knee: params.knee ?? 0,
       lookaheadMs: params.lookaheadMs ?? 0,
       sab: null,
