@@ -12,6 +12,7 @@ import type {
   PatchNetwork,
 } from 'src/patchNetwork';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { getState } from 'src/redux';
 
 /**
  * Commits the state of the provided `patchNetwork`'s foreign connectables to the Rust/Wasm engine,
@@ -118,12 +119,15 @@ export const maybeUpdateVCM = (
   }
 
   setTimeout(() => {
+    const freshPatchNetwork = getState().viewContextManager.patchNetwork;
+    const freshForeignConnectables = freshPatchNetwork.connectables.filter(({ node }) => !!node);
+
     if (!connectionsUnchanged) {
-      engine.set_connections(JSON.stringify(newPatchNetwork.connections));
+      engine.set_connections(JSON.stringify(freshPatchNetwork.connections));
     }
 
     if (!foreignConnectablesUnchanged) {
-      commitForeignConnectables(engine, newForeignConnectables);
+      commitForeignConnectables(engine, freshForeignConnectables);
     }
   });
 };

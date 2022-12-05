@@ -153,7 +153,9 @@ const actionGroups = {
 
       disconnectNodes(fromConnectable.node, toConnectable.node, to);
 
-      const newConnections = [...connections].filter(
+      const newConnections: [ConnectableDescriptor, ConnectableDescriptor][] = [
+        ...connections,
+      ].filter(
         ([from2, to2]) =>
           from2.name !== from.name ||
           from2.vcId !== from.vcId ||

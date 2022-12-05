@@ -6,7 +6,7 @@ import { delay } from 'src/util';
 import * as PIXI from './pixi';
 
 const MARGIN_TOP_PX = 20;
-const COMRESSOR_CONTROLS_HEIGHT_PX = 100;
+const COMPRESSOR_CONTROLS_HEIGHT_PX = 100;
 const COMPRESSOR_MARGIN_PX = 140;
 const COMPRESSOR_BG_COLOR = 0x141414;
 
@@ -20,6 +20,12 @@ const MAX_VALUE_DB = 4;
 // 3: low band envelope level
 // 4: mid band envelope level
 // 5: high band envelope level
+// 6: low band output level
+// 7: mid band output level
+// 8: high band output level
+// 9: low band applied gain
+// 10: mid band applied gain
+// 11: high band applied gain
 
 class CompressorControls {
   public container: PIXI.Container;
@@ -27,6 +33,7 @@ class CompressorControls {
   private detectedSABIx: number;
   private envelopeSABIx: number;
   private outputSABIx: number;
+  private appliedGainSABIx: number;
   private width: number;
   private bottomThreshold: number;
   private bottomThresholdGraphics: PIXI.Graphics;
@@ -48,6 +55,7 @@ class CompressorControls {
     detectedSABIx: number,
     envelopeSABIx: number,
     outputSABIx: number,
+    appliedGainSABIx: number,
     initialBottomThreshold: number,
     initialTopThreshold: number,
     onThresholdChange: (newBottomThreshold: number, newTopThreshold: number) => void
@@ -56,13 +64,14 @@ class CompressorControls {
     this.detectedSABIx = detectedSABIx;
     this.envelopeSABIx = envelopeSABIx;
     this.outputSABIx = outputSABIx;
+    this.appliedGainSABIx = appliedGainSABIx;
     this.width = width;
     this.bottomThreshold = initialBottomThreshold;
     this.topThreshold = initialTopThreshold;
     this.onThresholdChange = onThresholdChange;
     const bg = new PIXI.Graphics();
     bg.beginFill(COMPRESSOR_BG_COLOR);
-    bg.drawRect(0, 0, width, COMRESSOR_CONTROLS_HEIGHT_PX);
+    bg.drawRect(0, 0, width, COMPRESSOR_CONTROLS_HEIGHT_PX);
     bg.endFill();
     bg.cacheAsBitmap = true;
     this.container.addChild(bg);
@@ -85,7 +94,7 @@ class CompressorControls {
     const bottomThresholdGraphics = new PIXI.Graphics();
     bottomThresholdGraphics.lineStyle(2, 0xffffff);
     bottomThresholdGraphics.moveTo(0, 0);
-    bottomThresholdGraphics.lineTo(0, COMRESSOR_CONTROLS_HEIGHT_PX);
+    bottomThresholdGraphics.lineTo(0, COMPRESSOR_CONTROLS_HEIGHT_PX);
     bottomThresholdGraphics.cacheAsBitmap = true;
     bottomThresholdGraphics.cursor = 'ew-resize';
     this.container.addChild(bottomThresholdGraphics);
@@ -113,7 +122,7 @@ class CompressorControls {
     const topThresholdGraphics = new PIXI.Graphics();
     topThresholdGraphics.lineStyle(2, 0xffffff);
     topThresholdGraphics.moveTo(0, 0);
-    topThresholdGraphics.lineTo(0, COMRESSOR_CONTROLS_HEIGHT_PX);
+    topThresholdGraphics.lineTo(0, COMPRESSOR_CONTROLS_HEIGHT_PX);
     topThresholdGraphics.cacheAsBitmap = true;
     topThresholdGraphics.cursor = 'ew-resize';
     this.container.addChild(topThresholdGraphics);
@@ -136,7 +145,7 @@ class CompressorControls {
     const detectedLevel = this.sab[this.detectedSABIx];
     const envelopeLevel = this.sab[this.envelopeSABIx];
     const outputLevel = this.sab[this.outputSABIx];
-    // console.log({ detectedLevel, envelopeLevel, outputLevel });
+    const appliedGain = this.sab[this.appliedGainSABIx];
 
     // green rectangle to indicate detected level
     // red rectangle to indicate envelope level
@@ -173,12 +182,42 @@ class CompressorControls {
     outputLevelRect.endFill();
     outputLevelRect.cacheAsBitmap = false;
 
+    // Display applied gain as either a red bar going to the left from the midpoint or a green bar going to the right from the midpoint.
+    //
+    // Should display in linear units and have a min of 0 to the left and a max of 5 to the right.
+    const appliedGainRect = new PIXI.Graphics();
+    if (appliedGain > 1) {
+      appliedGainRect.beginFill(0x00ff00);
+      // scale applied gain to be between 0 and 1, where 1=0 and 5=1
+      const appliedGainWidth = Math.max(0, Math.min(1, appliedGain / 5));
+      appliedGainRect.drawRect(
+        this.width / 2,
+        COMPRESSOR_CONTROLS_HEIGHT_PX - 8,
+        appliedGainWidth * (this.width / 2),
+        8
+      );
+    } else if (appliedGain < 1) {
+      // draw red rect from the midpoint to the left
+      // scale applied gain to be between 0 and 1, where 1=1 and 0=0
+      const appliedGainWidth = Math.max(0, Math.min(1, 1 - appliedGain));
+      appliedGainRect.beginFill(0xff0000);
+      appliedGainRect.drawRect(
+        this.width / 2 - appliedGainWidth * (this.width / 2),
+        COMPRESSOR_CONTROLS_HEIGHT_PX - 8,
+        appliedGainWidth * (this.width / 2),
+        8
+      );
+    }
+    appliedGainRect.endFill();
+    appliedGainRect.cacheAsBitmap = false;
+
     this.container.removeChildren();
     this.container.addChild(this.bottomThresholdGraphics);
     this.container.addChild(this.topThresholdGraphics);
     this.container.addChild(detectedLevelRect);
     this.container.addChild(envelopeLevelRect);
     this.container.addChild(outputLevelRect);
+    this.container.addChild(appliedGainRect);
   }
 }
 
@@ -201,6 +240,7 @@ export class MultibandCompressorControls {
       2,
       5,
       8,
+      11,
       curState.high.bottom_threshold,
       curState.high.top_threshold,
       (newBottomThreshold, newTopThreshold) => {
@@ -213,7 +253,7 @@ export class MultibandCompressorControls {
     );
     this.highBand.container.position.set(
       0,
-      MARGIN_TOP_PX + 2 * (COMRESSOR_CONTROLS_HEIGHT_PX + COMPRESSOR_MARGIN_PX)
+      MARGIN_TOP_PX + 2 * (COMPRESSOR_CONTROLS_HEIGHT_PX + COMPRESSOR_MARGIN_PX)
     );
     this.app.stage.addChild(this.highBand.container);
     this.midBand = new CompressorControls(
@@ -221,6 +261,7 @@ export class MultibandCompressorControls {
       1,
       4,
       7,
+      10,
       curState.mid.bottom_threshold,
       curState.mid.top_threshold,
       (newBottomThreshold, newTopThreshold) => {
@@ -233,7 +274,7 @@ export class MultibandCompressorControls {
     );
     this.midBand.container.position.set(
       0,
-      MARGIN_TOP_PX + COMRESSOR_CONTROLS_HEIGHT_PX + COMPRESSOR_MARGIN_PX
+      MARGIN_TOP_PX + COMPRESSOR_CONTROLS_HEIGHT_PX + COMPRESSOR_MARGIN_PX
     );
     this.app.stage.addChild(this.midBand.container);
     this.lowBand = new CompressorControls(
@@ -241,6 +282,7 @@ export class MultibandCompressorControls {
       0,
       3,
       6,
+      9,
       curState.low.bottom_threshold,
       curState.low.top_threshold,
       (newBottomThreshold, newTopThreshold) => {

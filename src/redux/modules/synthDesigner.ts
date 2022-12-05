@@ -157,10 +157,10 @@ const connectFMSynth = (stateKey: string, synthIx: number) => {
   connectOscillators(false, targetSynth);
   connectOscillators(true, targetSynth);
 
-  setTimeout(() => {
-    const newConnectables = get_synth_designer_audio_connectables(`synthDesigner_${vcId}`);
-    updateConnectables(vcId, newConnectables);
-  });
+  // setTimeout(() => {
+  const newConnectables = get_synth_designer_audio_connectables(`synthDesigner_${vcId}`);
+  updateConnectables(vcId, newConnectables);
+  // });
 };
 
 export const gateSynthDesigner = (

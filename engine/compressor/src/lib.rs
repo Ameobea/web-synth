@@ -49,6 +49,9 @@ fn error(msg: &str) {
 // 6: low band output level
 // 7: mid band output level
 // 8: high band output level
+// 9: low band applied gain
+// 10: mid band applied gain
+// 11: high band applied gain
 
 #[derive(Clone, Default)]
 pub struct Compressor {
@@ -56,6 +59,7 @@ pub struct Compressor {
     pub top_envelope: f32,
     pub last_detected_level_linear: f32,
     pub last_output_level_db: f32,
+    pub last_applied_gain: f32,
 }
 
 #[derive(Clone)]
@@ -223,13 +227,19 @@ fn compute_release_coefficient(release_time_ms: f32) -> f32 {
 }
 
 /// Given a frame of samples, computes the average volume of the frame in decibels.
-fn compute_average_volume(samples: [f32; FRAME_SIZE]) -> f32 {
+fn detect_level_rms(
+    buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
+    lookahead_samples: isize,
+    sample_ix_in_frame: usize,
+) -> f32 {
     let mut sum = 0.;
-    for sample in samples.iter() {
+    for i in 0..lookahead_samples {
+        let ix = -lookahead_samples - FRAME_SIZE as isize + sample_ix_in_frame as isize + i;
+        let sample = buf.get(ix);
         sum += sample * sample;
     }
-    let average_volume = sum / FRAME_SIZE as f32;
-    average_volume.log10() * 20.
+    let avg = sum / lookahead_samples as f32;
+    avg.sqrt()
 }
 
 impl Compressor {
@@ -291,11 +301,11 @@ impl Compressor {
         let attack_coefficient = compute_attack_coefficient(attack_ms);
         let release_coefficient = compute_release_coefficient(release_ms);
 
-        let top_threshold_linear = db_to_gain(top_threshold_db);
-        let mut makeup_gain = 1.;
+        let makeup_gain = 1.;
         let mut detected_level_db = self.last_output_level_db;
         let mut detected_level_linear = self.last_detected_level_linear;
         let mut target_volume_db = detected_level_db;
+        let mut gain = 1.;
 
         for i in 0..FRAME_SIZE {
             let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
@@ -306,8 +316,8 @@ impl Compressor {
 
             // run level detection
             detected_level_linear = match sensing_method {
-                SensingMethod::Peak => detect_level_peak(input_buf, 1800, i, detected_level_linear),
-                SensingMethod::RMS => unimplemented!(),
+                SensingMethod::Peak => detect_level_peak(input_buf, 5800, i, detected_level_linear),
+                SensingMethod::RMS => detect_level_rms(input_buf, 5800, i),
             };
             detected_level_db = gain_to_db(detected_level_linear);
 
@@ -337,19 +347,21 @@ impl Compressor {
 
             // Compute the gain.
             // TODO: Add support for soft knee
-            let gain = if top_envelope > top_threshold_db {
+            gain = if top_envelope > top_threshold_db {
                 // Push the volume down towards the top threshold
                 target_volume_db = top_threshold_db + (top_envelope - top_threshold_db) / top_ratio;
-                let target_volume_linear = db_to_gain(target_volume_db);
-                target_volume_linear / detected_level_linear
+                // let target_volume_linear = db_to_gain(target_volume_db);
+                // target_volume_linear / detected_level_linear
+                db_to_gain(target_volume_db - detected_level_db)
             } else if bottom_envelope < bottom_threshold_db {
                 // Push the volume up towards the bottom threshold
                 let diff_db = bottom_threshold_db - bottom_envelope;
                 // if we're 10db below the threshold with a ratio of 0.5, then we want to be 5db
                 // below the threshold
                 target_volume_db = bottom_threshold_db - diff_db * bottom_ratio;
-                let target_volume_linear = db_to_gain(target_volume_db);
-                (target_volume_linear / detected_level_linear).min(2.)
+                // let target_volume_linear = db_to_gain(target_volume_db);
+                // target_volume_linear / detected_level_linear
+                db_to_gain(target_volume_db - detected_level_db)
             } else {
                 target_volume_db = top_envelope;
                 1.
@@ -390,6 +402,7 @@ impl Compressor {
         self.top_envelope = top_envelope;
         self.last_detected_level_linear = detected_level_linear;
         self.last_output_level_db = target_volume_db;
+        self.last_applied_gain = gain;
         detected_level_db
     }
 }
@@ -459,7 +472,7 @@ impl MultibandCompressor {
         self.output_buffer.fill(0.);
 
         // Apply compression to each band
-        let sensing_method = SensingMethod::Peak;
+        let sensing_method = SensingMethod::RMS;
         let low_band_detected_level = self.low_band_compressor.apply(
             &self.low_band_lookahead_buffer,
             lookahead_samples,
@@ -476,6 +489,7 @@ impl MultibandCompressor {
         self.sab[0] = low_band_detected_level;
         self.sab[3] = self.low_band_compressor.bottom_envelope;
         self.sab[6] = self.low_band_compressor.last_output_level_db;
+        self.sab[9] = self.low_band_compressor.last_applied_gain;
         let mid_band_detected_level = self.mid_band_compressor.apply(
             &self.mid_band_lookahead_buffer,
             lookahead_samples,
@@ -492,6 +506,7 @@ impl MultibandCompressor {
         self.sab[1] = mid_band_detected_level;
         self.sab[4] = self.mid_band_compressor.bottom_envelope;
         self.sab[7] = self.mid_band_compressor.last_output_level_db;
+        self.sab[10] = self.mid_band_compressor.last_applied_gain;
         let high_band_detected_level = self.high_band_compressor.apply(
             &self.high_band_lookahead_buffer,
             lookahead_samples,
@@ -508,6 +523,7 @@ impl MultibandCompressor {
         self.sab[2] = high_band_detected_level;
         self.sab[5] = self.high_band_compressor.bottom_envelope;
         self.sab[8] = self.high_band_compressor.last_output_level_db;
+        self.sab[11] = self.high_band_compressor.last_applied_gain;
 
         // apply post gain
         if post_gain != 1. {

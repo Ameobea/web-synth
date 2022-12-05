@@ -2,8 +2,12 @@
   import type { Writable } from 'svelte/store';
 
   import { MultibandCompressorControls } from 'src/controls/MultibandCompressor';
+  import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import CompressorControlPanel from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorControlPanel.svelte';
-  import type { CompressorNodeUIState } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
+  import {
+    buildDefaultCompressorNodeUIState,
+    type CompressorNodeUIState,
+  } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 
   export let store: Writable<CompressorNodeUIState>;
 
@@ -12,9 +16,20 @@
 
     return { destroy: () => controls.dispose() };
   };
+
+  const reset = () => store.set(buildDefaultCompressorNodeUIState());
 </script>
 
 <div class="root">
+  <SvelteControlPanel
+    style={{ position: 'absolute', top: 0, left: 0 }}
+    settings={[
+      { label: 'bypass', type: 'checkbox' },
+      { label: 'reset', type: 'button', action: reset },
+    ]}
+    state={{ bypass: $store.bypass }}
+    onChange={(_key, val) => store.update(state => ({ ...state, bypass: val }))}
+  />
   <canvas use:renderMultibandCompressor width={500} height={800} />
   <CompressorControlPanel
     state={$store.low}

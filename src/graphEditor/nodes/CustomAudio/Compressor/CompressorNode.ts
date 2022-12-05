@@ -33,30 +33,32 @@ export interface CompressorNodeUIState {
   knee: number;
   lookaheadMs: number;
   sab: Float32Array | null;
+  bypass: boolean;
 }
 
-const buildDefaultCompressorBandState = (): CompressorBandState => ({
+const buildDefaultCompressorBandState = (band: 'low' | 'mid' | 'high'): CompressorBandState => ({
   gain: 1,
-  bottom_ratio: 0.2,
-  top_ratio: 12,
+  bottom_ratio: { low: 0.24, mid: 0.24, high: 0.24 }[band],
+  top_ratio: { low: 444, mid: 66.7, high: 66.7 }[band],
   attack_ms: 3,
   release_ms: 250,
-  bottom_threshold: -34,
-  top_threshold: -24,
+  bottom_threshold: { low: -40.8, mid: -41.8, high: -40.8 }[band],
+  top_threshold: { low: -35.5, mid: -30.2, high: -33.8 }[band],
 });
 
-const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
+export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   preGain: 1,
   detectionMode: 'peak',
-  low: buildDefaultCompressorBandState(),
-  mid: buildDefaultCompressorBandState(),
-  high: buildDefaultCompressorBandState(),
+  low: buildDefaultCompressorBandState('low'),
+  mid: buildDefaultCompressorBandState('mid'),
+  high: buildDefaultCompressorBandState('high'),
   postGain: 1,
   bottomRatio: 0.2,
   topRatio: 12,
   knee: 30,
   lookaheadMs: 1.2,
   sab: null,
+  bypass: false,
 });
 
 const CompressorWasmBytes = new AsyncOnce(() =>
@@ -72,8 +74,8 @@ const CompressorAWPRegistered = new AsyncOnce(() =>
 );
 
 export class CompressorNode implements ForeignNode {
-  private dummyInput = new DummyNode();
-  private dummyOutput = new DummyNode();
+  private dummyInput = new DummyNode('CompressorNodeInput');
+  private dummyOutput = new DummyNode('CompressorNodeOutput');
   private ctx: AudioContext;
   private vcId: string;
   private awpHandle: AudioWorkletNode | null = null;

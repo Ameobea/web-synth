@@ -9,8 +9,13 @@ const noop = () => {};
  * as loading and lazy initialization.
  */
 export default class DummyNode extends GainNode implements AudioNode, MIDINode {
-  constructor() {
+  public name = '';
+
+  constructor(name?: string) {
     super(new AudioContext());
+    if (name) {
+      this.name = name;
+    }
   }
 
   public outputCbs = [];
