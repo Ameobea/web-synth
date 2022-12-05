@@ -1,20 +1,11 @@
-import { UnimplementedError } from 'ameo-utils';
 import { Option } from 'funfix-core';
-import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import React, { Suspense } from 'react';
 
 import './ControlPanel.scss';
-
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { buildControlPanelAudioConnectables } from 'src/controlPanel/getConnectables';
 import Loading from 'src/misc/Loading';
-import type {
-  AudioConnectables,
-  ConnectableDescriptor,
-  ConnectableInput,
-  ConnectableOutput,
-} from 'src/patchNetwork';
-import { updateConnectables } from 'src/patchNetwork/interface';
+import type { AudioConnectables } from 'src/patchNetwork';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import {
   mkContainerCleanupHelper,
@@ -25,15 +16,14 @@ import {
 import { actionCreators, dispatch, getState, store } from 'src/redux';
 import {
   buildDefaultControl,
+  deserializeControlPanelVisualizationDescriptor,
+  serializeControlPanelVisualizationDescriptor,
   type ControlPanelConnection,
   type ControlPanelInstanceState,
   type ControlPanelMidiKeyboardDescriptor,
-  deserializeControlPanelVisualizationDescriptor,
-  serializeControlPanelVisualizationDescriptor,
   type SerializedControlPanelVisualizationDescriptor,
 } from 'src/redux/modules/controlPanel';
 
-const ctx = new AudioContext();
 const BASE_ROOT_NODE_ID = 'control-panel-root-node';
 const getRootNodeID = (vcId: string) => `${BASE_ROOT_NODE_ID}${vcId}`;
 
@@ -148,111 +138,6 @@ export const cleanup_control_panel = (stateKey: string) => {
   }
 
   dispatch(actionCreators.controlPanel.REMOVE_INSTANCE(vcId));
-};
-
-export class PlaceholderInput extends GainNode implements AudioNode {
-  private controlPanelVcId: string;
-
-  constructor(ctx: AudioContext, controlPanelVcId: string) {
-    super(ctx);
-    this.controlPanelVcId = controlPanelVcId;
-  }
-
-  connect(
-    destinationNode: AudioNode | AudioParam,
-    outputNumOrDescriptor?: number | ConnectableDescriptor,
-    _input?: number
-  ) {
-    if (destinationNode instanceof OverridableAudioParam) {
-      destinationNode.setIsOverridden(true);
-    }
-    if (!outputNumOrDescriptor || typeof outputNumOrDescriptor === 'number') {
-      throw new Error(
-        'Must provide `ConnectableDescriptor` as second argument to `connect` for `PlaceholderInput`'
-      );
-    }
-    const dstDescriptor = outputNumOrDescriptor;
-
-    setTimeout(() => {
-      // Disconnect from the dummy "add a new control", create a new input for it, and re-connect it to that
-
-      dispatch(
-        actionCreators.viewContextManager.DISCONNECT(
-          { vcId: this.controlPanelVcId, name: 'Add a new control...' },
-          dstDescriptor
-        )
-      );
-
-      let outputName = dstDescriptor.name;
-      while (
-        getState().controlPanel.stateByPanelInstance[this.controlPanelVcId].controls.some(
-          control => control.name === outputName
-        )
-      ) {
-        outputName += '_1';
-      }
-
-      dispatch(
-        actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(
-          this.controlPanelVcId,
-          dstDescriptor.vcId,
-          outputName
-        )
-      );
-      updateConnectables(
-        this.controlPanelVcId,
-        get_control_panel_audio_connectables(`controlPanel_${this.controlPanelVcId}`)
-      );
-      dispatch(
-        actionCreators.viewContextManager.CONNECT(
-          { vcId: this.controlPanelVcId, name: outputName },
-          dstDescriptor
-        )
-      );
-    });
-
-    return destinationNode as any;
-  }
-
-  disconnect(..._args: any) {
-    // no-op
-  }
-}
-
-export const buildControlPanelAudioConnectables = (
-  vcId: string,
-  instState: ControlPanelInstanceState
-): AudioConnectables => {
-  let existingConnections = instState.controls.reduce(
-    (acc, conn) => acc.set(conn.name, { type: 'number', node: conn.node }),
-    ImmMap() as ImmMap<string, ConnectableOutput>
-  );
-  existingConnections = instState.midiKeyboards.reduce(
-    (acc, conn) => acc.set(conn.name, { type: 'midi', node: conn.midiNode }),
-    existingConnections
-  );
-
-  const outputs = existingConnections.set('Add a new control...', {
-    type: 'number',
-    node: new PlaceholderInput(ctx, vcId),
-  });
-
-  return {
-    vcId,
-    inputs: instState.visualizations.reduce((acc, viz) => {
-      switch (viz.type) {
-        case 'oscilloscope':
-          throw new UnimplementedError();
-        case 'spectrogram':
-          return acc.set(viz.name, { type: 'customAudio', node: viz.analyser });
-        case 'note':
-          return acc;
-        default:
-          throw new Error(`Unknown viz type: ${(viz as any).type}`);
-      }
-    }, ImmMap<string, ConnectableInput>()),
-    outputs,
-  };
 };
 
 export const get_control_panel_audio_connectables = (stateKey: string): AudioConnectables => {

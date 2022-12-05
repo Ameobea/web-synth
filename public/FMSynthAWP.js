@@ -363,7 +363,12 @@ class FMSynthAWP extends AudioWorkletProcessor {
   };
 
   async initWasm(wasmBytes, modulationMatrix, outputWeights, adsrs) {
-    const importObject = { env: { log_err: this.handleWasmPanic } };
+    const importObject = {
+      env: {
+        log_err: this.handleWasmPanic,
+        log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
+      },
+    };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
     this.wasmInstance.exports.memory.grow(1024 * 4);

@@ -1,7 +1,7 @@
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
 
-import { buildControlPanelAudioConnectables } from 'src/controlPanel';
+import { buildControlPanelAudioConnectables } from 'src/controlPanel/getConnectables';
 import type { ConnectableDescriptor } from 'src/patchNetwork';
 import { connect, updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode } from 'src/patchNetwork/midiNode';

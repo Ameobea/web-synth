@@ -2,7 +2,7 @@ import { Option } from 'funfix-core';
 import { Map } from 'immutable';
 import * as R from 'ramda';
 
-import { PlaceholderInput } from 'src/controlPanel';
+import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type {
   AudioConnectables,

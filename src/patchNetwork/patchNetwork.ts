@@ -1,7 +1,7 @@
 import { Option } from 'funfix-core';
 import { Map } from 'immutable';
 
-import { PlaceholderInput } from 'src/controlPanel';
+import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 import { audioNodeGetters, type ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { connectNodes, disconnectNodes, getConnectedPair } from 'src/redux/modules/vcmUtils';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
