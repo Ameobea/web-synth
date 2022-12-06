@@ -211,7 +211,7 @@ fn detect_level_peak(
 /// Given the attack time in milliseconds, compute the coefficient for a one-pole lowpass filter to
 /// be used in the envelope follower.
 fn compute_attack_coefficient(attack_time_ms: f32) -> f32 {
-    let attack_time_s = attack_time_ms * 0.001;
+    let attack_time_s = (attack_time_ms * 0.001).max(0.0001);
     let attack_time_samples = attack_time_s * SAMPLE_RATE;
     let attack_coefficient = 1. - 1. / attack_time_samples;
     attack_coefficient
@@ -220,7 +220,7 @@ fn compute_attack_coefficient(attack_time_ms: f32) -> f32 {
 /// Given the release time in milliseconds, compute the coefficient for a one-pole highpass filter
 /// to be used in the envelope follower.
 fn compute_release_coefficient(release_time_ms: f32) -> f32 {
-    let release_time_s = release_time_ms * 0.001;
+    let release_time_s = (release_time_ms * 0.001).max(0.0001);
     let release_time_samples = release_time_s * SAMPLE_RATE;
     let release_coefficient = 1. / release_time_samples;
     release_coefficient
@@ -243,43 +243,6 @@ fn detect_level_rms(
 }
 
 impl Compressor {
-    /// Returns target gain in linear units.
-    fn apply_compression_top_curve(
-        input_volume_linear: f32,
-        threshold_linear: f32,
-        ratio: f32,
-        knee: f32,
-    ) -> f32 {
-        // TODO: support soft knee
-        if input_volume_linear < threshold_linear {
-            return input_volume_linear;
-        }
-
-        (1. / ratio) * input_volume_linear
-    }
-
-    fn apply_compression_bottom_curve(
-        input_volume_linear: f32,
-        threshold_linear: f32,
-        ratio: f32,
-        knee: f32,
-    ) -> f32 {
-        // TODO: support soft knee
-        if input_volume_linear > threshold_linear {
-            return input_volume_linear;
-        }
-
-        (1. / ratio) * input_volume_linear
-    }
-
-    fn compute_makeup_gain(threshold_linear: f32, ratio: f32, knee: f32) -> f32 {
-        // TODO: support soft knee
-        let full_range_gain = Self::apply_compression_top_curve(1., threshold_linear, ratio, knee);
-        // inverse of full_range_gain
-        let full_range_makup_gain = 1. / full_range_gain;
-        full_range_makup_gain.powf(0.6)
-    }
-
     pub fn apply(
         &mut self,
         input_buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
@@ -301,7 +264,6 @@ impl Compressor {
         let attack_coefficient = compute_attack_coefficient(attack_ms);
         let release_coefficient = compute_release_coefficient(release_ms);
 
-        let makeup_gain = 1.;
         let mut detected_level_db = self.last_output_level_db;
         let mut detected_level_linear = self.last_detected_level_linear;
         let mut target_volume_db = detected_level_db;
@@ -309,15 +271,19 @@ impl Compressor {
 
         for i in 0..FRAME_SIZE {
             let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
-            if input < 0.0001 {
+            if input < 0.0001 && input > -0.0001 {
+                target_volume_db = -100.;
                 output_buf[i] += input;
                 continue;
             }
 
-            // run level detection
             detected_level_linear = match sensing_method {
-                SensingMethod::Peak => detect_level_peak(input_buf, 5800, i, detected_level_linear),
-                SensingMethod::RMS => detect_level_rms(input_buf, 5800, i),
+                SensingMethod::Peak =>
+                    detect_level_peak(input_buf, lookahead_samples, i, detected_level_linear),
+                // TODO: This needs to be more intelligent.  We should be able to detect the
+                // volume of the signal without having to compute the RMS of the entire lookahead
+                // buffer.
+                SensingMethod::RMS => detect_level_rms(input_buf, lookahead_samples, i),
             };
             detected_level_db = gain_to_db(detected_level_linear);
 
@@ -325,7 +291,6 @@ impl Compressor {
             if detected_level_db > top_envelope {
                 top_envelope = attack_coefficient * top_envelope
                     + (1. - attack_coefficient) * detected_level_db;
-                // makeup_gain = Self::compute_makeup_gain(top_threshold_linear, top_ratio, knee);
             } else {
                 top_envelope = release_coefficient * top_envelope
                     + (1. - release_coefficient) * detected_level_db;
@@ -350,52 +315,19 @@ impl Compressor {
             gain = if top_envelope > top_threshold_db {
                 // Push the volume down towards the top threshold
                 target_volume_db = top_threshold_db + (top_envelope - top_threshold_db) / top_ratio;
-                // let target_volume_linear = db_to_gain(target_volume_db);
-                // target_volume_linear / detected_level_linear
-                db_to_gain(target_volume_db - detected_level_db)
+                db_to_gain(target_volume_db - top_envelope)
             } else if bottom_envelope < bottom_threshold_db {
                 // Push the volume up towards the bottom threshold
-                let diff_db = bottom_threshold_db - bottom_envelope;
-                // if we're 10db below the threshold with a ratio of 0.5, then we want to be 5db
-                // below the threshold
-                target_volume_db = bottom_threshold_db - diff_db * bottom_ratio;
-                // let target_volume_linear = db_to_gain(target_volume_db);
-                // target_volume_linear / detected_level_linear
-                db_to_gain(target_volume_db - detected_level_db)
+                target_volume_db =
+                    bottom_threshold_db - (bottom_threshold_db - bottom_envelope) * bottom_ratio;
+                db_to_gain(target_volume_db - bottom_envelope)
             } else {
                 target_volume_db = top_envelope;
                 1.
             };
 
-            //             if gain > 5. || target_volume_db > -10. {
-            //                 panic!(
-            //                     "gain={}
-            // top_envelope={}
-            // bottom_envelope={}
-            // bottom_threshold_db={}
-            // top_ratio={}
-            // bottom_ratio={}
-            // target_volume_db={}
-            // detected_level_db={}
-            // top_threshold_db={}
-            // top_threshold_linear={}
-            // makeup_gain={}",
-            //                     gain,
-            //                     top_envelope,
-            //                     bottom_envelope,
-            //                     bottom_threshold_db,
-            //                     top_ratio,
-            //                     bottom_ratio,
-            //                     target_volume_db,
-            //                     detected_level_db,
-            //                     top_threshold_db,
-            //                     top_threshold_linear,
-            //                     makeup_gain
-            //                 );
-            //             }
-
             // Apply the gain
-            output_buf[i] += input * gain * makeup_gain;
+            output_buf[i] += input * gain;
         }
 
         self.bottom_envelope = bottom_envelope;
@@ -591,6 +523,9 @@ pub extern "C" fn process_compressor(
     knee: f32,
     lookahead_samples: usize,
 ) {
+    // TODO TEMP
+    let lookahead_samples = 700;
+
     let compressor = unsafe { &mut *compressor };
     compressor.apply(
         pre_gain,
