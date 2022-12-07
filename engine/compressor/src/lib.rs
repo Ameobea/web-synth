@@ -256,6 +256,7 @@ impl Compressor {
         top_ratio: f32,
         knee: f32,
         sensing_method: SensingMethod,
+        post_gain: f32,
     ) -> f32 {
         let mut bottom_envelope = self.bottom_envelope;
         let mut top_envelope = self.top_envelope;
@@ -304,7 +305,7 @@ impl Compressor {
             }
 
             // TODO: re-check this
-            if detected_level_db < -60. {
+            if detected_level_db < -80. {
                 target_volume_db = detected_level_db;
                 output_buf[i] += input;
                 continue;
@@ -320,14 +321,14 @@ impl Compressor {
                 // Push the volume up towards the bottom threshold
                 target_volume_db =
                     bottom_threshold_db - (bottom_threshold_db - bottom_envelope) * bottom_ratio;
-                db_to_gain(target_volume_db - bottom_envelope)
+                db_to_gain(target_volume_db - bottom_envelope).min(3.)
             } else {
                 target_volume_db = top_envelope;
                 1.
             };
 
             // Apply the gain
-            output_buf[i] += input * gain;
+            output_buf[i] += input * gain * post_gain;
         }
 
         self.bottom_envelope = bottom_envelope;
@@ -372,9 +373,9 @@ impl MultibandCompressor {
         &mut self,
         pre_gain: f32,
         post_gain: f32,
-        low_band_gain: f32,
-        mid_band_gain: f32,
-        high_band_gain: f32,
+        low_band_pre_gain: f32,
+        mid_band_pre_gain: f32,
+        high_band_pre_gain: f32,
         low_band_attack_ms: f32,
         low_band_release_ms: f32,
         mid_band_attack_ms: f32,
@@ -391,6 +392,9 @@ impl MultibandCompressor {
         top_ratio: f32,
         knee: f32,
         lookahead_samples: usize,
+        low_band_post_gain: f32,
+        mid_band_post_gain: f32,
+        high_band_post_gain: f32,
     ) {
         // apply pre gain
         if pre_gain != 1. {
@@ -399,7 +403,7 @@ impl MultibandCompressor {
             }
         }
 
-        self.apply_bandsplitting(low_band_gain, mid_band_gain, high_band_gain);
+        self.apply_bandsplitting(low_band_pre_gain, mid_band_pre_gain, high_band_pre_gain);
 
         self.output_buffer.fill(0.);
 
@@ -417,6 +421,7 @@ impl MultibandCompressor {
             top_ratio,
             knee,
             sensing_method,
+            low_band_post_gain,
         );
         self.sab[0] = low_band_detected_level;
         self.sab[3] = self.low_band_compressor.bottom_envelope;
@@ -434,6 +439,7 @@ impl MultibandCompressor {
             top_ratio,
             knee,
             sensing_method,
+            mid_band_post_gain,
         );
         self.sab[1] = mid_band_detected_level;
         self.sab[4] = self.mid_band_compressor.bottom_envelope;
@@ -451,6 +457,7 @@ impl MultibandCompressor {
             top_ratio,
             knee,
             sensing_method,
+            high_band_post_gain,
         );
         self.sab[2] = high_band_detected_level;
         self.sab[5] = self.high_band_compressor.bottom_envelope;
@@ -503,9 +510,9 @@ pub extern "C" fn process_compressor(
     compressor: *mut MultibandCompressor,
     pre_gain: f32,
     post_gain: f32,
-    low_band_gain: f32,
-    mid_band_gain: f32,
-    high_band_gain: f32,
+    low_band_pre_gain: f32,
+    mid_band_pre_gain: f32,
+    high_band_pre_gain: f32,
     low_band_attack_ms: f32,
     low_band_release_ms: f32,
     mid_band_attack_ms: f32,
@@ -525,14 +532,26 @@ pub extern "C" fn process_compressor(
 ) {
     // TODO TEMP
     let lookahead_samples = 700;
+    // let low_band_pre_gain = low_band_pre_gain * db_to_gain(5.2);
+    let low_band_pre_gain = low_band_pre_gain * 1.8197008586099834;
+    // let mid_band_pre_gain = mid_band_pre_gain * db_to_gain(5.2);
+    let mid_band_pre_gain = mid_band_pre_gain * 1.8197008586099834;
+    // let high_band_pre_gain = high_band_pre_gain * db_to_gain(5.2);
+    let high_band_pre_gain = high_band_pre_gain * 1.8197008586099834;
+    // let low_band_post_gain = db_to_gain(10.3);
+    let low_band_post_gain = 3.273406948788382;
+    // let mid_band_post_gain = db_to_gain(5.7);
+    let mid_band_post_gain = 1.9275249131909362;
+    // let high_band_post_gain = db_to_gain(10.3);
+    let high_band_post_gain = 3.273406948788382;
 
     let compressor = unsafe { &mut *compressor };
     compressor.apply(
         pre_gain,
         post_gain,
-        low_band_gain,
-        mid_band_gain,
-        high_band_gain,
+        low_band_pre_gain,
+        mid_band_pre_gain,
+        high_band_pre_gain,
         low_band_attack_ms,
         low_band_release_ms,
         mid_band_attack_ms,
@@ -549,5 +568,8 @@ pub extern "C" fn process_compressor(
         top_ratio,
         knee,
         lookahead_samples,
+        low_band_post_gain,
+        mid_band_post_gain,
+        high_band_post_gain,
     );
 }

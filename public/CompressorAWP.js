@@ -156,7 +156,7 @@ class CompressorAWP extends AudioWorkletProcessor {
     ];
   }
 
-  constructor(options) {
+  constructor(_options) {
     super({ numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
 
     this.isShutdown = false;

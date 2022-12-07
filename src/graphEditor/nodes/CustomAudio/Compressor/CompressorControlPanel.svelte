@@ -18,5 +18,5 @@
   ]}
   {state}
   onChange={handleChange}
-  style={{ width: 500, height: 144, position: 'absolute', top: 20 + 100 - 3 + ix * (140 + 100) }}
+  style={{ width: 500, height: 144, position: 'absolute', top: 100 + 100 - 3 + ix * (140 + 100) }}
 />

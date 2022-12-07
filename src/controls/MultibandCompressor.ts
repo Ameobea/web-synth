@@ -5,7 +5,7 @@ import type { CompressorNodeUIState } from 'src/graphEditor/nodes/CustomAudio/Co
 import { delay } from 'src/util';
 import * as PIXI from './pixi';
 
-const MARGIN_TOP_PX = 20;
+const MARGIN_TOP_PX = 100;
 const COMPRESSOR_CONTROLS_HEIGHT_PX = 100;
 const COMPRESSOR_MARGIN_PX = 140;
 const COMPRESSOR_BG_COLOR = 0x141414;
