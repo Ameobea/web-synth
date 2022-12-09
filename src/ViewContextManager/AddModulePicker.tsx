@@ -3,7 +3,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './GlobalVolume.scss';
-
 import { getEngine } from 'src/util';
 
 interface ViewContextDescriptor {
@@ -36,6 +35,7 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
   { name: 'filter_designer', displayName: 'Filter Designer' },
   { name: 'sinsy', displayName: 'Sinsy' },
   { name: 'looper', displayName: 'Looper' },
+  { name: 'welcome_page', displayName: 'Welcome Page' },
 ];
 
 const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {

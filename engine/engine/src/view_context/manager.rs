@@ -19,6 +19,7 @@ use crate::{
         sequencer::mk_sequencer,
         sinsy::mk_sinsy,
         synth_designer::{mk_synth_designer, SynthDesigner},
+        welcome_page::mk_welcome_page,
     },
     ViewContext,
 };
@@ -570,6 +571,7 @@ pub fn build_view(name: &str, uuid: Uuid) -> Box<dyn ViewContext> {
         "filter_designer" => mk_filter_designer(uuid),
         "sinsy" => mk_sinsy(uuid),
         "looper" => mk_looper(uuid),
+        "welcome_page" => mk_welcome_page(uuid),
         _ => panic!("No handler for view context with name {}", name),
     }
 }

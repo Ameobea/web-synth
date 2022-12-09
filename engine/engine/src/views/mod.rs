@@ -11,3 +11,4 @@ pub mod sample_library;
 pub mod sequencer;
 pub mod sinsy;
 pub mod synth_designer;
+pub mod welcome_page;

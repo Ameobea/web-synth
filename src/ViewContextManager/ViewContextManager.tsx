@@ -3,7 +3,6 @@ import { useSelector } from 'react-redux';
 
 import GlobalVolumeSlider from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
-
 import {
   getIsGlobalBeatCounterStarted,
   registerStartCB,
@@ -14,7 +13,7 @@ import {
   unregisterStopCB,
 } from 'src/eventScheduler';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
-import { ReduxStore } from 'src/redux';
+import type { ReduxStore } from 'src/redux';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
 
 const styles: { [key: string]: React.CSSProperties } = {

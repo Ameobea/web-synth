@@ -162,3 +162,11 @@ extern "C" {
     pub fn cleanup_looper(state_key: &str);
     pub fn get_looper_audio_connectables(vc_id: &str) -> JsValue;
 }
+
+#[wasm_bindgen(raw_module = "./welcomePage/WelcomePage")]
+extern "C" {
+    pub fn init_welcome_page(state_key: &str);
+    pub fn hide_welcome_page(state_key: &str);
+    pub fn unhide_welcome_page(state_key: &str);
+    pub fn cleanup_welcome_page(state_key: &str);
+}
