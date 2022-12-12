@@ -60,6 +60,7 @@ pub struct Compressor {
     pub last_detected_level_linear: f32,
     pub last_output_level_db: f32,
     pub last_applied_gain: f32,
+    pub lookback_period_squared_samples_sum: f32,
 }
 
 #[derive(Clone)]
@@ -227,7 +228,7 @@ fn compute_release_coefficient(release_time_ms: f32) -> f32 {
 }
 
 /// Given a frame of samples, computes the average volume of the frame in decibels.
-fn detect_level_rms(
+fn detect_level_rms_old(
     buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
     lookahead_samples: isize,
     sample_ix_in_frame: usize,
@@ -240,6 +241,32 @@ fn detect_level_rms(
     }
     let avg = sum / lookahead_samples as f32;
     avg.sqrt()
+}
+
+/// Given a frame of samples, computes the average volume of the frame in decibels.
+fn detect_level_rms(
+    buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
+    lookahead_samples: isize,
+    sample_ix_in_frame: usize,
+    lookback_period_squared_samples_sum: &mut f32,
+) -> f32 {
+    let prev_ix = -lookahead_samples - FRAME_SIZE as isize + sample_ix_in_frame as isize - 1;
+    let removed_sample = buf.get(prev_ix);
+    *lookback_period_squared_samples_sum -= removed_sample * removed_sample;
+
+    let cur_ix = -(FRAME_SIZE as isize) + sample_ix_in_frame as isize;
+    let cur_sample = buf.get(cur_ix);
+    *lookback_period_squared_samples_sum += cur_sample * cur_sample;
+
+    if *lookback_period_squared_samples_sum < 0.0001 {
+        *lookback_period_squared_samples_sum = 0.;
+    } else if lookback_period_squared_samples_sum.is_nan()
+        || lookback_period_squared_samples_sum.is_infinite()
+    {
+        panic!("{}, {}", *lookback_period_squared_samples_sum, cur_sample);
+    }
+
+    (*lookback_period_squared_samples_sum / lookahead_samples as f32).sqrt()
 }
 
 impl Compressor {
@@ -272,20 +299,24 @@ impl Compressor {
 
         for i in 0..FRAME_SIZE {
             let input = input_buf.get(-lookahead_samples - FRAME_SIZE as isize + i as isize);
+
+            detected_level_linear = match sensing_method {
+                SensingMethod::Peak =>
+                    detect_level_peak(input_buf, lookahead_samples, i, detected_level_linear),
+                SensingMethod::RMS => detect_level_rms(
+                    input_buf,
+                    lookahead_samples,
+                    i,
+                    &mut self.lookback_period_squared_samples_sum,
+                ),
+            };
+
             if input < 0.0001 && input > -0.0001 {
                 target_volume_db = -100.;
                 output_buf[i] += input;
                 continue;
             }
 
-            detected_level_linear = match sensing_method {
-                SensingMethod::Peak =>
-                    detect_level_peak(input_buf, lookahead_samples, i, detected_level_linear),
-                // TODO: This needs to be more intelligent.  We should be able to detect the
-                // volume of the signal without having to compute the RMS of the entire lookahead
-                // buffer.
-                SensingMethod::RMS => detect_level_rms(input_buf, lookahead_samples, i),
-            };
             detected_level_db = gain_to_db(detected_level_linear);
 
             // Compute the envelope
@@ -572,4 +603,31 @@ pub extern "C" fn process_compressor(
         mid_band_post_gain,
         high_band_post_gain,
     );
+}
+
+#[test]
+fn rms_detection_correctness() {
+    let mut lookback_period_squared_samples_sum = 0.;
+    let lookahead_samples = 200;
+    let mut buf = CircularBuffer::<MAX_LOOKAHEAD_SAMPLES>::new();
+
+    let mut detected_level_new = 0.;
+    let mut detected_level_old = 0.;
+    for _ in 0..2 {
+        for i in 0..FRAME_SIZE {
+            buf.set(0.5);
+        }
+
+        for sample_ix_in_frame in 0..FRAME_SIZE {
+            detected_level_new = detect_level_rms(
+                &buf,
+                lookahead_samples,
+                sample_ix_in_frame,
+                &mut lookback_period_squared_samples_sum,
+            );
+            detected_level_old = detect_level_rms_old(&buf, lookahead_samples, sample_ix_in_frame);
+        }
+    }
+
+    assert_eq!(detected_level_new, detected_level_old);
 }
