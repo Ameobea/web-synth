@@ -16,8 +16,7 @@ pub enum SensingMethod {
 
 const BAND_SPLITTER_FILTER_ORDER: usize = 16;
 const BAND_SPLITTER_FILTER_CHAIN_LENGTH: usize = BAND_SPLITTER_FILTER_ORDER / 2;
-// 50ms
-const MAX_LOOKAHEAD_SAMPLES: usize = SAMPLE_RATE as usize / 20;
+const MAX_LOOKAHEAD_SAMPLES: usize = SAMPLE_RATE as usize / 10;
 const LOW_BAND_CUTOFF: f32 = 88.3;
 const MID_BAND_CUTOFF: f32 = 2500.;
 const SAB_SIZE: usize = 16;
@@ -269,6 +268,19 @@ fn detect_level_rms(
     (*lookback_period_squared_samples_sum / lookahead_samples as f32).sqrt()
 }
 
+/// Same as GLSL smoothstep.  Returns 0. if x < min, 1. if x > max, and smoothly interpolates
+/// between 0. and 1. for x in [min, max].
+fn smoothstep(min: f32, max: f32, x: f32) -> f32 {
+    let t = (x - min) / (max - min);
+    if t < 0. {
+        0.
+    } else if t > 1. {
+        1.
+    } else {
+        t * t * (3. - 2. * t)
+    }
+}
+
 impl Compressor {
     pub fn apply(
         &mut self,
@@ -311,12 +323,6 @@ impl Compressor {
                 ),
             };
 
-            if input < 0.0001 && input > -0.0001 {
-                target_volume_db = -100.;
-                output_buf[i] += input;
-                continue;
-            }
-
             detected_level_db = gain_to_db(detected_level_linear);
 
             // Compute the envelope
@@ -335,12 +341,20 @@ impl Compressor {
                     + (1. - release_coefficient) * detected_level_db;
             }
 
-            // TODO: re-check this
-            if detected_level_db < -80. {
-                target_volume_db = detected_level_db;
-                output_buf[i] += input;
-                continue;
-            }
+            // if input < 0.0001 && input > -0.0001 {
+            //     target_volume_db = -100.;
+            //     output_buf[i] += input;
+            //     continue;
+            // }
+
+            // let activation = smoothstep(-80., -70., bottom_envelope);
+
+            // // TODO: re-check this
+            // if activation < 0.01 {
+            //     target_volume_db = detected_level_db;
+            //     output_buf[i] += input;
+            //     continue;
+            // }
 
             // Compute the gain.
             // TODO: Add support for soft knee
@@ -357,6 +371,7 @@ impl Compressor {
                 target_volume_db = top_envelope;
                 1.
             };
+            // gain *= activation;
 
             // Apply the gain
             output_buf[i] += input * gain * post_gain;
@@ -562,7 +577,7 @@ pub extern "C" fn process_compressor(
     lookahead_samples: usize,
 ) {
     // TODO TEMP
-    let lookahead_samples = 700;
+    let lookahead_samples = (MAX_LOOKAHEAD_SAMPLES / 3) * 2;
     // let low_band_pre_gain = low_band_pre_gain * db_to_gain(5.2);
     let low_band_pre_gain = low_band_pre_gain * 1.8197008586099834;
     // let mid_band_pre_gain = mid_band_pre_gain * db_to_gain(5.2);
