@@ -7,6 +7,13 @@ class CompressorAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
       {
+        name: 'mix',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 1,
+      },
+      {
         name: 'pre_gain',
         defaultValue: 0,
         automationRate: 'k-rate',
@@ -170,6 +177,7 @@ class CompressorAWP extends AudioWorkletProcessor {
     this.ctxPtr = 0;
     this.inputBufPtr = 0;
     this.outputBufPtr = 0;
+    this.bypass = false;
 
     this.port.onmessage = async evt => {
       switch (evt.data.type) {
@@ -179,6 +187,10 @@ class CompressorAWP extends AudioWorkletProcessor {
         }
         case 'shutdown': {
           this.isShutdown = true;
+          break;
+        }
+        case 'setBypassed': {
+          this.bypass = evt.data.bypass;
           break;
         }
         default:
@@ -237,6 +249,11 @@ class CompressorAWP extends AudioWorkletProcessor {
       return false;
     }
 
+    if (this.bypass) {
+      output.set(input);
+      return true;
+    }
+
     const wasmMemory = this.getWasmMemoryBuffer();
     const inputBuffer = wasmMemory.subarray(
       this.inputBufPtr / BYTES_PER_F32,
@@ -244,6 +261,7 @@ class CompressorAWP extends AudioWorkletProcessor {
     );
     inputBuffer.set(input);
 
+    const mix = params.mix[0];
     const preGain = params.pre_gain[0];
     const postGain = params.post_gain[0];
     const lowBandGain = params.low_band_gain[0];
@@ -268,6 +286,7 @@ class CompressorAWP extends AudioWorkletProcessor {
 
     this.wasmInstance.exports.process_compressor(
       this.ctxPtr,
+      mix,
       preGain,
       postGain,
       lowBandGain,

@@ -1,7 +1,10 @@
 import { get, type Writable } from 'svelte/store';
 
 import { makeDraggable } from 'src/controls/pixiUtils';
-import type { CompressorNodeUIState } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
+import type {
+  CompressorBandState,
+  CompressorNodeUIState,
+} from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 import { delay } from 'src/util';
 import * as PIXI from './pixi';
 
@@ -219,6 +222,18 @@ class CompressorControls {
     this.container.addChild(outputLevelRect);
     this.container.addChild(appliedGainRect);
   }
+
+  public setState(newState: CompressorBandState) {
+    this.bottomThreshold = newState.bottom_threshold;
+    this.topThreshold = newState.top_threshold;
+
+    this.bottomThresholdGraphics.x =
+      (this.width * (this.bottomThreshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+    this.topThresholdGraphics.x =
+      (this.width * (this.topThreshold - MIN_VALUE_DB)) / (MAX_VALUE_DB - MIN_VALUE_DB);
+
+    this.render();
+  }
 }
 
 export class MultibandCompressorControls {
@@ -324,6 +339,12 @@ export class MultibandCompressorControls {
     this.highBand.render();
     this.midBand.render();
     this.lowBand.render();
+  }
+
+  public setState(state: CompressorNodeUIState) {
+    this.highBand.setState(state.high);
+    this.midBand.setState(state.mid);
+    this.lowBand.setState(state.low);
   }
 
   public dispose() {

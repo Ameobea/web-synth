@@ -2,7 +2,7 @@ use dsp::{
     circular_buffer::CircularBuffer,
     db_to_gain,
     filters::biquad::{compute_higher_order_biquad_q_factors, BiquadFilter, FilterMode},
-    gain_to_db, SAMPLE_RATE,
+    gain_to_db, one_pole, SAMPLE_RATE,
 };
 
 const FRAME_SIZE: usize = 128;
@@ -77,6 +77,7 @@ pub struct MultibandCompressor {
     pub high_band_compressor: Compressor,
     pub output_buffer: [f32; FRAME_SIZE],
     pub sab: [f32; SAB_SIZE],
+    pub mix_state: f32,
 }
 
 impl Default for MultibandCompressor {
@@ -156,6 +157,7 @@ impl Default for MultibandCompressor {
             high_band_compressor: Compressor::default(),
             output_buffer: [0.0; FRAME_SIZE],
             sab: [0.0; SAB_SIZE],
+            mix_state: 0.,
         }
     }
 }
@@ -417,6 +419,7 @@ impl MultibandCompressor {
     #[inline]
     pub fn apply(
         &mut self,
+        mix: f32,
         pre_gain: f32,
         post_gain: f32,
         low_band_pre_gain: f32,
@@ -452,6 +455,21 @@ impl MultibandCompressor {
         self.apply_bandsplitting(low_band_pre_gain, mid_band_pre_gain, high_band_pre_gain);
 
         self.output_buffer.fill(0.);
+        let mix = one_pole(&mut self.mix_state, mix, 0.1);
+        if mix != 1. {
+            let lookahead_samples = lookahead_samples as isize;
+            for input_buf in &[
+                &self.low_band_lookahead_buffer,
+                &self.mid_band_lookahead_buffer,
+                &self.high_band_lookahead_buffer,
+            ] {
+                for i in 0..FRAME_SIZE {
+                    let ix = -lookahead_samples - FRAME_SIZE as isize + i as isize;
+                    let input = input_buf.get(ix);
+                    self.output_buffer[i] += input * (1. - mix);
+                }
+            }
+        }
 
         // Apply compression to each band
         let sensing_method = SensingMethod::RMS;
@@ -467,7 +485,7 @@ impl MultibandCompressor {
             top_ratio,
             knee,
             sensing_method,
-            low_band_post_gain,
+            low_band_post_gain * mix,
         );
         self.sab[0] = low_band_detected_level;
         self.sab[3] = self.low_band_compressor.bottom_envelope;
@@ -485,7 +503,7 @@ impl MultibandCompressor {
             top_ratio,
             knee,
             sensing_method,
-            mid_band_post_gain,
+            mid_band_post_gain * mix,
         );
         self.sab[1] = mid_band_detected_level;
         self.sab[4] = self.mid_band_compressor.bottom_envelope;
@@ -503,7 +521,7 @@ impl MultibandCompressor {
             top_ratio,
             knee,
             sensing_method,
-            high_band_post_gain,
+            high_band_post_gain * mix,
         );
         self.sab[2] = high_band_detected_level;
         self.sab[5] = self.high_band_compressor.bottom_envelope;
@@ -554,6 +572,7 @@ pub extern "C" fn get_sab_ptr(compressor: *mut MultibandCompressor) -> *mut f32 
 #[no_mangle]
 pub extern "C" fn process_compressor(
     compressor: *mut MultibandCompressor,
+    mix: f32,
     pre_gain: f32,
     post_gain: f32,
     low_band_pre_gain: f32,
@@ -593,6 +612,7 @@ pub extern "C" fn process_compressor(
 
     let compressor = unsafe { &mut *compressor };
     compressor.apply(
+        mix,
         pre_gain,
         post_gain,
         low_band_pre_gain,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Writable } from 'svelte/store';
+  import { get, type Writable } from 'svelte/store';
 
   import { MultibandCompressorControls } from 'src/controls/MultibandCompressor';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
@@ -11,13 +11,23 @@
 
   export let store: Writable<CompressorNodeUIState>;
 
+  let activeControls: MultibandCompressorControls | null = null;
   const renderMultibandCompressor = (canvas: HTMLCanvasElement) => {
     const controls = new MultibandCompressorControls(canvas, store);
+    activeControls = controls;
 
     return { destroy: () => controls.dispose() };
   };
 
-  const reset = () => store.set(buildDefaultCompressorNodeUIState());
+  const reset = () => {
+    const newState = buildDefaultCompressorNodeUIState();
+    newState.bypass = get(store).bypass;
+    activeControls?.setState(newState);
+    store.set(newState);
+  };
+
+  const handleTopControlPanelChange = (key: string, val: any) =>
+    store.update(state => ({ ...state, [key]: val }));
 </script>
 
 <div class="root">
@@ -26,9 +36,10 @@
     settings={[
       { label: 'bypass', type: 'checkbox' },
       { label: 'reset', type: 'button', action: reset },
+      { label: 'mix', type: 'range', min: 0, max: 1, step: 0.005 },
     ]}
-    state={{ bypass: $store.bypass }}
-    onChange={(_key, val) => store.update(state => ({ ...state, bypass: val }))}
+    state={{ bypass: $store.bypass, mix: $store.mix }}
+    onChange={handleTopControlPanelChange}
   />
   <canvas use:renderMultibandCompressor width={500} height={800} />
   <CompressorControlPanel

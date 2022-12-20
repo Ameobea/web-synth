@@ -19,6 +19,7 @@ export interface CompressorBandState {
   release_ms: number;
   bottom_threshold: number;
   top_threshold: number;
+  mix: number;
 }
 
 export interface CompressorNodeUIState {
@@ -34,6 +35,7 @@ export interface CompressorNodeUIState {
   lookaheadMs: number;
   sab: Float32Array | null;
   bypass: boolean;
+  mix: number;
 }
 
 const buildDefaultCompressorBandState = (band: 'low' | 'mid' | 'high'): CompressorBandState => ({
@@ -44,6 +46,7 @@ const buildDefaultCompressorBandState = (band: 'low' | 'mid' | 'high'): Compress
   release_ms: 250,
   bottom_threshold: { low: -40.8, mid: -41.8, high: -40.8 }[band],
   top_threshold: { low: -35.5, mid: -30.2, high: -33.8 }[band],
+  mix: 1,
 });
 
 export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
@@ -59,6 +62,7 @@ export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   lookaheadMs: 1.2,
   sab: null,
   bypass: false,
+  mix: 1,
 });
 
 const CompressorWasmBytes = new AsyncOnce(() =>
@@ -82,6 +86,7 @@ export class CompressorNode implements ForeignNode {
   private store: Writable<CompressorNodeUIState> = writable(buildDefaultCompressorNodeUIState());
 
   // params
+  private mix: OverridableAudioParam | DummyNode = new DummyNode();
   private preGain: OverridableAudioParam | DummyNode = new DummyNode();
   private postGain: OverridableAudioParam | DummyNode = new DummyNode();
   private lowBandGain: OverridableAudioParam | DummyNode = new DummyNode();
@@ -163,6 +168,7 @@ export class CompressorNode implements ForeignNode {
     this.awpHandle.port.onmessage = (e: MessageEvent) => this.handleMessageFromAWP(e);
 
     const params = this.awpHandle.parameters as Map<string, AudioParam>;
+    this.mix = new OverridableAudioParam(ctx, params.get('mix')!, undefined, true);
     this.preGain = new OverridableAudioParam(ctx, params.get('pre_gain')!, undefined, true);
     this.postGain = new OverridableAudioParam(ctx, params.get('post_gain')!, undefined, true);
     this.lowBandGain = new OverridableAudioParam(
@@ -260,6 +266,8 @@ export class CompressorNode implements ForeignNode {
     this.knee = new OverridableAudioParam(ctx, params.get('knee')!, undefined, true);
     this.lookaheadMs = new OverridableAudioParam(ctx, params.get('lookahead_ms')!, undefined, true);
 
+    const { bypass } = get(this.store);
+    this.awpHandle.port.postMessage({ type: 'setBypassed', bypass });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     this.onChange(get(this.store));
     updateConnectables(this.vcId, this.buildConnectables());
@@ -270,6 +278,8 @@ export class CompressorNode implements ForeignNode {
       return;
     }
 
+    this.awpHandle?.port.postMessage({ type: 'setBypassed', bypass: newState.bypass });
+    (this.mix as OverridableAudioParam).manualControl.offset.value = newState.mix;
     (this.preGain as OverridableAudioParam).manualControl.offset.value = newState.preGain;
     (this.postGain as OverridableAudioParam).manualControl.offset.value = newState.postGain;
     (this.lowBandGain as OverridableAudioParam).manualControl.offset.value = newState.low.gain;
@@ -316,22 +326,26 @@ export class CompressorNode implements ForeignNode {
         ...params.high,
         bottom_threshold: params.high.bottom_threshold ?? -34,
         top_threshold: params.high.top_threshold ?? -24,
+        mix: params.high.mix ?? 1,
       },
       mid: {
         ...params.mid,
         bottom_threshold: params.mid.bottom_threshold ?? -34,
         top_threshold: params.mid.top_threshold ?? -24,
+        mix: params.mid.mix ?? 1,
       },
       low: {
         ...params.low,
         bottom_threshold: params.low.bottom_threshold ?? -34,
         top_threshold: params.low.top_threshold ?? -24,
+        mix: params.low.mix ?? 1,
       },
       bottomRatio: params.bottomRatio ?? 0.2,
       topRatio: params.topRatio ?? 12,
       knee: params.knee ?? 0,
       lookaheadMs: params.lookaheadMs ?? 0,
       sab: null,
+      mix: params.mix ?? 1,
     });
   }
 
