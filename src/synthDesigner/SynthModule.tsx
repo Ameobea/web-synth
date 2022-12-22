@@ -1,22 +1,24 @@
 import { UnreachableException } from 'ameo-utils';
-import { Option } from 'funfix-core';
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual } from 'react-redux';
 
 import { saveSynthVoicePreset } from 'src/api';
-import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
+import {
+  mkControlPanelADSR2WithSize,
+  type ADSRWithOutputRange,
+} from 'src/controls/adsr2/ControlPanelADSR2';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { getState, store, useSelector } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
-import { getSynthDesignerReduxInfra, SynthModule } from 'src/redux/modules/synthDesigner';
+import { getSynthDesignerReduxInfra, type SynthModule } from 'src/redux/modules/synthDesigner';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
 import { msToSamples, samplesToMs } from 'src/util';
-import FilterModule from './Filter';
+import { Filter as FilterModule } from './Filter';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
@@ -121,7 +123,7 @@ const buildSynthControlPanelSettings = (vcId: string) => [
   {
     type: 'custom',
     label: 'gain envelope',
-    Comp: mkControlPanelADSR2WithSize(380, 200, vcId),
+    Comp: mkControlPanelADSR2WithSize(380, 200, vcId, 'synthDesignerGainEnvelope'),
   },
 ];
 
@@ -172,21 +174,26 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
     [actionCreators.synthDesigner, dispatch, props.index]
   );
 
-  const state = useMemo(
-    () => ({
+  const state = useMemo(() => {
+    const gainEnvelopeState: ADSRWithOutputRange = {
+      ...gainEnvelope,
+      lenSamples: msToSamples(gainADSRLengthMs),
+      outputRange: [0, 1],
+    };
+
+    return {
       volume: props.masterGain,
       'adsr length ms': gainADSRLengthMs,
-      'gain envelope': {
-        ...gainEnvelope,
-        lenSamples: msToSamples(gainADSRLengthMs),
-        outputRange: [0, 1],
-      },
-      'pitch multiplier': Option.of(localPitchMultiplier).getOrElseL(
-        () => props.pitchMultiplier?.toString() ?? 1
-      ),
-    }),
-    [props.masterGain, gainADSRLengthMs, gainEnvelope, props.pitchMultiplier, localPitchMultiplier]
-  );
+      'gain envelope': gainEnvelopeState,
+      'pitch multiplier': localPitchMultiplier ?? props.pitchMultiplier?.toString() ?? 1,
+    };
+  }, [
+    props.masterGain,
+    gainADSRLengthMs,
+    gainEnvelope,
+    props.pitchMultiplier,
+    localPitchMultiplier,
+  ]);
   const vcId = props.stateKey.split('_')[1];
   const settings = useMemo(() => buildSynthControlPanelSettings(vcId), [vcId]);
 
@@ -223,7 +230,7 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
 }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const filterEnvelope = useMemo(
-    () => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
+    (): ADSRWithOutputRange => ({ ...synth.filterEnvelope, outputRange: [0, 20_000] as const }),
     [synth.filterEnvelope]
   );
   const getFMSynthOutput = useCallback(async () => {
@@ -273,6 +280,8 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
         filterEnvelope={filterEnvelope}
         stateKey={stateKey}
         bypass={synth.filterBypassed}
+        adsrLengthMs={synth.filterADSRLength}
+        enableEnvelope={synth.filterEnvelopeEnabled ?? false}
       />
 
       <div className='effects'>{children}</div>

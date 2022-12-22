@@ -8,17 +8,16 @@ import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { MIDINode } from 'src/patchNetwork/midiNode';
-import {
+import buildSynthDesignerRedux, {
   deserializeSynthModule,
   gateSynthDesigner,
   getInitialSynthDesignerState,
   getSynthDesignerReduxInfra,
   serializeSynthModule,
-  type SynthDesignerState,
   SynthDesignerStateByStateKey,
   ungateSynthDesigner,
+  type SynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
-import buildSynthDesignerRedux from 'src/redux/modules/synthDesigner';
 import { AsyncOnce } from 'src/util';
 import SynthDesigner from './SynthDesigner';
 
@@ -37,8 +36,6 @@ export const init_synth_designer = (stateKey: string) => {
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
   // everything in a big map.
   const vcId = stateKey.split('_')[1]!;
-  const reduxInfra = buildSynthDesignerRedux(vcId);
-  SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
 
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
   const initialState = Try.of(() =>
@@ -67,6 +64,9 @@ export const init_synth_designer = (stateKey: string) => {
       localStorage.removeItem(stateKey);
       return getInitialSynthDesignerState(vcId);
     });
+
+  const reduxInfra = buildSynthDesignerRedux(vcId, initialState);
+  SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
 
   PolysynthMod.get().then(mod => {
     const playNote = (voiceIx: number, note: number, _velocity: number) =>

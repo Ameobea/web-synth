@@ -3,6 +3,7 @@ import * as R from 'ramda';
 import React, { useEffect, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
 
+import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
 import * as PIXI from 'src/controls/pixi';
 import { makeDraggable } from 'src/controls/pixiUtils';
 import type { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -18,9 +19,9 @@ const BACKGROUND_COLOR = 0x131313;
 const RAMP_LINE_COLOR = 0x43f79d;
 const RAMP_LINE_WIDTH = 1.4;
 const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
-const STEP_HANDLE_WIDTH = 4.5;
+const STEP_HANDLE_WIDTH = 4;
 const RAMP_HANDLE_COLOR = 0x0077ff;
-const PHASE_MARKER_COLOR = 0xf7e045;
+const PHASE_MARKER_COLOR = 0x73e6cf;
 const LOOP_DRAG_BAR_COLOR = 0xffd608;
 const RELEASE_DRAG_BAR_COLOR = 0x3500e3;
 const SCALE_MARKING_LINE_COLOR = 0xeeeeee;
@@ -508,6 +509,7 @@ export interface AudioThreadData {
    * The index of `buffer` at which the envelope's current phase is stored and updated
    */
   phaseIndex: number;
+  debugName?: string;
 }
 
 const LEFT_GUTTER_WIDTH_PX = 27;
@@ -529,12 +531,13 @@ class ADSR2Instance {
   private loopDragBar: DragBar | null = null;
   private releasePoint!: number;
   private releaseDragBar!: DragBar;
-  private onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void;
+  private onChange: (newState: ADSRWithOutputRange) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
   private audioThreadData: AudioThreadData;
   private scaleMarkings!: ScaleMarkings;
   private vcId?: string;
+  private debugName?: string;
   /**
    * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
    */
@@ -572,7 +575,7 @@ class ADSR2Instance {
 
   public update(
     state: Adsr,
-    onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void,
+    onChange: (newState: ADSRWithOutputRange) => void,
     outputRange: readonly [number, number]
   ) {
     this.onChange = onChange;
@@ -676,8 +679,12 @@ class ADSR2Instance {
     ctx: AudioContext,
     initialState: Adsr,
     outputRange: readonly [number, number],
-    vcId?: string
+    vcId?: string,
+    debugName?: string
   ) {
+    if (!debugName) {
+      console.trace('No debug name provided for ADSR');
+    }
     try {
       this.app = new PIXI.Application({
         antialias: true,
@@ -696,6 +703,7 @@ class ADSR2Instance {
       this.vcId = vcId;
       this.registerVcHideCb();
     }
+    this.debugName = debugName;
 
     this.audioThreadData = initialState.audioThreadData;
     this.onChange = onChange;
@@ -836,6 +844,12 @@ class ADSR2Instance {
 
     this.app?.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
+        // console.warn('No audio thread data yet', {
+        //   debugName: this.debugName,
+        //   audioThreadDataDebugName: this.audioThreadData
+        //     ? this.audioThreadData.debugName
+        //     : 'NO AUDIO THREAD DATA SET',
+        // });
         return;
       }
       const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
@@ -873,7 +887,7 @@ class ADSR2Instance {
     }
   };
 
-  public serialize(): Adsr & { outputRange: readonly [number, number] } {
+  public serialize(): ADSRWithOutputRange {
     return {
       steps: this.steps.map(R.prop('step')),
       lenSamples: (this.lengthMs / 1000) * SAMPLE_RATE,
@@ -896,9 +910,10 @@ class ADSR2Instance {
 interface ADSR2Props {
   width?: number;
   height?: number;
-  initialState: Adsr & { outputRange: readonly [number, number] };
-  onChange: (newState: Adsr & { outputRange: readonly [number, number] }) => void;
+  initialState: ADSRWithOutputRange;
+  onChange: (newState: ADSRWithOutputRange) => void;
   vcId?: string;
+  debugName?: string;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -909,10 +924,11 @@ export const buildDefaultADSR2Envelope = (audioThreadData: AudioThreadData): Ads
     { x: 0.5, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
     { x: 1, y: 0.2, ramper: { type: 'exponential', exponent: 0.5 } },
   ],
-  lenSamples: SAMPLE_RATE,
+  lenSamples: SAMPLE_RATE / 4,
   loopPoint: 0,
   releasePoint: 0.7,
   audioThreadData,
+  logScale: true,
 });
 
 const ADSR2: React.FC<ADSR2Props> = ({
@@ -921,6 +937,7 @@ const ADSR2: React.FC<ADSR2Props> = ({
   initialState,
   onChange,
   vcId,
+  debugName,
 }) => {
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
@@ -973,7 +990,8 @@ const ADSR2: React.FC<ADSR2Props> = ({
             ctx,
             initialState,
             [outputRangeStart, outputRangeEnd],
-            vcId
+            vcId,
+            debugName
           );
         }}
       />

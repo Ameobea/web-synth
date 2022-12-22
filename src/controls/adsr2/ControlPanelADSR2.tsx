@@ -3,15 +3,24 @@ import React from 'react';
 import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
+export type ADSRWithOutputRange = Adsr & { outputRange: readonly [number, number] };
+
+interface ControlPanelADSR2Props {
+  value: ADSRWithOutputRange;
+  onChange: (newState: ADSRWithOutputRange) => void;
+}
+
 export const mkControlPanelADSR2WithSize = (
   widthPx: number | undefined,
   heightPx = 350,
-  vcId?: string
+  vcId?: string,
+  debugName?: string
 ) => {
-  const ControlPanelADSR2: React.FC<{
-    value: Adsr & { outputRange: [number, number] };
-    onChange: (newState: Adsr & { outputRange: [number, number] }) => void;
-  }> = ({ value, onChange }) => {
+  if (!debugName) {
+    console.trace('Missing `debugName` for `mkControlPanelADSR2WithSize`');
+  }
+
+  const ControlPanelADSR2: React.FC<ControlPanelADSR2Props> = ({ value, onChange }) => {
     if (!value) {
       console.error('Missing `value` to `ControlPanelADSR2`');
     } else if (!value.outputRange) {
@@ -20,6 +29,7 @@ export const mkControlPanelADSR2WithSize = (
         value
       );
     }
+
     return (
       <ADSR2
         initialState={value}
@@ -27,12 +37,9 @@ export const mkControlPanelADSR2WithSize = (
         height={heightPx}
         width={widthPx}
         vcId={vcId}
+        debugName={debugName}
       />
     );
   };
   return ControlPanelADSR2;
 };
-
-export const ControlPanelADSR2 = mkControlPanelADSR2WithSize(undefined);
-
-export default ControlPanelADSR2;

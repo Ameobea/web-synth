@@ -93,21 +93,26 @@ const NoiseGenSmallView: React.FC<NoiseGenSmallViewProps> = ({ onChange, node })
   );
 
   return (
-    <ControlPanel
-      settings={settings}
-      onChange={(key: string, val: any) => {
-        if (key === 'enable_smoothing') {
-          setEnableSmoothing(val);
-        } else if (key === 'noise_type') {
-          setEnableUpdateFreq(+val === 3);
-          onChange(key, +val);
-          return;
-        }
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <p style={{ marginLeft: 4 }}>
+        <code>Outputs values in the range [-1, 1]</code>
+      </p>
+      <ControlPanel
+        settings={settings}
+        onChange={(key: string, val: any) => {
+          if (key === 'enable_smoothing') {
+            setEnableSmoothing(val);
+          } else if (key === 'noise_type') {
+            setEnableUpdateFreq(+val === 3);
+            onChange(key, +val);
+            return;
+          }
 
-        onChange(key, val);
-      }}
-      width={500}
-    />
+          onChange(key, val);
+        }}
+        width={500}
+      />
+    </div>
   );
 };
 

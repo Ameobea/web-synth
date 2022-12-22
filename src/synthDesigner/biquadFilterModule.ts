@@ -31,6 +31,8 @@ export declare class AbstractFilterModule {
   public getInput(): BiquadFilterNode;
   public getOutput(): BiquadFilterNode;
 
+  public getFrequencyParams(): AudioParam[];
+
   public destroy(): void;
 }
 
@@ -129,6 +131,10 @@ export class HigherOrderBiquadFilter implements AbstractFilterModule {
     return R.last(this.inner)!;
   }
 
+  public getFrequencyParams(): AudioParam[] {
+    return this.inner.map(node => node.frequency);
+  }
+
   public destroy() {
     this.inner.forEach(node => node.disconnect());
   }
@@ -173,6 +179,10 @@ export class SingleBiquadFilterModule implements AbstractFilterModule {
   }
   public getOutput(): BiquadFilterNode {
     return this.inner;
+  }
+
+  public getFrequencyParams(): AudioParam[] {
+    return [this.inner.frequency];
   }
 
   constructor(ctx: AudioContext, type: FilterType, csns: FilterCSNs) {

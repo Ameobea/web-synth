@@ -3,8 +3,8 @@ import { createSelector } from 'reselect';
 
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { ADSRValues } from 'src/controls/adsr';
-import { actionCreators, dispatch, ReduxStore } from 'src/redux';
-import { serializeSynthModule } from 'src/redux/modules/synthDesigner';
+import { actionCreators, dispatch, type ReduxStore } from 'src/redux';
+import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 
 export interface SynthPresetEntry {
   id: number;

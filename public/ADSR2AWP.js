@@ -180,6 +180,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     for (let i = 0; i < this.adsrInstanceCount; i++) {
       const output = outputs[i]?.[0];
       if (!output) {
+        console.warn(`No output for ADSR2 index ${i}`);
         continue;
       }
 

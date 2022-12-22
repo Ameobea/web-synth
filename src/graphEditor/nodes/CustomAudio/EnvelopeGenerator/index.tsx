@@ -57,7 +57,10 @@ export class EnvelopeGenerator implements ForeignNode {
         minValue: params?.outputRange?.[0] ?? 0,
         maxValue: params?.outputRange?.[1] ?? 1,
         lengthMs: 2000,
-        steps: buildDefaultADSR2Envelope({ phaseIndex: 0 }).steps,
+        steps: buildDefaultADSR2Envelope({
+          phaseIndex: 0,
+          debugName: 'EnvelopeGenerator constructor',
+        }).steps,
         releaseStartPhase: 0.978,
       },
       1

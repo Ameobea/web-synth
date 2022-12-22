@@ -1,13 +1,16 @@
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
-import { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import {
+  mkControlPanelADSR2WithSize,
+  type ADSRWithOutputRange,
+} from 'src/controls/adsr2/ControlPanelADSR2';
+import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 interface EnvelopeGeneratorSmallViewProps {
   onChange: (params: Adsr, lengthMS: number) => void;
   setLogScale: (logScale: boolean) => void;
-  initialState: { envelope: Adsr & { outputRange: [number, number] }; lengthMS: number };
+  initialState: { envelope: ADSRWithOutputRange; lengthMS: number };
 }
 
 const EnvelopeGeneratorSmallView: React.FC<EnvelopeGeneratorSmallViewProps> = ({
@@ -34,7 +37,7 @@ const EnvelopeGeneratorSmallView: React.FC<EnvelopeGeneratorSmallViewProps> = ({
         type: 'custom',
         label: 'adsr',
         initial: initialState.envelope,
-        Comp: mkControlPanelADSR2WithSize(475),
+        Comp: mkControlPanelADSR2WithSize(475, undefined, undefined, 'EnvelopeGeneratorSmallView'),
       },
     ],
     [initialState.envelope, initialState.lengthMS]

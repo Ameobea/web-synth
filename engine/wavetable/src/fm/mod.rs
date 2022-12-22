@@ -26,6 +26,7 @@ extern "C" {
 }
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
+const GAIN_ENVELOPE_PHASE_BUF_INDEX: usize = 255;
 
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: usize) {
@@ -1910,9 +1911,11 @@ pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *c
 #[no_mangle]
 pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
     // Stop recording phases for the last recently gated voice so the new one can record them
-    for adsr in &mut (*ctx).voices[(*ctx).most_recent_gated_voice_ix].adsrs {
+    let old_phases_voice = &mut (*ctx).voices[(*ctx).most_recent_gated_voice_ix];
+    for adsr in &mut old_phases_voice.adsrs {
         adsr.store_phase_to = None;
     }
+    old_phases_voice.gain_envelope.store_phase_to = None;
     (*ctx).most_recent_gated_voice_ix = voice_ix;
 
     let voice = &mut (*ctx).voices[voice_ix];
@@ -1922,6 +1925,8 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
     }
 
     voice.gain_envelope.gate();
+    voice.gain_envelope.store_phase_to =
+        Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(GAIN_ENVELOPE_PHASE_BUF_INDEX));
 
     for operator in &mut voice.operators {
         if operator.randomize_start_phases {

@@ -131,8 +131,12 @@ const serializeADSR = (adsr: AdsrParams) => ({
     typeof adsr.lenSamples === 'number'
       ? { type: 'constant' as const, value: adsr.lenSamples }
       : adsr.lenSamples,
-  audioThreadData: undefined,
+  audioThreadData: { phaseIndex: 0 },
 });
+
+interface ADSRParamsWithLenSamples extends AdsrParams {
+  lenSamples: { type: 'constant'; value: number };
+}
 
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
@@ -161,7 +165,7 @@ export default class FMSynth implements ForeignNode {
   private sampleMappingStore: Writable<SampleMappingState> = writable(
     buildDefaultSampleMappingState()
   );
-  public gainEnvelope: AdsrParams & { lenSamples: { type: 'constant'; value: number } } = {
+  public gainEnvelope: ADSRParamsWithLenSamples = {
     steps: [
       { x: 0, y: 0, ramper: { type: 'instant' } },
       { x: 0.02, y: 0.65, ramper: { type: 'exponential', exponent: 1 } },
@@ -172,7 +176,7 @@ export default class FMSynth implements ForeignNode {
     lenSamples: { type: 'constant', value: 44_100 / 2 },
     loopPoint: null,
     releasePoint: 0.98,
-    audioThreadData: { phaseIndex: 0 },
+    audioThreadData: { phaseIndex: 255 },
   };
   private gateCallbacks: Set<(midiNumber: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number) => void> = new Set();
@@ -314,6 +318,7 @@ export default class FMSynth implements ForeignNode {
             this.adsrs.forEach(adsr => {
               adsr.audioThreadData.buffer = this.audioThreadDataBuffer!;
             });
+            this.gainEnvelope.audioThreadData.buffer = this.audioThreadDataBuffer!;
           }
 
           // Initialize backend with all effects and modulation indices that were deserialized
@@ -883,6 +888,7 @@ export default class FMSynth implements ForeignNode {
           typeof gainEnvelope.lenSamples === 'number'
             ? { type: 'constant', value: gainEnvelope.lenSamples }
             : gainEnvelope.lenSamples,
+        audioThreadData: { phaseIndex: 255 },
       };
     }
     if (params.sampleMappingState) {

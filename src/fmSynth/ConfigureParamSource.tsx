@@ -7,7 +7,7 @@ import ADSR2, { type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { msToSamples, samplesToMs } from 'src/util';
 
 export const PARAM_BUFFER_COUNT = 8;
@@ -101,7 +101,7 @@ export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): AdsrParams 
   lenSamples: { type: 'constant', value: 44100 },
   loopPoint: null,
   releasePoint: 0.7,
-  audioThreadData: audioThreadData ?? { phaseIndex: 0 },
+  audioThreadData: audioThreadData ?? { phaseIndex: 0, debugName: 'buildDefaultAdsr' },
   logScale: false,
 });
 
@@ -279,7 +279,11 @@ const buildConfigureParamSourceSettings = ({
           action: () => {
             onAdsrChange(
               adsrs.length,
-              buildDefaultAdsr({ ...adsrs[0].audioThreadData, phaseIndex: adsrs.length })
+              buildDefaultAdsr({
+                ...adsrs[0].audioThreadData,
+                phaseIndex: adsrs.length,
+                debugName: 'buildConfigureParamSourceSettings -> buildDefaultAdsr',
+              })
             );
           },
         },
@@ -544,6 +548,7 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
               });
             }}
             vcId={vcId}
+            debugName={`fm synth adsr ${vcId} ${state['adsr index']}`}
           />
         </>
       ) : null}

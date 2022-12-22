@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import React, { useCallback } from 'react';
 import { Range } from 'react-control-panel';
 
-import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { dbToLinear, linearToDb } from 'src/util';
@@ -60,7 +60,7 @@ const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
   );
 };
 
-const filterSettings = {
+const buildFilterSettings = (adsrDebugName?: string, adsrAudioThreadData?: AudioThreadData) => ({
   bypass: {
     label: 'bypass',
     type: 'checkbox',
@@ -108,18 +108,25 @@ const filterSettings = {
   adsr: {
     type: 'custom',
     label: 'adsr',
-    initial: { ...buildDefaultADSR2Envelope({ phaseIndex: 0 }), outputRange: [0, 20_000] },
-    Comp: mkControlPanelADSR2WithSize(500, 320),
+    initial: {
+      ...buildDefaultADSR2Envelope(
+        adsrAudioThreadData ?? { phaseIndex: 0, debugName: 'buildFilterSettings' }
+      ),
+      outputRange: [0, 20_000],
+    },
+    Comp: mkControlPanelADSR2WithSize(500, 320, undefined, adsrDebugName),
   },
-};
+});
 
 export const getSettingsForFilterType = (
   filterType: FilterType,
-  includeADSR = true,
+  includeADSR: false | { adsrAudioThreadData?: AudioThreadData },
   includeBypass = true,
-  vcId?: string
-) =>
-  R.clone(
+  vcId?: string,
+  adsrDebugName?: string
+) => {
+  const filterSettings = buildFilterSettings(adsrDebugName);
+  return R.clone(
     filterNils([
       includeBypass ? filterSettings.bypass : null,
       filterSettings.type,
@@ -144,22 +151,30 @@ export const getSettingsForFilterType = (
         ? {
             type: 'range',
             label: 'adsr length ms',
-            min: 50,
+            min: 20,
             max: 10000,
             initial: 1000,
+            scale: 'log',
           }
         : null,
       includeADSR
-        ? { ...filterSettings.adsr, Comp: mkControlPanelADSR2WithSize(500, 320, vcId) }
+        ? {
+            ...filterSettings.adsr,
+            Comp: mkControlPanelADSR2WithSize(500, 320, vcId, adsrDebugName),
+          }
         : null,
     ])
   );
+};
 
 export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
-  getSettingsForFilterType(filterType).reduce(
-    (acc, { label, initial }) => ({ ...acc, [label]: initial }),
-    {}
-  ) as FilterParams;
+  getSettingsForFilterType(
+    filterType,
+    false,
+    false,
+    undefined,
+    'getDefaultFilterParams SHOULD NOT SHOW UP'
+  ).reduce((acc, { label, initial }) => ({ ...acc, [label]: initial }), {}) as FilterParams;
 
 export const buildDefaultFilter = (
   type: FilterType.Lowpass | FilterType.Highpass,

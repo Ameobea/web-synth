@@ -264,7 +264,7 @@ export const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
       lenSamples: 44_100,
       loopPoint: null,
       releasePoint: env.release.pos ?? 0.9,
-      audioThreadData: { phaseIndex: 0 },
+      audioThreadData: { phaseIndex: 0, debugName: '`normalizeEnvelope`' },
     };
   }
   return envelope as Adsr;

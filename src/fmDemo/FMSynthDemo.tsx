@@ -5,14 +5,12 @@ import ControlPanel from 'react-control-panel';
 import { createRoot } from 'react-dom/client';
 
 import './fmDemo.scss';
-
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import FMSynth, { type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
-
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';
@@ -31,14 +29,14 @@ const SAMPLE_RATE = 44_100;
 const buildDefaultGainADSR = (): Adsr => ({
   steps: [
     { x: 0, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 0.04, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
+    { x: 0.005, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
     { x: 0.7, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
     { x: 1, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
   ],
   lenSamples: SAMPLE_RATE,
   loopPoint: null,
   releasePoint: 0.7,
-  audioThreadData: { phaseIndex: 0 },
+  audioThreadData: { phaseIndex: 255 },
 });
 
 const buildDefaultFilterEnvelope = (): Adsr => ({
@@ -50,7 +48,7 @@ const buildDefaultFilterEnvelope = (): Adsr => ({
   lenSamples: SAMPLE_RATE,
   loopPoint: null,
   releasePoint: 0.7,
-  audioThreadData: { phaseIndex: 0 },
+  audioThreadData: { phaseIndex: 0, debugName: '`buildDefaultFilterEnvelope`' },
 });
 
 const GlobalState: {
@@ -362,7 +360,10 @@ const MainControlPanel: React.FC = ({}) => {
     },
   });
 
-  const SizedControlPanelADSR2 = useMemo(() => mkControlPanelADSR2WithSize(360, 200), []);
+  const SizedControlPanelADSR2 = useMemo(
+    () => mkControlPanelADSR2WithSize(360, 200, undefined, 'fmSynthDemoVolumeEnvelope'),
+    []
+  );
   const settings = useMemo(
     () =>
       filterNils([
@@ -803,6 +804,8 @@ const FMSynthDemo: React.FC = () => {
                 GlobalState.filterBypassed = bypass;
               }}
               vcId={undefined}
+              adsrDebugName='fmSynthDemoFilter'
+              adsrAudioThreadData={filterAdsrs.audioThreadData}
             />
           </>
         )}

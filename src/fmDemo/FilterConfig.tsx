@@ -2,15 +2,16 @@ import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import HelpIcon from 'src/misc/HelpIcon';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
+import type { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import {
   AbstractFilterModule,
   buildAbstractFilterModule,
-  FilterCSNs,
+  type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 import { msToSamples, samplesToMs } from 'src/util';
@@ -130,6 +131,8 @@ interface FilterConfigProps {
   adsrs: ADSR2Module;
   onChange: (params: FilterParams, envelope: Adsr, bypass: boolean, enableADSR: boolean) => void;
   vcId: string | undefined;
+  adsrDebugName?: string;
+  adsrAudioThreadData: AudioThreadData;
 }
 
 const FilterConfig: React.FC<FilterConfigProps> = ({
@@ -138,12 +141,20 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
   adsrs,
   onChange,
   vcId,
+  adsrDebugName,
+  adsrAudioThreadData,
 }) => {
   const [state, setState] = useState(initialState);
 
   const settings = useMemo(
     () =>
-      getSettingsForFilterType(state.params.type, true, true, vcId)
+      getSettingsForFilterType(
+        state.params.type,
+        { adsrAudioThreadData },
+        true,
+        vcId,
+        adsrDebugName
+      )
         .filter(s => {
           if (!state.enableADSR && (s.label === 'adsr' || s.label === 'adsr length ms')) {
             return false;
@@ -156,7 +167,7 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
           delete (s as any).initial;
           return s;
         }),
-    [state.enableADSR, state.params.type, vcId]
+    [state.enableADSR, state.params.type, vcId, adsrDebugName, adsrAudioThreadData]
   );
   const controlPanelState = useMemo(
     () => ({

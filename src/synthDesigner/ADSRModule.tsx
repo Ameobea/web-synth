@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
-import { type ADSRValues, buildDefaultAdsrEnvelope } from 'src/controls/adsr';
+import { buildDefaultAdsrEnvelope, type ADSRValues } from 'src/controls/adsr';
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
@@ -45,17 +45,23 @@ export class ADSR2Module {
   private params: ADSR2Params;
   private onInitializedCbs: (() => void)[] = [];
   public audioThreadData: AudioThreadData;
+  private debugName?: string;
 
   constructor(
     ctx: AudioContext,
     params: ADSR2Params,
     instanceCount: number,
-    audioThreadData?: AudioThreadData
+    audioThreadData?: AudioThreadData,
+    debugName?: string
   ) {
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
     this.params = params;
-    this.audioThreadData = audioThreadData ?? { phaseIndex: 0 };
+    this.audioThreadData = audioThreadData ?? {
+      phaseIndex: 0,
+      debugName: `NO AUDIO THREAD DATA PROVDED FOR \`ADSR2Module\` debugName=${debugName}`,
+    };
+    this.debugName = debugName;
     this.init(instanceCount);
   }
 
