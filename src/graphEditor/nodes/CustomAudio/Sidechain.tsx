@@ -1,5 +1,6 @@
 import { Map as ImmMap } from 'immutable';
-import React from 'react';
+import * as R from 'ramda';
+import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
@@ -14,26 +15,74 @@ const SidechainAWPRegistered = new AsyncOnce(() =>
   new AudioContext().audioWorklet.addModule(
     process.env.ASSET_PATH +
       'SidechainWorkletProcessor.js?cacheBust=' +
-      btoa(Math.random().toString())
+      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );
 const SidechainWasm = new AsyncOnce(() =>
-  fetch(process.env.ASSET_PATH + 'sidechain.wasm').then(res => res.arrayBuffer())
+  fetch(
+    process.env.ASSET_PATH +
+      'sidechain.wasm' +
+      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+  ).then(res => res.arrayBuffer())
 );
 
-const SidechainSmallView: React.FC<{
+interface SidechainState {
+  window_size_samples: number;
+  lowpass_coefficient: number;
+  range_multiplier: number;
+  bypass: boolean;
+}
+
+const buildDefaultSidechainState = (): SidechainState => ({
+  window_size_samples: 800,
+  lowpass_coefficient: 0.5,
+  range_multiplier: -1,
+  bypass: false,
+});
+
+interface SidechainSmallViewProps {
   onChange: (key: string, val: number) => void;
-}> = ({ onChange }) => (
-  <ControlPanel
-    settings={[
-      { type: 'range', label: 'window_size_samples', min: 1, max: 2400, step: 1, initial: 800 },
-      { type: 'range', label: 'lowpass_coefficient', min: 0.5, max: 0.999, initial: 0.5 },
-      { type: 'range', label: 'range_multiplier', min: -3, max: 3, step: 0.001, initial: -1 },
-    ]}
-    onChange={onChange}
-    style={{ width: 500 }}
-  />
-);
+  initialState: SidechainState;
+}
+
+const SidechainSmallView: React.FC<SidechainSmallViewProps> = ({ onChange, initialState }) => {
+  const settings = useMemo(
+    () => [
+      { type: 'checkbox', label: 'bypass', initial: initialState.bypass },
+      {
+        type: 'range',
+        label: 'window_size_samples',
+        min: 1,
+        max: 2400,
+        step: 1,
+        initial: initialState.window_size_samples,
+      },
+      {
+        type: 'range',
+        label: 'lowpass_coefficient',
+        min: 0.5,
+        max: 0.999,
+        initial: initialState.lowpass_coefficient,
+      },
+      {
+        type: 'range',
+        label: 'range_multiplier',
+        min: -3,
+        max: 3,
+        step: 0.001,
+        initial: initialState.range_multiplier,
+      },
+    ],
+    [
+      initialState.bypass,
+      initialState.lowpass_coefficient,
+      initialState.range_multiplier,
+      initialState.window_size_samples,
+    ]
+  );
+
+  return <ControlPanel settings={settings} onChange={onChange} style={{ width: 500 }} />;
+};
 
 export class Sidechain {
   public vcId: string;
@@ -44,6 +93,7 @@ export class Sidechain {
   private gainNode: GainNode;
   private gainDebugNode: GainNode;
   private awpNode: AudioWorkletNode | null = null;
+  private state: SidechainState = buildDefaultSidechainState();
 
   /**
    * See the docs for `enhanceAudioNode`.
@@ -56,7 +106,7 @@ export class Sidechain {
   public renderSmallView: ForeignNode['renderSmallView'];
   public cleanupSmallView: ForeignNode['cleanupSmallView'];
 
-  constructor(ctx: AudioContext, vcId: string, _params?: { [key: string]: any } | null) {
+  constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
     this.ctx = ctx;
     this.gainNode = new GainNode(this.ctx);
@@ -64,49 +114,67 @@ export class Sidechain {
     this.gainDebugNode = new GainNode(this.ctx);
     this.gainDebugNode.gain.value = 1;
 
+    if (params) {
+      this.deserialize(params);
+    }
+
     this.init();
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: SidechainSmallView,
       getProps: () => ({
-        onChange: (key: string, val: number) => {
-          if (!this.awpNode) {
-            return;
-          }
-
-          switch (key) {
-            case 'window_size_samples': {
-              this.awpNode.port.postMessage({
-                type: 'setWindowSizeSamples',
-                windowSizeSamples: val,
-              });
-              break;
-            }
-            case 'lowpass_coefficient': {
-              this.awpNode.port.postMessage({
-                type: 'setLowpassCoefficient',
-                lowpassCoefficient: val,
-              });
-              break;
-            }
-            case 'range_multiplier': {
-              this.awpNode.port.postMessage({
-                type: 'setRangeMultiplier',
-                rangeMultiplier: val,
-              });
-              break;
-            }
-            default: {
-              console.warn('Unhandled key in sidechain UI onchange: ', key);
-            }
-          }
-        },
-        initialState: {
-          // TODO: Deserialize
-        },
+        onChange: (key: string, val: number) => this.onChange(key as keyof SidechainState, val),
+        initialState: R.clone(this.state),
       }),
     });
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
+  }
+
+  private onChange(key: keyof SidechainState, val: any) {
+    if (!(key in this.state)) {
+      console.error(`Invalid key ${key} passed to \`Sidechain.onChange\``);
+      return;
+    }
+
+    (this.state as any)[key] = val;
+
+    if (!this.awpNode) {
+      return;
+    }
+
+    switch (key) {
+      case 'window_size_samples': {
+        this.awpNode.port.postMessage({
+          type: 'setWindowSizeSamples',
+          windowSizeSamples: val,
+        });
+        break;
+      }
+      case 'lowpass_coefficient': {
+        this.awpNode.port.postMessage({
+          type: 'setLowpassCoefficient',
+          lowpassCoefficient: val,
+        });
+        break;
+      }
+      case 'range_multiplier': {
+        this.awpNode.port.postMessage({
+          type: 'setRangeMultiplier',
+          rangeMultiplier: val,
+        });
+        break;
+      }
+      case 'bypass': {
+        this.awpNode.port.postMessage({
+          type: 'setBypass',
+          bypass: val,
+        });
+        break;
+      }
+      default: {
+        console.warn('Unhandled key in sidechain UI onchange: ', key);
+      }
+    }
   }
 
   private async init() {
@@ -114,7 +182,23 @@ export class Sidechain {
       SidechainWasm.get(),
       SidechainAWPRegistered.get(),
     ] as const);
+
     this.awpNode = new AudioWorkletNode(this.ctx, 'sidechain-audio-worklet-node-processor');
+    this.awpNode.port.onmessage = e => {
+      switch (e.data.type) {
+        case 'wasmInitialized': {
+          console.log('Sidechain AWP initialized');
+          for (const key of Object.keys(this.state) as (keyof SidechainState)[]) {
+            this.onChange(key, this.state[key]);
+          }
+          break;
+        }
+        default: {
+          console.warn('Unhandled message from sidechain AWP: ', e.data);
+        }
+      }
+    };
+
     this.awpNode.port.postMessage({ type: 'setWasmBytes', wasmBytes: sidechainWasm });
 
     // The output of the node gets sent into the gain node
@@ -145,6 +229,10 @@ export class Sidechain {
   }
 
   public serialize(): { [key: string]: any } {
-    return {}; // TODO
+    return { ...this.state };
+  }
+
+  public deserialize(data: { [key: string]: any }) {
+    this.state = { ...this.state, ...data };
   }
 }

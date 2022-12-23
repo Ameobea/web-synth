@@ -60,7 +60,11 @@ const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
   );
 };
 
-const buildFilterSettings = (adsrDebugName?: string, adsrAudioThreadData?: AudioThreadData) => ({
+const buildFilterSettings = (
+  includeADSR: boolean,
+  adsrDebugName?: string,
+  adsrAudioThreadData?: AudioThreadData
+) => ({
   bypass: {
     label: 'bypass',
     type: 'checkbox',
@@ -105,17 +109,19 @@ const buildFilterSettings = (adsrDebugName?: string, adsrAudioThreadData?: Audio
     initial: 1,
     steps: 1000,
   },
-  adsr: {
-    type: 'custom',
-    label: 'adsr',
-    initial: {
-      ...buildDefaultADSR2Envelope(
-        adsrAudioThreadData ?? { phaseIndex: 0, debugName: 'buildFilterSettings' }
-      ),
-      outputRange: [0, 20_000],
-    },
-    Comp: mkControlPanelADSR2WithSize(500, 320, undefined, adsrDebugName),
-  },
+  adsr: includeADSR
+    ? {
+        type: 'custom',
+        label: 'adsr',
+        initial: {
+          ...buildDefaultADSR2Envelope(
+            adsrAudioThreadData ?? { phaseIndex: 0, debugName: 'buildFilterSettings' }
+          ),
+          outputRange: [0, 20_000],
+        },
+        Comp: mkControlPanelADSR2WithSize(500, 320, undefined, adsrDebugName),
+      }
+    : {},
 });
 
 export const getSettingsForFilterType = (
@@ -125,7 +131,7 @@ export const getSettingsForFilterType = (
   vcId?: string,
   adsrDebugName?: string
 ) => {
-  const filterSettings = buildFilterSettings(adsrDebugName);
+  const filterSettings = buildFilterSettings(!!includeADSR, adsrDebugName);
   return R.clone(
     filterNils([
       includeBypass ? filterSettings.bypass : null,

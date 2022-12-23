@@ -5,6 +5,8 @@ class SidechainWorkletProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
 
+    this.bypassed = false;
+
     this.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
@@ -29,6 +31,10 @@ class SidechainWorkletProcessor extends AudioWorkletProcessor {
           }
           break;
         }
+        case 'setBypass': {
+          this.bypassed = evt.data.bypass;
+          break;
+        }
         default: {
           console.warn('Unhandled message type in sidechain AWP: ', evt.data.type);
         }
@@ -42,10 +48,12 @@ class SidechainWorkletProcessor extends AudioWorkletProcessor {
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
     this.inputsBufPtr = this.wasmInstance.exports.init(FRAME_SIZE);
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+
+    this.port.postMessage({ type: 'wasmInitialized' });
   }
 
   process(inputs, outputs, _params) {
-    if (!inputs[0]?.[0] || !outputs[0]?.[0] || !this.wasmInstance) {
+    if (!inputs[0]?.[0] || !outputs[0]?.[0] || !this.wasmInstance || this.bypassed) {
       return true;
     }
 
