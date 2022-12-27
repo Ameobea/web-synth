@@ -9,7 +9,10 @@ import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import FMSynth, { type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, {
+  AdsrLengthMode,
+  type Adsr,
+} from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
@@ -223,7 +226,8 @@ const adsrs = (() => {
     {
       minValue: 0,
       maxValue: 1,
-      lengthMs: samplesToMs(base.lenSamples),
+      length: base.lenSamples,
+      lengthMode: AdsrLengthMode.Samples,
       loopPoint: base.loopPoint,
       releaseStartPhase: base.releasePoint,
       steps: base.steps,
@@ -248,7 +252,8 @@ const filterAdsrs = (() => {
     {
       minValue: 80,
       maxValue: 44_100 / 2,
-      lengthMs: samplesToMs(base.lenSamples),
+      length: base.lenSamples,
+      lengthMode: AdsrLengthMode.Samples,
       loopPoint: base.loopPoint,
       releaseStartPhase: base.releasePoint,
       steps: base.steps,

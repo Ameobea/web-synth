@@ -3,7 +3,11 @@ import * as R from 'ramda';
 
 import { buildDefaultAdsrEnvelope, type ADSRValues } from 'src/controls/adsr';
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
-import type { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import {
+  AdsrLengthMode,
+  type Adsr,
+  type AdsrStep,
+} from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
 
 const ADSR2AWPRegistered = new AsyncOnce(() =>
@@ -25,10 +29,11 @@ const ADSRWasm = new AsyncOnce(() => {
   return fetch(url).then(res => res.arrayBuffer());
 });
 
-export interface ADSR2Params {
+interface ADSR2Params {
   minValue?: number;
   maxValue?: number;
-  lengthMs: number;
+  length: number;
+  lengthMode: AdsrLengthMode;
   loopPoint?: number | null;
   releaseStartPhase: number;
   steps: AdsrStep[];
@@ -45,23 +50,20 @@ export class ADSR2Module {
   private params: ADSR2Params;
   private onInitializedCbs: (() => void)[] = [];
   public audioThreadData: AudioThreadData;
-  private debugName?: string;
 
   constructor(
     ctx: AudioContext,
     params: ADSR2Params,
     instanceCount: number,
-    audioThreadData?: AudioThreadData,
-    debugName?: string
+    audioThreadData?: AudioThreadData
   ) {
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
     this.params = params;
     this.audioThreadData = audioThreadData ?? {
       phaseIndex: 0,
-      debugName: `NO AUDIO THREAD DATA PROVDED FOR \`ADSR2Module\` debugName=${debugName}`,
+      debugName: 'NO AUDIO THREAD DATA PROVDED FOR `ADSR2Module`',
     };
-    this.debugName = debugName;
     this.init(instanceCount);
   }
 
@@ -93,6 +95,7 @@ export class ADSR2Module {
             );
             break;
           }
+          console.log('phaseDataBuffer: ', this.audioThreadData.debugName);
           this.audioThreadData.buffer = new Float32Array(
             evt.data.phaseDataBuffer as SharedArrayBuffer
           );
@@ -109,7 +112,8 @@ export class ADSR2Module {
       encodedSteps: ADSR2Module.encodeADSRSteps(this.params.steps),
       releaseStartPhase: this.params.releaseStartPhase,
       loopPoint: this.params.loopPoint,
-      lenMs: this.params.lengthMs,
+      length: this.params.length,
+      lengthMode: this.params.lengthMode,
       outputRange: this.outputRange,
       logScale: this.params.logScale ?? false,
     });
@@ -132,14 +136,9 @@ export class ADSR2Module {
 
   public setState(newState: Adsr) {
     this.setSteps(newState.steps);
-    this.params.steps = R.clone(newState.steps);
     this.setLoopPoint(newState.loopPoint);
-    this.params.loopPoint = newState.loopPoint;
     this.setReleaseStartPhase(newState.releasePoint);
-    this.params.releaseStartPhase = newState.releasePoint;
-    const newLengthMs = samplesToMs(newState.lenSamples);
-    this.setLengthMs(newLengthMs);
-    this.params.lengthMs = newLengthMs;
+    // this.setLength(newState.lengthMode, newState.lenSamples);
     this.setLogScale(newState.logScale ?? false);
   }
 
@@ -171,12 +170,32 @@ export class ADSR2Module {
     });
   }
 
-  public setLengthMs(newLengthMs: number) {
-    this.params.lengthMs = newLengthMs;
+  public setLength(lengthMode: AdsrLengthMode | undefined, newLength: number) {
+    this.params.lengthMode = lengthMode ?? AdsrLengthMode.Samples;
+    this.params.length = newLength;
     if (!this.awp) {
       return;
     }
-    this.awp.port.postMessage({ type: 'setLenMs', lenMs: newLengthMs });
+
+    this.awp.port.postMessage({
+      type: 'setLength',
+      length: (() => {
+        switch (lengthMode) {
+          case AdsrLengthMode.Samples:
+            return samplesToMs(newLength);
+          case AdsrLengthMode.Beats:
+            return newLength;
+          default:
+            throw new UnreachableException(`Unhandled length mode: ${lengthMode}`);
+        }
+      })(),
+      lengthMode: lengthMode ?? AdsrLengthMode.Samples,
+    });
+  }
+
+  public setLengthMs(newLengthMs: number) {
+    const newLengthSamples = msToSamples(newLengthMs);
+    this.setLength(AdsrLengthMode.Samples, newLengthSamples);
   }
 
   public setLogScale(logScale: boolean) {
@@ -192,7 +211,12 @@ export class ADSR2Module {
   }
 
   public getLengthMs(): number {
-    return this.params.lengthMs;
+    if (this.params.lengthMode === AdsrLengthMode.Samples) {
+      return samplesToMs(this.params.length);
+    } else {
+      console.error('Tried to get ADSR2 length in ms when length mode is not samples');
+      return 100;
+    }
   }
 
   public getSteps(): AdsrStep[] {
@@ -227,7 +251,7 @@ export class ADSR2Module {
   public serialize(): Adsr {
     return {
       steps: R.clone(this.params.steps),
-      lenSamples: msToSamples(this.params.lengthMs),
+      lenSamples: this.params.length,
       loopPoint: this.params.loopPoint ?? null,
       releasePoint: this.params.releaseStartPhase ?? null,
       audioThreadData: { phaseIndex: 0 },

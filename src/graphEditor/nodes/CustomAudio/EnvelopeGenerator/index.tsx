@@ -5,7 +5,7 @@ import type { ADSRValues } from 'src/controls/adsr';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
-import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -13,7 +13,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
-import { normalizeEnvelope } from 'src/util';
+import { msToSamples, normalizeEnvelope } from 'src/util';
 
 interface SerializedState {
   envelope: Adsr;
@@ -56,7 +56,8 @@ export class EnvelopeGenerator implements ForeignNode {
       {
         minValue: params?.outputRange?.[0] ?? 0,
         maxValue: params?.outputRange?.[1] ?? 1,
-        lengthMs: 2000,
+        length: msToSamples(2000),
+        lengthMode: AdsrLengthMode.Samples,
         steps: buildDefaultADSR2Envelope({
           phaseIndex: 0,
           debugName: 'EnvelopeGenerator constructor',

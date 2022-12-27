@@ -2,13 +2,46 @@ use std::rc::Rc;
 
 use crate::{Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE, SAMPLE_RATE};
 
+pub struct ManagedAdsr {
+    pub adsr: Adsr,
+    pub length_mode: AdsrLengthMode,
+    pub length: f32,
+}
+
+impl ManagedAdsr {
+    fn get_len_samples(&self, cur_bpm: f32) -> f32 {
+        match self.length_mode {
+            AdsrLengthMode::Ms => ms_to_samples(self.length),
+            AdsrLengthMode::Beats => {
+                let cur_bps = cur_bpm / 60.;
+                let seconds_per_beat = 1. / cur_bps;
+                let samples_per_beat = seconds_per_beat * SAMPLE_RATE as f32;
+                samples_per_beat * self.length
+            },
+        }
+    }
+
+    pub fn set_length(&mut self, new_length_mode: AdsrLengthMode, new_length: f32) {
+        self.length_mode = new_length_mode;
+        self.length = new_length;
+    }
+
+    pub fn render(&mut self) { self.adsr.render(); }
+
+    pub fn render_frame(&mut self, scale: f32, shift: f32, cur_bpm: f32) {
+        let length_samples = self.get_len_samples(cur_bpm);
+        self.adsr.set_len_samples(length_samples);
+        self.adsr.render_frame(scale, shift);
+    }
+}
+
 pub struct AdsrContext {
-    pub adsrs: Vec<Adsr>,
+    pub adsrs: Vec<ManagedAdsr>,
     pub most_recent_gated_ix: usize,
 }
 
 impl AdsrContext {
-    pub fn new(adsrs: Vec<Adsr>) -> Self {
+    pub fn new(adsrs: Vec<ManagedAdsr>) -> Self {
         AdsrContext {
             adsrs,
             most_recent_gated_ix: 0,
@@ -67,37 +100,61 @@ pub unsafe extern "C" fn get_encoded_adsr_step_buf_ptr(step_count: usize) -> *mu
     ENCODED_ADSR_STEP_BUF.as_mut_ptr()
 }
 
+#[derive(Clone, Copy)]
+#[repr(u32)]
+pub enum AdsrLengthMode {
+    Ms = 0,
+    Beats = 1,
+}
+
+impl AdsrLengthMode {
+    pub fn from_u32(val: u32) -> Self {
+        match val {
+            0 => AdsrLengthMode::Ms,
+            1 => AdsrLengthMode::Beats,
+            _ => unreachable!("Invalid AdsrLengthMode value"),
+        }
+    }
+}
+
 /// `encoded_steps` should be an array of imaginary tuples like `(x, y, ramp_fn_type,
 /// ramp_fn_param)`
 #[no_mangle]
 pub unsafe extern "C" fn create_adsr_ctx(
     loop_point: f32,
-    len_ms: f32,
+    length: f32,
+    length_mode: u32,
     release_start_phase: f32,
     adsr_count: usize,
     log_scale: bool,
 ) -> *mut AdsrContext {
+    let length_mode = AdsrLengthMode::from_u32(length_mode);
+
     let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> =
         Rc::new(std::mem::MaybeUninit::uninit().assume_init());
-    let len_samples = ms_to_samples(len_ms);
     let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
     assert!(adsr_count > 0);
 
     let mut adsrs = Vec::with_capacity(adsr_count);
     for _ in 0..adsr_count {
-        adsrs.push(Adsr::new(
+        let adsr = Adsr::new(
             decoded_steps.clone(),
             if loop_point < 0. {
                 None
             } else {
                 Some(loop_point)
             },
-            len_samples,
+            10_000., // will be updated during render
             release_start_phase,
             Rc::clone(&rendered),
             crate::EarlyReleaseConfig::default(),
             log_scale,
-        ));
+        );
+        adsrs.push(ManagedAdsr {
+            adsr,
+            length_mode,
+            length,
+        });
     }
     adsrs[0].render();
 
@@ -111,7 +168,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
 pub unsafe extern "C" fn update_adsr_steps(ctx: *mut AdsrContext) {
     let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
     for adsr in &mut (*ctx).adsrs {
-        adsr.set_steps(decoded_steps.clone());
+        adsr.adsr.set_steps(decoded_steps.clone());
     }
     (*ctx).adsrs[0].render();
 }
@@ -119,21 +176,26 @@ pub unsafe extern "C" fn update_adsr_steps(ctx: *mut AdsrContext) {
 fn ms_to_samples(ms: f32) -> f32 { (ms / 1000.) * SAMPLE_RATE as f32 }
 
 #[no_mangle]
-pub unsafe extern "C" fn update_adsr_len_ms(ctx: *mut AdsrContext, new_len_ms: f32) {
+pub unsafe extern "C" fn update_adsr_len_ms(
+    ctx: *mut AdsrContext,
+    new_length: f32,
+    new_raw_length_mode: u32,
+) {
+    let new_length_mode = AdsrLengthMode::from_u32(new_raw_length_mode);
     for adsr in &mut (*ctx).adsrs {
-        adsr.set_len_samples(ms_to_samples(new_len_ms))
+        adsr.set_length(new_length_mode, new_length);
     }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext, index: usize) {
-    (*ctx).adsrs[index].gate();
+    (*ctx).adsrs[index].adsr.gate();
     (*ctx).most_recent_gated_ix = index;
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ungate_adsr(ctx: *mut AdsrContext, index: usize) {
-    (*ctx).adsrs[index].ungate()
+    (*ctx).adsrs[index].adsr.ungate()
 }
 
 /// Updates all ADSRs, rendering them to their respective output buffers.  Returns the current phase
@@ -143,20 +205,21 @@ pub unsafe extern "C" fn process_adsr(
     ctx: *mut AdsrContext,
     output_range_min: f32,
     output_range_max: f32,
+    cur_bpm: f32,
 ) -> f32 {
     let shift = output_range_min;
     let scale = output_range_max - output_range_min;
     for adsr in &mut (*ctx).adsrs {
-        adsr.render_frame(scale, shift);
+        adsr.render_frame(scale, shift, cur_bpm);
     }
 
-    (*ctx).adsrs[(*ctx).most_recent_gated_ix].phase
+    (*ctx).adsrs[(*ctx).most_recent_gated_ix].adsr.phase
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn adsr_set_loop_point(ctx: *mut AdsrContext, new_loop_point: f32) {
     for adsr in &mut (*ctx).adsrs {
-        adsr.set_loop_point(if new_loop_point < 0. {
+        adsr.adsr.set_loop_point(if new_loop_point < 0. {
             None
         } else {
             Some(new_loop_point)
@@ -170,13 +233,13 @@ pub unsafe extern "C" fn adsr_set_release_start_phase(
     new_release_start_phase: f32,
 ) {
     for adsr in &mut (*ctx).adsrs {
-        adsr.set_release_start_phase(new_release_start_phase);
+        adsr.adsr.set_release_start_phase(new_release_start_phase);
     }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn adsr_set_log_scale(ctx: *mut AdsrContext, index: usize, log_scale: bool) {
-    (*ctx).adsrs[index].log_scale = log_scale;
+    (*ctx).adsrs[index].adsr.log_scale = log_scale;
 }
 
 #[no_mangle]
@@ -184,5 +247,5 @@ pub unsafe extern "C" fn adsr_get_output_buf_ptr(
     ctx: *const AdsrContext,
     index: usize,
 ) -> *const f32 {
-    (*ctx).adsrs[index].get_cur_frame_output().as_ptr()
+    (*ctx).adsrs[index].adsr.get_cur_frame_output().as_ptr()
 }

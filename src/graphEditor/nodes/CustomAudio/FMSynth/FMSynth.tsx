@@ -104,12 +104,22 @@ export interface AdsrStep {
   ramper: RampFn;
 }
 
+export enum AdsrLengthMode {
+  Samples,
+  Beats,
+}
+
 /**
  * Corresponds to `Adsr` in the Wasm engine
  */
 export interface Adsr {
   steps: AdsrStep[];
+  /**
+   * This will be interpreted differently if `lengthMode` is set to a value
+   * other than `AdsrLengthMode.Samples`
+   */
   lenSamples: number;
+  lengthMode?: AdsrLengthMode;
   loopPoint: number | null;
   releasePoint: number;
   audioThreadData: AudioThreadData;

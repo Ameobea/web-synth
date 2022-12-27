@@ -23,9 +23,9 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
             evt.data.wasmBytes,
             evt.data.encodedSteps,
             evt.data.loopPoint,
-            evt.data.lenMs,
+            evt.data.length,
+            evt.data.lengthMode,
             evt.data.releaseStartPhase,
-            evt.data.outputRange,
             evt.data.logScale
           );
           break;
@@ -39,12 +39,16 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
           this.wasmInstance.exports.update_adsr_steps(this.ctxPtr);
           break;
         }
-        case 'setLenMs': {
+        case 'setLength': {
           if (!this.wasmInstance) {
-            console.error('Tried to set ADSR2 len ms before initialization');
+            console.error('Tried to set ADSR2 length before initialization');
             break;
           }
-          this.wasmInstance.exports.update_adsr_len_ms(this.ctxPtr, evt.data.lenMs);
+          this.wasmInstance.exports.update_adsr_len_ms(
+            this.ctxPtr,
+            evt.data.length,
+            evt.data.lengthMode
+          );
           break;
         }
         case 'setLoopPoint': {
@@ -91,7 +95,6 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
           break;
         }
         case 'setOutputRange': {
-          console.log(evt.data);
           this.outputRange = evt.data.outputRange;
           break;
         }
@@ -124,7 +127,15 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     stepBuf.set(encodedSteps);
   }
 
-  async initWasm(wasmBytes, encodedSteps, loopPoint, lenMs, releaseStartPhase, logScale) {
+  async initWasm(
+    wasmBytes,
+    encodedSteps,
+    loopPoint,
+    length,
+    lengthMode,
+    releaseStartPhase,
+    logScale
+  ) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule);
 
@@ -132,10 +143,12 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
 
     this.ctxPtr = this.wasmInstance.exports.create_adsr_ctx(
       loopPoint ?? -1,
-      lenMs,
+      length,
+      lengthMode,
       releaseStartPhase,
       this.adsrInstanceCount,
       logScale
+      // false
     );
     this.outputBufPtrs = new Array(this.adsrInstanceCount)
       .fill(null)
@@ -172,7 +185,8 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     const curPhase = this.wasmInstance.exports.process_adsr(
       this.ctxPtr,
       this.outputRange[0],
-      this.outputRange[1]
+      this.outputRange[1],
+      globalThis.globalTempoBPM
     );
     // Record the current phase of the most recently gated ADSR which will be displayed
     // in the UI as an indicator on the ADSR UI

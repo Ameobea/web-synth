@@ -121,7 +121,7 @@ const buildFilterSettings = (
         },
         Comp: mkControlPanelADSR2WithSize(500, 320, undefined, adsrDebugName),
       }
-    : {},
+    : { label: 'adsr' },
 });
 
 export const getSettingsForFilterType = (

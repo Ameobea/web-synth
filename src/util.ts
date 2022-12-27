@@ -5,6 +5,8 @@ import * as R from 'ramda';
 import type { ADSRValues } from 'src/controls/adsr';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
+export const SAMPLE_RATE = 44_100;
+
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
 
 /**

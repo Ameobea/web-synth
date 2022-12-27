@@ -4,6 +4,7 @@ import type { Root as ReactDOMRoot } from 'react-dom/client';
 
 import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import FMSynth, {
+  AdsrLengthMode,
   type Adsr,
   type AdsrParams,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -213,7 +214,8 @@ export const gateSynthDesigner = (
     }
 
     // Trigger gain and filter ADSRs
-    if (synth.filterEnvelopeEnabled && !synth.filterBypassed) {
+    if (synth.filterEnvelopeEnabled) {
+      console.log('triggering filter ADSR');
       synth.filterADSRModule.gate(voiceIx);
     }
     // We edit state directly w/o updating references because this is only needed internally
@@ -303,11 +305,17 @@ const buildDefaultFilterModule = (
   return { filterParams, filterNode };
 };
 
+const buildDefaultFilterEnvelope = (audioThreadData: AudioThreadData): Adsr => {
+  const envelope = buildDefaultADSR2Envelope(audioThreadData);
+  envelope.logScale = false;
+  return envelope;
+};
+
 const buildDefaultSynthModule = (
   stateKey: string,
   filterType: FilterType,
   synthIx: number,
-  filterADSRAudioThreadData: AudioThreadData,
+  filterEnvelope: Adsr,
   filterEnvelopeEnabled: boolean
 ): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
@@ -317,19 +325,16 @@ const buildDefaultSynthModule = (
   const filterADSRModule = new ADSR2Module(
     ctx,
     {
-      minValue: 0,
+      minValue: 80,
       maxValue: 20000,
-      lengthMs: 2000,
-      steps: buildDefaultADSR2Envelope({
-        phaseIndex: 0,
-        debugName: '`buildDefaultSynthModule` STEPS SHOULD NEVER SHOW UP',
-      }).steps,
+      length: msToSamples(2000),
+      lengthMode: AdsrLengthMode.Samples,
+      steps: filterEnvelope.steps,
       releaseStartPhase: 0.8,
-      logScale: true,
+      logScale: false,
     },
     VOICE_COUNT,
-    filterADSRAudioThreadData,
-    `buildDefaultSynthModule synthDesigner_voice_${synthIx}_filterADSR`
+    filterEnvelope.audioThreadData
   );
 
   const inst: SynthModule = {
@@ -355,10 +360,10 @@ const buildDefaultSynthModule = (
     filterParams,
     filterCSNs,
     masterGain: 0,
-    filterEnvelope: buildDefaultADSR2Envelope({
-      phaseIndex: 0,
-      debugName: `\`buildDefaultSynthModule\` ${genRandomStringID()}`,
-    }),
+    filterEnvelope: {
+      ...buildDefaultFilterEnvelope(filterEnvelope.audioThreadData),
+      lengthMode: AdsrLengthMode.Samples,
+    },
     filterEnvelopeEnabled,
     filterADSRLength: 1000,
     pitchMultiplier: 1,
@@ -387,20 +392,25 @@ export const deserializeSynthModule = (
   stateKey: string,
   synthIx: number
 ): SynthModule => {
+  if (R.isNil(filterEnvelope.lengthMode)) {
+    filterEnvelope.lengthMode = AdsrLengthMode.Samples;
+  }
+  filterEnvelope.logScale = false;
+
   const base = buildDefaultSynthModule(
     stateKey,
     filterParams.type,
     synthIx,
-    filterEnvelope.audioThreadData,
+    filterEnvelope,
     filterEnvelopeEnabled
   );
 
   if ((filterEnvelope as any).attack) {
-    filterEnvelope = buildDefaultADSR2Envelope(filterEnvelope.audioThreadData);
+    filterEnvelope = buildDefaultFilterEnvelope(filterEnvelope.audioThreadData);
   }
 
   base.filterADSRModule.setState(filterEnvelope);
-  base.filterADSRModule.setLengthMs(filterADSRLength ?? 1000);
+  base.filterADSRModule.setLength(filterEnvelope.lengthMode, filterADSRLength ?? msToSamples(1000));
 
   const voices = base.voices.map(voice => {
     voice.outerGainNode.gain.value = masterGain + 1;
@@ -443,10 +453,10 @@ export const getInitialSynthDesignerState = (vcId: string): SynthDesignerState =
       `synthDesigner_${vcId}`,
       FilterType.Lowpass,
       0,
-      {
+      buildDefaultFilterEnvelope({
         phaseIndex: 0,
         debugName: 'getInitialSynthDesignerState',
-      },
+      }),
       false
     ),
   ],
@@ -489,7 +499,10 @@ const actionGroups = {
         `synthDesigner_${state.vcId}`,
         FilterType.Lowpass,
         state.synths.length,
-        { phaseIndex: 0, debugName: `\`ADD_SYNTH_MODULE\` index ${state.synths.length}` },
+        buildDefaultFilterEnvelope({
+          phaseIndex: 0,
+          debugName: `\`ADD_SYNTH_MODULE\` index ${state.synths.length}`,
+        }),
         false
       );
 
@@ -629,10 +642,10 @@ const actionGroups = {
             stateKey,
             FilterType.Lowpass,
             synthIx,
-            {
+            buildDefaultFilterEnvelope({
               phaseIndex: 0,
               debugName: `\`SET_VOICE_STATE\` synthIx: ${synthIx}`,
-            },
+            }),
             false
           );
 
@@ -726,20 +739,24 @@ const actionGroups = {
     },
   }),
   SET_FILTER_ADSR_LENGTH: buildActionGroup({
-    actionCreator: (synthIx: number, lengthMs: number) => ({
+    actionCreator: (synthIx: number, length: number, lengthMode: AdsrLengthMode) => ({
       type: 'SET_FILTER_ADSR_LENGTH',
       synthIx,
-      lengthMs,
+      length,
+      lengthMode,
     }),
-    subReducer: (state: SynthDesignerState, { synthIx, lengthMs }) => {
+    subReducer: (state: SynthDesignerState, { synthIx, length, lengthMode }) => {
       const targetSynth = getSynth(synthIx, state.synths);
-      targetSynth.filterADSRModule.setLengthMs(lengthMs);
+      targetSynth.filterADSRModule.setLength(
+        lengthMode,
+        lengthMode === AdsrLengthMode.Samples ? msToSamples(length) : length
+      );
       return setSynth(
         synthIx,
         {
           ...targetSynth,
-          filterADSRLength: lengthMs,
-          filterEnvelope: { ...targetSynth.filterEnvelope, lenSamples: msToSamples(lengthMs) },
+          filterADSRLength: length,
+          filterEnvelope: { ...targetSynth.filterEnvelope, lenSamples: length, lengthMode },
         },
         state
       );

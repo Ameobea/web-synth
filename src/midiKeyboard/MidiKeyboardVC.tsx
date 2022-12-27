@@ -7,7 +7,7 @@ import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 import MidiKeyboardOutputMappingConfigurator from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 import Loading from 'src/misc/Loading';
-import { actionCreators, dispatch, ReduxStore, useSelector } from 'src/redux';
+import { actionCreators, dispatch, useSelector, type ReduxStore } from 'src/redux';
 import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
 
 const mkOctaveCountSelector = () =>

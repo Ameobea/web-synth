@@ -6,7 +6,11 @@ import ControlPanel from 'react-control-panel';
 import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
 import * as PIXI from 'src/controls/pixi';
 import { makeDraggable } from 'src/controls/pixiUtils';
-import type { Adsr, AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type {
+  Adsr,
+  AdsrLengthMode,
+  AdsrStep,
+} from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { mkLinearToLog } from 'src/util';
 import {
   getIsVcHidden,
@@ -525,6 +529,7 @@ class ADSR2Instance {
   private lengthMs = 1000;
   private outputRange: readonly [number, number] = [0, 1];
   private logScale = false;
+  private lengthMode: AdsrLengthMode | undefined;
   public steps!: StepHandle[];
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
@@ -612,6 +617,7 @@ class ADSR2Instance {
 
     this.outputRange = [...outputRange];
     this.logScale = state.logScale ?? false;
+    this.lengthMode = state.lengthMode;
     this.audioThreadData = state.audioThreadData;
     this.scaleMarkings.update(this.lengthMs, this.outputRange, this.logScale);
   }
@@ -710,6 +716,7 @@ class ADSR2Instance {
     this.ctx = ctx;
     this.outputRange = [...outputRange];
     this.logScale = initialState.logScale ?? false;
+    this.lengthMode = initialState.lengthMode;
 
     this.vizContainer = new PIXI.Container();
     this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
@@ -842,6 +849,7 @@ class ADSR2Instance {
 
     this.scaleMarkings = new ScaleMarkings(this, this.lengthMs, this.outputRange);
 
+    console.log({ debugName: this.debugName, audioThreadData: this.audioThreadData.debugName });
     this.app?.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
         // console.warn('No audio thread data yet', {
@@ -896,6 +904,7 @@ class ADSR2Instance {
       audioThreadData: this.audioThreadData!,
       outputRange: this.outputRange,
       logScale: this.logScale,
+      lengthMode: this.lengthMode,
     };
   }
 

@@ -1096,11 +1096,6 @@ impl ParamSource {
                     }
                 };
 
-                // if raw.is_normal() {
-                //     raw
-                // } else {
-                //     0.
-                // }
                 raw
             },
             ParamSource::Constant { last_val, cur_val } => dsp::one_pole(
@@ -1964,6 +1959,7 @@ static mut ADSR_STEP_BUFFER: [AdsrStep; 512] = [AdsrStep {
     y: 0.,
     ramper: RampFn::Linear,
 }; 512];
+
 #[no_mangle]
 pub unsafe extern "C" fn set_adsr_step_buffer(i: usize, x: f32, y: f32, ramper: u32, param: f32) {
     ADSR_STEP_BUFFER[i] = AdsrStep {
