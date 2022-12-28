@@ -7,19 +7,17 @@ import { LGraph, LGraphCanvas, LGraphNode, LiteGraph } from 'litegraph.js';
 
 import 'litegraph.js/css/litegraph.css';
 import * as R from 'ramda';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { useSelector } from 'react-redux';
 
 import './GraphEditor.scss';
-
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
 import { getState, type ReduxStore } from 'src/redux';
-import { tryParseJson } from 'src/util';
-import { getEngine } from 'src/util';
+import { getEngine, tryParseJson } from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 import {
   getIsVcHidden,
@@ -175,21 +173,23 @@ export const setConnectionFlowingStatus = (
   setFlowingCb();
 };
 
+interface HandleNodeSelectActionArgs {
+  smallViewDOMId: string;
+  lgNode: any;
+  setCurSelectedNode: (newNode: any) => void;
+  setSelectedNodeVCID: (id: string | null) => void;
+  isNowSelected: boolean;
+  curSelectedNodeRef: React.MutableRefObject<any>;
+}
+
 const handleNodeSelectAction = async ({
   smallViewDOMId,
   lgNode,
   setCurSelectedNode,
   setSelectedNodeVCID,
   isNowSelected,
-  curSelectedNode,
-}: {
-  smallViewDOMId: string;
-  lgNode: any;
-  setCurSelectedNode: (newNode: any) => void;
-  setSelectedNodeVCID: (id: string | null) => void;
-  isNowSelected: boolean;
-  curSelectedNode: any;
-}) => {
+  curSelectedNodeRef,
+}: HandleNodeSelectActionArgs) => {
   const nodeID: string = (lgNode as any).id.toString();
   if (lgNode instanceof LGAudioConnectables) {
     const node = getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === nodeID);
@@ -205,7 +205,7 @@ const handleNodeSelectAction = async ({
     if (isNowSelected) {
       setCurSelectedNode(lgNode);
       setSelectedNodeVCID(nodeID);
-    } else if (curSelectedNode === lgNode) {
+    } else if (curSelectedNodeRef.current === lgNode) {
       setCurSelectedNode(null);
       setSelectedNodeVCID(null);
     }
@@ -220,7 +220,7 @@ const handleNodeSelectAction = async ({
     if (isNowSelected) {
       setCurSelectedNode(lgNode);
       setSelectedNodeVCID(null);
-    } else if (curSelectedNode === lgNode) {
+    } else if (curSelectedNodeRef.current === lgNode) {
       setCurSelectedNode(null);
     }
   }
@@ -300,12 +300,35 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
 const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lGraphCanvasRef = useRef<LGraphCanvas | null>(null);
   const [lGraphInstance, setLGraphInstance] = useState<LGraph | null>(null);
   const [selectedNodeVCID, setSelectedNodeVCID] = useState<string | null>(null);
-  const [curSelectedNode, setCurSelectedNode] = useState<any>(null);
+  const [curSelectedNode, setCurSelectedNodeInner] = useState<any>(null);
+  const curSelectedNodeRef = useRef<any>(null);
+  const setCurSelectedNode = useCallback(
+    (newNode: any) => {
+      curSelectedNodeRef.current = newNode;
+      setCurSelectedNodeInner(newNode);
+    },
+    [setCurSelectedNodeInner]
+  );
   const { patchNetwork, activeViewContexts, isLoaded } = useSelector((state: ReduxStore) =>
     R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager)
   );
+
+  const [canvasHeight, setCanvasHeight] = useState(window.innerHeight - 130);
+  useEffect(() => {
+    const onResize = () => {
+      const newHeight = window.innerHeight - 130;
+      setCanvasHeight(newHeight);
+      const newWidth = curSelectedNodeRef.current
+        ? window.innerWidth - 500 - 44
+        : window.innerWidth - 44;
+      lGraphCanvasRef.current?.resize(newWidth, newHeight);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const vcId = stateKey.split('_')[1];
   const smallViewDOMId = `graph-editor_${vcId}_small-view-dom-id`;
@@ -317,10 +340,8 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
     const cb = (isHidden: boolean) => {
       if (isHidden) {
-        console.log('Stopping lgraph');
         lGraphInstance.stop();
       } else {
-        console.log('Starting lgraph');
         lGraphInstance.start();
       }
     };
@@ -371,16 +392,17 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         key => delete LiteGraph.searchbox_extras[key]
       );
       const canvas = new LGraphCanvas(`#${stateKey}_canvas`, graph);
+      lGraphCanvasRef.current = canvas;
 
       canvas.onNodeSelected = node => {
-        if (curSelectedNode) {
+        if (curSelectedNodeRef.current) {
           handleNodeSelectAction({
             smallViewDOMId,
             lgNode: curSelectedNode,
             setCurSelectedNode,
             setSelectedNodeVCID,
             isNowSelected: false,
-            curSelectedNode,
+            curSelectedNodeRef,
           });
         }
         handleNodeSelectAction({
@@ -389,7 +411,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: true,
-          curSelectedNode,
+          curSelectedNodeRef,
         });
       };
       canvas.onNodeDeselected = node => {
@@ -399,7 +421,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: false,
-          curSelectedNode,
+          curSelectedNodeRef,
         });
       };
       graph.onNodeRemoved = node => {
@@ -409,7 +431,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           setCurSelectedNode,
           setSelectedNodeVCID,
           isNowSelected: false,
-          curSelectedNode,
+          curSelectedNodeRef,
         });
       };
 
@@ -426,7 +448,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       // Set an entry into the mapping so that we can get the current instance's state before unmounting
       GraphEditorInstances.set(stateKey, graph);
     })();
-  });
+  }, [curSelectedNode, setCurSelectedNode, smallViewDOMId, stateKey, vcId]);
 
   const lastPatchNetwork = useRef<typeof patchNetwork | null>(null);
   useEffect(() => {
@@ -452,7 +474,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     setCurSelectedNode(node);
     lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
     lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
-  }, [patchNetwork, lGraphInstance, activeViewContexts, selectedNodeVCID]);
+  }, [patchNetwork, lGraphInstance, activeViewContexts, selectedNodeVCID, setCurSelectedNode]);
 
   // Set node from serialized state when we first render
   useEffect(() => {
@@ -492,20 +514,18 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       node.pos = pos;
     });
     lGraphInstance.setDirtyCanvas(true, true);
-  }, [stateKey, lGraphInstance, isLoaded]);
+  }, [stateKey, lGraphInstance, isLoaded, setCurSelectedNode]);
 
   return (
     <>
-      <div className='graph-editor-container' style={{ maxHeight: window.innerHeight - 130 }}>
+      <div className='graph-editor-container' style={{ maxHeight: canvasHeight }}>
         <canvas
-          ref={ref => {
-            canvasRef.current = ref;
-          }}
+          ref={canvasRef}
           id={stateKey + '_canvas'}
           className='graph-editor'
           width={curSelectedNode ? window.innerWidth - 500 - 44 : window.innerWidth - 44}
-          height={window.innerHeight - 130}
-          style={{ maxHeight: window.innerHeight - 130 }}
+          height={canvasHeight}
+          style={{ maxHeight: canvasHeight }}
         />
 
         <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
