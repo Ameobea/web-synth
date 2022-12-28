@@ -849,7 +849,6 @@ class ADSR2Instance {
 
     this.scaleMarkings = new ScaleMarkings(this, this.lengthMs, this.outputRange);
 
-    console.log({ debugName: this.debugName, audioThreadData: this.audioThreadData.debugName });
     this.app?.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
         // console.warn('No audio thread data yet', {

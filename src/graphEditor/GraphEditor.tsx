@@ -190,6 +190,10 @@ const handleNodeSelectAction = async ({
   isNowSelected,
   curSelectedNodeRef,
 }: HandleNodeSelectActionArgs) => {
+  if (!lgNode?.id) {
+    return;
+  }
+
   const nodeID: string = (lgNode as any).id.toString();
   if (lgNode instanceof LGAudioConnectables) {
     const node = getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === nodeID);

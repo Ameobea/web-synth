@@ -108,6 +108,7 @@
     "reselect": "^4.1.7",
     "showdown": "^2.1.0",
     "showdown-xss-filter": "^0.2.0",
-    "svelte": "^3.55.0"
+    "svelte": "^3.55.0",
+    "svelte-loading-spinners": "^0.3.4"
   }
 }

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import DemoTile from 'src/welcomePage/DemoTile.svelte';
+
+  let isLoadingComposition = false;
 </script>
 
 <div class="root">
@@ -19,12 +22,48 @@
     <a target="_blank" href="https://notes.ameo.design/docs/">Docs</a>
   </div>
 
-  <h2 style="margin-bottom: 10px;">Try It</h2>
+  <h2 style="margin-bottom: 10px;">Demos</h2>
   <div class="demos">
-    <div>TODO</div>
-    <div>TODO</div>
-    <div>TODO</div>
-    <div>TODO</div>
+    <DemoTile
+      title="Multi-Instrument Song"
+      description="A winter-y looping song made using a variety of web synth modules"
+      compositionID="50"
+      {isLoadingComposition}
+      image="/demo-images/vibey-winter.jpg"
+      imageAlt="A screenshot of the web synth audio graph editor for the 'Vibey Winter' composition.  It shows several connected modules including some synthesizers, a band splitter, filters, a reverb, and a mixer."
+      imageWidth={1692}
+      imageHeight={1692}
+    />
+    <DemoTile
+      title="Modern Talking Wavetable"
+      description="The famous Modern Talking wavetable imported into Web Synth with FM and other web synth features"
+      compositionID="46"
+      {isLoadingComposition}
+      image="/demo-images/modern-talking.jpg"
+      imageAlt="A screenshot of the web synth control panel for the modern talking demo. Shows several sliders for controlling frequency modulation, volume, detune, LFO envelope length, and reverb room size.  Has a colorful spectrogram on the right showing the frequencies in the sound produced by the synthesizer.  Has an on-screen MIDI keyboard on the bottom that can be used to control the demo; the notes are labeled with keys on the computer keyboard."
+      imageWidth={1174}
+      imageHeight={1174}
+    />
+    <DemoTile
+      title="TODO"
+      description="A winter-y looping song made using a variety of web synth modules"
+      compositionID="50"
+      {isLoadingComposition}
+      image="/demo-images/vibey-winter.jpg"
+      imageAlt="A screenshot of the web synth audio graph editor for the 'Vibey Winter' composition.  It shows several connected modules including some synthesizers, a band splitter, filters, a reverb, and a mixer."
+      imageWidth={1692}
+      imageHeight={1692}
+    />
+    <DemoTile
+      title="TODO"
+      description="A winter-y looping song made using a variety of web synth modules"
+      compositionID="50"
+      {isLoadingComposition}
+      image="/demo-images/vibey-winter.jpg"
+      imageAlt="A screenshot of the web synth audio graph editor for the 'Vibey Winter' composition.  It shows several connected modules including some synthesizers, a band splitter, filters, a reverb, and a mixer."
+      imageWidth={1692}
+      imageHeight={1692}
+    />
   </div>
 
   <h2>Features</h2>
@@ -104,7 +143,6 @@
     flex-direction: column;
     align-items: center;
     background-color: #1b1b1b;
-    height: 100%;
     max-width: 1500px;
     margin: auto;
     box-sizing: border-box;
@@ -113,7 +151,7 @@
 
   h1 {
     font-family: 'Hack', 'Oxygen Mono', 'Input Mono', 'Consolas', monospace;
-    margin-top: 50px;
+    margin-top: 30px;
     margin-bottom: 30px;
   }
 
@@ -138,13 +176,7 @@
     flex-direction: row;
     flex-wrap: wrap;
     margin-bottom: 20px;
-  }
-
-  .demos > div {
-    width: 300px;
-    height: 300px;
-    margin: 10px;
-    background-color: #333;
+    justify-content: center;
   }
 
   h2 {
@@ -163,5 +195,13 @@
 
   ul {
     line-height: 1.8;
+  }
+
+  details:not([open]) {
+    cursor: pointer;
+  }
+
+  details[open] summary {
+    cursor: pointer;
   }
 </style>
