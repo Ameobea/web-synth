@@ -4,6 +4,7 @@ import * as R from 'ramda';
 
 import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import DefaultComposition from 'src/init-composition.json';
 import type {
   AudioConnectables,
   ConnectableDescriptor,
@@ -12,7 +13,10 @@ import type {
   PatchNetwork,
 } from 'src/patchNetwork';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { reinitializeWithComposition } from 'src/persistance';
 import { getState } from 'src/redux';
+import { getEngine } from 'src/util';
+import { setGlobalVolume } from 'src/ViewContextManager/GlobalVolumeSlider';
 
 /**
  * Commits the state of the provided `patchNetwork`'s foreign connectables to the Rust/Wasm engine,
@@ -144,7 +148,9 @@ export const getConnectedPair = (
   }
   const fromNode = fromConnectables.outputs.get(from.name);
   if (!fromNode) {
-    console.error(`No output of name ${from.name} found in connectables of VC ID ${from.vcId}`);
+    console.error(
+      `No output of name ${from.name} found in output connectables of VC ID ${from.vcId}`
+    );
     return null;
   }
 
@@ -155,7 +161,11 @@ export const getConnectedPair = (
   }
   const toNode = toConnectables.inputs.get(to.name);
   if (!toNode) {
-    console.error(`No output of name ${to.name} found in connectables of VC ID ${to.vcId}`);
+    console.error(
+      `No input of name ${to.name} found in input connectables of VC ID ${
+        to.vcId
+      }; found: ${toConnectables.inputs.keySeq().join(', ')}`
+    );
     return null;
   }
 
@@ -167,3 +177,17 @@ export const create_empty_audio_connectables = (vcId: string): AudioConnectables
   inputs: Map(),
   outputs: Map(),
 });
+
+export const initializeDefaultVCMState = () => {
+  const engine = getEngine()!;
+  const allViewContextIds = getState().viewContextManager.activeViewContexts.map(R.prop('uuid'));
+  const res = reinitializeWithComposition(
+    { type: 'parsed', value: DefaultComposition },
+    engine,
+    allViewContextIds
+  );
+  if (res.value) {
+    alert('Error loading composition: ' + res.value);
+  }
+  setGlobalVolume(20);
+};

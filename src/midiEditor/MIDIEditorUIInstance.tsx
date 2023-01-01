@@ -98,6 +98,7 @@ export default class MIDIEditorUIInstance {
   public noteMetadataByNoteID: Map<number, any> = new Map();
   private vcId: string;
   private isHidden: boolean;
+  private destroyed = false;
 
   constructor(
     width: number,
@@ -1155,6 +1156,12 @@ export default class MIDIEditorUIInstance {
   };
 
   public destroy() {
+    if (this.destroyed) {
+      console.error('MIDI editor already destroyed');
+      return;
+    }
+
+    this.destroyed = true;
     this.cleanupEventHandlers();
     try {
       this.app.destroy();

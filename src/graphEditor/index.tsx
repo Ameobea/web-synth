@@ -4,7 +4,6 @@ import { Provider } from 'react-redux';
 
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { store } from 'src/redux';
-import { retryAsync } from 'src/util';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
 
 interface GraphEditorCtx {
@@ -88,17 +87,4 @@ export const cleanup_graph_editor = (stateKey: string) => {
   graphEditorReactRootNode?.remove();
 
   GraphEditorCtxsByVcId.delete(vcId);
-};
-
-export const arrange_graph_editor = (vcId: string) => {
-  const inner = async () => {
-    const ctx = GraphEditorCtxsByVcId.get(vcId);
-    if (!ctx) {
-      throw new Error(`Tried to arrange lgraph with vcId=${vcId} but no entry is registered`);
-    }
-    ctx.lgraphHandle.arrange();
-  };
-  // It takes a little bit of time for the graph editor to initialize and the instance to be registered after
-  // committing from the VCM, so we account for that here.
-  retryAsync(inner, 10, 100);
 };

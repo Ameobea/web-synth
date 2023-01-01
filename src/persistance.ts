@@ -5,7 +5,8 @@ import { Either } from 'funfix-core';
 import { getLoadedComposition } from 'src/api';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { stopAll } from 'src/eventScheduler/eventScheduler';
-import { getState } from 'src/redux';
+import { setGlobalBpm } from 'src/globalMenu';
+import { actionCreators, dispatch, getState } from 'src/redux';
 import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
 
 export const serializeAndDownloadComposition = () => {
@@ -17,15 +18,21 @@ export const serializeAndDownloadComposition = () => {
  * with the provided composition.
  */
 export const reinitializeWithComposition = (
-  compositionBody: string,
+  compositionBody:
+    | { type: 'serialized'; value: string }
+    | { type: 'parsed'; value: { [key: string]: string } },
   engine: typeof import('./engine'),
   allViewContextIds: string[]
 ): Either<string, void> => {
   let deserialized: { [key: string]: string };
-  try {
-    deserialized = JSON.parse(compositionBody);
-  } catch (err) {
-    return Either.left('Failed to parse provided JSON');
+  if (compositionBody.type === 'serialized') {
+    try {
+      deserialized = JSON.parse(compositionBody.value);
+    } catch (err) {
+      return Either.left('Failed to parse provided JSON');
+    }
+  } else {
+    deserialized = compositionBody.value;
   }
 
   // Stop any playback
@@ -33,6 +40,9 @@ export const reinitializeWithComposition = (
 
   // Tear down current application state
   allViewContextIds.forEach(engine.delete_vc_by_id);
+  getState().viewContextManager.patchNetwork.connectables.forEach(connectable => {
+    dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(connectable.vcId));
+  });
 
   // Rehydrate `localStorage` with parsed composition
   Object.entries(deserialized).forEach(([key, val]) => localStorage.setItem(key, val));
@@ -104,6 +114,13 @@ export const loadSharedComposition = async (
       localStorage.setItem(key, val as any);
     }
   });
+
+  if (
+    typeof deserialized.globalTempo === 'string' ||
+    typeof deserialized.globalTempo === 'number'
+  ) {
+    setGlobalBpm(+deserialized.globalTempo);
+  }
 };
 
 export const maybeRestoreLocalComposition = async () => {

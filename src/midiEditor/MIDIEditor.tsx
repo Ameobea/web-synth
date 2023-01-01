@@ -5,12 +5,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
-
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
-import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 import type { MIDIEditorInstance } from 'src/midiEditor';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
@@ -549,7 +548,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   });
 
   const handleChange = useCallback(
-    ({ bpm, loopEnabled }) => {
+    ({ bpm, loopEnabled }: MIDIEditorControlsState) => {
       parentInstance.uiInstance!.localBPM = bpm;
       if (loopEnabled === R.isNil(parentInstance.uiInstance!.loopCursor)) {
         parentInstance.uiInstance!.toggleLoop();

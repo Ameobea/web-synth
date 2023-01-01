@@ -10,6 +10,7 @@ import FMSynth, {
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { updateConnectables } from 'src/patchNetwork/interface';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
 import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
@@ -19,13 +20,7 @@ import {
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import {
-  genRandomStringID,
-  midiToFrequency,
-  msToSamples,
-  normalizeEnvelope,
-  samplesToMs,
-} from 'src/util';
+import { midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;
@@ -114,7 +109,7 @@ function updateFilterNode<K extends keyof FilterParams>(
 }
 
 export const serializeSynthModule = (synth: SynthModule) => ({
-  fmSynthConfig: synth.fmSynth?.serialize(),
+  fmSynthConfig: synth.fmSynth.serialize(),
   filter: synth.filterParams,
   masterGain: synth.masterGain,
   filterEnvelope: synth.filterEnvelope,
@@ -129,15 +124,19 @@ const connectOscillators = (connect: boolean, synth: SynthModule) =>
     const voiceDst = synth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput();
 
     const fmSynthAWPNode = synth.fmSynth.getAWPNode();
+    if (!fmSynthAWPNode) {
+      console.error('`connectOscillators`: no fmSynthAWPNode');
+      return;
+    }
 
     if (!connect) {
       try {
-        fmSynthAWPNode?.disconnect();
+        fmSynthAWPNode.disconnect();
       } catch (_err) {
         // pass
       }
     } else {
-      fmSynthAWPNode?.connect(voiceDst, voiceIx);
+      fmSynthAWPNode.connect(voiceDst, voiceIx);
     }
   });
 
@@ -206,7 +205,7 @@ export const gateSynthDesigner = (
   state.synths.forEach(synth => {
     const frequency = baseFrequency * synth.pitchMultiplier;
     synth.fmSynth.setFrequency(voiceIx, frequency);
-    synth.fmSynth?.onGate(voiceIx, midiNumber);
+    synth.fmSynth.onGate(voiceIx, midiNumber);
 
     const targetVoice = synth.voices[voiceIx];
     if (!state.wavyJonesInstance) {
@@ -215,7 +214,6 @@ export const gateSynthDesigner = (
 
     // Trigger gain and filter ADSRs
     if (synth.filterEnvelopeEnabled) {
-      console.log('triggering filter ADSR');
       synth.filterADSRModule.gate(voiceIx);
     }
     // We edit state directly w/o updating references because this is only needed internally
@@ -231,7 +229,7 @@ export const ungateSynthDesigner = (
   midiNumber: number
 ) =>
   getState().synthDesigner.synths.forEach(({ voices, fmSynth, filterADSRModule }, synthIx) => {
-    fmSynth?.onUnGate(voiceIx, midiNumber);
+    fmSynth.onUnGate(voiceIx, midiNumber);
     const targetVoice = voices[voiceIx];
     // We edit state directly w/o updating references because this is only needed internally
     const ungateTime = ctx.currentTime;
@@ -316,7 +314,8 @@ const buildDefaultSynthModule = (
   filterType: FilterType,
   synthIx: number,
   filterEnvelope: Adsr,
-  filterEnvelopeEnabled: boolean
+  filterEnvelopeEnabled: boolean,
+  fmSynth?: FMSynth
 ): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
   const { filterParams } = buildDefaultFilterModule(filterType, filterCSNs);
@@ -353,9 +352,11 @@ const buildDefaultSynthModule = (
         lastGateOrUngateTime: 0,
       };
     }),
-    fmSynth: new FMSynth(ctx, undefined, {
-      onInitialized: () => connectFMSynth(stateKey, synthIx),
-    }),
+    fmSynth:
+      fmSynth ??
+      new FMSynth(ctx, undefined, {
+        onInitialized: () => connectFMSynth(stateKey, synthIx),
+      }),
     filterADSRModule,
     filterParams,
     filterCSNs,
@@ -397,12 +398,21 @@ export const deserializeSynthModule = (
   }
   filterEnvelope.logScale = false;
 
+  const fmSynth = new FMSynth(ctx, undefined, {
+    ...(fmSynthConfig || {}),
+    gainEnvelope: gainEnvelope
+      ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
+      : fmSynthConfig.gainEnvelope,
+    onInitialized: () => connectFMSynth(stateKey, synthIx),
+  });
+
   const base = buildDefaultSynthModule(
     stateKey,
     filterParams.type,
     synthIx,
     filterEnvelope,
-    filterEnvelopeEnabled
+    filterEnvelopeEnabled,
+    fmSynth
   );
 
   if ((filterEnvelope as any).attack) {
@@ -428,21 +438,12 @@ export const deserializeSynthModule = (
     ...base,
     filterBypassed,
     voices,
-    fmSynth: new FMSynth(ctx, undefined, {
-      ...(fmSynthConfig || {}),
-      gainEnvelope: gainEnvelope
-        ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
-        : fmSynthConfig.gainEnvelope,
-      onInitialized: () => connectFMSynth(stateKey, synthIx),
-    }),
     masterGain,
     filterEnvelope: normalizeEnvelope(filterEnvelope),
     filterADSRLength: R.clamp(20, 100_000, filterADSRLength ?? 1000),
     filterParams,
     pitchMultiplier: pitchMultiplier ?? 1,
   };
-  connectOscillators(false, synthModule);
-  connectOscillators(true, synthModule);
 
   return synthModule;
 };
@@ -797,13 +798,15 @@ const actionGroups = {
   }),
 };
 
+interface SynthDesignerStateMapValue extends ReturnType<typeof buildSynthDesignerReduxInfra> {
+  reactRoot: ReactDOMRoot | 'NOT_LOADED';
+  midiNode: MIDINode;
+}
+
 /**
  * Global map of state key to Redux infrastructure
  */
-export const SynthDesignerStateByStateKey: Map<
-  string,
-  ReturnType<typeof buildSynthDesignerReduxInfra> & { reactRoot: ReactDOMRoot | 'NOT_LOADED' }
-> = new Map();
+export const SynthDesignerStateByStateKey: Map<string, SynthDesignerStateMapValue> = new Map();
 
 export const getSynthDesignerReduxInfra = (stateKey: string) => {
   const reduxInfra = SynthDesignerStateByStateKey.get(stateKey);

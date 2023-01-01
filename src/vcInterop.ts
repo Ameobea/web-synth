@@ -1,5 +1,6 @@
 import { initPatchNetwork } from 'src/patchNetwork';
 import type { ConnectableDescriptor } from 'src/patchNetwork';
+import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getEngine, tryParseJson } from 'src/util';
@@ -95,4 +96,11 @@ export const list_foreign_node_used_samples = (id: string): SampleDescriptor[] =
   }
 
   return connectables.node.listUsedSamples?.() ?? [];
+};
+
+export const initialize_default_vcm_state = () => {
+  if (localStorage.vcmState) {
+    console.warn('VCM state already set in localStorage when trying to initialize default state');
+  }
+  initializeDefaultVCMState();
 };

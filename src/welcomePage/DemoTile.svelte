@@ -5,6 +5,7 @@
   import { reinitializeWithComposition } from 'src/persistance';
   import { getState } from 'src/redux';
   import { getEngine } from 'src/util';
+  import { setGlobalVolume } from '../ViewContextManager/GlobalVolumeSlider';
 
   export let title: string;
   export let description: string;
@@ -29,7 +30,12 @@
       return;
     }
     const allViewContextIds = getState().viewContextManager.activeViewContexts.map(c => c.uuid);
-    reinitializeWithComposition(composition.content, getEngine()!, allViewContextIds);
+    reinitializeWithComposition(
+      { type: 'serialized', value: composition.content },
+      getEngine()!,
+      allViewContextIds
+    );
+    setGlobalVolume(20);
   };
 </script>
 

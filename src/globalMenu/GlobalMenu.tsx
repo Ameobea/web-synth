@@ -1,15 +1,19 @@
 import * as R from 'ramda';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import './GlobalMenu.scss';
-
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
 import { reinitializeWithComposition, serializeAndDownloadComposition } from 'src/persistance';
 import { getState } from 'src/redux';
 
 const ctx = new AudioContext();
 
-const GlobalMenuItem: React.FC<{ onClick: () => void }> = ({ children, onClick }) => (
+interface GlobalMenuItemProps {
+  onClick: () => void;
+  children?: React.ReactNode;
+}
+
+const GlobalMenuItem: React.FC<GlobalMenuItemProps> = ({ children, onClick }) => (
   <div className='global-menu-item' role='menuitem' onClick={onClick}>
     {children}
   </div>
@@ -65,48 +69,59 @@ interface GlobalMenuProps {
   isOpen: boolean;
 }
 
-const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) => (
-  <div className='global-menu' role='menu' style={isOpen ? undefined : { right: -300 }}>
-    <RetractGlobalMenuButton onClose={closeMenu} />
-    <GlobalTempoControl />
-    <GlobalMenuItem
-      onClick={() => {
-        serializeAndDownloadComposition();
-        closeMenu();
-      }}
-    >
-      Save to File
-    </GlobalMenuItem>
-    <GlobalMenuItem
-      onClick={() => {
-        const uploader = document.getElementById('load-composition-uploader')! as HTMLInputElement;
-        uploader.value = '';
+const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) => {
+  const loadCompositionUploader = useRef<HTMLInputElement | null>(null);
 
-        uploader.dispatchEvent(new MouseEvent('click'));
-      }}
-    >
-      <>
-        <input
-          type='file'
-          id='load-composition-uploader'
-          style={{ display: 'none' }}
-          onChange={async evt => {
-            const { fileContent } = await parseUploadedFileAsText(evt);
-            const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
-              R.prop('uuid')
-            );
-            const res = reinitializeWithComposition(fileContent, engine, allViewContextIds);
-            if (res.value) {
-              alert('Error loading composition: ' + res.value);
-            }
-            closeMenu();
-          }}
-        />
-        Load from File
-      </>
-    </GlobalMenuItem>
-  </div>
-);
+  return (
+    <div className='global-menu' role='menu' style={isOpen ? undefined : { right: -300 }}>
+      <RetractGlobalMenuButton onClose={closeMenu} />
+      <GlobalTempoControl />
+      <GlobalMenuItem
+        onClick={() => {
+          serializeAndDownloadComposition();
+          closeMenu();
+        }}
+      >
+        Save to File
+      </GlobalMenuItem>
+      <GlobalMenuItem
+        onClick={() => {
+          if (!loadCompositionUploader.current) {
+            throw new Error('loadCompositionUploader.current is null');
+          }
+
+          loadCompositionUploader.current.value = '';
+          loadCompositionUploader.current.dispatchEvent(new MouseEvent('click'));
+        }}
+      >
+        <>
+          <input
+            ref={loadCompositionUploader}
+            type='file'
+            id='load-composition-uploader'
+            style={{ display: 'none' }}
+            onChange={async evt => {
+              const { fileContent } = await parseUploadedFileAsText(evt);
+              const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
+                R.prop('uuid')
+              );
+              const res = reinitializeWithComposition(
+                { type: 'serialized', value: fileContent },
+                engine,
+                allViewContextIds
+              );
+              if (res.value) {
+                alert('Error loading composition: ' + res.value);
+              }
+              closeMenu();
+            }}
+          />
+          Load from File
+        </>
+      </GlobalMenuItem>
+    </div>
+  );
+};
 
 const GlobalMenuButton: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
   const [isOpen, setIsOpen] = useState(false);

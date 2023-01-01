@@ -45,24 +45,24 @@
       imageHeight={1174}
     />
     <DemoTile
-      title="TODO"
-      description="A winter-y looping song made using a variety of web synth modules"
-      compositionID="50"
+      title="Generative Modular Patch"
+      description="Lots of modulation with randomness + LFOs with a FM synth"
+      compositionID="79"
       {isLoadingComposition}
-      image="/demo-images/vibey-winter.jpg"
-      imageAlt="A screenshot of the web synth audio graph editor for the 'Vibey Winter' composition.  It shows several connected modules including some synthesizers, a band splitter, filters, a reverb, and a mixer."
-      imageWidth={1692}
-      imageHeight={1692}
+      image="/demo-images/modular-esque.jpg"
+      imageAlt="A screenshot of the web synth audio graph editor for the modular-esque composition. It shows several different sources of modulation including both LFOs and stepped randomness for a variety of synth designer parameters as well as scale & shift nodes."
+      imageWidth={1530}
+      imageHeight={1530}
     />
     <DemoTile
-      title="TODO"
-      description="A winter-y looping song made using a variety of web synth modules"
-      compositionID="50"
+      title="Physically-Modeled Bell"
+      description="A physically-modeled bell from the Faust standard library compiled to WebAssembly"
+      compositionID="81"
       {isLoadingComposition}
-      image="/demo-images/vibey-winter.jpg"
-      imageAlt="A screenshot of the web synth audio graph editor for the 'Vibey Winter' composition.  It shows several connected modules including some synthesizers, a band splitter, filters, a reverb, and a mixer."
-      imageWidth={1692}
-      imageHeight={1692}
+      image="/demo-images/faust-bells.jpg"
+      imageAlt="A screenshot of the web synth code editor UI.  Shows some source code for the physically modeled bell and some buttons with labels like 'compile' and 'save program'."
+      imageWidth={1214}
+      imageHeight={1214}
     />
   </div>
 
@@ -141,7 +141,9 @@
   .root {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    /* align-items: center; */
+    padding-left: 10px;
+    padding-right: 10px;
     background-color: #1b1b1b;
     max-width: 1500px;
     margin: auto;

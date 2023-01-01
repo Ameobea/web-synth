@@ -8,6 +8,7 @@ import {
   maybeRestoreLocalComposition,
   onBeforeUnload,
 } from 'src/persistance';
+import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { initSentry } from 'src/sentry';
 import { setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
@@ -47,6 +48,10 @@ if (typeof AudioWorkletNode === 'undefined') {
 
   wasm.then(async engine => {
     setEngine(engine);
+
+    if (!localStorage.vcmState) {
+      initializeDefaultVCMState();
+    }
 
     // Check to see if the user has reached this page via a composition share link.  If so,
     // save the current composition and load the shared one before initializing.

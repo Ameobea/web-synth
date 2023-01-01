@@ -4,6 +4,7 @@ use miniserde::{json, Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    js::initialize_default_vcm_state,
     prelude::*,
     views::{
         composition_sharing::mk_composition_sharing,
@@ -375,23 +376,20 @@ impl ViewContextManager {
     /// Loads saved application state from the browser's `localstorage`.  Then calls the `init()`
     /// function of all managed `ViewContext`s.
     pub fn init(&mut self) {
-        let graph_editor_vc_id = if let Some(vcm_state) = Self::load_vcm_state() {
+        if let Some(vcm_state) = Self::load_vcm_state() {
             self.init_from_state_snapshot(vcm_state);
-            None
         } else {
-            let graph_editor_vc_id = self.init_default_state();
-            Some(graph_editor_vc_id)
+            panic!("No VCM state found in localStorage; must have been set by this point");
         };
 
-        if self.active_context_ix >= self.contexts.len() {
+        if self.contexts.is_empty() {
+            self.reset();
+        } else if self.active_context_ix >= self.contexts.len() {
             self.active_context_ix = 0;
         }
         self.contexts[self.active_context_ix].context.unhide();
 
         self.commit();
-        if let Some(graph_editor_vc_id) = graph_editor_vc_id {
-            js::arrange_graph_editor(&graph_editor_vc_id.to_string());
-        }
     }
 
     /// Retrieves the active `ViewContextManager`
@@ -552,7 +550,8 @@ impl ViewContextManager {
         self.contexts.clear();
         self.connections.clear();
         self.foreign_connectables.clear();
-        self.init();
+
+        initialize_default_vcm_state();
     }
 }
 

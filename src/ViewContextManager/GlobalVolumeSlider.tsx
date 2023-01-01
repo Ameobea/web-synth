@@ -4,7 +4,16 @@ import './GlobalVolume.scss';
 
 const ctx = new AudioContext();
 
-const GlobalVolumeSlider: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+export const setGlobalVolume = (newGlobalVolume: number) => {
+  localStorage.setItem('globalVolume', newGlobalVolume.toString());
+  ((ctx as any).globalVolume as GainNode).gain.value = newGlobalVolume / 100;
+};
+
+interface GlobalVolumeSliderProps {
+  onClose: () => void;
+}
+
+export const GlobalVolumeSlider: React.FC<GlobalVolumeSliderProps> = ({ onClose }) => {
   const [value, setValue] = useState(localStorage.getItem('globalVolume') ?? 20);
 
   return (
@@ -26,14 +35,11 @@ const GlobalVolumeSlider: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           value={value}
           onChange={evt => {
             const value = +evt.target.value;
-            localStorage.setItem('globalVolume', value.toString());
             setValue(value);
-            ((ctx as any).globalVolume as GainNode).gain.value = value / 100;
+            setGlobalVolume(value);
           }}
         />
       </div>
     </>
   );
 };
-
-export default GlobalVolumeSlider;

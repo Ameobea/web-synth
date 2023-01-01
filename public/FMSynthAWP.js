@@ -36,6 +36,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     super();
 
     this.wasmInstance = null;
+    this.shutdown = false;
     this.ctxPtr = 0;
     this.wasmMemoryBuffer = null;
     this.sampleDataIxByHashedSampleDescriptor = new Map();
@@ -49,6 +50,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.outputWeights,
             evt.data.adsrs
           );
+          this.debugID = evt.data.debugID;
           break;
         }
         case 'setModulationIndex': {
@@ -348,6 +350,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
           this.sampleDataIxByHashedSampleDescriptor.set(descriptorHash, sampleDataIx);
           break;
         }
+        case 'shutdown': {
+          this.shutdown = true;
+          break;
+        }
         default: {
           console.warn('Unhandled message type in FM Synth AWP: ', evt.data.type);
         }
@@ -443,6 +449,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
   process(_inputs, outputs, params) {
     if (!this.wasmInstance) {
       return true;
+    }
+    if (this.shutdown) {
+      console.log('Shutting down FM Synth AWP', this.debugID);
+      return false;
     }
 
     if (globalThis.globalTempoBPM) {

@@ -116,7 +116,7 @@
   </div>
 </div>
 
-<style lang="scss">
+<style lang="css">
   .root {
     display: flex;
     flex-direction: column;
@@ -139,17 +139,17 @@
     display: flex;
     flex-direction: row;
     margin-bottom: 6px;
+  }
 
-    label {
-      display: flex;
-      flex-basis: 150px;
-    }
+  .select-wrapper label {
+    display: flex;
+    flex-basis: 150px;
+  }
 
-    select {
-      margin-left: 12px;
-      display: flex;
-      flex: 1;
-    }
+  .select-wrapper select {
+    margin-left: 12px;
+    display: flex;
+    flex: 1;
   }
 
   .parse-error-message {
@@ -162,20 +162,20 @@
     display: flex;
     flex-direction: row;
     margin-top: 8px;
+  }
 
-    .custom-interval-display {
-      border: 1px solid #888;
-      padding: 2px 4px;
-      margin-right: 8px;
-      font-size: 15px;
-      font-weight: bold;
-      flex-basis: 80px;
-      text-align: center;
-    }
+  .custom-quantization-interval .custom-interval-display {
+    border: 1px solid #888;
+    padding: 2px 4px;
+    margin-right: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    flex-basis: 80px;
+    text-align: center;
+  }
 
-    input[type='text'] {
-      margin-right: 8px;
-    }
+  .custom-quantization-interval input[type='text'] {
+    margin-right: 8px;
   }
 
   select {

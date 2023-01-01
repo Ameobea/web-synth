@@ -191,6 +191,7 @@ export default class FMSynth implements ForeignNode {
   private gateCallbacks: Set<(midiNumber: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
+  public readonly debugID = genRandomStringID();
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';
@@ -316,6 +317,7 @@ export default class FMSynth implements ForeignNode {
         this.encodeAdsr(this.gainEnvelope, -1),
         ...this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
       ],
+      debugID: this.debugID,
     });
 
     this.awpHandle.port.onmessage = evt => {
@@ -904,6 +906,15 @@ export default class FMSynth implements ForeignNode {
     if (params.sampleMappingState) {
       this.sampleMappingStore.set(deserializeSampleMappingState(params.sampleMappingState));
     }
+  }
+
+  public shutdown() {
+    if (!this.awpHandle) {
+      console.error('Tried to shut down FM synth before AWP initialized');
+      return;
+    }
+
+    this.awpHandle.port.postMessage({ type: 'shutdown' });
   }
 
   public serialize() {

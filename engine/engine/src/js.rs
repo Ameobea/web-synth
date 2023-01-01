@@ -14,6 +14,8 @@ extern "C" {
     pub fn delete_view_context(id: &str);
     pub fn set_active_vc_ix(new_ix: usize);
     pub fn list_foreign_node_used_samples(id: &str) -> Vec<JsValue>;
+    /// Returns the ID of the active view context to display after initializing
+    pub fn initialize_default_vcm_state();
 }
 
 #[wasm_bindgen]
@@ -57,7 +59,6 @@ extern "C" {
     pub fn hide_graph_editor(state_key: &str);
     pub fn unhide_graph_editor(state_key: &str);
     pub fn cleanup_graph_editor(state_key: &str);
-    pub fn arrange_graph_editor(vc_id: &str);
 }
 
 #[wasm_bindgen(raw_module = "./midiEditor")]

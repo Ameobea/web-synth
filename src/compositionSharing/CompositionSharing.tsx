@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 
 import { onBeforeUnload, reinitializeWithComposition } from '../persistance';
 import './CompositionSharing.scss';
-
 import {
   fetchAllSharedCompositions,
   getExistingCompositionTags,
@@ -16,7 +15,7 @@ import {
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
-import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
@@ -321,7 +320,11 @@ const CompositionSharing: React.FC = () => (
           const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
             R.prop('uuid')
           );
-          reinitializeWithComposition(composition.content, getEngine()!, allViewContextIds);
+          reinitializeWithComposition(
+            { type: 'serialized', value: composition.content },
+            getEngine()!,
+            allViewContextIds
+          );
         }}
       >
         Load Composition

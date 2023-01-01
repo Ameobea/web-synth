@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import GlobalVolumeSlider from './GlobalVolumeSlider';
+import { GlobalVolumeSlider } from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
 import {
   getIsGlobalBeatCounterStarted,

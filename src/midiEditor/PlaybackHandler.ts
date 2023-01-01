@@ -12,8 +12,8 @@ import {
   unregisterStopCB,
 } from 'src/eventScheduler';
 import { getGlobalBpm } from 'src/globalMenu';
-import { MIDIEditorInstance } from 'src/midiEditor';
-import { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import type { MIDIEditorInstance } from 'src/midiEditor';
+import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 
 interface SchedulableNoteEvent {
   isAttack: boolean;

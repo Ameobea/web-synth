@@ -31,6 +31,42 @@ const PolysynthMod = new AsyncOnce(() => import('src/polysynth'));
 
 const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 
+const buildSynthDesignerMIDINode = (
+  getState: () => {
+    synthDesigner: SynthDesignerState;
+  }
+): MIDINode =>
+  new MIDINode(() => {
+    const onAttack = (note: number, velocity: number) => {
+      const polysynthCtx = getState().synthDesigner.polysynthCtx;
+      if (!polysynthCtx) {
+        return;
+      }
+
+      polysynthCtx.module.handle_note_down(polysynthCtx.ctxPtr, note, velocity);
+    };
+
+    const onRelease = (note: number, _velocity: number) => {
+      const polysynthCtx = getState().synthDesigner.polysynthCtx;
+      if (!polysynthCtx) {
+        return;
+      }
+
+      polysynthCtx.module.handle_note_up(polysynthCtx.ctxPtr, note);
+    };
+
+    return {
+      onAttack,
+      onRelease,
+      onPitchBend: () => {
+        // No-op; TODO?
+      },
+      onClearAll: () => {
+        /* deprecated */
+      },
+    };
+  });
+
 export const init_synth_designer = (stateKey: string) => {
   // Create a fresh Redux store just for this instance.  It makes things a lot simpler on the Redux side due to the
   // complexity of the Redux architecture for synth designer; we'd have to add an id param to all actions and store
@@ -66,7 +102,8 @@ export const init_synth_designer = (stateKey: string) => {
     });
 
   const reduxInfra = buildSynthDesignerRedux(vcId, initialState);
-  SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED' });
+  const midiNode = buildSynthDesignerMIDINode(reduxInfra.getState);
+  SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED', midiNode });
 
   PolysynthMod.get().then(mod => {
     const playNote = (voiceIx: number, note: number, _velocity: number) =>
@@ -154,53 +191,11 @@ export const cleanup_synth_designer = (stateKey: string): string => {
     } else {
       state.reactRoot.unmount();
     }
+
+    state.getState().synthDesigner.synths.forEach(synth => synth.fmSynth.shutdown());
   }
   rootNode.remove();
   return designerState;
-};
-
-const midiInputCbCache: Map<string, MIDINode> = new Map();
-
-const getMidiNode = (stateKey: string): MIDINode => {
-  const cached = midiInputCbCache.get(stateKey);
-  if (cached) {
-    return cached;
-  }
-
-  const midiNode = new MIDINode(() => {
-    const { getState } = getSynthDesignerReduxInfra(stateKey);
-
-    const onAttack = (note: number, velocity: number) => {
-      const polysynthCtx = getState().synthDesigner.polysynthCtx;
-      if (!polysynthCtx) {
-        return;
-      }
-
-      polysynthCtx.module.handle_note_down(polysynthCtx.ctxPtr, note, velocity);
-    };
-
-    const onRelease = (note: number, _velocity: number) => {
-      const polysynthCtx = getState().synthDesigner.polysynthCtx;
-      if (!polysynthCtx) {
-        return;
-      }
-
-      polysynthCtx.module.handle_note_up(polysynthCtx.ctxPtr, note);
-    };
-
-    return {
-      onAttack,
-      onRelease,
-      onPitchBend: () => {
-        // No-op; TODO?
-      },
-      onClearAll: () => {
-        /* deprecated */
-      },
-    };
-  });
-  midiInputCbCache.set(stateKey, midiNode);
-  return midiNode;
 };
 
 export const getVoicePreset = (stateKey: string, synthIx: number) => {
@@ -209,7 +204,8 @@ export const getVoicePreset = (stateKey: string, synthIx: number) => {
 };
 
 export const get_synth_designer_audio_connectables = (stateKey: string): AudioConnectables => {
-  const { synths, spectrumNode } = getSynthDesignerReduxInfra(stateKey).getState().synthDesigner;
+  const { getState, midiNode } = getSynthDesignerReduxInfra(stateKey);
+  const { synths, spectrumNode } = getState().synthDesigner;
 
   return {
     vcId: stateKey.split('_')[1]!,
@@ -228,7 +224,7 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
 
         const awpNode = synth.fmSynth!.getAWPNode();
         return new Array(PARAM_BUFFER_COUNT).fill(null as any).reduce(
-          (acc, _i, i) =>
+          (acc, _, i) =>
             acc.set(`synth_${voiceIx}_fm_input_${i}`, {
               type: 'number',
               node: awpNode
@@ -237,10 +233,8 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
             }),
           inputsForSynth
         );
-
-        return inputsForSynth;
       }, ImmMap<string, ConnectableInput>())
-      .set('midi', { node: getMidiNode(stateKey), type: 'midi' }),
+      .set('midi', { node: midiNode, type: 'midi' }),
     outputs: ImmMap<string, ConnectableOutput>().set('masterOutput', {
       node: spectrumNode,
       type: 'customAudio',
