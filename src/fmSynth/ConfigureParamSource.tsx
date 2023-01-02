@@ -420,9 +420,6 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
     [state, excludedTypes, min, max, scale, step, adsrs, onAdsrChange, midiNode, onChange]
   );
 
-  if (!vcId) {
-    console.trace({ vcId });
-  }
   const adsr = state.type === 'adsr' ? adsrs[state['adsr index']] : undefined;
 
   return (

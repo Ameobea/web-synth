@@ -149,7 +149,11 @@ const connectFilterADSRToFrequencyParams = (
     voices.forEach((voice, voiceIx) =>
       voice.filterNode.getFrequencyParams().forEach(frequencyParam => {
         filterADSROutput.connect(frequencyParam, voiceIx);
-        filterCSNs.frequency.outputCSN?.disconnect(frequencyParam);
+        try {
+          filterCSNs.frequency.outputCSN?.disconnect(frequencyParam);
+        } catch (_err) {
+          // pass
+        }
       })
     )
   );
@@ -164,7 +168,11 @@ const disconnectFilterADSRFromFrequencyParams = (
     voices.forEach((voice, voiceIx) =>
       voice.filterNode.getFrequencyParams().forEach(frequencyParam => {
         filterCSNs.frequency.outputCSN?.connect(frequencyParam);
-        filterADSROutput.disconnect(frequencyParam, voiceIx);
+        try {
+          filterADSROutput.disconnect(frequencyParam, voiceIx);
+        } catch (_err) {
+          // pass
+        }
       })
     )
   );

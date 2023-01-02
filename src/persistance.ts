@@ -47,6 +47,14 @@ export const reinitializeWithComposition = (
   // Rehydrate `localStorage` with parsed composition
   Object.entries(deserialized).forEach(([key, val]) => localStorage.setItem(key, val));
 
+  if (
+    typeof deserialized.globalTempo === 'string' ||
+    typeof deserialized.globalTempo === 'number'
+  ) {
+    console.log('Setting global tempo to', deserialized.globalTempo);
+    setGlobalBpm(+deserialized.globalTempo);
+  }
+
   // Trigger applicaion to refresh using the newly set `localStorage` content
   engine.init();
 
@@ -119,6 +127,7 @@ export const loadSharedComposition = async (
     typeof deserialized.globalTempo === 'string' ||
     typeof deserialized.globalTempo === 'number'
   ) {
+    console.log('Setting global tempo to', deserialized.globalTempo);
     setGlobalBpm(+deserialized.globalTempo);
   }
 };

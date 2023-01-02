@@ -5,7 +5,6 @@ import type { Writable } from 'svelte/store';
 
 import ConfigureOperator, { type OperatorConfig, type WavetableState } from './ConfigureOperator';
 import './FMSynth.scss';
-
 import ConfigureEffects, {
   type AdsrChangeHandler,
   type Effect,
@@ -142,6 +141,7 @@ export type UISelection =
   | { type: 'oscilloscope' };
 
 interface FMSynthUIProps {
+  fmSynth: FMSynth;
   updateBackendModulation: BackendModulationUpdater;
   updateBackendOutput: BackendOutputUpdater;
   modulationMatrix: ParamSource[][];
@@ -170,6 +170,7 @@ interface FMSynthUIProps {
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
+  fmSynth,
   updateBackendModulation,
   updateBackendOutput,
   modulationMatrix,
@@ -215,6 +216,36 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     [onSelectedUIChange]
   );
   const wavyJonesInstance = useRef<WavyJones | null>(null);
+
+  // If the fm synth instance changes, we need to re-initialize local state
+  const lastFMSynthInst = useRef<FMSynth>(fmSynth);
+  useEffect(() => {
+    if (lastFMSynthInst.current === fmSynth) {
+      return;
+    }
+    lastFMSynthInst.current = fmSynth;
+
+    setState({
+      modulationMatrix,
+      outputWeights,
+      operatorConfigs,
+      operatorEffects,
+      mainEffectChain,
+      adsrs,
+      detune,
+      wavetableState,
+    });
+  }, [
+    adsrs,
+    detune,
+    fmSynth,
+    mainEffectChain,
+    modulationMatrix,
+    operatorConfigs,
+    operatorEffects,
+    outputWeights,
+    wavetableState,
+  ]);
 
   const onOperatorChange = (selectedOperatorIx: number, newConf: OperatorConfig) => {
     setState({
@@ -597,15 +628,25 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   );
 };
 
-export const ConnectedFMSynthUI: React.FC<{
+interface ConnectedFMSynthUIProps {
   synth: FMSynth;
   getFMSynthOutput: () => Promise<AudioNode>;
   midiNode?: MIDINode | null;
   synthID: string;
   isHidden: boolean;
   vcId: string | undefined;
-}> = React.memo(({ synth, getFMSynthOutput, midiNode, synthID, isHidden, vcId }) => (
+}
+
+const ConnectedFMSynthUIInner: React.FC<ConnectedFMSynthUIProps> = ({
+  synth,
+  getFMSynthOutput,
+  midiNode,
+  synthID,
+  isHidden,
+  vcId,
+}) => (
   <FMSynthUI
+    fmSynth={synth}
     updateBackendModulation={useCallback(
       (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
         synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val),
@@ -657,6 +698,9 @@ export const ConnectedFMSynthUI: React.FC<{
     sampleMappingStore={synth.getSampleMappingStore()}
     registerGateUngateCallbacks={synth.registerGateUngateCallbacks}
   />
-));
+);
+
+export const ConnectedFMSynthUI: React.FC<ConnectedFMSynthUIProps> =
+  React.memo(ConnectedFMSynthUIInner);
 
 export default React.memo(FMSynthUI);

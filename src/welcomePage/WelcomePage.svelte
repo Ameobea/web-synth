@@ -27,7 +27,7 @@
     <DemoTile
       title="Multi-Instrument Song"
       description="A winter-y looping song made using a variety of web synth modules"
-      compositionID="50"
+      compositionID="60"
       {isLoadingComposition}
       image="/demo-images/vibey-winter.jpg"
       imageAlt="A screenshot of the web synth audio graph editor for the 'Vibey Winter' composition.  It shows several connected modules including some synthesizers, a band splitter, filters, a reverb, and a mixer."
@@ -142,8 +142,8 @@
     display: flex;
     flex-direction: column;
     /* align-items: center; */
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 30px;
+    padding-right: 30px;
     background-color: #1b1b1b;
     max-width: 1500px;
     margin: auto;
@@ -178,7 +178,7 @@
     flex-direction: row;
     flex-wrap: wrap;
     margin-bottom: 20px;
-    justify-content: center;
+    justify-content: space-between;
   }
 
   h2 {

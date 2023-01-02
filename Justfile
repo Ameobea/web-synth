@@ -48,6 +48,8 @@ fix-litegraph:
   fi
 
 build-all:
+  #!/bin/bash
+
   just fix-litegraph
 
   cd engine \

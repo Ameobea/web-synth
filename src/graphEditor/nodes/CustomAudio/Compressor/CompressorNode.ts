@@ -266,10 +266,10 @@ export class CompressorNode implements ForeignNode {
     this.knee = new OverridableAudioParam(ctx, params.get('knee')!, undefined, true);
     this.lookaheadMs = new OverridableAudioParam(ctx, params.get('lookahead_ms')!, undefined, true);
 
-    const { bypass } = get(this.store);
-    this.awpHandle.port.postMessage({ type: 'setBypassed', bypass });
+    const state = get(this.store);
+    this.awpHandle.port.postMessage({ type: 'setBypassed', bypass: state.bypass });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
-    this.onChange(get(this.store));
+    this.onChange(state);
     updateConnectables(this.vcId, this.buildConnectables());
   }
 

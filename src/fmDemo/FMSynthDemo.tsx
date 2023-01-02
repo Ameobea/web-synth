@@ -192,6 +192,7 @@ try {
   GlobalState.lastLoadedPreset = 'pluck';
 }
 if (!R.isNil(serialized?.globalVolume)) {
+  console.log('Setting global volume', serialized!.globalVolume);
   mainGain.gain.value = serialized!.globalVolume;
   GlobalState.globalVolume = serialized!.globalVolume;
 }
@@ -481,6 +482,7 @@ const PresetsControlPanel: React.FC<{
         audioThreadData: GlobalState.gainEnvelope.audioThreadData,
       };
       adsrs.setState(gainEnvelope);
+      adsrs.setLength(AdsrLengthMode.Samples, gainEnvelope.lenSamples);
       GlobalState.gainEnvelope = gainEnvelope;
       // Filter ADSRs
       filterAdsrs.setState(normalizeEnvelope(preset.filterEnvelope));

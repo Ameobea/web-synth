@@ -42,7 +42,7 @@ const actionGroups = {
       newState,
       patchNetwork: getPatchNetworkReturnVal,
     }),
-    subReducer: (state: VCMState, { patchNetwork, newState }) => {
+    subReducer: (state: VCMState, { patchNetwork: newPatchNetwork, newState }) => {
       const engine = getEngine();
       if (!engine) {
         console.error('Tried to init patch betwork before engine was initialized');
@@ -53,9 +53,9 @@ const actionGroups = {
         );
       }
 
-      maybeUpdateVCM(engine, state.patchNetwork, patchNetwork);
+      maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
 
-      return { ...newState, patchNetwork, isLoaded: true };
+      return { ...newState, patchNetwork: newPatchNetwork, isLoaded: true };
     },
   }),
   CONNECT: buildActionGroup({
@@ -185,7 +185,7 @@ const actionGroups = {
       connectables,
     }),
     subReducer: (state: VCMState, { vcId, connectables }) => {
-      if (!connectables) {
+      if (!connectables || state.patchNetwork.connectables.has(vcId)) {
         return state;
       }
 
@@ -259,6 +259,7 @@ const actionGroups = {
       // no longer exist and replace the connectables object with the new one
       const oldConnectables = connectables.get(vcId);
       if (!oldConnectables) {
+        console.warn(`Tried to update connectables for VC ID ${vcId} but old ones weren't found`);
         return {
           ...state,
           patchNetwork: {

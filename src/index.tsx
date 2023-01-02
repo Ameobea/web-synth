@@ -49,21 +49,21 @@ if (typeof AudioWorkletNode === 'undefined') {
   wasm.then(async engine => {
     setEngine(engine);
 
-    if (!localStorage.vcmState) {
-      initializeDefaultVCMState();
-    }
-
-    // Check to see if the user has reached this page via a composition share link.  If so,
-    // save the current composition and load the shared one before initializing.
-    if (window.location.pathname.startsWith('/composition/')) {
-      await fetchAndLoadSharedComposition(window.location.pathname.split('/composition/')[1]);
-    } else {
-      await maybeRestoreLocalComposition();
-    }
-
     registerMainReduxGetState(getState);
 
-    engine.init();
+    if (!localStorage.vcmState) {
+      initializeDefaultVCMState();
+    } else {
+      // Check to see if the user has reached this page via a composition share link.  If so,
+      // save the current composition and load the shared one before initializing.
+      if (window.location.pathname.startsWith('/composition/')) {
+        await fetchAndLoadSharedComposition(window.location.pathname.split('/composition/')[1]);
+      } else {
+        await maybeRestoreLocalComposition();
+      }
+
+      engine.init();
+    }
 
     window.addEventListener('beforeunload', () => onBeforeUnload(engine));
 

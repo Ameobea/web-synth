@@ -111,7 +111,17 @@ export class ADSR2Module {
       encodedSteps: ADSR2Module.encodeADSRSteps(this.params.steps),
       releaseStartPhase: this.params.releaseStartPhase,
       loopPoint: this.params.loopPoint,
-      length: this.params.length,
+      length: (() => {
+        switch (this.params.lengthMode) {
+          case AdsrLengthMode.Samples:
+          case undefined:
+            return samplesToMs(this.params.length);
+          case AdsrLengthMode.Beats:
+            return this.params.length;
+          default:
+            throw new UnreachableException(`Unhandled length mode: ${this.params.lengthMode}`);
+        }
+      })(),
       lengthMode: this.params.lengthMode,
       outputRange: this.outputRange,
       logScale: this.params.logScale ?? false,
@@ -175,12 +185,14 @@ export class ADSR2Module {
     if (!this.awp) {
       return;
     }
+    console.log('setting length', newLength, lengthMode);
 
     this.awp.port.postMessage({
       type: 'setLength',
       length: (() => {
         switch (lengthMode) {
           case AdsrLengthMode.Samples:
+          case undefined:
             return samplesToMs(newLength);
           case AdsrLengthMode.Beats:
             return newLength;

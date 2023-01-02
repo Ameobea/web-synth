@@ -218,6 +218,7 @@ interface SynthModuleCompProps {
   stateKey: string;
   isHidden: boolean;
   vcId: string;
+  children?: React.ReactNode;
 }
 
 const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
@@ -256,10 +257,8 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
       </div>
 
       <SynthControlPanel
-        {...R.pick(
-          ['masterGain', 'detune', 'gainADSRLength', 'gainEnvelope', 'pitchMultiplier'],
-          synth
-        )}
+        masterGain={synth.masterGain}
+        pitchMultiplier={synth.pitchMultiplier}
         stateKey={stateKey}
         index={index}
         gainEnvelope={synth.fmSynth.gainEnvelope}
