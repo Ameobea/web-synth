@@ -7,7 +7,7 @@ import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { type MIDIInputCbs, MIDINode, mkBuildPasthroughInputCBs } from 'src/patchNetwork/midiNode';
+import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
@@ -162,13 +162,7 @@ export const init_midi_editor = (vcId: string) => {
 
   mkContainerRenderHelper({
     Comp: MIDIEditor,
-    getProps: () => ({
-      vcId,
-      height: window.innerHeight - 140,
-      width: window.innerWidth - 80,
-      initialState,
-      instance: inst,
-    }),
+    getProps: () => ({ vcId, initialState, instance: inst }),
     enableReactQuery: true,
   })(domID);
 };

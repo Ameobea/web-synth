@@ -115,21 +115,11 @@ pub struct ADSRValues {
 
 fn default_pitch_multiplier() -> f32 { 1. }
 
-// export interface AudioThreadData {
-//     /**
-//      * The shared memory buffer between this thread and the audio thread.
-//      */
-//     buffer?: Float32Array;
-//     /**
-//      * The index of `buffer` at which the envelope's current phase is stored and updated
-//      */
-//     phaseIndex: number;
-// }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioThreadData {
-    buffer: Option<Vec<f32>>,
     phase_index: usize,
+    debug_name: Option<String>,
 }
 
 // export type RampFn =

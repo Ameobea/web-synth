@@ -11,10 +11,9 @@
   export let registerGateUngateCallbacks: GateUngateCallbackRegistrar;
   export let store: Writable<SampleMappingState>;
   export let operatorIx: number;
-  $: {
-    if (!$store.stateByOperatorIx[operatorIx]) {
-      $store.stateByOperatorIx[operatorIx] = buildDefaultSampleMappingOperatorState();
-    }
+
+  $: if (!$store.stateByOperatorIx[operatorIx]) {
+    $store.stateByOperatorIx[operatorIx] = buildDefaultSampleMappingOperatorState();
   }
 </script>
 
@@ -37,7 +36,7 @@
   {/if}
 </div>
 
-<style lang="scss">
+<style lang="css">
   .root {
     display: flex;
     flex-direction: column;

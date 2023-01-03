@@ -5,7 +5,11 @@
   "editor.lineHeight": 24,
   "workbench.colorTheme": "Gray Matter Dark",
   "[markdown]": {
-    "editor.quickSuggestions": true,
+    "editor.quickSuggestions": {
+      "comments": "on",
+      "strings": "on",
+      "other": "on"
+    },
     "editor.formatOnSave": false
   },
   "files.exclude": {

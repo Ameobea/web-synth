@@ -32,7 +32,7 @@
   </div>
 </div>
 
-<style lang="scss">
+<style lang="css">
   .root {
     margin-left: -2px;
     margin-right: -2px;
@@ -47,10 +47,10 @@
     display: flex;
     flex-direction: row;
     margin-bottom: -1px;
+  }
 
-    .label {
-      margin-right: 8px;
-    }
+  .selected-sample .label {
+    margin-right: 8px;
   }
 
   .no-sample-mapped {

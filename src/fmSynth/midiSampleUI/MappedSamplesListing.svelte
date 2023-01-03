@@ -102,7 +102,7 @@
   {/if}
 </div>
 
-<style lang="scss">
+<style lang="css">
   .root {
     display: flex;
     flex-direction: column;
@@ -121,10 +121,10 @@
     flex-direction: column;
     padding: 6px;
     margin-top: -4px;
+  }
 
-    > * {
-      margin-top: 4px;
-    }
+  .controls > * {
+    margin-top: 4px;
   }
 
   button {

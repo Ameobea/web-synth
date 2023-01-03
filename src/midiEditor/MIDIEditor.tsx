@@ -17,7 +17,7 @@ import MIDIEditorUIInstance, {
   type SerializedMIDIEditorState,
 } from 'src/midiEditor/MIDIEditorUIInstance';
 import BasicModal from 'src/misc/BasicModal';
-import { mkImageLoadPlaceholder } from 'src/reactUtils';
+import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
@@ -532,8 +532,6 @@ interface MIDIEditorProps {
 
 const MIDIEditor: React.FC<MIDIEditorProps> = ({
   initialState,
-  width,
-  height,
   instance: parentInstance,
   vcId,
 }) => {
@@ -547,6 +545,17 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
     metronomeEnabled: initialState.metronomeEnabled,
   });
 
+  const windowSize = useWindowSize();
+  const height = windowSize.height - 140;
+  const width = windowSize.width - 80;
+  const lastWindowWidth = useRef(windowSize);
+  useEffect(() => {
+    if (lastWindowWidth.current.width !== windowSize.width) {
+      lastWindowWidth.current = windowSize;
+      instance.current?.setSize(width, height);
+    }
+  }, [height, width, windowSize]);
+
   const handleChange = useCallback(
     ({ bpm, loopEnabled }: MIDIEditorControlsState) => {
       parentInstance.uiInstance!.localBPM = bpm;
@@ -557,6 +566,8 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
     [parentInstance.uiInstance]
   );
 
+  const lastCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   return (
     <div className='midi-editor'>
       <MIDIEditorControls
@@ -565,36 +576,44 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
         onChange={handleChange}
       />
       <canvas
-        style={{ width, height }}
-        ref={ref => {
-          if (!ref) {
+        // style={{ width, height }}
+        ref={canvas => {
+          if (!canvas) {
             instance.current?.destroy();
             instance.current = undefined;
+            lastCanvasRef.current = null;
             return;
           }
+
+          if (canvas === lastCanvasRef.current) {
+            return;
+          }
+          lastCanvasRef.current = canvas;
 
           instance.current = new MIDIEditorUIInstance(
             width,
             height,
-            ref,
+            canvas,
             initialState,
             parentInstance,
             vcId
           );
           parentInstance.registerUI(instance.current);
         }}
-        onMouseDown={evt => {
+        onMouseDown={useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
           // Prevent clicks on the canvas from selecting text and stuff in the rest of the page
           evt.preventDefault();
           evt.stopPropagation();
-        }}
-        onContextMenu={evt => {
+        }, [])}
+        onContextMenu={useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
           evt.preventDefault();
           evt.stopPropagation();
-        }}
+        }, [])}
       />
     </div>
   );
 };
 
-export default MIDIEditor;
+const MIDIEditorMemo = React.memo(MIDIEditor);
+
+export default MIDIEditorMemo;

@@ -16,7 +16,9 @@
     {#each mappedSamples as mappedSampleData, i}
       <ConfigureMappedSample
         bind:mappedSampleData
-        onDelete={() => (mappedSamples = R.remove(i, 1, mappedSamples))}
+        onDelete={() => {
+          mappedSamples = R.remove(i, 1, mappedSamples);
+        }}
       />
     {/each}
   </div>
@@ -29,7 +31,7 @@
   <button class="close-button" on:click={onClose}>Collapse</button>
 </div>
 
-<style lang="scss">
+<style lang="css">
   .root {
     box-sizing: border-box;
     display: flex;

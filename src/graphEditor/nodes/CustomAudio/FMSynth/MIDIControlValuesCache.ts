@@ -1,5 +1,5 @@
-import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 
 export default class MIDIControlValuesCache {
   private lastSeenValues: Map<number, number> = new Map();

@@ -112,7 +112,10 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   fmSynthConfig: synth.fmSynth.serialize(),
   filter: synth.filterParams,
   masterGain: synth.masterGain,
-  filterEnvelope: synth.filterEnvelope,
+  filterEnvelope: {
+    ...synth.filterEnvelope,
+    audioThreadData: R.omit(['buffer'], synth.filterEnvelope.audioThreadData),
+  },
   filterADSRLength: synth.filterADSRLength,
   pitchMultiplier: synth.pitchMultiplier,
   filterBypassed: synth.filterBypassed,
@@ -602,11 +605,19 @@ const actionGroups = {
           filterNode: newFilters[voiceIx],
         }));
         newSynth.voices.forEach(voice => voice.filterNode.getOutput().connect(voice.outerGainNode));
-        connectFilterADSRToFrequencyParams(
-          newSynth.voices,
-          newSynth.filterADSRModule,
-          newSynth.filterCSNs
-        );
+        if (newSynth.filterEnvelopeEnabled) {
+          connectFilterADSRToFrequencyParams(
+            newSynth.voices,
+            newSynth.filterADSRModule,
+            newSynth.filterCSNs
+          );
+        } else {
+          disconnectFilterADSRFromFrequencyParams(
+            newSynth.voices,
+            newSynth.filterADSRModule,
+            newSynth.filterCSNs
+          );
+        }
         connectOscillators(true, newSynth);
       }
 

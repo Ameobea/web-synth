@@ -6,9 +6,7 @@
   export let mappedSamples: MappedSampleData[] | undefined;
   export let isGated: boolean;
   let mappedSampleCount: number;
-  $: {
-    mappedSampleCount = mappedSamples?.length ?? 0;
-  }
+  $: mappedSampleCount = mappedSamples?.filter(d => !!d.descriptor).length ?? 0;
 </script>
 
 <div
@@ -28,7 +26,7 @@
   </div>
 </div>
 
-<style lang="scss">
+<style lang="css">
   .note-row {
     display: grid;
     grid-template-columns: 24px 1fr;
@@ -40,10 +38,10 @@
   .note-row[data-gated='true'] {
     background-color: rgb(250, 82, 250) !important;
     color: #121212 !important;
+  }
 
-    .no-mapped-samples {
-      color: #222 !important;
-    }
+  .note-row[data-gated='true'] .no-mapped-samples {
+    color: #222 !important;
   }
 
   .midi-number {
@@ -59,10 +57,10 @@
   .note-row[data-color='white'] {
     background-color: #ddd;
     color: #121212;
+  }
 
-    .no-mapped-samples {
-      color: #333;
-    }
+  .note-row[data-color='white'] .no-mapped-samples {
+    color: #333;
   }
 
   .note-row[data-color='white']:hover {
@@ -72,10 +70,10 @@
   .note-row[data-color='black'] {
     background-color: #242424;
     color: #ddd;
+  }
 
-    .no-mapped-samples {
-      color: #9f9f9f;
-    }
+  .note-row[data-color='black'] .no-mapped-samples {
+    color: #9f9f9f;
   }
 
   .note-row[data-color='black']:hover {

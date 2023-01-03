@@ -186,6 +186,9 @@ export default class MIDIEditorUIInstance {
     });
 
     this.init(initialState).then(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.pianoKeys = new PianoKeys(this);
 
       // border around everything
@@ -241,6 +244,9 @@ export default class MIDIEditorUIInstance {
     const wasmInst = await import('src/note_container');
     const noteLinesCtxPtr = wasmInst.create_note_lines(initialState.lines.length);
     this.wasm = { instance: wasmInst, noteLinesCtxPtr };
+    if (this.destroyed) {
+      return;
+    }
 
     this.lines = this.buildNoteLines(initialState.lines);
   }
@@ -292,6 +298,13 @@ export default class MIDIEditorUIInstance {
     }
 
     return Math.round(rawBeat * (1 / this.beatSnapInterval)) / (1 / this.beatSnapInterval);
+  }
+
+  public setSize(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+    this.app.renderer.resize(width, height);
+    this.handleViewChange();
   }
 
   /**
@@ -1121,6 +1134,26 @@ export default class MIDIEditorUIInstance {
         }
 
         if (evt.target !== this.app.renderer.view || this.panningData) {
+          return;
+        }
+
+        if (evt.ctrlKey || evt.metaKey) {
+          this.view.scrollHorizontalBeats = Math.max(
+            0,
+            this.view.scrollHorizontalBeats + evt.deltaX / conf.SCROLL_HORIZONTAL_FACTOR
+          );
+          const maxVerticalScrollPx = Math.max(
+            this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT + 10,
+            0
+          );
+          this.view.scrollVerticalPx = Math.max(
+            0,
+            Math.min(
+              maxVerticalScrollPx,
+              this.view.scrollVerticalPx + evt.deltaY / conf.SCROLL_VERTICAL_FACTOR
+            )
+          );
+          this.handleViewChange();
           return;
         }
 
