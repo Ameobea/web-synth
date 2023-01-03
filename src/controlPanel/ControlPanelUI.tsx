@@ -7,15 +7,15 @@ import { shallowEqual, useSelector } from 'react-redux';
 import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';
 import ControlPanelNote from 'src/controlPanel/ControlPanelNote';
 import ControlPanelSpectrogram from 'src/controlPanel/ControlPanelSpectrogram';
-import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
-import { actionCreators, dispatch, ReduxStore } from 'src/redux';
+import { actionCreators, dispatch, type ReduxStore } from 'src/redux';
 import {
   buildDefaultControlPanelInfo,
-  Control,
-  ControlInfo,
-  ControlPanelConnection,
-  ControlPanelInstanceState,
+  type Control,
+  type ControlInfo,
+  type ControlPanelConnection,
+  type ControlPanelInstanceState,
 } from 'src/redux/modules/controlPanel';
 
 interface ConfigureInputInnerProps {

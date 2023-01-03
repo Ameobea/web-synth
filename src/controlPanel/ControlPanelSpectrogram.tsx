@@ -42,25 +42,28 @@ const ControlPanelSpectrogram: React.FC<ControlPanelSpectrogramProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <SpectrumVisualization paused={isHidden} analyzerNode={analyser}>
-        {isHovered ? (
-          <div
-            className='delete-input-button'
-            onClick={() =>
-              dispatch(actionCreators.controlPanel.DELETE_CONTROL_PANEL_VIZ(vcId, name))
-            }
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              transform: 'scale(1.5)',
-              cursor: 'pointer',
-            }}
-          >
-            🗑️
-          </div>
-        ) : null}
-      </SpectrumVisualization>
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+        <SpectrumVisualization paused={isHidden} analyzerNode={analyser}>
+          {isHovered ? (
+            <div
+              className='delete-input-button'
+              onClick={() =>
+                dispatch(actionCreators.controlPanel.DELETE_CONTROL_PANEL_VIZ(vcId, name))
+              }
+              style={{
+                position: 'absolute',
+                top: 10,
+                transform: 'scale(2.8)',
+                cursor: 'pointer',
+                width: 10,
+                left: 1180,
+              }}
+            >
+              🗑️
+            </div>
+          ) : null}
+        </SpectrumVisualization>
+      </div>
     </div>
   );
 };
