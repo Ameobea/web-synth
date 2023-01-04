@@ -1,5 +1,3 @@
-use dsp::midi_number_to_frequency;
-
 use crate::fm::OPERATOR_COUNT;
 
 use super::sample_manager;
@@ -12,11 +10,15 @@ pub struct SampleMappingEmitter {
 impl SampleMappingEmitter {
     pub fn new() -> Self { SampleMappingEmitter { cur_ix: 0 } }
 
-    pub fn gen_sample(&mut self, base_frequency: f32, config: &SampleMappingOperatorConfig) -> f32 {
+    pub fn gen_sample(&mut self, midi_number: usize, config: &SampleMappingOperatorConfig) -> f32 {
         let mut out = 0.;
 
-        for (_midi_number, slot_base_frequency, data) in &config.mapped_samples_by_midi_number {
-            if *slot_base_frequency != base_frequency {
+        for MappedSample {
+            midi_number: slot_midi_number,
+            data,
+        } in &config.mapped_samples_by_midi_number
+        {
+            if *slot_midi_number != midi_number {
                 continue;
             }
 
@@ -66,8 +68,14 @@ impl Default for MappedSampleData {
 }
 
 #[derive(Default)]
+pub struct MappedSample {
+    pub midi_number: usize,
+    pub data: Vec<MappedSampleData>,
+}
+
+#[derive(Default)]
 pub struct SampleMappingOperatorConfig {
-    pub mapped_samples_by_midi_number: Vec<(usize, f32, Vec<MappedSampleData>)>,
+    pub mapped_samples_by_midi_number: Vec<MappedSample>,
 }
 
 impl SampleMappingOperatorConfig {
@@ -84,10 +92,9 @@ impl SampleMappingOperatorConfig {
     ) {
         let mapped_samples_for_midi_number =
             &mut self.mapped_samples_by_midi_number[midi_number_slot_ix];
-        mapped_samples_for_midi_number.0 = midi_number;
-        mapped_samples_for_midi_number.1 = midi_number_to_frequency(midi_number);
+        mapped_samples_for_midi_number.midi_number = midi_number;
         mapped_samples_for_midi_number
-            .2
+            .data
             .resize_with(mapped_sample_count, Default::default);
     }
 
@@ -98,7 +105,7 @@ impl SampleMappingOperatorConfig {
         sample_data_ix: isize,
         do_loop: bool,
     ) {
-        self.mapped_samples_by_midi_number[midi_number_ix].2[mapped_sample_ix] =
+        self.mapped_samples_by_midi_number[midi_number_ix].data[mapped_sample_ix] =
             MappedSampleData::from_parts(sample_data_ix, do_loop);
     }
 }

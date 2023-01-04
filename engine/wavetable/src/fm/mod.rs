@@ -481,6 +481,7 @@ impl Operator {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
+        midi_number: usize,
         base_frequency: f32,
         sample_mapping_config: &SampleMappingOperatorConfig,
     ) -> f32 {
@@ -494,6 +495,7 @@ impl Operator {
             param_buffers,
             adsrs,
             sample_ix_within_frame,
+            midi_number,
             base_frequency,
             sample_mapping_config,
         );
@@ -614,6 +616,7 @@ impl OscillatorSource {
         param_buffers: &[[f32; FRAME_SIZE]],
         adsrs: &[Adsr],
         sample_ix_within_frame: usize,
+        midi_number: usize,
         base_frequency: f32,
         sample_mapping_config: &SampleMappingOperatorConfig,
     ) -> f32 {
@@ -716,7 +719,7 @@ impl OscillatorSource {
                 base_frequency,
             ),
             OscillatorSource::SampleMapping(emitter) =>
-                emitter.gen_sample(base_frequency, sample_mapping_config),
+                emitter.gen_sample(midi_number, sample_mapping_config),
             OscillatorSource::TunedSample(_) => todo!(),
         }
     }
@@ -738,6 +741,7 @@ pub struct FMSynthVoice {
     pub effect_chain: EffectChain,
     cached_modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
     pub gain_envelope: Adsr,
+    pub last_gated_midi_number: usize,
 }
 
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
@@ -824,6 +828,7 @@ impl FMSynthVoice {
                 },
                 false,
             ),
+            last_gated_midi_number: 0,
         }
     }
 
@@ -974,6 +979,7 @@ impl FMSynthVoice {
                     param_buffers,
                     &self.adsrs,
                     sample_ix_within_frame,
+                    self.last_gated_midi_number,
                     base_frequency,
                     &sample_mapping_manager.config_by_operator[operator_ix],
                 );
@@ -986,9 +992,6 @@ impl FMSynthVoice {
                             .get_unchecked(operator_ix)
                             .get_unchecked(sample_ix_within_frame)
                     };
-                // if output_sample != 0. && !output_sample.is_normal() {
-                //     panic!();
-                // }
             }
 
             debug_assert!(output_sample == 0. || output_sample.is_normal());
@@ -1904,7 +1907,7 @@ pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
+pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize, midi_number: usize) {
     // Stop recording phases for the last recently gated voice so the new one can record them
     let old_phases_voice = &mut (*ctx).voices[(*ctx).most_recent_gated_voice_ix];
     for adsr in &mut old_phases_voice.adsrs {
@@ -1919,6 +1922,7 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
         adsr.gate();
     }
 
+    voice.last_gated_midi_number = midi_number;
     voice.gain_envelope.gate();
     voice.gain_envelope.store_phase_to =
         Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(GAIN_ENVELOPE_PHASE_BUF_INDEX));

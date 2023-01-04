@@ -36,6 +36,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     super();
 
     this.wasmInstance = null;
+    this.lastStateByOperatorIx = null;
     this.shutdown = false;
     this.ctxPtr = 0;
     this.wasmMemoryBuffer = null;
@@ -223,7 +224,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          this.wasmInstance.exports.gate_voice(this.ctxPtr, evt.data.voiceIx);
+          this.wasmInstance.exports.gate_voice(this.ctxPtr, evt.data.voiceIx, evt.data.midiNumber);
           break;
         }
         case 'ungate': {
@@ -296,48 +297,17 @@ class FMSynthAWP extends AudioWorkletProcessor {
         }
         case 'setSampleMappingState': {
           const { stateByOperatorIx } = evt.data.sampleMappingState;
-          Object.entries(stateByOperatorIx).forEach(
-            ([operatorIxStr, { mappedSamplesByMIDINumber }]) => {
-              const operatorIx = +operatorIxStr;
-              const entries = Object.entries(mappedSamplesByMIDINumber);
-              this.wasmInstance.exports.fm_synth_set_mapped_sample_midi_number_count(
-                this.ctxPtr,
-                operatorIx,
-                entries.length
-              );
-              entries.forEach(([midiNumberStr, mappedSampleDataForMIDINumber], slotIx) => {
-                const midiNumber = +midiNumberStr;
-                this.wasmInstance.exports.fm_synth_set_mapped_sample_data_for_midi_number_slot(
-                  this.ctxPtr,
-                  operatorIx,
-                  slotIx,
-                  midiNumber,
-                  mappedSampleDataForMIDINumber.length
-                );
-
-                mappedSampleDataForMIDINumber.forEach(({ doLoop, descriptor }, mappedSampleIx) => {
-                  const sampleDescriptorHash = descriptor ? hashSampleDescriptor(descriptor) : null;
-                  const sampleDataIx = sampleDescriptorHash
-                    ? this.sampleDataIxByHashedSampleDescriptor.get(sampleDescriptorHash)
-                    : null;
-
-                  this.wasmInstance.exports.fm_synth_set_mapped_sample_config(
-                    this.ctxPtr,
-                    operatorIx,
-                    slotIx,
-                    mappedSampleIx,
-                    sampleDataIx ?? -1,
-                    doLoop ?? false
-                  );
-                });
-              });
-            }
-          );
+          this.lastStateByOperatorIx = stateByOperatorIx;
+          this.setSampleMappingState(stateByOperatorIx);
           break;
         }
         case 'setSample': {
           const { descriptor, data } = evt.data;
           const descriptorHash = hashSampleDescriptor(descriptor);
+          if (this.sampleDataIxByHashedSampleDescriptor.has(descriptorHash)) {
+            console.warn('Already added sample data with descriptor', descriptor);
+            break;
+          }
           const sampleDataIx = this.wasmInstance.exports.fm_synth_add_sample(data.length);
           const sampleDataBufPtr =
             this.wasmInstance.exports.fm_synth_get_sample_buf_ptr(sampleDataIx);
@@ -348,6 +318,9 @@ class FMSynthAWP extends AudioWorkletProcessor {
           );
           sampleBuffer.set(data);
           this.sampleDataIxByHashedSampleDescriptor.set(descriptorHash, sampleDataIx);
+          if (this.lastStateByOperatorIx) {
+            this.setSampleMappingState(this.lastStateByOperatorIx);
+          }
           break;
         }
         case 'shutdown': {
@@ -367,6 +340,49 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const str = String.fromCharCode(...slice);
     throw new Error(str);
   };
+
+  setOperatorState(operatorIx, mappedSamplesByMIDINumber) {
+    const entries = Object.entries(mappedSamplesByMIDINumber);
+    this.wasmInstance.exports.fm_synth_set_mapped_sample_midi_number_count(
+      this.ctxPtr,
+      operatorIx,
+      entries.length
+    );
+    entries.forEach(([midiNumberStr, mappedSampleDataForMIDINumber], slotIx) => {
+      const midiNumber = +midiNumberStr;
+      this.wasmInstance.exports.fm_synth_set_mapped_sample_data_for_midi_number_slot(
+        this.ctxPtr,
+        operatorIx,
+        slotIx,
+        midiNumber,
+        mappedSampleDataForMIDINumber.length
+      );
+
+      mappedSampleDataForMIDINumber.forEach(({ doLoop, descriptor }, mappedSampleIx) => {
+        const sampleDescriptorHash = descriptor ? hashSampleDescriptor(descriptor) : null;
+        const sampleDataIx = sampleDescriptorHash
+          ? this.sampleDataIxByHashedSampleDescriptor.get(sampleDescriptorHash)
+          : null;
+
+        this.wasmInstance.exports.fm_synth_set_mapped_sample_config(
+          this.ctxPtr,
+          operatorIx,
+          slotIx,
+          mappedSampleIx,
+          sampleDataIx ?? -1,
+          doLoop ?? false
+        );
+      });
+    });
+  }
+
+  setSampleMappingState(stateByOperatorIx) {
+    const entries = Object.entries(stateByOperatorIx);
+    for (const [operatorIxStr, { mappedSamplesByMIDINumber }] of entries) {
+      const operatorIx = +operatorIxStr;
+      this.setOperatorState(operatorIx, mappedSamplesByMIDINumber);
+    }
+  }
 
   async initWasm(wasmBytes, modulationMatrix, outputWeights, adsrs) {
     const importObject = {

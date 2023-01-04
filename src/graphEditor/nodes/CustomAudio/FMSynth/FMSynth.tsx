@@ -396,7 +396,7 @@ export default class FMSynth implements ForeignNode {
     for (const cb of this.gateCallbacks) {
       cb(midiNumber);
     }
-    this.awpHandle.port.postMessage({ type: 'gate', voiceIx });
+    this.awpHandle.port.postMessage({ type: 'gate', voiceIx, midiNumber });
   }
 
   public onUnGate(voiceIx: number, midiNumber: number) {

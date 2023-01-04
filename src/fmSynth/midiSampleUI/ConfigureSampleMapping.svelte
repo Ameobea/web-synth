@@ -30,7 +30,7 @@
   {#if $store.stateByOperatorIx[operatorIx] && $store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded}
     <MappedSamplesListing
       bind:selectedMIDINumber={$store.stateByOperatorIx[operatorIx].selectedMIDINumber}
-      state={$store.stateByOperatorIx[operatorIx]}
+      bind:state={$store.stateByOperatorIx[operatorIx]}
       {registerGateUngateCallbacks}
     />
   {/if}
