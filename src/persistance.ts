@@ -166,3 +166,36 @@ export const fetchAndLoadSharedComposition = async (
   }
   await loadSharedComposition(composition, force, retainLocalStorage);
 };
+
+const LoginTokenDBClient = new Dexie('loginToken');
+LoginTokenDBClient.version(1).stores({
+  loginToken: '',
+});
+
+const LoginTokenTable = LoginTokenDBClient.table('loginToken');
+let cachedLoginToken: string | null = null;
+// only one token fetched at a time
+let fetchingLoginToken: Promise<string> | null = null;
+
+export const getLoginToken = async (): Promise<string> => {
+  if (cachedLoginToken) {
+    return cachedLoginToken;
+  } else if (fetchingLoginToken) {
+    return fetchingLoginToken;
+  }
+
+  fetchingLoginToken = new Promise(async resolve => {
+    const [token] = await LoginTokenTable.toArray();
+    cachedLoginToken = token || '';
+    resolve(token || '');
+    fetchingLoginToken = null;
+  });
+
+  return fetchingLoginToken;
+};
+
+export const setLoginToken = async (token: string) => {
+  await LoginTokenTable.clear();
+  await LoginTokenTable.add(token, ['']);
+  cachedLoginToken = token;
+};

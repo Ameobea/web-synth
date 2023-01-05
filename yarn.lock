@@ -5808,10 +5808,10 @@ react-ace@^10.1.0:
     lodash.isequal "^4.5.0"
     prop-types "^15.7.2"
 
-react-control-panel@>=0.10.0:
-  version "0.10.0"
-  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.10.0.tgz#ecbb254b6907c5f10d44045973e5885f7b0ffe41"
-  integrity sha512-QeGP65Ihy9ryhG+EXAiRQ3BDK0gqNegrEim1w+CbBfmgO6B9f7erZ2/fAcfMsbp8pM56Ah91ohSrLzRrv9xZ8A==
+react-control-panel@>=0.10.2:
+  version "0.10.2"
+  resolved "https://registry.yarnpkg.com/react-control-panel/-/react-control-panel-0.10.2.tgz#415152334532cc8e4ba185b52a4c031d61239983"
+  integrity sha512-zWUDV1YzrtfL3jHmVTuBH5DRDWI9Sd7pTAglMgcyytEL7Pm2SAUVsB1MIN+eB19M7q1xFFy2uANt5mZLKaZFfg==
   dependencies:
     is-numeric "0.0.9"
     is-string "^1.0.7"

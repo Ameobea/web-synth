@@ -114,6 +114,7 @@
     overflow-y: auto;
     box-sizing: border-box;
     border: 1px solid #888;
+    overflow-x: hidden;
   }
 
   .controls {

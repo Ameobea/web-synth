@@ -45,7 +45,7 @@ impl Fairing for CorsFairing {
         ));
         res.set_header(rocket::http::Header::new(
             "Access-Control-Allow-Headers",
-            "Content-Type",
+            "content-type, authorization, accept",
         ));
 
         if res.status() == Status::NotFound && req.method() == Method::Options {
@@ -89,7 +89,9 @@ async fn main() {
             routes::create_looper_preset,
             routes::get_looper_preset_tags,
             routes::get_midi_composition_tags,
-            routes::get_composition_tags
+            routes::get_composition_tags,
+            routes::login::login,
+            routes::login::register,
         ])
         .attach(CorsFairing);
 
@@ -97,7 +99,8 @@ async fn main() {
         ship = ship.attach(rocket_async_compression::Compression::fairing());
     }
 
-    ship.ignite()
+    let _ = ship
+        .ignite()
         .await
         .expect("Error starting Rocket")
         .launch()

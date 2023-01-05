@@ -1,0 +1,40 @@
+.login-modal {
+  display: flex;
+  flex-direction: column;
+  width: 800px;
+  padding: 20px;
+  min-height: 300px;
+  margin: auto;
+  background-color: #121212;
+}
+
+.login-modal h2 {
+  text-align: center;
+}
+
+.login-modal label {
+  margin-right: 10px;
+  width: 80px;
+  display: inline-block;
+}
+
+.login-modal .login-modal-input-container {
+  margin-top: 10px;
+}
+
+.login-modal button {
+  margin-left: 8px;
+}
+
+.login-modal .login-modal-buttons-container {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+}
+
+.login-modal .login-modal-status {
+  margin-top: 0px;
+  margin-bottom: 20px;
+  text-align: center;
+  height: 20px;
+}

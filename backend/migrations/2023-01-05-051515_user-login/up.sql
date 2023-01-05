@@ -1,0 +1,13 @@
+ALTER TABLE `users` DROP INDEX IF EXISTS `id`;
+
+ALTER TABLE `users` ADD UNIQUE INDEX IF NOT EXISTS `uniq_username` (`username`);
+
+CREATE TABLE IF NOT EXISTS login_tokens (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    token TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS `token_index` ON login_tokens(token);

@@ -1,9 +1,15 @@
 import * as R from 'ramda';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import './GlobalMenu.scss';
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
-import { reinitializeWithComposition, serializeAndDownloadComposition } from 'src/persistance';
+import { renderModalWithControls } from 'src/controls/Modal';
+import { LoginModal } from 'src/login/LoginModal';
+import {
+  getLoginToken,
+  reinitializeWithComposition,
+  serializeAndDownloadComposition,
+} from 'src/persistance';
 import { getState } from 'src/redux';
 
 const ctx = new AudioContext();
@@ -59,6 +65,30 @@ const GlobalTempoControl: React.FC = () => {
           }
         }}
       />
+    </div>
+  );
+};
+
+const LoginStatus: React.FC = () => {
+  const [loggedIn, setLoggedIn] = useState<boolean | 'loading'>('loading');
+
+  useEffect(() => {
+    getLoginToken().then(token => setLoggedIn(!!token));
+  }, []);
+
+  const handleLoginButtonClick = async () => {
+    try {
+      await renderModalWithControls(LoginModal, true);
+    } catch (_err) {
+      return;
+    }
+    setLoggedIn(!!(await getLoginToken()));
+  };
+
+  return (
+    <div className='login-status'>
+      {loggedIn === 'loading' ? <p>Loading login status...</p> : null}
+      {loggedIn ? <p>Logged in</p> : <button onClick={handleLoginButtonClick}>Log in</button>}
     </div>
   );
 };
@@ -119,6 +149,8 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) =>
           Load from File
         </>
       </GlobalMenuItem>
+
+      <LoginStatus />
     </div>
   );
 };

@@ -9,6 +9,8 @@ use crate::{
     WebSynthDbConn,
 };
 
+pub mod login;
+
 // Facilitate getting the primary key of the last inserted item
 //
 // https://github.com/diesel-rs/diesel/issues/1011#issuecomment-315536931

@@ -7,15 +7,37 @@ use diesel::prelude::*;
 use rocket::{data::ToByteUnit, serde::json::Json};
 use sha2::{Digest, Sha256};
 
-use crate::{models::remote_samples::RemoteSample, WebSynthDbConn};
+use crate::{
+    db_util::login::validate_login_token,
+    models::{remote_samples::RemoteSample, user::MaybeLoginToken},
+    WebSynthDbConn,
+};
 
 const FAUST_SERVER_URL: &str = "https://faust-compiler.ameo.design";
 // const FAUST_SERVER_URL: &str = "http://localhost:4565";
 const REMOTE_SAMPLES_BUCKET_URL: &str = "https://storage.googleapis.com/web-synth-remote-samples/";
 
 #[get("/remote_samples")]
-pub async fn list_remote_samples(conn: WebSynthDbConn) -> Result<Json<Vec<RemoteSample>>, String> {
+pub async fn list_remote_samples(
+    conn: WebSynthDbConn,
+    login_token_opt: MaybeLoginToken,
+) -> Result<Json<Vec<RemoteSample>>, String> {
     use crate::schema::remote_sample_urls;
+
+    let user_id = if let Some(login_token) = login_token_opt.0 {
+        match validate_login_token(&conn, login_token).await {
+            Ok(user_id) => user_id,
+            Err(err) => {
+                error!("Error validating login token: {}", err);
+                None
+            },
+        }
+    } else {
+        None
+    };
+    if let Some(user_id) = user_id {
+        // TODO
+    }
 
     let all_remote_samples: Vec<RemoteSample> = conn
         .run(|conn| remote_sample_urls::table.load(conn))

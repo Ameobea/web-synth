@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     compositions (id) {
         id -> Bigint,
         author -> Bigint,
@@ -8,7 +10,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     compositions_tags (id) {
         id -> Bigint,
         composition_id -> Bigint,
@@ -16,7 +18,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     effects (id) {
         id -> Bigint,
         title -> Varchar,
@@ -25,7 +27,16 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
+    login_tokens (id) {
+        id -> Unsigned<Integer>,
+        user_id -> Bigint,
+        token -> Text,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     looper_presets (id) {
         id -> Bigint,
         author -> Nullable<Bigint>,
@@ -35,7 +46,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     looper_presets_tags (id) {
         id -> Bigint,
         looper_preset_id -> Bigint,
@@ -43,7 +54,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     midi_compositions (id) {
         id -> Bigint,
         name -> Text,
@@ -52,7 +63,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     midi_compositions_tags (id) {
         id -> Bigint,
         midi_composition_id -> Bigint,
@@ -60,7 +71,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     remote_sample_urls (id, name) {
         id -> Varchar,
         name -> Varchar,
@@ -68,7 +79,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     synth_presets (id) {
         id -> Bigint,
         title -> Text,
@@ -77,14 +88,14 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     tags (id) {
         id -> Bigint,
         tag -> Text,
     }
 }
 
-table! {
+diesel::table! {
     users (id) {
         id -> Bigint,
         username -> Text,
@@ -93,7 +104,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     voice_presets (id) {
         id -> Bigint,
         title -> Text,
@@ -102,18 +113,20 @@ table! {
     }
 }
 
-joinable!(compositions_tags -> compositions (composition_id));
-joinable!(compositions_tags -> tags (tag_id));
-joinable!(looper_presets -> users (author));
-joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
-joinable!(looper_presets_tags -> tags (tag_id));
-joinable!(midi_compositions_tags -> midi_compositions (midi_composition_id));
-joinable!(midi_compositions_tags -> tags (tag_id));
+diesel::joinable!(compositions_tags -> compositions (composition_id));
+diesel::joinable!(compositions_tags -> tags (tag_id));
+diesel::joinable!(login_tokens -> users (user_id));
+diesel::joinable!(looper_presets -> users (author));
+diesel::joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
+diesel::joinable!(looper_presets_tags -> tags (tag_id));
+diesel::joinable!(midi_compositions_tags -> midi_compositions (midi_composition_id));
+diesel::joinable!(midi_compositions_tags -> tags (tag_id));
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     compositions,
     compositions_tags,
     effects,
+    login_tokens,
     looper_presets,
     looper_presets_tags,
     midi_compositions,

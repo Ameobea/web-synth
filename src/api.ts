@@ -3,6 +3,7 @@ import type { Without } from 'ameo-utils';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import { getLoginToken, setLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
 import type { SerializedLooperInstState } from 'src/redux/modules/looper';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
@@ -112,12 +113,14 @@ export const storeRemoteSample = async (
 };
 
 export const listRemoteSamples = async (): Promise<RemoteSample[]> =>
-  fetch(buildURL('/remote_samples')).then(async res => {
-    if (!res.ok) {
-      throw await res.text();
+  fetch(buildURL('/remote_samples'), { headers: { Authorization: await getLoginToken() } }).then(
+    async res => {
+      if (!res.ok) {
+        throw await res.text();
+      }
+      return res.json();
     }
-    return res.json();
-  });
+  );
 
 export const fetchEffects = (): Promise<Effect[]> =>
   fetch(`${BACKEND_BASE_URL}/effects`).then(async res => {
@@ -215,3 +218,33 @@ export const getLooperPreset = async (id: number): Promise<SerializedLooperInstS
     }
     return res.json();
   });
+
+export const login = async (username: string, password: string) => {
+  const res = await fetch(`${BACKEND_BASE_URL}/login`, {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    throw await res.text();
+  }
+
+  return res.text();
+};
+
+export const register = async (username: string, password: string) => {
+  const res = await fetch(`${BACKEND_BASE_URL}/register`, {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    throw await res.text();
+  }
+
+  return res.text();
+};

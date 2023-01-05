@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 
 import './MidiImportDialog.scss';
-
 import { renderModalWithControls } from './Modal';
 
 export interface MidiTrackInfo {
@@ -32,12 +31,14 @@ const TrackInputItem: React.FC<{ onSelect: () => void; isSelected: boolean } & M
   </div>
 );
 
-const mkMidiImportDialog: (fileInfo: MidiFileInfo) => React.FC<{
+interface MIDIImportDialogProps {
   onSubmit: (settings: MidiImportSettings) => void;
-}> = fileInfo => {
-  const MidiImportDialog: React.FC<{
-    onSubmit: (settings: MidiImportSettings) => void;
-  }> = ({ onSubmit }) => {
+}
+
+const mkMidiImportDialog: (
+  fileInfo: MidiFileInfo
+) => React.FC<MIDIImportDialogProps> = fileInfo => {
+  const MidiImportDialog: React.FC<MIDIImportDialogProps> = ({ onSubmit }) => {
     const [selectedTrack, setSelectedTrack] = useState(0);
 
     return (

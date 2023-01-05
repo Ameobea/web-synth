@@ -1,9 +1,12 @@
 <script lang="ts">
   import type { MappedSampleData } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
+  import { genRandomStringID } from 'src/util';
 
   export let mappedSampleData: MappedSampleData;
   export let onDelete: () => void;
+
+  const checkboxID = `loop-checkbox-${genRandomStringID()}`;
 </script>
 
 <div class="root">
@@ -29,6 +32,8 @@
       Pick Sample
     </button>
     <button style="margin-left: 8px;" on:click={onDelete}>Delete</button>
+    <label class="loop-checkbox-label" for={checkboxID}>Loop</label>
+    <input id={checkboxID} type="checkbox" bind:checked={mappedSampleData.doLoop} />
   </div>
 </div>
 
@@ -64,5 +69,9 @@
   .select-sample-button {
     width: 140px;
     margin-top: 8px;
+  }
+
+  .loop-checkbox-label {
+    margin-left: 8px;
   }
 </style>

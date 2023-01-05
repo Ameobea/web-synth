@@ -36,6 +36,14 @@
     text-align: left;
     padding-right: 8px;
   }
+
+  .login-status {
+    margin-top: 20px;
+    padding-left: 10px;
+    padding-right: 10px;
+    display: flex;
+    justify-content: center;
+  }
 }
 
 .global-tempo-control {
@@ -61,6 +69,8 @@
     border: 1px solid #6a6a6a;
     box-sizing: border-box;
   }
+
+
 }
 
 .global-menu-backdrop {
@@ -72,3 +82,5 @@
   left: 0;
   top: 0;
 }
+
+
