@@ -10,6 +10,7 @@ use crate::{
 };
 
 pub mod login;
+pub mod private_sample_libraries;
 
 // Facilitate getting the primary key of the last inserted item
 //

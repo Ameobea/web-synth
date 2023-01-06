@@ -2,7 +2,7 @@
 name = "web-synth-backend"
 version = "0.1.0"
 authors = ["Casey Primozic <me@ameo.link>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 dotenv = "0.15.0"
@@ -35,3 +35,7 @@ tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
 
 scrypt = "0.10.0"
 base64 = "0.20.0"
+
+rust-s3 = { version = "0.32.3", features = [] }
+aws-region = { version = "0.25.0", features = ["serde"] }
+urlencoding = "2.1"

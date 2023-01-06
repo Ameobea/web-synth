@@ -72,6 +72,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    private_sample_libraries (id) {
+        id -> Unsigned<Bigint>,
+        user_id -> Bigint,
+        bucket_name -> Text,
+        region_json -> Text,
+        public_url_base -> Text,
+        access_key_id -> Text,
+        secret_access_key -> Text,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     remote_sample_urls (id, name) {
         id -> Varchar,
         name -> Varchar,
@@ -121,6 +134,7 @@ diesel::joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
 diesel::joinable!(looper_presets_tags -> tags (tag_id));
 diesel::joinable!(midi_compositions_tags -> midi_compositions (midi_composition_id));
 diesel::joinable!(midi_compositions_tags -> tags (tag_id));
+diesel::joinable!(private_sample_libraries -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     compositions,
@@ -131,6 +145,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     looper_presets_tags,
     midi_compositions,
     midi_compositions_tags,
+    private_sample_libraries,
     remote_sample_urls,
     synth_presets,
     tags,

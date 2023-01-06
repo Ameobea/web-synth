@@ -8,7 +8,10 @@ use rocket::{data::ToByteUnit, serde::json::Json};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    db_util::login::validate_login_token,
+    db_util::{
+        login::validate_login_token,
+        private_sample_libraries::get_private_sample_libraries_for_user,
+    },
     models::{remote_samples::RemoteSample, user::MaybeLoginToken},
     WebSynthDbConn,
 };
@@ -20,6 +23,7 @@ const REMOTE_SAMPLES_BUCKET_URL: &str = "https://storage.googleapis.com/web-synt
 #[get("/remote_samples")]
 pub async fn list_remote_samples(
     conn: WebSynthDbConn,
+    conn2: WebSynthDbConn,
     login_token_opt: MaybeLoginToken,
 ) -> Result<Json<Vec<RemoteSample>>, String> {
     use crate::schema::remote_sample_urls;
@@ -35,17 +39,71 @@ pub async fn list_remote_samples(
     } else {
         None
     };
-    if let Some(user_id) = user_id {
-        // TODO
-    }
+    let private_samples_rx = if let Some(user_id) = user_id {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tokio::task::spawn(async move {
+            let private_sample_libraries =
+                match get_private_sample_libraries_for_user(conn2, user_id).await {
+                    Ok(private_samples) => private_samples,
+                    Err(err) => {
+                        error!(
+                            "Error getting private samples for user {}: {:?}",
+                            user_id, err
+                        );
+                        let _ = tx.send(Vec::new());
+                        return;
+                    },
+                };
+            info!(
+                "Found {} private sample libraries for user {}",
+                private_sample_libraries.len(),
+                user_id
+            );
 
-    let all_remote_samples: Vec<RemoteSample> = conn
+            let mut remote_samples = Vec::new();
+            for lib in private_sample_libraries {
+                let samples_for_library = match lib.list_remote_samples().await {
+                    Ok(samples) => samples,
+                    Err(err) => {
+                        error!(
+                            "Error listing remote samples for private sample library {}, user {}: \
+                             {:?}",
+                            lib.id, user_id, err
+                        );
+                        continue;
+                    },
+                };
+                remote_samples.extend(samples_for_library);
+            }
+            info!(
+                "Got {} remote samples for user {}",
+                remote_samples.len(),
+                user_id
+            );
+            let _ = tx.send(remote_samples);
+        });
+        Some(rx)
+    } else {
+        drop(conn2);
+        None
+    };
+
+    let mut all_remote_samples: Vec<RemoteSample> = conn
         .run(|conn| remote_sample_urls::table.load(conn))
         .await
         .map_err(|err| {
             error!("Error querying DB for remote samples: {:?}", err);
             String::from("DB error")
         })?;
+
+    if let Some(private_samples_rx) = private_samples_rx {
+        let private_samples = private_samples_rx.await.unwrap_or_else(|err| {
+            error!("Error getting private samples: {:?}", err);
+            Vec::new()
+        });
+        all_remote_samples.extend(private_samples);
+    }
+
     Ok(Json(all_remote_samples))
 }
 

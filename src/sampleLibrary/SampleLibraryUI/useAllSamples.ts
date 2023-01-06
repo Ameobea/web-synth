@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 
-import { listSamples, SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { listSamples, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 
 const buildSampleDescriptorKey = (desc: SampleDescriptor): string =>
   `${desc.id ?? ''}${desc.isLocal}${desc.name}`;
@@ -35,8 +35,10 @@ export const useAllSamples = () => {
   const [localSamples, setLocalSamples] = useState<
     SampleDescriptor[] | null | 'FETCHING' | 'FETCH_ERROR'
   >(null);
-  const { data: remoteSamples } = useQuery('remoteSamples', () =>
-    listSamples({ includeRemote: true })
+  const { data: remoteSamples } = useQuery(
+    'remoteSamples',
+    () => listSamples({ includeRemote: true }),
+    { refetchOnWindowFocus: false }
   );
   const [includeLocalSamples, setIncludeLocalSamples] = useState(false);
 

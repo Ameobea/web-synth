@@ -2,19 +2,14 @@
 
 #[macro_use]
 extern crate diesel;
-extern crate dotenv;
 #[macro_use]
 extern crate rocket;
-extern crate serde;
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate chrono;
-extern crate tokio;
 #[macro_use]
 extern crate rocket_sync_db_pools;
 
