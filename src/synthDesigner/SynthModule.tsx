@@ -16,6 +16,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { getState, store, useSelector } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { getSynthDesignerReduxInfra, type SynthModule } from 'src/redux/modules/synthDesigner';
+import { getSentry } from 'src/sentry';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
 import { msToSamples, samplesToMs } from 'src/util';
 import { Filter as FilterModule } from './Filter';
@@ -51,6 +52,7 @@ const PresetsControlPanel: React.FC<{
           }
 
           const presetId = controlPanelContext.current.preset;
+          getSentry()?.captureMessage('Load synth designer voice preset', { tags: { presetId } });
           const allVoicePresets = getState().presets.voicePresets;
           if (typeof allVoicePresets === 'string') {
             console.error("Somehow voice presets aren't loaded at this point...");

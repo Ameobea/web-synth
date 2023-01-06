@@ -14,6 +14,7 @@ import {
 } from 'src/eventScheduler';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import type { ReduxStore } from 'src/redux';
+import { getSentry } from 'src/sentry';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
 
 const styles: { [key: string]: React.CSSProperties } = {
@@ -95,6 +96,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
           if (!confirmed) {
             return;
           }
+          getSentry()?.captureMessage('Reset Everything button clicked');
           engine.reset_vcm();
         }}
         style={{ backgroundColor: '#730505', justifyContent: 'space-around', fontSize: 36 }}

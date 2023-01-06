@@ -3,6 +3,7 @@ import React from 'react';
 import { login, register } from 'src/api';
 import type { ModalCompProps } from 'src/controls/Modal';
 import { setLoginToken } from 'src/persistance';
+import { getSentry } from 'src/sentry';
 import './LoginModal.css';
 
 type LoginModalProps = ModalCompProps<undefined>;
@@ -52,8 +53,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onSubmit, onCancel }) =>
       </div>
 
       <div className='login-modal-buttons-container'>
-        <button onClick={() => doLogin(login)}>Login</button>
-        <button onClick={() => doLogin(register)}>Register</button>
+        <button
+          onClick={() => {
+            getSentry()?.captureMessage('Login button clicked', {
+              level: 'info',
+              tags: { username },
+            });
+            doLogin(login);
+          }}
+        >
+          Login
+        </button>
+        <button
+          onClick={() => {
+            getSentry()?.captureMessage('Register button clicked', {
+              level: 'info',
+              tags: { username },
+            });
+            doLogin(register);
+          }}
+        >
+          Register
+        </button>
 
         <button onClick={onCancel}>Cancel</button>
       </div>

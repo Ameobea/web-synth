@@ -4,6 +4,7 @@
   import { getLoadedComposition } from 'src/api';
   import { reinitializeWithComposition } from 'src/persistance';
   import { getState } from 'src/redux';
+  import { getSentry } from 'src/sentry';
   import { getEngine } from 'src/util';
   import { setGlobalVolume } from '../ViewContextManager/GlobalVolumeSlider';
 
@@ -24,6 +25,7 @@
     }
     isLoadingComposition = true;
     thisCompositionLoading = true;
+    getSentry()?.captureMessage(`Welcome page demo tile clicked: ${title}`);
 
     const composition = await getLoadedComposition(compositionID);
     if (!composition) {

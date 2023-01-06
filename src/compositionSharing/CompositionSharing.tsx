@@ -20,6 +20,7 @@ import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
 import { getSample, type SampleDescriptor } from 'src/sampleLibrary';
+import { getSentry } from 'src/sentry';
 import { getEngine } from 'src/util';
 
 export interface CompositionDefinition {
@@ -254,6 +255,13 @@ const ShareComposition: React.FC = () => {
               getExistingTags: getExistingCompositionTags,
             });
 
+            getSentry()?.captureMessage('Saving composition', {
+              tags: {
+                title,
+                description,
+                tags: tags?.join(','),
+              },
+            });
             const savedCompositionID = await serializeAndSaveComposition({
               title,
               description: description ?? '',
@@ -265,6 +273,7 @@ const ShareComposition: React.FC = () => {
               return;
             }
 
+            getSentry()?.captureException(err);
             alert('Error saving composition: ' + err);
           }
         }}

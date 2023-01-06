@@ -3,7 +3,7 @@ import type { Without } from 'ameo-utils';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
-import { getLoginToken, setLoginToken } from 'src/persistance';
+import { getLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
 import type { SerializedLooperInstState } from 'src/redux/modules/looper';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
