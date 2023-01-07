@@ -4,14 +4,17 @@ import ControlPanel from 'react-control-panel';
 import { shallowEqual, useSelector } from 'react-redux';
 
 import './LooperUI.scss';
-
 import {
   fetchLooperPresets,
   getExistingLooperPresetTags,
   getLooperPreset,
   saveLooperPreset,
+  type LooperPreset,
 } from 'src/api';
-import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import {
+  pickPresetWithModal,
+  type PresetDescriptor,
+} from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import ConfigureTransitionAlgorithm from 'src/looper/LooperUI/ConfigureTransitionAlgorithm';
 import LooperViz from 'src/looper/LooperUI/LooperViz';
@@ -22,10 +25,10 @@ import { getState, looperDispatch, type ReduxStore } from 'src/redux';
 import {
   deserializeLooper,
   looperActions,
+  serializeLooper,
   type LooperBank,
   type LooperModule,
   type SerializedLooperInstState,
-  serializeLooper,
 } from 'src/redux/modules/looper';
 
 const DeleteBankButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
@@ -335,13 +338,17 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
           onClick={async () => {
             const wrappedFetchLooperPresets = () =>
               fetchLooperPresets().then(presets =>
-                presets.map(preset => ({
-                  id: preset.id,
-                  name: preset.name,
-                  description: preset.description,
-                  tags: preset.tags,
-                  preset: preset,
-                }))
+                presets.map(
+                  (preset): PresetDescriptor<LooperPreset> => ({
+                    id: preset.id,
+                    name: preset.name,
+                    description: preset.description,
+                    tags: preset.tags,
+                    preset: preset,
+                    userID: preset.userId,
+                    userName: preset.userName,
+                  })
+                )
               );
 
             try {

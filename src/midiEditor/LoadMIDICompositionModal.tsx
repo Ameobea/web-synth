@@ -9,6 +9,8 @@ const wrappedGetSavedMIDICompositions = () =>
       description: comp.description,
       tags: comp.tags,
       preset: comp,
+      userId: comp.userId,
+      userName: comp.userName,
     }))
   );
 

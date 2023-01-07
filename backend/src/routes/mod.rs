@@ -61,12 +61,27 @@ pub async fn create_effect(
 
 #[get("/effects")]
 pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, String> {
-    use crate::schema::effects::dsl::*;
+    use crate::schema::{effects, users};
 
-    let all_effects = conn.run(|conn| effects.load(conn)).await.map_err(|err| {
-        error!("Error querying effects: {:?}", err);
-        "Error querying effects from the database".to_string()
-    })?;
+    let all_effects = conn
+        .run(|conn| {
+            effects::table
+                .left_join(users::table)
+                .select((
+                    effects::id,
+                    effects::title,
+                    effects::description,
+                    effects::code,
+                    effects::user_id,
+                    users::username.nullable(),
+                ))
+                .load(conn)
+        })
+        .await
+        .map_err(|err| {
+            error!("Error querying effects: {:?}", err);
+            "Error querying effects from the database".to_string()
+        })?;
     Ok(Json(all_effects))
 }
 
@@ -156,17 +171,21 @@ pub async fn get_composition_by_id(
 pub async fn get_compositions(
     conn: WebSynthDbConn,
 ) -> Result<Json<Vec<CompositionDescriptor>>, String> {
-    use crate::schema::{compositions, compositions_tags, tags};
+    use crate::schema::{compositions, compositions_tags, tags, users};
 
     let (all_compos, all_compos_tags) = conn
         .run(
-            |conn| -> QueryResult<(Vec<(_, _, _, _)>, Vec<EntityIdTag>)> {
+            |conn| -> QueryResult<(Vec<(_, _, _, _, _)>, Vec<EntityIdTag>)> {
                 let all_compos = compositions::table
+                    .left_join(
+                        users::table.on(compositions::dsl::user_id.eq(users::dsl::id.nullable())),
+                    )
                     .select((
                         compositions::dsl::id,
                         compositions::dsl::title,
                         compositions::dsl::description,
                         compositions::dsl::user_id,
+                        users::dsl::username.nullable(),
                     ))
                     .load(conn)?;
 
@@ -189,7 +208,7 @@ pub async fn get_compositions(
 
     let all_compos = all_compos
         .into_iter()
-        .map(|(id, title, description, user_id)| {
+        .map(|(id, title, description, user_id, user_name)| {
             let tags = tags_by_compo_id
                 .remove(&id)
                 .unwrap_or_default()
@@ -203,6 +222,7 @@ pub async fn get_compositions(
                 description,
                 tags,
                 user_id,
+                user_name,
             }
         })
         .collect_vec();

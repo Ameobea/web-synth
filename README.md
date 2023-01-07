@@ -1,29 +1,56 @@
-# Web Synth and Digial Audio Workstation
+# Web Synth
 
-Try it yourself:
+![Combined screenshots of the Web Synth application showing the graph editor for the audio patch network and a part of the synth designer UI with envelope generators, param controls, and the FM synth modulation matrix](./public/web-synth-splash.jpg)
+
+**Web Synth** is a browser-based audio synthesis, music production, and sound experimentation platform.  It has features of traditional DAWs as well as additional tools to support modular style patching, dynamic custom code, and live looping.
+
+## Try It Yourself
 
  * Full application: <https://synth.ameo.dev>
  * Standalone FM Synthesizer Demo: <https://synth.ameo.dev/fm.html>
  * Documentation and Development Notes: <https://synth.ameo.dev/docs/>
 
-[Watch demo video on YouTube](https://www.youtube.com/watch?v=kgkpJk0P7Uo)
+Or, [Watch the (old out-of-date) demo video on YouTube](https://www.youtube.com/watch?v=kgkpJk0P7Uo) first to get a feel for what it can do.
 
-This is a web-based DAW (Digital Audio Workstation) written in Rust/WebAssembly and TypeScript. Its goal is to provide tools for creating unique sounds and audio compositions within the context of the web browser. It makes use of the latest modern WebAudio API with `AudioWorkletProcessor` for executing custom DSP code written in WebAssembly.
+## Tech
 
-This project is still in very active development. At the time of writing this, a lot of functionality has been completed and it's possible to actually do interesting things with it! There are many bugs and rough edges, and much of the UI lacks some polish and documentation. That being said, it's absolutely a functional tool and getting more usable + useful all the time!
+Web synth makes extensive use of many modern web technologies for its operation including Web Audio, WebAssembly, WebGL, WebMIDI, `SharedArrayBuffer`, `AudioWorkletProcessor`, and more.
 
-## Using the Tool
+Web synth supports high performance and low latency realtime audio generation.  It achieves this by compiling code for synthesizers, effects, and other audio nodes from Rust and other specialized languages into WebAssembly and running it on the dedicated audio thread.  This offers near-native performance and jank-free playback.
 
-Google Chrome is highly recommended. Although other browsers (Firefox + Safari) technically support the WebAudio APIs that this tool makes use of, I've found their support to be spotty. There are also some other bleeding-edge web APIs (WebMIDI and Native Filesystem) that the tool makes use of for some features which are, at this time, only supported in Google Chrome. Last I tried, the app loads and runs in the latest Firefox for the most part though.
+Because of this, Web Synth requires a modern browser to run.  Although it will technically load on mobile devices and phones, the UI isn't optimized for mobile use at this time.
 
-I currently have no documentation or tutorials or anything for helping people learn and make use of this tool. Once I get things into a more cohesive state, I will spend the time to build that.
+## Notable Features
 
-For some other quick demos of what this tool can do, check out these videos:
+*   Versatile 8-operator polyphonic FM Synthesizer
+    *   Supports many primitive waveforms as well as loading wavetables from [WaveEdit](https://synthtech.com/waveedit/) or other sources
+    *   Contains a number of built-in effects from basics like bitcrusher and filters to OTT-style multiband compression and wavefolding
+    *   Highly modulatable and patchable with sample-level parameter automation via other modules or built-in per-voice envelope generators
+*   Fully functional MIDI editor
+    *   MIDI file import and export
+    *   Multi-note selection and editing
+    *   Record live from keyboard or other input source
+    *   Live playback and preview
+*   Two programmable loopers for samples and MIDI
+*   Dynamic compilation of DSP code written in [Faust](https://faust.grame.fr/) and [Soul](https://soul.dev) via WebAssembly
+    *   Facilitates infinite custom effects using existing code with minimal or no changes required
+    *   Parameters are fully integrated into the web synth patching system allowing them to be modulated by other components or controlled live by auto-generated UI
+*   Preset and composition sharing/loading system for many of web synth's components
+*   Modular synth-style utilities like LFOs, random voltage sources, and quantizers
+*   Variety of visualizers including oscilloscope and spectrum analyzer
+*   Support for building custom UIs with many input types and markdown notes
+*   Supports hardware MIDI keyboards and controllers via WebMIDI
+*   Many other miscellaneous tools and modules like visual filter designer, granular synthesizer, delays, signal debuggers, and more
 
-- https://twitter.com/Ameobea10/status/1330014698125754368?s=20
-- https://twitter.com/Ameobea10/status/1325234292151119873?s=20
+## Design + Structure
 
-## Building + Installing from Scratch
+The tool is built on top of the WebAudio API and makes use of it for all audio processing. The WebAudio graph is the backbone of everything and the every piece of audio-processing code exists as a node within it. These nodes are created as different modules within the application and can be connected together using a built-in graph editor. The tool's engine has support for handling de/initialization of nodes, resolving connections, handling input/output shapes changing, and de/serializing on page un/load.
+
+Speaking of that, the whole application state is serialized to the browser's local storage every time the tab is closed and automatically re-loaded when the tab is opened back up again. Saving and loading is as simple as just creating or loading a JSON blob representing the state of `localStorage`. The goal (which is mostly but not completely realized) is that refreshing the page should bring you back to the exact state you were in before automatically with no user intervention required.
+
+## Building + Running for Development
+
+_Note that these docs might be somewhat out of date.  Check the Github Actions CI script and the `Justfile` in the project root for details._
 
 You'll need a few pieces of software in order to build and run this locally. They're mainly for compiling, transforming, and optimizing the WebAssembly blobs that are created as output for the Rust application.
 
@@ -39,38 +66,3 @@ You must have several tools installed in order to build this tool for developmen
 - If you want to run the Web API backend which handles presets, composition sharing, and a few other things like that, you'll need to stand up a MySQL database and install the Diesel ORM command line (`cargo install diesel-cli --features=mysql`).
 
 Once you have these tools installed, you can build the project by running `just build-all` (to create an optimized, production deployment) or `just run` (to start a local webserver on port 9000 for development that automatically hot-reloads when the JS/TS code is changed).
-
-## Design + Structure
-
-The tool is built on top of the WebAudio API and makes use of it for all audio processing. The WebAudio graph is the backbone of everything and the every piece of audio-processing code exists as a node within it. These nodes are created as different modules within the application and can be connected together using a built-in graph editor. The tool's engine has support for handling de/initialization of nodes, resolving connections, handling input/output shapes changing, and de/serializing on page un/load.
-
-Speaking of that, the whole application state is serialized to the browser's local storage every time the tab is closed and automatically re-loaded when the tab is opened back up again. Saving and loading is as simple as just creating or loading a JSON blob representing the state of `localStorage`. The goal (which is mostly but not completely realized) is that refreshing the page should bring you back to the exact state you were in before automatically with no user intervention required.
-
-### Notable Features
-
-Note that these features may not be 100% complete or functional, but they all exist in some form.
-
-- Runs 100% in the web browser with no installation, signup, or registration required. 100% free and open source
-- Extensive [Faust language](https://faust.grame.fr/) integration with dynamic remote code compilation and executing via WebAssembly. Complete with auto-generated UIs and full integration/connectability with the rest of the tool's modules
-- (Very rough/WIP) MIDI editor with support for playback and looping that outputs MIDI events directly to other modules
-- Synth Designer built on top of native WebAudio oscillators + filters plus custom synthesis methods, preset sharing, and oscilloscope
-- Live audio spectrum visualizations
-- Graph editor/virtual patch bay allowing a top-down view of all modules and their connections with utility nodes like LFOs, signal scale+shifters (like attenuverters but way better), envelope generators, and much more
-- Sequencer with support for emitting MIDI events or playing samples
-- Sample library that supports loading/saving samples from local disk directly via the experimental Native Filesystem API and caching them in IndexedDB
-- Granular synthesizer with waveform viewer
-- Built-in support for MIDI keyboards via the WebMIDI API (currently Google Chrome only)
-- Support for creating custom UIs with controls connected to any inputs in the application
-
-### Planned Features
-
-- Better composition, preset, etc. sharing with some basic user accounts with cloud-based sharing and forking of other users' creations
-- Multi-threaded audio rendering using `SharedArrayBuffer` and web workers
-- Support for more pre-built synthesis methods like FM, Karplus-Strong, wavetable, etc. directly in the synth designer
-- Track compositor for laying out and sequencing MIDI, samples, signals, etc. over time and playing back
-- Rendering output to audio files
-- Global tempo/clock sync with integration into applicable modules
-- Faust polyphonic support
-- Support for user-created modules plugins with a modular loading system
-- Docs, tutorials, examples
-- UX improvements (always)

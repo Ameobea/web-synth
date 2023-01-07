@@ -10,8 +10,8 @@ import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPre
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import {
   faustEditorContextMap,
-  type FaustEditorReduxInfra,
   get_faust_editor_connectables,
+  type FaustEditorReduxInfra,
 } from 'src/faustEditor';
 import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import { buildFaustWorkletNode, FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
@@ -245,6 +245,8 @@ const buildFaustEditorControlPanelSettings = ({
               name: effect.title,
               description: effect.description,
               preset: effect,
+              userID: effect.userId,
+              userName: effect.userName,
             }));
           });
           reduxInfra.dispatch(

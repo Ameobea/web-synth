@@ -28,6 +28,7 @@ pub struct CompositionDescriptor {
     pub description: String,
     pub tags: Vec<String>,
     pub user_id: Option<i64>,
+    pub user_name: Option<String>,
 }
 
 #[derive(Serialize, Queryable)]

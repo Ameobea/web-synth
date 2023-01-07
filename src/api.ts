@@ -163,6 +163,7 @@ export interface SavedMIDIComposition {
   composition: SerializedMIDIEditorState;
   tags: string[];
   userId: number | null | undefined;
+  userName: string | null | undefined;
 }
 
 export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]> =>
