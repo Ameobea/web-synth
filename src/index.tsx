@@ -9,7 +9,7 @@ import {
   onBeforeUnload,
 } from 'src/persistance';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
-import { initSentry } from 'src/sentry';
+import { getSentry, initSentry } from 'src/sentry';
 import { setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
@@ -62,7 +62,11 @@ if (typeof AudioWorkletNode === 'undefined') {
         await maybeRestoreLocalComposition();
       }
 
-      engine.init();
+      try {
+        engine.init();
+      } catch (e) {
+        getSentry()?.captureException(e);
+      }
     }
 
     window.addEventListener('beforeunload', () => onBeforeUnload(engine));

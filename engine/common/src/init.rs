@@ -56,17 +56,6 @@ pub fn init_rng(rng_seed: Option<u64>) {
 
 static mut IS_INITIALIZED: bool = false;
 
-#[cfg(all(feature = "bindgen", debug_assertions))]
-pub fn maybe_init(rng_seed: Option<u64>) {
-    if unsafe { IS_INITIALIZED } {
-        return;
-    }
-    unsafe { IS_INITIALIZED = true };
-
-    init_rng(rng_seed);
-}
-
-#[cfg(any(not(feature = "bindgen"), not(debug_assertions)))]
 pub fn maybe_init(rng_seed: Option<u64>) {
     if unsafe { IS_INITIALIZED } {
         return;
