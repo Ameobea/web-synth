@@ -9,6 +9,7 @@ pub struct Effect {
     pub title: String,
     pub description: String,
     pub code: String,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Deserialize, Insertable)]
@@ -17,4 +18,6 @@ pub struct InsertableEffect {
     pub title: String,
     pub description: String,
     pub code: String,
+    #[serde(default)]
+    pub user_id: Option<i64>,
 }

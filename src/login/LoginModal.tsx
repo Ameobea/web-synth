@@ -40,16 +40,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onSubmit, onCancel }) =>
     }
   };
 
+  const handleKeyDown = (evt: React.KeyboardEvent<HTMLInputElement>) => {
+    if (evt.key === 'Enter') {
+      doLogin(login);
+    }
+  };
+
   return (
     <div className='login-modal'>
       <h2>Login</h2>
       <div className='login-modal-input-container'>
         <label>Username</label>
-        <input type='text' value={username} onChange={evt => setUsername(evt.target.value)} />
+        <input
+          type='text'
+          value={username}
+          onChange={evt => setUsername(evt.target.value)}
+          onKeyDown={handleKeyDown}
+        />
       </div>
       <div className='login-modal-input-container'>
         <label>Password</label>
-        <input type='password' value={password} onChange={evt => setPassword(evt.target.value)} />
+        <input
+          type='password'
+          value={password}
+          onChange={evt => setPassword(evt.target.value)}
+          onKeyDown={handleKeyDown}
+        />
       </div>
 
       <div className='login-modal-buttons-container'>

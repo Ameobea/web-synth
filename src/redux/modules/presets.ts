@@ -11,6 +11,7 @@ export interface SynthPresetEntry {
   title: string;
   description: string;
   body: { voices: SynthVoicePreset[] };
+  userId: number | null | undefined;
 }
 
 export type SynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
@@ -23,6 +24,7 @@ export interface SynthVoicePresetEntry {
   title: string;
   description: string;
   body: SynthVoicePreset;
+  userId: number | null | undefined;
 }
 
 export type PresetsState = {

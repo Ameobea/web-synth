@@ -36,6 +36,7 @@ pub async fn get_midi_compositions(
                  name,
                  description,
                  composition_json,
+                 user_id,
              }| {
                 let composition: SerializedMIDIEditorState =
                     match serde_json::from_str(&composition_json) {
@@ -51,6 +52,7 @@ pub async fn get_midi_compositions(
                     description,
                     composition,
                     tags: Vec::new(),
+                    user_id,
                 })
             },
         )

@@ -46,6 +46,7 @@ impl<'r> FromRequest<'r> for MaybeLoginToken {
         let token = request
             .headers()
             .get_one("Authorization")
+            .filter(|token| !token.is_empty())
             .map(|token| token.to_string());
         Outcome::Success(MaybeLoginToken(token))
     }

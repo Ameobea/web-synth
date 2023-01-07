@@ -9,6 +9,7 @@ import {
   getLoginToken,
   reinitializeWithComposition,
   serializeAndDownloadComposition,
+  setLoginToken,
 } from 'src/persistance';
 import { getState } from 'src/redux';
 
@@ -85,10 +86,22 @@ const LoginStatus: React.FC = () => {
     setLoggedIn(!!(await getLoginToken()));
   };
 
+  const logout = async () => {
+    await setLoginToken('');
+    setLoggedIn(false);
+  };
+
   return (
     <div className='login-status'>
       {loggedIn === 'loading' ? <p>Loading login status...</p> : null}
-      {loggedIn ? <p>Logged in</p> : <button onClick={handleLoginButtonClick}>Log in</button>}
+      {loggedIn ? (
+        <div className='logged-in-wrapper'>
+          <p>Logged in</p>
+          <button onClick={logout}>Logout</button>
+        </div>
+      ) : (
+        <button onClick={handleLoginButtonClick}>Log in / Register</button>
+      )}
     </div>
   );
 };

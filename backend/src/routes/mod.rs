@@ -5,7 +5,10 @@ use itertools::Itertools;
 use rocket::serde::json::Json;
 
 use crate::{
-    db_util::{build_tags_with_counts, get_and_create_tag_ids, last_insert_id},
+    db_util::{
+        build_tags_with_counts, get_and_create_tag_ids, last_insert_id,
+        login::get_logged_in_user_id,
+    },
     models::{
         compositions::{
             Composition, CompositionDescriptor, NewComposition, NewCompositionRequest,
@@ -18,6 +21,7 @@ use crate::{
             UserProvidedNewSynthVoicePreset, VoiceDefinition,
         },
         tags::{EntityIdTag, TagCount},
+        user::MaybeLoginToken,
     },
     schema, WebSynthDbConn,
 };
@@ -29,17 +33,17 @@ pub use self::{looper_preset::*, midi_composition::*, remote_samples::*};
 pub mod login;
 
 #[get("/")]
-pub fn index() -> &'static str {
-    warn!("TEST");
-    info!("TEST");
-    "Application successfully started!"
-}
+pub fn index() -> &'static str { "Application successfully started!" }
 
 #[post("/effects", data = "<effect>")]
 pub async fn create_effect(
     conn: WebSynthDbConn,
-    effect: Json<InsertableEffect>,
+    mut effect: Json<InsertableEffect>,
+    maybe_login_token: MaybeLoginToken,
 ) -> Result<String, String> {
+    let user_id = get_logged_in_user_id(&conn, maybe_login_token).await;
+    effect.0.user_id = user_id;
+
     let inserted_rows = conn
         .run(move |conn| {
             diesel::insert_into(schema::effects::table)
@@ -70,15 +74,17 @@ pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, Str
 pub async fn save_composition(
     conn: WebSynthDbConn,
     mut composition: Json<NewCompositionRequest>,
+    login_token: MaybeLoginToken,
 ) -> Result<Json<i64>, String> {
+    let user_id = get_logged_in_user_id(&conn, login_token).await;
     let new_composition = NewComposition {
-        author: 0, // TODO: Make dynamic once user system is in place
         title: composition.0.title,
         description: composition.0.description,
         content: serde_json::to_string(&composition.0.content).map_err(|err| {
             error!("Failed to serialize composition to JSON string: {:?}", err);
             format!("Failed to serialize composition to JSON string")
         })?,
+        user_id,
     };
     let tags: Vec<String> = std::mem::take(&mut composition.0.tags);
 
@@ -158,9 +164,9 @@ pub async fn get_compositions(
                 let all_compos = compositions::table
                     .select((
                         compositions::dsl::id,
-                        compositions::dsl::author,
                         compositions::dsl::title,
                         compositions::dsl::description,
+                        compositions::dsl::user_id,
                     ))
                     .load(conn)?;
 
@@ -183,7 +189,7 @@ pub async fn get_compositions(
 
     let all_compos = all_compos
         .into_iter()
-        .map(|(id, author, title, description)| {
+        .map(|(id, title, description, user_id)| {
             let tags = tags_by_compo_id
                 .remove(&id)
                 .unwrap_or_default()
@@ -195,8 +201,8 @@ pub async fn get_compositions(
                 id,
                 title,
                 description,
-                author,
                 tags,
+                user_id,
             }
         })
         .collect_vec();
@@ -225,8 +231,8 @@ pub async fn get_synth_presets(
     use crate::schema::{synth_presets, voice_presets};
 
     let (synth_presets_, voice_presets_): (
-        Vec<(i64, String, String, String)>,
-        Vec<(i64, String, String, String)>,
+        Vec<(i64, String, String, String, Option<i64>)>,
+        Vec<(i64, String, String, String, Option<i64>)>,
     ) = tokio::try_join!(
         conn0.run(|conn| {
             synth_presets::table
@@ -235,6 +241,7 @@ pub async fn get_synth_presets(
                     synth_presets::title,
                     synth_presets::description,
                     synth_presets::body,
+                    synth_presets::user_id,
                 ))
                 .load(conn)
                 .map_err(|err| {
@@ -249,6 +256,7 @@ pub async fn get_synth_presets(
                     voice_presets::title,
                     voice_presets::description,
                     voice_presets::body,
+                    voice_presets::user_id,
                 ))
                 .load(conn)
                 .map_err(|err| {
@@ -260,7 +268,7 @@ pub async fn get_synth_presets(
 
     // build a mapping of voice preset id to voice preset
     let mut voice_presets_by_id: HashMap<i64, SynthVoicePresetEntry> = HashMap::new();
-    for (id_, title_, description_, body_) in voice_presets_ {
+    for (id_, title_, description_, body_, user_id_) in voice_presets_ {
         let body_ = serde_json::from_str(&body_).map_err(|err| -> String {
             error!("Error parsing voice preset entry stored in DB: {:?}", err);
             "Error parsing voice preset entry stored in DB".into()
@@ -271,6 +279,7 @@ pub async fn get_synth_presets(
             title: title_,
             description: description_,
             body: body_,
+            user_id: user_id_,
         };
 
         voice_presets_by_id.insert(voice_preset.id, voice_preset);
@@ -281,7 +290,7 @@ pub async fn get_synth_presets(
             synth_presets_
                 .into_iter()
                 .map(
-                    |(synth_preset_id, title_, description_, body_)|
+                    |(synth_preset_id, title_, description_, body_, user_id_)|
                      -> Result<InlineSynthPresetEntry, String> {
                         let body_: SynthPreset =
                             serde_json::from_str(&body_).map_err(|err| -> String {
@@ -296,6 +305,7 @@ pub async fn get_synth_presets(
                             title: title_,
                             description: description_,
                             body: inlined_body,
+                            user_id: user_id_,
                         })
                     },
                 )
@@ -308,8 +318,11 @@ pub async fn get_synth_presets(
 pub async fn create_synth_preset(
     conn: WebSynthDbConn,
     preset: Json<ReceivedSynthPresetEntry>,
+    login_token: MaybeLoginToken,
 ) -> Result<(), String> {
     use crate::schema::synth_presets::dsl::*;
+
+    let user_id_ = get_logged_in_user_id(&conn, login_token).await;
 
     let body_: String = serde_json::to_string(&preset.body).map_err(|err| -> String {
         let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
@@ -320,6 +333,7 @@ pub async fn create_synth_preset(
         title: preset.0.title,
         description: preset.0.description,
         body: body_,
+        user_id: user_id_,
     };
 
     conn.run(move |conn| {
@@ -344,7 +358,7 @@ pub async fn get_synth_voice_presets(
     let all_presets = conn
         .run(|conn| {
             voice_presets
-                .select((id, title, description, body))
+                .select((id, title, description, body, user_id))
                 .load(conn)
         })
         .await
@@ -355,7 +369,13 @@ pub async fn get_synth_voice_presets(
     let all_presets: Vec<SynthVoicePresetEntry> = all_presets
         .into_iter()
         .map(
-            |(id_, title_, description_, body_): (i64, String, String, String)| {
+            |(id_, title_, description_, body_, user_id_): (
+                i64,
+                String,
+                String,
+                String,
+                Option<i64>,
+            )| {
                 let preset: VoiceDefinition =
                     serde_json::from_str(&body_).map_err(|err| -> String {
                         let err_msg = format!("Error parsing provided synth definition: {:?}", err);
@@ -367,6 +387,7 @@ pub async fn get_synth_voice_presets(
                     title: title_,
                     description: description_,
                     body: preset,
+                    user_id: user_id_,
                 })
             },
         )
@@ -378,8 +399,11 @@ pub async fn get_synth_voice_presets(
 pub async fn create_synth_voice_preset(
     conn: WebSynthDbConn,
     voice_preset: Json<UserProvidedNewSynthVoicePreset>,
+    login_token: MaybeLoginToken,
 ) -> Result<(), String> {
     use crate::schema::voice_presets::dsl::*;
+
+    let user_id_ = get_logged_in_user_id(&conn, login_token).await;
 
     let body_: String = serde_json::to_string(&voice_preset.0.body).map_err(|err| -> String {
         let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
@@ -390,6 +414,7 @@ pub async fn create_synth_voice_preset(
         title: voice_preset.0.title,
         description: voice_preset.0.description,
         body: body_,
+        user_id: user_id_,
     };
 
     conn.run(move |conn| {

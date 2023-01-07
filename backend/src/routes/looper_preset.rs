@@ -3,13 +3,17 @@ use itertools::Itertools;
 use rocket::serde::json::Json;
 
 use crate::{
-    db_util::{build_tags_with_counts, get_and_create_tag_ids, last_insert_id},
+    db_util::{
+        build_tags_with_counts, get_and_create_tag_ids, last_insert_id,
+        login::get_logged_in_user_id,
+    },
     models::{
         looper_preset::{
             LooperPresetDescriptor, NewLooperPreset, NewLooperPresetTag, SaveLooperPresetRequest,
             SerializedLooperInstState,
         },
         tags::{EntityIdTag, TagCount},
+        user::MaybeLoginToken,
     },
     WebSynthDbConn,
 };
@@ -18,17 +22,20 @@ use crate::{
 pub async fn get_looper_presets(
     conn: WebSynthDbConn,
 ) -> Result<Json<Vec<LooperPresetDescriptor>>, String> {
-    use crate::schema::{looper_presets, looper_presets_tags, tags};
+    use crate::schema::{looper_presets, looper_presets_tags, tags, users};
 
     let (looper_presets, preset_tags) = conn
         .run(|conn| -> QueryResult<(_, _)> {
             let presets = looper_presets::table
+                .left_join(users::table)
                 .select((
                     looper_presets::dsl::id,
                     looper_presets::dsl::name,
                     looper_presets::dsl::description,
+                    users::dsl::id.nullable(),
+                    users::dsl::username.nullable(),
                 ))
-                .load::<(i64, String, String)>(conn)?;
+                .load::<(i64, String, String, Option<i64>, Option<String>)>(conn)?;
 
             let preset_tags: Vec<EntityIdTag> = looper_presets_tags::table
                 .inner_join(tags::table)
@@ -49,7 +56,7 @@ pub async fn get_looper_presets(
 
     let looper_presets = looper_presets
         .into_iter()
-        .map(|(id, name, description)| {
+        .map(|(id, name, description, user_id, user_name)| {
             let tags = tags_by_preset_id
                 .remove(&id)
                 .unwrap_or_default()
@@ -62,6 +69,8 @@ pub async fn get_looper_presets(
                 name,
                 description,
                 tags,
+                user_id,
+                user_name,
             }
         })
         .collect_vec();
@@ -107,8 +116,11 @@ pub async fn get_looper_preset_by_id(
 pub async fn create_looper_preset(
     conn: WebSynthDbConn,
     looper_preset: Json<SaveLooperPresetRequest>,
+    login_token: MaybeLoginToken,
 ) -> Result<Json<i64>, String> {
     use crate::schema::{looper_presets, looper_presets_tags};
+
+    let user_id = get_logged_in_user_id(&conn, login_token).await;
 
     let SaveLooperPresetRequest {
         serialized_looper_inst_state,
@@ -128,6 +140,7 @@ pub async fn create_looper_preset(
                         name,
                         description,
                         serialized_looper_inst_state,
+                        user_id,
                     })
                     .execute(conn)?;
                 let created_preset_id = diesel::select(last_insert_id).first(conn)?;

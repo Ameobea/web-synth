@@ -26,9 +26,9 @@ import { getEngine } from 'src/util';
 export interface CompositionDefinition {
   id: number;
   title: string;
-  author: number;
   description: string;
   content: string;
+  userId: number | null | undefined;
 }
 
 const mkLocalSamplesConfirmation = (localSamples: SampleDescriptor[]) => {

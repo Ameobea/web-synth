@@ -11,31 +11,33 @@ pub struct NewCompositionRequest {
     pub tags: Vec<String>,
 }
 
-#[derive(Serialize, Insertable)]
+#[derive(Insertable)]
 #[table_name = "compositions"]
 pub struct NewComposition {
-    pub author: i64,
     pub title: String,
     pub description: String,
     pub content: String,
+    pub user_id: Option<i64>,
 }
 
-#[derive(Serialize, Queryable)]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompositionDescriptor {
     pub id: i64,
-    pub author: i64,
     pub title: String,
     pub description: String,
     pub tags: Vec<String>,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Serialize, Queryable)]
+#[serde(rename_all = "camelCase")]
 pub struct Composition {
     pub id: i64,
-    pub author: i64,
     pub title: String,
     pub description: String,
     pub content: String,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Insertable)]

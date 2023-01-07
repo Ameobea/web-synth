@@ -50,6 +50,7 @@ pub struct QueryableMIDIComposition {
     pub name: String,
     pub description: String,
     pub composition_json: String,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,6 +60,7 @@ pub struct NewMIDIComposition {
     pub description: String,
     pub composition: SerializedMIDIEditorState,
     pub tags: Vec<String>,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -69,6 +71,7 @@ pub struct MIDIComposition {
     pub description: String,
     pub composition: SerializedMIDIEditorState,
     pub tags: Vec<String>,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Insertable)]

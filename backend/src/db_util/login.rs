@@ -10,7 +10,7 @@ use scrypt::{
 };
 
 use crate::{
-    models::user::{NewLoginToken, NewUser, User},
+    models::user::{MaybeLoginToken, NewLoginToken, NewUser, User},
     WebSynthDbConn,
 };
 
@@ -63,6 +63,7 @@ pub async fn get_user_by_username(
     Ok(user)
 }
 
+/// If the login token is valid, returns the ID of the logged-in user.
 pub async fn validate_login_token(
     conn: &WebSynthDbConn,
     login_token: String,
@@ -134,4 +135,24 @@ fn test_hash_password() {
     let password = "password";
     let hash = hash_password(password).unwrap();
     assert!(verify_password(password, &hash));
+}
+
+pub async fn get_logged_in_user_id(
+    conn: &WebSynthDbConn,
+    login_token: MaybeLoginToken,
+) -> Option<i64> {
+    match login_token.0 {
+        Some(login_token) => match validate_login_token(&conn, login_token).await {
+            Ok(Some(user_id)) => Some(user_id),
+            Ok(None) => {
+                warn!("Failed to validate login token");
+                None
+            },
+            Err(err) => {
+                error!("Error while validating login token: {:?}", err);
+                None
+            },
+        },
+        None => None,
+    }
 }

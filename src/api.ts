@@ -11,35 +11,45 @@ import type { SampleDescriptor } from 'src/sampleLibrary';
 
 const buildURL = (path: string) => `${BACKEND_BASE_URL}${path}`;
 
-export const saveSynthVoicePreset = (preset: {
+export const saveSynthVoicePreset = async (preset: {
   title: string;
   description: string;
   body: ReturnType<typeof serializeSynthModule>;
-}) =>
-  fetch(buildURL('/synth_voice_presets'), {
+}) => {
+  const maybeLoginToken = await getLoginToken();
+  return fetch(buildURL('/synth_voice_presets'), {
     method: 'POST',
     body: JSON.stringify(preset),
+    headers: {
+      Authorization: maybeLoginToken,
+    },
   }).then(res => {
     if (!res.ok) {
       throw new Error(`Got bad status code ${res.status} when performing API request`);
     }
   });
+};
 
-export const saveSynthPreset = (preset: {
+export const saveSynthPreset = async (preset: {
   title: string;
   description: string;
   body: {
     voices: ReturnType<typeof serializeSynthModule>[];
   };
-}) =>
+}) => {
+  const maybeLoginToken = await getLoginToken();
   fetch(buildURL('/synth_presets'), {
     method: 'POST',
     body: JSON.stringify(preset),
+    headers: {
+      Authorization: maybeLoginToken,
+    },
   }).then(res => {
     if (!res.ok) {
       throw new Error(`Got bad status code ${res.status} when performing API request`);
     }
   });
+};
 
 export const fetchAllSharedCompositions = (): Promise<Omit<CompositionDefinition, 'content'>[]> =>
   fetch(`${BACKEND_BASE_URL}/compositions`).then(async res => {
@@ -81,6 +91,7 @@ export const saveComposition = async (
     body: JSON.stringify({ title, description, content: serializedComposition, tags }),
     headers: {
       'Content-Type': 'application/json',
+      Authorization: await getLoginToken(),
     },
   }).then(async res => {
     if (!res.ok) {
@@ -130,15 +141,20 @@ export const fetchEffects = (): Promise<Effect[]> =>
     return res.json();
   });
 
-export const saveEffect = (effect: Without<Effect, 'id'>) =>
-  fetch(`${BACKEND_BASE_URL}/effects`, {
+export const saveEffect = async (effect: Without<Effect, 'id'>) => {
+  const maybeLoginToken = await getLoginToken();
+  return fetch(`${BACKEND_BASE_URL}/effects`, {
     method: 'POST',
     body: JSON.stringify(effect),
+    headers: {
+      Authorization: maybeLoginToken,
+    },
   }).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }
   });
+};
 
 export interface SavedMIDIComposition {
   id: number;
@@ -146,6 +162,7 @@ export interface SavedMIDIComposition {
   description: string;
   composition: SerializedMIDIEditorState;
   tags: string[];
+  userId: number | null | undefined;
 }
 
 export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]> =>
@@ -156,11 +173,16 @@ export const saveMIDIComposition = async (
   description: string,
   composition: SerializedMIDIEditorState,
   tags: string[]
-) =>
-  fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
+) => {
+  const maybeLoginToken = await getLoginToken();
+  return fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
     body: JSON.stringify({ name, description, composition, tags }),
     method: 'POST',
+    headers: {
+      Authorization: maybeLoginToken,
+    },
   });
+};
 
 export const getExistingMIDICompositionTags = async (): Promise<
   { name: string; count: number }[]
@@ -177,6 +199,8 @@ export interface LooperPreset {
   name: string;
   description: string;
   tags: string[];
+  userId: number | null | undefined;
+  userName: string | null | undefined;
 }
 
 export const fetchLooperPresets = async (): Promise<LooperPreset[]> =>
@@ -192,16 +216,21 @@ export const saveLooperPreset = async (preset: {
   description: string;
   tags: string[];
   serializedLooperInstState: SerializedLooperInstState;
-}) =>
-  fetch(`${BACKEND_BASE_URL}/looper_preset`, {
+}) => {
+  const maybeLoginToken = await getLoginToken();
+  return fetch(`${BACKEND_BASE_URL}/looper_preset`, {
     body: JSON.stringify(preset),
     method: 'POST',
+    headers: {
+      Authorization: maybeLoginToken,
+    },
   }).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }
     return res.json();
   });
+};
 
 export const getExistingLooperPresetTags = async (): Promise<{ name: string; count: number }[]> =>
   fetch(`${BACKEND_BASE_URL}/looper_preset_tags`).then(async res => {

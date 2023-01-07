@@ -36,6 +36,8 @@ pub struct LooperPresetDescriptor {
     pub name: String,
     pub description: String,
     pub tags: Vec<String>,
+    pub user_id: Option<i64>,
+    pub user_name: Option<String>,
 }
 
 #[derive(Insertable)]
@@ -44,6 +46,7 @@ pub struct NewLooperPreset {
     pub name: String,
     pub description: String,
     pub serialized_looper_inst_state: String,
+    pub user_id: Option<i64>,
 }
 
 #[derive(Insertable)]

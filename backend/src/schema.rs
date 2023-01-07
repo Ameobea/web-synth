@@ -3,10 +3,10 @@
 diesel::table! {
     compositions (id) {
         id -> Bigint,
-        author -> Bigint,
         title -> Text,
         description -> Text,
         content -> Longtext,
+        user_id -> Nullable<Bigint>,
     }
 }
 
@@ -24,6 +24,7 @@ diesel::table! {
         title -> Varchar,
         description -> Text,
         code -> Text,
+        user_id -> Nullable<Bigint>,
     }
 }
 
@@ -39,10 +40,10 @@ diesel::table! {
 diesel::table! {
     looper_presets (id) {
         id -> Bigint,
-        author -> Nullable<Bigint>,
         name -> Text,
         description -> Text,
         serialized_looper_inst_state -> Longtext,
+        user_id -> Nullable<Bigint>,
     }
 }
 
@@ -60,6 +61,7 @@ diesel::table! {
         name -> Text,
         description -> Text,
         composition_json -> Text,
+        user_id -> Nullable<Bigint>,
     }
 }
 
@@ -98,6 +100,7 @@ diesel::table! {
         title -> Text,
         description -> Text,
         body -> Text,
+        user_id -> Nullable<Bigint>,
     }
 }
 
@@ -123,18 +126,23 @@ diesel::table! {
         title -> Text,
         description -> Text,
         body -> Longtext,
+        user_id -> Nullable<Bigint>,
     }
 }
 
 diesel::joinable!(compositions_tags -> compositions (composition_id));
 diesel::joinable!(compositions_tags -> tags (tag_id));
+diesel::joinable!(effects -> users (user_id));
 diesel::joinable!(login_tokens -> users (user_id));
-diesel::joinable!(looper_presets -> users (author));
+diesel::joinable!(looper_presets -> users (user_id));
 diesel::joinable!(looper_presets_tags -> looper_presets (looper_preset_id));
 diesel::joinable!(looper_presets_tags -> tags (tag_id));
+diesel::joinable!(midi_compositions -> users (user_id));
 diesel::joinable!(midi_compositions_tags -> midi_compositions (midi_composition_id));
 diesel::joinable!(midi_compositions_tags -> tags (tag_id));
 diesel::joinable!(private_sample_libraries -> users (user_id));
+diesel::joinable!(synth_presets -> users (user_id));
+diesel::joinable!(voice_presets -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     compositions,
