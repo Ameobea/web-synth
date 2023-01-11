@@ -136,14 +136,14 @@ class CompressorAWP extends AudioWorkletProcessor {
         name: 'bottom_ratio',
         defaultValue: 0,
         automationRate: 'k-rate',
-        minValue: 0.01,
+        minValue: 0,
         maxValue: 1024,
       },
       {
         name: 'top_ratio',
         defaultValue: 0,
         automationRate: 'k-rate',
-        minValue: 0.01,
+        minValue: 0,
         maxValue: 1024,
       },
       {

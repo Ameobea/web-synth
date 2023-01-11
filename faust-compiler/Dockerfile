@@ -4,15 +4,16 @@ RUN apt update && apt install -y cmake build-essential git pkg-config python3
 
 RUN mkdir /faust
 WORKDIR /
-RUN git clone https://github.com/grame-cncm/faust.git
+RUN git clone --depth 1 https://github.com/grame-cncm/faust.git
 WORKDIR /faust
-RUN git checkout 3743d55728b48194002f8360d1e632cb7a344f16
-RUN make -j
+RUN git checkout 776d0ce3b2efb0303f82f1ce20a2aa97d1b790db
+RUN make
 RUN make install
 
 # Install `wasm-opt` via `binaryen`
-RUN git clone https://github.com/WebAssembly/binaryen.git /tmp/binaryen
+RUN git clone --depth 1 https://github.com/WebAssembly/binaryen.git /tmp/binaryen
 WORKDIR /tmp/binaryen
+RUN git submodule init && git submodule update
 RUN cmake . && make install
 WORKDIR /
 RUN rm -rf /tmp/binaryen
