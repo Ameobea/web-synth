@@ -431,7 +431,7 @@ export const deserializeSynthModule = (
   }
 
   base.filterADSRModule.setState(filterEnvelope);
-  base.filterADSRModule.setLength(filterEnvelope.lengthMode, filterADSRLength ?? msToSamples(1000));
+  base.filterADSRModule.setLength(filterEnvelope.lengthMode, msToSamples(filterADSRLength ?? 1000));
 
   const voices = base.voices.map(voice => {
     voice.outerGainNode.gain.value = masterGain + 1;

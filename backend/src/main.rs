@@ -87,6 +87,7 @@ async fn main() {
             routes::get_composition_tags,
             routes::login::login,
             routes::login::register,
+            routes::login::get_logged_in_username,
         ])
         .attach(CorsFairing);
 

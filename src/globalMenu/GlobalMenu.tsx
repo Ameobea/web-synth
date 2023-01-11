@@ -2,6 +2,9 @@ import * as R from 'ramda';
 import React, { useEffect, useRef, useState } from 'react';
 
 import './GlobalMenu.scss';
+import { useQuery } from 'react-query';
+
+import { getLoggedInUsername } from 'src/api';
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { LoginModal } from 'src/login/LoginModal';
@@ -72,6 +75,13 @@ const GlobalTempoControl: React.FC = () => {
 
 const LoginStatus: React.FC = () => {
   const [loggedIn, setLoggedIn] = useState<boolean | 'loading'>('loading');
+  const loggedInUsername = useQuery([loggedIn], async () => {
+    if (!loggedIn) {
+      return null;
+    }
+
+    return getLoggedInUsername();
+  });
 
   useEffect(() => {
     getLoginToken().then(token => setLoggedIn(!!token));
@@ -96,7 +106,7 @@ const LoginStatus: React.FC = () => {
       {loggedIn === 'loading' ? <p>Loading login status...</p> : null}
       {loggedIn ? (
         <div className='logged-in-wrapper'>
-          <p>Logged in</p>
+          <p>Logged in{loggedInUsername.data ? ` as ${loggedInUsername.data}` : null}</p>
           <button onClick={logout}>Logout</button>
         </div>
       ) : (

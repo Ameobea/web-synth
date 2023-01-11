@@ -5,11 +5,10 @@ import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useSelector } from 'react-redux';
 
 import './SynthDesigner.scss';
-
 import { saveSynthPreset } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { type ReduxStore, store } from 'src/redux';
+import { store, type ReduxStore } from 'src/redux';
 import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import {
@@ -154,7 +153,7 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
 
           dispatch(
             actionCreators.synthDesigner.SET_SYNTH_PRESET(
-              synthPresets.find(preset => preset.id === state.preset)!
+              synthPresets.find(preset => preset.id == state.preset)!
             )
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);

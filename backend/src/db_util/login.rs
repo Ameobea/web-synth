@@ -156,3 +156,35 @@ pub async fn get_logged_in_user_id(
         None => None,
     }
 }
+
+pub async fn get_user_by_login_token(
+    conn: &WebSynthDbConn,
+    login_token: MaybeLoginToken,
+) -> Option<User> {
+    use crate::schema::users;
+
+    let user_id = match get_logged_in_user_id(&conn, login_token).await {
+        Some(user_id) => user_id,
+        None => return None,
+    };
+
+    match conn
+        .run(move |conn| {
+            users::table
+                .filter(users::dsl::id.eq(user_id))
+                .first::<User>(conn)
+                .optional()
+        })
+        .await
+    {
+        Ok(Some(user)) => Some(user),
+        Ok(None) => {
+            warn!("Failed to get user by ID");
+            None
+        },
+        Err(err) => {
+            error!("Error while getting user by ID: {:?}", err);
+            None
+        },
+    }
+}

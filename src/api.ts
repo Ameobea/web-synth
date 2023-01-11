@@ -278,3 +278,15 @@ export const register = async (username: string, password: string) => {
 
   return res.text();
 };
+
+export const getLoggedInUsername = async (): Promise<string | null> => {
+  const res = await fetch(`${BACKEND_BASE_URL}/logged_in_username`, {
+    headers: {
+      Authorization: await getLoginToken(),
+    },
+  });
+  if (!res.ok) {
+    return null;
+  }
+  return res.text();
+};

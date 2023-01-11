@@ -5,7 +5,7 @@ use crate::{
         generate_login_token, get_user_by_username, insert_new_login_token, insert_new_user,
         verify_password,
     },
-    models::user::LoginRequest,
+    models::user::{LoginRequest, MaybeLoginToken},
     WebSynthDbConn,
 };
 
@@ -78,4 +78,21 @@ pub async fn register(
         })?;
 
     Ok(login_token)
+}
+
+#[get("/logged_in_username")]
+pub async fn get_logged_in_username(
+    conn: WebSynthDbConn,
+    login_token: MaybeLoginToken,
+) -> Result<String, Custom<String>> {
+    let user = match crate::db_util::login::get_user_by_login_token(&conn, login_token).await {
+        Some(user) => user,
+        None =>
+            return Err(Custom(
+                Status::Unauthorized,
+                String::from("Invalid login token"),
+            )),
+    };
+
+    Ok(user.username)
 }

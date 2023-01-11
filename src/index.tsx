@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClientProvider as ReactQueryProvider } from 'react-query';
 import { Provider } from 'react-redux';
 
 import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
@@ -8,6 +9,7 @@ import {
   maybeRestoreLocalComposition,
   onBeforeUnload,
 } from 'src/persistance';
+import { getReactQueryClient } from 'src/reactUtils';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
 import { setEngine } from 'src/util';
@@ -29,9 +31,11 @@ document.addEventListener('touchend', () => ctx.resume(), { once: true });
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
   createRoot(document.getElementById('view-context-manager')!).render(
-    <Provider store={store}>
-      <ViewContextManager engine={engine} />
-    </Provider>
+    <ReactQueryProvider client={getReactQueryClient()}>
+      <Provider store={store}>
+        <ViewContextManager engine={engine} />
+      </Provider>
+    </ReactQueryProvider>
   );
 
   createRoot(document.getElementById('view-context-switcher')!).render(
