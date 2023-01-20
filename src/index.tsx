@@ -55,12 +55,13 @@ if (typeof AudioWorkletNode === 'undefined') {
 
     registerMainReduxGetState(getState);
 
-    if (!localStorage.vcmState) {
+    const isLoadingComposition = window.location.pathname.startsWith('/composition/');
+    if (!localStorage.vcmState && !isLoadingComposition) {
       initializeDefaultVCMState();
     } else {
       // Check to see if the user has reached this page via a composition share link.  If so,
       // save the current composition and load the shared one before initializing.
-      if (window.location.pathname.startsWith('/composition/')) {
+      if (isLoadingComposition) {
         await fetchAndLoadSharedComposition(window.location.pathname.split('/composition/')[1]);
       } else {
         await maybeRestoreLocalComposition();

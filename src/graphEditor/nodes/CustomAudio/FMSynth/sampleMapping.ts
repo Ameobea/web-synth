@@ -3,6 +3,10 @@ import type { SampleDescriptor } from 'src/sampleLibrary';
 interface SerializedMappedSampleData {
   descriptor: SampleDescriptor | null;
   doLoop: boolean;
+  gain?: number;
+  startIx?: number;
+  endIx?: number;
+  playbackRate?: number;
 }
 
 export interface SerializedSampleMappingOperatorState {
@@ -24,12 +28,18 @@ export interface MappedSampleData {
     | { type: 'loading' }
     | { type: 'loadError'; message: string }
     | { type: 'loaded' };
+  gain: number;
+  startIx?: number;
+  endIx?: number;
+  playbackRate: number;
 }
 
 export const buildDefaultMappedSampleData = (): MappedSampleData => ({
   descriptor: null,
   doLoop: false,
   loadStatus: { type: 'loading' },
+  gain: 1,
+  playbackRate: 1,
 });
 
 export interface SampleMappingOperatorState {
@@ -48,10 +58,16 @@ const serializeSampleMappingOperatorState = (
 ): SerializedSampleMappingOperatorState => {
   const mappedSamplesByMIDINumber: { [midiNumber: number]: SerializedMappedSampleData[] } = {};
   for (const [midiNumber, mappedSampleData] of Object.entries(state.mappedSamplesByMIDINumber)) {
-    mappedSamplesByMIDINumber[+midiNumber] = mappedSampleData.map(({ descriptor, doLoop }) => ({
-      descriptor,
-      doLoop,
-    }));
+    mappedSamplesByMIDINumber[+midiNumber] = mappedSampleData.map(
+      ({ descriptor, doLoop, startIx, endIx, gain, playbackRate }) => ({
+        descriptor,
+        doLoop,
+        startIx,
+        endIx,
+        gain,
+        playbackRate,
+      })
+    );
   }
 
   return {
@@ -80,11 +96,17 @@ const deserializeSampleMappingOperatorState = (
   for (const [midiNumber, mappedSampleData] of Object.entries(
     serialized.mappedSamplesByMIDINumber
   )) {
-    mappedSamplesByMIDINumber[+midiNumber] = mappedSampleData.map(({ descriptor, doLoop }) => ({
-      descriptor,
-      doLoop,
-      loadStatus: { type: 'notLoaded' },
-    }));
+    mappedSamplesByMIDINumber[+midiNumber] = mappedSampleData.map(
+      ({ descriptor, doLoop, startIx, endIx, gain, playbackRate }) => ({
+        descriptor,
+        doLoop,
+        loadStatus: { type: 'notLoaded' },
+        startIx,
+        endIx,
+        gain: gain ?? 1,
+        playbackRate: playbackRate ?? 1,
+      })
+    );
   }
 
   return {

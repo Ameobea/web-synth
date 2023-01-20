@@ -1,12 +1,62 @@
+<script lang="ts" context="module">
+  import { filterNils } from 'ameo-utils';
+
+  const buildMappedSampleControlPanelSettings = (lenSamples: number | null | undefined) =>
+    filterNils([
+      { label: 'gain', type: 'range', min: 0, max: 5 },
+      { label: 'playback rate', type: 'range', min: 0, max: 5, step: 0.1 },
+      lenSamples
+        ? { label: 'range (samples)', type: 'interval', min: 0, max: lenSamples, step: 1 }
+        : null,
+    ]);
+</script>
+
 <script lang="ts">
+  import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { MappedSampleData } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+  import { getSample } from 'src/sampleLibrary/sampleLibrary';
   import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
   import { genRandomStringID } from 'src/util';
 
   export let mappedSampleData: MappedSampleData;
   export let onDelete: () => void;
 
+  $: selectedSampleLength = 0;
+  $: if (mappedSampleData.descriptor) {
+    getSample(mappedSampleData.descriptor).then(sample => {
+      selectedSampleLength = sample.length;
+    });
+  } else {
+    selectedSampleLength = 0;
+  }
+  $: mappedSampleControlPanelSettings = buildMappedSampleControlPanelSettings(selectedSampleLength);
+  $: controlPanelState = {
+    gain: mappedSampleData.gain ?? 1,
+    'playback rate': mappedSampleData.playbackRate ?? 1,
+    'range (samples)': [
+      mappedSampleData.startIx ?? 0,
+      mappedSampleData.endIx ?? selectedSampleLength,
+    ],
+  };
+
   const checkboxID = `loop-checkbox-${genRandomStringID()}`;
+
+  const handleControlPanelChange = (key: string, value: any, _state: Record<string, any>) => {
+    switch (key) {
+      case 'gain':
+        mappedSampleData.gain = value;
+        break;
+      case 'playback rate':
+        mappedSampleData.playbackRate = value;
+        break;
+      case 'range (samples)':
+        mappedSampleData.startIx = value[0];
+        mappedSampleData.endIx = value[1];
+        break;
+      default:
+        console.error('Unknown key', key);
+    }
+  };
 </script>
 
 <div class="root">
@@ -34,6 +84,14 @@
     <button style="margin-left: 8px;" on:click={onDelete}>Delete</button>
     <label class="loop-checkbox-label" for={checkboxID}>Loop</label>
     <input id={checkboxID} type="checkbox" bind:checked={mappedSampleData.doLoop} />
+    {#if mappedSampleData.descriptor}
+      <SvelteControlPanel
+        settings={mappedSampleControlPanelSettings}
+        state={controlPanelState}
+        onChange={handleControlPanelChange}
+        style={{ width: '100%', marginTop: 8 }}
+      />
+    {/if}
   </div>
 </div>
 

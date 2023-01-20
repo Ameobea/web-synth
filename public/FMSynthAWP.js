@@ -358,21 +358,27 @@ class FMSynthAWP extends AudioWorkletProcessor {
         mappedSampleDataForMIDINumber.length
       );
 
-      mappedSampleDataForMIDINumber.forEach(({ doLoop, descriptor }, mappedSampleIx) => {
-        const sampleDescriptorHash = descriptor ? hashSampleDescriptor(descriptor) : null;
-        const sampleDataIx = sampleDescriptorHash
-          ? this.sampleDataIxByHashedSampleDescriptor.get(sampleDescriptorHash)
-          : null;
+      mappedSampleDataForMIDINumber.forEach(
+        ({ doLoop, descriptor, gain, startIx, endIx, playbackRate }, mappedSampleIx) => {
+          const sampleDescriptorHash = descriptor ? hashSampleDescriptor(descriptor) : null;
+          const sampleDataIx = sampleDescriptorHash
+            ? this.sampleDataIxByHashedSampleDescriptor.get(sampleDescriptorHash)
+            : null;
 
-        this.wasmInstance.exports.fm_synth_set_mapped_sample_config(
-          this.ctxPtr,
-          operatorIx,
-          slotIx,
-          mappedSampleIx,
-          sampleDataIx ?? -1,
-          doLoop ?? false
-        );
-      });
+          this.wasmInstance.exports.fm_synth_set_mapped_sample_config(
+            this.ctxPtr,
+            operatorIx,
+            slotIx,
+            mappedSampleIx,
+            sampleDataIx ?? -1,
+            doLoop ?? false,
+            gain ?? 1,
+            startIx ?? 0,
+            endIx ?? 0,
+            playbackRate ?? 1
+          );
+        }
+      );
     });
   }
 

@@ -22,7 +22,7 @@ const SidechainWasm = new AsyncOnce(() =>
   fetch(
     process.env.ASSET_PATH +
       'sidechain.wasm' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+      (window.location.host.includes('localhost') ? '' : `?${btoa(Math.random().toString())}`)
   ).then(res => res.arrayBuffer())
 );
 

@@ -560,7 +560,12 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonTriangle(osc) => osc.set_phases(new_phases),
             OscillatorSource::UnisonSawtooth(osc) => osc.set_phases(new_phases),
-            OscillatorSource::SampleMapping(_) => (),
+            OscillatorSource::SampleMapping(emitter) => {
+                if new_phases.len() > 1 || new_phases[0] != 0. {
+                    unimplemented!();
+                }
+                emitter.reset_phases()
+            },
             OscillatorSource::TunedSample(_) => (),
         }
     }
@@ -598,7 +603,7 @@ impl OscillatorSource {
             OscillatorSource::UnisonSquare(osc) => osc.set_phase_at(new_phase, ix),
             OscillatorSource::UnisonTriangle(osc) => osc.set_phase_at(new_phase, ix),
             OscillatorSource::UnisonSawtooth(osc) => osc.set_phase_at(new_phase, ix),
-            OscillatorSource::SampleMapping(_) => (),
+            OscillatorSource::SampleMapping(_) => unimplemented!(),
             OscillatorSource::TunedSample(_) => (),
         }
     }
@@ -1938,12 +1943,6 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize, m
             let initial_phases = &[0.];
             operator.oscillator_source.set_phase(initial_phases);
         }
-
-        match &mut operator.oscillator_source {
-            OscillatorSource::SampleMapping(emitter) => emitter.cur_ix = 0,
-            OscillatorSource::TunedSample(_) => todo!(),
-            _ => (),
-        }
     }
 }
 
@@ -2174,6 +2173,10 @@ pub extern "C" fn fm_synth_set_mapped_sample_config(
     mapped_sample_ix: usize,
     sample_data_ix: isize,
     do_loop: bool,
+    gain: f32,
+    start_ix: usize,
+    end_ix: usize,
+    playback_rate: f32,
 ) {
     let ctx = unsafe { &mut *ctx };
     ctx.sample_mapping_manager.config_by_operator[operator_ix]
@@ -2182,5 +2185,9 @@ pub extern "C" fn fm_synth_set_mapped_sample_config(
             mapped_sample_ix,
             sample_data_ix,
             do_loop,
+            gain,
+            start_ix,
+            end_ix,
+            playback_rate,
         )
 }

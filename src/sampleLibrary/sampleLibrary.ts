@@ -136,6 +136,8 @@ export const listSamples = async ({
   return [...allSamples.values()];
 };
 
+const ActiveFetchesByHash = new Map<string, Promise<AudioBuffer>>();
+
 /**
  * This is the main entrypoint for loading sample from descriptors.  It will check both layers of cache first and
  * if the sample is not available, it will attempt to load it from its source (local filesystem or remote URL).
@@ -156,17 +158,27 @@ export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuff
     return buf;
   }
 
-  // We don't have the sample available, so we load it from its original source
-  const sampleData = await (descriptor.isLocal
-    ? loadLocalSample(descriptor)
-    : loadRemoteSample(descriptor));
-  const buf = await ctx.decodeAudioData(sampleData.slice(0));
+  const activeFetch = ActiveFetchesByHash.get(hashSampleDescriptor(descriptor));
+  if (activeFetch) {
+    return activeFetch;
+  }
 
-  // Add it to both levels of cache
-  cacheSample(descriptor, sampleData);
-  GLOBAL_SAMPLE_MANAGER.setSample(descriptor, buf);
+  const prom = new Promise<AudioBuffer>(async resolve => {
+    // We don't have the sample available, so we load it from its original source
+    const sampleData = await (descriptor.isLocal
+      ? loadLocalSample(descriptor)
+      : loadRemoteSample(descriptor));
+    const buf = await ctx.decodeAudioData(sampleData.slice(0));
 
-  return buf;
+    // Add it to both levels of cache
+    cacheSample(descriptor, sampleData);
+    GLOBAL_SAMPLE_MANAGER.setSample(descriptor, buf);
+
+    resolve(buf);
+  });
+
+  ActiveFetchesByHash.set(hashSampleDescriptor(descriptor), prom);
+  return prom;
 };
 
 /**
