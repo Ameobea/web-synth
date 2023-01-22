@@ -8,4 +8,6 @@ Web synth is a browser-based audio synthesis and experimentation platform.  It g
 * [[fm-synth]] standalone demo: <https://synth.ameo.dev/fm.html>
 * [[getting-started]]
 
+Or, watch the demo video to get a feel for what it can do:
 
+[![screenshot from the youtube video showing web synth in the background](https://img.youtube.com/vi/42ytPljgJ_U/0.jpg)](https://www.youtube.com/watch?v=42ytPljgJ_U)

@@ -9,6 +9,7 @@ import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 import type React from 'react';
 
+import { AddNode } from 'src/graphEditor/nodes/CustomAudio/AddNode/AddNode';
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 import { CompressorNode } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
@@ -461,6 +462,9 @@ export const audioNodeGetters: {
   },
   'customAudio/compressor': {
     nodeGetter: CompressorNode,
+  },
+  'customAudio/add': {
+    nodeGetter: AddNode,
   },
 };
 

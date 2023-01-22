@@ -10,7 +10,9 @@
  * Standalone FM Synthesizer Demo: <https://synth.ameo.dev/fm.html>
  * Documentation and Development Notes: <https://synth.ameo.dev/docs/>
 
-Or, [Watch the (old out-of-date) demo video on YouTube](https://www.youtube.com/watch?v=kgkpJk0P7Uo) first to get a feel for what it can do.
+Or, watch the demo video to get a feel for what it can do:
+
+[![screenshot from the youtube video showing web synth in the background](https://img.youtube.com/vi/42ytPljgJ_U/0.jpg)](https://www.youtube.com/watch?v=42ytPljgJ_U)
 
 ## Tech
 
