@@ -357,7 +357,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
               R.lensPath(['filterGroups', groupIx]),
               [
                 ...state.filterGroups[groupIx],
-                { filter: newFilter, params, id: btoa(Math.random().toString()) },
+                { filter: newFilter, params, id: btoa(Math.random().toString()), oaps },
               ],
               state
             );
