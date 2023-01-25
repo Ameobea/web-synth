@@ -433,6 +433,7 @@ export default class FMSynth implements ForeignNode {
           valParamInt: 0,
           valParamFloat: source.multiplier,
           valParamFloat2: 0,
+          valParamFloat3: 0,
         };
       }
       case 'constant': {
@@ -441,6 +442,7 @@ export default class FMSynth implements ForeignNode {
           valParamInt: 0,
           valParamFloat: source.value,
           valParamFloat2: 0,
+          valParamFloat3: 0,
         };
       }
       case 'adsr': {
@@ -449,6 +451,7 @@ export default class FMSynth implements ForeignNode {
           valParamInt: source['adsr index'],
           valParamFloat: source.scale,
           valParamFloat2: source.shift,
+          valParamFloat3: 0,
         };
       }
       case 'param buffer': {
@@ -457,6 +460,7 @@ export default class FMSynth implements ForeignNode {
           valParamInt: source['buffer index'],
           valParamFloat: 0,
           valParamFloat2: 0,
+          valParamFloat3: 0,
         };
       }
       case 'midi control': {
@@ -465,6 +469,7 @@ export default class FMSynth implements ForeignNode {
           valParamInt: source.midiControlIndex,
           valParamFloat: source.scale,
           valParamFloat2: source.shift,
+          valParamFloat3: 0,
         };
       }
       case 'beats to samples': {
@@ -473,6 +478,16 @@ export default class FMSynth implements ForeignNode {
           valParamInt: 0,
           valParamFloat: source.value,
           valParamFloat2: 0,
+          valParamFloat3: 0,
+        };
+      }
+      case 'random': {
+        return {
+          valueType: 6,
+          valParamInt: source.updateIntervalSamples,
+          valParamFloat: source.min,
+          valParamFloat2: source.max,
+          valParamFloat3: source.smoothingCoefficient,
         };
       }
       default: {

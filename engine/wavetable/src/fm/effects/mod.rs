@@ -93,18 +93,22 @@ impl EffectInstance {
         param_1_int_val: usize,
         param_1_float_val: f32,
         param_1_float_val_2: f32,
+        param_1_float_val_3: f32,
         param_2_type: usize,
         param_2_int_val: usize,
         param_2_float_val: f32,
         param_2_float_val_2: f32,
+        param_2_float_val_3: f32,
         param_3_type: usize,
         param_3_int_val: usize,
         param_3_float_val: f32,
         param_3_float_val_2: f32,
+        param_3_float_val_3: f32,
         param_4_type: usize,
         param_4_int_val: usize,
         param_4_float_val: f32,
         param_4_float_val_2: f32,
+        param_4_float_val_3: f32,
     ) -> Self {
         match effect_type {
             0 => {
@@ -113,12 +117,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 );
                 let warp_factor = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
                 let params = SpectralWarpingParams {
                     frequency,
@@ -133,24 +139,28 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 );
                 let top_fold_width = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
                 let bottom_fold_position = ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
+                    param_3_float_val_3,
                 );
                 let bottom_fold_width = ParamSource::from_parts(
                     param_4_type,
                     param_4_int_val,
                     param_4_float_val,
                     param_4_float_val_2,
+                    param_4_float_val_3,
                 );
 
                 EffectInstance::Wavecruncher(Wavecruncher {
@@ -166,12 +176,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 );
                 let bit_depth = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
 
                 EffectInstance::Bitcrusher(Bitcrusher::new(sample_rate, bit_depth))
@@ -182,12 +194,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 );
                 let offset = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
 
                 EffectInstance::Wavefolder(Wavefolder::new(gain, offset))
@@ -198,12 +212,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 );
                 let post_gain = ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
                 let algorithm = param_3_int_val;
 
@@ -216,6 +232,7 @@ impl EffectInstance {
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
 
                 EffectInstance::ButterworthFilter(ButterworthFilter::new(mode, cutoff_freq))
@@ -228,24 +245,28 @@ impl EffectInstance {
                         param_1_int_val,
                         param_1_float_val,
                         param_1_float_val_2,
+                        param_1_float_val_3,
                     ),
                     wet: ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
+                        param_2_float_val_3,
                     ),
                     dry: ParamSource::from_parts(
                         param_3_type,
                         param_3_int_val,
                         param_3_float_val,
                         param_3_float_val_2,
+                        param_3_float_val_3,
                     ),
                     feedback: ParamSource::from_parts(
                         param_4_type,
                         param_4_int_val,
                         param_4_float_val,
                         param_4_float_val_2,
+                        param_4_float_val_3,
                     ),
                 };
 
@@ -258,18 +279,21 @@ impl EffectInstance {
                         param_1_int_val,
                         param_1_float_val,
                         param_1_float_val_2,
+                        param_1_float_val_3,
                     ),
                     ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
+                        param_2_float_val_3,
                     ),
                     ParamSource::from_parts(
                         param_3_type,
                         param_3_int_val,
                         param_3_float_val,
                         param_3_float_val_2,
+                        param_3_float_val_3,
                     ),
                 );
 
@@ -284,24 +308,28 @@ impl EffectInstance {
                         param_1_int_val,
                         param_1_float_val,
                         param_1_float_val_2,
+                        param_1_float_val_3,
                     ),
                     feedback_delay_samples: ParamSource::from_parts(
                         param_2_type,
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
+                        param_2_float_val_3,
                     ),
                     feedback_gain: ParamSource::from_parts(
                         param_3_type,
                         param_3_int_val,
                         param_3_float_val,
                         param_3_float_val_2,
+                        param_3_float_val_3,
                     ),
                     feedforward_gain: ParamSource::from_parts(
                         param_4_type,
                         param_4_int_val,
                         param_4_float_val,
                         param_4_float_val_2,
+                        param_4_float_val_3,
                     ),
                 };
 
@@ -328,18 +356,22 @@ impl EffectInstance {
         param_1_int_val: usize,
         param_1_float_val: f32,
         param_1_float_val_2: f32,
+        param_1_float_val_3: f32,
         param_2_type: usize,
         param_2_int_val: usize,
         param_2_float_val: f32,
         param_2_float_val_2: f32,
+        param_2_float_val_3: f32,
         param_3_type: usize,
         param_3_int_val: usize,
         param_3_float_val: f32,
         param_3_float_val_2: f32,
+        param_3_float_val_3: f32,
         param_4_type: usize,
         param_4_int_val: usize,
         param_4_float_val: f32,
         param_4_float_val_2: f32,
+        param_4_float_val_3: f32,
     ) -> bool {
         match effect_type {
             0 => {
@@ -352,6 +384,7 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 spectral_warping
                     .osc
@@ -361,6 +394,7 @@ impl EffectInstance {
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
+                        param_2_float_val_3,
                     ));
                 return true;
             },
@@ -380,12 +414,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 bitcrusher.bit_depth.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 ));
                 return true;
             },
@@ -400,12 +436,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 wavefolder.offset.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 ));
                 return true;
             },
@@ -420,12 +458,14 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 soft_clipper.post_gain.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 ));
                 soft_clipper.algorithm = unsafe { std::mem::transmute(param_3_int_val as u32) };
                 return true;
@@ -442,6 +482,7 @@ impl EffectInstance {
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 );
 
                 butterworth_filter.mode = mode;
@@ -459,24 +500,28 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 delay.wet.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 ));
                 delay.dry.replace(ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
+                    param_3_float_val_3,
                 ));
                 delay.feedback.replace(ParamSource::from_parts(
                     param_4_type,
                     param_4_int_val,
                     param_4_float_val,
                     param_4_float_val_2,
+                    param_4_float_val_3,
                 ));
                 return true;
             },
@@ -491,18 +536,21 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 moog_filter.resonance.replace(ParamSource::from_parts(
                     param_2_type,
                     param_2_int_val,
                     param_2_float_val,
                     param_2_float_val_2,
+                    param_2_float_val_3,
                 ));
                 moog_filter.drive.replace(ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
+                    param_3_float_val_3,
                 ));
                 return true;
             },
@@ -517,6 +565,7 @@ impl EffectInstance {
                     param_1_int_val,
                     param_1_float_val,
                     param_1_float_val_2,
+                    param_1_float_val_3,
                 ));
                 comb_filter
                     .feedback_delay_samples
@@ -525,12 +574,14 @@ impl EffectInstance {
                         param_2_int_val,
                         param_2_float_val,
                         param_2_float_val_2,
+                        param_2_float_val_3,
                     ));
                 comb_filter.feedback_gain.replace(ParamSource::from_parts(
                     param_3_type,
                     param_3_int_val,
                     param_3_float_val,
                     param_3_float_val_2,
+                    param_3_float_val_3,
                 ));
                 comb_filter
                     .feedforward_gain
@@ -539,6 +590,7 @@ impl EffectInstance {
                         param_4_int_val,
                         param_4_float_val,
                         param_4_float_val_2,
+                        param_4_float_val_3,
                     ));
                 return true;
             },
@@ -642,18 +694,22 @@ impl EffectChain {
         param_1_int_val: usize,
         param_1_float_val: f32,
         param_1_float_val_2: f32,
+        param_1_float_val_3: f32,
         param_2_type: usize,
         param_2_int_val: usize,
         param_2_float_val: f32,
         param_2_float_val_2: f32,
+        param_2_float_val_3: f32,
         param_3_type: usize,
         param_3_int_val: usize,
         param_3_float_val: f32,
         param_3_float_val_2: f32,
+        param_3_float_val_3: f32,
         param_4_type: usize,
         param_4_int_val: usize,
         param_4_float_val: f32,
         param_4_float_val_2: f32,
+        param_4_float_val_3: f32,
         is_bypassed: bool,
     ) {
         if let Some(effect) = &mut self.effects[effect_ix] {
@@ -663,18 +719,22 @@ impl EffectChain {
                 param_1_int_val,
                 param_1_float_val,
                 param_1_float_val_2,
+                param_1_float_val_3,
                 param_2_type,
                 param_2_int_val,
                 param_2_float_val,
                 param_2_float_val_2,
+                param_2_float_val_3,
                 param_3_type,
                 param_3_int_val,
                 param_3_float_val,
                 param_3_float_val_2,
+                param_3_float_val_3,
                 param_4_type,
                 param_4_int_val,
                 param_4_float_val,
                 param_4_float_val_2,
+                param_4_float_val_3,
             );
             if successfully_updated {
                 effect.is_bypassed = is_bypassed;
@@ -689,18 +749,22 @@ impl EffectChain {
                 param_1_int_val,
                 param_1_float_val,
                 param_1_float_val_2,
+                param_1_float_val_3,
                 param_2_type,
                 param_2_int_val,
                 param_2_float_val,
                 param_2_float_val_2,
+                param_2_float_val_3,
                 param_3_type,
                 param_3_int_val,
                 param_3_float_val,
                 param_3_float_val_2,
+                param_3_float_val_3,
                 param_4_type,
                 param_4_int_val,
                 param_4_float_val,
                 param_4_float_val_2,
+                param_4_float_val_3,
             ),
             is_bypassed,
         });
@@ -727,7 +791,7 @@ fn render_effect_params<'a, E: Effect>(
     let mut params: [Option<&mut ParamSource>; 4] = [None, None, None, None];
     effect.get_params(&mut params);
 
-    for (i, param) in core::array::IntoIter::new(params).enumerate() {
+    for (i, param) in params.into_iter().enumerate() {
         let param = match param {
             Some(param) => param,
             None => return i,

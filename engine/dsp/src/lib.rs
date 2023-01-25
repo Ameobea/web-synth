@@ -28,8 +28,9 @@ pub fn one_pole(state: &mut f32, new_val: f32, coefficient: f32) -> f32 {
 /// `smooth_factor` determines the amount of smoothing that is applied.  The closer to 1.0 you get,
 /// the smoother it is.
 #[inline]
-pub fn smooth(state: &mut f32, new_val: f32, smooth_factor: f32) {
+pub fn smooth(state: &mut f32, new_val: f32, smooth_factor: f32) -> f32 {
     *state = smooth_factor * *state + (1. - smooth_factor) * new_val;
+    *state
 }
 
 #[inline]

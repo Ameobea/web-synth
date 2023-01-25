@@ -66,7 +66,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.valueType,
             evt.data.valParamInt,
             evt.data.valParamFloat,
-            evt.data.valParamFloat2
+            evt.data.valParamFloat2,
+            evt.data.valParamFloat3
           );
           break;
         }
@@ -81,7 +82,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.valueType,
             evt.data.valParamInt,
             evt.data.valParamFloat,
-            evt.data.valParamFloat2
+            evt.data.valParamFloat2,
+            evt.data.valParamFloat3
           );
           break;
         }
@@ -111,22 +113,27 @@ class FMSynthAWP extends AudioWorkletProcessor {
             param1?.valParamInt ?? 0,
             param1?.valParamFloat ?? 0,
             param1?.valParamFloat2 ?? 0,
+            param1?.valParamFloat3 ?? 0,
             param2?.valueType ?? 0,
             param2?.valParamInt ?? 0,
             param2?.valParamFloat ?? 0,
             param2?.valParamFloat2 ?? 0,
+            param2?.valParamFloat3 ?? 0,
             param3?.valueType ?? 0,
             param3?.valParamInt ?? 0,
             param3?.valParamFloat ?? 0,
             param3?.valParamFloat2 ?? 0,
+            param3?.valParamFloat3 ?? 0,
             param4?.valueType ?? 0,
             param4?.valParamInt ?? 0,
             param4?.valParamFloat ?? 0,
             param4?.valParamFloat2 ?? 0,
+            param4?.valParamFloat3 ?? 0,
             param5?.valueType ?? 0,
             param5?.valParamInt ?? 0,
             param5?.valParamFloat ?? 0,
-            param5?.valParamFloat2 ?? 0
+            param5?.valParamFloat2 ?? 0,
+            param5?.valParamFloat3 ?? 0
           );
           break;
         }
@@ -141,7 +148,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.valueType,
             evt.data.valParamInt,
             evt.data.valParamFloat,
-            evt.data.valParamFloat2
+            evt.data.valParamFloat2,
+            evt.data.valParamFloat3
           );
           break;
         }
@@ -161,18 +169,22 @@ class FMSynthAWP extends AudioWorkletProcessor {
             param1?.valParamInt ?? 0,
             param1?.valParamFloat ?? 0,
             param1?.valParamFloat2 ?? 0,
+            param1?.valParamFloat3 ?? 0,
             param2?.valueType ?? 0,
             param2?.valParamInt ?? 0,
             param2?.valParamFloat ?? 0,
             param2?.valParamFloat2 ?? 0,
+            param2?.valParamFloat3 ?? 0,
             param3?.valueType ?? 0,
             param3?.valParamInt ?? 0,
             param3?.valParamFloat ?? 0,
             param3?.valParamFloat2 ?? 0,
+            param3?.valParamFloat3 ?? 0,
             param4?.valueType ?? 0,
             param4?.valParamInt ?? 0,
             param4?.valParamFloat ?? 0,
             param4?.valParamFloat2 ?? 0,
+            param4?.valParamFloat3 ?? 0,
             isBypassed ?? false
           );
           break;
@@ -195,6 +207,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             lenSamples.valParamInt,
             lenSamples.valParamFloat,
             lenSamples.valParamFloat2,
+            lenSamples.valParamFloat3,
             releasePoint,
             loopPoint ?? -1.0,
             logScale ?? false
@@ -213,7 +226,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             lenSamples.valueType,
             lenSamples.valParamInt,
             lenSamples.valParamFloat,
-            lenSamples.valParamFloat2
+            lenSamples.valParamFloat2,
+            lenSamples.valParamFloat3
           );
 
           break;
@@ -247,7 +261,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
             evt.data.valueType ?? 0,
             evt.data.valParamInt ?? 0,
             evt.data.valParamFloat ?? 0,
-            evt.data.valParamFloat2 ?? 0
+            evt.data.valParamFloat2 ?? 0,
+            evt.data.valParamFloat3 ?? 0
           );
           break;
         }
@@ -411,7 +426,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
         paramSource.valueType,
         paramSource.valParamInt,
         paramSource.valParamFloat,
-        paramSource.valParamFloat2
+        paramSource.valParamFloat2,
+        paramSource.valParamFloat3
       )
     );
     adsrs.forEach(({ steps, lenSamples, releasePoint, loopPoint, logScale, adsrIx }) => {
@@ -426,6 +442,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
         lenSamples.valParamInt,
         lenSamples.valParamFloat,
         lenSamples.valParamFloat2,
+        lenSamples.valParamFloat3,
         releasePoint,
         loopPoint ?? -1.0,
         logScale
@@ -440,7 +457,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
           paramSource.valueType,
           paramSource.valParamInt,
           paramSource.valParamFloat,
-          paramSource.valParamFloat2
+          paramSource.valParamFloat2,
+          paramSource.valParamFloat3
         )
       )
     );

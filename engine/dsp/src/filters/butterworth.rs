@@ -38,10 +38,10 @@ impl ButterworthFilter {
     // Adapted from code at the bottom of this page: http://basicsynth.com/index.php?page=filters
     #[inline]
     pub fn lowpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let cutoff_freq = crate::one_pole(
+        let cutoff_freq = crate::smooth(
             &mut self.last_cutoff_freq,
             crate::clamp_normalize(1., 18_000., cutoff_freq),
-            0.995,
+            0.99,
         );
         let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let c2 = c * c;
@@ -63,10 +63,10 @@ impl ButterworthFilter {
 
     #[inline]
     pub fn highpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let cutoff_freq = crate::one_pole(
+        let cutoff_freq = crate::smooth(
             &mut self.last_cutoff_freq,
             crate::clamp_normalize(1., 18_000., cutoff_freq),
-            0.995,
+            0.99,
         );
         let mut c = ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         if c.abs() < 0.002 {
@@ -92,10 +92,10 @@ impl ButterworthFilter {
 
     #[inline]
     pub fn bandpass(&mut self, cutoff_freq: f32, input: f32) -> f32 {
-        let cutoff_freq = crate::one_pole(
+        let cutoff_freq = crate::smooth(
             &mut self.last_cutoff_freq,
             crate::clamp_normalize(1., 18_000., cutoff_freq),
-            0.995,
+            0.99,
         );
         let c = 1. / ((std::f32::consts::PI / SAMPLE_RATE) * cutoff_freq).tan();
         let d = 1. + c;

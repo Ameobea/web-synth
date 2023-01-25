@@ -1,4 +1,4 @@
-import { UnreachableException } from 'ameo-utils';
+import { filterNils, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -47,14 +47,26 @@ export type ParamSource =
       scale: number;
       shift: number;
     }
-  | { type: 'beats to samples'; value: number };
+  | { type: 'beats to samples'; value: number }
+  | {
+      type: 'random';
+      min: number;
+      max: number;
+      smoothingCoefficient: number;
+      updateIntervalSamples: number;
+    };
 
 const buildTypeSetting = (excludedTypes?: ParamSource['type'][]) => ({
   type: 'select',
   label: 'type',
-  options: ['param buffer', 'constant', 'adsr', 'base frequency multiplier', 'midi control'].filter(
-    paramType => !excludedTypes?.includes(paramType as any)
-  ),
+  options: [
+    'param buffer',
+    'constant',
+    'adsr',
+    'base frequency multiplier',
+    'midi control',
+    'random',
+  ].filter(paramType => !excludedTypes?.includes(paramType as any)),
 });
 
 const updateState = (state: ParamSource, newState: Partial<ParamSource>): ParamSource => ({
@@ -83,6 +95,15 @@ export const buildDefaultParamSource = (
     }
     case 'midi control': {
       return { type, midiControlIndex: null, scale: 0, shift: 0 };
+    }
+    case 'random': {
+      return {
+        type,
+        min,
+        max,
+        smoothingCoefficient: 0,
+        updateIntervalSamples: 1,
+      };
     }
     default: {
       throw new UnreachableException('Invalid operator state type: ' + type);
@@ -361,6 +382,37 @@ const buildConfigureParamSourceSettings = ({
         },
       ];
     }
+    case 'random': {
+      return filterNils([
+        buildTypeSetting(excludedTypes),
+        {
+          type: 'interval',
+          label: 'range',
+          min,
+          max,
+        },
+        {
+          type: 'range',
+          label: 'update interval samples',
+          min: 1,
+          max: 2000,
+          step: 1,
+        },
+        {
+          type: 'checkbox',
+          label: 'enable smoothing',
+        },
+        state.smoothingCoefficient > 0
+          ? {
+              type: 'range',
+              label: 'smoothing coefficient',
+              min: 0.5,
+              max: 0.99,
+              scale: 'log',
+            }
+          : null,
+      ]);
+    }
     default: {
       console.error('Invalid operator state type: ', (state as any).type);
     }
@@ -440,6 +492,15 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
                 : undefined,
             adsr: adsr ? adsr : undefined,
             'log scale': adsr ? adsr.logScale ?? false : undefined,
+            range: state.type === 'random' ? [state.min, state.max] : undefined,
+            'update interval samples':
+              state.type === 'random' ? state.updateIntervalSamples : undefined,
+            'enable smoothing':
+              state.type === 'random' ? state.smoothingCoefficient > 0 : undefined,
+            'smoothing coefficient':
+              state.type === 'random' && state.smoothingCoefficient > 0
+                ? state.smoothingCoefficient
+                : undefined,
           }),
           [adsr, state]
         )}
@@ -485,6 +546,22 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
                 break;
               }
               onChange(updateState(state, { multiplier: value }));
+              break;
+            }
+            case 'enable smoothing': {
+              onChange(updateState(state, { smoothingCoefficient: value ? 0.99 : 0 }));
+              break;
+            }
+            case 'update interval samples': {
+              onChange(updateState(state, { updateIntervalSamples: value }));
+              break;
+            }
+            case 'smoothing coefficient': {
+              onChange(updateState(state, { smoothingCoefficient: value }));
+              break;
+            }
+            case 'range': {
+              onChange(updateState(state, { min: value[0], max: value[1] }));
               break;
             }
             default: {

@@ -1,7 +1,7 @@
 #[cfg(feature = "simd")]
 use core::arch::wasm32::*;
 use rand::Rng;
-use std::rc::Rc;
+use std::{cell::Cell, rc::Rc};
 
 use adsr::{
     Adsr, AdsrStep, EarlyReleaseConfig, EarlyReleaseStrategy, GateStatus, RampFn,
@@ -1025,7 +1025,7 @@ pub enum ParamSource {
     ParamBuffer(usize),
     /// Built-in smoothing to prevent clicks and pops when sliders are dragged around in the UI
     Constant {
-        last_val: f32,
+        last_val: Cell<f32>,
         cur_val: f32,
     },
     /// The value of this parameter is determined by the output of a per-voice ADSR that is
@@ -1040,12 +1040,20 @@ pub enum ParamSource {
     /// Converts the provided number of beats into samples.  If the cur BPM is 60, that equates to
     /// 1 beat per second which comes out to 44_100 samples.
     BeatsToSamples(f32),
+    Random {
+        last_val: Cell<f32>,
+        samples_since_last_update: Cell<usize>,
+        min: f32,
+        max: f32,
+        update_interval_samples: usize,
+        smoothing_coefficient: f32,
+    },
 }
 
 impl ParamSource {
     pub fn new_constant(val: f32) -> Self {
         ParamSource::Constant {
-            last_val: val,
+            last_val: Cell::new(val),
             cur_val: val,
         }
     }
@@ -1059,8 +1067,29 @@ impl ParamSource {
                     last_val: old_last_val,
                     cur_val: old_cur_val,
                 } => {
-                    *old_last_val = *old_cur_val;
+                    old_last_val.set(*old_cur_val);
                     *old_cur_val = new_val;
+                },
+                other => *other = new,
+            },
+            ParamSource::Random {
+                min,
+                max,
+                update_interval_samples,
+                smoothing_coefficient,
+                ..
+            } => match self {
+                ParamSource::Random {
+                    min: old_min,
+                    max: old_max,
+                    update_interval_samples: old_update_interval_samples,
+                    smoothing_coefficient: old_smoothing_coefficient,
+                    ..
+                } => {
+                    *old_min = min;
+                    *old_max = max;
+                    *old_update_interval_samples = update_interval_samples;
+                    *old_smoothing_coefficient = smoothing_coefficient;
                 },
                 other => *other = new,
             },
@@ -1078,7 +1107,7 @@ pub struct RenderRawParams<'a> {
 impl Default for ParamSource {
     fn default() -> Self {
         ParamSource::Constant {
-            last_val: 0.,
+            last_val: Cell::new(0.),
             cur_val: 0.,
         }
     }
@@ -1106,11 +1135,13 @@ impl ParamSource {
 
                 raw
             },
-            ParamSource::Constant { last_val, cur_val } => dsp::one_pole(
-                unsafe { std::mem::transmute(last_val as *const _) },
-                *cur_val,
-                0.995,
-            ),
+            ParamSource::Constant { last_val, cur_val } => {
+                let mut state = last_val.get();
+                dsp::smooth(&mut state, *cur_val, 0.97);
+                let out = state;
+                last_val.set(out);
+                out
+            },
             ParamSource::PerVoiceADSR(AdsrState {
                 adsr_ix,
                 scale,
@@ -1142,6 +1173,31 @@ impl ParamSource {
                 let samples_per_beat = seconds_per_beat * SAMPLE_RATE as f32;
                 samples_per_beat * *beats
             },
+            ParamSource::Random {
+                last_val,
+                samples_since_last_update,
+                min,
+                max,
+                update_interval_samples,
+                smoothing_coefficient,
+            } => {
+                let cur_value = if samples_since_last_update.get() >= *update_interval_samples {
+                    samples_since_last_update.set(0);
+                    common::rng().gen_range(*min, *max)
+                } else {
+                    samples_since_last_update.set(samples_since_last_update.get() + 1);
+                    last_val.get()
+                };
+
+                if *smoothing_coefficient == 0. || *smoothing_coefficient == 1. {
+                    last_val.set(cur_value);
+                    return cur_value;
+                }
+                let mut state = last_val.get();
+                dsp::smooth(&mut state, cur_value, *smoothing_coefficient);
+                last_val.set(state);
+                state
+            },
         }
     }
 
@@ -1150,11 +1206,12 @@ impl ParamSource {
         value_param_int: usize,
         value_param_float: f32,
         value_param_float_2: f32,
+        value_param_float_3: f32,
     ) -> Self {
         match value_type {
             0 => ParamSource::ParamBuffer(value_param_int),
             1 => ParamSource::Constant {
-                last_val: value_param_float,
+                last_val: Cell::new(value_param_float),
                 cur_val: value_param_float,
             },
             2 => ParamSource::PerVoiceADSR(AdsrState {
@@ -1169,6 +1226,18 @@ impl ParamSource {
                 shift: value_param_float_2,
             },
             5 => ParamSource::BeatsToSamples(value_param_float),
+            6 => {
+                let (min, max) = (value_param_float, value_param_float_2);
+                let init = common::rng().gen_range(min, max);
+                ParamSource::Random {
+                    last_val: Cell::new(init),
+                    samples_since_last_update: Cell::new(0),
+                    min,
+                    max,
+                    update_interval_samples: value_param_int,
+                    smoothing_coefficient: value_param_float_3,
+                }
+            },
             _ => panic!("Invalid value type; expected [0,4]"),
         }
     }
@@ -1195,7 +1264,7 @@ impl ParamSource {
                 } else {
                     for i in 0..FRAME_SIZE {
                         output_buf[i] =
-                            dsp::one_pole(&mut *(last_val as *const _ as *mut _), *cur_val, 0.995);
+                            dsp::smooth(&mut *(last_val as *const _ as *mut _), *cur_val, 0.97);
                     }
                 }
             },
@@ -1273,6 +1342,31 @@ impl ParamSource {
                     unsafe { v128_store(base_output_ptr.add(i), splat) };
                 }
             },
+            ParamSource::Random {
+                last_val,
+                samples_since_last_update,
+                min,
+                max,
+                update_interval_samples,
+                smoothing_coefficient,
+            } => {
+                let cur_value = if samples_since_last_update.get() >= *update_interval_samples {
+                    samples_since_last_update.set(0);
+                    common::rng().gen_range(*min, *max)
+                } else {
+                    samples_since_last_update.set(samples_since_last_update.get() + 1);
+                    last_val.get()
+                };
+
+                if *smoothing_coefficient == 0. || *smoothing_coefficient == 1. {
+                    last_val.set(cur_value);
+                    return cur_value;
+                }
+                let mut state = last_val.get();
+                dsp::smooth(&mut state, cur_value, *smoothing_coefficient);
+                last_val.set(state);
+                state
+            },
         }
     }
 
@@ -1288,7 +1382,7 @@ impl ParamSource {
     ) {
         match self {
             ParamSource::Constant { last_val, cur_val } => {
-                let diff = (*cur_val - *last_val).abs();
+                let diff = (*cur_val - last_val.get()).abs();
                 if diff < 0.000001 {
                     for i in 0..FRAME_SIZE {
                         unsafe {
@@ -1296,13 +1390,11 @@ impl ParamSource {
                         };
                     }
                 } else {
+                    let mut state = last_val.get();
                     for i in 0..FRAME_SIZE {
-                        output_buf[i] = dsp::one_pole(
-                            unsafe { &mut *(last_val as *const _ as *mut _) },
-                            *cur_val,
-                            0.995,
-                        );
+                        output_buf[i] = dsp::smooth(&mut state, *cur_val, 0.97);
                     }
+                    last_val.set(state);
                 }
             },
             ParamSource::ParamBuffer(buffer_ix) => {
@@ -1355,6 +1447,37 @@ impl ParamSource {
                         *output_buf.get_unchecked_mut(i) = samples;
                     };
                 }
+            },
+            ParamSource::Random {
+                last_val,
+                samples_since_last_update,
+                min,
+                max,
+                update_interval_samples,
+                smoothing_coefficient,
+            } => {
+                let (min, max, update_interval_samples, smoothing_coefficient) =
+                    (*min, *max, *update_interval_samples, *smoothing_coefficient);
+                let mut state = last_val.get();
+                let mut samples_since_last_update_local = samples_since_last_update.get();
+                for i in 0..FRAME_SIZE {
+                    let new_val = if samples_since_last_update_local >= update_interval_samples {
+                        samples_since_last_update_local = 1;
+                        common::rng().gen_range(min, max)
+                    } else {
+                        samples_since_last_update_local += 1;
+                        state
+                    };
+
+                    if smoothing_coefficient != 0. && smoothing_coefficient != 1. {
+                        output_buf[i] = dsp::smooth(&mut state, new_val, smoothing_coefficient);
+                    } else {
+                        output_buf[i] = new_val;
+                        state = new_val;
+                    }
+                }
+                last_val.set(state);
+                samples_since_last_update.set(samples_since_last_update_local);
             },
         }
     }
@@ -1552,12 +1675,14 @@ pub unsafe extern "C" fn fm_synth_set_modulation_index(
     val_param_int: usize,
     val_param_float: f32,
     val_param_float_2: f32,
+    val_param_float_3: f32,
 ) {
     let param = ParamSource::from_parts(
         value_type,
         val_param_int,
         val_param_float,
         val_param_float_2,
+        val_param_float_3,
     );
     (*ctx).modulation_matrix.weights_per_operator[src_operator_ix][dst_operator_ix].replace(param);
 
@@ -1572,12 +1697,14 @@ pub unsafe extern "C" fn fm_synth_set_output_weight_value(
     val_param_int: usize,
     val_param_float: f32,
     val_param_float_2: f32,
+    val_param_float_3: f32,
 ) {
     let param = ParamSource::from_parts(
         value_type,
         val_param_int,
         val_param_float,
         val_param_float_2,
+        val_param_float_3,
     );
     (*ctx).modulation_matrix.output_weights[operator_ix].replace(param);
 
@@ -1598,22 +1725,27 @@ fn build_oscillator_source(
     param_0_val_int: usize,
     param_0_val_float: f32,
     param_0_val_float_2: f32,
+    param_0_val_float_3: f32,
     param_1_value_type: usize,
     param_1_val_int: usize,
     param_1_val_float: f32,
     param_1_val_float_2: f32,
+    param_1_val_float_3: f32,
     param_2_value_type: usize,
     param_2_val_int: usize,
     param_2_val_float: f32,
     param_2_val_float_2: f32,
+    param_2_val_float_3: f32,
     param_3_value_type: usize,
     param_3_val_int: usize,
     param_3_val_float: f32,
     param_3_val_float_2: f32,
+    param_3_val_float_3: f32,
     param_4_value_type: usize,
     param_4_val_int: usize,
     param_4_val_float: f32,
     param_4_val_float_2: f32,
+    param_4_val_float_3: f32,
     old_phases: &[f32],
 ) -> OscillatorSource {
     match operator_type {
@@ -1625,18 +1757,21 @@ fn build_oscillator_source(
                 param_1_val_int,
                 param_1_val_float,
                 param_1_val_float_2,
+                param_1_val_float_3,
             ),
             dim_1_intra_mix: ParamSource::from_parts(
                 param_2_value_type,
                 param_2_val_int,
                 param_2_val_float,
                 param_2_val_float_2,
+                param_2_val_float_3,
             ),
             inter_dim_mix: ParamSource::from_parts(
                 param_3_value_type,
                 param_3_val_int,
                 param_3_val_float,
                 param_3_val_float_2,
+                param_3_val_float_3,
             ),
         }),
         1 => OscillatorSource::ParamBuffer(param_0_val_int),
@@ -1650,6 +1785,7 @@ fn build_oscillator_source(
                 param_0_val_int,
                 param_0_val_float,
                 param_0_val_float_2,
+                param_0_val_float_3,
             ),
         }),
         4 => OscillatorSource::Square(SquareOscillator {
@@ -1669,6 +1805,7 @@ fn build_oscillator_source(
                 param_4_val_int,
                 param_4_val_float,
                 param_4_val_float_2,
+                param_4_val_float_3,
             ),
             oscillators: initialize_phases(old_phases, vec![SineOscillator { phase: 0. }; unison]),
         }),
@@ -1678,6 +1815,7 @@ fn build_oscillator_source(
                 param_4_val_int,
                 param_4_val_float,
                 param_4_val_float_2,
+                param_4_val_float_3,
             ),
             oscillators: initialize_phases(old_phases, vec![
                 WaveTableHandle {
@@ -1688,18 +1826,21 @@ fn build_oscillator_source(
                         param_1_val_int,
                         param_1_val_float,
                         param_1_val_float_2,
+                        param_1_val_float_3,
                     ),
                     dim_1_intra_mix: ParamSource::from_parts(
                         param_2_value_type,
                         param_2_val_int,
                         param_2_val_float,
                         param_2_val_float_2,
+                        param_2_val_float_3,
                     ),
                     inter_dim_mix: ParamSource::from_parts(
                         param_3_value_type,
                         param_3_val_int,
                         param_3_val_float,
                         param_3_val_float_2,
+                        param_3_val_float_3,
                     ),
                 };
                 unison
@@ -1711,6 +1852,7 @@ fn build_oscillator_source(
                 param_4_val_int,
                 param_4_val_float,
                 param_4_val_float_2,
+                param_4_val_float_3,
             ),
             oscillators: initialize_phases(old_phases, vec![
                 SquareOscillator { phase: 0. };
@@ -1723,6 +1865,7 @@ fn build_oscillator_source(
                 param_4_val_int,
                 param_4_val_float,
                 param_4_val_float_2,
+                param_4_val_float_3,
             ),
             oscillators: initialize_phases(old_phases, vec![
                 TriangleOscillator { phase: 0. };
@@ -1735,6 +1878,7 @@ fn build_oscillator_source(
                 param_4_val_int,
                 param_4_val_float,
                 param_4_val_float_2,
+                param_4_val_float_3,
             ),
             oscillators: initialize_phases(old_phases, vec![
                 SawtoothOscillator { phase: 0. };
@@ -1756,22 +1900,27 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     param_0_val_int: usize,
     param_0_val_float: f32,
     param_0_val_float_2: f32,
+    param_0_val_float_3: f32,
     param_1_value_type: usize,
     param_1_val_int: usize,
     param_1_val_float: f32,
     param_1_val_float_2: f32,
+    param_1_val_float_3: f32,
     param_2_value_type: usize,
     param_2_val_int: usize,
     param_2_val_float: f32,
     param_2_val_float_2: f32,
+    param_2_val_float_3: f32,
     param_3_value_type: usize,
     param_3_val_int: usize,
     param_3_val_float: f32,
     param_3_val_float_2: f32,
+    param_3_val_float_3: f32,
     param_4_value_type: usize,
     param_4_val_int: usize,
     param_4_val_float: f32,
     param_4_val_float_2: f32,
+    param_4_val_float_3: f32,
 ) {
     for voice in &mut (*ctx).voices {
         let operator = &mut voice.operators[operator_ix];
@@ -1783,22 +1932,27 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
             param_0_val_int,
             param_0_val_float,
             param_0_val_float_2,
+            param_0_val_float_3,
             param_1_value_type,
             param_1_val_int,
             param_1_val_float,
             param_1_val_float_2,
+            param_1_val_float_3,
             param_2_value_type,
             param_2_val_int,
             param_2_val_float,
             param_2_val_float_2,
+            param_2_val_float_3,
             param_3_value_type,
             param_3_val_int,
             param_3_val_float,
             param_3_val_float_2,
+            param_3_val_float_3,
             param_4_value_type,
             param_4_val_int,
             param_4_val_float,
             param_4_val_float_2,
+            param_4_val_float_3,
             &old_phases,
         );
         operator.randomize_start_phases = unison_phase_randomization_enabled;
@@ -1813,12 +1967,14 @@ pub unsafe extern "C" fn fm_synth_set_operator_base_frequency_source(
     value_param_int: usize,
     value_param_float: f32,
     val_param_float_2: f32,
+    val_param_float_3: f32,
 ) {
     let param = ParamSource::from_parts(
         value_type,
         value_param_int,
         value_param_float,
         val_param_float_2,
+        val_param_float_3,
     );
     (*ctx).operator_base_frequency_sources[operator_ix] = param;
 }
@@ -1830,6 +1986,7 @@ pub unsafe extern "C" fn fm_synth_set_detune(
     param_int_val: usize,
     param_float_val: f32,
     param_float_val_2: f32,
+    param_float_val_3: f32,
 ) {
     if param_type < 0 {
         (*ctx).detune = None;
@@ -1840,6 +1997,7 @@ pub unsafe extern "C" fn fm_synth_set_detune(
         param_int_val,
         param_float_val,
         param_float_val_2,
+        param_float_val_3,
     );
     match &mut (*ctx).detune {
         Some(old_detune) => old_detune.replace(param),
@@ -1857,18 +2015,22 @@ pub unsafe extern "C" fn fm_synth_set_effect(
     param_1_int_val: usize,
     param_1_float_val: f32,
     param_1_float_val_2: f32,
+    param_1_float_val_3: f32,
     param_2_type: usize,
     param_2_int_val: usize,
     param_2_float_val: f32,
     param_2_float_val_2: f32,
+    param_2_float_val_3: f32,
     param_3_type: usize,
     param_3_int_val: usize,
     param_3_float_val: f32,
     param_3_float_val_2: f32,
+    param_3_float_val_3: f32,
     param_4_type: usize,
     param_4_int_val: usize,
     param_4_float_val: f32,
     param_4_float_val_2: f32,
+    param_4_float_val_3: f32,
     is_bypassed: bool,
 ) {
     for voice in &mut (*ctx).voices {
@@ -1888,18 +2050,22 @@ pub unsafe extern "C" fn fm_synth_set_effect(
                 param_1_int_val,
                 param_1_float_val,
                 param_1_float_val_2,
+                param_1_float_val_3,
                 param_2_type,
                 param_2_int_val,
                 param_2_float_val,
                 param_2_float_val_2,
+                param_2_float_val_3,
                 param_3_type,
                 param_3_int_val,
                 param_3_float_val,
                 param_3_float_val_2,
+                param_3_float_val_3,
                 param_4_type,
                 param_4_int_val,
                 param_4_float_val,
                 param_4_float_val_2,
+                param_4_float_val_3,
                 is_bypassed,
             );
         }
@@ -1981,6 +2147,7 @@ pub unsafe extern "C" fn set_adsr(
     len_samples_int_val: usize,
     len_samples_float_val: f32,
     len_samples_float_val_2: f32,
+    len_samples_float_val_3: f32,
     release_start_phase: f32,
     loop_point: f32,
     log_scale: bool,
@@ -2008,6 +2175,7 @@ pub unsafe extern "C" fn set_adsr(
                 len_samples_int_val,
                 len_samples_float_val,
                 len_samples_float_val_2,
+                len_samples_float_val_3,
             ),
         };
 
@@ -2068,12 +2236,14 @@ pub unsafe extern "C" fn set_adsr_length(
     len_samples_int_val: usize,
     len_samples_float_val: f32,
     len_samples_float_val_2: f32,
+    len_samples_float_val_3: f32,
 ) {
     let param = ParamSource::from_parts(
         len_samples_type,
         len_samples_int_val,
         len_samples_float_val,
         len_samples_float_val_2,
+        len_samples_float_val_3,
     );
 
     if adsr_ix < 0 {
