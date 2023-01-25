@@ -1254,7 +1254,7 @@ impl ParamSource {
     ) {
         match self {
             ParamSource::Constant { last_val, cur_val } => unsafe {
-                let diff = (*cur_val - *last_val).abs();
+                let diff = (*cur_val - *last_val.get()).abs();
                 if diff < 0.000001 {
                     let splat = f32x4_splat(*cur_val);
                     let base_output_ptr = output_buf.as_ptr() as *mut v128;
@@ -1262,10 +1262,11 @@ impl ParamSource {
                         v128_store(base_output_ptr.add(i), splat);
                     }
                 } else {
+                    let mut state = last_val.get();
                     for i in 0..FRAME_SIZE {
-                        output_buf[i] =
-                            dsp::smooth(&mut *(last_val as *const _ as *mut _), *cur_val, 0.97);
+                        output_buf[i] = dsp::smooth(&mut state, *cur_val, 0.97);
                     }
+                    last_val.set(state);
                 }
             },
             ParamSource::ParamBuffer(buffer_ix) => {
