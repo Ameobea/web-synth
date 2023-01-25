@@ -1254,7 +1254,7 @@ impl ParamSource {
     ) {
         match self {
             ParamSource::Constant { last_val, cur_val } => unsafe {
-                let diff = (*cur_val - *last_val.get()).abs();
+                let diff = (*cur_val - last_val.get()).abs();
                 if diff < 0.000001 {
                     let splat = f32x4_splat(*cur_val);
                     let base_output_ptr = output_buf.as_ptr() as *mut v128;
@@ -1351,22 +1351,28 @@ impl ParamSource {
                 update_interval_samples,
                 smoothing_coefficient,
             } => {
-                let cur_value = if samples_since_last_update.get() >= *update_interval_samples {
-                    samples_since_last_update.set(0);
-                    common::rng().gen_range(*min, *max)
-                } else {
-                    samples_since_last_update.set(samples_since_last_update.get() + 1);
-                    last_val.get()
-                };
-
-                if *smoothing_coefficient == 0. || *smoothing_coefficient == 1. {
-                    last_val.set(cur_value);
-                    return cur_value;
-                }
+                let (min, max, update_interval_samples, smoothing_coefficient) =
+                    (*min, *max, *update_interval_samples, *smoothing_coefficient);
                 let mut state = last_val.get();
-                dsp::smooth(&mut state, cur_value, *smoothing_coefficient);
+                let mut samples_since_last_update_local = samples_since_last_update.get();
+                for i in 0..FRAME_SIZE {
+                    let new_val = if samples_since_last_update_local >= update_interval_samples {
+                        samples_since_last_update_local = 1;
+                        common::rng().gen_range(min, max)
+                    } else {
+                        samples_since_last_update_local += 1;
+                        state
+                    };
+
+                    if smoothing_coefficient != 0. && smoothing_coefficient != 1. {
+                        output_buf[i] = dsp::smooth(&mut state, new_val, smoothing_coefficient);
+                    } else {
+                        output_buf[i] = new_val;
+                        state = new_val;
+                    }
+                }
                 last_val.set(state);
-                state
+                samples_since_last_update.set(samples_since_last_update_local);
             },
         }
     }
