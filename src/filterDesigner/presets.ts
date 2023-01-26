@@ -53,6 +53,24 @@ export const buildOTTBandSplitterPreset = () => {
   };
 };
 
+const buildHighOrderBandpassFilters = (
+  order: number,
+  bandwidthHz: number,
+  centerFreqHz: number
+) => {
+  const highPassFreq = centerFreqHz - bandwidthHz / 2;
+  const lowPassFreq = centerFreqHz + bandwidthHz / 2;
+
+  const lowPasses = computeHigherOrderBiquadQFactors(order).map(q =>
+    buildDefaultFilter(FilterType.Lowpass, q, lowPassFreq)
+  );
+  const highPasses = computeHigherOrderBiquadQFactors(order).map(q =>
+    buildDefaultFilter(FilterType.Highpass, q, highPassFreq)
+  );
+
+  return [...lowPasses, ...highPasses];
+};
+
 const buildFilterDesignerPresets = (): FilterDesignerPreset[] => [
   {
     name: 'init',
@@ -115,6 +133,54 @@ const buildFilterDesignerPresets = (): FilterDesignerPreset[] => [
         computeHigherOrderBiquadQFactors(16).map(q => buildDefaultFilter(FilterType.Highpass, q)),
       ],
       lockedFrequencyByGroup: [440],
+    },
+  },
+  {
+    name: 'order 4 BP',
+    preset: {
+      filterGroups: [
+        computeHigherOrderBiquadQFactors(4).map(q => buildDefaultFilter(FilterType.Bandpass, q)),
+      ],
+      lockedFrequencyByGroup: [440],
+    },
+  },
+  {
+    name: 'order 8 BP',
+    preset: {
+      filterGroups: [
+        computeHigherOrderBiquadQFactors(8).map(q => buildDefaultFilter(FilterType.Bandpass, q)),
+      ],
+      lockedFrequencyByGroup: [440],
+    },
+  },
+  {
+    name: 'order 16 BP',
+    preset: {
+      filterGroups: [
+        computeHigherOrderBiquadQFactors(16).map(q => buildDefaultFilter(FilterType.Bandpass, q)),
+      ],
+      lockedFrequencyByGroup: [440],
+    },
+  },
+  {
+    name: 'order 4 composite BP 4khz bandwidth',
+    preset: {
+      filterGroups: [buildHighOrderBandpassFilters(4, 4000, 2200)],
+      lockedFrequencyByGroup: [null],
+    },
+  },
+  {
+    name: 'order 16 composite BP 2khz bandwidth',
+    preset: {
+      filterGroups: [buildHighOrderBandpassFilters(16, 2000, 1050)],
+      lockedFrequencyByGroup: [null],
+    },
+  },
+  {
+    name: 'order 16 composite BP 200hz bandwidth',
+    preset: {
+      filterGroups: [buildHighOrderBandpassFilters(16, 200, 13000)],
+      lockedFrequencyByGroup: [null],
     },
   },
   {

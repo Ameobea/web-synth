@@ -1,12 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 
-const CustomBiquadFilterNodeSmallView: React.FC<{
+interface CustomBiquadFilterNodeSmallViewProps {
   node: ForeignNode<BiquadFilterNode>;
-}> = ({ node }) => {
+}
+
+const CustomBiquadFilterNodeSmallView: React.FC<CustomBiquadFilterNodeSmallViewProps> = ({
+  node,
+}) => {
   const [renderIx, setRenderIx] = useState(0);
   const params = {
     ...node.serialize(),
@@ -15,7 +19,7 @@ const CustomBiquadFilterNodeSmallView: React.FC<{
 
   const settings = useMemo(
     () =>
-      getSettingsForFilterType(params.type, false).map(setting => ({
+      getSettingsForFilterType({ filterType: params.type, includeADSR: false }).map(setting => ({
         ...setting,
         initial: undefined,
       })),

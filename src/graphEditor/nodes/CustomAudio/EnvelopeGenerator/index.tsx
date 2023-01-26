@@ -63,6 +63,7 @@ export class EnvelopeGenerator implements ForeignNode {
           debugName: 'EnvelopeGenerator constructor',
         }).steps,
         releaseStartPhase: 0.978,
+        logScale: true,
       },
       1
     );

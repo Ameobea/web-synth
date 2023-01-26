@@ -64,7 +64,12 @@ const FilterInstInner: React.FC<FilterInstProps> = ({
   onDelete,
 }) => {
   const settings = useMemo(() => {
-    const settings = getSettingsForFilterType(params.type, false, false);
+    const settings = getSettingsForFilterType({
+      filterType: params.type,
+      includeADSR: false,
+      includeBypass: false,
+      includeNonPrimitiveFilterTypes: false,
+    });
     return frequencyLocked ? settings.filter(setting => setting.label !== 'frequency') : settings;
   }, [params.type, frequencyLocked]);
   const state = useMemo(
@@ -336,23 +341,28 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
     [inst, setState]
   );
 
-  const settings = useMemo(
-    () => [
+  const settings = useMemo(() => {
+    const buildAndSetDefaultFilter = (state: FilterDesignerState) => {
+      const newFilter = new BiquadFilterNode(ctx);
+      const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
+      const oaps = {
+        frequency: new OverridableAudioParam(ctx, newFilter.frequency, undefined, true),
+        detune: new OverridableAudioParam(ctx, newFilter.detune, undefined, true),
+        Q: new OverridableAudioParam(ctx, newFilter.Q, undefined, true),
+        gain: new OverridableAudioParam(ctx, newFilter.gain, undefined, true),
+      };
+      setFilter(newFilter, oaps, params, state.lockedFrequencyByGroup[groupIx]);
+      return { newFilter, params, oaps };
+    };
+
+    return [
       {
         type: 'button',
         label: 'add filter',
         action: () => {
           setState(state => {
             disconnectFilterChain(state.filterGroups[groupIx].map(g => g.filter));
-            const newFilter = new BiquadFilterNode(ctx);
-            const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
-            const oaps = {
-              frequency: new OverridableAudioParam(ctx, newFilter.frequency, undefined, true),
-              detune: new OverridableAudioParam(ctx, newFilter.detune, undefined, true),
-              Q: new OverridableAudioParam(ctx, newFilter.Q, undefined, true),
-              gain: new OverridableAudioParam(ctx, newFilter.gain, undefined, true),
-            };
-            setFilter(newFilter, oaps, params, state.lockedFrequencyByGroup[groupIx]);
+            const { newFilter, params, oaps } = buildAndSetDefaultFilter(state);
             const newState = R.set(
               R.lensPath(['filterGroups', groupIx]),
               [
@@ -367,9 +377,27 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
           });
         },
       },
-    ],
-    [groupIx, setState, updateConnectables]
-  );
+      {
+        type: 'button',
+        label: 'add filter group',
+        action: () => {
+          setState(state => {
+            const { newFilter, params, oaps } = buildAndSetDefaultFilter(state);
+            const newState = {
+              ...state,
+              filterGroups: [
+                ...state.filterGroups,
+                [{ filter: newFilter, params, id: btoa(Math.random().toString()), oaps }],
+              ],
+            };
+            connectFilterChain(newState.filterGroups[groupIx].map(g => g.filter));
+            updateConnectables?.(newState);
+            return newState;
+          });
+        },
+      },
+    ];
+  }, [groupIx, setState, updateConnectables]);
 
   // Locked frequency isn't actually depended upon by the individual filter instances' UIs, but its value is needed
   // when toggling params so we pass through a static function that gets the current value to avoid re-rendering

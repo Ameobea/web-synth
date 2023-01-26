@@ -316,7 +316,7 @@ const buildDefaultFilterModule = (
 
 const buildDefaultFilterEnvelope = (audioThreadData: AudioThreadData): Adsr => {
   const envelope = buildDefaultADSR2Envelope(audioThreadData);
-  envelope.logScale = false;
+  envelope.logScale = true;
   return envelope;
 };
 

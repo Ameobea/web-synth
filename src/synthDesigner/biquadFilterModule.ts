@@ -4,6 +4,7 @@ import * as R from 'ramda';
 import { connectFilterChain } from 'src/filterDesigner/util';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { DynaBandpassFilterWrapper } from 'src/synthDesigner/DynaBandPassFilter';
 import { FilterType } from 'src/synthDesigner/filterHelpers';
 import { linearToDb } from 'src/util';
 
@@ -28,17 +29,17 @@ export interface FilterCSNs {
 export declare class AbstractFilterModule {
   constructor(ctx: AudioContext, type: FilterType, params: FilterParams, csns: FilterCSNs);
 
-  public getInput(): BiquadFilterNode;
-  public getOutput(): BiquadFilterNode;
+  public getInput(): AudioNode;
+  public getOutput(): AudioNode;
 
   public getFrequencyParams(): AudioParam[];
 
   public destroy(): void;
 }
 
-const buildConnectedFilterChain = (
+export const buildConnectedFilterChain = (
   ctx: AudioContext,
-  type: FilterType.Highpass | FilterType.Lowpass,
+  type: FilterType.Highpass | FilterType.Lowpass | FilterType.Bandpass,
   qFactors: number[]
 ): BiquadFilterNode[] => {
   const chain = qFactors.map(q => {
@@ -101,7 +102,27 @@ export class HigherOrderBiquadFilter implements AbstractFilterModule {
           computeHigherOrderBiquadQFactors(16)
         );
       }
-
+      case FilterType.BP4: {
+        return buildConnectedFilterChain(
+          this.ctx,
+          FilterType.Bandpass,
+          computeHigherOrderBiquadQFactors(4)
+        );
+      }
+      case FilterType.BP8: {
+        return buildConnectedFilterChain(
+          this.ctx,
+          FilterType.Bandpass,
+          computeHigherOrderBiquadQFactors(8)
+        );
+      }
+      case FilterType.BP16: {
+        return buildConnectedFilterChain(
+          this.ctx,
+          FilterType.Bandpass,
+          computeHigherOrderBiquadQFactors(16)
+        );
+      }
       default: {
         throw new UnreachableException('must supply higher order filter type to this class');
       }
@@ -223,8 +244,19 @@ export const buildAbstractFilterModule = (
     case FilterType.LP16:
     case FilterType.HP4:
     case FilterType.HP8:
-    case FilterType.HP16: {
+    case FilterType.HP16:
+    case FilterType.BP4:
+    case FilterType.BP8:
+    case FilterType.BP16: {
       return new HigherOrderBiquadFilter(ctx, type, csns);
+    }
+
+    case FilterType.DynaBP_50:
+    case FilterType.DynaBP_100:
+    case FilterType.DynaBP_200:
+    case FilterType.DynaBP_400:
+    case FilterType.DynaBP_800: {
+      return new DynaBandpassFilterWrapper(type, csns.frequency);
     }
 
     default: {

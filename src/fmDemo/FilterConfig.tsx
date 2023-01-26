@@ -148,13 +148,13 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
 
   const settings = useMemo(
     () =>
-      getSettingsForFilterType(
-        state.params.type,
-        { adsrAudioThreadData },
-        true,
+      getSettingsForFilterType({
+        filterType: state.params.type,
+        includeADSR: { adsrAudioThreadData },
+        includeBypass: true,
         vcId,
-        adsrDebugName
-      )
+        adsrDebugName,
+      })
         .filter(s => {
           if (!state.enableADSR && (s.label === 'adsr' || s.label === 'adsr length ms')) {
             return false;
@@ -173,7 +173,7 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
     () => ({
       ...state.params,
       'enable envelope': state.enableADSR,
-      adsr: { ...state.envelope, outputRange: [80, 44_100 / 2] },
+      adsr: { ...state.envelope, outputRange: [20, 44_100 / 2] },
       bypass: state.bypass,
       'adsr length ms': R.clamp(0, 10000, samplesToMs(state.envelope.lenSamples)),
     }),

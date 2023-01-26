@@ -18,12 +18,40 @@ export enum FilterType {
   HP8 = 'order 8 highpass',
   HP16 = 'order 16 highpass',
   Bandpass = 'bandpass',
+  BP4 = 'order 4 bandpass',
+  BP8 = 'order 8 bandpass',
+  BP16 = 'order 16 bandpass',
+  DynaBP_50 = 'dynamic bandpass (50 Hz)',
+  DynaBP_100 = 'dynamic bandpass (100 Hz)',
+  DynaBP_200 = 'dynamic bandpass (200 Hz)',
+  DynaBP_400 = 'dynamic bandpass (400 Hz)',
+  DynaBP_800 = 'dynamic bandpass (800 Hz)',
   Lowshelf = 'lowshelf',
   Highshelf = 'highshelf',
   Peaking = 'peaking',
   Notch = 'notch',
   Allpass = 'allpass',
 }
+
+/**
+ * @returns `true` if the filter type is a primitive filter type (one which is natively supported by WebAudio's
+ *          `BiquadFilterNode`), `false` otherwise.
+ */
+export const isFilterTypePrimitive = (filterType: FilterType) => {
+  switch (filterType) {
+    case FilterType.Lowpass:
+    case FilterType.Highpass:
+    case FilterType.Bandpass:
+    case FilterType.Lowshelf:
+    case FilterType.Highshelf:
+    case FilterType.Peaking:
+    case FilterType.Notch:
+    case FilterType.Allpass:
+      return true;
+    default:
+      return false;
+  }
+};
 
 interface CustomQSettingProps {
   value: number;
@@ -52,7 +80,7 @@ const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
       label='Q'
       onChange={wrappedOnChange}
       value={linearQ}
-      min={0.01}
+      min={0.3}
       max={30}
       steps={300}
       scale='log'
@@ -63,7 +91,8 @@ const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
 const buildFilterSettings = (
   includeADSR: boolean,
   adsrDebugName?: string,
-  adsrAudioThreadData?: AudioThreadData
+  adsrAudioThreadData?: AudioThreadData,
+  includeNonPrimitiveFilterTypes?: boolean
 ) => ({
   bypass: {
     label: 'bypass',
@@ -73,7 +102,9 @@ const buildFilterSettings = (
   type: {
     type: 'select',
     label: 'type',
-    options: Object.values(FilterType),
+    options: includeNonPrimitiveFilterTypes
+      ? Object.values(FilterType)
+      : Object.values(FilterType).filter(isFilterTypePrimitive),
     initial: FilterType.Lowpass,
   },
   detune: {
@@ -118,20 +149,36 @@ const buildFilterSettings = (
             adsrAudioThreadData ?? { phaseIndex: 0, debugName: 'buildFilterSettings' }
           ),
           outputRange: [0, 20_000],
+          logScale: true,
         },
         Comp: mkControlPanelADSR2WithSize(500, 320, undefined, adsrDebugName),
       }
     : { label: 'adsr' },
 });
 
-export const getSettingsForFilterType = (
-  filterType: FilterType,
-  includeADSR: false | { adsrAudioThreadData?: AudioThreadData },
+interface GetSettingsForFilterTypeArgs {
+  filterType: FilterType;
+  includeADSR: false | { adsrAudioThreadData?: AudioThreadData };
+  includeBypass?: boolean;
+  vcId?: string;
+  adsrDebugName?: string;
+  includeNonPrimitiveFilterTypes?: boolean;
+}
+
+export const getSettingsForFilterType = ({
+  filterType,
+  includeADSR,
   includeBypass = true,
-  vcId?: string,
-  adsrDebugName?: string
-) => {
-  const filterSettings = buildFilterSettings(!!includeADSR, adsrDebugName);
+  vcId,
+  adsrDebugName,
+  includeNonPrimitiveFilterTypes = true,
+}: GetSettingsForFilterTypeArgs) => {
+  const filterSettings = buildFilterSettings(
+    !!includeADSR,
+    adsrDebugName,
+    undefined,
+    includeNonPrimitiveFilterTypes
+  );
   return R.clone(
     filterNils([
       includeBypass ? filterSettings.bypass : null,
@@ -174,16 +221,16 @@ export const getSettingsForFilterType = (
 };
 
 export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
-  getSettingsForFilterType(
+  getSettingsForFilterType({
     filterType,
-    false,
-    false,
-    undefined,
-    'getDefaultFilterParams SHOULD NOT SHOW UP'
-  ).reduce((acc, { label, initial }) => ({ ...acc, [label]: initial }), {}) as FilterParams;
+    includeADSR: false,
+    includeBypass: false,
+    vcId: undefined,
+    adsrDebugName: 'getDefaultFilterParams SHOULD NOT SHOW UP',
+  }).reduce((acc, { label, initial }) => ({ ...acc, [label]: initial }), {}) as FilterParams;
 
 export const buildDefaultFilter = (
-  type: FilterType.Lowpass | FilterType.Highpass,
+  type: FilterType.Lowpass | FilterType.Highpass | FilterType.Bandpass,
   Q: number,
   frequency?: number
 ) => ({

@@ -61,8 +61,8 @@ const FilterEnvelopeControls: React.FC<FilterEnvelopeControlsProps> = ({
               debugName: 'No audio thread data in synth designer `filterEnvelope`',
             }
           ),
-          outputRange: [80, 20_000],
-          logScale: false,
+          outputRange: [20, 20_000],
+          logScale: true,
         },
         Comp: ADSRControlsComp,
       },
@@ -152,7 +152,12 @@ export const Filter: React.FC<FilterProps> = ({
   const vcId = stateKey.split('_')[1];
   const settings = useMemo(
     () => [
-      ...getSettingsForFilterType(params.type, false, undefined, vcId),
+      ...getSettingsForFilterType({
+        filterType: params.type,
+        includeADSR: false,
+        includeBypass: undefined,
+        vcId,
+      }),
       { type: 'checkbox', label: 'enable envelope', initial: true },
     ],
     [params.type, vcId]
