@@ -329,7 +329,7 @@ const buildDefaultSynthModule = (
   fmSynth?: FMSynth
 ): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
-  const { filterParams } = buildDefaultFilterModule(filterType, filterCSNs);
+  const filterParams = getDefaultFilterParams(filterType);
 
   // Start the filter ADSR module and configure it to modulate the voice's filter node's frequency
   const filterADSRModule = new ADSR2Module(
@@ -383,6 +383,8 @@ const buildDefaultSynthModule = (
 
   if (inst.filterEnvelopeEnabled) {
     connectFilterADSRToFrequencyParams(inst.voices, inst.filterADSRModule, inst.filterCSNs);
+  } else {
+    disconnectFilterADSRFromFrequencyParams(inst.voices, inst.filterADSRModule, inst.filterCSNs);
   }
 
   return inst;

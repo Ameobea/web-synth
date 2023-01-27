@@ -41,6 +41,12 @@ class DynaBandpassFilterAWP extends AudioWorkletProcessor {
     ];
   }
 
+  constructor() {
+    super();
+
+    this.lastFrequency = 0;
+  }
+
   /**
    *
    * @param {Float32Array[][]} _inputs
@@ -55,22 +61,26 @@ class DynaBandpassFilterAWP extends AudioWorkletProcessor {
       return true;
     }
 
-    const baseFrequency = params.center_frequency;
+    const baseFrequencies = params.center_frequency;
     const baseBandWidth = params.base_band_width[0];
+    let frequency = this.lastFrequency;
 
     for (let i = 0; i < FRAME_SIZE; i++) {
-      const frequency = baseFrequency.length === 1 ? baseFrequency[0] : baseFrequency[i];
+      const rawFrequency = baseFrequencies.length === 1 ? baseFrequencies[0] : baseFrequencies[i];
+      // low-pass filter frequency to prevent clicks and glitches
+      frequency = 0.95 * frequency + 0.05 * rawFrequency;
       const bandWidth = computeModifiedBandWidth(10, baseBandWidth, frequency);
       const highPassFrequency = clamp(frequency - bandWidth / 2, 10, SAMPLE_RATE / 2);
       const lowPassFrequency = clamp(frequency + bandWidth / 2, 10, SAMPLE_RATE / 2);
       lowPassOutput[i] = lowPassFrequency;
       highPassOutput[i] = highPassFrequency;
 
-      if (i === 0) {
-        console.log({ params, frequency, bandWidth, lowPassFrequency, highPassFrequency });
-      }
+      // if (i === 0) {
+      //   console.log({ params, frequency, bandWidth, lowPassFrequency, highPassFrequency });
+      // }
     }
 
+    this.lastFrequency = frequency;
     return true;
   }
 }

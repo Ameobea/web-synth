@@ -90,7 +90,6 @@ export class DynaBandPassFilter {
       throw new Error('DynaBandPassFilter not yet initialized');
     }
 
-    (this.awpHandle.parameters as Map<string, AudioParam>).get('center_frequency')!.value = 0.1;
     return (this.awpHandle.parameters as Map<string, AudioParam>).get('center_frequency')!;
   }
 
@@ -168,7 +167,6 @@ export class DynaBandpassFilterWrapper implements AbstractFilterModule {
       frequency.connect(this.inner.getCenterFrequencyParam());
 
       this.output.gain.value = 1;
-      console.log('DynaBandpassFilterWrapper initialized');
     });
   }
 
