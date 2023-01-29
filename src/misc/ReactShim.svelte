@@ -3,8 +3,8 @@
   import { createRoot } from 'react-dom/client';
   import { onDestroy } from 'svelte';
 
-  export let Component: React.Component;
-  export let props = {};
+  export let Component: React.Component<any>;
+  export let props = {} as Record<string, any>;
 
   let container: HTMLDivElement | null = null;
   $: root = container ? createRoot(container) : null;

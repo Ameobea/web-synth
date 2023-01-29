@@ -1,4 +1,4 @@
-import { get, writable, type Writable } from 'svelte/store';
+import { get, writable, type Unsubscriber, type Writable } from 'svelte/store';
 
 import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -6,17 +6,15 @@ import { get_midi_editor_audio_connectables } from 'src/midiEditor';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { ADSR2Module, type ADSR2Params } from 'src/synthDesigner/ADSRModule';
 
-export interface CVOutputUIState {
-  isExpanded: boolean;
-}
-
-export interface SerializedCVOutputState {
+export interface CVOutputState {
   name: string;
   adsr: Adsr;
   minValue: number;
   maxValue: number;
-  uiState: CVOutputUIState;
+  isExpanded: boolean;
 }
+
+export type SerializedCVOutputState = CVOutputState;
 
 export const buildDefaultCVOutputState = (
   midiEditorVcId: string,
@@ -41,7 +39,7 @@ export const buildDefaultCVOutputState = (
   },
   minValue: 0,
   maxValue: 1,
-  uiState: { isExpanded: true },
+  isExpanded: true,
 });
 
 export class CVOutput {
@@ -49,10 +47,9 @@ export class CVOutput {
   public backend: ADSR2Module;
   private ctx: AudioContext;
   public dummyOutput: DummyNode = new DummyNode('MIDI editor CV dummy output');
+  private onChangeUnsub: Unsubscriber;
 
-  public uiState: Writable<CVOutputUIState>;
-  private minValue: number;
-  private maxValue: number;
+  public state: Writable<CVOutputState>;
 
   constructor(
     ctx: AudioContext,
@@ -63,9 +60,7 @@ export class CVOutput {
     this.ctx = ctx;
     this.name = name;
 
-    this.uiState = writable(state.uiState);
-    this.minValue = state.minValue;
-    this.maxValue = state.maxValue;
+    this.state = writable(state);
 
     const params: ADSR2Params = {
       // TODO: will have to be dynamic
@@ -85,17 +80,24 @@ export class CVOutput {
       .then(() =>
         updateConnectables(midiEditorVCId, get_midi_editor_audio_connectables(midiEditorVCId))
       );
+
+    this.onChangeUnsub = this.state.subscribe(newState => {
+      this.backend.setState(newState.adsr);
+    });
   }
 
   public serialize(): SerializedCVOutputState {
     const adsr = this.backend.serialize();
+    console.log({ adsr: JSON.stringify(adsr) });
 
     return {
-      name: this.name,
+      ...get(this.state),
       adsr,
-      minValue: this.minValue,
-      maxValue: this.maxValue,
-      uiState: get(this.uiState),
     };
+  }
+
+  public destroy() {
+    this.backend.destroy();
+    this.onChangeUnsub();
   }
 }

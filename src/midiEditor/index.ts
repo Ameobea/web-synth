@@ -144,7 +144,25 @@ export class MIDIEditorInstance {
       console.warn(`Tried to delete CV output ${name} but it doesn't exist`);
       return;
     }
-    cvOutputs.splice(ix, 1);
+    const removed = cvOutputs.splice(ix, 1);
+    removed[0].destroy();
+    this.cvOutputs.set(cvOutputs);
+    setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));
+  }
+
+  public renameCVOutput(oldName: string, newName: string) {
+    const cvOutputs = get(this.cvOutputs);
+    const ix = cvOutputs.findIndex(cvOutput => cvOutput.name === oldName);
+    if (ix === -1) {
+      console.warn(`Tried to rename CV output ${oldName} but it doesn't exist`);
+      return;
+    }
+
+    if (cvOutputs.some(cvOutput => cvOutput.name === newName)) {
+      newName = `${newName}_1`;
+    }
+
+    cvOutputs[ix].name = newName;
     this.cvOutputs.set(cvOutputs);
     setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));
   }
@@ -246,7 +264,7 @@ export const get_midi_editor_audio_connectables = (vcId: string): AudioConnectab
     const awpOut = output.backend.getOutputSync() ?? output.dummyOutput;
 
     return acc.set(output.name, {
-      type: 'customAudio',
+      type: 'number',
       node: awpOut,
     });
   }, outputs);

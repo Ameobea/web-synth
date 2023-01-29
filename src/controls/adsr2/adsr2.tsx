@@ -50,10 +50,20 @@ class RampHandle {
   private inst: ADSR2Instance;
   private parentRamp: RampCurve;
   private graphics!: PIXI.Graphics;
+  private renderedRegion: RenderedRegion;
 
   private computeInitialPos(): PIXI.Point {
-    const rampStartPx = this.startStep.x * this.inst.width;
-    const rampWidthPx = (this.endStep.x - this.startStep.x) * this.inst.width;
+    const rampStartPx = computeTransformedXPosition(
+      this.renderedRegion,
+      this.inst.width,
+      this.startStep.x
+    );
+    const rampEndPx = computeTransformedXPosition(
+      this.renderedRegion,
+      this.inst.width,
+      this.endStep.x
+    );
+    const rampWidthPx = rampEndPx - rampStartPx;
     const rampHeightPx = (this.endStep.y - this.startStep.y) * this.inst.height;
 
     switch (this.endStep.ramper.type) {
@@ -82,7 +92,9 @@ class RampHandle {
         const x = R.clamp(
           0.01,
           0.99,
-          (pos.x / this.inst.width - this.startStep.x) / (this.endStep.x - this.startStep.x)
+          (computeReverseTransformedXPosition(this.renderedRegion, this.inst.width, pos.x) -
+            this.startStep.x) /
+            (this.endStep.x - this.startStep.x)
         );
         const y = R.clamp(
           0.01,
@@ -111,8 +123,8 @@ class RampHandle {
   private handleDrag(newPos: PIXI.Point) {
     // Always constrain drags to the area defined by the marks
     newPos.x = R.clamp(
-      this.startStep.x * this.inst.width,
-      this.endStep.x * this.inst.width,
+      computeTransformedXPosition(this.renderedRegion, this.inst.width, this.startStep.x),
+      computeTransformedXPosition(this.renderedRegion, this.inst.width, this.endStep.x),
       newPos.x
     );
     newPos.y = R.clamp(
@@ -162,12 +174,24 @@ class RampHandle {
     this.inst.vizContainer.addChild(g);
   }
 
-  constructor(inst: ADSR2Instance, parentRamp: RampCurve, startStep: AdsrStep, endStep: AdsrStep) {
+  constructor(
+    inst: ADSR2Instance,
+    parentRamp: RampCurve,
+    startStep: AdsrStep,
+    endStep: AdsrStep,
+    renderedRegion: RenderedRegion
+  ) {
+    this.renderedRegion = renderedRegion;
     this.inst = inst;
     this.startStep = startStep;
     this.endStep = endStep;
     this.parentRamp = parentRamp;
     this.render();
+  }
+
+  public setRenderedRegion(renderedRegion: RenderedRegion) {
+    this.renderedRegion = renderedRegion;
+    this.graphics.position.copyFrom(this.computeInitialPos());
   }
 
   public destroy() {
@@ -184,9 +208,18 @@ class RampCurve {
   private curve: PIXI.Graphics;
   private handle: RampHandle | null;
   private inst: ADSR2Instance;
+  private renderedRegion: RenderedRegion;
+  private steps: [AdsrStep, AdsrStep];
 
-  constructor(inst: ADSR2Instance, startStep: AdsrStep, endStep: AdsrStep) {
+  constructor(
+    inst: ADSR2Instance,
+    startStep: AdsrStep,
+    endStep: AdsrStep,
+    renderedRegion: RenderedRegion
+  ) {
+    this.steps = [startStep, endStep];
     this.inst = inst;
+    this.renderedRegion = renderedRegion;
     this.curve = this.renderRampCurve(startStep, endStep);
     this.handle = this.buildRampHandle(startStep, endStep);
   }
@@ -194,7 +227,7 @@ class RampCurve {
   private buildRampHandle(startStep: AdsrStep, endStep: AdsrStep) {
     switch (endStep.ramper.type) {
       case 'exponential': {
-        return new RampHandle(this.inst, this, startStep, endStep);
+        return new RampHandle(this.inst, this, startStep, endStep, this.renderedRegion);
       }
       default: {
         return null;
@@ -203,15 +236,18 @@ class RampCurve {
   }
 
   private computeRampCurve(step1: AdsrStep, step2: AdsrStep): { x: number; y: number }[] {
+    const step1PosXPx = computeTransformedXPosition(this.renderedRegion, this.inst.width, step1.x);
+    const step2PosXPx = computeTransformedXPosition(this.renderedRegion, this.inst.width, step2.x);
+
     switch (step2.ramper.type) {
       case 'linear': {
         return [
-          { x: step1.x * this.inst.width, y: (1 - step1.y) * this.inst.height },
-          { x: step2.x * this.inst.width, y: (1 - step2.y) * this.inst.height },
+          { x: step1PosXPx, y: (1 - step1.y) * this.inst.height },
+          { x: step2PosXPx, y: (1 - step2.y) * this.inst.height },
         ];
       }
       case 'exponential': {
-        const widthPx = (step2.x - step1.x) * this.inst.width;
+        const widthPx = step2PosXPx - step1PosXPx;
         const heightPx = (1 - step2.y - (1 - step1.y)) * this.inst.height;
         const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
 
@@ -220,7 +256,7 @@ class RampCurve {
           const x = i / pointCount;
           const y = Math.pow(x, step2.ramper.exponent);
           pts.push({
-            x: step1.x * this.inst.width + x * widthPx,
+            x: step1PosXPx + x * widthPx,
             y: (1 - step1.y) * this.inst.height + y * heightPx,
           });
         }
@@ -228,9 +264,9 @@ class RampCurve {
       }
       case 'instant': {
         return [
-          { x: step1.x * this.inst.width, y: (1 - step1.y) * this.inst.height },
-          { x: step2.x * this.inst.width, y: (1 - step1.y) * this.inst.height },
-          { x: step2.x * this.inst.width, y: (1 - step2.y) * this.inst.height },
+          { x: step1PosXPx, y: (1 - step1.y) * this.inst.height },
+          { x: step2PosXPx, y: (1 - step1.y) * this.inst.height },
+          { x: step2PosXPx, y: (1 - step2.y) * this.inst.height },
         ];
       }
     }
@@ -247,11 +283,18 @@ class RampCurve {
   }
 
   public reRenderRampCurve(startStep: AdsrStep, endStep: AdsrStep) {
+    this.steps = [startStep, endStep];
     if (this.curve) {
       this.inst.vizContainer.removeChild(this.curve);
       this.curve.destroy();
     }
     this.curve = this.renderRampCurve(startStep, endStep);
+  }
+
+  public setRenderedRegion(renderedRegion: RenderedRegion) {
+    this.renderedRegion = renderedRegion;
+    this.reRenderRampCurve(this.steps[0], this.steps[1]);
+    this.handle?.setRenderedRegion(renderedRegion);
   }
 
   public destroy() {
@@ -265,6 +308,7 @@ class StepHandle {
   private graphics!: PIXI.Graphics;
   private dragData: PIXI.InteractionData | null = null;
   public step: AdsrStep;
+  private renderedRegion: RenderedRegion;
 
   private handleMove(newPos: PIXI.Point, thisHandleIx: number) {
     this.graphics.position.copyFrom(newPos);
@@ -310,7 +354,11 @@ class StepHandle {
         }
         newPosition.y = R.clamp(0, this.inst.height - 0.0001, newPosition.y);
 
-        this.step.x = newPosition.x / this.inst.width;
+        this.step.x = computeReverseTransformedXPosition(
+          this.renderedRegion,
+          this.inst.width,
+          newPosition.x
+        );
         this.step.y = 1 - newPosition.y / this.inst.height;
         this.handleMove(newPosition, index);
       })
@@ -322,7 +370,7 @@ class StepHandle {
       });
 
     this.inst.vizContainer.addChild(g);
-    g.x = this.step.x * this.inst.width;
+    g.x = computeTransformedXPosition(this.renderedRegion, this.inst.width, this.step.x);
     g.y = (1 - this.step.y) * this.inst.height;
     this.graphics = g;
   }
@@ -337,10 +385,17 @@ class StepHandle {
     this.inst.sortAndUpdateMarks();
   }
 
-  constructor(inst: ADSR2Instance, step: AdsrStep) {
+  constructor(inst: ADSR2Instance, step: AdsrStep, renderedRegion: RenderedRegion) {
     this.inst = inst;
     this.step = step;
+    this.renderedRegion = renderedRegion;
     this.render();
+  }
+
+  public setRenderedRegion(renderedRegion: RenderedRegion) {
+    this.renderedRegion = renderedRegion;
+    this.graphics.x = computeTransformedXPosition(renderedRegion, this.inst.width, this.step.x);
+    // TODO: Cull offscreen handles
   }
 
   public destroy() {
@@ -516,12 +571,50 @@ export interface AudioThreadData {
   debugName?: string;
 }
 
+/**
+ * The normalized [0, 1] start and end of the region of the envelope to be rendered
+ */
+export interface RenderedRegion {
+  /**
+   * The normalized [0, 1] start of the region of the envelope to be rendered
+   */
+  start: number;
+  /**
+   * The normalized [0, 1] end of the region of the envelope to be rendered
+   */
+  end: number;
+}
+
 const LEFT_GUTTER_WIDTH_PX = 27;
 const RIGHT_GUTTER_WIDTH_PX = 7;
 const TOP_GUTTER_WIDTH_PX = 10;
 const BOTTOM_GUTTER_WIDTH_PX = 10;
 
-class ADSR2Instance {
+/**
+ * Given the normalized [0, 1] X position of an element to be rendered on the ADSR, returns the X position
+ * in pixels given the current `renderedRegion` and the ADSR's width.
+ */
+const computeTransformedXPosition = (
+  { start, end }: RenderedRegion,
+  widthPx: number,
+  x: number
+): number => {
+  return (x - start) * (1 / (end - start)) * widthPx;
+};
+
+/**
+ * Given the X position in pixels of an element to be rendered on the ADSR, returns the normalized [0, 1] X position
+ * given the current `renderedRegion` and the ADSR's width.
+ */
+const computeReverseTransformedXPosition = (
+  { start, end }: RenderedRegion,
+  widthPx: number,
+  xPx: number
+): number => {
+  return start + (xPx / widthPx) * (end - start);
+};
+
+export class ADSR2Instance {
   /**
    * This only time this will be uninitialized is when WebGL isn't supported by the browser (probably in CI)
    */
@@ -531,6 +624,7 @@ class ADSR2Instance {
   private logScale = false;
   private lengthMode: AdsrLengthMode | undefined;
   public steps!: StepHandle[];
+  private renderedRegion: RenderedRegion = { start: 0, end: 1 };
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
   private loopDragBar: DragBar | null = null;
@@ -573,8 +667,14 @@ class ADSR2Instance {
 
   private setSteps(newSteps: AdsrStep[]) {
     this.steps.forEach(step => step.destroy());
-    this.steps = newSteps.map(step => new StepHandle(this, R.clone(step)));
+    this.steps = newSteps.map(step => new StepHandle(this, R.clone(step), this.renderedRegion));
     this.sortAndUpdateMarks();
+  }
+
+  public setRenderedRegion(renderedRegion: RenderedRegion) {
+    this.renderedRegion = renderedRegion;
+    this.steps.forEach(step => step.setRenderedRegion(renderedRegion));
+    this.sprites.rampCurves.forEach(curve => curve.setRenderedRegion(renderedRegion));
   }
 
   public update(
@@ -655,7 +755,8 @@ class ADSR2Instance {
       this.sprites.rampCurves[curveIx] = new RampCurve(
         this,
         this.steps[curveIx].step,
-        this.steps[curveIx + 1].step
+        this.steps[curveIx + 1].step,
+        this.renderedRegion
       );
     });
   }
@@ -736,7 +837,7 @@ class ADSR2Instance {
         { x: 0, y: 0.5, ramper: { type: 'linear' as const } },
         { x: 0.5, y: 0.8, ramper: { type: 'exponential' as const, exponent: 1.5 } },
         { x: 1, y: 0.5, ramper: { type: 'exponential' as const, exponent: 1.1 } },
-      ].map(step => new StepHandle(this, step));
+      ].map(step => new StepHandle(this, step, this.renderedRegion));
       this.releasePoint = 0.8;
     }
 
@@ -744,11 +845,15 @@ class ADSR2Instance {
   }
 
   private addMark(pos: PIXI.Point) {
-    const step = new StepHandle(this, {
-      x: pos.x / this.width,
-      y: 1 - pos.y / this.height,
-      ramper: { type: 'exponential' as const, exponent: 0.1 },
-    });
+    const step = new StepHandle(
+      this,
+      {
+        x: computeReverseTransformedXPosition(this.renderedRegion, this.width, pos.x),
+        y: 1 - pos.y / this.height,
+        ramper: { type: 'exponential' as const, exponent: 0.1 },
+      },
+      this.renderedRegion
+    );
     this.steps.push(step);
     this.sortAndUpdateMarks();
     this.onChange(this.serialize());
@@ -812,7 +917,9 @@ class ADSR2Instance {
   private renderInitial() {
     const rampCurves = [];
     for (let i = 0; i < this.steps.length - 1; i++) {
-      rampCurves.push(new RampCurve(this, this.steps[i].step, this.steps[i + 1].step));
+      rampCurves.push(
+        new RampCurve(this, this.steps[i].step, this.steps[i + 1].step, this.renderedRegion)
+      );
     }
 
     this.app?.stage.addChild(this.vizContainer);
@@ -849,12 +956,6 @@ class ADSR2Instance {
 
     this.app?.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
-        // console.warn('No audio thread data yet', {
-        //   debugName: this.debugName,
-        //   audioThreadDataDebugName: this.audioThreadData
-        //     ? this.audioThreadData.debugName
-        //     : 'NO AUDIO THREAD DATA SET',
-        // });
         return;
       }
       const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
@@ -864,15 +965,12 @@ class ADSR2Instance {
 
   private deserialize(state: Adsr) {
     state.lenSamples = state.lenSamples ?? SAMPLE_RATE;
-    this.steps = state.steps.map(step => new StepHandle(this, R.clone(step)));
+    this.steps = state.steps.map(step => new StepHandle(this, R.clone(step), this.renderedRegion));
     this.lengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
     this.loopPoint = state.loopPoint;
     this.releasePoint = state.releasePoint;
   }
 
-  /**
-   * Registers callbacks
-   */
   private registerVcHideCb = () => {
     if (!this.vcId) {
       return;
@@ -920,6 +1018,8 @@ interface ADSR2Props {
   onChange: (newState: ADSRWithOutputRange) => void;
   vcId?: string;
   debugName?: string;
+  disableControlPanel?: boolean;
+  instanceCb?: (instance: ADSR2Instance) => void;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -944,6 +1044,8 @@ const ADSR2: React.FC<ADSR2Props> = ({
   onChange,
   vcId,
   debugName,
+  disableControlPanel = false,
+  instanceCb,
 }) => {
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
@@ -958,22 +1060,24 @@ const ADSR2: React.FC<ADSR2Props> = ({
 
   return (
     <div>
-      <ControlPanel
-        style={{ width: 140 }}
-        settings={ADSR2_SETTINGS}
-        state={{ loop: !R.isNil(initialState.loopPoint) }}
-        onChange={(key: string, val: any) => {
-          switch (key) {
-            case 'loop': {
-              onChange({ ...initialState, loopPoint: val ? 0 : null });
-              break;
+      {disableControlPanel ? null : (
+        <ControlPanel
+          style={{ width: 140 }}
+          settings={ADSR2_SETTINGS}
+          state={{ loop: !R.isNil(initialState.loopPoint) }}
+          onChange={(key: string, val: any) => {
+            switch (key) {
+              case 'loop': {
+                onChange({ ...initialState, loopPoint: val ? 0 : null });
+                break;
+              }
+              default: {
+                console.error('Unhandled key in ADSR2 settings: ', key);
+              }
             }
-            default: {
-              console.error('Unhandled key in ADSR2 settings: ', key);
-            }
-          }
-        }}
-      />
+          }}
+        />
+      )}
       <canvas
         onContextMenu={evt => evt.preventDefault()}
         onMouseDown={evt => {
@@ -999,6 +1103,7 @@ const ADSR2: React.FC<ADSR2Props> = ({
             vcId,
             debugName
           );
+          instanceCb?.(instance.current);
         }}
       />
     </div>

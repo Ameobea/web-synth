@@ -621,8 +621,9 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
             <CVOutputControlsShim
               key={output.name}
               name={output.name}
-              state={output.uiState}
+              state={output.state}
               deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
+              setName={newName => parentInstance.renameCVOutput(output.name, newName)}
             />
           ))}
         </div>
