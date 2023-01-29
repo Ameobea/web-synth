@@ -542,7 +542,6 @@ class ADSR2Instance {
   private audioThreadData: AudioThreadData;
   private scaleMarkings!: ScaleMarkings;
   private vcId?: string;
-  private debugName?: string;
   /**
    * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
    */
@@ -709,7 +708,6 @@ class ADSR2Instance {
       this.vcId = vcId;
       this.registerVcHideCb();
     }
-    this.debugName = debugName;
 
     this.audioThreadData = initialState.audioThreadData;
     this.onChange = onChange;

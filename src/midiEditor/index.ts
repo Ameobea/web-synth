@@ -1,12 +1,15 @@
 import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
+import { get, writable, type Writable } from 'svelte/store';
 
+import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import {
   mkContainerCleanupHelper,
@@ -22,6 +25,10 @@ export class MIDIEditorInstance {
   public playbackHandler: MIDIEditorPlaybackHandler;
   public uiInstance: MIDIEditorUIInstance | undefined;
   public lineCount: number;
+  private ctx: AudioContext;
+
+  public cvOutputs: Writable<CVOutput[]>;
+
   private midiInputCBs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
       if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
@@ -56,9 +63,17 @@ export class MIDIEditorInstance {
     },
   };
 
-  constructor(vcId: string, initialState: SerializedMIDIEditorState) {
+  constructor(ctx: AudioContext, vcId: string, initialState: SerializedMIDIEditorState) {
+    this.ctx = ctx;
     this.lineCount = initialState.lines.length;
     this.vcId = vcId;
+
+    this.cvOutputs = writable(
+      initialState.cvOutputStates?.map(
+        state => new CVOutput(this.ctx, this.vcId, state.name, state)
+      ) ?? []
+    );
+
     this.midiInput = new MIDINode(() => this.midiInputCBs);
     this.midiOutput = new MIDINode();
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
@@ -79,6 +94,7 @@ export class MIDIEditorInstance {
     if (!this.uiInstance) {
       return buildDefaultMIDIEditorState();
     }
+
     return this.uiInstance.serialize();
   }
 
@@ -101,6 +117,36 @@ export class MIDIEditorInstance {
 
   public getCursorPosBeats(): number {
     return this.playbackHandler.getCursorPosBeats();
+  }
+
+  public addCVOutput() {
+    const cvOutputs = get(this.cvOutputs);
+    let name = `CV Output ${cvOutputs.length + 1}`;
+    while (cvOutputs.some(cvOutput => cvOutput.name === name)) {
+      name = `${name}_1`;
+    }
+    const cvOutput = new CVOutput(
+      this.ctx,
+      this.vcId,
+      name,
+      buildDefaultCVOutputState(this.vcId, name)
+    );
+    cvOutputs.push(cvOutput);
+    this.cvOutputs.set(cvOutputs);
+    setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));
+    return cvOutput;
+  }
+
+  public deleteCVOutput(name: string) {
+    const cvOutputs = get(this.cvOutputs);
+    const ix = cvOutputs.findIndex(cvOutput => cvOutput.name === name);
+    if (ix === -1) {
+      console.warn(`Tried to delete CV output ${name} but it doesn't exist`);
+      return;
+    }
+    cvOutputs.splice(ix, 1);
+    this.cvOutputs.set(cvOutputs);
+    setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));
   }
 
   public destroy() {
@@ -148,7 +194,8 @@ export const init_midi_editor = (vcId: string) => {
       }
     })
     .getOrElseL(buildDefaultMIDIEditorState);
-  const inst = new MIDIEditorInstance(vcId, initialState);
+
+  const inst = new MIDIEditorInstance(new AudioContext(), vcId, initialState);
   Instances.set(vcId, inst);
 
   const domID = getContainerID(vcId);
@@ -191,15 +238,25 @@ export const get_midi_editor_audio_connectables = (vcId: string): AudioConnectab
     throw new UnreachableException(`No MIDI editor instance in map with vcId=${vcId}`);
   }
 
+  let outputs = ImmMap<string, ConnectableOutput>().set('midi_out', {
+    type: 'midi',
+    node: inst.midiOutput,
+  });
+  outputs = get(inst.cvOutputs).reduce((acc, output) => {
+    const awpOut = output.backend.getOutputSync() ?? output.dummyOutput;
+
+    return acc.set(output.name, {
+      type: 'customAudio',
+      node: awpOut,
+    });
+  }, outputs);
+
   return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>().set('midi_in', {
       type: 'midi',
       node: inst.midiInput,
     }),
-    outputs: ImmMap<string, ConnectableOutput>().set('midi_out', {
-      type: 'midi',
-      node: inst.midiOutput,
-    }),
+    outputs,
   };
 };

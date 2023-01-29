@@ -99,7 +99,13 @@ export type RampFn =
  * Corresponds to `AdsrStep` in the Wasm engine
  */
 export interface AdsrStep {
+  /**
+   * Normalized between 0 and 1
+   */
   x: number;
+  /**
+   * Normalized between 0 and 1
+   */
   y: number;
   ramper: RampFn;
 }

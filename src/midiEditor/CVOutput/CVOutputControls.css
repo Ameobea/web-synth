@@ -1,0 +1,29 @@
+.collapsed-cv-output-controls,
+.cv-output-controls header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  height: 32px;
+  font-size: 17px;
+  color: #b6b6b6;
+  box-sizing: border-box;
+  user-select: none;
+  cursor: pointer;
+  background-color: #2c2c2c;
+  border-bottom: 1px solid #555;
+}
+
+.delete-cv-output-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 31px;
+  height: 31px;
+  z-index: 2;
+  color: #991111;
+  padding: 0;
+  font-size: 26px;
+  line-height: 0;
+  user-select: none;
+}

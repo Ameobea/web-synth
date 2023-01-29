@@ -1,10 +1,12 @@
 import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
+import { get, type Writable } from 'svelte/store';
 
 import * as PIXI from 'src/controls/pixi';
 import type { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
+import type { CVOutput, SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 import type { NoteBox } from 'src/midiEditor/NoteBox';
 import MIDINoteBox, {
   NoteDragHandle,
@@ -49,6 +51,7 @@ export interface SerializedMIDIEditorState {
   localBPM: number;
   loopPoint: number | null;
   metronomeEnabled: boolean;
+  cvOutputStates?: SerializedCVOutputState[];
 }
 
 export default class MIDIEditorUIInstance {
@@ -99,6 +102,7 @@ export default class MIDIEditorUIInstance {
   private vcId: string;
   private isHidden: boolean;
   private destroyed = false;
+  public cvOutputsRef: Writable<CVOutput[]>;
 
   constructor(
     width: number,
@@ -106,7 +110,8 @@ export default class MIDIEditorUIInstance {
     canvas: HTMLCanvasElement,
     initialState: SerializedMIDIEditorState,
     parentInstance: MIDIEditorInstance,
-    vcId: string
+    vcId: string,
+    cvOutputsRef: Writable<CVOutput[]>
   ) {
     this.width = width;
     this.height = height;
@@ -118,6 +123,7 @@ export default class MIDIEditorUIInstance {
       .orNull();
     this.parentInstance = parentInstance;
     this.vcId = vcId;
+    this.cvOutputsRef = cvOutputsRef;
 
     this.app = new PIXI.Application({
       antialias: true,
@@ -176,7 +182,7 @@ export default class MIDIEditorUIInstance {
     this.app.stage.addChild(this.linesContainer);
 
     // Cursor gutter
-    const cursorGutter = new CursorGutter(this);
+    new CursorGutter(this);
 
     this.cursor = new Cursor(this);
     this.cursor.setPosBeats(initialState.cursorPosBeats ?? 0);
@@ -964,6 +970,10 @@ export default class MIDIEditorUIInstance {
   }
 
   public serialize(): SerializedMIDIEditorState {
+    const cvOutputs = get(this.cvOutputsRef);
+    const cvOutputStates: SerializedCVOutputState[] = cvOutputs.map(cvOutput =>
+      cvOutput.serialize()
+    );
     return {
       lines: this.lines.map((line, lineIx) => ({
         midiNumber: this.lines.length - lineIx,
@@ -978,6 +988,7 @@ export default class MIDIEditorUIInstance {
       localBPM: this.localBPM,
       loopPoint: this.loopCursor?.getPosBeats() ?? null,
       metronomeEnabled: this.parentInstance.playbackHandler.metronomeEnabled,
+      cvOutputStates,
     };
   }
 

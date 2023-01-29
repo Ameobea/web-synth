@@ -29,7 +29,7 @@ const ADSRWasm = new AsyncOnce(() => {
   return fetch(url).then(res => res.arrayBuffer());
 });
 
-interface ADSR2Params {
+export interface ADSR2Params {
   minValue?: number;
   maxValue?: number;
   length: number;
@@ -140,6 +140,20 @@ export class ADSR2Module {
 
     return new Promise(resolve => {
       this.onInitializedCbs.push(() => resolve(this.awp!));
+    });
+  }
+
+  public getOutputSync(): AudioWorkletNode | undefined {
+    return this.awp;
+  }
+
+  public onInit(): Promise<void> {
+    if (this.awp) {
+      return Promise.resolve();
+    }
+
+    return new Promise(resolve => {
+      this.onInitializedCbs.push(() => resolve());
     });
   }
 

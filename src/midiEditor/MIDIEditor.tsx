@@ -1,10 +1,11 @@
-import { filterNils } from 'ameo-utils';
 import download from 'downloadjs';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
+import { SvelteComponentTyped } from 'svelte';
+
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
@@ -12,36 +13,23 @@ import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImpor
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 import type { MIDIEditorInstance } from 'src/midiEditor';
+import { CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
+import { CVOutputTopControls } from 'src/midiEditor/CVOutput/CVOutputTopControls';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
+import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
 import MIDIEditorUIInstance, {
   type SerializedMIDIEditorState,
 } from 'src/midiEditor/MIDIEditorUIInstance';
 import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
+import CVOutputControls from './CVOutput/CVOutputControls.svelte';
+import './CVOutput/CVOutputControls.css';
 
 const ctx = new AudioContext();
 
 const MIDIWasmModule = new AsyncOnce(() => import('src/midi'));
-
-const MIDIEditorControlButton: React.FC<{
-  onClick: () => void;
-  label: React.ReactNode;
-  disabled?: boolean;
-  style?: React.CSSProperties;
-  active?: boolean;
-  title: string;
-}> = ({ onClick, label, disabled, style, active, title }) => (
-  <div
-    role='button'
-    className={filterNils(['midi-editor-control-button', active ? 'active' : null]).join(' ')}
-    style={disabled ? { ...(style ?? {}), color: '#666' } : style}
-    onClick={disabled ? undefined : onClick}
-    title={title}
-  >
-    {label}
-  </div>
-);
 
 interface MIDIEditorControlsState {
   bpm: number;
@@ -224,12 +212,14 @@ const handleMIDIFileUpload = async (
 };
 
 interface MIDIEditorControlsProps {
+  parentInst: MIDIEditorInstance;
   inst: React.MutableRefObject<MIDIEditorUIInstance | undefined>;
   initialState: MIDIEditorControlsState;
   onChange: (newState: MIDIEditorControlsState) => void;
 }
 
 const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
+  parentInst,
   inst,
   initialState,
   onChange: onChangeInner,
@@ -516,11 +506,19 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         label='⭳'
         style={{ fontSize: 29, textAlign: 'center' }}
       />
+
+      <CVOutputTopControls inst={parentInst} />
     </div>
   );
 };
 
 const MIDIEditorControls = React.memo(MIDIEditorControlsInner);
+
+type CVOutputControlsProps = CVOutputControls extends SvelteComponentTyped<infer Props, any>
+  ? Props
+  : never;
+
+const CVOutputControlsShim = mkSvelteComponentShim<CVOutputControlsProps>(CVOutputControls);
 
 interface MIDIEditorProps {
   initialState: SerializedMIDIEditorState;
@@ -568,15 +566,21 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
 
   const lastCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const [cvOutputs, setCVOutputs] = useState<CVOutput[]>([]);
+  useEffect(
+    () => parentInstance.cvOutputs.subscribe(newOutputs => setCVOutputs([...newOutputs])),
+    [parentInstance.cvOutputs]
+  );
+
   return (
     <div className='midi-editor'>
       <MIDIEditorControls
+        parentInst={parentInstance}
         inst={instance}
         initialState={initialStateForControls.current}
         onChange={handleChange}
       />
       <canvas
-        // style={{ width, height }}
         ref={canvas => {
           if (!canvas) {
             instance.current?.destroy();
@@ -596,7 +600,8 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
             canvas,
             initialState,
             parentInstance,
-            vcId
+            vcId,
+            parentInstance.cvOutputs
           );
           parentInstance.registerUI(instance.current);
         }}
@@ -610,10 +615,23 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
           evt.stopPropagation();
         }, [])}
       />
+      {cvOutputs.length > 0 ? (
+        <div className='cv-outputs-wrapper'>
+          {cvOutputs.map(output => (
+            <CVOutputControlsShim
+              key={output.name}
+              name={output.name}
+              state={output.uiState}
+              deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };
 
-const MIDIEditorMemo = React.memo(MIDIEditor);
+// const MIDIEditorMemo = React.memo(MIDIEditor);
+const MIDIEditorMemo = MIDIEditor;
 
 export default MIDIEditorMemo;
