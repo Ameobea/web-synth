@@ -26,7 +26,6 @@ import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
-import { get } from 'svelte/store';
 
 const ctx = new AudioContext();
 
@@ -547,10 +546,13 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   const windowSize = useWindowSize();
   const height = windowSize.height - 140;
   const width = windowSize.width - 80;
-  const lastWindowWidth = useRef(windowSize);
+  const lastWindowSize = useRef(windowSize);
   useEffect(() => {
-    if (lastWindowWidth.current.width !== windowSize.width) {
-      lastWindowWidth.current = windowSize;
+    if (
+      lastWindowSize.current.width !== windowSize.width ||
+      lastWindowSize.current.height !== windowSize.height
+    ) {
+      lastWindowSize.current = windowSize;
       instance.current?.setSize(width, height);
     }
   }, [height, width, windowSize]);
@@ -584,9 +586,9 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
       <canvas
         ref={canvas => {
           if (!canvas) {
-            instance.current?.destroy();
-            instance.current = undefined;
-            lastCanvasRef.current = null;
+            // instance.current?.destroy();
+            // instance.current = undefined;
+            // lastCanvasRef.current = null;
             return;
           }
 
@@ -595,6 +597,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
           }
           lastCanvasRef.current = canvas;
 
+          instance.current?.destroy();
           instance.current = new MIDIEditorUIInstance(
             width,
             height,
@@ -634,7 +637,6 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   );
 };
 
-// const MIDIEditorMemo = React.memo(MIDIEditor);
-const MIDIEditorMemo = MIDIEditor;
+const MIDIEditorMemo = React.memo(MIDIEditor);
 
 export default MIDIEditorMemo;

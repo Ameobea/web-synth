@@ -238,8 +238,10 @@ pub unsafe extern "C" fn adsr_set_release_start_phase(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn adsr_set_log_scale(ctx: *mut AdsrContext, index: usize, log_scale: bool) {
-    (*ctx).adsrs[index].adsr.log_scale = log_scale;
+pub unsafe extern "C" fn adsr_set_log_scale(ctx: *mut AdsrContext, log_scale: bool) {
+    for adsr in &mut (*ctx).adsrs {
+        adsr.adsr.log_scale = log_scale;
+    }
 }
 
 #[no_mangle]

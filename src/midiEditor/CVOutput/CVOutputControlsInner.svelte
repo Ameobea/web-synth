@@ -3,8 +3,10 @@
 
   import { ADSR2Instance, LEFT_GUTTER_WIDTH_PX } from 'src/controls/adsr2/adsr2';
   import SvelteADSR2 from 'src/controls/adsr2/SvelteADSR2.svelte';
+  import { renderModalWithControls } from 'src/controls/Modal';
   import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import type { CVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
+  import { mkCVOutputSettingsPopup } from './CVOutputSettingsPopup';
 
   export let name: string;
   export let setName: (name: string) => void;
@@ -29,6 +31,11 @@
     });
     widthObserver.observe(widthObserverTarget);
   }
+
+  const openSettings = () =>
+    renderModalWithControls(mkCVOutputSettingsPopup($state))
+      .then(newState => state.update(s => ({ ...s, ...newState })))
+      .catch(() => {});
 </script>
 
 <div class="root cv-output-controls" bind:this={widthObserverTarget}>
@@ -92,11 +99,22 @@
     <button class="delete-cv-output-button" on:click={deleteOutput}>×</button>
   </header>
 
+  <div
+    class="open-settings-button"
+    on:click={openSettings}
+    tabindex="0"
+    on:keydown={e => e.key === 'Enter' && openSettings()}
+    aria-label="Open settings"
+    role="button"
+  >
+    ⚙
+  </div>
+
   {#if width}
     <div style="margin-left: {PIANO_KEYBOARD_WIDTH - LEFT_GUTTER_WIDTH_PX}px;">
       <SvelteADSR2
         {width}
-        height={180}
+        height={220}
         debugName={`MIDI editor CV output ${name}`}
         initialState={{ ...$state.adsr, outputRange: [$state.minValue, $state.maxValue] }}
         onChange={newState => {
@@ -132,5 +150,22 @@
     height: 20px;
     margin-bottom: 4px;
     margin-top: -2px;
+  }
+
+  .open-settings-button {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    line-height: 0;
+    padding-top: 2px;
+    position: absolute;
+    top: 35px;
+    left: 3px;
+    border: 1px solid #333;
+    cursor: pointer;
+    user-select: none;
   }
 </style>

@@ -100,12 +100,23 @@ export class CVOutput {
       // The UI envelope uses absolute beats, but the backend expects normalized [0, 1] values for
       // step positions.  So, we compute a length in beats and conver the steps to normalized values
       // before passing them to the backend.
-      const lengthBeats = newState.adsr.steps[newState.adsr.steps.length - 1].x;
+      const releasePoint = this.parentInstance.playbackHandler.getLoopPoint();
+      const lengthBeats = Math.max(
+        newState.adsr.steps[newState.adsr.steps.length - 1].x,
+        releasePoint ?? -Infinity
+      );
       const normalizedSteps: AdsrStep[] = newState.adsr.steps.map(step => ({
         ...step,
         x: step.x / lengthBeats,
       }));
-      const releasePoint = this.parentInstance.playbackHandler.getLoopPoint();
+      if (normalizedSteps[normalizedSteps.length - 1].x !== 1) {
+        normalizedSteps.push({
+          ...normalizedSteps[normalizedSteps.length - 1],
+          x: 1,
+          ramper: { type: 'linear' },
+        });
+      }
+
       const normalizedReleasePoint = releasePoint === null ? null : releasePoint / lengthBeats;
 
       const newBackendState = {
@@ -157,7 +168,7 @@ export class CVOutput {
   }
 
   public serialize(): SerializedCVOutputState {
-    return get(this.state);
+    return { ...get(this.state), name: this.name };
   }
 
   public destroy() {

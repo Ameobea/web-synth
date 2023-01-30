@@ -95,6 +95,8 @@ export default class MIDIEditorUIInstance {
   private beatSnapInterval: number;
   public cursor: Cursor;
   private pianoKeys: PianoKeys | undefined;
+  private cursorGutter: CursorGutter;
+  private stageBorder: PIXI.Graphics;
   public localBPM: number;
   public loopCursor: LoopCursor | null;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
@@ -170,19 +172,11 @@ export default class MIDIEditorUIInstance {
     this.linesContainer.x = conf.PIANO_KEYBOARD_WIDTH;
     this.linesContainer.y = conf.CURSOR_GUTTER_HEIGHT;
     // Clip stuff hidden at the top outside of it
-    this.linesContainer.mask = new PIXI.Graphics()
-      .beginFill(0xff3300)
-      .drawRect(
-        conf.PIANO_KEYBOARD_WIDTH,
-        10,
-        this.width - conf.PIANO_KEYBOARD_WIDTH - 10,
-        this.height - 20
-      )
-      .endFill();
+    this.linesContainer.mask = this.buildLinesContainerMask();
     this.app.stage.addChild(this.linesContainer);
 
     // Cursor gutter
-    new CursorGutter(this);
+    this.cursorGutter = new CursorGutter(this);
 
     this.cursor = new Cursor(this);
     this.cursor.setPosBeats(initialState.cursorPosBeats ?? 0);
@@ -191,28 +185,43 @@ export default class MIDIEditorUIInstance {
       this.parentInstance.playbackHandler?.recordingCtx?.tick();
     });
 
+    // border around everything
+    this.stageBorder = this.buildStageBorder();
+    this.app.stage.addChild(this.stageBorder);
+
     this.init(initialState).then(() => {
       if (this.destroyed) {
         return;
       }
       this.pianoKeys = new PianoKeys(this);
 
-      // border around everything
-      this.app.stage.addChild(
-        new PIXI.Graphics()
-          .lineStyle(1, conf.LINE_BORDER_COLOR)
-          .moveTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
-          .lineTo(this.width - 10.5, conf.CURSOR_GUTTER_HEIGHT)
-          .lineTo(this.width - 10.5, this.height - 10.5)
-          .lineTo(conf.PIANO_KEYBOARD_WIDTH, this.height - 10.5)
-          .lineTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
-      );
-
       this.app.stage.addChild(this.cursor.graphics);
       if (this.loopCursor) {
         this.app.stage.addChild(this.loopCursor.graphics);
       }
     });
+  }
+
+  private buildLinesContainerMask() {
+    return new PIXI.Graphics()
+      .beginFill(0xff3300)
+      .drawRect(
+        conf.PIANO_KEYBOARD_WIDTH,
+        10,
+        this.width - conf.PIANO_KEYBOARD_WIDTH - 10,
+        this.height - 20
+      )
+      .endFill();
+  }
+
+  private buildStageBorder() {
+    return new PIXI.Graphics()
+      .lineStyle(1, conf.LINE_BORDER_COLOR)
+      .moveTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
+      .lineTo(this.width - 10.5, conf.CURSOR_GUTTER_HEIGHT)
+      .lineTo(this.width - 10.5, this.height - 10.5)
+      .lineTo(conf.PIANO_KEYBOARD_WIDTH, this.height - 10.5)
+      .lineTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT);
   }
 
   private buildNoteLines(
@@ -310,6 +319,16 @@ export default class MIDIEditorUIInstance {
     this.width = width;
     this.height = height;
     this.app.renderer.resize(width, height);
+
+    this.linesContainer.mask = this.buildLinesContainerMask();
+    this.stageBorder.parent.removeChild(this.stageBorder);
+    this.stageBorder = this.buildStageBorder();
+    this.app.stage.addChild(this.stageBorder);
+    this.pianoKeys?.destroy();
+    this.pianoKeys = new PianoKeys(this);
+    this.cursorGutter.destroy();
+    this.cursorGutter = new CursorGutter(this);
+
     this.handleViewChange();
   }
 

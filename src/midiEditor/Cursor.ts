@@ -6,6 +6,7 @@ import * as conf from './conf';
 export class CursorGutter {
   private app: MIDIEditorUIInstance;
   private isDragging = false;
+  private graphics: PIXI.Graphics;
 
   constructor(app: MIDIEditorUIInstance) {
     this.app = app;
@@ -49,7 +50,13 @@ export class CursorGutter {
       .lineTo(0.5, 0.5);
     g.x = conf.PIANO_KEYBOARD_WIDTH;
     g.cacheAsBitmap = true;
+    this.graphics = g;
     this.app.app.stage.addChild(g);
+  }
+
+  public destroy() {
+    this.app.app.stage.removeChild(this.graphics);
+    this.graphics.destroy();
   }
 }
 
