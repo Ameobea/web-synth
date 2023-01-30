@@ -1027,6 +1027,8 @@ export default class MIDIEditorUIInstance {
     this.cursor.handleViewChange();
     this.loopCursor?.handleViewChange();
     this.pianoKeys?.handleViewChange();
+
+    get(this.cvOutputsRef).forEach(cvOutput => cvOutput.handleViewChange(this.view));
   }
 
   private handleZoom(evt: WheelEvent) {

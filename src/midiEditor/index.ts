@@ -68,9 +68,10 @@ export class MIDIEditorInstance {
     this.lineCount = initialState.lines.length;
     this.vcId = vcId;
 
+    this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
     this.cvOutputs = writable(
       initialState.cvOutputStates?.map(
-        state => new CVOutput(this.ctx, this.vcId, state.name, state)
+        state => new CVOutput(this, this.ctx, this.vcId, state.name, state)
       ) ?? []
     );
 
@@ -79,7 +80,6 @@ export class MIDIEditorInstance {
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
     // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
-    this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
   }
 
   /**
@@ -126,6 +126,7 @@ export class MIDIEditorInstance {
       name = `${name}_1`;
     }
     const cvOutput = new CVOutput(
+      this,
       this.ctx,
       this.vcId,
       name,

@@ -11,6 +11,8 @@
   export let debugName: string | undefined;
   export let disableControlPanel: boolean | undefined;
   export let instanceCb: ((instance: ADSR2Instance) => void) | undefined;
+  export let enableInfiniteMode: boolean | undefined = false;
+  export let disablePhaseVisualization: boolean | undefined = false;
 </script>
 
 <ReactShim
@@ -24,5 +26,7 @@
     debugName,
     disableControlPanel,
     instanceCb,
+    enableInfiniteMode,
+    disablePhaseVisualization,
   }}
 />

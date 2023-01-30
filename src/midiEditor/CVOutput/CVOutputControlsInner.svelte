@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Writable } from 'svelte/store';
 
+  import { ADSR2Instance, LEFT_GUTTER_WIDTH_PX } from 'src/controls/adsr2/adsr2';
   import SvelteADSR2 from 'src/controls/adsr2/SvelteADSR2.svelte';
+  import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import type { CVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 
   export let name: string;
@@ -9,6 +11,7 @@
   export let state: Writable<CVOutputState>;
   export let collapse: () => void;
   export let deleteOutput: () => void;
+  export let registerInstance: (instance: ADSR2Instance) => void;
 
   let isEditingName = false;
   let nameWrapperHovered = false;
@@ -22,7 +25,7 @@
   $: if (widthObserverTarget) {
     widthObserver?.unobserve(widthObserverTarget);
     widthObserver = new ResizeObserver(entries => {
-      width = entries[0].contentRect.width;
+      width = entries[0].contentRect.width - 120;
     });
     widthObserver.observe(widthObserverTarget);
   }
@@ -90,26 +93,27 @@
   </header>
 
   {#if width}
-    <SvelteADSR2
-      {width}
-      height={180}
-      debugName={`MIDI editor CV output ${name}`}
-      initialState={{ ...$state.adsr, outputRange: [$state.minValue, $state.maxValue] }}
-      onChange={newState =>
-        state.update(s => ({
-          ...s,
-          adsr: newState,
-          minValue: newState.outputRange[0],
-          maxValue: newState.outputRange[1],
-        }))}
-      vcId={undefined}
-      disableControlPanel={true}
-      instanceCb={inst => {
-        console.log('Got inst!!');
-        // inst.setRenderedRegion({ start: 0.4, end: 0.9 });
-        // TODO
-      }}
-    />
+    <div style="margin-left: {PIANO_KEYBOARD_WIDTH - LEFT_GUTTER_WIDTH_PX}px;">
+      <SvelteADSR2
+        {width}
+        height={180}
+        debugName={`MIDI editor CV output ${name}`}
+        initialState={{ ...$state.adsr, outputRange: [$state.minValue, $state.maxValue] }}
+        onChange={newState => {
+          state.update(s => ({
+            ...s,
+            adsr: newState,
+            minValue: newState.outputRange[0],
+            maxValue: newState.outputRange[1],
+          }));
+        }}
+        vcId={undefined}
+        disableControlPanel={true}
+        instanceCb={registerInstance}
+        enableInfiniteMode={true}
+        disablePhaseVisualization={true}
+      />
+    </div>
   {/if}
 </div>
 

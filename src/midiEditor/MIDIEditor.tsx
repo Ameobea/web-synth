@@ -26,6 +26,7 @@ import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
+import { get } from 'svelte/store';
 
 const ctx = new AudioContext();
 
@@ -624,6 +625,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
               state={output.state}
               deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
               setName={newName => parentInstance.renameCVOutput(output.name, newName)}
+              registerInstance={uiInstance => output.registerUIInstance(uiInstance)}
             />
           ))}
         </div>

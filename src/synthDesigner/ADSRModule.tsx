@@ -199,7 +199,6 @@ export class ADSR2Module {
     if (!this.awp) {
       return;
     }
-    console.log('setting length', newLength, lengthMode);
 
     this.awp.port.postMessage({
       type: 'setLength',

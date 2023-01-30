@@ -309,6 +309,7 @@ class StepHandle {
   private dragData: PIXI.InteractionData | null = null;
   public step: AdsrStep;
   private renderedRegion: RenderedRegion;
+  private disableSnapToEnd: boolean;
 
   private handleMove(newPos: PIXI.Point, thisHandleIx: number) {
     this.graphics.position.copyFrom(newPos);
@@ -348,7 +349,11 @@ class StepHandle {
         if (index === 0) {
           newPosition.x = 0;
         } else if (index === this.inst.steps.length - 1) {
-          newPosition.x = this.inst.width;
+          if (this.disableSnapToEnd) {
+            newPosition.x = R.clamp(0.001, Infinity, newPosition.x);
+          } else {
+            newPosition.x = this.inst.width;
+          }
         } else {
           newPosition.x = R.clamp(0.001, this.inst.width - 0.0001, newPosition.x);
         }
@@ -385,7 +390,13 @@ class StepHandle {
     this.inst.sortAndUpdateMarks();
   }
 
-  constructor(inst: ADSR2Instance, step: AdsrStep, renderedRegion: RenderedRegion) {
+  constructor(
+    inst: ADSR2Instance,
+    step: AdsrStep,
+    renderedRegion: RenderedRegion,
+    disableSnapToEnd: boolean
+  ) {
+    this.disableSnapToEnd = disableSnapToEnd;
     this.inst = inst;
     this.step = step;
     this.renderedRegion = renderedRegion;
@@ -585,7 +596,7 @@ export interface RenderedRegion {
   end: number;
 }
 
-const LEFT_GUTTER_WIDTH_PX = 27;
+export const LEFT_GUTTER_WIDTH_PX = 27;
 const RIGHT_GUTTER_WIDTH_PX = 7;
 const TOP_GUTTER_WIDTH_PX = 10;
 const BOTTOM_GUTTER_WIDTH_PX = 10;
@@ -629,10 +640,16 @@ export class ADSR2Instance {
   private loopPoint: number | null = null;
   private loopDragBar: DragBar | null = null;
   private releasePoint!: number;
-  private releaseDragBar!: DragBar;
+  private releaseDragBar: DragBar | null = null;
   private onChange: (newState: ADSRWithOutputRange) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
+  /**
+   * If enabled, the envelope will not have a specific end point.  Adding more points on the end will
+   * extend the envelope.  This is used in the CV outputs for the MIDI editor currently.
+   */
+  private infiniteMode: boolean;
+  private disablePhaseVisualization = false;
   private audioThreadData: AudioThreadData;
   private scaleMarkings!: ScaleMarkings;
   private vcId?: string;
@@ -667,7 +684,9 @@ export class ADSR2Instance {
 
   private setSteps(newSteps: AdsrStep[]) {
     this.steps.forEach(step => step.destroy());
-    this.steps = newSteps.map(step => new StepHandle(this, R.clone(step), this.renderedRegion));
+    this.steps = newSteps.map(
+      step => new StepHandle(this, R.clone(step), this.renderedRegion, this.infiniteMode)
+    );
     this.sortAndUpdateMarks();
   }
 
@@ -675,6 +694,35 @@ export class ADSR2Instance {
     this.renderedRegion = renderedRegion;
     this.steps.forEach(step => step.setRenderedRegion(renderedRegion));
     this.sprites.rampCurves.forEach(curve => curve.setRenderedRegion(renderedRegion));
+
+    this.maybeAddOrUpdateEndVirtualRampCurve();
+  }
+
+  private maybeAddOrUpdateEndVirtualRampCurve() {
+    // If the end of the rendered region is greater than the X value of the final step, then we need to render
+    // a "virtual" ramp curve to the end of the rendered region from the final step.
+    const finalStep = this.steps[this.steps.length - 1];
+    if (finalStep.step.x < this.renderedRegion.end) {
+      const virtualEndStep: AdsrStep = {
+        x: this.renderedRegion.end,
+        y: finalStep.step.y,
+        ramper: { type: 'linear' },
+      };
+      const newVirtualRampCurve = new RampCurve(
+        this,
+        finalStep.step,
+        virtualEndStep,
+        this.renderedRegion
+      );
+
+      if (this.sprites.rampCurves.length === this.steps.length - 1) {
+        this.sprites.rampCurves.push(newVirtualRampCurve);
+      } else {
+        const virtualRampCurve = this.sprites.rampCurves[this.sprites.rampCurves.length - 1];
+        virtualRampCurve.destroy();
+        this.sprites.rampCurves[this.sprites.rampCurves.length - 1] = newVirtualRampCurve;
+      }
+    }
   }
 
   public update(
@@ -711,7 +759,7 @@ export class ADSR2Instance {
 
     if (this.releasePoint !== state.releasePoint) {
       this.releasePoint = state.releasePoint;
-      this.releaseDragBar.setPos(this.releasePoint);
+      this.releaseDragBar?.setPos(this.releasePoint);
     }
 
     this.outputRange = [...outputRange];
@@ -736,7 +784,7 @@ export class ADSR2Instance {
     while (this.sprites.rampCurves.length < this.steps.length - 1) {
       this.sprites.rampCurves.push(null as any); // this will get reconciled instantly
     }
-    while (this.sprites.rampCurves.length > this.steps.length - 1) {
+    while (this.sprites.rampCurves.length > this.steps.length - (this.infiniteMode ? 0 : 1)) {
       if (!R.isNil(updatedMarkIx)) {
         throw new UnreachableException(
           "Can't have an updated mark index when there are more ramps than expected"
@@ -752,10 +800,18 @@ export class ADSR2Instance {
       }
 
       this.sprites.rampCurves[curveIx]?.destroy();
+      const startStep = this.steps[curveIx].step;
+      let endStep = this.steps[curveIx + 1]?.step;
+      if (this.infiniteMode && !endStep) {
+        // Create a virtual end step at the same Y value as the start step and an X value at the end
+        // of current rendered region
+        endStep = { x: this.renderedRegion.end, y: startStep.y, ramper: { type: 'linear' } };
+      }
+
       this.sprites.rampCurves[curveIx] = new RampCurve(
         this,
-        this.steps[curveIx].step,
-        this.steps[curveIx + 1].step,
+        startStep,
+        endStep,
         this.renderedRegion
       );
     });
@@ -786,7 +842,9 @@ export class ADSR2Instance {
     initialState: Adsr,
     outputRange: readonly [number, number],
     vcId?: string,
-    debugName?: string
+    debugName?: string,
+    infiniteMode?: boolean,
+    disablePhaseVisualization?: boolean
   ) {
     if (!debugName) {
       console.trace('No debug name provided for ADSR');
@@ -810,6 +868,8 @@ export class ADSR2Instance {
       this.registerVcHideCb();
     }
 
+    this.infiniteMode = infiniteMode ?? false;
+    this.disablePhaseVisualization = disablePhaseVisualization ?? false;
     this.audioThreadData = initialState.audioThreadData;
     this.onChange = onChange;
     this.ctx = ctx;
@@ -837,14 +897,14 @@ export class ADSR2Instance {
         { x: 0, y: 0.5, ramper: { type: 'linear' as const } },
         { x: 0.5, y: 0.8, ramper: { type: 'exponential' as const, exponent: 1.5 } },
         { x: 1, y: 0.5, ramper: { type: 'exponential' as const, exponent: 1.1 } },
-      ].map(step => new StepHandle(this, step, this.renderedRegion));
+      ].map(step => new StepHandle(this, step, this.renderedRegion, this.infiniteMode));
       this.releasePoint = 0.8;
     }
 
     this.renderInitial();
   }
 
-  private addMark(pos: PIXI.Point) {
+  private addStep(pos: PIXI.Point) {
     const step = new StepHandle(
       this,
       {
@@ -852,11 +912,14 @@ export class ADSR2Instance {
         y: 1 - pos.y / this.height,
         ramper: { type: 'exponential' as const, exponent: 0.1 },
       },
-      this.renderedRegion
+      this.renderedRegion,
+      this.infiniteMode
     );
     this.steps.push(step);
     this.sortAndUpdateMarks();
     this.onChange(this.serialize());
+
+    this.maybeAddOrUpdateEndVirtualRampCurve();
   }
 
   private initBackgroundClickHandler() {
@@ -890,7 +953,7 @@ export class ADSR2Instance {
 
       // We've got a bona-fide double click
       this.lastClick = null;
-      this.addMark(pos);
+      this.addStep(pos);
     });
     this.vizContainer.addChild(bg);
   }
@@ -926,34 +989,39 @@ export class ADSR2Instance {
 
     this.sprites = { rampCurves };
 
-    const phaseMarker = this.buildPhaseMarker();
+    const phaseMarker = this.disablePhaseVisualization ? null : this.buildPhaseMarker();
 
     if (!R.isNil(this.loopPoint)) {
       this.loopDragBar = this.buildLoopDragBar();
     }
 
-    this.releaseDragBar = new DragBar(
-      this,
-      RELEASE_DRAG_BAR_COLOR,
-      this.releasePoint,
-      (newReleasePos: number) => {
-        if (newReleasePos < 0 || newReleasePos > 1) {
-          throw new UnreachableException();
-        }
+    if (!this.infiniteMode) {
+      this.releaseDragBar = new DragBar(
+        this,
+        RELEASE_DRAG_BAR_COLOR,
+        this.releasePoint,
+        (newReleasePos: number) => {
+          if (newReleasePos < 0 || newReleasePos > 1) {
+            throw new UnreachableException();
+          }
 
-        // release has to be after the loop point, if there is one
-        if (!R.isNil(this.loopPoint)) {
-          newReleasePos = R.clamp(this.loopPoint, 1, newReleasePos);
-          this.releaseDragBar.setPos(newReleasePos);
-        }
+          // release has to be after the loop point, if there is one
+          if (!R.isNil(this.loopPoint)) {
+            newReleasePos = R.clamp(this.loopPoint, 1, newReleasePos);
+            this.releaseDragBar?.setPos(newReleasePos);
+          }
 
-        this.releasePoint = newReleasePos;
-        this.onUpdated();
-      }
-    );
+          this.releasePoint = newReleasePos;
+          this.onUpdated();
+        }
+      );
+    }
 
     this.scaleMarkings = new ScaleMarkings(this, this.lengthMs, this.outputRange);
 
+    if (!phaseMarker) {
+      return;
+    }
     this.app?.ticker.add(() => {
       if (!this.audioThreadData?.buffer) {
         return;
@@ -965,7 +1033,9 @@ export class ADSR2Instance {
 
   private deserialize(state: Adsr) {
     state.lenSamples = state.lenSamples ?? SAMPLE_RATE;
-    this.steps = state.steps.map(step => new StepHandle(this, R.clone(step), this.renderedRegion));
+    this.steps = state.steps.map(
+      step => new StepHandle(this, R.clone(step), this.renderedRegion, this.infiniteMode)
+    );
     this.lengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
     this.loopPoint = state.loopPoint;
     this.releasePoint = state.releasePoint;
@@ -1020,6 +1090,8 @@ interface ADSR2Props {
   debugName?: string;
   disableControlPanel?: boolean;
   instanceCb?: (instance: ADSR2Instance) => void;
+  enableInfiniteMode?: boolean;
+  disablePhaseVisualization?: boolean;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -1046,6 +1118,8 @@ const ADSR2: React.FC<ADSR2Props> = ({
   debugName,
   disableControlPanel = false,
   instanceCb,
+  enableInfiniteMode,
+  disablePhaseVisualization,
 }) => {
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
@@ -1101,7 +1175,9 @@ const ADSR2: React.FC<ADSR2Props> = ({
             initialState,
             [outputRangeStart, outputRangeEnd],
             vcId,
-            debugName
+            debugName,
+            enableInfiniteMode,
+            disablePhaseVisualization
           );
           instanceCb?.(instance.current);
         }}

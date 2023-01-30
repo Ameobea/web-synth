@@ -1,4 +1,5 @@
 import * as R from 'ramda';
+import { get } from 'svelte/store';
 
 import {
   cancelCb,
@@ -189,6 +190,7 @@ export default class MIDIEditorPlaybackHandler {
     }
 
     this.loopPoint = newLoopPoint;
+    get(this.inst.cvOutputs).forEach(cvOutput => cvOutput.setLoopPoint(this.loopPoint));
     return true;
   }
 
@@ -479,6 +481,8 @@ export default class MIDIEditorPlaybackHandler {
       return;
     }
 
+    get(this.inst.cvOutputs).forEach(cvOutput => cvOutput.startPlayback());
+
     this.lastPlaybackSchedulParams = scheduleParams;
     this.playbackGeneration = Math.random();
     if (this.loopPoint === null) {
@@ -496,6 +500,8 @@ export default class MIDIEditorPlaybackHandler {
     if (!this.isPlaying) {
       return;
     }
+
+    get(this.inst.cvOutputs).forEach(cvOutput => cvOutput.stopPlayback());
 
     this.lastSetCursorPosBeats = this.getCursorPosBeats();
     this.playbackGeneration = null;
