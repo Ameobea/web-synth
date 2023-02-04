@@ -127,11 +127,12 @@ pub unsafe extern "C" fn create_adsr_ctx(
     release_start_phase: f32,
     adsr_count: usize,
     log_scale: bool,
+    early_release_mode_type: usize,
+    early_release_mode_param: usize,
 ) -> *mut AdsrContext {
     let length_mode = AdsrLengthMode::from_u32(length_mode);
 
-    let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> =
-        Rc::new(std::mem::MaybeUninit::uninit().assume_init());
+    let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> = Rc::new([0.0f32; RENDERED_BUFFER_SIZE]);
     let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
     assert!(adsr_count > 0);
 
@@ -147,7 +148,10 @@ pub unsafe extern "C" fn create_adsr_ctx(
             10_000., // will be updated during render
             release_start_phase,
             Rc::clone(&rendered),
-            crate::EarlyReleaseConfig::default(),
+            crate::EarlyReleaseConfig::from_parts(
+                early_release_mode_type,
+                early_release_mode_param,
+            ),
             log_scale,
         );
         adsrs.push(ManagedAdsr {
@@ -250,4 +254,41 @@ pub unsafe extern "C" fn adsr_get_output_buf_ptr(
     index: usize,
 ) -> *const f32 {
     (*ctx).adsrs[index].adsr.get_cur_frame_output().as_ptr()
+}
+
+/// If the ADSR is in the "Done" state, meaning it will output a constant value forever until gated
+/// again, this function will set the constant value to the given value.
+///
+/// Useful for situations where you're editing the ADSR interactively and want to see the effect of
+/// the change immediately.
+///
+/// Expects a normalized value in the range [0, 1].
+#[no_mangle]
+pub unsafe extern "C" fn adsr_set_frozen_output_value(
+    ctx: *mut AdsrContext,
+    new_frozen_output_value: f32,
+    output_range_min: f32,
+    output_range_max: f32,
+) {
+    let scale = output_range_max - output_range_min;
+    let shift = output_range_min;
+    for adsr in &mut (*ctx).adsrs {
+        adsr.adsr
+            .set_frozen_output_value(new_frozen_output_value, scale, shift);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn adsr_set_frozen_output_value_from_phase(
+    ctx: *mut AdsrContext,
+    new_frozen_output_phase: f32,
+    output_range_min: f32,
+    output_range_max: f32,
+) {
+    let scale = output_range_max - output_range_min;
+    let shift = output_range_min;
+    for adsr in &mut (*ctx).adsrs {
+        adsr.adsr
+            .set_frozen_output_value_from_phase(new_frozen_output_phase, scale, shift);
+    }
 }

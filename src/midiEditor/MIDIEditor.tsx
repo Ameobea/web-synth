@@ -629,6 +629,9 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
               deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
               setName={newName => parentInstance.renameCVOutput(output.name, newName)}
               registerInstance={uiInstance => output.registerUIInstance(uiInstance)}
+              setFrozenOutputValue={newFrozenOutputValue =>
+                output.backend.setFrozenOutputValue(newFrozenOutputValue)
+              }
             />
           ))}
         </div>

@@ -14,12 +14,15 @@
   export let collapse: () => void;
   export let deleteOutput: () => void;
   export let registerInstance: (instance: ADSR2Instance) => void;
+  export let setFrozenOutputValue: (frozenOutputValue: number) => void;
 
   let isEditingName = false;
   let nameWrapperHovered = false;
   let editingNameValue = name;
 
   // auto-updated width of the component
+  let forceNoRender = false;
+  let lastWidth: number | undefined;
   let width: number | undefined;
   let widthObserver: ResizeObserver | undefined;
   let widthObserverTarget: HTMLElement | undefined;
@@ -27,9 +30,18 @@
   $: if (widthObserverTarget) {
     widthObserver?.unobserve(widthObserverTarget);
     widthObserver = new ResizeObserver(entries => {
-      width = entries[0].contentRect.width - 120;
+      const newWidth = entries[0].contentRect.width - 120;
+      if (lastWidth !== undefined && newWidth !== lastWidth) {
+        console.log('re-rendering', { lastWidth, newWidth });
+        forceNoRender = true;
+      }
+      lastWidth = newWidth;
+      width = newWidth;
     });
     widthObserver.observe(widthObserverTarget);
+  }
+  $: if (forceNoRender) {
+    forceNoRender = false;
   }
 
   const openSettings = () =>
@@ -110,7 +122,7 @@
     ⚙
   </div>
 
-  {#if width}
+  {#if !forceNoRender && width && width > 0}
     <div style="margin-left: {PIANO_KEYBOARD_WIDTH - LEFT_GUTTER_WIDTH_PX}px;">
       <SvelteADSR2
         {width}
@@ -130,6 +142,7 @@
         instanceCb={registerInstance}
         enableInfiniteMode={true}
         disablePhaseVisualization={true}
+        {setFrozenOutputValue}
       />
     </div>
   {/if}

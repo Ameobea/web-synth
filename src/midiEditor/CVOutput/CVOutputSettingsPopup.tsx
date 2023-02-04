@@ -58,7 +58,6 @@ export const mkCVOutputSettingsPopup = (
         return;
       }
 
-      console.log({ ...state, minValue, maxValue, adsr: { ...state.adsr, logScale } });
       onSubmit({ ...state, minValue, maxValue, adsr: { ...state.adsr, logScale } });
     }, [onSubmit]);
     const settings = useMemo(

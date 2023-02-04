@@ -239,6 +239,8 @@ export default class MIDIEditorPlaybackHandler {
       this.lastSetCursorPosBeats = cursorPosBeats;
       this.startPlayback({ ...this.lastPlaybackSchedulParams, startTime: ctx.currentTime });
       return;
+    } else {
+      get(this.inst.cvOutputs).forEach(output => output.handleCursorPosChange(cursorPosBeats));
     }
     this.lastSetCursorPosBeats = cursorPosBeats;
     return true;

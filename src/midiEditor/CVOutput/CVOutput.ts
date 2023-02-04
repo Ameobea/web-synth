@@ -10,7 +10,7 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { get_midi_editor_audio_connectables, MIDIEditorInstance } from 'src/midiEditor';
 import type { MIDIEditorView } from 'src/midiEditor/MIDIEditorUIInstance';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { ADSR2Module, type ADSR2Params } from 'src/synthDesigner/ADSRModule';
+import { ADSR2Module, EarlyReleaseModeType, type ADSR2Params } from 'src/synthDesigner/ADSRModule';
 
 export interface CVOutputState {
   name: string;
@@ -85,7 +85,10 @@ export class CVOutput {
       logScale: state.adsr.logScale,
     };
 
-    this.backend = new ADSR2Module(ctx, params, 1);
+    this.backend = new ADSR2Module(ctx, params, 1, undefined, {
+      type: EarlyReleaseModeType.Freeze,
+      param: 0,
+    });
     this.backend
       .onInit()
       .then(() =>
@@ -129,6 +132,8 @@ export class CVOutput {
       };
       this.backend.setLength(AdsrLengthMode.Beats, lengthBeats);
       this.backend.setState(newBackendState);
+      this.backend.setOutputRange([newState.minValue, newState.maxValue]);
+      this.backend.setLogScale(newState.adsr.logScale ?? false);
     } catch (err) {
       console.error('CVOutput: error updating backend state', err);
     }
@@ -165,6 +170,18 @@ export class CVOutput {
     if (this.parentInstance.uiInstance) {
       this.handleStateChange(get(this.state));
     }
+  }
+
+  public handleCursorPosChange(newCursorPosBeats: number) {
+    const state = get(this.state);
+    const releasePoint = this.parentInstance.playbackHandler.getLoopPoint();
+    const lengthBeats = Math.max(
+      state.adsr.steps[state.adsr.steps.length - 1].x,
+      releasePoint ?? -Infinity
+    );
+    let normalizedX = newCursorPosBeats / lengthBeats;
+    normalizedX = Math.max(0, Math.min(1, normalizedX));
+    this.backend.setFrozenOutputValueFromPhase(normalizedX);
   }
 
   public serialize(): SerializedCVOutputState {

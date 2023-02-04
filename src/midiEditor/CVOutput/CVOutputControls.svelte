@@ -11,6 +11,7 @@
   export let state: Writable<CVOutputState>;
   export let deleteOutput: () => void;
   export let registerInstance: (instance: ADSR2Instance) => void;
+  export let setFrozenOutputValue: (frozenOutputValue: number) => void;
 
   const expand = () => {
     $state.isExpanded = true;
@@ -23,5 +24,13 @@
 {#if !$state.isExpanded}
   <CollapsedCvOutputControls {name} {expand} {deleteOutput} />
 {:else}
-  <CVOutputControlsInner {name} {state} {collapse} {deleteOutput} {setName} {registerInstance} />
+  <CVOutputControlsInner
+    {name}
+    {state}
+    {collapse}
+    {deleteOutput}
+    {setName}
+    {registerInstance}
+    {setFrozenOutputValue}
+  />
 {/if}

@@ -249,14 +249,29 @@ class RampCurve {
       case 'exponential': {
         const widthPx = step2PosXPx - step1PosXPx;
         const heightPx = (1 - step2.y - (1 - step1.y)) * this.inst.height;
-        const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
+        const isFullyOffScreen =
+          (step1PosXPx > this.inst.width && step2PosXPx > this.inst.width) ||
+          (step1PosXPx < 0 && step2PosXPx < 0);
+        const pointCount = isFullyOffScreen
+          ? 2
+          : Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
 
         const pts = [];
         for (let i = 0; i <= pointCount; i++) {
-          const x = i / pointCount;
-          const y = Math.pow(x, step2.ramper.exponent);
+          const pct = i / pointCount;
+          const x = step1.x + pct * (step2.x - step1.x);
+          const y = Math.pow(pct, step2.ramper.exponent);
+
+          if (i !== 0 && i !== pointCount - 1) {
+            const isOnScreen =
+              x > this.renderedRegion.start - 0.01 && x < this.renderedRegion.end + 0.01;
+            if (!isOnScreen) {
+              continue;
+            }
+          }
+
           pts.push({
-            x: step1PosXPx + x * widthPx,
+            x: step1PosXPx + pct * widthPx,
             y: (1 - step1.y) * this.inst.height + y * heightPx,
           });
         }
@@ -311,10 +326,39 @@ class StepHandle {
   private renderedRegion: RenderedRegion;
   private disableSnapToEnd: boolean;
 
-  private handleMove(newPos: PIXI.Point, thisHandleIx: number) {
-    this.graphics.position.copyFrom(newPos);
-    this.inst.sortAndUpdateMarks(thisHandleIx);
+  private handlePointerMove() {
+    if (!this.dragData) {
+      return;
+    }
+
+    const newPosition = this.dragData.getLocalPosition(this.graphics.parent);
+
+    // Clamp first and last points to the start and end of the envelope
+    const index = this.inst.steps.findIndex(s => s === this);
+    if (index === 0) {
+      newPosition.x = 0;
+    } else if (index === this.inst.steps.length - 1) {
+      if (this.disableSnapToEnd) {
+        newPosition.x = R.clamp(0.001, Infinity, newPosition.x);
+      } else {
+        newPosition.x = this.inst.width;
+      }
+    } else {
+      newPosition.x = R.clamp(0.001, this.inst.width - 0.0001, newPosition.x);
+    }
+    newPosition.y = R.clamp(0, this.inst.height - 0.0001, newPosition.y);
+
+    this.step.x = computeReverseTransformedXPosition(
+      this.renderedRegion,
+      this.inst.width,
+      newPosition.x
+    );
+    this.step.y = 1 - newPosition.y / this.inst.height;
+
+    this.graphics.position.copyFrom(newPosition);
+    this.inst.sortAndUpdateMarks(index);
     this.inst.onUpdated();
+    this.inst.setFrozenOutputValue?.(this.step.y);
   }
 
   private render() {
@@ -337,36 +381,7 @@ class StepHandle {
       .on('pointerupoutside', () => {
         this.dragData = null;
       })
-      .on('pointermove', () => {
-        if (!this.dragData) {
-          return;
-        }
-
-        const newPosition = this.dragData.getLocalPosition(this.graphics.parent);
-
-        // Clamp first and last points to the start and end of the envelope
-        const index = this.inst.steps.findIndex(s => s === this);
-        if (index === 0) {
-          newPosition.x = 0;
-        } else if (index === this.inst.steps.length - 1) {
-          if (this.disableSnapToEnd) {
-            newPosition.x = R.clamp(0.001, Infinity, newPosition.x);
-          } else {
-            newPosition.x = this.inst.width;
-          }
-        } else {
-          newPosition.x = R.clamp(0.001, this.inst.width - 0.0001, newPosition.x);
-        }
-        newPosition.y = R.clamp(0, this.inst.height - 0.0001, newPosition.y);
-
-        this.step.x = computeReverseTransformedXPosition(
-          this.renderedRegion,
-          this.inst.width,
-          newPosition.x
-        );
-        this.step.y = 1 - newPosition.y / this.inst.height;
-        this.handleMove(newPosition, index);
-      })
+      .on('pointermove', () => this.handlePointerMove())
       .on('rightdown', (evt: any) => {
         const data: PIXI.InteractionData = evt.data;
         data.originalEvent.preventDefault();
@@ -657,6 +672,7 @@ export class ADSR2Instance {
    * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
    */
   public vizContainer: PIXI.Container;
+  public setFrozenOutputValue: ((frozenOutputValue: number) => void) | undefined;
 
   /**
    * Returns the width of the canvas in pixels minus the horizontal gutters
@@ -844,7 +860,8 @@ export class ADSR2Instance {
     vcId?: string,
     debugName?: string,
     infiniteMode?: boolean,
-    disablePhaseVisualization?: boolean
+    disablePhaseVisualization?: boolean,
+    setFrozenOutputValue?: (frozenOutputValue: number) => void
   ) {
     if (!debugName) {
       console.trace('No debug name provided for ADSR');
@@ -868,6 +885,7 @@ export class ADSR2Instance {
       this.registerVcHideCb();
     }
 
+    this.setFrozenOutputValue = setFrozenOutputValue;
     this.infiniteMode = infiniteMode ?? false;
     this.disablePhaseVisualization = disablePhaseVisualization ?? false;
     this.audioThreadData = initialState.audioThreadData;
@@ -1092,6 +1110,7 @@ interface ADSR2Props {
   instanceCb?: (instance: ADSR2Instance) => void;
   enableInfiniteMode?: boolean;
   disablePhaseVisualization?: boolean;
+  setFrozenOutputValue?: (frozenOutputValue: number) => void;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -1120,6 +1139,7 @@ const ADSR2: React.FC<ADSR2Props> = ({
   instanceCb,
   enableInfiniteMode,
   disablePhaseVisualization,
+  setFrozenOutputValue,
 }) => {
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
@@ -1177,7 +1197,8 @@ const ADSR2: React.FC<ADSR2Props> = ({
             vcId,
             debugName,
             enableInfiniteMode,
-            disablePhaseVisualization
+            disablePhaseVisualization,
+            setFrozenOutputValue
           );
           instanceCb?.(instance.current);
         }}

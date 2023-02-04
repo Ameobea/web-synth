@@ -280,10 +280,13 @@ export const register = async (username: string, password: string) => {
 };
 
 export const getLoggedInUsername = async (): Promise<string | null> => {
+  const loginToken = await getLoginToken();
+  if (!loginToken) {
+    return null;
+  }
+
   const res = await fetch(`${BACKEND_BASE_URL}/logged_in_username`, {
-    headers: {
-      Authorization: await getLoginToken(),
-    },
+    headers: { Authorization: loginToken },
   });
   if (!res.ok) {
     return null;

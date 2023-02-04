@@ -91,7 +91,7 @@ pub enum GateStatus {
 }
 
 /// Method that we use if releasing the ADSR before we reach the release point
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum EarlyReleaseStrategy {
     /// We mix linearly between the start value (value of the ADSR when it was released) and the
     /// value at the release point linearly
@@ -99,6 +99,8 @@ pub enum EarlyReleaseStrategy {
     /// We follow the ADSR's envelope at an increased speed, bridging the gap between the point at
     /// which the ADSR was released and the release point in `len_samples` samples
     FastEnvelopeFollow,
+    /// We output the value at the point at which the ADSR was released forever
+    Freeze,
 }
 
 /// Determines how we handle releasing if the ADSR is ungated before the release point
@@ -106,6 +108,31 @@ pub enum EarlyReleaseStrategy {
 pub struct EarlyReleaseConfig {
     pub strategy: EarlyReleaseStrategy,
     pub len_samples: usize,
+}
+impl EarlyReleaseConfig {
+    pub(crate) fn from_parts(
+        early_release_mode_type: usize,
+        early_release_mode_param: usize,
+    ) -> EarlyReleaseConfig {
+        match early_release_mode_type {
+            0 => EarlyReleaseConfig {
+                strategy: EarlyReleaseStrategy::LinearMix,
+                len_samples: early_release_mode_param,
+            },
+            1 => EarlyReleaseConfig {
+                strategy: EarlyReleaseStrategy::FastEnvelopeFollow,
+                len_samples: early_release_mode_param,
+            },
+            2 => EarlyReleaseConfig {
+                strategy: EarlyReleaseStrategy::Freeze,
+                len_samples: 0,
+            },
+            _ => panic!(
+                "Invalid early release mode type: {}",
+                early_release_mode_type
+            ),
+        }
+    }
 }
 
 impl Default for EarlyReleaseConfig {
@@ -172,7 +199,7 @@ impl Adsr {
             steps,
             loop_point,
             rendered,
-            cur_frame_output: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            cur_frame_output: box [0.; FRAME_SIZE],
             len_samples,
             cached_phase_diff_per_sample: (1. / len_samples),
             store_phase_to: None,
@@ -201,7 +228,10 @@ impl Adsr {
             };
         } else {
             self.phase = self.release_start_phase;
-            self.gate_status = GateStatus::Releasing;
+            self.gate_status = match self.gate_status {
+                GateStatus::Done => GateStatus::Done,
+                _ => GateStatus::Releasing,
+            };
         }
     }
 
@@ -283,8 +313,13 @@ impl Adsr {
             if *cur_progress_samples <= self.early_release_config.len_samples {
                 return;
             } else {
-                self.phase = self.release_start_phase;
-                self.gate_status = GateStatus::Releasing;
+                match self.early_release_config.strategy {
+                    EarlyReleaseStrategy::LinearMix | EarlyReleaseStrategy::FastEnvelopeFollow => {
+                        self.phase = self.release_start_phase;
+                        self.gate_status = GateStatus::Releasing;
+                    },
+                    EarlyReleaseStrategy::Freeze => (),
+                }
             }
         }
 
@@ -330,6 +365,7 @@ impl Adsr {
                     EarlyReleaseStrategy::FastEnvelopeFollow => todo!(),
                     EarlyReleaseStrategy::LinearMix =>
                         dsp::mix(early_release_phase, release_start_point_y, start_y),
+                    EarlyReleaseStrategy::Freeze => start_y,
                 }
             },
             _ => {
@@ -351,29 +387,45 @@ impl Adsr {
         }
     }
 
+    fn fill_buffer_with_value(&mut self, value: f32, scale: f32, shift: f32) {
+        let mut frozen_output = value * if self.log_scale { 100. } else { scale + shift };
+        if self.log_scale {
+            let mut min = shift;
+            let max = min + scale;
+            if shift == 0. {
+                min = if max > 0. { 0.01 } else { -0.01 };
+            }
+
+            frozen_output = mk_linear_to_log(min, max, max.signum())(frozen_output);
+        }
+        for i in 0..FRAME_SIZE {
+            self.cur_frame_output[i] = frozen_output;
+        }
+    }
+
     /// Populates `self.cur_frame_output` with samples for the current frame
     pub fn render_frame(&mut self, scale: f32, shift: f32) {
         match self.gate_status {
             GateStatus::Gated
                 if self.loop_point.is_none() && self.phase >= self.release_start_phase =>
             {
-                // No loop point, so we freeze the output value and avoid re-rendering until after
-                // ungating
-                let mut frozen_output =
-                    self.get_sample() * if self.log_scale { 100. } else { scale + shift };
-                if self.log_scale {
-                    let mut min = shift;
-                    let max = min + scale;
-                    if shift == 0. {
-                        min = if max > 0. { 0.01 } else { -0.01 };
-                    }
-
-                    frozen_output = mk_linear_to_log(min, max, max.signum())(frozen_output);
-                }
-                for i in 0..FRAME_SIZE {
-                    self.cur_frame_output[i] = frozen_output;
-                }
-                self.gate_status = GateStatus::GatedFrozen;
+                let final_sample = self.get_sample();
+                self.fill_buffer_with_value(final_sample, scale, shift);
+                self.gate_status =
+                    if self.early_release_config.strategy == EarlyReleaseStrategy::Freeze {
+                        GateStatus::Done
+                    } else {
+                        GateStatus::GatedFrozen
+                    };
+                self.maybe_write_cur_phase();
+                return;
+            },
+            GateStatus::EarlyRelease {
+                start_y, start_x, ..
+            } if self.early_release_config.strategy == EarlyReleaseStrategy::Freeze => {
+                self.fill_buffer_with_value(start_y, scale, shift);
+                self.gate_status = GateStatus::Done;
+                self.phase = start_x;
                 self.maybe_write_cur_phase();
                 return;
             },
@@ -414,6 +466,32 @@ impl Adsr {
     }
 
     pub fn get_cur_frame_output(&self) -> &[f32; FRAME_SIZE] { &self.cur_frame_output }
+
+    pub fn set_frozen_output_value(
+        &mut self,
+        new_frozen_output_value: f32,
+        scale: f32,
+        shift: f32,
+    ) {
+        match self.gate_status {
+            GateStatus::Done => self.fill_buffer_with_value(new_frozen_output_value, scale, shift),
+            _ => (),
+        }
+    }
+
+    pub fn set_frozen_output_value_from_phase(&mut self, phase: f32, scale: f32, shift: f32) {
+        match self.gate_status {
+            GateStatus::Done => {
+                self.phase = phase;
+                let new_frozen_output_value = dsp::read_interpolated(
+                    &*self.rendered,
+                    phase * (RENDERED_BUFFER_SIZE - 2) as f32,
+                );
+                self.fill_buffer_with_value(new_frozen_output_value, scale, shift);
+            },
+            _ => panic!(),
+        }
+    }
 
     pub fn set_loop_point(&mut self, new_loop_point: Option<f32>) {
         self.loop_point = new_loop_point;

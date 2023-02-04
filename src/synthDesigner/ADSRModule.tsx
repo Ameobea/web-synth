@@ -40,9 +40,21 @@ export interface ADSR2Params {
   logScale?: boolean;
 }
 
+export enum EarlyReleaseModeType {
+  LinearMix = 0,
+  FastEnvelopeFollow = 1,
+  Freeze = 2,
+}
+
+export interface EarlyReleaseMode {
+  type: EarlyReleaseModeType;
+  param: number;
+}
+
 export class ADSR2Module {
   private ctx: AudioContext;
   private outputRange: [number, number];
+  private earlyReleaseMode: EarlyReleaseMode;
   private awp: AudioWorkletNode | undefined;
   /**
    * Params that will be sent to the AWP to initialize it
@@ -55,10 +67,12 @@ export class ADSR2Module {
     ctx: AudioContext,
     params: ADSR2Params,
     instanceCount: number,
-    audioThreadData?: AudioThreadData
+    audioThreadData?: AudioThreadData,
+    earlyReleaseMode: EarlyReleaseMode = { type: EarlyReleaseModeType.LinearMix, param: 2640 }
   ) {
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];
+    this.earlyReleaseMode = earlyReleaseMode;
     this.params = params;
     this.audioThreadData = audioThreadData ?? {
       phaseIndex: 0,
@@ -125,6 +139,8 @@ export class ADSR2Module {
       lengthMode: this.params.lengthMode,
       outputRange: this.outputRange,
       logScale: this.params.logScale ?? false,
+      earlyReleaseModeType: this.earlyReleaseMode.type,
+      earlyReleaseModeParam: this.earlyReleaseMode.param,
     });
     this.onInitializedCbs.forEach(cb => cb());
     this.onInitializedCbs = [];
@@ -254,6 +270,22 @@ export class ADSR2Module {
       return;
     }
     this.awp.port.postMessage({ type: 'setOutputRange', outputRange: [minVal, maxVal] });
+  }
+
+  public setFrozenOutputValue(newFrozenOutputValue: number) {
+    if (!this.awp) {
+      console.error('Tried to set ADSR2 frozen output value before AWP initialized');
+      return;
+    }
+    this.awp.port.postMessage({ type: 'setFrozenOutputValue', value: newFrozenOutputValue });
+  }
+
+  public setFrozenOutputValueFromPhase(phase: number) {
+    if (!this.awp) {
+      console.error('Tried to set ADSR2 frozen output value from phase before AWP initialized');
+      return;
+    }
+    this.awp.port.postMessage({ type: 'setFrozenOutputValueFromPhase', phase });
   }
 
   public gate(adsrIndex: number) {

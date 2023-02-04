@@ -13,6 +13,7 @@
   export let instanceCb: ((instance: ADSR2Instance) => void) | undefined;
   export let enableInfiniteMode: boolean | undefined = false;
   export let disablePhaseVisualization: boolean | undefined = false;
+  export let setFrozenOutputValue: ((frozenOutputValue: number) => void) | undefined;
 </script>
 
 <ReactShim
@@ -28,5 +29,6 @@
     instanceCb,
     enableInfiniteMode,
     disablePhaseVisualization,
+    setFrozenOutputValue,
   }}
 />

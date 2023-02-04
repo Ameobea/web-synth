@@ -26,7 +26,9 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
             evt.data.length,
             evt.data.lengthMode,
             evt.data.releaseStartPhase,
-            evt.data.logScale
+            evt.data.logScale,
+            evt.data.earlyReleaseModeType,
+            evt.data.earlyReleaseModeParam
           );
           break;
         }
@@ -98,8 +100,38 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
           this.outputRange = evt.data.outputRange;
           break;
         }
+        case 'setFrozenOutputValue': {
+          if (!this.wasmInstance) {
+            console.warn(
+              'Tried to set frozen output value before wasm inst initialize in ADSR2 AWP'
+            );
+            break;
+          }
+          this.wasmInstance.exports.adsr_set_frozen_output_value(
+            this.ctxPtr,
+            evt.data.value,
+            this.outputRange[0],
+            this.outputRange[1]
+          );
+          break;
+        }
+        case 'setFrozenOutputValueFromPhase': {
+          if (!this.wasmInstance) {
+            console.warn(
+              'Tried to set frozen output value from phase before wasm inst initialize in ADSR2 AWP'
+            );
+            break;
+          }
+          this.wasmInstance.exports.adsr_set_frozen_output_value_from_phase(
+            this.ctxPtr,
+            evt.data.phase,
+            this.outputRange[0],
+            this.outputRange[1]
+          );
+          break;
+        }
         default: {
-          console.error('Unhandled message type in ADSR2 AWP: ', evt.data.type);
+          console.error('Unhandled message type in ADSR2 AWP: ', evt.data.type, evt.data);
         }
       }
     };
@@ -134,7 +166,9 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     length,
     lengthMode,
     releaseStartPhase,
-    logScale
+    logScale,
+    earlyReleaseModeType,
+    earlyReleaseModeParam
   ) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule);
@@ -147,8 +181,9 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
       lengthMode,
       releaseStartPhase,
       this.adsrInstanceCount,
-      logScale
-      // false
+      logScale,
+      earlyReleaseModeType,
+      earlyReleaseModeParam
     );
     this.outputBufPtrs = new Array(this.adsrInstanceCount)
       .fill(null)
