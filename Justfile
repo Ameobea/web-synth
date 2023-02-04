@@ -257,3 +257,7 @@ build-quantizer:
 build-compressor:
   cd ./engine/compressor && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/compressor.wasm ../../public
+
+build-polysynth:
+  cd ./engine/polysynth && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/polysynth.wasm ../../public

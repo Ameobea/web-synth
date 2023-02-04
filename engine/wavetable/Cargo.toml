@@ -13,6 +13,7 @@ dsp = { path = "../dsp" }
 fastapprox = "0.3"
 common = { path = "../common" }
 compressor = { path = "../compressor" }
+polysynth = { path = "../polysynth", default-features = false }
 rand = "0.7"
 
 [features]

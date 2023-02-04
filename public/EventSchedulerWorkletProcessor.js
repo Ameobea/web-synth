@@ -1,3 +1,63 @@
+// Mailbox Layout:
+//
+// Ring buffer that contains a sequence of MIDI events.
+//
+// Each event has the following format:
+//
+// [0] = event type enum
+// [1] = (generic param 1)
+// [2] = (generic param 2)
+// [3] = sample index within current frame
+
+class MIDIEventMailboxRegistry {
+  constructor() {
+    this.mailboxes = new Map();
+  }
+
+  addMailbox(id) {
+    const buffer = new Float32Array(1024 * 256 * 4);
+    const mailbox = { startIx: 0, endIx: 0, f32: buffer, u32: new Uint32Array(buffer.buffer) };
+    this.mailboxes.set(id, mailbox);
+  }
+
+  submitEvent(id, eventType, param1, param2, sampleIx) {
+    const mailbox = this.mailboxes.get(id);
+    if (!mailbox) {
+      console.error(`Tried to submit event to unknown mailbox: ${id}`);
+      return;
+    }
+
+    const ix = mailbox.endIx;
+    mailbox.u32[ix] = eventType;
+    mailbox.f32[ix + 1] = param1;
+    mailbox.f32[ix + 2] = param2;
+    mailbox.u32[ix + 3] = sampleIx;
+    mailbox.endIx = (ix + 4) % mailbox.f32.length;
+  }
+
+  getEvent(id) {
+    const mailbox = this.mailboxes.get(id);
+    if (!mailbox) {
+      console.error(`Tried to get event from unknown mailbox: ${id}`);
+      return;
+    }
+
+    if (mailbox.startIx === mailbox.endIx) {
+      return null;
+    }
+
+    const ix = mailbox.startIx;
+    const eventType = mailbox.u32[ix];
+    const param1 = mailbox.f32[ix + 1];
+    const param2 = mailbox.f32[ix + 2];
+    const sampleIx = mailbox.u32[ix + 3];
+    mailbox.startIx = (ix + 4) % mailbox.f32.length;
+    return { eventType, param1, param2, sampleIx };
+  }
+}
+
+globalThis.midiEventMailboxRegistry = new MIDIEventMailboxRegistry();
+
 class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [

@@ -2,7 +2,6 @@
 
 use std::mem;
 
-use common::uuid_v4;
 use js_sys::Function;
 use polysynth::{PolySynth, SynthCallbacks};
 use rimd::{MidiMessage, Status};
@@ -14,11 +13,8 @@ pub struct MsgHandlerContext {
     pub pitch_bend: Option<Function>,
     pub mod_wheel: Option<Function>,
     pub voice_manager: PolySynth<
-        Box<dyn Fn(String, usize) -> usize>,
-        Box<dyn Fn(usize, usize, usize, u8, Option<f32>)>,
-        Box<dyn Fn(usize, usize, usize, Option<f32>)>,
-        Box<dyn Fn(usize, usize, f32, f32)>,
-        Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
+        Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+        Box<dyn Fn(usize, usize, Option<f32>)>,
     >,
     pub generic_control_handler: Option<Function>,
 }
@@ -41,12 +37,9 @@ pub fn create_msg_handler_context(
         mod_wheel,
         // Insert temporary pointers for now that we will swap out once we have psueo-static
         // pointers to the boxed `Function`s
-        voice_manager: PolySynth::new(uuid_v4(), true, SynthCallbacks {
-            init_synth: box |_, _| 0usize,
-            trigger_release: box |_, _, _, _| panic!(),
-            trigger_attack: box |_, _, _, _, _| panic!(),
-            trigger_attack_release: box |_, _, _, _| panic!(),
-            schedule_events: box |_, _, _, _| panic!(),
+        voice_manager: PolySynth::new(SynthCallbacks {
+            trigger_release: box |_, _, _| panic!(),
+            trigger_attack: box |_, _, _, _| panic!(),
         }),
         generic_control_handler,
     };
@@ -56,9 +49,7 @@ pub fn create_msg_handler_context(
     let release_note: *const Function = &ctx.release_note as *const Function;
 
     let synth_cbs = SynthCallbacks {
-        init_synth: (box move |_, _| 0usize) as Box<dyn Fn(String, usize) -> usize>, // No-op
-        trigger_attack: (box move |_synth_ix: usize,
-                                   voice_ix: usize,
+        trigger_attack: (box move |voice_ix: usize,
                                    note_id: usize,
                                    velocity: u8,
                                    offset: Option<f32>| {
@@ -80,11 +71,8 @@ pub fn create_msg_handler_context(
                     Err(err) => error!("Error playing note: {:?}", err),
                 }
             };
-        }) as Box<dyn Fn(usize, usize, usize, u8, Option<f32>)>,
-        trigger_release: (box move |_synth_ix: usize,
-                                    voice_ix: usize,
-                                    note_id: usize,
-                                    offset: Option<f32>| {
+        }) as Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+        trigger_release: (box move |voice_ix: usize, note_id: usize, offset: Option<f32>| {
             if cfg!(debug_assertions) && offset.is_some() {
                 warn!(
                     "Offset provided to streaming synth release CB, but it doesn't support \
@@ -102,11 +90,7 @@ pub fn create_msg_handler_context(
                     Err(err) => error!("Error playing note: {:?}", err),
                 }
             };
-        }) as Box<dyn Fn(usize, usize, usize, Option<f32>)>,
-        trigger_attack_release: (box move |_: usize, _: usize, _: f32, _: f32| unimplemented!())
-            as Box<dyn Fn(usize, usize, f32, f32)>,
-        schedule_events: (box move |_: usize, _: &[u8], _: &[usize], _: &[f32]| unimplemented!())
-            as Box<dyn Fn(usize, &[u8], &[usize], &[f32])>,
+        }) as Box<dyn Fn(usize, usize, Option<f32>)>,
     };
     let _ = mem::replace(&mut ctx.voice_manager.synth_cbs, synth_cbs);
 

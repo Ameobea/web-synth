@@ -966,6 +966,19 @@ export default class FMSynth implements ForeignNode {
     )!.value = frequency;
   }
 
+  public clearOutputBuffer(voiceIx: number) {
+    throw new Error();
+    if (!this.awpHandle) {
+      console.warn('Tried to clear FM synth output buffer before AWP initialized');
+      return;
+    }
+
+    (this.awpHandle.parameters as Map<string, AudioParam>).get(
+      `voice_${voiceIx}_base_frequency`
+    )!.value = 0;
+    this.awpHandle.port.postMessage({ type: 'clearOutputBuffer', voiceIx });
+  }
+
   public handleDetuneChange(newDetune: ParamSource | null) {
     this.detune = R.clone(newDetune);
     if (!this.awpHandle) {

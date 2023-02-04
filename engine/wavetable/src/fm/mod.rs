@@ -1,5 +1,6 @@
 #[cfg(feature = "simd")]
 use core::arch::wasm32::*;
+use polysynth::{PolySynth, SynthCallbacks};
 use rand::Rng;
 use std::{cell::Cell, rc::Rc};
 
@@ -1542,6 +1543,10 @@ pub struct FMSynthContext {
     pub detune: Option<ParamSource>,
     pub wavetables: Vec<WaveTable>,
     pub sample_mapping_manager: SampleMappingManager,
+    pub polysynth: PolySynth<
+        Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+        Box<dyn Fn(usize, usize, Option<f32>)>,
+    >,
 }
 
 impl FMSynthContext {
@@ -1549,15 +1554,16 @@ impl FMSynthContext {
         for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
             let base_frequency_buffer =
                 unsafe { self.base_frequency_input_buffer.get_unchecked(voice_ix) };
+            let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
             if unsafe { *base_frequency_buffer.get_unchecked(0) } == 0. {
                 for adsr in &mut voice.adsrs {
                     if let Some(store_phase_to) = adsr.store_phase_to {
                         unsafe { *store_phase_to = 0. };
                     }
                 }
+                // output_buffer.fill(0.);
                 continue;
             }
-            let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
 
             voice.gen_samples(
                 &mut self.modulation_matrix,
@@ -1632,6 +1638,10 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         detune: None,
         wavetables: Vec::new(),
         sample_mapping_manager: SampleMappingManager::default(),
+        polysynth: PolySynth::new(SynthCallbacks {
+            trigger_attack: Box::new(|_, _, _, _| todo!()),
+            trigger_release: Box::new(|_, _, _| todo!()),
+        }),
     });
     for i in 0..OPERATOR_COUNT {
         (*ctx)
@@ -2118,6 +2128,12 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize, m
             operator.oscillator_source.set_phase(initial_phases);
         }
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_clear_output_buffer(ctx: *mut FMSynthContext, voice_ix: usize) {
+    let buf = &mut (*ctx).output_buffers[voice_ix];
+    buf.fill(0.);
 }
 
 #[no_mangle]

@@ -1,4 +1,4 @@
-import { type PromiseResolveType, UnreachableException } from 'ameo-utils';
+import { UnreachableException, type PromiseResolveType } from 'ameo-utils';
 import * as R from 'ramda';
 
 /**
@@ -32,6 +32,10 @@ export class MIDINode {
   private outputCbs_: MIDIInputCbs[] = [];
   public getInputCbs: () => MIDIInputCbs;
   private cachedInputCbs: MIDIInputCbs | null = null;
+  /**
+   * If set to true, indicates that this MIDI node is able to receive events directly on the audio thread.
+   */
+  public enableRxAudioThreadScheduling: false | { mailboxID: string } = false;
 
   constructor(getInputCbs?: (() => MIDIInputCbs) | undefined) {
     this.getInputCbs =

@@ -338,6 +338,16 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
           break;
         }
+        case 'clearOutputBuffer': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to clear output buffer before Wasm instance loaded');
+            return;
+          }
+
+          console.log({ voiceIx: evt.data.voiceIx });
+          this.wasmInstance.exports.fm_synth_clear_output_buffer(this.ctxPtr, evt.data.voiceIx);
+          break;
+        }
         case 'shutdown': {
           this.shutdown = true;
           break;

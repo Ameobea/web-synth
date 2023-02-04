@@ -78,7 +78,7 @@ function updateFilterNode<K extends keyof FilterParams>(
   key: K,
   val: FilterParams[K]
 ): AbstractFilterModule[] | null {
-  switch (key) {
+  switch (key as string) {
     case 'type': {
       filters.forEach(filter => filter.destroy());
       return new Array(filters.length)
@@ -200,10 +200,8 @@ const connectFMSynth = (stateKey: string, synthIx: number) => {
   connectOscillators(false, targetSynth);
   connectOscillators(true, targetSynth);
 
-  // setTimeout(() => {
   const newConnectables = get_synth_designer_audio_connectables(`synthDesigner_${vcId}`);
   updateConnectables(vcId, newConnectables);
-  // });
 };
 
 export const gateSynthDesigner = (
@@ -255,16 +253,17 @@ export const ungateSynthDesigner = (
         if (!targetSynth) {
           return;
         }
-        const targetVoice = voices[voiceIx];
-        if (targetVoice.lastGateOrUngateTime !== ungateTime) {
-          // Voice has been re-gated before it finished playing last time; do not disconnect
-          return;
-        }
+        // const targetVoice = voices[voiceIx];
+        // if (targetVoice.lastGateOrUngateTime !== ungateTime) {
+        //   // Voice has been re-gated before it finished playing last time; do not disconnect
+        //   return;
+        // }
 
         targetVoice.outerGainNode.disconnect();
 
         // Optimization to avoid computing voices that aren't playing
         targetSynth.fmSynth.setFrequency(voiceIx, 0);
+        // targetSynth.fmSynth.clearOutputBuffer(voiceIx);
       },
       // We wait until the voice is done playing, accounting for the early-release phase and
       // adding a little bit extra leeway
@@ -574,6 +573,10 @@ const actionGroups = {
         instance.connect(state.spectrumNode);
       }
       (instance as any).isPaused = state.isHidden;
+
+      // state.synths.forEach(synth =>
+      //   synth.voices.forEach(voice => voice.outerGainNode.connect(instance))
+      // );
 
       return { ...state, wavyJonesInstance: instance };
     },

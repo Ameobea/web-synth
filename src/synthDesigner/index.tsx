@@ -34,9 +34,10 @@ const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 const buildSynthDesignerMIDINode = (
   getState: () => {
     synthDesigner: SynthDesignerState;
-  }
-): MIDINode =>
-  new MIDINode(() => {
+  },
+  vcId: string
+): MIDINode => {
+  const node = new MIDINode(() => {
     const onAttack = (note: number, velocity: number) => {
       const polysynthCtx = getState().synthDesigner.polysynthCtx;
       if (!polysynthCtx) {
@@ -66,6 +67,9 @@ const buildSynthDesignerMIDINode = (
       },
     };
   });
+  node.enableRxAudioThreadScheduling = { mailboxID: vcId };
+  return node;
+};
 
 export const init_synth_designer = (stateKey: string) => {
   // Create a fresh Redux store just for this instance.  It makes things a lot simpler on the Redux side due to the
@@ -102,7 +106,7 @@ export const init_synth_designer = (stateKey: string) => {
     });
 
   const reduxInfra = buildSynthDesignerRedux(vcId, initialState);
-  const midiNode = buildSynthDesignerMIDINode(reduxInfra.getState);
+  const midiNode = buildSynthDesignerMIDINode(reduxInfra.getState, vcId);
   SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED', midiNode });
 
   PolysynthMod.get().then(mod => {
