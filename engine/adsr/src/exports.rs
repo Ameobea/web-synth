@@ -28,10 +28,20 @@ impl ManagedAdsr {
 
     pub fn render(&mut self) { self.adsr.render(); }
 
-    pub fn render_frame(&mut self, scale: f32, shift: f32, cur_bpm: f32) {
+    pub fn render_frame(
+        &mut self,
+        scale: f32,
+        shift: f32,
+        cur_bpm: f32,
+        cur_frame_start_beat: f32,
+    ) {
         let length_samples = self.get_len_samples(cur_bpm);
-        self.adsr.set_len_samples(length_samples);
-        self.adsr.render_frame(scale, shift);
+        let length_beats = match self.length_mode {
+            AdsrLengthMode::Ms => None,
+            AdsrLengthMode::Beats => Some(self.length),
+        };
+        self.adsr.set_len(length_samples, length_beats);
+        self.adsr.render_frame(scale, shift, cur_frame_start_beat);
     }
 }
 
@@ -146,6 +156,10 @@ pub unsafe extern "C" fn create_adsr_ctx(
                 Some(loop_point)
             },
             10_000., // will be updated during render
+            match length_mode {
+                AdsrLengthMode::Ms => None,
+                AdsrLengthMode::Beats => Some(length),
+            },
             release_start_phase,
             Rc::clone(&rendered),
             crate::EarlyReleaseConfig::from_parts(
@@ -192,8 +206,8 @@ pub unsafe extern "C" fn update_adsr_len_ms(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext, index: usize) {
-    (*ctx).adsrs[index].adsr.gate();
+pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext, index: usize, cur_beat: f32) {
+    (*ctx).adsrs[index].adsr.gate(cur_beat);
     (*ctx).most_recent_gated_ix = index;
 }
 
@@ -210,11 +224,12 @@ pub unsafe extern "C" fn process_adsr(
     output_range_min: f32,
     output_range_max: f32,
     cur_bpm: f32,
+    cur_beat: f32,
 ) -> f32 {
     let shift = output_range_min;
     let scale = output_range_max - output_range_min;
     for adsr in &mut (*ctx).adsrs {
-        adsr.render_frame(scale, shift, cur_bpm);
+        adsr.render_frame(scale, shift, cur_bpm, cur_beat);
     }
 
     (*ctx).adsrs[(*ctx).most_recent_gated_ix].adsr.phase

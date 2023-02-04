@@ -32,7 +32,6 @@
     widthObserver = new ResizeObserver(entries => {
       const newWidth = entries[0].contentRect.width - 120;
       if (lastWidth !== undefined && newWidth !== lastWidth) {
-        console.log('re-rendering', { lastWidth, newWidth });
         forceNoRender = true;
       }
       lastWidth = newWidth;
@@ -152,7 +151,6 @@
   .root {
     display: flex;
     flex-direction: column;
-    height: 240px;
   }
 
   .name-wrapper {

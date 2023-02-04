@@ -65,7 +65,8 @@ export class CVOutput {
     ctx: AudioContext,
     midiEditorVCId: string,
     name: string,
-    state: SerializedCVOutputState
+    state: SerializedCVOutputState,
+    silentOutput: GainNode
   ) {
     this.parentInstance = parentInstance;
     this.ctx = ctx;
@@ -89,11 +90,14 @@ export class CVOutput {
       type: EarlyReleaseModeType.Freeze,
       param: 0,
     });
-    this.backend
-      .onInit()
-      .then(() =>
-        updateConnectables(midiEditorVCId, get_midi_editor_audio_connectables(midiEditorVCId))
-      );
+    this.backend.onInit().then(() => {
+      // We connect the backend to a gain node with a gain of 0.  This prevents the backend from getting
+      // stopped if it is disconnected
+      this.backend.getOutput().then(output => output.connect(silentOutput));
+      updateConnectables(midiEditorVCId, get_midi_editor_audio_connectables(midiEditorVCId));
+      const cursorPosBeats = this.parentInstance.playbackHandler.getCursorPosBeats();
+      this.handleCursorPosChange(cursorPosBeats);
+    });
 
     this.onChangeUnsub = this.state.subscribe(newState => this.handleStateChange(newState));
   }
@@ -122,7 +126,7 @@ export class CVOutput {
 
       const normalizedReleasePoint = releasePoint === null ? null : releasePoint / lengthBeats;
 
-      const newBackendState = {
+      const newBackendState: Adsr = {
         ...newState.adsr,
         steps: normalizedSteps,
         lengthMode: AdsrLengthMode.Beats,
@@ -130,10 +134,9 @@ export class CVOutput {
         releasePoint: normalizedReleasePoint ?? 1,
         loopPoint: releasePoint === null ? null : 0,
       };
-      this.backend.setLength(AdsrLengthMode.Beats, lengthBeats);
       this.backend.setState(newBackendState);
+      this.backend.setLength(AdsrLengthMode.Beats, lengthBeats);
       this.backend.setOutputRange([newState.minValue, newState.maxValue]);
-      this.backend.setLogScale(newState.adsr.logScale ?? false);
     } catch (err) {
       console.error('CVOutput: error updating backend state', err);
     }

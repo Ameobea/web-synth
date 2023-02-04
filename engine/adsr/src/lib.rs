@@ -149,7 +149,6 @@ pub struct Adsr {
     /// From 0 to 1 representing position in the ADSR from start to end
     pub phase: f32,
     pub gate_status: GateStatus,
-    /// Point at which the decay begins.
     pub release_start_phase: f32,
     pub early_release_config: EarlyReleaseConfig,
     steps: Vec<AdsrStep>,
@@ -162,6 +161,12 @@ pub struct Adsr {
     /// A buffer into which the current output for the ADSR is rendered each frame
     cur_frame_output: Box<[f32; FRAME_SIZE]>,
     len_samples: f32,
+    /// Beat on which the current gate started.  If loop is enabled, this is the beat on which the
+    /// current loop started.
+    gated_beat: f32,
+    /// If this is set, it is assumed that the ADSR is in beats length mode.  In this case, the
+    /// ADSR will be synchronized with the global beat counter.
+    len_beats: Option<f32>,
     /// Optimization to avoid having to do some math in the hot path.  Always should be equal to
     /// `(1 / len_samples) `
     cached_phase_diff_per_sample: f32,
@@ -183,6 +188,7 @@ impl Adsr {
         steps: Vec<AdsrStep>,
         loop_point: Option<f32>,
         len_samples: f32,
+        len_beats: Option<f32>,
         release_start_phase: f32,
         rendered: Rc<[f32; RENDERED_BUFFER_SIZE]>,
         early_release_config: EarlyReleaseConfig,
@@ -201,14 +207,17 @@ impl Adsr {
             rendered,
             cur_frame_output: box [0.; FRAME_SIZE],
             len_samples,
+            gated_beat: 0.,
+            len_beats,
             cached_phase_diff_per_sample: (1. / len_samples),
             store_phase_to: None,
             log_scale,
         }
     }
 
-    pub fn gate(&mut self) {
+    pub fn gate(&mut self, cur_beat: f32) {
         self.phase = 0.;
+        self.gated_beat = cur_beat;
         self.gate_status = GateStatus::Gated;
     }
 
@@ -294,8 +303,9 @@ impl Adsr {
         }
     }
 
-    pub fn set_len_samples(&mut self, new_len_samples: f32) {
+    pub fn set_len(&mut self, new_len_samples: f32, new_len_beats: Option<f32>) {
         self.len_samples = new_len_samples;
+        self.len_beats = new_len_beats;
         self.cached_phase_diff_per_sample = 1. / new_len_samples;
     }
 
@@ -303,7 +313,12 @@ impl Adsr {
     ///
     /// TODO: Fastpath this if we are not close to hitting the decay point (if gated) or the end of
     /// the waveform (if released)
-    fn advance_phase(&mut self) {
+    fn advance_phase(
+        &mut self,
+        cur_frame_start_phase: &mut f32,
+        cur_frame_start_beat: f32,
+        cur_ix_in_frame: usize,
+    ) {
         if let GateStatus::EarlyRelease {
             cur_progress_samples,
             ..
@@ -323,18 +338,58 @@ impl Adsr {
             }
         }
 
-        self.phase = (self.phase + self.cached_phase_diff_per_sample).min(1.);
+        if !matches!(self.gate_status, GateStatus::Gated) {
+            return;
+        }
+
+        if *cur_frame_start_phase > -1. && self.len_beats.is_some() {
+            let len_beats = self.len_beats.unwrap();
+
+            // In order to keep our phase in sync with the global beat counter and prevent drift
+            // caused by floating point inaccuracies and other things, we interpolate between the
+            // phase we count ourselves and the expected phase at the end of the current frame as
+            // computed from the current beat from the global beat counter.
+
+            let cur_loop_progress_beats = (cur_frame_start_beat - self.gated_beat).max(0.);
+            let cur_frame_expected_start_phase = cur_loop_progress_beats / len_beats;
+
+            let cur_frame_phase_length = self.cached_phase_diff_per_sample * FRAME_SIZE as f32;
+            let cur_sample_expected_phase = cur_frame_expected_start_phase
+                + cur_frame_phase_length * cur_ix_in_frame as f32 / (FRAME_SIZE - 1) as f32;
+            let cur_sample_expected_phase = cur_sample_expected_phase.max(0.);
+            let cur_sample_computed_phase = *cur_frame_start_phase
+                + (self.cached_phase_diff_per_sample * cur_ix_in_frame as f32);
+
+            let mix = cur_ix_in_frame as f32 / (FRAME_SIZE - 1) as f32;
+            self.phase = cur_sample_expected_phase * mix + cur_sample_computed_phase * (1. - mix);
+        } else {
+            self.phase += self.cached_phase_diff_per_sample;
+        }
 
         // We are gating and have crossed the release point
-        if self.gate_status == GateStatus::Gated && self.phase >= self.release_start_phase {
+        if self.phase >= self.release_start_phase {
+            // Disable the global beat sync if we've reset the loop since we can no longer
+            // accurately track things
+            *cur_frame_start_phase = -100.;
+
             if let Some(loop_start) = self.loop_point {
                 if self.release_start_phase <= loop_start {
                     self.phase = loop_start;
+                    if let Some(len_beats) = self.len_beats {
+                        let loop_len_normalized = self.release_start_phase - loop_start;
+                        let loop_len_beats = loop_len_normalized * len_beats;
+                        self.gated_beat += loop_len_beats;
+                    }
                     return;
                 }
                 let overflow_amount = self.phase - self.release_start_phase;
                 let loop_size = self.release_start_phase - loop_start;
                 self.phase = loop_start + ((overflow_amount / loop_size).fract() * loop_size);
+                if let Some(len_beats) = self.len_beats {
+                    let loop_len_normalized = self.release_start_phase - loop_start;
+                    let loop_len_beats = loop_len_normalized * len_beats;
+                    self.gated_beat += loop_len_beats;
+                }
             } else {
                 // Lock our phase to the release point if we're still gated.  Transitioning to
                 // `GateStatus::GatedFrozen` is handled in `render_frame()`.
@@ -344,8 +399,13 @@ impl Adsr {
     }
 
     /// Advance the ADSR state by one sample worth and return the output for the current sample
-    fn get_sample(&mut self) -> f32 {
-        self.advance_phase();
+    fn get_sample(
+        &mut self,
+        cur_frame_start_phase: &mut f32,
+        cur_frame_start_beat: f32,
+        cur_ix_in_frame: usize,
+    ) -> f32 {
+        self.advance_phase(cur_frame_start_phase, cur_frame_start_beat, cur_ix_in_frame);
 
         let sample = match self.gate_status {
             GateStatus::EarlyRelease {
@@ -404,12 +464,17 @@ impl Adsr {
     }
 
     /// Populates `self.cur_frame_output` with samples for the current frame
-    pub fn render_frame(&mut self, scale: f32, shift: f32) {
+    pub fn render_frame(&mut self, scale: f32, shift: f32, cur_frame_start_beat: f32) {
+        let mut cur_frame_start_phase = self.phase;
         match self.gate_status {
             GateStatus::Gated
                 if self.loop_point.is_none() && self.phase >= self.release_start_phase =>
             {
-                let final_sample = self.get_sample();
+                let final_sample = self.get_sample(
+                    &mut cur_frame_start_phase,
+                    cur_frame_start_beat,
+                    FRAME_SIZE - 1,
+                );
                 self.fill_buffer_with_value(final_sample, scale, shift);
                 self.gate_status =
                     if self.early_release_config.strategy == EarlyReleaseStrategy::Freeze {
@@ -442,11 +507,14 @@ impl Adsr {
 
         if self.log_scale {
             for i in 0..FRAME_SIZE {
-                self.cur_frame_output[i] = self.get_sample() * 100.;
+                self.cur_frame_output[i] =
+                    self.get_sample(&mut cur_frame_start_phase, cur_frame_start_beat, i) * 100.;
             }
         } else {
             for i in 0..FRAME_SIZE {
-                self.cur_frame_output[i] = self.get_sample() * scale + shift;
+                self.cur_frame_output[i] =
+                    self.get_sample(&mut cur_frame_start_phase, cur_frame_start_beat, i) * scale
+                        + shift;
             }
         }
         self.maybe_write_cur_phase();

@@ -112,6 +112,8 @@ export class ADSR2Module {
           this.audioThreadData.buffer = new Float32Array(
             evt.data.phaseDataBuffer as SharedArrayBuffer
           );
+          this.onInitializedCbs.forEach(cb => cb());
+          this.onInitializedCbs = [];
           break;
         }
         default: {
@@ -142,8 +144,6 @@ export class ADSR2Module {
       earlyReleaseModeType: this.earlyReleaseMode.type,
       earlyReleaseModeParam: this.earlyReleaseMode.param,
     });
-    this.onInitializedCbs.forEach(cb => cb());
-    this.onInitializedCbs = [];
   }
 
   /**
@@ -266,7 +266,6 @@ export class ADSR2Module {
   public setOutputRange([minVal, maxVal]: [number, number]) {
     this.outputRange = [minVal, maxVal];
     if (!this.awp) {
-      console.error('Tried to set ADSR2 output range before AWP initialized');
       return;
     }
     this.awp.port.postMessage({ type: 'setOutputRange', outputRange: [minVal, maxVal] });
@@ -319,6 +318,7 @@ export class ADSR2Module {
     if (!this.awp) {
       throw new UnreachableException('Tried to destroy AWP before initialization');
     }
+    this.awp.disconnect();
     this.awp.port.postMessage({ type: 'shutdown' });
   }
 }

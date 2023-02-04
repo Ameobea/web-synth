@@ -26,6 +26,7 @@ export class MIDIEditorInstance {
   public uiInstance: MIDIEditorUIInstance | undefined;
   public lineCount: number;
   private ctx: AudioContext;
+  private silentOutput: GainNode;
 
   public cvOutputs: Writable<CVOutput[]>;
 
@@ -67,11 +68,13 @@ export class MIDIEditorInstance {
     this.ctx = ctx;
     this.lineCount = initialState.lines.length;
     this.vcId = vcId;
+    this.silentOutput = new GainNode(ctx);
+    this.silentOutput.gain.value = 0;
 
     this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
     this.cvOutputs = writable(
       initialState.cvOutputStates?.map(
-        state => new CVOutput(this, this.ctx, this.vcId, state.name, state)
+        state => new CVOutput(this, this.ctx, this.vcId, state.name, state, this.silentOutput)
       ) ?? []
     );
 
@@ -130,7 +133,8 @@ export class MIDIEditorInstance {
       this.ctx,
       this.vcId,
       name,
-      buildDefaultCVOutputState(this.vcId, name)
+      buildDefaultCVOutputState(this.vcId, name),
+      this.silentOutput
     );
     cvOutputs.push(cvOutput);
     this.cvOutputs.set(cvOutputs);

@@ -825,6 +825,7 @@ impl FMSynthVoice {
                 build_default_gain_adsr_steps(),
                 None,
                 44_100.,
+                None,
                 0.975,
                 shared_gain_adsr_rendered_buffer,
                 EarlyReleaseConfig {
@@ -870,8 +871,8 @@ impl FMSynthVoice {
                 .len_samples
                 // Cannot use ADSR or base frequency as param sources for ADSR length
                 .get(param_buffers, &[], 0, 0.);
-            adsr.set_len_samples(len_samples);
-            adsr.render_frame(1., 0.);
+            adsr.set_len(len_samples, None);
+            adsr.render_frame(1., 0., 0.);
         }
 
         // If necessary, compute detuned base frequency based off of detune param
@@ -1569,7 +1570,7 @@ impl FMSynthContext {
                 &self.sample_mapping_manager,
             );
 
-            voice.gain_envelope.render_frame(1., 0.);
+            voice.gain_envelope.render_frame(1., 0., 0.);
             // TODO: SIMD-ify
             let gain_adsr_output = voice.gain_envelope.get_cur_frame_output();
             for i in 0..FRAME_SIZE {
@@ -2097,11 +2098,11 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize, m
     let voice = &mut (*ctx).voices[voice_ix];
     for (i, adsr) in voice.adsrs.iter_mut().enumerate() {
         adsr.store_phase_to = Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(i));
-        adsr.gate();
+        adsr.gate(0.);
     }
 
     voice.last_gated_midi_number = midi_number;
-    voice.gain_envelope.gate();
+    voice.gain_envelope.gate(0.);
     voice.gain_envelope.store_phase_to =
         Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(GAIN_ENVELOPE_PHASE_BUF_INDEX));
 
@@ -2170,7 +2171,8 @@ pub unsafe extern "C" fn set_adsr(
             } else {
                 Some(loop_point)
             },
-            0., // This will be overridden when ADSRs are rendered
+            0.,   // This will be overridden when ADSRs are rendered
+            None, // Maybe we want to set this later?
             release_start_phase,
             shared_buffer.clone(),
             EarlyReleaseConfig::default(),
@@ -2214,7 +2216,7 @@ pub unsafe extern "C" fn set_adsr(
             if adsr_ix >= 0 {
                 voice.adsr_params[adsr_ix as usize] = params;
             } else {
-                old_adsr.set_len_samples(len_samples_float_val);
+                old_adsr.set_len(len_samples_float_val, None);
             }
         } else if voice.adsrs.len() != adsr_ix as usize {
             panic!(
@@ -2256,7 +2258,7 @@ pub unsafe extern "C" fn set_adsr_length(
     if adsr_ix < 0 {
         // gain envelope
         for voice in &mut (*ctx).voices {
-            voice.gain_envelope.set_len_samples(len_samples_float_val);
+            voice.gain_envelope.set_len(len_samples_float_val, None);
         }
         return;
     }

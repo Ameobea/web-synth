@@ -85,7 +85,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
             console.warn('Tried to gate before wasm inst initialize in ADSR2 AWP');
             break;
           }
-          this.wasmInstance.exports.gate_adsr(this.ctxPtr, evt.data.index);
+          this.wasmInstance.exports.gate_adsr(this.ctxPtr, evt.data.index, globalThis.curBeat);
           break;
         }
         case 'ungate': {
@@ -171,7 +171,9 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
     earlyReleaseModeParam
   ) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
-    this.wasmInstance = await WebAssembly.instantiate(compiledModule);
+    this.wasmInstance = await WebAssembly.instantiate(compiledModule, {
+      env: { debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }) },
+    });
 
     this.setEncodedSteps(encodedSteps);
 
@@ -221,7 +223,8 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
       this.ctxPtr,
       this.outputRange[0],
       this.outputRange[1],
-      globalThis.globalTempoBPM
+      globalThis.globalTempoBPM,
+      globalThis.curBeat
     );
     // Record the current phase of the most recently gated ADSR which will be displayed
     // in the UI as an indicator on the ADSR UI
