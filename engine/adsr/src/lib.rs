@@ -338,10 +338,6 @@ impl Adsr {
             }
         }
 
-        if !matches!(self.gate_status, GateStatus::Gated) {
-            return;
-        }
-
         if *cur_frame_start_phase > -1. && self.len_beats.is_some() {
             let len_beats = self.len_beats.unwrap();
 
@@ -363,11 +359,15 @@ impl Adsr {
             let mix = cur_ix_in_frame as f32 / (FRAME_SIZE - 1) as f32;
             self.phase = cur_sample_expected_phase * mix + cur_sample_computed_phase * (1. - mix);
         } else {
-            self.phase += self.cached_phase_diff_per_sample;
+            if matches!(self.gate_status, GateStatus::Gated) {
+                self.phase += self.cached_phase_diff_per_sample;
+            } else {
+                self.phase = (self.phase + self.cached_phase_diff_per_sample).min(1.);
+            }
         }
 
         // We are gating and have crossed the release point
-        if self.phase >= self.release_start_phase {
+        if matches!(self.gate_status, GateStatus::Gated) && self.phase >= self.release_start_phase {
             // Disable the global beat sync if we've reset the loop since we can no longer
             // accurately track things
             *cur_frame_start_phase = -100.;

@@ -410,6 +410,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
       env: {
         log_err: this.handleWasmPanic,
         log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
+        debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }),
       },
     };
     const compiledModule = await WebAssembly.compile(wasmBytes);
