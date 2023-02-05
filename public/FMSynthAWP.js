@@ -532,6 +532,17 @@ class FMSynthAWP extends AudioWorkletProcessor {
 
           this.wasmInstance.exports.ungate(this.ctxPtr, param1);
           break;
+        case 2: // Pitch bend
+          console.error('Pitch bend not implemented');
+          break;
+        case 3: // Clear All
+          if (!this.wasmInstance) {
+            console.warn('Tried clearing all before Wasm instance loaded');
+            break;
+          }
+
+          this.wasmInstance.exports.ungate_all(this.ctxPtr);
+          break;
         default:
           console.error('Unhandled MIDI event type', evt);
       }

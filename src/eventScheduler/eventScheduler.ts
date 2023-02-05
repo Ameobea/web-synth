@@ -5,11 +5,11 @@ import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 import { genRandomStringID } from 'src/util';
 
 export enum MIDIEventType {
-  Attack,
-  Release,
-  PitchBend,
-  ClearAll,
-  GenericControl,
+  Attack = 0,
+  Release = 1,
+  PitchBend = 2,
+  ClearAll = 3,
+  GenericControl = 4,
 }
 
 type PendingEvent =

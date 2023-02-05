@@ -30,7 +30,7 @@
   $: if (widthObserverTarget) {
     widthObserver?.unobserve(widthObserverTarget);
     widthObserver = new ResizeObserver(entries => {
-      const newWidth = entries[0].contentRect.width - 120;
+      const newWidth = entries[0].contentRect.width - 109;
       if (lastWidth !== undefined && newWidth !== lastWidth) {
         forceNoRender = true;
       }

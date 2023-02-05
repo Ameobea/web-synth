@@ -1,23 +1,26 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import * as R from 'ramda';
+import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import { connect } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 
-import { faustEditorContextMap, FaustEditorReduxInfra } from 'src/faustEditor';
-import { mkCompileButtonClickHandler, mkStopInstanceHandler } from 'src/faustEditor/FaustEditor';
+import { faustEditorContextMap } from 'src/faustEditor';
+import {
+  compileFaustInstance,
+  compileSoulInstance,
+  mkCompileButtonClickHandler,
+  mkStopInstanceHandler,
+  type FaustEditorReduxStore,
+} from 'src/faustEditor/FaustEditor';
 import FlatButton from 'src/misc/FlatButton';
 
-const mapSmallViewCompStateToProps = (state: ReturnType<FaustEditorReduxInfra['getState']>) => ({
-  instance: state.faustEditor.instance,
-  faustCode: state.faustEditor.editorContent,
-});
-
 export const mkFaustEditorSmallView = (vcId: string) => {
-  const SmallViewCompInner: React.FC<ReturnType<typeof mapSmallViewCompStateToProps>> = ({
-    instance,
-    faustCode,
-  }) => {
-    const [optimize, setOptimize] = useState(true);
+  const SmallViewCompInner: React.FC = () => {
     const [compileErr, setCompileErr] = useState(false);
+    const { ControlPanelComponent, language, instance } = useSelector(
+      ({ faustEditor }: FaustEditorReduxStore) =>
+        R.pick(['ControlPanelComponent', 'language', 'instance'], faustEditor),
+      shallowEqual
+    );
 
     const instanceContext = faustEditorContextMap[vcId];
     if (!instanceContext) {
@@ -32,28 +35,22 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       }
 
       return mkCompileButtonClickHandler({
-        code: faustCode,
-        optimize,
         setErrMessage: msg => setCompileErr(!!msg),
         vcId,
         analyzerNode: instanceContext.analyzerNode,
+        compiler: language === 'faust' ? compileFaustInstance : compileSoulInstance,
       });
-    }, [instanceContext, faustCode, optimize]);
+    }, [instanceContext.analyzerNode, language]);
 
     const stop = useMemo(() => {
       if (!instance) {
         return undefined;
       }
 
-      return mkStopInstanceHandler({
-        vcId,
-        context: instanceContext,
-      });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      return mkStopInstanceHandler(vcId);
     }, [instance]);
     const settings = useMemo(
       () => [
-        { type: 'checkbox', label: 'optimize', initial: true },
         {
           type: 'button',
           label: 'compile + start',
@@ -65,22 +62,11 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       ],
       [start]
     );
-    const handleChange = useCallback((key: string, val: any) => {
-      switch (key) {
-        case 'optimize': {
-          setOptimize(val);
-          break;
-        }
-        default: {
-          console.warn('Unhandled key in faust editor small view RCP: ', key);
-        }
-      }
-    }, []);
 
     if (!instance) {
       return (
         <div>
-          <ControlPanel width={500} settings={settings} onChange={handleChange} />
+          <ControlPanel width={500} settings={settings} />
 
           {compileErr ? (
             <>
@@ -94,7 +80,6 @@ export const mkFaustEditorSmallView = (vcId: string) => {
       );
     }
 
-    const { ControlPanelComponent } = instanceContext.reduxInfra.getState().faustEditor;
     if (!ControlPanelComponent) {
       return null;
     }
@@ -107,5 +92,5 @@ export const mkFaustEditorSmallView = (vcId: string) => {
     );
   };
 
-  return connect(mapSmallViewCompStateToProps)(SmallViewCompInner);
+  return SmallViewCompInner;
 };

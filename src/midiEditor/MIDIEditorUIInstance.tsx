@@ -328,6 +328,18 @@ export default class MIDIEditorUIInstance {
     this.pianoKeys = new PianoKeys(this);
     this.cursorGutter.destroy();
     this.cursorGutter = new CursorGutter(this);
+    this.app.stage.removeChild(this.cursor.graphics);
+    this.cursor.destroy();
+    this.cursor = new Cursor(this);
+    this.app.stage.addChild(this.cursor.graphics);
+
+    if (this.loopCursor) {
+      this.app.stage.removeChild(this.loopCursor.graphics);
+      this.loopCursor.destroy();
+      const loopPoint = this.loopCursor.getPosBeats();
+      this.loopCursor = new LoopCursor(this, loopPoint);
+      this.app.stage.addChild(this.loopCursor.graphics);
+    }
 
     this.handleViewChange();
   }

@@ -520,6 +520,7 @@ export default class MIDIEditorPlaybackHandler {
     this.lastSetCursorPosBeats = this.getCursorPosBeats();
     this.playbackGeneration = null;
     this.cancelAllScheduledNotes();
+    this.inst.midiOutput.clearAll();
   }
 
   public startRecording() {

@@ -2175,8 +2175,11 @@ pub unsafe extern "C" fn fm_synth_set_frequency_multiplier(
 
 #[no_mangle]
 pub unsafe extern "C" fn ungate(ctx: *mut FMSynthContext, midi_number: usize) {
-    (*ctx).polysynth.trigger_release(midi_number, None)
+    (*ctx).polysynth.trigger_release(midi_number, None);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn ungate_all(ctx: *mut FMSynthContext) { (*ctx).polysynth.release_all(); }
 
 unsafe fn ungate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize) {
     let voice = &mut (*ctx).voices[voice_ix];

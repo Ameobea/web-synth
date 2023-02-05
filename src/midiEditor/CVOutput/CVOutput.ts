@@ -151,7 +151,6 @@ export class CVOutput {
 
   public handleViewChange({ pxPerBeat, scrollHorizontalBeats }: MIDIEditorView) {
     if (!this.uiInstance) {
-      console.warn('CVOutput: no UI instance registered');
       return;
     }
 

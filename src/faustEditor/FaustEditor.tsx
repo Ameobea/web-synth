@@ -21,7 +21,9 @@ import { useWindowSize } from 'src/reactUtils';
 import type { Effect } from 'src/redux/modules/effects';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
-type FaustEditorReduxStore = ReturnType<typeof faustEditorContextMap.key.reduxInfra.getState>;
+export type FaustEditorReduxStore = ReturnType<
+  typeof faustEditorContextMap.key.reduxInfra.getState
+>;
 
 const CodeEditor = React.lazy(() => import('./CodeEditor'));
 
@@ -195,21 +197,23 @@ export const mkStopInstanceHandler = (vcId: string) => () => {
   context.overrideableParams = {};
 };
 
-const buildFaustEditorControlPanelSettings = ({
-  isRunning,
-  language,
-  stopInstance,
-  compile,
-  reduxInfra,
-  saveCode,
-}: {
+interface BuildCodeEditorControlPanelSettingsArgs {
   isRunning: boolean;
   language: string;
   stopInstance: () => void;
   compile: () => void;
   reduxInfra: FaustEditorReduxInfra;
   saveCode: (args: { code: string; title: string; description: string }) => void;
-}) =>
+}
+
+const buildCodeEditorControlPanelSettings = ({
+  isRunning,
+  language,
+  stopInstance,
+  compile,
+  reduxInfra,
+  saveCode,
+}: BuildCodeEditorControlPanelSettingsArgs) =>
   filterNils([
     { type: 'select', label: 'language', options: ['faust', 'soul'] },
     {
@@ -266,7 +270,7 @@ interface FaustEditorControlPanelProps {
   setIsRunning: (isRunning: boolean) => void;
 }
 
-const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({
+export const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({
   isRunning,
   setIsRunning,
   vcId,
@@ -292,7 +296,7 @@ const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({
 
   const settings = useMemo(
     () =>
-      buildFaustEditorControlPanelSettings({
+      buildCodeEditorControlPanelSettings({
         isRunning,
         language,
         stopInstance: () => {
@@ -350,7 +354,11 @@ const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = ({
   );
 };
 
-const FaustEditor: React.FC<{ vcId: string }> = ({ vcId }) => {
+interface FaustEditorProps {
+  vcId: string;
+}
+
+const FaustEditor: React.FC<FaustEditorProps> = ({ vcId }) => {
   const {
     ControlPanelComponent: FaustInstanceControlPanelComponent,
     editorContent,

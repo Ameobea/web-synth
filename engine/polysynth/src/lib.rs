@@ -202,12 +202,6 @@ impl<
         }
     }
 
-    pub fn trigger_releases(&mut self, note_ids: &[usize]) {
-        for note_id in note_ids {
-            self.trigger_release(*note_id, None);
-        }
-    }
-
     pub fn release_all(&mut self) {
         for i in 0..POLY_SYNTH_VOICE_COUNT {
             if let VoicePlayingStatus::Playing(note_id) = self.voices[i].playing {

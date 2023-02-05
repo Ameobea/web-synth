@@ -1,4 +1,4 @@
-import { ArrayElementOf, filterNils, UnimplementedError, ValueOf } from 'ameo-utils';
+import { filterNils, UnimplementedError, type ArrayElementOf, type ValueOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useRef } from 'react';

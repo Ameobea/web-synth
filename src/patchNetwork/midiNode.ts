@@ -175,6 +175,18 @@ export class MIDINode {
     });
   }
 
+  public clearAll() {
+    this.outputCbs.forEach(cbs => {
+      if (cbs.enableRxAudioThreadScheduling) {
+        for (const mailboxID of cbs.enableRxAudioThreadScheduling.mailboxIDs) {
+          postMIDIEventToAudioThread(mailboxID, MIDIEventType.ClearAll, 0, 0);
+        }
+      } else {
+        cbs.onClearAll();
+      }
+    });
+  }
+
   private scheduledEvents: {
     at: { type: 'beat'; beat: number } | { type: 'time'; time: number };
     evt: MIDIEvent;
@@ -310,9 +322,5 @@ export class MIDINode {
 
     // Tell all MIDI nodes connected to us that we've changed and that they need to re-schedule their events.
     this.connectedInputs.forEach(input => input.onConnectionsChanged());
-  }
-
-  public clearAll() {
-    this.outputCbs.forEach(cbs => cbs.onClearAll());
   }
 }
