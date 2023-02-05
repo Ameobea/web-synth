@@ -1,4 +1,4 @@
-import { filterNils, type PromiseResolveType } from 'ameo-utils';
+import { filterNils, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -23,7 +23,7 @@ import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSentry } from 'src/sentry';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { AsyncOnce, midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 const VOICE_COUNT = 10;
@@ -142,14 +142,6 @@ const limiter = new DynamicsCompressorNode(ctx);
 limiter.connect(ctx.destination);
 
 mainGain.connect(limiter);
-
-let polysynthCtxPtr = 0;
-
-export const PolysynthMod = new AsyncOnce(() => import('src/polysynth'));
-let polySynthMod: PromiseResolveType<ReturnType<typeof PolysynthMod.get>>;
-
-// Start fetching immediately
-PolysynthMod.get();
 
 const serializeState = () => {
   const serialized: SerializedFMSynthDemoState = {
@@ -292,8 +284,13 @@ const baseTheme = {
 const midiInputNode = new MIDINode();
 const midiInput = new MIDIInput(ctx, midiInputNode, GlobalState.selectedMIDIInputName);
 const midiOutput = new MIDINode(() => ({
-  onAttack: (note, _velocity) => polySynthMod?.handle_note_down(polysynthCtxPtr, note),
-  onRelease: (note, _velocity) => polySynthMod?.handle_note_up(polysynthCtxPtr, note),
+  enableRxAudioThreadScheduling: { mailboxID: 'fm-synth-demo-fm-synth' },
+  onAttack: (_note, _velocity) => {
+    throw new UnreachableException();
+  },
+  onRelease: (_note, _velocity) => {
+    throw new UnreachableException();
+  },
   onClearAll: () => {
     // no-op; this will never get sent directly from user MIDI devices and only exists
     // for internal web-synth use cases that aren't part of this demo
@@ -306,23 +303,21 @@ midiInputNode.connect(midiOutput);
 
 const synth = new FMSynth(ctx, undefined, {
   ...(serialized?.synth ?? {}),
+  audioThreadMIDIEventMailboxID: 'fm-synth-demo-fm-synth',
   midiNode: midiInputNode,
-  onInitialized: (inst: FMSynth) => {
+  onInitialized: () => {
     const awpNode = synth.getAWPNode()!;
     voiceGains.forEach((voiceGain, voiceIx) => awpNode.connect(voiceGain, voiceIx));
 
-    PolysynthMod.get().then(mod => {
-      const playNote = (voiceIx: number, midiNumber: number, _velocity: number) => {
-        const frequency = midiToFrequency(midiNumber);
-        (awpNode.parameters as Map<string, AudioParam>).get(
-          `voice_${voiceIx}_base_frequency`
-        )!.value = frequency;
+    const onGate = (_midiNumber: number, voiceIx: number) => {
+      adsrs.gate(voiceIx);
+      filterAdsrs.gate(voiceIx);
+      LastGateTimeByVoice[voiceIx] = ctx.currentTime;
+    };
 
-        adsrs.gate(voiceIx);
-        filterAdsrs.gate(voiceIx);
-        inst.onGate(midiNumber);
-        LastGateTimeByVoice[voiceIx] = ctx.currentTime;
-      };
+    const onUngate = (_midiNumber: number, voiceIx: number) => {
+      adsrs.ungate(voiceIx);
+      filterAdsrs.ungate(voiceIx);
 
       // We wait until the voice is done playing, accounting for the early-release phase and
       // adding a little bit extra leeway
@@ -331,30 +326,29 @@ const synth = new FMSynth(ctx, undefined, {
       // user-configurable
       const releaseLengthMs =
         (1 - adsrs.getReleaseStartPhase()) * adsrs.getLengthMs() + (2_640 / 44_100) * 1000 + 60;
-      const releaseNote = (voiceIx: number, midiNumber: number, _velocity: number) => {
-        const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
-        setTimeout(() => {
-          // If the voice has been re-gated since releasing, don't disconnect
-          if (LastGateTimeByVoice[voiceIx] !== expectedLastGateTime) {
-            return;
-          }
 
-          const freqParam = (synth.getAWPNode()!.parameters as Map<string, AudioParam>).get(
-            `voice_${voiceIx}_base_frequency`
-          )!;
-          freqParam.value = 0;
-        }, releaseLengthMs);
+      const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
+      setTimeout(() => {
+        // If the voice has been re-gated since releasing, don't disconnect
+        if (LastGateTimeByVoice[voiceIx] !== expectedLastGateTime) {
+          return;
+        }
 
-        adsrs.ungate(voiceIx);
-        filterAdsrs.ungate(voiceIx);
-        inst.onUnGate(midiNumber);
-      };
+        synth.clearOutputBuffer(voiceIx);
+      }, releaseLengthMs);
+    };
 
-      polysynthCtxPtr = mod.create_polysynth_context(playNote, releaseNote);
-      polySynthMod = mod;
-    });
+    synth.registerGateUngateCallbacks(onGate, onUngate);
   },
 });
+
+const playNote = (midiNumber: number) => {
+  midiInputNode.onAttack(midiNumber, 255);
+};
+
+const releaseNote = (midiNumber: number) => {
+  midiInputNode.onRelease(midiNumber, 255);
+};
 
 const MainControlPanel: React.FC = ({}) => {
   const [mainControlPanelState, setMainControlPanelState] = useState({
@@ -733,8 +727,8 @@ const FMSynthDemo: React.FC = () => {
           <MidiKeyboard
             octaveOffset={octaveOffset}
             onOctaveOffsetChange={setOctaveOffset}
-            onAttack={midiNumber => polySynthMod?.handle_note_down(polysynthCtxPtr, midiNumber)}
-            onRelease={midiNumber => polySynthMod?.handle_note_up(polysynthCtxPtr, midiNumber)}
+            onAttack={midiNumber => playNote(midiNumber)}
+            onRelease={midiNumber => releaseNote(midiNumber)}
             style={{ height: 180 }}
           />
         </div>
@@ -824,8 +818,8 @@ const FMSynthDemo: React.FC = () => {
             setOctaveOffset(newOctaveOffset);
             sentryRecord('Octave offset change', { newOctaveOffset });
           }}
-          onAttack={midiNumber => polySynthMod?.handle_note_down(polysynthCtxPtr, midiNumber)}
-          onRelease={midiNumber => polySynthMod?.handle_note_up(polysynthCtxPtr, midiNumber)}
+          onAttack={midiNumber => playNote(midiNumber)}
+          onRelease={midiNumber => releaseNote(midiNumber)}
         />
       </div>
     </div>
