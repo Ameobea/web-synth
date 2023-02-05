@@ -284,7 +284,7 @@ const baseTheme = {
 const midiInputNode = new MIDINode();
 const midiInput = new MIDIInput(ctx, midiInputNode, GlobalState.selectedMIDIInputName);
 const midiOutput = new MIDINode(() => ({
-  enableRxAudioThreadScheduling: { mailboxID: 'fm-synth-demo-fm-synth' },
+  enableRxAudioThreadScheduling: { mailboxIDs: ['fm-synth-demo-fm-synth'] },
   onAttack: (_note, _velocity) => {
     throw new UnreachableException();
   },

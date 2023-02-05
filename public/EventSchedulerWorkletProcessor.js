@@ -141,6 +141,31 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
           );
           break;
         }
+        case 'cancelAndRescheduleMany': {
+          if (!this.wasmInstance) {
+            console.error('Tried to cancel and reschedule events before Wasm initialized');
+            break;
+          }
+
+          const { cancelledCbIDs, newEvents } = event.data;
+          const idsBufPtr = this.wasmInstance.exports.alloc_ids_buffer(cancelledCbIDs.length);
+          const idsBuf = new Int32Array(
+            this.wasmInstance.exports.memory.buffer,
+            idsBufPtr,
+            cancelledCbIDs.length
+          );
+          for (let i = 0; i < cancelledCbIDs.length; i++) {
+            idsBuf[i] = cancelledCbIDs[i];
+          }
+          const actuallyCancelledCount = this.wasmInstance.exports.cancel_events_by_ids();
+          console.log(
+            `Cancelled ${actuallyCancelledCount}/${cancelledCbIDs.length} events`,
+            idsBuf
+          );
+
+          this.scheduleAllEventsAfterCurrentTimeOrBeat(newEvents);
+          break;
+        }
         case 'scheduleBeatsRelative': {
           this.scheduleEventBeats(globalThis.curBeat + event.data.beatsFromNow, event.data.cbId);
           break;
@@ -170,6 +195,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     const compiledModule = await WebAssembly.compile(arrayBuffer);
     this.wasmInstance = new WebAssembly.Instance(compiledModule, {
       env: {
+        debug1: v => console.log(v),
         run_callback: val => this.port.postMessage(val),
         run_midi_callback: (mailboxIx, midiEventType, param0, param1) => {
           const mailboxID = globalThis.midiEventMailboxRegistry.getMailboxID(mailboxIx);
@@ -196,6 +222,34 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
         : this.scheduleEvent(event.time, event.cbId)
     );
     this.pendingEvents = null;
+  }
+
+  /**
+   * @param {Array<{ at: {type: 'time'; time: number} | {type: 'beats'; beat: number}; cbId: number; mailboxID: string|null; midiEventType: number | null | undefined; param0: number; param1: number }>} events
+   */
+  scheduleAllEventsAfterCurrentTimeOrBeat(events) {
+    const curBeat = globalThis.curBeat;
+    const currentTime = this.lastRecordedTime;
+
+    let scheduledCount = 0;
+    for (const event of events) {
+      if (event.at.type === 'beats' && event.at.beat >= curBeat) {
+        this.scheduleEventBeats(
+          event.at.beat,
+          event.cbId,
+          event.mailboxID,
+          event.midiEventType,
+          event.param0,
+          event.param1
+        );
+        scheduledCount += 1;
+      } else if (event.at.type === 'time' && event.at.time >= currentTime) {
+        this.scheduleEvent(event.at.time, event.cbId);
+        scheduledCount += 1;
+      }
+    }
+
+    console.log(`Scheduled ${scheduledCount}/${events.length} events`);
   }
 
   scheduleEvent(time, cbId) {

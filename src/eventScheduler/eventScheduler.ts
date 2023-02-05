@@ -25,6 +25,7 @@ type PendingEvent =
             eventType: MIDIEventType;
             param0: number;
             param1: number;
+            cbId: number;
           };
     }
   | {
@@ -40,8 +41,10 @@ let PendingEvents: PendingEvent[] = [];
 const ctx = new AudioContext();
 let SchedulerHandle: AudioWorkletNode | null = null;
 
-let cbIdCounter = 0;
+let cbIdCounter = 1;
 const RegisteredCbs: Map<number, () => void> = new Map();
+
+export const getUniqueCBID = () => cbIdCounter++;
 
 const registerCb = (cb: () => void): number => {
   const cbId = cbIdCounter++;
@@ -201,6 +204,7 @@ Promise.all([
           SchedulerHandle!.port.postMessage({
             type: 'scheduleBeats',
             beats,
+            cbId: payload.cbId,
             mailboxID: payload.mailboxID,
             midiEventtype: payload.eventType,
             param0: payload.param0,
@@ -270,25 +274,28 @@ export const scheduleMIDIEventBeats = (
   eventType: MIDIEventType,
   param0: number,
   param1: number
-) => {
+): number => {
+  const cbId = cbIdCounter++;
   if (!SchedulerHandle) {
     PendingEvents.push({
       type: 'schedule',
       time: null,
       beats,
-      payload: { type: 'midi', mailboxID, eventType, param0, param1 },
+      payload: { type: 'midi', mailboxID, eventType, param0, param1, cbId },
     });
-    return;
+    return cbId;
   }
 
   SchedulerHandle.port.postMessage({
     type: 'scheduleBeats',
+    cbId,
     beats,
     mailboxID,
     midiEventType: eventType,
     param0,
     param1,
   });
+  return cbId;
 };
 
 /**
@@ -317,4 +324,37 @@ export const postMIDIEventToAudioThread = (
   }
 
   SchedulerHandle.port.postMessage({ type: 'postMIDIEvent', mailboxID, eventType, param0, param1 });
+};
+
+export interface EventToReschedule {
+  at: { type: 'time'; time: number } | { type: 'beats'; beat: number };
+  cbId: number;
+  mailboxID: string | null;
+  midiEventType: number | null | undefined;
+  param0: number;
+  param1: number;
+}
+
+export const cancelAndRescheduleManyEvents = (
+  cbIDsToCancel: number[],
+  newEvents: EventToReschedule[]
+) => {
+  if (!SchedulerHandle) {
+    console.error('cancelAndRescheduleManyEvents called before scheduler initialized');
+    return;
+  }
+
+  const curBeat = getCurBeat() - 4;
+  newEvents = newEvents.filter(evt => {
+    if (evt.at.type === 'beats' && evt.at.beat < curBeat) {
+      return false;
+    }
+    return true;
+  });
+
+  SchedulerHandle.port.postMessage({
+    type: 'cancelAndRescheduleMany',
+    cancelledCbIDs: cbIDsToCancel,
+    newEvents,
+  });
 };

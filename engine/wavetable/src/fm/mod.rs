@@ -1542,6 +1542,7 @@ pub struct FMSynthContext {
     pub operator_base_frequency_sources: [ParamSource; OPERATOR_COUNT],
     pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
     pub output_buffers: Vec<[f32; FRAME_SIZE]>,
+    pub frequency_multiplier: f32,
     pub most_recent_gated_voice_ix: usize,
     pub adsr_phase_buf: [f32; 256],
     pub detune: Option<ParamSource>,
@@ -1636,6 +1637,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         operator_base_frequency_sources: uninit(),
         base_frequency_input_buffer: Vec::with_capacity(voice_count),
         output_buffers: Vec::with_capacity(voice_count),
+        frequency_multiplier: 1.,
         most_recent_gated_voice_ix: 0,
         adsr_phase_buf: [0.; 256],
         detune: None,
@@ -1649,7 +1651,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         PolySynth::new(SynthCallbacks {
             trigger_attack: Box::new(
                 move |voice_ix: usize, note_id: usize, _velocity: u8, _offset: Option<f32>| {
-                    let frequency = midi_number_to_frequency(note_id);
+                    let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
                     (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
                     gate_voice_inner(ctx, voice_ix, note_id);
                     on_gate_cb(note_id, voice_ix);
@@ -2161,6 +2163,14 @@ pub unsafe extern "C" fn fm_synth_clear_output_buffer(ctx: *mut FMSynthContext, 
     ctx.base_frequency_input_buffer[voice_ix].fill(0.);
     let buf = &mut ctx.output_buffers[voice_ix];
     buf.fill(0.);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_frequency_multiplier(
+    ctx: *mut FMSynthContext,
+    frequency_multiplier: f32,
+) {
+    (*ctx).frequency_multiplier = frequency_multiplier;
 }
 
 #[no_mangle]

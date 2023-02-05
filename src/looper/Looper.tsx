@@ -4,7 +4,7 @@ import { Map as ImmMap } from 'immutable';
 import React, { Suspense } from 'react';
 
 import { LooperNode } from 'src/looper/LooperNode';
-import { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
+import type { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import {
   mkContainerCleanupHelper,
@@ -17,8 +17,8 @@ import {
   buildDefaultLooperInstState,
   deserializeLooper,
   looperActions,
-  LooperInstState,
   serializeLooper,
+  type LooperInstState,
 } from 'src/redux/modules/looper';
 
 const LazyLooperUI = React.lazy(() => import('src/looper/LooperUI/LooperUI'));

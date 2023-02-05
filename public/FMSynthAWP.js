@@ -341,6 +341,18 @@ class FMSynthAWP extends AudioWorkletProcessor {
           this.wasmInstance.exports.fm_synth_clear_output_buffer(this.ctxPtr, evt.data.voiceIx);
           break;
         }
+        case 'setFrequencyMultiplier': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set frequency multiplier before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.fm_synth_set_frequency_multiplier(
+            this.ctxPtr,
+            evt.data.frequencyMultiplier
+          );
+          break;
+        }
         case 'shutdown': {
           this.shutdown = true;
           break;
@@ -502,6 +514,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     let msg;
     while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
       const { eventType, param1 } = msg;
+      // console.log('GOT MAIL ' + this.mailboxID + JSON.stringify(msg));
       switch (eventType) {
         case 0: // Attack
           if (!this.wasmInstance) {

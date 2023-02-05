@@ -1,11 +1,13 @@
+import { filterNils } from 'ameo-utils';
+
 import type { SavedMIDIComposition } from 'src/api';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { looperDispatch } from 'src/redux';
 import {
   looperActions,
+  parseLooperTransitionAlgorithmUIState,
   type LooperInstState,
   type LooperTransitionAlgorithm,
-  parseLooperTransitionAlgorithmUIState,
 } from 'src/redux/modules/looper';
 import { AsyncOnce } from 'src/util';
 
@@ -57,7 +59,7 @@ export class LooperNode {
     this.midiNodes = [];
 
     serialized.modules?.forEach((module, moduleIx) => {
-      this.midiNodes.push(new MIDINode());
+      this.midiNodes.push(this.buildMIDINode(moduleIx));
 
       module.banks?.forEach((bank, bankIx) => {
         this.setLoopLenBeats(moduleIx, bankIx, bank.lenBeats);
@@ -124,6 +126,7 @@ export class LooperNode {
       bankIx,
       notes,
       lenBeats,
+      ...this.getMIDISchedulingInfoForModule(moduleIx),
     });
   }
 
@@ -139,9 +142,37 @@ export class LooperNode {
     this.postMessage({ type: 'setNextBankIx', moduleIx, nextBankIx });
   }
 
+  private getMIDISchedulingInfoForModule(
+    moduleIx: number
+  ): { mailboxIDs: string[] | null; needsUIThreadScheduling: boolean } | null {
+    const mailboxIDs = filterNils(
+      this.midiNodes[moduleIx].outputCbs.flatMap(
+        cbs => cbs.enableRxAudioThreadScheduling?.mailboxIDs ?? []
+      )
+    );
+    const needsUIThreadScheduling =
+      mailboxIDs.length > 0 && mailboxIDs.length !== mailboxIDs.length;
+
+    return { mailboxIDs, needsUIThreadScheduling };
+  }
+
+  private buildMIDINode(moduleIx: number): MIDINode {
+    const node = new MIDINode();
+
+    node.registerOnConnectionsChangedCb(() => {
+      this.postMessage({
+        type: 'updateMIDISchedulingInfoForModule',
+        moduleIx,
+        ...this.getMIDISchedulingInfoForModule(moduleIx),
+      });
+    });
+
+    return node;
+  }
+
   public setActiveModuleIx(moduleIx: number) {
     while (this.midiNodes.length <= moduleIx) {
-      this.midiNodes.push(new MIDINode());
+      this.midiNodes.push(this.buildMIDINode(this.midiNodes.length));
     }
 
     this.postMessage({ type: 'setActiveModuleIx', moduleIx });

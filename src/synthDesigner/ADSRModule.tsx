@@ -316,7 +316,8 @@ export class ADSR2Module {
 
   public destroy() {
     if (!this.awp) {
-      throw new UnreachableException('Tried to destroy AWP before initialization');
+      this.onInit().then(() => this.destroy());
+      return;
     }
     this.awp.disconnect();
     this.awp.port.postMessage({ type: 'shutdown' });

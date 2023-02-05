@@ -1,3 +1,4 @@
+import { UnreachableException } from 'ameo-utils';
 import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import * as R from 'ramda';
 import type { Root as ReactDOMRoot } from 'react-dom/client';
@@ -20,7 +21,7 @@ import {
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { genRandomStringID, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;
@@ -181,6 +182,15 @@ const disconnectFilterADSRFromFrequencyParams = (
   );
 };
 
+const disposeSynthModule = (synth: SynthModule) => {
+  synth.fmSynth.shutdown();
+  synth.voices.forEach(voice => {
+    voice.outerGainNode.disconnect();
+    voice.filterNode.destroy();
+  });
+  synth.filterADSRModule.destroy();
+};
+
 const connectFMSynth = (stateKey: string, synthIx: number) => {
   const vcId = stateKey.split('_')[1];
   const reduxInfra = getSynthDesignerReduxInfra(stateKey);
@@ -297,6 +307,7 @@ const buildDefaultFilterEnvelope = (audioThreadData: AudioThreadData): Adsr => {
 };
 
 const buildDefaultSynthModule = (
+  wavyJonesInstance: AnalyserNode | undefined,
   stateKey: string,
   filterType: FilterType,
   synthIx: number,
@@ -328,15 +339,18 @@ const buildDefaultSynthModule = (
     providedFMSynth ??
     new FMSynth(ctx, undefined, {
       onInitialized: () => {
-        connectFMSynth(stateKey, synthIx);
-
         const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
         if (!getState) {
           throw new Error(`Failed to get state for stateKey=${stateKey}`);
         }
+        const pitchMultiplier = getState().synthDesigner.synths[synthIx].pitchMultiplier;
+        fmSynth.setFrequencyMultiplier(pitchMultiplier);
+
+        connectFMSynth(stateKey, synthIx);
+
         fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
       },
-      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth`,
+      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
     });
 
   const inst: SynthModule = {
@@ -348,6 +362,9 @@ const buildDefaultSynthModule = (
       const { filterNode } = buildDefaultFilterModule(filterType, filterCSNs);
 
       filterNode.getOutput().connect(outerGainNode);
+      if (wavyJonesInstance) {
+        outerGainNode.connect(wavyJonesInstance);
+      }
 
       return {
         outerGainNode,
@@ -379,6 +396,7 @@ const buildDefaultSynthModule = (
 };
 
 export const deserializeSynthModule = (
+  wavyJonesInstance: AnalyserNode | undefined,
   {
     filter: filterParams,
     masterGain,
@@ -406,6 +424,8 @@ export const deserializeSynthModule = (
       ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
       : fmSynthConfig.gainEnvelope,
     onInitialized: () => {
+      fmSynth.setFrequencyMultiplier(pitchMultiplier);
+
       connectFMSynth(stateKey, synthIx);
 
       const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
@@ -414,10 +434,11 @@ export const deserializeSynthModule = (
       }
       fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
     },
-    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth`,
+    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
   });
 
   const base = buildDefaultSynthModule(
+    wavyJonesInstance,
     stateKey,
     filterParams.type,
     synthIx,
@@ -462,6 +483,7 @@ export const deserializeSynthModule = (
 export const getInitialSynthDesignerState = (vcId: string): SynthDesignerState => ({
   synths: [
     buildDefaultSynthModule(
+      undefined,
       `synthDesigner_${vcId}`,
       FilterType.Lowpass,
       0,
@@ -498,15 +520,55 @@ const setSynth = (
   synths: R.set(R.lensIndex(synthIx), synth, state.synths),
 });
 
+const maybeUpdateMIDINode = (state: SynthDesignerState) => {
+  const vcId = state.vcId;
+  const stateKey = `synthDesigner_${vcId}`;
+  const { midiNode } = getSynthDesignerReduxInfra(stateKey);
+  const mailboxIDs = state.synths.map(synth => synth.fmSynth.mailboxID!);
+  if (R.equals(mailboxIDs, midiNode.inputCbs.enableRxAudioThreadScheduling?.mailboxIDs)) {
+    return;
+  }
+
+  midiNode.setInputCbs(() => {
+    return {
+      enableRxAudioThreadScheduling: { mailboxIDs },
+      onAttack: () => {
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
+      },
+      onRelease: () => {
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
+      },
+      onPitchBend: () => {
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
+      },
+      onClearAll: () => {
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
+      },
+    };
+  });
+};
+
 const actionGroups = {
   SET_STATE: buildActionGroup({
     actionCreator: (state: SynthDesignerState) => ({ type: 'SET_STATE', state }),
-    subReducer: (_state: SynthDesignerState, { state }) => state,
+    subReducer: (_state: SynthDesignerState, { state }) => {
+      maybeUpdateMIDINode(state);
+      return state;
+    },
   }),
   ADD_SYNTH_MODULE: buildActionGroup({
     actionCreator: () => ({ type: 'ADD_SYNTH_MODULE' }),
     subReducer: (state: SynthDesignerState) => {
       const newModule = buildDefaultSynthModule(
+        state.wavyJonesInstance,
         `synthDesigner_${state.vcId}`,
         FilterType.Lowpass,
         state.synths.length,
@@ -517,10 +579,12 @@ const actionGroups = {
         false
       );
 
-      return {
+      const newState = {
         ...state,
         synths: [...state.synths, newModule],
       };
+      maybeUpdateMIDINode(newState);
+      return newState;
     },
   }),
   DELETE_SYNTH_MODULE: buildActionGroup({
@@ -531,11 +595,14 @@ const actionGroups = {
         console.error(`Tried to remove synth ix ${index} but we only have ${state.synths.length}`);
         return state;
       }
+      disposeSynthModule(removedModule);
 
-      return {
+      const newState = {
         ...state,
         synths: R.remove(index, 1, state.synths),
       };
+      maybeUpdateMIDINode(newState);
+      return newState;
     },
   }),
   // TODO: Should not be a Redux action
@@ -657,11 +724,13 @@ const actionGroups = {
         );
         return state;
       }
+      disposeSynthModule(oldSynthModule);
 
       const stateKey = `synthDesigner_${state.vcId}`;
       const builtVoice: SynthModule = preset
-        ? deserializeSynthModule(preset, stateKey, synthIx)
+        ? deserializeSynthModule(state.wavyJonesInstance, preset, stateKey, synthIx)
         : buildDefaultSynthModule(
+            state.wavyJonesInstance,
             stateKey,
             FilterType.Lowpass,
             synthIx,
@@ -672,7 +741,9 @@ const actionGroups = {
             false
           );
 
-      return { ...state, synths: R.set(R.lensIndex(synthIx), builtVoice, state.synths) };
+      const newState = { ...state, synths: R.set(R.lensIndex(synthIx), builtVoice, state.synths) };
+      maybeUpdateMIDINode(newState);
+      return newState;
     },
   }),
   SET_SYNTH_DESIGNER_IS_HIDDEN: buildActionGroup({
@@ -693,6 +764,7 @@ const actionGroups = {
     }),
     subReducer: (state: SynthDesignerState, { synthIx, pitchMultiplier }) => {
       const synth = getSynth(synthIx, state.synths);
+      synth.fmSynth.setFrequencyMultiplier(pitchMultiplier);
       return setSynth(synthIx, { ...synth, pitchMultiplier }, state);
     },
   }),
@@ -706,8 +778,16 @@ const actionGroups = {
       }
 
       const stateKey = `synthDesigner_${state.vcId}`;
-      const synths = preset.body.voices.map((def, i) => deserializeSynthModule(def, stateKey, i));
-      return { ...state, synths };
+      const synths = preset.body.voices.map((def, i) =>
+        deserializeSynthModule(state.wavyJonesInstance, def, stateKey, i)
+      );
+      for (const synth of state.synths) {
+        disposeSynthModule(synth);
+      }
+
+      const newState = { ...state, synths };
+      maybeUpdateMIDINode(newState);
+      return newState;
     },
   }),
   SET_FILTER_IS_BYPASSED: buildActionGroup({

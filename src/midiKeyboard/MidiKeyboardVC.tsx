@@ -95,12 +95,12 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
     [stateKey]
   );
   const onAttack = useCallback(
-    midiNumber => midiNode?.outputCbs.forEach(cbs => cbs.onAttack(midiNumber, 255)),
-    [midiNode?.outputCbs]
+    (midiNumber: number) => midiNode?.onAttack(midiNumber, 255),
+    [midiNode]
   );
   const onRelease = useCallback(
-    midiNumber => midiNode?.outputCbs.forEach(cbs => cbs.onRelease(midiNumber, 255)),
-    [midiNode?.outputCbs]
+    (midiNumber: number) => midiNode?.onRelease(midiNumber, 255),
+    [midiNode]
   );
 
   if (!midiNode) {

@@ -11,6 +11,8 @@ class LooperAWP extends AudioWorkletProcessor {
     const curPhaseSAB =
       typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(8) : undefined;
     this.curPhaseBuffer = curPhaseSAB ? new Float32Array(curPhaseSAB) : undefined;
+    this.mailboxIDsByModuleIx = new Array(64).fill(null);
+    this.needsUIThreadSchedulingByModuleIX = new Array(64).fill(true);
 
     this.port.onmessage = async evt => {
       if (!this.wasmInstance && evt.data.type !== 'setWasmBytes') {
@@ -44,7 +46,9 @@ class LooperAWP extends AudioWorkletProcessor {
         break;
       }
       case 'setCompositionForBank': {
-        const { moduleIx, notes, bankIx, lenBeats } = data;
+        const { moduleIx, notes, bankIx, lenBeats, mailboxIDs, needsUIThreadScheduling } = data;
+        this.mailboxIDsByModuleIx[moduleIx] = mailboxIDs;
+        this.needsUIThreadSchedulingByModuleIX[moduleIx] = needsUIThreadScheduling;
         this.wasmInstance.exports.looper_clear_bank(moduleIx, bankIx);
         notes.forEach(note =>
           this.wasmInstance.exports.looper_add_evt(
@@ -91,15 +95,47 @@ class LooperAWP extends AudioWorkletProcessor {
         );
         break;
       }
+      case 'updateMIDISchedulingInfoForModule': {
+        const { moduleIx, mailboxIDs, needsUIThreadScheduling } = data;
+        this.mailboxIDsByModuleIx[moduleIx] = mailboxIDs;
+        this.needsUIThreadSchedulingByModuleIX[moduleIx] = needsUIThreadScheduling;
+        break;
+      }
       default: {
-        console.error('Unhandled message type in Looper AWP: ', evt.data.type);
+        console.error('Unhandled message type in Looper AWP: ', data);
       }
     }
   };
 
-  playNote = (moduleIx, note) => this.port.postMessage({ type: 'playNote', moduleIx, note });
+  playNote = (moduleIx, note) => {
+    const needsUIThreadScheduling = this.needsUIThreadSchedulingByModuleIX[moduleIx];
+    const mailboxIDs = this.mailboxIDsByModuleIx[moduleIx];
 
-  releaseNote = (moduleIx, note) => this.port.postMessage({ type: 'releaseNote', moduleIx, note });
+    if (needsUIThreadScheduling) {
+      this.port.postMessage({ type: 'playNote', moduleIx, note });
+    }
+
+    if (mailboxIDs) {
+      for (const mailboxID of mailboxIDs) {
+        globalThis.midiEventMailboxRegistry.submitEvent(mailboxID, 0, note, 255);
+      }
+    }
+  };
+
+  releaseNote = (moduleIx, note) => {
+    const needsUIThreadScheduling = this.needsUIThreadSchedulingByModuleIX[moduleIx];
+    const mailboxIDs = this.mailboxIDsByModuleIx[moduleIx];
+
+    if (needsUIThreadScheduling) {
+      this.port.postMessage({ type: 'releaseNote', moduleIx, note });
+    }
+
+    if (this.mailboxIDsByModuleIx[moduleIx]) {
+      for (const mailboxID of mailboxIDs) {
+        globalThis.midiEventMailboxRegistry.submitEvent(mailboxID, 1, note, 255);
+      }
+    }
+  };
 
   setActiveBankIx = (moduleIx, bankIx) =>
     this.port.postMessage({ type: 'setActiveBankIx', moduleIx, bankIx });

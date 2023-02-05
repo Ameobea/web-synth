@@ -27,10 +27,10 @@ export type SynthDesignerReduxStore = ReturnType<
 
 const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 
-const buildSynthDesignerMIDINode = (vcId: string): MIDINode =>
+const buildSynthDesignerMIDINode = (): MIDINode =>
   new MIDINode(() => {
     return {
-      enableRxAudioThreadScheduling: { mailboxID: `${vcId}-fm-synth` },
+      enableRxAudioThreadScheduling: { mailboxIDs: [] },
       onAttack: () => {
         throw new UnreachableException(
           'Should never be called; should be handled by audio thread scheduling'
@@ -61,13 +61,15 @@ export const init_synth_designer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   // Retrieve the initial synth designer content from `localStorage` (if it's set)
-  const initialState = Try.of(() =>
+  const initialState: SynthDesignerState | null = Try.of(() =>
     Option.of(localStorage.getItem(stateKey))
       .map(serializedState => JSON.parse(serializedState))
       .map(
         ({ synths, ...rest }) =>
           ({
-            synths: (synths as any[]).map((synth, i) => deserializeSynthModule(synth, stateKey, i)),
+            synths: (synths as any[]).map((synth, i) =>
+              deserializeSynthModule(undefined, synth, stateKey, i)
+            ),
             spectrumNode: new AnalyserNode(new AudioContext()),
             ...rest,
             isHidden: false,
@@ -89,7 +91,7 @@ export const init_synth_designer = (stateKey: string) => {
     });
 
   const reduxInfra = buildSynthDesignerRedux(vcId, initialState);
-  const midiNode = buildSynthDesignerMIDINode(vcId);
+  const midiNode = buildSynthDesignerMIDINode();
   SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED', midiNode });
 
   if (initialState) {

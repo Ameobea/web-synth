@@ -1,13 +1,22 @@
-import { UnreachableException, type PromiseResolveType } from 'ameo-utils';
+import { UnimplementedError, UnreachableException, type PromiseResolveType } from 'ameo-utils';
 import * as R from 'ramda';
 
-import { MIDIEventType, postMIDIEventToAudioThread } from 'src/eventScheduler';
+import {
+  cancelAndRescheduleManyEvents,
+  getUniqueCBID,
+  MIDIEventType,
+  postMIDIEventToAudioThread,
+  registerStopCB,
+  scheduleEventBeats,
+  scheduleMIDIEventBeats,
+  type EventToReschedule,
+} from 'src/eventScheduler';
 
 /**
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
  */
 export interface MIDIInputCbs {
-  enableRxAudioThreadScheduling?: { mailboxID: string };
+  enableRxAudioThreadScheduling?: { mailboxIDs: string[] };
   onAttack: (note: number, velocity: number) => void;
   onRelease: (note: number, velocity: number) => void;
   onPitchBend: (bendAmount: number) => void;
@@ -27,14 +36,20 @@ export const mkBuildPasthroughInputCBs = (node: MIDINode) => (): MIDIInputCbs =>
     node.outputCbs.forEach(cbs => cbs.onGenericControl?.(controlIndex, controlValue)),
 });
 
+type MIDIEvent =
+  | { type: MIDIEventType.Attack; note: number; velocity: number }
+  | { type: MIDIEventType.Release; note: number; velocity: number };
+
 /**
  * A `MIDINode` is a special kind of connectable that deals with polyphonic MIDI events.  They are connectable
  * in the patch network with a connection type of 'midi'.
  */
 export class MIDINode {
-  private outputCbs_: MIDIInputCbs[] = [];
+  private connectedInputs: MIDINode[] = [];
+  private connectedOutputs: MIDINode[] = [];
   public getInputCbs: () => MIDIInputCbs;
   private cachedInputCbs: MIDIInputCbs | null = null;
+  private connectionsChangedCbs: (() => void)[] = [];
 
   constructor(getInputCbs?: (() => MIDIInputCbs) | undefined) {
     this.getInputCbs =
@@ -42,6 +57,10 @@ export class MIDINode {
       (() => {
         throw new UnreachableException("MIDI node doesn't accept inputs");
       });
+
+    registerStopCB(() => {
+      this.scheduledEvents.length = 0;
+    });
   }
 
   /**
@@ -62,32 +81,56 @@ export class MIDINode {
    * Always call this getter to get the latest instance of the output callbacks array.
    */
   public get outputCbs() {
-    return this.outputCbs_;
+    return this.connectedOutputs.map(node => node.inputCbs);
   }
 
   public connect(dst: MIDINode) {
     const inputCbs = dst.inputCbs;
     // Make sure we're not already connected
-    if (this.outputCbs_.find(R.equals(inputCbs))) {
+    if (this.outputCbs.find(R.equals(inputCbs))) {
       return;
     }
 
-    this.outputCbs_.push(inputCbs);
+    this.connectedOutputs.push(dst);
+    dst.connectedInputs.push(this);
+
+    this.onConnectionsChanged();
+    dst.onConnectionsChanged();
   }
 
   public disconnect(dst?: MIDINode) {
     if (!dst) {
-      this.outputCbs_ = [];
+      this.connectedOutputs.forEach(dst => {
+        dst.connectedInputs = dst.connectedInputs.filter(node => node !== this);
+        dst.onConnectionsChanged();
+      });
+      this.connectedOutputs.length = 0;
+      this.onConnectionsChanged();
       return;
     }
 
-    const inputCbs = dst.inputCbs;
-    const beforeCbCount = this.outputCbs_.length;
-    this.outputCbs_ = this.outputCbs_.filter(cbs => cbs !== inputCbs);
+    const beforeOutputCount = this.connectedOutputs.length;
+    this.connectedOutputs = this.connectedOutputs.filter(node => node !== dst);
 
-    if (beforeCbCount === this.outputCbs_.length) {
+    if (beforeOutputCount === this.connectedOutputs.length) {
       console.warn("Tried to disconnect two MIDI nodes but they weren't connected");
+    } else {
+      dst.connectedInputs = dst.connectedInputs.filter(node => node !== this);
+      dst.onConnectionsChanged();
+      this.onConnectionsChanged();
     }
+  }
+
+  private onConnectionsChanged() {
+    this.rescheduleEvents();
+
+    for (const cb of this.connectionsChangedCbs) {
+      cb();
+    }
+  }
+
+  public registerOnConnectionsChangedCb(cb: () => void) {
+    this.connectionsChangedCbs.push(cb);
   }
 
   /**
@@ -101,12 +144,9 @@ export class MIDINode {
           return;
         }
 
-        postMIDIEventToAudioThread(
-          cbs.enableRxAudioThreadScheduling.mailboxID,
-          MIDIEventType.Attack,
-          note,
-          velocity
-        );
+        for (const mailboxID of cbs.enableRxAudioThreadScheduling.mailboxIDs) {
+          postMIDIEventToAudioThread(mailboxID, MIDIEventType.Attack, note, velocity);
+        }
         return;
       }
 
@@ -125,17 +165,151 @@ export class MIDINode {
           return;
         }
 
-        postMIDIEventToAudioThread(
-          cbs.enableRxAudioThreadScheduling.mailboxID,
-          MIDIEventType.Release,
-          note,
-          velocity
-        );
+        for (const mailboxID of cbs.enableRxAudioThreadScheduling.mailboxIDs) {
+          postMIDIEventToAudioThread(mailboxID, MIDIEventType.Release, note, velocity);
+        }
         return;
       }
 
       cbs.onRelease(note, velocity);
     });
+  }
+
+  private scheduledEvents: {
+    at: { type: 'beat'; beat: number } | { type: 'time'; time: number };
+    evt: MIDIEvent;
+    cbIDs: number[];
+  }[] = [];
+
+  get needsUIThreadScheduling() {
+    return this.outputCbs.some(cbs => !cbs.enableRxAudioThreadScheduling);
+  }
+
+  get needsAudioThreadScheduling() {
+    return this.outputCbs.some(cbs => !!cbs.enableRxAudioThreadScheduling);
+  }
+
+  private scheduleEventInner(
+    needsUIThreadScheduling: boolean,
+    needsAudioThreadScheduling: boolean,
+    beat: number,
+    evt: MIDIEvent
+  ) {
+    const cbIDs: number[] = [];
+
+    if (needsUIThreadScheduling) {
+      const cb = () => {
+        const fn = {
+          [MIDIEventType.Attack]: this.onAttack,
+          [MIDIEventType.Release]: this.onRelease,
+        }[evt.type];
+        fn(evt.note, evt.velocity, true);
+      };
+
+      cbIDs.push(scheduleEventBeats(beat, cb));
+    }
+
+    if (needsAudioThreadScheduling) {
+      for (const cbs of this.outputCbs) {
+        if (!cbs.enableRxAudioThreadScheduling) {
+          continue;
+        }
+
+        for (const mailboxID of cbs.enableRxAudioThreadScheduling.mailboxIDs) {
+          cbIDs.push(scheduleMIDIEventBeats(beat, mailboxID, evt.type, evt.note, evt.velocity));
+        }
+      }
+    }
+
+    return { at: { type: 'beat' as const, beat }, evt, cbIDs };
+  }
+
+  public scheduleEvent(beat: number, evt: MIDIEvent) {
+    const scheduledEvent = this.scheduleEventInner(
+      this.needsUIThreadScheduling,
+      this.needsAudioThreadScheduling,
+      beat,
+      evt
+    );
+    this.scheduledEvents.push(scheduledEvent);
+  }
+
+  /**
+   * Creates new scheduled events for all previously scheduled events to reflect new connected destinations.
+   *
+   * All these events will have new `cbId`s and we will forget all about the old ones since they'll either be
+   * cancelled or already happened.
+   */
+  private rescheduleEvents() {
+    if (this.scheduledEvents.length === 0) {
+      return;
+    }
+
+    console.log('Rescheduling events in MIDI node', this.scheduledEvents);
+
+    const needsUIThreadScheduling = this.needsUIThreadScheduling;
+    const needsAudioThreadScheduling = this.needsAudioThreadScheduling;
+
+    const cbIDsToCancel = this.scheduledEvents.flatMap(({ cbIDs }) => cbIDs);
+    const eventsToReschedule: EventToReschedule[] = [];
+    const newScheduledEvents: typeof this.scheduledEvents = [];
+
+    for (const { at, evt } of this.scheduledEvents) {
+      if (at.type !== 'beat') {
+        throw new UnimplementedError();
+      }
+
+      const cbIDs: number[] = [];
+
+      if (needsUIThreadScheduling) {
+        const cbId = getUniqueCBID();
+        cbIDs.push(cbId);
+        eventsToReschedule.push({
+          at: { type: 'beats' as const, beat: at.beat },
+          cbId,
+          mailboxID: null,
+          midiEventType: evt.type,
+          param0: evt.note,
+          param1: evt.velocity,
+        });
+      }
+
+      if (needsAudioThreadScheduling) {
+        for (const cbs of this.outputCbs) {
+          if (!cbs.enableRxAudioThreadScheduling) {
+            continue;
+          }
+
+          for (const mailboxID of cbs.enableRxAudioThreadScheduling.mailboxIDs) {
+            const cbId = getUniqueCBID();
+            cbIDs.push(cbId);
+            eventsToReschedule.push({
+              at: { type: 'beats' as const, beat: at.beat },
+              cbId,
+              mailboxID,
+              midiEventType: evt.type,
+              param0: evt.note,
+              param1: evt.velocity,
+            });
+          }
+        }
+      }
+
+      const newScheduledEvent = { at, evt, cbIDs };
+      newScheduledEvents.push(newScheduledEvent);
+    }
+    this.scheduledEvents = newScheduledEvents;
+
+    cancelAndRescheduleManyEvents(cbIDsToCancel, eventsToReschedule);
+    console.log(`Rescheduled ${eventsToReschedule.length} events`);
+  }
+
+  public setInputCbs(newGetInputCbs: () => MIDIInputCbs) {
+    this.cachedInputCbs = null;
+    this.getInputCbs = newGetInputCbs;
+
+    // Tell all MIDI nodes connected to us that we've changed and that they need to re-schedule their events.
+    this.connectedInputs.forEach(input => input.onConnectionsChanged());
   }
 
   public clearAll() {

@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { SavedMIDIComposition } from 'src/api';
 import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
@@ -70,7 +70,11 @@ export const deserializeLooper = (serialized: string): Omit<LooperInstState, 'lo
 };
 
 export const serializeLooper = (looperState: LooperInstState): string => {
-  const serialized: SerializedLooperInstState = { ...looperState };
+  const serialized: SerializedLooperInstState = {
+    activeModuleIx: looperState.activeModuleIx,
+    modules: looperState.modules,
+    configureTransitionAlgorithmExpanded: looperState.configureTransitionAlgorithmExpanded,
+  };
   return JSON.stringify(serialized);
 };
 

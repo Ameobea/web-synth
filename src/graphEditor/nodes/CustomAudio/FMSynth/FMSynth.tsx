@@ -235,6 +235,10 @@ export default class FMSynth implements ForeignNode {
     this.wavetableState = newState;
   }
 
+  public get mailboxID() {
+    return this.audioThreadMIDIEventMailboxID;
+  }
+
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
@@ -977,6 +981,15 @@ export default class FMSynth implements ForeignNode {
     }
 
     this.awpHandle.port.postMessage({ type: 'clearOutputBuffer', voiceIx });
+  }
+
+  public setFrequencyMultiplier(frequencyMultiplier: number) {
+    if (!this.awpHandle) {
+      console.warn('Tried to set FM synth frequency multiplier before AWP initialized');
+      return;
+    }
+
+    this.awpHandle.port.postMessage({ type: 'setFrequencyMultiplier', frequencyMultiplier });
   }
 
   public handleDetuneChange(newDetune: ParamSource | null) {
