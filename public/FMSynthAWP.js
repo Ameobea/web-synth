@@ -3,13 +3,7 @@ const BYTES_PER_F32 = 32 / 8;
 const OUTPUT_BYTES_PER_OPERATOR = FRAME_SIZE * BYTES_PER_F32;
 const VOICE_COUNT = 10;
 const PARAM_COUNT = 8;
-const SAMPLE_RATE = 44_100;
 const ADSR_PHASE_BUF_LENGTH = 256;
-
-const BASE_FREQUENCY_PARAM_NAMES = new Array(VOICE_COUNT);
-for (let i = 0; i < VOICE_COUNT; i++) {
-  BASE_FREQUENCY_PARAM_NAMES[i] = `voice_${i}_base_frequency`;
-}
 
 const hashSampleDescriptor = descriptor =>
   `${descriptor.name}${descriptor.isLocal}${descriptor.id}`;
@@ -17,13 +11,6 @@ const hashSampleDescriptor = descriptor =>
 class FMSynthAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
-      ...new Array(VOICE_COUNT).fill(null).map((_x, i) => ({
-        name: `voice_${i}_base_frequency`,
-        defaultValue: 0,
-        automationRate: 'a-rate',
-        minValue: 0,
-        maxValue: SAMPLE_RATE / 2,
-      })),
       ...new Array(PARAM_COUNT).fill(null).map((_x, i) => ({
         name: i.toString(),
         defaultValue: 0,
@@ -32,8 +19,15 @@ class FMSynthAWP extends AudioWorkletProcessor {
     ];
   }
 
-  constructor() {
+  constructor({ processorOptions }) {
     super();
+
+    if (processorOptions?.mailboxID) {
+      this.mailboxID = processorOptions.mailboxID;
+      globalThis.midiEventMailboxRegistry.addMailbox(processorOptions.mailboxID);
+    } else {
+      this.mailboxID = null;
+    }
 
     this.wasmInstance = null;
     this.lastStateByOperatorIx = null;
@@ -238,7 +232,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          this.wasmInstance.exports.gate_voice(this.ctxPtr, evt.data.voiceIx, evt.data.midiNumber);
+          this.wasmInstance.exports.gate(this.ctxPtr, evt.data.midiNumber);
           break;
         }
         case 'ungate': {
@@ -247,7 +241,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          this.wasmInstance.exports.ungate_voice(this.ctxPtr, evt.data.voiceIx);
+          this.wasmInstance.exports.ungate(this.ctxPtr, evt.data.midiNumber);
           break;
         }
         case 'setDetune': {
@@ -344,7 +338,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          console.log({ voiceIx: evt.data.voiceIx });
           this.wasmInstance.exports.fm_synth_clear_output_buffer(this.ctxPtr, evt.data.voiceIx);
           break;
         }
@@ -421,6 +414,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
         log_err: this.handleWasmPanic,
         log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
         debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }),
+        on_gate_cb: (midiNumber, voiceIx) =>
+          this.port.postMessage({ type: 'onGate', midiNumber, voiceIx }),
+        on_ungate_cb: (midiNumber, voiceIx) =>
+          this.port.postMessage({ type: 'onUngate', midiNumber, voiceIx }),
       },
     };
     const compiledModule = await WebAssembly.compile(wasmBytes);
@@ -497,6 +494,37 @@ class FMSynthAWP extends AudioWorkletProcessor {
     return this.wasmMemoryBuffer;
   }
 
+  checkMailbox() {
+    if (!this.mailboxID) {
+      return;
+    }
+
+    let msg;
+    while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
+      const { eventType, param1 } = msg;
+      switch (eventType) {
+        case 0: // Attack
+          if (!this.wasmInstance) {
+            console.warn('Tried gating before Wasm instance loaded');
+            break;
+          }
+
+          this.wasmInstance.exports.gate(this.ctxPtr, param1);
+          break;
+        case 1: // Release
+          if (!this.wasmInstance) {
+            console.warn('Tried un-gating before Wasm instance loaded');
+            break;
+          }
+
+          this.wasmInstance.exports.ungate(this.ctxPtr, param1);
+          break;
+        default:
+          console.error('Unhandled MIDI event type', evt);
+      }
+    }
+  }
+
   process(_inputs, outputs, params) {
     if (!this.wasmInstance) {
       return true;
@@ -510,25 +538,9 @@ class FMSynthAWP extends AudioWorkletProcessor {
       this.wasmInstance.exports.set_cur_bpm(globalThis.globalTempoBPM);
     }
 
-    let wasmMemory = this.getWasmMemoryBuffer();
-    const baseFrequencyInputBufPtr = this.wasmInstance.exports.get_base_frequency_input_buffer_ptr(
-      this.ctxPtr
-    );
-    for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
-      const param = params[BASE_FREQUENCY_PARAM_NAMES[voiceIx]];
-      const voiceIsTacent = param.length === 0 && param[0] === 0;
-      if (voiceIsTacent && this.tacentVoiceFlags[voiceIx] === 1) {
-        continue;
-      }
-      this.tacentVoiceFlags[voiceIx] = voiceIsTacent ? 1 : 0;
-      const ptrForVoice = baseFrequencyInputBufPtr + FRAME_SIZE * BYTES_PER_F32 * voiceIx;
+    this.checkMailbox();
 
-      if (param.length === 1) {
-        wasmMemory.fill(param[0], ptrForVoice / 4, (ptrForVoice + FRAME_SIZE * BYTES_PER_F32) / 4);
-      } else {
-        wasmMemory.set(param, ptrForVoice / 4);
-      }
-    }
+    let wasmMemory = this.getWasmMemoryBuffer();
     const paramBuffersPtr = this.wasmInstance.exports.get_param_buffers_ptr(this.ctxPtr);
     // TODO: Store active param count somewhere to avoid unnecessary memcopies
     for (let paramIx = 0; paramIx < PARAM_COUNT; paramIx++) {

@@ -18,7 +18,6 @@ use std::{mem, ptr};
 
 #[cfg(feature = "wasm-bindgen")]
 use js_sys::Array;
-use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SynthCallbacks<

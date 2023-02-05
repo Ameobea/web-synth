@@ -5,10 +5,12 @@ import {
   cancelCb,
   getCurBeat,
   getIsGlobalBeatCounterStarted,
+  MIDIEventType,
   registerStartCB,
   registerStopCB,
   scheduleEventBeats,
   scheduleEventTimeAbsolute,
+  scheduleMIDIEventBeats,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
@@ -293,11 +295,11 @@ export default class MIDIEditorPlaybackHandler {
       const cb = () => {
         entries.forEach(({ isAttack, lineIx }) => {
           if (isAttack) {
-            this.inst.midiInput.onAttack(lineCount - lineIx, 255);
+            this.inst.midiInput.onAttack(lineCount - lineIx, 255, true);
             this.inst.uiInstance?.onGated(lineIx);
             this.heldLineIndices.add(lineIx);
           } else {
-            this.inst.midiInput.onRelease(lineCount - lineIx, 255);
+            this.inst.midiInput.onRelease(lineCount - lineIx, 255, true);
             this.inst.uiInstance?.onUngated(lineIx);
             this.heldLineIndices.delete(lineIx);
           }
@@ -307,6 +309,27 @@ export default class MIDIEditorPlaybackHandler {
       };
 
       if (scheduleParams.type === 'globalBeatCounter') {
+        // For all connected outputs that support audio-thread scheduling of MIDI events, we schedule
+        // them here.
+        //
+        // Outputs that do not support it will have it scheduled interactively via the callback passed
+        // to `scheduleEventBeats`.
+        for (const cbs of this.inst.midiOutput.outputCbs) {
+          if (cbs.enableRxAudioThreadScheduling) {
+            const mailboxID = cbs.enableRxAudioThreadScheduling.mailboxID;
+            for (const { isAttack, lineIx } of entries) {
+              const midiNumber = lineCount - lineIx;
+              scheduleMIDIEventBeats(
+                scheduleParams.curBeat + beat,
+                mailboxID,
+                isAttack ? MIDIEventType.Attack : MIDIEventType.Release,
+                midiNumber,
+                255
+              );
+            }
+          }
+        }
+
         handle = scheduleEventBeats(scheduleParams.curBeat + beat, cb);
       } else {
         const beatsPerSecond = scheduleParams.bpm / 60;

@@ -1,4 +1,4 @@
 export type GateUngateCallbackRegistrar = (
-  onGate: (midiNumber: number) => void,
-  onUngate: (midiNumber: number) => void
+  onGate: (midiNumber: number, voiceIx: number) => void,
+  onUngate: (midiNumber: number, voiceIx: number) => void
 ) => { unregister: () => void };

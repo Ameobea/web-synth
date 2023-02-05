@@ -8,7 +8,7 @@ use adsr::{
     Adsr, AdsrStep, EarlyReleaseConfig, EarlyReleaseStrategy, GateStatus, RampFn,
     RENDERED_BUFFER_SIZE,
 };
-use dsp::{even_faster_pow, oscillator::PhasedOscillator};
+use dsp::{even_faster_pow, midi_number_to_frequency, oscillator::PhasedOscillator};
 
 pub mod effects;
 mod samples;
@@ -24,6 +24,10 @@ use self::{
 
 extern "C" {
     fn log_err(ptr: *const u8, len: usize);
+
+    fn on_gate_cb(midi_number: usize, voice_ix: usize);
+
+    fn on_ungate_cb(midi_number: usize, voice_ix: usize);
 }
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
@@ -1554,16 +1558,15 @@ impl FMSynthContext {
         for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
             let base_frequency_buffer =
                 unsafe { self.base_frequency_input_buffer.get_unchecked(voice_ix) };
-            let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
             if unsafe { *base_frequency_buffer.get_unchecked(0) } == 0. {
                 for adsr in &mut voice.adsrs {
                     if let Some(store_phase_to) = adsr.store_phase_to {
                         unsafe { *store_phase_to = 0. };
                     }
                 }
-                // output_buffer.fill(0.);
                 continue;
             }
+            let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
 
             voice.gen_samples(
                 &mut self.modulation_matrix,
@@ -1638,11 +1641,29 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
         detune: None,
         wavetables: Vec::new(),
         sample_mapping_manager: SampleMappingManager::default(),
-        polysynth: PolySynth::new(SynthCallbacks {
-            trigger_attack: Box::new(|_, _, _, _| todo!()),
-            trigger_release: Box::new(|_, _, _| todo!()),
-        }),
+        polysynth: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
     });
+
+    std::ptr::write(
+        &mut (*ctx).polysynth,
+        PolySynth::new(SynthCallbacks {
+            trigger_attack: Box::new(
+                move |voice_ix: usize, note_id: usize, _velocity: u8, _offset: Option<f32>| {
+                    let frequency = midi_number_to_frequency(note_id);
+                    (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
+                    gate_voice_inner(ctx, voice_ix, note_id);
+                    on_gate_cb(note_id, voice_ix);
+                },
+            ),
+            trigger_release: Box::new(
+                move |voice_ix: usize, note_id: usize, _offset: Option<f32>| {
+                    ungate_voice_inner(ctx, voice_ix);
+                    on_ungate_cb(note_id, voice_ix);
+                },
+            ),
+        }),
+    );
+
     for i in 0..OPERATOR_COUNT {
         (*ctx)
             .operator_base_frequency_sources
@@ -2096,7 +2117,11 @@ pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize, midi_number: usize) {
+pub unsafe extern "C" fn gate(ctx: *mut FMSynthContext, midi_number: usize) {
+    (*ctx).polysynth.trigger_attack(midi_number, 0, None)
+}
+
+unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_number: usize) {
     // Stop recording phases for the last recently gated voice so the new one can record them
     let old_phases_voice = &mut (*ctx).voices[(*ctx).most_recent_gated_voice_ix];
     for adsr in &mut old_phases_voice.adsrs {
@@ -2132,12 +2157,18 @@ pub unsafe extern "C" fn gate_voice(ctx: *mut FMSynthContext, voice_ix: usize, m
 
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_clear_output_buffer(ctx: *mut FMSynthContext, voice_ix: usize) {
-    let buf = &mut (*ctx).output_buffers[voice_ix];
+    let ctx = &mut (*ctx);
+    ctx.base_frequency_input_buffer[voice_ix].fill(0.);
+    let buf = &mut ctx.output_buffers[voice_ix];
     buf.fill(0.);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ungate_voice(ctx: *mut FMSynthContext, voice_ix: usize) {
+pub unsafe extern "C" fn ungate(ctx: *mut FMSynthContext, midi_number: usize) {
+    (*ctx).polysynth.trigger_release(midi_number, None)
+}
+
+unsafe fn ungate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize) {
     let voice = &mut (*ctx).voices[voice_ix];
 
     for adsr in &mut voice.adsrs {

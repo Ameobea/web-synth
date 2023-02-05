@@ -1,9 +1,41 @@
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import { useEffect, useState } from 'react';
 
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 import { genRandomStringID } from 'src/util';
 
-let PendingEvents: { time: number | null; beats: number | null; cbId: number }[] = [];
+export enum MIDIEventType {
+  Attack,
+  Release,
+  PitchBend,
+  ClearAll,
+  GenericControl,
+}
+
+type PendingEvent =
+  | {
+      type: 'schedule';
+      time: number | null;
+      beats: number | null;
+      payload:
+        | { type: 'cbId'; cbId: number }
+        | {
+            type: 'midi';
+            mailboxID: string;
+            eventType: MIDIEventType;
+            param0: number;
+            param1: number;
+          };
+    }
+  | {
+      type: 'interactiveMIDIEvent';
+      mailboxID: string;
+      eventType: MIDIEventType;
+      param0: number;
+      param1: number;
+    };
+
+let PendingEvents: PendingEvent[] = [];
 
 const ctx = new AudioContext();
 let SchedulerHandle: AudioWorkletNode | null = null;
@@ -161,11 +193,35 @@ Promise.all([
     }
   };
   SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
-  PendingEvents.forEach(({ time, beats, cbId }) =>
-    time === null
-      ? SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId })
-      : SchedulerHandle!.port.postMessage({ type: 'schedule', time, cbId })
-  );
+  PendingEvents.forEach(evt => {
+    if (evt.type === 'schedule') {
+      const { time, beats, payload } = evt;
+      if (time === null) {
+        if (payload.type === 'midi') {
+          SchedulerHandle!.port.postMessage({
+            type: 'scheduleBeats',
+            beats,
+            mailboxID: payload.mailboxID,
+            midiEventtype: payload.eventType,
+            param0: payload.param0,
+            param1: payload.param1,
+          });
+        } else {
+          SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId: payload.cbId });
+        }
+      } else {
+        if (payload.type === 'midi') {
+          throw new UnimplementedError();
+        }
+        SchedulerHandle!.port.postMessage({ type: 'schedule', time, cbId: payload.cbId });
+      }
+    } else if (evt.type === 'interactiveMIDIEvent') {
+      const { eventType, param0, param1 } = evt;
+      SchedulerHandle!.port.postMessage({ type: 'postMIDIEvent', eventType, param0, param1 });
+    } else {
+      throw new UnreachableException();
+    }
+  });
   PendingEvents = [];
 });
 
@@ -175,7 +231,7 @@ Promise.all([
 export const scheduleEventTimeAbsolute = (time: number, cb: () => void): number => {
   const cbId = registerCb(cb);
   if (!SchedulerHandle) {
-    PendingEvents.push({ time, beats: null, cbId });
+    PendingEvents.push({ type: 'schedule', time, beats: null, payload: { type: 'cbId', cbId } });
     return cbId;
   }
 
@@ -200,12 +256,39 @@ export const scheduleEventTimeRelativeToCurTime = (
 export const scheduleEventBeats = (beats: number, cb: () => void): number => {
   const cbId = registerCb(cb);
   if (!SchedulerHandle) {
-    PendingEvents.push({ time: null, beats, cbId });
+    PendingEvents.push({ type: 'schedule', time: null, beats, payload: { type: 'cbId', cbId } });
     return cbId;
   }
 
   SchedulerHandle.port.postMessage({ type: 'scheduleBeats', beats, cbId });
   return cbId;
+};
+
+export const scheduleMIDIEventBeats = (
+  beats: number,
+  mailboxID: string,
+  eventType: MIDIEventType,
+  param0: number,
+  param1: number
+) => {
+  if (!SchedulerHandle) {
+    PendingEvents.push({
+      type: 'schedule',
+      time: null,
+      beats,
+      payload: { type: 'midi', mailboxID, eventType, param0, param1 },
+    });
+    return;
+  }
+
+  SchedulerHandle.port.postMessage({
+    type: 'scheduleBeats',
+    beats,
+    mailboxID,
+    midiEventType: eventType,
+    param0,
+    param1,
+  });
 };
 
 /**
@@ -214,10 +297,24 @@ export const scheduleEventBeats = (beats: number, cb: () => void): number => {
 export const scheduleEventBeatsRelative = (beatsFromNow: number, cb: () => void): number => {
   const cbId = registerCb(cb);
   if (!SchedulerHandle) {
-    PendingEvents.push({ time: null, beats: 0, cbId });
+    PendingEvents.push({ type: 'schedule', time: null, beats: 0, payload: { type: 'cbId', cbId } });
     return cbId;
   }
 
   SchedulerHandle.port.postMessage({ type: 'scheduleBeatsRelative', beatsFromNow, cbId });
   return cbId;
+};
+
+export const postMIDIEventToAudioThread = (
+  mailboxID: string,
+  eventType: MIDIEventType,
+  param0: number,
+  param1: number
+) => {
+  if (!SchedulerHandle) {
+    PendingEvents.push({ type: 'interactiveMIDIEvent', mailboxID, eventType, param0, param1 });
+    return;
+  }
+
+  SchedulerHandle.port.postMessage({ type: 'postMIDIEvent', mailboxID, eventType, param0, param1 });
 };

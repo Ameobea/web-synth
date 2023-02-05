@@ -3,12 +3,23 @@ use heapless::binary_heap::{BinaryHeap, Min};
 
 extern "C" {
     fn run_callback(cb_id: i32);
+
+    fn run_midi_callback(mailbox_ix: usize, event_type: u8, param_0: f32, param_1: f32);
+}
+
+#[derive(PartialEq)]
+struct MidiEvent {
+    pub mailbox_ix: usize,
+    pub event_type: u8,
+    pub param_0: f32,
+    pub param_1: f32,
 }
 
 #[derive(PartialEq)]
 struct ScheduledEvent {
     pub time: f64,
     pub cb_id: i32,
+    pub midi_evt: Option<MidiEvent>,
 }
 
 impl Eq for ScheduledEvent {}
@@ -33,12 +44,57 @@ pub unsafe extern "C" fn stop() { SCHEDULED_EVENTS.clear(); }
 
 #[no_mangle]
 pub extern "C" fn schedule(time: f64, cb_id: i32) {
-    unsafe { SCHEDULED_EVENTS.push_unchecked(ScheduledEvent { time, cb_id }) }
+    unsafe {
+        SCHEDULED_EVENTS.push_unchecked(ScheduledEvent {
+            time,
+            cb_id,
+            midi_evt: None,
+        })
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn schedule_beats(beats: f64, cb_id: i32) {
-    unsafe { SCHEDULED_BEAT_EVENTS.push_unchecked(ScheduledEvent { time: beats, cb_id }) }
+pub extern "C" fn schedule_beats(
+    beats: f64,
+    cb_id: i32,
+    mailbox_ix: i32,
+    midi_event_type: u8,
+    midi_param_0: f32,
+    midi_param_1: f32,
+) {
+    let midi_evt = if mailbox_ix >= 0 {
+        Some(MidiEvent {
+            mailbox_ix: mailbox_ix as usize,
+            event_type: midi_event_type,
+            param_0: midi_param_0,
+            param_1: midi_param_1,
+        })
+    } else {
+        None
+    };
+
+    unsafe {
+        SCHEDULED_BEAT_EVENTS.push_unchecked(ScheduledEvent {
+            time: beats,
+            cb_id,
+            midi_evt,
+        })
+    }
+}
+
+fn handle_event(evt: ScheduledEvent) {
+    if let Some(midi_evt) = evt.midi_evt {
+        unsafe {
+            run_midi_callback(
+                midi_evt.mailbox_ix,
+                midi_evt.event_type,
+                midi_evt.param_0,
+                midi_evt.param_1,
+            )
+        }
+    } else {
+        unsafe { run_callback(evt.cb_id) }
+    }
 }
 
 #[no_mangle]
@@ -52,7 +108,7 @@ pub extern "C" fn run(raw_cur_time: f64, cur_beats: f64) {
         }
 
         let evt = unsafe { scheduled_events.pop_unchecked() };
-        unsafe { run_callback(evt.cb_id) };
+        handle_event(evt);
     }
 
     let scheduled_beat_events = unsafe { &mut SCHEDULED_BEAT_EVENTS };
@@ -64,6 +120,6 @@ pub extern "C" fn run(raw_cur_time: f64, cur_beats: f64) {
         }
 
         let evt = unsafe { scheduled_beat_events.pop_unchecked() };
-        unsafe { run_callback(evt.cb_id) };
+        handle_event(evt);
     }
 }

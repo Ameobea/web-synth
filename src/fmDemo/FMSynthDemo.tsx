@@ -320,7 +320,7 @@ const synth = new FMSynth(ctx, undefined, {
 
         adsrs.gate(voiceIx);
         filterAdsrs.gate(voiceIx);
-        inst.onGate(voiceIx, midiNumber);
+        inst.onGate(midiNumber);
         LastGateTimeByVoice[voiceIx] = ctx.currentTime;
       };
 
@@ -347,7 +347,7 @@ const synth = new FMSynth(ctx, undefined, {
 
         adsrs.ungate(voiceIx);
         filterAdsrs.ungate(voiceIx);
-        inst.onUnGate(voiceIx, midiNumber);
+        inst.onUnGate(midiNumber);
       };
 
       polysynthCtxPtr = mod.create_polysynth_context(playNote, releaseNote);

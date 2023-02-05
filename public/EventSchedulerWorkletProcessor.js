@@ -12,12 +12,25 @@
 class MIDIEventMailboxRegistry {
   constructor() {
     this.mailboxes = new Map();
+    this.IDByIndex = new Map();
+    this.indexByID = new Map();
   }
 
   addMailbox(id) {
     const buffer = new Float32Array(1024 * 256 * 4);
     const mailbox = { startIx: 0, endIx: 0, f32: buffer, u32: new Uint32Array(buffer.buffer) };
     this.mailboxes.set(id, mailbox);
+    const index = this.mailboxes.size - 1;
+    this.IDByIndex.set(index, id);
+    this.indexByID.set(id, index);
+  }
+
+  getMailboxIndex(id) {
+    return this.indexByID.get(id);
+  }
+
+  getMailboxID(index) {
+    return this.IDByIndex.get(index);
   }
 
   submitEvent(id, eventType, param1, param2, sampleIx) {
@@ -35,10 +48,10 @@ class MIDIEventMailboxRegistry {
     mailbox.endIx = (ix + 4) % mailbox.f32.length;
   }
 
-  getEvent(id) {
-    const mailbox = this.mailboxes.get(id);
+  getEvent(mailboxID) {
+    const mailbox = this.mailboxes.get(mailboxID);
     if (!mailbox) {
-      console.error(`Tried to get event from unknown mailbox: ${id}`);
+      console.error(`Tried to get event from unknown mailbox: ${mailboxID}`);
       return;
     }
 
@@ -118,7 +131,14 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
           break;
         }
         case 'scheduleBeats': {
-          this.scheduleEventBeats(event.data.beats, event.data.cbId);
+          this.scheduleEventBeats(
+            event.data.beats,
+            event.data.cbId,
+            event.data.mailboxID,
+            event.data.midiEventType,
+            event.data.param0,
+            event.data.param1
+          );
           break;
         }
         case 'scheduleBeatsRelative': {
@@ -129,8 +149,18 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
           this.isShutdown = true;
           break;
         }
+        case 'postMIDIEvent': {
+          globalThis.midiEventMailboxRegistry.submitEvent(
+            event.data.mailboxID,
+            event.data.eventType,
+            event.data.param0,
+            event.data.param1,
+            0
+          );
+          break;
+        }
         default: {
-          console.log(`Unhandled message type: ${event.data.type}`);
+          console.error(`Unhandled message type: ${event.data.type}`);
         }
       }
     };
@@ -139,7 +169,24 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
   async initWasm(arrayBuffer) {
     const compiledModule = await WebAssembly.compile(arrayBuffer);
     this.wasmInstance = new WebAssembly.Instance(compiledModule, {
-      env: { run_callback: val => this.port.postMessage(val) },
+      env: {
+        run_callback: val => this.port.postMessage(val),
+        run_midi_callback: (mailboxIx, midiEventType, param0, param1) => {
+          const mailboxID = globalThis.midiEventMailboxRegistry.getMailboxID(mailboxIx);
+          if (!mailboxID) {
+            console.error(`Tried to run MIDI callback for unknown mailbox: ${mailboxIx}`);
+            return;
+          }
+
+          globalThis.midiEventMailboxRegistry.submitEvent(
+            mailboxID,
+            midiEventType,
+            param0,
+            param1,
+            0
+          );
+        },
+      },
     });
 
     // Schedule any events that we missed while the Wasm instance was initializing
@@ -160,13 +207,22 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     this.wasmInstance.exports.schedule(time, cbId);
   }
 
-  scheduleEventBeats(beats, cbId) {
+  scheduleEventBeats(beats, cbId, mailboxID, midiEventType, param0, param1) {
     if (!this.wasmInstance) {
       this.pendingEvents.push({ time: null, beats, cbId });
       return;
     }
 
-    this.wasmInstance.exports.schedule_beats(beats, cbId);
+    let mailboxIx = -1;
+    if (mailboxID) {
+      mailboxIx = globalThis.midiEventMailboxRegistry.getMailboxIndex(mailboxID);
+      if (mailboxIx === null) {
+        console.error(`Tried to schedule event with unknown mailbox: ${mailboxID}`);
+        return;
+      }
+    }
+
+    this.wasmInstance.exports.schedule_beats(beats, cbId, mailboxIx, midiEventType, param0, param1);
   }
 
   updateGlobalBeats(globalTempoBPM) {

@@ -1,10 +1,13 @@
 import { UnreachableException, type PromiseResolveType } from 'ameo-utils';
 import * as R from 'ramda';
 
+import { MIDIEventType, postMIDIEventToAudioThread } from 'src/eventScheduler';
+
 /**
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
  */
 export interface MIDIInputCbs {
+  enableRxAudioThreadScheduling?: { mailboxID: string };
   onAttack: (note: number, velocity: number) => void;
   onRelease: (note: number, velocity: number) => void;
   onPitchBend: (bendAmount: number) => void;
@@ -32,10 +35,6 @@ export class MIDINode {
   private outputCbs_: MIDIInputCbs[] = [];
   public getInputCbs: () => MIDIInputCbs;
   private cachedInputCbs: MIDIInputCbs | null = null;
-  /**
-   * If set to true, indicates that this MIDI node is able to receive events directly on the audio thread.
-   */
-  public enableRxAudioThreadScheduling: false | { mailboxID: string } = false;
 
   constructor(getInputCbs?: (() => MIDIInputCbs) | undefined) {
     this.getInputCbs =
@@ -91,12 +90,52 @@ export class MIDINode {
     }
   }
 
-  public onAttack(note: number, velocity: number) {
-    this.outputCbs.forEach(cbs => cbs.onAttack(note, velocity));
+  /**
+   * @param interactiveOnly If set, this event will only be sent to connected outputs that do not have
+   * audio thread scheduling enabled.
+   */
+  public onAttack(note: number, velocity: number, interactiveOnly = false) {
+    this.outputCbs.forEach(cbs => {
+      if (cbs.enableRxAudioThreadScheduling) {
+        if (interactiveOnly) {
+          return;
+        }
+
+        postMIDIEventToAudioThread(
+          cbs.enableRxAudioThreadScheduling.mailboxID,
+          MIDIEventType.Attack,
+          note,
+          velocity
+        );
+        return;
+      }
+
+      cbs.onAttack(note, velocity);
+    });
   }
 
-  public onRelease(note: number, velocity: number) {
-    this.outputCbs.forEach(cbs => cbs.onRelease(note, velocity));
+  /**
+   * @param interactiveOnly If set, this event will only be sent to connected outputs that do not have
+   * audio thread scheduling enabled.
+   */
+  public onRelease(note: number, velocity: number, interactiveOnly = false) {
+    this.outputCbs.forEach(cbs => {
+      if (cbs.enableRxAudioThreadScheduling) {
+        if (interactiveOnly) {
+          return;
+        }
+
+        postMIDIEventToAudioThread(
+          cbs.enableRxAudioThreadScheduling.mailboxID,
+          MIDIEventType.Release,
+          note,
+          velocity
+        );
+        return;
+      }
+
+      cbs.onRelease(note, velocity);
+    });
   }
 
   public clearAll() {

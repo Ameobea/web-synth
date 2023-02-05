@@ -20,7 +20,7 @@ import {
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { midiToFrequency, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;
@@ -204,85 +204,62 @@ const connectFMSynth = (stateKey: string, synthIx: number) => {
   updateConnectables(vcId, newConnectables);
 };
 
-export const gateSynthDesigner = (
-  state: SynthDesignerState,
-  midiNumber: number,
-  voiceIx: number
-) => {
-  const baseFrequency = midiToFrequency(midiNumber);
+const mkOnGate =
+  (getState: () => { synthDesigner: SynthDesignerState }) =>
+  (_midiNumber: number, voiceIx: number) => {
+    getState().synthDesigner.synths.forEach(synth => {
+      const targetVoice = synth.voices[voiceIx];
 
-  state.synths.forEach(synth => {
-    const frequency = baseFrequency * synth.pitchMultiplier;
-    synth.fmSynth.setFrequency(voiceIx, frequency);
-    synth.fmSynth.onGate(voiceIx, midiNumber);
+      // Trigger gain and filter ADSRs
+      // TODO: migrate to audio thread scheduling too
+      if (synth.filterEnvelopeEnabled) {
+        synth.filterADSRModule.gate(voiceIx);
+      }
+      // We edit state directly w/o updating references because this is only needed internally
+      targetVoice.lastGateOrUngateTime = ctx.currentTime;
+    });
+  };
 
-    const targetVoice = synth.voices[voiceIx];
-    if (!state.wavyJonesInstance) {
-      return;
-    }
+const mkOnUngate =
+  (getState: () => { synthDesigner: SynthDesignerState }) =>
+  (_midiNumber: number, voiceIx: number) =>
+    getState().synthDesigner.synths.forEach(({ voices, fmSynth, filterADSRModule }, synthIx) => {
+      const targetVoice = voices[voiceIx];
+      // We edit state directly w/o updating references because this is only needed internally
+      const ungateTime = ctx.currentTime;
+      targetVoice.lastGateOrUngateTime = ungateTime;
+      const releaseLengthMs =
+        (1 - fmSynth.gainEnvelope.releasePoint) *
+        samplesToMs(fmSynth.gainEnvelope.lenSamples.value);
 
-    // Trigger gain and filter ADSRs
-    if (synth.filterEnvelopeEnabled) {
-      synth.filterADSRModule.gate(voiceIx);
-    }
-    // We edit state directly w/o updating references because this is only needed internally
-    targetVoice.lastGateOrUngateTime = ctx.currentTime;
+      setTimeout(
+        () => {
+          const state = getState().synthDesigner;
+          const targetSynth = state.synths[synthIx];
+          if (!targetSynth) {
+            return;
+          }
 
-    targetVoice.outerGainNode.connect(state.wavyJonesInstance);
-  });
-};
+          targetSynth.fmSynth.clearOutputBuffer(voiceIx);
+        },
+        // We wait until the voice is done playing, accounting for the early-release phase and
+        // adding a little bit extra leeway
+        //
+        // We will need to make this dynamic if we make the length of the early release period
+        // user-configurable
+        releaseLengthMs + (2_640 / 44_100) * 1000 + 60
+      );
 
-export const ungateSynthDesigner = (
-  getState: () => { synthDesigner: SynthDesignerState },
-  voiceIx: number,
-  midiNumber: number
-) =>
-  getState().synthDesigner.synths.forEach(({ voices, fmSynth, filterADSRModule }, synthIx) => {
-    fmSynth.onUnGate(voiceIx, midiNumber);
-    const targetVoice = voices[voiceIx];
-    // We edit state directly w/o updating references because this is only needed internally
-    const ungateTime = ctx.currentTime;
-    targetVoice.lastGateOrUngateTime = ungateTime;
-    const releaseLengthMs =
-      (1 - fmSynth.gainEnvelope.releasePoint) * samplesToMs(fmSynth.gainEnvelope.lenSamples.value);
-
-    setTimeout(
-      () => {
-        const state = getState().synthDesigner;
-        const targetSynth = state.synths[synthIx];
-        if (!targetSynth) {
-          return;
-        }
-        // const targetVoice = voices[voiceIx];
-        // if (targetVoice.lastGateOrUngateTime !== ungateTime) {
-        //   // Voice has been re-gated before it finished playing last time; do not disconnect
-        //   return;
-        // }
-
-        targetVoice.outerGainNode.disconnect();
-
-        // Optimization to avoid computing voices that aren't playing
-        targetSynth.fmSynth.setFrequency(voiceIx, 0);
-        // targetSynth.fmSynth.clearOutputBuffer(voiceIx);
-      },
-      // We wait until the voice is done playing, accounting for the early-release phase and
-      // adding a little bit extra leeway
-      //
-      // We will need to make this dynamic if we make the length of the early release period
-      // user-configurable
-      releaseLengthMs + (2_640 / 44_100) * 1000 + 60
-    );
-
-    // Trigger release of gain and filter ADSRs
-    filterADSRModule.ungate(voiceIx);
-  });
+      // Trigger release of gain and filter ADSRs
+      // TODO: Migrate to audio thread scheduling too
+      filterADSRModule.ungate(voiceIx);
+    });
 
 export interface SynthDesignerState {
   synths: SynthModule[];
   wavyJonesInstance: AnalyserNode | undefined;
   spectrumNode: AnalyserNode;
   isHidden: boolean;
-  polysynthCtx: PolysynthContext | null;
   vcId: string;
 }
 
@@ -325,7 +302,7 @@ const buildDefaultSynthModule = (
   synthIx: number,
   filterEnvelope: Adsr,
   filterEnvelopeEnabled: boolean,
-  fmSynth?: FMSynth
+  providedFMSynth?: FMSynth
 ): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
   const filterParams = getDefaultFilterParams(filterType);
@@ -346,6 +323,22 @@ const buildDefaultSynthModule = (
     filterEnvelope.audioThreadData
   );
 
+  const vcId = stateKey.split('_')[1]!;
+  const fmSynth =
+    providedFMSynth ??
+    new FMSynth(ctx, undefined, {
+      onInitialized: () => {
+        connectFMSynth(stateKey, synthIx);
+
+        const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
+        if (!getState) {
+          throw new Error(`Failed to get state for stateKey=${stateKey}`);
+        }
+        fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
+      },
+      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth`,
+    });
+
   const inst: SynthModule = {
     filterBypassed: true,
     voices: new Array(VOICE_COUNT).fill(null).map(() => {
@@ -362,11 +355,7 @@ const buildDefaultSynthModule = (
         lastGateOrUngateTime: 0,
       };
     }),
-    fmSynth:
-      fmSynth ??
-      new FMSynth(ctx, undefined, {
-        onInitialized: () => connectFMSynth(stateKey, synthIx),
-      }),
+    fmSynth,
     filterADSRModule,
     filterParams,
     filterCSNs,
@@ -410,12 +399,22 @@ export const deserializeSynthModule = (
   }
   filterEnvelope.logScale = false;
 
+  const vcId = stateKey.split('_')[1]!;
   const fmSynth = new FMSynth(ctx, undefined, {
     ...(fmSynthConfig || {}),
     gainEnvelope: gainEnvelope
       ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
       : fmSynthConfig.gainEnvelope,
-    onInitialized: () => connectFMSynth(stateKey, synthIx),
+    onInitialized: () => {
+      connectFMSynth(stateKey, synthIx);
+
+      const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
+      if (!getState) {
+        throw new Error(`Failed to get state for stateKey=${stateKey}`);
+      }
+      fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
+    },
+    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth`,
   });
 
   const base = buildDefaultSynthModule(
@@ -476,7 +475,6 @@ export const getInitialSynthDesignerState = (vcId: string): SynthDesignerState =
   wavyJonesInstance: undefined,
   spectrumNode: new AnalyserNode(new AudioContext()),
   isHidden: false,
-  polysynthCtx: null,
   vcId,
 });
 
@@ -574,9 +572,9 @@ const actionGroups = {
       }
       (instance as any).isPaused = state.isHidden;
 
-      // state.synths.forEach(synth =>
-      //   synth.voices.forEach(voice => voice.outerGainNode.connect(instance))
-      // );
+      state.synths.forEach(synth =>
+        synth.voices.forEach(voice => voice.outerGainNode.connect(instance))
+      );
 
       return { ...state, wavyJonesInstance: instance };
     },

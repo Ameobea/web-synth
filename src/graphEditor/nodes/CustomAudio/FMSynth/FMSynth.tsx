@@ -157,6 +157,7 @@ interface ADSRParamsWithLenSamples extends AdsrParams {
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
+  private audioThreadMIDIEventMailboxID?: string;
   private awpHandle: AudioWorkletNode | null = null;
   private modulationMatrix: ParamSource[][] = buildDefaultModulationIndices();
   private outputWeights: ParamSource[] = new Array(OPERATOR_COUNT)
@@ -194,8 +195,8 @@ export default class FMSynth implements ForeignNode {
     releasePoint: 0.98,
     audioThreadData: { phaseIndex: 255 },
   };
-  private gateCallbacks: Set<(midiNumber: number) => void> = new Set();
-  private ungateCallbacks: Set<(midiNumber: number) => void> = new Set();
+  private gateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
+  private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
   public readonly debugID = genRandomStringID();
 
@@ -237,6 +238,7 @@ export default class FMSynth implements ForeignNode {
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
+    this.audioThreadMIDIEventMailboxID = params?.audioThreadMIDIEventMailboxID;
 
     if (params) {
       this.deserialize(params);
@@ -309,6 +311,7 @@ export default class FMSynth implements ForeignNode {
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       numberOfOutputs: VOICE_COUNT,
+      processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
     });
 
     this.awpHandle.port.postMessage({
@@ -360,6 +363,18 @@ export default class FMSynth implements ForeignNode {
           }
           break;
         }
+        case 'onGate': {
+          for (const gateCb of this.gateCallbacks) {
+            gateCb(evt.data.midiNumber, evt.data.voiceIx);
+          }
+          break;
+        }
+        case 'onUngate': {
+          for (const ungateCb of this.ungateCallbacks) {
+            ungateCb(evt.data.midiNumber, evt.data.voiceIx);
+          }
+          break;
+        }
         default: {
           console.error('Unhandled event type from FM synth AWP: ', evt.data.type);
         }
@@ -394,27 +409,27 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public onGate(voiceIx: number, midiNumber: number) {
-    if (!this.awpHandle) {
-      console.warn('Tried gating before AWP initialized');
-      return;
-    }
-    for (const cb of this.gateCallbacks) {
-      cb(midiNumber);
-    }
-    this.awpHandle.port.postMessage({ type: 'gate', voiceIx, midiNumber });
-  }
+  // public onGate(midiNumber: number) {
+  //   if (!this.awpHandle) {
+  //     console.warn('Tried gating before AWP initialized');
+  //     return;
+  //   }
+  //   for (const cb of this.gateCallbacks) {
+  //     cb(midiNumber);
+  //   }
+  //   this.awpHandle.port.postMessage({ type: 'gate', midiNumber });
+  // }
 
-  public onUnGate(voiceIx: number, midiNumber: number) {
-    if (!this.awpHandle) {
-      console.warn('Tried ungating before AWP initialized');
-      return;
-    }
-    for (const cb of this.ungateCallbacks) {
-      cb(midiNumber);
-    }
-    this.awpHandle.port.postMessage({ type: 'ungate', voiceIx });
-  }
+  // public onUnGate(midiNumber: number) {
+  //   if (!this.awpHandle) {
+  //     console.warn('Tried ungating before AWP initialized');
+  //     return;
+  //   }
+  //   for (const cb of this.ungateCallbacks) {
+  //     cb(midiNumber);
+  //   }
+  //   this.awpHandle.port.postMessage({ type: 'ungate', midiNumber });
+  // }
 
   public registerGateUngateCallbacks: GateUngateCallbackRegistrar = (onGate, onUngate) => {
     this.gateCallbacks.add(onGate);
@@ -955,27 +970,12 @@ export default class FMSynth implements ForeignNode {
     };
   }
 
-  public setFrequency(voiceIx: number, frequency: number) {
-    if (!this.awpHandle) {
-      console.warn('Tried to set FM synth frequency before AWP initialized');
-      return;
-    }
-
-    (this.awpHandle.parameters as Map<string, AudioParam>).get(
-      `voice_${voiceIx}_base_frequency`
-    )!.value = frequency;
-  }
-
   public clearOutputBuffer(voiceIx: number) {
-    throw new Error();
     if (!this.awpHandle) {
       console.warn('Tried to clear FM synth output buffer before AWP initialized');
       return;
     }
 
-    (this.awpHandle.parameters as Map<string, AudioParam>).get(
-      `voice_${voiceIx}_base_frequency`
-    )!.value = 0;
     this.awpHandle.port.postMessage({ type: 'clearOutputBuffer', voiceIx });
   }
 

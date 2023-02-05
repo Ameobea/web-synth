@@ -1,3 +1,4 @@
+import { UnreachableException } from 'ameo-utils';
 import { Option, Try } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import React from 'react';
@@ -10,15 +11,12 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import buildSynthDesignerRedux, {
   deserializeSynthModule,
-  gateSynthDesigner,
   getInitialSynthDesignerState,
   getSynthDesignerReduxInfra,
   serializeSynthModule,
   SynthDesignerStateByStateKey,
-  ungateSynthDesigner,
   type SynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
-import { AsyncOnce } from 'src/util';
 import SynthDesigner from './SynthDesigner';
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
@@ -27,49 +25,34 @@ export type SynthDesignerReduxStore = ReturnType<
   ReturnType<typeof buildSynthDesignerRedux>['getState']
 >;
 
-const PolysynthMod = new AsyncOnce(() => import('src/polysynth'));
-
 const getRootNodeId = (vcId: string) => `synth-designer-react-root_${vcId}`;
 
-const buildSynthDesignerMIDINode = (
-  getState: () => {
-    synthDesigner: SynthDesignerState;
-  },
-  vcId: string
-): MIDINode => {
-  const node = new MIDINode(() => {
-    const onAttack = (note: number, velocity: number) => {
-      const polysynthCtx = getState().synthDesigner.polysynthCtx;
-      if (!polysynthCtx) {
-        return;
-      }
-
-      polysynthCtx.module.handle_note_down(polysynthCtx.ctxPtr, note, velocity);
-    };
-
-    const onRelease = (note: number, _velocity: number) => {
-      const polysynthCtx = getState().synthDesigner.polysynthCtx;
-      if (!polysynthCtx) {
-        return;
-      }
-
-      polysynthCtx.module.handle_note_up(polysynthCtx.ctxPtr, note);
-    };
-
+const buildSynthDesignerMIDINode = (vcId: string): MIDINode =>
+  new MIDINode(() => {
     return {
-      onAttack,
-      onRelease,
+      enableRxAudioThreadScheduling: { mailboxID: `${vcId}-fm-synth` },
+      onAttack: () => {
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
+      },
+      onRelease: () => {
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
+      },
       onPitchBend: () => {
-        // No-op; TODO?
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
       },
       onClearAll: () => {
-        /* deprecated */
+        throw new UnreachableException(
+          'Should never be called; should be handled by audio thread scheduling'
+        );
       },
     };
   });
-  node.enableRxAudioThreadScheduling = { mailboxID: vcId };
-  return node;
-};
 
 export const init_synth_designer = (stateKey: string) => {
   // Create a fresh Redux store just for this instance.  It makes things a lot simpler on the Redux side due to the
@@ -106,21 +89,8 @@ export const init_synth_designer = (stateKey: string) => {
     });
 
   const reduxInfra = buildSynthDesignerRedux(vcId, initialState);
-  const midiNode = buildSynthDesignerMIDINode(reduxInfra.getState, vcId);
+  const midiNode = buildSynthDesignerMIDINode(vcId);
   SynthDesignerStateByStateKey.set(stateKey, { ...reduxInfra, reactRoot: 'NOT_LOADED', midiNode });
-
-  PolysynthMod.get().then(mod => {
-    const playNote = (voiceIx: number, note: number, _velocity: number) =>
-      gateSynthDesigner(reduxInfra.getState().synthDesigner, note, voiceIx);
-
-    const releaseNote = (voiceIx: number, note: number, _velocity: number) =>
-      ungateSynthDesigner(reduxInfra.getState, voiceIx, note);
-
-    const ctxPtr = mod.create_polysynth_context(playNote, releaseNote);
-    reduxInfra.dispatch(
-      reduxInfra.actionCreators.synthDesigner.SET_POLYSYNTH_CTX({ ctxPtr, module: mod })
-    );
-  });
 
   if (initialState) {
     initialState.vcId = vcId;
