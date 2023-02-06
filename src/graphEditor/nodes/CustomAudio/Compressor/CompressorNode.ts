@@ -144,7 +144,13 @@ export class CompressorNode implements ForeignNode {
 
     this.cleanupSmallView = mkSvelteContainerCleanupHelper({
       preserveRoot: true,
-      predicate: () => unsubscribe?.(),
+      predicate: () => {
+        try {
+          unsubscribe?.();
+        } catch (e) {
+          console.warn('Error unsubscribing from compressor store', e);
+        }
+      },
     });
 
     this.init().catch(err => {
@@ -277,6 +283,7 @@ export class CompressorNode implements ForeignNode {
     this.awpHandle.port.postMessage({ type: 'setBypassed', bypass: state.bypass });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     this.onChange(state);
+    console.log('Compressor node initialized', this.buildConnectables());
     updateConnectables(this.vcId, this.buildConnectables());
   }
 

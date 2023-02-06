@@ -233,37 +233,41 @@ const mkOnGate =
 const mkOnUngate =
   (getState: () => { synthDesigner: SynthDesignerState }) =>
   (_midiNumber: number, voiceIx: number) =>
-    getState().synthDesigner.synths.forEach(({ voices, fmSynth, filterADSRModule }, synthIx) => {
-      const targetVoice = voices[voiceIx];
-      // We edit state directly w/o updating references because this is only needed internally
-      const ungateTime = ctx.currentTime;
-      targetVoice.lastGateOrUngateTime = ungateTime;
-      const releaseLengthMs =
-        (1 - fmSynth.gainEnvelope.releasePoint) *
-        samplesToMs(fmSynth.gainEnvelope.lenSamples.value);
+    getState().synthDesigner.synths.forEach(
+      ({ voices, fmSynth, filterADSRModule, filterEnvelopeEnabled }, synthIx) => {
+        const targetVoice = voices[voiceIx];
+        // We edit state directly w/o updating references because this is only needed internally
+        const ungateTime = ctx.currentTime;
+        targetVoice.lastGateOrUngateTime = ungateTime;
+        const releaseLengthMs =
+          (1 - fmSynth.gainEnvelope.releasePoint) *
+          samplesToMs(fmSynth.gainEnvelope.lenSamples.value);
 
-      setTimeout(
-        () => {
-          const state = getState().synthDesigner;
-          const targetSynth = state.synths[synthIx];
-          if (!targetSynth) {
-            return;
-          }
+        setTimeout(
+          () => {
+            const state = getState().synthDesigner;
+            const targetSynth = state.synths[synthIx];
+            if (!targetSynth) {
+              return;
+            }
 
-          targetSynth.fmSynth.clearOutputBuffer(voiceIx);
-        },
-        // We wait until the voice is done playing, accounting for the early-release phase and
-        // adding a little bit extra leeway
-        //
-        // We will need to make this dynamic if we make the length of the early release period
-        // user-configurable
-        releaseLengthMs + (2_640 / 44_100) * 1000 + 60
-      );
+            targetSynth.fmSynth.clearOutputBuffer(voiceIx);
+          },
+          // We wait until the voice is done playing, accounting for the early-release phase and
+          // adding a little bit extra leeway
+          //
+          // We will need to make this dynamic if we make the length of the early release period
+          // user-configurable
+          releaseLengthMs + (2_640 / 44_100) * 1000 + 60
+        );
 
-      // Trigger release of gain and filter ADSRs
-      // TODO: Migrate to audio thread scheduling too
-      filterADSRModule.ungate(voiceIx);
-    });
+        // Trigger release of gain and filter ADSRs
+        // TODO: Migrate to audio thread scheduling too
+        if (filterEnvelopeEnabled) {
+          filterADSRModule.ungate(voiceIx);
+        }
+      }
+    );
 
 export interface SynthDesignerState {
   synths: SynthModule[];

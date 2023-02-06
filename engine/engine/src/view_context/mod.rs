@@ -31,19 +31,6 @@ pub trait ViewContext {
     /// interact with it.
     fn unhide(&mut self) {}
 
-    // input handlers
-    fn handle_key_down(&mut self, _key: &str, _control_pressed: bool, _shift_pressed: bool) {}
-    fn handle_key_up(&mut self, _key: &str, _control_pressed: bool, _shift_pressed: bool) {}
-    fn handle_mouse_down(&mut self, _x: usize, _y: usize) {}
-    fn handle_mouse_move(&mut self, _x: usize, _y: usize) {}
-    fn handle_mouse_up(&mut self, _x: usize, _y: usize) {}
-    fn handle_mouse_wheel(&mut self, _ydiff: isize) {}
-
-    /// A function that will be called with arbitrary messages containing binary data to be handled
-    /// in an arbitrary manner by the view context.  Each message includes a type which can be used
-    /// to identify it.
-    fn handle_message(&mut self, _key: &str, _val: &[u8]) -> Option<Vec<u8>> { None }
-
     /// Returns a JavaScript object that contains WebAudio constructs that can be used to connect
     /// this `ViewContext` to other `ViewContext`s programatically.  This function should return
     /// the same object throughout the life of the view context.

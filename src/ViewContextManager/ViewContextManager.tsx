@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 
 import { GlobalVolumeSlider } from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
@@ -197,9 +197,11 @@ const ViewContextTabRenamer: React.FC<VCMTabRenamerProps> = ({ value, setValue, 
   );
 };
 
-const VCTabCloseIcon: React.FC<{
+interface VCTabCloseIconProps {
   onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-}> = ({ onClick }) => (
+}
+
+const VCTabCloseIcon: React.FC<VCTabCloseIconProps> = ({ onClick }) => (
   <div onClick={onClick} className='vc-close-tab-icon'>
     ×
   </div>
@@ -222,6 +224,9 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({ engine, name, uuid, tit
       }}
       onClick={() => {
         if (!active) {
+          getSentry()?.addBreadcrumb({
+            message: `Switching to VC ${uuid} name=${name} title=${title}`,
+          });
           engine.switch_view_context(uuid);
         }
       }}
@@ -232,6 +237,9 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({ engine, name, uuid, tit
           value={renamingTitle}
           setValue={setRenamingTitle}
           submit={() => {
+            getSentry()?.addBreadcrumb({
+              message: `Renaming VC ${uuid} name=${name} title=${title} to ${renamingTitle}`,
+            });
             setIsRenaming(false);
             engine.set_vc_title(uuid, renamingTitle);
           }}
@@ -240,6 +248,9 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({ engine, name, uuid, tit
         <>
           <VCTabCloseIcon
             onClick={e => {
+              getSentry()?.addBreadcrumb({
+                message: `Deleting VC ${uuid} name=${name} title=${title}`,
+              });
               engine.delete_vc_by_id(uuid);
               e.stopPropagation();
             }}
@@ -263,10 +274,13 @@ interface ViewContextSwitcherProps {
  * backend every time there is a change.
  */
 export const ViewContextSwitcher: React.FC<ViewContextSwitcherProps> = ({ engine }) => {
-  const { activeViewContexts, activeViewContextIx } = useSelector((state: ReduxStore) => ({
-    activeViewContexts: state.viewContextManager.activeViewContexts,
-    activeViewContextIx: state.viewContextManager.activeViewContextIx,
-  }));
+  const { activeViewContexts, activeViewContextIx } = useSelector(
+    (state: ReduxStore) => ({
+      activeViewContexts: state.viewContextManager.activeViewContexts,
+      activeViewContextIx: state.viewContextManager.activeViewContextIx,
+    }),
+    shallowEqual
+  );
 
   return (
     <div style={styles.viewContextSwitcher}>

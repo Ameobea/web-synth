@@ -138,8 +138,8 @@ export const maybeRestoreLocalComposition = async () => {
     return;
   }
 
-  const [serializedSavedComp] = await currentLoadedCompositionIdTable.toArray();
-  const savedComp = JSON.parse(serializedSavedComp);
+  const [serializedSavedComp] = (await localCompositionTable.toArray()) as string[];
+  const savedComp: Record<string, string> = JSON.parse(serializedSavedComp);
   localStorage.clear();
   Object.entries(savedComp).forEach(([key, val]) => localStorage.setItem(key, val as any));
 

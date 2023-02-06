@@ -19,6 +19,7 @@ import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { useWindowSize } from 'src/reactUtils';
 import type { Effect } from 'src/redux/modules/effects';
+import { getSentry } from 'src/sentry';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 export type FaustEditorReduxStore = ReturnType<
@@ -219,7 +220,15 @@ const buildCodeEditorControlPanelSettings = ({
     {
       type: 'button',
       label: isRunning ? 'stop' : 'compile',
-      action: isRunning ? stopInstance : compile,
+      action: isRunning
+        ? () => {
+            getSentry()?.captureMessage('Stopping Faust editor instance');
+            stopInstance();
+          }
+        : () => {
+            getSentry()?.captureMessage('Compiling Faust editor instance');
+            compile();
+          },
     },
     language === 'faust' ? { type: 'checkbox', label: 'optimize' } : null,
     {
