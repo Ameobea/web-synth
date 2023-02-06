@@ -186,6 +186,10 @@ build-wavetable:
   cd ./engine/wavetable && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/wavetable.wasm ../../public
 
+debug-wavetable:
+  cd ./engine/wavetable && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/wavetable.wasm ../../public
+
 debug-adsr:
   cd ./engine/adsr && cargo build --features=exports --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/adsr.wasm ../../public

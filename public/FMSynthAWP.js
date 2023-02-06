@@ -596,6 +596,19 @@ class FMSynthAWP extends AudioWorkletProcessor {
         (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4
       );
       outputs[voiceIx]?.[0]?.set(outputSlice);
+
+      const filterADSROutput = outputs[VOICE_COUNT + voiceIx]?.[0];
+      if (filterADSROutput) {
+        const ptr = this.wasmInstance.exports.fm_synth_get_filter_adsr_output_buf_ptr(
+          this.ctxPtr,
+          voiceIx
+        );
+        const outputsSlice = wasmMemory.subarray(
+          ptr / BYTES_PER_F32,
+          ptr / BYTES_PER_F32 + FRAME_SIZE
+        );
+        filterADSROutput.set(outputsSlice);
+      }
     }
 
     // Copy current ADSR phases to shared buffer

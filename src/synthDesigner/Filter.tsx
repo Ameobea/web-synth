@@ -11,6 +11,7 @@ import {
 import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import { getSynthDesignerReduxInfra, type FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { msToSamples } from 'src/util';
 
 const style = { width: 600 };
 

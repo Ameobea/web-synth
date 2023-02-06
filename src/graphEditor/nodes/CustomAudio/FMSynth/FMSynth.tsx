@@ -151,11 +151,11 @@ const serializeADSR = (adsr: AdsrParams) => ({
     typeof adsr.lenSamples === 'number'
       ? { type: 'constant' as const, value: adsr.lenSamples }
       : adsr.lenSamples,
-  audioThreadData: { phaseIndex: 0 },
+  audioThreadData: { phaseIndex: 0, debugName: 'serializeAdsr' },
 });
 
 interface ADSRParamsWithLenSamples extends AdsrParams {
-  lenSamples: { type: 'constant'; value: number };
+  lenSamples: { type: 'constant'; value: number } | { type: 'beats to samples'; value: number };
 }
 
 export default class FMSynth implements ForeignNode {
@@ -177,7 +177,7 @@ export default class FMSynth implements ForeignNode {
   private mainEffectChain: (Effect | null)[] = new Array(16).fill(null);
   private adsrs: AdsrParams[] = [buildDefaultAdsr()];
   public selectedUI: UISelection | null = null;
-  private onInitialized: ((inst: FMSynth) => void) | undefined;
+  private onInitializedCBs: ((inst: FMSynth) => void)[] = [];
   private audioThreadDataBuffer: Float32Array | null = null;
   private detune: ParamSource | null = null;
   public midiControlValuesCache: MIDIControlValuesCache;
@@ -198,6 +198,17 @@ export default class FMSynth implements ForeignNode {
     loopPoint: null,
     releasePoint: 0.98,
     audioThreadData: { phaseIndex: 255 },
+  };
+  public filterEnvelope: ADSRParamsWithLenSamples = {
+    steps: [
+      { x: 0, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
+      { x: 0.04, y: 0.5, ramper: { type: 'exponential', exponent: 0.5 } },
+      { x: 1, y: 0.5, ramper: { type: 'exponential', exponent: 0.5 } },
+    ],
+    lenSamples: { type: 'constant', value: 44_100 / 2 },
+    loopPoint: null,
+    releasePoint: 0.7,
+    audioThreadData: { phaseIndex: 254 },
   };
   private gateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
@@ -321,7 +332,9 @@ export default class FMSynth implements ForeignNode {
       RegisterFMSynthAWP.get(),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
-      numberOfOutputs: VOICE_COUNT,
+      // First `VOICE_COUNT` outputs are for the actual voice outputs
+      // Second `VOICE_COUNT` outputs are for the outputs of the filter envelope generator
+      numberOfOutputs: VOICE_COUNT * 2,
       processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
     });
 
@@ -335,6 +348,7 @@ export default class FMSynth implements ForeignNode {
       outputWeights: this.outputWeights.map(ps => this.encodeParamSource(ps)),
       adsrs: [
         this.encodeAdsr(this.gainEnvelope, -1),
+        this.encodeAdsr(this.filterEnvelope, -2),
         ...this.adsrs.map((adsr, adsrIx) => this.encodeAdsr(adsr, adsrIx)),
       ],
       debugID: this.debugID,
@@ -351,6 +365,7 @@ export default class FMSynth implements ForeignNode {
               adsr.audioThreadData.buffer = this.audioThreadDataBuffer!;
             });
             this.gainEnvelope.audioThreadData.buffer = this.audioThreadDataBuffer!;
+            this.filterEnvelope.audioThreadData.buffer = this.audioThreadDataBuffer!;
           }
 
           // Initialize backend with all effects and modulation indices that were deserialized
@@ -368,9 +383,8 @@ export default class FMSynth implements ForeignNode {
           this.handleDetuneChange(this.detune);
           this.sampleMappingStore.subscribe(this.handleSampleMappingStateChange);
 
-          if (this.onInitialized) {
-            this.onInitialized(this);
-            this.onInitialized = undefined;
+          for (const cb of this.onInitializedCBs) {
+            cb(this);
           }
           break;
         }
@@ -419,28 +433,6 @@ export default class FMSynth implements ForeignNode {
       samples: bank.samples,
     });
   }
-
-  // public onGate(midiNumber: number) {
-  //   if (!this.awpHandle) {
-  //     console.warn('Tried gating before AWP initialized');
-  //     return;
-  //   }
-  //   for (const cb of this.gateCallbacks) {
-  //     cb(midiNumber);
-  //   }
-  //   this.awpHandle.port.postMessage({ type: 'gate', midiNumber });
-  // }
-
-  // public onUnGate(midiNumber: number) {
-  //   if (!this.awpHandle) {
-  //     console.warn('Tried ungating before AWP initialized');
-  //     return;
-  //   }
-  //   for (const cb of this.ungateCallbacks) {
-  //     cb(midiNumber);
-  //   }
-  //   this.awpHandle.port.postMessage({ type: 'ungate', midiNumber });
-  // }
 
   public registerGateUngateCallbacks: GateUngateCallbackRegistrar = (onGate, onUngate) => {
     this.gateCallbacks.add(onGate);
@@ -673,6 +665,16 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
+  public onInitialized(): Promise<FMSynth> {
+    if (this.awpHandle) {
+      return Promise.resolve(this);
+    }
+
+    return new Promise<FMSynth>(resolve => {
+      this.onInitializedCBs.push(() => resolve(this));
+    });
+  }
+
   public handleAdsrChange(adsrIx: number, newAdsrRaw: AdsrParams) {
     if (!this.awpHandle) {
       console.error('Tried to set ADSR before AWP initialization');
@@ -683,7 +685,8 @@ export default class FMSynth implements ForeignNode {
       newAdsrRaw.lenSamples = { type: 'constant', value: newAdsrRaw.lenSamples };
     }
 
-    const oldAdsr = adsrIx < 0 ? this.gainEnvelope : this.adsrs[adsrIx];
+    const oldAdsr =
+      adsrIx === -1 ? this.gainEnvelope : adsrIx === -2 ? this.filterEnvelope : this.adsrs[adsrIx];
 
     const isLenOnlyChange = oldAdsr && !R.equals(oldAdsr.lenSamples, newAdsrRaw.lenSamples);
     const newAdsr = {
@@ -691,14 +694,30 @@ export default class FMSynth implements ForeignNode {
       audioThreadData: {
         phaseIndex: adsrIx,
         buffer: this.audioThreadDataBuffer ?? undefined,
+        debugName: `handleAdsrChange adsrIx=${adsrIx}`,
       },
     };
-    if (adsrIx < 0) {
+    if (adsrIx === -1) {
       const newLenSamples = newAdsr.lenSamples;
       if (newLenSamples.type !== 'constant') {
         throw new UnreachableException('Only constant gain envelope length is supported');
       }
       this.gainEnvelope = { ...newAdsr, lenSamples: newLenSamples };
+    } else if (adsrIx === -2) {
+      if (
+        newAdsr.lenSamples.type !== 'constant' &&
+        newAdsr.lenSamples.type !== 'beats to samples'
+      ) {
+        throw new UnreachableException(
+          'Only constant and beats to samples filter envelope length is supported'
+        );
+      }
+
+      this.filterEnvelope = {
+        ...newAdsr,
+        lenSamples: newAdsr.lenSamples,
+        audioThreadData: this.filterEnvelope.audioThreadData,
+      };
     } else {
       this.adsrs[adsrIx] = newAdsr;
     }
@@ -905,7 +924,7 @@ export default class FMSynth implements ForeignNode {
       });
     }
     if (params.onInitialized) {
-      this.onInitialized = params.onInitialized;
+      this.onInitializedCBs.push(params.onInitialized);
     }
     if (params.operatorEffects) {
       this.operatorEffects = params.operatorEffects;
@@ -950,6 +969,17 @@ export default class FMSynth implements ForeignNode {
         audioThreadData: { phaseIndex: 255 },
       };
     }
+    if (params.filterEnvelope && params.filterEnvelope.steps.length > 0) {
+      const filterEnvelope = normalizeEnvelope(params.filterEnvelope);
+      this.filterEnvelope = {
+        ...filterEnvelope,
+        lenSamples:
+          typeof filterEnvelope.lenSamples === 'number'
+            ? { type: 'constant', value: filterEnvelope.lenSamples }
+            : filterEnvelope.lenSamples,
+      };
+      this.filterEnvelope.audioThreadData.phaseIndex = 254;
+    }
     if (params.sampleMappingState) {
       this.sampleMappingStore.set(deserializeSampleMappingState(params.sampleMappingState));
     }
@@ -977,6 +1007,7 @@ export default class FMSynth implements ForeignNode {
       lastSeenMIDIControlValues: this.midiControlValuesCache.serialize(),
       wavetableState: serializeWavetableState(this.wavetableState),
       gainEnvelope: this.gainEnvelope,
+      filterEnvelope: this.filterEnvelope,
       sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
     };
   }

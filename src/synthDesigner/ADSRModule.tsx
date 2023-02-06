@@ -315,7 +315,7 @@ export class ADSR2Module {
       lenSamples: this.params.length,
       loopPoint: this.params.loopPoint ?? null,
       releasePoint: this.params.releaseStartPhase ?? null,
-      audioThreadData: { phaseIndex: 0 },
+      audioThreadData: { phaseIndex: 0, debugName: 'ADSR2Module.serialize()' },
       logScale: this.params.logScale ?? false,
     };
   }

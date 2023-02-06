@@ -32,6 +32,7 @@ extern "C" {
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
 const GAIN_ENVELOPE_PHASE_BUF_INDEX: usize = 255;
+const FILTER_ENVELOPE_PHASE_BUF_INDEX: usize = 254;
 
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: usize) {
@@ -751,6 +752,7 @@ pub struct FMSynthVoice {
     pub effect_chain: EffectChain,
     cached_modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
     pub gain_envelope: Adsr,
+    pub filter_envelope: Adsr,
     pub last_gated_midi_number: usize,
 }
 
@@ -807,7 +809,10 @@ fn build_default_gain_adsr_steps() -> Vec<AdsrStep> {
 
 impl FMSynthVoice {
     #[cold]
-    fn new(shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]>) -> Self {
+    fn new(
+        shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]>,
+        shared_filter_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]>,
+    ) -> Self {
         FMSynthVoice {
             output: 0.,
             adsrs: Vec::new(),
@@ -833,6 +838,19 @@ impl FMSynthVoice {
                 None,
                 0.975,
                 shared_gain_adsr_rendered_buffer,
+                EarlyReleaseConfig {
+                    strategy: EarlyReleaseStrategy::LinearMix,
+                    len_samples: 3_400,
+                },
+                false,
+            ),
+            filter_envelope: Adsr::new(
+                build_default_gain_adsr_steps(),
+                None,
+                44_100.,
+                None,
+                0.975,
+                shared_filter_adsr_rendered_buffer,
                 EarlyReleaseConfig {
                     strategy: EarlyReleaseStrategy::LinearMix,
                     len_samples: 3_400,
@@ -1581,6 +1599,15 @@ impl FMSynthContext {
             );
 
             voice.gain_envelope.render_frame(1., 0., 0.);
+            // TODO: Skip rendering filter ADSR if not enabled
+            // Currently hard-coded output range from [20, 44_100 / 2]
+            let filter_adsr_shift = 20.;
+            let filter_adsr_scale = 44_100. / 2. - filter_adsr_shift;
+            // TODO: Make use of the global beat counter sync optimization if in beat mode.  We'll
+            // also have to update the ADSR length given the current bpm.
+            voice
+                .filter_envelope
+                .render_frame(filter_adsr_scale, filter_adsr_shift, 0.);
             // TODO: SIMD-ify
             let gain_adsr_output = voice.gain_envelope.get_cur_frame_output();
             for i in 0..FRAME_SIZE {
@@ -1673,17 +1700,25 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
             .add(i)
             .write(ParamSource::BaseFrequencyMultiplier(1.));
     }
-    let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> = box uninit();
+    let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
+        box [0.242424; RENDERED_BUFFER_SIZE];
     let shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
         shared_gain_adsr_rendered_buffer.into();
 
+    let shared_filter_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
+        box [0.424242; RENDERED_BUFFER_SIZE];
+    let shared_filter_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
+        shared_filter_adsr_rendered_buffer.into();
+
     for _ in 0..voice_count {
-        (*ctx).voices.push(FMSynthVoice::new(Rc::clone(
-            &shared_gain_adsr_rendered_buffer,
-        )));
+        (*ctx).voices.push(FMSynthVoice::new(
+            Rc::clone(&shared_gain_adsr_rendered_buffer),
+            Rc::clone(&shared_filter_adsr_rendered_buffer),
+        ));
     }
-    // Render the default gain envelope for all voices
+    // Render the default gain and filter envelope for all voices
     (*ctx).voices[0].gain_envelope.render();
+    (*ctx).voices[0].filter_envelope.render();
 
     (*ctx).base_frequency_input_buffer.set_len(voice_count);
     (*ctx).output_buffers.set_len(voice_count);
@@ -2130,6 +2165,7 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
         adsr.store_phase_to = None;
     }
     old_phases_voice.gain_envelope.store_phase_to = None;
+    old_phases_voice.filter_envelope.store_phase_to = None;
     (*ctx).most_recent_gated_voice_ix = voice_ix;
 
     let voice = &mut (*ctx).voices[voice_ix];
@@ -2142,6 +2178,9 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
     voice.gain_envelope.gate(0.);
     voice.gain_envelope.store_phase_to =
         Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(GAIN_ENVELOPE_PHASE_BUF_INDEX));
+    voice.filter_envelope.gate(0.);
+    voice.filter_envelope.store_phase_to =
+        Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(FILTER_ENVELOPE_PHASE_BUF_INDEX));
 
     for operator in &mut voice.operators {
         if operator.randomize_start_phases {
@@ -2189,6 +2228,7 @@ unsafe fn ungate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize) {
     }
 
     voice.gain_envelope.ungate();
+    voice.filter_envelope.ungate();
 }
 
 static mut ADSR_STEP_BUFFER: [AdsrStep; 512] = [AdsrStep {
@@ -2248,8 +2288,10 @@ pub unsafe extern "C" fn set_adsr(
             ),
         };
 
-        let old_adsr = if adsr_ix < 0 {
+        let old_adsr = if adsr_ix == -1 {
             Some(&mut voice.gain_envelope)
+        } else if adsr_ix == -2 {
+            Some(&mut voice.filter_envelope)
         } else {
             voice.adsrs.get_mut(adsr_ix as usize)
         };
@@ -2275,8 +2317,13 @@ pub unsafe extern "C" fn set_adsr(
             *old_adsr = new_adsr;
             if adsr_ix >= 0 {
                 voice.adsr_params[adsr_ix as usize] = params;
-            } else {
+            } else if adsr_ix == -1 {
                 old_adsr.set_len(len_samples_float_val, None);
+            } else if adsr_ix == -2 {
+                // TODO: Need to be able to handle beat length mode
+                old_adsr.set_len(len_samples_float_val, None);
+            } else {
+                unimplemented!()
             }
         } else if voice.adsrs.len() != adsr_ix as usize {
             panic!(
@@ -2290,8 +2337,10 @@ pub unsafe extern "C" fn set_adsr(
         }
     }
     // Render the ADSR's shared buffer
-    if adsr_ix < 0 {
+    if adsr_ix == -1 {
         (*ctx).voices[0].gain_envelope.render();
+    } else if adsr_ix == -2 {
+        (*ctx).voices[0].filter_envelope.render();
     } else {
         (*ctx).voices[0].adsrs[adsr_ix as usize].render();
     }
@@ -2315,10 +2364,16 @@ pub unsafe extern "C" fn set_adsr_length(
         len_samples_float_val_3,
     );
 
-    if adsr_ix < 0 {
+    if adsr_ix == -1 {
         // gain envelope
         for voice in &mut (*ctx).voices {
             voice.gain_envelope.set_len(len_samples_float_val, None);
+        }
+        return;
+    } else if adsr_ix == -2 {
+        // filter envelope
+        for voice in &mut (*ctx).voices {
+            voice.filter_envelope.set_len(len_samples_float_val, None);
         }
         return;
     }
@@ -2429,4 +2484,14 @@ pub extern "C" fn fm_synth_set_mapped_sample_config(
             end_ix,
             playback_rate,
         )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_get_filter_adsr_output_buf_ptr(
+    ctx: *mut FMSynthContext,
+    voice_ix: usize,
+) -> *const f32 {
+    let ctx = &mut *ctx;
+    let voice = &mut ctx.voices[voice_ix];
+    voice.filter_envelope.get_cur_frame_output().as_ptr()
 }

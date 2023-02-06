@@ -131,7 +131,7 @@ const buildSynthControlPanelSettings = (vcId: string) => [
 
 const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
   const [localPitchMultiplier, setLocalPitchMultiplier] = useState<string | null>(null);
-  const { dispatch, actionCreators } = getSynthDesignerReduxInfra(props.stateKey);
+  const { dispatch, actionCreators, getState } = getSynthDesignerReduxInfra(props.stateKey);
   const [gainADSRLengthMs, setGainADSRLengthMs] = useState<number>(props.gainADSRLength);
   const [gainEnvelope, setGainEnvelope] = useState<Adsr>({
     ...props.gainEnvelope,
@@ -147,16 +147,25 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         }
         case 'gain envelope': {
           setGainEnvelope(val);
-          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR(val, props.index));
+          const fmSynth = getState().synthDesigner.synths[props.index].fmSynth;
+          fmSynth.handleAdsrChange(-1, val);
           return;
         }
         case 'adsr length ms': {
           setGainADSRLengthMs(val);
-          dispatch(actionCreators.synthDesigner.SET_GAIN_ADSR_LENGTH(props.index, val));
+          const fmSynth = getState().synthDesigner.synths[props.index].fmSynth;
+          fmSynth.handleAdsrChange(-1, {
+            ...fmSynth.gainEnvelope,
+            lenSamples: { type: 'constant', value: msToSamples(val) },
+          });
           return;
         }
         case 'log scale': {
-          dispatch(actionCreators.synthDesigner.SET_GAIN_LOG_SCALE(props.index, val));
+          const fmSynth = getState().synthDesigner.synths[props.index].fmSynth;
+          fmSynth.handleAdsrChange(-1, {
+            ...fmSynth.gainEnvelope,
+            logScale: val,
+          });
           return;
         }
         case 'pitch multiplier': {
@@ -173,7 +182,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         }
       }
     },
-    [actionCreators.synthDesigner, dispatch, props.index]
+    [actionCreators.synthDesigner, dispatch, getState, props.index]
   );
 
   const state = useMemo(() => {

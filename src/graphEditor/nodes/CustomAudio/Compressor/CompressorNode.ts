@@ -283,7 +283,6 @@ export class CompressorNode implements ForeignNode {
     this.awpHandle.port.postMessage({ type: 'setBypassed', bypass: state.bypass });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     this.onChange(state);
-    console.log('Compressor node initialized', this.buildConnectables());
     updateConnectables(this.vcId, this.buildConnectables());
   }
 
