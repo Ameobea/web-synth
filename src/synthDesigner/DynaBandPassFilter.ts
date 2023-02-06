@@ -1,21 +1,23 @@
-import { AsyncOnce } from 'ameo-utils';
-
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { getSentry } from 'src/sentry';
 import {
   AbstractFilterModule,
   buildConnectedFilterChain,
   computeHigherOrderBiquadQFactors,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType } from 'src/synthDesigner/filterHelpers';
+import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
 
-const DynaBandPassFilterAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'DynaBandpassFilterAWP.js?cacheBust=' +
-      (window.location.href.includes('localhost') ? btoa(Math.random().toString()) : '')
-  )
+const DynaBandPassFilterAWPRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'DynaBandpassFilterAWP.js?cacheBust=' +
+        (window.location.href.includes('localhost') ? btoa(Math.random().toString()) : '')
+    ),
+  true
 );
 
 /**
@@ -28,7 +30,10 @@ export class DynaBandPassFilter {
   private pendingOnInitCbs: (() => void)[] = [];
 
   constructor(order: number) {
-    this.init(order);
+    this.init(order).catch(err => {
+      console.error('DynaBandPassFilter init error', err);
+      getSentry()?.captureException(err);
+    });
   }
 
   private async init(order: number) {

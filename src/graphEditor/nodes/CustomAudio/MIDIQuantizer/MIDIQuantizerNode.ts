@@ -3,8 +3,8 @@ import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
 import {
-  registerStartCB,
-  registerStopCB,
+  registerGlobalStartCB,
+  registerGlobalStopCB,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
@@ -14,22 +14,26 @@ import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode } from 'src/patchNetwork/midiNode';
+import { getSentry } from 'src/sentry';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
 import MIDIQuantizerNodeUI from './MIDIQuantizerNodeUI.svelte';
 import { buildDefaultMIDIQuantizerNodeUIState, type MIDIQuantizerNodeUIState } from './types';
 
-const MIDIQuantizerWasmBytes = new AsyncOnce(() =>
-  fetch(process.env.ASSET_PATH + 'midi_quantizer.wasm').then(res => res.arrayBuffer())
+const MIDIQuantizerWasmBytes = new AsyncOnce(
+  () => fetch(process.env.ASSET_PATH + 'midi_quantizer.wasm').then(res => res.arrayBuffer()),
+  true
 );
 
 const ctx = new AudioContext();
-const MIDIQuantizerAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'MIDIQuantizerAWP.js?cacheBust=' +
-      (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
-  )
+const MIDIQuantizerAWPRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'MIDIQuantizerAWP.js?cacheBust=' +
+        (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
 
 export default class MIDIQuantizerNode implements ForeignNode {
@@ -57,7 +61,10 @@ export default class MIDIQuantizerNode implements ForeignNode {
       this.deserialize(params as MIDIQuantizerNodeUIState);
     }
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing MIDIQuantizerNode:', err);
+      getSentry()?.captureException(err);
+    });
 
     this.store.subscribe(this.onChange);
 
@@ -119,8 +126,8 @@ export default class MIDIQuantizerNode implements ForeignNode {
 
   private registerGlobalStartCBs = () => {
     this.globalStartCBsRegistered = true;
-    registerStartCB(this.start);
-    registerStopCB(this.stop);
+    registerGlobalStartCB(this.start);
+    registerGlobalStopCB(this.stop);
   };
 
   private deregisterGlobalStartCBs = () => {

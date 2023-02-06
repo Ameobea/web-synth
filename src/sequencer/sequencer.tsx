@@ -4,8 +4,8 @@ import * as R from 'ramda';
 import React, { Suspense } from 'react';
 
 import {
-  registerStartCB,
-  registerStopCB,
+  registerGlobalStartCB,
+  registerGlobalStopCB,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';
@@ -21,6 +21,7 @@ import {
 } from 'src/reactUtils';
 import { getSample } from 'src/sampleLibrary';
 import type { SampleDescriptor } from 'src/sampleLibrary';
+import { getSentry } from 'src/sentry';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce } from 'src/util';
@@ -104,12 +105,14 @@ export const buildGateOutput = (): ConstantSourceNode => {
   return csn;
 };
 
-const SequencerAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'SequencerWorkletProcessor.js?cacheBust=' +
-      btoa(Math.random().toString())
-  )
+const SequencerAWPRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'SequencerWorkletProcessor.js?cacheBust=' +
+        btoa(Math.random().toString())
+    ),
+  true
 );
 
 const getIsSequencerVisible = (vcId: string): boolean => {
@@ -226,19 +229,24 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     curActiveMarkIx: null,
   };
 
-  initSequenceAWP(vcId).then(awpHandle => {
-    const reduxInfra = SequencerInstancesMap.get(vcId);
-    if (!reduxInfra) {
-      console.warn('No redux infra found for sequencer when trying to auto-start');
-      return;
-    }
-    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_AWP_HANDLE(awpHandle));
+  initSequenceAWP(vcId)
+    .then(awpHandle => {
+      const reduxInfra = SequencerInstancesMap.get(vcId);
+      if (!reduxInfra) {
+        console.warn('No redux infra found for sequencer when trying to auto-start');
+        return;
+      }
+      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.SET_AWP_HANDLE(awpHandle));
 
-    // If the sequencer was playing when we saved, re-start it and set a new valid handle
-    if (isPlaying) {
-      reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
-    }
-  });
+      // If the sequencer was playing when we saved, re-start it and set a new valid handle
+      if (isPlaying) {
+        reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
+      }
+    })
+    .catch(err => {
+      console.error('Failed to initialize sequencer AWP: ', err);
+      getSentry()?.captureException(err);
+    });
 
   return state;
 };
@@ -325,14 +333,14 @@ export const init_sequencer = (stateKey: string) => {
     }
     reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
   };
-  registerStartCB(onGlobalStart);
+  registerGlobalStartCB(onGlobalStart);
   const onGlobalStop = () => {
     const isPlaying = reduxInfra.getState().sequencer.isPlaying;
     if (isPlaying) {
       reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
     }
   };
-  registerStopCB(onGlobalStop);
+  registerGlobalStopCB(onGlobalStop);
   SequencerInstancesMap.set(vcId, { ...reduxInfra, onGlobalStart, onGlobalStop });
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state

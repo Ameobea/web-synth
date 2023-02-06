@@ -10,23 +10,26 @@ import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { getSentry } from 'src/sentry';
 import { AsyncOnce, genRandomStringID } from 'src/util';
 
-const NoiseGenAWPRegistered = new AsyncOnce(() =>
-  new AudioContext().audioWorklet
-    .addModule(
+const NoiseGenAWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
       process.env.ASSET_PATH +
         'NoiseGenAWP.js?cacheBust=' +
         (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-    )
-    .catch(console.error)
+    ),
+  true
 );
-const NoiseGenWasm = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'noise_gen.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : genRandomStringID())
-  ).then(res => res.arrayBuffer())
+const NoiseGenWasm = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'noise_gen.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    ).then(res => res.arrayBuffer()),
+  true
 );
 
 interface NoiseGenSmallViewProps {
@@ -146,7 +149,10 @@ export class NoiseGenNode {
     this.ctx = ctx;
 
     this.maybeDeserialize(params);
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing NoiseGenNode', err);
+      getSentry()?.captureException(err);
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: NoiseGenSmallView,

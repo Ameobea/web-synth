@@ -9,12 +9,21 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce, genRandomStringID } from 'src/util';
 
-export const DistortionWasmBytes = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'distortion.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : genRandomStringID())
-  ).then(res => res.arrayBuffer())
+const DistortionWasmBytes = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'distortion.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    ).then(res => res.arrayBuffer()),
+  true
+);
+const DistortionAWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
+      process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + btoa(Math.random().toString())
+    ),
+  true
 );
 
 export default class DistortionNode implements ForeignNode {
@@ -61,9 +70,7 @@ export default class DistortionNode implements ForeignNode {
   private async init() {
     const [wasmBytes] = await Promise.all([
       DistortionWasmBytes.get(),
-      this.ctx.audioWorklet.addModule(
-        process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + btoa(Math.random().toString())
-      ),
+      DistortionAWPRegistered.get(),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'distortion-awp');
     this.stretchFactorOAP = new OverridableAudioParam(
@@ -78,7 +85,7 @@ export default class DistortionNode implements ForeignNode {
     }
   }
 
-  private deserialize(params: { [key: string]: any }) {
+  private deserialize(_params: { [key: string]: any }) {
     // TODO
   }
 

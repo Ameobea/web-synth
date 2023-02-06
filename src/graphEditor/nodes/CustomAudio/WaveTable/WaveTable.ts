@@ -7,7 +7,9 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { AsyncOnce, genRandomStringID, getHasSIMDSupport } from 'src/util';
+import WaveTableSmallView from './WaveTableSmallView.svelte';
 
 // Manually generate some waveforms... for science
 
@@ -58,7 +60,7 @@ export const getDefaultWavetableDef = () => [
   [bufs[2], bufs[3]],
 ];
 
-const WavetableWasmBytes = new AsyncOnce(async () => {
+const fetchWavetableWasmBytes = async () => {
   const hasSIMDSupport = getHasSIMDSupport();
   if (!window.location.href.includes('localhost')) {
     console.log(
@@ -75,7 +77,9 @@ const WavetableWasmBytes = new AsyncOnce(async () => {
   }
   const res = fetch(path);
   return res.then(res => res.arrayBuffer());
-});
+};
+
+const WavetableWasmBytes = new AsyncOnce(fetchWavetableWasmBytes, true);
 
 let wavetableWasmInstance: WebAssembly.Instance | undefined | null;
 export const WavetableWasmInstance = new AsyncOnce(() =>
@@ -139,6 +143,13 @@ export default class WaveTable implements ForeignNode {
         this.onInitialized(this);
       }
     });
+
+    this.renderSmallView = mkSvelteContainerRenderHelper({
+      Comp: WaveTableSmallView,
+      getProps: () => ({}),
+    });
+
+    this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
   }
 
   private buildParamOverrides(workletHandle: AudioWorkletNode): ForeignNode['paramOverrides'] {
@@ -304,4 +315,8 @@ export default class WaveTable implements ForeignNode {
   public shutdown() {
     this.workletHandle?.port.postMessage('shutdown');
   }
+
+  // These are set dynamically at initialization time in the constructor
+  public renderSmallView: ForeignNode['renderSmallView'];
+  public cleanupSmallView: ForeignNode['cleanupSmallView'];
 }

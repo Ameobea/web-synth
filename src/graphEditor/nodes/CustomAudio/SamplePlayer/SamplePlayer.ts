@@ -10,14 +10,26 @@ import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { getSentry } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 
-export const SamplePlayerWasmBytes = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'sample_player.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-  ).then(res => res.arrayBuffer())
+const SamplePlayerWasmBytes = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'sample_player.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ).then(res => res.arrayBuffer()),
+  true
+);
+const SamplePlayerAWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'SamplePlayerAWP.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
 
 export interface SampleCrossfadeParams {
@@ -75,17 +87,16 @@ export default class SamplePlayerNode implements ForeignNode {
     });
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing SamplePlayerNode', err);
+      getSentry()?.captureException(err);
+    });
   }
 
   private async init() {
     const [wasmBytes] = await Promise.all([
       SamplePlayerWasmBytes.get(),
-      this.ctx.audioWorklet.addModule(
-        process.env.ASSET_PATH +
-          'SamplePlayerAWP.js?cacheBust=' +
-          (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-      ),
+      SamplePlayerAWPRegistered.get(),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'sample-player-awp', { numberOfOutputs: 1 });
 

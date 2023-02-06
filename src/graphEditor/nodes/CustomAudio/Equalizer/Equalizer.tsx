@@ -20,18 +20,22 @@ const DEFAULT_POINTS: EqualizerPoint[] = [
 ];
 
 const ctx = new AudioContext();
-const EqualizerRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'EqualizerWorkletProcessor.js?cacheBust=' +
-      btoa(Math.random().toString())
-  )
+const EqualizerRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'EqualizerWorkletProcessor.js?cacheBust=' +
+        btoa(Math.random().toString())
+    ),
+  true
 );
 
-const EqualizerWasm = new AsyncOnce(() =>
-  fetch(
-    'https://storage.googleapis.com/web_synth-compiled_faust_modules_wasm/0f26ef8a4b554909c851c0e658674cbd439b023a_optimized.wasm'
-  ).then(res => res.arrayBuffer())
+const EqualizerWasm = new AsyncOnce(
+  () =>
+    fetch(
+      'https://storage.googleapis.com/web_synth-compiled_faust_modules_wasm/0f26ef8a4b554909c851c0e658674cbd439b023a_optimized.wasm'
+    ).then(res => res.arrayBuffer()),
+  true
 );
 
 export class Equalizer implements ForeignNode {

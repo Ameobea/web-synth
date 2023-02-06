@@ -11,6 +11,12 @@ const DistortionUI: React.FC<{ onChange: (newValue: number) => void }> = ({ onCh
 
   return (
     <div className='distortion-ui'>
+      <div style={{ color: 'red', marginBottom: 10, padding: 4 }}>
+        NOTE: This node is incomplete and doesn&apos;t work very well. Recommend that you either use
+        the clipper included in the synth designer&apos;s effects or use the code editor to load a
+        distortion preset.
+      </div>
+
       <ControlPanel
         style={{ width: 500 }}
         settings={settings}

@@ -1,4 +1,3 @@
-import { AsyncOnce } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
@@ -8,7 +7,9 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
+import { getSentry } from 'src/sentry';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { AsyncOnce } from 'src/util';
 import CompressorSmallView from './CompressorSmallView.svelte';
 
 export interface CompressorBandState {
@@ -65,16 +66,19 @@ export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   mix: 1,
 });
 
-const CompressorWasmBytes = new AsyncOnce(() =>
-  fetch(process.env.ASSET_PATH + 'compressor.wasm').then(res => res.arrayBuffer())
+const CompressorWasmBytes = new AsyncOnce(
+  () => fetch(process.env.ASSET_PATH + 'compressor.wasm').then(res => res.arrayBuffer()),
+  true
 );
 const ctx = new AudioContext();
-const CompressorAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'CompressorAWP.js?cacheBust=' +
-      (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
-  )
+const CompressorAWPRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'CompressorAWP.js?cacheBust=' +
+        (window.location.href.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
 
 export class CompressorNode implements ForeignNode {
@@ -143,7 +147,10 @@ export class CompressorNode implements ForeignNode {
       predicate: () => unsubscribe?.(),
     });
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing compressor node', err);
+      getSentry()?.captureException(err);
+    });
   }
 
   private handleMessageFromAWP = (e: MessageEvent) => {

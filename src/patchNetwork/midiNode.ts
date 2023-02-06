@@ -6,7 +6,7 @@ import {
   getUniqueCBID,
   MIDIEventType,
   postMIDIEventToAudioThread,
-  registerStopCB,
+  registerGlobalStopCB,
   scheduleEventBeats,
   scheduleMIDIEventBeats,
   type EventToReschedule,
@@ -58,7 +58,7 @@ export class MIDINode {
         throw new UnreachableException("MIDI node doesn't accept inputs");
       });
 
-    registerStopCB(() => {
+    registerGlobalStopCB(() => {
       this.scheduledEvents.length = 0;
     });
   }

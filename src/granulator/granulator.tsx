@@ -19,12 +19,14 @@ import { AsyncOnce, genRandomStringID } from 'src/util';
 
 const ctx = new AudioContext();
 
-const GranulatorRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'GranulatorWorkletProcessor.js?cacheBust=' +
-      btoa(Math.random().toString())
-  )
+const GranulatorRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'GranulatorWorkletProcessor.js?cacheBust=' +
+        btoa(Math.random().toString())
+    ),
+  true
 );
 
 interface GranulatorInstance {
@@ -165,12 +167,14 @@ export const build_granulator_audio_connectables = (vcId: string): AudioConnecta
   };
 };
 
-const GranularWasm = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'granular.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : genRandomStringID())
-  ).then(res => res.arrayBuffer())
+const GranularWasm = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'granular.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    ).then(res => res.arrayBuffer()),
+  true
 );
 
 export const init_granulator = async (stateKey: string) => {

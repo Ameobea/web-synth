@@ -8,14 +8,26 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { getSentry } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 
-export const DelayWasmBytes = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'delay.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-  ).then(res => res.arrayBuffer())
+const DelayWasmBytes = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'delay.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ).then(res => res.arrayBuffer()),
+  true
+);
+const DelayAWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'DelayAWP.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
 
 interface DelayParams {
@@ -60,7 +72,10 @@ export default class DelayNode implements ForeignNode {
       this.deserialize(params);
     }
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing Delay node:', err);
+      getSentry()?.captureException(err);
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: DelaySmallView,
@@ -119,11 +134,7 @@ export default class DelayNode implements ForeignNode {
   private async init() {
     const [wasmBytes] = await Promise.all([
       DelayWasmBytes.get(),
-      this.ctx.audioWorklet.addModule(
-        process.env.ASSET_PATH +
-          'DelayAWP.js?cacheBust=' +
-          (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-      ),
+      DelayAWPRegistered.get(),
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'delay-awp', { numberOfOutputs: 2 });
     this.awpHandle.connect(this.delayOutput, 1);

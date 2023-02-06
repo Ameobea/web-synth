@@ -9,24 +9,29 @@ import {
   type LooperInstState,
   type LooperTransitionAlgorithm,
 } from 'src/redux/modules/looper';
+import { getSentry } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
 
-const LooperAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'LooperAWP.js?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-  )
+const LooperAWPRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'LooperAWP.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
 
-const LooperWasm = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'looper.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-  ).then(res => res.arrayBuffer())
+const LooperWasm = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'looper.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ).then(res => res.arrayBuffer()),
+  true
 );
 
 export class LooperNode {
@@ -52,7 +57,10 @@ export class LooperNode {
       this.deserialize(serialized);
     }
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing looper node', err);
+      getSentry()?.captureException(err);
+    });
   }
 
   private deserialize(serialized: Omit<LooperInstState, 'looperNode'>) {

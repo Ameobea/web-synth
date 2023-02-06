@@ -2,7 +2,8 @@ import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import { useEffect, useState } from 'react';
 
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
-import { genRandomStringID } from 'src/util';
+import { getSentry } from 'src/sentry';
+import { genRandomStringID, retryAsync } from 'src/util';
 
 export enum MIDIEventType {
   Attack = 0,
@@ -64,12 +65,12 @@ export const getIsGlobalBeatCounterStarted = (): boolean => isStarted;
 /**
  * Registers a callback to be called when the global beat counter is started
  */
-export const registerStartCB = (cb: () => void) => StartCBs.push(cb);
+export const registerGlobalStartCB = (cb: () => void) => StartCBs.push(cb);
 
 /**
  * Registers a callback to be called when the global beat counter is stopped
  */
-export const registerStopCB = (cb: () => void) => StopCBs.push(cb);
+export const registerGlobalStopCB = (cb: () => void) => StopCBs.push(cb);
 
 export const unregisterStartCB = (cb: () => void) => {
   StartCBs = StartCBs.filter(ocb => ocb !== cb);
@@ -85,8 +86,8 @@ export const useIsGlobalBeatCounterStarted = () => {
   useEffect(() => {
     const startCb = () => setIsStarted(true);
     const stopCb = () => setIsStarted(false);
-    registerStartCB(startCb);
-    registerStopCB(stopCb);
+    registerGlobalStartCB(startCb);
+    registerGlobalStopCB(stopCb);
 
     return () => {
       unregisterStartCB(startCb);
@@ -173,61 +174,74 @@ export const getCurGlobalBPM = () => {
 
 // Init the scheduler AWP instance
 Promise.all([
-  fetch(
-    process.env.ASSET_PATH +
-      'event_scheduler.wasm?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : genRandomStringID())
-  ).then(res => res.arrayBuffer()),
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'EventSchedulerWorkletProcessor.js?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : genRandomStringID())
+  retryAsync(() =>
+    fetch(
+      process.env.ASSET_PATH +
+        'event_scheduler.wasm?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    ).then(res => res.arrayBuffer())
   ),
-] as const).then(([wasmArrayBuffer]) => {
-  SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
-  globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));
-  SchedulerHandle.port.onmessage = evt => {
-    if (typeof evt.data === 'number') {
-      callCb(evt.data);
-    } else if (evt.data.type === 'beatManagerSAB') {
-      beatManagerSAB = evt.data.beatManagerSAB;
-    } else {
-      console.warn('Unhandled event manager message: ', evt.data);
-    }
-  };
-  SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
-  PendingEvents.forEach(evt => {
-    if (evt.type === 'schedule') {
-      const { time, beats, payload } = evt;
-      if (time === null) {
-        if (payload.type === 'midi') {
-          SchedulerHandle!.port.postMessage({
-            type: 'scheduleBeats',
-            beats,
-            cbId: payload.cbId,
-            mailboxID: payload.mailboxID,
-            midiEventtype: payload.eventType,
-            param0: payload.param0,
-            param1: payload.param1,
-          });
-        } else {
-          SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId: payload.cbId });
-        }
+  retryAsync(() =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'EventSchedulerWorkletProcessor.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    )
+  ),
+] as const)
+  .then(([wasmArrayBuffer]) => {
+    SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
+    globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));
+    SchedulerHandle.port.onmessage = evt => {
+      if (typeof evt.data === 'number') {
+        callCb(evt.data);
+      } else if (evt.data.type === 'beatManagerSAB') {
+        beatManagerSAB = evt.data.beatManagerSAB;
       } else {
-        if (payload.type === 'midi') {
-          throw new UnimplementedError();
-        }
-        SchedulerHandle!.port.postMessage({ type: 'schedule', time, cbId: payload.cbId });
+        console.warn('Unhandled event manager message: ', evt.data);
       }
-    } else if (evt.type === 'interactiveMIDIEvent') {
-      const { eventType, param0, param1 } = evt;
-      SchedulerHandle!.port.postMessage({ type: 'postMIDIEvent', eventType, param0, param1 });
-    } else {
-      throw new UnreachableException();
-    }
+    };
+    SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
+    PendingEvents.forEach(evt => {
+      if (evt.type === 'schedule') {
+        const { time, beats, payload } = evt;
+        if (time === null) {
+          if (payload.type === 'midi') {
+            SchedulerHandle!.port.postMessage({
+              type: 'scheduleBeats',
+              beats,
+              cbId: payload.cbId,
+              mailboxID: payload.mailboxID,
+              midiEventtype: payload.eventType,
+              param0: payload.param0,
+              param1: payload.param1,
+            });
+          } else {
+            SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId: payload.cbId });
+          }
+        } else {
+          if (payload.type === 'midi') {
+            throw new UnimplementedError();
+          }
+          SchedulerHandle!.port.postMessage({ type: 'schedule', time, cbId: payload.cbId });
+        }
+      } else if (evt.type === 'interactiveMIDIEvent') {
+        const { eventType, param0, param1 } = evt;
+        SchedulerHandle!.port.postMessage({ type: 'postMIDIEvent', eventType, param0, param1 });
+      } else {
+        throw new UnreachableException();
+      }
+    });
+    PendingEvents = [];
+  })
+  .catch(err => {
+    console.error('Failed to initialize event scheduler: ', err);
+    getSentry()?.captureException(err);
+    alert(
+      'Failed to initialize event scheduler. Some core app functionality will not work.  Error: ' +
+        err
+    );
   });
-  PendingEvents = [];
-});
 
 /**
  * Schedules `cb` to be run when the global audio context `currentTime` reaches `time`.

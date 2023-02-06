@@ -5,8 +5,8 @@ import { GlobalVolumeSlider } from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
 import {
   getIsGlobalBeatCounterStarted,
-  registerStartCB,
-  registerStopCB,
+  registerGlobalStartCB,
+  registerGlobalStopCB,
   startAll,
   stopAll,
   unregisterStartCB,
@@ -77,8 +77,8 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
   useEffect(() => {
     const startCb = () => setGlobalBeatCounterStarted(true);
     const stopCb = () => setGlobalBeatCounterStarted(false);
-    registerStartCB(startCb);
-    registerStopCB(stopCb);
+    registerGlobalStartCB(startCb);
+    registerGlobalStopCB(stopCb);
 
     return () => {
       unregisterStartCB(startCb);
@@ -244,7 +244,9 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({ engine, name, uuid, tit
               e.stopPropagation();
             }}
           />
-          <span className='vc-switcher-tab-title'>{displayName}</span>
+          <span className='vc-switcher-tab-title' data-vc-id={uuid} data-vc-name={name}>
+            {displayName}
+          </span>
         </>
       )}
     </ViewContextIcon>

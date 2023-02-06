@@ -45,7 +45,7 @@ const saveStateForInstance = (stateKey: string) => {
 
   const serialized: SerializedControlPanelState = {
     connections: serializableConnections,
-    midiKeyboards: instanceState.midiKeyboards,
+    midiKeyboards: instanceState.midiKeyboards.map(mkb => R.omit(['midiNode' as const], mkb)),
     visualizations: instanceState.visualizations.map(serializeControlPanelVisualizationDescriptor),
     presets: instanceState.presets,
     snapToGrid: instanceState.snapToGrid ?? false,

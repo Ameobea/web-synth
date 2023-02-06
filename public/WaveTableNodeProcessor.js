@@ -36,10 +36,25 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     ];
   }
 
+  handleWasmPanic = (ptr, len) => {
+    const mem = new Uint8Array(this.getWasmMemoryBuffer().buffer);
+    const slice = mem.subarray(ptr, ptr + len);
+    const str = String.fromCharCode(...slice);
+    throw new Error(str);
+  };
+
   async initWasmInstance(data) {
-    // const debug = (id, ...args) => console.log(`[${id}]: ${args.join(' ')}`);
     const importObject = {
-      env: {},
+      env: {
+        on_gate_cb: () => {
+          throw new Error('this should only be called by the FM synth');
+        },
+        on_ungate_cb: () => {
+          throw new Error('this should only be called by the FM synth');
+        },
+        log_err: (ptr, len) => this.handleWasmPanic(ptr, len),
+        log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
+      },
     };
 
     const compiledModule = await WebAssembly.compile(data.arrayBuffer);

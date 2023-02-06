@@ -8,16 +8,19 @@ import {
   type Adsr,
   type AdsrStep,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { getSentry } from 'src/sentry';
 import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
 
-const ADSR2AWPRegistered = new AsyncOnce(() =>
-  new AudioContext().audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'ADSR2AWP.js' +
-      (window.location.href.includes('localhost')
-        ? ''
-        : '?cacheBust=' + btoa(Math.random().toString()))
-  )
+const ADSR2AWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'ADSR2AWP.js' +
+        (window.location.href.includes('localhost')
+          ? ''
+          : '?cacheBust=' + btoa(Math.random().toString()))
+    ),
+  true
 );
 const ADSRWasm = new AsyncOnce(() => {
   const url =
@@ -27,7 +30,7 @@ const ADSRWasm = new AsyncOnce(() => {
       ? ''
       : `?cacheBust=${btoa(Math.random().toString())}`);
   return fetch(url).then(res => res.arrayBuffer());
-});
+}, true);
 
 export interface ADSR2Params {
   minValue?: number;
@@ -78,7 +81,10 @@ export class ADSR2Module {
       phaseIndex: 0,
       debugName: 'NO AUDIO THREAD DATA PROVDED FOR `ADSR2Module`',
     };
-    this.init(instanceCount);
+    this.init(instanceCount).catch(err => {
+      console.error('Error initializing ADSR2Module: ', err);
+      getSentry()?.captureException(err);
+    });
   }
 
   private static encodeADSRSteps(steps: AdsrStep[]): Float32Array {

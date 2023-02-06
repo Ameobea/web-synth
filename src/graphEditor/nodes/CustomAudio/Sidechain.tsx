@@ -9,21 +9,26 @@ import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { getSentry } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 
-const SidechainAWPRegistered = new AsyncOnce(() =>
-  new AudioContext().audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'SidechainWorkletProcessor.js?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-  )
+const SidechainAWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'SidechainWorkletProcessor.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
-const SidechainWasm = new AsyncOnce(() =>
-  fetch(
-    process.env.ASSET_PATH +
-      'sidechain.wasm' +
-      (window.location.host.includes('localhost') ? '' : `?${btoa(Math.random().toString())}`)
-  ).then(res => res.arrayBuffer())
+const SidechainWasm = new AsyncOnce(
+  () =>
+    fetch(
+      process.env.ASSET_PATH +
+        'sidechain.wasm' +
+        (window.location.host.includes('localhost') ? '' : `?${btoa(Math.random().toString())}`)
+    ).then(res => res.arrayBuffer()),
+  true
 );
 
 interface SidechainState {
@@ -118,7 +123,10 @@ export class Sidechain {
       this.deserialize(params);
     }
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing sidechain node: ', err);
+      getSentry()?.captureException(err);
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: SidechainSmallView,

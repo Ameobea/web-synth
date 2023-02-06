@@ -4,6 +4,7 @@ import { faustEditorContextMap } from 'src/faustEditor';
 import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { getSentry } from 'src/sentry';
 
 /**
  * Structure of the JSON stored in `localStorage` for the Faust editor.
@@ -81,6 +82,13 @@ const actionGroups = {
         const dstParam = getFaustModuleParam(vcId, path);
         if (!dstParam) {
           console.warn(`Param doesn't exist: "${path}"`);
+          return;
+        }
+
+        if (!isFinite(val)) {
+          getSentry()?.captureMessage(
+            `Tried to set non-finite value to param "${path}", vcId: "${vcId}", value: "${val}"`
+          );
           return;
         }
 

@@ -42,13 +42,15 @@ const VOICE_COUNT = 10;
 
 const ctx = new AudioContext();
 
-const RegisterFMSynthAWP = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      (window.location.href.includes('localhost')
-        ? 'FMSynthAWP.js'
-        : 'FMSynthAWP.js?randId=' + btoa(Math.random().toString()))
-  )
+const RegisterFMSynthAWP = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        (window.location.href.includes('localhost')
+          ? 'FMSynthAWP.js'
+          : 'FMSynthAWP.js?randId=' + btoa(Math.random().toString()))
+    ),
+  true
 );
 
 const buildDefaultModulationIndices = (): ParamSource[][] => {
@@ -59,7 +61,7 @@ const buildDefaultModulationIndices = (): ParamSource[][] => {
   return indices;
 };
 
-const WavetableWasmBytes = new AsyncOnce(async (): Promise<ArrayBuffer> => {
+const fetchWavetableWasmBytes = async (): Promise<ArrayBuffer> => {
   const hasSIMDSupport = getHasSIMDSupport();
   getSentry()?.setContext('wasmSIMDSupport', { hasWasmSIMDSupport: hasSIMDSupport });
   if (!window.location.href.includes('localhost')) {
@@ -85,7 +87,9 @@ const WavetableWasmBytes = new AsyncOnce(async (): Promise<ArrayBuffer> => {
   }
   const res = fetch(path);
   return res.then(res => res.arrayBuffer());
-});
+};
+
+const WavetableWasmBytes = new AsyncOnce(fetchWavetableWasmBytes, true);
 
 /**
  * Corresponds to `RampFn` in the Wasm engine
@@ -272,7 +276,10 @@ export default class FMSynth implements ForeignNode {
       this
     );
 
-    this.init();
+    this.init().catch(err => {
+      console.error('Error initializing FMSynth', err);
+      getSentry()?.captureException(err);
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: ConnectedFMSynthUI,

@@ -1,3 +1,5 @@
+import { retryAsync } from 'src/util';
+
 /**
  * Implements an audio node that pulls values out of the webaudio context up into the JS context.
  *
@@ -17,10 +19,12 @@ const registerRecorder = async (ctx: AudioContext) => {
     return;
   }
 
-  const prom = ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'ValueRecorderWorkletProcessor.js?cacheBust=' +
-      btoa(Math.random().toString())
+  const prom = retryAsync(() =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'ValueRecorderWorkletProcessor.js?cacheBust=' +
+        btoa(Math.random().toString())
+    )
   );
   recorderIsRegistered = prom;
   await prom;

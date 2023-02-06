@@ -202,6 +202,7 @@ export const init_sample_library = (stateKey: string) => {
   mkContainerRenderHelper({
     Comp: SampleLibraryUI,
     getProps: () => ({}),
+    enableReactQuery: true,
   })(stateKey);
 };
 

@@ -1,7 +1,6 @@
 /**
  * Analyzes the input signal and periodically samples it, recording statistics about the distribution of input signals.
  */
-import { AsyncOnce } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import React, { Suspense } from 'react';
@@ -10,15 +9,19 @@ import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio'
 import Loading from 'src/misc/Loading';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { getSentry } from 'src/sentry';
+import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
 
-const StatisticsAWPRegistered = new AsyncOnce(() =>
-  ctx.audioWorklet.addModule(
-    process.env.ASSET_PATH +
-      'StatisticsNodeProcessor.js?cacheBust=' +
-      (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
-  )
+const StatisticsAWPRegistered = new AsyncOnce(
+  () =>
+    ctx.audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'StatisticsNodeProcessor.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
+    ),
+  true
 );
 
 export type Settings = {
@@ -84,7 +87,10 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
 
     this.reduxInfra = createReduxInfra({ data: { min: 0, max: 0, buckets: [] } });
 
-    this.initWorklet();
+    this.initWorklet().catch(err => {
+      console.error('Failed to initialize statistics node', err);
+      getSentry()?.captureException(err);
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: LazyStatisticsNodeUI,

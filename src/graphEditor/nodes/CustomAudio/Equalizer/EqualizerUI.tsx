@@ -5,16 +5,17 @@ import ControlPanel from 'react-control-panel';
 import { Provider, useSelector } from 'react-redux';
 
 import './Equalizer.scss';
-
 import { NEGATIVE_VALUE_DIVIDER_INTERVAL } from 'src/graphEditor/nodes/CustomAudio/Equalizer/Equalizer';
-import { actionCreators, dispatch, ReduxStore, store } from 'src/redux';
-import { EQUALIZER_LEVEL_COUNT, EqualizerPoint } from 'src/redux/modules/equalizer';
+import { actionCreators, dispatch, store, type ReduxStore } from 'src/redux';
+import { EQUALIZER_LEVEL_COUNT, type EqualizerPoint } from 'src/redux/modules/equalizer';
 
-const EqualizerLine: React.FC<{
+interface EqualizerLineProps {
   points: EqualizerPoint[];
   width: number;
   height: number;
-}> = ({ points, width, height }) => {
+}
+
+const EqualizerLine: React.FC<EqualizerLineProps> = ({ points, width, height }) => {
   const path = useMemo(
     () =>
       'M ' +
@@ -27,7 +28,7 @@ const EqualizerLine: React.FC<{
   return <path d={path} className='eq-line' />;
 };
 
-const EqualizerKnob: React.FC<{
+interface EqualizerKnobProps {
   vcId: string;
   x: number;
   y: number;
@@ -36,7 +37,18 @@ const EqualizerKnob: React.FC<{
   width: number;
   height: number;
   isManuallyControlled: boolean;
-}> = ({ vcId, x, y, index, width, height, pointCount, isManuallyControlled }) => (
+}
+
+const EqualizerKnob: React.FC<EqualizerKnobProps> = ({
+  vcId,
+  x,
+  y,
+  index,
+  width,
+  height,
+  pointCount,
+  isManuallyControlled,
+}) => (
   <>
     <circle
       className={`equalizer-knob${isManuallyControlled ? '' : ' equalizer-knob-disabled'}`}
@@ -94,10 +106,12 @@ const EqualizerKnob: React.FC<{
   </>
 );
 
-const EqualizerBackgroundInner: React.FC<{
+interface EqualizerBackgroundInnerProps {
   width: number;
   height: number;
-}> = ({ width, height }) => (
+}
+
+const EqualizerBackgroundInner: React.FC<EqualizerBackgroundInnerProps> = ({ width, height }) => (
   <>
     {/* bar indicating positive and negative values */}
     <line
@@ -119,11 +133,13 @@ const EqualizerBackground = React.memo(EqualizerBackgroundInner);
 
 const dbToPercent = (db: number) => (db + 0.65 * 70) / 70;
 
-const EqualizerLevelsInner: React.FC<{
+interface EqualizerLevelsInnerProps {
   width: number;
   height: number;
   levels: Float32Array;
-}> = ({ width, height, levels }) => (
+}
+
+const EqualizerLevelsInner: React.FC<EqualizerLevelsInnerProps> = ({ width, height, levels }) => (
   <>
     {R.range(0, levels.length).map(i => (
       <rect
@@ -140,11 +156,13 @@ const EqualizerLevelsInner: React.FC<{
 
 const EqualizerLevels = React.memo(EqualizerLevelsInner);
 
-const EqualizerViz: React.FC<{
+interface EqualizerVizProps {
   vcId: string;
   height: number;
   width: number;
-}> = ({ vcId, height, width }) => {
+}
+
+const EqualizerViz: React.FC<EqualizerVizProps> = ({ vcId, height, width }) => {
   const state = useSelector((state: ReduxStore) => state.equalizer[vcId]);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -186,7 +204,11 @@ const EqualizerViz: React.FC<{
   );
 };
 
-const EqualizerControlPanel: React.FC<{ vcId: string }> = ({ vcId }) => {
+interface EqualizerControlPanelProps {
+  vcId: string;
+}
+
+const EqualizerControlPanel: React.FC<EqualizerControlPanelProps> = ({ vcId }) => {
   const { smoothFactor, isBypassed } = useSelector((state: ReduxStore) => state.equalizer[vcId]);
 
   return (
@@ -218,13 +240,22 @@ const EqualizerControlPanel: React.FC<{ vcId: string }> = ({ vcId }) => {
   );
 };
 
-const EqualizerSmallView: React.FC<{
+interface EqualizerSmallViewProps {
   vcId: string;
-}> = ({ vcId }) => (
+}
+
+const EqualizerSmallView: React.FC<EqualizerSmallViewProps> = ({ vcId }) => (
   <div>
     <Provider store={store}>
       <EqualizerViz vcId={vcId} width={500} height={300} />
       <EqualizerControlPanel vcId={vcId} />
+
+      <div style={{ marginTop: 12, color: '#ff6666', padding: 4 }}>
+        <strong>Warning:</strong> This equalizer created as an experiment, and it doesn&apos;t work
+        very well (if it works at all). <br />
+        <br />
+        Consider using the &quot;Filter Designer&quot; for a modern, working replacement.
+      </div>
     </Provider>
   </div>
 );

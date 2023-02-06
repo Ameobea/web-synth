@@ -6,8 +6,8 @@ import {
   getCurBeat,
   getIsGlobalBeatCounterStarted,
   MIDIEventType,
-  registerStartCB,
-  registerStopCB,
+  registerGlobalStartCB,
+  registerGlobalStopCB,
   scheduleEventBeats,
   scheduleEventTimeAbsolute,
   scheduleMIDIEventBeats,
@@ -173,8 +173,8 @@ export default class MIDIEditorPlaybackHandler {
       start: () => this.onGlobalStart(),
       stop: () => this.stopPlayback(),
     };
-    registerStartCB(this.cbs.start);
-    registerStopCB(this.cbs.stop);
+    registerGlobalStartCB(this.cbs.start);
+    registerGlobalStopCB(this.cbs.stop);
   }
 
   public getLoopPoint(): number | null {
