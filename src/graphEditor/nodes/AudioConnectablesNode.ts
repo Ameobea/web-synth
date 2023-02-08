@@ -4,7 +4,7 @@
 import { LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 
-import {
+import type {
   LiteGraphLink,
   LiteGraphNodeInput,
   LiteGraph as LiteGraphType,

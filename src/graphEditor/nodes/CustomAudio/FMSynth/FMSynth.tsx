@@ -1,6 +1,7 @@
 import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
+import * as React from 'react';
 import { get, writable, type Writable } from 'svelte/store';
 
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
@@ -292,8 +293,22 @@ export default class FMSynth implements ForeignNode {
       getSentry()?.captureException(err);
     });
 
+    const FMSynthSmallView: React.FC<any> = props => (
+      <div>
+        <div style={{ color: '#ee6666', padding: 4 }}>
+          <strong>Note</strong>: This standalone FM synth node only exists for legacy purposes. It
+          is likely broken and should no longer be used.
+          <br />
+          <br />
+          Use the <strong>Synth Designer</strong> instead, which embeds this FM synth along with a
+          bunch of other functionality.
+        </div>
+        <ConnectedFMSynthUI {...props} />
+      </div>
+    );
+
     this.renderSmallView = mkContainerRenderHelper({
-      Comp: ConnectedFMSynthUI,
+      Comp: FMSynthSmallView,
       getProps: () => ({
         synth: this,
         midiNode,
@@ -316,9 +331,6 @@ export default class FMSynth implements ForeignNode {
   }
 
   private encodeAdsr(adsr: AdsrParams, adsrIx: number) {
-    if (adsrIx === -2) {
-      console.log(adsr.lenSamples);
-    }
     return {
       adsrIx,
       steps: adsr.steps.map(step => this.encodeAdsrStep(step)),

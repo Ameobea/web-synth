@@ -318,26 +318,6 @@ const CustomBiquadFilterNode = enhanceAudioNode({
   SmallViewRenderer: CustomBiquadFilterNodeSmallView,
 });
 
-const CustomAudioBufferSourceNode = enhanceAudioNode({
-  AudioNodeClass: AudioBufferSourceNode,
-  nodeType: 'customAudio/audioClip',
-  name: 'Audio Clip',
-  buildConnectables: (
-    foreignNode: ForeignNode<AudioBufferSourceNode> & {
-      node: AudioBufferSourceNode;
-    }
-  ) => ({
-    inputs: Map<string, ConnectableInput>(),
-    outputs: Map<string, ConnectableOutput>().set('output', {
-      node: foreignNode.node,
-      type: 'customAudio',
-    }),
-    node: foreignNode,
-  }),
-  getOverridableParams: () => [],
-  paramKeys: [],
-});
-
 const CustomDestinationNode = enhanceAudioNode({
   AudioNodeClass: class CustomAudioDestinationNode {
     constructor(ctx: AudioContext) {
@@ -384,14 +364,6 @@ export const audioNodeGetters: {
   },
   'customAudio/constantSource': {
     nodeGetter: CustomConstantSourceNode,
-  },
-  'customAudio/audioClip': {
-    nodeGetter: CustomAudioBufferSourceNode,
-    protoParams: {
-      onDropFile: function (...args: unknown[]) {
-        console.log('Dropped file: ', this, ...args);
-      },
-    },
   },
   'customAudio/destination': {
     nodeGetter: CustomDestinationNode,

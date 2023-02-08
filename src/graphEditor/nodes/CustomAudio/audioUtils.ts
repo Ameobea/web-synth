@@ -30,7 +30,22 @@ export const getMicrophoneStream = (): Promise<MediaStream> =>
   });
 
 const micNode = new GainNode(ctx);
-// getMicrophoneStream().then(stream => ctx.createMediaStreamSource(stream).connect(micNode));
+
+let didConnectMic = false;
+const maybeConnectMicNode = async () => {
+  if (didConnectMic) {
+    return;
+  }
+
+  try {
+    const stream = await getMicrophoneStream();
+    ctx.createMediaStreamSource(stream).connect(micNode);
+    console.log('Connected microphone stream to patch network');
+    didConnectMic = true;
+  } catch (err) {
+    console.error('Error getting microphone stream', err);
+  }
+};
 
 /**
  * This is a custom node type that we use to facilitate initializing the patch network and everything else synchronously while also having
@@ -53,6 +68,9 @@ export class MicNode extends GainNode {
   public constructor(ctx: AudioContext, vcId: string) {
     super(ctx);
     this.vcId = vcId;
+
+    maybeConnectMicNode();
+
     micNode.connect(this);
   }
 

@@ -3,7 +3,9 @@ import React from 'react';
 import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
-export type ADSRWithOutputRange = Adsr & { outputRange: readonly [number, number] };
+export interface ADSRWithOutputRange extends Adsr {
+  outputRange: readonly [number, number];
+}
 
 interface ControlPanelADSR2Props {
   value: ADSRWithOutputRange;

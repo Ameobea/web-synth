@@ -2,7 +2,7 @@ import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
 import type { ADSRValues } from 'src/controls/adsr';
-import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
+import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
 import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -51,6 +51,10 @@ export class EnvelopeGenerator implements ForeignNode {
 
   constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.vcId = vcId;
+    const audioThreadData: AudioThreadData = {
+      phaseIndex: 0,
+      debugName: 'EnvelopeGenerator constructor',
+    };
     this.adsrModule = new ADSR2Module(
       ctx,
       {
@@ -65,7 +69,8 @@ export class EnvelopeGenerator implements ForeignNode {
         releaseStartPhase: 0.978,
         logScale: true,
       },
-      1
+      1,
+      audioThreadData
     );
 
     this.adsrModule.getOutput().then(output => {
@@ -88,7 +93,11 @@ export class EnvelopeGenerator implements ForeignNode {
         },
         setLogScale: (logScale: boolean) => this.adsrModule.setLogScale(logScale),
         initialState: {
-          envelope: { ...this.adsrModule.serialize(), outputRange: this.outputRange },
+          envelope: {
+            ...this.adsrModule.serialize(),
+            outputRange: this.outputRange,
+            audioThreadData,
+          },
           lengthMS: this.adsrModule.getLengthMs(),
         },
       }),
