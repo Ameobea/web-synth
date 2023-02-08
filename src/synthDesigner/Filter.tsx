@@ -11,14 +11,13 @@ import {
 import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import { getSynthDesignerReduxInfra, type FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
-import { msToSamples } from 'src/util';
 
 const style = { width: 600 };
 
 const getDefaultLengthForAdsrLengthMode = (lengthMode: AdsrLengthMode) => {
   switch (lengthMode) {
     case AdsrLengthMode.Beats:
-      return 1 / 4;
+      return 1;
     case AdsrLengthMode.Samples:
       return 1000;
     default:

@@ -6,6 +6,7 @@ use dsp::{even_faster_pow, mk_linear_to_log};
 
 #[cfg(feature = "exports")]
 pub mod exports;
+pub mod managed_adsr;
 
 extern "C" {
     pub fn debug1(v1: f32, v2: f32, v3: f32);
@@ -338,7 +339,7 @@ impl Adsr {
             }
         }
 
-        if *cur_frame_start_phase > -1. && self.len_beats.is_some() {
+        if *cur_frame_start_phase > -1. && self.len_beats.is_some() && cur_frame_start_beat > 0. {
             let len_beats = self.len_beats.unwrap();
 
             // In order to keep our phase in sync with the global beat counter and prevent drift

@@ -41,7 +41,7 @@ export interface CompressorNodeUIState {
 
 const buildDefaultCompressorBandState = (band: 'low' | 'mid' | 'high'): CompressorBandState => ({
   gain: 1,
-  bottom_ratio: { low: 0.24, mid: 0.24, high: 0.24 }[band],
+  bottom_ratio: { low: 1, mid: 1, high: 1 }[band],
   top_ratio: { low: 444, mid: 66.7, high: 66.7 }[band],
   attack_ms: 3,
   release_ms: 250,
@@ -108,8 +108,12 @@ export class CompressorNode implements ForeignNode {
   private lowBandTopThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
   private midBandTopThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
   private highBandTopThresholdDb: OverridableAudioParam | DummyNode = new DummyNode();
-  private bottomRatio: OverridableAudioParam | DummyNode = new DummyNode();
-  private topRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandBottomRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandBottomRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandBottomRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandTopRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandTopRatio: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandTopRatio: OverridableAudioParam | DummyNode = new DummyNode();
   private knee: OverridableAudioParam | DummyNode = new DummyNode();
   private lookaheadMs: OverridableAudioParam | DummyNode = new DummyNode();
 
@@ -274,8 +278,42 @@ export class CompressorNode implements ForeignNode {
       undefined,
       true
     );
-    this.bottomRatio = new OverridableAudioParam(ctx, params.get('bottom_ratio')!, undefined, true);
-    this.topRatio = new OverridableAudioParam(ctx, params.get('top_ratio')!, undefined, true);
+    this.lowBandBottomRatio = new OverridableAudioParam(
+      ctx,
+      params.get('low_band_bottom_ratio')!,
+      undefined,
+      true
+    );
+    this.midBandBottomRatio = new OverridableAudioParam(
+      ctx,
+      params.get('mid_band_bottom_ratio')!,
+      undefined,
+      true
+    );
+    this.highBandBottomRatio = new OverridableAudioParam(
+      ctx,
+      params.get('high_band_bottom_ratio')!,
+      undefined,
+      true
+    );
+    this.lowBandTopRatio = new OverridableAudioParam(
+      ctx,
+      params.get('low_band_top_ratio')!,
+      undefined,
+      true
+    );
+    this.midBandTopRatio = new OverridableAudioParam(
+      ctx,
+      params.get('mid_band_top_ratio')!,
+      undefined,
+      true
+    );
+    this.highBandTopRatio = new OverridableAudioParam(
+      ctx,
+      params.get('high_band_top_ratio')!,
+      undefined,
+      true
+    );
     this.knee = new OverridableAudioParam(ctx, params.get('knee')!, undefined, true);
     this.lookaheadMs = new OverridableAudioParam(ctx, params.get('lookahead_ms')!, undefined, true);
 
@@ -322,8 +360,18 @@ export class CompressorNode implements ForeignNode {
       newState.mid.top_threshold;
     (this.highBandTopThresholdDb as OverridableAudioParam).manualControl.offset.value =
       newState.high.top_threshold;
-    (this.bottomRatio as OverridableAudioParam).manualControl.offset.value = newState.bottomRatio;
-    (this.topRatio as OverridableAudioParam).manualControl.offset.value = newState.topRatio;
+    (this.lowBandBottomRatio as OverridableAudioParam).manualControl.offset.value =
+      newState.low.bottom_ratio;
+    (this.midBandBottomRatio as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.bottom_ratio;
+    (this.highBandBottomRatio as OverridableAudioParam).manualControl.offset.value =
+      newState.high.bottom_ratio;
+    (this.lowBandTopRatio as OverridableAudioParam).manualControl.offset.value =
+      newState.low.top_ratio;
+    (this.midBandTopRatio as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.top_ratio;
+    (this.highBandTopRatio as OverridableAudioParam).manualControl.offset.value =
+      newState.high.top_ratio;
     (this.knee as OverridableAudioParam).manualControl.offset.value = newState.knee;
     (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lookaheadMs;
   };

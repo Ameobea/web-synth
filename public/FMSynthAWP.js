@@ -190,6 +190,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
 
           const { adsrIx, steps, lenSamples, releasePoint, loopPoint, logScale } = evt.data;
+          console.log('setAdsr', evt.data);
           steps.forEach(({ x, y, ramper, param }, stepIx) => {
             this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
           });
@@ -582,7 +583,17 @@ class FMSynthAWP extends AudioWorkletProcessor {
       }
     }
 
-    const outputsPtr = this.wasmInstance.exports.fm_synth_generate(this.ctxPtr);
+    const outputsPtr = this.wasmInstance.exports.fm_synth_generate(
+      this.ctxPtr,
+      globalThis.globalTempoBPM,
+      // TODO: This causes things to sound weird when using filter envelope with beat length mode.
+      //
+      // Should probably investigate why that's happening and fix it at some point
+      //
+      // For now, setting it to 0 will disable the global beat counter synchronization.
+      // globalThis.globalBeatCounterStarted ? globalThis.curBeat : 0
+      0
+    );
     wasmMemory = this.getWasmMemoryBuffer();
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
       const voiceIsTacent = this.tacentVoiceFlags[voiceIx];

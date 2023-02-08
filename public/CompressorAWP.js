@@ -133,14 +133,42 @@ class CompressorAWP extends AudioWorkletProcessor {
         maxValue: 24,
       },
       {
-        name: 'bottom_ratio',
+        name: 'low_band_bottom_ratio',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 1024,
       },
       {
-        name: 'top_ratio',
+        name: 'mid_band_bottom_ratio',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 1024,
+      },
+      {
+        name: 'high_band_bottom_ratio',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 1024,
+      },
+      {
+        name: 'low_band_top_ratio',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 1024,
+      },
+      {
+        name: 'mid_band_top_ratio',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 1024,
+      },
+      {
+        name: 'high_band_top_ratio',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
@@ -279,8 +307,12 @@ class CompressorAWP extends AudioWorkletProcessor {
     const lowBandThresholdTopDb = params.low_band_top_threshold_db[0];
     const midBandThresholdTopDb = params.mid_band_top_threshold_db[0];
     const highBandThresholdTopDb = params.high_band_top_threshold_db[0];
-    const bottomRatio = params.bottom_ratio[0];
-    const topRatio = params.top_ratio[0];
+    const lowBandBottomRatio = params.low_band_bottom_ratio[0];
+    const midBandBottomRatio = params.mid_band_bottom_ratio[0];
+    const highBandBottomRatio = params.high_band_bottom_ratio[0];
+    const lowBandTopRatio = params.low_band_top_ratio[0];
+    const midBandTopRatio = params.mid_band_top_ratio[0];
+    const highBandTopRatio = params.high_band_top_ratio[0];
     const knee = params.knee[0];
     const lookaheadSamples = Math.floor(params.lookahead_ms[0] * 0.001 * SAMPLE_RATE);
 
@@ -304,8 +336,12 @@ class CompressorAWP extends AudioWorkletProcessor {
       lowBandThresholdTopDb,
       midBandThresholdTopDb,
       highBandThresholdTopDb,
-      bottomRatio,
-      topRatio,
+      lowBandBottomRatio,
+      midBandBottomRatio,
+      highBandBottomRatio,
+      lowBandTopRatio,
+      midBandTopRatio,
+      highBandTopRatio,
       knee,
       lookaheadSamples
     );

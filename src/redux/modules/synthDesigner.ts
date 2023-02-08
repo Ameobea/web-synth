@@ -398,7 +398,13 @@ export const deserializeSynthModule = (
       ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
       : fmSynthConfig.gainEnvelope,
     filterEnvelope: filterEnvelope
-      ? { ...normalizeEnvelope(filterEnvelope), lenSamples: msToSamples(filterADSRLength ?? 1000) }
+      ? {
+          ...normalizeEnvelope(filterEnvelope),
+          lenSamples:
+            (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
+              ? msToSamples(filterADSRLength ?? 1000)
+              : filterADSRLength ?? 1,
+        }
       : fmSynthConfig.filterEnvelope,
     onInitialized: () => {
       fmSynth.setFrequencyMultiplier(pitchMultiplier);
@@ -440,13 +446,18 @@ export const deserializeSynthModule = (
     return voice;
   });
 
+  const normalizedFilterEnvelope = normalizeEnvelope(filterEnvelope);
+
   const synthModule = {
     ...base,
     filterBypassed,
     voices,
     masterGain,
-    filterEnvelope: normalizeEnvelope(filterEnvelope),
-    filterADSRLength: R.clamp(20, 100_000, filterADSRLength ?? 1000),
+    filterEnvelope: normalizedFilterEnvelope,
+    filterADSRLength:
+      (normalizedFilterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
+        ? R.clamp(20, 100_000, filterADSRLength ?? 1000)
+        : R.clamp(0.001, 100_000, filterADSRLength ?? 1),
     filterParams,
     pitchMultiplier: pitchMultiplier ?? 1,
   };

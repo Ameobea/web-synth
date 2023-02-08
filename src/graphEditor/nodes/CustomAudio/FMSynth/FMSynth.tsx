@@ -316,6 +316,9 @@ export default class FMSynth implements ForeignNode {
   }
 
   private encodeAdsr(adsr: AdsrParams, adsrIx: number) {
+    if (adsrIx === -2) {
+      console.log(adsr.lenSamples);
+    }
     return {
       adsrIx,
       steps: adsr.steps.map(step => this.encodeAdsrStep(step)),
@@ -975,7 +978,9 @@ export default class FMSynth implements ForeignNode {
         ...filterEnvelope,
         lenSamples:
           typeof filterEnvelope.lenSamples === 'number'
-            ? { type: 'constant', value: filterEnvelope.lenSamples }
+            ? (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
+              ? { type: 'constant', value: filterEnvelope.lenSamples }
+              : { type: 'beats to samples', value: filterEnvelope.lenSamples }
             : filterEnvelope.lenSamples,
       };
       this.filterEnvelope.audioThreadData.phaseIndex = 254;
