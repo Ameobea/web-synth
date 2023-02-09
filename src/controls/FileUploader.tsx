@@ -1,14 +1,19 @@
 import React from 'react';
 
-import type { ControlPanelCustomComponentProps } from '../types';
 import './FileUploader.scss';
 
-export interface Value<T = ArrayBuffer> {
+interface ControlPanelCustomComponentProps<T> {
+  value: T;
+  onChange: (newVal: T) => void;
+  theme: { [key: string]: React.CSSProperties };
+}
+
+export interface FileUploaderValue<T = ArrayBuffer> {
   fileName: string;
   fileContent: T;
 }
 
-const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Value> =>
+const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<FileUploaderValue> =>
   new Promise((resolve, reject) => {
     const file = evt.target.files![0]!;
 
@@ -20,7 +25,7 @@ const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Va
         return;
       }
 
-      const value: Value = {
+      const value: FileUploaderValue = {
         fileName: file.name,
         fileContent: this.result as ArrayBuffer,
       };
@@ -33,7 +38,7 @@ const parseUploadedFile = (evt: React.ChangeEvent<HTMLInputElement>): Promise<Va
 
 export const parseUploadedFileAsText = (
   evt: React.ChangeEvent<HTMLInputElement>
-): Promise<Value<string>> =>
+): Promise<FileUploaderValue<string>> =>
   new Promise((resolve, reject) => {
     const file = evt.target.files![0]!;
 
@@ -45,7 +50,7 @@ export const parseUploadedFileAsText = (
         return;
       }
 
-      const value: Value<string> = {
+      const value: FileUploaderValue<string> = {
         fileName: file.name,
         fileContent: this.result as string,
       };
@@ -56,7 +61,10 @@ export const parseUploadedFileAsText = (
     reader.readAsText(file);
   });
 
-const FileUploader: React.FC<ControlPanelCustomComponentProps<Value>> = ({ onChange, value }) => (
+const FileUploader: React.FC<ControlPanelCustomComponentProps<FileUploaderValue>> = ({
+  onChange,
+  value,
+}) => (
   <div className='file-uploader'>
     <div>Upload file</div>
     <div>

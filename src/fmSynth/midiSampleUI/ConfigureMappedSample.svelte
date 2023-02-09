@@ -1,7 +1,9 @@
 <script lang="ts" context="module">
   import { filterNils } from 'ameo-utils';
 
-  const buildMappedSampleControlPanelSettings = (lenSamples: number | null | undefined) =>
+  const buildMappedSampleControlPanelSettings = (
+    lenSamples: number | null | undefined
+  ): ControlPanelSetting[] =>
     filterNils([
       { label: 'gain', type: 'range', min: 0, max: 5 },
       { label: 'playback rate', type: 'range', min: 0, max: 5, step: 0.1 },
@@ -12,7 +14,9 @@
 </script>
 
 <script lang="ts">
-  import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+  import SvelteControlPanel, {
+    type ControlPanelSetting,
+  } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { MappedSampleData } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import { getSample } from 'src/sampleLibrary/sampleLibrary';
   import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';

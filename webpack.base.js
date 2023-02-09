@@ -112,8 +112,8 @@ const config = {
     },
     headers: {
       // Support sending `SharedArrayBuffer` between threads
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+      // 'Cross-Origin-Opener-Policy': 'same-origin',
+      // 'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
   experiments: {

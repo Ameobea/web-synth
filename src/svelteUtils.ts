@@ -155,6 +155,15 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
   return { set, update, subscribe };
 }
 
+export type SveltePropTypesOf<Comp> = Comp extends SvelteComponentTyped<infer Props>
+  ? Props
+  : // handle it being the class itself
+  Comp extends new (args: { target: Element; props: infer Props }) => SvelteComponentTyped<
+      infer Props
+    >
+  ? Props
+  : never;
+
 /**
  * Creates a React component that renders the provided Svelte component.
  *

@@ -1,10 +1,22 @@
 import { Map } from 'immutable';
 import * as R from 'ramda';
+import { writable, type Unsubscriber } from 'svelte/store';
 
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { midiToFrequency } from 'src/util';
+import MidiToFrequencySmallView, { RegateMode } from './MIDIToFrequencySmallView.svelte';
+
+export interface MIDIToFrequencyState {
+  regateMode: RegateMode;
+}
+
+const buildDefaultMIDIToFrequencyState = (): MIDIToFrequencyState => ({
+  regateMode: RegateMode.AnyAttack,
+});
 
 export class MIDIToFrequencyNode {
   public vcId: string;
@@ -19,32 +31,37 @@ export class MIDIToFrequencyNode {
    * and we're always gated if this array is non-empty.
    */
   private activeNotes: number[] = [];
+  private state: MIDIToFrequencyState;
 
   private noteToFrequency(note: number): number {
     return midiToFrequency(note); // TODO: Make configurable somehow
   }
 
-  private gate(offset = 0) {
-    this.gateCSN.offset.setValueAtTime(1, this.ctx.currentTime + offset);
+  private gate() {
+    switch (this.state.regateMode) {
+      case RegateMode.AnyAttack:
+        this.gateCSN.offset.setValueAtTime(0, this.ctx.currentTime);
+        this.gateCSN.offset.linearRampToValueAtTime(1, this.ctx.currentTime + 0.000001);
+        break;
+      case RegateMode.NoNotesHeld:
+        this.gateCSN.offset.setValueAtTime(1, this.ctx.currentTime);
+        break;
+      default:
+        throw new Error(`Unknown regate mode: ${this.state.regateMode}`);
+    }
   }
 
-  private unGate(offset = 0) {
-    this.gateCSN.offset.setValueAtTime(0, this.ctx.currentTime + offset);
+  private unGate() {
+    this.gateCSN.offset.setValueAtTime(0, this.ctx.currentTime);
   }
 
   private getMIDIInputCbs = (): MIDIInputCbs => ({
-    onAttack: (note, _velocity, offset?: number) => {
-      this.gate(offset);
-      this.frequencyCSN.offset.setValueAtTime(
-        this.noteToFrequency(note),
-        this.ctx.currentTime + (offset || 0)
-      );
+    onAttack: (note, _velocity) => {
+      this.gate();
 
-      if (R.isNil(offset)) {
-        // Don't even try to do any kind of scheduling when offsets are involved; just set frequency and
-        // gate at the offset.
-        this.activeNotes.push(note);
-      }
+      this.frequencyCSN.offset.setValueAtTime(this.noteToFrequency(note), this.ctx.currentTime);
+
+      this.activeNotes.push(note);
     },
     onRelease: (note, _velocity) => {
       this.activeNotes = this.activeNotes.filter(compNote => compNote !== note);
@@ -76,9 +93,10 @@ export class MIDIToFrequencyNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
-  constructor(ctx: AudioContext, vcId: string, _params?: { [key: string]: any } | null) {
+  constructor(ctx: AudioContext, vcId: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;
     this.vcId = vcId;
+    this.state = this.deserialize(params);
     this.frequencyCSN = new ConstantSourceNode(ctx);
     this.frequencyCSN.start();
     this.gateCSN = new ConstantSourceNode(ctx);
@@ -90,6 +108,26 @@ export class MIDIToFrequencyNode {
     this.frequencyCSN.connect(this.detuneCSN.offset);
 
     this.midiNode = new MIDINode(this.getMIDIInputCbs);
+
+    let unsubscribe: Unsubscriber | undefined;
+    const store = writable(this.state);
+
+    this.renderSmallView = mkSvelteContainerRenderHelper({
+      Comp: MidiToFrequencySmallView,
+      getProps: () => ({ state: store }),
+      predicate: () => {
+        unsubscribe = store.subscribe(newState => this.handleChange(newState));
+      },
+    });
+
+    this.cleanupSmallView = mkSvelteContainerCleanupHelper({
+      preserveRoot: true,
+      predicate: () => unsubscribe?.(),
+    });
+  }
+
+  private handleChange(newState: MIDIToFrequencyState) {
+    this.state = newState;
   }
 
   public buildConnectables(): AudioConnectables & { node: MIDIToFrequencyNode } {
@@ -111,7 +149,19 @@ export class MIDIToFrequencyNode {
     };
   }
 
-  public serialize(): { [key: string]: any } {
-    return {}; // TODO
+  public serialize(): Record<string, any> {
+    return { ...this.state };
   }
+
+  public deserialize(params: Record<string, any> | null | undefined): MIDIToFrequencyState {
+    if (!params) {
+      return buildDefaultMIDIToFrequencyState();
+    }
+
+    return { ...params, regateMode: params.regateMode ?? RegateMode.AnyAttack };
+  }
+
+  // These are set dynamically at initialization time in the constructor
+  public renderSmallView: ForeignNode['renderSmallView'];
+  public cleanupSmallView: ForeignNode['cleanupSmallView'];
 }

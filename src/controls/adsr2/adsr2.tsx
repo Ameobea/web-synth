@@ -7,10 +7,10 @@ import ControlPanel from 'react-control-panel';
 import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
 import * as PIXI from 'src/controls/pixi';
 import { makeDraggable } from 'src/controls/pixiUtils';
-import type {
-  Adsr,
+import {
   AdsrLengthMode,
-  AdsrStep,
+  type Adsr,
+  type AdsrStep,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { mkLinearToLog } from 'src/util';
 import {
@@ -18,6 +18,7 @@ import {
   registerVcHideCb,
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
+import ConfigureStepControlPanel from './ConfigureStepControlPanel.svelte';
 
 const dpr = window.devicePixelRatio ?? 1;
 
@@ -38,6 +39,10 @@ PIXI.settings.ROUND_PIXELS = true;
 
 interface ADSR2Sprites {
   rampCurves: RampCurve[];
+}
+
+interface StepHandleConfiguratorCtx {
+  inst: ConfigureStepControlPanel;
 }
 
 PIXI.utils.skipHello();
@@ -329,39 +334,38 @@ class StepHandle {
   private renderedRegion: RenderedRegion;
   private disableSnapToEnd: boolean;
 
+  public handlePointerMoveInner(xPx: number, yPx: number) {
+    // Clamp first and last points to the start and end of the envelope
+    const index = this.inst.steps.findIndex(s => s === this);
+    if (index === 0) {
+      xPx = 0;
+    } else if (index === this.inst.steps.length - 1) {
+      if (this.disableSnapToEnd) {
+        xPx = R.clamp(0.001, Infinity, xPx);
+      } else {
+        xPx = this.inst.width;
+      }
+    } else {
+      xPx = R.clamp(0.001, this.inst.width - 0.0001, xPx);
+    }
+    yPx = R.clamp(0, this.inst.height - 0.0001, yPx);
+
+    this.step.x = computeReverseTransformedXPosition(this.renderedRegion, this.inst.width, xPx);
+    this.step.y = 1 - yPx / this.inst.height;
+
+    this.graphics.position.set(xPx, yPx);
+    this.inst.sortAndUpdateMarks(index);
+    this.inst.onUpdated();
+    this.inst.setFrozenOutputValue?.(this.step.y);
+  }
+
   private handlePointerMove() {
     if (!this.dragData) {
       return;
     }
 
     const newPosition = this.dragData.getLocalPosition(this.graphics.parent);
-
-    // Clamp first and last points to the start and end of the envelope
-    const index = this.inst.steps.findIndex(s => s === this);
-    if (index === 0) {
-      newPosition.x = 0;
-    } else if (index === this.inst.steps.length - 1) {
-      if (this.disableSnapToEnd) {
-        newPosition.x = R.clamp(0.001, Infinity, newPosition.x);
-      } else {
-        newPosition.x = this.inst.width;
-      }
-    } else {
-      newPosition.x = R.clamp(0.001, this.inst.width - 0.0001, newPosition.x);
-    }
-    newPosition.y = R.clamp(0, this.inst.height - 0.0001, newPosition.y);
-
-    this.step.x = computeReverseTransformedXPosition(
-      this.renderedRegion,
-      this.inst.width,
-      newPosition.x
-    );
-    this.step.y = 1 - newPosition.y / this.inst.height;
-
-    this.graphics.position.copyFrom(newPosition);
-    this.inst.sortAndUpdateMarks(index);
-    this.inst.onUpdated();
-    this.inst.setFrozenOutputValue?.(this.step.y);
+    this.handlePointerMoveInner(newPosition.x, newPosition.y);
   }
 
   private render() {
@@ -376,6 +380,12 @@ class StepHandle {
     g.buttonMode = true;
     g.interactive = true;
     g.on('pointerdown', (evt: any) => {
+      const originalEvent: PointerEvent = evt.data.originalEvent;
+      if (originalEvent.ctrlKey) {
+        this.inst.openStepHandleConfigurator(this, originalEvent);
+        return;
+      }
+
       this.dragData = evt.data;
     })
       .on('pointerup', () => {
@@ -677,6 +687,7 @@ export class ADSR2Instance {
   private audioThreadData: AudioThreadData;
   private scaleMarkings!: ScaleMarkings;
   private vcId?: string;
+  private stepHandleConfigurator: StepHandleConfiguratorCtx | null = null;
   /**
    * Container into which the ADSR curve, handles, phase viz, and other pieces are rendered
    */
@@ -1059,6 +1070,60 @@ export class ADSR2Instance {
       const phase = this.audioThreadData.buffer[this.audioThreadData.phaseIndex];
       phaseMarker.x = -this.width + phase * this.width;
     });
+  }
+
+  private closeStepHandleConfigurator() {
+    if (!this.stepHandleConfigurator) {
+      return;
+    }
+
+    this.stepHandleConfigurator.inst.$destroy();
+    this.stepHandleConfigurator = null;
+  }
+
+  public openStepHandleConfigurator(step: StepHandle, evt: PointerEvent) {
+    this.closeStepHandleConfigurator();
+
+    const parent = this.app?.renderer.view.parentElement;
+    if (!parent) {
+      console.error('Could not find parent element of renderer');
+      return;
+    }
+
+    const { x, y } = evt;
+    const onSubmit = (newStep: AdsrStep) => {
+      const xPx = computeTransformedXPosition(
+        this.renderedRegion,
+        this.width,
+        this.infiniteMode ? newStep.x * this.renderedRegion.end : newStep.x
+      );
+      const yPx = (1 - newStep.y) * this.height;
+      step.handlePointerMoveInner(xPx, yPx);
+      this.closeStepHandleConfigurator();
+    };
+
+    this.stepHandleConfigurator = {
+      inst: new ConfigureStepControlPanel({
+        props: {
+          top: y - 50,
+          left: x,
+          length: {
+            type: {
+              [AdsrLengthMode.Beats]: 'beats' as const,
+              [AdsrLengthMode.Samples]: 'ms' as const,
+            }[this.lengthMode ?? AdsrLengthMode.Samples],
+            value: this.infiniteMode ? this.renderedRegion.end : this.lengthMs,
+          },
+          onCancel: () => this.closeStepHandleConfigurator(),
+          onSubmit,
+          outputRange: this.outputRange ?? [0, 1],
+          step: this.infiniteMode
+            ? { ...step.step, x: step.step.x / this.renderedRegion.end }
+            : step.step,
+        },
+        target: parent,
+      }),
+    };
   }
 
   private deserialize(state: Adsr) {

@@ -4,6 +4,7 @@
   import { ADSR2Instance, LEFT_GUTTER_WIDTH_PX } from 'src/controls/adsr2/adsr2';
   import SvelteADSR2 from 'src/controls/adsr2/SvelteADSR2.svelte';
   import { renderModalWithControls } from 'src/controls/Modal';
+  import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
   import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import type { CVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
   import { mkCVOutputSettingsPopup } from './CVOutputSettingsPopup';
@@ -116,7 +117,11 @@
         {width}
         height={220}
         debugName={`MIDI editor CV output ${name}`}
-        initialState={{ ...$state.adsr, outputRange: [$state.minValue, $state.maxValue] }}
+        initialState={{
+          ...$state.adsr,
+          outputRange: [$state.minValue, $state.maxValue],
+          lengthMode: AdsrLengthMode.Beats,
+        }}
         onChange={newState => {
           state.update(s => ({
             ...s,

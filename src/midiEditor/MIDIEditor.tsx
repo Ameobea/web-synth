@@ -7,7 +7,7 @@ import './MIDIEditor.scss';
 import { SvelteComponentTyped } from 'svelte';
 
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
-import FileUploader, { type Value as FileUploaderValue } from 'src/controls/FileUploader';
+import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';

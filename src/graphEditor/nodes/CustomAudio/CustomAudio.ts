@@ -23,7 +23,7 @@ import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
-import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/midiToFrequency';
+import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequency';
 import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
 import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import QuantizerNode from 'src/graphEditor/nodes/CustomAudio/Quantizer/QuantizerNode';
