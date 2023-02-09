@@ -1,4 +1,6 @@
 <script lang="ts" context="module">
+  import { filterNils } from 'ameo-utils';
+
   import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
@@ -9,19 +11,19 @@
 </script>
 
 <script lang="ts">
-  import type { AdsrStep } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
   import { samplesToMs } from 'src/util';
 
   export let top: number;
   export let left: number;
-  export let step: AdsrStep;
+  export let step: { x: number; y: number };
   export let outputRange: readonly [number, number];
   export let length:
     | { type: 'samples'; value: number }
     | { type: 'beats'; value: number }
     | { type: 'ms'; value: number };
-  export let onSubmit: (newStep: AdsrStep) => void;
+  export let onSubmit: (newStep: { x: number; y: number }) => void;
   export let onCancel: () => void;
+  export let enableY = true;
 
   const { normalizedToLocalX, localToNormalizedX } = (() => {
     switch (length.type) {
@@ -56,23 +58,22 @@
     },
   };
 
-  const settings: ControlPanelSetting[] = [
+  const settings: ControlPanelSetting[] = filterNils([
     { type: 'range', label: 'x', min: 0, max: normalizedToLocalX(1) },
-    { type: 'range', label: 'y', min: 0, max: normalizedToLocalY(1) },
+    enableY ? { type: 'range', label: 'y', min: 0, max: normalizedToLocalY(1) } : null,
     { type: 'button', label: 'cancel', action: onCancel },
     {
       type: 'button',
       label: 'submit',
       action: () => {
-        const newStep: AdsrStep = {
+        const newStep = {
           x: localToNormalizedX(state.x),
           y: localToNormalizedY(state.y),
-          ramper: step.ramper,
         };
         onSubmit(newStep);
       },
     },
-  ];
+  ]);
 
   let state: LocalState = {
     x: normalizedToLocalX(step.x),
@@ -105,11 +106,11 @@
     margin-bottom: -1px;
   }
 
-  :global(.adsr2-configure-step-control-panel .control-panel .container div:first-child) {
+  :global(.adsr2-configure-step-control-panel .control-panel > .container > :first-child) {
     width: 10% !important;
   }
 
-  :global(.adsr2-configure-step-control-panel .control-panel .container div:nth-child(3)) {
+  :global(.adsr2-configure-step-control-panel .control-panel > .container > :nth-child(3)) {
     width: 37% !important;
   }
 </style>

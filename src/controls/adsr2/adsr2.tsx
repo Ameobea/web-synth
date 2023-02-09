@@ -6,7 +6,6 @@ import ControlPanel from 'react-control-panel';
 
 import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
 import * as PIXI from 'src/controls/pixi';
-import { makeDraggable } from 'src/controls/pixiUtils';
 import {
   AdsrLengthMode,
   type Adsr,
@@ -33,6 +32,8 @@ const PHASE_MARKER_COLOR = 0x73e6cf;
 const LOOP_DRAG_BAR_COLOR = 0xffd608;
 const RELEASE_DRAG_BAR_COLOR = 0x5818d9;
 const SCALE_MARKING_LINE_COLOR = 0xeeeeee;
+const DOUBLE_CLICK_TIME_RANGE_MS = 300;
+
 const ctx = new AudioContext();
 
 PIXI.settings.ROUND_PIXELS = true;
@@ -333,13 +334,14 @@ class StepHandle {
   public step: AdsrStep;
   private renderedRegion: RenderedRegion;
   private disableSnapToEnd: boolean;
+  private lastClickTime = 0;
 
   public handlePointerMoveInner(xPx: number, yPx: number) {
     // Clamp first and last points to the start and end of the envelope
-    const index = this.inst.steps.findIndex(s => s === this);
-    if (index === 0) {
+    const curIndex = this.inst.steps.findIndex(s => s === this);
+    if (curIndex === 0) {
       xPx = 0;
-    } else if (index === this.inst.steps.length - 1) {
+    } else if (curIndex === this.inst.steps.length - 1) {
       if (this.disableSnapToEnd) {
         xPx = R.clamp(0.001, Infinity, xPx);
       } else {
@@ -354,7 +356,7 @@ class StepHandle {
     this.step.y = 1 - yPx / this.inst.height;
 
     this.graphics.position.set(xPx, yPx);
-    this.inst.sortAndUpdateMarks(index);
+    this.inst.sortAndUpdateMarks(curIndex);
     this.inst.onUpdated();
     this.inst.setFrozenOutputValue?.(this.step.y);
   }
@@ -381,8 +383,21 @@ class StepHandle {
     g.interactive = true;
     g.on('pointerdown', (evt: any) => {
       const originalEvent: PointerEvent = evt.data.originalEvent;
-      if (originalEvent.ctrlKey) {
-        this.inst.openStepHandleConfigurator(this, originalEvent);
+
+      const clickTime = Date.now();
+      const isDoubleClick = clickTime - this.lastClickTime < DOUBLE_CLICK_TIME_RANGE_MS;
+      this.lastClickTime = clickTime;
+
+      if (originalEvent.ctrlKey || isDoubleClick) {
+        this.inst.openStepHandleConfigurator(this.step, originalEvent, (newStep: AdsrStep) => {
+          const xPx = computeTransformedXPosition(
+            this.renderedRegion,
+            this.inst.width,
+            this.inst.infiniteMode ? newStep.x * this.renderedRegion.end : newStep.x
+          );
+          const yPx = (1 - newStep.y) * this.inst.height;
+          this.handlePointerMoveInner(xPx, yPx);
+        });
         return;
       }
 
@@ -451,6 +466,7 @@ class DragBar {
   private g!: PIXI.Graphics;
   public dragData: PIXI.InteractionData | null = null;
   private onDrag: (newVal: number) => void;
+  private lastClickTime = 0;
 
   constructor(
     inst: ADSR2Instance,
@@ -472,7 +488,63 @@ class DragBar {
     g.lineTo(0, this.inst.height + 2);
     g.endFill();
 
-    makeDraggable(g, this);
+    g.interactive = true;
+    g.cursor = 'pointer';
+    g.on('pointerdown', (evt: PIXI.InteractionEvent) => {
+      const originalEvent = evt.data.originalEvent as PointerEvent;
+      if (originalEvent.button !== 0) {
+        return;
+      }
+
+      const clickTime = Date.now();
+      const isDoubleClick = clickTime - this.lastClickTime < DOUBLE_CLICK_TIME_RANGE_MS;
+      this.lastClickTime = clickTime;
+
+      if (originalEvent.ctrlKey || isDoubleClick) {
+        originalEvent.preventDefault();
+        const step = {
+          x: computeReverseTransformedXPosition(
+            this.inst.renderedRegion,
+            this.inst.width,
+            // The drag bars are children of the parent container rather than the viz container,
+            // so left gutter offset has to be handled manually.
+            this.g.x - LEFT_GUTTER_WIDTH_PX
+          ),
+          y: 1,
+        };
+        this.inst.openStepHandleConfigurator(
+          step,
+          originalEvent,
+          (newStep: AdsrStep) => {
+            const x = this.inst.infiniteMode
+              ? newStep.x * this.inst.renderedRegion.end
+              : R.clamp(0, 1, newStep.x);
+            const xPx = computeTransformedXPosition(this.inst.renderedRegion, this.inst.width, x);
+            // The drag bars are children of the parent container rather than the viz container,
+            // so left gutter offset has to be handled manually.
+            this.handleDrag(new PIXI.Point(xPx + LEFT_GUTTER_WIDTH_PX, 0));
+          },
+          false
+        );
+        return;
+      }
+
+      this.dragData = evt.data;
+    })
+      .on('pointerup', () => {
+        this.dragData = null;
+      })
+      .on('pointerupoutside', () => {
+        this.dragData = null;
+      })
+      .on('pointermove', () => {
+        if (!this.dragData) {
+          return;
+        }
+
+        const newPosition = this.dragData.getLocalPosition(g.parent);
+        this.handleDrag(newPosition);
+      });
 
     g.x = LEFT_GUTTER_WIDTH_PX + initialPos * this.inst.width;
     g.y = TOP_GUTTER_WIDTH_PX - 4;
@@ -669,7 +741,7 @@ export class ADSR2Instance {
   private logScale = false;
   private lengthMode: AdsrLengthMode | undefined;
   public steps!: StepHandle[];
-  private renderedRegion: RenderedRegion = { start: 0, end: 1 };
+  public renderedRegion: RenderedRegion = { start: 0, end: 1 };
   public sprites!: ADSR2Sprites;
   private loopPoint: number | null = null;
   private loopDragBar: DragBar | null = null;
@@ -682,7 +754,7 @@ export class ADSR2Instance {
    * If enabled, the envelope will not have a specific end point.  Adding more points on the end will
    * extend the envelope.  This is used in the CV outputs for the MIDI editor currently.
    */
-  private infiniteMode: boolean;
+  public readonly infiniteMode: boolean;
   private disablePhaseVisualization = false;
   private audioThreadData: AudioThreadData;
   private scaleMarkings!: ScaleMarkings;
@@ -986,7 +1058,8 @@ export class ADSR2Instance {
         return;
       }
 
-      const isInDoubleClickTimeRange = now - this.lastClick.time;
+      const isInDoubleClickTimeRange =
+        now - this.lastClick.time < DOUBLE_CLICK_TIME_RANGE_MS / 1000;
       if (!isInDoubleClickTimeRange) {
         this.lastClick = { time: now, pos };
         return;
@@ -1081,7 +1154,12 @@ export class ADSR2Instance {
     this.stepHandleConfigurator = null;
   }
 
-  public openStepHandleConfigurator(step: StepHandle, evt: PointerEvent) {
+  public openStepHandleConfigurator(
+    step: { x: number; y: number },
+    evt: PointerEvent,
+    onSubmit: (newStep: { x: number; y: number }) => void,
+    enableY = true
+  ) {
     this.closeStepHandleConfigurator();
 
     const parent = this.app?.renderer.view.parentElement;
@@ -1091,16 +1169,6 @@ export class ADSR2Instance {
     }
 
     const { x, y } = evt;
-    const onSubmit = (newStep: AdsrStep) => {
-      const xPx = computeTransformedXPosition(
-        this.renderedRegion,
-        this.width,
-        this.infiniteMode ? newStep.x * this.renderedRegion.end : newStep.x
-      );
-      const yPx = (1 - newStep.y) * this.height;
-      step.handlePointerMoveInner(xPx, yPx);
-      this.closeStepHandleConfigurator();
-    };
 
     this.stepHandleConfigurator = {
       inst: new ConfigureStepControlPanel({
@@ -1115,11 +1183,13 @@ export class ADSR2Instance {
             value: this.infiniteMode ? this.renderedRegion.end : this.lengthMs,
           },
           onCancel: () => this.closeStepHandleConfigurator(),
-          onSubmit,
+          onSubmit: newStep => {
+            this.closeStepHandleConfigurator();
+            onSubmit(newStep);
+          },
           outputRange: this.outputRange ?? [0, 1],
-          step: this.infiniteMode
-            ? { ...step.step, x: step.step.x / this.renderedRegion.end }
-            : step.step,
+          step: this.infiniteMode ? { ...step, x: step.x / this.renderedRegion.end } : step,
+          enableY,
         },
         target: parent,
       }),
