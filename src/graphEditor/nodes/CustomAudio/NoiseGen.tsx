@@ -11,7 +11,7 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, genRandomStringID } from 'src/util';
+import { AsyncOnce } from 'src/util';
 
 const NoiseGenAWPRegistered = new AsyncOnce(
   () =>
@@ -27,7 +27,7 @@ const NoiseGenWasm = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'noise_gen.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
     ).then(res => res.arrayBuffer()),
   true
 );

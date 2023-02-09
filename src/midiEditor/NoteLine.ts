@@ -2,7 +2,7 @@ import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
-import MIDIEditorUIInstance, { Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import MIDIEditorUIInstance, { type Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox';
 import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';
 import * as conf from './conf';
@@ -26,7 +26,7 @@ export default class NoteLine {
   public app: MIDIEditorUIInstance;
   public notesByID: Map<number, NoteBox> = new Map();
   public container: PIXI.Container;
-  public background: PIXI.Graphics;
+  public background: PIXI.DisplayObject;
   public index: number;
   private graphics: PIXI.Graphics | undefined;
   private noteCreationState: NoteCreationState | null = null;
@@ -46,11 +46,8 @@ export default class NoteLine {
     this.app = app;
     this.index = index;
     this.container = new PIXI.Container();
-    this.background = new PIXI.Graphics();
-    this.background.lineStyle(1, 0, 0);
-    this.background.beginFill(conf.BACKGROUND_COLOR, 1);
-    this.background.drawRect(0, 0, this.app.width, conf.LINE_HEIGHT);
-    this.background.endFill();
+    this.background = new PIXI.Container();
+    this.background.hitArea = new PIXI.Rectangle(0, 0, this.app.width, conf.LINE_HEIGHT);
     this.background.interactive = true;
     this.container.addChild(this.background);
     this.container.width = this.app.width;

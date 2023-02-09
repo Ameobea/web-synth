@@ -190,7 +190,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
 
           const { adsrIx, steps, lenSamples, releasePoint, loopPoint, logScale } = evt.data;
-          console.log('setAdsr', evt.data);
           steps.forEach(({ x, y, ramper, param }, stepIx) => {
             this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
           });

@@ -8,7 +8,7 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce, genRandomStringID, getHasSIMDSupport } from 'src/util';
+import { AsyncOnce, getHasSIMDSupport } from 'src/util';
 import WaveTableSmallView from './WaveTableSmallView.svelte';
 
 // Manually generate some waveforms... for science
@@ -73,7 +73,7 @@ const fetchWavetableWasmBytes = async () => {
   let path =
     process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
   if (!window.location.href.includes('localhost')) {
-    path += `?cacheBust=${genRandomStringID()}`;
+    path += `?cacheBust=${crypto.randomUUID()}`;
   }
   const res = fetch(path);
   return res.then(res => res.arrayBuffer());

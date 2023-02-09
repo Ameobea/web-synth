@@ -5,8 +5,6 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import { Provider, useStore } from 'react-redux';
 import type { AnyAction, Store } from 'redux';
 
-import { genRandomStringID } from 'src/util';
-
 interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
   /**
    * The component to render into the container
@@ -64,7 +62,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
       }
     } else {
       root = createRoot(node);
-      const rootID = genRandomStringID();
+      const rootID = crypto.randomUUID();
       node.setAttribute('data-react-root-id', rootID);
       RootsByID.set(rootID, root);
     }
@@ -236,7 +234,7 @@ export function withReactQueryClient<T>(Comp: React.ComponentType<T>): React.Com
   const client = new QueryClient();
   const WithReactQueryClient: React.FC<T> = ({ ...props }) => (
     <QueryClientProvider client={client}>
-      <Comp {...props} />
+      <Comp {...(props as any)} />
     </QueryClientProvider>
   );
   return WithReactQueryClient;
@@ -248,7 +246,7 @@ export function withReduxProvider<T>(
 ): React.ComponentType<T> {
   const WithReduxProvider: React.FC<T> = ({ ...props }) => (
     <Provider store={store}>
-      <Comp {...props} />
+      <Comp {...(props as any)} />
     </Provider>
   );
   return WithReduxProvider;

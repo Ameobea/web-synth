@@ -11,7 +11,6 @@
     buildDefaultMappedSampleData,
     type SampleMappingOperatorState,
   } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
-  import { genRandomStringID } from 'src/util';
   import type { GateUngateCallbackRegistrar } from './types';
 
   export let registerGateUngateCallbacks: GateUngateCallbackRegistrar;
@@ -54,7 +53,7 @@
           (state.mappedSamplesByMIDINumber[midiNumber]?.length ?? 0) > 0 || gatedNotes[midiNumber]
       );
 
-  const uniqueID = genRandomStringID();
+  const uniqueID = crypto.randomUUID();
 </script>
 
 <div class="root">

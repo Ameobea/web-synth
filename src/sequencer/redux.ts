@@ -2,11 +2,10 @@ import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import * as R from 'ramda';
 
 import { setConnectionFlowingStatus } from 'src/graphEditor/GraphEditor';
-import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { buildGateOutput } from 'src/sequencer';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
-import { genRandomStringID } from 'src/util';
 
 export type VoiceTarget =
   | {
@@ -130,7 +129,7 @@ const actionGroups = {
         ...state,
         marks: [
           ...state.marks,
-          { marks: R.times(() => null, state.marks[0]!.marks.length), rowID: genRandomStringID() },
+          { marks: R.times(() => null, state.marks[0]!.marks.length), rowID: crypto.randomUUID() },
         ],
         voices: [...state.voices, { type: 'sample' as const, name: 'sample', gain: 1 }],
       }),
@@ -475,7 +474,7 @@ export const buildInitialState = (vcId: string): SequencerReduxState => ({
   activeBeats: [0],
   voices: [{ type: 'sample' as const, name: 'sample', gain: 1 }],
   sampleBank: {},
-  marks: [{ marks: R.times(() => null, DEFAULT_WIDTH), rowID: genRandomStringID() }],
+  marks: [{ marks: R.times(() => null, DEFAULT_WIDTH), rowID: crypto.randomUUID() }],
   bpm: 80,
   isPlaying: false,
   outputGainNode: new GainNode(ctx),

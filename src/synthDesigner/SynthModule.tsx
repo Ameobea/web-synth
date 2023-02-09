@@ -158,6 +158,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
             ...fmSynth.gainEnvelope,
             lenSamples: { type: 'constant', value: msToSamples(val) },
           });
+          setGainEnvelope({ ...gainEnvelope, lenSamples: val });
           return;
         }
         case 'log scale': {
@@ -166,6 +167,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
             ...fmSynth.gainEnvelope,
             logScale: val,
           });
+          setGainEnvelope({ ...gainEnvelope, logScale: val });
           return;
         }
         case 'pitch multiplier': {
@@ -197,6 +199,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
       'adsr length ms': gainADSRLengthMs,
       'gain envelope': gainEnvelopeState,
       'pitch multiplier': localPitchMultiplier ?? props.pitchMultiplier?.toString() ?? 1,
+      'log scale': gainEnvelope.logScale,
     };
   }, [
     props.masterGain,

@@ -5,7 +5,6 @@ import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 import { get_looper_audio_connectables } from 'src/looper/Looper';
 import type { LooperNode } from 'src/looper/LooperNode';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { genRandomStringID } from 'src/util';
 
 export interface LooperBank {
   id: string;
@@ -79,7 +78,7 @@ export const serializeLooper = (looperState: LooperInstState): string => {
 };
 
 const buildDefaultLooperBank = (): LooperBank => ({
-  id: genRandomStringID(),
+  id: crypto.randomUUID(),
   loadedComposition: null,
   lenBeats: 8,
   compositionLenBeats: null,

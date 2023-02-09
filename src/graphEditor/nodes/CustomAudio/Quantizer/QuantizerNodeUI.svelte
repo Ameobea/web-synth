@@ -28,11 +28,10 @@
   import type { Writable } from 'svelte/store';
 
   import type { QuantizerNodeUIState } from 'src/graphEditor/nodes/CustomAudio/Quantizer/types';
-  import { genRandomStringID } from 'src/util';
 
   export let store: Writable<QuantizerNodeUIState>;
 
-  const uniqueID = genRandomStringID();
+  const uniqueID = crypto.randomUUID();
   let parseErrorMessage: string | null;
 
   const handleQuantizationIntervalTypeChange = (evt: { currentTarget: HTMLSelectElement }) => {

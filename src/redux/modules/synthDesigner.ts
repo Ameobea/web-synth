@@ -19,7 +19,7 @@ import {
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { genRandomStringID, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;
@@ -325,7 +325,7 @@ const buildDefaultSynthModule = (
 
         fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
       },
-      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
+      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${crypto.randomUUID()}`,
     });
 
   const inst: SynthModule = {
@@ -417,7 +417,7 @@ export const deserializeSynthModule = (
       }
       fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
     },
-    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
+    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${crypto.randomUUID()}`,
   });
 
   const base = buildDefaultSynthModule(

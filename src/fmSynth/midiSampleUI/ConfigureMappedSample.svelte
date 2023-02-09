@@ -16,7 +16,6 @@
   import type { MappedSampleData } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import { getSample } from 'src/sampleLibrary/sampleLibrary';
   import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
-  import { genRandomStringID } from 'src/util';
 
   export let mappedSampleData: MappedSampleData;
   export let onDelete: () => void;
@@ -39,7 +38,7 @@
     ],
   };
 
-  const checkboxID = `loop-checkbox-${genRandomStringID()}`;
+  const checkboxID = `loop-checkbox-${crypto.randomUUID()}`;
 
   const handleControlPanelChange = (key: string, value: any, _state: Record<string, any>) => {
     switch (key) {

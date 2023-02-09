@@ -15,7 +15,7 @@ import {
   mkContainerUnhider,
 } from 'src/reactUtils';
 import type { SampleDescriptor } from 'src/sampleLibrary';
-import { AsyncOnce, genRandomStringID } from 'src/util';
+import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -172,7 +172,7 @@ const GranularWasm = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'granular.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
     ).then(res => res.arrayBuffer()),
   true
 );

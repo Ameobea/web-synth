@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 import { getSentry } from 'src/sentry';
-import { genRandomStringID, retryAsync } from 'src/util';
+import { retryAsync } from 'src/util';
 
 export enum MIDIEventType {
   Attack = 0,
@@ -178,14 +178,14 @@ Promise.all([
     fetch(
       process.env.ASSET_PATH +
         'event_scheduler.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
     ).then(res => res.arrayBuffer())
   ),
   retryAsync(() =>
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'EventSchedulerWorkletProcessor.js?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
     )
   ),
 ] as const)

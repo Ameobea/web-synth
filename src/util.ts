@@ -201,11 +201,6 @@ export const truncateWithElipsis = (s: string, maxLength: number): string => {
   return truncated;
 };
 
-export const genRandomStringID = () => {
-  const base = btoa(`${Math.random()}${Math.random()}`);
-  return base.split('').reverse().join('');
-};
-
 export const classNameIncludes = (
   className: string | SVGAnimatedString | null | undefined,
   needle: string

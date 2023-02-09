@@ -13,7 +13,7 @@ import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { getSentry } from 'src/sentry';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce, genRandomStringID } from 'src/util';
+import { AsyncOnce } from 'src/util';
 import QuantizerNodeUI from './QuantizerNodeUI.svelte';
 
 const QuantizerWasmBytes = new AsyncOnce(
@@ -21,7 +21,7 @@ const QuantizerWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'quantizer.wasm?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : genRandomStringID())
+        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
     ).then(res => res.arrayBuffer()),
   true
 );
@@ -32,7 +32,7 @@ const QuantizerAWPRegistered = new AsyncOnce(
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'QuantizerAWP.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : genRandomStringID())
+        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
     ),
   true
 );

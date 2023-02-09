@@ -1,4 +1,5 @@
 import { UnreachableException } from 'ameo-utils';
+import numbro from 'numbro';
 import * as R from 'ramda';
 import React, { useEffect, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -18,16 +19,18 @@ import {
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 
+const dpr = window.devicePixelRatio ?? 1;
+
 const SAMPLE_RATE = 44_100;
 const BACKGROUND_COLOR = 0x131313;
 const RAMP_LINE_COLOR = 0x43f79d;
-const RAMP_LINE_WIDTH = 1.4;
-const INTERPOLATED_SEGMENT_LENGTH_PX = 2;
-const STEP_HANDLE_WIDTH = 4;
+const RAMP_LINE_WIDTH = Math.min(1.4 * dpr, 2);
+const INTERPOLATED_SEGMENT_LENGTH_PX = 2 * dpr;
+const STEP_HANDLE_WIDTH = Math.min(4 * dpr, 6);
 const RAMP_HANDLE_COLOR = 0x0077ff;
 const PHASE_MARKER_COLOR = 0x73e6cf;
 const LOOP_DRAG_BAR_COLOR = 0xffd608;
-const RELEASE_DRAG_BAR_COLOR = 0x3500e3;
+const RELEASE_DRAG_BAR_COLOR = 0x5818d9;
 const SCALE_MARKING_LINE_COLOR = 0xeeeeee;
 const ctx = new AudioContext();
 
@@ -539,19 +542,25 @@ class ScaleMarkings {
     g.lineTo(this.inst.width / 2, this.inst.height);
 
     const createText = (scaledY: number) => {
-      const text = new PIXI.Text(scaledY.toPrecision(4), {
-        fontSize: 9,
-        fontFamily: 'PT Sans',
-        fill: 0xffffff,
-        align: 'left',
+      const formatted = numbro(scaledY).format({
+        thousandSeparated: false,
+        lowPrecision: true,
+        average: true,
+        totalLength: 4,
+        trimMantissa: true,
       });
-      text.x = 2;
+      const text = new PIXI.Text(formatted, {
+        fontSize: 8.5 * dpr,
+        fontFamily: 'PT Sans',
+        fill: 0xfcfcfc,
+      });
+      text.x = Math.min(2 * dpr, 5);
       this.inst.app?.stage.addChild(text);
       return text;
     };
 
     const text = createText(this.outputRange[1]);
-    text.y = TOP_GUTTER_WIDTH_PX - 2;
+    text.y = TOP_GUTTER_WIDTH_PX - 2 * dpr;
     this.texts.push(text);
 
     const horizontalAxisLineCount = this.computeHorizontalAxisLineCount();
@@ -611,10 +620,10 @@ export interface RenderedRegion {
   end: number;
 }
 
-export const LEFT_GUTTER_WIDTH_PX = 27;
-const RIGHT_GUTTER_WIDTH_PX = 7;
-const TOP_GUTTER_WIDTH_PX = 10;
-const BOTTOM_GUTTER_WIDTH_PX = 10;
+export const LEFT_GUTTER_WIDTH_PX = 27 * dpr;
+const RIGHT_GUTTER_WIDTH_PX = 7 * dpr;
+const TOP_GUTTER_WIDTH_PX = 10 * dpr;
+const BOTTOM_GUTTER_WIDTH_PX = 10 * dpr;
 
 /**
  * Given the normalized [0, 1] X position of an element to be rendered on the ADSR, returns the X position
@@ -869,11 +878,10 @@ export class ADSR2Instance {
     try {
       this.app = new PIXI.Application({
         antialias: true,
-        resolution: 1,
         autoDensity: true,
         view: canvas,
-        height,
-        width,
+        height: height * dpr,
+        width: width * dpr,
         backgroundColor: BACKGROUND_COLOR,
       });
     } catch (err) {
@@ -920,6 +928,10 @@ export class ADSR2Instance {
     }
 
     this.renderInitial();
+  }
+
+  public setSize(width: number, height: number) {
+    this.app?.renderer.resize(width * dpr, height * dpr);
   }
 
   private addStep(pos: PIXI.Point) {
@@ -1092,7 +1104,7 @@ export class ADSR2Instance {
   }
 
   public destroy() {
-    this.app?.destroy(false);
+    this.app?.destroy(false, { children: true });
     if (this.vcId) {
       unregisterVcHideCb(this.vcId, this.onHiddenStatusChanged);
     }
@@ -1141,8 +1153,21 @@ const ADSR2: React.FC<ADSR2Props> = ({
   disablePhaseVisualization,
   setFrozenOutputValue,
 }) => {
+  const lastSize = useRef({ width, height });
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
+
+  useEffect(() => {
+    if (!instance.current || !instance.current.app?.view) {
+      return;
+    }
+    if (lastSize.current.width === width && lastSize.current.height === height) {
+      return;
+    }
+    lastSize.current = { width, height };
+
+    instance.current.setSize(width, height);
+  }, [width, height]);
 
   useEffect(() => {
     if (!instance.current || !initialState) {

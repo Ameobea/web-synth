@@ -36,7 +36,7 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, genRandomStringID, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
+import { AsyncOnce, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -84,7 +84,7 @@ const fetchWavetableWasmBytes = async (): Promise<ArrayBuffer> => {
   let path =
     process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
   if (!window.location.host.includes('localhost')) {
-    path += `?cacheBust=${genRandomStringID()}`;
+    path += `?cacheBust=${crypto.randomUUID()}`;
   }
   const res = fetch(path);
   return res.then(res => res.arrayBuffer());
@@ -214,7 +214,7 @@ export default class FMSynth implements ForeignNode {
   private gateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
-  public readonly debugID = genRandomStringID();
+  public readonly debugID = crypto.randomUUID();
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';

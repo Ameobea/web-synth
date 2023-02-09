@@ -7,6 +7,8 @@ use dsp::{even_faster_pow, mk_linear_to_log};
 #[cfg(feature = "exports")]
 pub mod exports;
 pub mod managed_adsr;
+#[cfg(test)]
+mod tests;
 
 extern "C" {
     pub fn debug1(v1: f32, v2: f32, v3: f32);
