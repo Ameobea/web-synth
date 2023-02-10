@@ -6,6 +6,10 @@
   export let onChange: (newState: CompressorBandState) => void;
   export let ix: number;
 
+  const MARGIN_TOP = 122;
+  const VIZ_HEIGHT = 116;
+  const PANEL_HEIGHT = 122 + 14 + 10;
+
   const handleChange = (_key: string, _val: number, newState: Record<string, any>) => {
     onChange({
       ...newState,
@@ -26,5 +30,10 @@
   ]}
   state={{ ...state, down_ratio: state.top_ratio, up_ratio: state.bottom_ratio }}
   onChange={handleChange}
-  style={{ width: 500, height: 144, position: 'absolute', top: 100 + 100 - 3 + ix * (140 + 100) }}
+  style={{
+    width: '100%',
+    height: 144,
+    position: 'absolute',
+    top: MARGIN_TOP + ix * PANEL_HEIGHT + (ix + 1) * VIZ_HEIGHT,
+  }}
 />

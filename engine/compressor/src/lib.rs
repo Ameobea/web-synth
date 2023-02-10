@@ -335,12 +335,33 @@ impl Compressor {
                 top_envelope = release_coefficient * top_envelope
                     + (1. - release_coefficient) * detected_level_db;
             }
+            if cfg!(debug_assertions) && (top_envelope.is_nan() || top_envelope.is_infinite()) {
+                panic!(
+                    "top_envelope={top_envelope}, detected_level_linear={detected_level_linear}, \
+                     detected_level_db={detected_level_db}, \
+                     attack_coefficient={attack_coefficient}, \
+                     release_coefficient={release_coefficient}, input={input}, i={i}, \
+                     lookahead_samples={lookahead_samples}"
+                );
+            }
+
             if detected_level_db < bottom_envelope {
                 bottom_envelope = attack_coefficient * bottom_envelope
                     + (1. - attack_coefficient) * detected_level_db;
             } else {
                 bottom_envelope = release_coefficient * bottom_envelope
                     + (1. - release_coefficient) * detected_level_db;
+            }
+            if cfg!(debug_assertions) && (bottom_envelope.is_nan() || bottom_envelope.is_infinite())
+            {
+                panic!(
+                    "bottom_envelope={bottom_envelope}, \
+                     detected_level_linear={detected_level_linear}, \
+                     detected_level_db={detected_level_db}, \
+                     attack_coefficient={attack_coefficient}, \
+                     release_coefficient={release_coefficient}, input={input}, i={i}, \
+                     lookahead_samples={lookahead_samples}"
+                );
             }
 
             // if input < 0.0001 && input > -0.0001 {
@@ -363,20 +384,44 @@ impl Compressor {
             gain = if top_envelope > top_threshold_db {
                 // Push the volume down towards the top threshold
                 target_volume_db = top_threshold_db + (top_envelope - top_threshold_db) / top_ratio;
+                if cfg!(debug_assertions)
+                    && (target_volume_db.is_infinite() || target_volume_db.is_nan())
+                {
+                    panic!(
+                        "top_envelope={top_envelope}, top_threshold_db={top_threshold_db}, \
+                         top_ratio={top_ratio}, target_volume_db={target_volume_db}"
+                    );
+                }
                 db_to_gain(target_volume_db - top_envelope)
             } else if bottom_envelope < bottom_threshold_db {
                 // Push the volume up towards the bottom threshold
                 target_volume_db =
                     bottom_threshold_db - (bottom_threshold_db - bottom_envelope) * bottom_ratio;
+                if cfg!(debug_assertions)
+                    && (target_volume_db.is_infinite() || target_volume_db.is_nan())
+                {
+                    panic!(
+                        "bottom_envelope={bottom_envelope}, \
+                         bottom_threshold_db={bottom_threshold_db}, bottom_ratio={bottom_ratio}, \
+                         target_volume_db={target_volume_db}"
+                    );
+                }
                 db_to_gain(target_volume_db - bottom_envelope).min(3.)
             } else {
                 target_volume_db = top_envelope;
+                if cfg!(debug_assertions)
+                    && (target_volume_db.is_infinite() || target_volume_db.is_nan())
+                {
+                    panic!("top_envelope={top_envelope}, target_volume_db={target_volume_db}");
+                }
                 1.
             };
-            // gain *= activation;
 
-            // Apply the gain
-            output_buf[i] += input * gain * post_gain;
+            let output = input * gain * post_gain;
+            if cfg!(debug_assertions) && output.is_infinite() || output.is_nan() {
+                panic!("input={input}, gain={gain}, post_gain={post_gain}, output={output}");
+            }
+            output_buf[i] += output;
         }
 
         self.bottom_envelope = bottom_envelope;
@@ -603,9 +648,7 @@ pub extern "C" fn process_compressor(
     knee: f32,
     lookahead_samples: usize,
 ) {
-    // TODO TEMP
-    let lookahead_samples = (MAX_LOOKAHEAD_SAMPLES / 3); // * 2;
-                                                         // let low_band_pre_gain = low_band_pre_gain * db_to_gain(5.2);
+    // let low_band_pre_gain = low_band_pre_gain * db_to_gain(5.2);
     let low_band_pre_gain = low_band_pre_gain * 1.8197008586099834;
     // let mid_band_pre_gain = mid_band_pre_gain * db_to_gain(5.2);
     let mid_band_pre_gain = mid_band_pre_gain * 1.8197008586099834;

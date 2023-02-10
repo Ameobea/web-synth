@@ -9,7 +9,7 @@ import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { getSentry } from 'src/sentry';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, SAMPLE_RATE, samplesToMs } from 'src/util';
 import CompressorSmallView from './CompressorSmallView.svelte';
 
 export interface CompressorBandState {
@@ -33,11 +33,13 @@ export interface CompressorNodeUIState {
   bottomRatio: number;
   topRatio: number;
   knee: number;
-  lookaheadMs: number;
   sab: Float32Array | null;
   bypass: boolean;
   mix: number;
+  lowLatencyMode: boolean;
 }
+
+const DEFAULT_LOOKAHEAD_SAMPLES = SAMPLE_RATE / 10 / 3;
 
 const buildDefaultCompressorBandState = (band: 'low' | 'mid' | 'high'): CompressorBandState => ({
   gain: 1,
@@ -60,10 +62,10 @@ export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   bottomRatio: 0.2,
   topRatio: 12,
   knee: 30,
-  lookaheadMs: 1.2,
   sab: null,
   bypass: false,
   mix: 1,
+  lowLatencyMode: false,
 });
 
 const CompressorWasmBytes = new AsyncOnce(
@@ -373,7 +375,9 @@ export class CompressorNode implements ForeignNode {
     (this.highBandTopRatio as OverridableAudioParam).manualControl.offset.value =
       newState.high.top_ratio;
     (this.knee as OverridableAudioParam).manualControl.offset.value = newState.knee;
-    (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lookaheadMs;
+    (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lowLatencyMode
+      ? samplesToMs(DEFAULT_LOOKAHEAD_SAMPLES / 2.5)
+      : samplesToMs(DEFAULT_LOOKAHEAD_SAMPLES);
   };
 
   private deserialize(params: CompressorNodeUIState) {
@@ -404,9 +408,9 @@ export class CompressorNode implements ForeignNode {
       bottomRatio: params.bottomRatio ?? 0.2,
       topRatio: params.topRatio ?? 12,
       knee: params.knee ?? 0,
-      lookaheadMs: params.lookaheadMs ?? 0,
       sab: null,
       mix: params.mix ?? 1,
+      lowLatencyMode: params.lowLatencyMode ?? false,
     });
   }
 

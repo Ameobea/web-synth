@@ -26,22 +26,30 @@
     store.set(newState);
   };
 
-  const handleTopControlPanelChange = (key: string, val: any) =>
+  const handleTopControlPanelChange = (rawKey: string, val: any) => {
+    const key = rawKey === 'low latency mode' ? 'lowLatencyMode' : rawKey;
     store.update(state => ({ ...state, [key]: val }));
+  };
 </script>
 
 <div class="root">
   <SvelteControlPanel
-    style={{ position: 'absolute', top: 0, left: 0 }}
+    style={{ position: 'absolute', top: 0, left: 0, width: 500 }}
     settings={[
       { label: 'bypass', type: 'checkbox' },
       { label: 'reset', type: 'button', action: reset },
       { label: 'mix', type: 'range', min: 0, max: 1, step: 0.005 },
+      { label: 'low latency mode', type: 'checkbox' },
     ]}
-    state={{ bypass: $store.bypass, mix: $store.mix }}
+    state={{ bypass: $store.bypass, mix: $store.mix, 'low latency mode': $store.lowLatencyMode }}
     onChange={handleTopControlPanelChange}
   />
-  <canvas use:renderMultibandCompressor width={500} height={800} />
+  <canvas
+    use:renderMultibandCompressor
+    width={500}
+    height={800}
+    style="min-width: 500px; min-height: 800px"
+  />
   <CompressorControlPanel
     state={$store.low}
     onChange={newState => {
@@ -71,6 +79,8 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
     overflow-x: hidden;
   }
 </style>

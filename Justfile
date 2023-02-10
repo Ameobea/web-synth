@@ -262,6 +262,10 @@ build-compressor:
   cd ./engine/compressor && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/compressor.wasm ../../public
 
+debug-compressor:
+  cd ./engine/compressor && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/compressor.wasm ../../public
+
 build-polysynth:
   cd ./engine/polysynth && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/polysynth.wasm ../../public

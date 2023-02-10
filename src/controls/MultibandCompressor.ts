@@ -8,8 +8,8 @@ import type {
 import { delay } from 'src/util';
 import * as PIXI from './pixi';
 
-const MARGIN_TOP_PX = 100;
-const COMPRESSOR_CONTROLS_HEIGHT_PX = 100;
+const MARGIN_TOP_PX = 122;
+const COMPRESSOR_CONTROLS_HEIGHT_PX = 120;
 const COMPRESSOR_MARGIN_PX = 140;
 const COMPRESSOR_BG_COLOR = 0x141414;
 
