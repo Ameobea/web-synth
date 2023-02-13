@@ -4,12 +4,12 @@ import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio'
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 
-export class AddNode implements ForeignNode {
+export class TypeConverterNode implements ForeignNode {
   private vcId: string | undefined;
   private gain: GainNode;
 
-  static typeName = 'Add';
-  public nodeType = 'customAudio/add';
+  static typeName = 'Type Converter';
+  public nodeType = 'customAudio/typeConverter';
 
   public paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
@@ -27,18 +27,23 @@ export class AddNode implements ForeignNode {
   public buildConnectables() {
     return {
       inputs: ImmMap<string, ConnectableInput>()
-        .set('input1', {
-          type: 'number',
+        .set('input audio', {
+          type: 'customAudio',
           node: this.gain,
         })
-        .set('input2', {
+        .set('input cv', {
           type: 'number',
           node: this.gain,
         }),
-      outputs: ImmMap<string, ConnectableOutput>().set('output', {
-        type: 'number',
-        node: this.gain,
-      }),
+      outputs: ImmMap<string, ConnectableOutput>()
+        .set('output audio', {
+          type: 'customAudio',
+          node: this.gain,
+        })
+        .set('output cv', {
+          type: 'number',
+          node: this.gain,
+        }),
       vcId: this.vcId!,
       node: this,
     };

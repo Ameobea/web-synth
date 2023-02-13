@@ -118,7 +118,11 @@ export const connectFilterChain = (filters: BiquadFilterNode[]) => {
 export const disconnectFilterChain = (filters: BiquadFilterNode[]) => {
   const [firstFilter, ...rest] = filters;
   rest.reduce((acc, filter) => {
-    acc.disconnect(filter);
+    try {
+      acc.disconnect(filter);
+    } catch (_err) {
+      // pass
+    }
     return filter;
   }, firstFilter);
 };

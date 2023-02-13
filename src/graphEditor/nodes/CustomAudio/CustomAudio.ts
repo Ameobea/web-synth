@@ -31,6 +31,8 @@ import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/Sam
 import { ScaleAndShiftNode } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift';
 import { Sidechain } from 'src/graphEditor/nodes/CustomAudio/Sidechain';
 import StatisticsNode from 'src/graphEditor/nodes/CustomAudio/StatisticsNode/StatisticsNode';
+import { TypeConverterNode } from 'src/graphEditor/nodes/CustomAudio/TypeConverter/TypeConverterNode';
+import { VocoderNode } from 'src/graphEditor/nodes/CustomAudio/Vocoder/VocoderNode';
 import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -437,6 +439,12 @@ export const audioNodeGetters: {
   },
   'customAudio/add': {
     nodeGetter: AddNode,
+  },
+  'customAudio/vocoder': {
+    nodeGetter: VocoderNode,
+  },
+  'customAudio/typeConverter': {
+    nodeGetter: TypeConverterNode,
   },
 };
 

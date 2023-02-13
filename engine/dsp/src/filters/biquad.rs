@@ -20,6 +20,7 @@ pub struct BiquadFilter {
     pub y: [f32; 2],
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum FilterMode {
     Lowpass,
     Highpass,

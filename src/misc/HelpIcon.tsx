@@ -1,17 +1,17 @@
-import type { PropTypesOf } from 'ameo-utils/dist/util/react';
 import React from 'react';
-import { Tooltip } from 'react-tippy';
+import { Tooltip, type Position } from 'react-tippy';
 
 import 'react-tippy/dist/tippy.css';
 import './HelpIcon.scss';
 
+interface HelpIconIconProps
+  extends React.DetailedHTMLProps<React.HTMLAttributes<SVGSVGElement>, SVGSVGElement> {
+  size?: number;
+  color?: string;
+}
+
 // From: https://icons.mono.company/, MIT license
-const HelpIconIcon: React.FC<
-  { size?: number; color?: string } & React.DetailedHTMLProps<
-    React.HTMLAttributes<SVGSVGElement>,
-    SVGSVGElement
-  >
-> = ({ size = 18, color = '#FCFCFC', ...props }) => (
+const HelpIconIcon: React.FC<HelpIconIconProps> = ({ size = 18, color = '#FCFCFC', ...props }) => (
   <svg
     fill='none'
     viewBox='0 0 24 24'
@@ -44,15 +44,25 @@ const HelpIconIcon: React.FC<
   </svg>
 );
 
-const HelpIcon: React.FC<{
+interface HelpIconProps {
   link: string;
   size?: number;
   style?: React.CSSProperties;
   tooltipStyle?: React.CSSProperties;
   color?: string;
   arrow?: boolean;
-  position?: PropTypesOf<typeof Tooltip>['position'];
-}> = ({ link, size, style, tooltipStyle, color, arrow = true, position }) => {
+  position?: Position;
+}
+
+const HelpIcon: React.FC<HelpIconProps> = ({
+  link,
+  size,
+  style,
+  tooltipStyle,
+  color,
+  arrow = true,
+  position,
+}) => {
   const content = (
     <a href={link.startsWith('http') ? link : `/docs/${link}`} target='_blank'>
       <HelpIconIcon style={style} size={size} color={color} />

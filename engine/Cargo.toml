@@ -22,11 +22,12 @@ members = [
   "midi_quantizer",
   "quantizer",
   "wbg_logging",
-  "compressor"
+  "compressor",
+  "vocoder"
 ]
 
 [profile.release]
-#debug-assertions = true
+# debug-assertions = true
 panic = "abort"
 debug = 1
 codegen-units = 1

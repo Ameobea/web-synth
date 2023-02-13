@@ -1,8 +1,10 @@
+import { buildHighOrderBandpassFilters } from 'src/filterDesigner/higherOrderBandpass';
 import type { SerializedFilterDesigner } from 'src/filterDesigner/util';
+import { buildVocoderBandpassChainPreset } from 'src/filterDesigner/vocoder';
 import { computeHigherOrderBiquadQFactors } from 'src/synthDesigner/biquadFilterModule';
 import { buildDefaultFilter, FilterType } from 'src/synthDesigner/filterHelpers';
 
-interface FilterDesignerPreset {
+export interface FilterDesignerPreset {
   name: string;
   preset: SerializedFilterDesigner;
 }
@@ -51,24 +53,6 @@ export const buildOTTBandSplitterPreset = () => {
     filterGroups: [lowBand, [...midBandBottom, ...midBandTop], highBand],
     lockedFrequencyByGroup: [lowBandCutoff, null, midBandCutoff],
   };
-};
-
-const buildHighOrderBandpassFilters = (
-  order: number,
-  bandwidthHz: number,
-  centerFreqHz: number
-) => {
-  const highPassFreq = centerFreqHz - bandwidthHz / 2;
-  const lowPassFreq = centerFreqHz + bandwidthHz / 2;
-
-  const lowPasses = computeHigherOrderBiquadQFactors(order).map(q =>
-    buildDefaultFilter(FilterType.Lowpass, q, lowPassFreq)
-  );
-  const highPasses = computeHigherOrderBiquadQFactors(order).map(q =>
-    buildDefaultFilter(FilterType.Highpass, q, highPassFreq)
-  );
-
-  return [...lowPasses, ...highPasses];
 };
 
 const buildFilterDesignerPresets = (): FilterDesignerPreset[] => [
@@ -190,6 +174,10 @@ const buildFilterDesignerPresets = (): FilterDesignerPreset[] => [
   {
     name: 'OTT band splitter',
     preset: buildOTTBandSplitterPreset(),
+  },
+  {
+    name: 'vocoder bandpass chain',
+    preset: buildVocoderBandpassChainPreset(16),
   },
 ];
 

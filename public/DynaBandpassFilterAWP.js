@@ -74,10 +74,6 @@ class DynaBandpassFilterAWP extends AudioWorkletProcessor {
       const lowPassFrequency = clamp(frequency + bandWidth / 2, 10, SAMPLE_RATE / 2);
       lowPassOutput[i] = lowPassFrequency;
       highPassOutput[i] = highPassFrequency;
-
-      // if (i === 0) {
-      //   console.log({ params, frequency, bandWidth, lowPassFrequency, highPassFrequency });
-      // }
     }
 
     this.lastFrequency = frequency;

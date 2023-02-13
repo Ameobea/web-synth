@@ -361,6 +361,11 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       // If the graph editor isn't visible, make sure we stop its rendering to save resources
       const { activeViewContexts, activeViewContextIx } = getState().viewContextManager;
       const activeVC = activeViewContexts[activeViewContextIx];
+      if (!activeVC) {
+        console.error('No active view context');
+        return;
+      }
+
       if (activeVC.uuid !== vcId) {
         hide_graph_editor(`graphEditor_${vcId}`);
       }
