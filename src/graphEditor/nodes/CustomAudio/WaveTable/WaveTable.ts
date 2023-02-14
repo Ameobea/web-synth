@@ -3,12 +3,13 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WavetableWasm';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce, getHasSIMDSupport } from 'src/util';
+import { AsyncOnce } from 'src/util';
 import WaveTableSmallView from './WaveTableSmallView.svelte';
 
 // Manually generate some waveforms... for science
@@ -59,27 +60,6 @@ export const getDefaultWavetableDef = () => [
   [bufs[0], bufs[1]],
   [bufs[2], bufs[3]],
 ];
-
-const fetchWavetableWasmBytes = async () => {
-  const hasSIMDSupport = getHasSIMDSupport();
-  if (!window.location.href.includes('localhost')) {
-    console.log(
-      hasSIMDSupport
-        ? 'Wasm SIMD support detected!'
-        : 'Wasm SIMD support NOT detected; using fallback Wasm'
-    );
-  }
-
-  let path =
-    process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
-  if (!window.location.href.includes('localhost')) {
-    path += `?cacheBust=${crypto.randomUUID()}`;
-  }
-  const res = fetch(path);
-  return res.then(res => res.arrayBuffer());
-};
-
-const WavetableWasmBytes = new AsyncOnce(fetchWavetableWasmBytes, true);
 
 let wavetableWasmInstance: WebAssembly.Instance | undefined | null;
 export const WavetableWasmInstance = new AsyncOnce(() =>

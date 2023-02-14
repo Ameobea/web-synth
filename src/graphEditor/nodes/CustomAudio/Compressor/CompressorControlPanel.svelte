@@ -16,7 +16,6 @@
       top_ratio: newState.down_ratio,
       bottom_ratio: newState.up_ratio,
     } as CompressorBandState);
-    console.log(newState);
   };
 </script>
 

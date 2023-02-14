@@ -12,6 +12,7 @@ use dsp::{even_faster_pow, midi_number_to_frequency, oscillator::PhasedOscillato
 
 pub mod effects;
 mod samples;
+mod standalone_fx;
 use crate::{WaveTable, WaveTableSettings};
 
 use self::{
@@ -1689,20 +1690,19 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     std::ptr::write(
         &mut (*ctx).polysynth,
         PolySynth::new(SynthCallbacks {
-            trigger_attack: Box::new(
-                move |voice_ix: usize, note_id: usize, _velocity: u8, _offset: Option<f32>| {
-                    let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
-                    (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
-                    gate_voice_inner(ctx, voice_ix, note_id);
-                    on_gate_cb(note_id, voice_ix);
-                },
-            ),
-            trigger_release: Box::new(
-                move |voice_ix: usize, note_id: usize, _offset: Option<f32>| {
-                    ungate_voice_inner(ctx, voice_ix);
-                    on_ungate_cb(note_id, voice_ix);
-                },
-            ),
+            trigger_attack: box move |voice_ix: usize,
+                                      note_id: usize,
+                                      _velocity: u8,
+                                      _offset: Option<f32>| {
+                let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
+                (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
+                gate_voice_inner(ctx, voice_ix, note_id);
+                on_gate_cb(note_id, voice_ix);
+            },
+            trigger_release: box move |voice_ix: usize, note_id: usize, _offset: Option<f32>| {
+                ungate_voice_inner(ctx, voice_ix);
+                on_ungate_cb(note_id, voice_ix);
+            },
         }),
     );
 

@@ -1,8 +1,9 @@
 import React, { useCallback } from 'react';
 
-import { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
-import ConfigureParamSource, { ParamSource } from 'src/fmSynth/ConfigureParamSource';
-import { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
+import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
+import type { ParamSource } from 'src/fmSynth/ParamSource';
+import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import HelpIcon from 'src/misc/HelpIcon';
 
 const EXCLUDED_TYPES: ParamSource['type'][] = ['base frequency multiplier'];

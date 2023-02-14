@@ -41,6 +41,7 @@ import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtil
 import { getState } from 'src/redux';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
+import { FMSynthFxNode } from './FMSynthFx/FMSynthFxNode';
 
 const ctx = new AudioContext();
 
@@ -445,6 +446,9 @@ export const audioNodeGetters: {
   },
   'customAudio/typeConverter': {
     nodeGetter: TypeConverterNode,
+  },
+  'customAudio/fmSynthFx': {
+    nodeGetter: FMSynthFxNode,
   },
 };
 

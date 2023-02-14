@@ -4,15 +4,11 @@ import ControlPanel from 'react-control-panel';
 import type { Writable } from 'svelte/store';
 
 import { renderModalWithControls } from 'src/controls/Modal';
-import ConfigureEffects, {
-  type AdsrChangeHandler,
-  type Effect,
-} from 'src/fmSynth/ConfigureEffects';
-import ConfigureParamSource, {
-  buildDefaultParamSource,
-  type ParamSource,
-} from 'src/fmSynth/ConfigureParamSource';
+import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
+import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
+import type { Effect } from 'src/fmSynth/Effect';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+import { buildDefaultParamSource, type ParamSource } from 'src/fmSynth/ParamSource';
 import type { UploadWavetableModalProps } from 'src/fmSynth/UploadWavetable';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';

@@ -5,18 +5,14 @@ import type { Writable } from 'svelte/store';
 
 import ConfigureOperator, { type OperatorConfig, type WavetableState } from './ConfigureOperator';
 import './FMSynth.scss';
-import ConfigureEffects, {
-  type AdsrChangeHandler,
-  type Effect,
-} from 'src/fmSynth/ConfigureEffects';
+import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
-import ConfigureParamSource, {
-  buildDefaultParamSource,
-  type ParamSource,
-} from 'src/fmSynth/ConfigureParamSource';
+import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
+import type { Effect } from 'src/fmSynth/Effect';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
+import { buildDefaultParamSource, type ParamSource } from 'src/fmSynth/ParamSource';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';

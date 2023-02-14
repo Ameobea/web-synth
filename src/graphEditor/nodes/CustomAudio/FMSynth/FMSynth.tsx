@@ -5,7 +5,6 @@ import * as React from 'react';
 import { get, writable, type Writable } from 'svelte/store';
 
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
-import type { Effect } from 'src/fmSynth/ConfigureEffects';
 import {
   buildDefaultOperatorConfig,
   deserializeWavetableState,
@@ -14,13 +13,15 @@ import {
   type WavetableBank,
   type WavetableState,
 } from 'src/fmSynth/ConfigureOperator';
+import { encodeEffect, type Effect } from 'src/fmSynth/Effect';
+import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
+import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 import {
   buildDefaultAdsr,
   buildDefaultParamSource,
+  encodeParamSource,
   type ParamSource,
-} from 'src/fmSynth/ConfigureParamSource';
-import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
-import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
+} from 'src/fmSynth/ParamSource';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 import {
@@ -29,6 +30,7 @@ import {
   serializeSampleMappingState,
   type SampleMappingState,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
+import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WavetableWasm';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -36,7 +38,7 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, getHasSIMDSupport, normalizeEnvelope } from 'src/util';
+import { AsyncOnce, normalizeEnvelope } from 'src/util';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -61,36 +63,6 @@ const buildDefaultModulationIndices = (): ParamSource[][] => {
   }
   return indices;
 };
-
-const fetchWavetableWasmBytes = async (): Promise<ArrayBuffer> => {
-  const hasSIMDSupport = getHasSIMDSupport();
-  getSentry()?.setContext('wasmSIMDSupport', { hasWasmSIMDSupport: hasSIMDSupport });
-  if (!window.location.href.includes('localhost')) {
-    console.log(
-      hasSIMDSupport
-        ? 'Wasm SIMD support detected!'
-        : 'Wasm SIMD support NOT detected; using fallback Wasm'
-    );
-  }
-  const simdStatusElem = document.getElementById('simd-status');
-  if (simdStatusElem) {
-    if (hasSIMDSupport) {
-      simdStatusElem.setAttribute('style', 'display:block; color: #08bf3f;');
-    } else {
-      simdStatusElem.innerHTML = 'SIMD support not detected; using non-SIMD Wasm';
-      simdStatusElem.setAttribute('style', 'display:block; color: #cfeb1e;');
-    }
-  }
-  let path =
-    process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
-  if (!window.location.host.includes('localhost')) {
-    path += `?cacheBust=${crypto.randomUUID()}`;
-  }
-  const res = fetch(path);
-  return res.then(res => res.arrayBuffer());
-};
-
-const WavetableWasmBytes = new AsyncOnce(fetchWavetableWasmBytes, true);
 
 /**
  * Corresponds to `RampFn` in the Wasm engine
@@ -334,7 +306,7 @@ export default class FMSynth implements ForeignNode {
     return {
       adsrIx,
       steps: adsr.steps.map(step => this.encodeAdsrStep(step)),
-      lenSamples: this.encodeParamSource(adsr.lenSamples),
+      lenSamples: encodeParamSource(adsr.lenSamples),
       releasePoint: adsr.releasePoint,
       loopPoint: adsr.loopPoint,
       logScale: adsr.logScale ?? false,
@@ -357,10 +329,8 @@ export default class FMSynth implements ForeignNode {
       type: 'setWasmBytes',
       logScale: this.logScale,
       wasmBytes,
-      modulationMatrix: this.modulationMatrix.map(row =>
-        row.map(cell => this.encodeParamSource(cell))
-      ),
-      outputWeights: this.outputWeights.map(ps => this.encodeParamSource(ps)),
+      modulationMatrix: this.modulationMatrix.map(row => row.map(cell => encodeParamSource(cell))),
+      outputWeights: this.outputWeights.map(ps => encodeParamSource(ps)),
       adsrs: [
         this.encodeAdsr(this.gainEnvelope, -1),
         this.encodeAdsr(this.filterEnvelope, -2),
@@ -460,83 +430,6 @@ export default class FMSynth implements ForeignNode {
     return { unregister };
   };
 
-  private encodeParamSource(source: ParamSource | null | undefined) {
-    if (!source) {
-      return { valueType: -1, valParamInt: 0, valParamFloat: 0, valParamFloat2: 0 };
-    }
-
-    switch (source.type) {
-      case 'base frequency multiplier': {
-        return {
-          valueType: 3,
-          valParamInt: 0,
-          valParamFloat: source.multiplier,
-          valParamFloat2: 0,
-          valParamFloat3: 0,
-        };
-      }
-      case 'constant': {
-        return {
-          valueType: 1,
-          valParamInt: 0,
-          valParamFloat: source.value,
-          valParamFloat2: 0,
-          valParamFloat3: 0,
-        };
-      }
-      case 'adsr': {
-        return {
-          valueType: 2,
-          valParamInt: source['adsr index'],
-          valParamFloat: source.scale,
-          valParamFloat2: source.shift,
-          valParamFloat3: 0,
-        };
-      }
-      case 'param buffer': {
-        return {
-          valueType: 0,
-          valParamInt: source['buffer index'],
-          valParamFloat: 0,
-          valParamFloat2: 0,
-          valParamFloat3: 0,
-        };
-      }
-      case 'midi control': {
-        return {
-          valueType: 4,
-          valParamInt: source.midiControlIndex,
-          valParamFloat: source.scale,
-          valParamFloat2: source.shift,
-          valParamFloat3: 0,
-        };
-      }
-      case 'beats to samples': {
-        return {
-          valueType: 5,
-          valParamInt: 0,
-          valParamFloat: source.value,
-          valParamFloat2: 0,
-          valParamFloat3: 0,
-        };
-      }
-      case 'random': {
-        return {
-          valueType: 6,
-          valParamInt: source.updateIntervalSamples,
-          valParamFloat: source.min,
-          valParamFloat2: source.max,
-          valParamFloat3: source.smoothingCoefficient,
-        };
-      }
-      default: {
-        throw new UnimplementedError(
-          `frequency source not yet implemented: ${(source as any).type}`
-        );
-      }
-    }
-  }
-
   private setOperatorBaseFrequencySource(operatorIx: number, source: ParamSource) {
     if (!this.awpHandle) {
       throw new UnreachableException();
@@ -545,7 +438,7 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.postMessage({
       type: 'setOperatorBaseFrequencySource',
       operatorIx,
-      ...this.encodeParamSource(source),
+      ...encodeParamSource(source),
     });
   }
 
@@ -598,17 +491,17 @@ export default class FMSynth implements ForeignNode {
       ...(() => {
         switch (config.type) {
           case 'exponential oscillator':
-            return { param1: this.encodeParamSource(config.stretchFactor) };
+            return { param1: encodeParamSource(config.stretchFactor) };
           case 'wavetable':
             return {
               param1: {
                 valParamInt:
                   this.wavetableBackendIxByName.findIndex(x => x === config.wavetableName) ?? 1000,
               },
-              param2: this.encodeParamSource(config.dim0IntraMix),
-              param3: this.encodeParamSource(config.dim1IntraMix),
-              param4: this.encodeParamSource(config.interDimMix),
-              param5: unisonDetune ? this.encodeParamSource(unisonDetune) : null,
+              param2: encodeParamSource(config.dim0IntraMix),
+              param3: encodeParamSource(config.dim1IntraMix),
+              param4: encodeParamSource(config.interDimMix),
+              param5: unisonDetune ? encodeParamSource(unisonDetune) : null,
             };
           default: {
             if (!unisonDetune) {
@@ -616,7 +509,7 @@ export default class FMSynth implements ForeignNode {
             }
 
             return {
-              param5: this.encodeParamSource(unisonDetune),
+              param5: encodeParamSource(unisonDetune),
             };
           }
         }
@@ -652,7 +545,7 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.postMessage({
       type: 'setOutputWeightValue',
       operatorIx,
-      ...this.encodeParamSource(value),
+      ...encodeParamSource(value),
     });
   }
 
@@ -676,7 +569,7 @@ export default class FMSynth implements ForeignNode {
       type: 'setModulationIndex',
       srcOperatorIx,
       dstOperatorIx,
-      ...this.encodeParamSource(val),
+      ...encodeParamSource(val),
     });
   }
 
@@ -741,7 +634,7 @@ export default class FMSynth implements ForeignNode {
       this.awpHandle.port.postMessage({
         type: 'setAdsrLength',
         adsrIx,
-        lenSamples: this.encodeParamSource(
+        lenSamples: encodeParamSource(
           typeof newAdsr.lenSamples === 'number'
             ? { type: 'constant', value: newAdsr.lenSamples }
             : newAdsr.lenSamples
@@ -752,117 +645,11 @@ export default class FMSynth implements ForeignNode {
         type: 'setAdsr',
         adsrIx,
         steps: newAdsr.steps.map(step => this.encodeAdsrStep(step)),
-        lenSamples: this.encodeParamSource(newAdsr.lenSamples),
+        lenSamples: encodeParamSource(newAdsr.lenSamples),
         releasePoint: newAdsr.releasePoint,
         loopPoint: newAdsr.loopPoint,
         logScale: newAdsr.logScale ?? false,
       });
-    }
-  }
-
-  private encodeEffect(effect: Effect | null) {
-    if (!effect) {
-      return [-1, null, null, null, null];
-    }
-
-    switch (effect.type) {
-      case 'spectral warping': {
-        return [
-          0,
-          this.encodeParamSource(effect.frequency),
-          this.encodeParamSource(effect.warpFactor),
-          null,
-          null,
-        ];
-      }
-      case 'wavecruncher': {
-        return [
-          1,
-          this.encodeParamSource(effect.topFoldPosition),
-          this.encodeParamSource(effect.topFoldWidth),
-          this.encodeParamSource(effect.bottomFoldPosition),
-          this.encodeParamSource(effect.bottomFoldWidth),
-        ];
-      }
-      case 'bitcrusher': {
-        return [
-          2,
-          this.encodeParamSource(effect.sampleRate),
-          this.encodeParamSource(effect.bitDepth),
-          null,
-          null,
-        ];
-      }
-      case 'wavefolder': {
-        return [
-          3,
-          this.encodeParamSource(effect.gain),
-          this.encodeParamSource(effect.offset),
-          null,
-          null,
-        ];
-      }
-      case 'soft clipper': {
-        return [
-          4,
-          this.encodeParamSource(effect.preGain),
-          this.encodeParamSource(effect.postGain),
-          {
-            valueType: -1,
-            valParamInt: effect.algorithm,
-            valParamFloat: 0,
-            valParamFloat2: 0,
-          },
-          null,
-        ];
-      }
-      case 'butterworth filter': {
-        return [
-          5,
-          {
-            valueType: -1,
-            valParamInt: effect.mode,
-            valParamFloat: 0,
-            valParamFloat2: 0,
-          },
-          this.encodeParamSource(effect.cutoffFrequency),
-          null,
-          null,
-        ];
-      }
-      case 'delay': {
-        return [
-          6,
-          this.encodeParamSource(effect.delaySamples),
-          this.encodeParamSource(effect.wet),
-          this.encodeParamSource(effect.dry),
-          this.encodeParamSource(effect.feedback),
-        ];
-      }
-      case 'moog filter': {
-        return [
-          7,
-          this.encodeParamSource(effect.cutoffFrequency),
-          this.encodeParamSource(effect.resonance),
-          this.encodeParamSource(effect.drive),
-          null,
-        ];
-      }
-      case 'comb filter': {
-        return [
-          8,
-          this.encodeParamSource(effect.delaySamples),
-          this.encodeParamSource(effect.feedbackDelaySamples),
-          this.encodeParamSource(effect.feedbackGain),
-          this.encodeParamSource(effect.feedforwardGain),
-        ];
-      }
-      case 'compressor': {
-        return [9, null, null, null, null];
-      }
-      default: {
-        throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);
-      }
     }
   }
 
@@ -877,7 +664,7 @@ export default class FMSynth implements ForeignNode {
       this.operatorEffects[operatorIx][effectIx] = R.clone(newEffect);
     }
 
-    const [effectType, param1, param2, param3, param4] = this.encodeEffect(newEffect);
+    const [effectType, param1, param2, param3, param4] = encodeEffect(newEffect);
 
     this.awpHandle.port.postMessage({
       type: 'setEffect',
@@ -1054,7 +841,7 @@ export default class FMSynth implements ForeignNode {
       return;
     }
 
-    this.awpHandle.port.postMessage({ type: 'setDetune', ...this.encodeParamSource(newDetune) });
+    this.awpHandle.port.postMessage({ type: 'setDetune', ...encodeParamSource(newDetune) });
   }
 
   private fetchAndSetSample = async (descriptor: SampleDescriptor) => {

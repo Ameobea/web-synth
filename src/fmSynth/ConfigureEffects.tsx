@@ -3,77 +3,13 @@ import { Option } from 'funfix-core';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import ConfigureParamSource, { type ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
+import { ButterworthFilterMode, SoftClipperAlgorithm, type Effect } from 'src/fmSynth/Effect';
+import type { ParamSource } from 'src/fmSynth/ParamSource';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import FlatButton from 'src/misc/FlatButton';
 import HelpIcon from 'src/misc/HelpIcon';
 import { getSentry } from 'src/sentry';
-
-export enum ButterworthFilterMode {
-  Lowpass = 0,
-  Highpass = 1,
-  Bandpass = 2,
-}
-
-export enum SoftClipperAlgorithm {
-  CubicNonlinearity = 0,
-  Tanh = 1,
-  XOverOnePlusAbsX = 2,
-  HardClipper = 3,
-}
-
-export type EffectInner =
-  | {
-      type: 'spectral warping';
-      frequency: ParamSource;
-      warpFactor: ParamSource;
-      phaseOffset: number;
-    }
-  | {
-      type: 'wavecruncher';
-      topFoldPosition: ParamSource;
-      topFoldWidth: ParamSource;
-      bottomFoldPosition: ParamSource;
-      bottomFoldWidth: ParamSource;
-    }
-  | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
-  | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource }
-  | {
-      type: 'soft clipper';
-      preGain: ParamSource;
-      postGain: ParamSource;
-      algorithm: SoftClipperAlgorithm;
-    }
-  | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource }
-  | {
-      type: 'delay';
-      delaySamples: ParamSource;
-      wet: ParamSource;
-      dry: ParamSource;
-      feedback: ParamSource;
-    }
-  | {
-      type: 'moog filter';
-      cutoffFrequency: ParamSource;
-      resonance: ParamSource;
-      drive: ParamSource;
-    }
-  | {
-      type: 'comb filter';
-      delaySamples: ParamSource;
-      feedbackDelaySamples: ParamSource;
-      feedbackGain: ParamSource;
-      feedforwardGain: ParamSource;
-    }
-  | {
-      type: 'compressor';
-      // TODO: Params
-    };
-
-export type Effect = EffectInner & {
-  isBypassed?: boolean;
-  isCollapsed?: boolean;
-};
 
 const EFFECT_TYPE_SETTING = {
   type: 'select',
@@ -801,7 +737,7 @@ const ConfigureEffect: React.FC<ConfigureEffectProps> = ({
   );
 };
 
-interface ConfigureEffectsProps {
+export interface ConfigureEffectsProps {
   state: (Effect | null)[];
   onChange: (ix: number, newState: Partial<Effect> | null) => void;
   setOperatorEffects: (newOperatorEffects: (Effect | null)[]) => void;
@@ -881,6 +817,7 @@ class ConfigureEffects extends React.Component<ConfigureEffectsProps, ConfigureE
                 const activeEffectCount = state.filter(e => e).length;
                 if (activeEffectCount === state.length) {
                   // Max effect count reached
+                  alert('Max effect count reached');
                   return;
                 }
 

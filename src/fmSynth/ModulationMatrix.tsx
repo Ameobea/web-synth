@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
-import type { ParamSource } from 'src/fmSynth/ConfigureParamSource';
 import type { UISelection } from 'src/fmSynth/FMSynthUI';
+import type { ParamSource } from 'src/fmSynth/ParamSource';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
 
@@ -66,7 +66,11 @@ const FormattedMIDIControlValue: React.FC<FormattedMIDIControlValueProps> = ({
   return <>{((rawValue / 127) * scale + shift).toFixed(2)}</>;
 };
 
-const FormattedParamSource: React.FC<{ param: ParamSource }> = ({ param }) => {
+interface FormattedParamSourceProps {
+  param: ParamSource;
+}
+
+const FormattedParamSource: React.FC<FormattedParamSourceProps> = ({ param }) => {
   if (param.type === 'constant') {
     return <>{Math.abs(param.value) < 0.01 ? null : param.value.toFixed(2)}</>;
   } else if (param.type === 'adsr') {
@@ -290,5 +294,5 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
     </>
   );
 };
-9;
+
 export default React.memo(ModulationMatrix);

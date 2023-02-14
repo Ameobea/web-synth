@@ -1,7 +1,8 @@
 import React from 'react';
 
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
-import ConfigureParamSource, { type ParamSource } from 'src/fmSynth/ConfigureParamSource';
+import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
+import type { ParamSource } from 'src/fmSynth/ParamSource';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 
 const EXCLUDED_TYPES: ParamSource['type'][] = ['base frequency multiplier'];

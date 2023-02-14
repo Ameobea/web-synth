@@ -3,7 +3,7 @@
   import { createRoot } from 'react-dom/client';
   import { onDestroy } from 'svelte';
 
-  export let Component: React.Component<any>;
+  export let Component: React.FC<Record<string, any>> | React.ComponentClass<Record<string, any>>;
   export let props = {} as Record<string, any>;
 
   let container: HTMLDivElement | null = null;

@@ -812,7 +812,7 @@ impl EffectChain {
                     } else {
                         &mut effect_container.inst
                     },
-                _ => return,
+                None => return,
             };
 
             let buffers = unsafe { self.param_render_buf.get_unchecked_mut(effect_ix) };
