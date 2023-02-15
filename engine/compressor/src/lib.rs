@@ -229,22 +229,6 @@ fn compute_release_coefficient(release_time_ms: f32) -> f32 {
 }
 
 /// Given a frame of samples, computes the average volume of the frame in decibels.
-fn detect_level_rms_old(
-    buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
-    lookahead_samples: isize,
-    sample_ix_in_frame: usize,
-) -> f32 {
-    let mut sum = 0.;
-    for i in 0..lookahead_samples {
-        let ix = -lookahead_samples - FRAME_SIZE as isize + sample_ix_in_frame as isize + i;
-        let sample = buf.get(ix);
-        sum += sample * sample;
-    }
-    let avg = sum / lookahead_samples as f32;
-    avg.sqrt()
-}
-
-/// Given a frame of samples, computes the average volume of the frame in decibels.
 fn detect_level_rms(
     buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
     lookahead_samples: isize,
@@ -268,19 +252,6 @@ fn detect_level_rms(
     }
 
     (*lookback_period_squared_samples_sum / lookahead_samples as f32).sqrt()
-}
-
-/// Same as GLSL smoothstep.  Returns 0. if x < min, 1. if x > max, and smoothly interpolates
-/// between 0. and 1. for x in [min, max].
-fn smoothstep(min: f32, max: f32, x: f32) -> f32 {
-    let t = (x - min) / (max - min);
-    if t < 0. {
-        0.
-    } else if t > 1. {
-        1.
-    } else {
-        t * t * (3. - 2. * t)
-    }
 }
 
 impl Compressor {
@@ -363,21 +334,6 @@ impl Compressor {
                      lookahead_samples={lookahead_samples}"
                 );
             }
-
-            // if input < 0.0001 && input > -0.0001 {
-            //     target_volume_db = -100.;
-            //     output_buf[i] += input;
-            //     continue;
-            // }
-
-            // let activation = smoothstep(-80., -70., bottom_envelope);
-
-            // // TODO: re-check this
-            // if activation < 0.01 {
-            //     target_volume_db = detected_level_db;
-            //     output_buf[i] += input;
-            //     continue;
-            // }
 
             // Compute the gain.
             // TODO: Add support for soft knee
@@ -693,31 +649,4 @@ pub extern "C" fn process_compressor(
         mid_band_post_gain,
         high_band_post_gain,
     );
-}
-
-#[test]
-fn rms_detection_correctness() {
-    let mut lookback_period_squared_samples_sum = 0.;
-    let lookahead_samples = 200;
-    let mut buf = CircularBuffer::<MAX_LOOKAHEAD_SAMPLES>::new();
-
-    let mut detected_level_new = 0.;
-    let mut detected_level_old = 0.;
-    for _ in 0..2 {
-        for i in 0..FRAME_SIZE {
-            buf.set(0.5);
-        }
-
-        for sample_ix_in_frame in 0..FRAME_SIZE {
-            detected_level_new = detect_level_rms(
-                &buf,
-                lookahead_samples,
-                sample_ix_in_frame,
-                &mut lookback_period_squared_samples_sum,
-            );
-            detected_level_old = detect_level_rms_old(&buf, lookahead_samples, sample_ix_in_frame);
-        }
-    }
-
-    assert_eq!(detected_level_new, detected_level_old);
 }
