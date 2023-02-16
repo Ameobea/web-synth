@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import { shallowEqual } from 'react-redux';
 import { createSelector } from 'reselect';
 
 import { midiKeyboardCtxByStateKey } from 'src/midiKeyboard';
@@ -65,12 +66,15 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
   deregisterGenericControlCb,
 }) => {
   const octaveCountSelector = useMemo(() => mkOctaveCountSelector(), []);
-  const { octaveOffset, mode, midiInput, midiInputName } = useSelector((state: ReduxStore) => ({
-    octaveOffset: octaveCountSelector(state, stateKey),
-    mode: state.midiKeyboard[stateKey].mode,
-    midiInput: state.midiKeyboard[stateKey].midiInput,
-    midiInputName: state.midiKeyboard[stateKey].midiInputName,
-  }));
+  const { octaveOffset, mode, midiInput, midiInputName } = useSelector(
+    (state: ReduxStore) => ({
+      octaveOffset: octaveCountSelector(state, stateKey),
+      mode: state.midiKeyboard[stateKey].mode,
+      midiInput: state.midiKeyboard[stateKey].midiInput,
+      midiInputName: state.midiKeyboard[stateKey].midiInputName,
+    }),
+    shallowEqual
+  );
   const [midiInputNames, setMidiInputNames] = useState<string[]>([]);
   useEffect(() => {
     midiInput?.getMidiInputNames().then(inputNames => setMidiInputNames(['', ...inputNames]));

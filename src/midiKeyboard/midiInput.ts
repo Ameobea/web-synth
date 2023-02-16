@@ -1,8 +1,8 @@
-import { IterableValueOf, UnreachableException } from 'ameo-utils';
+import { UnreachableException, type IterableValueOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
-import { MIDIAccess, MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode, type MIDIAccess } from 'src/patchNetwork/midiNode';
 
 export type BulitinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
@@ -70,10 +70,9 @@ export class MIDIInput {
     // Register input handlers for the MIDI input so that MIDI events trigger our output callbacks
     // to be called appropriately.
     const ctxPtr = midiModule.create_msg_handler_context(
+      (_voiceIx: number, note: number, velocity: number) => this.midiNode?.onAttack(note, velocity),
       (_voiceIx: number, note: number, velocity: number) =>
-        this.midiNode?.outputCbs.forEach(({ onAttack }) => onAttack(note, velocity)),
-      (_voiceIx: number, note: number, velocity: number) =>
-        this.midiNode?.outputCbs.forEach(({ onRelease }) => onRelease(note, velocity)),
+        this.midiNode?.onRelease(note, velocity),
       (_lsb: number, msb: number) => {
         this.pitchBendNode.offset.value = msb;
         this.midiNode?.outputCbs.forEach(({ onPitchBend }) => onPitchBend(msb));
