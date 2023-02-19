@@ -25,7 +25,8 @@
       }
     | { type: 'button'; label: string; action: () => void }
     | { type: 'checkbox'; label: string; initialValue?: boolean }
-    | { type: 'text'; label: string; initialValue?: string };
+    | { type: 'text'; label: string; initialValue?: string }
+    | { type: 'custom'; label: string; Comp: React.FC<any>; initialValue?: any };
 
   export interface ControlPanelTheme {
     background1: string;
@@ -48,6 +49,7 @@
 
 <script lang="ts">
   import type { CSSProperties } from 'react';
+  import React from 'react';
   import ControlPanel from 'react-control-panel';
 
   import ReactShim from 'src/misc/ReactShim.svelte';

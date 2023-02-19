@@ -1,5 +1,6 @@
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
+import { writable, type Writable } from 'svelte/store';
 
 import type { ADSRValues } from 'src/controls/adsr';
 import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
@@ -13,9 +14,9 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
-import { msToSamples, normalizeEnvelope } from 'src/util';
+import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
-interface SerializedState {
+export interface EnvelopeGeneratorState {
   envelope: Adsr;
   outputRange: [number, number];
 }
@@ -25,6 +26,8 @@ export class EnvelopeGenerator implements ForeignNode {
   private adsrModule: ADSR2Module;
   private adsrOutputNode: AudioNode | null = null;
   private outputRange: [number, number] = [0, 1];
+  private state: Writable<EnvelopeGeneratorState>;
+
   public nodeType = 'customAudio/envelopeGenerator';
   static typeName = 'Envelope Generator';
 
@@ -79,10 +82,16 @@ export class EnvelopeGenerator implements ForeignNode {
     });
 
     if (params) {
-      this.deserialize(params as SerializedState);
-    } else {
-      // TODO: Set defaults?
+      this.deserialize(params as EnvelopeGeneratorState);
     }
+    this.state = writable({
+      envelope: {
+        ...this.adsrModule.serialize(),
+        outputRange: this.outputRange,
+        audioThreadData,
+      },
+      outputRange: this.outputRange,
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: EnvelopeGeneratorSmallView,
@@ -90,16 +99,16 @@ export class EnvelopeGenerator implements ForeignNode {
         onChange: (envelope: Adsr | ADSRValues, lengthMS: number) => {
           this.adsrModule.setState(normalizeEnvelope(envelope));
           this.adsrModule.setLengthMs(lengthMS);
+          this.state.update(state => ({
+            ...state,
+            envelope: {
+              ...this.adsrModule.serialize(),
+              audioThreadData,
+            },
+          }));
         },
         setLogScale: (logScale: boolean) => this.adsrModule.setLogScale(logScale),
-        initialState: {
-          envelope: {
-            ...this.adsrModule.serialize(),
-            outputRange: this.outputRange,
-            audioThreadData,
-          },
-          lengthMS: this.adsrModule.getLengthMs(),
-        },
+        store: this.state,
       }),
     });
 
@@ -110,17 +119,18 @@ export class EnvelopeGenerator implements ForeignNode {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
 
-  public deserialize(params: SerializedState) {
-    if (!R.isNil(params.envelope)) {
-      const serialized: Adsr = params.envelope;
-      this.adsrModule.setState(normalizeEnvelope(serialized));
+  public deserialize(params: EnvelopeGeneratorState) {
+    const adsr: Adsr | null = R.isNil(params.envelope) ? null : normalizeEnvelope(params.envelope);
+    if (adsr) {
+      this.adsrModule.setState(adsr);
+      this.adsrModule.setLengthMs(samplesToMs(adsr.lenSamples));
     }
     if (!R.isNil(params.outputRange)) {
       this.outputRange = params.outputRange;
     }
   }
 
-  public serialize(): SerializedState {
+  public serialize(): EnvelopeGeneratorState {
     return {
       envelope: this.adsrModule.serialize(),
       outputRange: this.outputRange,
