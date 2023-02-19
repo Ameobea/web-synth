@@ -24,7 +24,8 @@
         initialValue?: [number, number];
       }
     | { type: 'button'; label: string; action: () => void }
-    | { type: 'checkbox'; label: string; initialValue?: boolean };
+    | { type: 'checkbox'; label: string; initialValue?: boolean }
+    | { type: 'text'; label: string; initialValue?: string };
 
   export interface ControlPanelTheme {
     background1: string;

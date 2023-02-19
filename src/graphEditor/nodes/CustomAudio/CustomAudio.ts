@@ -25,6 +25,7 @@ import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequency';
 import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
+import { MultiplyNode } from 'src/graphEditor/nodes/CustomAudio/MultiplyNode/MultiplyNode';
 import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import QuantizerNode from 'src/graphEditor/nodes/CustomAudio/Quantizer/QuantizerNode';
 import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
@@ -449,6 +450,9 @@ export const audioNodeGetters: {
   },
   'customAudio/fmSynthFx': {
     nodeGetter: FMSynthFxNode,
+  },
+  'customAudio/multiply': {
+    nodeGetter: MultiplyNode,
   },
 };
 

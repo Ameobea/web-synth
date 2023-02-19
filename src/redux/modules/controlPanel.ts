@@ -14,7 +14,7 @@ export interface ControlPanelState {
 }
 
 export type ControlInfo =
-  | { type: 'range'; min: number; max: number; width?: number }
+  | { type: 'range'; min: number; max: number; width?: number; scale?: 'log' }
   | { type: 'gate'; offValue: number; gateValue: number; width?: number };
 
 export const buildDefaultControlPanelInfo = (type: ControlInfo['type'] = 'range'): ControlInfo => {

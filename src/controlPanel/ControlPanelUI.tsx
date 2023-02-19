@@ -51,12 +51,13 @@ const ConfigureInputInner: React.FC<ConfigureInputInnerProps> = ({ info, onChang
     case 'range':
       return (
         <ControlPanel
-          state={{ ...info, width: info.width ?? 500 }}
+          state={{ ...info, 'log scale': info.scale === 'log', width: info.width ?? 500 }}
           onChange={(_key: string, _val: any, state: any) =>
             onChange({
               type: 'range',
               min: Number.isNaN(+state.min) ? info.min : +state.min,
               max: Number.isNaN(+state.max) ? info.max : +state.max,
+              scale: state['log scale'] ? 'log' : undefined,
               width: Number.isNaN(+state.width) ? undefined : +state.width,
             })
           }
@@ -68,6 +69,10 @@ const ConfigureInputInner: React.FC<ConfigureInputInnerProps> = ({ info, onChang
             {
               type: 'text',
               label: 'max',
+            },
+            {
+              type: 'checkbox',
+              label: 'log scale',
             },
             {
               type: 'text',
@@ -277,6 +282,7 @@ const buildSettingForControl = (
         type: 'range',
         min: info.min,
         max: info.max,
+        scale: info.scale,
         label: name,
         LabelComponent,
       };
