@@ -79,6 +79,7 @@ const config = {
     alias: {
       svelte: path.dirname(require.resolve('svelte/package.json')),
     },
+    conditionNames: ['require', 'node', 'svelte'],
   },
   plugins: [
     new HtmlWebpackPlugin({
