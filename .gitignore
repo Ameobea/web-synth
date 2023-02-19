@@ -48,3 +48,4 @@ public/wav_decoder.wasm
 public/waveform_renderer.wasm
 public/compressor.wasm
 public/vocoder.wasm
+public/level_detector.wasm

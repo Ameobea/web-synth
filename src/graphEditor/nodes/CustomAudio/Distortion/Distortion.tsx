@@ -21,7 +21,7 @@ const DistortionWasmBytes = new AsyncOnce(
 const DistortionAWPRegistered = new AsyncOnce(
   () =>
     new AudioContext().audioWorklet.addModule(
-      process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + btoa(Math.random().toString())
+      process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + crypto.randomUUID()
     ),
   true
 );

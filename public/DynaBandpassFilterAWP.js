@@ -48,7 +48,6 @@ class DynaBandpassFilterAWP extends AudioWorkletProcessor {
   }
 
   /**
-   *
    * @param {Float32Array[][]} _inputs
    * @param {Float32Array[][]} outputs
    * @param {{[key: string]: Float32Array}} params

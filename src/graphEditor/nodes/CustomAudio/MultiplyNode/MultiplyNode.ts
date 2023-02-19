@@ -71,7 +71,7 @@ export class MultiplyNode implements ForeignNode {
     return get(this.state);
   }
 
-  public deserialize(params?: Record<string, any>): MultiplyNodeState {
+  public deserialize(params: Record<string, any> | null | undefined): MultiplyNodeState {
     const defaultState = buildDefaultMultiplyNodeState();
     if (!params) {
       return defaultState;

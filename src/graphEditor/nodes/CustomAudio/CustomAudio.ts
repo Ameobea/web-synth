@@ -21,6 +21,7 @@ import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGen
 import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
+import { LevelDetectorNode } from 'src/graphEditor/nodes/CustomAudio/LevelDetectorNode/LevelDetectorNode';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequency';
@@ -453,6 +454,9 @@ export const audioNodeGetters: {
   },
   'customAudio/multiply': {
     nodeGetter: MultiplyNode,
+  },
+  'customAudio/levelDetector': {
+    nodeGetter: LevelDetectorNode,
   },
 };
 

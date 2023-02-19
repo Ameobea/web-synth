@@ -277,3 +277,7 @@ build-vocoder:
 debug-vocoder:
   cd ./engine/vocoder && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/vocoder.wasm ../../public
+
+build-level-detector:
+  cd ./engine/level_detector && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/level_detector.wasm ../../public

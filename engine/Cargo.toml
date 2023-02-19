@@ -23,7 +23,8 @@ members = [
   "quantizer",
   "wbg_logging",
   "compressor",
-  "vocoder"
+  "vocoder",
+  "level_detector"
 ]
 
 [profile.release]

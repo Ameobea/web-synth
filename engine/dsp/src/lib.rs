@@ -3,6 +3,7 @@ use fastapprox::fast;
 pub mod circular_buffer;
 pub mod filters;
 pub mod oscillator;
+pub mod rms_level_detector;
 
 pub const SAMPLE_RATE: f32 = 44_100.;
 pub const NYQUIST: f32 = SAMPLE_RATE / 2.;

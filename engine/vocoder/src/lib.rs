@@ -3,8 +3,8 @@
 use std::mem::MaybeUninit;
 
 use dsp::{
-    circular_buffer::CircularBuffer,
     filters::biquad::{BiquadFilter, FilterMode},
+    rms_level_detector::RMSLevelDetector,
     FRAME_SIZE,
 };
 
@@ -20,8 +20,6 @@ const SAMPLE_RATE: usize = 44_100;
 const BAND_ORDER: usize = 16; // 24;
 const BAND_COUNT: usize = 22; // 36;
 const FILTERS_PER_BAND: usize = BAND_ORDER;
-
-const MAX_LEVEL_DETECTION_WINDOW_SAMPLES: usize = SAMPLE_RATE / 10;
 
 /// We use RMS level detection, so we need to make sure that the window size is big enough to
 /// capture a full cycle of the signal.  For lower frequencies, we need a longer window.
@@ -43,46 +41,18 @@ impl VocoderBand {
     }
 }
 
-pub struct LevelDetectionBand {
-    pub buf: CircularBuffer<MAX_LEVEL_DETECTION_WINDOW_SAMPLES>,
-    pub sum: f32,
-    pub negative_window_size_samples: isize,
-    pub window_size_samples_f32: f32,
-}
+pub struct LevelDetectionBand(RMSLevelDetector);
 
 impl LevelDetectionBand {
     fn new(band_center_freq_hz: f32) -> Self {
         let window_size_samples = compute_level_detection_window_samples(band_center_freq_hz);
-        LevelDetectionBand {
-            buf: CircularBuffer::new(),
-            sum: 0.,
-            negative_window_size_samples: -((window_size_samples.ceil()) as isize),
-            window_size_samples_f32: window_size_samples.ceil(),
-        }
+        LevelDetectionBand(RMSLevelDetector::new(window_size_samples))
     }
 }
 
 impl LevelDetectionBand {
     /// RMS level detection
-    pub fn process(&mut self, sample: f32) -> f32 {
-        if cfg!(debug_assertions) && (sample.is_infinite() || sample.is_nan()) {
-            panic!("{}", sample);
-        }
-        let removed_squared_sample = self.buf.get(self.negative_window_size_samples);
-        self.sum -= removed_squared_sample;
-        let squared_sample = sample * sample;
-        self.sum = (self.sum + squared_sample).max(0.);
-        self.buf.set(squared_sample);
-
-        let output = (self.sum / self.window_size_samples_f32).sqrt();
-        if cfg!(debug_assertions) && (output.is_infinite() || output.is_nan()) {
-            panic!(
-                "out={output}, sum={sum}, sample={sample}, removed={removed_squared_sample}",
-                sum = self.sum
-            );
-        }
-        output
-    }
+    pub fn process(&mut self, sample: f32) -> f32 { self.0.process(sample) }
 }
 
 pub struct LevelDetectionCtx {
@@ -288,10 +258,12 @@ pub extern "C" fn vocoder_process(
 
 #[test]
 fn level_detection_correctness() {
+    use dsp::rms_level_detector::MAX_LEVEL_DETECTION_WINDOW_SAMPLES;
+
     let mut level_detector = LevelDetectionBand::new(100.);
-    level_detector.negative_window_size_samples =
+    level_detector.0.negative_window_size_samples =
         -((MAX_LEVEL_DETECTION_WINDOW_SAMPLES - 2) as isize);
-    level_detector.window_size_samples_f32 = MAX_LEVEL_DETECTION_WINDOW_SAMPLES as f32;
+    level_detector.0.window_size_samples_f32 = MAX_LEVEL_DETECTION_WINDOW_SAMPLES as f32;
     let mut samples = [0.; MAX_LEVEL_DETECTION_WINDOW_SAMPLES];
     for i in 0..MAX_LEVEL_DETECTION_WINDOW_SAMPLES {
         samples[i] = -(i as isize) as f32;
@@ -318,6 +290,7 @@ fn level_detection_correctness() {
 
 #[test]
 fn get_max_level_detection_window_size() {
+    use dsp::rms_level_detector::MAX_LEVEL_DETECTION_WINDOW_SAMPLES;
     let window_size = compute_level_detection_window_samples(11.596639);
     assert!(window_size.ceil() < MAX_LEVEL_DETECTION_WINDOW_SAMPLES as f32);
 }
