@@ -6,11 +6,13 @@ import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 import type { EnvelopeGeneratorState } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequencySmallView.svelte';
 import { samplesToMs } from 'src/util';
 
 interface EnvelopeGeneratorSmallViewProps {
   onChange: (params: Adsr, lengthMS: number) => void;
   setLogScale: (logScale: boolean) => void;
+  setRegateMode: (regateMode: RegateMode) => void;
   store: Writable<EnvelopeGeneratorState>;
 }
 
@@ -27,6 +29,14 @@ const settings: ControlPanelSetting[] = [
     scale: 'log',
   },
   {
+    type: 'select',
+    options: {
+      'on any attack': RegateMode.AnyAttack,
+      'when no notes currently held': RegateMode.NoNotesHeld,
+    },
+    label: 'regate mode',
+  },
+  {
     type: 'custom',
     label: 'adsr',
     Comp: mkControlPanelADSR2WithSize(475, undefined, undefined, 'EnvelopeGeneratorSmallView'),
@@ -36,6 +46,7 @@ const settings: ControlPanelSetting[] = [
 const EnvelopeGeneratorSmallView: React.FC<EnvelopeGeneratorSmallViewProps> = ({
   onChange,
   setLogScale,
+  setRegateMode,
   store,
 }) => {
   const [state, setState] = useState(get(store));
@@ -48,11 +59,14 @@ const EnvelopeGeneratorSmallView: React.FC<EnvelopeGeneratorSmallViewProps> = ({
     (key: string, val: any, state: any) => {
       if (key === 'log scale') {
         setLogScale(val);
+      } else if (key === 'regate mode') {
+        setRegateMode(val);
+        return;
       }
 
       onChange({ ...state.adsr, logScale: state['log scale'] }, state.lengthMS);
     },
-    [onChange, setLogScale]
+    [onChange, setLogScale, setRegateMode]
   );
 
   return (
@@ -64,6 +78,7 @@ const EnvelopeGeneratorSmallView: React.FC<EnvelopeGeneratorSmallViewProps> = ({
         'log scale': state.envelope.logScale ?? false,
         adsr: { ...state.envelope, outputRange: state.outputRange },
         lengthMS: samplesToMs(state.envelope.lenSamples),
+        'regate mode': state.regateMode,
       }}
     />
   );

@@ -526,7 +526,7 @@ impl Adsr {
             let mut min = shift;
             let max = min + scale;
             if shift == 0. {
-                min = if max > 0. { 0.01 } else { -0.01 };
+                min = if max > 0. { 0.001 } else { -0.001 };
             }
             let linear_to_log = mk_linear_to_log(min, max, max.signum());
 

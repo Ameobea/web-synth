@@ -187,7 +187,7 @@ const Instances: Map<string, MIDIEditorInstance> = new Map();
 const getContainerID = (vcId: string) => `midiEditor_${vcId}`;
 
 const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
-  const maxMIDINumber = 90;
+  const maxMIDINumber = 120;
   return {
     lines: new Array(maxMIDINumber)
       .fill(null)
@@ -217,6 +217,9 @@ export const init_midi_editor = (vcId: string) => {
       }
     })
     .getOrElseL(buildDefaultMIDIEditorState);
+  while (initialState.lines.length < 90) {
+    initialState.lines.push({ notes: [], midiNumber: initialState.lines.length + 21 });
+  }
 
   const inst = new MIDIEditorInstance(new AudioContext(), vcId, initialState);
   Instances.set(vcId, inst);

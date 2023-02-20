@@ -1625,7 +1625,14 @@ impl FMSynthContext {
             // TODO: SIMD-ify
             let gain_adsr_output = voice.gain_envelope_generator.adsr.get_cur_frame_output();
             for i in 0..FRAME_SIZE {
-                output_buffer[i] *= gain_adsr_output[i];
+                let mut gain = gain_adsr_output[i];
+                // When the gain envelope generator is in log scale mode, we set the min value to
+                // 0.001.  So, in order to get proper zeros when the envelope generator goes to its
+                // min value, we need to account for that.
+                if voice.gain_envelope_generator.adsr.log_scale {
+                    gain = (gain - 0.001).max(0.);
+                }
+                output_buffer[i] *= gain;
             }
         }
     }

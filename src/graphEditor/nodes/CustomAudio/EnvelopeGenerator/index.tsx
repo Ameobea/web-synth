@@ -1,12 +1,13 @@
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
-import { writable, type Writable } from 'svelte/store';
+import { get, writable, type Writable } from 'svelte/store';
 
 import type { ADSRValues } from 'src/controls/adsr';
 import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
 import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequencySmallView.svelte';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -19,6 +20,7 @@ import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 export interface EnvelopeGeneratorState {
   envelope: Adsr;
   outputRange: [number, number];
+  regateMode: RegateMode;
 }
 
 export class EnvelopeGenerator implements ForeignNode {
@@ -26,6 +28,7 @@ export class EnvelopeGenerator implements ForeignNode {
   private adsrModule: ADSR2Module;
   private adsrOutputNode: AudioNode | null = null;
   private outputRange: [number, number] = [0, 1];
+  private regateMode: RegateMode = RegateMode.AnyAttack;
   private state: Writable<EnvelopeGeneratorState>;
 
   public nodeType = 'customAudio/envelopeGenerator';
@@ -34,14 +37,38 @@ export class EnvelopeGenerator implements ForeignNode {
   private heldNotes: number[] = [];
   private gateMIDINodeInputCBs: MIDIInputCbs = {
     onAttack: (note, _velocity) => {
+      const beforeHeldNoteCount = this.heldNotes.length;
       this.heldNotes.push(note);
-      this.adsrModule.gate(0);
+      switch (this.regateMode) {
+        case RegateMode.AnyAttack:
+          this.adsrModule.gate(0);
+          break;
+        case RegateMode.NoNotesHeld:
+          if (beforeHeldNoteCount === 0) {
+            this.adsrModule.gate(0);
+          }
+          break;
+        default:
+          throw new Error(`Unexpected regate mode: ${this.regateMode}`);
+      }
     },
     onRelease: (note, _velocity) => {
-      if (R.last(this.heldNotes) === note) {
-        this.adsrModule.ungate(0);
+      const newHeldNotes = this.heldNotes.filter(oNote => note !== oNote);
+      switch (this.regateMode) {
+        case RegateMode.AnyAttack:
+          if (R.last(this.heldNotes) === note) {
+            this.adsrModule.ungate(0);
+          }
+          break;
+        case RegateMode.NoNotesHeld:
+          if (newHeldNotes.length === 0) {
+            this.adsrModule.ungate(0);
+          }
+          break;
+        default:
+          throw new Error(`Unexpected regate mode: ${this.regateMode}`);
       }
-      this.heldNotes = this.heldNotes.filter(oNote => note !== oNote);
+      this.heldNotes = newHeldNotes;
     },
     onPitchBend: () => {
       /* no-op */
@@ -91,6 +118,7 @@ export class EnvelopeGenerator implements ForeignNode {
         audioThreadData,
       },
       outputRange: this.outputRange,
+      regateMode: this.regateMode,
     });
 
     this.renderSmallView = mkContainerRenderHelper({
@@ -108,6 +136,10 @@ export class EnvelopeGenerator implements ForeignNode {
           }));
         },
         setLogScale: (logScale: boolean) => this.adsrModule.setLogScale(logScale),
+        setRegateMode: (regateMode: RegateMode) => {
+          this.regateMode = regateMode;
+          this.state.update(state => ({ ...state, regateMode }));
+        },
         store: this.state,
       }),
     });
@@ -128,12 +160,17 @@ export class EnvelopeGenerator implements ForeignNode {
     if (!R.isNil(params.outputRange)) {
       this.outputRange = params.outputRange;
     }
+    if (!R.isNil(params.regateMode)) {
+      this.regateMode = params.regateMode;
+    }
   }
 
   public serialize(): EnvelopeGeneratorState {
+    const state = get(this.state);
     return {
       envelope: this.adsrModule.serialize(),
       outputRange: this.outputRange,
+      regateMode: state.regateMode,
     };
   }
 

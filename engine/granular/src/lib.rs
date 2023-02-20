@@ -224,6 +224,10 @@ impl GranularVoice {
         grain_start_randomness_samples: f32,
         sample_buffer_len: usize,
     ) {
+        if sample_playback_ratio <= 0.05 {
+            return;
+        }
+
         self.samples_since_last_grain += 1.;
         if self.grains.len() >= scratch().len() {
             // Can't exceed the ridiculous max grain count

@@ -295,11 +295,15 @@ export default class MIDIEditorPlaybackHandler {
       const cb = () => {
         entries.forEach(({ isAttack, lineIx }) => {
           if (isAttack) {
-            // this.inst.midiInput.onAttack(lineCount - lineIx, 255, true);
+            if (scheduleParams.type === 'localTempo') {
+              this.inst.midiInput.onAttack(lineCount - lineIx, 255, true);
+            }
             this.inst.uiInstance?.onGated(lineIx);
             this.heldLineIndices.add(lineIx);
           } else {
-            // this.inst.midiInput.onRelease(lineCount - lineIx, 255, true);
+            if (scheduleParams.type === 'localTempo') {
+              this.inst.midiInput.onRelease(lineCount - lineIx, 255, true);
+            }
             this.inst.uiInstance?.onUngated(lineIx);
             this.heldLineIndices.delete(lineIx);
           }

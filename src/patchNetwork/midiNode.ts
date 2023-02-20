@@ -25,7 +25,7 @@ export interface MIDIInputCbs {
 }
 
 // hilarious
-export type MIDIAccess = PromiseResolveType<ReturnType<typeof navigator['requestMIDIAccess']>>;
+export type MIDIAccess = PromiseResolveType<ReturnType<(typeof navigator)['requestMIDIAccess']>>;
 
 export const mkBuildPasthroughInputCBs = (node: MIDINode) => (): MIDIInputCbs => ({
   onAttack: (note, velocity) => node.onAttack(note, velocity),
@@ -214,7 +214,7 @@ export class MIDINode {
         const fn = {
           [MIDIEventType.Attack]: this.onAttack,
           [MIDIEventType.Release]: this.onRelease,
-        }[evt.type];
+        }[evt.type].bind(this);
         fn(evt.note, evt.velocity, true);
       };
 

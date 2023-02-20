@@ -56,14 +56,10 @@ impl LevelDetectionBand {
 }
 
 pub struct LevelDetectionCtx {
-    #[cfg(debug_assertions)]
     pub bands: [Box<LevelDetectionBand>; BAND_COUNT],
-    #[cfg(not(debug_assertions))]
-    pub bands: [LevelDetectionBand; BAND_COUNT],
 }
 
 impl LevelDetectionCtx {
-    #[cfg(debug_assertions)]
     fn new(band_center_freqs_hz: &[f32]) -> Self {
         let mut bands = MaybeUninit::<[Box<LevelDetectionBand>; BAND_COUNT]>::uninit();
         let bands_ptr = bands.as_mut_ptr() as *mut Box<LevelDetectionBand>;
@@ -73,23 +69,6 @@ impl LevelDetectionCtx {
                 bands_ptr
                     .add(band_ix)
                     .write(box LevelDetectionBand::new(center_freq_hz));
-            }
-        }
-        Self {
-            bands: unsafe { bands.assume_init() },
-        }
-    }
-
-    #[cfg(not(debug_assertions))]
-    fn new(band_center_freqs_hz: &[f32]) -> Self {
-        let mut bands = MaybeUninit::<[LevelDetectionBand; BAND_COUNT]>::uninit();
-        let bands_ptr = bands.as_mut_ptr() as *mut LevelDetectionBand;
-        for band_ix in 0..BAND_COUNT {
-            let center_freq_hz = band_center_freqs_hz[band_ix];
-            unsafe {
-                bands_ptr
-                    .add(band_ix)
-                    .write(LevelDetectionBand::new(center_freq_hz));
             }
         }
         Self {

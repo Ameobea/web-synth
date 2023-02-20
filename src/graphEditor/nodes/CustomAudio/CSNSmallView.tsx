@@ -3,7 +3,11 @@ import ControlPanel from 'react-control-panel';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 
-export const CSNSmallView: React.FC<{ node: ForeignNode<ConstantSourceNode> }> = ({ node }) => {
+interface CSNSmallViewProps {
+  node: ForeignNode<ConstantSourceNode>;
+}
+
+export const CSNSmallView: React.FC<CSNSmallViewProps> = ({ node }) => {
   const [isInvalid, setIsInvalid] = useState(false);
 
   return (

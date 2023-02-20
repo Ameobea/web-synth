@@ -13,6 +13,7 @@ import { AddNode } from 'src/graphEditor/nodes/CustomAudio/AddNode/AddNode';
 import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 import { CompressorNode } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
+import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/CSNSmallView';
 import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
 import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
@@ -20,7 +21,6 @@ import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distort
 import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/helpers';
 import { LevelDetectorNode } from 'src/graphEditor/nodes/CustomAudio/LevelDetectorNode/LevelDetectorNode';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
 import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/MIDIQuantizerNode';
