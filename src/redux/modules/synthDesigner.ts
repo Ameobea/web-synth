@@ -326,6 +326,7 @@ const buildDefaultSynthModule = (
         fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
       },
       audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${crypto.randomUUID()}`,
+      useLegacyWavetableControls: false,
     });
 
   const inst: SynthModule = {

@@ -163,6 +163,7 @@ interface FMSynthUIProps {
   vcId: string | undefined;
   sampleMappingStore: Writable<SampleMappingState>;
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;
+  useLegacyWavetableControls: boolean;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -192,6 +193,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   vcId,
   sampleMappingStore,
   registerGateUngateCallbacks,
+  useLegacyWavetableControls,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -586,6 +588,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                   vcId={vcId}
                   sampleMappingStore={sampleMappingStore}
                   registerGateUngateCallbacks={registerGateUngateCallbacks}
+                  useLegacyWavetableControls={useLegacyWavetableControls}
                 />
               );
             })()
@@ -693,6 +696,7 @@ const ConnectedFMSynthUIInner: React.FC<ConnectedFMSynthUIProps> = ({
     vcId={vcId}
     sampleMappingStore={synth.getSampleMappingStore()}
     registerGateUngateCallbacks={synth.registerGateUngateCallbacks}
+    useLegacyWavetableControls={synth.useLegacyWavetableControls}
   />
 );
 

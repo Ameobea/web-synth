@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import './UploadWavetable.scss';
-
-import { ModalCompProps } from 'src/controls/Modal';
+import type { ModalCompProps } from 'src/controls/Modal';
 import type { WavetableBank } from 'src/fmSynth/ConfigureOperator';
 import BasicModal from 'src/misc/BasicModal';
 import { AsyncOnce } from 'src/util';

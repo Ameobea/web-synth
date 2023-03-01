@@ -1,9 +1,15 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import { SvelteComponentTyped } from 'svelte';
 import type { Writable } from 'svelte/store';
 
-import { renderModalWithControls } from 'src/controls/Modal';
+import {
+  renderModalWithControls,
+  renderSvelteModalWithControls,
+  type ModalCompProps,
+} from 'src/controls/Modal';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/Effect';
@@ -163,6 +169,7 @@ interface ConfigureWavetableIndexProps {
   wavetableState: WavetableState;
   setWavetableState: (newState: WavetableState) => void;
   setSelectedWavetableName: (newName: string | null) => void;
+  useLegacyControls: boolean;
 }
 
 const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
@@ -170,13 +177,39 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
   wavetableState,
   setWavetableState,
   setSelectedWavetableName,
+  useLegacyControls,
 }) => {
   const state = useMemo(
     () => ({ wavetable: selectedWavetableName ?? '' }),
     [selectedWavetableName]
   );
-  const settings = useMemo(
-    () => [
+  const settings: ControlPanelSetting[] = useMemo(() => {
+    if (!useLegacyControls) {
+      return [
+        {
+          type: 'custom',
+          label: 'wavetable',
+          Comp: ({ value }) => <span>{value || <i>No wavetable selected</i>}</span>,
+        },
+        {
+          type: 'button',
+          label: 'configure wavetable',
+          action: async () => {
+            const WavetableConfigurator = (await import('./WavetableConfigurator.svelte'))
+              .default as typeof SvelteComponentTyped<ModalCompProps<unknown>>;
+            try {
+              const val = await renderSvelteModalWithControls(WavetableConfigurator);
+              // TODO
+            } catch (_err) {
+              // cancelled
+            }
+          },
+        },
+      ];
+    }
+
+    // legacy
+    return [
       {
         type: 'select',
         label: 'wavetable',
@@ -226,9 +259,8 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           }
         },
       },
-    ],
-    [setWavetableState, state.wavetable, wavetableState]
-  );
+    ];
+  }, [setWavetableState, state.wavetable, wavetableState, useLegacyControls]);
   const handleChange = useCallback(
     (_key: string, wavetableName: string, _state: any) => setSelectedWavetableName(wavetableName),
     [setSelectedWavetableName]
@@ -245,6 +277,7 @@ interface ConfigureWavetableProps {
   wavetableState: WavetableState;
   setWavetableState: (newState: WavetableState) => void;
   vcId: string | undefined;
+  useLegacyControls: boolean;
 }
 
 const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
@@ -255,6 +288,7 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
   wavetableState,
   setWavetableState,
   vcId,
+  useLegacyControls,
 }) => (
   <>
     <ConfigureWavetableIndex
@@ -264,6 +298,7 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
       setSelectedWavetableName={newSelectedWavetableName =>
         onChange({ ...config, wavetableName: newSelectedWavetableName })
       }
+      useLegacyControls={useLegacyControls}
     />
     <ConfigureParamSource
       title='dim 0 intra mix'
@@ -312,6 +347,7 @@ interface ConfigureOperatorProps {
   vcId: string | undefined;
   sampleMappingStore: Writable<SampleMappingState>;
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;
+  useLegacyWavetableControls: boolean;
 }
 
 const OperatorTypeSettings = [
@@ -390,6 +426,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   vcId,
   sampleMappingStore,
   registerGateUngateCallbacks,
+  useLegacyWavetableControls,
 }) => {
   const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
@@ -492,6 +529,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           wavetableState={wavetableState}
           setWavetableState={setWavetableState}
           vcId={vcId}
+          useLegacyControls={useLegacyWavetableControls}
         />
       ) : null}
       {config.type === 'sample mapping' ? (

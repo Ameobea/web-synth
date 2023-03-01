@@ -186,6 +186,7 @@ export default class FMSynth implements ForeignNode {
   private gateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
+  public useLegacyWavetableControls = true;
   public readonly debugID = crypto.randomUUID();
 
   static typeName = 'FM Synthesizer';
@@ -787,6 +788,9 @@ export default class FMSynth implements ForeignNode {
     if (params.sampleMappingState) {
       this.sampleMappingStore.set(deserializeSampleMappingState(params.sampleMappingState));
     }
+    if (!R.isNil(params.useLegacyWavetableControls)) {
+      this.useLegacyWavetableControls = params.useLegacyWavetableControls;
+    }
   }
 
   public shutdown() {
@@ -813,6 +817,7 @@ export default class FMSynth implements ForeignNode {
       gainEnvelope: this.gainEnvelope,
       filterEnvelope: this.filterEnvelope,
       sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
+      useLegacyWavetableControls: this.useLegacyWavetableControls,
     };
   }
 

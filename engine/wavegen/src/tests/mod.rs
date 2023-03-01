@@ -171,6 +171,37 @@ fn basic_square_wave_forward() {
     plot_wave(&phases[..20]);
 }
 
+/// Given the frequency domain representation of a waveform, alters the phases of the components to
+/// shift the waveform by `wavelengths` of the fundamental frequency.
+fn shift_waveform(buffer: &mut [Complex32], wavelengths: f32) {
+    for (i, v) in buffer[24..].iter_mut().enumerate() {
+        if i == 0 {
+            *v = complex_from_magnitude_and_phase(0., PI);
+            continue;
+        }
+
+        *v *= complex_from_magnitude_and_phase(1., -wavelengths * PI * 2. * i as f32);
+    }
+}
+
+#[test]
+fn square_wave_shift() {
+    let planner = FftPlanner::new().plan_fft_inverse(1024);
+    let mut buffer = vec![Complex32 { im: 0., re: 0. }; 1024];
+    for i in 1..1024 {
+        if i % 2 == 1 {
+            buffer[i].im = -(1. / (i as f32));
+        }
+    }
+
+    shift_waveform(&mut buffer, 0.25);
+
+    planner.process(&mut buffer);
+
+    let reals = buffer.iter().map(|c| c.re).collect::<Vec<_>>();
+    plot_wave(&reals);
+}
+
 #[test]
 fn basic_sine_forward() {
     let planner = FftPlanner::new().plan_fft_forward(1024);
@@ -179,7 +210,7 @@ fn basic_sine_forward() {
         for harmonic_ix in 1..10 {
             let shift_local_wavelengths = 0. * harmonic_ix as f32;
             let phase = (i as f32 / buffer.len() as f32) * PI * 2. * harmonic_ix as f32
-                + shift_local_wavelengths * PI * 2.;
+                + -shift_local_wavelengths * PI * 2.;
             buffer[i].re += phase.sin();
         }
     }
@@ -203,14 +234,14 @@ fn basic_sine_forward() {
 
     println!("----SHIFTED----");
 
-    let shift_base_wavelengths = -0.125;
+    let shift_base_wavelengths = 0.125;
     // First 10 harmonics all at the same level shifted forward by `shift_wavelengths`
     let mut buffer = vec![Complex32 { im: 0., re: 0. }; 1024];
     for i in 0..buffer.len() {
         for harmonic_ix in 1..10 {
             let shift_local_wavelengths = shift_base_wavelengths * harmonic_ix as f32;
             let phase = (i as f32 / buffer.len() as f32) * PI * 2. * harmonic_ix as f32
-                + shift_local_wavelengths * PI * 2.;
+                + -shift_local_wavelengths * PI * 2.;
             buffer[i].re += phase.sin();
         }
     }

@@ -9,7 +9,7 @@ pub fn plot_wave(samples: &[f32]) {
             (x, s)
         })
         .collect();
-    Chart::new(200, 100, 0., 1.)
+    Chart::new(400, 100, 0., 1.)
         .lineplot(&Shape::Lines(&points))
         .display();
 }
