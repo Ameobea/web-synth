@@ -1,0 +1,14 @@
+[package]
+name = "wavegen"
+version = "0.1.0"
+authors = ["Casey Primozic <casey@cprimozic.net>"]
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+rustfft = "6.1"
+
+[dev-dependencies]
+textplots = "0.8"

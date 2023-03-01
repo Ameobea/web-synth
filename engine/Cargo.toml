@@ -24,7 +24,8 @@ members = [
   "wbg_logging",
   "compressor",
   "vocoder",
-  "level_detector"
+  "level_detector",
+  "wavegen"
 ]
 
 [profile.release]
