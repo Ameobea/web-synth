@@ -36,7 +36,8 @@ impl WaveformRendererCtx {
     }
 }
 
-#[cfg_attr(feature = "bindgen", wasm_bindgen)]
+#[cfg(feature = "bindgen")]
+#[wasm_bindgen]
 pub fn create_waveform_renderer_ctx(
     waveform_length_samples: u32,
     sample_rate: u32,
@@ -44,6 +45,7 @@ pub fn create_waveform_renderer_ctx(
     height_px: u32,
 ) -> *mut WaveformRendererCtx {
     common::maybe_init(None);
+
     wbg_logging::maybe_init();
 
     let mut ctx =
@@ -56,19 +58,22 @@ pub fn create_waveform_renderer_ctx(
     Box::into_raw(ctx)
 }
 
-#[cfg_attr(feature = "bindgen", wasm_bindgen)]
+#[cfg(feature = "bindgen")]
+#[wasm_bindgen]
 pub fn append_samples_to_waveform(ctx: *mut WaveformRendererCtx, new_samples: &[f32]) -> usize {
     let ctx = unsafe { &mut *ctx };
     ctx.waveform_buf.extend_from_slice(new_samples);
     ctx.waveform_buf.len()
 }
 
-#[cfg_attr(feature = "bindgen", wasm_bindgen)]
+#[cfg(feature = "bindgen")]
+#[wasm_bindgen]
 pub fn free_waveform_renderer_ctx(ctx: *mut WaveformRendererCtx) {
     drop(unsafe { Box::from_raw(ctx) })
 }
 
-#[cfg_attr(feature = "bindgen", wasm_bindgen)]
+#[cfg(feature = "bindgen")]
+#[wasm_bindgen]
 pub fn get_waveform_buf_ptr(ctx: *mut WaveformRendererCtx) -> *mut f32 {
     unsafe { (*ctx).waveform_buf.as_mut_ptr() }
 }
@@ -151,7 +156,8 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32
     ctx.image_data_buf.as_mut_ptr()
 }
 
-#[cfg_attr(feature = "bindgen", wasm_bindgen)]
+#[cfg(feature = "bindgen")]
+#[wasm_bindgen]
 pub fn get_sample_count(ctx: *const WaveformRendererCtx) -> usize {
     unsafe { (*ctx).waveform_buf.len() }
 }

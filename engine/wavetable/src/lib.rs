@@ -1,9 +1,4 @@
-#![feature(
-    box_syntax,
-    stdsimd,
-    const_maybe_uninit_assume_init,
-    get_mut_unchecked
-)]
+#![feature(box_syntax, stdsimd, const_maybe_uninit_assume_init, get_mut_unchecked)]
 
 pub mod fm;
 pub mod lookup_tables;
@@ -175,6 +170,8 @@ pub fn init_wavetable(
     waveform_length: usize,
     base_frequency: f32,
 ) -> *mut WaveTable {
+    common::set_raw_panic_hook(crate::fm::log_err);
+
     let settings = WaveTableSettings {
         waveforms_per_dimension,
         dimension_count,
@@ -188,6 +185,11 @@ pub fn init_wavetable(
 #[no_mangle]
 pub fn get_data_table_ptr(handle_ptr: *mut WaveTable) -> *mut f32 {
     unsafe { (*handle_ptr).samples.as_mut_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn set_base_frequency(handle_ptr: *mut WaveTable, base_frequency: f32) {
+    unsafe { (*handle_ptr).settings.base_frequency = base_frequency }
 }
 
 #[no_mangle]
@@ -237,6 +239,12 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
     }
 
     for sample_ix in 0..sample_count {
+        let frequency = handle.frequencies_buffer[sample_ix];
+        if frequency == 0.0 {
+            handle.sample_buffer[sample_ix] = 0.0;
+            continue;
+        }
+
         for dimension_ix in 0..handle.table.settings.dimension_count {
             handle.mixes_for_sample[dimension_ix * 2] =
                 handle.mixes[(dimension_ix * 2 * sample_count) + sample_ix];
@@ -244,7 +252,6 @@ pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *co
                 handle.mixes[(dimension_ix * 2 * sample_count) + sample_count + sample_ix];
         }
 
-        let frequency = handle.frequencies_buffer[sample_ix];
         handle.sample_buffer[sample_ix] = handle.get_sample(frequency);
     }
 

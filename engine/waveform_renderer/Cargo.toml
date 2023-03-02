@@ -9,10 +9,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = { version = "=0.2.82", optional = true }
-common = { path = "../common" }
-wbg_logging = { path = "../wbg_logging" }
+common = { path = "../common", default_features = false, features = [] }
+wbg_logging = { path = "../wbg_logging", optional = true }
 log = { version = "0.4", features = ["release_max_level_off"] }
 
 [features]
-bindgen = ["wasm-bindgen"]
+bindgen = ["wasm-bindgen", "common/bindgen", "wbg_logging"]
 default = ["bindgen"]

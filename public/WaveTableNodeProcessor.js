@@ -37,7 +37,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
   }
 
   handleWasmPanic = (ptr, len) => {
-    const mem = new Uint8Array(this.getWasmMemoryBuffer().buffer);
+    const mem = new Uint8Array(this.wasmInstance.exports.memory.buffer);
     const slice = mem.subarray(ptr, ptr + len);
     const str = String.fromCharCode(...slice);
     throw new Error(str);
@@ -66,6 +66,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       data.waveformLength,
       data.baseFrequency
     );
+    console.log(data);
 
     // Wasm memory doesn't become available until after some function in the Wasm module has been called, apparently,
     // so we wait to set this reference until after calling one of the Wasm functions.
@@ -107,17 +108,62 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     this.frequencyBufArrayOffset = frequencyBufPtr / BYTES_PER_F32;
   }
 
+  updateWavetable(data) {
+    if (!this.lastWavetableParams) {
+      throw new Error('Tried to update wavetable before initializing it');
+    }
+    if (
+      data.waveformsPerDimension !== this.lastWavetableParams.waveformsPerDimension ||
+      data.dimensionCount !== this.lastWavetableParams.dimensionCount ||
+      data.waveformLength !== this.lastWavetableParams.waveformLength
+    ) {
+      console.error(
+        'Tried to update wavetable with different params than it was initialized with:',
+        { old: this.lastWavetableParams, new: data }
+      );
+      throw new Error(
+        'Tried to update wavetable with different params than it was initialized with'
+      );
+    }
+
+    this.float32WasmMemory = new Float32Array(this.wasmInstance.exports.memory.buffer);
+
+    const wavetableDataPtr = this.wasmInstance.exports.get_data_table_ptr(this.waveTablePtr);
+    const wavetableDataArrayOffset = wavetableDataPtr / BYTES_PER_F32;
+
+    // Write the table's data into the Wasm heap
+    // TODO: Interpolate between the old and new tables
+    if (data.tableSamples.some(isNaN)) {
+      console.error('NaN in table samples', data.tableSamples);
+      throw new Error('NaN in table samples');
+    }
+    this.float32WasmMemory.set(data.tableSamples, wavetableDataArrayOffset);
+
+    this.wasmInstance.exports.set_base_frequency(this.waveTablePtr, data.baseFrequency);
+  }
+
   constructor() {
     super();
 
     this.isShutdown = false;
+    this.lastWavetableParams = null;
+
     this.port.onmessage = event => {
       if (event.data === 'shutdown') {
         this.isShutdown = true;
         return;
+      } else if (event.data.type === 'init') {
+        this.lastWavetableParams = {
+          waveformsPerDimension: event.data.waveformsPerDimension,
+          dimensionCount: event.data.dimensionCount,
+          waveformLength: event.data.waveformLength,
+        };
+        this.initWasmInstance(event.data);
+      } else if (event.data.type === 'update') {
+        this.updateWavetable(event.data);
+      } else {
+        console.error('Unknown message type', event.data);
       }
-
-      this.initWasmInstance(event.data);
     };
   }
 

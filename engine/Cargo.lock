@@ -113,6 +113,7 @@ dependencies = [
  "rand",
  "rand_pcg 0.2.1",
  "uuid",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1214,11 +1215,10 @@ dependencies = [
 name = "wavegen"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
+ "common",
  "fastapprox",
  "rustfft",
  "textplots",
- "wasm-bindgen",
  "waveform_renderer",
 ]
 

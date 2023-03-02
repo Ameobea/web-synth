@@ -34,6 +34,10 @@ const config = {
   plugins: [...baseConfig.plugins, new webpack.EnvironmentPlugin({ ASSET_PATH })],
   mode: 'production',
   devtool: 'source-map',
+  experiments: {
+    ...(baseConfig.experiments || {}),
+    outputModule: true,
+  },
 };
 
 module.exports = config;

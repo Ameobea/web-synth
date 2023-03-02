@@ -120,7 +120,7 @@ const config = {
   experiments: {
     syncWebAssembly: true,
     backCompat: false,
-    outputModule: true,
+    // outputModule: true,
   },
 };
 

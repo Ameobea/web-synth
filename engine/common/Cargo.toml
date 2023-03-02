@@ -8,3 +8,7 @@ edition = "2021"
 uuid = { version = "1.2" }
 rand = "0.7.3"
 rand_pcg = "0.2.1"
+wasm-bindgen = { version = "0.2.82", optional = true }
+
+[features]
+bindgen = ["wasm-bindgen"]

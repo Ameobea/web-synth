@@ -60,8 +60,7 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wavegen.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
 
   cd -
   cp ./engine/target/wasm32-unknown-unknown/release/*.wasm ./public
@@ -80,6 +79,8 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -109,15 +110,13 @@ run:
     && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/note_container.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/wav_decoder.wasm /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/release/wavegen.wasm /tmp/wasm \
     && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/note_container.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/wavegen.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
 
   cd -
   cp ./engine/build/* ./src/
@@ -137,6 +136,8 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
 
   just debug-sinsy
 
@@ -245,11 +246,6 @@ build-wav-decoder:
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/wav_decoder.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/wav_decoder* ./src/
 
-build-wavegen:
-  cd ./engine/wavegen && cargo build --release --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm --browser --remove-producers-section --out-dir ./engine/build
-  cp ./engine/build/wavegen* ./src/
-
 build-event-scheduler:
   cd ./engine/event_scheduler && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/event_scheduler.wasm ../../public
@@ -289,3 +285,7 @@ debug-vocoder:
 build-level-detector:
   cd ./engine/level_detector && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/level_detector.wasm ../../public
+
+build-wavegen:
+  cd ./engine/wavegen && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/wavegen.wasm ../../public

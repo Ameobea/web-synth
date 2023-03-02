@@ -24,7 +24,7 @@ use self::{
 };
 
 extern "C" {
-    fn log_err(ptr: *const u8, len: usize);
+    pub(crate) fn log_err(ptr: *const u8, len: usize);
 
     fn on_gate_cb(midi_number: usize, voice_ix: usize);
 

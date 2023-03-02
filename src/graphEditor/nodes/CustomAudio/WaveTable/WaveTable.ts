@@ -14,7 +14,7 @@ import WaveTableSmallView from './WaveTableSmallView.svelte';
 
 // Manually generate some waveforms... for science
 
-const SAMPLE_RATE = 44100;
+const SAMPLE_RATE = 44_100;
 const baseFrequency = 30; // 30hz
 
 // Number of samples per waveform
@@ -56,7 +56,9 @@ for (let i = 0; i < waveformLength; i++) {
   bufs[3][i] = periodIxFract * 2 - 1;
 }
 
-export const getDefaultWavetableDef = () => [
+export type WavetableDef = Float32Array[][];
+
+export const getDefaultWavetableDef = (): WavetableDef => [
   [bufs[0], bufs[1]],
   [bufs[2], bufs[3]],
 ];
@@ -86,7 +88,7 @@ export default class WaveTable implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string;
   public workletHandle: AudioWorkletNode | undefined;
-  private wavetableDef: Float32Array[][] = getDefaultWavetableDef();
+  private wavetableDef: WavetableDef = getDefaultWavetableDef();
   private onInitialized?: (inst: WaveTable) => void;
 
   static typeName = 'Wave Table Synthesizer';
@@ -124,12 +126,14 @@ export default class WaveTable implements ForeignNode {
       }
     });
 
-    this.renderSmallView = mkSvelteContainerRenderHelper({
-      Comp: WaveTableSmallView,
-      getProps: () => ({}),
-    });
+    if (this.vcId) {
+      this.renderSmallView = mkSvelteContainerRenderHelper({
+        Comp: WaveTableSmallView,
+        getProps: () => ({}),
+      });
 
-    this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
+      this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
+    }
   }
 
   private buildParamOverrides(workletHandle: AudioWorkletNode): ForeignNode['paramOverrides'] {
@@ -209,9 +213,10 @@ export default class WaveTable implements ForeignNode {
     );
   }
 
-  private async initWaveTable() {
+  private encodeTableDef() {
     const dimensionCount = this.wavetableDef.length;
     const waveformsPerDimension = this.wavetableDef[0].length;
+    const waveformLength = this.wavetableDef[0][0].length;
     const samplesPerDimension = waveformLength * waveformsPerDimension;
 
     const tableSamples = new Float32Array(dimensionCount * waveformsPerDimension * waveformLength);
@@ -224,7 +229,15 @@ export default class WaveTable implements ForeignNode {
       }
     }
 
+    return { dimensionCount, waveformsPerDimension, tableSamples, waveformLength };
+  }
+
+  private async initWaveTable() {
+    const { dimensionCount, waveformsPerDimension, tableSamples, waveformLength } =
+      this.encodeTableDef();
+
     this.workletHandle!.port.postMessage({
+      type: 'init',
       arrayBuffer: await getWavetableWasmBytes(),
       waveformsPerDimension,
       dimensionCount,
@@ -238,13 +251,31 @@ export default class WaveTable implements ForeignNode {
     await this.ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'WaveTableNodeProcessor.js?cacheBust=' +
-        btoa(Math.random().toString())
+        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
     );
     this.workletHandle = new AudioWorkletNode(this.ctx, 'wavetable-node-processor');
 
     await this.initWaveTable();
 
     return this.workletHandle;
+  }
+
+  public setWavetableDef(wavetableDef: WavetableDef, baseFrequency: number) {
+    this.wavetableDef = wavetableDef;
+    if (!this.workletHandle) {
+      return;
+    }
+
+    const { dimensionCount, waveformsPerDimension, tableSamples, waveformLength } =
+      this.encodeTableDef();
+    this.workletHandle.port.postMessage({
+      type: 'update',
+      waveformsPerDimension,
+      dimensionCount,
+      waveformLength,
+      baseFrequency,
+      tableSamples,
+    });
   }
 
   public buildConnectables() {

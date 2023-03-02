@@ -86,6 +86,7 @@
     "ace-builds": "^1.15",
     "ameo-utils": "^0.8.0",
     "chartist": "^0.11.4",
+    "comlink": "^4.4.1",
     "d3": "^7.8.2",
     "dexie": "^3.2.3",
     "downloadjs": "^1.4.7",
