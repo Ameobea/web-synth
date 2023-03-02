@@ -49,3 +49,4 @@ public/waveform_renderer.wasm
 public/compressor.wasm
 public/vocoder.wasm
 public/level_detector.wasm
+src/wavegen*

@@ -1214,8 +1214,12 @@ dependencies = [
 name = "wavegen"
 version = "0.1.0"
 dependencies = [
+ "console_error_panic_hook",
+ "fastapprox",
  "rustfft",
  "textplots",
+ "wasm-bindgen",
+ "waveform_renderer",
 ]
 
 [[package]]

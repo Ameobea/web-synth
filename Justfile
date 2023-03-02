@@ -60,7 +60,8 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wavegen.wasm --browser --remove-producers-section --out-dir ./build
 
   cd -
   cp ./engine/target/wasm32-unknown-unknown/release/*.wasm ./public
@@ -108,13 +109,15 @@ run:
     && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/note_container.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/wav_decoder.wasm /tmp/wasm \
+    && cp ./target/wasm32-unknown-unknown/release/wavegen.wasm /tmp/wasm \
     && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/note_container.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
+    && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build \
+    && wasm-bindgen /tmp/wasm/wavegen.wasm --browser --remove-producers-section --out-dir ./build
 
   cd -
   cp ./engine/build/* ./src/
@@ -241,6 +244,11 @@ build-wav-decoder:
   cd ./engine/wav_decoder && cargo build --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/wav_decoder.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/wav_decoder* ./src/
+
+build-wavegen:
+  cd ./engine/wavegen && cargo build --release --target wasm32-unknown-unknown && \
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm --browser --remove-producers-section --out-dir ./engine/build
+  cp ./engine/build/wavegen* ./src/
 
 build-event-scheduler:
   cd ./engine/event_scheduler && cargo build --release --target wasm32-unknown-unknown && \

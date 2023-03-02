@@ -15,7 +15,7 @@ import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/Effect';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 import { buildDefaultParamSource, type ParamSource } from 'src/fmSynth/ParamSource';
-import type { UploadWavetableModalProps } from 'src/fmSynth/UploadWavetable';
+import type { UploadWavetableModalProps } from 'src/fmSynth/Wavetable/UploadWavetable';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
@@ -195,7 +195,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           type: 'button',
           label: 'configure wavetable',
           action: async () => {
-            const WavetableConfigurator = (await import('./WavetableConfigurator.svelte'))
+            const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
               .default as typeof SvelteComponentTyped<ModalCompProps<unknown>>;
             try {
               const val = await renderSvelteModalWithControls(WavetableConfigurator);
@@ -238,7 +238,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
         label: 'import wavetable',
         action: async () => {
           const LazyUploadWavetableModal = React.lazy(() =>
-            import('src/fmSynth/UploadWavetable').then(mod => ({
+            import('src/fmSynth/Wavetable/UploadWavetable').then(mod => ({
               default: mod.mkUploadWavetableModal(wavetableState.wavetableBanks.map(b => b.name)),
             }))
           );
