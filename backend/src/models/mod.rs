@@ -7,3 +7,4 @@ pub mod remote_samples;
 pub mod synth_preset;
 pub mod tags;
 pub mod user;
+pub mod wavetable_preset;

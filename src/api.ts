@@ -2,6 +2,7 @@ import type { Without } from 'ameo-utils';
 
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
+import type { BuildWavetableInstanceState } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
 import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 import { getLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
@@ -243,6 +244,71 @@ export const getExistingLooperPresetTags = async (): Promise<{ name: string; cou
 
 export const getLooperPreset = async (id: number): Promise<SerializedLooperInstState> =>
   fetch(`${BACKEND_BASE_URL}/looper_preset/${id}`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export interface WavetablePreset {
+  waveforms: {
+    instState: BuildWavetableInstanceState;
+    renderedWaveformSamplesBase64: string;
+  }[];
+}
+
+export interface WavetablePresetDescriptor {
+  id: number;
+  name: string;
+  description: string;
+  tags: string[];
+  userId: number | null | undefined;
+  userName: string | null | undefined;
+}
+
+export interface SaveWaveformPresetRequest {
+  name: string;
+  description: string;
+  tags: string[];
+  serializedWavetableInstState: WavetablePreset;
+}
+
+export const fetchWavetablePresets = async (): Promise<WavetablePresetDescriptor[]> =>
+  fetch(`${BACKEND_BASE_URL}/wavetable_presets`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const saveWavetablePreset = async (preset: SaveWaveformPresetRequest) => {
+  const maybeLoginToken = await getLoginToken();
+  return fetch(`${BACKEND_BASE_URL}/wavetable_preset`, {
+    body: JSON.stringify(preset),
+    method: 'POST',
+    headers: {
+      Authorization: maybeLoginToken,
+    },
+  }).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+};
+
+export const getWavetablePreset = async (id: number): Promise<WavetablePreset> =>
+  fetch(`${BACKEND_BASE_URL}/wavetable_preset/${id}`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getExistingWavetablePresetTags = async (): Promise<
+  { name: string; count: number }[]
+> =>
+  fetch(`${BACKEND_BASE_URL}/wavetable_preset_tags`).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }

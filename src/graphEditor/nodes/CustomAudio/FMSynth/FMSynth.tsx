@@ -398,21 +398,26 @@ export default class FMSynth implements ForeignNode {
   }
 
   private maybeLoadWavetableIntoBackend(bank: WavetableBank) {
-    const isAlreadyLoaded = this.wavetableBackendIxByName.includes(bank.name);
-    if (isAlreadyLoaded) {
-      return;
+    const loadedIndex = this.wavetableBackendIxByName.findIndex(n => n === bank.name);
+    // if (isAlreadyLoaded) {
+    // return;
+    // }
+
+    const backendIx = loadedIndex === -1 ? this.wavetableBackendIxByName.length : loadedIndex;
+    if (loadedIndex === -1) {
+      this.wavetableBackendIxByName.push(bank.name);
     }
 
-    const newBackendIx = this.wavetableBackendIxByName.length;
-    this.wavetableBackendIxByName.push(bank.name);
     if (!this.awpHandle) {
       console.error('Tried to load wavetable into backend before AWP initialized');
       return;
     }
 
+    console.log('Loading wavetable into backend', backendIx, bank);
+
     this.awpHandle.port.postMessage({
       type: 'setWavetableData',
-      wavetableIx: newBackendIx,
+      wavetableIx: backendIx,
       waveformsPerDimension: bank.waveformsPerDimension,
       waveformLength: bank.samplesPerWaveform,
       baseFrequency: bank.baseFrequency,
@@ -471,22 +476,25 @@ export default class FMSynth implements ForeignNode {
         ? { unison: (config as any).unison, unisonDetune: (config as any).unisonDetune }
         : { unison: null, unisonDetune: null };
 
+    const operatorType =
+      {
+        wavetable: 0,
+        'sine oscillator': 2,
+        'exponential oscillator': 3,
+        'param buffer': 1,
+        'square oscillator': 4,
+        'triangle oscillator': 5,
+        'sawtooth oscillator': 6,
+        'sample mapping': 7,
+        'tuned sample': 8,
+      }[config.type] + (unisonEnabled ? 50 : 0);
+    console.log({ operatorType });
+
     // Set the operator config along with any hyperparam config
     this.awpHandle.port.postMessage({
       type: 'setOperatorConfig',
       operatorIx,
-      operatorType:
-        {
-          wavetable: 0,
-          'sine oscillator': 2,
-          'exponential oscillator': 3,
-          'param buffer': 1,
-          'square oscillator': 4,
-          'triangle oscillator': 5,
-          'sawtooth oscillator': 6,
-          'sample mapping': 7,
-          'tuned sample': 8,
-        }[config.type] + (unisonEnabled ? 50 : 0),
+      operatorType,
       unison: unison ?? 1,
       unisonPhaseRandomizationEnabled: (config as any).unisonPhaseRandomization?.enabled ?? false,
       ...(() => {
@@ -494,6 +502,7 @@ export default class FMSynth implements ForeignNode {
           case 'exponential oscillator':
             return { param1: encodeParamSource(config.stretchFactor) };
           case 'wavetable':
+            console.log({ unisonDetune });
             return {
               param1: {
                 valParamInt:

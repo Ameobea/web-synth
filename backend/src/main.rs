@@ -88,6 +88,10 @@ async fn main() {
             routes::login::login,
             routes::login::register,
             routes::login::get_logged_in_username,
+            routes::get_wavetable_presets,
+            routes::get_wavetable_preset_by_id,
+            routes::create_wavetable_preset,
+            routes::get_wavetable_preset_tags,
         ])
         .attach(CorsFairing);
 

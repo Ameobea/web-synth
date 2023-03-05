@@ -130,6 +130,25 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    wavetable_presets (id) {
+        id -> Bigint,
+        name -> Text,
+        description -> Text,
+        serialized_wavetable_inst_state -> Longtext,
+        user_id -> Nullable<Bigint>,
+    }
+}
+
+diesel::table! {
+    wavetable_presets_tags (id) {
+        id -> Bigint,
+        wavetable_preset_id -> Bigint,
+        tag_id -> Bigint,
+    }
+}
+
+diesel::joinable!(compositions -> users (user_id));
 diesel::joinable!(compositions_tags -> compositions (composition_id));
 diesel::joinable!(compositions_tags -> tags (tag_id));
 diesel::joinable!(effects -> users (user_id));
@@ -143,6 +162,9 @@ diesel::joinable!(midi_compositions_tags -> tags (tag_id));
 diesel::joinable!(private_sample_libraries -> users (user_id));
 diesel::joinable!(synth_presets -> users (user_id));
 diesel::joinable!(voice_presets -> users (user_id));
+diesel::joinable!(wavetable_presets -> users (user_id));
+diesel::joinable!(wavetable_presets_tags -> tags (tag_id));
+diesel::joinable!(wavetable_presets_tags -> wavetable_presets (wavetable_preset_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     compositions,
@@ -159,4 +181,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     tags,
     users,
     voice_presets,
+    wavetable_presets,
+    wavetable_presets_tags,
 );

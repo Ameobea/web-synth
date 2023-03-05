@@ -57,7 +57,7 @@ export function renderModalWithControls<T>(
 export function renderSvelteModalWithControls<T>(
   Comp: typeof SvelteComponentTyped<ModalCompProps<T>>,
   clickBackdropToClose = true
-) {
+): Promise<T> {
   const bodyNode = document.getElementsByTagName('body')[0]!;
   const modalNode = document.createElement('div');
   bodyNode.appendChild(modalNode);

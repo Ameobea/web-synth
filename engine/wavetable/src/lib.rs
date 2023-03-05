@@ -62,6 +62,20 @@ impl WaveTable {
             sample_ix.floor() as usize,
             (sample_ix.ceil() as usize).min(self.samples.len() - 1),
         );
+
+        if waveform_offset_samples + sample_hi_ix >= self.samples.len() {
+            panic!(
+                "sample_hi_ix: {}, waveform_offset_samples: {}, samples.len(): {}, waveform_ix: \
+                 {}, dimension_ix: {}, sample_ix: {}",
+                sample_hi_ix,
+                waveform_offset_samples,
+                self.samples.len(),
+                waveform_ix,
+                dimension_ix,
+                sample_ix
+            );
+        }
+
         let (low_sample, high_sample) = (
             self.samples[waveform_offset_samples + sample_low_ix],
             self.samples[waveform_offset_samples + sample_hi_ix],
@@ -96,7 +110,15 @@ impl WaveTable {
     }
 
     pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
-        debug_assert!(sample_ix < (self.settings.waveform_length - 1) as f32);
+        // debug_assert!(sample_ix < (self.settings.waveform_length - 1) as f32);
+        if cfg!(debug_assertions) {
+            if sample_ix < 0.0 || sample_ix >= (self.settings.waveform_length - 1) as f32 {
+                panic!(
+                    "sample_ix: {}, waveform_length: {}",
+                    sample_ix, self.settings.waveform_length
+                );
+            }
+        }
 
         let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
         let base_sample = self.sample_dimension(0, waveform_ix, sample_ix);

@@ -75,6 +75,40 @@ export class WavetableConfiguratorWorker {
       waveformSamples.buffer,
     ]);
   };
+
+  public renderWavetable = async (
+    waveforms: { harmonics: { magnitude: number; phase: number }[] }[]
+  ) => {
+    const inst = await this.wasmInstance;
+    const memory = inst.exports.memory as WebAssembly.Memory;
+
+    const renderedWavetable: Float32Array[] = [];
+    for (let i = 0; i < waveforms.length; i++) {
+      const encodedState = this.encodeState(waveforms[i].harmonics);
+      const encodedStateBufPtr: number = (inst.exports.get_encoded_state_buf_ptr as any)();
+      const encodedStateBuf = new Float32Array(memory.buffer).subarray(
+        encodedStateBufPtr / 4,
+        encodedStateBufPtr / 4 + encodedState.length
+      );
+      encodedStateBuf.set(encodedState);
+
+      const waveformBufPtr: number = (inst.exports.wavegen_get_waveform_buf_ptr as any)();
+      const waveformSamples = new Float32Array(memory.buffer).slice(
+        waveformBufPtr / 4,
+        waveformBufPtr / 4 + WAVEFORM_LENGTH_SAMPLES
+      );
+      if (waveformSamples.some(isNaN)) {
+        console.error('NaN in waveform samples', waveformSamples);
+        throw new Error('NaN in waveform samples');
+      }
+      renderedWavetable.push(waveformSamples);
+    }
+
+    return Comlink.transfer(
+      renderedWavetable,
+      renderedWavetable.map(w => w.buffer)
+    );
+  };
 }
 
 Comlink.expose(new WavetableConfiguratorWorker());

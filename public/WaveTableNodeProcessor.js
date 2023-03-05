@@ -66,7 +66,6 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       data.waveformLength,
       data.baseFrequency
     );
-    console.log(data);
 
     // Wasm memory doesn't become available until after some function in the Wasm module has been called, apparently,
     // so we wait to set this reference until after calling one of the Wasm functions.

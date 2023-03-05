@@ -7,13 +7,16 @@ import { FixedSizeList as List } from 'react-window';
 import { Tag } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
-import { useWindowSize, withReactQueryClient, withReduxProvider } from 'src/reactUtils';
+import {
+  useContainerSize,
+  useWindowSize,
+  withReactQueryClient,
+  withReduxProvider,
+} from 'src/reactUtils';
 import { genericPresetDispatch, store, type ReduxStore } from 'src/redux';
 import { genericPresetPickerActions } from 'src/redux/modules/genericPresetPicker';
 // prettier-ignore
 import './GenericPresetPicker.scss';
-
-const SEARCH_BAR_HEIGHT = 38;
 
 interface SearchBarProps {
   value: string;
@@ -73,40 +76,40 @@ function mkPresetRow<T>(filteredPresets: PresetDescriptor<T>[]): React.FC<Preset
 interface PresetInfoProps {
   preset: PresetDescriptor<any>;
   setSearchValue: (value: string) => void;
+  CustomPresetInfo?: React.FC<CustomPresetInfoProps<any>>;
 }
 
-const PresetInfo: React.FC<PresetInfoProps> = ({ preset, setSearchValue }) => {
-  return (
-    <div className='preset-info'>
-      <div className='preset-info-item '>
-        <div>Name</div>
-        <div>{preset.name}</div>
-      </div>
-      {preset.description ? (
-        <div className='preset-info-item '>
-          <div>Description</div>
-          <div>{preset.description ?? ''}</div>
-        </div>
-      ) : null}
-      {preset.userName ? (
-        <div className='preset-info-item '>
-          <div>Author</div>
-          <div>{preset.userName}</div>
-        </div>
-      ) : null}
-      {preset.tags && preset.tags.length > 0 ? (
-        <div className='preset-info-item '>
-          <div>Tags</div>
-          <div className='tags-container'>
-            {preset.tags.map(tag => (
-              <Tag key={tag} isSelected name={tag} onClick={() => setSearchValue(tag)} />
-            ))}
-          </div>
-        </div>
-      ) : null}
+const PresetInfo: React.FC<PresetInfoProps> = ({ preset, setSearchValue, CustomPresetInfo }) => (
+  <div className='preset-info'>
+    <div className='preset-info-item '>
+      <div>Name</div>
+      <div>{preset.name}</div>
     </div>
-  );
-};
+    {preset.description ? (
+      <div className='preset-info-item '>
+        <div>Description</div>
+        <div>{preset.description ?? ''}</div>
+      </div>
+    ) : null}
+    {preset.userName ? (
+      <div className='preset-info-item '>
+        <div>Author</div>
+        <div>{preset.userName}</div>
+      </div>
+    ) : null}
+    {preset.tags && preset.tags.length > 0 ? (
+      <div className='preset-info-item '>
+        <div>Tags</div>
+        <div className='tags-container'>
+          {preset.tags.map(tag => (
+            <Tag key={tag} isSelected name={tag} onClick={() => setSearchValue(tag)} />
+          ))}
+        </div>
+      </div>
+    ) : null}
+    {CustomPresetInfo ? <CustomPresetInfo preset={preset} /> : null}
+  </div>
+);
 
 const filterPresets = (presets: PresetDescriptor<any>[], searchValue: string) => {
   if (searchValue === '') {
@@ -134,24 +137,38 @@ const filterPresets = (presets: PresetDescriptor<any>[], searchValue: string) =>
 };
 
 interface GenericPresetPickerContainerProps {
+  style?: React.CSSProperties;
   children: React.ReactNode;
 }
 
 const GenericPresetPickerContainer: React.FC<GenericPresetPickerContainerProps> = ({
   children,
-}) => <BasicModal className='generic-preset-picker'>{children}</BasicModal>;
+  style,
+}) => (
+  <BasicModal className='generic-preset-picker' style={style}>
+    {children}
+  </BasicModal>
+);
 
-function mkGenericPresetPicker<T>(
-  getPresets: () => Promise<PresetDescriptor<T>[]>
+export interface CustomPresetInfoProps<T> {
+  preset: PresetDescriptor<T>;
+}
+
+export function mkGenericPresetPicker<T>(
+  getPresets: () => Promise<PresetDescriptor<T>[]>,
+  style?: React.CSSProperties,
+  CustomPresetInfo?: React.FC<CustomPresetInfoProps<T>>
 ): React.FC<ModalCompProps<PresetDescriptor<T>>> {
   genericPresetDispatch(genericPresetPickerActions.setSelectedPresetID(null));
+  const presetQueryID = crypto.randomUUID() + '-presets';
 
   const GenericPresetPicker: React.FC<ModalCompProps<PresetDescriptor<T>>> = ({
     onSubmit,
     onCancel,
   }) => {
-    const { data: presets, error: fetchPresetsError } = useQuery('presets', getPresets);
+    const { data: presets, error: fetchPresetsError } = useQuery(presetQueryID, getPresets);
     const windowSize = useWindowSize();
+    const { ref: leftBarContainerRef, size: leftBarContainerSize } = useContainerSize();
     const [searchValue, setSearchValue] = useState('');
     const selectedPresetID = useSelector(
       (state: ReduxStore) => state.genericPresetPicker.selectedPresetID
@@ -171,13 +188,13 @@ function mkGenericPresetPicker<T>(
 
     if (fetchPresetsError) {
       return (
-        <GenericPresetPickerContainer>
+        <GenericPresetPickerContainer style={style}>
           <span style={{ color: 'red' }}>Error fetching presets: {`${fetchPresetsError}`}</span>
         </GenericPresetPickerContainer>
       );
     } else if (!presets || !PresetRow) {
       return (
-        <GenericPresetPickerContainer>
+        <GenericPresetPickerContainer style={style}>
           <span>Loading presets...</span>
         </GenericPresetPickerContainer>
       );
@@ -186,12 +203,12 @@ function mkGenericPresetPicker<T>(
     const presetListWidth = Math.max(windowSize.width * 0.18, 200);
 
     return (
-      <GenericPresetPickerContainer>
-        <div style={{ width: presetListWidth + 12 }}>
+      <GenericPresetPickerContainer style={style}>
+        <div style={{ width: presetListWidth + 12, height: '100%' }} ref={leftBarContainerRef}>
           <SearchBar value={searchValue} onChange={setSearchValue} />
           <List
             className='preset-list'
-            height={Math.max(windowSize.height - 150 - SEARCH_BAR_HEIGHT, 200)}
+            height={Math.max(leftBarContainerSize.height - 38, 200)}
             width={presetListWidth}
             itemSize={24}
             itemCount={filteredPresets?.length ?? 0}
@@ -201,7 +218,11 @@ function mkGenericPresetPicker<T>(
         </div>
         <div className='preset-info-wrapper'>
           {selectedPreset ? (
-            <PresetInfo preset={selectedPreset} setSearchValue={setSearchValue} />
+            <PresetInfo
+              preset={selectedPreset}
+              setSearchValue={setSearchValue}
+              CustomPresetInfo={CustomPresetInfo}
+            />
           ) : (
             <p className='select-preset-prompt'>
               Select a preset from the list on the left to view info about it

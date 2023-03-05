@@ -13,11 +13,11 @@ import { AsyncOnce, SAMPLE_RATE } from 'src/util';
 const dpr = window.devicePixelRatio ?? 1;
 
 const BACKGROUND_COLOR = 0x020202;
-export const BUILD_WAVETABLE_INST_HEIGHT_PX = 800;
-export const BUILD_WAVETABLE_INST_WIDTH_PX = Math.round(BUILD_WAVETABLE_INST_HEIGHT_PX * 1.618);
+export const BUILD_WAVETABLE_INST_HEIGHT_PX = 446;
+export const BUILD_WAVETABLE_INST_WIDTH_PX = 1234;
 
 const HARMONICS_COUNT = 64;
-const WAVEFORM_LENGTH_SAMPLES = 1024 * 4;
+export const BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES = 1024 * 4;
 
 const SLIDER_BG_COLOR = 0x1f1f1f;
 const SLIDER_BORDER_COLOR = 0x2f2f2f;
@@ -36,8 +36,8 @@ const WAVEFORM_IMAGE_HEIGHT_PX = 256;
 const WAVEFORM_IMAGE_WIDTH_PX = 1024;
 
 export enum BuildWavetableSliderMode {
-  Magnitude,
-  Phase,
+  Magnitude = 'Magnitude',
+  Phase = 'Phase',
 }
 
 export interface BuildWavetableInstanceState {
@@ -45,7 +45,7 @@ export interface BuildWavetableInstanceState {
   sliderMode: BuildWavetableSliderMode;
 }
 
-const buildDefaultBuildWavetableInstanceState = (): BuildWavetableInstanceState => ({
+export const buildDefaultBuildWavetableInstanceState = (): BuildWavetableInstanceState => ({
   harmonics: new Array(HARMONICS_COUNT)
     .fill(null)
     .map((_, i) => ({ magnitude: i === 1 ? 1 : 0, phase: 0 })),
@@ -167,11 +167,12 @@ class VerticalSlider {
 }
 
 const buildPlaceholderWavetableDef = (): WavetableDef => [
-  [new Float32Array(WAVEFORM_LENGTH_SAMPLES)],
+  [new Float32Array(BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES)],
 ];
 
 export class BuildWavetableInstance {
   private ctx = new AudioContext();
+  private destroyed = false;
   private app: PIXI.Application;
   private worker: Comlink.Remote<WavetableConfiguratorWorker>;
   private waveformImage: PIXI.Sprite;
@@ -183,20 +184,31 @@ export class BuildWavetableInstance {
   private wavetable: WaveTable;
   private gainNode: GainNode;
   private frequencyCSN: ConstantSourceNode;
+  private wavetablePositionCSN: ConstantSourceNode;
 
   private state: BuildWavetableInstanceState = buildDefaultBuildWavetableInstanceState();
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.worker = Comlink.wrap(
-      new Worker(new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url))
-    );
+  constructor(
+    canvas: HTMLCanvasElement,
+    worker: Comlink.Remote<WavetableConfiguratorWorker>,
+    initialState?: BuildWavetableInstanceState
+  ) {
+    if (initialState) {
+      this.state = initialState;
+    }
+    this.worker = worker;
     WavegenWasm.get().then(async wasm => {
-      await this.worker.setWasmBytes(Comlink.transfer(wasm, [wasm]));
+      if (this.destroyed) {
+        return;
+      }
+      // Do not transfer since they might be re-used for future instances
+      await this.worker.setWasmBytes(wasm);
       this.commit();
     });
 
     this.gainNode = new GainNode(this.ctx);
     this.frequencyCSN = new ConstantSourceNode(this.ctx);
+    this.wavetablePositionCSN = new ConstantSourceNode(this.ctx);
     this.wavetable = new WaveTable(this.ctx, '', {
       wavetableDef: buildPlaceholderWavetableDef(),
       onInitialized: (wavetable: WaveTable) => {
@@ -205,6 +217,12 @@ export class BuildWavetableInstance {
           (wavetable.workletHandle!.parameters as Map<string, AudioParam>).get('frequency')!
         );
         this.frequencyCSN.start();
+
+        this.wavetablePositionCSN.offset.value = 0;
+        this.wavetablePositionCSN.start();
+        this.wavetablePositionCSN.connect(
+          (wavetable.workletHandle!.parameters as Map<string, AudioParam>).get('dimension_0_mix')!
+        );
       },
     });
 
@@ -241,27 +259,36 @@ export class BuildWavetableInstance {
       this.slidersContainer.addChild(slider.graphics);
       this.sliders.push(slider);
     }
-    this.slidersContainer.y = BUILD_WAVETABLE_INST_HEIGHT_PX - SLIDER_HEIGHT - 10;
+    this.slidersContainer.y = BUILD_WAVETABLE_INST_HEIGHT_PX - SLIDER_HEIGHT - 16;
     this.app.stage.addChild(this.slidersContainer);
 
     this.waveformContainer = new PIXI.Container();
-    this.waveformContainer.x = 10;
+    // center
+    this.waveformContainer.x = BUILD_WAVETABLE_INST_WIDTH_PX / 2 - WAVEFORM_IMAGE_WIDTH_PX / 2;
     this.waveformContainer.y = 10;
     this.app.stage.addChild(this.waveformContainer);
 
     this.waveformImage = new PIXI.Sprite();
     this.waveformContainer.addChild(this.waveformImage);
+
+    // border around waveform + horizontal line in the middle to indicate 0
+    const waveformDecorations = new PIXI.Graphics();
+    waveformDecorations.lineStyle(1, 0xffffff, 0.8);
+    waveformDecorations.drawRect(-1, -1, WAVEFORM_IMAGE_WIDTH_PX + 2, WAVEFORM_IMAGE_HEIGHT_PX + 2);
+    waveformDecorations.lineStyle(1, 0x888888, 0.92);
+    waveformDecorations.moveTo(0, WAVEFORM_IMAGE_HEIGHT_PX / 2);
+    waveformDecorations.lineTo(WAVEFORM_IMAGE_WIDTH_PX, WAVEFORM_IMAGE_HEIGHT_PX / 2);
+    this.waveformContainer.addChild(waveformDecorations);
   }
 
-  public setSliderMode = (sliderMode: BuildWavetableSliderMode) => {
-    this.state.sliderMode = sliderMode;
+  private updateSliders() {
     for (let harmonicIx = 0; harmonicIx < HARMONICS_COUNT; harmonicIx++) {
       if (harmonicIx === 0) {
         continue;
       }
 
       const slider = this.sliders[harmonicIx - 1];
-      if (sliderMode === BuildWavetableSliderMode.Magnitude) {
+      if (this.state.sliderMode === BuildWavetableSliderMode.Magnitude) {
         slider.setValue(
           this.state.harmonics[harmonicIx].magnitude,
           this.state.harmonics[harmonicIx].phase,
@@ -275,6 +302,11 @@ export class BuildWavetableInstance {
         );
       }
     }
+  }
+
+  public setSliderMode = (sliderMode: BuildWavetableSliderMode) => {
+    this.state.sliderMode = sliderMode;
+    this.updateSliders();
   };
 
   public setIsPlaying = (isPlaying: boolean) => {
@@ -291,12 +323,25 @@ export class BuildWavetableInstance {
 
   public setVolumeDb = (volumeDb: number) => {
     const gain = Math.pow(10, volumeDb / 20);
-    console.log('gain', gain);
-    this.gainNode.gain.value = gain;
+    this.gainNode.gain.cancelScheduledValues(0);
+    this.gainNode.gain.linearRampToValueAtTime(gain, this.ctx.currentTime + 0.01);
   };
 
   public setFrequency = (frequency: number) => {
-    this.frequencyCSN.offset.value = frequency;
+    this.frequencyCSN.offset.cancelScheduledValues(0);
+    this.frequencyCSN.offset.linearRampToValueAtTime(frequency, this.ctx.currentTime + 0.01);
+  };
+
+  public setWavetablePosition = (wavetablePosition: number) => {
+    if (wavetablePosition < 0 || wavetablePosition > 1) {
+      throw new Error(`Invalid wavetable position: ${wavetablePosition}`);
+    }
+
+    this.wavetablePositionCSN.offset.cancelScheduledValues(0);
+    this.wavetablePositionCSN.offset.linearRampToValueAtTime(
+      wavetablePosition,
+      this.ctx.currentTime + 0.01
+    );
   };
 
   private handleSliderChange = (sliderIx: number, value: number) => {
@@ -360,7 +405,7 @@ export class BuildWavetableInstance {
     this.commitRenderSeq = dispatchID;
 
     // We need to compute the frequency of the base harmonic, which has a wavelength of `WAVEFORM_LENGTH_SAMPLES`.
-    const baseFrequency = SAMPLE_RATE / WAVEFORM_LENGTH_SAMPLES;
+    const baseFrequency = SAMPLE_RATE / BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES;
     // normalize the samples to [-1, 1]
     const maxSample = Math.max(...waveformSamples);
     const minSample = Math.min(...waveformSamples);
@@ -373,7 +418,28 @@ export class BuildWavetableInstance {
     this.wavetable.setWavetableDef([[waveformSamples]], baseFrequency);
   };
 
+  public serialize(): BuildWavetableInstanceState {
+    return R.clone(this.state);
+  }
+
+  public setState(state: BuildWavetableInstanceState) {
+    this.state = R.clone(state);
+    this.commit();
+    this.updateSliders();
+  }
+
+  public reset() {
+    this.state = buildDefaultBuildWavetableInstanceState();
+    this.commit();
+    this.updateSliders();
+  }
+
   public destroy() {
+    if (this.destroyed) {
+      console.warn('BuildWavetableInstance already destroyed');
+      return;
+    }
+    this.destroyed = true;
     this.app.destroy(false, { children: true, texture: true, baseTexture: true });
     this.wavetable.shutdown();
     this.gainNode.disconnect();

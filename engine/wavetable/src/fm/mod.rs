@@ -457,7 +457,7 @@ impl Oscillator for WaveTableHandle {
         for _ in 0..4 {
             self.update_phase_oversampled(4., frequency);
             sample += wavetable.get_sample(
-                self.phase * wavetable.settings.waveform_length as f32,
+                self.phase * (wavetable.settings.waveform_length - 1) as f32,
                 &mixes,
             );
         }

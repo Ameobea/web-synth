@@ -34,3 +34,15 @@ export const initSentry = () => {
     },
   });
 };
+
+export const logError = (msg: string, err?: any) => {
+  console.error(msg, err);
+  const sentry = getSentry();
+  if (sentry) {
+    if (err) {
+      sentry.captureException(err);
+    } else {
+      sentry.captureMessage(msg, 'error');
+    }
+  }
+};

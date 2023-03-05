@@ -189,17 +189,25 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
         {
           type: 'custom',
           label: 'wavetable',
-          Comp: ({ value }) => <span>{value || <i>No wavetable selected</i>}</span>,
+          Comp: ({ value }) => (
+            <span style={{ color: 'orange' }}>{value || <i>No wavetable selected</i>}</span>
+          ),
         },
         {
           type: 'button',
           label: 'configure wavetable',
           action: async () => {
             const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
-              .default as typeof SvelteComponentTyped<ModalCompProps<unknown>>;
+              .default as typeof SvelteComponentTyped<ModalCompProps<WavetableBank>>;
             try {
-              const val = await renderSvelteModalWithControls(WavetableConfigurator);
-              // TODO
+              const wavetableBank = await renderSvelteModalWithControls<WavetableBank>(
+                WavetableConfigurator
+              );
+              setWavetableState({
+                ...wavetableState,
+                wavetableBanks: [wavetableBank],
+              });
+              setSelectedWavetableName(wavetableBank.name);
             } catch (_err) {
               // cancelled
             }
@@ -260,7 +268,13 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
         },
       },
     ];
-  }, [setWavetableState, state.wavetable, wavetableState, useLegacyControls]);
+  }, [
+    useLegacyControls,
+    wavetableState,
+    setWavetableState,
+    setSelectedWavetableName,
+    state.wavetable,
+  ]);
   const handleChange = useCallback(
     (_key: string, wavetableName: string, _state: any) => setSelectedWavetableName(wavetableName),
     [setSelectedWavetableName]

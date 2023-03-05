@@ -333,3 +333,36 @@ export const mkImageLoadPlaceholder = (
   };
   return ImageLoadPlaceholder;
 };
+
+export const useContainerSize = () => {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const resizeObserver = useRef<ResizeObserver | null>(null);
+
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    if (!node) {
+      return;
+    }
+
+    if (resizeObserver.current) {
+      resizeObserver.current.disconnect();
+    }
+
+    resizeObserver.current = new ResizeObserver(entries => {
+      setSize(entries[0].contentRect);
+    });
+
+    resizeObserver.current.observe(node);
+  }, []);
+
+  useEffect(() => () => resizeObserver.current?.disconnect(), []);
+
+  return { ref, size };
+};
+
+export function addProps<Props extends Record<string, any>, AddedProps extends Record<string, any>>(
+  Component: React.ComponentType<Props>,
+  addedProps: AddedProps
+): React.FC<Omit<Props, keyof AddedProps>> {
+  const AddProps = (props: any) => <Component {...props} {...addedProps} />;
+  return AddProps;
+}

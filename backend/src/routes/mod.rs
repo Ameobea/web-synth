@@ -31,6 +31,8 @@ pub mod midi_composition;
 mod remote_samples;
 pub use self::{looper_preset::*, midi_composition::*, remote_samples::*};
 pub mod login;
+mod wavetable_preset;
+pub use self::wavetable_preset::*;
 
 #[get("/")]
 pub fn index() -> &'static str { "Application successfully started!" }
