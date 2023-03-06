@@ -1462,6 +1462,7 @@ impl ParamSource {
             },
             ParamSource::Random {
                 last_val,
+                target_val,
                 samples_since_last_update,
                 min,
                 max,
@@ -1475,10 +1476,12 @@ impl ParamSource {
                 for i in 0..FRAME_SIZE {
                     let new_val = if samples_since_last_update_local >= update_interval_samples {
                         samples_since_last_update_local = 1;
-                        common::rng().gen_range(min, max)
+                        let new_target_val = common::rng().gen_range(min, max);
+                        target_val.set(new_target_val);
+                        new_target_val
                     } else {
                         samples_since_last_update_local += 1;
-                        state
+                        target_val.get()
                     };
 
                     if smoothing_coefficient != 0. && smoothing_coefficient != 1. {
