@@ -31,6 +31,7 @@
     font-size: 14px;
     font-family: sans-serif;
     cursor: pointer;
+    user-select: none;
   }
 
   .root > button.active {

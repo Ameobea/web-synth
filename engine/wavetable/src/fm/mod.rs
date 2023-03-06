@@ -86,7 +86,7 @@ impl Oscillator for SineOscillator {
         _sample_ix_within_frame: usize,
         _base_frequency: f32,
     ) -> f32 {
-        let sine_lookup_table = crate::lookup_tables::get_sine_lookup_table();
+        let sine_lookup_table = dsp::lookup_tables::get_sine_lookup_table();
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
             return dsp::read_interpolated(
@@ -174,7 +174,7 @@ impl Oscillator for TriangleOscillator {
     ) -> f32 {
         self.update_phase(frequency);
 
-        let triangle_lookup_table = crate::lookup_tables::get_triangle_lookup_table();
+        let triangle_lookup_table = dsp::lookup_tables::get_triangle_lookup_table();
         dsp::read_interpolated(
             triangle_lookup_table,
             self.phase * (triangle_lookup_table.len() - 2) as f32,
@@ -203,7 +203,7 @@ impl Oscillator for SawtoothOscillator {
         _sample_ix_within_frame: usize,
         _base_frequency: f32,
     ) -> f32 {
-        let sawtooth_lookup_table = crate::lookup_tables::get_sawtooth_lookup_table();
+        let sawtooth_lookup_table = dsp::lookup_tables::get_sawtooth_lookup_table();
         if frequency.abs() < 1000. {
             self.update_phase(frequency);
             return dsp::read_interpolated(
@@ -600,7 +600,7 @@ impl OscillatorSource {
 
     pub fn set_phase_at(&mut self, new_phase: f32, ix: usize) {
         match self {
-            OscillatorSource::Wavetable(_) => (),
+            OscillatorSource::Wavetable(wt) => wt.set_phase(new_phase),
             OscillatorSource::ParamBuffer(_) => (),
             OscillatorSource::Sine(osc) => osc.set_phase(new_phase),
             OscillatorSource::ExponentialOscillator(osc) => osc.set_phase(new_phase),
@@ -614,6 +614,83 @@ impl OscillatorSource {
             OscillatorSource::UnisonSawtooth(osc) => osc.set_phase_at(new_phase, ix),
             OscillatorSource::SampleMapping(_) => unimplemented!(),
             OscillatorSource::TunedSample(_) => (),
+        }
+    }
+
+    /// Given a new operator source, if the new one is the same type as the old one, we
+    pub fn maybe_update(&mut self, other: &OscillatorSource) -> bool {
+        match self {
+            OscillatorSource::Sine(_) => false,
+            OscillatorSource::Wavetable(wt) =>
+                if let OscillatorSource::Wavetable(other) = other {
+                    wt.dim_0_intra_mix.replace(other.dim_0_intra_mix.clone());
+                    wt.dim_1_intra_mix.replace(other.dim_1_intra_mix.clone());
+                    wt.inter_dim_mix.replace(other.inter_dim_mix.clone());
+                    wt.wavetable_index = other.wavetable_index;
+                    true
+                } else {
+                    false
+                },
+            OscillatorSource::ParamBuffer(_) => false,
+            OscillatorSource::ExponentialOscillator(_) => false,
+            OscillatorSource::Square(_) => false,
+            OscillatorSource::Triangle(_) => false,
+            OscillatorSource::Sawtooth(_) => false,
+            OscillatorSource::UnisonSine(osc) =>
+                if let OscillatorSource::UnisonSine(other) = other {
+                    osc.unison_detune_range_semitones
+                        .replace(other.unison_detune_range_semitones.clone());
+                    true
+                } else {
+                    false
+                },
+            OscillatorSource::UnisonWavetable(uwt) =>
+                if let OscillatorSource::UnisonWavetable(other) = other {
+                    uwt.unison_detune_range_semitones
+                        .replace(other.unison_detune_range_semitones.clone());
+
+                    for (osc_ix, osc) in uwt.oscillators.iter_mut().enumerate() {
+                        let o_osc = match other.oscillators.get(osc_ix) {
+                            Some(o) => o,
+                            None => return false,
+                        };
+
+                        osc.wavetable_index = o_osc.wavetable_index;
+                        osc.dim_0_intra_mix.replace(o_osc.dim_0_intra_mix.clone());
+                        osc.dim_1_intra_mix.replace(o_osc.dim_1_intra_mix.clone());
+                        osc.inter_dim_mix.replace(o_osc.inter_dim_mix.clone());
+                    }
+
+                    true
+                } else {
+                    false
+                },
+            OscillatorSource::UnisonSquare(osc) =>
+                if let OscillatorSource::UnisonSquare(other) = other {
+                    osc.unison_detune_range_semitones
+                        .replace(other.unison_detune_range_semitones.clone());
+                    true
+                } else {
+                    false
+                },
+            OscillatorSource::UnisonTriangle(osc) =>
+                if let OscillatorSource::UnisonTriangle(other) = other {
+                    osc.unison_detune_range_semitones
+                        .replace(other.unison_detune_range_semitones.clone());
+                    true
+                } else {
+                    false
+                },
+            OscillatorSource::UnisonSawtooth(osc) =>
+                if let OscillatorSource::UnisonSawtooth(other) = other {
+                    osc.unison_detune_range_semitones
+                        .replace(other.unison_detune_range_semitones.clone());
+                    true
+                } else {
+                    false
+                },
+            OscillatorSource::SampleMapping(_) => false,
+            OscillatorSource::TunedSample(_) => false,
         }
     }
 }
@@ -1077,6 +1154,7 @@ pub enum ParamSource {
     BeatsToSamples(f32),
     Random {
         last_val: Cell<f32>,
+        target_val: Cell<f32>,
         samples_since_last_update: Cell<usize>,
         min: f32,
         max: f32,
@@ -1099,10 +1177,10 @@ impl ParamSource {
                 cur_val: new_val, ..
             } => match self {
                 ParamSource::Constant {
-                    last_val: old_last_val,
+                    last_val: _,
                     cur_val: old_cur_val,
                 } => {
-                    old_last_val.set(*old_cur_val);
+                    // old_last_val.set(*old_cur_val);
                     *old_cur_val = new_val;
                 },
                 other => *other = new,
@@ -1172,7 +1250,7 @@ impl ParamSource {
             },
             ParamSource::Constant { last_val, cur_val } => {
                 let mut state = last_val.get();
-                dsp::smooth(&mut state, *cur_val, 0.97);
+                dsp::smooth(&mut state, *cur_val, 0.99);
                 let out = state;
                 last_val.set(out);
                 out
@@ -1210,6 +1288,7 @@ impl ParamSource {
             },
             ParamSource::Random {
                 last_val,
+                target_val,
                 samples_since_last_update,
                 min,
                 max,
@@ -1218,10 +1297,12 @@ impl ParamSource {
             } => {
                 let cur_value = if samples_since_last_update.get() >= *update_interval_samples {
                     samples_since_last_update.set(0);
-                    common::rng().gen_range(*min, *max)
+                    let new_target_val = common::rng().gen_range(*min, *max);
+                    target_val.set(new_target_val);
+                    new_target_val
                 } else {
                     samples_since_last_update.set(samples_since_last_update.get() + 1);
-                    last_val.get()
+                    target_val.get()
                 };
 
                 if *smoothing_coefficient == 0. || *smoothing_coefficient == 1. {
@@ -1266,6 +1347,7 @@ impl ParamSource {
                 let init = common::rng().gen_range(min, max);
                 ParamSource::Random {
                     last_val: Cell::new(init),
+                    target_val: Cell::new(init),
                     samples_since_last_update: Cell::new(0),
                     min,
                     max,
@@ -1492,6 +1574,7 @@ impl ParamSource {
             },
             ParamSource::Random {
                 last_val,
+                target_val,
                 samples_since_last_update,
                 min,
                 max,
@@ -1505,10 +1588,12 @@ impl ParamSource {
                 for i in 0..FRAME_SIZE {
                     let new_val = if samples_since_last_update_local >= update_interval_samples {
                         samples_since_last_update_local = 1;
-                        common::rng().gen_range(min, max)
+                        let new_target_val = common::rng().gen_range(min, max);
+                        target_val.set(new_target_val);
+                        new_target_val
                     } else {
                         samples_since_last_update_local += 1;
-                        state
+                        target_val.get()
                     };
 
                     if smoothing_coefficient != 0. && smoothing_coefficient != 1. {
@@ -1674,7 +1759,7 @@ impl FMSynthContext {
 #[no_mangle]
 #[cold]
 pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthContext {
-    crate::lookup_tables::maybe_init_lookup_tables();
+    dsp::lookup_tables::maybe_init_lookup_tables();
     init_sample_manager();
     common::set_raw_panic_hook(log_err);
 
@@ -2025,7 +2110,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
     for voice in &mut (*ctx).voices {
         let operator = &mut voice.operators[operator_ix];
         let old_phases = operator.oscillator_source.get_phase();
-        operator.oscillator_source = build_oscillator_source(
+        let new_oscillator_source = build_oscillator_source(
             operator_type,
             unison,
             param_0_value_type,
@@ -2055,6 +2140,12 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
             param_4_val_float_3,
             &old_phases,
         );
+        let did_update = operator
+            .oscillator_source
+            .maybe_update(&new_oscillator_source);
+        if !did_update {
+            operator.oscillator_source = new_oscillator_source;
+        }
         operator.randomize_start_phases = unison_phase_randomization_enabled;
     }
 }

@@ -10,8 +10,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 rustfft = "6.1"
 waveform_renderer = { path = "../waveform_renderer", default-features = false, features = [] }
-fastapprox = "0.3"
 common = { path = "../common", default-features = false, features = [] }
+dsp = { path = "../dsp" }
 
 [dev-dependencies]
 textplots = "0.8"

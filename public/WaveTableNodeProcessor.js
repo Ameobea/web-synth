@@ -116,13 +116,17 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
       data.dimensionCount !== this.lastWavetableParams.dimensionCount ||
       data.waveformLength !== this.lastWavetableParams.waveformLength
     ) {
-      console.error(
-        'Tried to update wavetable with different params than it was initialized with:',
-        { old: this.lastWavetableParams, new: data }
+      this.wasmInstance.exports.resize_wavetable(
+        this.waveTablePtr,
+        data.waveformsPerDimension,
+        data.dimensionCount,
+        data.waveformLength
       );
-      throw new Error(
-        'Tried to update wavetable with different params than it was initialized with'
-      );
+      this.lastWavetableParams = {
+        waveformsPerDimension: data.waveformsPerDimension,
+        dimensionCount: data.dimensionCount,
+        waveformLength: data.waveformLength,
+      };
     }
 
     this.float32WasmMemory = new Float32Array(this.wasmInstance.exports.memory.buffer);
@@ -131,7 +135,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
     const wavetableDataArrayOffset = wavetableDataPtr / BYTES_PER_F32;
 
     // Write the table's data into the Wasm heap
-    // TODO: Interpolate between the old and new tables
+    // TODO: Interpolate between the old and new tables?
     if (data.tableSamples.some(isNaN)) {
       console.error('NaN in table samples', data.tableSamples);
       throw new Error('NaN in table samples');

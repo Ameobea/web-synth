@@ -1,7 +1,6 @@
 #![feature(box_syntax, stdsimd, const_maybe_uninit_assume_init, get_mut_unchecked)]
 
 pub mod fm;
-pub mod lookup_tables;
 
 pub static mut CUR_BPM: f32 = 0.;
 
@@ -53,6 +52,18 @@ impl WaveTable {
         }
     }
 
+    pub fn resize(
+        &mut self,
+        waveforms_per_dimension: usize,
+        dimension_count: usize,
+        waveform_length: usize,
+    ) {
+        self.settings.waveforms_per_dimension = waveforms_per_dimension;
+        self.settings.dimension_count = dimension_count;
+        self.settings.waveform_length = waveform_length;
+        self.samples.resize(self.settings.get_wavetable_size(), 0.);
+    }
+
     fn sample_waveform(&self, dimension_ix: usize, waveform_ix: usize, sample_ix: f32) -> f32 {
         let waveform_offset_samples = (dimension_ix * self.settings.get_samples_per_dimension())
             + (waveform_ix * self.settings.waveform_length);
@@ -85,9 +96,9 @@ impl WaveTable {
         // We mix the final `SMOOTH_TAIL_LEN_SAMPLES` samples with the first sample of the waveform
         // to avoid audio artifacts caused by discontinuities produced by wrapping around
         let samples_from_the_end = self.settings.waveform_length - sample_low_ix;
-        if samples_from_the_end > SMOOTH_TAIL_LEN_SAMPLES {
-            return base_sample;
-        }
+        // if samples_from_the_end > SMOOTH_TAIL_LEN_SAMPLES {
+        return base_sample;
+        // }
 
         let first_sample = self.samples[waveform_offset_samples];
         mix(
@@ -215,7 +226,15 @@ pub extern "C" fn set_base_frequency(handle_ptr: *mut WaveTable, base_frequency:
 }
 
 #[no_mangle]
-pub fn drop_wavetable(table: *mut WaveTable) { drop(unsafe { Box::from_raw(table) }) }
+pub extern "C" fn resize_wavetable(
+    handle_ptr: *mut WaveTable,
+    waveforms_per_dimension: usize,
+    dimension_count: usize,
+    waveform_length: usize,
+) {
+    let ctx = unsafe { &mut *handle_ptr };
+    ctx.resize(waveforms_per_dimension, dimension_count, waveform_length);
+}
 
 #[no_mangle]
 pub unsafe fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {

@@ -156,6 +156,19 @@ export default class FMSynth implements ForeignNode {
   public midiControlValuesCache: MIDIControlValuesCache;
   private wavetableState: WavetableState = { wavetableBanks: [] };
   private wavetableBackendIxByName: string[] = [];
+  private lastSetWavetableData: {
+    wavetableIx: number;
+    waveformsPerDimension: number;
+    waveformLength: number;
+    baseFrequency: number;
+    samples: Float32Array;
+  } = {
+    wavetableIx: -1,
+    waveformsPerDimension: -1,
+    waveformLength: -1,
+    baseFrequency: -1,
+    samples: new Float32Array(0),
+  };
   private sampleMappingStore: Writable<SampleMappingState> = writable(
     buildDefaultSampleMappingState()
   );
@@ -408,6 +421,23 @@ export default class FMSynth implements ForeignNode {
       this.wavetableBackendIxByName.push(bank.name);
     }
 
+    const setWavetableData = {
+      wavetableIx: backendIx,
+      waveformsPerDimension: bank.waveformsPerDimension,
+      waveformLength: bank.samplesPerWaveform,
+      baseFrequency: bank.baseFrequency,
+      samples: bank.samples,
+    };
+    if (
+      this.lastSetWavetableData.baseFrequency === setWavetableData.baseFrequency &&
+      this.lastSetWavetableData.waveformsPerDimension === setWavetableData.waveformsPerDimension &&
+      this.lastSetWavetableData.waveformLength === setWavetableData.waveformLength &&
+      this.lastSetWavetableData.samples.length === setWavetableData.samples.length &&
+      this.lastSetWavetableData.samples.every((s, ix) => s === setWavetableData.samples[ix])
+    ) {
+      return;
+    }
+
     if (!this.awpHandle) {
       console.error('Tried to load wavetable into backend before AWP initialized');
       return;
@@ -415,6 +445,7 @@ export default class FMSynth implements ForeignNode {
 
     console.log('Loading wavetable into backend', backendIx, bank);
 
+    this.lastSetWavetableData = setWavetableData;
     this.awpHandle.port.postMessage({
       type: 'setWavetableData',
       wavetableIx: backendIx,
@@ -488,7 +519,6 @@ export default class FMSynth implements ForeignNode {
         'sample mapping': 7,
         'tuned sample': 8,
       }[config.type] + (unisonEnabled ? 50 : 0);
-    console.log({ operatorType });
 
     // Set the operator config along with any hyperparam config
     this.awpHandle.port.postMessage({
@@ -502,7 +532,6 @@ export default class FMSynth implements ForeignNode {
           case 'exponential oscillator':
             return { param1: encodeParamSource(config.stretchFactor) };
           case 'wavetable':
-            console.log({ unisonDetune });
             return {
               param1: {
                 valParamInt:
@@ -532,7 +561,8 @@ export default class FMSynth implements ForeignNode {
       case 'exponential oscillator':
       case 'square oscillator':
       case 'triangle oscillator':
-      case 'sawtooth oscillator': {
+      case 'sawtooth oscillator':
+      case 'wavetable': {
         this.setOperatorBaseFrequencySource(operatorIx, config.frequency);
         break;
       }

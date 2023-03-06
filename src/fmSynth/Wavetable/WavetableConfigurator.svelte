@@ -35,7 +35,10 @@
 
   let route: Route = Route.BrowseWavetables;
 
-  const renderPresetToBank = async (preset: WavetablePreset): Promise<WavetableBank> => {
+  const renderPresetToBank = async (
+    preset: WavetablePreset,
+    name?: string
+  ): Promise<WavetableBank> => {
     const rendered: Float32Array[] = await worker.renderWavetable(
       preset.waveforms.map(w => w.instState)
     );
@@ -55,7 +58,7 @@
 
     return {
       baseFrequency: SAMPLE_RATE / BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES,
-      name: 'untitled wavetable',
+      name: name ?? 'untitled wavetable',
       samples: concatenatedSamples,
       samplesPerWaveform: BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES,
       waveformsPerDimension: preset.waveforms.length,
@@ -63,14 +66,14 @@
   };
 
   let isSubmitting = false;
-  const handleBuildWavetableSubmit = async (preset: WavetablePreset) => {
+  const handleBuildWavetableSubmit = async (preset: WavetablePreset, name?: string) => {
     if (isSubmitting) {
       return;
     }
     isSubmitting = true;
 
     try {
-      const bank = await renderPresetToBank(preset);
+      const bank = await renderPresetToBank(preset, name);
       onSubmit(bank);
     } catch (err) {
       logError('Error rendering waveform', err);
@@ -84,7 +87,7 @@
   ) => {
     try {
       const preset = await getWavetablePreset(pickedPreset.preset.id);
-      handleBuildWavetableSubmit(preset);
+      handleBuildWavetableSubmit(preset, pickedPreset.preset.name);
     } catch (err) {
       logError('Error loading preset', err);
       alert(`Error loading preset: ${err}`);

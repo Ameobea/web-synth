@@ -1,7 +1,10 @@
+#![feature(box_syntax)]
+
 use fastapprox::fast;
 
 pub mod circular_buffer;
 pub mod filters;
+pub mod lookup_tables;
 pub mod oscillator;
 pub mod rms_level_detector;
 

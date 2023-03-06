@@ -364,7 +364,7 @@ export const buildConfigureParamSourceSettings = ({
           type: 'range',
           label: 'update interval samples',
           min: 1,
-          max: 2000,
+          max: 44_100 / 2,
           step: 1,
         },
         {
@@ -375,8 +375,8 @@ export const buildConfigureParamSourceSettings = ({
           ? {
               type: 'range',
               label: 'smoothing coefficient',
-              min: 0.5,
-              max: 0.99,
+              min: 0.9,
+              max: 0.9999,
               scale: 'log',
             }
           : null,

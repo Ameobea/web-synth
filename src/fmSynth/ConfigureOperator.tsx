@@ -190,7 +190,9 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           type: 'custom',
           label: 'wavetable',
           Comp: ({ value }) => (
-            <span style={{ color: 'orange' }}>{value || <i>No wavetable selected</i>}</span>
+            <span style={{ color: value ? '#4dcbcb' : 'orange' }}>
+              {value || <i>No wavetable selected</i>}
+            </span>
           ),
         },
         {
@@ -315,16 +317,18 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
       useLegacyControls={useLegacyControls}
     />
     <ConfigureParamSource
-      title='dim 0 intra mix'
+      // title='dim 0 intra mix'
+      title='wavetable position'
       state={config.dim0IntraMix}
       onChange={newDim0IntraMix => onChange({ ...config, dim0IntraMix: newDim0IntraMix })}
       min={0}
       max={1}
+      step={0.00001}
       adsrs={adsrs}
       onAdsrChange={onAdsrChange}
       vcId={vcId}
     />
-    <ConfigureParamSource
+    {/* <ConfigureParamSource
       title='dim 1 intra mix'
       state={config.dim1IntraMix}
       onChange={newDim1IntraMix => onChange({ ...config, dim1IntraMix: newDim1IntraMix })}
@@ -343,7 +347,7 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
       adsrs={adsrs}
       onAdsrChange={onAdsrChange}
       vcId={vcId}
-    />
+    /> */}
   </>
 );
 
@@ -470,7 +474,8 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
       config.type === 'exponential oscillator' ||
       config.type === 'square oscillator' ||
       config.type === 'triangle oscillator' ||
-      config.type === 'sawtooth oscillator' ? (
+      config.type === 'sawtooth oscillator' ||
+      config.type === 'wavetable' ? (
         <ConfigureParamSource
           title='frequency'
           state={config.frequency}

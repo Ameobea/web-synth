@@ -10,7 +10,12 @@
   export let preset: PresetDescriptor<WavetablePresetDescriptor>;
   export let worker: Comlink.Remote<WavetableConfiguratorWorker>;
 
-  const fetchedPreset = getWavetablePreset(preset.preset.id);
+  let lastPresetID: number | undefined = preset.preset.id;
+  let fetchedPreset = getWavetablePreset(preset.preset.id);
+  $: if (preset.preset.id !== lastPresetID) {
+    lastPresetID = preset.preset.id;
+    fetchedPreset = getWavetablePreset(preset.preset.id);
+  }
 </script>
 
 {#await fetchedPreset}
@@ -25,7 +30,7 @@
       throw new UnreachableException();
     }}
     hideSaveControls
-    initialInstState={preset.waveforms[0].instState}
+    initialInstState={preset}
     {worker}
   />
 {:catch error}

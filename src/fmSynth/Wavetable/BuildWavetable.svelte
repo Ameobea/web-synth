@@ -2,12 +2,14 @@
   interface BuildWavetableState {
     isPlaying: boolean;
     volumeDb: number;
+    wavetablePosition: number;
     frequency: number;
   }
 
   const buildDefaultBuildWavetableState = (): BuildWavetableState => ({
     isPlaying: false,
     volumeDb: -30,
+    wavetablePosition: 0,
     frequency: 180,
   });
 </script>
@@ -24,11 +26,11 @@
   import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import {
+    BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES,
     BUILD_WAVETABLE_INST_WIDTH_PX,
     buildDefaultBuildWavetableInstanceState,
     BuildWavetableInstance,
     BuildWavetableSliderMode,
-    type BuildWavetableInstanceState,
   } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
   import StackedWaveforms from 'src/fmSynth/Wavetable/StackedWaveforms.svelte';
   import { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
@@ -36,15 +38,40 @@
 
   export let onSubmit: (val: WavetablePreset) => void;
   export let onCancel: () => void;
-  export let initialInstState: BuildWavetableInstanceState | undefined = undefined;
+  export let initialInstState: WavetablePreset | undefined = undefined;
   export let hideSaveControls = false;
   export let worker: Comlink.Remote<WavetableConfiguratorWorker>;
 
   let sliderMode: BuildWavetableSliderMode = BuildWavetableSliderMode.Magnitude;
   let inst: BuildWavetableInstance | null = null;
   let uiState: BuildWavetableState = buildDefaultBuildWavetableState();
-  let presetState: WavetablePreset = { waveforms: [] };
+  let presetState: WavetablePreset = {
+    waveforms: initialInstState?.waveforms ?? [
+      { instState: buildDefaultBuildWavetableInstanceState(), renderedWaveformSamplesBase64: '' },
+    ],
+  };
+  const renderedWavetableRef = {
+    renderedWavetable: [
+      new Float32Array(BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES * presetState.waveforms.length),
+    ],
+  };
   let activeWaveformIx = 0;
+
+  let lastInitialInstState: WavetablePreset | undefined = undefined;
+  $: if (initialInstState && initialInstState !== lastInitialInstState) {
+    lastInitialInstState = initialInstState;
+    presetState.waveforms = initialInstState.waveforms;
+    inst?.setState(presetState.waveforms[activeWaveformIx].instState);
+
+    worker
+      .renderWavetable(presetState.waveforms.map(w => w.instState))
+      .then(newRenderedWaveformSamples => {
+        renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
+      })
+      .catch(err => {
+        logError('Error rendering initial wavetable', err);
+      });
+  }
 
   const setActiveWaveformIx = (newIx: number) => {
     const serialized = inst?.serialize();
@@ -52,20 +79,46 @@
       presetState.waveforms[activeWaveformIx].instState = serialized;
     }
     activeWaveformIx = newIx;
+
+    uiState.wavetablePosition = newIx / (presetState.waveforms.length - 1);
+    inst?.setWavetablePosition(uiState.wavetablePosition);
+    inst?.setActiveWaveformIx(activeWaveformIx);
     inst?.setState(presetState.waveforms[activeWaveformIx].instState);
   };
 
-  const addWaveform = () => {
-    const instState = inst?.serialize() ?? buildDefaultBuildWavetableInstanceState();
-    presetState.waveforms.push({
-      instState,
-      renderedWaveformSamplesBase64: '',
-    });
-    setActiveWaveformIx(presetState.waveforms.length - 1);
+  let isAddingWaveform = false;
+  const addWaveform = async () => {
+    if (isAddingWaveform) {
+      return;
+    }
+    isAddingWaveform = true;
+
+    try {
+      const instState = inst?.serialize() ?? buildDefaultBuildWavetableInstanceState();
+      presetState.waveforms.push({
+        instState,
+        renderedWaveformSamplesBase64: '',
+      });
+      const newRenderedWaveformSamples: Float32Array[] = await worker.renderWavetable(
+        presetState.waveforms.map(w => w.instState)
+      );
+      renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
+
+      setActiveWaveformIx(presetState.waveforms.length - 1);
+    } catch (err) {
+      logError('Error adding waveform', err);
+    } finally {
+      isAddingWaveform = false;
+    }
   };
 
   const buildWavetableInstance = (canvas: HTMLCanvasElement) => {
-    const thisInst = new BuildWavetableInstance(canvas, worker, initialInstState);
+    const thisInst = new BuildWavetableInstance(
+      canvas,
+      worker,
+      renderedWavetableRef,
+      presetState.waveforms[0].instState
+    );
     if (!presetState.waveforms[0]) {
       presetState.waveforms[0] = {
         instState: thisInst.serialize(),
@@ -75,6 +128,8 @@
     thisInst.setSliderMode(sliderMode);
     thisInst.setVolumeDb(uiState.volumeDb);
     thisInst.setFrequency(uiState.frequency);
+    thisInst.setWavetablePosition(uiState.wavetablePosition);
+    thisInst.setActiveWaveformIx(activeWaveformIx);
     inst = thisInst;
 
     return { destroy: () => void thisInst.destroy() };
@@ -93,6 +148,10 @@
       case 'frequency hz':
         uiState.frequency = val;
         inst?.setFrequency(val);
+        break;
+      case 'wavetable position':
+        uiState.wavetablePosition = val;
+        inst?.setWavetablePosition(val);
         break;
       default:
         console.error('unhandled key', key);
@@ -171,12 +230,14 @@
             },
           },
           { type: 'checkbox', label: 'play' },
+          { type: 'range', label: 'wavetable position', min: 0, max: 1, step: 0.0001 },
           { type: 'range', label: 'frequency hz', min: 10, max: 20_000, scale: 'log' },
           { type: 'range', label: 'volume db', min: -60, max: 0 },
           { type: 'button', label: 'reset waveform', action: () => inst?.reset() },
         ]}
         state={{
           play: uiState.isPlaying,
+          'wavetable position': uiState.wavetablePosition,
           'volume db': uiState.volumeDb,
           'frequency hz': uiState.frequency,
         }}

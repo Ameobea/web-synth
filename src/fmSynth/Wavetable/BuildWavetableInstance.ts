@@ -182,6 +182,8 @@ export class BuildWavetableInstance {
   private commitDispatchSeq = 0;
   private commitRenderSeq = 0;
   private wavetable: WaveTable;
+  private activeWaveformIx = 0;
+  private renderedWavetableRef: { renderedWavetable: Float32Array[] };
   private gainNode: GainNode;
   private frequencyCSN: ConstantSourceNode;
   private wavetablePositionCSN: ConstantSourceNode;
@@ -191,11 +193,13 @@ export class BuildWavetableInstance {
   constructor(
     canvas: HTMLCanvasElement,
     worker: Comlink.Remote<WavetableConfiguratorWorker>,
+    renderedWavetableRef: { renderedWavetable: Float32Array[] },
     initialState?: BuildWavetableInstanceState
   ) {
     if (initialState) {
       this.state = initialState;
     }
+    this.renderedWavetableRef = renderedWavetableRef;
     this.worker = worker;
     WavegenWasm.get().then(async wasm => {
       if (this.destroyed) {
@@ -344,6 +348,10 @@ export class BuildWavetableInstance {
     );
   };
 
+  public setActiveWaveformIx = (activeWaveformIx: number) => {
+    this.activeWaveformIx = activeWaveformIx;
+  };
+
   private handleSliderChange = (sliderIx: number, value: number) => {
     if (this.state.sliderMode === BuildWavetableSliderMode.Magnitude) {
       this.setHarmonicMagnitude(sliderIx, value);
@@ -415,7 +423,9 @@ export class BuildWavetableInstance {
         waveformSamples[i] /= maxAbsSample;
       }
     }
-    this.wavetable.setWavetableDef([[waveformSamples]], baseFrequency);
+
+    this.renderedWavetableRef.renderedWavetable[this.activeWaveformIx] = waveformSamples;
+    this.wavetable.setWavetableDef([this.renderedWavetableRef.renderedWavetable], baseFrequency);
   };
 
   public serialize(): BuildWavetableInstanceState {

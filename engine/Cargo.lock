@@ -1216,7 +1216,7 @@ name = "wavegen"
 version = "0.1.0"
 dependencies = [
  "common",
- "fastapprox",
+ "dsp",
  "rustfft",
  "textplots",
  "waveform_renderer",

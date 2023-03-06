@@ -92,15 +92,31 @@ export class WavetableConfiguratorWorker {
       );
       encodedStateBuf.set(encodedState);
 
+      (inst.exports.wavegen_render_waveform as any)();
+
       const waveformBufPtr: number = (inst.exports.wavegen_get_waveform_buf_ptr as any)();
-      const waveformSamples = new Float32Array(memory.buffer).slice(
-        waveformBufPtr / 4,
-        waveformBufPtr / 4 + WAVEFORM_LENGTH_SAMPLES
+      // Need to clone the array buffer because the wasm module will overwrite it
+      const waveformSamples = new Float32Array(WAVEFORM_LENGTH_SAMPLES);
+      waveformSamples.set(
+        new Float32Array(memory.buffer).slice(
+          waveformBufPtr / 4,
+          waveformBufPtr / 4 + WAVEFORM_LENGTH_SAMPLES
+        )
       );
+
       if (waveformSamples.some(isNaN)) {
         console.error('NaN in waveform samples', waveformSamples);
         throw new Error('NaN in waveform samples');
       }
+
+      // Normalize
+      const max = Math.max(...waveformSamples);
+      const min = Math.min(...waveformSamples);
+      const absMax = Math.max(Math.abs(max), Math.abs(min));
+      for (let j = 0; j < waveformSamples.length; j++) {
+        waveformSamples[j] /= absMax;
+      }
+
       renderedWavetable.push(waveformSamples);
     }
 
