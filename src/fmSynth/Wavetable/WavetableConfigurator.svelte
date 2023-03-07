@@ -143,8 +143,8 @@
     display: flex;
     height: 100%;
     flex-direction: column;
-    width: 90vw;
-    height: 88vh;
+    width: 94vw;
+    height: 92vh;
     background-color: #222;
   }
 </style>

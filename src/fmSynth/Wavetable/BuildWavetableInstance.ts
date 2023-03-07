@@ -234,9 +234,10 @@ export class BuildWavetableInstance {
       this.app = new PIXI.Application({
         antialias: true,
         autoDensity: true,
+        resolution: dpr,
         view: canvas,
-        height: BUILD_WAVETABLE_INST_HEIGHT_PX * dpr,
-        width: BUILD_WAVETABLE_INST_WIDTH_PX * dpr,
+        height: BUILD_WAVETABLE_INST_HEIGHT_PX,
+        width: BUILD_WAVETABLE_INST_WIDTH_PX,
         backgroundColor: BACKGROUND_COLOR,
       });
     } catch (err) {
@@ -277,9 +278,9 @@ export class BuildWavetableInstance {
 
     // border around waveform + horizontal line in the middle to indicate 0
     const waveformDecorations = new PIXI.Graphics();
-    waveformDecorations.lineStyle(1, 0xffffff, 0.8);
+    waveformDecorations.lineStyle(0.5, 0xffffff, 0.8);
     waveformDecorations.drawRect(-1, -1, WAVEFORM_IMAGE_WIDTH_PX + 2, WAVEFORM_IMAGE_HEIGHT_PX + 2);
-    waveformDecorations.lineStyle(1, 0x888888, 0.92);
+    waveformDecorations.lineStyle(0.5, 0x888888, 0.92);
     waveformDecorations.moveTo(0, WAVEFORM_IMAGE_HEIGHT_PX / 2);
     waveformDecorations.lineTo(WAVEFORM_IMAGE_WIDTH_PX, WAVEFORM_IMAGE_HEIGHT_PX / 2);
     this.waveformContainer.addChild(waveformDecorations);

@@ -26,6 +26,7 @@
   import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import {
+    BUILD_WAVETABLE_INST_HEIGHT_PX,
     BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES,
     BUILD_WAVETABLE_INST_WIDTH_PX,
     buildDefaultBuildWavetableInstanceState,
@@ -210,7 +211,9 @@
     <StackedWaveforms {addWaveform} {setActiveWaveformIx} {activeWaveformIx} {presetState} />
     <div class="viz-container">
       <canvas
-        style="width: ${BUILD_WAVETABLE_INST_WIDTH_PX}px; height: ${BUILD_WAVETABLE_INST_WIDTH_PX}px;"
+        width={BUILD_WAVETABLE_INST_WIDTH_PX}
+        height={BUILD_WAVETABLE_INST_HEIGHT_PX}
+        style="max-width: {BUILD_WAVETABLE_INST_WIDTH_PX}px; max-height: {BUILD_WAVETABLE_INST_HEIGHT_PX}px;"
         use:buildWavetableInstance
       />
       <SvelteControlPanel
