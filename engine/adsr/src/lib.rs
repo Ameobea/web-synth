@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use dsp::{even_faster_pow, mk_linear_to_log};
+use dsp::mk_linear_to_log;
 
 #[cfg(feature = "exports")]
 pub mod exports;
@@ -52,8 +52,8 @@ fn compute_pos(prev_step: &AdsrStep, next_step: &AdsrStep, phase: f32) -> f32 {
         RampFn::Exponential { exponent } => {
             let y_diff = next_step.y - prev_step.y;
             let x = (phase - prev_step.x) / distance;
-            // prev_step.y + x.powf(exponent) * y_diff
-            prev_step.y + even_faster_pow(x, exponent) * y_diff
+            prev_step.y + x.powf(exponent) * y_diff
+            // prev_step.y + even_faster_pow(x, exponent) * y_diff
         },
     }
 }
@@ -320,7 +320,8 @@ impl Adsr {
         &mut self,
         cur_frame_start_phase: &mut f32,
         cur_frame_start_beat: f32,
-        cur_ix_in_frame: usize,
+        cur_oversampled_ix_in_frame: usize,
+        oversample_factor: usize,
     ) {
         if let GateStatus::EarlyRelease {
             cur_progress_samples,
@@ -341,6 +342,8 @@ impl Adsr {
             }
         }
 
+        let phase_diff = self.cached_phase_diff_per_sample / oversample_factor as f32;
+
         if *cur_frame_start_phase > -1. && self.len_beats.is_some() && cur_frame_start_beat > 0. {
             let len_beats = self.len_beats.unwrap();
 
@@ -354,18 +357,20 @@ impl Adsr {
 
             let cur_frame_phase_length = self.cached_phase_diff_per_sample * FRAME_SIZE as f32;
             let cur_sample_expected_phase = cur_frame_expected_start_phase
-                + cur_frame_phase_length * cur_ix_in_frame as f32 / (FRAME_SIZE - 1) as f32;
+                + cur_frame_phase_length * cur_oversampled_ix_in_frame as f32
+                    / (FRAME_SIZE * oversample_factor - 1) as f32;
             let cur_sample_expected_phase = cur_sample_expected_phase.max(0.);
-            let cur_sample_computed_phase = *cur_frame_start_phase
-                + (self.cached_phase_diff_per_sample * cur_ix_in_frame as f32);
+            let cur_sample_computed_phase =
+                *cur_frame_start_phase + (phase_diff * cur_oversampled_ix_in_frame as f32);
 
-            let mix = cur_ix_in_frame as f32 / (FRAME_SIZE - 1) as f32;
+            let mix =
+                cur_oversampled_ix_in_frame as f32 / (FRAME_SIZE * oversample_factor - 1) as f32;
             self.phase = cur_sample_expected_phase * mix + cur_sample_computed_phase * (1. - mix);
         } else {
             if matches!(self.gate_status, GateStatus::Gated) {
-                self.phase += self.cached_phase_diff_per_sample;
+                self.phase += phase_diff;
             } else {
-                self.phase = (self.phase + self.cached_phase_diff_per_sample).min(1.);
+                self.phase = (self.phase + phase_diff).min(1.);
             }
         }
 
@@ -401,15 +406,13 @@ impl Adsr {
         }
     }
 
-    /// Advance the ADSR state by one sample worth and return the output for the current sample
-    fn get_sample(
+    fn get_sample_inner(
         &mut self,
         cur_frame_start_phase: &mut f32,
         cur_frame_start_beat: f32,
-        cur_ix_in_frame: usize,
+        cur_oversampled_ix_in_frame: usize,
+        oversample_factor: usize,
     ) -> f32 {
-        self.advance_phase(cur_frame_start_phase, cur_frame_start_beat, cur_ix_in_frame);
-
         let sample = match self.gate_status {
             GateStatus::EarlyRelease {
                 cur_progress_samples,
@@ -441,7 +444,39 @@ impl Adsr {
         };
 
         debug_assert!(sample.is_normal() || sample == 0.);
+
+        self.advance_phase(
+            cur_frame_start_phase,
+            cur_frame_start_beat,
+            cur_oversampled_ix_in_frame,
+            oversample_factor,
+        );
+
         sample
+    }
+
+    /// Advance the ADSR state by one sample worth and return the output for the current sample.
+    ///
+    /// Performs oversampling by calling `get_sample_inner()` multiple times and averaging the
+    /// results.
+    fn get_sample(
+        &mut self,
+        cur_frame_start_phase: &mut f32,
+        cur_frame_start_beat: f32,
+        cur_ix_in_frame: usize,
+    ) -> f32 {
+        let mut sample = 0.;
+        const OVERSAMPLE_FACTOR: usize = 8;
+        for i in 0..OVERSAMPLE_FACTOR {
+            let cur_oversampled_ix_in_frame = cur_ix_in_frame * OVERSAMPLE_FACTOR + i;
+            sample += self.get_sample_inner(
+                cur_frame_start_phase,
+                cur_frame_start_beat,
+                cur_oversampled_ix_in_frame,
+                OVERSAMPLE_FACTOR,
+            );
+        }
+        sample / OVERSAMPLE_FACTOR as f32
     }
 
     fn maybe_write_cur_phase(&self) {

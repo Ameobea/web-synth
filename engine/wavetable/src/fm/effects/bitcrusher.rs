@@ -1,4 +1,4 @@
-use dsp::even_faster_pow2;
+use std::cell::Cell;
 
 use super::Effect;
 use crate::fm::ParamSource;
@@ -7,6 +7,8 @@ use crate::fm::ParamSource;
 pub struct Bitcrusher {
     pub sample_rate: ParamSource,
     pub bit_depth: ParamSource,
+    pub last_bit_depth: Cell<f32>,
+    pub amplitude_bucket_count: Cell<f32>,
     pub samples_since_last_sample: usize,
     pub held_sample: f32,
 }
@@ -16,17 +18,29 @@ impl Bitcrusher {
         Bitcrusher {
             sample_rate,
             bit_depth,
+            last_bit_depth: Cell::new(std::f32::INFINITY),
+            amplitude_bucket_count: Cell::new(std::f32::INFINITY),
             samples_since_last_sample: 0,
             held_sample: 0.,
         }
     }
 
-    fn discretize_sample(bit_depth: f32, sample: f32) -> f32 {
+    fn discretize_sample(&self, bit_depth: f32, sample: f32) -> f32 {
         if bit_depth == 1. {
             return sample;
         }
 
-        let amplitude_bucket_count = even_faster_pow2(bit_depth);
+        let last_bit_depth = self.last_bit_depth.get();
+        let amplitude_bucket_count = if last_bit_depth == bit_depth {
+            self.amplitude_bucket_count.get()
+        } else {
+            self.last_bit_depth.set(bit_depth);
+            // let amplitude_bucket_count = even_faster_pow2(bit_depth);
+            let amplitude_bucket_count = 2.0_f32.powf(bit_depth);
+            self.amplitude_bucket_count.set(amplitude_bucket_count);
+            amplitude_bucket_count
+        };
+
         dsp::quantize(-1., 1., amplitude_bucket_count, sample)
     }
 }
@@ -44,7 +58,7 @@ impl Effect for Bitcrusher {
 
         let bit_depth = dsp::clamp(1., 32., unsafe { *rendered_params.get_unchecked(1) });
 
-        self.held_sample = Self::discretize_sample(bit_depth, sample);
+        self.held_sample = self.discretize_sample(bit_depth, sample);
         self.held_sample
     }
 

@@ -373,8 +373,9 @@ impl ExponentialOscillator {
         self.update_phase(frequency);
         let stretch_factor = dsp::clamp(0., 1., stretch_factor);
 
-        // let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
-        let exponent_numerator = even_faster_pow(10.0f32, 4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+        let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+        // let exponent_numerator = even_faster_pow(10.0f32, 4.0 * (stretch_factor * 0.8 + 0.35)) +
+        // 1.;
         let exponent_denominator = 999.0f32;
         let exponent = exponent_numerator / exponent_denominator;
 
