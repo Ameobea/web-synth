@@ -33,6 +33,14 @@ pub enum SynthType {
 // HP8 = 'order 8 highpass',
 // HP16 = 'order 16 highpass',
 // Bandpass = 'bandpass',
+// BP4 = 'order 4 bandpass',
+// BP8 = 'order 8 bandpass',
+// BP16 = 'order 16 bandpass',
+// DynaBP_50 = 'dynamic bandpass (50 Hz)',
+// DynaBP_100 = 'dynamic bandpass (100 Hz)',
+// DynaBP_200 = 'dynamic bandpass (200 Hz)',
+// DynaBP_400 = 'dynamic bandpass (400 Hz)',
+// DynaBP_800 = 'dynamic bandpass (800 Hz)',
 // Lowshelf = 'lowshelf',
 // Highshelf = 'highshelf',
 // Peaking = 'peaking',
@@ -58,6 +66,22 @@ pub enum FilterType {
     HP16,
     #[serde(rename = "bandpass")]
     Bandpass,
+    #[serde(rename = "order 4 bandpass")]
+    BP4,
+    #[serde(rename = "order 8 bandpass")]
+    BP8,
+    #[serde(rename = "order 16 bandpass")]
+    BP16,
+    #[serde(rename = "dynamic bandpass (50 Hz)")]
+    DynaBP50,
+    #[serde(rename = "dynamic bandpass (100 Hz)")]
+    DynaBP100,
+    #[serde(rename = "dynamic bandpass (200 Hz)")]
+    DynaBP200,
+    #[serde(rename = "dynamic bandpass (400 Hz)")]
+    DynaBP400,
+    #[serde(rename = "dynamic bandpass (800 Hz)")]
+    DynaBP800,
     #[serde(rename = "lowshelf")]
     Lowshelf,
     #[serde(rename = "highshelf")]

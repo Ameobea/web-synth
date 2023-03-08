@@ -32,20 +32,20 @@ export class MIDIEditorInstance {
 
   private midiInputCBs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
-      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
-        this.midiInput.onAttack(note, velocity);
-        this.uiInstance?.onGated(this.lineCount - note);
-      }
+      // if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
+      this.midiInput.onAttack(note, velocity);
+      this.uiInstance?.onGated(this.lineCount - note);
+      // }
 
       if (this.playbackHandler?.recordingCtx) {
         this.playbackHandler.recordingCtx.onAttack(note);
       }
     },
     onRelease: (note, velocity) => {
-      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
-        this.midiInput.onRelease(note, velocity);
-        this.uiInstance?.onUngated(this.lineCount - note);
-      }
+      // if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
+      this.midiInput.onRelease(note, velocity);
+      this.uiInstance?.onUngated(this.lineCount - note);
+      // }
 
       if (this.playbackHandler?.recordingCtx) {
         this.playbackHandler.recordingCtx.onRelease(note);

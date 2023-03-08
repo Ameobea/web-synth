@@ -307,33 +307,30 @@ pub async fn get_synth_presets(
         voice_presets_by_id.insert(voice_preset.id, voice_preset);
     }
 
-    Ok(
-        Json(
-            synth_presets_
-                .into_iter()
-                .map(
-                    |(synth_preset_id, title_, description_, body_, user_id_)|
-                     -> Result<InlineSynthPresetEntry, String> {
-                        let body_: SynthPreset =
-                            serde_json::from_str(&body_).map_err(|err| -> String {
-                                error!("Invalid synth preset body provided: {:?}", err);
-                                "Invalid synth preset body provided".into()
-                            })?;
-                        let inlined_body = InlineSynthPreset {
-                            voices: body_.voices,
-                        };
-                        Ok(InlineSynthPresetEntry {
-                            id: synth_preset_id,
-                            title: title_,
-                            description: description_,
-                            body: inlined_body,
-                            user_id: user_id_,
-                        })
-                    },
-                )
-                .collect::<Result<Vec<_>, String>>()?,
-        ),
-    )
+    let presets = synth_presets_
+        .into_iter()
+        .map(
+            |(synth_preset_id, title_, description_, body_, user_id_)| -> Result<InlineSynthPresetEntry, String> {
+                let body_: SynthPreset =
+                    serde_json::from_str(&body_).map_err(|err| -> String {
+                        error!("Invalid synth preset body provided: {:?}", err);
+                        "Invalid synth preset body provided".into()
+                    })?;
+                let inlined_body = InlineSynthPreset {
+                    voices: body_.voices,
+                };
+                Ok(InlineSynthPresetEntry {
+                    id: synth_preset_id,
+                    title: title_,
+                    description: description_,
+                    body: inlined_body,
+                    user_id: user_id_,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, String>>()?;
+
+    Ok(Json(presets))
 }
 
 #[post("/synth_presets", data = "<preset>")]

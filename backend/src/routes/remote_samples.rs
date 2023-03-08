@@ -104,6 +104,8 @@ pub async fn list_remote_samples(
         all_remote_samples.extend(private_samples);
     }
 
+    all_remote_samples.retain(|s| !s.name.to_ascii_lowercase().contains(".ds_store"));
+
     Ok(Json(all_remote_samples))
 }
 
