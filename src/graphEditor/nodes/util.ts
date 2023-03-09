@@ -70,6 +70,13 @@ export const createPassthroughNode = <T extends GainNode = GainNode>(
   return node;
 };
 
+const buildManualControl = (ctx: AudioContext) => {
+  const manualControl = new ConstantSourceNode(ctx);
+  manualControl.offset.value = 0;
+  manualControl.start();
+  return manualControl;
+};
+
 /**
  * Wraps an `AudioParm` with a switch that toggles between a `manualControl` input and everything connected to
  * the created `OverridableAudioParam` itself.
@@ -104,7 +111,7 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     this.ctx = ctx;
 
     this.wrappedParam = wrappedParam || this.buildWrappedParam();
-    this.manualControl = manualControl || this.buildManualControl();
+    this.manualControl = manualControl || buildManualControl(ctx);
 
     this.isOverridden = defaultOverridden;
     if (defaultOverridden) {
@@ -113,13 +120,6 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
       this.connect(this.wrappedParam);
     }
   }
-
-  private buildManualControl = () => {
-    const manualControl = new ConstantSourceNode(this.ctx);
-    manualControl.offset.value = 0;
-    manualControl.start();
-    return manualControl;
-  };
 
   private buildWrappedParam = () => {
     const node = new ConstantSourceNode(this.ctx);
@@ -189,6 +189,52 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     }
     if (this.outputCSN) {
       this.outputCSN.disconnect();
+    }
+  }
+}
+
+/**
+ * Similar to `OverridableAudioParam`, but instead of wrapping an `AudioParam` directly, it outputs the passthrough or
+ * override value on itself.
+ */
+export class OverridableAudioNode extends GainNode {
+  public manualControl: ConstantSourceNode;
+  private isOverridden: boolean;
+  public output: GainNode;
+
+  constructor(ctx: AudioContext, manualControl?: ConstantSourceNode, defaultOverridden = true) {
+    super(ctx);
+
+    this.manualControl = manualControl || buildManualControl(ctx);
+    this.isOverridden = defaultOverridden;
+    this.output = new GainNode(ctx);
+    this.output.gain.value = 1;
+
+    if (defaultOverridden) {
+      this.manualControl.connect(this.output);
+    } else {
+      this.connect(this.output);
+    }
+    this.isOverridden = defaultOverridden;
+  }
+
+  public getIsOverridden(): boolean {
+    return this.isOverridden;
+  }
+
+  public setIsOverridden(isOverridden: boolean) {
+    if (isOverridden === this.isOverridden) {
+      return;
+    }
+
+    this.isOverridden = isOverridden;
+
+    if (isOverridden) {
+      this.disconnect(this.output);
+      this.manualControl.connect(this.output);
+    } else {
+      this.manualControl.disconnect(this.output);
+      this.connect(this.output);
     }
   }
 }

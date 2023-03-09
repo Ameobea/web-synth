@@ -99,12 +99,12 @@
     }
     if (disconnect) {
       try {
-        gainInput.disconnect(gainParam);
+        gainInput.output.disconnect(gainParam);
       } catch (e) {
         // Ignore
       }
     } else {
-      gainInput.connect(gainParam);
+      gainInput.output.connect(gainParam);
     }
 
     const trackInput = mixer.gainNodes[trackIx];

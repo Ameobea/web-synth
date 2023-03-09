@@ -2,7 +2,7 @@ import { Map } from 'immutable';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView.svelte';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { OverridableAudioNode, type OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
@@ -11,7 +11,7 @@ export const MAX_MIXER_TRACK_COUNT = 16;
 
 export class MixerNode {
   public gainNodes: GainNode[];
-  public gainParams: OverridableAudioParam[];
+  public gainParams: OverridableAudioNode[];
   private outputNode: GainNode;
   private vcId: string;
   private ctx: AudioContext;
@@ -31,7 +31,11 @@ export class MixerNode {
     this.outputNode = new GainNode(ctx);
     this.gainNodes = [new GainNode(ctx), new GainNode(ctx)];
     this.gainNodes.forEach(gain => gain.connect(this.outputNode));
-    this.gainParams = this.gainNodes.map(gain => new OverridableAudioParam(ctx, gain.gain));
+    this.gainParams = this.gainNodes.map(gain => {
+      const param = new OverridableAudioNode(ctx);
+      param.output.connect(gain.gain);
+      return param;
+    });
     this.node = this.outputNode;
     this.renderSmallView = mkSvelteContainerRenderHelper({
       Comp: MixerSmallView,
@@ -53,7 +57,6 @@ export class MixerNode {
           }
 
           gains.forEach((gain, i) => {
-            // Set the value of the overrides for each of the
             this.gainParams[i].manualControl.offset.value = gain;
           });
         }
@@ -65,7 +68,9 @@ export class MixerNode {
     const newGain = new GainNode(this.ctx);
     newGain.connect(this.outputNode);
     this.gainNodes.push(newGain);
-    this.gainParams.push(new OverridableAudioParam(this.ctx, newGain.gain));
+    const gainParam = new OverridableAudioNode(this.ctx);
+    gainParam.output.connect(newGain.gain);
+    this.gainParams.push(gainParam);
     updateConnectables(this.vcId, this.buildConnectables());
   }
 
@@ -75,7 +80,8 @@ export class MixerNode {
     }
 
     const removedGain = this.gainNodes.pop()!;
-    this.gainParams.pop();
+    const removedParam = this.gainParams.pop();
+    removedParam?.output.disconnect();
     // Don't disconnect any incoming connections to this input; those will be trimmed by the graph diffing.
     // Only disconnect the internal connection.
     removedGain.disconnect(this.outputNode);

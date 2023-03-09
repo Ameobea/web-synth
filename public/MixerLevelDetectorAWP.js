@@ -12,7 +12,13 @@ const SAMPLE_RATE = 44_100;
 // 1 full waveform at 20hz
 const WINDOW_SIZE_SAMPLES = SAMPLE_RATE / 20;
 
-const gainToDb = gain => 20 * Math.log10(gain);
+const gainToDb = gain => {
+  const absGain = Math.abs(gain);
+  if (absGain <= 0.00001) {
+    return -100;
+  }
+  return 20 * Math.log10(absGain);
+};
 
 class MixerLevelDetectorAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -102,16 +108,34 @@ class MixerLevelDetectorAWP extends AudioWorkletProcessor {
     );
     ioBuf.set(input);
 
-    this.wasmInstance.exports.level_detector_process(this.ctxPtr, WINDOW_SIZE_SAMPLES * 2);
-    const preGain = ioBuf[ioBuf.length - 1];
+    this.wasmInstance.exports.level_detector_process(ctxPtr, WINDOW_SIZE_SAMPLES);
+    const postGain = ioBuf[FRAME_SIZE - 1];
+    const preGain = appliedGain < 0.00001 ? 0 : postGain / appliedGain;
 
-    const postGain = preGain * appliedGain;
-
-    const preGainDb = gainToDb(preGain);
-    const postGainDb = gainToDb(postGain);
+    const preGainDb = Math.max(gainToDb(preGain), -100);
+    const postGainDb = Math.max(gainToDb(postGain), -100);
+    if (Number.isNaN(preGainDb) || Number.isNaN(postGainDb)) {
+      console.error('NaN in level detector', {
+        preGain,
+        postGain,
+        appliedGain,
+        preGainDb,
+        postGainDb,
+      });
+    }
 
     this.audioThreadDataBuffer[baseSABIx] = preGainDb;
     this.audioThreadDataBuffer[baseSABIx + 1] = postGainDb;
+
+    // low-pass with existing value to reduce flickering
+    const oldPreGain = this.audioThreadDataBuffer[baseSABIx];
+    this.audioThreadDataBuffer[baseSABIx] = Number.isNaN(oldPreGain)
+      ? preGainDb
+      : 0.8 * oldPreGain + 0.2 * preGainDb;
+    const oldPostGain = this.audioThreadDataBuffer[baseSABIx + 1];
+    this.audioThreadDataBuffer[baseSABIx + 1] = Number.isNaN(oldPostGain)
+      ? postGainDb
+      : 0.8 * oldPostGain + 0.2 * postGainDb;
   }
 
   process(inputs, _outputs, params) {
@@ -135,7 +159,7 @@ class MixerLevelDetectorAWP extends AudioWorkletProcessor {
       }
 
       const ctxPtr = this.ctxPtrs[trackIx];
-      const appliedGain = params[`track_${trackIx}_gain`][0];
+      const appliedGain = Math.abs(params[`track_${trackIx}_gain`][0] + 1);
 
       this.processTrackAndWriteToSAB(wasmMemory, trackIx * 2, input, ctxPtr, appliedGain);
     }

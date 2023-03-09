@@ -4,6 +4,7 @@ import * as R from 'ramda';
 import { get, type Writable } from 'svelte/store';
 
 import * as PIXI from 'src/controls/pixi';
+import { destroyPIXIApp } from 'src/controls/pixiUtils';
 import type { MIDIEditorInstance } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
 import type { CVOutput, SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
@@ -1241,7 +1242,7 @@ export default class MIDIEditorUIInstance {
     this.destroyed = true;
     this.cleanupEventHandlers();
     try {
-      this.app.destroy();
+      destroyPIXIApp(this.app);
     } catch (err) {
       console.warn('Error destroying MIDI editor PIXI instance: ', err);
     }

@@ -3,7 +3,7 @@ import { Map } from 'immutable';
 import * as R from 'ramda';
 
 import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import { OverridableAudioNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DefaultComposition from 'src/init-composition.json';
 import type {
   AudioConnectables,
@@ -52,8 +52,8 @@ export const connectNodes = (
   dst: AudioNode | MIDINode | AudioParam,
   dstDescriptor: ConnectableDescriptor
 ) => {
-  // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
-  if (dst instanceof OverridableAudioParam) {
+  // We handle the special case of an `OverridableAudioParam` or `OverridableAudioNode` here, notifying it of its potentially new status
+  if (dst instanceof OverridableAudioParam || dst instanceof OverridableAudioNode) {
     dst.setIsOverridden(false);
   }
 
@@ -65,8 +65,8 @@ export const disconnectNodes = (
   dst: AudioNode | MIDINode | AudioParam,
   dstDescriptor: ConnectableDescriptor
 ) => {
-  // We handle the special case of an `OverridableAudioParam` here, notifying it of its potentially new status
-  if (dst instanceof OverridableAudioParam) {
+  // We handle the special case of an `OverridableAudioParam` or `OverridableAudioNode` here, notifying it of its potentially new status
+  if (dst instanceof OverridableAudioParam || dst instanceof OverridableAudioNode) {
     dst.setIsOverridden(true);
   }
 

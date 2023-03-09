@@ -39,6 +39,11 @@ impl RMSLevelDetector {
                 sum = self.sum
             );
         }
+
+        // To deal with floating point precision issues, we tend the sum towards zero slightly so
+        // that it doesn't get stuck at a non-zero value when the input is silent.
+        self.sum *= 0.999999;
+
         output
     }
 

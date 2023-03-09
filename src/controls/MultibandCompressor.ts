@@ -1,6 +1,6 @@
 import { get, type Writable } from 'svelte/store';
 
-import { makeDraggable } from 'src/controls/pixiUtils';
+import { destroyPIXIApp, makeDraggable } from 'src/controls/pixiUtils';
 import type {
   CompressorBandState,
   CompressorNodeUIState,
@@ -348,6 +348,6 @@ export class MultibandCompressorControls {
   }
 
   public dispose() {
-    this.app.destroy(false, { children: true, texture: true, baseTexture: true });
+    destroyPIXIApp(this.app);
   }
 }
