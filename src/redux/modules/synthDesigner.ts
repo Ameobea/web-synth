@@ -120,6 +120,10 @@ export const serializeSynthModule = (synth: SynthModule) => ({
   filterEnvelopeEnabled: synth.filterEnvelopeEnabled,
 });
 
+/**
+ * Connects or disconnects the FM synth output for all voices to either the filter or the voice outer gain
+ * node depending on whether the filter is bypassed.
+ */
 const connectOscillators = (connect: boolean, synth: SynthModule) =>
   synth.voices.forEach((voice, voiceIx) => {
     const voiceDst = synth.filterBypassed ? voice.outerGainNode : voice.filterNode.getInput();
@@ -437,7 +441,7 @@ export const deserializeSynthModule = (
 
   const voices = base.voices.map(voice => {
     voice.outerGainNode.gain.value = masterGain + 1;
-    voice.filterNode.getOutput().connect(voice.outerGainNode);
+    // voice.filterNode.getOutput().connect(voice.outerGainNode);
     Object.entries(filterParams)
       .filter(([k, _v]) => k !== 'type')
       .forEach(([key, val]: [keyof typeof filterParams, any]) =>

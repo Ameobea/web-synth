@@ -466,7 +466,7 @@ impl Adsr {
         cur_ix_in_frame: usize,
     ) -> f32 {
         let mut sample = 0.;
-        const OVERSAMPLE_FACTOR: usize = 8;
+        const OVERSAMPLE_FACTOR: usize = 4;
         for i in 0..OVERSAMPLE_FACTOR {
             let cur_oversampled_ix_in_frame = cur_ix_in_frame * OVERSAMPLE_FACTOR + i;
             sample += self.get_sample_inner(

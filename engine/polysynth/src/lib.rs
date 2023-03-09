@@ -160,12 +160,6 @@ impl<
         }
     }
 
-    pub fn trigger_attacks(&mut self, note_ids: &[usize], velocity: u8) {
-        for note_id in note_ids {
-            self.trigger_attack(*note_id, velocity, None);
-        }
-    }
-
     pub fn trigger_release_cb(&mut self, note_id: usize) -> Option<usize> {
         let target_voice_ix = match self.find_ix_of_voice_playing(note_id) {
             Some(target_voice_ix) => target_voice_ix,

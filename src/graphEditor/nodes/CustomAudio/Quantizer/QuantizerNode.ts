@@ -78,7 +78,11 @@ export default class QuantizerNode implements ForeignNode {
       QuantizerWasmBytes.get(),
       QuantizerAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'quantizer');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'quantizer', {
+      channelCount: 1,
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+    });
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     this.onChange(get(this.store));

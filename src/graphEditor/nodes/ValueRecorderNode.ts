@@ -36,7 +36,11 @@ export const createValueRecorder = async (
   defaultValue: number
 ): Promise<ValueRecorder> => {
   await registerRecorder(ctx);
-  const workletHandle = new AudioWorkletNode(ctx, 'value-recorder-audio-worklet-node-processor');
+  const workletHandle = new AudioWorkletNode(ctx, 'value-recorder-audio-worklet-node-processor', {
+    numberOfInputs: 0,
+    numberOfOutputs: 0,
+    channelCount: 1,
+  });
 
   const param: ValueRecorder = (workletHandle.parameters as any).get('input');
   param.lastValue = defaultValue;

@@ -82,7 +82,11 @@ export class FMSynthFxNode implements ForeignNode {
       WavetableWasmBytes.get(),
       FMSynthFxAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-fx-awp');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-fx-awp', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      channelCount: 1,
+    });
     updateConnectables(this.vcId, this.buildConnectables());
 
     this.awpHandle.port.onmessage = evt => {

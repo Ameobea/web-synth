@@ -74,7 +74,11 @@ export class LevelDetectorNode implements ForeignNode {
       LevelDetectorWasmBytes.get(),
       LevelDetectorAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'level-detector-awp');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'level-detector-awp', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      channelCount: 1,
+    });
 
     const awpParams = this.awpHandle.parameters as Map<string, AudioParam>;
     this.windowSizeSamples = new OverridableAudioParam(

@@ -335,7 +335,9 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       // First `VOICE_COUNT` outputs are for the actual voice outputs
       // Second `VOICE_COUNT` outputs are for the outputs of the filter envelope generator
+      numberOfInputs: 0,
       numberOfOutputs: VOICE_COUNT * 2,
+      channelCount: 1,
       processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
     });
 

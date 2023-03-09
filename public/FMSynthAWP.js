@@ -339,6 +339,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
 
           this.wasmInstance.exports.fm_synth_clear_output_buffer(this.ctxPtr, evt.data.voiceIx);
+          this.tacentVoiceFlags[evt.data.voiceIx] = 1;
           break;
         }
         case 'setFrequencyMultiplier': {
@@ -426,8 +427,10 @@ class FMSynthAWP extends AudioWorkletProcessor {
         log_err: this.handleWasmPanic,
         log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
         debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }),
-        on_gate_cb: (midiNumber, voiceIx) =>
-          this.port.postMessage({ type: 'onGate', midiNumber, voiceIx }),
+        on_gate_cb: (midiNumber, voiceIx) => {
+          this.tacentVoiceFlags[voiceIx] = 0;
+          this.port.postMessage({ type: 'onGate', midiNumber, voiceIx });
+        },
         on_ungate_cb: (midiNumber, voiceIx) =>
           this.port.postMessage({ type: 'onUngate', midiNumber, voiceIx }),
       },
@@ -437,7 +440,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.wasmInstance.exports.memory.grow(1024 * 4);
     this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx(VOICE_COUNT);
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
-    this.tacentVoiceFlags = new Uint8Array(VOICE_COUNT);
+    this.tacentVoiceFlags = new Uint8Array(VOICE_COUNT).fill(1);
 
     outputWeights.forEach((paramSource, operatorIx) =>
       this.wasmInstance.exports.fm_synth_set_output_weight_value(
@@ -514,7 +517,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
     let msg;
     while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
       const { eventType, param1 } = msg;
-      // console.log('GOT MAIL ' + this.mailboxID + JSON.stringify(msg));
       switch (eventType) {
         case 0: // Attack
           if (!this.wasmInstance) {
@@ -597,7 +599,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
       const voiceIsTacent = this.tacentVoiceFlags[voiceIx];
       if (voiceIsTacent) {
-        outputs[voiceIx]?.[0]?.fill(0);
+        // outputs[voiceIx]?.[0]?.fill(0);
         continue;
       }
 

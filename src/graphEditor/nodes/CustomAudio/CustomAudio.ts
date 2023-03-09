@@ -27,6 +27,7 @@ import MIDIQuantizerNode from 'src/graphEditor/nodes/CustomAudio/MIDIQuantizer/M
 import { MIDIToFrequencyNode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequency';
 import { MixerNode } from 'src/graphEditor/nodes/CustomAudio/mixer';
 import { MultiplyNode } from 'src/graphEditor/nodes/CustomAudio/MultiplyNode/MultiplyNode';
+import { NativeCompressorSmallViewShim } from 'src/graphEditor/nodes/CustomAudio/NativeCompressor/NativeCompressorSmallViewShim';
 import { NoiseGenNode } from 'src/graphEditor/nodes/CustomAudio/NoiseGen';
 import QuantizerNode from 'src/graphEditor/nodes/CustomAudio/Quantizer/QuantizerNode';
 import SamplePlayerNode from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
@@ -347,6 +348,42 @@ const CustomDestinationNode = enhanceAudioNode({
   paramKeys: [],
 });
 
+const NativeCompressorNode = enhanceAudioNode({
+  AudioNodeClass: DynamicsCompressorNode,
+  nodeType: 'customAudio/nativeCompressor',
+  name: 'Native Compressor',
+  buildConnectables: (
+    foreignNode: ForeignNode<DynamicsCompressorNode> & {
+      node: DynamicsCompressorNode;
+    }
+  ) => ({
+    inputs: Map<string, ConnectableInput>(
+      Object.entries({
+        input: { node: foreignNode.node, type: 'customAudio' },
+        threshold: { node: foreignNode.paramOverrides.threshold.param, type: 'number' },
+        knee: { node: foreignNode.paramOverrides.knee.param, type: 'number' },
+        ratio: { node: foreignNode.paramOverrides.ratio.param, type: 'number' },
+        attack: { node: foreignNode.paramOverrides.attack.param, type: 'number' },
+        release: { node: foreignNode.paramOverrides.release.param, type: 'number' },
+      })
+    ),
+    outputs: Map<string, ConnectableOutput>().set('output', {
+      node: foreignNode.node,
+      type: 'customAudio',
+    }),
+    node: foreignNode,
+  }),
+  getOverridableParams: (node: DynamicsCompressorNode) => [
+    { name: 'threshold', param: node.threshold, defaultValue: -24 },
+    { name: 'knee', param: node.knee, defaultValue: 30 },
+    { name: 'ratio', param: node.ratio, defaultValue: 12 },
+    { name: 'attack', param: node.attack, defaultValue: 0.003 },
+    { name: 'release', param: node.release, defaultValue: 0.25 },
+  ],
+  paramKeys: ['threshold', 'knee', 'ratio', 'attack', 'release'],
+  SmallViewRenderer: NativeCompressorSmallViewShim,
+});
+
 /**
  * A map of functions that can be used to build a new `ForeignNode`.  The getter provides the VC ID of the foreign node
  * that this will belong to as well as an optional `params` object of state to build it with.
@@ -457,6 +494,9 @@ export const audioNodeGetters: {
   },
   'customAudio/levelDetector': {
     nodeGetter: LevelDetectorNode,
+  },
+  'customAudio/nativeCompressor': {
+    nodeGetter: NativeCompressorNode,
   },
 };
 

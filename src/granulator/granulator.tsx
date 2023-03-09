@@ -196,7 +196,11 @@ export const init_granulator = async (stateKey: string) => {
 
   const granularWasmPromise = GranularWasm.get();
   GranulatorRegistered.get().then(async () => {
-    const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor');
+    const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor', {
+      channelCount: 1,
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+    });
     const granularWasm = await granularWasmPromise;
     // Once we've fetched the Wasm bytes for the granular's DSP instance, we send them to the AWP
     // to be instantiated and start.

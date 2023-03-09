@@ -119,7 +119,7 @@ export class CompressorNode implements ForeignNode {
   private knee: OverridableAudioParam | DummyNode = new DummyNode();
   private lookaheadMs: OverridableAudioParam | DummyNode = new DummyNode();
 
-  static typeName = 'Compressor';
+  static typeName = 'Multi Compressor';
   public nodeType = 'customAudio/compressor';
 
   public paramOverrides: {
@@ -183,7 +183,11 @@ export class CompressorNode implements ForeignNode {
       CompressorWasmBytes.get(),
       CompressorAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'compressor-awp');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'compressor-awp', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      channelCount: 1,
+    });
     this.awpHandle.port.onmessage = (e: MessageEvent) => this.handleMessageFromAWP(e);
 
     const params = this.awpHandle.parameters as Map<string, AudioParam>;
