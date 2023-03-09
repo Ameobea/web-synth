@@ -2,7 +2,7 @@ import * as Comlink from 'comlink';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
-import { makeDraggable } from 'src/controls/pixiUtils';
+import { destroyPIXIApp, makeDraggable } from 'src/controls/pixiUtils';
 import { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
 import WaveTable, {
   type WavetableDef,
@@ -451,7 +451,7 @@ export class BuildWavetableInstance {
       return;
     }
     this.destroyed = true;
-    this.app.destroy(false, { children: true, texture: true, baseTexture: true });
+    destroyPIXIApp(this.app);
     this.wavetable.shutdown();
     this.gainNode.disconnect();
     this.frequencyCSN.disconnect();

@@ -11,7 +11,7 @@ import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 's
 import { AsyncOnce } from 'src/util';
 import LevelDetectorNodeSmallView from './LevelDetectorNodeSmallView.svelte';
 
-const LevelDetectorWasmBytes = new AsyncOnce(
+export const LevelDetectorWasmBytes = new AsyncOnce(
   () =>
     fetch(
       process.env.ASSET_PATH +
@@ -23,7 +23,9 @@ const LevelDetectorWasmBytes = new AsyncOnce(
 const LevelDetectorAWPRegistered = new AsyncOnce(
   () =>
     new AudioContext().audioWorklet.addModule(
-      process.env.ASSET_PATH + 'LevelDetectorAWP.js?cacheBust=' + crypto.randomUUID()
+      process.env.ASSET_PATH +
+        'LevelDetectorAWP.js?cacheBust=' +
+        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
     ),
   true
 );

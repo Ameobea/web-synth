@@ -6,6 +6,7 @@ import ControlPanel from 'react-control-panel';
 
 import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
 import * as PIXI from 'src/controls/pixi';
+import { destroyPIXIApp } from 'src/controls/pixiUtils';
 import {
   AdsrLengthMode,
   type Adsr,
@@ -1239,7 +1240,10 @@ export class ADSR2Instance {
   }
 
   public destroy() {
-    this.app?.destroy(false, { children: true });
+    if (this.app) {
+      destroyPIXIApp(this.app, { children: true });
+    }
+
     if (this.vcId) {
       unregisterVcHideCb(this.vcId, this.onHiddenStatusChanged);
     }

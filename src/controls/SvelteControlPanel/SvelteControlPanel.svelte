@@ -7,13 +7,13 @@
         max: number;
         step?: number;
         scale?: 'log';
-        initialValue?: number;
+        initial?: number;
       }
     | {
         type: 'select';
         label: string;
         options: string[] | Record<any, any>;
-        initialValue?: string | number;
+        initial?: string | number;
       }
     | {
         type: 'interval';
@@ -21,12 +21,12 @@
         min: number;
         max: number;
         step?: number;
-        initialValue?: [number, number];
+        initial?: [number, number];
       }
     | { type: 'button'; label: string; action: () => void }
-    | { type: 'checkbox'; label: string; initialValue?: boolean }
-    | { type: 'text'; label: string; initialValue?: string }
-    | { type: 'custom'; label: string; Comp: React.FC<any>; initialValue?: any };
+    | { type: 'checkbox'; label: string; initial?: boolean }
+    | { type: 'text'; label: string; initial?: string }
+    | { type: 'custom'; label: string; Comp: React.FC<any>; initial?: any };
 
   export interface ControlPanelTheme {
     background1: string;
@@ -61,6 +61,7 @@
     | undefined = undefined;
   export let style: CSSProperties | undefined = undefined;
   export let theme: Partial<ControlPanelTheme> | undefined = undefined;
+  export let width: number | undefined = undefined;
 </script>
 
 <ReactShim
@@ -71,5 +72,6 @@
     onChange,
     style,
     theme: theme ? { ...BaseTheme, ...theme } : undefined,
+    width,
   }}
 />

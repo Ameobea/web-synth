@@ -1,14 +1,16 @@
 import { Map } from 'immutable';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
+import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView.svelte';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+
+export const MAX_MIXER_TRACK_COUNT = 16;
 
 export class MixerNode {
-  private gainNodes: GainNode[];
+  public gainNodes: GainNode[];
   public gainParams: OverridableAudioParam[];
   private outputNode: GainNode;
   private vcId: string;
@@ -31,11 +33,11 @@ export class MixerNode {
     this.gainNodes.forEach(gain => gain.connect(this.outputNode));
     this.gainParams = this.gainNodes.map(gain => new OverridableAudioParam(ctx, gain.gain));
     this.node = this.outputNode;
-    this.renderSmallView = mkContainerRenderHelper({
+    this.renderSmallView = mkSvelteContainerRenderHelper({
       Comp: MixerSmallView,
       getProps: () => ({ mixer: this }),
     });
-    this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
+    this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
 
     if (params) {
       Object.entries(params).forEach(([key, val]) => {
@@ -45,6 +47,7 @@ export class MixerNode {
             return;
           }
           const gains = val as number[];
+          console.log({ gains });
           while (this.gainNodes.length < gains.length) {
             this.addInput();
           }
