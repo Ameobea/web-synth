@@ -1,4 +1,4 @@
-import { ValueOf } from 'ameo-utils';
+import type { ValueOf } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
@@ -17,10 +17,6 @@ export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWor
   public pathTable: { [path: string]: number } = {};
   private fPitchwheelLabel: unknown[] = [];
   private fCtrlLabel: unknown[][] = new Array(128).fill(null).map(() => []);
-
-  // bar graph
-  private inputsItems: unknown[] = [];
-  private outputsItems: unknown[] = [];
 
   public jsonDef!: { [key: string]: any };
 
@@ -51,8 +47,6 @@ export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWor
     if (item.type === 'vgroup' || item.type === 'hgroup' || item.type === 'tgroup') {
       this.parseUiItems(item.items);
     } else if (item.type === 'hbargraph' || item.type === 'vbargraph') {
-      // Keep bargraph adresses
-      this.outputsItems.push(item.address);
       this.pathTable[item.address] = parseInt(item.index);
     } else if (
       item.type === 'vslider' ||
@@ -62,7 +56,6 @@ export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWor
       item.type === 'nentry'
     ) {
       // Keep inputs adresses
-      this.inputsItems.push(item.address);
       this.pathTable[item.address] = parseInt(item.index);
       if (!item.meta) {
         return;
@@ -102,33 +95,35 @@ export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWor
   ): Promise<FaustWorkletNode> {
     return new Promise(resolve => {
       this.port.onmessage = (msg: MessageEvent) => {
-        if (typeof msg.data === 'object') {
-          if (msg.data.jsonDef) {
-            let allDefaultParamsAreZero = false;
-            if (context) {
-              // We set default values onto the node's params in order to allow the node to function
-              // while things initialize.
-              const uiItems = msg.data.jsonDef.ui as any[];
-              const settings = R.flatten(
-                uiItems.map(item =>
-                  mapUiGroupToControlPanelFields(item, () => void 0, context.paramDefaultValues)
-                )
-              ) as any[];
-              settings.forEach(setting => {
-                const targetParam = (this.parameters as any).get(setting.address);
-                targetParam.value = setting.initial;
-              });
-              allDefaultParamsAreZero = settings.every(R.propEq('initial', 0));
-            }
+        if (typeof msg.data !== 'object') {
+          return;
+        }
 
-            const pathTable = this.parseUi(msg.data.jsonDef);
-            this.port.postMessage({ type: 'setPathTable', pathTable, allDefaultParamsAreZero });
-            resolve(this);
-          } else if (msg.data.log) {
-            console.log(...msg.data.log);
-          } else if (customMessageHandler) {
-            customMessageHandler(msg);
+        if (msg.data.jsonDef) {
+          let allDefaultParamsAreZero = false;
+          if (context) {
+            // We set default values onto the node's params in order to allow the node to function
+            // while things initialize.
+            const uiItems = msg.data.jsonDef.ui as any[];
+            const settings = R.flatten(
+              uiItems.map(item =>
+                mapUiGroupToControlPanelFields(item, () => void 0, context.paramDefaultValues)
+              )
+            ) as any[];
+            settings.forEach(setting => {
+              const targetParam = (this.parameters as any).get(setting.address);
+              targetParam.value = setting.initial;
+            });
+            allDefaultParamsAreZero = settings.every(R.propEq('initial', 0));
           }
+
+          const pathTable = this.parseUi(msg.data.jsonDef);
+          this.port.postMessage({ type: 'setPathTable', pathTable, allDefaultParamsAreZero });
+          resolve(this);
+        } else if (msg.data.log) {
+          console.log(...msg.data.log);
+        } else if (customMessageHandler) {
+          customMessageHandler(msg);
         }
       };
 

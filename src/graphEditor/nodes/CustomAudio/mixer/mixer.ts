@@ -51,7 +51,6 @@ export class MixerNode {
             return;
           }
           const gains = val as number[];
-          console.log({ gains });
           while (this.gainNodes.length < gains.length) {
             this.addInput();
           }

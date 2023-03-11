@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 
 import { GlobalVolumeSlider } from './GlobalVolumeSlider';
@@ -281,9 +281,20 @@ export const ViewContextSwitcher: React.FC<ViewContextSwitcherProps> = ({ engine
     }),
     shallowEqual
   );
+  const [horizontalScroll, setHorizontalScroll] = useState(0);
+  const handleScroll: React.WheelEventHandler<HTMLDivElement> = useCallback(
+    e => void setHorizontalScroll(prev => Math.max(prev + e.deltaY * 0.6, 0)),
+    []
+  );
 
   return (
-    <div style={styles.viewContextSwitcher}>
+    <div
+      style={{
+        ...styles.viewContextSwitcher,
+        transform: `translateX(-${horizontalScroll}px)`,
+      }}
+      onWheel={handleScroll}
+    >
       {activeViewContexts.map((props, i) => (
         <ViewContextTab
           engine={engine}

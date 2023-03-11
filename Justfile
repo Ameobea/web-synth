@@ -3,6 +3,7 @@ set dotenv-load := true
 opt:
   wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
   for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
+  for file in `ls ./dist/headless | grep "\\.wasm"`; do wasm-opt ./dist/headless/$file -g -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/headless/$file; done
   svgo -p 1 --multipass -f ./dist -o ./dist
   svgo -p 1 --multipass -f ./dist/icons/music_notes -o ./dist/icons/music_notes
 
@@ -81,6 +82,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -138,6 +140,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
 
   just debug-sinsy
 
@@ -289,3 +292,7 @@ build-level-detector:
 build-wavegen:
   cd ./engine/wavegen && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/wavegen.wasm ../../public
+
+build-mbdld:
+  cd ./engine/multiband_diode_ladder_distortion && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ../../public

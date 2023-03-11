@@ -2,6 +2,7 @@
 
 use fastapprox::fast;
 
+pub mod band_splitter;
 pub mod circular_buffer;
 pub mod filters;
 pub mod lookup_tables;

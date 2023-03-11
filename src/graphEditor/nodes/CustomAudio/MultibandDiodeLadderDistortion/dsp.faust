@@ -1,0 +1,37 @@
+import("stdfaust.lib");
+
+preGain_low = hslider("pre_gain_low", 1, 0, 3, 0.0001) : si.smoo;
+postGain_low = hslider("post_gain_low", 1, 0, 3, 0.0001) : si.smoo;
+Q_low = hslider("Q_low", 1.5, 0.3, 20, 0.001) : si.smoo;
+normFreq_low = hslider("normalized_frequency_low", 0.5, 0, 1, 0.0001) : si.smoo;
+wet_low = hslider("wet_low",0.8, 0, 1, 0.0001) : si.smoo;
+dry_low = hslider("dry_low",0.8, 0, 1, 0.0001) : si.smoo;
+
+preGain_mid = hslider("pre_gain_mid", 1, 0, 3, 0.0001) : si.smoo;
+postGain_mid = hslider("post_gain_mid", 1, 0, 3, 0.0001) : si.smoo;
+Q_mid = hslider("Q_mid", 1.5, 0.3, 20, 0.001) : si.smoo;
+normFreq_mid = hslider("normalized_frequency_mid", 0.5, 0, 1, 0.0001) : si.smoo;
+wet_mid = hslider("wet_mid", 0.8, 0, 1, 0.0001) : si.smoo;
+dry_mid = hslider("dry_mid", 0.8, 0, 1, 0.0001) : si.smoo;
+
+preGain_high = hslider("pre_gain_high", 1, 0, 3, 0.0001) : si.smoo;
+postGain_high = hslider("post_gain_high", 1, 0, 3, 0.0001) : si.smoo;
+Q_high = hslider("Q_high",1.5, 0.3, 20, 0.001) : si.smoo;
+normFreq_high = hslider("normalized_frequency_high", 0.5, 0, 1, 0.0001) : si.smoo;
+wet_high = hslider("wet_high",0.8, 0, 1, 0.0001) : si.smoo;
+dry_high = hslider("dry_high",0.8, 0, 1, 0.0001) : si.smoo;
+
+proc_low = _ <:
+  (_ : *(preGain_low) : ve.diodeLadder(normFreq_low,Q_low) : *(wet_low)),
+  (_ : *(dry_low) : _)
+:> *(postGain_low);
+proc_mid = _ <:
+  (_ : *(preGain_mid) : ve.diodeLadder(normFreq_mid,Q_mid) : *(wet_mid)),
+  (_ : *(dry_mid) : _)
+:> *(postGain_mid);
+proc_high = _ <:
+  (_ : *(preGain_high) : ve.diodeLadder(normFreq_high,Q_high) : *(wet_high)),
+  (_ : *(dry_high) : _)
+:> *(postGain_high);
+
+process = proc_low, proc_mid, proc_high :> _;

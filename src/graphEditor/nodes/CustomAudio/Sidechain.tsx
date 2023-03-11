@@ -195,7 +195,6 @@ export class Sidechain {
     this.awpNode.port.onmessage = e => {
       switch (e.data.type) {
         case 'wasmInitialized': {
-          console.log('Sidechain AWP initialized');
           for (const key of Object.keys(this.state) as (keyof SidechainState)[]) {
             this.onChange(key, this.state[key]);
           }

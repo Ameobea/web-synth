@@ -62,6 +62,7 @@
   export let style: CSSProperties | undefined = undefined;
   export let theme: Partial<ControlPanelTheme> | undefined = undefined;
   export let width: number | undefined = undefined;
+  export let title: string | undefined = undefined;
 </script>
 
 <ReactShim
@@ -73,5 +74,6 @@
     style,
     theme: theme ? { ...BaseTheme, ...theme } : undefined,
     width,
+    title,
   }}
 />
