@@ -4,21 +4,21 @@ use miniserde::{json, Serialize};
 
 #[derive(Serialize)]
 pub struct SettingDefinition {
-    pub name: String,
-    pub description: Option<String>,
-    pub id: usize,
+  pub name: String,
+  pub description: Option<String>,
+  pub id: usize,
 }
 
 #[derive(Serialize)]
 pub struct ConfigDefinition {
-    pub scaler_functions: Vec<SettingDefinition>,
-    pub color_functions: Vec<SettingDefinition>,
+  pub scaler_functions: Vec<SettingDefinition>,
+  pub color_functions: Vec<SettingDefinition>,
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+  println!("cargo:rerun-if-changed=build.rs");
 
-    let config = ConfigDefinition {
+  let config = ConfigDefinition {
         scaler_functions: vec![
             SettingDefinition {
                 name: "Linear".into(),
@@ -50,8 +50,7 @@ fn main() {
         ],
     };
 
-    let config_json = json::to_string(&config);
-    let mut config_file =
-        File::create("./src/conf.json").expect("Failed to create config JSON file");
-    write!(config_file, "{}", &config_json).expect("Failed to write config to JSON file");
+  let config_json = json::to_string(&config);
+  let mut config_file = File::create("./src/conf.json").expect("Failed to create config JSON file");
+  write!(config_file, "{}", &config_json).expect("Failed to write config to JSON file");
 }

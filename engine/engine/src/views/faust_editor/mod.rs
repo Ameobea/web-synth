@@ -9,39 +9,37 @@ use crate::{js, view_context::ViewContext};
 /// interactive or graphical components of this view context, the actual implementation for this
 /// is done in JS.
 pub struct FaustEditor {
-    pub uuid: Uuid,
+  pub uuid: Uuid,
 }
 
 impl FaustEditor {
-    pub fn new(uuid: Uuid) -> Self { FaustEditor { uuid } }
+  pub fn new(uuid: Uuid) -> Self { FaustEditor { uuid } }
 
-    pub fn get_state_key(&self) -> String { format!("faustEditor_{}", self.uuid) }
+  pub fn get_state_key(&self) -> String { format!("faustEditor_{}", self.uuid) }
 }
 
 impl ViewContext for FaustEditor {
-    fn init(&mut self) { js::init_faust_editor(&self.get_state_key()); }
+  fn init(&mut self) { js::init_faust_editor(&self.get_state_key()); }
 
-    fn hide(&mut self) { js::hide_faust_editor(&self.get_id()); }
+  fn hide(&mut self) { js::hide_faust_editor(&self.get_id()); }
 
-    fn unhide(&mut self) { js::unhide_faust_editor(&self.get_id()); }
+  fn unhide(&mut self) { js::unhide_faust_editor(&self.get_id()); }
 
-    fn cleanup(&mut self) { js::cleanup_faust_editor(&self.get_state_key()); }
+  fn cleanup(&mut self) { js::cleanup_faust_editor(&self.get_state_key()); }
 
-    fn get_id(&self) -> String { self.uuid.to_string() }
+  fn get_id(&self) -> String { self.uuid.to_string() }
 
-    fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
+  fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
-    fn get_audio_connectables(&self) -> JsValue {
-        js::get_faust_editor_connectables(&self.get_id())
-    }
+  fn get_audio_connectables(&self) -> JsValue { js::get_faust_editor_connectables(&self.get_id()) }
 
-    fn render_small_view(&mut self, target_dom_id: &str) {
-        js::render_faust_editor_small_view(&self.get_id(), target_dom_id);
-    }
+  fn render_small_view(&mut self, target_dom_id: &str) {
+    js::render_faust_editor_small_view(&self.get_id(), target_dom_id);
+  }
 
-    fn cleanup_small_view(&mut self, target_dom_id: &str) {
-        js::cleanup_faust_editor_small_view(&self.get_id(), target_dom_id);
-    }
+  fn cleanup_small_view(&mut self, target_dom_id: &str) {
+    js::cleanup_faust_editor_small_view(&self.get_id(), target_dom_id);
+  }
 }
 
 pub fn mk_faust_editor(uuid: Uuid) -> Box<dyn ViewContext> { box FaustEditor::new(uuid) }

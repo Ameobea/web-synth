@@ -6,12 +6,12 @@ pub use wasm_bindgen::prelude::*;
 pub use common::{rng, uuid_v4};
 
 pub use super::{
-    constants::*,
-    get_vcm, js,
-    util::{self, *},
-    view_context::{
-        self,
-        manager::{ConnectionDescriptor, ViewContextDefinition},
-        ViewContext, ViewContextManager,
-    },
+  constants::*,
+  get_vcm, js,
+  util::{self, *},
+  view_context::{
+    self,
+    manager::{ConnectionDescriptor, ViewContextDefinition},
+    ViewContext, ViewContextManager,
+  },
 };
