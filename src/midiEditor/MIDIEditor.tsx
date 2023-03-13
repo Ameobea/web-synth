@@ -1,6 +1,6 @@
 import download from 'downloadjs';
 import * as R from 'ramda';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
@@ -26,6 +26,11 @@ import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
+import type {
+  ManagedMIDIEditorUIInstance,
+  MIDIEditorUIManager,
+} from 'src/midiEditor/MIDIEditorUIManager';
+import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 
 const ctx = new AudioContext();
 
@@ -213,14 +218,16 @@ const handleMIDIFileUpload = async (
 
 interface MIDIEditorControlsProps {
   parentInst: MIDIEditorInstance;
-  inst: React.MutableRefObject<MIDIEditorUIInstance | undefined>;
+  activeInstance: { current: MIDIEditorUIInstance | undefined };
+  playbackHandler: MIDIEditorPlaybackHandler;
   initialState: MIDIEditorControlsState;
   onChange: (newState: MIDIEditorControlsState) => void;
 }
 
 const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
   parentInst,
-  inst,
+  activeInstance,
+  playbackHandler,
   initialState,
   onChange: onChangeInner,
 }) => {
@@ -229,7 +236,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [metronomeEnabled, setMetronomeEnabled] = useState(initialState.metronomeEnabled);
   const onChange = (newState: MIDIEditorControlsState) => {
-    if (!inst.current) {
+    if (!activeInstance.current) {
       return;
     }
 
@@ -243,11 +250,6 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         disabled={isGlobalBeatCounterStarted}
         title='Start/Stop Playback'
         onClick={() => {
-          if (!inst.current) {
-            return;
-          }
-          const playbackHandler = inst.current.parentInstance.playbackHandler;
-
           if (playbackHandler.isPlaying) {
             playbackHandler.stopPlayback();
           } else {
@@ -263,11 +265,6 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (!inst.current) {
-            return;
-          }
-
-          const playbackHandler = inst.current.parentInstance.playbackHandler;
           if (isRecording) {
             setIsRecording(false);
             playbackHandler.stopRecording();
@@ -289,11 +286,11 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (!inst.current || inst.current.parentInstance.playbackHandler.isPlaying) {
+          if (playbackHandler.isPlaying) {
             return;
           }
 
-          inst.current.parentInstance.playbackHandler.metronomeEnabled = !metronomeEnabled;
+          playbackHandler.metronomeEnabled = !metronomeEnabled;
           setMetronomeEnabled(!metronomeEnabled);
         }}
         label={
@@ -316,7 +313,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+          if (playbackHandler.isPlaying) {
             return;
           }
 
@@ -329,15 +326,11 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (inst.current?.parentInstance.playbackHandler?.isPlaying !== false) {
+          if (playbackHandler.isPlaying) {
             return;
           }
 
-          if (!inst.current || inst.current.parentInstance.playbackHandler?.isPlaying !== false) {
-            return;
-          }
-
-          inst.current.copySelection();
+          activeInstance.current?.copySelection();
         }}
         label={
           // Adapted from: https://stackoverflow.com/a/60023353/3833068
@@ -360,11 +353,11 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (!inst.current || inst.current.parentInstance.playbackHandler?.isPlaying !== false) {
+          if (playbackHandler.isPlaying) {
             return;
           }
 
-          inst.current.cutSelection();
+          activeInstance.current?.cutSelection();
         }}
         label='✂️'
         title='Cut selection'
@@ -372,11 +365,11 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
-          if (!inst.current || inst.current.parentInstance.playbackHandler?.isPlaying !== false) {
+          if (playbackHandler.isPlaying) {
             return;
           }
 
-          inst.current.pasteSelection();
+          activeInstance.current?.pasteSelection();
         }}
         label='📋'
         title='Paste selection'
@@ -384,7 +377,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={async () => {
-          if (!inst.current) {
+          if (!activeInstance.current) {
             return;
           }
 
@@ -393,8 +386,8 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             return;
           }
 
-          for (const noteId of inst.current.allNotesByID.keys()) {
-            inst.current.deleteNote(noteId);
+          for (const noteId of activeInstance.current.allNotesByID.keys()) {
+            activeInstance.current.deleteNote(noteId);
           }
         }}
         title='Clear all notes'
@@ -403,11 +396,11 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={async () => {
-          if (!inst.current) {
+          if (!activeInstance.current) {
             return;
           }
 
-          inst.current.snapAllSelectedNotes();
+          activeInstance.current.snapAllSelectedNotes();
         }}
         title='Auto-snap all selected notes'
         label='▥'
@@ -425,7 +418,9 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       <div className='labeled-container'>
         <label>Snap Interval</label>
         <SnapControls
-          onChange={newBeatSnapInterval => inst.current?.setBeatSnapInterval(newBeatSnapInterval)}
+          onChange={newBeatSnapInterval =>
+            activeInstance.current?.setBeatSnapInterval(newBeatSnapInterval)
+          }
           initialBeatSnapInterval={initialState.beatSnapInterval}
         />
       </div>
@@ -444,7 +439,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       </div>
       <MIDIEditorControlButton
         onClick={async () => {
-          if (!inst.current) {
+          if (!activeInstance.current) {
             return;
           }
 
@@ -453,7 +448,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
               description: true,
               getExistingTags: getExistingMIDICompositionTags,
             });
-            const composition = inst.current!.serialize();
+            const composition = activeInstance.current!.serialize();
             await saveMIDIComposition(name, description ?? '', composition, tags ?? []);
           } catch (err) {
             return;
@@ -466,7 +461,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={async () => {
-          if (!inst.current || inst.current.parentInstance.playbackHandler.isPlaying) {
+          if (!activeInstance.current || playbackHandler.isPlaying) {
             return;
           }
 
@@ -475,7 +470,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
               preset: { composition },
             } = await mkLoadMIDICompositionModal();
 
-            inst.current.reInitialize(composition);
+            activeInstance.current.reInitialize(composition);
           } catch (_err) {
             return;
           }
@@ -486,18 +481,18 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         active={state.loopEnabled}
       />
       <MIDIEditorControlButton
-        onClick={() => handleMIDIFileUpload(inst)}
+        onClick={() => handleMIDIFileUpload(activeInstance)}
         title='Upload MIDI File'
         label='⭱'
         style={{ fontSize: 29, textAlign: 'center' }}
       />
       <MIDIEditorControlButton
         onClick={async () => {
-          if (!inst.current) {
+          if (!activeInstance.current) {
             return;
           }
 
-          const rawNoteDataBuf = inst.current.exportToRawNoteDataBuffer();
+          const rawNoteDataBuf = activeInstance.current.exportToRawNoteDataBuffer();
           const midiModule = await MIDIWasmModule.get();
           const midiFileData = midiModule.write_to_midi('midi_composition', rawNoteDataBuf);
           download(midiFileData, 'midi_composition.mid', 'audio/midi');
@@ -520,6 +515,24 @@ type CVOutputControlsProps = CVOutputControls extends SvelteComponentTyped<infer
 
 const CVOutputControlsShim = mkSvelteComponentShim<CVOutputControlsProps>(CVOutputControls);
 
+const blockMouseEvent = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+  // Prevent clicks on the canvas from selecting text and stuff in the rest of the page
+  evt.preventDefault();
+  evt.stopPropagation();
+};
+
+class ActiveInstanceProxy {
+  private uiManager: MIDIEditorUIManager;
+
+  constructor(uiManager: MIDIEditorUIManager) {
+    this.uiManager = uiManager;
+  }
+
+  public get current() {
+    return this.uiManager.activeUIInstance;
+  }
+}
+
 interface MIDIEditorProps {
   initialState: SerializedMIDIEditorState;
   width: number;
@@ -533,8 +546,6 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   instance: parentInstance,
   vcId,
 }) => {
-  const instance = useRef<MIDIEditorUIInstance | undefined>();
-  useEffect(() => () => instance.current?.destroy(), []);
   const initialStateForControls = useRef({
     bpm: initialState.localBPM ?? 120,
     loopEnabled: !R.isNil(initialState.loopPoint),
@@ -553,9 +564,9 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
       lastWindowSize.current.height !== windowSize.height
     ) {
       lastWindowSize.current = windowSize;
-      instance.current?.setSize(width, height);
+      parentInstance.uiManager.handleWindowResize(width, height);
     }
-  }, [height, width, windowSize]);
+  }, [height, parentInstance.uiManager, width, windowSize]);
 
   const handleChange = useCallback(
     ({ bpm, loopEnabled }: MIDIEditorControlsState) => {
@@ -567,58 +578,87 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
     [parentInstance.uiInstance]
   );
 
-  const lastCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastCanvasRefsByInstID = useRef<{ [key: string]: HTMLCanvasElement }>({});
+  const [instances, setInstances] = useState<ManagedMIDIEditorUIInstance[]>([]);
+  useEffect(
+    () =>
+      parentInstance.uiManager.instances.subscribe(newInstances => setInstances([...newInstances])),
+    [parentInstance.uiManager.instances]
+  );
 
   const [cvOutputs, setCVOutputs] = useState<CVOutput[]>([]);
   useEffect(
     () => parentInstance.cvOutputs.subscribe(newOutputs => setCVOutputs([...newOutputs])),
     [parentInstance.cvOutputs]
   );
+  const activeInstanceProxy = useMemo(
+    () => new ActiveInstanceProxy(parentInstance.uiManager),
+    [parentInstance.uiManager]
+  );
 
   return (
     <div className='midi-editor'>
       <MIDIEditorControls
         parentInst={parentInstance}
-        inst={instance}
+        activeInstance={activeInstanceProxy}
         initialState={initialStateForControls.current}
         onChange={handleChange}
+        playbackHandler={parentInstance.playbackHandler}
       />
-      <canvas
-        ref={canvas => {
-          if (!canvas) {
-            // instance.current?.destroy();
-            // instance.current = undefined;
-            // lastCanvasRef.current = null;
-            return;
-          }
+      {instances.map(inst => {
+        if (inst.isActive) {
+          return (
+            <div key={inst.id} className='expanded-midi-editor-instance'>
+              <button
+                className='collapse-midi-editor-instance'
+                onClick={() => parentInstance.uiManager.collapseUIInstance(inst.id)}
+              >
+                ⌄
+              </button>
+              <canvas
+                ref={canvas => {
+                  if (!canvas) {
+                    return;
+                  }
 
-          if (canvas === lastCanvasRef.current) {
-            return;
-          }
-          lastCanvasRef.current = canvas;
+                  if (canvas === lastCanvasRefsByInstID.current[inst.id]) {
+                    return;
+                  }
+                  lastCanvasRefsByInstID.current[inst.id] = canvas;
 
-          instance.current?.destroy();
-          instance.current = new MIDIEditorUIInstance(
-            width,
-            height,
-            canvas,
-            initialState,
-            parentInstance,
-            vcId,
-            parentInstance.cvOutputs
+                  parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
+                  const instanceHeight = parentInstance.uiManager.computeUIInstanceHeight();
+                  const newInst = new MIDIEditorUIInstance(
+                    width,
+                    instanceHeight,
+                    canvas,
+                    initialState,
+                    parentInstance,
+                    vcId,
+                    parentInstance.cvOutputs
+                  );
+                  parentInstance.uiManager.setUIInstanceForID(inst.id, newInst);
+                }}
+                onMouseDown={blockMouseEvent}
+                onContextMenu={blockMouseEvent}
+              />
+            </div>
           );
-          parentInstance.registerUI(instance.current);
-        }}
-        onMouseDown={useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
-          // Prevent clicks on the canvas from selecting text and stuff in the rest of the page
-          evt.preventDefault();
-          evt.stopPropagation();
-        }, [])}
-        onContextMenu={useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
-          evt.preventDefault();
-          evt.stopPropagation();
-        }, [])}
-      />
+        }
+
+        return (
+          <div className='collapsed-midi-editor-instance' key={inst.id}>
+            <button
+              className='expand-midi-editor-instance'
+              onClick={() => parentInstance.uiManager.expandUIInstance(inst.id)}
+            >
+              ›
+            </button>
+            TODO TODO TODO
+          </div>
+        );
+      })}
+
       {cvOutputs.length > 0 ? (
         <div className='cv-outputs-wrapper'>
           {cvOutputs.map(output => (

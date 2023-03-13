@@ -10,7 +10,6 @@ import {
   registerGlobalStopCB,
   scheduleEventBeats,
   scheduleEventTimeAbsolute,
-  scheduleMIDIEventBeats,
   unregisterStartCB,
   unregisterStopCB,
 } from 'src/eventScheduler';

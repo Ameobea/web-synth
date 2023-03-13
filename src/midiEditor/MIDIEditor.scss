@@ -79,6 +79,23 @@
   }
 }
 
+.expanded-midi-editor-instance {
+  position: relative;
+}
+
+.collapse-midi-editor-instance,
+.expand-midi-editor-instance {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 18px;
+  line-height: 4px;
+}
+
+.collapsed-midi-editor-instance {
+  position: relative;
+}
+
 .cv-outputs-wrapper {
   position: absolute;
   bottom: 20px;

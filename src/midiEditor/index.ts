@@ -7,6 +7,7 @@ import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVO
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import { MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
@@ -23,12 +24,16 @@ export class MIDIEditorInstance {
   public midiInput: MIDINode;
   public midiOutput: MIDINode;
   public playbackHandler: MIDIEditorPlaybackHandler;
-  public uiInstance: MIDIEditorUIInstance | undefined;
+  public uiManager: MIDIEditorUIManager;
   public lineCount: number;
   private ctx: AudioContext;
   private silentOutput: GainNode;
 
   public cvOutputs: Writable<CVOutput[]>;
+
+  public get uiInstance(): MIDIEditorUIInstance | undefined {
+    return this.uiManager.activeUIInstance;
+  }
 
   private midiInputCBs: MIDIInputCbs = {
     onAttack: (note, velocity) => {
@@ -70,6 +75,7 @@ export class MIDIEditorInstance {
     this.vcId = vcId;
     this.silentOutput = new GainNode(ctx);
     this.silentOutput.gain.value = 0;
+    this.uiManager = new MIDIEditorUIManager();
 
     this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
     this.cvOutputs = writable(
@@ -85,17 +91,9 @@ export class MIDIEditorInstance {
     this.midiInput.connect(this.midiOutput);
   }
 
-  /**
-   * The canvas used to render the UI for the MIDI is created by React and isn't available until after
-   * we render the UI, so we set it here via callback so we can route events to and from it.
-   */
-  public registerUI(uiInstance: MIDIEditorUIInstance) {
-    this.uiInstance = uiInstance;
-  }
-
   public serialize(): SerializedMIDIEditorState {
     if (!this.uiInstance) {
-      return buildDefaultMIDIEditorState();
+      throw new Error('Tried to serialize MIDI editor before UI instance initialized');
     }
 
     return this.uiInstance.serialize();

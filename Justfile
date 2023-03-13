@@ -83,6 +83,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/minimap_renderer.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -141,6 +142,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/minimap_renderer.wasm ./public
 
   just debug-sinsy
 
@@ -296,3 +298,7 @@ build-wavegen:
 build-mbdld:
   cd ./engine/multiband_diode_ladder_distortion && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ../../public
+
+build-minimap-renderer:
+  cd ./engine/minimap_renderer && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/minimap_renderer.wasm ../../public
