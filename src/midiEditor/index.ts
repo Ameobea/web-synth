@@ -3,15 +3,17 @@ import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import { get, writable, type Writable } from 'svelte/store';
 
-import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
+import {
+  buildDefaultCVOutputState,
+  CVOutput,
+  type SerializedCVOutputState,
+} from 'src/midiEditor/CVOutput/CVOutput';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
 import { MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
@@ -19,13 +21,141 @@ import {
   mkContainerUnhider,
 } from 'src/reactUtils';
 
+interface OldMIDIEditorView {
+  /**
+   * Zoom factor, indicating how many pixels per beat are rendered.
+   */
+  pxPerBeat: number;
+  scrollHorizontalBeats: number;
+  scrollVerticalPx: number;
+  beatsPerMeasure: number;
+}
+
+interface OldSerializedMIDIEditorState {
+  lines: { midiNumber: number; notes: { startPoint: number; length: number }[] }[];
+  view: OldMIDIEditorView;
+  beatSnapInterval: number;
+  cursorPosBeats: number;
+  localBPM: number;
+  loopPoint: number | null;
+  metronomeEnabled: boolean;
+  cvOutputStates?: SerializedCVOutputState[];
+}
+
+export interface MIDIEditorBaseView {
+  /**
+   * Zoom factor, indicating how many pixels per beat are rendered.
+   */
+  pxPerBeat: number;
+  scrollHorizontalBeats: number;
+  beatsPerMeasure: number;
+}
+
+export interface MIDIEditorInstanceView {
+  scrollVerticalPx: number;
+}
+
+export interface SerializedMIDINote {
+  startPoint: number;
+  length: number;
+}
+
+export interface SerializedMIDILine {
+  midiNumber: number;
+  notes: SerializedMIDINote[];
+}
+
+export interface SerializedMIDIEditorInstance {
+  name: string;
+  lines: SerializedMIDILine[];
+  isActive: boolean;
+  view: MIDIEditorInstanceView;
+}
+
+export interface SerializedMIDIEditorState {
+  version: 2;
+  scrollHorizontalBeats: number;
+  instances: SerializedMIDIEditorInstance[];
+  view: MIDIEditorBaseView;
+  localBPM: number;
+  loopPoint: number | null;
+  metronomeEnabled: boolean;
+  beatSnapInterval: number;
+  cursorPosBeats: number;
+  cvOutputStates?: SerializedCVOutputState[];
+}
+
+const buildDefaultMIDIEditorInstanceState = (): SerializedMIDIEditorInstance => {
+  const maxMIDINumber = 120;
+  return {
+    name: 'midi',
+    lines: new Array(maxMIDINumber)
+      .fill(null)
+      .map((_, lineIx) => ({ notes: [], midiNumber: maxMIDINumber - lineIx })),
+    isActive: true,
+    view: { scrollVerticalPx: 0 },
+  };
+};
+
+const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => ({
+  cvOutputStates: [],
+  instances: [buildDefaultMIDIEditorInstanceState()],
+  localBPM: 120,
+  loopPoint: null,
+  metronomeEnabled: true,
+  scrollHorizontalBeats: 0,
+  beatSnapInterval: 1,
+  cursorPosBeats: 0,
+  version: 2,
+  view: { pxPerBeat: 32, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
+});
+
+const normalizeSerializedMIDIEditorState = (
+  state: OldSerializedMIDIEditorState | SerializedMIDIEditorState
+): SerializedMIDIEditorState => {
+  if (!state || typeof state !== 'object') {
+    console.error('Invalid MIDI editor state', state);
+    return buildDefaultMIDIEditorState();
+  }
+
+  if ((state as any).version === 2) {
+    return state as SerializedMIDIEditorState;
+  }
+
+  const oldState = state as OldSerializedMIDIEditorState;
+  return {
+    cvOutputStates: oldState.cvOutputStates || [],
+    instances: [
+      {
+        name: 'midi',
+        lines: oldState.lines,
+        isActive: true,
+        view: { scrollVerticalPx: oldState.view.scrollVerticalPx },
+      },
+    ],
+    localBPM: oldState.localBPM,
+    loopPoint: oldState.loopPoint,
+    metronomeEnabled: oldState.metronomeEnabled,
+    scrollHorizontalBeats: oldState.view.scrollHorizontalBeats,
+    beatSnapInterval: oldState.beatSnapInterval,
+    cursorPosBeats: oldState.cursorPosBeats,
+    version: 2,
+    view: {
+      pxPerBeat: oldState.view.pxPerBeat,
+      scrollHorizontalBeats: oldState.view.scrollHorizontalBeats,
+      beatsPerMeasure: oldState.view.beatsPerMeasure,
+    },
+  };
+};
+
 export class MIDIEditorInstance {
   public vcId: string;
-  public midiInput: MIDINode;
-  public midiOutput: MIDINode;
+  public baseView: MIDIEditorBaseView;
+  public localBPM: number;
+  public loopPoint: number | null;
+  public beatSnapInterval: number;
   public playbackHandler: MIDIEditorPlaybackHandler;
   public uiManager: MIDIEditorUIManager;
-  public lineCount: number;
   private ctx: AudioContext;
   private silentOutput: GainNode;
 
@@ -35,47 +165,16 @@ export class MIDIEditorInstance {
     return this.uiManager.activeUIInstance;
   }
 
-  private midiInputCBs: MIDIInputCbs = {
-    onAttack: (note, velocity) => {
-      // if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
-      this.midiInput.onAttack(note, velocity);
-      this.uiInstance?.onGated(this.lineCount - note);
-      // }
-
-      if (this.playbackHandler?.recordingCtx) {
-        this.playbackHandler.recordingCtx.onAttack(note);
-      }
-    },
-    onRelease: (note, velocity) => {
-      // if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
-      this.midiInput.onRelease(note, velocity);
-      this.uiInstance?.onUngated(this.lineCount - note);
-      // }
-
-      if (this.playbackHandler?.recordingCtx) {
-        this.playbackHandler.recordingCtx.onRelease(note);
-      }
-    },
-    onPitchBend: bendAmount => {
-      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
-        this.midiInput.outputCbs.forEach(cbs => cbs.onPitchBend(bendAmount));
-      }
-    },
-    onClearAll: () => {
-      if (!this.playbackHandler.isPlaying || this.playbackHandler.recordingCtx) {
-        this.midiInput.outputCbs.forEach(cbs => cbs.onClearAll());
-      }
-      // TODO
-    },
-  };
-
   constructor(ctx: AudioContext, vcId: string, initialState: SerializedMIDIEditorState) {
     this.ctx = ctx;
-    this.lineCount = initialState.lines.length;
     this.vcId = vcId;
+    this.baseView = initialState.view;
+    this.localBPM = initialState.localBPM;
+    this.loopPoint = initialState.loopPoint;
+    this.beatSnapInterval = initialState.beatSnapInterval;
     this.silentOutput = new GainNode(ctx);
     this.silentOutput.gain.value = 0;
-    this.uiManager = new MIDIEditorUIManager();
+    this.uiManager = new MIDIEditorUIManager(this, initialState);
 
     this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
     this.cvOutputs = writable(
@@ -83,12 +182,6 @@ export class MIDIEditorInstance {
         state => new CVOutput(this, this.ctx, this.vcId, state.name, state, this.silentOutput)
       ) ?? []
     );
-
-    this.midiInput = new MIDINode(() => this.midiInputCBs);
-    this.midiOutput = new MIDINode();
-    this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
-    // By default, we pass MIDI events through from the input to the output
-    this.midiInput.connect(this.midiOutput);
   }
 
   public serialize(): SerializedMIDIEditorState {
@@ -96,15 +189,27 @@ export class MIDIEditorInstance {
       throw new Error('Tried to serialize MIDI editor before UI instance initialized');
     }
 
-    return this.uiInstance.serialize();
+    const instances = get(this.uiManager.instances).map(inst => inst.serialize());
+    return {
+      beatSnapInterval: this.beatSnapInterval,
+      cursorPosBeats: this.getCursorPosBeats(),
+      instances,
+      localBPM: this.localBPM,
+      loopPoint: this.loopPoint,
+      metronomeEnabled: this.playbackHandler.metronomeEnabled,
+      scrollHorizontalBeats: this.baseView.scrollHorizontalBeats,
+      version: 2,
+      view: this.baseView,
+      cvOutputStates: get(this.cvOutputs).map(cvOutput => cvOutput.serialize()),
+    };
   }
 
-  public gate(lineIx: number) {
-    this.midiInputCBs.onAttack(this.lineCount - lineIx, 255);
+  public gate(instanceID: string, lineIx: number) {
+    this.uiManager.gateInstance(instanceID, lineIx);
   }
 
-  public ungate(lineIx: number) {
-    this.midiInputCBs.onRelease(this.lineCount - lineIx, 255);
+  public ungate(instanceID: string, lineIx: number) {
+    this.uiManager.ungateInstance(instanceID, lineIx);
   }
 
   public getWasmInstance() {
@@ -118,6 +223,15 @@ export class MIDIEditorInstance {
 
   public getCursorPosBeats(): number {
     return this.playbackHandler.getCursorPosBeats();
+  }
+
+  public setBeatSnapInterval(beatSnapInterval: number) {
+    this.beatSnapInterval = beatSnapInterval;
+  }
+
+  public setScrollHorizontalBeats(scrollHorizontalBeats: number) {
+    this.baseView.scrollHorizontalBeats = scrollHorizontalBeats;
+    this.uiManager.updateAllViews();
   }
 
   public addCVOutput() {
@@ -184,21 +298,6 @@ const Instances: Map<string, MIDIEditorInstance> = new Map();
 
 const getContainerID = (vcId: string) => `midiEditor_${vcId}`;
 
-const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => {
-  const maxMIDINumber = 120;
-  return {
-    lines: new Array(maxMIDINumber)
-      .fill(null)
-      .map((_, lineIx) => ({ notes: [], midiNumber: maxMIDINumber - lineIx })),
-    view: { pxPerBeat: 32, scrollVerticalPx: 0, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
-    beatSnapInterval: 1,
-    cursorPosBeats: 0,
-    localBPM: 120,
-    loopPoint: null,
-    metronomeEnabled: true,
-  };
-};
-
 export const hide_midi_editor = mkContainerHider(getContainerID);
 
 export const unhide_midi_editor = mkContainerUnhider(getContainerID);
@@ -214,9 +313,12 @@ export const init_midi_editor = (vcId: string) => {
         return Option.none();
       }
     })
+    .map(normalizeSerializedMIDIEditorState)
     .getOrElseL(buildDefaultMIDIEditorState);
-  while (initialState.lines.length < 90) {
-    initialState.lines.push({ notes: [], midiNumber: initialState.lines.length + 21 });
+  for (const inst of initialState.instances) {
+    while (inst.lines.length < 120) {
+      inst.lines.push({ notes: [], midiNumber: inst.lines.length + 21 });
+    }
   }
 
   const inst = new MIDIEditorInstance(new AudioContext(), vcId, initialState);
@@ -262,10 +364,12 @@ export const get_midi_editor_audio_connectables = (vcId: string): AudioConnectab
     throw new UnreachableException(`No MIDI editor instance in map with vcId=${vcId}`);
   }
 
-  let outputs = ImmMap<string, ConnectableOutput>().set('midi_out', {
-    type: 'midi',
-    node: inst.midiOutput,
-  });
+  const insts = get(inst.uiManager.instances);
+  let outputs = insts.reduce(
+    (acc, inst) => acc.set(`${inst.name}_out`, { type: 'midi', node: inst.midiOutput }),
+    ImmMap<string, ConnectableOutput>()
+  );
+
   outputs = get(inst.cvOutputs).reduce((acc, output) => {
     const awpOut = output.backend.getOutputSync() ?? output.dummyOutput;
 
@@ -275,12 +379,10 @@ export const get_midi_editor_audio_connectables = (vcId: string): AudioConnectab
     });
   }, outputs);
 
-  return {
-    vcId,
-    inputs: ImmMap<string, ConnectableInput>().set('midi_in', {
-      type: 'midi',
-      node: inst.midiInput,
-    }),
-    outputs,
-  };
+  const inputs = insts.reduce(
+    (acc, inst) => acc.set(`${inst.name}_in`, { type: 'midi', node: inst.midiInput }),
+    ImmMap<string, ConnectableInput>()
+  );
+
+  return { vcId, inputs, outputs };
 };

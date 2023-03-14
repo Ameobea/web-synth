@@ -1,13 +1,17 @@
 import { UnreachableException } from 'ameo-utils';
-import { Option } from 'funfix-core';
 import * as R from 'ramda';
 import { get, type Writable } from 'svelte/store';
 
 import * as PIXI from 'src/controls/pixi';
 import { destroyPIXIApp } from 'src/controls/pixiUtils';
-import type { MIDIEditorInstance } from 'src/midiEditor';
+import type {
+  MIDIEditorInstance,
+  MIDIEditorInstanceView,
+  SerializedMIDIEditorInstance,
+} from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
-import type { CVOutput, SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
+import type { CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
+import { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
 import type { NoteBox } from 'src/midiEditor/NoteBox';
 import MIDINoteBox, {
   NoteDragHandle,
@@ -34,31 +38,16 @@ export interface Note {
 
 PIXI.utils.skipHello();
 
-export interface MIDIEditorView {
-  /**
-   * Zoom factor, indicating how many pixels per beat are rendered.
-   */
-  pxPerBeat: number;
+interface MIDIEditorPanningView {
   scrollHorizontalBeats: number;
   scrollVerticalPx: number;
-  beatsPerMeasure: number;
-}
-
-export interface SerializedMIDIEditorState {
-  lines: { midiNumber: number; notes: { startPoint: number; length: number }[] }[];
-  view: MIDIEditorView;
-  beatSnapInterval: number;
-  cursorPosBeats: number;
-  localBPM: number;
-  loopPoint: number | null;
-  metronomeEnabled: boolean;
-  cvOutputStates?: SerializedCVOutputState[];
 }
 
 export default class MIDIEditorUIInstance {
   public width: number;
   public height: number;
   public parentInstance: MIDIEditorInstance;
+  public managedInst: ManagedMIDIEditorUIInstance;
   public app: PIXI.Application;
   public wasm:
     | {
@@ -68,7 +57,6 @@ export default class MIDIEditorUIInstance {
     | undefined;
   public linesContainer: PIXI.Container;
   public lines: NoteLine[] = [];
-  public view: MIDIEditorView;
   public allNotesByID: Map<number, NoteBox> = new Map();
   public selectedNoteIDs: Set<number> = new Set();
   public multiSelectEnabled = false;
@@ -79,7 +67,7 @@ export default class MIDIEditorUIInstance {
     wheel: (evt: WheelEvent) => void;
   };
   private mouseUpCBs: (() => void)[] = [];
-  private panningData: { startPoint: PIXI.Point; startView: MIDIEditorView } | null = null;
+  private panningData: { startPoint: PIXI.Point; startView: MIDIEditorPanningView } | null = null;
   private resizeData: {
     globalStartPoint: PIXI.Point;
     side: NoteDragHandleSide;
@@ -93,12 +81,10 @@ export default class MIDIEditorUIInstance {
   } | null = null;
   private selectionBox: SelectionBox | null = null;
   public selectionBoxButtonDown = false;
-  private beatSnapInterval: number;
   public cursor: Cursor;
   private pianoKeys: PianoKeys | undefined;
   private cursorGutter: CursorGutter;
   private stageBorder: PIXI.Graphics;
-  public localBPM: number;
   public loopCursor: LoopCursor | null;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
   public noteMetadataByNoteID: Map<number, any> = new Map();
@@ -107,24 +93,31 @@ export default class MIDIEditorUIInstance {
   private destroyed = false;
   public cvOutputsRef: Writable<CVOutput[]>;
 
+  private get beatSnapInterval(): number {
+    return this.parentInstance.beatSnapInterval;
+  }
+
+  private get view(): MIDIEditorInstanceView {
+    return this.managedInst.view;
+  }
+
   constructor(
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
-    initialState: SerializedMIDIEditorState,
+    initialState: SerializedMIDIEditorInstance,
     parentInstance: MIDIEditorInstance,
+    managedInst: ManagedMIDIEditorUIInstance,
     vcId: string,
     cvOutputsRef: Writable<CVOutput[]>
   ) {
     this.width = width;
     this.height = height;
-    this.view = R.clone(initialState.view);
-    this.beatSnapInterval = initialState.beatSnapInterval;
-    this.localBPM = initialState.localBPM ?? 120;
-    this.loopCursor = Option.of(initialState.loopPoint)
-      .map(loopPoint => new LoopCursor(this, loopPoint))
-      .orNull();
+    this.loopCursor = parentInstance.loopPoint
+      ? new LoopCursor(this, parentInstance.loopPoint)
+      : null;
     this.parentInstance = parentInstance;
+    this.managedInst = managedInst;
     this.vcId = vcId;
     this.cvOutputsRef = cvOutputsRef;
 
@@ -180,7 +173,7 @@ export default class MIDIEditorUIInstance {
     this.cursorGutter = new CursorGutter(this);
 
     this.cursor = new Cursor(this);
-    this.cursor.setPosBeats(initialState.cursorPosBeats ?? 0);
+    this.cursor.setPosBeats(parentInstance.getCursorPosBeats());
     this.app.ticker.add(() => {
       this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
       this.parentInstance.playbackHandler?.recordingCtx?.tick();
@@ -256,7 +249,7 @@ export default class MIDIEditorUIInstance {
     return lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
   }
 
-  private async init(initialState: SerializedMIDIEditorState) {
+  private async init(initialState: SerializedMIDIEditorInstance) {
     const wasmInst = await import('src/note_container');
     const noteLinesCtxPtr = wasmInst.create_note_lines(initialState.lines.length);
     this.wasm = { instance: wasmInst, noteLinesCtxPtr };
@@ -267,7 +260,7 @@ export default class MIDIEditorUIInstance {
     this.lines = this.buildNoteLines(initialState.lines);
   }
 
-  public async reInitialize(newState: SerializedMIDIEditorState) {
+  public async reInitialize(newState: SerializedMIDIEditorInstance) {
     if (!this.wasm) {
       console.error('Tried to re-initialize MIDI editor state before Wasm initialized');
       return;
@@ -287,25 +280,24 @@ export default class MIDIEditorUIInstance {
     this.pianoKeys = new PianoKeys(this);
 
     // Adjust the view to match
-    this.view.beatsPerMeasure = newState.view.beatsPerMeasure;
-    this.view.pxPerBeat = newState.view.pxPerBeat;
-    this.view.scrollHorizontalBeats = newState.view.scrollHorizontalBeats;
+    this.parentInstance.baseView.beatsPerMeasure = this.parentInstance.baseView.beatsPerMeasure;
+    this.parentInstance.baseView.pxPerBeat = this.parentInstance.baseView.pxPerBeat;
+    this.parentInstance.baseView.scrollHorizontalBeats =
+      this.parentInstance.baseView.scrollHorizontalBeats;
     this.view.scrollVerticalPx = newState.view.scrollVerticalPx;
     this.handleViewChange();
 
     // Set other misc. state
-    this.setBeatSnapInterval(newState.beatSnapInterval);
-    this.localBPM = newState.localBPM;
-    this.toggleLoop(newState.loopPoint);
-    this.cursor.setPosBeats(newState.cursorPosBeats);
+    this.toggleLoop(this.parentInstance.loopPoint);
+    this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
   }
 
   public pxToBeats(px: number) {
-    return px / this.view.pxPerBeat;
+    return px / this.parentInstance.baseView.pxPerBeat;
   }
 
   public beatsToPx(beats: number) {
-    return beats * this.view.pxPerBeat;
+    return beats * this.parentInstance.baseView.pxPerBeat;
   }
 
   public snapBeat(rawBeat: number): number {
@@ -508,7 +500,10 @@ export default class MIDIEditorUIInstance {
   private startPanning(data: PIXI.InteractionData) {
     this.panningData = {
       startPoint: data.getLocalPosition(this.linesContainer),
-      startView: R.clone(this.view),
+      startView: {
+        scrollHorizontalBeats: this.parentInstance.baseView.scrollHorizontalBeats,
+        scrollVerticalPx: this.view.scrollVerticalPx,
+      },
     };
   }
 
@@ -520,10 +515,6 @@ export default class MIDIEditorUIInstance {
     const xDiffPx = -(newPoint.x - this.panningData.startPoint.x);
     const yDiffPx = -(newPoint.y - this.panningData.startPoint.y);
 
-    this.view.scrollHorizontalBeats = Math.max(
-      this.panningData.startView.scrollHorizontalBeats + this.pxToBeats(xDiffPx),
-      0
-    );
     const maxVerticalScrollPx = Math.max(
       this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT + 10,
       0
@@ -533,7 +524,12 @@ export default class MIDIEditorUIInstance {
       maxVerticalScrollPx,
       this.panningData.startView.scrollVerticalPx + yDiffPx
     );
-    this.handleViewChange();
+
+    // This triggers `handleViewChange` on all instances
+    this.parentInstance.setScrollHorizontalBeats(
+      Math.max(this.panningData.startView.scrollHorizontalBeats + this.pxToBeats(xDiffPx), 0)
+    );
+    // this.handleViewChange();
   }
 
   private stopPanning() {
@@ -840,7 +836,7 @@ export default class MIDIEditorUIInstance {
   }
 
   public gate(lineIx: number) {
-    this.parentInstance.gate(lineIx);
+    this.parentInstance.gate(this.managedInst.id, lineIx);
     this.pianoKeys?.setNotePlaying(lineIx, true);
   }
 
@@ -853,7 +849,7 @@ export default class MIDIEditorUIInstance {
   }
 
   public ungate(lineIx: number) {
-    this.parentInstance.ungate(lineIx);
+    this.parentInstance.ungate(this.managedInst.id, lineIx);
     this.pianoKeys?.setNotePlaying(lineIx, false);
   }
 
@@ -989,7 +985,8 @@ export default class MIDIEditorUIInstance {
       this.parentInstance.playbackHandler.setLoopPoint(null);
     } else {
       const newLoopPoint = this.snapBeat(
-        loopPoint ?? this.parentInstance.getCursorPosBeats() + this.view.beatsPerMeasure
+        loopPoint ??
+          this.parentInstance.getCursorPosBeats() + this.parentInstance.baseView.beatsPerMeasure
       );
       this.parentInstance.playbackHandler.setLoopPoint(newLoopPoint);
       this.loopCursor = new LoopCursor(this, newLoopPoint);
@@ -997,15 +994,7 @@ export default class MIDIEditorUIInstance {
     }
   }
 
-  public setBeatSnapInterval(newBeatSnapInterval: number) {
-    this.beatSnapInterval = newBeatSnapInterval;
-  }
-
-  public serialize(): SerializedMIDIEditorState {
-    const cvOutputs = get(this.cvOutputsRef);
-    const cvOutputStates: SerializedCVOutputState[] = cvOutputs.map(cvOutput =>
-      cvOutput.serialize()
-    );
+  public serialize(): SerializedMIDIEditorInstance {
     return {
       lines: this.lines.map((line, lineIx) => ({
         midiNumber: this.lines.length - lineIx,
@@ -1015,12 +1004,8 @@ export default class MIDIEditorUIInstance {
         })),
       })),
       view: R.clone(this.view),
-      beatSnapInterval: this.beatSnapInterval,
-      cursorPosBeats: this.parentInstance.getCursorPosBeats(),
-      localBPM: this.localBPM,
-      loopPoint: this.loopCursor?.getPosBeats() ?? null,
-      metronomeEnabled: this.parentInstance.playbackHandler.metronomeEnabled,
-      cvOutputStates,
+      isActive: this.managedInst.isActive,
+      name: this.managedInst.name,
     };
   }
 
@@ -1054,7 +1039,7 @@ export default class MIDIEditorUIInstance {
     return buffer;
   }
 
-  private handleViewChange() {
+  public handleViewChange() {
     this.lines.forEach(line => line.handleViewChange());
     this.cursor.handleViewChange();
     this.loopCursor?.handleViewChange();
@@ -1075,14 +1060,20 @@ export default class MIDIEditorUIInstance {
           // by the same amount puts the zoom at the same point as before.
           1 - 1 / (1 + -deltaYPx / conf.SCROLL_ZOOM_DOUBLE_INTERVAL_PX);
     const widthBeats = this.pxToBeats(this.width);
-    const endBeat = this.view.scrollHorizontalBeats + widthBeats;
+    const endBeat = this.parentInstance.baseView.scrollHorizontalBeats + widthBeats;
 
     const leftBeatsToAdd = xPercent * multiplier * widthBeats * (evt.deltaY > 0 ? -1 : 1);
     const rightBeatsToAdd = (1 - xPercent) * multiplier * widthBeats * (evt.deltaY > 0 ? 1 : -1);
-    this.view.scrollHorizontalBeats = Math.max(0, this.view.scrollHorizontalBeats + leftBeatsToAdd);
-    const newEndBeat = Math.max(this.view.scrollHorizontalBeats + 1, endBeat + rightBeatsToAdd);
-    const newWidthBeats = newEndBeat - this.view.scrollHorizontalBeats;
-    this.view.pxPerBeat = this.width / newWidthBeats;
+    this.parentInstance.baseView.scrollHorizontalBeats = Math.max(
+      0,
+      this.parentInstance.baseView.scrollHorizontalBeats + leftBeatsToAdd
+    );
+    const newEndBeat = Math.max(
+      this.parentInstance.baseView.scrollHorizontalBeats + 1,
+      endBeat + rightBeatsToAdd
+    );
+    const newWidthBeats = newEndBeat - this.parentInstance.baseView.scrollHorizontalBeats;
+    this.parentInstance.baseView.pxPerBeat = this.width / newWidthBeats;
 
     this.handleViewChange();
   }
@@ -1131,12 +1122,16 @@ export default class MIDIEditorUIInstance {
             break;
           }
           case 'ArrowLeft': {
-            this.view.scrollHorizontalBeats = Math.max(this.view.scrollHorizontalBeats - 1, 0);
+            this.parentInstance.setScrollHorizontalBeats(
+              Math.max(this.parentInstance.baseView.scrollHorizontalBeats - 1, 0)
+            );
             this.handleViewChange();
             break;
           }
           case 'ArrowRight': {
-            this.view.scrollHorizontalBeats += 1;
+            this.parentInstance.setScrollHorizontalBeats(
+              this.parentInstance.baseView.scrollHorizontalBeats + 1
+            );
             this.handleViewChange();
             break;
           }
@@ -1183,10 +1178,6 @@ export default class MIDIEditorUIInstance {
         }
 
         if (evt.ctrlKey || evt.metaKey) {
-          this.view.scrollHorizontalBeats = Math.max(
-            0,
-            this.view.scrollHorizontalBeats + evt.deltaX / conf.SCROLL_HORIZONTAL_FACTOR
-          );
           const maxVerticalScrollPx = Math.max(
             this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT + 10,
             0
@@ -1198,7 +1189,14 @@ export default class MIDIEditorUIInstance {
               this.view.scrollVerticalPx + evt.deltaY / conf.SCROLL_VERTICAL_FACTOR
             )
           );
-          this.handleViewChange();
+
+          this.parentInstance.setScrollHorizontalBeats(
+            Math.max(
+              0,
+              this.parentInstance.baseView.scrollHorizontalBeats +
+                evt.deltaX / conf.SCROLL_HORIZONTAL_FACTOR
+            )
+          );
           return;
         }
 

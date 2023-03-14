@@ -12,20 +12,18 @@ import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPic
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
-import type { MIDIEditorInstance } from 'src/midiEditor';
+import type { MIDIEditorInstance, SerializedMIDIEditorState } from 'src/midiEditor';
 import { CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import { CVOutputTopControls } from 'src/midiEditor/CVOutput/CVOutputTopControls';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
-import MIDIEditorUIInstance, {
-  type SerializedMIDIEditorState,
-} from 'src/midiEditor/MIDIEditorUIInstance';
 import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
+import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type {
   ManagedMIDIEditorUIInstance,
   MIDIEditorUIManager,
@@ -206,7 +204,7 @@ const handleMIDIFileUpload = async (
     inst.current.reInitialize({
       ...curState,
       lines,
-      view: { ...curState.view, scrollHorizontalBeats: 0 },
+      view: { ...curState.view },
     });
   } catch (err) {
     if (err) {
@@ -418,9 +416,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       <div className='labeled-container'>
         <label>Snap Interval</label>
         <SnapControls
-          onChange={newBeatSnapInterval =>
-            activeInstance.current?.setBeatSnapInterval(newBeatSnapInterval)
-          }
+          onChange={newBeatSnapInterval => parentInst.setBeatSnapInterval(newBeatSnapInterval)}
           initialBeatSnapInterval={initialState.beatSnapInterval}
         />
       </div>
@@ -535,8 +531,6 @@ class ActiveInstanceProxy {
 
 interface MIDIEditorProps {
   initialState: SerializedMIDIEditorState;
-  width: number;
-  height: number;
   instance: MIDIEditorInstance;
   vcId: string;
 }
@@ -570,12 +564,12 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
 
   const handleChange = useCallback(
     ({ bpm, loopEnabled }: MIDIEditorControlsState) => {
-      parentInstance.uiInstance!.localBPM = bpm;
+      parentInstance.localBPM = bpm;
       if (loopEnabled === R.isNil(parentInstance.uiInstance!.loopCursor)) {
         parentInstance.uiInstance!.toggleLoop();
       }
     },
-    [parentInstance.uiInstance]
+    [parentInstance]
   );
 
   const lastCanvasRefsByInstID = useRef<{ [key: string]: HTMLCanvasElement }>({});
@@ -627,13 +621,15 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
                   lastCanvasRefsByInstID.current[inst.id] = canvas;
 
                   parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
+                  const managedInst = parentInstance.uiManager.getInstanceByID(inst.id)!;
                   const instanceHeight = parentInstance.uiManager.computeUIInstanceHeight();
                   const newInst = new MIDIEditorUIInstance(
                     width,
                     instanceHeight,
                     canvas,
-                    initialState,
+                    parentInstance.uiManager.getSerializedStateForInstance(inst.id),
                     parentInstance,
+                    managedInst,
                     vcId,
                     parentInstance.cvOutputs
                   );

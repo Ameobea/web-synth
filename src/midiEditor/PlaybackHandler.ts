@@ -14,8 +14,8 @@ import {
   unregisterStopCB,
 } from 'src/eventScheduler';
 import { getGlobalBpm } from 'src/globalMenu';
-import type { MIDIEditorInstance } from 'src/midiEditor';
-import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import type { MIDIEditorInstance, SerializedMIDIEditorState } from 'src/midiEditor';
+import { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
 
 interface SchedulableNoteEvent {
   isAttack: boolean;
@@ -155,9 +155,23 @@ export default class MIDIEditorPlaybackHandler {
   };
   private loopPoint: number | null = null;
   private scheduledEventHandles: Set<number> = new Set();
-  private heldLineIndices: Set<number> = new Set();
+  private heldLineIndicesByInstanceID: Map<string, Set<number>> = new Map();
   public recordingCtx: RecordingContext | null = null;
   public metronomeEnabled: boolean;
+
+  private addHeldLineIndex = (instID: string, lineIx: number) => {
+    if (!this.heldLineIndicesByInstanceID.has(instID)) {
+      this.heldLineIndicesByInstanceID.set(instID, new Set());
+    }
+    this.heldLineIndicesByInstanceID.get(instID)!.add(lineIx);
+  };
+
+  private removeHeldLineIndex = (instID: string, lineIx: number) => {
+    if (!this.heldLineIndicesByInstanceID.has(instID)) {
+      return;
+    }
+    this.heldLineIndicesByInstanceID.get(instID)!.delete(lineIx);
+  };
 
   public get isPlaying() {
     return this.playbackGeneration !== null;
@@ -260,6 +274,7 @@ export default class MIDIEditorPlaybackHandler {
    * `startBeatInclusive` ir provided.
    */
   private getNotesInRange(
+    inst: ManagedMIDIEditorUIInstance,
     startBeatInclusive: number | null,
     endBeatExclusive: number | null
   ): Map<number, SchedulableNoteEvent[]> {
@@ -285,26 +300,27 @@ export default class MIDIEditorPlaybackHandler {
   }
 
   private scheduleNotes(
+    managedInst: ManagedMIDIEditorUIInstance,
     noteEventsByBeat: Map<number, SchedulableNoteEvent[]>,
     scheduleParams: ScheduleParams
   ) {
-    const lineCount = this.inst.lineCount;
+    const lineCount = managedInst.lineCount;
     for (const [beat, entries] of noteEventsByBeat.entries()) {
       let handle: number;
       const cb = () => {
         entries.forEach(({ isAttack, lineIx }) => {
           if (isAttack) {
             if (scheduleParams.type === 'localTempo') {
-              this.inst.midiInput.onAttack(lineCount - lineIx, 255, true);
+              managedInst.midiInput.onAttack(lineCount - lineIx, 255, true);
             }
             this.inst.uiInstance?.onGated(lineIx);
-            this.heldLineIndices.add(lineIx);
+            this.addHeldLineIndex(managedInst.id, lineIx);
           } else {
             if (scheduleParams.type === 'localTempo') {
-              this.inst.midiInput.onRelease(lineCount - lineIx, 255, true);
+              managedInst.midiInput.onRelease(lineCount - lineIx, 255, true);
             }
             this.inst.uiInstance?.onUngated(lineIx);
-            this.heldLineIndices.delete(lineIx);
+            this.removeHeldLineIndex(managedInst.id, lineIx);
           }
 
           this.scheduledEventHandles.delete(handle);
@@ -314,7 +330,7 @@ export default class MIDIEditorPlaybackHandler {
       if (scheduleParams.type === 'globalBeatCounter') {
         for (const { isAttack, lineIx } of entries) {
           const midiNumber = lineCount - lineIx;
-          this.inst.midiOutput.scheduleEvent(scheduleParams.curBeat + beat, {
+          managedInst.midiOutput.scheduleEvent(scheduleParams.curBeat + beat, {
             type: isAttack ? MIDIEventType.Attack : MIDIEventType.Release,
             note: midiNumber,
             velocity: 255,
@@ -339,24 +355,33 @@ export default class MIDIEditorPlaybackHandler {
     }
     this.scheduledEventHandles.clear();
 
-    for (const lineIx of this.heldLineIndices) {
-      this.inst.midiInput.onRelease(this.inst.lineCount - lineIx, 255);
-      this.inst.uiInstance?.onUngated(lineIx);
+    for (const [instID, map] of this.heldLineIndicesByInstanceID.entries()) {
+      const inst = this.inst.uiManager.getInstanceByID(instID);
+      if (!inst) {
+        continue;
+      }
+
+      for (const lineIx of map.values()) {
+        inst.midiInput.onRelease(inst.lineCount - lineIx, 255);
+        inst.instance?.onUngated(lineIx);
+      }
     }
-    this.heldLineIndices.clear();
+    this.heldLineIndicesByInstanceID.clear();
   }
 
   /**
    * Schedules note events for one play through of all notes in the MIDI editor, starting at the cursor position.
    */
   private scheduleOneshot(scheduleParams: ScheduleParams) {
-    const notesInRange = this.getNotesInRange(this.lastSetCursorPosBeats, null);
-    this.scheduleNotes(notesInRange, scheduleParams);
+    const insts = get(this.inst.uiManager.instances);
+    for (const inst of insts) {
+      const notesInRange = this.getNotesInRange(inst, this.lastSetCursorPosBeats, null);
+      this.scheduleNotes(inst, notesInRange, scheduleParams);
+    }
   }
 
   private scheduleLoop(scheduleParams: ScheduleParams) {
     const loopPoint = this.loopPoint!;
-    const notesInRange = this.getNotesInRange(0, loopPoint);
     const loopLengthBeats = loopPoint;
     const playbackGeneration = this.playbackGeneration;
 
@@ -393,17 +418,21 @@ export default class MIDIEditorPlaybackHandler {
 
       // If we're starting in the middle of a loop on the first loop iteration, filter out notes that
       // start before the starting cursor position
-      if (this.lastPlaybackSchedulParams.type === 'localTempo' && loopIx === 0) {
-        const clonedNotesInRange = new Map();
-        for (const [beat, events] of notesInRange.entries()) {
-          if (beat < this.lastSetCursorPosBeats) {
-            continue;
+      const insts = get(this.inst.uiManager.instances);
+      for (const inst of insts) {
+        const notesInRange = this.getNotesInRange(inst, 0, loopPoint);
+        if (this.lastPlaybackSchedulParams.type === 'localTempo' && loopIx === 0) {
+          const clonedNotesInRange = new Map();
+          for (const [beat, events] of notesInRange.entries()) {
+            if (beat < this.lastSetCursorPosBeats) {
+              continue;
+            }
+            clonedNotesInRange.set(beat - this.lastSetCursorPosBeats, events);
           }
-          clonedNotesInRange.set(beat - this.lastSetCursorPosBeats, events);
+          this.scheduleNotes(inst, clonedNotesInRange, newScheduleParams);
+        } else {
+          this.scheduleNotes(inst, notesInRange, newScheduleParams);
         }
-        this.scheduleNotes(clonedNotesInRange, newScheduleParams);
-      } else {
-        this.scheduleNotes(notesInRange, newScheduleParams);
       }
 
       // Schedule an event before the loop ends to recursively schedule another.
@@ -523,7 +552,7 @@ export default class MIDIEditorPlaybackHandler {
     this.lastSetCursorPosBeats = this.getCursorPosBeats();
     this.playbackGeneration = null;
     this.cancelAllScheduledNotes();
-    this.inst.midiOutput.clearAll();
+    this.inst.uiManager.stopAllPlayback();
   }
 
   public startRecording() {
@@ -536,7 +565,7 @@ export default class MIDIEditorPlaybackHandler {
     if (!this.isPlaying) {
       this.startPlayback({
         type: 'localTempo',
-        bpm: this.inst.uiInstance?.localBPM ?? 120,
+        bpm: this.inst.localBPM,
         startTime: ctx.currentTime,
       });
     }

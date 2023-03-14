@@ -51,7 +51,7 @@ export default class NoteLine {
     this.background.interactive = true;
     this.container.addChild(this.background);
     this.container.width = this.app.width;
-    this.container.y = index * conf.LINE_HEIGHT - this.app.view.scrollVerticalPx;
+    this.container.y = index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx;
 
     notes.forEach(note => {
       const noteBox = new NoteBoxClass(this, note);
@@ -74,7 +74,7 @@ export default class NoteLine {
         const data: PIXI.InteractionData = evt.data;
         const posBeats = this.app.snapBeat(
           this.app.pxToBeats(data.getLocalPosition(this.background).x) +
-            this.app.view.scrollHorizontalBeats
+            this.app.parentInstance.baseView.scrollHorizontalBeats
         );
         const isBlocked = !this.app.wasm!.instance.check_can_add_note(
           this.app.wasm!.noteLinesCtxPtr,
@@ -108,7 +108,7 @@ export default class NoteLine {
         const data: PIXI.InteractionData = evt.data;
         const newPosBeats = this.app.snapBeat(
           this.app.pxToBeats(data.getLocalPosition(this.background).x) +
-            this.app.view.scrollHorizontalBeats
+            this.app.parentInstance.baseView.scrollHorizontalBeats
         );
         let [newStartPosBeats, newEndPosBeats] = [
           Math.min(newPosBeats, this.noteCreationState.originalPosBeats),
@@ -163,7 +163,7 @@ export default class NoteLine {
   public handleViewChange() {
     const newY = Math.max(
       -conf.LINE_HEIGHT,
-      Math.round(this.index * conf.LINE_HEIGHT - this.app.view.scrollVerticalPx)
+      Math.round(this.index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx)
     );
     const isCulled = this.container.y + conf.LINE_HEIGHT < 0 || this.container.y > this.app.height;
     if (!isCulled && this.isCulled) {
@@ -183,7 +183,7 @@ export default class NoteLine {
   }
 
   private buildMarkers(): PIXI.Graphics {
-    const cached = MarkersCache.get(this.app.view.pxPerBeat);
+    const cached = MarkersCache.get(this.app.parentInstance.baseView.pxPerBeat);
     if (cached) {
       return cached.clone();
     }
@@ -195,10 +195,10 @@ export default class NoteLine {
     g.lineTo(this.app.width * 2, conf.LINE_HEIGHT);
 
     let beat = 0;
-    const visibleBeats = this.app.width / this.app.view.pxPerBeat;
+    const visibleBeats = this.app.width / this.app.parentInstance.baseView.pxPerBeat;
     const endBeat = Math.floor(visibleBeats) + 20;
     while (beat <= endBeat) {
-      const isMeasureLine = beat % this.app.view.beatsPerMeasure === 0;
+      const isMeasureLine = beat % this.app.parentInstance.baseView.beatsPerMeasure === 0;
       let x = this.app.beatsToPx(beat);
       if (isMeasureLine) {
         x = Math.round(x);
@@ -214,12 +214,12 @@ export default class NoteLine {
     }
 
     g.cacheAsBitmap = true;
-    MarkersCache.set(this.app.view.pxPerBeat, g);
+    MarkersCache.set(this.app.parentInstance.baseView.pxPerBeat, g);
     return g.clone();
   }
 
   private renderMarkers() {
-    if (!this.graphics || this.lastPxPerBeat !== this.app.view.pxPerBeat) {
+    if (!this.graphics || this.lastPxPerBeat !== this.app.parentInstance.baseView.pxPerBeat) {
       if (this.graphics) {
         this.container.removeChild(this.graphics);
         this.graphics.destroy();
@@ -229,10 +229,13 @@ export default class NoteLine {
       this.container.addChild(this.graphics);
       // after background, before notes
       this.container.setChildIndex(this.graphics, 1);
-      this.lastPxPerBeat = this.app.view.pxPerBeat;
+      this.lastPxPerBeat = this.app.parentInstance.baseView.pxPerBeat;
     }
 
-    const xOffsetBeats = -(this.app.view.scrollHorizontalBeats % this.app.view.beatsPerMeasure);
+    const xOffsetBeats = -(
+      this.app.parentInstance.baseView.scrollHorizontalBeats %
+      this.app.parentInstance.baseView.beatsPerMeasure
+    );
     this.graphics.x = this.app.beatsToPx(xOffsetBeats);
   }
 
