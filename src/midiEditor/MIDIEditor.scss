@@ -95,16 +95,3 @@
 .collapsed-midi-editor-instance {
   position: relative;
 }
-
-.cv-outputs-wrapper {
-  position: absolute;
-  bottom: 20px;
-  background-color: #1b1b1b;
-  border-top: 1px solid #555;
-  border-left: 1px solid #555;
-  border-right: 1px solid #555;
-  width: calc(100% - 4px);
-  min-height: 20px;
-  max-height: 500px;
-  overflow-y: auto;
-}

@@ -356,14 +356,14 @@ export default class MIDIEditorPlaybackHandler {
     this.scheduledEventHandles.clear();
 
     for (const [instID, map] of this.heldLineIndicesByInstanceID.entries()) {
-      const inst = this.inst.uiManager.getInstanceByID(instID);
+      const inst = this.inst.uiManager.getMIDIEditorInstanceByID(instID);
       if (!inst) {
         continue;
       }
 
       for (const lineIx of map.values()) {
         inst.midiInput.onRelease(inst.lineCount - lineIx, 255);
-        inst.instance?.onUngated(lineIx);
+        inst.uiInst?.onUngated(lineIx);
       }
     }
     this.heldLineIndicesByInstanceID.clear();

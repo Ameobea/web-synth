@@ -8,12 +8,13 @@ interface CVOutputTopControlsProps {
   inst: MIDIEditorInstance;
 }
 
-export const CVOutputTopControls: React.FC<CVOutputTopControlsProps> = ({ inst }) => {
-  const handleClick = () => inst.addCVOutput();
-
-  return (
-    <div className='cv-top-output-controls'>
-      <MIDIEditorControlButton label='AO' onClick={handleClick} title='Add CV Output' />
-    </div>
-  );
-};
+export const CVOutputTopControls: React.FC<CVOutputTopControlsProps> = ({ inst }) => (
+  <div className='cv-top-output-controls'>
+    <MIDIEditorControlButton
+      label='AE'
+      onClick={() => inst.uiManager.addMIDIEditorInstance()}
+      title='Add MIDI Editor Instance'
+    />
+    <MIDIEditorControlButton label='AO' onClick={() => inst.addCVOutput()} title='Add CV Output' />
+  </div>
+);

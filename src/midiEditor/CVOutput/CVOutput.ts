@@ -7,8 +7,11 @@ import {
   type AdsrStep,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { get_midi_editor_audio_connectables, MIDIEditorInstance } from 'src/midiEditor';
-import type { MIDIEditorView } from 'src/midiEditor/MIDIEditorUIInstance';
+import {
+  get_midi_editor_audio_connectables,
+  MIDIEditorBaseView,
+  MIDIEditorInstance,
+} from 'src/midiEditor';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { ADSR2Module, EarlyReleaseModeType, type ADSR2Params } from 'src/synthDesigner/ADSRModule';
 
@@ -145,11 +148,11 @@ export class CVOutput {
   public registerUIInstance(uiInstance: ADSR2Instance) {
     this.uiInstance = uiInstance;
     if (this.parentInstance.uiInstance) {
-      this.handleViewChange(this.parentInstance.uiInstance.view);
+      this.handleViewChange(this.parentInstance.baseView);
     }
   }
 
-  public handleViewChange({ pxPerBeat, scrollHorizontalBeats }: MIDIEditorView) {
+  public handleViewChange({ pxPerBeat, scrollHorizontalBeats }: MIDIEditorBaseView) {
     if (!this.uiInstance) {
       return;
     }

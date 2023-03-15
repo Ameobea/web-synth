@@ -1,6 +1,5 @@
 import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
-import { get, type Writable } from 'svelte/store';
 
 import * as PIXI from 'src/controls/pixi';
 import { destroyPIXIApp } from 'src/controls/pixiUtils';
@@ -11,7 +10,6 @@ import type {
   SerializedMIDILine,
 } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
-import type { CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDINoteBox, {
   NoteDragHandle,
@@ -48,7 +46,7 @@ export default class MIDIEditorUIInstance {
   public width: number;
   public height: number;
   public parentInstance: MIDIEditorInstance;
-  public managedInst: ManagedMIDIEditorUIInstance;
+  private managedInst: ManagedMIDIEditorUIInstance;
   public app: PIXI.Application;
   public wasm:
     | {
@@ -92,13 +90,12 @@ export default class MIDIEditorUIInstance {
   private vcId: string;
   private isHidden: boolean;
   private destroyed = false;
-  public cvOutputsRef: Writable<CVOutput[]>;
 
   private get beatSnapInterval(): number {
     return this.parentInstance.beatSnapInterval;
   }
 
-  private get view(): MIDIEditorInstanceView {
+  public get view(): MIDIEditorInstanceView {
     return this.managedInst.view;
   }
 
@@ -109,8 +106,7 @@ export default class MIDIEditorUIInstance {
     initialState: SerializedMIDIEditorInstance,
     parentInstance: MIDIEditorInstance,
     managedInst: ManagedMIDIEditorUIInstance,
-    vcId: string,
-    cvOutputsRef: Writable<CVOutput[]>
+    vcId: string
   ) {
     this.width = width;
     this.height = height;
@@ -120,7 +116,6 @@ export default class MIDIEditorUIInstance {
     this.parentInstance = parentInstance;
     this.managedInst = managedInst;
     this.vcId = vcId;
-    this.cvOutputsRef = cvOutputsRef;
 
     this.app = new PIXI.Application({
       antialias: true,
@@ -1005,11 +1000,11 @@ export default class MIDIEditorUIInstance {
     }));
   }
 
-  public serialize(): SerializedMIDIEditorInstance {
+  public serialize(isExpanded: boolean): SerializedMIDIEditorInstance {
     return {
       lines: this.serializeLines(),
       view: R.clone(this.view),
-      isActive: this.managedInst.isActive,
+      isExpanded,
       name: this.managedInst.name,
     };
   }
@@ -1049,8 +1044,6 @@ export default class MIDIEditorUIInstance {
     this.cursor.handleViewChange();
     this.loopCursor?.handleViewChange();
     this.pianoKeys?.handleViewChange();
-
-    get(this.cvOutputsRef).forEach(cvOutput => cvOutput.handleViewChange(this.view));
   }
 
   private handleZoom(evt: WheelEvent) {
@@ -1078,9 +1071,7 @@ export default class MIDIEditorUIInstance {
       endBeat + rightBeatsToAdd
     );
     const newWidthBeats = newEndBeat - this.parentInstance.baseView.scrollHorizontalBeats;
-    this.parentInstance.baseView.pxPerBeat = this.width / newWidthBeats;
-
-    this.handleViewChange();
+    this.parentInstance.setPxPerBeat(this.width / newWidthBeats);
   }
 
   private initEventHandlers() {

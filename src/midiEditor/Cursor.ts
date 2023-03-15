@@ -24,7 +24,7 @@ export class CursorGutter {
 
       const xPx = evt.data.getLocalPosition(g).x;
       const xBeats = this.app.snapBeat(
-        this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx)
+        this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
       );
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
 
@@ -38,7 +38,10 @@ export class CursorGutter {
 
       const xPx = evt.data.getLocalPosition(g).x;
       const xBeats = this.app.snapBeat(
-        Math.max(0, this.app.view.scrollHorizontalBeats + this.app.pxToBeats(xPx))
+        Math.max(
+          0,
+          this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
+        )
       );
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
     });
@@ -70,7 +73,7 @@ export class Cursor {
   public handleDrag(newPos: PIXI.Point) {
     const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
     const newPosBeats = Math.max(
-      this.app.pxToBeats(normalizedX) + this.app.view.scrollHorizontalBeats,
+      this.app.pxToBeats(normalizedX) + this.app.parentInstance.baseView.scrollHorizontalBeats,
       0
     );
     const didUpdate = this.app.parentInstance.playbackHandler.setCursorPosBeats(newPosBeats);
@@ -115,7 +118,8 @@ export class Cursor {
   }
 
   public handleViewChange() {
-    const normalizedPosBeats = this.posBeats - this.app.view.scrollHorizontalBeats;
+    const normalizedPosBeats =
+      this.posBeats - this.app.parentInstance.baseView.scrollHorizontalBeats;
     const xPx =
       this.app.beatsToPx(normalizedPosBeats) +
       conf.PIANO_KEYBOARD_WIDTH -
@@ -154,7 +158,9 @@ export class LoopCursor extends Cursor {
 
     const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
     const newPosBeats = Math.max(
-      this.app.snapBeat(this.app.pxToBeats(normalizedX) + this.app.view.scrollHorizontalBeats),
+      this.app.snapBeat(
+        this.app.pxToBeats(normalizedX) + this.app.parentInstance.baseView.scrollHorizontalBeats
+      ),
       0
     );
     const didUpdate = this.app.parentInstance.playbackHandler.setLoopPoint(newPosBeats);

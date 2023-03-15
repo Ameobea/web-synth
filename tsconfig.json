@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "preserveValueImports": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "module": "es2020",
@@ -15,13 +14,12 @@
     "forceConsistentCasingInFileNames": true,
     "strictFunctionTypes": false, // This is required by Jantix
     "strict": true,
-    "noStrictGenericChecks": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "suppressImplicitAnyIndexErrors": false,
     "noUnusedLocals": true,
     "typeRoots": ["./node_modules/@types"],
-    "types": ["react/next", "react-dom/next", "svelte"],
+    "types": ["react/next", "react-dom/next", "svelte", "node"],
     "jsx": "react",
     "baseUrl": ".",
     "paths": {

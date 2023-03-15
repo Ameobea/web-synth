@@ -13,7 +13,6 @@ import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImpor
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 import type { MIDIEditorInstance, SerializedMIDIEditorState } from 'src/midiEditor';
-import { CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import { CVOutputTopControls } from 'src/midiEditor/CVOutput/CVOutputTopControls';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
@@ -24,10 +23,7 @@ import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
 import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import type {
-  ManagedMIDIEditorUIInstance,
-  MIDIEditorUIManager,
-} from 'src/midiEditor/MIDIEditorUIManager';
+import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 
 const ctx = new AudioContext();
@@ -196,7 +192,7 @@ const handleMIDIFileUpload = async (
       }
     );
 
-    const curState = inst.current.serialize();
+    const curState = inst.current.serialize(true);
     const lines = [...notesByMIDINumber.entries()].map(([midiNumber, notes]) => ({
       midiNumber,
       notes,
@@ -444,7 +440,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
               description: true,
               getExistingTags: getExistingMIDICompositionTags,
             });
-            const composition = activeInstance.current!.serialize();
+            const composition = activeInstance.current!.serialize(true);
             await saveMIDIComposition(name, description ?? '', composition, tags ?? []);
           } catch (err) {
             return;
@@ -573,18 +569,13 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   );
 
   const lastCanvasRefsByInstID = useRef<{ [key: string]: HTMLCanvasElement }>({});
-  const [instances, setInstances] = useState<ManagedMIDIEditorUIInstance[]>([]);
+  const [instances, setInstances] = useState<ManagedInstance[]>([]);
   useEffect(
     () =>
       parentInstance.uiManager.instances.subscribe(newInstances => setInstances([...newInstances])),
     [parentInstance.uiManager.instances]
   );
 
-  const [cvOutputs, setCVOutputs] = useState<CVOutput[]>([]);
-  useEffect(
-    () => parentInstance.cvOutputs.subscribe(newOutputs => setCVOutputs([...newOutputs])),
-    [parentInstance.cvOutputs]
-  );
   const activeInstanceProxy = useMemo(
     () => new ActiveInstanceProxy(parentInstance.uiManager),
     [parentInstance.uiManager]
@@ -599,65 +590,66 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
         onChange={handleChange}
         playbackHandler={parentInstance.playbackHandler}
       />
-      {instances.map(inst => {
-        if (inst.isActive) {
+      {instances.map(instance => {
+        if (instance.type === 'midiEditor') {
+          const inst = instance.instance;
+          if (instance.isExpanded) {
+            return (
+              <div key={inst.id} className='expanded-midi-editor-instance'>
+                <button
+                  className='collapse-midi-editor-instance'
+                  onClick={() => parentInstance.uiManager.collapseUIInstance(inst.id)}
+                >
+                  ⌄
+                </button>
+                <canvas
+                  ref={canvas => {
+                    if (!canvas) {
+                      return;
+                    }
+
+                    if (canvas === lastCanvasRefsByInstID.current[inst.id]) {
+                      return;
+                    }
+                    lastCanvasRefsByInstID.current[inst.id] = canvas;
+
+                    parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
+                    const managedInst = parentInstance.uiManager.getMIDIEditorInstanceByID(
+                      inst.id
+                    )!;
+                    const instanceHeight = parentInstance.uiManager.computeUIInstanceHeight();
+                    const newInst = new MIDIEditorUIInstance(
+                      width,
+                      instanceHeight,
+                      canvas,
+                      parentInstance.uiManager.getSerializedStateForMIDIInstance(inst.id),
+                      parentInstance,
+                      managedInst,
+                      vcId
+                    );
+                    parentInstance.uiManager.setUIInstanceForID(inst.id, newInst);
+                  }}
+                  onMouseDown={blockMouseEvent}
+                  onContextMenu={blockMouseEvent}
+                />
+              </div>
+            );
+          }
+
           return (
-            <div key={inst.id} className='expanded-midi-editor-instance'>
+            <div className='collapsed-midi-editor-instance' key={inst.id}>
               <button
-                className='collapse-midi-editor-instance'
-                onClick={() => parentInstance.uiManager.collapseUIInstance(inst.id)}
+                className='expand-midi-editor-instance'
+                onClick={() => parentInstance.uiManager.expandUIInstance(inst.id)}
               >
-                ⌄
+                ›
               </button>
-              <canvas
-                ref={canvas => {
-                  if (!canvas) {
-                    return;
-                  }
-
-                  if (canvas === lastCanvasRefsByInstID.current[inst.id]) {
-                    return;
-                  }
-                  lastCanvasRefsByInstID.current[inst.id] = canvas;
-
-                  parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
-                  const managedInst = parentInstance.uiManager.getInstanceByID(inst.id)!;
-                  const instanceHeight = parentInstance.uiManager.computeUIInstanceHeight();
-                  const newInst = new MIDIEditorUIInstance(
-                    width,
-                    instanceHeight,
-                    canvas,
-                    parentInstance.uiManager.getSerializedStateForInstance(inst.id),
-                    parentInstance,
-                    managedInst,
-                    vcId,
-                    parentInstance.cvOutputs
-                  );
-                  parentInstance.uiManager.setUIInstanceForID(inst.id, newInst);
-                }}
-                onMouseDown={blockMouseEvent}
-                onContextMenu={blockMouseEvent}
-              />
+              TODO TODO TODO
             </div>
           );
-        }
-
-        return (
-          <div className='collapsed-midi-editor-instance' key={inst.id}>
-            <button
-              className='expand-midi-editor-instance'
-              onClick={() => parentInstance.uiManager.expandUIInstance(inst.id)}
-            >
-              ›
-            </button>
-            TODO TODO TODO
-          </div>
-        );
-      })}
-
-      {cvOutputs.length > 0 ? (
-        <div className='cv-outputs-wrapper'>
-          {cvOutputs.map(output => (
+        } else if (instance.type === 'cvOutput') {
+          const output = instance.instance;
+          return (
             <CVOutputControlsShim
               key={output.name}
               name={output.name}
@@ -669,9 +661,11 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
                 output.backend.setFrozenOutputValue(newFrozenOutputValue)
               }
             />
-          ))}
-        </div>
-      ) : null}
+          );
+        } else {
+          throw new Error('Unknown instance type');
+        }
+      })}
     </div>
   );
 };

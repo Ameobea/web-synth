@@ -1,3 +1,10 @@
 .cv-top-output-controls {
   margin-left: 20px;
+  display: flex;
+  flex-direction: row;
+}
+
+.cv-top-output-controls .midi-editor-control-button {
+  font-size: 30px !important;
+  text-align: center;
 }
