@@ -8,15 +8,16 @@ import type {
   MIDIEditorInstance,
   MIDIEditorInstanceView,
   SerializedMIDIEditorInstance,
+  SerializedMIDILine,
 } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
 import type { CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
-import type { NoteBox } from 'src/midiEditor/NoteBox';
 import MIDINoteBox, {
   NoteDragHandle,
   NoteDragHandleSide,
 } from 'src/midiEditor/NoteBox/MIDINoteBox';
+import type { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import NoteLine from 'src/midiEditor/NoteLine';
 import PianoKeys from 'src/midiEditor/PianoKeyboard';
 import SelectionBox from 'src/midiEditor/SelectionBox';
@@ -994,15 +995,19 @@ export default class MIDIEditorUIInstance {
     }
   }
 
+  public serializeLines(): SerializedMIDILine[] {
+    return this.lines.map((line, lineIx) => ({
+      midiNumber: this.lines.length - lineIx,
+      notes: [...line.notesByID.values()].map(note => ({
+        startPoint: note.note.startPoint,
+        length: note.note.length,
+      })),
+    }));
+  }
+
   public serialize(): SerializedMIDIEditorInstance {
     return {
-      lines: this.lines.map((line, lineIx) => ({
-        midiNumber: this.lines.length - lineIx,
-        notes: [...line.notesByID.values()].map(note => ({
-          startPoint: note.note.startPoint,
-          length: note.note.length,
-        })),
-      })),
+      lines: this.serializeLines(),
       view: R.clone(this.view),
       isActive: this.managedInst.isActive,
       name: this.managedInst.name,

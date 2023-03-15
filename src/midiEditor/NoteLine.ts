@@ -3,8 +3,8 @@ import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
 import MIDIEditorUIInstance, { type Note } from 'src/midiEditor/MIDIEditorUIInstance';
-import { NoteBox } from 'src/midiEditor/NoteBox';
 import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';
+import { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import * as conf from './conf';
 
 export interface NoteCreationState {

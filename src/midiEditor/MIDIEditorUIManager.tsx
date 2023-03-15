@@ -37,10 +37,11 @@ export class ManagedMIDIEditorUIInstance {
     this.view = view;
     this.isActive = isActive;
     this.lines = lines;
-    this.midiInput = new MIDINode();
+    this.midiInputCBs = this.buildInstanceMIDIInputCbs();
+
+    this.midiInput = new MIDINode(() => this.midiInputCBs);
     this.midiOutput = new MIDINode();
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
-    this.midiInputCBs = this.buildInstanceMIDIInputCbs();
     // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
   }
@@ -102,9 +103,10 @@ export class ManagedMIDIEditorUIInstance {
   }
 
   public serialize(): SerializedMIDIEditorInstance {
+    console.log({ isActive: this.isActive });
     return {
       isActive: this.isActive,
-      lines: this.lines,
+      lines: this.instance?.serializeLines() ?? this.lines,
       name: this.name,
       view: this.view,
     };
@@ -137,6 +139,7 @@ export class MIDIEditorUIManager {
       console.error(`Could not find UI instance with ID ${id}`);
       return undefined;
     }
+    return inst;
   }
 
   public getUIInstanceByID(id: string): MIDIEditorUIInstance | undefined {
@@ -166,6 +169,9 @@ export class MIDIEditorUIManager {
       return;
     }
 
+    if (inst.instance) {
+      inst.lines = inst.instance.serializeLines();
+    }
     inst.isActive = false;
     inst.instance?.destroy();
     inst.instance = undefined;

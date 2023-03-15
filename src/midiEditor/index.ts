@@ -185,10 +185,6 @@ export class MIDIEditorInstance {
   }
 
   public serialize(): SerializedMIDIEditorState {
-    if (!this.uiInstance) {
-      throw new Error('Tried to serialize MIDI editor before UI instance initialized');
-    }
-
     const instances = get(this.uiManager.instances).map(inst => inst.serialize());
     return {
       beatSnapInterval: this.beatSnapInterval,

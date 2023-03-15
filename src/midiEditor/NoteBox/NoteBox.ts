@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 
 import * as PIXI from 'src/controls/pixi';
-import { Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';
 
@@ -43,8 +43,8 @@ export class NoteBox {
 
   public render() {
     const startPointPx =
-      (this.note.startPoint - this.line.app.view.scrollHorizontalBeats) *
-        this.line.app.view.pxPerBeat -
+      (this.note.startPoint - this.line.app.parentInstance.baseView.scrollHorizontalBeats) *
+        this.line.app.parentInstance.baseView.pxPerBeat -
       1;
     const widthPx = this.line.app.beatsToPx(this.note.length) - 1;
     const endPointPx = startPointPx + widthPx;
