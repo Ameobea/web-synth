@@ -54,7 +54,6 @@ export const buildDefaultCVOutputState = (
 export class CVOutput {
   public name: string;
   public backend: ADSR2Module;
-  private ctx: AudioContext;
   public dummyOutput: DummyNode = new DummyNode('MIDI editor CV dummy output');
   private onChangeUnsub: Unsubscriber;
 
@@ -72,7 +71,6 @@ export class CVOutput {
     silentOutput: GainNode
   ) {
     this.parentInstance = parentInstance;
-    this.ctx = ctx;
     this.name = name;
 
     this.state = writable(state);
@@ -147,9 +145,7 @@ export class CVOutput {
 
   public registerUIInstance(uiInstance: ADSR2Instance) {
     this.uiInstance = uiInstance;
-    if (this.parentInstance.uiInstance) {
-      this.handleViewChange(this.parentInstance.baseView);
-    }
+    this.handleViewChange(this.parentInstance.baseView);
   }
 
   public handleViewChange({ pxPerBeat, scrollHorizontalBeats }: MIDIEditorBaseView) {
@@ -172,9 +168,7 @@ export class CVOutput {
   }
 
   public setLoopPoint(_newLoopPoint: number | null) {
-    if (this.parentInstance.uiInstance) {
-      this.handleStateChange(get(this.state));
-    }
+    this.handleStateChange(get(this.state));
   }
 
   public handleCursorPosChange(newCursorPosBeats: number) {

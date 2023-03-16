@@ -91,6 +91,17 @@ export class ManagedMIDIEditorUIInstance {
     },
   });
 
+  public getWasmInstance() {
+    if (!this.uiInst) {
+      throw new Error('UI instance not initialized; cannot get Wasm instance');
+    }
+    const wasmInst = this.uiInst.wasm;
+    if (!wasmInst) {
+      throw new Error('Wasm instance not initialized; cannot get Wasm instance');
+    }
+    return wasmInst;
+  }
+
   public gate(lineIx: number) {
     this.midiInputCBs.onAttack(this.lineCount - lineIx, 255);
   }
@@ -110,6 +121,10 @@ export class ManagedMIDIEditorUIInstance {
       name: this.name,
       view: this.view,
     };
+  }
+
+  public destroy() {
+    this.uiInst?.destroy();
   }
 }
 
@@ -481,4 +496,16 @@ export class MIDIEditorUIManager {
     this.windowSize = { width: newWidth, height: newHeight };
     this.resizeInstances(get(this.instances));
   };
+
+  public destroy() {
+    const insts = get(this.instances);
+    for (const inst of insts) {
+      if (inst.type === 'midiEditor') {
+        inst.instance.destroy();
+      } else if (inst.type === 'cvOutput') {
+        inst.instance.destroy();
+      }
+    }
+    this.instances.set([]);
+  }
 }

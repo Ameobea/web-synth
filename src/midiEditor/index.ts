@@ -5,7 +5,6 @@ import { get } from 'svelte/store';
 
 import { type SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
-import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import { MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -160,10 +159,6 @@ export class MIDIEditorInstance {
   public playbackHandler: MIDIEditorPlaybackHandler;
   public uiManager: MIDIEditorUIManager;
 
-  public get uiInstance(): MIDIEditorUIInstance | undefined {
-    return this.uiManager.activeUIInstance;
-  }
-
   constructor(ctx: AudioContext, vcId: string, initialState: SerializedMIDIEditorState) {
     this.vcId = vcId;
     this.baseView = initialState.view;
@@ -199,15 +194,6 @@ export class MIDIEditorInstance {
     this.uiManager.ungateInstance(instanceID, lineIx);
   }
 
-  public getWasmInstance() {
-    if (!this.uiInstance) {
-      throw new UnreachableException('Tried to get Wasm instance before UI instance initialized');
-    } else if (!this.uiInstance.wasm) {
-      throw new UnreachableException('Tried to get Wasm instance before it was initialized');
-    }
-    return this.uiInstance.wasm;
-  }
-
   public getCursorPosBeats(): number {
     return this.playbackHandler.getCursorPosBeats();
   }
@@ -241,7 +227,7 @@ export class MIDIEditorInstance {
   public destroy() {
     try {
       this.playbackHandler.destroy();
-      this.uiInstance?.destroy();
+      this.uiManager.destroy();
     } catch (err) {
       console.warn('Error destroying `MIDIEditorInstance`: ', err);
     }

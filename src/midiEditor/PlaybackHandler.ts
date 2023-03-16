@@ -205,7 +205,12 @@ export default class MIDIEditorPlaybackHandler {
     }
 
     this.loopPoint = newLoopPoint;
-    get(this.inst.cvOutputs).forEach(cvOutput => cvOutput.setLoopPoint(this.loopPoint));
+    for (const inst of get(this.inst.uiManager.instances)) {
+      if (inst.type === 'cvOutput') {
+        inst.instance.setLoopPoint(newLoopPoint);
+      }
+    }
+
     return true;
   }
 
@@ -255,7 +260,11 @@ export default class MIDIEditorPlaybackHandler {
       this.startPlayback({ ...this.lastPlaybackSchedulParams, startTime: ctx.currentTime });
       return;
     } else {
-      get(this.inst.cvOutputs).forEach(output => output.handleCursorPosChange(cursorPosBeats));
+      for (const inst of get(this.inst.uiManager.instances)) {
+        if (inst.type === 'cvOutput') {
+          inst.instance.handleCursorPosChange(cursorPosBeats);
+        }
+      }
     }
     this.lastSetCursorPosBeats = cursorPosBeats;
     return true;
@@ -289,7 +298,7 @@ export default class MIDIEditorPlaybackHandler {
       entry.push({ isAttack, lineIx });
     };
 
-    const { instance, noteLinesCtxPtr } = this.inst.getWasmInstance();
+    const { instance, noteLinesCtxPtr } = inst.getWasmInstance();
     instance.iter_notes_with_cb(
       noteLinesCtxPtr,
       startBeatInclusive ?? 0,
@@ -313,13 +322,13 @@ export default class MIDIEditorPlaybackHandler {
             if (scheduleParams.type === 'localTempo') {
               managedInst.midiInput.onAttack(lineCount - lineIx, 255, true);
             }
-            this.inst.uiInstance?.onGated(lineIx);
+            managedInst.uiInst?.onGated(lineIx);
             this.addHeldLineIndex(managedInst.id, lineIx);
           } else {
             if (scheduleParams.type === 'localTempo') {
               managedInst.midiInput.onRelease(lineCount - lineIx, 255, true);
             }
-            this.inst.uiInstance?.onUngated(lineIx);
+            managedInst.uiInst?.onUngated(lineIx);
             this.removeHeldLineIndex(managedInst.id, lineIx);
           }
 
@@ -375,8 +384,11 @@ export default class MIDIEditorPlaybackHandler {
   private scheduleOneshot(scheduleParams: ScheduleParams) {
     const insts = get(this.inst.uiManager.instances);
     for (const inst of insts) {
-      const notesInRange = this.getNotesInRange(inst, this.lastSetCursorPosBeats, null);
-      this.scheduleNotes(inst, notesInRange, scheduleParams);
+      if (inst.type !== 'midiEditor') {
+        continue;
+      }
+      const notesInRange = this.getNotesInRange(inst.instance, this.lastSetCursorPosBeats, null);
+      this.scheduleNotes(inst.instance, notesInRange, scheduleParams);
     }
   }
 
@@ -420,7 +432,12 @@ export default class MIDIEditorPlaybackHandler {
       // start before the starting cursor position
       const insts = get(this.inst.uiManager.instances);
       for (const inst of insts) {
-        const notesInRange = this.getNotesInRange(inst, 0, loopPoint);
+        if (inst.type !== 'midiEditor') {
+          continue;
+        }
+        const instance = inst.instance;
+
+        const notesInRange = this.getNotesInRange(instance, 0, loopPoint);
         if (this.lastPlaybackSchedulParams.type === 'localTempo' && loopIx === 0) {
           const clonedNotesInRange = new Map();
           for (const [beat, events] of notesInRange.entries()) {
@@ -429,9 +446,9 @@ export default class MIDIEditorPlaybackHandler {
             }
             clonedNotesInRange.set(beat - this.lastSetCursorPosBeats, events);
           }
-          this.scheduleNotes(inst, clonedNotesInRange, newScheduleParams);
+          this.scheduleNotes(instance, clonedNotesInRange, newScheduleParams);
         } else {
-          this.scheduleNotes(inst, notesInRange, newScheduleParams);
+          this.scheduleNotes(instance, notesInRange, newScheduleParams);
         }
       }
 
@@ -527,7 +544,11 @@ export default class MIDIEditorPlaybackHandler {
       return;
     }
 
-    get(this.inst.cvOutputs).forEach(cvOutput => cvOutput.startPlayback());
+    for (const inst of get(this.inst.uiManager.instances)) {
+      if (inst.type === 'cvOutput') {
+        inst.instance.startPlayback();
+      }
+    }
 
     this.lastPlaybackSchedulParams = scheduleParams;
     this.playbackGeneration = Math.random();
@@ -547,7 +568,11 @@ export default class MIDIEditorPlaybackHandler {
       return;
     }
 
-    get(this.inst.cvOutputs).forEach(cvOutput => cvOutput.stopPlayback());
+    for (const inst of get(this.inst.uiManager.instances)) {
+      if (inst.type === 'cvOutput') {
+        inst.instance.stopPlayback();
+      }
+    }
 
     this.lastSetCursorPosBeats = this.getCursorPosBeats();
     this.playbackGeneration = null;
