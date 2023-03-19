@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   collections::BinaryHeap,
@@ -140,7 +138,7 @@ impl SampleEditorCtx {
 
 #[no_mangle]
 pub extern "C" fn init_sample_editor_ctx() -> *mut SampleEditorCtx {
-  let ctx = box SampleEditorCtx::default();
+  let ctx = Box::new(SampleEditorCtx::default());
   Box::into_raw(ctx)
 }
 

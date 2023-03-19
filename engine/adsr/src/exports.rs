@@ -2,6 +2,10 @@ use std::rc::Rc;
 
 use crate::{managed_adsr::ManagedAdsr, Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE};
 
+extern "C" {
+  fn log_err(msg: *const u8, len: usize);
+}
+
 pub struct AdsrContext {
   pub adsrs: Vec<ManagedAdsr>,
   pub most_recent_gated_ix: usize,
@@ -84,6 +88,8 @@ impl AdsrLengthMode {
   }
 }
 
+static mut DID_INIT: bool = false;
+
 /// `encoded_steps` should be an array of imaginary tuples like `(x, y, ramp_fn_type,
 /// ramp_fn_param)`
 #[no_mangle]
@@ -97,6 +103,26 @@ pub unsafe extern "C" fn create_adsr_ctx(
   early_release_mode_type: usize,
   early_release_mode_param: usize,
 ) -> *mut AdsrContext {
+  let needs_init = unsafe {
+    if !DID_INIT {
+      DID_INIT = true;
+      true
+    } else {
+      false
+    }
+  };
+  if needs_init {
+    let hook = move |info: &std::panic::PanicInfo| {
+      let msg = format!("PANIC: {}", info.to_string());
+      let bytes = msg.into_bytes();
+      let len = bytes.len();
+      let ptr = bytes.as_ptr();
+      unsafe { log_err(ptr, len) }
+    };
+
+    std::panic::set_hook(Box::new(hook))
+  }
+
   let length_mode = AdsrLengthMode::from_u32(length_mode);
 
   let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> = Rc::new([0.0f32; RENDERED_BUFFER_SIZE]);
@@ -130,7 +156,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
   }
   adsrs[0].render();
 
-  Box::into_raw(box AdsrContext::new(adsrs))
+  Box::into_raw(Box::new(AdsrContext::new(adsrs)))
 }
 
 // #[no_mangle]

@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 use dsp::{band_splitter::BandSplitter, FRAME_SIZE};
 
 static mut INPUT_BUFFER: [f32; FRAME_SIZE] = [0.0; FRAME_SIZE];
@@ -11,7 +9,7 @@ static mut HIGH_BAND_OUTPUT_BUFFER: [f32; FRAME_SIZE] = [0.0; FRAME_SIZE];
 #[no_mangle]
 pub extern "C" fn init() {
   unsafe {
-    BAND_SPLITTER = Box::into_raw(box BandSplitter::new());
+    BAND_SPLITTER = Box::into_raw(Box::new(BandSplitter::new()));
   }
 }
 

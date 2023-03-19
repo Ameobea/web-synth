@@ -13,7 +13,7 @@ export class CursorGutter {
 
     const g = new PIXI.Graphics();
     g.beginFill(conf.CURSOR_GUTTER_COLOR);
-    g.drawRect(0, 0, this.app.width - conf.PIANO_KEYBOARD_WIDTH - 10, conf.CURSOR_GUTTER_HEIGHT);
+    g.drawRect(0, 0, this.app.width - conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT);
     g.endFill();
     g.interactive = true;
     g.on('pointerdown', (evt: PIXI.InteractionEvent) => {
@@ -47,8 +47,8 @@ export class CursorGutter {
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
     g.moveTo(0.5, 0.5)
-      .lineTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH - 10, 0.5)
-      .lineTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH - 10, conf.CURSOR_GUTTER_HEIGHT)
+      .lineTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH, 0.5)
+      .lineTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
       .lineTo(0.5, conf.CURSOR_GUTTER_HEIGHT)
       .lineTo(0.5, 0.5);
     g.x = conf.PIANO_KEYBOARD_WIDTH;
@@ -88,7 +88,7 @@ export class Cursor {
     g.alpha = 0.99;
     g.lineStyle(1, this.color, 0.6);
     g.moveTo(conf.CURSOR_CARET_WIDTH / 2 + 0.25, 1);
-    g.lineTo(conf.CURSOR_CARET_WIDTH / 2 + 0.25, this.app.height - 10);
+    g.lineTo(conf.CURSOR_CARET_WIDTH / 2 + 0.25, this.app.height);
     g.lineStyle(0);
     g.beginFill(this.color, 1);
     g.interactive = true;

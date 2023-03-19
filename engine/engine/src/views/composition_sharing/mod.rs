@@ -32,5 +32,5 @@ impl ViewContext for CompositionSharing {
 }
 
 pub fn mk_composition_sharing(uuid: Uuid) -> Box<dyn ViewContext> {
-  box CompositionSharing::new(uuid)
+  Box::new(CompositionSharing::new(uuid))
 }

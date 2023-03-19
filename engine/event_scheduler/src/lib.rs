@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 use std::cmp::Reverse;
 
 use float_ord::FloatOrd;
@@ -166,7 +164,7 @@ pub unsafe extern "C" fn alloc_ids_buffer(count: usize) -> *mut i32 {
 
   let mut new_buf = vec![0; count];
   let ptr = new_buf.as_mut_ptr();
-  IDS_BUFFER = Box::into_raw(box new_buf);
+  IDS_BUFFER = Box::into_raw(Box::new(new_buf));
 
   ptr
 }

@@ -1,4 +1,4 @@
-#![feature(box_syntax, get_mut_unchecked)]
+#![feature(get_mut_unchecked)]
 
 use std::rc::Rc;
 
@@ -65,7 +65,7 @@ pub struct AdsrStep {
   pub ramper: RampFn,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum GateStatus {
   Gated,
   /// We have progressed through the envelope and reached the release point.  No loop point was
@@ -208,7 +208,7 @@ impl Adsr {
       steps,
       loop_point,
       rendered,
-      cur_frame_output: box [0.; FRAME_SIZE],
+      cur_frame_output: Box::new([0.; FRAME_SIZE]),
       len_samples,
       gated_beat: 0.,
       len_beats,
@@ -576,15 +576,16 @@ impl Adsr {
   }
 
   pub fn set_frozen_output_value_from_phase(&mut self, phase: f32, scale: f32, shift: f32) {
-    match self.gate_status {
-      GateStatus::Done => {
-        self.phase = phase;
-        let new_frozen_output_value =
-          dsp::read_interpolated(&*self.rendered, phase * (RENDERED_BUFFER_SIZE - 2) as f32);
-        self.fill_buffer_with_value(new_frozen_output_value, scale, shift);
-      },
-      _ => panic!(),
-    }
+    self.gate_status = GateStatus::Done;
+    // match self.gate_status{
+    // GateStatus::Done => {
+    self.phase = phase;
+    let new_frozen_output_value =
+      dsp::read_interpolated(&*self.rendered, phase * (RENDERED_BUFFER_SIZE - 2) as f32);
+    self.fill_buffer_with_value(new_frozen_output_value, scale, shift);
+    //   },
+    //   _ => panic!("Unexpected gate status: {:?}", self.gate_status),
+    // }
   }
 
   pub fn set_loop_point(&mut self, new_loop_point: Option<f32>) {

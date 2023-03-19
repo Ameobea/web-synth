@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 use fastapprox::fast;
 
 pub mod band_splitter;

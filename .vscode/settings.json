@@ -13,5 +13,9 @@
       "other": "on"
     },
     "editor.formatOnSave": false
-  }
+  },
+  "gitlens.advanced.blame.customArguments": [
+    "--ignore-rev",
+    "1dfe67f13fe2a46ff96e5829a0ad153f6162ffcb"
+  ]
 }

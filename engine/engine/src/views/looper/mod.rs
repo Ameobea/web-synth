@@ -34,4 +34,4 @@ impl ViewContext for Looper {
   fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 }
 
-pub fn mk_looper(uuid: Uuid) -> Box<dyn ViewContext> { box Looper::new(uuid) }
+pub fn mk_looper(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(Looper::new(uuid)) }

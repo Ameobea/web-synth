@@ -38,9 +38,11 @@ impl BiquadFilter {
     let computed_frequency = freq * 2.0f32.powf(detune / 1200.0);
     let normalized_freq = computed_frequency / NYQUIST;
     let w0 = PI * normalized_freq;
+    #[allow(non_snake_case)]
     let A = 10.0_f32.powf(gain / 40.0);
     let aq = w0.sin() / (2.0 * q);
     let aqdb = w0.sin() / (2.0 * 10.0f32.powf(q / 20.));
+    #[allow(non_snake_case)]
     let S = 1.;
     let a_s = (w0.sin() / 2.) * ((A + (1. / A)) * ((1. / S) - 1.) + 2.).sqrt();
 

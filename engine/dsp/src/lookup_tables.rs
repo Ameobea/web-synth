@@ -15,11 +15,14 @@ pub fn get_sawtooth_lookup_table() -> &'static [f32; LOOKUP_TABLE_SIZE] {
   unsafe { &*SAWTOOTH_LOOKUP_TABLE }
 }
 
+#[inline(always)]
+fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
+
 #[cold]
 pub fn maybe_init_lookup_tables() {
   unsafe {
     if SINE_LOOKUP_TABLE.is_null() {
-      SINE_LOOKUP_TABLE = Box::into_raw(box std::mem::MaybeUninit::uninit().assume_init());
+      SINE_LOOKUP_TABLE = Box::into_raw(Box::new(uninit()));
 
       for i in 0..LOOKUP_TABLE_SIZE {
         *(*SINE_LOOKUP_TABLE).get_unchecked_mut(i) =
@@ -28,7 +31,7 @@ pub fn maybe_init_lookup_tables() {
     }
 
     if TRIANGLE_LOOKUP_TABLE.is_null() {
-      TRIANGLE_LOOKUP_TABLE = Box::into_raw(box std::mem::MaybeUninit::uninit().assume_init());
+      TRIANGLE_LOOKUP_TABLE = Box::into_raw(Box::new(uninit()));
 
       for i in 0..LOOKUP_TABLE_SIZE {
         let phase = ((i as f64) / (LOOKUP_TABLE_SIZE as f64)) as f32;
@@ -49,7 +52,7 @@ pub fn maybe_init_lookup_tables() {
     }
 
     if SAWTOOTH_LOOKUP_TABLE.is_null() {
-      SAWTOOTH_LOOKUP_TABLE = Box::into_raw(box std::mem::MaybeUninit::uninit().assume_init());
+      SAWTOOTH_LOOKUP_TABLE = Box::into_raw(Box::new(uninit()));
 
       for i in 0..LOOKUP_TABLE_SIZE {
         let phase = ((i as f64) / (LOOKUP_TABLE_SIZE as f64)) as f32;

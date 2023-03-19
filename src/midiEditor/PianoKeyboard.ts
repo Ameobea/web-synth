@@ -85,7 +85,7 @@ export default class PianoKeys {
         0,
         conf.CURSOR_GUTTER_HEIGHT,
         conf.PIANO_KEYBOARD_WIDTH,
-        this.app.height - conf.CURSOR_GUTTER_HEIGHT - 10
+        this.app.height - conf.CURSOR_GUTTER_HEIGHT
       )
       .endFill();
     this.container.addChild(this.keysLayer);

@@ -46,14 +46,11 @@ export default class MIDIEditorUIInstance {
   public width: number;
   public height: number;
   public parentInstance: MIDIEditorInstance;
-  private managedInst: ManagedMIDIEditorUIInstance;
+  public managedInst: ManagedMIDIEditorUIInstance;
   public app: PIXI.Application;
-  public wasm:
-    | {
-        instance: typeof import('src/note_container');
-        noteLinesCtxPtr: number;
-      }
-    | undefined;
+  public get wasm() {
+    return this.managedInst.wasm;
+  }
   public linesContainer: PIXI.Container;
   public lines: NoteLine[] = [];
   public allNotesByID: Map<number, NoteBox> = new Map();
@@ -179,7 +176,7 @@ export default class MIDIEditorUIInstance {
     this.stageBorder = this.buildStageBorder();
     this.app.stage.addChild(this.stageBorder);
 
-    this.init(initialState).then(() => {
+    this.init().then(() => {
       if (this.destroyed) {
         return;
       }
@@ -195,12 +192,7 @@ export default class MIDIEditorUIInstance {
   private buildLinesContainerMask() {
     return new PIXI.Graphics()
       .beginFill(0xff3300)
-      .drawRect(
-        conf.PIANO_KEYBOARD_WIDTH,
-        10,
-        this.width - conf.PIANO_KEYBOARD_WIDTH - 10,
-        this.height - 20
-      )
+      .drawRect(conf.PIANO_KEYBOARD_WIDTH, 10, this.width - conf.PIANO_KEYBOARD_WIDTH, this.height)
       .endFill();
   }
 
@@ -208,52 +200,21 @@ export default class MIDIEditorUIInstance {
     return new PIXI.Graphics()
       .lineStyle(1, conf.LINE_BORDER_COLOR)
       .moveTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
-      .lineTo(this.width - 10.5, conf.CURSOR_GUTTER_HEIGHT)
-      .lineTo(this.width - 10.5, this.height - 10.5)
-      .lineTo(conf.PIANO_KEYBOARD_WIDTH, this.height - 10.5)
+      .lineTo(this.width, conf.CURSOR_GUTTER_HEIGHT)
+      .lineTo(this.width, this.height)
+      .lineTo(conf.PIANO_KEYBOARD_WIDTH, this.height)
       .lineTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT);
   }
 
-  private buildNoteLines(
-    serializedLines: {
-      midiNumber: number;
-      notes: {
-        startPoint: number;
-        length: number;
-      }[];
-    }[]
-  ) {
-    const lines: Note[][] = new Array(serializedLines.length).fill(null).map(() => []);
-    serializedLines.forEach(({ midiNumber, notes }) => {
-      const lineIx = lines.length - midiNumber;
-      if (lineIx >= lines.length) {
-        console.error(`Tried to load line for MIDI number ${midiNumber} which is out of range`);
-        return;
-      }
+  private buildNoteLines = (linesWithIDs: readonly Note[][]): NoteLine[] =>
+    linesWithIDs.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
 
-      lines[lineIx] = notes.map(note => {
-        const id = this.wasm!.instance.create_note(
-          this.wasm!.noteLinesCtxPtr,
-          lineIx,
-          note.startPoint,
-          note.length,
-          0
-        );
-        return { ...note, id };
-      });
-    });
-    return lines.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
-  }
+  private async init() {
+    const linesWithIDs = await new Promise<readonly Note[][]>(resolve =>
+      this.managedInst.onWasmLoaded(linesWithIDs => resolve(linesWithIDs))
+    );
 
-  private async init(initialState: SerializedMIDIEditorInstance) {
-    const wasmInst = await import('src/note_container');
-    const noteLinesCtxPtr = wasmInst.create_note_lines(initialState.lines.length);
-    this.wasm = { instance: wasmInst, noteLinesCtxPtr };
-    if (this.destroyed) {
-      return;
-    }
-
-    this.lines = this.buildNoteLines(initialState.lines);
+    this.lines = this.buildNoteLines(linesWithIDs);
   }
 
   public async reInitialize(newState: SerializedMIDIEditorInstance) {
@@ -269,7 +230,22 @@ export default class MIDIEditorUIInstance {
 
     this.lines.forEach(line => line.destroy());
     this.wasm.instance.set_line_count(this.wasm.noteLinesCtxPtr, newState.lines.length);
-    this.lines = this.buildNoteLines(newState.lines);
+
+    const linesWithIDs: Note[][] = new Array(newState.lines.length).fill(null).map(() => []);
+    for (const { midiNumber, notes } of newState.lines) {
+      const lineIx = newState.lines.length - midiNumber;
+      for (const { length, startPoint } of notes) {
+        const id = this.wasm.instance.create_note(
+          this.wasm.noteLinesCtxPtr,
+          lineIx,
+          startPoint,
+          length,
+          0
+        );
+        linesWithIDs[lineIx].push({ id, startPoint, length });
+      }
+    }
+    this.lines = this.buildNoteLines(linesWithIDs);
 
     // Destroy + re-create piano notes
     this.pianoKeys?.destroy();
@@ -284,7 +260,7 @@ export default class MIDIEditorUIInstance {
     this.handleViewChange();
 
     // Set other misc. state
-    this.toggleLoop(this.parentInstance.loopPoint);
+    this.setLoopPoint(this.parentInstance.loopPoint);
     this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
   }
 
@@ -503,6 +479,13 @@ export default class MIDIEditorUIInstance {
     };
   }
 
+  private get maxVerticalScrollPx() {
+    return Math.max(
+      this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT,
+      0
+    );
+  }
+
   private handlePan(data: PIXI.InteractionData) {
     if (!this.panningData) {
       return;
@@ -511,13 +494,9 @@ export default class MIDIEditorUIInstance {
     const xDiffPx = -(newPoint.x - this.panningData.startPoint.x);
     const yDiffPx = -(newPoint.y - this.panningData.startPoint.y);
 
-    const maxVerticalScrollPx = Math.max(
-      this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT + 10,
-      0
-    );
     this.view.scrollVerticalPx = R.clamp(
       0,
-      maxVerticalScrollPx,
+      this.maxVerticalScrollPx,
       this.panningData.startView.scrollVerticalPx + yDiffPx
     );
 
@@ -969,22 +948,18 @@ export default class MIDIEditorUIInstance {
     note.line.notesByID.set(note.note.id, note);
   }
 
-  public toggleLoop(loopPoint?: number | null | undefined) {
-    if (this.parentInstance.playbackHandler.isPlaying) {
-      return;
-    }
-
+  public setLoopPoint(loopPoint?: number | null | undefined) {
     if (this.loopCursor) {
       this.app.stage.removeChild(this.loopCursor.graphics);
       this.loopCursor.destroy();
       this.loopCursor = null;
-      this.parentInstance.playbackHandler.setLoopPoint(null);
-    } else {
+    }
+
+    if (!R.isNil(loopPoint)) {
       const newLoopPoint = this.snapBeat(
         loopPoint ??
           this.parentInstance.getCursorPosBeats() + this.parentInstance.baseView.beatsPerMeasure
       );
-      this.parentInstance.playbackHandler.setLoopPoint(newLoopPoint);
       this.loopCursor = new LoopCursor(this, newLoopPoint);
       this.app.stage.addChild(this.loopCursor.graphics);
     }
@@ -1040,6 +1015,8 @@ export default class MIDIEditorUIInstance {
   }
 
   public handleViewChange() {
+    this.view.scrollVerticalPx = R.clamp(0, this.maxVerticalScrollPx, this.view.scrollVerticalPx);
+
     this.lines.forEach(line => line.handleViewChange());
     this.cursor.handleViewChange();
     this.loopCursor?.handleViewChange();
@@ -1173,11 +1150,14 @@ export default class MIDIEditorUIInstance {
           return;
         }
 
-        if (evt.ctrlKey || evt.metaKey) {
-          const maxVerticalScrollPx = Math.max(
-            this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT + 10,
-            0
-          );
+        // If the scroll is happening over the piano keys, we let the event bubble up
+        if (evt.clientX < conf.PIANO_KEYBOARD_WIDTH) {
+          return;
+        }
+
+        let stopPropagation = true;
+        if (evt.shiftKey || evt.metaKey) {
+          const maxVerticalScrollPx = Math.max(this.maxVerticalScrollPx, 0);
           this.view.scrollVerticalPx = Math.max(
             0,
             Math.min(
@@ -1193,12 +1173,16 @@ export default class MIDIEditorUIInstance {
                 evt.deltaX / conf.SCROLL_HORIZONTAL_FACTOR
             )
           );
-          return;
+        } else if (evt.ctrlKey) {
+          this.handleZoom(evt);
+        } else {
+          stopPropagation = false;
         }
 
-        this.handleZoom(evt);
-        evt.preventDefault();
-        evt.stopPropagation();
+        if (stopPropagation) {
+          evt.preventDefault();
+          evt.stopPropagation();
+        }
       },
     };
     document.addEventListener('keydown', this.eventHandlerCBs.keyDown);

@@ -1,8 +1,6 @@
 //! Synth state management.  Handles keeping track of what each voice of each polyphonic synth
 //! is playing and passing the correct commands through to the WebAudio synths.
 
-#![feature(box_syntax)]
-
 #[cfg(feature = "wasm-bindgen")]
 #[macro_use]
 extern crate wasm_bindgen;
@@ -75,6 +73,9 @@ pub struct PolySynth<
   pub synth_cbs: SynthCallbacks<TA, TR>,
 }
 
+#[inline(always)]
+fn uninit<T>() -> T { unsafe { mem::MaybeUninit::uninit().assume_init() } }
+
 impl<
     // voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>
     TA: Fn(usize, usize, u8, Option<f32>),
@@ -104,8 +105,7 @@ impl<
   }
 
   pub fn new(synth_cbs: SynthCallbacks<TA, TR>) -> Self {
-    let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] =
-      unsafe { mem::MaybeUninit::uninit().assume_init() };
+    let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] = uninit();
     let voices_ptr = &mut voices as *mut _ as *mut Voice;
     for i in 0..POLY_SYNTH_VOICE_COUNT {
       unsafe { ptr::write(voices_ptr.add(i), Voice::new(i)) };
@@ -221,8 +221,8 @@ pub mod exports {
 
     let context = PolySynthContext {
       synth: PolySynth::new(SynthCallbacks {
-        trigger_release: box move |voice_ix: usize, note_id: usize, offset: Option<f32>| {
-          match release_note.call3(
+        trigger_release: Box::new(
+          move |voice_ix: usize, note_id: usize, offset: Option<f32>| match release_note.call3(
             &JsValue::NULL,
             &JsValue::from(voice_ix as u32),
             &JsValue::from(note_id as u32),
@@ -230,29 +230,27 @@ pub mod exports {
           ) {
             Ok(_) => (),
             Err(err) => error!("Error playing note: {:?}", err),
-          }
-        },
-        trigger_attack: box move |voice_ix: usize,
-                                  note_id: usize,
-                                  velocity: u8,
-                                  offset: Option<f32>| {
-          match play_note.apply(
-            &JsValue::NULL,
-            &Array::of4(
-              &JsValue::from(voice_ix as u32),
-              &JsValue::from(note_id as u32),
-              &JsValue::from(velocity),
-              &JsValue::from(offset),
-            ),
-          ) {
+          },
+        ),
+        trigger_attack: Box::new(
+          move |voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>| match play_note
+            .apply(
+              &JsValue::NULL,
+              &Array::of4(
+                &JsValue::from(voice_ix as u32),
+                &JsValue::from(note_id as u32),
+                &JsValue::from(velocity),
+                &JsValue::from(offset),
+              ),
+            ) {
             Ok(_) => (),
             Err(err) => error!("Error playing note: {:?}", err),
-          }
-        },
+          },
+        ),
       }),
     };
 
-    Box::into_raw(box context)
+    Box::into_raw(Box::new(context))
   }
 
   #[wasm_bindgen]

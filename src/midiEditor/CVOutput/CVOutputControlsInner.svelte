@@ -28,7 +28,7 @@
   $: if (widthObserverTarget) {
     widthObserver?.unobserve(widthObserverTarget);
     widthObserver = new ResizeObserver(entries => {
-      width = entries[0].contentRect.width - 109;
+      width = entries[0].contentRect.width - 43;
     });
     widthObserver.observe(widthObserverTarget);
   }
@@ -145,10 +145,12 @@
   .root {
     display: flex;
     flex-direction: column;
+    position: relative;
   }
 
   .name-wrapper {
     margin-left: 4px;
+    margin-top: -3px;
   }
 
   .name-input {
@@ -157,18 +159,24 @@
     margin-top: -2px;
   }
 
+  header {
+    height: 19px;
+    font-size: 14px;
+    line-height: 8px;
+  }
+
   .open-settings-button {
-    width: 26px;
-    height: 26px;
+    width: 17px;
+    height: 17px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
-    line-height: 0;
+    font-size: 19px;
+    line-height: 10px;
     padding-top: 2px;
     position: absolute;
-    top: 35px;
-    left: 3px;
+    top: 19px;
+    left: 0px;
     border: 1px solid #333;
     cursor: pointer;
     user-select: none;

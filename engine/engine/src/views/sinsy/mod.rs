@@ -32,4 +32,4 @@ impl ViewContext for Sinsy {
   }
 }
 
-pub fn mk_sinsy(uuid: Uuid) -> Box<dyn ViewContext> { box Sinsy { uuid } }
+pub fn mk_sinsy(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(Sinsy { uuid }) }

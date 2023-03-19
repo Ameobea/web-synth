@@ -22,6 +22,7 @@ import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
+import CollapsedMIDIEditor from 'src/midiEditor/CollapsedMIDIEditor.svelte';
 import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
@@ -259,6 +260,10 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
+          if (!activeInstance.current) {
+            return;
+          }
+
           if (isRecording) {
             setIsRecording(false);
             playbackHandler.stopRecording();
@@ -266,7 +271,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           }
 
           setIsRecording(true);
-          playbackHandler.startRecording();
+          playbackHandler.startRecording(activeInstance.current.managedInst);
         }}
         title={isRecording ? 'Stop recording MIDI' : 'Start recording MIDI'}
         label={<div style={{ marginLeft: -1 }}>⏺</div>}
@@ -507,11 +512,12 @@ type CVOutputControlsProps = CVOutputControls extends SvelteComponentTyped<infer
 
 const CVOutputControlsShim = mkSvelteComponentShim<CVOutputControlsProps>(CVOutputControls);
 
-const blockMouseEvent = (evt: React.MouseEvent<HTMLCanvasElement>) => {
-  // Prevent clicks on the canvas from selecting text and stuff in the rest of the page
-  evt.preventDefault();
-  evt.stopPropagation();
-};
+type CollapsedMIDIEditorProps = CollapsedMIDIEditor extends SvelteComponentTyped<infer Props, any>
+  ? Props
+  : never;
+
+const CollapsedMIDIEditorShim =
+  mkSvelteComponentShim<CollapsedMIDIEditorProps>(CollapsedMIDIEditor);
 
 class ActiveInstanceProxy {
   private uiManager: MIDIEditorUIManager;
@@ -546,7 +552,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
 
   const windowSize = useWindowSize();
   const height = windowSize.height - 140;
-  const width = windowSize.width - 80;
+  const width = windowSize.width;
   const lastWindowSize = useRef(windowSize);
   useEffect(() => {
     if (
@@ -561,9 +567,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   const handleChange = useCallback(
     ({ bpm, loopEnabled }: MIDIEditorControlsState) => {
       parentInstance.localBPM = bpm;
-      if (loopEnabled === R.isNil(parentInstance.uiInstance!.loopCursor)) {
-        parentInstance.uiInstance!.toggleLoop();
-      }
+      parentInstance.setLoopEnabled(loopEnabled);
     },
     [parentInstance]
   );
@@ -590,6 +594,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
         onChange={handleChange}
         playbackHandler={parentInstance.playbackHandler}
       />
+      <div className='spacer' style={{ height: 64 }} />
       {instances.map(instance => {
         if (instance.type === 'midiEditor') {
           const inst = instance.instance;
@@ -629,23 +634,29 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
                     );
                     parentInstance.uiManager.setUIInstanceForID(inst.id, newInst);
                   }}
-                  onMouseDown={blockMouseEvent}
-                  onContextMenu={blockMouseEvent}
+                  onMouseDown={evt => {
+                    parentInstance.uiManager.setActiveUIInstanceID(inst.id);
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                  }}
+                  onContextMenu={evt => {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                  }}
                 />
               </div>
             );
           }
 
           return (
-            <div className='collapsed-midi-editor-instance' key={inst.id}>
-              <button
-                className='expand-midi-editor-instance'
-                onClick={() => parentInstance.uiManager.expandUIInstance(inst.id)}
-              >
-                ›
-              </button>
-              TODO TODO TODO
-            </div>
+            <CollapsedMIDIEditorShim
+              key={inst.id}
+              parentInstance={parentInstance}
+              inst={inst}
+              pxPerBeat={parentInstance.baseView.pxPerBeatStore}
+              scrollHorizontalBeats={parentInstance.baseView.scrollHorizontalBeatsStore}
+              expand={() => parentInstance.uiManager.expandUIInstance(inst.id)}
+            />
           );
         } else if (instance.type === 'cvOutput') {
           const output = instance.instance;

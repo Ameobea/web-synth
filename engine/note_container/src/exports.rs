@@ -17,7 +17,7 @@ pub fn create_note_lines(line_count: usize) -> *mut NoteLines {
   for _ in 0..line_count {
     lines.push(NoteContainer::default())
   }
-  Box::into_raw(box NoteLines { lines })
+  Box::into_raw(Box::new(NoteLines { lines }))
 }
 
 #[wasm_bindgen]

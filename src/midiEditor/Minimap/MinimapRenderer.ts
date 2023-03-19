@@ -1,7 +1,7 @@
 import * as Comlink from 'comlink';
 
+import { SerializedMIDILine } from 'src/midiEditor';
 import { MIDIMinimapRendererWorker } from 'src/midiEditor/Minimap/MinimapRenderer.worker';
-import { NoteBox } from 'src/midiEditor/NoteBox';
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 
@@ -38,8 +38,9 @@ const getWorker = ():
     });
 };
 
-const encodeMIDINotes = (allNotesByID: Map<number, NoteBox>, lineCount: number): ArrayBuffer => {
-  const noteCount = allNotesByID.size;
+const encodeMIDINotes = (lines: SerializedMIDILine[]): ArrayBuffer => {
+  const lineCount = lines.length;
+  const noteCount = lines.reduce((sum, line) => sum + line.notes.length, 0);
   // Buffer format:
   // [midiNumber, startPoint, length]
   // [i32, f32, f32]
@@ -47,11 +48,15 @@ const encodeMIDINotes = (allNotesByID: Map<number, NoteBox>, lineCount: number):
   const f32 = new Float32Array(buffer);
   const i32 = new Int32Array(buffer);
 
-  for (const [noteIx, note] of allNotesByID.entries()) {
-    const lineIx = note.line.index;
-    i32[noteIx * 3] = lineCount - lineIx;
-    f32[noteIx * 3 + 1] = note.note.startPoint;
-    f32[noteIx * 3 + 2] = note.note.length;
+  let noteIx = 0;
+  for (let lineIx = 0; lineIx < lineCount; lineIx += 1) {
+    const line = lines[lineIx];
+    for (const note of line.notes) {
+      i32[noteIx * 3] = lineCount - lineIx;
+      f32[noteIx * 3 + 1] = note.startPoint;
+      f32[noteIx * 3 + 2] = note.length;
+      noteIx += 1;
+    }
   }
 
   return buffer;
@@ -60,13 +65,16 @@ const encodeMIDINotes = (allNotesByID: Map<number, NoteBox>, lineCount: number):
 /**
  * @returns a string of SVG data
  */
-export const renderMIDIMinimap = async (allNotesByID: Map<number, NoteBox>, lineCount: number) => {
+export const renderMIDIMinimap = async (
+  lines: SerializedMIDILine[],
+  beatsPerMeasure: number
+): Promise<SVGSVGElement> => {
   const worker = await getWorker();
-  const encodedNotes = encodeMIDINotes(allNotesByID, lineCount);
-  const svgText = await worker.renderMinimap(encodedNotes);
+  const encodedNotes = encodeMIDINotes(lines);
+  const svgText = await worker.renderMinimap(encodedNotes, beatsPerMeasure);
   const parser = new DOMParser();
   const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
-  const svg = svgDoc.documentElement;
+  const svg = svgDoc.documentElement as unknown as SVGSVGElement;
   svg.setAttribute('width', '100%');
   return svg;
 };

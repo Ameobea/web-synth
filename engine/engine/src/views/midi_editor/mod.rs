@@ -32,4 +32,4 @@ impl ViewContext for MIDIEditor {
   }
 }
 
-pub fn mk_midi_editor(vc_id: Uuid) -> Box<dyn ViewContext> { box MIDIEditor { vc_id } }
+pub fn mk_midi_editor(vc_id: Uuid) -> Box<dyn ViewContext> { Box::new(MIDIEditor { vc_id }) }

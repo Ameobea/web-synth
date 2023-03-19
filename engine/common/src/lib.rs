@@ -1,4 +1,4 @@
-#![feature(box_syntax, thread_local)]
+#![feature(thread_local)]
 
 use std::mem;
 
@@ -31,5 +31,5 @@ pub fn set_raw_panic_hook(log_err: unsafe extern "C" fn(ptr: *const u8, len: usi
     unsafe { log_err(ptr, len) }
   };
 
-  std::panic::set_hook(box hook)
+  std::panic::set_hook(Box::new(hook))
 }

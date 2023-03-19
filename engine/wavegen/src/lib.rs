@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 //! Utilities for generating waveforms and wavetables using inverse FFT.
 
 mod bindings;

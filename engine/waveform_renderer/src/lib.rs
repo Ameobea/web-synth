@@ -1,8 +1,3 @@
-#![feature(box_syntax)]
-
-// #[macro_use]
-// extern crate log;
-
 #[cfg(feature = "bindgen")]
 use wasm_bindgen::prelude::*;
 
@@ -48,8 +43,12 @@ pub fn create_waveform_renderer_ctx(
 
   wbg_logging::maybe_init();
 
-  let mut ctx =
-    box WaveformRendererCtx::new(waveform_length_samples, sample_rate, width_px, height_px);
+  let mut ctx = Box::new(WaveformRendererCtx::new(
+    waveform_length_samples,
+    sample_rate,
+    width_px,
+    height_px,
+  ));
   unsafe {
     ctx.waveform_buf.set_len(waveform_length_samples as usize);
     ctx

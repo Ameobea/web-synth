@@ -35,7 +35,7 @@ impl NoteLines {
     end_point: f64,
   ) -> Vec<u32> {
     let mut acc: HashSet<u32> = HashSet::new();
-    for line_ix in start_line_ix..=end_line_ix {
+    for line_ix in start_line_ix..=end_line_ix.min(self.lines.len() - 1) {
       let line = &self.lines[line_ix];
       line.iter_notes(&mut acc, start_point, end_point);
     }

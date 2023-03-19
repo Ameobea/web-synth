@@ -31,4 +31,4 @@ impl ViewContext for GraphEditor {
   fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 }
 
-pub fn mk_graph_editor(uuid: Uuid) -> Box<dyn ViewContext> { box GraphEditor::new(uuid) }
+pub fn mk_graph_editor(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(GraphEditor::new(uuid)) }

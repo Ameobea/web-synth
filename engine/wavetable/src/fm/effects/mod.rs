@@ -5,7 +5,7 @@ use spectral_warping::SpectralWarpingParams;
 
 use crate::fm::effects::comb_filter::CombFilter;
 
-use super::{ParamSource, RenderRawParams, FRAME_SIZE};
+use super::{uninit, ParamSource, RenderRawParams, FRAME_SIZE};
 
 pub mod bitcrusher;
 pub mod butterworth_filter;
@@ -237,7 +237,7 @@ impl EffectInstance {
       },
       6 => {
         let delay = Delay {
-          buffer: box CircularBuffer::new(),
+          buffer: Box::new(CircularBuffer::new()),
           delay_samples: ParamSource::from_parts(
             param_1_type,
             param_1_int_val,
@@ -299,8 +299,8 @@ impl EffectInstance {
       },
       8 => {
         let comb_filter = CombFilter {
-          input_buffer: box CircularBuffer::new(),
-          feedback_buffer: box CircularBuffer::new(),
+          input_buffer: Box::new(CircularBuffer::new()),
+          feedback_buffer: Box::new(CircularBuffer::new()),
           delay_samples: ParamSource::from_parts(
             param_1_type,
             param_1_int_val,
@@ -669,7 +669,7 @@ impl Default for EffectChain {
         None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
         None,
       ],
-      param_render_buf: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      param_render_buf: Box::new(uninit()),
     }
   }
 }
@@ -732,7 +732,7 @@ impl EffectChain {
     }
 
     self.effects[effect_ix] = Some(EffectContainer {
-      inst: box EffectInstance::from_parts(
+      inst: Box::new(EffectInstance::from_parts(
         effect_type,
         param_1_type,
         param_1_int_val,
@@ -754,7 +754,7 @@ impl EffectChain {
         param_4_float_val,
         param_4_float_val_2,
         param_4_float_val_3,
-      ),
+      )),
       is_bypassed,
     });
   }
@@ -831,7 +831,7 @@ impl EffectChain {
   ) -> f32 {
     let mut output = sample;
 
-    let mut params_for_sample: [f32; 4] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    let mut params_for_sample: [f32; 4] = uninit();
     for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
       let effect = match effect {
         Some(effect_container) =>
@@ -862,8 +862,7 @@ impl EffectChain {
     render_params: &RenderRawParams<'a>,
     samples: &mut [f32; FRAME_SIZE],
   ) {
-    let mut rendered_params: [[f32; FRAME_SIZE]; 4] =
-      unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    let mut rendered_params: [[f32; FRAME_SIZE]; 4] = uninit();
 
     for effect in &mut self.effects {
       let effect = match effect {

@@ -5,8 +5,6 @@
 //! Several aspects of this design draw significant inspiration from the Clouds eurorack module made
 //! by Mutable Instruments and associated code which is available on Github: https://github.com/pichenettes/eurorack
 
-#![feature(box_syntax)]
-
 use dsp::{clamp, filters::butterworth::ButterworthFilter, mix, read_interpolated, smooth};
 use rand::prelude::*;
 
@@ -382,7 +380,7 @@ impl GranularCtx {
 #[no_mangle]
 pub fn create_granular_instance() -> *mut GranularCtx {
   common::maybe_init(None);
-  let ctx = box GranularCtx::default();
+  let ctx = Box::new(GranularCtx::default());
   Box::into_raw(ctx)
 }
 

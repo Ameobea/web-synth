@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 use float_ord::FloatOrd;
 
 extern "C" {
@@ -187,7 +185,7 @@ fn ctx(module_ix: usize) -> &'static mut LooperCtx {
 #[no_mangle]
 pub extern "C" fn looper_init() {
   unsafe {
-    CTXS = Box::into_raw(box Vec::new());
+    CTXS = Box::into_raw(Box::new(Vec::new()));
   }
 }
 
@@ -432,7 +430,7 @@ static mut TRANSITION_ALGORITHM_BUFFER: *mut Vec<f32> = std::ptr::null_mut();
 fn transition_algorithm_buffer() -> &'static mut Vec<f32> {
   unsafe {
     if TRANSITION_ALGORITHM_BUFFER.is_null() {
-      TRANSITION_ALGORITHM_BUFFER = Box::into_raw(box Vec::new());
+      TRANSITION_ALGORITHM_BUFFER = Box::into_raw(Box::new(Vec::new()));
     }
   }
   unsafe { &mut *TRANSITION_ALGORITHM_BUFFER }

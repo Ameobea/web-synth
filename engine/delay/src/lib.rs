@@ -17,16 +17,19 @@ pub struct DelayCtx {
   pub highpass_filter: ButterworthFilter,
 }
 
+#[inline(always)]
+fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
+
 #[no_mangle]
 pub extern "C" fn init_delay_ctx() -> *mut DelayCtx {
   let delay_ctx = DelayCtx {
     delay_line: dsp::circular_buffer::CircularBuffer::new(),
-    main_io_buffer: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-    delay_output_buffer: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-    delay_ms: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-    delay_gain: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-    feedback: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-    highpass_cutoff: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+    main_io_buffer: Box::new(uninit()),
+    delay_output_buffer: Box::new(uninit()),
+    delay_ms: Box::new(uninit()),
+    delay_gain: Box::new(uninit()),
+    feedback: Box::new(uninit()),
+    highpass_cutoff: Box::new(uninit()),
     highpass_filter: ButterworthFilter::default(),
   };
   Box::into_raw(Box::new(delay_ctx))

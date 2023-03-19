@@ -42,4 +42,4 @@ impl ViewContext for FaustEditor {
   }
 }
 
-pub fn mk_faust_editor(uuid: Uuid) -> Box<dyn ViewContext> { box FaustEditor::new(uuid) }
+pub fn mk_faust_editor(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(FaustEditor::new(uuid)) }

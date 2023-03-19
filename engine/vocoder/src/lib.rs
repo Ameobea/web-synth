@@ -1,4 +1,4 @@
-#![feature(box_syntax, new_uninit)]
+#![feature(new_uninit)]
 
 use std::mem::MaybeUninit;
 
@@ -68,7 +68,7 @@ impl LevelDetectionCtx {
       unsafe {
         bands_ptr
           .add(band_ix)
-          .write(box LevelDetectionBand::new(center_freq_hz));
+          .write(Box::new(LevelDetectionBand::new(center_freq_hz)));
       }
     }
     Self {

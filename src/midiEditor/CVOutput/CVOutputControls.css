@@ -4,8 +4,8 @@
   display: flex;
   align-items: center;
   padding-left: 6px;
-  height: 32px;
-  font-size: 17px;
+  height: 19px;
+  font-size: 14px;
   color: #b6b6b6;
   box-sizing: border-box;
   user-select: none;
@@ -18,8 +18,8 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: 31px;
-  height: 31px;
+  width: 18px;
+  height: 18px;
   z-index: 2;
   color: #991111;
   padding: 0;

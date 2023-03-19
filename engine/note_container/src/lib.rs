@@ -3,7 +3,7 @@
 //! container as well as a wrapper container to hold note containers for multiple rows/lines as is
 //! needed by these use cases.
 
-#![feature(box_syntax, vec_into_raw_parts)]
+#![feature(vec_into_raw_parts)]
 
 pub mod exports;
 pub mod note_container;

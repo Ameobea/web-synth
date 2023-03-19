@@ -7,20 +7,11 @@ use crate::{
   js::initialize_default_vcm_state,
   prelude::*,
   views::{
-    composition_sharing::mk_composition_sharing,
-    control_panel::mk_control_panel,
-    faust_editor::{mk_faust_editor, FaustEditor},
-    filter_designer::mk_filter_designer,
-    granulator::mk_granulator,
-    graph_editor::mk_graph_editor,
-    looper::mk_looper,
-    midi_editor::mk_midi_editor,
-    midi_keyboard::mk_midi_keyboard,
-    sample_library::mk_sample_library,
-    sequencer::mk_sequencer,
-    sinsy::mk_sinsy,
-    synth_designer::{mk_synth_designer, SynthDesigner},
-    welcome_page::mk_welcome_page,
+    composition_sharing::mk_composition_sharing, control_panel::mk_control_panel,
+    faust_editor::mk_faust_editor, filter_designer::mk_filter_designer, granulator::mk_granulator,
+    graph_editor::mk_graph_editor, looper::mk_looper, midi_editor::mk_midi_editor,
+    midi_keyboard::mk_midi_keyboard, sample_library::mk_sample_library, sequencer::mk_sequencer,
+    sinsy::mk_sinsy, synth_designer::mk_synth_designer, welcome_page::mk_welcome_page,
   },
   ViewContext,
 };
@@ -221,145 +212,6 @@ impl ViewContextManager {
     self.active_context_ix = vcm_state.active_view_ix;
     self.connections = vcm_state.patch_network_connections;
     self.foreign_connectables = vcm_state.foreign_connectables;
-  }
-
-  /// Initializes the VCM with the default view context and state from scratch.  Returns the UUID
-  /// of the graph editor that is created.
-  fn init_default_state(&mut self) -> Uuid {
-    let graph_editor_vc_id = uuid_v4();
-    let mut graph_editor_view_context = build_view("graph_editor", graph_editor_vc_id);
-    graph_editor_view_context.init();
-    graph_editor_view_context.hide();
-    self.add_view_context_inner(
-      MinimalViewContextDefinition {
-        uuid: graph_editor_vc_id.to_string(),
-        name: "graph_editor".into(),
-        title: Some("Graph Editor".into()),
-      },
-      graph_editor_view_context,
-    );
-
-    // MIDI Keyboard
-    let uuid = uuid_v4();
-    let mut midi_keyboard_view_context = build_view("midi_keyboard", uuid);
-    midi_keyboard_view_context.init();
-    midi_keyboard_view_context.hide();
-    self.add_view_context_inner(
-      MinimalViewContextDefinition {
-        uuid: uuid.to_string(),
-        name: "midi_keyboard".into(),
-        title: Some("MIDI Keyboard".into()),
-      },
-      midi_keyboard_view_context,
-    );
-
-    // MIDI Editor
-    let uuid = uuid_v4();
-    let mut view_context = build_view("midi_editor", uuid);
-    view_context.init();
-    view_context.hide();
-    self.add_view_context_inner(
-      MinimalViewContextDefinition {
-        uuid: uuid.to_string(),
-        name: "midi_editor".into(),
-        title: Some("MIDI Editor".into()),
-      },
-      view_context,
-    );
-
-    // Synth Designer
-    let uuid = uuid_v4();
-    let mut synth_designer_context = box SynthDesigner { uuid };
-    synth_designer_context.init();
-    synth_designer_context.hide();
-    self.add_view_context_inner(
-      MinimalViewContextDefinition {
-        uuid: uuid.to_string(),
-        name: "synth_designer".into(),
-        title: Some("Synth Designer".into()),
-      },
-      synth_designer_context,
-    );
-
-    // Faust Editor
-    let uuid = uuid_v4();
-    let mut faust_editor_ctx = box FaustEditor { uuid };
-    let state_key = faust_editor_ctx.get_state_key();
-
-    let faust_editor_content = format!(
-      r#"{{"editorContent": {}, "isRunning": true, "language": "faust" }}"#,
-      include_str!("../../static/flanger.dsp")
-    );
-    js::set_localstorage_key(&state_key, &faust_editor_content);
-
-    faust_editor_ctx.init();
-    faust_editor_ctx.hide();
-    self.add_view_context_inner(
-      MinimalViewContextDefinition {
-        uuid: uuid.to_string(),
-        name: "faust_editor".into(),
-        title: Some("Code Editor".into()),
-      },
-      faust_editor_ctx,
-    );
-
-    let destination_id = 1;
-    self.foreign_connectables.push(ForeignConnectable {
-      _type: "customAudio/destination".into(),
-      id: format!("{}", destination_id),
-      serialized_state: None,
-    });
-
-    // Connect MIDI Keyboard -> MIDI Editor -> Synth Designer -> Faust Editor
-    let (midi_keyboard_id, midi_editor_id, synth_id, faust_id) = (
-      self.contexts[1].definition.uuid.clone(),
-      self.contexts[2].definition.uuid.clone(),
-      self.contexts[3].definition.uuid.clone(),
-      self.contexts[4].definition.uuid.clone(),
-    );
-    self.connections.push((
-      ConnectionDescriptor {
-        vc_id: midi_keyboard_id,
-        name: "midi out".to_string(),
-      },
-      ConnectionDescriptor {
-        vc_id: midi_editor_id.to_string(),
-        name: "midi_in".to_string(),
-      },
-    ));
-    self.connections.push((
-      ConnectionDescriptor {
-        vc_id: midi_editor_id,
-        name: "midi_out".into(),
-      },
-      ConnectionDescriptor {
-        vc_id: synth_id.to_string(),
-        name: "midi".into(),
-      },
-    ));
-    self.connections.push((
-      ConnectionDescriptor {
-        vc_id: synth_id,
-        name: "masterOutput".into(),
-      },
-      ConnectionDescriptor {
-        vc_id: faust_id.to_string(),
-        name: "input".into(),
-      },
-    ));
-    self.connections.push((
-      ConnectionDescriptor {
-        vc_id: faust_id,
-        name: "output".into(),
-      },
-      ConnectionDescriptor {
-        vc_id: destination_id.to_string(),
-        name: "input".into(),
-      },
-    ));
-
-    self.active_context_ix = 0;
-    graph_editor_vc_id
   }
 
   fn load_vcm_state() -> Option<ViewContextManagerState> {

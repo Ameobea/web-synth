@@ -38,9 +38,14 @@ const ctx = new AudioContext();
 class RecordingContext {
   private playbackHandler: MIDIEditorPlaybackHandler;
   private downNoteIdsByMIDINumber: Map<number, number> = new Map();
+  private activeInstance: ManagedMIDIEditorUIInstance;
 
-  constructor(playbackHandler: MIDIEditorPlaybackHandler) {
+  constructor(
+    playbackHandler: MIDIEditorPlaybackHandler,
+    activeInstance: ManagedMIDIEditorUIInstance
+  ) {
     this.playbackHandler = playbackHandler;
+    this.activeInstance = activeInstance;
   }
 
   private getCurBeat(): number {
@@ -49,7 +54,7 @@ class RecordingContext {
 
   public tick() {
     const curBeat = this.getCurBeat();
-    const uiInstance = this.playbackHandler.inst.uiInstance;
+    const uiInstance = this.activeInstance.uiInst;
     if (!uiInstance) {
       return;
     }
@@ -85,7 +90,7 @@ class RecordingContext {
     }
 
     const curBeat = this.getCurBeat();
-    const uiInstance = this.playbackHandler.inst.uiInstance;
+    const uiInstance = this.activeInstance.uiInst;
     if (!uiInstance) {
       return;
     }
@@ -106,7 +111,7 @@ class RecordingContext {
 
   public onRelease(midiNumber: number) {
     const curBeat = this.getCurBeat();
-    const uiInstance = this.playbackHandler.inst.uiInstance;
+    const uiInstance = this.activeInstance.uiInst;
     if (!uiInstance) {
       return;
     }
@@ -297,14 +302,8 @@ export default class MIDIEditorPlaybackHandler {
       }
       entry.push({ isAttack, lineIx });
     };
+    inst.iterNotesWithCB(startBeatInclusive, endBeatExclusive, cb);
 
-    const { instance, noteLinesCtxPtr } = inst.getWasmInstance();
-    instance.iter_notes_with_cb(
-      noteLinesCtxPtr,
-      startBeatInclusive ?? 0,
-      endBeatExclusive ?? -1,
-      cb
-    );
     return noteEventsByBeat;
   }
 
@@ -580,13 +579,13 @@ export default class MIDIEditorPlaybackHandler {
     this.inst.uiManager.stopAllPlayback();
   }
 
-  public startRecording() {
+  public startRecording(activeInstance: ManagedMIDIEditorUIInstance) {
     if (this.recordingCtx) {
       console.warn('Tried to start recording, but recording context already exists');
       return;
     }
 
-    this.recordingCtx = new RecordingContext(this);
+    this.recordingCtx = new RecordingContext(this, activeInstance);
     if (!this.isPlaying) {
       this.startPlayback({
         type: 'localTempo',

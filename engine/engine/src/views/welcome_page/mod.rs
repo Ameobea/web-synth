@@ -29,4 +29,4 @@ impl ViewContext for WelcomePage {
   fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 }
 
-pub fn mk_welcome_page(uuid: Uuid) -> Box<dyn ViewContext> { box WelcomePage::new(uuid) }
+pub fn mk_welcome_page(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(WelcomePage::new(uuid)) }

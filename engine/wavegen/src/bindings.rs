@@ -64,12 +64,12 @@ fn get_waveform_renderer_ctx() -> &'static mut WaveformRendererCtx {
     return unsafe { &mut *WAVEFORM_RENDERER_CTX };
   }
 
-  let ctx = Box::into_raw(box WaveformRendererCtx::new(
+  let ctx = Box::into_raw(Box::new(WaveformRendererCtx::new(
     WAVEFORM_LENGTH_SAMPLES as u32,
     SAMPLE_RATE,
     WAVEFORM_WIDTH_PX,
     WAVEFORM_HEIGHT_PX,
-  ));
+  )));
   unsafe { WAVEFORM_RENDERER_CTX = ctx };
   unsafe { &mut *WAVEFORM_RENDERER_CTX }
 }

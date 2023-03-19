@@ -1,4 +1,4 @@
-#![feature(box_syntax, stdsimd, const_maybe_uninit_assume_init, get_mut_unchecked)]
+#![feature(stdsimd, const_maybe_uninit_assume_init, get_mut_unchecked)]
 
 pub mod fm;
 
@@ -211,7 +211,7 @@ pub fn init_wavetable(
     base_frequency,
   };
 
-  Box::into_raw(box WaveTable::new(settings))
+  Box::into_raw(Box::new(WaveTable::new(settings)))
 }
 
 #[no_mangle]
@@ -237,7 +237,7 @@ pub extern "C" fn resize_wavetable(
 
 #[no_mangle]
 pub unsafe fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
-  Box::into_raw(box WaveTableHandle::new(std::mem::transmute(table)))
+  Box::into_raw(Box::new(WaveTableHandle::new(std::mem::transmute(table))))
 }
 
 #[no_mangle]

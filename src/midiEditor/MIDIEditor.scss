@@ -1,13 +1,13 @@
 .midi-editor {
-  margin-top: 20px;
-  margin-bottom: 10px;
-
   .midi-editor-controls {
     display: flex;
     flex-direction: row;
-    margin-left: 13px;
-    margin-bottom: 8px;
+    margin-left: 1px;
     align-items: flex-end;
+    position: fixed;
+    z-index: 2;
+    background-color: #151515;
+    width: calc(100vw - 8px);
 
     .midi-editor-control-button {
       cursor: pointer;
@@ -80,6 +80,7 @@
 }
 
 .expanded-midi-editor-instance {
+  display: flex;
   position: relative;
 }
 
@@ -90,8 +91,5 @@
   left: 0;
   height: 18px;
   line-height: 4px;
-}
-
-.collapsed-midi-editor-instance {
-  position: relative;
+  user-select: none;
 }

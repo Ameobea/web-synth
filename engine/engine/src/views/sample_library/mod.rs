@@ -32,4 +32,4 @@ impl ViewContext for SampleLibrary {
   }
 }
 
-pub fn mk_sample_library(uuid: Uuid) -> Box<dyn ViewContext> { box SampleLibrary { uuid } }
+pub fn mk_sample_library(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(SampleLibrary { uuid }) }

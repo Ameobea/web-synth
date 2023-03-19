@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -191,12 +189,12 @@ pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
   common::maybe_init(None);
   wbg_logging::maybe_init();
 
-  Box::into_raw(box Context {
+  Box::into_raw(Box::new(Context {
     byte_frequency_data: [255u8; BUFFER_SIZE],
     pixel_buffer: [255u8; BUFFER_SIZE * 4],
     color_fn,
     scaler_fn,
-  })
+  }))
 }
 
 #[wasm_bindgen]

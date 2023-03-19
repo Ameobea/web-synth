@@ -28,7 +28,7 @@ pub fn create_msg_handler_context(
   common::maybe_init(None);
   wbg_logging::maybe_init();
 
-  let mut ctx = box MsgHandlerContext {
+  let mut ctx = Box::new(MsgHandlerContext {
     play_note,
     release_note,
     pitch_bend,
@@ -36,57 +36,60 @@ pub fn create_msg_handler_context(
     // Insert temporary pointers for now that we will swap out once we have psueo-static
     // pointers to the boxed `Function`s
     voice_manager: PolySynth::new(SynthCallbacks {
-      trigger_release: box |_, _, _| panic!(),
-      trigger_attack: box |_, _, _, _| panic!(),
+      trigger_release: Box::new(|_, _, _| panic!()),
+      trigger_attack: Box::new(|_, _, _, _| panic!()),
     }),
     generic_control_handler,
-  };
+  });
 
   // Replace the temporary synth cb pointers with real ones
   let play_note: *const Function = &ctx.play_note as *const Function;
   let release_note: *const Function = &ctx.release_note as *const Function;
 
   let synth_cbs = SynthCallbacks {
-    trigger_attack: (box move |voice_ix: usize,
-                               note_id: usize,
-                               velocity: u8,
-                               offset: Option<f32>| {
-      if cfg!(debug_assertions) && offset.is_some() {
-        warn!(
-          "Offset provided to streaming synth attack CB, but it doesn't support offsets; ignoring"
-        );
-      }
-
-      unsafe {
-        match (&*play_note).call3(
-          &JsValue::NULL,
-          &JsValue::from(voice_ix as u32),
-          &JsValue::from(note_id as u32),
-          &JsValue::from(velocity),
-        ) {
-          Ok(_) => (),
-          Err(err) => error!("Error playing note: {:?}", err),
+    trigger_attack: (Box::new(
+      move |voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>| {
+        if cfg!(debug_assertions) && offset.is_some() {
+          warn!(
+            "Offset provided to streaming synth attack CB, but it doesn't support offsets; \
+             ignoring"
+          );
         }
-      };
-    }) as Box<dyn Fn(usize, usize, u8, Option<f32>)>,
-    trigger_release: (box move |voice_ix: usize, note_id: usize, offset: Option<f32>| {
-      if cfg!(debug_assertions) && offset.is_some() {
-        warn!(
-          "Offset provided to streaming synth release CB, but it doesn't support offsets; ignoring"
-        );
-      }
 
-      unsafe {
-        match (&*release_note).call2(
-          &JsValue::NULL,
-          &JsValue::from(voice_ix as u32),
-          &JsValue::from(note_id as u32),
-        ) {
-          Ok(_) => (),
-          Err(err) => error!("Error playing note: {:?}", err),
+        unsafe {
+          match (&*play_note).call3(
+            &JsValue::NULL,
+            &JsValue::from(voice_ix as u32),
+            &JsValue::from(note_id as u32),
+            &JsValue::from(velocity),
+          ) {
+            Ok(_) => (),
+            Err(err) => error!("Error playing note: {:?}", err),
+          }
+        };
+      },
+    )) as Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+    trigger_release: (Box::new(
+      move |voice_ix: usize, note_id: usize, offset: Option<f32>| {
+        if cfg!(debug_assertions) && offset.is_some() {
+          warn!(
+            "Offset provided to streaming synth release CB, but it doesn't support offsets; \
+             ignoring"
+          );
         }
-      };
-    }) as Box<dyn Fn(usize, usize, Option<f32>)>,
+
+        unsafe {
+          match (&*release_note).call2(
+            &JsValue::NULL,
+            &JsValue::from(voice_ix as u32),
+            &JsValue::from(note_id as u32),
+          ) {
+            Ok(_) => (),
+            Err(err) => error!("Error playing note: {:?}", err),
+          }
+        };
+      },
+    )) as Box<dyn Fn(usize, usize, Option<f32>)>,
   };
   let _ = mem::replace(&mut ctx.voice_manager.synth_cbs, synth_cbs);
 

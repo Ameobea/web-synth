@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
-import { get } from 'svelte/store';
+import { derived, get, Readable, Writable, writable } from 'svelte/store';
 
 import { type SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
@@ -150,9 +150,50 @@ const normalizeSerializedMIDIEditorState = (
   };
 };
 
+class ProxyMIDIEditorBaseView {
+  public readonly store: Writable<MIDIEditorBaseView>;
+  public readonly pxPerBeatStore: Readable<number>;
+  public readonly scrollHorizontalBeatsStore: Readable<number>;
+  public readonly inner: MIDIEditorBaseView;
+
+  constructor(inner: MIDIEditorBaseView) {
+    this.inner = inner;
+    this.store = writable(inner);
+    this.pxPerBeatStore = derived(this.store, v => v.pxPerBeat);
+    this.scrollHorizontalBeatsStore = derived(this.store, v => v.scrollHorizontalBeats);
+  }
+
+  public get pxPerBeat() {
+    return this.inner.pxPerBeat;
+  }
+
+  public set pxPerBeat(val: number) {
+    this.inner.pxPerBeat = val;
+    this.store.update(v => ({ ...v, pxPerBeat: val }));
+  }
+
+  public get scrollHorizontalBeats() {
+    return this.inner.scrollHorizontalBeats;
+  }
+
+  public set scrollHorizontalBeats(val: number) {
+    this.inner.scrollHorizontalBeats = val;
+    this.store.update(v => ({ ...v, scrollHorizontalBeats: val }));
+  }
+
+  public get beatsPerMeasure() {
+    return this.inner.beatsPerMeasure;
+  }
+
+  public set beatsPerMeasure(val: number) {
+    this.inner.beatsPerMeasure = val;
+    this.store.update(v => ({ ...v, beatsPerMeasure: val }));
+  }
+}
+
 export class MIDIEditorInstance {
   public vcId: string;
-  public baseView: MIDIEditorBaseView;
+  public baseView: ProxyMIDIEditorBaseView;
   public localBPM: number;
   public loopPoint: number | null;
   public beatSnapInterval: number;
@@ -161,14 +202,14 @@ export class MIDIEditorInstance {
 
   constructor(ctx: AudioContext, vcId: string, initialState: SerializedMIDIEditorState) {
     this.vcId = vcId;
-    this.baseView = initialState.view;
+    this.baseView = new ProxyMIDIEditorBaseView(initialState.view);
     this.localBPM = initialState.localBPM;
     this.loopPoint = initialState.loopPoint;
     this.beatSnapInterval = initialState.beatSnapInterval;
 
-    this.uiManager = new MIDIEditorUIManager(ctx, this, initialState, vcId);
-
     this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
+
+    this.uiManager = new MIDIEditorUIManager(ctx, this, initialState, vcId);
   }
 
   public serialize(): SerializedMIDIEditorState {
@@ -182,7 +223,7 @@ export class MIDIEditorInstance {
       metronomeEnabled: this.playbackHandler.metronomeEnabled,
       scrollHorizontalBeats: this.baseView.scrollHorizontalBeats,
       version: 2,
-      view: this.baseView,
+      view: this.baseView.inner,
     };
   }
 
@@ -210,6 +251,24 @@ export class MIDIEditorInstance {
   public setPxPerBeat(pxPerBeat: number) {
     this.baseView.pxPerBeat = pxPerBeat;
     this.uiManager.updateAllViews();
+  }
+
+  public setLoopEnabled(enabled: boolean) {
+    const loopCurrentlyEnabled = this.playbackHandler.getLoopPoint() !== null;
+    if (loopCurrentlyEnabled === enabled) {
+      return;
+    }
+
+    const newLoopPoint = enabled ? this.getCursorPosBeats() + 4 : null;
+    this.playbackHandler.setLoopPoint(newLoopPoint);
+    const insts = get(this.uiManager.instances);
+    for (const inst of insts) {
+      if (inst.type !== 'midiEditor') {
+        continue;
+      }
+
+      inst.instance.uiInst?.setLoopPoint(newLoopPoint);
+    }
   }
 
   public addCVOutput() {
@@ -271,7 +330,7 @@ export const init_midi_editor = (vcId: string) => {
   elem.id = domID;
   elem.setAttribute(
     'style',
-    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0; display: none;'
+    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0; display: none; overflow-x: hidden;'
   );
   document.getElementById('content')!.appendChild(elem);
 

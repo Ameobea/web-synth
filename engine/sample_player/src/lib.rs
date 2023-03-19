@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 const MAX_VOICE_COUNT: usize = 8;
 const FRAME_SIZE: usize = 128;
 
@@ -68,6 +66,9 @@ impl SampleDescriptor {
   }
 }
 
+#[inline(always)]
+fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
+
 pub struct SamplePlayerCtx {
   pub voices: Vec<SampleDescriptor>,
   pub gain_inputs: Box<[[f32; FRAME_SIZE]; MAX_VOICE_COUNT]>,
@@ -79,16 +80,16 @@ impl Default for SamplePlayerCtx {
   fn default() -> Self {
     SamplePlayerCtx {
       voices: Vec::with_capacity(MAX_VOICE_COUNT),
-      gain_inputs: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
-      gate_inputs: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
-      output_buffer: box unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      gain_inputs: Box::new(uninit()),
+      gate_inputs: Box::new(uninit()),
+      output_buffer: Box::new(uninit()),
     }
   }
 }
 
 #[no_mangle]
 pub extern "C" fn init_sample_player_ctx() -> *mut SamplePlayerCtx {
-  Box::into_raw(box SamplePlayerCtx::default())
+  Box::into_raw(Box::new(SamplePlayerCtx::default()))
 }
 
 #[no_mangle]

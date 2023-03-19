@@ -48,14 +48,14 @@ impl FMSynthFxCtx {
 
 #[no_mangle]
 pub extern "C" fn fm_synth_fx_create_ctx() -> *mut FMSynthFxCtx {
-  let ctx = box FMSynthFxCtx {
+  let ctx = Box::new(FMSynthFxCtx {
     adsrs: Vec::new(),
     adsr_params: Vec::new(),
     param_buffers: [[0.0; FRAME_SIZE]; FM_SYNTH_PARAM_BUFFER_COUNT],
     base_frequencies: [0.0; FRAME_SIZE],
     effect_chain: EffectChain::default(),
     io_buf: [0.0; FRAME_SIZE],
-  };
+  });
   Box::into_raw(ctx)
 }
 

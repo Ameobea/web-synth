@@ -1,3 +1,4 @@
+import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
 import {
@@ -11,8 +12,13 @@ import {
 } from 'src/midiEditor';
 import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
+import { Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import { renderMIDIMinimap } from 'src/midiEditor/Minimap/MinimapRenderer';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
+import { AsyncOnce } from 'src/util';
+
+const NoteContainerWasm = new AsyncOnce(() => import('src/note_container'), true);
 
 export class ManagedMIDIEditorUIInstance {
   public manager: MIDIEditorUIManager;
@@ -24,7 +30,15 @@ export class ManagedMIDIEditorUIInstance {
   public midiOutput: MIDINode;
   public midiInputCBs: MIDIInputCbs;
   public lines: SerializedMIDILine[];
-  // TODO: SVG minimap integration
+  private onWasmInitCBs: ((linesWithIDs: readonly Note[][]) => void)[] = [];
+  public wasm:
+    | {
+        instance: typeof import('src/note_container');
+        noteLinesCtxPtr: number;
+        linesWithIDs: readonly Note[][];
+      }
+    | undefined;
+  public renderedMinimap: SVGSVGElement | undefined;
 
   constructor(
     manager: MIDIEditorUIManager,
@@ -45,11 +59,41 @@ export class ManagedMIDIEditorUIInstance {
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
     // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
+
+    NoteContainerWasm.get().then(wasm => {
+      const noteLinesCtxPtr = wasm.create_note_lines(lines.length);
+
+      const linesWithIDs: Note[][] = new Array(lines.length).fill(null).map(() => []);
+      for (const { midiNumber, notes } of lines) {
+        const lineIx = lines.length - midiNumber;
+        for (const { length, startPoint } of notes) {
+          const id = wasm.create_note(noteLinesCtxPtr, lineIx, startPoint, length, 0);
+          linesWithIDs[lineIx].push({ id, startPoint, length });
+        }
+      }
+
+      this.wasm = {
+        instance: wasm,
+        noteLinesCtxPtr,
+        linesWithIDs,
+      };
+
+      this.onWasmInitCBs.forEach(cb => cb(linesWithIDs));
+      this.onWasmInitCBs = [];
+    });
   }
 
   public get lineCount(): number {
     return this.lines.length;
   }
+
+  public onWasmLoaded = (cb: (linesWithIDs: readonly Note[][]) => void) => {
+    if (this.wasm) {
+      cb(this.wasm.linesWithIDs);
+    } else {
+      this.onWasmInitCBs.push(cb);
+    }
+  };
 
   private buildInstanceMIDIInputCbs = (): MIDIInputCbs => ({
     onAttack: (note, velocity) => {
@@ -91,16 +135,23 @@ export class ManagedMIDIEditorUIInstance {
     },
   });
 
-  public getWasmInstance() {
-    if (!this.uiInst) {
-      throw new Error('UI instance not initialized; cannot get Wasm instance');
-    }
-    const wasmInst = this.uiInst.wasm;
-    if (!wasmInst) {
+  public iterNotesWithCB = (
+    startBeatInclusive: number | null | undefined,
+    endBeatExclusive: number | null | undefined,
+    cb: (isAttack: boolean, lineIx: number, rawBeat: number, noteID: number) => void
+  ) => {
+    if (!this.wasm) {
       throw new Error('Wasm instance not initialized; cannot get Wasm instance');
     }
-    return wasmInst;
-  }
+    const { instance, noteLinesCtxPtr } = this.wasm;
+
+    instance.iter_notes_with_cb(
+      noteLinesCtxPtr,
+      startBeatInclusive ?? 0,
+      endBeatExclusive ?? -1,
+      cb
+    );
+  };
 
   public gate(lineIx: number) {
     this.midiInputCBs.onAttack(this.lineCount - lineIx, 255);
@@ -125,6 +176,7 @@ export class ManagedMIDIEditorUIInstance {
 
   public destroy() {
     this.uiInst?.destroy();
+    this.wasm?.instance.free_note_lines(this.wasm.noteLinesCtxPtr);
   }
 }
 
@@ -148,19 +200,21 @@ export class MIDIEditorUIManager {
   private silentOutput: GainNode;
   private ctx: AudioContext;
   private vcId: string;
+  public activeUIInstance: MIDIEditorUIInstance | undefined;
 
-  // TODO: This is a holdover until we implement full multi-instance support.
-  public get activeUIInstance(): MIDIEditorUIInstance | undefined {
+  public setActiveUIInstanceID(id: string) {
     const instances = get(this.instances);
-    const instance = instances[0];
-    if (instance.type !== 'midiEditor') {
-      console.error('Active UI instance is not a MIDI editor');
-      return undefined;
+    const inst = instances.find(inst => inst.id === id);
+    if (!inst) {
+      console.error(`Could not find UI instance with ID ${id}`);
+      return;
     }
-    if (instance.isExpanded) {
-      return instance.instance.uiInst;
+    if (inst.type !== 'midiEditor') {
+      console.error(`Instance with ID ${id} is not a MIDI editor`);
+      return;
     }
-    return undefined;
+
+    this.activeUIInstance = inst.instance.uiInst;
   }
 
   public getMIDIEditorInstanceByID(id: string): ManagedMIDIEditorUIInstance | undefined {
@@ -198,6 +252,18 @@ export class MIDIEditorUIManager {
     this.instances.set(instances);
   }
 
+  private setMinimapForID(id: string, svg: SVGSVGElement) {
+    const insts = get(this.instances);
+    const inst = insts.find(inst => inst.id === id);
+    // make sure it hasn't been toggled back to expanded in the meantime
+    if (!inst || inst.isExpanded || inst.type !== 'midiEditor') {
+      return;
+    }
+
+    inst.instance.renderedMinimap = svg;
+    this.instances.set(insts);
+  }
+
   public collapseUIInstance(id: string) {
     const instances = get(this.instances);
     const inst = instances.find(inst => inst.id === id);
@@ -212,8 +278,19 @@ export class MIDIEditorUIManager {
 
     if (inst.type === 'midiEditor' && inst.instance.uiInst) {
       inst.instance.lines = inst.instance.uiInst.serializeLines();
+      const renderMinimapPromise = renderMIDIMinimap(
+        inst.instance.lines,
+        this.parentInst.baseView.beatsPerMeasure
+      );
+
+      if (this.activeUIInstance === inst.instance.uiInst) {
+        this.activeUIInstance = undefined;
+      }
+
       inst.instance.uiInst?.destroy();
       inst.instance.uiInst = undefined;
+
+      renderMinimapPromise.then(svg => this.setMinimapForID(id, svg));
     }
     inst.isExpanded = false;
 
@@ -234,6 +311,9 @@ export class MIDIEditorUIManager {
     }
 
     inst.isExpanded = true;
+    if (inst.type === 'midiEditor') {
+      inst.instance.renderedMinimap = undefined;
+    }
 
     this.resizeInstances(instances);
     this.instances.set(instances);
@@ -241,10 +321,11 @@ export class MIDIEditorUIManager {
 
   public computeUIInstanceHeight(): number {
     const instances = get(this.instances);
-    const activeInstanceCount = instances.filter(
-      inst => inst.type === 'midiEditor' && inst.isExpanded
-    ).length;
-    return Math.max(500, (this.windowSize.height - 140) / activeInstanceCount);
+    const activeInstanceCount =
+      instances.filter(inst => inst.type === 'midiEditor' && inst.isExpanded).length || 1;
+
+    const maxHeight = Math.max(500, this.windowSize.height - 600);
+    return R.clamp(500, maxHeight, (this.windowSize.height - 200) / activeInstanceCount);
   }
 
   private resizeInstances(instances: ManagedInstance[]) {
@@ -256,14 +337,14 @@ export class MIDIEditorUIManager {
       }
 
       if (inst.type === 'midiEditor') {
-        inst.instance.uiInst?.setSize(this.windowSize.width - 80, height);
+        inst.instance.uiInst?.setSize(this.windowSize.width, height);
       }
     }
   }
 
   public addMIDIEditorInstance(defaultActive = true) {
     const instances = get(this.instances);
-    let instName = `midi_out_${instances.length}`;
+    let instName = `midi_${instances.length}`;
     while (
       instances.find(
         inst =>
@@ -300,7 +381,12 @@ export class MIDIEditorUIManager {
     }
 
     if (inst.type === 'midiEditor') {
-      inst.instance.uiInst?.destroy();
+      if (inst.instance.uiInst) {
+        if (this.activeUIInstance === inst.instance.uiInst) {
+          this.activeUIInstance = undefined;
+        }
+        inst.instance.uiInst.destroy();
+      }
     } else if (inst.type === 'cvOutput') {
       inst.instance.destroy();
     }
@@ -404,6 +490,13 @@ export class MIDIEditorUIManager {
           crypto.randomUUID(),
           inst.state.lines
         );
+
+        if (!inst.state.isExpanded) {
+          renderMIDIMinimap(inst.state.lines, this.parentInst.baseView.beatsPerMeasure).then(svg =>
+            this.setMinimapForID(instance.id, svg)
+          );
+        }
+
         return {
           type: 'midiEditor' as const,
           id: instance.id,
@@ -430,18 +523,6 @@ export class MIDIEditorUIManager {
       }
     });
     this.instances = writable(instances);
-  }
-
-  // TODO: This is a holdover until we implement full multi-instance support.
-  public setActiveInstance(instance: MIDIEditorUIInstance) {
-    this.instances.update(instances => {
-      const firstInst = instances[0];
-      if (firstInst.type !== 'midiEditor') {
-        throw new Error('Expected first instance to be a MIDI editor');
-      }
-      firstInst.instance.uiInst = instance;
-      return instances;
-    });
   }
 
   public updateAllViews() {

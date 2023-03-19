@@ -8,7 +8,7 @@ pub struct SampleRcorderContext {
 
 #[no_mangle]
 pub extern "C" fn create_sample_recorder_ctx() -> *const SampleRcorderContext {
-  Box::into_raw(box SampleRcorderContext::default())
+  Box::into_raw(Box::new(SampleRcorderContext::default()))
 }
 
 /// Given the number of samples to be written, returns a pointer to the spot in memory where they

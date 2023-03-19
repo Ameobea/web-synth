@@ -1,4 +1,4 @@
-#![feature(box_syntax, test, thread_local)]
+#![feature(thread_local)]
 #![allow(clippy::float_cmp, clippy::needless_range_loop, clippy::manual_memcpy)]
 
 extern crate wasm_bindgen;
@@ -49,7 +49,7 @@ pub fn init() {
   }
 
   // Create the `ViewContextManager` and initialize it, then set it into the global
-  let vcm = box ViewContextManager::default();
+  let vcm = Box::new(ViewContextManager::default());
   // We have to store it in the pointer before initializing it since some initializing functions
   // call into JS code which in turn calls back into Rust code which expects to be able to access
   // the global VCM via that pointer.

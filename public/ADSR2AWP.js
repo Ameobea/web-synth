@@ -172,7 +172,16 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
   ) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, {
-      env: { debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }) },
+      env: {
+        debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }),
+        log_err: (ptr, len) => {
+          const memory = new Uint8Array(this.wasmInstance.exports.memory.buffer);
+          const str = Array.from(memory.subarray(ptr, ptr + len))
+            .map(v => String.fromCharCode(v))
+            .join('');
+          console.error(str);
+        },
+      },
     });
 
     this.setEncodedSteps(encodedSteps);

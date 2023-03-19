@@ -31,4 +31,4 @@ impl ViewContext for ControlPanel {
   }
 }
 
-pub fn mk_control_panel(uuid: Uuid) -> Box<dyn ViewContext> { box ControlPanel::new(uuid) }
+pub fn mk_control_panel(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(ControlPanel::new(uuid)) }

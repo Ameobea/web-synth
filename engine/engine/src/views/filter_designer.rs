@@ -34,4 +34,6 @@ impl ViewContext for FilterDesigner {
   fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 }
 
-pub fn mk_filter_designer(uuid: Uuid) -> Box<dyn ViewContext> { box FilterDesigner::new(uuid) }
+pub fn mk_filter_designer(uuid: Uuid) -> Box<dyn ViewContext> {
+  Box::new(FilterDesigner::new(uuid))
+}

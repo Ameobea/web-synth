@@ -44,4 +44,4 @@ impl ViewContext for Sequencer {
   }
 }
 
-pub fn mk_sequencer(uuid: Uuid) -> Box<dyn ViewContext> { box Sequencer { uuid } }
+pub fn mk_sequencer(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(Sequencer { uuid }) }

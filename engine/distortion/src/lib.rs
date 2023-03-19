@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 use dsp::circular_buffer::CircularBuffer;
 
 pub const FRAME_SIZE: usize = 128;
@@ -100,8 +98,7 @@ impl WaveStretcher {
 
 #[no_mangle]
 pub unsafe extern "C" fn distortion_init_ctx(len_samples: usize) -> *mut WaveStretcher {
-  Box::into_raw(box WaveStretcher::new(len_samples))
-  // &mut WAVE_STRETCHER as *mut _
+  Box::into_raw(Box::new(WaveStretcher::new(len_samples)))
 }
 
 #[no_mangle]

@@ -522,6 +522,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "midi_renderer"
+version = "0.1.0"
+dependencies = [
+ "svg",
+]
+
+[[package]]
 name = "mini-internal"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1010,6 +1017,12 @@ dependencies = [
  "quote 1.0.7",
  "syn 1.0.73",
 ]
+
+[[package]]
+name = "svg"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e715e0c3fc987f4c435dc7189641fd9caa6919a74675ace605c38e201d278001"
 
 [[package]]
 name = "syn"

@@ -1794,7 +1794,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
   init_sample_manager();
   common::set_raw_panic_hook(log_err);
 
-  let ctx = Box::into_raw(box FMSynthContext {
+  let ctx = Box::into_raw(Box::new(FMSynthContext {
     voices: Vec::with_capacity(voice_count),
     modulation_matrix: ModulationMatrix::default(),
     param_buffers: uninit(),
@@ -1807,25 +1807,26 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     detune: None,
     wavetables: Vec::new(),
     sample_mapping_manager: SampleMappingManager::default(),
-    polysynth: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
-  });
+    polysynth: uninit(),
+  }));
 
   std::ptr::write(
     &mut (*ctx).polysynth,
     PolySynth::new(SynthCallbacks {
-      trigger_attack: box move |voice_ix: usize,
-                                note_id: usize,
-                                _velocity: u8,
-                                _offset: Option<f32>| {
-        let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
-        (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
-        gate_voice_inner(ctx, voice_ix, note_id);
-        on_gate_cb(note_id, voice_ix);
-      },
-      trigger_release: box move |voice_ix: usize, note_id: usize, _offset: Option<f32>| {
-        ungate_voice_inner(ctx, voice_ix);
-        on_ungate_cb(note_id, voice_ix);
-      },
+      trigger_attack: Box::new(
+        move |voice_ix: usize, note_id: usize, _velocity: u8, _offset: Option<f32>| {
+          let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
+          (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
+          gate_voice_inner(ctx, voice_ix, note_id);
+          on_gate_cb(note_id, voice_ix);
+        },
+      ),
+      trigger_release: Box::new(
+        move |voice_ix: usize, note_id: usize, _offset: Option<f32>| {
+          ungate_voice_inner(ctx, voice_ix);
+          on_ungate_cb(note_id, voice_ix);
+        },
+      ),
     }),
   );
 
@@ -1837,12 +1838,12 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
       .write(ParamSource::BaseFrequencyMultiplier(1.));
   }
   let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
-    box [0.242424; RENDERED_BUFFER_SIZE];
+    Box::new([0.242424; RENDERED_BUFFER_SIZE]);
   let shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
     shared_gain_adsr_rendered_buffer.into();
 
   let shared_filter_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
-    box [0.424242; RENDERED_BUFFER_SIZE];
+    Box::new([0.424242; RENDERED_BUFFER_SIZE]);
   let shared_filter_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
     shared_filter_adsr_rendered_buffer.into();
 
@@ -2400,7 +2401,7 @@ pub unsafe extern "C" fn set_adsr(
   loop_point: f32,
   log_scale: bool,
 ) {
-  let shared_buffer = box [0.0f32; RENDERED_BUFFER_SIZE];
+  let shared_buffer = Box::new([0.0f32; RENDERED_BUFFER_SIZE]);
   let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
 
   for voice in &mut (*ctx).voices {

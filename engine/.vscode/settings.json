@@ -1,3 +1,4 @@
 {
-  "rust-analyzer.cargo.target": "wasm32-unknown-unknown"
+  "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+  "gitlens.advanced.blame.customArguments": ["--ignore-rev", "1dfe67f13fe2a46ff96e5829a0ad153f6162ffcb"]
 }

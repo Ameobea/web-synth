@@ -21,7 +21,7 @@ impl Effect for CompressorEffect {
     }
   }
 
-  fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+  fn apply(&mut self, _rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
     self.inner.input_buffer[self.cur_frame_ix] = sample;
     let output = self.inner.output_buffer[self.cur_frame_ix];
     self.cur_frame_ix += 1;

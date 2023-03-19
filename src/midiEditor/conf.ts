@@ -14,7 +14,7 @@ export const MIN_DRAWING_NOTE_WIDTH_PX = 6;
  */
 export const SCROLL_ZOOM_DOUBLE_INTERVAL_PX = 410;
 export const SCROLL_HORIZONTAL_FACTOR = 15;
-export const SCROLL_VERTICAL_FACTOR = 35;
+export const SCROLL_VERTICAL_FACTOR = 5;
 export const CURSOR_COLOR = 0xcfcfcf;
 export const CURSOR_CARET_WIDTH = 11;
 export const CURSOR_CARET_HEIGHT = (Math.sqrt(3) / 2) * CURSOR_CARET_WIDTH;

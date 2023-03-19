@@ -26,7 +26,7 @@ impl SpectralWarping {
   ) -> Self {
     SpectralWarping {
       frequency,
-      buffer: box CircularBuffer::new(),
+      buffer: Box::new(CircularBuffer::new()),
       osc: ExponentialOscillator::new(warp_factor),
     }
   }

@@ -40,4 +40,4 @@ impl ViewContext for SynthDesigner {
   fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 }
 
-pub fn mk_synth_designer(uuid: Uuid) -> Box<dyn ViewContext> { box SynthDesigner::new(uuid) }
+pub fn mk_synth_designer(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(SynthDesigner::new(uuid)) }

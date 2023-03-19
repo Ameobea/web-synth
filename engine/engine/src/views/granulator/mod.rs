@@ -35,4 +35,4 @@ impl ViewContext for Granulator {
   }
 }
 
-pub fn mk_granulator(uuid: Uuid) -> Box<dyn ViewContext> { box Granulator::new(uuid) }
+pub fn mk_granulator(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(Granulator::new(uuid)) }
