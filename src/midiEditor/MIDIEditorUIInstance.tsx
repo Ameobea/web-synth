@@ -80,7 +80,6 @@ export default class MIDIEditorUIInstance {
   public cursor: Cursor;
   private pianoKeys: PianoKeys | undefined;
   private cursorGutter: CursorGutter;
-  private stageBorder: PIXI.Graphics;
   public loopCursor: LoopCursor | null;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
   public noteMetadataByNoteID: Map<number, any> = new Map();
@@ -172,10 +171,6 @@ export default class MIDIEditorUIInstance {
       this.parentInstance.playbackHandler?.recordingCtx?.tick();
     });
 
-    // border around everything
-    this.stageBorder = this.buildStageBorder();
-    this.app.stage.addChild(this.stageBorder);
-
     this.init().then(() => {
       if (this.destroyed) {
         return;
@@ -194,16 +189,6 @@ export default class MIDIEditorUIInstance {
       .beginFill(0xff3300)
       .drawRect(conf.PIANO_KEYBOARD_WIDTH, 10, this.width - conf.PIANO_KEYBOARD_WIDTH, this.height)
       .endFill();
-  }
-
-  private buildStageBorder() {
-    return new PIXI.Graphics()
-      .lineStyle(1, conf.LINE_BORDER_COLOR)
-      .moveTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
-      .lineTo(this.width, conf.CURSOR_GUTTER_HEIGHT)
-      .lineTo(this.width, this.height)
-      .lineTo(conf.PIANO_KEYBOARD_WIDTH, this.height)
-      .lineTo(conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT);
   }
 
   private buildNoteLines = (linesWithIDs: readonly Note[][]): NoteLine[] =>
@@ -286,9 +271,6 @@ export default class MIDIEditorUIInstance {
     this.app.renderer.resize(width, height);
 
     this.linesContainer.mask = this.buildLinesContainerMask();
-    this.stageBorder.parent.removeChild(this.stageBorder);
-    this.stageBorder = this.buildStageBorder();
-    this.app.stage.addChild(this.stageBorder);
     this.pianoKeys?.destroy();
     this.pianoKeys = new PianoKeys(this);
     this.cursorGutter.destroy();

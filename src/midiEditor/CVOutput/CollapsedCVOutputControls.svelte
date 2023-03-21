@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
+
   export let name: string;
   export let expand: () => void;
   export let deleteOutput: () => void;
@@ -12,6 +14,6 @@
   aria-label="Expand"
   role="button"
 >
-  › {name}
+  › <div class="collapsed-cv-output-name" style="left: {PIANO_KEYBOARD_WIDTH}px">{name}</div>
   <button class="delete-cv-output-button" on:click={deleteOutput}>×</button>
 </div>

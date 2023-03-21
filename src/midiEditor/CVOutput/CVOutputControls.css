@@ -27,3 +27,12 @@
   line-height: 0;
   user-select: none;
 }
+
+.cv-output-name,
+.collapsed-cv-output-name,
+.cv-output-controls .name-wrapper,
+.expanded-midi-editor-name {
+  position: absolute;
+  font-family: Hack, Oxygen Mono, Menlo, monospace;
+  font-size: 13px;
+}

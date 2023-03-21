@@ -47,8 +47,10 @@
     aria-label="Collapse"
     role="button"
   >
-    ⌄ <div
+    ⌄
+    <div
       class="name-wrapper"
+      style="left: {PIANO_KEYBOARD_WIDTH}px"
       on:mouseenter={() => {
         nameWrapperHovered = true;
       }}
@@ -151,6 +153,7 @@
   .name-wrapper {
     margin-left: 4px;
     margin-top: -3px;
+    position: absolute;
   }
 
   .name-input {

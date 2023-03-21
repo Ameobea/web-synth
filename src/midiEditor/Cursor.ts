@@ -13,7 +13,7 @@ export class CursorGutter {
 
     const g = new PIXI.Graphics();
     g.beginFill(conf.CURSOR_GUTTER_COLOR);
-    g.drawRect(0, 0, this.app.width - conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT);
+    g.drawRect(-conf.PIANO_KEYBOARD_WIDTH + 0.5, 0, this.app.width, conf.CURSOR_GUTTER_HEIGHT);
     g.endFill();
     g.interactive = true;
     g.on('pointerdown', (evt: PIXI.InteractionEvent) => {
@@ -46,11 +46,10 @@ export class CursorGutter {
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
-    g.moveTo(0.5, 0.5)
-      .lineTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH, 0.5)
-      .lineTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT)
-      .lineTo(0.5, conf.CURSOR_GUTTER_HEIGHT)
-      .lineTo(0.5, 0.5);
+    g.moveTo(this.app.width - conf.PIANO_KEYBOARD_WIDTH, conf.CURSOR_GUTTER_HEIGHT).lineTo(
+      0.5,
+      conf.CURSOR_GUTTER_HEIGHT
+    );
     g.x = conf.PIANO_KEYBOARD_WIDTH;
     g.cacheAsBitmap = true;
     this.graphics = g;

@@ -23,6 +23,7 @@ import { AsyncOnce } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
 import CollapsedMIDIEditor from 'src/midiEditor/CollapsedMIDIEditor.svelte';
+import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
 import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
@@ -607,6 +608,12 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
                 >
                   ⌄
                 </button>
+                <div
+                  className='expanded-midi-editor-name'
+                  style={{ left: PIANO_KEYBOARD_WIDTH + 2, top: 1 }}
+                >
+                  {inst.name}
+                </div>
                 <canvas
                   ref={canvas => {
                     if (!canvas) {

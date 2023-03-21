@@ -52,7 +52,7 @@
   >
     ›
   </button>
-  <div class="midi-editor-instance-name">{inst.name}</div>
+  <div class="midi-editor-instance-name" style="left: {PIANO_KEYBOARD_WIDTH}px">{inst.name}</div>
   <div class="midi-editor-minimap-container" bind:this={minimapContainer} on:dblclick={expand} />
 </div>
 
@@ -67,7 +67,6 @@
 
   .midi-editor-instance-name {
     position: absolute;
-    left: 28px;
     top: 2px;
     font-size: 13px;
     font-family: Hack, Oxygen Mono, Menlo, monospace;
