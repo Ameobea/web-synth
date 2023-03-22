@@ -99,17 +99,15 @@ export default class MIDIEditorUIInstance {
     width: number,
     height: number,
     canvas: HTMLCanvasElement,
-    initialState: SerializedMIDIEditorInstance,
     parentInstance: MIDIEditorInstance,
     managedInst: ManagedMIDIEditorUIInstance,
     vcId: string
   ) {
     this.width = width;
     this.height = height;
-    this.loopCursor = parentInstance.loopPoint
-      ? new LoopCursor(this, parentInstance.loopPoint)
-      : null;
     this.parentInstance = parentInstance;
+    const loopPoint = parentInstance.playbackHandler.getLoopPoint();
+    this.loopCursor = loopPoint ? new LoopCursor(this, loopPoint) : null;
     this.managedInst = managedInst;
     this.vcId = vcId;
 
@@ -245,7 +243,7 @@ export default class MIDIEditorUIInstance {
     this.handleViewChange();
 
     // Set other misc. state
-    this.setLoopPoint(this.parentInstance.loopPoint);
+    this.setLoopPoint(this.parentInstance.playbackHandler.getLoopPoint());
     this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
   }
 
@@ -255,14 +253,6 @@ export default class MIDIEditorUIInstance {
 
   public beatsToPx(beats: number) {
     return beats * this.parentInstance.baseView.pxPerBeat;
-  }
-
-  public snapBeat(rawBeat: number): number {
-    if (this.beatSnapInterval === 0) {
-      return rawBeat;
-    }
-
-    return Math.round(rawBeat * (1 / this.beatSnapInterval)) / (1 / this.beatSnapInterval);
   }
 
   public setSize(width: number, height: number) {
@@ -639,8 +629,8 @@ export default class MIDIEditorUIInstance {
         continue;
       }
 
-      const snappedStart = this.snapBeat(note.startPoint);
-      const snappedEnd = this.snapBeat(note.startPoint + note.length);
+      const snappedStart = this.parentInstance.snapBeat(note.startPoint);
+      const snappedEnd = this.parentInstance.snapBeat(note.startPoint + note.length);
 
       if (snappedStart > note.startPoint) {
         this.resizeNoteHorizontalStart(line.index, note.startPoint, note.id, snappedStart);
@@ -660,7 +650,7 @@ export default class MIDIEditorUIInstance {
       const shortNotes = notes.filter(({ note }) => note.length <= this.beatSnapInterval / 2);
       shortNotes.forEach(({ note }) => {
         wasm.instance.delete_note(wasm.noteLinesCtxPtr, lineIx, note.startPoint, note.id);
-        const snappedStart = this.snapBeat(note.startPoint);
+        const snappedStart = this.parentInstance.snapBeat(note.startPoint);
         const canMove = wasm.instance.check_can_add_note(
           wasm.noteLinesCtxPtr,
           lineIx,
@@ -696,8 +686,8 @@ export default class MIDIEditorUIInstance {
         continue;
       }
 
-      const snappedStart = this.snapBeat(note.startPoint);
-      const snappedEnd = this.snapBeat(note.startPoint + note.length);
+      const snappedStart = this.parentInstance.snapBeat(note.startPoint);
+      const snappedEnd = this.parentInstance.snapBeat(note.startPoint + note.length);
 
       if (snappedStart < note.startPoint) {
         wasm.instance.delete_note(wasm.noteLinesCtxPtr, line.index, note.startPoint, note.id);
@@ -849,7 +839,10 @@ export default class MIDIEditorUIInstance {
           `Note id ${noteId} is selected but not in original pos mapping`
         );
       }
-      const newDesiredStartPosBeats = Math.max(this.snapBeat(originalPosBeats + xDiffBeats), 0);
+      const newDesiredStartPosBeats = Math.max(
+        this.parentInstance.snapBeat(originalPosBeats + xDiffBeats),
+        0
+      );
       note.handleDrag(newDesiredStartPosBeats);
     }
 
@@ -931,17 +924,24 @@ export default class MIDIEditorUIInstance {
   }
 
   public setLoopPoint(loopPoint?: number | null | undefined) {
+    const newLoopPoint = this.parentInstance.snapBeat(
+      loopPoint ??
+        this.parentInstance.getCursorPosBeats() + this.parentInstance.baseView.beatsPerMeasure
+    );
+
     if (this.loopCursor) {
-      this.app.stage.removeChild(this.loopCursor.graphics);
-      this.loopCursor.destroy();
-      this.loopCursor = null;
+      if (R.isNil(loopPoint)) {
+        this.app.stage.removeChild(this.loopCursor.graphics);
+        this.loopCursor.destroy();
+        this.loopCursor = null;
+        return;
+      }
+
+      this.loopCursor.setPosBeats(newLoopPoint);
+      return;
     }
 
     if (!R.isNil(loopPoint)) {
-      const newLoopPoint = this.snapBeat(
-        loopPoint ??
-          this.parentInstance.getCursorPosBeats() + this.parentInstance.baseView.beatsPerMeasure
-      );
       this.loopCursor = new LoopCursor(this, newLoopPoint);
       this.app.stage.addChild(this.loopCursor.graphics);
     }

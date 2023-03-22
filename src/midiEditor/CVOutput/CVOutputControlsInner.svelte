@@ -7,6 +7,7 @@
   import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
   import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import type { CVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
+  import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
   import { mkCVOutputSettingsPopup } from './CVOutputSettingsPopup';
 
   export let name: string;
@@ -16,10 +17,6 @@
   export let deleteOutput: () => void;
   export let registerInstance: (instance: ADSR2Instance) => void;
   export let setFrozenOutputValue: (frozenOutputValue: number) => void;
-
-  let isEditingName = false;
-  let nameWrapperHovered = false;
-  let editingNameValue = name;
 
   let width: number | undefined;
   let widthObserver: ResizeObserver | undefined;
@@ -48,58 +45,8 @@
     role="button"
   >
     ⌄
-    <div
-      class="name-wrapper"
-      style="left: {PIANO_KEYBOARD_WIDTH}px"
-      on:mouseenter={() => {
-        nameWrapperHovered = true;
-      }}
-      on:mouseleave={() => {
-        nameWrapperHovered = false;
-      }}
-    >
-      {#if isEditingName}
-        <input
-          type="text"
-          bind:value={editingNameValue}
-          on:blur={() => {
-            isEditingName = false;
-          }}
-          on:keydown={e => {
-            if (e.key === 'Enter') {
-              e.stopPropagation();
-              isEditingName = false;
-              if (editingNameValue !== name) {
-                setName(editingNameValue);
-              }
-            }
-          }}
-          on:click={e => e.stopPropagation()}
-          class="name-input"
-        />
-      {:else}
-        {name}
-      {/if}
-      <span
-        style="visibility: {nameWrapperHovered ? 'visible' : 'hidden'}; font-size: 21px;"
-        on:click={e => {
-          e.stopPropagation();
-          isEditingName = true;
-        }}
-        role="button"
-        aria-label="Edit name"
-        tabindex="0"
-        on:keydown={e => {
-          if (e.key === 'Enter') {
-            e.stopPropagation();
-            isEditingName = true;
-          }
-        }}
-      >
-        ✎
-      </span>
-    </div>
-    <button class="delete-cv-output-button" on:click={deleteOutput}>×</button>
+    <EditableInstanceName {name} {setName} left={PIANO_KEYBOARD_WIDTH} />
+    <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
   </header>
 
   <div
@@ -148,18 +95,6 @@
     display: flex;
     flex-direction: column;
     position: relative;
-  }
-
-  .name-wrapper {
-    margin-left: 4px;
-    margin-top: -3px;
-    position: absolute;
-  }
-
-  .name-input {
-    height: 20px;
-    margin-bottom: 4px;
-    margin-top: -2px;
   }
 
   header {

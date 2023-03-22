@@ -72,7 +72,7 @@ export default class NoteLine {
         }
 
         const data: PIXI.InteractionData = evt.data;
-        const posBeats = this.app.snapBeat(
+        const posBeats = this.app.parentInstance.snapBeat(
           this.app.pxToBeats(data.getLocalPosition(this.background).x) +
             this.app.parentInstance.baseView.scrollHorizontalBeats
         );
@@ -106,7 +106,7 @@ export default class NoteLine {
         }
 
         const data: PIXI.InteractionData = evt.data;
-        const newPosBeats = this.app.snapBeat(
+        const newPosBeats = this.app.parentInstance.snapBeat(
           this.app.pxToBeats(data.getLocalPosition(this.background).x) +
             this.app.parentInstance.baseView.scrollHorizontalBeats
         );

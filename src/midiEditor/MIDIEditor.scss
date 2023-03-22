@@ -82,6 +82,11 @@
 .expanded-midi-editor-instance {
   display: flex;
   position: relative;
+  border-top: 1px solid #888;
+}
+
+.midi-editor .expanded-midi-editor-instance:first-child {
+  border-top: none;
 }
 
 .collapse-midi-editor-instance,

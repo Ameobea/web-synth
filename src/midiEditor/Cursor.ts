@@ -23,7 +23,7 @@ export class CursorGutter {
       this.isDragging = true;
 
       const xPx = evt.data.getLocalPosition(g).x;
-      const xBeats = this.app.snapBeat(
+      const xBeats = this.app.parentInstance.snapBeat(
         this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
       );
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
@@ -37,7 +37,7 @@ export class CursorGutter {
       }
 
       const xPx = evt.data.getLocalPosition(g).x;
-      const xBeats = this.app.snapBeat(
+      const xBeats = this.app.parentInstance.snapBeat(
         Math.max(
           0,
           this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
@@ -157,15 +157,14 @@ export class LoopCursor extends Cursor {
 
     const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
     const newPosBeats = Math.max(
-      this.app.snapBeat(
+      this.app.parentInstance.snapBeat(
         this.app.pxToBeats(normalizedX) + this.app.parentInstance.baseView.scrollHorizontalBeats
       ),
       0
     );
-    const didUpdate = this.app.parentInstance.playbackHandler.setLoopPoint(newPosBeats);
+    const didUpdate = this.app.parentInstance.setLoopPoint(newPosBeats);
     if (!didUpdate) {
       return;
     }
-    this.setPosBeats(newPosBeats);
   }
 }

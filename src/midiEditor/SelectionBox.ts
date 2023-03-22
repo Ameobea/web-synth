@@ -31,8 +31,10 @@ export default class SelectionBox {
 
     const startLineIx = this.app.computeLineIndex(minY);
     const endLineIx = this.app.computeLineIndex(maxY);
-    const startBeat = this.app.pxToBeats(minX) + this.app.view.scrollHorizontalBeats;
-    const endBeat = this.app.pxToBeats(maxX) + this.app.view.scrollHorizontalBeats;
+    const startBeat =
+      this.app.pxToBeats(minX) + this.app.parentInstance.baseView.scrollHorizontalBeats;
+    const endBeat =
+      this.app.pxToBeats(maxX) + this.app.parentInstance.baseView.scrollHorizontalBeats;
     const newSelectedNotes = new Set(
       this.app.wasm!.instance.iter_notes(
         this.app.wasm!.noteLinesCtxPtr,

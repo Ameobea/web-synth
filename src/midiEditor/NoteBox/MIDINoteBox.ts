@@ -58,7 +58,9 @@ export class NoteDragHandle {
   public handleDrag(downPos: PIXI.Point, newPos: PIXI.Point, originalPosBeats: number) {
     const diffPx = newPos.x - downPos.x;
     const diffBeats = this.parentNote.line.app.pxToBeats(diffPx);
-    const newPosBeats = this.parentNote.line.app.snapBeat(originalPosBeats + diffBeats);
+    const newPosBeats = this.parentNote.line.app.parentInstance.snapBeat(
+      originalPosBeats + diffBeats
+    );
     const newLength =
       this.side === NoteDragHandleSide.Left
         ? this.parentNote.note.startPoint + this.parentNote.note.length - newPosBeats

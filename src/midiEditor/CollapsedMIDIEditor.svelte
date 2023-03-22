@@ -4,12 +4,14 @@
   import type { MIDIEditorInstance } from 'src/midiEditor';
   import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
+  import EditableInstanceName from './EditableInstanceName.svelte';
 
   export let parentInstance: MIDIEditorInstance;
   export let inst: ManagedMIDIEditorUIInstance;
   export let pxPerBeat: Readable<number>;
   export let scrollHorizontalBeats: Readable<number>;
   export let expand: () => void;
+  export let instIx: number;
 
   let minimapContainer: HTMLDivElement | null = null;
   let svg: SVGSVGElement | null = null;
@@ -52,7 +54,18 @@
   >
     ›
   </button>
-  <div class="midi-editor-instance-name" style="left: {PIANO_KEYBOARD_WIDTH}px">{inst.name}</div>
+  <button
+    class="delete-cv-output-button"
+    on:click={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}
+    style={instIx === 0 ? 'right: 30px' : undefined}
+  >
+    ✕
+  </button>
+  <EditableInstanceName
+    left={PIANO_KEYBOARD_WIDTH + 2}
+    name={inst.name}
+    setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
+  />
   <div class="midi-editor-minimap-container" bind:this={minimapContainer} on:dblclick={expand} />
 </div>
 
@@ -63,18 +76,6 @@
     background-color: black;
     box-sizing: border-box;
     border-top: 1px solid #555;
-  }
-
-  .midi-editor-instance-name {
-    position: absolute;
-    top: 2px;
-    font-size: 13px;
-    font-family: Hack, Oxygen Mono, Menlo, monospace;
-    z-index: 2;
-    user-select: none;
-    background-color: #000000c9;
-    padding-left: 4px;
-    padding-right: 4px;
   }
 
   .expand-midi-editor-instance {

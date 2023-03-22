@@ -195,7 +195,6 @@ export class MIDIEditorInstance {
   public vcId: string;
   public baseView: ProxyMIDIEditorBaseView;
   public localBPM: number;
-  public loopPoint: number | null;
   public beatSnapInterval: number;
   public playbackHandler: MIDIEditorPlaybackHandler;
   public uiManager: MIDIEditorUIManager;
@@ -204,7 +203,6 @@ export class MIDIEditorInstance {
     this.vcId = vcId;
     this.baseView = new ProxyMIDIEditorBaseView(initialState.view);
     this.localBPM = initialState.localBPM;
-    this.loopPoint = initialState.loopPoint;
     this.beatSnapInterval = initialState.beatSnapInterval;
 
     this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
@@ -219,7 +217,7 @@ export class MIDIEditorInstance {
       cursorPosBeats: this.getCursorPosBeats(),
       instances: serializedInstances,
       localBPM: this.localBPM,
-      loopPoint: this.loopPoint,
+      loopPoint: this.playbackHandler.getLoopPoint(),
       metronomeEnabled: this.playbackHandler.metronomeEnabled,
       scrollHorizontalBeats: this.baseView.scrollHorizontalBeats,
       version: 2,
@@ -260,15 +258,27 @@ export class MIDIEditorInstance {
     }
 
     const newLoopPoint = enabled ? this.getCursorPosBeats() + 4 : null;
-    this.playbackHandler.setLoopPoint(newLoopPoint);
-    const insts = get(this.uiManager.instances);
-    for (const inst of insts) {
-      if (inst.type !== 'midiEditor') {
-        continue;
-      }
+    this.setLoopPoint(newLoopPoint);
+  }
 
-      inst.instance.uiInst?.setLoopPoint(newLoopPoint);
+  public snapBeat(rawBeat: number): number {
+    if (this.beatSnapInterval === 0) {
+      return rawBeat;
     }
+
+    return Math.round(rawBeat * (1 / this.beatSnapInterval)) / (1 / this.beatSnapInterval);
+  }
+
+  /**
+   * Retruns `true` if the loop point was actually updated and `false` if it wasn't updated due to
+   * playback currently being active or something else.
+   */
+  public setLoopPoint(loopPoint: number | null): boolean {
+    const didUpdate = this.playbackHandler.setLoopPoint(loopPoint);
+    if (didUpdate) {
+      this.uiManager.updateLoopPoint(loopPoint);
+    }
+    return didUpdate;
   }
 
   public addCVOutput() {
@@ -280,7 +290,7 @@ export class MIDIEditorInstance {
   }
 
   public renameCVOutput(oldName: string, newName: string) {
-    this.uiManager.renameCVOutput(oldName, newName);
+    this.uiManager.renameInstance(oldName, newName);
   }
 
   public destroy() {

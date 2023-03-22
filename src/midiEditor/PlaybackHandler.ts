@@ -200,7 +200,7 @@ export default class MIDIEditorPlaybackHandler {
   }
 
   /**
-   * Retruns `true` if the loop point was actually updated and `false` if it wasn't udpated due to
+   * Retruns `true` if the loop point was actually updated and `false` if it wasn't updated due to
    * playback currently being active or something else.
    */
   public setLoopPoint(newLoopPoint: number | null): boolean {
