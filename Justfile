@@ -80,6 +80,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/vocoder.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
@@ -139,6 +140,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/vocoder.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public

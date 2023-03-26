@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Readable } from 'svelte/store';
+  import type { Readable } from 'svelte/store';
 
   import type { MIDIEditorInstance } from 'src/midiEditor';
   import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';

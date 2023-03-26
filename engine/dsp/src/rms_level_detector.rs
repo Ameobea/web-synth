@@ -2,14 +2,14 @@ use crate::circular_buffer::CircularBuffer;
 
 pub const MAX_LEVEL_DETECTION_WINDOW_SAMPLES: usize = crate::SAMPLE_RATE as usize;
 
-pub struct RMSLevelDetector {
+pub struct RMSLevelDetector<const TEND_TOWARDS_ZERO: bool> {
   pub buf: CircularBuffer<MAX_LEVEL_DETECTION_WINDOW_SAMPLES>,
   pub sum: f32,
   pub negative_window_size_samples: isize,
   pub window_size_samples_f32: f32,
 }
 
-impl RMSLevelDetector {
+impl<const TEND_TOWARDS_ZERO: bool> RMSLevelDetector<TEND_TOWARDS_ZERO> {
   pub fn new(window_size_samples: f32) -> Self {
     RMSLevelDetector {
       buf: CircularBuffer::new(),
@@ -18,9 +18,7 @@ impl RMSLevelDetector {
       window_size_samples_f32: window_size_samples.ceil(),
     }
   }
-}
 
-impl RMSLevelDetector {
   /// RMS level detection
   pub fn process(&mut self, sample: f32) -> f32 {
     if cfg!(debug_assertions) && (sample.is_infinite() || sample.is_nan()) {
@@ -42,7 +40,9 @@ impl RMSLevelDetector {
 
     // To deal with floating point precision issues, we tend the sum towards zero slightly so
     // that it doesn't get stuck at a non-zero value when the input is silent.
-    self.sum *= 0.999999;
+    if TEND_TOWARDS_ZERO {
+      self.sum *= 0.999999;
+    }
 
     output
   }

@@ -41,7 +41,7 @@ impl VocoderBand {
   }
 }
 
-pub struct LevelDetectionBand(RMSLevelDetector);
+pub struct LevelDetectionBand(RMSLevelDetector<false>);
 
 impl LevelDetectionBand {
   fn new(band_center_freq_hz: f32) -> Self {

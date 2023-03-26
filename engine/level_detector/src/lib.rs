@@ -6,7 +6,7 @@ extern "C" {
 
 pub struct LevelDetectorCtx {
   pub io_buffer: [f32; FRAME_SIZE],
-  pub detector: RMSLevelDetector,
+  pub detector: RMSLevelDetector<true>,
 }
 
 impl Default for LevelDetectorCtx {
