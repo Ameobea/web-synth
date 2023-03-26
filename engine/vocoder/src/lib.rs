@@ -3,7 +3,7 @@
 use std::mem::MaybeUninit;
 
 use dsp::{
-  filters::biquad::{BiquadFilter, FilterMode},
+  filters::biquad::{BiquadFilter, BiquadFilterBank2D, FilterMode},
   rms_level_detector::RMSLevelDetector,
   FRAME_SIZE,
 };
@@ -78,10 +78,12 @@ impl LevelDetectionCtx {
 }
 
 pub struct VocoderCtx {
-  pub carrier_filter_bands: Box<[VocoderBand; BAND_COUNT]>,
   pub carrier_input_buf: [f32; FRAME_SIZE],
+  pub carrier_filter_bands: Box<[VocoderBand; BAND_COUNT]>,
+  pub carrier_filter_bands_simd: Box<BiquadFilterBank2D<BAND_COUNT, FILTERS_PER_BAND>>,
   pub modulator_input_buf: [f32; FRAME_SIZE],
   pub modulator_filter_bands: Box<[VocoderBand; BAND_COUNT]>,
+  pub modulator_filter_bands_simd: Box<BiquadFilterBank2D<BAND_COUNT, FILTERS_PER_BAND>>,
   pub modulator_level_detection_ctx: LevelDetectionCtx,
   pub output_buf: [f32; FRAME_SIZE],
   pub carrier_gain: f32,
@@ -97,6 +99,9 @@ pub static mut FILTER_PARAMS_BUF: [f32; FILTER_PARAMS_BUF_LEN] = [0.; FILTER_PAR
 pub extern "C" fn get_filter_params_buf_ptr() -> *mut f32 {
   unsafe { FILTER_PARAMS_BUF.as_mut_ptr() }
 }
+
+#[inline(always)]
+fn uninit<T>() -> T { unsafe { MaybeUninit::uninit().assume_init() } }
 
 impl VocoderCtx {
   #[cold]
@@ -134,12 +139,43 @@ impl VocoderCtx {
       band_center_freqs_hz[band_ix] = (lowpass_freq + highpass_freq) / 2.;
     }
 
+    let carrier_filter_bands = Self::build_filter_bands();
+    let modulator_filter_bands = Self::build_filter_bands();
+
+    let mut filter_bands_for_simd: [[BiquadFilter; BAND_COUNT]; FILTERS_PER_BAND] = uninit();
+
+    for filter_ix in 0..FILTERS_PER_BAND {
+      for band_ix in 0..BAND_COUNT {
+        unsafe {
+          std::ptr::write(
+            &mut filter_bands_for_simd[filter_ix][band_ix],
+            carrier_filter_bands[band_ix].filters[filter_ix],
+          )
+        }
+      }
+    }
+    let carrier_filter_bands_simd = Box::new(BiquadFilterBank2D::new(&filter_bands_for_simd));
+
+    for filter_ix in 0..FILTERS_PER_BAND {
+      for band_ix in 0..BAND_COUNT {
+        unsafe {
+          std::ptr::write(
+            &mut filter_bands_for_simd[filter_ix][band_ix],
+            modulator_filter_bands[band_ix].filters[filter_ix],
+          )
+        }
+      }
+    }
+    let modulator_filter_bands_simd = Box::new(BiquadFilterBank2D::new(&filter_bands_for_simd));
+
     Self {
-      carrier_filter_bands: Self::build_filter_bands(),
-      modulator_filter_bands: Self::build_filter_bands(),
       carrier_input_buf: [0.; FRAME_SIZE],
+      carrier_filter_bands,
+      carrier_filter_bands_simd,
       modulator_input_buf: [0.; FRAME_SIZE],
+      modulator_filter_bands,
       modulator_level_detection_ctx: LevelDetectionCtx::new(&band_center_freqs_hz),
+      modulator_filter_bands_simd,
       output_buf: [0.; FRAME_SIZE],
       carrier_gain: 1.,
       modulator_gain: 1.,
@@ -153,6 +189,7 @@ impl VocoderCtx {
   /// the level of the corresponding modulator band.
   ///
   /// Filters in each band are processed in series.  Bands are processed in parallel.
+  #[cfg(not(target_arch = "wasm32"))]
   pub fn process(&mut self, carrier_gain: f32, modulator_gain: f32, post_gain: f32) {
     let carrier_gain = dsp::smooth(&mut self.carrier_gain, carrier_gain, 0.5);
     let modulator_gain = dsp::smooth(&mut self.modulator_gain, modulator_gain, 0.5);
@@ -176,6 +213,47 @@ impl VocoderCtx {
           carrier_band.process(self.carrier_input_buf[sample_ix] * carrier_gain);
 
         self.output_buf[sample_ix] += carrier_band_output * level;
+      }
+    }
+
+    for sample_ix in 0..FRAME_SIZE {
+      self.output_buf[sample_ix] *= post_gain;
+    }
+  }
+
+  #[cfg(target_arch = "wasm32")]
+  pub fn process(&mut self, carrier_gain: f32, modulator_gain: f32, post_gain: f32) {
+    let carrier_gain = dsp::smooth(&mut self.carrier_gain, carrier_gain, 0.5);
+    let modulator_gain = dsp::smooth(&mut self.modulator_gain, modulator_gain, 0.5);
+    let post_gain = dsp::smooth(&mut self.output_gain, post_gain, 0.5);
+
+    self.output_buf.fill(0.);
+
+    let mut modulator_outputs: [f32; BAND_COUNT] = [0.; BAND_COUNT];
+    let mut carrier_outputs: [f32; BAND_COUNT] = [0.; BAND_COUNT];
+
+    for sample_ix in 0..FRAME_SIZE {
+      modulator_outputs.fill(self.modulator_input_buf[sample_ix] * modulator_gain);
+      carrier_outputs.fill(self.carrier_input_buf[sample_ix] * carrier_gain);
+
+      for depth in 0..FILTERS_PER_BAND {
+        self
+          .modulator_filter_bands_simd
+          .apply_simd(&mut modulator_outputs, depth);
+
+        self
+          .carrier_filter_bands_simd
+          .apply_simd(&mut carrier_outputs, depth);
+      }
+
+      for band_ix in 0..BAND_COUNT {
+        let sample = modulator_outputs[band_ix];
+        let level = self.modulator_level_detection_ctx.bands[band_ix].process(sample);
+        if cfg!(debug_assertions) && (level.is_infinite() || level.is_nan()) {
+          panic!("{}", level);
+        }
+
+        self.output_buf[sample_ix] += carrier_outputs[band_ix] * level;
       }
     }
 

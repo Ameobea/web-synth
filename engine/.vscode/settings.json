@@ -1,4 +1,10 @@
 {
   "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
-  "gitlens.advanced.blame.customArguments": ["--ignore-rev", "1dfe67f13fe2a46ff96e5829a0ad153f6162ffcb"]
+  "rust-analyzer.server.extraEnv": {
+    "RUSTFLAGS": "-Ctarget-feature=+simd128"
+  },
+  "gitlens.advanced.blame.customArguments": [
+    "--ignore-rev",
+    "1dfe67f13fe2a46ff96e5829a0ad153f6162ffcb"
+  ]
 }

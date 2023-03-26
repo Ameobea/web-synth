@@ -280,11 +280,11 @@ build-polysynth:
     cp ../target/wasm32-unknown-unknown/release/polysynth.wasm ../../public
 
 build-vocoder:
-  cd ./engine/vocoder && cargo build --release --target wasm32-unknown-unknown && \
+  cd ./engine/vocoder && RUSTFLAGS="-Ctarget-feature=+simd128" cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/vocoder.wasm ../../public
 
 debug-vocoder:
-  cd ./engine/vocoder && cargo build --target wasm32-unknown-unknown && \
+  cd ./engine/vocoder && RUSTFLAGS="-Ctarget-feature=+simd128" cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/vocoder.wasm ../../public
 
 build-level-detector:

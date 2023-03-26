@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 use fastapprox::fast;
 
 pub mod band_splitter;
