@@ -631,6 +631,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
 
 [[package]]
+name = "oscilloscope"
+version = "0.1.0"
+dependencies = [
+ "textplots",
+ "waveform_renderer",
+]
+
+[[package]]
 name = "palette"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -52,3 +52,4 @@ public/level_detector.wasm
 public/wavegen.wasm
 public/multiband_diode_ladder_distortion.wasm
 public/midi_renderer.wasm
+public/oscilloscope.wasm

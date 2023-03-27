@@ -11,7 +11,8 @@ use crate::{
     faust_editor::mk_faust_editor, filter_designer::mk_filter_designer, granulator::mk_granulator,
     graph_editor::mk_graph_editor, looper::mk_looper, midi_editor::mk_midi_editor,
     midi_keyboard::mk_midi_keyboard, sample_library::mk_sample_library, sequencer::mk_sequencer,
-    sinsy::mk_sinsy, synth_designer::mk_synth_designer, welcome_page::mk_welcome_page,
+    signal_analyzer::mk_signal_analyzer, sinsy::mk_sinsy, synth_designer::mk_synth_designer,
+    welcome_page::mk_welcome_page,
   },
   ViewContext,
 };
@@ -423,6 +424,7 @@ pub fn build_view(name: &str, uuid: Uuid) -> Box<dyn ViewContext> {
     "sinsy" => mk_sinsy(uuid),
     "looper" => mk_looper(uuid),
     "welcome_page" => mk_welcome_page(uuid),
+    "signal_analyzer" => mk_signal_analyzer(uuid),
     _ => panic!("No handler for view context with name {}", name),
   }
 }

@@ -35,7 +35,18 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
   { name: 'filter_designer', displayName: 'Filter Designer' },
   { name: 'sinsy', displayName: 'Sinsy' },
   { name: 'looper', displayName: 'Looper' },
-  { name: 'welcome_page', displayName: 'Welcome Page' },
+  {
+    name: 'welcome_page',
+    displayName: 'Welcome Page',
+    description:
+      'The page showing info about web synth and links to demos that is shown when the application is first loaded',
+  },
+  {
+    name: 'signal_analyzer',
+    displayName: 'Signal Analyzer',
+    description:
+      'Contains visualizations for analyzing sound including an oscilloscope and spectrogram',
+  },
 ];
 
 const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {

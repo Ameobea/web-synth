@@ -12,10 +12,8 @@ use prelude::js::js_random;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
-pub mod constants;
 pub mod js;
 pub mod prelude;
-pub mod util;
 pub mod view_context;
 pub mod views;
 use crate::{

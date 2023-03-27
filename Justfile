@@ -85,6 +85,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -145,6 +146,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
 
   just debug-sinsy
 
@@ -304,3 +306,7 @@ build-mbdld:
 build-midi-renderer:
   cd ./engine/midi_renderer && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/midi_renderer.wasm ../../public
+
+build-oscilloscope:
+  cd ./engine/oscilloscope && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/oscilloscope.wasm ../../public

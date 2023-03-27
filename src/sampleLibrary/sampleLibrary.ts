@@ -38,7 +38,7 @@ const traverseDir = async (
 
   const childDirs: Promise<SampleDescriptor[]>[] = [];
 
-  for await (const [_name, entry] of entries) {
+  for await (const [, entry] of entries) {
     if (entry.kind === 'directory') {
       childDirs.push(traverseDir(entry, prefix + entry.name + '/'));
       continue;
@@ -62,8 +62,7 @@ const listLocalSamples = async (): Promise<SampleDescriptor[]> => {
 const loadLocalSample = async (descriptor: SampleDescriptor): Promise<ArrayBuffer> => {
   const fsAccess = await getFSAccess();
   const sampleFile = await fsAccess.getFile('samples', descriptor.name);
-  // TS doesn't like the `.arrayBuffer()` method on `File`/`Blob` for whatever reason
-  return (sampleFile as any).arrayBuffer() as Promise<ArrayBuffer>;
+  return sampleFile.arrayBuffer() as Promise<ArrayBuffer>;
 };
 
 const saveLocalSample = async (descriptor: SampleDescriptor, sampleData: ArrayBuffer) => {

@@ -171,3 +171,12 @@ extern "C" {
   pub fn unhide_welcome_page(state_key: &str);
   pub fn cleanup_welcome_page(state_key: &str);
 }
+
+#[wasm_bindgen(raw_module = "./signalAnalyzer/signalAnalyzer")]
+extern "C" {
+  pub fn init_signal_analyzer(state_key: &str);
+  pub fn hide_signal_analyzer(state_key: &str);
+  pub fn unhide_signal_analyzer(state_key: &str);
+  pub fn cleanup_signal_analyzer(state_key: &str);
+  pub fn get_signal_analyzer_audio_connectables(state_key: &str) -> JsValue;
+}

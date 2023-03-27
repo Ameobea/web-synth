@@ -1,5 +1,5 @@
 [package]
-name = "wavegen"
+name = "oscilloscope"
 version = "0.1.0"
 authors = ["Casey Primozic <casey@cprimozic.net>"]
 edition = "2021"
@@ -9,10 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 waveform_renderer = { path = "../waveform_renderer", default-features = false, features = [] }
-common = { path = "../common", default-features = false, features = [] }
-dsp = { path = "../dsp" }
 
 [dev-dependencies]
-rustfft = "6.1"
 textplots = "0.8"
 
