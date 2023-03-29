@@ -22,7 +22,7 @@ static mut FRAME_DATA_BUFFER: [f32; FRAME_SIZE] = [0.0; FRAME_SIZE];
 
 static mut VIZ: Viz = Viz {
   samples: Vec::new(),
-  window_length: WindowLength::Seconds(1.),
+  window_length: WindowLength::Beats(1.),
   last_processed_sample_ix: 0,
   last_rendered_beat: 0.0,
   last_rendered_time: 0.0,

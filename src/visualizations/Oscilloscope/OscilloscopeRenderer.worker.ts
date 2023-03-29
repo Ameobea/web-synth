@@ -59,13 +59,6 @@ class OscilloscopeRendererWorker {
     // TODO: store ctx
     const ctx = this.view.getContext('2d')!;
     // TODO: Only write changed portion of image data
-    // console.log({
-    //   width: this.view.width,
-    //   height: this.view.height,
-    //   dpr: this.dpr,
-    //   lenBytes: imageDataLenBytes,
-    //   imageDataLen: imageData.length,
-    // });
     const imageDataObj = new ImageData(imageData, this.view.width, this.view.height);
     ctx.putImageData(imageDataObj, 0, 0);
   };
@@ -201,6 +194,7 @@ class OscilloscopeRendererWorker {
     while (true) {
       const curBeat = this.sabF32![3];
       const curTime = this.sabF32![4];
+      // TODO: need to handle global beat counter integration so it still works even when playback is paused
       const curBpm = this.sabF32![5];
 
       const bufferHeadIx = this.sabI32![7];
@@ -258,7 +252,6 @@ class OscilloscopeRendererWorker {
   private async run() {
     const runToken = Math.random() + Math.random() * 10 + Math.random() * 100;
     this.runToken = runToken;
-    console.log('Starting run: ', runToken);
 
     while (this.running) {
       // Wait for the realtime audio rendering thread to render a frame

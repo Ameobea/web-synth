@@ -4,7 +4,7 @@
   export let inst: Oscilloscope;
 
   // TODO: Dynamically sized
-  const width = 2400;
+  const width = 1500;
   const height = 600;
 
   const dpr = Math.floor(window.devicePixelRatio || 1);
