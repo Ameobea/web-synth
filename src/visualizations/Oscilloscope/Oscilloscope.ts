@@ -33,6 +33,10 @@ export class Oscilloscope {
   }
 
   public setView(view: OffscreenCanvas, dpr: number) {
+    // dpr must be an integer
+    if (dpr !== Math.floor(dpr)) {
+      throw new Error('dpr must be an integer for oscilloscope');
+    }
     this.renderWorker.postMessage({ type: 'setView', view, dpr }, [view]);
   }
 

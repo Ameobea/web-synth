@@ -310,3 +310,7 @@ build-midi-renderer:
 build-oscilloscope:
   cd ./engine/oscilloscope && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/oscilloscope.wasm ../../public
+
+debug-oscilloscope:
+  cd ./engine/oscilloscope && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/oscilloscope.wasm ../../public

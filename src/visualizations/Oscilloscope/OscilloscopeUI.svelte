@@ -3,8 +3,12 @@
 
   export let inst: Oscilloscope;
 
+  // TODO: Dynamically sized
+  const width = 2400;
+  const height = 600;
+
+  const dpr = Math.floor(window.devicePixelRatio || 1);
   const useOscilloscopeViz = (canvas: HTMLCanvasElement) => {
-    const dpr = window.devicePixelRatio || 1;
     const offscreenCanvas = canvas.transferControlToOffscreen();
 
     if (canvas) {
@@ -14,7 +18,12 @@
 </script>
 
 <div class="root">
-  <canvas width={800} height={600} use:useOscilloscopeViz />
+  <canvas
+    width={width * dpr}
+    height={height * dpr}
+    style="width: {width}px; height: {height}px;"
+    use:useOscilloscopeViz
+  />
 </div>
 
 <style lang="css">

@@ -31,7 +31,6 @@ class SignalAnalyzerAWP extends AudioWorkletProcessor {
 
   process(inputs, _outputs, _params) {
     const input = inputs[0]?.[0];
-    console.log(input);
     if (!input) {
       return true;
     }
@@ -57,7 +56,12 @@ class SignalAnalyzerAWP extends AudioWorkletProcessor {
       head = (head + 1) % bufferLen;
     }
     Atomics.store(this.sabI32, 7, head);
+    Atomics.notify(this.sabI32, 7);
     Atomics.add(this.sabI32, 2, 1);
+    Atomics.notify(this.sabI32, 2);
+    this.sabF32[3] = globalThis.curBeat;
+    this.sabF32[4] = globalThis.currentTime;
+    this.sabF32[5] = globalThis.globalTempoBPM;
 
     return true;
   }

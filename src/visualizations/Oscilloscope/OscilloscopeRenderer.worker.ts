@@ -34,6 +34,7 @@ class OscilloscopeRendererWorker {
   private lastProcessedBufferHeadIx = 0;
   private view: OffscreenCanvas | null = null;
   private dpr = 1;
+  private runToken = 0;
 
   constructor() {
     this.startRenderLoop();
@@ -42,16 +43,31 @@ class OscilloscopeRendererWorker {
   private renderFrame = () => {
     this.checkEvents();
 
-    if (!this.view || !this.running) {
+    if (!this.view || !this.running || !this.wasmInstance) {
       return;
     }
 
-    // TODO: Temp
+    const imageDataPtr = (
+      this.wasmInstance!.exports.oscilloscope_get_image_data_buf_ptr as () => number
+    )();
+    const imageDataLenBytes = (
+      this.wasmInstance!.exports.oscilloscope_get_image_data_buf_len as () => number
+    )();
+    // TODO: Store separate uint8clampedarray view of memory
+    const memory = this.getWasmMemoryBuffer();
+    const imageData = new Uint8ClampedArray(memory.buffer, imageDataPtr, imageDataLenBytes);
+    // TODO: store ctx
     const ctx = this.view.getContext('2d')!;
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, this.view.width, this.view.height);
-    ctx.fillStyle = Math.random() > 0.5 ? 'red' : 'blue';
-    ctx.fillRect(0, 0, 40, 40);
+    // TODO: Only write changed portion of image data
+    // console.log({
+    //   width: this.view.width,
+    //   height: this.view.height,
+    //   dpr: this.dpr,
+    //   lenBytes: imageDataLenBytes,
+    //   imageDataLen: imageData.length,
+    // });
+    const imageDataObj = new ImageData(imageData, this.view.width, this.view.height);
+    ctx.putImageData(imageDataObj, 0, 0);
   };
 
   private startRenderLoop = () => {
@@ -70,6 +86,7 @@ class OscilloscopeRendererWorker {
     switch (message.type) {
       case 'setSAB':
         this.setSAB(message.sab);
+        this.maybeSetViewToWasm();
         break;
       case 'setWasmBytes':
         this.setWasmBytes(message.wasmBytes);
@@ -77,10 +94,26 @@ class OscilloscopeRendererWorker {
       case 'setView':
         this.view = message.view;
         this.dpr = message.dpr;
+        this.maybeSetViewToWasm();
         break;
       default:
         console.warn(`Unknown message type: ${(message as any).type}`);
     }
+  }
+
+  private maybeSetViewToWasm() {
+    if (!this.sabF32 || !this.view || !this.wasmInstance) {
+      return;
+    }
+
+    const curBPM = this.sabF32[5] || 60;
+    const setViewToWasm = this.wasmInstance.exports.oscilloscope_renderer_set_view as (
+      curBPM: number,
+      width: number,
+      height: number,
+      dpr: number
+    ) => void;
+    setViewToWasm(curBPM, this.view.width / this.dpr, this.view.height / this.dpr, this.dpr);
   }
 
   private setSAB(sab: SharedArrayBuffer) {
@@ -101,7 +134,23 @@ class OscilloscopeRendererWorker {
 
   private async setWasmBytes(wasmBytes: ArrayBuffer) {
     const wasmModule = await WebAssembly.compile(wasmBytes);
-    this.wasmInstance = await WebAssembly.instantiate(wasmModule);
+    this.wasmInstance = await WebAssembly.instantiate(wasmModule, {
+      env: {
+        log_err: (ptr: number, len: number) => {
+          const str = new TextDecoder().decode(
+            new Uint8Array(this.getWasmMemoryBuffer().buffer).subarray(ptr, ptr + len)
+          );
+          console.error(str);
+        },
+        log_info: (ptr: number, len: number) => {
+          const str = new TextDecoder().decode(
+            new Uint8Array(this.getWasmMemoryBuffer().buffer).subarray(ptr, ptr + len)
+          );
+          console.log(str);
+        },
+      },
+    });
+    this.maybeSetViewToWasm();
     this.checkAndStart();
   }
 
@@ -129,7 +178,7 @@ class OscilloscopeRendererWorker {
         this.shutdown();
         break;
       case RendererStatusFlag.Running:
-        this.running = true;
+        this.checkAndStart();
         break;
       default:
         console.error(`Unknown shutdown flag value: ${sabShutdownFlag}`);
@@ -150,9 +199,10 @@ class OscilloscopeRendererWorker {
 
   private consumeBuffer() {
     while (true) {
-      const curBpm = this.sabF32![4];
-      const curBeat = this.sabF32![5];
-      const curTime = this.sabF32![6];
+      const curBeat = this.sabF32![3];
+      const curTime = this.sabF32![4];
+      const curBpm = this.sabF32![5];
+
       const bufferHeadIx = this.sabI32![7];
 
       if (bufferHeadIx !== this.lastProcessedBufferHeadIx) {
@@ -183,15 +233,13 @@ class OscilloscopeRendererWorker {
           const frameData = memory.subarray(frameDataPtr / 4, frameDataPtr / 4 + FRAME_SIZE);
 
           // Buffer head index has not wrapped around
-          frameData.set(
-            this.samplesCircularBuffer.subarray(
-              this.lastProcessedBufferHeadIx,
-              this.lastProcessedBufferHeadIx + FRAME_SIZE
-            )
+          const freshSamples = this.samplesCircularBuffer.subarray(
+            this.lastProcessedBufferHeadIx,
+            this.lastProcessedBufferHeadIx + FRAME_SIZE
           );
+          frameData.set(freshSamples);
           this.lastProcessedBufferHeadIx += FRAME_SIZE;
 
-          console.log(`Processing frame before head index: ${this.lastProcessedBufferHeadIx}`);
           commitSamples();
 
           if (this.lastProcessedBufferHeadIx >= this.samplesCircularBuffer.length) {
@@ -208,16 +256,24 @@ class OscilloscopeRendererWorker {
   }
 
   private async run() {
+    const runToken = Math.random() + Math.random() * 10 + Math.random() * 100;
+    this.runToken = runToken;
+    console.log('Starting run: ', runToken);
+
     while (this.running) {
       // Wait for the realtime audio rendering thread to render a frame
       const rtAudioWaitRes = Atomics.waitAsync(
         this.sabI32!,
-        2,
+        7,
         this.lastProcessedBufferHeadIx,
         500
       );
 
       await rtAudioWaitRes.value;
+
+      if (this.runToken !== runToken) {
+        break;
+      }
 
       // Consume any new samples from the audio rendering thread and update viz
       this.consumeBuffer();

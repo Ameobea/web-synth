@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "isolatedModules": true,
+    // "isolatedModules": true,
     "skipLibCheck": true,
     "module": "es2020",
     "target": "es2018",
@@ -8,7 +8,7 @@
     "allowJs": true,
     "moduleResolution": "node",
     "outDir": "dist",
-    "lib": ["esnext", "dom"],
+    "lib": ["ESNext", "dom"],
     "sourceMap": true,
     "rootDir": ".",
     "forceConsistentCasingInFileNames": true,
