@@ -215,8 +215,7 @@ impl Viz {
 
     fn mix(a: f32, b: f32, t: f32) -> f32 { a * (1.0 - t) + b * t }
 
-    // Start a 1 since we already wrote the first pixel in the last line
-    for i in 1..=steps {
+    for i in 0..steps {
       let weight = i as f32 * step_size;
       let x = mix(x0_px, x1_px, weight);
       let y = mix(y0_px, y1_px, weight);
