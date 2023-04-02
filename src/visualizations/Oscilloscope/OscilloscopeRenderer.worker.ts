@@ -106,6 +106,14 @@ class OscilloscopeRendererWorker {
       case 'setFrameByFrame':
         this.setFrameByFrame(message.frameByFrame);
         break;
+      case 'resizeView':
+        const { newWidth, newHeight } = message;
+        if (this.view) {
+          this.view.width = newWidth;
+          this.view.height = newHeight;
+        }
+        this.maybeSetViewToWasm();
+        break;
       default:
         console.warn(
           `Unknown message type in \`OscilloscopeRendererWorker\`: ${(message as any).type}`

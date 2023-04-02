@@ -51,6 +51,11 @@ export class Oscilloscope {
     this.renderWorker.postMessage({ type: 'setView', view, dpr }, [view]);
   }
 
+  public resizeView(newWidth: number, newHeight: number) {
+    const msg: OscilloscopeWorkerMessage = { type: 'resizeView', newWidth, newHeight };
+    this.renderWorker.postMessage(msg);
+  }
+
   public setWindow(newWindowType: OscilloscopeWindowType, newWindowLength: number) {
     const msg: OscilloscopeWorkerMessage = {
       type: 'setWindow',

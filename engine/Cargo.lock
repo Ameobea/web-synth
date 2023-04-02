@@ -634,8 +634,7 @@ checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
 name = "oscilloscope"
 version = "0.1.0"
 dependencies = [
- "textplots",
- "waveform_renderer",
+ "dsp",
 ]
 
 [[package]]

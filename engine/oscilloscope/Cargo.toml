@@ -8,8 +8,4 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-waveform_renderer = { path = "../waveform_renderer", default-features = false, features = [] }
-
-[dev-dependencies]
-textplots = "0.8"
-
+dsp = { path = "../dsp" }

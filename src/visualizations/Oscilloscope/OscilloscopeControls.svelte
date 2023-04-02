@@ -15,22 +15,53 @@
 
   let settings: ControlPanelSetting[] = [];
   $: {
-    const { minWindowLength, maxWindowLength } = (
+    const {
+      min: minWindowLength,
+      max: maxWindowLength,
+      scale: windowScale,
+      step: windowStep,
+    } = (
       {
-        [OscilloscopeWindowType.Seconds]: { minWindowLength: 0.1, maxWindowLength: 10 },
-        [OscilloscopeWindowType.Beats]: { minWindowLength: 1, maxWindowLength: 32 },
-        [OscilloscopeWindowType.Samples]: { minWindowLength: 100, maxWindowLength: 44_100 * 2 },
-      } as Record<OscilloscopeWindowType, { minWindowLength: number; maxWindowLength: number }>
+        [OscilloscopeWindowType.Seconds]: {
+          min: 0.02,
+          max: 10,
+          scale: 'log',
+        },
+        [OscilloscopeWindowType.Beats]: {
+          min: 0.25,
+          max: 32,
+          scale: 'log',
+        },
+        [OscilloscopeWindowType.Samples]: {
+          min: 100,
+          max: 44_100 * 2,
+          scale: 'log',
+        },
+        [OscilloscopeWindowType.Wavelengths]: {
+          min: 1,
+          max: 16,
+          scale: undefined,
+          step: 1,
+        },
+      } as Record<
+        OscilloscopeWindowType,
+        { min: number; max: number; scale: 'log' | undefined; step: number | undefined }
+      >
     )[$state.window.type];
 
     const newSettings: ControlPanelSetting[] = [
-      { label: 'window mode', type: 'select', options: ['seconds', 'beats', 'samples'] },
+      {
+        label: 'window mode',
+        type: 'select',
+        options: ['seconds', 'beats', 'samples', 'wavelengths'],
+      },
       {
         label: 'window length',
         type: 'range',
         min: minWindowLength,
         max: maxWindowLength,
-        scale: 'log',
+        scale: windowScale,
+        step: windowStep,
       },
       { label: 'freeze', type: 'checkbox' },
       { label: 'frame by frame', type: 'checkbox' },
@@ -39,13 +70,20 @@
   }
 
   $: controlPanelState = {
-    'window mode': (
-      {
-        [OscilloscopeWindowType.Seconds]: 'seconds',
-        [OscilloscopeWindowType.Beats]: 'beats',
-        [OscilloscopeWindowType.Samples]: 'samples',
-      } as Record<OscilloscopeWindowType, string>
-    )[$state.window.type],
+    'window mode': (() => {
+      const mode = (
+        {
+          [OscilloscopeWindowType.Seconds]: 'seconds',
+          [OscilloscopeWindowType.Beats]: 'beats',
+          [OscilloscopeWindowType.Samples]: 'samples',
+          [OscilloscopeWindowType.Wavelengths]: 'wavelengths',
+        } as Record<OscilloscopeWindowType, string>
+      )[$state.window.type];
+      if (mode === undefined) {
+        throw new Error(`Invalid window type: ${$state.window.type}`);
+      }
+      return mode;
+    })(),
     'window length': $state.window.value,
     freeze: $state.frozen,
     'frame by frame': $state.frameByFrame,
@@ -59,9 +97,10 @@
             seconds: OscilloscopeWindowType.Seconds,
             beats: OscilloscopeWindowType.Beats,
             samples: OscilloscopeWindowType.Samples,
+            wavelengths: OscilloscopeWindowType.Wavelengths,
           } as Record<string, OscilloscopeWindowType>
         )[value];
-        if (!newWindowType) {
+        if (newWindowType === undefined) {
           throw new Error(`Invalid window type: ${value}`);
         }
 

@@ -1,7 +1,9 @@
-use oscilloscope::{PreviousWindow, Viz, VizView, WindowLength};
+use self::oscilloscope::{PreviousWindow, Viz, VizView, WindowLength};
+use f0_estimation::YinCtx;
 
 pub(crate) mod conf;
-pub mod oscilloscope;
+pub(crate) mod f0_estimation;
+pub(crate) mod oscilloscope;
 
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
@@ -45,6 +47,7 @@ static mut VIZ: Viz = Viz {
     PreviousWindow::new(),
   ],
   frozen_window_complete: false,
+  yin_ctx: YinCtx::new(),
 };
 
 fn maybe_set_panic_hook() {

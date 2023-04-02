@@ -282,6 +282,7 @@ pub fn compute_higher_order_biquad_q_factors(order: usize) -> Vec<f32> {
     .collect()
 }
 
+#[cfg(target_arch = "wasm32")]
 pub extern "C" fn apply(
   banks: &mut BiquadFilterBank2D<22, 16>,
   outputs: &mut [f32; 22],

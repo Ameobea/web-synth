@@ -19,7 +19,7 @@ export const init_signal_analyzer = (stateKey: string) => {
   elem.id = stateKey;
   elem.setAttribute(
     'style',
-    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0; display: none;'
+    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: hidden; position: absolute; top: 0; left: 0; display: none;'
   );
   document.getElementById('content')!.appendChild(elem);
 
@@ -76,6 +76,7 @@ export const cleanup_signal_analyzer = (stateKey: string) => {
     throw new Error(`No signal analyzer instance found for state key ${stateKey}`);
   }
   const state = inst.serialize();
+  console.log(JSON.stringify(state));
   localStorage.setItem(stateKey, JSON.stringify(state));
 
   SignalAnalyzerInstsByStateKey.delete(stateKey);

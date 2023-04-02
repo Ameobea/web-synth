@@ -9,8 +9,10 @@
   export let uiState: Writable<OscilloscopeUIState>;
 
   // TODO: Dynamically sized
-  const width = 1500;
-  const height = 600;
+  let windowWidth = 100;
+  $: width = windowWidth; // - 12;
+  $: height = width * 0.2;
+  $: inst.resizeView(width, height);
 
   const dpr = Math.floor(window.devicePixelRatio || 1);
   const useOscilloscopeViz = (canvas: HTMLCanvasElement) => {
@@ -22,6 +24,7 @@
   };
 </script>
 
+<svelte:window bind:innerWidth={windowWidth} />
 <div class="root">
   <canvas
     width={width * dpr}

@@ -2,6 +2,7 @@ export enum OscilloscopeWindowType {
   Beats = 0,
   Seconds = 1,
   Samples = 2,
+  Wavelengths = 3,
 }
 
 export interface OscilloscopeWindow {
@@ -15,7 +16,8 @@ export type OscilloscopeWorkerMessage =
   | { type: 'setView'; view: OffscreenCanvas; dpr: number }
   | { type: 'setWindow'; window: OscilloscopeWindow }
   | { type: 'setFrozen'; frozen: boolean }
-  | { type: 'setFrameByFrame'; frameByFrame: boolean };
+  | { type: 'setFrameByFrame'; frameByFrame: boolean }
+  | { type: 'resizeView'; newWidth: number; newHeight: number };
 
 export interface OscilloscopeUIState {
   window: OscilloscopeWindow;
@@ -33,6 +35,7 @@ export const buildDefaultOscilloscopeUIState = (): OscilloscopeUIState => ({
     [OscilloscopeWindowType.Beats]: 4,
     [OscilloscopeWindowType.Seconds]: 2,
     [OscilloscopeWindowType.Samples]: 44_100,
+    [OscilloscopeWindowType.Wavelengths]: 2,
   },
   frozen: false,
   frameByFrame: true,

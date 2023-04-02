@@ -1,5 +1,6 @@
 use crate::{
   conf::{PAST_WINDOW_COUNT, SAMPLE_RATE},
+  f0_estimation::YinCtx,
   FRAME_SIZE,
 };
 
@@ -19,6 +20,7 @@ pub enum WindowLength {
   Beats(f32),
   Seconds(f32),
   Samples(usize),
+  Wavelengths(f32),
 }
 
 impl WindowLength {
@@ -33,6 +35,7 @@ impl WindowLength {
         let window_length = window_length.trunc();
         WindowLength::Samples(window_length as usize)
       },
+      3 => WindowLength::Wavelengths(window_length),
       _ => panic!("Invalid window mode: {window_mode}"),
     }
   }
@@ -84,6 +87,7 @@ pub(crate) struct Viz {
   pub frame_by_frame: bool,
   /// Previous rendered image data, with [0] being the most recent
   pub previous_windows: [PreviousWindow; PAST_WINDOW_COUNT],
+  pub yin_ctx: YinCtx,
 }
 
 impl Viz {
@@ -120,12 +124,15 @@ impl Viz {
     }
   }
 
-  pub fn commit_samples(&mut self, samples: &[f32]) {
+  pub fn commit_samples(&mut self, samples: &[f32; FRAME_SIZE]) {
     if self.frozen && self.frozen_window_complete {
       return;
     }
 
     self.samples.extend_from_slice(samples);
+    if matches!(self.window_length, WindowLength::Wavelengths(_)) {
+      self.yin_ctx.process_frame(samples);
+    }
   }
 
   fn get_view_length_samples(&self, cur_bpm: f32) -> f32 {
@@ -133,6 +140,12 @@ impl Viz {
       WindowLength::Beats(beats) => beats * 60.0 * SAMPLE_RATE / cur_bpm,
       WindowLength::Seconds(secs) => secs * SAMPLE_RATE,
       WindowLength::Samples(samples) => samples as f32,
+      WindowLength::Wavelengths(multiplier) => {
+        let f0 = self.yin_ctx.cur_f0_estimate;
+        let f0 = if f0 > 0.0 { f0 } else { 1.0 };
+        let period_samples = SAMPLE_RATE / f0;
+        period_samples * multiplier
+      },
     }
   }
 
@@ -308,7 +321,7 @@ impl Viz {
         self.image_data.len() / 4,
       )
     };
-    let color = (200, 0, 200, 255);
+    let color = (180, 0, 180, 255);
     Self::write_line_bilinear(pixels, &self.view, last_x_px, last_y_px, x_px, y_px, color);
   }
 
@@ -326,22 +339,59 @@ impl Viz {
   }
 
   /// We clear the viz and start drawing from the start again
-  fn maybe_clear_window(&mut self, cur_beat: f32, cur_time: f32) {
-    let needs_clear = match self.window_length {
-      WindowLength::Beats(beats) => (cur_beat % beats) < self.last_rendered_beat % beats,
-      WindowLength::Seconds(secs) => (cur_time % secs) < self.last_rendered_time % secs,
+  fn maybe_clear_window(&mut self, cur_bpm: f32, cur_beat: f32, cur_time: f32) {
+    let overrun_samples = match self.window_length {
+      WindowLength::Beats(beats) => {
+        let cur_beats = cur_beat % beats;
+        if cur_beats < self.last_rendered_beat % beats {
+          let phase = cur_beats / beats;
+          let samples_per_beat = self.get_view_length_samples(cur_bpm) as f32 / beats;
+          let samples = (samples_per_beat * beats * phase) as usize;
+          Some(samples)
+        } else {
+          None
+        }
+      },
+      WindowLength::Seconds(secs) => {
+        let cur_secs = cur_time % secs;
+        if cur_secs < self.last_rendered_time % secs {
+          let phase = cur_secs / secs;
+          let samples_per_sec = self.get_view_length_samples(cur_bpm) as f32 / secs;
+          let samples = (samples_per_sec * secs * phase) as usize;
+          Some(samples)
+        } else {
+          None
+        }
+      },
       WindowLength::Samples(samples) =>
-        self.samples.len() - self.last_processed_sample_ix < samples,
+        if self.samples.len() >= samples {
+          Some(self.samples.len() % samples)
+        } else {
+          None
+        },
+      WindowLength::Wavelengths(_) => {
+        let window_len = self.get_view_length_samples(cur_bpm);
+
+        if self.samples.len() >= window_len as usize {
+          Some(self.samples.len() % window_len as usize)
+        } else {
+          None
+        }
+      },
     };
+
+    let needs_clear = overrun_samples.is_some();
     if !needs_clear {
       return;
     }
+    let overrun_samples = overrun_samples.unwrap();
 
     if self.frozen {
-      crate::log("frozen window complete");
       self.frozen_window_complete = true;
       return;
     }
+
+    self.yin_ctx.cur_f0_estimate = self.yin_ctx.rolling_f0_estimate;
 
     // Swap our current image data buffer and samples into previous windows and replace with the
     // oldest one there to avoid allocations
@@ -362,17 +412,40 @@ impl Viz {
     self.image_data.resize(image_data_len_bytes, 0);
 
     self.clear_image_data_buffer();
-    // Retain the last `FRAME_SIZE` samples from the previous window and concat to the front so we
-    // don't miss any transients or anything
-    let mut old_samples: [f32; FRAME_SIZE] = [0.0; FRAME_SIZE];
-    let old_samples_len = new_prev_window.samples.len().min(FRAME_SIZE);
+
+    let mut old_samples: [f32; FRAME_SIZE * 8] =
+      unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    let old_samples_len = match self.window_length {
+      WindowLength::Wavelengths(_) => {
+        // We want to be as precise as possible with the window length, so we take the last
+        // `overrun_samples` samples from the previous window and concat to the front of the
+        // current window
+
+        if overrun_samples > FRAME_SIZE * 8 {
+          crate::log(&format!(
+            "overrun_samples {} > FRAME_SIZE*4; window_len={}",
+            overrun_samples,
+            self.get_view_length_samples(cur_bpm)
+          ));
+        }
+        overrun_samples.min(FRAME_SIZE * 8)
+      },
+      _ => {
+        // Retain the last `FRAME_SIZE` samples from the previous window and concat to the front so
+        // we don't miss any transients or anything
+
+        new_prev_window.samples.len().min(FRAME_SIZE)
+      },
+    };
+
+    self.last_processed_sample_ix = 0;
     old_samples[..old_samples_len]
       .copy_from_slice(&new_prev_window.samples[new_prev_window.samples.len() - old_samples_len..]);
     self.samples.clear();
     self
       .samples
       .extend_from_slice(&old_samples[..old_samples_len]);
-    self.last_processed_sample_ix = 0;
+
     self.previous_windows[0] = new_prev_window;
   }
 
@@ -381,7 +454,14 @@ impl Viz {
       return;
     }
 
-    self.maybe_clear_window(cur_beat, cur_time);
+    if matches!(self.window_length, WindowLength::Wavelengths(_)) {
+      let f0 = self.yin_ctx.rolling_f0_estimate;
+      if f0 > SAMPLE_RATE / 2.0 {
+        return;
+      }
+    }
+
+    self.maybe_clear_window(cur_bpm, cur_beat, cur_time);
 
     if self.frozen && self.frozen_window_complete {
       return;
@@ -405,7 +485,6 @@ impl Viz {
   }
 
   fn clear_previous_windows(&mut self) {
-    crate::log("clearing previous windows");
     for window in self.previous_windows.iter_mut() {
       *window = PreviousWindow::default();
     }
