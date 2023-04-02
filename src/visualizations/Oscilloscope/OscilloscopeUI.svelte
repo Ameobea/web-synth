@@ -1,7 +1,12 @@
 <script lang="ts">
+  import type { Writable } from 'svelte/store';
+
   import type { Oscilloscope } from 'src/visualizations/Oscilloscope/Oscilloscope';
+  import OscilloscopeControls from 'src/visualizations/Oscilloscope/OscilloscopeControls.svelte';
+  import type { OscilloscopeUIState } from 'src/visualizations/Oscilloscope/types';
 
   export let inst: Oscilloscope;
+  export let uiState: Writable<OscilloscopeUIState>;
 
   // TODO: Dynamically sized
   const width = 1500;
@@ -24,6 +29,7 @@
     style="width: {width}px; height: {height}px;"
     use:useOscilloscopeViz
   />
+  <OscilloscopeControls {inst} state={uiState} />
 </div>
 
 <style lang="css">

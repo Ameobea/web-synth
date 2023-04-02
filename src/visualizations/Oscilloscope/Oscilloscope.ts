@@ -1,5 +1,10 @@
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
+import {
+  OscilloscopeUIState,
+  OscilloscopeWindowType,
+  OscilloscopeWorkerMessage,
+} from 'src/visualizations/Oscilloscope/types';
 
 const OscilloscopeWasmBytes = new AsyncOnce(
   () =>
@@ -15,21 +20,27 @@ export class Oscilloscope {
   private renderWorker: Worker;
   private sab: Int32Array = new Int32Array(8);
 
-  constructor() {
+  constructor(initialState: OscilloscopeUIState) {
     this.renderWorker = new Worker(new URL('./OscilloscopeRenderer.worker', import.meta.url));
     this.init().catch(err => {
       logError('Error initializing oscilloscope', err);
     });
+
+    this.setWindow(initialState.window.type, initialState.window.value);
+    this.setFrozen(initialState.frozen);
+    this.setFrameByFrame(initialState.frameByFrame);
   }
 
   private async init() {
     const wasmBytes = await OscilloscopeWasmBytes.get();
-    this.renderWorker.postMessage({ type: 'setWasmBytes', wasmBytes }, [wasmBytes]);
+    const msg: OscilloscopeWorkerMessage = { type: 'setWasmBytes', wasmBytes };
+    this.renderWorker.postMessage(msg);
   }
 
   public setSAB(sab: SharedArrayBuffer) {
     this.sab = new Int32Array(sab);
-    this.renderWorker.postMessage({ type: 'setSAB', sab });
+    const msg: OscilloscopeWorkerMessage = { type: 'setSAB', sab };
+    this.renderWorker.postMessage(msg);
   }
 
   public setView(view: OffscreenCanvas, dpr: number) {
@@ -38,6 +49,24 @@ export class Oscilloscope {
       throw new Error('dpr must be an integer for oscilloscope');
     }
     this.renderWorker.postMessage({ type: 'setView', view, dpr }, [view]);
+  }
+
+  public setWindow(newWindowType: OscilloscopeWindowType, newWindowLength: number) {
+    const msg: OscilloscopeWorkerMessage = {
+      type: 'setWindow',
+      window: { type: newWindowType, value: newWindowLength },
+    };
+    this.renderWorker.postMessage(msg);
+  }
+
+  public setFrozen(frozen: boolean) {
+    const msg: OscilloscopeWorkerMessage = { type: 'setFrozen', frozen };
+    this.renderWorker.postMessage(msg);
+  }
+
+  public setFrameByFrame(frameByFrame: boolean) {
+    const msg: OscilloscopeWorkerMessage = { type: 'setFrameByFrame', frameByFrame };
+    this.renderWorker.postMessage(msg);
   }
 
   public pause() {

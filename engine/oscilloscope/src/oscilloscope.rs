@@ -1,4 +1,7 @@
-use crate::{conf::SAMPLE_RATE, FRAME_SIZE};
+use crate::{
+  conf::{PAST_WINDOW_COUNT, SAMPLE_RATE},
+  FRAME_SIZE,
+};
 
 const BYTES_PER_PX: usize = 4;
 
@@ -15,6 +18,24 @@ fn clamp(min: f32, max: f32, val: f32) -> f32 {
 pub enum WindowLength {
   Beats(f32),
   Seconds(f32),
+  Samples(usize),
+}
+
+impl WindowLength {
+  pub(crate) fn from_parts(window_mode: u8, window_length: f32) -> Self {
+    match window_mode {
+      0 => WindowLength::Beats(window_length),
+      1 => WindowLength::Seconds(window_length),
+      2 => {
+        if window_length < 0.0 {
+          panic!("Invalid window length: {window_length}");
+        }
+        let window_length = window_length.trunc();
+        WindowLength::Samples(window_length as usize)
+      },
+      _ => panic!("Invalid window mode: {window_mode}"),
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -25,7 +46,22 @@ pub struct VizView {
   pub height: usize,
 }
 
-pub struct Viz {
+#[derive(Default)]
+pub(crate) struct PreviousWindow {
+  pub image_data: Vec<u8>,
+  pub samples: Vec<f32>,
+}
+
+impl PreviousWindow {
+  pub const fn new() -> Self {
+    PreviousWindow {
+      image_data: Vec::new(),
+      samples: Vec::new(),
+    }
+  }
+}
+
+pub(crate) struct Viz {
   /// Stores all received samples for the currently rendered view
   pub samples: Vec<f32>,
   /// The user-configured length of the window
@@ -36,11 +72,27 @@ pub struct Viz {
   pub view: VizView,
   /// RGBA image data
   pub image_data: Vec<u8>,
+  /// If `true`, the viz will complete the current window and then keep displaying it until frozen
+  /// becomes `false`
+  ///
+  /// This is the flag set by the user; a separate flag `frozen_window_complete` is used to
+  /// determine if our current window is complete.
+  pub frozen: bool,
+  pub frozen_window_complete: bool,
+  /// If `true`, the viz will continue updating the window as new samples are received.  If
+  /// `false`, the viz will only update the window a complete next window is ready.
+  pub frame_by_frame: bool,
+  /// Previous rendered image data, with [0] being the most recent
+  pub previous_windows: [PreviousWindow; PAST_WINDOW_COUNT],
 }
 
 impl Viz {
+  fn get_image_data_buffer_size_bytes(view: &VizView) -> usize {
+    view.width * view.dpr * view.height * view.dpr * BYTES_PER_PX
+  }
+
   pub fn set_view(&mut self, cur_bpm: f32, view: VizView) {
-    let image_data_len_bytes = view.width * view.dpr * view.height * view.dpr * BYTES_PER_PX;
+    let image_data_len_bytes = Self::get_image_data_buffer_size_bytes(&view);
     crate::log(&format!(
       "Allocating {image_data_len_bytes} bytes for image_data for view"
     ));
@@ -51,6 +103,9 @@ impl Viz {
     self.clear_image_data_buffer();
     self.view = view;
     self.render(cur_bpm, 0, self.samples.len());
+
+    // previous windows are no longer valid
+    self.clear_previous_windows();
   }
 
   fn clear_image_data_buffer(&mut self) {
@@ -65,12 +120,19 @@ impl Viz {
     }
   }
 
-  pub fn commit_samples(&mut self, samples: &[f32]) { self.samples.extend_from_slice(samples); }
+  pub fn commit_samples(&mut self, samples: &[f32]) {
+    if self.frozen && self.frozen_window_complete {
+      return;
+    }
+
+    self.samples.extend_from_slice(samples);
+  }
 
   fn get_view_length_samples(&self, cur_bpm: f32) -> f32 {
     match self.window_length {
       WindowLength::Beats(beats) => beats * 60.0 * SAMPLE_RATE / cur_bpm,
       WindowLength::Seconds(secs) => secs * SAMPLE_RATE,
+      WindowLength::Samples(samples) => samples as f32,
     }
   }
 
@@ -210,7 +272,7 @@ impl Viz {
       ));
     }
 
-    let steps = (len.floor() as usize).max(2);
+    let steps = ((len * 1.5).floor() as usize).max(2);
     let step_size = 1.0 / steps as f32;
 
     fn mix(a: f32, b: f32, t: f32) -> f32 { a * (1.0 - t) + b * t }
@@ -247,7 +309,6 @@ impl Viz {
       )
     };
     let color = (200, 0, 200, 255);
-    // Self::write_pixel_bilinear(pixels, &self.view, x_px, y_px, color);
     Self::write_line_bilinear(pixels, &self.view, last_x_px, last_y_px, x_px, y_px, color);
   }
 
@@ -257,10 +318,6 @@ impl Viz {
     start_sample_ix_inclusive: usize,
     end_sample_ix_exclusive: usize,
   ) {
-    // crate::log(&format!(
-    //   "render: start_sample_ix_inclusive: {}, end_sample_ix_exclusive: {}",
-    //   start_sample_ix_inclusive, end_sample_ix_exclusive
-    // ));
     for sample_ix in start_sample_ix_inclusive..end_sample_ix_exclusive {
       self.render_one_sample(cur_bpm, sample_ix);
     }
@@ -273,23 +330,50 @@ impl Viz {
     let needs_clear = match self.window_length {
       WindowLength::Beats(beats) => (cur_beat % beats) < self.last_rendered_beat % beats,
       WindowLength::Seconds(secs) => (cur_time % secs) < self.last_rendered_time % secs,
+      WindowLength::Samples(samples) =>
+        self.samples.len() - self.last_processed_sample_ix < samples,
     };
     if !needs_clear {
       return;
     }
 
+    if self.frozen {
+      crate::log("frozen window complete");
+      self.frozen_window_complete = true;
+      return;
+    }
+
+    // Swap our current image data buffer and samples into previous windows and replace with the
+    // oldest one there to avoid allocations
+    //
+    // We shift the previous windows to the right and take the oldest one
+    let oldest_window = std::mem::take(&mut self.previous_windows[self.previous_windows.len() - 1]);
+    for i in (1..self.previous_windows.len()).rev() {
+      self.previous_windows[i] = std::mem::take(&mut self.previous_windows[i - 1]);
+    }
+
+    let new_prev_window = PreviousWindow {
+      image_data: std::mem::replace(&mut self.image_data, oldest_window.image_data),
+      samples: std::mem::replace(&mut self.samples, oldest_window.samples),
+    };
+
+    // Resize new image data buffer for current view
+    let image_data_len_bytes = Self::get_image_data_buffer_size_bytes(&self.view);
+    self.image_data.resize(image_data_len_bytes, 0);
+
     self.clear_image_data_buffer();
     // Retain the last `FRAME_SIZE` samples from the previous window and concat to the front so we
     // don't miss any transients or anything
     let mut old_samples: [f32; FRAME_SIZE] = [0.0; FRAME_SIZE];
-    let old_samples_len = self.samples.len().min(FRAME_SIZE);
+    let old_samples_len = new_prev_window.samples.len().min(FRAME_SIZE);
     old_samples[..old_samples_len]
-      .copy_from_slice(&self.samples[self.samples.len() - old_samples_len..]);
+      .copy_from_slice(&new_prev_window.samples[new_prev_window.samples.len() - old_samples_len..]);
     self.samples.clear();
     self
       .samples
       .extend_from_slice(&old_samples[..old_samples_len]);
     self.last_processed_sample_ix = 0;
+    self.previous_windows[0] = new_prev_window;
   }
 
   pub fn process(&mut self, cur_bpm: f32, cur_beat: f32, cur_time: f32) {
@@ -299,9 +383,53 @@ impl Viz {
 
     self.maybe_clear_window(cur_beat, cur_time);
 
+    if self.frozen && self.frozen_window_complete {
+      return;
+    }
+
     self.render(cur_bpm, self.last_processed_sample_ix, self.samples.len());
 
     self.last_rendered_beat = cur_beat;
     self.last_rendered_time = cur_time;
+  }
+
+  pub(crate) fn set_window(&mut self, window: WindowLength) {
+    self.window_length = window;
+    if !self.frozen_window_complete {
+      self.last_processed_sample_ix = 0;
+      self.clear_image_data_buffer();
+    }
+
+    // previous windows are no longer valid
+    self.clear_previous_windows();
+  }
+
+  fn clear_previous_windows(&mut self) {
+    crate::log("clearing previous windows");
+    for window in self.previous_windows.iter_mut() {
+      *window = PreviousWindow::default();
+    }
+  }
+
+  pub(crate) fn set_frozen(&mut self, frozen: bool) {
+    if !frozen && self.frozen && self.frozen_window_complete {
+      self.clear_image_data_buffer();
+      self.last_processed_sample_ix = 0;
+    }
+
+    self.frozen = frozen;
+    self.frozen_window_complete = false;
+  }
+
+  pub(crate) fn get_image_data(&self) -> &[u8] {
+    if self.frame_by_frame {
+      return &self.image_data;
+    }
+
+    return &self.previous_windows[0].image_data;
+  }
+
+  pub(crate) fn set_frame_by_frame(&mut self, frame_by_frame: bool) {
+    self.frame_by_frame = frame_by_frame;
   }
 }

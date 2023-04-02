@@ -6,7 +6,7 @@
 </script>
 
 <div class="root">
-  <OscilloscopeUI inst={inst.oscilloscope} />
+  <OscilloscopeUI inst={inst.oscilloscope} uiState={inst.oscilloscopeUIState} />
 </div>
 
 <style lang="css">

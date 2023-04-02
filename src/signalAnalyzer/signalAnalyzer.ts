@@ -1,10 +1,14 @@
 import { Map as ImmMap } from 'immutable';
 
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkContainerHider } from 'src/reactUtils';
-import { SignalAnalyzerInst } from 'src/signalAnalyzer/SignalAnalyzerInst';
+import {
+  buildDefaultSignalAnalyzerInstState,
+  SerializedSignalAnalyzerInst,
+  SignalAnalyzerInst,
+} from 'src/signalAnalyzer/SignalAnalyzerInst';
 import SignalAnalyzerUI from 'src/signalAnalyzer/SignalAnalyzerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { tryParseJson } from 'src/util';
 
 const SignalAnalyzerInstsByStateKey = new Map<string, SignalAnalyzerInst>();
 
@@ -19,7 +23,15 @@ export const init_signal_analyzer = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  const inst = new SignalAnalyzerInst(ctx);
+  const initialState =
+    tryParseJson<SerializedSignalAnalyzerInst, undefined>(
+      localStorage.getItem(stateKey)!,
+      undefined,
+      `Failed to parse localStorage state for signal analyzer with stateKey ${stateKey}; reverting to initial state.`
+    ) ?? buildDefaultSignalAnalyzerInstState();
+  initialState.oscilloscopeUIState.frozen = false;
+
+  const inst = new SignalAnalyzerInst(ctx, initialState);
   SignalAnalyzerInstsByStateKey.set(stateKey, inst);
 
   mkSvelteContainerRenderHelper({
@@ -59,6 +71,13 @@ export const unhide_signal_analyzer = (stateKey: string) => {
 };
 
 export const cleanup_signal_analyzer = (stateKey: string) => {
+  const inst = SignalAnalyzerInstsByStateKey.get(stateKey);
+  if (!inst) {
+    throw new Error(`No signal analyzer instance found for state key ${stateKey}`);
+  }
+  const state = inst.serialize();
+  localStorage.setItem(stateKey, JSON.stringify(state));
+
   SignalAnalyzerInstsByStateKey.delete(stateKey);
   mkSvelteContainerCleanupHelper({ preserveRoot: false })(stateKey);
 };

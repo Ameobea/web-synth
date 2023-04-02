@@ -1,4 +1,4 @@
-use oscilloscope::{Viz, VizView, WindowLength};
+use oscilloscope::{PreviousWindow, Viz, VizView, WindowLength};
 
 pub(crate) mod conf;
 pub mod oscilloscope;
@@ -32,6 +32,19 @@ static mut VIZ: Viz = Viz {
     height: 100,
     width: 100,
   },
+  frozen: false,
+  frame_by_frame: true,
+  previous_windows: [
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+    PreviousWindow::new(),
+  ],
+  frozen_window_complete: false,
 };
 
 fn maybe_set_panic_hook() {
@@ -63,6 +76,13 @@ pub extern "C" fn oscilloscope_renderer_set_view(
   viz.set_view(cur_bpm, VizView { width, height, dpr });
 }
 
+#[no_mangle]
+pub extern "C" fn oscilloscope_renderer_set_window(window_mode: u8, window_length: f32) {
+  let viz = unsafe { &mut VIZ };
+  let window = WindowLength::from_parts(window_mode, window_length);
+  viz.set_window(window);
+}
+
 /// Process all samples in `FRAME_DATA_BUFFER` and update the viz
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_process(cur_bpm: f32, cur_beat: f32, cur_time: f32) {
@@ -85,11 +105,23 @@ pub extern "C" fn oscilloscope_renderer_commit_samples() {
 #[no_mangle]
 pub extern "C" fn oscilloscope_get_image_data_buf_ptr() -> *const u8 {
   let viz = unsafe { &mut VIZ };
-  viz.image_data.as_ptr()
+  viz.get_image_data().as_ptr()
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_get_image_data_buf_len() -> usize {
   let viz = unsafe { &mut VIZ };
-  viz.image_data.len()
+  viz.get_image_data().len()
+}
+
+#[no_mangle]
+pub extern "C" fn oscilloscope_renderer_set_frozen(frozen: bool) {
+  let viz = unsafe { &mut VIZ };
+  viz.set_frozen(frozen);
+}
+
+#[no_mangle]
+pub extern "C" fn oscilloscope_renderer_set_frame_by_frame(frame_by_frame: bool) {
+  let viz = unsafe { &mut VIZ };
+  viz.set_frame_by_frame(frame_by_frame);
 }

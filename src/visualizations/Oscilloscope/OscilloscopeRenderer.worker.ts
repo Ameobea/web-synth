@@ -1,8 +1,3 @@
-type WorkerMessage =
-  | { type: 'setSAB'; sab: SharedArrayBuffer }
-  | { type: 'setWasmBytes'; wasmBytes: ArrayBuffer }
-  | { type: 'setView'; view: OffscreenCanvas; dpr: number };
-
 // SAB Layout (32-bit increments):
 // 0: [int32] shutdown / pause flag.  0 = running, 1 = paused, 2 = shutdown
 // 1: [int32] reserved
@@ -15,6 +10,12 @@ type WorkerMessage =
 //             It is incremented by the realtime audio rendering thread each time it renders a frame
 // 8-: [float32][] circular buffer containing raw samples from the realtime audio rendering thread.  It
 //                 extends to the end of the SAB.
+
+import {
+  OscilloscopeWindow,
+  OscilloscopeWindowType,
+  type OscilloscopeWorkerMessage,
+} from 'src/visualizations/Oscilloscope/types';
 
 enum RendererStatusFlag {
   Running = 0,
@@ -33,6 +34,9 @@ class OscilloscopeRendererWorker {
   private running = false;
   private lastProcessedBufferHeadIx = 0;
   private view: OffscreenCanvas | null = null;
+  private window: OscilloscopeWindow = { type: OscilloscopeWindowType.Beats, value: 4 };
+  private frozen = false;
+  private frameByFrame = true;
   private dpr = 1;
   private runToken = 0;
 
@@ -53,6 +57,9 @@ class OscilloscopeRendererWorker {
     const imageDataLenBytes = (
       this.wasmInstance!.exports.oscilloscope_get_image_data_buf_len as () => number
     )();
+    if (imageDataLenBytes === 0) {
+      return;
+    }
     // TODO: Store separate uint8clampedarray view of memory
     const memory = this.getWasmMemoryBuffer();
     const imageData = new Uint8ClampedArray(memory.buffer, imageDataPtr, imageDataLenBytes);
@@ -69,7 +76,7 @@ class OscilloscopeRendererWorker {
   };
 
   public handleMessage(event: MessageEvent) {
-    const message: WorkerMessage = event.data;
+    const message: OscilloscopeWorkerMessage = event.data;
 
     if (!message || typeof message !== 'object' || !message.type) {
       console.warn(`Invalid message received in oscilloscope renderer worker: ${message}`);
@@ -89,8 +96,20 @@ class OscilloscopeRendererWorker {
         this.dpr = message.dpr;
         this.maybeSetViewToWasm();
         break;
+      case 'setWindow':
+        this.window = message.window;
+        this.maybeSetWindowToWasm();
+        break;
+      case 'setFrozen':
+        this.setFrozen(message.frozen);
+        break;
+      case 'setFrameByFrame':
+        this.setFrameByFrame(message.frameByFrame);
+        break;
       default:
-        console.warn(`Unknown message type: ${(message as any).type}`);
+        console.warn(
+          `Unknown message type in \`OscilloscopeRendererWorker\`: ${(message as any).type}`
+        );
     }
   }
 
@@ -107,6 +126,37 @@ class OscilloscopeRendererWorker {
       dpr: number
     ) => void;
     setViewToWasm(curBPM, this.view.width / this.dpr, this.view.height / this.dpr, this.dpr);
+  }
+
+  private maybeSetWindowToWasm() {
+    if (!this.window || !this.wasmInstance) {
+      return;
+    }
+
+    const setWindowToWasm = this.wasmInstance.exports.oscilloscope_renderer_set_window as (
+      type: OscilloscopeWindowType,
+      value: number
+    ) => void;
+    setWindowToWasm(this.window.type, this.window.value);
+  }
+
+  private setFrozen(frozen: boolean) {
+    this.frozen = frozen;
+    if (this.wasmInstance) {
+      const setFrozen = this.wasmInstance.exports.oscilloscope_renderer_set_frozen as (
+        frozen: boolean
+      ) => void;
+      setFrozen(frozen);
+    }
+  }
+
+  private setFrameByFrame(frameByFrame: boolean) {
+    this.frameByFrame = frameByFrame;
+    if (this.wasmInstance) {
+      const setFrameByFrame = this.wasmInstance.exports
+        .oscilloscope_renderer_set_frame_by_frame as (frameByFrame: boolean) => void;
+      setFrameByFrame(frameByFrame);
+    }
   }
 
   private setSAB(sab: SharedArrayBuffer) {
@@ -143,7 +193,11 @@ class OscilloscopeRendererWorker {
         },
       },
     });
+
     this.maybeSetViewToWasm();
+    this.maybeSetWindowToWasm();
+    this.setFrozen(this.frozen);
+    this.setFrameByFrame(this.frameByFrame);
     this.checkAndStart();
   }
 

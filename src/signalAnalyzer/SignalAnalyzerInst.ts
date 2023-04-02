@@ -1,6 +1,12 @@
+import { get, Writable, writable } from 'svelte/store';
+
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 import { Oscilloscope } from 'src/visualizations/Oscilloscope/Oscilloscope';
+import {
+  buildDefaultOscilloscopeUIState,
+  OscilloscopeUIState,
+} from 'src/visualizations/Oscilloscope/types';
 
 const ctx = new AudioContext();
 const SignalAnalyzerAWPRegistered = new AsyncOnce(
@@ -13,20 +19,30 @@ const SignalAnalyzerAWPRegistered = new AsyncOnce(
   true
 );
 
+export interface SerializedSignalAnalyzerInst {
+  oscilloscopeUIState: OscilloscopeUIState;
+}
+
+export const buildDefaultSignalAnalyzerInstState = (): SerializedSignalAnalyzerInst => ({
+  oscilloscopeUIState: buildDefaultOscilloscopeUIState(),
+});
+
 export class SignalAnalyzerInst {
   public input: AnalyserNode;
   private awpHandle: AudioWorkletNode | null = null;
   public oscilloscope: Oscilloscope;
   // Need to connect the analyzer AWP to the audio graph so it gets driven
   private silentGain: GainNode;
+  public oscilloscopeUIState: Writable<OscilloscopeUIState>;
 
-  constructor(ctx: AudioContext) {
+  constructor(ctx: AudioContext, initialState: SerializedSignalAnalyzerInst) {
+    this.oscilloscopeUIState = writable(initialState.oscilloscopeUIState);
     this.input = ctx.createAnalyser();
     this.input.fftSize = 4096;
     this.silentGain = ctx.createGain();
     this.silentGain.gain.value = 0;
     this.silentGain.connect(ctx.destination);
-    this.oscilloscope = new Oscilloscope();
+    this.oscilloscope = new Oscilloscope(initialState.oscilloscopeUIState);
 
     this.init().catch(err => {
       logError('Error initializing signal analyzer', err);
@@ -62,6 +78,12 @@ export class SignalAnalyzerInst {
   public resume() {
     console.log('resume');
     this.oscilloscope.resume();
+  }
+
+  public serialize(): SerializedSignalAnalyzerInst {
+    return {
+      oscilloscopeUIState: get(this.oscilloscopeUIState),
+    };
   }
 
   public destroy() {
