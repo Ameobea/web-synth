@@ -99,6 +99,7 @@ export class SignalAnalyzerInst {
 
   public destroy() {
     this.oscilloscope.destroy();
+    this.lineSpectrogram.destroy();
     if (this.awpHandle) {
       this.awpHandle.port.close();
       this.awpHandle.disconnect();
