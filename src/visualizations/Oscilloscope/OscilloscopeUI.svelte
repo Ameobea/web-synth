@@ -8,7 +8,6 @@
   export let inst: Oscilloscope;
   export let uiState: Writable<OscilloscopeUIState>;
 
-  // TODO: Dynamically sized
   let windowWidth = 100;
   $: width = windowWidth; // - 12;
   $: height = width * 0.2;

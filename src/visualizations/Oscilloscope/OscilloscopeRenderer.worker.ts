@@ -30,10 +30,12 @@ class OscilloscopeRendererWorker {
   private sabI32: Int32Array | null = null;
   private samplesCircularBuffer: Float32Array = new Float32Array(0);
   private wasmInstance: WebAssembly.Instance | null = null;
-  private wasmMemoryBuffer: Float32Array = new Float32Array(0);
+  private wasmMemoryBufferF32: Float32Array = new Float32Array(0);
+  private wasmMemoryBufferU8: Uint8Array = new Uint8Array(0);
   private running = false;
   private lastProcessedBufferHeadIx = 0;
   private view: OffscreenCanvas | null = null;
+  private ctx: OffscreenCanvasRenderingContext2D | null = null;
   private window: OscilloscopeWindow = { type: OscilloscopeWindowType.Beats, value: 4 };
   private frozen = false;
   private frameByFrame = true;
@@ -47,7 +49,7 @@ class OscilloscopeRendererWorker {
   private renderFrame = () => {
     this.checkEvents();
 
-    if (!this.view || !this.running || !this.wasmInstance) {
+    if (!this.view || !this.ctx || !this.running || !this.wasmInstance) {
       return;
     }
 
@@ -61,13 +63,31 @@ class OscilloscopeRendererWorker {
       return;
     }
     // TODO: Store separate uint8clampedarray view of memory
-    const memory = this.getWasmMemoryBuffer();
-    const imageData = new Uint8ClampedArray(memory.buffer, imageDataPtr, imageDataLenBytes);
-    // TODO: store ctx
-    const ctx = this.view.getContext('2d')!;
+    const memoryF32 = this.getWasmMemoryBufferF32();
+    const imageData = new Uint8ClampedArray(memoryF32.buffer, imageDataPtr, imageDataLenBytes);
     // TODO: Only write changed portion of image data
     const imageDataObj = new ImageData(imageData, this.view.width, this.view.height);
-    ctx.putImageData(imageDataObj, 0, 0);
+    this.ctx.putImageData(imageDataObj, 0, 0);
+
+    if (this.window.type === OscilloscopeWindowType.Wavelengths) {
+      // Print estimated F0
+      const strPtr = (
+        this.wasmInstance!.exports.oscilloscope_renderer_get_detected_f0_display as () => number
+      )();
+      // zero-terminated string
+      const memoryU8 = this.getWasmMemoryBufferU8();
+      const strLen = memoryU8.indexOf(0, strPtr) - strPtr;
+      if (strLen <= 0 || strLen > 100) {
+        console.warn('Invalid string length for detected F0');
+        return;
+      }
+
+      const str = String.fromCharCode(...memoryU8.slice(strPtr, strPtr + strLen));
+      // Write to bottom left of canvas
+      this.ctx.font = '12px Hack, "Oxygen Mono", "Ubuntu Mono", "Lucida Console", monospace';
+      this.ctx.fillStyle = 'white';
+      this.ctx.fillText(str, 4, this.view.height - 4);
+    }
   };
 
   private startRenderLoop = () => {
@@ -93,6 +113,11 @@ class OscilloscopeRendererWorker {
         break;
       case 'setView':
         this.view = message.view;
+        const ctx = this.view.getContext('2d');
+        if (!ctx) {
+          throw new Error('Could not get 2d context from offscreen canvas');
+        }
+        this.ctx = ctx;
         this.dpr = message.dpr;
         this.maybeSetViewToWasm();
         break;
@@ -185,20 +210,12 @@ class OscilloscopeRendererWorker {
 
   private async setWasmBytes(wasmBytes: ArrayBuffer) {
     const wasmModule = await WebAssembly.compile(wasmBytes);
+    const decodeStr = (ptr: number, len: number) =>
+      new TextDecoder().decode(this.getWasmMemoryBufferU8().subarray(ptr, ptr + len));
     this.wasmInstance = await WebAssembly.instantiate(wasmModule, {
       env: {
-        log_err: (ptr: number, len: number) => {
-          const str = new TextDecoder().decode(
-            new Uint8Array(this.getWasmMemoryBuffer().buffer).subarray(ptr, ptr + len)
-          );
-          console.error(str);
-        },
-        log_info: (ptr: number, len: number) => {
-          const str = new TextDecoder().decode(
-            new Uint8Array(this.getWasmMemoryBuffer().buffer).subarray(ptr, ptr + len)
-          );
-          console.log(str);
-        },
+        log_err: (ptr: number, len: number) => console.error(decodeStr(ptr, len)),
+        log_info: (ptr: number, len: number) => console.log(decodeStr(ptr, len)),
       },
     });
 
@@ -240,16 +257,28 @@ class OscilloscopeRendererWorker {
     }
   }
 
-  getWasmMemoryBuffer() {
+  private getWasmMemoryBufferF32() {
     if (!this.wasmInstance) {
       throw new Error('Tried to get wasm memory buffer before wasm instance was initialized');
     }
 
     const memory = this.wasmInstance.exports.memory as WebAssembly.Memory;
-    if (this.wasmMemoryBuffer.buffer !== memory.buffer) {
-      this.wasmMemoryBuffer = new Float32Array(memory.buffer);
+    if (this.wasmMemoryBufferF32.buffer !== memory.buffer) {
+      this.wasmMemoryBufferF32 = new Float32Array(memory.buffer);
     }
-    return this.wasmMemoryBuffer;
+    return this.wasmMemoryBufferF32;
+  }
+
+  private getWasmMemoryBufferU8() {
+    if (!this.wasmInstance) {
+      throw new Error('Tried to get wasm memory buffer before wasm instance was initialized');
+    }
+
+    const memory = this.wasmInstance.exports.memory as WebAssembly.Memory;
+    if (this.wasmMemoryBufferU8.buffer !== memory.buffer) {
+      this.wasmMemoryBufferU8 = new Uint8Array(memory.buffer);
+    }
+    return this.wasmMemoryBufferU8;
   }
 
   private consumeBuffer() {
@@ -285,7 +314,7 @@ class OscilloscopeRendererWorker {
         // Copy over and process one frame of samples at a time from the SAB circular buffer to the wasm memory
         // until we've caught up to the current buffer head index
         while (this.lastProcessedBufferHeadIx !== bufferHeadIx) {
-          const memory = this.getWasmMemoryBuffer();
+          const memory = this.getWasmMemoryBufferF32();
           const frameData = memory.subarray(frameDataPtr / 4, frameDataPtr / 4 + FRAME_SIZE);
 
           // Buffer head index has not wrapped around

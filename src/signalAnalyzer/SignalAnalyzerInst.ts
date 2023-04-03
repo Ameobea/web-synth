@@ -2,6 +2,11 @@ import { get, Writable, writable } from 'svelte/store';
 
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
+import { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
+import {
+  buildDefaultLineSpecrogramUIState,
+  LineSpectrogramUIState,
+} from 'src/visualizations/LineSpectrogram/types';
 import { Oscilloscope } from 'src/visualizations/Oscilloscope/Oscilloscope';
 import {
   buildDefaultOscilloscopeUIState,
@@ -21,16 +26,19 @@ const SignalAnalyzerAWPRegistered = new AsyncOnce(
 
 export interface SerializedSignalAnalyzerInst {
   oscilloscopeUIState: OscilloscopeUIState;
+  lineSpectrogramUIState: LineSpectrogramUIState;
 }
 
 export const buildDefaultSignalAnalyzerInstState = (): SerializedSignalAnalyzerInst => ({
   oscilloscopeUIState: buildDefaultOscilloscopeUIState(),
+  lineSpectrogramUIState: buildDefaultLineSpecrogramUIState(),
 });
 
 export class SignalAnalyzerInst {
   public input: AnalyserNode;
   private awpHandle: AudioWorkletNode | null = null;
   public oscilloscope: Oscilloscope;
+  public lineSpectrogram: LineSpectrogram;
   // Need to connect the analyzer AWP to the audio graph so it gets driven
   private silentGain: GainNode;
   public oscilloscopeUIState: Writable<OscilloscopeUIState>;
@@ -43,6 +51,8 @@ export class SignalAnalyzerInst {
     this.silentGain.gain.value = 0;
     this.silentGain.connect(ctx.destination);
     this.oscilloscope = new Oscilloscope(initialState.oscilloscopeUIState);
+
+    this.lineSpectrogram = new LineSpectrogram(initialState.lineSpectrogramUIState, this.input);
 
     this.init().catch(err => {
       logError('Error initializing signal analyzer', err);
@@ -71,18 +81,19 @@ export class SignalAnalyzerInst {
   }
 
   public pause() {
-    console.log('pause');
     this.oscilloscope.pause();
+    this.lineSpectrogram.stop();
   }
 
   public resume() {
-    console.log('resume');
     this.oscilloscope.resume();
+    this.lineSpectrogram.start();
   }
 
   public serialize(): SerializedSignalAnalyzerInst {
     return {
       oscilloscopeUIState: get(this.oscilloscopeUIState),
+      lineSpectrogramUIState: this.lineSpectrogram.serialize(),
     };
   }
 

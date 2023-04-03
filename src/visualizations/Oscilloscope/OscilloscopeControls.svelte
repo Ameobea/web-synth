@@ -173,7 +173,7 @@
 </script>
 
 <div class="root">
-  <SvelteControlPanel {settings} onChange={handleChange} state={controlPanelState} />
+  <SvelteControlPanel {settings} onChange={handleChange} state={controlPanelState} width={500} />
 </div>
 
 <style lang="css">

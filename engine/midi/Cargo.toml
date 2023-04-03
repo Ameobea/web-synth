@@ -16,7 +16,7 @@ js-sys = "0.3"
 wasm-bindgen = "=0.2.82"
 wasm-bindgen-futures = "0.4"
 
-polysynth = { path = "../polysynth", default_features = false }
+polysynth = { path = "../polysynth", default-features = false }
 common = { path = "../common" }
 wbg_logging = { path = "../wbg_logging" }
 rimd = { git = "https://github.com/Ameobea/rimd.git" }

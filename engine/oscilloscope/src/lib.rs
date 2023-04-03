@@ -1,4 +1,5 @@
-use self::oscilloscope::{PreviousWindow, Viz, VizView, WindowLength};
+use self::oscilloscope::{PreviousWindow, Viz, WindowLength};
+use canvas_utils::VizView;
 use f0_estimation::YinCtx;
 
 pub(crate) mod conf;
@@ -50,7 +51,16 @@ static mut VIZ: Viz = Viz {
   yin_ctx: YinCtx::new(),
 };
 
+static mut DID_SET_PANIC_HOOK: bool = false;
+
 fn maybe_set_panic_hook() {
+  unsafe {
+    if DID_SET_PANIC_HOOK {
+      return;
+    }
+    DID_SET_PANIC_HOOK = true;
+  }
+
   let hook = move |info: &std::panic::PanicInfo| {
     let msg = format!("PANIC: {}", info.to_string());
     let bytes = msg.into_bytes();
@@ -127,4 +137,11 @@ pub extern "C" fn oscilloscope_renderer_set_frozen(frozen: bool) {
 pub extern "C" fn oscilloscope_renderer_set_frame_by_frame(frame_by_frame: bool) {
   let viz = unsafe { &mut VIZ };
   viz.set_frame_by_frame(frame_by_frame);
+}
+
+/// Returns pointer to zero-terminated string
+#[no_mangle]
+pub extern "C" fn oscilloscope_renderer_get_detected_f0_display() -> *const u8 {
+  let viz = unsafe { &mut VIZ };
+  viz.yin_ctx.get_detected_f0_display()
 }

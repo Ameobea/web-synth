@@ -1,5 +1,7 @@
 //! Fundamental frequency estimation
 
+use std::io::Write;
+
 use crate::{
   conf::{SAMPLE_RATE, YIN_FRAME_SIZE, YIN_MAX_PERIOD, YIN_THRESHOLD},
   FRAME_SIZE,
@@ -54,6 +56,7 @@ pub(crate) struct YinCtx {
   pub cur_f0_estimate: f32,
   pub samples_buf: [f32; YIN_FRAME_SIZE],
   pub buf_head: usize,
+  pub f0_display: [u8; 64],
 }
 
 impl YinCtx {
@@ -63,6 +66,7 @@ impl YinCtx {
       cur_f0_estimate: 100.,
       rolling_f0_estimate: 100.,
       samples_buf: [0.0; YIN_FRAME_SIZE],
+      f0_display: [0; 64],
     }
   }
 
@@ -83,19 +87,22 @@ impl YinCtx {
 
     // Update the rolling F0 estimate
     dsp::smooth(&mut self.rolling_f0_estimate, f0, 0.3);
-    // self.rolling_f0_estimate = f0;
-    // crate::log(&format!(
-    //   "F0: {:.2}Hz; {}",
-    //   self.rolling_f0_estimate,
-    //   freq_to_midi_note_name(self.rolling_f0_estimate)
-    // ));
   }
-}
 
-pub(crate) fn snap_to_midi_pitch(f0: f32) -> f32 {
-  let mut midi_pitch = 12. * (f0 / 440.).log2();
-  midi_pitch = midi_pitch.round();
-  440. * 2_f32.powf(midi_pitch / 12.)
+  pub(crate) fn get_detected_f0_display(&mut self) -> *const u8 {
+    // re-use allocation if possible
+    if self.rolling_f0_estimate > SAMPLE_RATE / 2. {
+      return b"---\0".as_ptr();
+    }
+    write!(
+      &mut self.f0_display as &mut [u8],
+      "{:.2}Hz; {}\0",
+      self.rolling_f0_estimate,
+      freq_to_midi_note_name(self.rolling_f0_estimate)
+    )
+    .unwrap();
+    self.f0_display.as_ptr()
+  }
 }
 
 pub(crate) fn freq_to_midi_note_name(frequency: f32) -> String {
@@ -123,6 +130,12 @@ pub(crate) fn freq_to_midi_note_name(frequency: f32) -> String {
 fn test_yin() {
   const YIN_FRAME_SIZE: usize = FRAME_SIZE * 16;
   const MAX_PERIOD: usize = 44_100 / 80;
+
+  fn snap_to_midi_pitch(f0: f32) -> f32 {
+    let mut midi_pitch = 12. * (f0 / 440.).log2();
+    midi_pitch = midi_pitch.round();
+    440. * 2_f32.powf(midi_pitch / 12.)
+  }
 
   // 1500 Hz sine wave + 100 Hz sine wave
   let p1 = snap_to_midi_pitch(1500.);

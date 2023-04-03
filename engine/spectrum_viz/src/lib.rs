@@ -8,9 +8,10 @@ use palette::{
   gradient::Gradient,
   rgb::Rgb,
 };
-use wasm_bindgen::prelude::*;
 
 mod conf;
+#[cfg(feature = "line_viz")]
+mod line_viz;
 
 const BUFFER_SIZE: usize = 8192;
 
@@ -19,6 +20,22 @@ pub struct Context {
   pub pixel_buffer: [u8; BUFFER_SIZE * 4],
   pub color_fn: usize,
   pub scaler_fn: usize,
+}
+
+impl Context {
+  pub fn process_viz_data(&mut self) {
+    let color_fn_ix = self.color_fn;
+    let color_fn = COLOR_FNS
+      .get(color_fn_ix)
+      .unwrap_or_else(|| panic!("No color fn found with index {}", color_fn_ix));
+
+    for (i, val) in self.byte_frequency_data.iter_mut().rev().enumerate() {
+      let [r, g, b, _] = color_fn(self.scaler_fn, *val);
+      self.pixel_buffer[i * 4] = r;
+      self.pixel_buffer[i * 4 + 1] = g;
+      self.pixel_buffer[i * 4 + 2] = b;
+    }
+  }
 }
 
 type ColorLUT = [[u8; 4]; 256];
@@ -176,61 +193,54 @@ lazy_static! {
   };
 }
 
-/// Returns a JSON-serialized array of scaler function definitions
-#[wasm_bindgen]
-pub fn get_config_definition() -> String {
-  common::maybe_init(None);
-  wbg_logging::maybe_init();
-  String::from(crate::conf::CONFIG_JSON)
-}
+#[cfg(feature = "bindgen")]
+pub mod exports {
+  use super::*;
+  use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
-  common::maybe_init(None);
-  wbg_logging::maybe_init();
-
-  Box::into_raw(Box::new(Context {
-    byte_frequency_data: [255u8; BUFFER_SIZE],
-    pixel_buffer: [255u8; BUFFER_SIZE * 4],
-    color_fn,
-    scaler_fn,
-  }))
-}
-
-#[wasm_bindgen]
-pub fn set_conf(ctx_ptr: *mut Context, color_fn: usize, scaler_fn: usize) {
-  unsafe {
-    (*ctx_ptr).color_fn = color_fn;
-    (*ctx_ptr).scaler_fn = scaler_fn;
+  /// Returns a JSON-serialized array of scaler function definitions
+  #[wasm_bindgen]
+  pub fn get_config_definition() -> String {
+    wbg_logging::maybe_init();
+    String::from(crate::conf::CONFIG_JSON)
   }
-}
 
-#[wasm_bindgen]
-pub fn process_viz_data(ctx: *mut Context) {
-  let color_fn_ix = unsafe { (*ctx).color_fn };
-  let color_fn = COLOR_FNS
-    .get(color_fn_ix)
-    .unwrap_or_else(|| panic!("No color fn found with index {}", color_fn_ix));
+  #[wasm_bindgen]
+  pub fn new_context(color_fn: usize, scaler_fn: usize) -> *mut Context {
+    wbg_logging::maybe_init();
 
-  unsafe {
-    for (i, val) in (&((*ctx).byte_frequency_data)[..]).iter().rev().enumerate() {
-      let [r, g, b, _] = color_fn((*ctx).scaler_fn, *val);
-      (*ctx).pixel_buffer[i * 4] = r;
-      (*ctx).pixel_buffer[i * 4 + 1] = g;
-      (*ctx).pixel_buffer[i * 4 + 2] = b;
+    Box::into_raw(Box::new(Context {
+      byte_frequency_data: [255u8; BUFFER_SIZE],
+      pixel_buffer: [255u8; BUFFER_SIZE * 4],
+      color_fn,
+      scaler_fn,
+    }))
+  }
+
+  #[wasm_bindgen]
+  pub fn set_conf(ctx_ptr: *mut Context, color_fn: usize, scaler_fn: usize) {
+    unsafe {
+      (*ctx_ptr).color_fn = color_fn;
+      (*ctx_ptr).scaler_fn = scaler_fn;
     }
   }
-}
 
-#[wasm_bindgen]
-pub fn get_byte_frequency_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE] {
-  unsafe { &(*ctx_ptr).byte_frequency_data as *const _ }
-}
+  #[wasm_bindgen]
+  pub fn process_viz_data(ctx: *mut Context) {
+    let ctx = unsafe { &mut *ctx };
+    ctx.process_viz_data();
+  }
 
-#[wasm_bindgen]
-pub fn get_pixel_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE * 4] {
-  unsafe { &(*ctx_ptr).pixel_buffer as *const _ }
-}
+  #[wasm_bindgen]
+  pub fn get_byte_frequency_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE] {
+    unsafe { &(*ctx_ptr).byte_frequency_data as *const _ }
+  }
 
-#[wasm_bindgen]
-pub fn drop_context(ctx_ptr: *mut Context) { drop(unsafe { Box::from_raw(ctx_ptr) }); }
+  #[wasm_bindgen]
+  pub fn get_pixel_data_ptr(ctx_ptr: *mut Context) -> *const [u8; BUFFER_SIZE * 4] {
+    unsafe { &(*ctx_ptr).pixel_buffer as *const _ }
+  }
+
+  #[wasm_bindgen]
+  pub fn drop_context(ctx_ptr: *mut Context) { drop(unsafe { Box::from_raw(ctx_ptr) }); }
+}

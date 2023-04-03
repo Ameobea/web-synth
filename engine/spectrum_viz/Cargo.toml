@@ -11,11 +11,22 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 lazy_static = "1.4.0"
 palette = "0.5"
-wasm-bindgen = "=0.2.82"
+wasm-bindgen = { version = "=0.2.82", optional = true }
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_off"] }
-common = { path = "../common" }
-wbg_logging = { path = "../wbg_logging" }
+wbg_logging = { path = "../wbg_logging", optional = true }
+
+ndarray = { version = "0.15", optional = true, default-features = false, features = ["std"] }
+canvas_utils = { path = "../canvas_utils", optional = true }
 
 [build-dependencies]
 miniserde = "0.1.16"
+
+[dev-dependencies]
+textplots = "0.8"
+
+[features]
+bindgen = ["wasm-bindgen", "wbg_logging"]
+# TODO REVERT
+default = ["bindgen", "line_viz"]
+line_viz = ["ndarray", "canvas_utils"]

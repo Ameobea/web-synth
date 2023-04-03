@@ -1,10 +1,10 @@
+use canvas_utils::{write_line_bilinear, VizView};
+
 use crate::{
   conf::{PAST_WINDOW_COUNT, SAMPLE_RATE},
   f0_estimation::YinCtx,
   FRAME_SIZE,
 };
-
-const BYTES_PER_PX: usize = 4;
 
 fn clamp(min: f32, max: f32, val: f32) -> f32 {
   if val < min {
@@ -41,14 +41,6 @@ impl WindowLength {
   }
 }
 
-#[derive(Clone)]
-pub struct VizView {
-  /// device pixel ratio
-  pub dpr: usize,
-  pub width: usize,
-  pub height: usize,
-}
-
 #[derive(Default)]
 pub(crate) struct PreviousWindow {
   pub image_data: Vec<u8>,
@@ -63,6 +55,8 @@ impl PreviousWindow {
     }
   }
 }
+
+unsafe fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
 
 pub(crate) struct Viz {
   /// Stores all received samples for the currently rendered view
@@ -91,15 +85,8 @@ pub(crate) struct Viz {
 }
 
 impl Viz {
-  fn get_image_data_buffer_size_bytes(view: &VizView) -> usize {
-    view.width * view.dpr * view.height * view.dpr * BYTES_PER_PX
-  }
-
   pub fn set_view(&mut self, cur_bpm: f32, view: VizView) {
-    let image_data_len_bytes = Self::get_image_data_buffer_size_bytes(&view);
-    crate::log(&format!(
-      "Allocating {image_data_len_bytes} bytes for image_data for view"
-    ));
+    let image_data_len_bytes = view.get_image_data_buffer_size_bytes();
     self.image_data = Vec::with_capacity(image_data_len_bytes);
     unsafe {
       self.image_data.set_len(image_data_len_bytes);
@@ -129,10 +116,20 @@ impl Viz {
       return;
     }
 
-    self.samples.extend_from_slice(samples);
     if matches!(self.window_length, WindowLength::Wavelengths(_)) {
       self.yin_ctx.process_frame(samples);
+
+      // wavelength multiplier window length depends on frequency detection, and if there is silence
+      // than it's unable to do that.  So to avoid filling the buffer infinitely, we wait until
+      // there is non-silence to start recording samples again
+      let f0 = self.yin_ctx.rolling_f0_estimate;
+      if f0 > SAMPLE_RATE / 2.0 {
+        self.samples.clear();
+        return;
+      }
     }
+
+    self.samples.extend_from_slice(samples);
   }
 
   fn get_view_length_samples(&self, cur_bpm: f32) -> f32 {
@@ -176,128 +173,6 @@ impl Viz {
     (x_px, y_px)
   }
 
-  fn write_pixel(
-    pixels: &mut [(u8, u8, u8, u8)],
-    view: &VizView,
-    x_px: usize,
-    y_px: usize,
-    val: (u8, u8, u8, u8),
-  ) {
-    let px_ix = y_px as usize * view.width + x_px as usize;
-    if px_ix >= pixels.len() {
-      crate::log(&format!(
-        "write_pixel_bilinearly: px_ix: {}, pixels.len(): {}; x_px: {}, y_px: {}",
-        px_ix,
-        pixels.len(),
-        x_px,
-        y_px,
-      ));
-      return;
-    }
-    let mut target = &mut pixels[px_ix];
-    target.0 = target.0.saturating_add(val.0);
-    target.1 = target.1.saturating_add(val.1);
-    target.2 = target.2.saturating_add(val.2);
-  }
-
-  /// Writes a pixel to the image data buffer, using bilinear interpolation to handle fractional
-  /// pixel coordinates
-  fn write_pixel_bilinear(
-    pixels: &mut [(u8, u8, u8, u8)],
-    view: &VizView,
-    x_px: f32,
-    y_px: f32,
-    color: (u8, u8, u8, u8),
-  ) {
-    let x1 = x_px.floor() as usize;
-    let y1 = y_px.floor() as usize;
-    let x2 = x1 + 1;
-    let y2 = y1 + 1;
-
-    let x_frac = x_px - x1 as f32;
-    let y_frac = y_px - y1 as f32;
-
-    let row_length_px = view.width;
-
-    let is_x2_out_of_bounds = x2 >= row_length_px;
-    let is_y2_out_of_bounds = y2 >= pixels.len() / row_length_px;
-
-    let w11 = (1.0 - x_frac) * (1.0 - y_frac);
-    let w12 = x_frac * (1.0 - y_frac);
-    let w21 = (1.0 - x_frac) * y_frac;
-    let w22 = x_frac * y_frac;
-
-    let val11 = (
-      (color.0 as f32 * w11) as u8,
-      (color.1 as f32 * w11) as u8,
-      (color.2 as f32 * w11) as u8,
-      (color.3 as f32 * w11) as u8,
-    );
-    let val12 = (
-      (color.0 as f32 * w12) as u8,
-      (color.1 as f32 * w12) as u8,
-      (color.2 as f32 * w12) as u8,
-      (color.3 as f32 * w12) as u8,
-    );
-    let val21 = (
-      (color.0 as f32 * w21) as u8,
-      (color.1 as f32 * w21) as u8,
-      (color.2 as f32 * w21) as u8,
-      (color.3 as f32 * w21) as u8,
-    );
-    let val22 = (
-      (color.0 as f32 * w22) as u8,
-      (color.1 as f32 * w22) as u8,
-      (color.2 as f32 * w22) as u8,
-      (color.3 as f32 * w22) as u8,
-    );
-
-    Self::write_pixel(pixels, view, x1, y1, val11);
-    if !is_x2_out_of_bounds {
-      Self::write_pixel(pixels, view, x2, y1, val12);
-    }
-    if !is_y2_out_of_bounds {
-      Self::write_pixel(pixels, view, x1, y2, val21);
-    }
-    if !is_x2_out_of_bounds && !is_y2_out_of_bounds {
-      Self::write_pixel(pixels, view, x2, y2, val22);
-    }
-  }
-
-  fn write_line_bilinear(
-    pixels: &mut [(u8, u8, u8, u8)],
-    view: &VizView,
-    x0_px: f32,
-    y0_px: f32,
-    x1_px: f32,
-    y1_px: f32,
-    color: (u8, u8, u8, u8),
-  ) {
-    fn distance(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
-      ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt()
-    }
-
-    let len = distance(x0_px, y0_px, x1_px, y1_px);
-    if len > 100.0 {
-      crate::log(&format!(
-        "write_line_bilinear: len: {}, x0_px: {}, y0_px: {}, x1_px: {}, y1_px: {}",
-        len, x0_px, y0_px, x1_px, y1_px
-      ));
-    }
-
-    let steps = ((len * 1.5).floor() as usize).max(2);
-    let step_size = 1.0 / steps as f32;
-
-    fn mix(a: f32, b: f32, t: f32) -> f32 { a * (1.0 - t) + b * t }
-
-    for i in 0..steps {
-      let weight = i as f32 * step_size;
-      let x = mix(x0_px, x1_px, weight);
-      let y = mix(y0_px, y1_px, weight);
-      Self::write_pixel_bilinear(pixels, view, x, y, color);
-    }
-  }
-
   fn render_one_sample(&mut self, cur_bpm: f32, sample_ix: usize) {
     let sample = self.samples[sample_ix];
     let last_sample = if sample_ix == 0 {
@@ -322,7 +197,7 @@ impl Viz {
       )
     };
     let color = (180, 0, 180, 255);
-    Self::write_line_bilinear(pixels, &self.view, last_x_px, last_y_px, x_px, y_px, color);
+    write_line_bilinear(pixels, &self.view, last_x_px, last_y_px, x_px, y_px, color);
   }
 
   fn render(
@@ -408,13 +283,12 @@ impl Viz {
     };
 
     // Resize new image data buffer for current view
-    let image_data_len_bytes = Self::get_image_data_buffer_size_bytes(&self.view);
+    let image_data_len_bytes = self.view.get_image_data_buffer_size_bytes();
     self.image_data.resize(image_data_len_bytes, 0);
 
     self.clear_image_data_buffer();
 
-    let mut old_samples: [f32; FRAME_SIZE * 8] =
-      unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    let mut old_samples: [f32; FRAME_SIZE * 8] = unsafe { uninit() };
     let old_samples_len = match self.window_length {
       WindowLength::Wavelengths(_) => {
         // We want to be as precise as possible with the window length, so we take the last

@@ -86,6 +86,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -147,6 +148,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
 
   just debug-sinsy
 
@@ -314,3 +316,11 @@ build-oscilloscope:
 debug-oscilloscope:
   cd ./engine/oscilloscope && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/oscilloscope.wasm ../../public
+
+debug-line-spectrogram:
+  cd ./engine/spectrum_viz && cargo build --target wasm32-unknown-unknown --no-default-features --features=line_viz && \
+    cp ../target/wasm32-unknown-unknown/debug/spectrum_viz.wasm ../../public/spectrum_viz_full.wasm
+
+build-line-spectrogram:
+  cd ./engine/spectrum_viz && cargo build --release --target wasm32-unknown-unknown --no-default-features --features=line_viz && \
+    cp ../target/wasm32-unknown-unknown/release/spectrum_viz.wasm ../../public/spectrum_viz_full.wasm
