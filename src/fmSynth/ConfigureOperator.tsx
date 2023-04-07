@@ -11,7 +11,7 @@ import {
 } from 'src/controls/Modal';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
-import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
+import ConfigureParamSource, { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/Effect';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 import { buildDefaultParamSource, type ParamSource } from 'src/fmSynth/ParamSource';
@@ -393,6 +393,31 @@ const ConfigureSampleMapping = mkSvelteComponentShim<{
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;
 }>(ConfigureSampleMappingInner as any);
 
+interface ConfigureParamBufferProps {
+  config: Extract<OperatorConfig, { type: 'param buffer' }>;
+  onChange: (newConfig: OperatorConfig) => void;
+}
+
+const ConfigureParamBufferSettings: ControlPanelSetting[] = [
+  {
+    type: 'select',
+    label: 'buffer ix',
+    options: new Array(PARAM_BUFFER_COUNT).fill(0).map((_, ix) => ix.toString()),
+  },
+];
+
+const ConfigureParamBuffer: React.FC<ConfigureParamBufferProps> = ({ config, onChange }) => (
+  <ControlPanel
+    title='param buffer'
+    width={500}
+    settings={ConfigureParamBufferSettings}
+    state={{ 'buffer ix': config.bufferIx.toString() }}
+    onChange={(_key: string, value: string, _state: any) => {
+      onChange({ ...config, bufferIx: parseInt(value, 10) });
+    }}
+  />
+);
+
 const UNISON_DETUNE_PHASE_RANDOMIZATION_SETTINGS = [{ type: 'checkbox', label: 'randomize phase' }];
 
 interface ConfigureUnisonDetunePhaseRandomizationProps {
@@ -557,6 +582,9 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           operatorIx={operatorIx}
           registerGateUngateCallbacks={registerGateUngateCallbacks}
         />
+      ) : null}
+      {config.type === 'param buffer' ? (
+        <ConfigureParamBuffer config={config} onChange={onChange} />
       ) : null}
       <ConfigureEffects
         operatorIx={operatorIx}

@@ -76,7 +76,6 @@ export const cleanup_signal_analyzer = (stateKey: string) => {
     throw new Error(`No signal analyzer instance found for state key ${stateKey}`);
   }
   const state = inst.serialize();
-  console.log(JSON.stringify(state));
   localStorage.setItem(stateKey, JSON.stringify(state));
 
   SignalAnalyzerInstsByStateKey.delete(stateKey);

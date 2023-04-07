@@ -750,13 +750,13 @@ impl OscillatorSource {
         sample_ix_within_frame,
         base_frequency,
       ),
-      OscillatorSource::ParamBuffer(buf_ix) =>
+      &mut OscillatorSource::ParamBuffer(buf_ix) =>
         if cfg!(debug_assertions) {
-          param_buffers[*buf_ix][sample_ix_within_frame]
+          param_buffers[buf_ix][sample_ix_within_frame]
         } else {
           *unsafe {
             param_buffers
-              .get_unchecked(*buf_ix)
+              .get_unchecked(buf_ix)
               .get_unchecked(sample_ix_within_frame)
           }
         },
