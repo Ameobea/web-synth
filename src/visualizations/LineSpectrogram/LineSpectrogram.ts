@@ -1,3 +1,5 @@
+import { get, Writable, writable } from 'svelte/store';
+
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 import { LineSpectrogramFFTSize } from 'src/visualizations/LineSpectrogram/conf';
@@ -22,6 +24,7 @@ const LineSpectrogramWasmBytes = new AsyncOnce(
  * Y position at each point representing the amplitude of the frequency at that point.
  */
 export class LineSpectrogram {
+  public store: Writable<LineSpectrogramUIState>;
   private analyserNode: AnalyserNode;
   private renderWorker: Worker;
   private notifySAB: SharedArrayBuffer;
@@ -32,14 +35,20 @@ export class LineSpectrogram {
   private running = false;
 
   constructor(initialState: LineSpectrogramUIState, analyserNode: AnalyserNode) {
+    this.store = writable(initialState);
+    if (analyserNode.fftSize !== LineSpectrogramFFTSize) {
+      throw new Error(
+        `LineSpectrogram requires analyserNode.fftSize to be ${LineSpectrogramFFTSize}, but it was ${analyserNode.fftSize}`
+      );
+    }
     this.analyserNode = analyserNode;
     this.renderWorker = new Worker(new URL('./LineSpectrogram.worker', import.meta.url));
 
     this.notifySAB = new SharedArrayBuffer(4);
     this.notifySABI32 = new Int32Array(this.notifySAB);
-    this.frequencyDataSAB = new SharedArrayBuffer(LineSpectrogramFFTSize);
+    this.frequencyDataSAB = new SharedArrayBuffer(LineSpectrogramFFTSize / 2);
     this.frequencyDataSABU8 = new Uint8Array(this.frequencyDataSAB);
-    this.frequencyDataBufTemp = new Uint8Array(LineSpectrogramFFTSize);
+    this.frequencyDataBufTemp = new Uint8Array(LineSpectrogramFFTSize / 2);
 
     this.init().catch(err => {
       logError('Error initializing oscilloscope', err);
@@ -101,7 +110,6 @@ export class LineSpectrogram {
   }
 
   public serialize(): LineSpectrogramUIState {
-    // TODO
-    return {};
+    return get(this.store);
   }
 }

@@ -14,6 +14,12 @@ export type LineSpectrogramWorkerMessage =
   | { type: 'start' }
   | { type: 'stop' };
 
-export interface LineSpectrogramUIState {}
+export interface LineSpectrogramUIState {
+  rangeDb: [number, number];
+  smoothingCoeff: number;
+}
 
-export const buildDefaultLineSpecrogramUIState = (): LineSpectrogramUIState => ({});
+export const buildDefaultLineSpecrogramUIState = (): LineSpectrogramUIState => ({
+  rangeDb: [-80, -20],
+  smoothingCoeff: 0.9,
+});

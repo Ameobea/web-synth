@@ -1,7 +1,7 @@
 use canvas_utils::{write_line_bilinear, VizView};
 
 use crate::{
-  conf::{PAST_WINDOW_COUNT, SAMPLE_RATE},
+  conf::{PAST_WINDOW_COUNT, PEAK_LEVEL_PAST_WINDOW_LOOKBACK_COUNT, SAMPLE_RATE},
   f0_estimation::YinCtx,
   FRAME_SIZE,
 };
@@ -45,6 +45,7 @@ impl WindowLength {
 pub(crate) struct PreviousWindow {
   pub image_data: Vec<u8>,
   pub samples: Vec<f32>,
+  pub abs_peak_level: f32,
 }
 
 impl PreviousWindow {
@@ -52,6 +53,7 @@ impl PreviousWindow {
     PreviousWindow {
       image_data: Vec::new(),
       samples: Vec::new(),
+      abs_peak_level: 0.,
     }
   }
 }
@@ -82,6 +84,11 @@ pub(crate) struct Viz {
   /// Previous rendered image data, with [0] being the most recent
   pub previous_windows: [PreviousWindow; PAST_WINDOW_COUNT],
   pub yin_ctx: YinCtx,
+  /// This holds the locked y range for the current window which is computed using the detected RMS
+  /// level. It is locked per frame to avoid distorting waveforms when the level changes during a
+  /// window. Values outside of this range are clamped.
+  pub cur_frame_y_range: (f32, f32),
+  pub cur_window_peak_level: f32,
 }
 
 impl Viz {
@@ -129,6 +136,10 @@ impl Viz {
       }
     }
 
+    for &sample in samples {
+      self.cur_window_peak_level = self.cur_window_peak_level.max(sample.abs());
+    }
+
     self.samples.extend_from_slice(samples);
   }
 
@@ -146,9 +157,20 @@ impl Viz {
     }
   }
 
+  fn compute_y_range(&self) -> (f32, f32) {
+    let mut peak = 0.;
+    for past_window_ix in 0..PEAK_LEVEL_PAST_WINDOW_LOOKBACK_COUNT {
+      peak = self.previous_windows[past_window_ix]
+        .abs_peak_level
+        .max(peak);
+    }
+
+    let scale = peak.max(1.);
+    (-scale, scale)
+  }
+
   fn compute_sample_coords(&self, cur_bpm: f32, sample_ix: usize, sample: f32) -> (f32, f32) {
-    let min_y = -1.0f32;
-    let max_y = 1.0f32;
+    let (min_y, max_y) = self.cur_frame_y_range;
 
     let phase = sample_ix as f32 / self.get_view_length_samples(cur_bpm);
     let phase = clamp(0., 1., phase);
@@ -159,31 +181,23 @@ impl Viz {
     // y is flipped
     let y = (self.view.height - 1) as f32 - y;
 
-    let x_px = clamp(
-      0.,
-      self.view.width as f32 * self.view.dpr as f32 - 1.,
-      x * self.view.dpr as f32,
-    );
-    let y_px = clamp(
-      0.,
-      self.view.height as f32 * self.view.dpr as f32 - 1.,
-      y * self.view.dpr as f32,
-    );
+    let x_px = clamp(0., self.view.width as f32 - 1., x);
+    let y_px = clamp(0., self.view.height as f32 - 1., y);
 
     (x_px, y_px)
   }
 
   fn render_one_sample(&mut self, cur_bpm: f32, sample_ix: usize) {
     let sample = self.samples[sample_ix];
-    let last_sample = if sample_ix == 0 {
-      sample
+    let (x_px, y_px) = self.compute_sample_coords(cur_bpm, sample_ix, sample);
+
+    let (mut last_x_px, mut last_y_px) = if sample_ix == 0 {
+      (x_px, y_px)
     } else {
-      self.samples[sample_ix - 1]
+      let last_sample = self.samples[sample_ix - 1];
+      self.compute_sample_coords(cur_bpm, sample_ix - 1, last_sample)
     };
 
-    let (mut last_x_px, mut last_y_px) =
-      self.compute_sample_coords(cur_bpm, sample_ix - 1, last_sample);
-    let (x_px, y_px) = self.compute_sample_coords(cur_bpm, sample_ix, sample);
     // Avoid drawing lines backwards if we've just looped around
     if last_x_px >= x_px {
       last_x_px = x_px;
@@ -280,7 +294,10 @@ impl Viz {
     let new_prev_window = PreviousWindow {
       image_data: std::mem::replace(&mut self.image_data, oldest_window.image_data),
       samples: std::mem::replace(&mut self.samples, oldest_window.samples),
+      abs_peak_level: self.cur_window_peak_level,
     };
+    self.cur_window_peak_level = 0.;
+    self.cur_frame_y_range = self.compute_y_range();
 
     // Resize new image data buffer for current view
     let image_data_len_bytes = self.view.get_image_data_buffer_size_bytes();

@@ -49,6 +49,8 @@ static mut VIZ: Viz = Viz {
   ],
   frozen_window_complete: false,
   yin_ctx: YinCtx::new(),
+  cur_frame_y_range: (-1., 1.),
+  cur_window_peak_level: 0.,
 };
 
 static mut DID_SET_PANIC_HOOK: bool = false;

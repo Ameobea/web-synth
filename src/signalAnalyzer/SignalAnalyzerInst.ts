@@ -47,6 +47,9 @@ export class SignalAnalyzerInst {
     this.oscilloscopeUIState = writable(initialState.oscilloscopeUIState);
     this.input = ctx.createAnalyser();
     this.input.fftSize = 4096;
+    this.input.minDecibels = initialState.lineSpectrogramUIState.rangeDb[0];
+    this.input.maxDecibels = initialState.lineSpectrogramUIState.rangeDb[1];
+    this.input.smoothingTimeConstant = initialState.lineSpectrogramUIState.smoothingCoeff;
     this.silentGain = ctx.createGain();
     this.silentGain.gain.value = 0;
     this.silentGain.connect(ctx.destination);

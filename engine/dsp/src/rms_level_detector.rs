@@ -10,12 +10,12 @@ pub struct RMSLevelDetector<const TEND_TOWARDS_ZERO: bool> {
 }
 
 impl<const TEND_TOWARDS_ZERO: bool> RMSLevelDetector<TEND_TOWARDS_ZERO> {
-  pub fn new(window_size_samples: f32) -> Self {
+  pub const fn new(window_size_samples: usize) -> Self {
     RMSLevelDetector {
       buf: CircularBuffer::new(),
       sum: 0.,
-      negative_window_size_samples: -((window_size_samples.ceil()) as isize),
-      window_size_samples_f32: window_size_samples.ceil(),
+      negative_window_size_samples: -((window_size_samples) as isize),
+      window_size_samples_f32: window_size_samples as f32,
     }
   }
 

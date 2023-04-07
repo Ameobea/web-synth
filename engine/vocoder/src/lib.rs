@@ -46,7 +46,7 @@ pub struct LevelDetectionBand(RMSLevelDetector<false>);
 impl LevelDetectionBand {
   fn new(band_center_freq_hz: f32) -> Self {
     let window_size_samples = compute_level_detection_window_samples(band_center_freq_hz);
-    LevelDetectionBand(RMSLevelDetector::new(window_size_samples))
+    LevelDetectionBand(RMSLevelDetector::new(window_size_samples.ceil() as usize))
   }
 }
 

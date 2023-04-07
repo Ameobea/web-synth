@@ -8,12 +8,20 @@
   export let inst: Oscilloscope;
   export let uiState: Writable<OscilloscopeUIState>;
 
-  let windowWidth = 100;
-  $: width = windowWidth; // - 12;
-  $: height = width * 0.2;
-  $: inst.resizeView(width, height);
-
   const dpr = Math.floor(window.devicePixelRatio || 1);
+  let windowWidth = 100;
+  $: width = (() => {
+    const remainder = windowWidth % dpr;
+    return windowWidth - remainder;
+  })();
+  $: height = (() => {
+    const baseHeight = Math.floor(width * 0.2);
+    const remainder = baseHeight % dpr;
+    return baseHeight - remainder;
+  })();
+  $: inst.resizeView(width, height);
+  $: console.log({ width, height });
+
   const useOscilloscopeViz = (canvas: HTMLCanvasElement) => {
     const offscreenCanvas = canvas.transferControlToOffscreen();
 

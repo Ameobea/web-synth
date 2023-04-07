@@ -2,14 +2,14 @@ use canvas_utils::{write_pixel_bilinear, VizView};
 use ndarray::ArrayView1;
 
 use super::{
-  conf::{CLEAR_COLOR, FFT_SIZE, LINE_COLOR},
+  conf::{CLEAR_COLOR, FFT_BUFFER_SIZE, LINE_COLOR},
   cubic_spline::draw_cubic_spline,
 };
 
 pub(super) struct LineSpectrumCtx {
   pub view: VizView,
-  pub frequency_data_buf: [u8; FFT_SIZE],
-  pub frequency_data_buf_f32: [f32; FFT_SIZE],
+  pub frequency_data_buf: [u8; FFT_BUFFER_SIZE],
+  pub frequency_data_buf_f32: [f32; FFT_BUFFER_SIZE],
   /// RGBA format
   pub image_data_buf: Vec<u8>,
 }
@@ -45,9 +45,9 @@ impl LineSpectrumCtx {
       return;
     }
 
-    // Convert our u8 frequency data to f32
+    // Convert our u8 frequency data to f32 and pre-scale to canvas height
     for (i, &byte) in self.frequency_data_buf.iter().enumerate() {
-      self.frequency_data_buf_f32[i] = byte as f32 / 255.0;
+      self.frequency_data_buf_f32[i] = (byte as f32 / 255.0) * (self.view.height - 1) as f32;
     }
 
     self.clear_image_data_buf();
@@ -62,7 +62,7 @@ impl LineSpectrumCtx {
 
     let ys: ArrayView1<f32> = ArrayView1::from(&self.frequency_data_buf_f32);
 
-    let points_per_pixel = 8;
+    let points_per_pixel = 2.5;
     draw_cubic_spline(
       self.view.width as u32,
       self.view.height as u32,

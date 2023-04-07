@@ -84,8 +84,8 @@ class LineSpectrogramWorker {
       return;
     }
 
-    this.canvas.width = width;
-    this.canvas.height = height;
+    this.canvas.width = width * this.dpr;
+    this.canvas.height = height * this.dpr;
     this.maybeSetViewToWasm();
   }
 

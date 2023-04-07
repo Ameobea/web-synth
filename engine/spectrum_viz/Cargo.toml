@@ -27,5 +27,5 @@ textplots = "0.8"
 
 [features]
 bindgen = ["wasm-bindgen", "wbg_logging"]
-default = ["bindgen"]
+default = ["bindgen", "line_viz"]
 line_viz = ["ndarray", "canvas_utils"]

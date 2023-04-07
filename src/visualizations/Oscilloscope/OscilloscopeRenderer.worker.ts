@@ -84,7 +84,9 @@ class OscilloscopeRendererWorker {
 
       const str = String.fromCharCode(...memoryU8.slice(strPtr, strPtr + strLen));
       // Write to bottom left of canvas
-      this.ctx.font = '12px Hack, "Oxygen Mono", "Ubuntu Mono", "Lucida Console", monospace';
+      this.ctx.font = `${
+        12 * this.dpr
+      }px Hack, "Oxygen Mono", "Ubuntu Mono", "Lucida Console", monospace`;
       this.ctx.fillStyle = 'white';
       this.ctx.fillText(str, 4, this.view.height - 4);
     }
@@ -134,8 +136,8 @@ class OscilloscopeRendererWorker {
       case 'resizeView':
         const { newWidth, newHeight } = message;
         if (this.view) {
-          this.view.width = newWidth;
-          this.view.height = newHeight;
+          this.view.width = newWidth * this.dpr;
+          this.view.height = newHeight * this.dpr;
         }
         this.maybeSetViewToWasm();
         break;

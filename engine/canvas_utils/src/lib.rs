@@ -1,4 +1,4 @@
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VizView {
   /// device pixel ratio
   pub dpr: usize,
@@ -10,11 +10,13 @@ const BYTES_PER_PX: usize = 4;
 
 impl VizView {
   /// Assumes RGBA format
+  #[inline]
   pub fn get_image_data_buffer_size_bytes(&self) -> usize {
     self.width * self.dpr * self.height * self.dpr * BYTES_PER_PX
   }
 }
 
+#[inline]
 pub fn write_pixel(
   pixels: &mut [(u8, u8, u8, u8)],
   view: &VizView,
@@ -22,19 +24,19 @@ pub fn write_pixel(
   y_px: usize,
   val: (u8, u8, u8, u8),
 ) {
-  let px_ix = y_px as usize * view.width + x_px as usize;
-  if cfg!(debug_assertions) {
-    if px_ix >= pixels.len() {
-      panic!(
-        "write_pixel_bilinearly: px_ix: {}, pixels.len(): {}; x_px: {}, y_px: {}",
-        px_ix,
-        pixels.len(),
-        x_px,
-        y_px,
-      );
-    }
+  let px_ix = y_px * view.dpr * view.width * view.dpr + x_px * view.dpr;
+  if px_ix >= pixels.len() {
+    panic!(
+      "write_pixel: px_ix: {}, pixels.len(): {}; x_px: {}, y_px: {}; view: {:?}",
+      px_ix,
+      pixels.len(),
+      x_px,
+      y_px,
+      view,
+    );
   }
-  let mut target = &mut pixels[px_ix];
+
+  let mut target = unsafe { pixels.get_unchecked_mut(px_ix) };
   target.0 = target.0.saturating_add(val.0);
   target.1 = target.1.saturating_add(val.1);
   target.2 = target.2.saturating_add(val.2);
@@ -42,6 +44,7 @@ pub fn write_pixel(
 
 /// Writes a pixel to the image data buffer, using bilinear interpolation to handle fractional
 /// pixel coordinates
+#[inline]
 pub fn write_pixel_bilinear(
   pixels: &mut [(u8, u8, u8, u8)],
   view: &VizView,
@@ -57,10 +60,8 @@ pub fn write_pixel_bilinear(
   let x_frac = x_px - x1 as f32;
   let y_frac = y_px - y1 as f32;
 
-  let row_length_px = view.width;
-
-  let is_x2_out_of_bounds = x2 >= row_length_px;
-  let is_y2_out_of_bounds = y2 >= pixels.len() / row_length_px;
+  let is_x2_out_of_bounds = x2 >= view.width;
+  let is_y2_out_of_bounds = y2 >= view.height;
 
   let w11 = (1.0 - x_frac) * (1.0 - y_frac);
   let w12 = x_frac * (1.0 - y_frac);
@@ -104,6 +105,7 @@ pub fn write_pixel_bilinear(
   }
 }
 
+#[inline]
 pub fn write_line_bilinear(
   pixels: &mut [(u8, u8, u8, u8)],
   view: &VizView,

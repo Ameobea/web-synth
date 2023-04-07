@@ -3,12 +3,16 @@
 
   export let inst: LineSpectrogram;
 
+  const dpr = Math.floor(window.devicePixelRatio || 1);
   let windowWidth = 100;
-  $: width = Math.floor(windowWidth * 0.8);
+  $: width = (() => {
+    const baseWidth = Math.floor(windowWidth * 0.75);
+    const remainder = baseWidth % dpr;
+    return baseWidth - remainder;
+  })();
   const height = 400;
   $: inst.resizeView(width, height);
 
-  const dpr = Math.floor(window.devicePixelRatio || 1);
   const useLineSpectrogram = (canvas: HTMLCanvasElement) => {
     const offscreenCanvas = canvas.transferControlToOffscreen();
 

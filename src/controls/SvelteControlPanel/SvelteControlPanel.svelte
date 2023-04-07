@@ -10,6 +10,14 @@
         initial?: number;
       }
     | {
+        type: 'interval';
+        label: string;
+        min: number;
+        max: number;
+        step?: number;
+        initial?: [number, number];
+      }
+    | {
         type: 'select';
         label: string;
         options: string[] | Record<any, any>;

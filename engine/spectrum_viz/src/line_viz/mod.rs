@@ -1,6 +1,6 @@
 use canvas_utils::VizView;
 
-use self::{conf::FFT_SIZE, viz::LineSpectrumCtx};
+use self::{conf::FFT_BUFFER_SIZE, viz::LineSpectrumCtx};
 
 pub(self) mod conf;
 pub(crate) mod cubic_spline;
@@ -11,6 +11,7 @@ extern "C" {
   fn log_info(ptr: *const u8, len: usize);
 }
 
+#[allow(dead_code)]
 pub(self) fn log(msg: &str) {
   let bytes = msg.as_bytes();
   let len = bytes.len();
@@ -45,8 +46,8 @@ static mut CTX: LineSpectrumCtx = LineSpectrumCtx {
     height: 0,
     width: 0,
   },
-  frequency_data_buf: [0; FFT_SIZE],
-  frequency_data_buf_f32: [0.; FFT_SIZE],
+  frequency_data_buf: [0; FFT_BUFFER_SIZE],
+  frequency_data_buf_f32: [0.; FFT_BUFFER_SIZE],
   image_data_buf: Vec::new(),
 };
 

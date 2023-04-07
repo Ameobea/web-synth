@@ -2,14 +2,16 @@ use ndarray::prelude::*;
 
 /// Computes the coefficients for a cubic spline interpolation.  Given the x and y values of the
 /// data points, it returns the coefficients (a, b, c, d) for the piecewise cubic functions.
-fn compute_cubic_spline_coefficients(
+#[inline(never)]
+fn compute_cubic_spline_coefficients<'y>(
   x: &Array1<f32>,
-  y: &ArrayView1<f32>,
-) -> (Array1<f32>, Array1<f32>, Array1<f32>, Array1<f32>) {
+  y: &'y ArrayView1<f32>,
+) -> (ArrayView1<'y, f32>, Array1<f32>, Array1<f32>, Array1<f32>) {
   let n = x.len() - 1;
 
   // Compute the intervals (h) between consecutive x values.
-  let h = x.slice(s![1..]).to_owned() - &x.slice(s![..n]);
+  // let h = x.slice(s![1..]).to_owned() - &x.slice(s![..n]);
+  let h = Array1::<f32>::from_shape_fn(n, |i| x[i + 1] - x[i]);
 
   let y_diff1 = &y.slice(s![2..]) - &y.slice(s![1..n]);
   let y_diff2 = &y.slice(s![1..n]) - &y.slice(s![..n - 1]);
@@ -49,12 +51,7 @@ fn compute_cubic_spline_coefficients(
   }
 
   // Return the coefficients for the piecewise cubic functions: a (the input y values), b, c, and d.
-  (
-    y.slice(s![..n]).to_owned(),
-    b,
-    c.slice(s![..n]).to_owned(),
-    d,
-  )
+  (y.slice(s![..n]), b, c.slice(s![..n]).to_owned(), d)
 }
 
 /// Evaluates a cubic spline at a given x value.  It takes the x value, the corresponding x-value
@@ -78,10 +75,10 @@ fn clamp(x: f32, min: f32, max: f32) -> f32 {
 pub const SAMPLE_RATE: f32 = 44_100.;
 pub const NYQUIST: f32 = SAMPLE_RATE / 2.;
 
-fn frequency_bin_to_pixel(bin_index: usize, num_bins: usize, canvas_width: f32) -> Option<f32> {
-  let min_log_freq = 10.0f32;
+fn frequency_bin_to_pixel(bin_ix: usize, num_bins: usize, canvas_width: f32) -> Option<f32> {
+  let min_log_freq = 20.0f32;
 
-  let bin_frequency = (bin_index as f32) * NYQUIST / (num_bins as f32);
+  let bin_frequency = (bin_ix as f32) * NYQUIST / (num_bins as f32);
   if bin_frequency < min_log_freq {
     return None;
   }
@@ -96,15 +93,48 @@ fn frequency_bin_to_pixel(bin_index: usize, num_bins: usize, canvas_width: f32) 
   Some(log_position * canvas_width)
 }
 
-/// Assumes that frequency bins are spaced linearly, but will plot them on a log10 scale.
+/// Estimates the length of a cubic spline segment using the trapezoidal rule.
+///
+/// Given the starting and ending x values and the cubic spline coefficients (bi, ci, di), this
+/// function estimates the length of the curve segment between these points.
+fn compute_spline_segment_length<const NUM_INTERVALS: usize>(
+  start_x: f32,
+  end_x: f32,
+  bi: f32,
+  ci: f32,
+  di: f32,
+) -> f32 {
+  let step = (end_x - start_x) / NUM_INTERVALS as f32;
+
+  let mut length = 0.0;
+  for i in 0..NUM_INTERVALS {
+    let x0 = start_x + i as f32 * step;
+    let x1 = start_x + (i + 1) as f32 * step;
+
+    let dx0 = x0 - start_x;
+    let dx1 = x1 - start_x;
+
+    let dy_dx0 = bi + 2.0 * ci * dx0 + 3.0 * di * dx0.powi(2);
+    let dy_dx1 = bi + 2.0 * ci * dx1 + 3.0 * di * dx1.powi(2);
+
+    let f0 = f32::sqrt(1.0 + dy_dx0.powi(2));
+    let f1 = f32::sqrt(1.0 + dy_dx1.powi(2));
+
+    length += 0.5 * (f0 + f1) * step;
+  }
+
+  length
+}
+
+/// Assumes that frequency bins are spaced linearly, but will plot them on a log10 scale.  Assumes
+/// that `y_values` is pre-scaled to [0, (canvas_height-1)].
 pub(crate) fn draw_cubic_spline(
   canvas_width: u32,
   canvas_height: u32,
   y_values: &ArrayView1<f32>,
-  points_per_pixel: u32,
+  points_per_pixel: f32,
   mut plot_pixel: impl FnMut(f32, f32),
 ) {
-  // TODO: optimize?
   let mut x_values = Vec::with_capacity(y_values.len());
   for bin_ix in 0..y_values.len() {
     let x = frequency_bin_to_pixel(bin_ix, y_values.len(), canvas_width as f32);
@@ -123,16 +153,19 @@ pub(crate) fn draw_cubic_spline(
   for i in 0..n {
     let x_start = x_values[i];
     let x_end = x_values[i + 1];
-    let step = (x_end - x_start) / (points_per_pixel as f32);
 
-    let mut x = x_start;
-    while x < x_end {
+    let spline_len = compute_spline_segment_length::<4>(x_start, x_end, b[i], c[i], d[i]);
+    let steps = ((spline_len * points_per_pixel) as usize).max(2);
+
+    let x_step = (x_end - x_start) / steps as f32;
+    // skip last point since we'll draw it next iteration
+    for step_ix in 0..(steps - 1) {
+      let x = x_start + x_step * step_ix as f32;
       let y = eval_spline(x, x_values[i], a[i], b[i], c[i], d[i]);
-      let y_pixel = (canvas_height as f32 - 1.0) * (1.0 - y); // Re-normalize y to canvas_height
-      let y_pixel = clamp(y_pixel, 0.0, canvas_height as f32 - 1.0);
-      plot_pixel(x, y_pixel);
-
-      x += step;
+      // flip y axis since y=0 is at the top of the canvas
+      let y = clamp(y, 0., (canvas_height - 1) as f32);
+      let y = (canvas_height - 1) as f32 - y;
+      plot_pixel(x, y);
     }
   }
 }
