@@ -66,7 +66,7 @@ pub fn create_view_context(vc_name: String) {
   view_context.init();
   let vcm = get_vcm();
   let new_vc_ix = vcm.add_view_context(uuid, vc_name, view_context);
-  vcm.set_active_view(new_vc_ix);
+  // vcm.set_active_view(new_vc_ix);
 }
 
 #[wasm_bindgen]

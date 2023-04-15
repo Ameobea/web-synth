@@ -86,9 +86,21 @@ export const updateGraph = (
     );
 
     if (params) {
-      Object.entries(params).forEach(([key, val]) => {
+      for (const [key, val] of Object.entries(params)) {
         (newNode as any)[key] = val;
-      });
+      }
+    }
+
+    // If this is a brand new node, place it in the middle of the viewport
+    if (!params) {
+      // format: [ startx, starty, width, height ]
+      const visibleArea: Float32Array = graph.list_of_graphcanvas[0].visible_area;
+
+      if (visibleArea) {
+        const centerX = visibleArea[0] + visibleArea[2] / 2;
+        const centerY = visibleArea[1] + visibleArea[3] / 2;
+        newNode.pos = [centerX, centerY];
+      }
     }
 
     graph.add(newNode);
@@ -120,7 +132,7 @@ export const updateGraph = (
   // We start by looping through the list of connections and checking if they all exist.  If they do not, we perform the connection now.
   //
   // Keep track of connections so that we can efficiently go back and check for missing connections later.
-  type ConnectionsMap = Map<string, ArrayElementOf<typeof patchNetwork['connections']>[]>;
+  type ConnectionsMap = Map<string, ArrayElementOf<(typeof patchNetwork)['connections']>[]>;
   const connectionsByNode: ConnectionsMap = patchNetwork.connections.reduce(
     (acc, connection) =>
       acc.set(connection[0].vcId, [...(acc.get(connection[0].vcId) || []), connection]),

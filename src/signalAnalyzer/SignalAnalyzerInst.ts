@@ -35,6 +35,7 @@ export const buildDefaultSignalAnalyzerInstState = (): SerializedSignalAnalyzerI
 });
 
 export class SignalAnalyzerInst {
+  private destroyed = false;
   public input: AnalyserNode;
   private awpHandle: AudioWorkletNode | null = null;
   public oscilloscope: Oscilloscope;
@@ -74,7 +75,16 @@ export class SignalAnalyzerInst {
 
   private async init() {
     await SignalAnalyzerAWPRegistered.get();
-    this.awpHandle = new AudioWorkletNode(ctx, 'signal-analyzer-awp');
+    if (this.destroyed) {
+      console.warn('Signal analyzer already destroyed');
+      return;
+    }
+
+    this.awpHandle = new AudioWorkletNode(ctx, 'signal-analyzer-awp', {
+      numberOfInputs: 1,
+      channelCount: 1,
+      numberOfOutputs: 1,
+    });
     this.awpHandle.port.onmessage = this.handleAWPMessage;
     this.input.connect(this.awpHandle);
     this.awpHandle.connect(this.silentGain);
@@ -101,6 +111,13 @@ export class SignalAnalyzerInst {
   }
 
   public destroy() {
+    if (this.destroyed) {
+      console.warn('Signal analyzer already destroyed');
+      return;
+    }
+    this.destroyed = true;
+
+    console.warn('DESTROYING SIGNAL ANALYZER');
     this.oscilloscope.destroy();
     this.lineSpectrogram.destroy();
     if (this.awpHandle) {

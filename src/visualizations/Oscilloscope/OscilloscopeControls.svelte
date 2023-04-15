@@ -110,6 +110,10 @@
           }
           inst.setWindow(newWindowType, state.lastValueByWindowType[newWindowType]);
 
+          const frameByFrame =
+            newWindowType === OscilloscopeWindowType.Wavelengths ? false : state.frameByFrame;
+          inst.setFrameByFrame(frameByFrame);
+
           return {
             ...state,
             window: {
@@ -117,6 +121,7 @@
               type: newWindowType,
               value: state.lastValueByWindowType[newWindowType],
             },
+            frameByFrame,
           };
         });
         break;

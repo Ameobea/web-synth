@@ -117,6 +117,13 @@ class LineSpectrogramWorker {
     const runToken = Math.random() + Math.random() * 10 + Math.random() * 100;
     this.runToken = runToken;
 
+    const hasWaitAsync = typeof Atomics.waitAsync === 'function';
+    if (!hasWaitAsync) {
+      console.warn(
+        'Atomics.waitAsync not available, falling back to less efficient `Atomics.wait`-based implementation'
+      );
+    }
+
     const frequencyDataU8 = this.frequencyDataSABU8;
     const frequencyDataBufPtr = (
       this.wasmInstance.exports.line_spectrogram_get_frequency_data_ptr as () => number
@@ -125,17 +132,27 @@ class LineSpectrogramWorker {
     const getImageDataPtr = this.wasmInstance.exports
       .line_spectrogram_get_image_data_ptr as () => number;
 
+    let lastRenderedFrameIx = -1;
+
     while (true) {
       if (this.runToken !== runToken) {
         // A new animation loop has started, so stop this one.
         return;
       }
 
-      const cur = Atomics.load(this.notifySABI32, 0);
-      const res = await Atomics.waitAsync(this.notifySABI32, 0, cur).value;
+      let res: 'not-equal' | 'timed-out' | 'ok';
+      if (hasWaitAsync) {
+        res = await Atomics.waitAsync(this.notifySABI32, 0, lastRenderedFrameIx).value;
+      } else {
+        res = Atomics.wait(this.notifySABI32, 0, lastRenderedFrameIx, 5);
+        // yield to allow microtasks to run
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
       if (res === 'timed-out') {
         continue;
       }
+      lastRenderedFrameIx = Atomics.load(this.notifySABI32, 0);
 
       // We have fresh frequency data to process
       let memoryU8 = this.getWasmMemoryBufferU8Clamped();

@@ -346,16 +346,29 @@ class OscilloscopeRendererWorker {
     const runToken = Math.random() + Math.random() * 10 + Math.random() * 100;
     this.runToken = runToken;
 
+    const hasWaitAsync = typeof Atomics.waitAsync === 'function';
+    if (!hasWaitAsync) {
+      console.warn(
+        'Atomics.waitAsync not available, falling back to less efficient `Atomics.wait`-based implementation'
+      );
+    }
+
     while (this.running) {
       // Wait for the realtime audio rendering thread to render a frame
-      const rtAudioWaitRes = Atomics.waitAsync(
-        this.sabI32!,
-        7,
-        this.lastProcessedBufferHeadIx,
-        500
-      );
+      if (hasWaitAsync) {
+        const rtAudioWaitRes = Atomics.waitAsync(
+          this.sabI32!,
+          7,
+          this.lastProcessedBufferHeadIx,
+          500
+        );
 
-      await rtAudioWaitRes.value;
+        await rtAudioWaitRes.value;
+      } else {
+        Atomics.wait(this.sabI32!, 7, this.lastProcessedBufferHeadIx, 5);
+        // yield to allow microtasks to run
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
 
       if (this.runToken !== runToken) {
         break;

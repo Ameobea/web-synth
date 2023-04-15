@@ -33,6 +33,7 @@ export class LineSpectrogram {
   private frequencyDataSABU8: Uint8Array;
   private frequencyDataBufTemp: Uint8Array;
   private running = false;
+  private frameIx = 0;
 
   constructor(initialState: LineSpectrogramUIState, analyserNode: AnalyserNode) {
     this.store = writable(initialState);
@@ -73,11 +74,14 @@ export class LineSpectrogram {
       return;
     }
 
+    const frameIx = (this.frameIx + 1) % 100_000;
+    this.frameIx = frameIx;
+
     // Browser is hilarious and doesn't let us write to shared buffer directly, so we have to waste a copy.
     this.analyserNode.getByteFrequencyData(this.frequencyDataBufTemp);
     this.frequencyDataSABU8.set(this.frequencyDataBufTemp);
-    Atomics.store(this.notifySABI32, 0, 1);
-    Atomics.notify(this.notifySABI32, 0, 1);
+    Atomics.store(this.notifySABI32, 0, frameIx);
+    Atomics.notify(this.notifySABI32, 0);
 
     requestAnimationFrame(() => this.animate());
   };
