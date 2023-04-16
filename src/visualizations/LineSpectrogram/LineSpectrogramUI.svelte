@@ -1,7 +1,13 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
+  import type { Writable } from 'svelte/store';
+
   import type { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
+  import { LineSpectrumUIInst } from 'src/visualizations/LineSpectrogram/LineSpectrogramUIInst';
+  import type { LineSpectrogramUIState } from 'src/visualizations/LineSpectrogram/types';
 
   export let inst: LineSpectrogram;
+  export let store: Writable<LineSpectrogramUIState>;
 
   const dpr = Math.floor(window.devicePixelRatio || 1);
   let windowWidth = 100;
@@ -11,7 +17,27 @@
     return baseWidth - remainder;
   })();
   const height = 400;
-  $: inst.resizeView(width, height);
+
+  let container: HTMLDivElement | null = null;
+  let uiInst: LineSpectrumUIInst | null = null;
+  $: if (container) {
+    uiInst?.destroy();
+    uiInst = new LineSpectrumUIInst(
+      container,
+      { width, height },
+      $store.rangeDb[0],
+      $store.rangeDb[1]
+    );
+  }
+  onDestroy(() => {
+    uiInst?.destroy();
+  });
+
+  $: {
+    inst.resizeView(width, height);
+    uiInst?.updateSize({ width, height });
+  }
+  $: uiInst?.updateYRange($store.rangeDb[0], $store.rangeDb[1]);
 
   const useLineSpectrogram = (canvas: HTMLCanvasElement) => {
     const offscreenCanvas = canvas.transferControlToOffscreen();
@@ -20,12 +46,40 @@
       inst.setCanvas(offscreenCanvas, dpr);
     }
   };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    const { x, y } = e;
+    const { left, top } = container!.getBoundingClientRect();
+    const canvasX = x - left;
+    const canvasY = y - top;
+    console.log(canvasX, canvasY);
+    uiInst?.onMouseMove(canvasX, canvasY);
+  };
+
+  const handleMouseLeave = () => {
+    uiInst?.onMouseOut();
+  };
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} />
-<canvas
-  width={width * dpr}
-  height={height * dpr}
-  style="width: {width}px; height: {height}px;"
-  use:useLineSpectrogram
-/>
+<div bind:this={container} class="container">
+  <canvas
+    width={width * dpr}
+    height={height * dpr}
+    style="width: {width}px; height: {height}px;"
+    use:useLineSpectrogram
+    on:mousemove={handleMouseMove}
+    on:mouseleave={handleMouseLeave}
+  />
+</div>
+
+<style lang="css">
+  .container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    margin-left: 30px;
+    margin-top: 8px;
+    margin-bottom: 16px;
+  }
+</style>

@@ -78,7 +78,7 @@ pub const NYQUIST: f32 = SAMPLE_RATE / 2.;
 fn frequency_bin_to_pixel(bin_ix: usize, num_bins: usize, canvas_width: f32) -> Option<f32> {
   let min_log_freq = 20.0f32;
 
-  let bin_frequency = (bin_ix as f32) * NYQUIST / (num_bins as f32);
+  let bin_frequency = (bin_ix as f32) * NYQUIST / ((num_bins - 1) as f32);
   if bin_frequency < min_log_freq {
     return None;
   }
@@ -143,8 +143,9 @@ pub(crate) fn draw_cubic_spline(
     }
   }
   let x_values = Array1::from(x_values);
-  // Trim y values to match x values.
-  let y_values = y_values.slice(s![..x_values.len()]);
+  // Trim starting y values to match x values.
+  let trim_count = y_values.len() - x_values.len();
+  let y_values = y_values.slice(s![trim_count..]);
 
   let n = y_values.len() - 1;
 

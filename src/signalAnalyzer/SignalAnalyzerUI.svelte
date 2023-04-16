@@ -9,7 +9,7 @@
 
 <div class="root">
   <div class="line-spectrogram-wrapper">
-    <LineSpectrogramUI inst={inst.lineSpectrogram} />
+    <LineSpectrogramUI inst={inst.lineSpectrogram} store={inst.lineSpectrogram.store} />
     <SignalAnalyzerGlobalControls analyserNode={inst.input} store={inst.lineSpectrogram.store} />
   </div>
   <OscilloscopeUI inst={inst.oscilloscope} uiState={inst.oscilloscopeUIState} />

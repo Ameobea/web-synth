@@ -2,6 +2,7 @@ import { get, Writable, writable } from 'svelte/store';
 
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
+import { LineSpectrogramFFTSize } from 'src/visualizations/LineSpectrogram/conf';
 import { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
 import {
   buildDefaultLineSpecrogramUIState,
@@ -47,7 +48,7 @@ export class SignalAnalyzerInst {
   constructor(ctx: AudioContext, initialState: SerializedSignalAnalyzerInst) {
     this.oscilloscopeUIState = writable(initialState.oscilloscopeUIState);
     this.input = ctx.createAnalyser();
-    this.input.fftSize = 4096;
+    this.input.fftSize = LineSpectrogramFFTSize;
     this.input.minDecibels = initialState.lineSpectrogramUIState.rangeDb[0];
     this.input.maxDecibels = initialState.lineSpectrogramUIState.rangeDb[1];
     this.input.smoothingTimeConstant = initialState.lineSpectrogramUIState.smoothingCoeff;

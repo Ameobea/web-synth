@@ -43,5 +43,5 @@
   {settings}
   state={controlPanelState}
   onChange={handleChange}
-  style={{ width: 'calc(25vw - 42px)' }}
+  style={{ width: 'calc(25vw - 80px)', marginRight: 46 }}
 />
