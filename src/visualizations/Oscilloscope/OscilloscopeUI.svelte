@@ -15,12 +15,11 @@
     return windowWidth - remainder;
   })();
   $: height = (() => {
-    const baseHeight = Math.floor(width * 0.2);
+    const baseHeight = 340;
     const remainder = baseHeight % dpr;
     return baseHeight - remainder;
   })();
   $: inst.resizeView(width, height);
-  $: console.log({ width, height });
 
   const useOscilloscopeViz = (canvas: HTMLCanvasElement) => {
     const offscreenCanvas = canvas.transferControlToOffscreen();

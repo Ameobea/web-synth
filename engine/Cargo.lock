@@ -117,7 +117,6 @@ dependencies = [
  "rand",
  "rand_pcg 0.2.1",
  "uuid",
- "wasm-bindgen",
 ]
 
 [[package]]

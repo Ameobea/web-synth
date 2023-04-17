@@ -11,12 +11,17 @@
 
   const dpr = Math.floor(window.devicePixelRatio || 1);
   let windowWidth = 100;
+  let windowHeight = 100;
   $: width = (() => {
     const baseWidth = Math.floor(windowWidth * 0.75);
     const remainder = baseWidth % dpr;
     return baseWidth - remainder;
   })();
-  const height = 400;
+  $: height = (() => {
+    const baseHeight = Math.max(Math.floor(windowHeight - 122 - 82 - 340), 350);
+    const remainder = baseHeight % dpr;
+    return baseHeight - remainder;
+  })();
 
   let container: HTMLDivElement | null = null;
   let uiInst: LineSpectrumUIInst | null = null;
@@ -61,7 +66,7 @@
   };
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} />
+<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 <div bind:this={container} class="container">
   <canvas
     width={width * dpr}
