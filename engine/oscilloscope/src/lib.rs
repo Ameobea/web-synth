@@ -26,6 +26,7 @@ static mut FRAME_DATA_BUFFER: [f32; FRAME_SIZE] = [0.0; FRAME_SIZE];
 static mut VIZ: Viz = Viz {
   samples: Vec::new(),
   window_length: WindowLength::Beats(1.),
+  snap_f0_to_midi: false,
   last_processed_sample_ix: 0,
   last_rendered_beat: 0.0,
   last_rendered_time: 0.0,
@@ -146,4 +147,10 @@ pub extern "C" fn oscilloscope_renderer_set_frame_by_frame(frame_by_frame: bool)
 pub extern "C" fn oscilloscope_renderer_get_detected_f0_display() -> *const u8 {
   let viz = unsafe { &mut VIZ };
   viz.yin_ctx.get_detected_f0_display()
+}
+
+#[no_mangle]
+pub extern "C" fn oscilloscope_renderer_set_snap_f0_to_midi(snap_f0_to_midi: bool) {
+  let viz = unsafe { &mut VIZ };
+  viz.snap_f0_to_midi = snap_f0_to_midi;
 }

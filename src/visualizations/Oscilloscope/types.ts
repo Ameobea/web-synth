@@ -17,13 +17,15 @@ export type OscilloscopeWorkerMessage =
   | { type: 'setWindow'; window: OscilloscopeWindow }
   | { type: 'setFrozen'; frozen: boolean }
   | { type: 'setFrameByFrame'; frameByFrame: boolean }
-  | { type: 'resizeView'; newWidth: number; newHeight: number };
+  | { type: 'resizeView'; newWidth: number; newHeight: number }
+  | { type: 'setSnapF0ToMIDI'; snapF0ToMIDI: boolean };
 
 export interface OscilloscopeUIState {
   window: OscilloscopeWindow;
   lastValueByWindowType: Record<OscilloscopeWindowType, number>;
   frozen: boolean;
   frameByFrame: boolean;
+  snapF0ToMIDI: boolean;
 }
 
 export const buildDefaultOscilloscopeUIState = (): OscilloscopeUIState => ({
@@ -39,4 +41,5 @@ export const buildDefaultOscilloscopeUIState = (): OscilloscopeUIState => ({
   },
   frozen: false,
   frameByFrame: true,
+  snapF0ToMIDI: false,
 });

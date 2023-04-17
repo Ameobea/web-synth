@@ -39,6 +39,7 @@ class OscilloscopeRendererWorker {
   private window: OscilloscopeWindow = { type: OscilloscopeWindowType.Beats, value: 4 };
   private frozen = false;
   private frameByFrame = true;
+  private snapF0ToMIDI = false;
   private dpr = 1;
   private runToken = 0;
 
@@ -141,10 +142,22 @@ class OscilloscopeRendererWorker {
         }
         this.maybeSetViewToWasm();
         break;
+      case 'setSnapF0ToMIDI':
+        this.setSnapF0ToMIDI(message.snapF0ToMIDI);
+        break;
       default:
         console.warn(
           `Unknown message type in \`OscilloscopeRendererWorker\`: ${(message as any).type}`
         );
+    }
+  }
+
+  setSnapF0ToMIDI(snapF0ToMIDI: boolean) {
+    this.snapF0ToMIDI = snapF0ToMIDI;
+    if (this.wasmInstance) {
+      const setSnapF0ToMIDI = this.wasmInstance.exports
+        .oscilloscope_renderer_set_snap_f0_to_midi as (snapF0ToMIDI: boolean) => void;
+      setSnapF0ToMIDI(snapF0ToMIDI);
     }
   }
 
@@ -225,6 +238,7 @@ class OscilloscopeRendererWorker {
     this.maybeSetWindowToWasm();
     this.setFrozen(this.frozen);
     this.setFrameByFrame(this.frameByFrame);
+    this.setSnapF0ToMIDI(this.snapF0ToMIDI);
     this.checkAndStart();
   }
 

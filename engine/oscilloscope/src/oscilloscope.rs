@@ -65,6 +65,9 @@ pub(crate) struct Viz {
   pub samples: Vec<f32>,
   /// The user-configured length of the window
   pub window_length: WindowLength,
+  /// Only used when window length is in wavelengths.  If true, the detected fundamental frequency
+  /// will be snapped to the nearest MIDI note.
+  pub snap_f0_to_midi: bool,
   pub last_processed_sample_ix: usize,
   pub last_rendered_beat: f32,
   pub last_rendered_time: f32,
@@ -89,6 +92,12 @@ pub(crate) struct Viz {
   /// window. Values outside of this range are clamped.
   pub cur_frame_y_range: (f32, f32),
   pub cur_window_peak_level: f32,
+}
+
+fn snap_freq_to_nearest_midi_note(freq_hz: f32) -> f32 {
+  let midi_note = 12.0 * (freq_hz / 440.0).log2() + 69.0;
+  let midi_note = midi_note.round();
+  440.0 * 2.0f32.powf((midi_note - 69.0) / 12.0)
 }
 
 impl Viz {
@@ -150,7 +159,11 @@ impl Viz {
       WindowLength::Samples(samples) => samples as f32,
       WindowLength::Wavelengths(multiplier) => {
         let f0 = self.yin_ctx.cur_f0_estimate;
-        let f0 = if f0 > 0.0 { f0 } else { 1.0 };
+        let mut f0 = if f0 > 0.0 { f0 } else { 1.0 };
+        if self.snap_f0_to_midi {
+          super::log("snapping");
+          f0 = snap_freq_to_nearest_midi_note(f0);
+        }
         let period_samples = SAMPLE_RATE / f0;
         period_samples * multiplier
       },

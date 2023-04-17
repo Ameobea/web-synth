@@ -74,6 +74,11 @@ export class Oscilloscope {
     this.renderWorker.postMessage(msg);
   }
 
+  public setSnapF0ToMIDI(snapF0ToMIDI: boolean) {
+    const msg: OscilloscopeWorkerMessage = { type: 'setSnapF0ToMIDI', snapF0ToMIDI };
+    this.renderWorker.postMessage(msg);
+  }
+
   public pause() {
     Atomics.store(this.sab, 0, 1);
   }

@@ -66,6 +66,10 @@
       { label: 'freeze', type: 'checkbox' },
       { label: 'frame by frame', type: 'checkbox' },
     ];
+    if ($state.window.type === OscilloscopeWindowType.Wavelengths) {
+      newSettings.push({ label: 'snap to midi', type: 'checkbox' });
+    }
+
     settings = newSettings;
   }
 
@@ -87,6 +91,7 @@
     'window length': $state.window.value,
     freeze: $state.frozen,
     'frame by frame': $state.frameByFrame,
+    'snap to midi': $state.snapF0ToMIDI,
   };
 
   const handleChange = (key: string, value: any, _state: Record<string, any>) => {
@@ -168,6 +173,19 @@
           return {
             ...state,
             frameByFrame: value,
+          };
+        });
+        break;
+      case 'snap to midi':
+        inst.setSnapF0ToMIDI(value);
+        state.update(state => {
+          if (state.snapF0ToMIDI === value) {
+            return state;
+          }
+
+          return {
+            ...state,
+            snapF0ToMIDI: value,
           };
         });
         break;
