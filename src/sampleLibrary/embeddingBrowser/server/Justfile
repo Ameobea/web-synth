@@ -1,0 +1,7 @@
+set dotenv-load := true
+
+docker-build:
+  docker build -t web-synth-embedding-server .
+
+run:
+  uvicorn main:app --reload --port 8080 --workers 4

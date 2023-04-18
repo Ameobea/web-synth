@@ -89,6 +89,7 @@
     "chartist": "^0.11.4",
     "comlink": "^4.4.1",
     "d3": "^7.8.3",
+    "d3-scale-chromatic": "^3.0.0",
     "dexie": "^3.2.3",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",

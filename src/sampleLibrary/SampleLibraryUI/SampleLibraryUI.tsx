@@ -3,9 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
 
 import './SampleLibraryUI.scss';
+import type { SvelteComponentTyped } from 'svelte';
+
 import Loading from 'src/misc/Loading';
+import EmbeddingBrowserUI from 'src/sampleLibrary/embeddingBrowser/EmbeddingBrowserUI/EmbeddingBrowserUI.svelte';
 import { getIsSampleCached } from 'src/sampleLibrary/sampleCache';
-import { getSample, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { PlayingSampleManager } from 'src/sampleLibrary/SampleLibraryUI/PlayingSampleManager';
+import { mkSvelteComponentShim } from 'src/svelteUtils';
+import tempEmbedding from '../embeddingBrowser/example-res-2.json';
 import useAllSamples, { getSampleDisplayName } from './useAllSamples';
 
 interface PlaySampleIconProps {
@@ -78,21 +84,6 @@ const mkDefaultSampleListingRowRenderer = ({
   return DefaultSampleListingRowRenderer;
 };
 
-const ctx = new AudioContext();
-
-const buildSampleBufferSourceNode = async (
-  descriptor: SampleDescriptor,
-  onFinished: () => void
-): Promise<AudioBufferSourceNode> => {
-  const buffer = await getSample(descriptor);
-  const bufSrc = new AudioBufferSourceNode(ctx);
-  bufSrc.buffer = buffer;
-  bufSrc.connect((ctx as any).globalVolume);
-  bufSrc.onended = onFinished;
-
-  return bufSrc;
-};
-
 interface SampleSearchProps {
   value: string;
   onChange: (newVal: string) => void;
@@ -104,56 +95,6 @@ const SampleSearch: React.FC<SampleSearchProps> = ({ value, onChange }) => (
     <input value={value} onChange={evt => onChange(evt.target.value)} />
   </div>
 );
-
-class PlayingSampleManager {
-  private setPlayingSampleName: (name: string | null) => void;
-  private playingSampleDescriptor: SampleDescriptor | null = null;
-  private playingSample: AudioBufferSourceNode | null = null;
-
-  constructor(setPlayingSampleName: (name: string | null) => void) {
-    this.setPlayingSampleName = setPlayingSampleName;
-  }
-
-  private startPlaying = (desc: SampleDescriptor) => {
-    this.playingSampleDescriptor = desc;
-    this.setPlayingSampleName(desc.name);
-    buildSampleBufferSourceNode(desc, () => {
-      if (this.playingSampleDescriptor?.name === desc.name) {
-        this.playingSample = null;
-        this.setPlayingSampleName(null);
-      }
-    }).then(bufSrc => {
-      // If the playing sample has changed before we fetched this, don't start playing it
-      if (this.playingSampleDescriptor?.name !== desc.name) {
-        return;
-      }
-      bufSrc.start();
-      if (this.playingSample) {
-        console.error('Invariant violation; playing sample buffer was set before fetch completed');
-        this.playingSample.stop();
-      }
-      this.playingSample = bufSrc;
-    });
-  };
-
-  public togglePlaying(desc: SampleDescriptor) {
-    this.playingSample?.stop();
-    this.playingSample = null;
-
-    if (desc.name === this.playingSampleDescriptor?.name) {
-      this.playingSampleDescriptor = null;
-      return;
-    }
-
-    this.startPlaying(desc);
-  }
-
-  public dispose() {
-    this.playingSample?.stop();
-    this.playingSample = null;
-    this.playingSampleDescriptor = null;
-  }
-}
 
 interface SampleListingProps {
   sampleDescriptors: SampleDescriptor[];
@@ -270,7 +211,7 @@ export const SampleListing: React.FC<SampleListingProps> = ({
   }
 
   return (
-    <>
+    <div style={{ width: 500 }}>
       <SampleSearch value={sampleSearch} onChange={setSampleSearch} />
       <div className='sample-row' style={{ width: '100%', borderBottom: '1px solid #888' }}>
         <div />
@@ -281,7 +222,7 @@ export const SampleListing: React.FC<SampleListingProps> = ({
       <List height={height} itemSize={20} itemCount={filteredSamples.length} width={width}>
         {RowRenderer}
       </List>
-    </>
+    </div>
   );
 };
 
@@ -304,6 +245,13 @@ export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
     ) : null}
   </div>
 );
+
+type EmbeddingBrowserUIProps = EmbeddingBrowserUI extends SvelteComponentTyped<infer Props, any>
+  ? Props
+  : never;
+
+const EmbeddingBrowserReactShim =
+  mkSvelteComponentShim<EmbeddingBrowserUIProps>(EmbeddingBrowserUI);
 
 const SampleLibraryUI: React.FC = () => {
   const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
@@ -332,11 +280,26 @@ const SampleLibraryUI: React.FC = () => {
         style={{ marginBottom: 14 }}
       />
 
-      <SampleListing
-        selectedSample={selectedSample}
-        setSelectedSample={setSelectedSample}
-        sampleDescriptors={allSamples}
-      />
+      <div style={{ display: 'flex', flexDirection: 'row' }}>
+        <SampleListing
+          selectedSample={selectedSample}
+          setSelectedSample={setSelectedSample}
+          sampleDescriptors={allSamples}
+        />
+
+        {/* TODO: Proper integration */}
+        <EmbeddingBrowserReactShim
+          embedding={tempEmbedding}
+          buildSampleDescriptor={sampleName => ({
+            isLocal: false,
+            name: sampleName,
+            id: `remote_sample_lib_1:${sampleName}`,
+            url: `https://web-synth-private-sample-lib-0002.ameo.workers.dev/${encodeURIComponent(
+              sampleName
+            )}`,
+          })}
+        />
+      </div>
     </div>
   );
 };

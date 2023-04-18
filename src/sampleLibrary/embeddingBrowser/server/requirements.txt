@@ -1,0 +1,8 @@
+fastapi[all]
+httpx
+boto3
+numpy
+librosa
+scipy
+scikit-learn
+emblaze
