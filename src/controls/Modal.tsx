@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './Modal.scss';
-import { SvelteComponentTyped } from 'svelte';
+import { SvelteComponent } from 'svelte';
 
 export interface ModalCompProps<T> {
   onSubmit: (val: T) => void;
@@ -55,7 +55,7 @@ export function renderModalWithControls<T>(
 }
 
 export function renderSvelteModalWithControls<T>(
-  Comp: typeof SvelteComponentTyped<ModalCompProps<T>>,
+  Comp: typeof SvelteComponent<ModalCompProps<T>>,
   clickBackdropToClose = true
 ): Promise<T> {
   const bodyNode = document.getElementsByTagName('body')[0]!;
@@ -63,7 +63,7 @@ export function renderSvelteModalWithControls<T>(
   bodyNode.appendChild(modalNode);
   modalNode.setAttribute('class', 'input-modal');
 
-  let inst: SvelteComponentTyped<ModalCompProps<T>> | null = null;
+  let inst: SvelteComponent<ModalCompProps<T>> | null = null;
   const unmount = () => {
     inst?.$destroy();
     bodyNode.removeChild(modalNode);

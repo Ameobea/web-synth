@@ -24,6 +24,8 @@
       ($store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded =
         !$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded)}
     on:keyup={() => {}}
+    tabindex="0"
+    role="button"
   >
     {$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded ? '∨' : '›'} Mapped Samples
   </div>

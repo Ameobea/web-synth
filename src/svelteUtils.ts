@@ -1,21 +1,21 @@
 import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
 import type { Unsubscribe as ReduxUnsubscribe, Store } from 'redux';
-import type { SvelteComponent, SvelteComponentTyped } from 'svelte';
+import type { SvelteComponent } from 'svelte';
 import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
 const RenderedSvelteComponentsByDomID = new Map<string, SvelteComponent>();
 
-type MkSvelteContainerRenderHelperArgs = {
-  Comp: typeof SvelteComponent;
-  getProps: () => Record<string, any>;
+type MkSvelteContainerRenderHelperArgs<Props extends Record<string, any>> = {
+  Comp: typeof SvelteComponent<Props>;
+  getProps: () => Props;
   predicate?: (comp: SvelteComponent) => void;
 };
 
-export function mkSvelteContainerRenderHelper({
+export function mkSvelteContainerRenderHelper<Props extends Record<string, any | never>>({
   Comp,
   getProps,
   predicate,
-}: MkSvelteContainerRenderHelperArgs) {
+}: MkSvelteContainerRenderHelperArgs<Props>) {
   return (domID: string) => {
     const node = document.getElementById(domID);
     if (!node) {
@@ -155,12 +155,10 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
   return { set, update, subscribe };
 }
 
-export type SveltePropTypesOf<Comp> = Comp extends SvelteComponentTyped<infer Props>
+export type SveltePropTypesOf<Comp> = Comp extends SvelteComponent<infer Props>
   ? Props
   : // handle it being the class itself
-  Comp extends new (args: { target: Element; props: infer Props }) => SvelteComponentTyped<
-      infer Props
-    >
+  Comp extends new (args: { target: Element; props: infer Props }) => SvelteComponent<infer Props>
   ? Props
   : never;
 
@@ -170,10 +168,10 @@ export type SveltePropTypesOf<Comp> = Comp extends SvelteComponentTyped<infer Pr
  * Adapted from: https://github.com/Rich-Harris/react-svelte/blob/master/index.js
  */
 export function mkSvelteComponentShim<Props extends Record<string, any>>(
-  Comp: new (args: { target: Element; props: Props }) => SvelteComponentTyped<Props>
+  Comp: new (args: { target: Element; props: Props }) => SvelteComponent<Props>
 ) {
   class SvelteComponentShim extends React.Component<Props> {
-    private instance: SvelteComponentTyped<Props> | null = null;
+    private instance: SvelteComponent<Props> | null = null;
     private container: RefObject<ReactElement<Record<string, never>>>;
     private div: ReactElement<{
       ref: RefObject<ReactElement<Record<string, never>, string | JSXElementConstructor<any>>>;

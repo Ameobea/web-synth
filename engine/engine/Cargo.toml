@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 wasm-bindgen = { version = "=0.2.82" }
 rand = "0.7"
 rand_pcg = "0.2.1"
-miniserde = "0.1.16"
+miniserde = "0.1.34"
 # Disable logging staticly in release, making all log calls into no-ops
 log = { version = "0.4", features = ["release_max_level_warn"] }
 uuid = { version = "1.2" }

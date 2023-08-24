@@ -19,7 +19,7 @@
     "suppressImplicitAnyIndexErrors": false,
     "noUnusedLocals": true,
     "typeRoots": ["./node_modules/@types"],
-    "types": ["react/next", "react-dom/next", "svelte", "node"],
+    "types": ["svelte", "node"],
     "jsx": "react",
     "baseUrl": ".",
     "paths": {

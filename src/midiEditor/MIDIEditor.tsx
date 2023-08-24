@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
-import { SvelteComponentTyped } from 'svelte';
+import { SvelteComponent } from 'svelte';
 
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
@@ -504,20 +504,20 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
 
 const MIDIEditorControls = React.memo(MIDIEditorControlsInner);
 
-type CVOutputControlsProps = CVOutputControls extends SvelteComponentTyped<infer Props, any>
+type CVOutputControlsProps = CVOutputControls extends SvelteComponent<infer Props, any>
   ? Props
   : never;
 
 const CVOutputControlsShim = mkSvelteComponentShim<CVOutputControlsProps>(CVOutputControls);
 
-type CollapsedMIDIEditorProps = CollapsedMIDIEditor extends SvelteComponentTyped<infer Props, any>
+type CollapsedMIDIEditorProps = CollapsedMIDIEditor extends SvelteComponent<infer Props, any>
   ? Props
   : never;
 
 const CollapsedMIDIEditorShim =
   mkSvelteComponentShim<CollapsedMIDIEditorProps>(CollapsedMIDIEditor);
 
-type EditableInstanceNameProps = EditableInstanceName extends SvelteComponentTyped<infer Props, any>
+type EditableInstanceNameProps = EditableInstanceName extends SvelteComponent<infer Props, any>
   ? Props
   : never;
 

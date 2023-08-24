@@ -66,7 +66,12 @@
     name={inst.name}
     setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
   />
-  <div class="midi-editor-minimap-container" bind:this={minimapContainer} on:dblclick={expand} />
+  <div
+    class="midi-editor-minimap-container"
+    bind:this={minimapContainer}
+    on:dblclick={expand}
+    role="figure"
+  />
 </div>
 
 <style lang="css">

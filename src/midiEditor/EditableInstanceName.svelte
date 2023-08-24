@@ -22,6 +22,8 @@
   on:mouseleave={() => {
     nameWrapperHovered = false;
   }}
+  role="heading"
+  aria-level={2}
 >
   {#if isEditingName}
     <input

@@ -3,12 +3,9 @@ const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const sveltePreprocess = require('svelte-preprocess');
-const subcomponentPreprocessor = require('svelte-subcomponent-preprocessor');
 
 const mode = process.env.NODE_ENV || 'development';
 const prod = mode === 'production';
-
-const ASSET_PATH = process.env.ASSET_PATH || '/';
 
 /**
  * @type {import('webpack').Configuration}
@@ -55,7 +52,7 @@ const config = {
         use: {
           loader: 'svelte-loader',
           options: {
-            preprocess: [subcomponentPreprocessor(), sveltePreprocess({ typescript: {} })],
+            preprocess: [sveltePreprocess({ typescript: {} })],
             compilerOptions: {
               dev: !prod,
             },
@@ -65,7 +62,7 @@ const config = {
         },
       },
       {
-        // required to prevent errors from Svelte on Webpack 5+
+        // required to prevent errors from Svelte on Webpack 5+, omit on Webpack 4
         test: /node_modules\/svelte\/.*\.mjs$/,
         resolve: {
           fullySpecified: false,
@@ -77,7 +74,7 @@ const config = {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.wasm', '.svelte', '.mjs'],
     modules: [path.resolve('./node_modules'), path.resolve('.')],
     alias: {
-      svelte: path.dirname(require.resolve('svelte/package.json')),
+      svelte: path.resolve('node_modules', 'svelte/src/runtime'),
     },
     conditionNames: ['require', 'node', 'svelte'],
   },

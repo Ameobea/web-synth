@@ -15,6 +15,8 @@
   data-gated={`${isGated}`}
   on:click
   on:keyup={() => {}}
+  tabindex="0"
+  role="button"
 >
   <div class="midi-number">{midiNumber}<br />{midiNumberToNoteName(midiNumber)}</div>
   <div class="content">

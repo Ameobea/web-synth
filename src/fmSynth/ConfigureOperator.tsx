@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import { SvelteComponentTyped } from 'svelte';
+import { SvelteComponent } from 'svelte';
 import type { Writable } from 'svelte/store';
 
 import {
@@ -200,11 +200,10 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           label: 'configure wavetable',
           action: async () => {
             const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
-              .default as typeof SvelteComponentTyped<ModalCompProps<WavetableBank>>;
+              .default as typeof SvelteComponent<ModalCompProps<WavetableBank>>;
             try {
-              const wavetableBank = await renderSvelteModalWithControls<WavetableBank>(
-                WavetableConfigurator
-              );
+              const wavetableBank =
+                await renderSvelteModalWithControls<WavetableBank>(WavetableConfigurator);
               setWavetableState({
                 ...wavetableState,
                 wavetableBanks: [wavetableBank],

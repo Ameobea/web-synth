@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
 
 import './SampleLibraryUI.scss';
-import type { SvelteComponentTyped } from 'svelte';
+import type { SvelteComponent } from 'svelte';
 
 import Loading from 'src/misc/Loading';
 import EmbeddingBrowserUI from 'src/sampleLibrary/embeddingBrowser/EmbeddingBrowserUI/EmbeddingBrowserUI.svelte';
@@ -11,7 +11,7 @@ import { getIsSampleCached } from 'src/sampleLibrary/sampleCache';
 import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { PlayingSampleManager } from 'src/sampleLibrary/SampleLibraryUI/PlayingSampleManager';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
-import tempEmbedding from '../embeddingBrowser/example-res-2.json';
+// import tempEmbedding from '../embeddingBrowser/example-res-3.json';
 import useAllSamples, { getSampleDisplayName } from './useAllSamples';
 
 interface PlaySampleIconProps {
@@ -246,7 +246,7 @@ export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
   </div>
 );
 
-type EmbeddingBrowserUIProps = EmbeddingBrowserUI extends SvelteComponentTyped<infer Props, any>
+type EmbeddingBrowserUIProps = EmbeddingBrowserUI extends SvelteComponent<infer Props, any>
   ? Props
   : never;
 
@@ -288,7 +288,7 @@ const SampleLibraryUI: React.FC = () => {
         />
 
         {/* TODO: Proper integration */}
-        <EmbeddingBrowserReactShim
+        {/* <EmbeddingBrowserReactShim
           embedding={tempEmbedding}
           buildSampleDescriptor={sampleName => ({
             isLocal: false,
@@ -298,7 +298,7 @@ const SampleLibraryUI: React.FC = () => {
               sampleName
             )}`,
           })}
-        />
+        /> */}
       </div>
     </div>
   );

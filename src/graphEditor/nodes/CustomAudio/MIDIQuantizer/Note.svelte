@@ -10,6 +10,8 @@
   data-note-type={noteType}
   on:click={onClick}
   on:keyup={() => {}}
+  tabindex="0"
+  role="button"
 >
   <slot />
 </div>
