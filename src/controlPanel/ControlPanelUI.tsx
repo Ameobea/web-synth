@@ -489,7 +489,7 @@ const buildConfigureControlPanelSettings = (
         return;
       }
       const presetName = panelCtx.current['preset name'];
-      if (presets.find(R.propEq('name' as const, presetName))) {
+      if (presets.find(R.propEq(presetName, 'name' as const))) {
         alert('A preset already exists with that name; choose a unique name');
         return;
       }

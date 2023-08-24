@@ -493,7 +493,7 @@ export default class FMSynth implements ForeignNode {
     }
 
     if (config.type === 'wavetable' && config.wavetableName !== null) {
-      const bank = this.wavetableState.wavetableBanks.find(R.propEq('name', config.wavetableName));
+      const bank = this.wavetableState.wavetableBanks.find(R.propEq(config.wavetableName, 'name'));
       if (!bank) {
         console.error(
           `Wavetable bank ${config.wavetableName} not found in wavetable state but was referenced by operator ix=${operatorIx}`

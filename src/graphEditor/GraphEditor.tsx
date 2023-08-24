@@ -9,7 +9,7 @@ import 'litegraph.js/css/litegraph.css';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 
 import './GraphEditor.scss';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
@@ -126,7 +126,7 @@ const getLGNodeByVcId = (vcId: string) => {
   return null;
 };
 
-const FlowingIntervalHandles = new Map<string, number>();
+const FlowingIntervalHandles = new Map<string, NodeJS.Timeout>();
 export const setConnectionFlowingStatus = (
   vcId: string,
   outputName: string,
@@ -134,7 +134,7 @@ export const setConnectionFlowingStatus = (
 ) => {
   if (!isFlowing) {
     const node = getLGNodeByVcId(vcId);
-    const outputIx = node?.outputs?.findIndex(R.propEq('name', outputName)) ?? -1;
+    const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;
     if (!!node && outputIx !== -1) {
       node.clearTriggeredSlot(outputIx);
     }
@@ -152,7 +152,7 @@ export const setConnectionFlowingStatus = (
   const setFlowingCb = () => {
     const node = getLGNodeByVcId(vcId);
 
-    const outputIx = node?.outputs?.findIndex(R.propEq('name', outputName)) ?? -1;
+    const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;
 
     if (node === null || outputIx === -1) {
       const intervalHandle = FlowingIntervalHandles.get(vcId);
@@ -316,8 +316,10 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     },
     [setCurSelectedNodeInner]
   );
-  const { patchNetwork, activeViewContexts, isLoaded } = useSelector((state: ReduxStore) =>
-    R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager)
+  const { patchNetwork, activeViewContexts, isLoaded } = useSelector(
+    (state: ReduxStore) =>
+      R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager),
+    shallowEqual
   );
 
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight - 130);

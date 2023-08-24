@@ -610,7 +610,7 @@ const actionGroups = {
       const instState = state.stateByPanelInstance[controlPanelVcId];
 
       let name = `midi keyboard ${instState.midiKeyboards.length + 1}`;
-      while (instState.midiKeyboards.some(R.propEq('name', name))) {
+      while (instState.midiKeyboards.some(R.propEq(name, 'name'))) {
         name = `midi keyboard ${instState.midiKeyboards.length + 1}`;
       }
 
@@ -730,7 +730,7 @@ const actionGroups = {
       const instState = state.stateByPanelInstance[controlPanelVcId];
 
       let name = `${vizType} ${instState.visualizations.length + 1}`;
-      while (instState.visualizations.some(R.propEq('name', name))) {
+      while (instState.visualizations.some(R.propEq(name, 'name'))) {
         name = `${vizType} ${instState.visualizations.length + 1}`;
       }
 

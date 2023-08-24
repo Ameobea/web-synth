@@ -138,7 +138,7 @@ export default class SamplePlayerNode implements ForeignNode {
 
     this.sampleDescriptors
       .map((slot, i) => [slot, i] as const)
-      .filter(([slot]) => R.propEq('descriptor', descriptor, slot))
+      .filter(([slot]) => slot.descriptor === descriptor)
       .forEach(([slot, slotIx]) => {
         slot.sample = sample;
         this.awpHandle?.port.postMessage({

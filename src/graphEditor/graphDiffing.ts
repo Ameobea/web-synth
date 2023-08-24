@@ -32,10 +32,10 @@ const getVcTitle = (
   activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts'],
   id: string
 ): string =>
-  Option.of(activeViewContexts.find(R.propEq('uuid', id)))
+  Option.of(activeViewContexts.find(R.propEq(id, 'uuid')))
     .flatMap(({ title, name }) => Option.of(title).orElse(Option.of(name)))
     .getOrElseL(() => {
-      console.warn(`Unable to find view context with id "${id}"`);
+      console.warn(`Unable to find view context with id "${id}"`, activeViewContexts);
       return 'Untitled';
     });
 
@@ -193,7 +193,7 @@ export const updateGraph = (
     if (!srcNode) {
       return;
     }
-    const srcSlotIx = srcNode.outputs.findIndex(R.propEq('name', connection[0].name));
+    const srcSlotIx = srcNode.outputs.findIndex(R.propEq(connection[0].name, 'name'));
     if (srcSlotIx === -1) {
       console.error(
         `Expected to find output with name ${connection[0].name} on node id ${connection[0].vcId} but it wasn't found`
@@ -205,7 +205,7 @@ export const updateGraph = (
     if (!dstNode) {
       return;
     }
-    const dstSlotIx = dstNode.inputs.findIndex(R.propEq('name', connection[1].name));
+    const dstSlotIx = dstNode.inputs.findIndex(R.propEq(connection[1].name, 'name'));
     if (dstSlotIx === -1) {
       console.error(
         `Expected to find output with name ${connection[1].name} on node id ${connection[1].vcId} but it wasn't found`

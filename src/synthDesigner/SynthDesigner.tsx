@@ -230,7 +230,8 @@ const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       wavyJonesInstanceInitialized: !!state.synthDesigner.wavyJonesInstance,
       spectrumNode: state.synthDesigner.spectrumNode,
       isHidden: state.synthDesigner.isHidden,
-    })
+    }),
+    shallowEqual
   );
 
   useEffect(() => {

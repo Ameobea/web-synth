@@ -474,7 +474,7 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
         action: () => {
           setState(state => {
             state.filterGroups.forEach(group => disconnectFilterChain(group.map(g => g.filter)));
-            const { preset } = Presets.find(R.propEq('name', selectedPresetName))!;
+            const { preset } = Presets.find(R.propEq(selectedPresetName, 'name'))!;
             const newState = deserializeFilterDesigner(preset);
             updateConnectables?.(newState);
             return newState;

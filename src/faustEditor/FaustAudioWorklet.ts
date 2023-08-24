@@ -114,7 +114,7 @@ export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWor
               const targetParam = (this.parameters as any).get(setting.address);
               targetParam.value = setting.initial;
             });
-            allDefaultParamsAreZero = settings.every(R.propEq('initial', 0));
+            allDefaultParamsAreZero = settings.every(R.propEq(0, 'initial'));
           }
 
           const pathTable = this.parseUi(msg.data.jsonDef);

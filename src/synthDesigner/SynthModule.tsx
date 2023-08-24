@@ -60,7 +60,7 @@ const PresetsControlPanel: React.FC<{
           }
 
           const preset =
-            presetId === 'blank' ? null : allVoicePresets.find(R.propEq('id', +presetId));
+            presetId === 'blank' ? null : allVoicePresets.find(R.propEq(+presetId, 'id'));
           if (preset === undefined) {
             console.error(
               `No voice preset found with id ${presetId} even though we have one with that id in the control panel`

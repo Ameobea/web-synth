@@ -90,7 +90,6 @@ pub extern "C" fn wavegen_render_waveform() -> *const u8 {
       *magnitude /= max_magnitude;
     }
   }
-  drop(magnitudes);
   let magnitudes = &state[..HARMONIC_COUNT];
   let phases = &state[HARMONIC_COUNT..];
 

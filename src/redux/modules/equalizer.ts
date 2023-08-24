@@ -171,7 +171,7 @@ const actionGroups = {
     actionCreator: (vcId: string, index: number) => ({ type: 'REMOVE_POINT', vcId, index }),
     subReducer: (state: EqualizerState, { vcId, index }) => {
       const instanceState = state[vcId];
-      const removedPoint = instanceState.points.find(R.propEq('index', index));
+      const removedPoint = instanceState.points.find(R.propEq(index, 'index'));
       if (!removedPoint) {
         console.error(`Tried to remove point index ${index} but it is not found`);
         return state;
