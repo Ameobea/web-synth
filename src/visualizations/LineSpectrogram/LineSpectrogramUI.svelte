@@ -57,7 +57,6 @@
     const { left, top } = container!.getBoundingClientRect();
     const canvasX = x - left;
     const canvasY = y - top;
-    console.log(canvasX, canvasY);
     uiInst?.onMouseMove(canvasX, canvasY);
   };
 
