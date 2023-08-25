@@ -261,6 +261,11 @@ export class MIDIEditorInstance {
     this.setLoopPoint(newLoopPoint);
   }
 
+  public setBeatsPerMeasure(beatsPerMeasure: number) {
+    this.baseView.beatsPerMeasure = beatsPerMeasure;
+    this.uiManager.updateAllViews();
+  }
+
   public snapBeat(rawBeat: number): number {
     if (this.beatSnapInterval === 0) {
       return rawBeat;

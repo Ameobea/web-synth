@@ -18,9 +18,9 @@ export interface NoteCreationState {
 }
 
 /**
- * A cache for storing line marker sprites keyed by `pxPerBeat`
+ * A cache for storing line marker sprites keyed by `${pxPerBeat}-${beatsPerMeasure}`
  */
-const MarkersCache: Map<number, PIXI.Graphics> = new Map();
+const MarkersCache: Map<string, PIXI.Graphics> = new Map();
 
 export default class NoteLine {
   public app: MIDIEditorUIInstance;
@@ -35,6 +35,7 @@ export default class NoteLine {
    * Used for markings caching to determine whether we need to re-render markings or not
    */
   private lastPxPerBeat = 0;
+  private lastBeatsPerMeasure = 0;
 
   constructor(
     app: MIDIEditorUIInstance,
@@ -183,7 +184,8 @@ export default class NoteLine {
   }
 
   private buildMarkers(): PIXI.Graphics {
-    const cached = MarkersCache.get(this.app.parentInstance.baseView.pxPerBeat);
+    const markersCacheKey = `${this.app.parentInstance.baseView.pxPerBeat}-${this.app.parentInstance.baseView.beatsPerMeasure}`;
+    const cached = MarkersCache.get(markersCacheKey);
     if (cached) {
       return cached.clone();
     }
@@ -214,12 +216,16 @@ export default class NoteLine {
     }
 
     g.cacheAsBitmap = true;
-    MarkersCache.set(this.app.parentInstance.baseView.pxPerBeat, g);
+    MarkersCache.set(markersCacheKey, g);
     return g.clone();
   }
 
   private renderMarkers() {
-    if (!this.graphics || this.lastPxPerBeat !== this.app.parentInstance.baseView.pxPerBeat) {
+    if (
+      !this.graphics ||
+      this.lastPxPerBeat !== this.app.parentInstance.baseView.pxPerBeat ||
+      this.lastBeatsPerMeasure !== this.app.parentInstance.baseView.beatsPerMeasure
+    ) {
       if (this.graphics) {
         this.container.removeChild(this.graphics);
         this.graphics.destroy();
@@ -230,6 +236,7 @@ export default class NoteLine {
       // after background, before notes
       this.container.setChildIndex(this.graphics, 1);
       this.lastPxPerBeat = this.app.parentInstance.baseView.pxPerBeat;
+      this.lastBeatsPerMeasure = this.app.parentInstance.baseView.beatsPerMeasure;
     }
 
     const xOffsetBeats = -(

@@ -19,7 +19,7 @@ import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton'
 import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, clamp } from 'src/util';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
 import CollapsedMIDIEditor from 'src/midiEditor/CollapsedMIDIEditor.svelte';
@@ -229,12 +229,12 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
   onChange: onChangeInner,
 }) => {
   const isGlobalBeatCounterStarted = useIsGlobalBeatCounterStarted();
-  const [state, setStateInner] = useState(initialState);
+  const [state, setState] = useState(initialState);
   const [isRecording, setIsRecording] = useState(false);
   const [metronomeEnabled, setMetronomeEnabled] = useState(initialState.metronomeEnabled);
   const onChange = (newState: MIDIEditorControlsState) => {
     onChangeInner(newState);
-    setStateInner(newState);
+    setState(newState);
   };
 
   return (
@@ -428,7 +428,12 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         <input
           type='number'
           value={state.beatsPerMeasure}
-          onChange={evt => onChange({ ...state, beatsPerMeasure: +evt.target.value })}
+          onChange={evt =>
+            onChange({ ...state, beatsPerMeasure: clamp(0, 63, Math.round(+evt.target.value)) })
+          }
+          // Prevent the horrifying behavior of pasting into the input when the middle mouse button
+          // is clicked
+          onPaste={evt => evt.preventDefault()}
           style={{ width: 63, fontSize: 20 }}
         />
       </div>
@@ -568,9 +573,10 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   }, [parentInstance.uiManager, windowSize]);
 
   const handleChange = useCallback(
-    ({ bpm, loopEnabled }: MIDIEditorControlsState) => {
+    ({ bpm, loopEnabled, beatsPerMeasure }: MIDIEditorControlsState) => {
       parentInstance.localBPM = bpm;
       parentInstance.setLoopEnabled(loopEnabled);
+      parentInstance.setBeatsPerMeasure(beatsPerMeasure);
     },
     [parentInstance]
   );
