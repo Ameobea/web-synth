@@ -1,9 +1,8 @@
 set dotenv-load := true
 
 opt:
-  wasm-opt ./dist/wavetable.wasm -g --strip-dwarf -o ./dist/wavetable.wasm
-  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
-  for file in `ls ./dist/headless | grep "\\.wasm"`; do wasm-opt ./dist/headless/$file -g -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/headless/$file; done
+  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g --strip-dwarf -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
+  for file in `ls ./dist/headless | grep "\\.wasm"`; do wasm-opt ./dist/headless/$file -g --strip-dwarf -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/headless/$file; done
   svgo -p 1 --multipass -f ./dist -o ./dist
   svgo -p 1 --multipass -f ./dist/icons/music_notes -o ./dist/icons/music_notes
 

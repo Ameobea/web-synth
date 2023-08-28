@@ -612,6 +612,7 @@ export default class MIDIEditorPlaybackHandler {
   }
 
   public destroy() {
+    this.stopPlayback();
     unregisterStartCB(this.cbs.start);
     unregisterStopCB(this.cbs.stop);
   }

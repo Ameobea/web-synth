@@ -3,7 +3,7 @@ import type { Without } from 'ameo-utils';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { BuildWavetableInstanceState } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
-import type { SerializedMIDIEditorState } from 'src/midiEditor/MIDIEditorUIInstance';
+import { SerializedMIDIEditorInstance } from 'src/midiEditor';
 import { getLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
 import type { SerializedLooperInstState } from 'src/redux/modules/looper';
@@ -161,7 +161,7 @@ export interface SavedMIDIComposition {
   id: number;
   name: string;
   description: string;
-  composition: SerializedMIDIEditorState;
+  composition: SerializedMIDIEditorInstance;
   tags: string[];
   userId: number | null | undefined;
   userName: string | null | undefined;
@@ -173,7 +173,7 @@ export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]
 export const saveMIDIComposition = async (
   name: string,
   description: string,
-  composition: SerializedMIDIEditorState,
+  composition: SerializedMIDIEditorInstance,
   tags: string[]
 ) => {
   const maybeLoginToken = await getLoginToken();

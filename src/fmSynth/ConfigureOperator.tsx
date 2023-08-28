@@ -170,6 +170,7 @@ interface ConfigureWavetableIndexProps {
   setWavetableState: (newState: WavetableState) => void;
   setSelectedWavetableName: (newName: string | null) => void;
   useLegacyControls: boolean;
+  setUseLegacyControls: (newVal: boolean) => void;
 }
 
 const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
@@ -178,6 +179,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
   setWavetableState,
   setSelectedWavetableName,
   useLegacyControls,
+  setUseLegacyControls,
 }) => {
   const state = useMemo(
     () => ({ wavetable: selectedWavetableName ?? '' }),
@@ -268,6 +270,11 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           }
         },
       },
+      {
+        type: 'button',
+        label: 'switch off legacy mode',
+        action: () => setUseLegacyControls(false),
+      },
     ];
   }, [
     useLegacyControls,
@@ -275,6 +282,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
     setWavetableState,
     setSelectedWavetableName,
     state.wavetable,
+    setUseLegacyControls,
   ]);
   const handleChange = useCallback(
     (_key: string, wavetableName: string, _state: any) => setSelectedWavetableName(wavetableName),
@@ -293,6 +301,7 @@ interface ConfigureWavetableProps {
   setWavetableState: (newState: WavetableState) => void;
   vcId: string | undefined;
   useLegacyControls: boolean;
+  setUseLegacyControls: (newVal: boolean) => void;
 }
 
 const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
@@ -304,6 +313,7 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
   setWavetableState,
   vcId,
   useLegacyControls,
+  setUseLegacyControls,
 }) => (
   <>
     <ConfigureWavetableIndex
@@ -314,6 +324,7 @@ const ConfigureWavetable: React.FC<ConfigureWavetableProps> = ({
         onChange({ ...config, wavetableName: newSelectedWavetableName })
       }
       useLegacyControls={useLegacyControls}
+      setUseLegacyControls={setUseLegacyControls}
     />
     <ConfigureParamSource
       // title='dim 0 intra mix'
@@ -365,6 +376,7 @@ interface ConfigureOperatorProps {
   sampleMappingStore: Writable<SampleMappingState>;
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;
   useLegacyWavetableControls: boolean;
+  setUseLegacyWavetableControls: (newVal: boolean) => void;
 }
 
 const OperatorTypeSettings = [
@@ -469,6 +481,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
   sampleMappingStore,
   registerGateUngateCallbacks,
   useLegacyWavetableControls,
+  setUseLegacyWavetableControls,
 }) => {
   const operatorTypeState = useMemo(() => ({ 'operator type': config.type }), [config.type]);
 
@@ -573,6 +586,7 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           setWavetableState={setWavetableState}
           vcId={vcId}
           useLegacyControls={useLegacyWavetableControls}
+          setUseLegacyControls={setUseLegacyWavetableControls}
         />
       ) : null}
       {config.type === 'sample mapping' ? (

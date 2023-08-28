@@ -21,6 +21,10 @@ export const setLGraphHandle = (vcId: string, lgraphHandle: any) => {
   }
 
   ctx.lgraphHandle = lgraphHandle;
+
+  if ((window as any).isHeadless) {
+    hide_graph_editor(`graphEditor_${vcId}`);
+  }
 };
 
 export const init_graph_editor = (stateKey: string) => {
@@ -63,6 +67,10 @@ export const unhide_graph_editor = (stateKey: string) => {
   const { lgraphHandle: inst } = GraphEditorCtxsByVcId.get(vcId)!;
   // Resume rendering now that the graph editor is visible
   inst?.list_of_graphcanvas?.forEach((canvas: any) => {
+    if ((window as any).isHeadless) {
+      return;
+    }
+
     canvas.startRendering();
     canvas.pause_rendering = false;
   });

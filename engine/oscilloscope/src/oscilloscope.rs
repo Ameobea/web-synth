@@ -161,7 +161,6 @@ impl Viz {
         let f0 = self.yin_ctx.cur_f0_estimate;
         let mut f0 = if f0 > 0.0 { f0 } else { 1.0 };
         if self.snap_f0_to_midi {
-          super::log("snapping");
           f0 = snap_freq_to_nearest_midi_note(f0);
         }
         let period_samples = SAMPLE_RATE / f0;

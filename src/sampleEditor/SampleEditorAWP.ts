@@ -16,7 +16,7 @@ const SampleEditorAWPWasm = new AsyncOnce(() =>
 const AWPModuleAdded = new AsyncOnce(() =>
   ctx.audioWorklet.addModule(
     process.env.ASSET_PATH +
-      'EventSchedulerWorkletProcessor.js' +
+      'TODO.js' +
       (window.location.host.includes('localhost') ? '' : btoa(Math.random().toString()))
   )
 );

@@ -1,3 +1,6 @@
+// prettier-ignore
+import './headlessFlagSideEffect';
+
 import { startAll, stopAll } from 'src/eventScheduler/eventScheduler';
 import { getGlobalBpm, setGlobalBpm } from 'src/globalMenu/GlobalMenu';
 import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';

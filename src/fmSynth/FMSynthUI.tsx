@@ -164,6 +164,7 @@ interface FMSynthUIProps {
   sampleMappingStore: Writable<SampleMappingState>;
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;
   useLegacyWavetableControls: boolean;
+  setUseLegacyWavetableControls: (newUseLegacyControls: boolean) => void;
 }
 
 const FMSynthUI: React.FC<FMSynthUIProps> = ({
@@ -194,6 +195,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   sampleMappingStore,
   registerGateUngateCallbacks,
   useLegacyWavetableControls,
+  setUseLegacyWavetableControls,
 }) => {
   const [state, setState] = useState<FMSynthState>({
     modulationMatrix,
@@ -589,6 +591,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                   sampleMappingStore={sampleMappingStore}
                   registerGateUngateCallbacks={registerGateUngateCallbacks}
                   useLegacyWavetableControls={useLegacyWavetableControls}
+                  setUseLegacyWavetableControls={setUseLegacyWavetableControls}
                 />
               );
             })()
@@ -643,62 +646,74 @@ const ConnectedFMSynthUIInner: React.FC<ConnectedFMSynthUIProps> = ({
   synthID,
   isHidden,
   vcId,
-}) => (
-  <FMSynthUI
-    fmSynth={synth}
-    updateBackendModulation={useCallback(
-      (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
-        synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val),
-      [synth]
-    )}
-    updateBackendOutput={useCallback(
-      (operatorIx: number, val: ParamSource) => synth.handleOutputWeightChange(operatorIx, val),
-      [synth]
-    )}
-    modulationMatrix={synth.getModulationMatrix()}
-    outputWeights={synth.getOutputWeights()}
-    operatorConfigs={synth.getOperatorConfigs()}
-    onOperatorConfigChange={useCallback(
-      (operatorIx: number, newOperatorConfig: OperatorConfig) =>
-        synth.handleOperatorConfigChange(operatorIx, newOperatorConfig),
-      [synth]
-    )}
-    operatorEffects={synth.getOperatorEffects()}
-    mainEffectChain={synth.getMainEffectChain()}
-    setEffect={useMemo(() => synth.setEffect.bind(synth), [synth])}
-    initialSelectedUI={synth.selectedUI}
-    onSelectedUIChange={useCallback(
-      newSelectedUI => {
-        synth.selectedUI = newSelectedUI;
-      },
-      [synth]
-    )}
-    adsrs={synth.getAdsrs()}
-    onAdsrChange={useCallback(
-      (adsrIx: number, newAdsr: AdsrParams) => synth.handleAdsrChange(adsrIx, newAdsr),
-      [synth]
-    )}
-    detune={synth.getDetune()}
-    handleDetuneChange={useCallback(
-      (newDetune: ParamSource) => synth.handleDetuneChange(newDetune),
-      [synth]
-    )}
-    getFMSynthOutput={getFMSynthOutput}
-    midiNode={midiNode}
-    midiControlValuesCache={synth.midiControlValuesCache}
-    synthID={synthID}
-    wavetableState={synth.getWavetableState()}
-    setWavetableState={useCallback(
-      (newState: WavetableState) => synth.setWavetableState(newState),
-      [synth]
-    )}
-    isHidden={isHidden}
-    vcId={vcId}
-    sampleMappingStore={synth.getSampleMappingStore()}
-    registerGateUngateCallbacks={synth.registerGateUngateCallbacks}
-    useLegacyWavetableControls={synth.useLegacyWavetableControls}
-  />
-);
+}) => {
+  const [useLegacyWavetableControls, setUseLegacyWavetableControls] = useState(
+    synth.useLegacyWavetableControls
+  );
+  return (
+    <FMSynthUI
+      fmSynth={synth}
+      updateBackendModulation={useCallback(
+        (srcOperatorIx: number, dstOperatorIx: number, val: ParamSource) =>
+          synth.handleModulationIndexChange(srcOperatorIx, dstOperatorIx, val),
+        [synth]
+      )}
+      updateBackendOutput={useCallback(
+        (operatorIx: number, val: ParamSource) => synth.handleOutputWeightChange(operatorIx, val),
+        [synth]
+      )}
+      modulationMatrix={synth.getModulationMatrix()}
+      outputWeights={synth.getOutputWeights()}
+      operatorConfigs={synth.getOperatorConfigs()}
+      onOperatorConfigChange={useCallback(
+        (operatorIx: number, newOperatorConfig: OperatorConfig) =>
+          synth.handleOperatorConfigChange(operatorIx, newOperatorConfig),
+        [synth]
+      )}
+      operatorEffects={synth.getOperatorEffects()}
+      mainEffectChain={synth.getMainEffectChain()}
+      setEffect={useMemo(() => synth.setEffect.bind(synth), [synth])}
+      initialSelectedUI={synth.selectedUI}
+      onSelectedUIChange={useCallback(
+        newSelectedUI => {
+          synth.selectedUI = newSelectedUI;
+        },
+        [synth]
+      )}
+      adsrs={synth.getAdsrs()}
+      onAdsrChange={useCallback(
+        (adsrIx: number, newAdsr: AdsrParams) => synth.handleAdsrChange(adsrIx, newAdsr),
+        [synth]
+      )}
+      detune={synth.getDetune()}
+      handleDetuneChange={useCallback(
+        (newDetune: ParamSource) => synth.handleDetuneChange(newDetune),
+        [synth]
+      )}
+      getFMSynthOutput={getFMSynthOutput}
+      midiNode={midiNode}
+      midiControlValuesCache={synth.midiControlValuesCache}
+      synthID={synthID}
+      wavetableState={synth.getWavetableState()}
+      setWavetableState={useCallback(
+        (newState: WavetableState) => synth.setWavetableState(newState),
+        [synth]
+      )}
+      isHidden={isHidden}
+      vcId={vcId}
+      sampleMappingStore={synth.getSampleMappingStore()}
+      registerGateUngateCallbacks={synth.registerGateUngateCallbacks}
+      useLegacyWavetableControls={useLegacyWavetableControls}
+      setUseLegacyWavetableControls={newUseLegacyControls => {
+        if (newUseLegacyControls === synth.useLegacyWavetableControls) {
+          return;
+        }
+        setUseLegacyWavetableControls(newUseLegacyControls);
+        synth.useLegacyWavetableControls = newUseLegacyControls;
+      }}
+    />
+  );
+};
 
 export const ConnectedFMSynthUI: React.FC<ConnectedFMSynthUIProps> =
   React.memo(ConnectedFMSynthUIInner);

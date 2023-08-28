@@ -69,6 +69,13 @@ export const renderMIDIMinimap = async (
   lines: SerializedMIDILine[],
   beatsPerMeasure: number
 ): Promise<SVGSVGElement> => {
+  // There are issues with cross-domain workers which come up when using headless mode.
+  //
+  // Since we're headless anyway, we can just no-op this.
+  if ((window as any).isHeadless) {
+    return document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  }
+
   const worker = await getWorker();
   const encodedNotes = encodeMIDINotes(lines);
   const svgText = await worker.renderMinimap(encodedNotes, beatsPerMeasure);

@@ -51,7 +51,9 @@ export const genericPresetDispatch = (
 ) => dispatch(action as any);
 
 // Don't mind my side effects; they're harmless I promise
-fetchSynthPresets();
-fetchSynthVoicePresets();
+if (!(window as any).isHeadless) {
+  fetchSynthPresets();
+  fetchSynthVoicePresets();
+}
 
 (window as any).getState = getState;
