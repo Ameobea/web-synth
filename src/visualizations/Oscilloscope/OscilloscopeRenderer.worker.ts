@@ -94,10 +94,6 @@ class OscilloscopeRendererWorker {
   };
 
   private startRenderLoop = () => {
-    if ((window as any).isHeadless) {
-      return;
-    }
-
     this.renderFrame();
     requestAnimationFrame(this.startRenderLoop);
   };
