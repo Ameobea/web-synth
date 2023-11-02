@@ -463,6 +463,8 @@ impl Adsr {
     cur_frame_start_phase: &mut f32,
     cur_frame_start_beat: f32,
     cur_ix_in_frame: usize,
+    scale: f32,
+    shift: f32,
   ) -> f32 {
     let mut sample = 0.;
     const OVERSAMPLE_FACTOR: usize = 4;
@@ -475,7 +477,12 @@ impl Adsr {
         OVERSAMPLE_FACTOR,
       );
     }
-    sample / OVERSAMPLE_FACTOR as f32
+    let sample = sample / OVERSAMPLE_FACTOR as f32;
+    if self.log_scale {
+      sample * 100.
+    } else {
+      sample * scale + shift
+    }
   }
 
   fn maybe_write_cur_phase(&self) {
@@ -508,15 +515,18 @@ impl Adsr {
         let final_sample = self.get_sample(
           &mut cur_frame_start_phase,
           cur_frame_start_beat,
-          FRAME_SIZE - 1,
+          0,
+          scale,
+          shift,
         );
-        self.fill_buffer_with_value(final_sample, scale, shift);
+        self.cur_frame_output.fill(final_sample);
         self.gate_status = if self.early_release_config.strategy == EarlyReleaseStrategy::Freeze {
           GateStatus::Done
         } else {
           GateStatus::GatedFrozen
         };
         self.maybe_write_cur_phase();
+        self.maybe_convert_to_log(scale, shift);
         return;
       },
       GateStatus::EarlyRelease {
@@ -539,19 +549,24 @@ impl Adsr {
       _ => (),
     }
 
-    if self.log_scale {
-      for i in 0..FRAME_SIZE {
-        self.cur_frame_output[i] =
-          self.get_sample(&mut cur_frame_start_phase, cur_frame_start_beat, i) * 100.;
-      }
-    } else {
-      for i in 0..FRAME_SIZE {
-        self.cur_frame_output[i] =
-          self.get_sample(&mut cur_frame_start_phase, cur_frame_start_beat, i) * scale + shift;
-      }
+    for i in 0..FRAME_SIZE {
+      self.cur_frame_output[i] = self.get_sample(
+        &mut cur_frame_start_phase,
+        cur_frame_start_beat,
+        i,
+        scale,
+        shift,
+      );
     }
+
     self.maybe_write_cur_phase();
 
+    self.maybe_convert_to_log(scale, shift);
+  }
+
+  /// If the ADSR is in log_scale mode, then converts all samples in `cur_frame_output` from linear
+  /// to log scale
+  fn maybe_convert_to_log(&mut self, scale: f32, shift: f32) {
     if self.log_scale {
       let mut min = shift;
       let max = min + scale;
@@ -577,15 +592,10 @@ impl Adsr {
 
   pub fn set_frozen_output_value_from_phase(&mut self, phase: f32, scale: f32, shift: f32) {
     self.gate_status = GateStatus::Done;
-    // match self.gate_status{
-    // GateStatus::Done => {
     self.phase = phase;
     let new_frozen_output_value =
       dsp::read_interpolated(&*self.rendered, phase * (RENDERED_BUFFER_SIZE - 2) as f32);
     self.fill_buffer_with_value(new_frozen_output_value, scale, shift);
-    //   },
-    //   _ => panic!("Unexpected gate status: {:?}", self.gate_status),
-    // }
   }
 
   pub fn set_loop_point(&mut self, new_loop_point: Option<f32>) {
