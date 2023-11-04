@@ -74,25 +74,28 @@
       });
   }
 
-  const setActiveWaveformIx = (newIx: number) => {
-    const serialized = inst?.serialize();
-    if (serialized) {
-      presetState.waveforms[activeWaveformIx].instState = serialized;
+  const setActiveWaveformIx = (newIx: number, skipSerialize?: boolean) => {
+    if (!skipSerialize) {
+      const serialized = inst?.serialize();
+      if (serialized) {
+        presetState.waveforms[activeWaveformIx].instState = serialized;
+      }
     }
     activeWaveformIx = newIx;
 
-    uiState.wavetablePosition = newIx / (presetState.waveforms.length - 1);
+    uiState.wavetablePosition =
+      presetState.waveforms.length <= 1 ? 0.5 : newIx / (presetState.waveforms.length - 1);
     inst?.setWavetablePosition(uiState.wavetablePosition);
     inst?.setActiveWaveformIx(activeWaveformIx);
     inst?.setState(presetState.waveforms[activeWaveformIx].instState);
   };
 
-  let isAddingWaveform = false;
+  let isAddingOrRemovingWaveform = false;
   const addWaveform = async () => {
-    if (isAddingWaveform) {
+    if (isAddingOrRemovingWaveform) {
       return;
     }
-    isAddingWaveform = true;
+    isAddingOrRemovingWaveform = true;
 
     try {
       const instState = inst?.serialize() ?? buildDefaultBuildWavetableInstanceState();
@@ -109,8 +112,35 @@
     } catch (err) {
       logError('Error adding waveform', err);
     } finally {
-      isAddingWaveform = false;
+      isAddingOrRemovingWaveform = false;
     }
+  };
+
+  const deleteWaveform = async (ix: number) => {
+    if (presetState.waveforms.length === 1) {
+      return;
+    }
+
+    if (isAddingOrRemovingWaveform) {
+      return;
+    }
+    isAddingOrRemovingWaveform = true;
+
+    presetState.waveforms.splice(ix, 1);
+    presetState.waveforms = [...presetState.waveforms];
+
+    try {
+      const newRenderedWaveformSamples: Float32Array[] = await worker.renderWavetable(
+        presetState.waveforms.map(w => w.instState)
+      );
+      renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
+    } catch (err) {
+      logError('Error removing waveform', err);
+    } finally {
+      isAddingOrRemovingWaveform = false;
+    }
+
+    setActiveWaveformIx(presetState.waveforms.length - 1, true);
   };
 
   const buildWavetableInstance = (canvas: HTMLCanvasElement) => {
@@ -237,6 +267,11 @@
           { type: 'range', label: 'frequency hz', min: 10, max: 20_000, scale: 'log' },
           { type: 'range', label: 'volume db', min: -60, max: 0 },
           { type: 'button', label: 'reset waveform', action: () => inst?.reset() },
+          {
+            type: 'button',
+            label: 'delete waveform',
+            action: () => deleteWaveform(activeWaveformIx),
+          },
         ]}
         state={{
           play: uiState.isPlaying,
