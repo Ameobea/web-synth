@@ -1,7 +1,16 @@
 // prettier-ignore
 import './headlessFlagSideEffect';
 
-import { startAll, stopAll } from 'src/eventScheduler/eventScheduler';
+import {
+  scheduleMIDIEventBeats,
+  scheduleEventBeatsRelative,
+  scheduleEventTimeAbsolute,
+  scheduleEventTimeRelativeToStart,
+  scheduleEventTimeRelativeToCurTime,
+  postMIDIEventToAudioThread,
+  startAll,
+  stopAll,
+} from 'src/eventScheduler/eventScheduler';
 import { getGlobalBpm, setGlobalBpm } from 'src/globalMenu/GlobalMenu';
 import { createBrowserNotSupportedMessage } from 'src/misc/BrowserNotSupported';
 import { connect, disconnect } from 'src/patchNetwork/interface';
@@ -40,5 +49,20 @@ export const initHeadlessWebSynth = async ({
 
   engine.init();
 
-  return { getState, dispatch, startAll, stopAll, disconnect, connect, getGlobalBpm, setGlobalBpm };
+  return {
+    getState,
+    dispatch,
+    startAll,
+    stopAll,
+    disconnect,
+    connect,
+    getGlobalBpm,
+    setGlobalBpm,
+    scheduleMIDIEventBeats,
+    scheduleEventBeatsRelative,
+    scheduleEventTimeAbsolute,
+    scheduleEventTimeRelativeToStart,
+    scheduleEventTimeRelativeToCurTime,
+    postMIDIEventToAudioThread,
+  };
 };
