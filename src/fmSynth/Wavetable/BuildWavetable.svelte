@@ -4,6 +4,7 @@
     volumeDb: number;
     wavetablePosition: number;
     frequency: number;
+    enableCodeEditor: boolean;
   }
 
   const buildDefaultBuildWavetableState = (): BuildWavetableState => ({
@@ -11,7 +12,12 @@
     volumeDb: -30,
     wavetablePosition: 0,
     frequency: 180,
+    enableCodeEditor: false,
   });
+
+  const DEFAULT_WAVETABLE_SOURCE_CODE = `// Sawtooth wave
+return new Array(32).fill(null).map((_, i) => 1.0 / (i + 1));
+`;
 </script>
 
 <script lang="ts">
@@ -25,6 +31,7 @@
   } from 'src/api';
   import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+  import SvelteCodeEditor from 'src/faustEditor/SvelteCodeEditor.svelte';
   import {
     BUILD_WAVETABLE_INST_HEIGHT_PX,
     BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES,
@@ -35,6 +42,7 @@
   } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
   import StackedWaveforms from 'src/fmSynth/Wavetable/StackedWaveforms.svelte';
   import { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
+  import { HARMONICS_COUNT } from 'src/fmSynth/Wavetable/conf';
   import { logError } from 'src/sentry';
 
   export let onSubmit: (val: WavetablePreset) => void;
@@ -45,12 +53,17 @@
 
   let sliderMode: BuildWavetableSliderMode = BuildWavetableSliderMode.Magnitude;
   let inst: BuildWavetableInstance | null = null;
-  let uiState: BuildWavetableState = buildDefaultBuildWavetableState();
+  let uiState: BuildWavetableState = {
+    ...buildDefaultBuildWavetableState(),
+    enableCodeEditor: !!initialInstState?.sourceCode,
+  };
   let presetState: WavetablePreset = {
     waveforms: initialInstState?.waveforms ?? [
       { instState: buildDefaultBuildWavetableInstanceState(), renderedWaveformSamplesBase64: '' },
     ],
+    sourceCode: initialInstState?.sourceCode ?? DEFAULT_WAVETABLE_SOURCE_CODE,
   };
+  let isExecutingCode = false;
   const renderedWavetableRef = {
     renderedWavetable: [
       new Float32Array(BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES * presetState.waveforms.length),
@@ -184,6 +197,9 @@
         uiState.wavetablePosition = val;
         inst?.setWavetablePosition(val);
         break;
+      case 'enable code editor':
+        uiState.enableCodeEditor = val;
+        break;
       default:
         console.error('unhandled key', key);
     }
@@ -246,41 +262,104 @@
         style="max-width: {BUILD_WAVETABLE_INST_WIDTH_PX}px; max-height: {BUILD_WAVETABLE_INST_HEIGHT_PX}px;"
         use:buildWavetableInstance
       />
-      <SvelteControlPanel
-        style={{ width: 440 }}
-        settings={[
-          {
-            type: 'button',
-            label: `toggle sliders to ${
-              sliderMode === BuildWavetableSliderMode.Magnitude ? 'phase' : 'magnitude'
-            }`,
-            action: () => {
-              sliderMode =
-                sliderMode === BuildWavetableSliderMode.Magnitude
-                  ? BuildWavetableSliderMode.Phase
-                  : BuildWavetableSliderMode.Magnitude;
-              inst?.setSliderMode(sliderMode);
+      <div class="controls-container">
+        <SvelteControlPanel
+          style={{ width: 440 }}
+          settings={[
+            {
+              type: 'button',
+              label: `toggle sliders to ${
+                sliderMode === BuildWavetableSliderMode.Magnitude ? 'phase' : 'magnitude'
+              }`,
+              action: () => {
+                sliderMode =
+                  sliderMode === BuildWavetableSliderMode.Magnitude
+                    ? BuildWavetableSliderMode.Phase
+                    : BuildWavetableSliderMode.Magnitude;
+                inst?.setSliderMode(sliderMode);
+              },
             },
-          },
-          { type: 'checkbox', label: 'play' },
-          { type: 'range', label: 'wavetable position', min: 0, max: 1, step: 0.0001 },
-          { type: 'range', label: 'frequency hz', min: 10, max: 20_000, scale: 'log' },
-          { type: 'range', label: 'volume db', min: -60, max: 0 },
-          { type: 'button', label: 'reset waveform', action: () => inst?.reset() },
-          {
-            type: 'button',
-            label: 'delete waveform',
-            action: () => deleteWaveform(activeWaveformIx),
-          },
-        ]}
-        state={{
-          play: uiState.isPlaying,
-          'wavetable position': uiState.wavetablePosition,
-          'volume db': uiState.volumeDb,
-          'frequency hz': uiState.frequency,
-        }}
-        onChange={handleChange}
-      />
+            { type: 'checkbox', label: 'play' },
+            { type: 'range', label: 'wavetable position', min: 0, max: 1, step: 0.0001 },
+            { type: 'range', label: 'frequency hz', min: 10, max: 20_000, scale: 'log' },
+            { type: 'range', label: 'volume db', min: -60, max: 0 },
+            { type: 'button', label: 'reset waveform', action: () => inst?.reset() },
+            {
+              type: 'button',
+              label: 'delete waveform',
+              action: () => deleteWaveform(activeWaveformIx),
+            },
+            { type: 'checkbox', label: 'enable code editor' },
+          ]}
+          state={{
+            play: uiState.isPlaying,
+            'wavetable position': uiState.wavetablePosition,
+            'volume db': uiState.volumeDb,
+            'frequency hz': uiState.frequency,
+            'enable code editor': uiState.enableCodeEditor,
+          }}
+          onChange={handleChange}
+        />
+        {#if uiState.enableCodeEditor}
+          <div class="code-editor-container">
+            <SvelteCodeEditor
+              value={presetState.sourceCode ?? ''}
+              onChange={newSourceCode => {
+                presetState.sourceCode = newSourceCode;
+              }}
+              mode="javascript"
+            />
+            <SvelteControlPanel
+              style={{ width: 440 }}
+              settings={[
+                {
+                  type: 'button',
+                  label: 'execute',
+                  action: async () => {
+                    if (isExecutingCode) {
+                      return;
+                    }
+                    isExecutingCode = true;
+
+                    try {
+                      const fn = new Function(presetState.sourceCode ?? '');
+                      const harmonicAmplitudes = fn();
+                      if (!Array.isArray(harmonicAmplitudes)) {
+                        throw new Error('Provided code did not return an array');
+                      }
+
+                      // Currently expect each harmonic to be a number
+                      if (!harmonicAmplitudes.every(h => typeof h === 'number')) {
+                        throw new Error('Provided code did not return an array of numbers');
+                      }
+
+                      // Pad/clamp to expected length
+                      while (harmonicAmplitudes.length < HARMONICS_COUNT) {
+                        harmonicAmplitudes.push(0);
+                      }
+                      while (harmonicAmplitudes.length > HARMONICS_COUNT) {
+                        harmonicAmplitudes.pop();
+                      }
+
+                      const harmonics = harmonicAmplitudes.map(amp => ({
+                        magnitude: amp,
+                        phase: 0,
+                      }));
+                      const rendered = await worker.renderWavetable([{ harmonics }]);
+                      renderedWavetableRef.renderedWavetable = rendered;
+                      inst?.setState({ harmonics, sliderMode });
+                    } catch (err) {
+                      alert(`Error executing code: ${err}`);
+                    } finally {
+                      isExecutingCode = false;
+                    }
+                  },
+                },
+              ]}
+            />
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
   {#if !hideSaveControls}
@@ -313,6 +392,11 @@
   .content .viz-container {
     display: flex;
     flex-direction: column;
+  }
+
+  .controls-container {
+    display: flex;
+    flex-direction: row;
   }
 
   .bottom {

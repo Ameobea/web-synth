@@ -441,7 +441,6 @@ export const deserializeSynthModule = (
 
   const voices = base.voices.map(voice => {
     voice.outerGainNode.gain.value = masterGain + 1;
-    // voice.filterNode.getOutput().connect(voice.outerGainNode);
     Object.entries(filterParams)
       .filter(([k, _v]) => k !== 'type')
       .forEach(([key, val]: [keyof typeof filterParams, any]) =>

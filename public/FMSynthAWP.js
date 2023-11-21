@@ -599,7 +599,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
     for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
       const voiceIsTacent = this.tacentVoiceFlags[voiceIx];
       if (voiceIsTacent) {
-        // outputs[voiceIx]?.[0]?.fill(0);
         continue;
       }
 

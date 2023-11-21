@@ -4,6 +4,7 @@ import * as R from 'ramda';
 import * as PIXI from 'src/controls/pixi';
 import { destroyPIXIApp, makeDraggable } from 'src/controls/pixiUtils';
 import { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
+import { HARMONICS_COUNT } from 'src/fmSynth/Wavetable/conf';
 import WaveTable, {
   type WavetableDef,
 } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
@@ -16,7 +17,6 @@ const BACKGROUND_COLOR = 0x020202;
 export const BUILD_WAVETABLE_INST_HEIGHT_PX = 446;
 export const BUILD_WAVETABLE_INST_WIDTH_PX = 1234;
 
-const HARMONICS_COUNT = 64;
 export const BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES = 1024 * 4;
 
 const SLIDER_BG_COLOR = 0x1f1f1f;

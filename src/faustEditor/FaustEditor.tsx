@@ -141,8 +141,8 @@ export const mkCompileButtonClickHandler =
     }
     setErrMessage('');
 
-    if (!context) {
-      throw new Error(`No context found for code editor vcId ${vcId}`);
+    if (!faustEditorContextMap[vcId]) {
+      return false;
     }
     const settings = codeNode.getParamSettings(context.paramDefaultValues);
 

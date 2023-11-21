@@ -255,6 +255,10 @@ export interface WavetablePreset {
     instState: BuildWavetableInstanceState;
     renderedWaveformSamplesBase64: string;
   }[];
+  /**
+   * JavaScript source code used to produce the wavetable
+   */
+  sourceCode?: string;
 }
 
 export interface WavetablePresetDescriptor {
