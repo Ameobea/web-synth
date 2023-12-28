@@ -1,16 +1,15 @@
-import { UnreachableException } from 'ameo-utils';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './Granulator.scss';
 
-import { GranulatorInstancesById } from 'src/granulator/granulator';
+import { type GranulatorInstance, GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import { getSample, SampleDescriptor } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
-import { delay, retryWithDelay } from 'src/util';
+import { useMappedWritableValue } from 'src/reactUtils';
 
 export interface GranulatorControlPanelState {
   grain_size: number;
@@ -27,21 +26,16 @@ export interface GranulatorControlPanelState {
 
 const GRANULATOR_CONTROL_PANEL_STYLE = { marginTop: 20, width: 800 };
 
-const GranularControlPanel: React.FC<{
-  vcId: string;
+interface GranularControlPanelProps {
   initialState: GranulatorControlPanelState;
-}> = ({ vcId, initialState }) => {
-  const onChange = useMemo(
-    () => async (key: string, value: any) => {
-      const inst = await retryWithDelay(20, 500, async () => {
-        const inst = GranulatorInstancesById.get(vcId);
-        if (!inst) {
-          throw new Error();
-        }
-        return inst;
-      });
+  inst: GranulatorInstance | null | undefined;
+}
+
+const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialState, inst }) => {
+  const onChange = useCallback(
+    async (key: string, value: any) => {
       if (!inst) {
-        throw new UnreachableException();
+        return;
       }
 
       switch (key) {
@@ -90,7 +84,7 @@ const GranularControlPanel: React.FC<{
         }
       }
     },
-    [vcId]
+    [inst]
   );
 
   useEffect(() => {
@@ -179,18 +173,7 @@ const GranularControlPanel: React.FC<{
         initial: initialState.voice_2_movement_samples_per_sample,
       },
     ],
-    [
-      initialState.grain_size,
-      initialState.linear_slope_length,
-      initialState.sample_speed_ratio,
-      initialState.slope_linearity,
-      initialState.voice_1_filter_cutoff,
-      initialState.voice_1_movement_samples_per_sample,
-      initialState.voice_1_samples_between_grains,
-      initialState.voice_2_filter_cutoff,
-      initialState.voice_2_movement_samples_per_sample,
-      initialState.voice_2_samples_between_grains,
-    ]
+    [initialState]
   );
 
   return (
@@ -208,81 +191,58 @@ const msToSamples = (ms: number | null, sampleRate: number): number | null => {
   return (ms / 1000) * sampleRate;
 };
 
-const GranulatorUI: React.FC<{
+export interface GranulatorUIProps {
   vcId: string;
   initialState: GranulatorControlPanelState;
   selectedSample: SampleDescriptor | null;
-}> = ({ vcId, initialState, selectedSample }) => {
-  const [activeSample, setActiveSample] = useState<{
-    descriptor: SampleDescriptor;
-    sampleData: AudioBuffer;
-  } | null>(null);
-  const awpNode = useRef<AudioWorkletNode | null>(null);
-  useEffect(() => {
-    (async () => {
-      function* retries() {
-        let attempts = 0;
-        while (attempts < 500) {
-          yield attempts;
-          attempts += 1;
-        }
-      }
+}
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
-      for (const _i of retries()) {
-        const inst = GranulatorInstancesById.get(vcId);
-        if (!inst) {
-          await delay(20);
-          continue;
-        }
-        awpNode.current = inst.node;
+interface ActiveSample {
+  descriptor: SampleDescriptor;
+  sampleData: AudioBuffer;
+}
 
-        inst.node.port.postMessage({
-          type: 'setSamples',
-          samples: activeSample?.sampleData.getChannelData(0),
-        });
-        return;
-      }
-
-      console.error('Failed to initialize Granulator instance');
-    })();
-  }, [activeSample, vcId]);
+const GranulatorUI: React.FC<GranulatorUIProps> = ({ vcId, initialState, selectedSample }) => {
+  const [activeSample, setActiveSample] = useState<ActiveSample | null>(null);
+  const inst = useMappedWritableValue(GranulatorInstancesById, map => map.get(vcId));
+  useEffect(
+    () =>
+      void inst?.node.port.postMessage({
+        type: 'setSamples',
+        samples: activeSample?.sampleData.getChannelData(0),
+      }),
+    [inst, activeSample, vcId]
+  );
 
   const waveformRenderer = useRef(new WaveformRenderer(activeSample?.sampleData));
   useEffect(() => {
     if (activeSample) {
-      waveformRenderer.current.setSample(activeSample?.sampleData);
+      waveformRenderer.current.setSample(activeSample.sampleData);
     }
   }, [activeSample]);
 
   // Load the previously selected sample, if one was provided
   useEffect(() => {
-    if (!selectedSample) {
-      return;
+    if (selectedSample) {
+      getSample(selectedSample).then(sampleData =>
+        setActiveSample({ descriptor: selectedSample, sampleData })
+      );
     }
-
-    (async () => {
-      const sampleData = await getSample(selectedSample);
-      setActiveSample({ descriptor: selectedSample, sampleData });
-    })();
   }, [selectedSample]);
 
   useEffect(() => {
-    if (!activeSample?.descriptor) {
-      return;
+    if (activeSample?.descriptor) {
+      ActiveSamplesByVcId.set(vcId, [activeSample.descriptor]);
     }
-
-    ActiveSamplesByVcId.set(vcId, [activeSample.descriptor]);
   }, [activeSample?.descriptor, vcId]);
 
   useEffect(() => {
-    const granulatorInst = GranulatorInstancesById.get(vcId);
-    if (!granulatorInst) {
+    if (!inst) {
       return;
     }
 
-    const startMarkPosSamples = granulatorInst.startSample.manualControl.offset.value;
-    const endMarkPosSamples = granulatorInst.endSample.manualControl.offset.value;
+    const startMarkPosSamples = inst.startSample.manualControl.offset.value;
+    const endMarkPosSamples = inst.endSample.manualControl.offset.value;
     waveformRenderer.current.setSelection({
       startMarkPosMs:
         startMarkPosSamples < 0
@@ -293,12 +253,11 @@ const GranulatorUI: React.FC<{
           ? null
           : (endMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000,
     });
-  }, [activeSample?.sampleData.sampleRate, vcId]);
+  }, [activeSample?.sampleData.sampleRate, inst, vcId]);
 
   useEffect(() => {
     const waveformRendererInst = waveformRenderer.current;
     const cb = (newSelection: { startMarkPosMs: number | null; endMarkPosMs: number | null }) => {
-      const inst = GranulatorInstancesById.get(vcId);
       if (!inst) {
         return;
       }
@@ -309,7 +268,9 @@ const GranulatorUI: React.FC<{
     };
     waveformRendererInst.addEventListener('selectionChange', cb);
     return () => waveformRendererInst.removeEventListener('selectionChange', cb);
-  }, [vcId]);
+  }, [inst]);
+
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
 
   return (
     <div className='granulator'>
@@ -319,26 +280,35 @@ const GranulatorUI: React.FC<{
         </div>
         <button
           style={{ marginLeft: 20 }}
+          disabled={isLoadingSample}
           onClick={async () => {
-            const descriptor = await selectSample();
-            const inst = GranulatorInstancesById.get(vcId);
-            if (inst) {
-              inst.selectedSample = descriptor;
+            if (isLoadingSample) {
+              return;
             }
-            const sampleData = await getSample(descriptor);
-            setActiveSample({ descriptor, sampleData });
+            setIsLoadingSample(true);
+
+            try {
+              const descriptor = await selectSample();
+              if (inst) {
+                inst.selectedSample = descriptor;
+              }
+              const sampleData = await getSample(descriptor);
+              setActiveSample({ descriptor, sampleData });
+            } finally {
+              setIsLoadingSample(false);
+            }
           }}
         >
           Select Sample
         </button>
       </div>
 
-      <GranularControlPanel initialState={initialState} vcId={vcId} />
+      <GranularControlPanel initialState={initialState} inst={inst} />
 
       {activeSample ? <SampleEditor waveformRenderer={waveformRenderer.current} /> : null}
 
       <hr />
-      <SampleRecorder vcId={vcId} awpNode={awpNode} />
+      <SampleRecorder vcId={vcId} awpNode={inst?.node ?? null} />
     </div>
   );
 };

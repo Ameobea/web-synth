@@ -11,18 +11,28 @@ const WaveformRendererInstance = new AsyncOnce(() =>
   }))
 );
 
+interface WaveformSelection {
+  startMarkPosMs: number | null;
+  endMarkPosMs: number | null;
+}
+
+interface WaveformBounds {
+  startMs: number;
+  endMs: number;
+}
+
 export class WaveformRenderer {
   private wasm: {
     instance: typeof import('src/waveform_renderer');
-    memory: typeof import('src/waveform_renderer_bg').memory;
+    memory: WebAssembly.Memory;
     ctxPtr: number;
   } | null = null;
-  private bounds: { startMs: number; endMs: number } = { startMs: 0, endMs: 0 };
+  private bounds: WaveformBounds = { startMs: 0, endMs: 0 };
   private widthPx = 1400;
   private heightPx = 240;
   private sampleRate = 44100;
   private canvasCtx: CanvasRenderingContext2D | null = null;
-  private selection: { startMarkPosMs: number | null; endMarkPosMs: number | null } = {
+  private selection: WaveformSelection = {
     startMarkPosMs: null,
     endMarkPosMs: null,
   };
@@ -45,13 +55,8 @@ export class WaveformRenderer {
   public getSelection() {
     return { ...this.selection };
   }
-  public setSelection({
-    startMarkPosMs,
-    endMarkPosMs,
-  }: {
-    startMarkPosMs: number | null;
-    endMarkPosMs: number | null;
-  }) {
+
+  public setSelection({ startMarkPosMs, endMarkPosMs }: WaveformSelection) {
     if (R.isNil(startMarkPosMs) && !R.isNil(endMarkPosMs)) {
       throw new Error('Setting nil startMarkPosMs with non-nil endMarkPosMs');
     }
@@ -134,7 +139,7 @@ export class WaveformRenderer {
     }
     this.bounds = { startMs, endMs };
     this.updateBoundsCbs();
-    this.render();
+    setTimeout(() => this.render());
   }
 
   private updateBoundsCbs() {
@@ -177,16 +182,11 @@ export class WaveformRenderer {
     return (this.getSampleCount() / this.sampleRate) * 1000;
   }
 
-  private boundsChangedCbs: ((bounds: { startMs: number; endMs: number }) => void)[] = [];
-  private selectionChangedCbs: ((selection: {
-    startMarkPosMs: number | null;
-    endMarkPosMs: number | null;
-  }) => void)[] = [];
+  private boundsChangedCbs: ((bounds: WaveformBounds) => void)[] = [];
+  private selectionChangedCbs: ((selection: WaveformSelection) => void)[] = [];
   public addEventListener(
     type: 'boundsChange' | 'selectionChange',
-    cb:
-      | ((bounds: { startMs: number; endMs: number }) => void)
-      | ((selection: { startMarkPosMs: number | null; endMarkPosMs: number | null }) => void)
+    cb: ((bounds: WaveformBounds) => void) | ((selection: WaveformSelection) => void)
   ) {
     switch (type) {
       case 'boundsChange': {
@@ -204,9 +204,7 @@ export class WaveformRenderer {
   }
   public removeEventListener(
     type: 'boundsChange' | 'selectionChange',
-    cb:
-      | ((bounds: { startMs: number; endMs: number }) => void)
-      | ((selection: { startMarkPosMs: number | null; endMarkPosMs: number | null }) => void)
+    cb: ((bounds: WaveformBounds) => void) | ((selection: WaveformSelection) => void)
   ) {
     switch (type) {
       case 'boundsChange': {

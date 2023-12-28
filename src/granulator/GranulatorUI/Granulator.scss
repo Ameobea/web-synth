@@ -19,11 +19,13 @@
   stroke: greenyellow;
   stroke-width: 4px;
   display: none;
+  cursor: ew-resize;
 }
 .granulator-end-bar {
   stroke: rgb(168, 0, 28);
   stroke-width: 4px;
   display: none;
+  cursor: ew-resize;
 }
 
 .granulator-overlay {
@@ -38,6 +40,7 @@
 
 .granulator-selection-indicator {
   fill: rgba(22, 140, 200, 0.2);
+  cursor: grab;
 }
 
 .sample-recorder {

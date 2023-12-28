@@ -101,7 +101,7 @@ const mkHandleAWPMessage = (recordingState: RecordingState) =>
 const getSampleRecorderSettings = (
   recordingStatus: RecordingStatus,
   setRecordingStatus: (newRecordingStatus: RecordingStatus) => void,
-  awpNode: React.MutableRefObject<AudioWorkletNode | null>,
+  awpNode: AudioWorkletNode | null,
   recordingState: React.MutableRefObject<RecordingState>
 ) =>
   filterNils([
@@ -111,11 +111,11 @@ const getSampleRecorderSettings = (
       action:
         recordingStatus.type === 'recording'
           ? () => {
-              if (!awpNode.current) {
+              if (!awpNode) {
                 console.warn('Recording not started because AWP not started');
                 return;
               }
-              awpNode.current!.port.postMessage({ type: 'stopRecording' });
+              awpNode!.port.postMessage({ type: 'stopRecording' });
 
               setRecordingStatus({
                 type: 'stopped',
@@ -125,7 +125,7 @@ const getSampleRecorderSettings = (
               });
             }
           : () => {
-              if (!awpNode.current) {
+              if (!awpNode) {
                 console.warn('Recording not started because AWP not started');
                 return;
               } else if (!recordingState.current.waveformRenderer.isInitialized()) {
@@ -136,8 +136,8 @@ const getSampleRecorderSettings = (
               // Throw away previous recording context if there was one
               recordingState.current.waveformRenderer.reinitializeCtx();
 
-              awpNode.current!.port.postMessage({ type: 'startRecording' });
-              awpNode.current!.port.onmessage = mkHandleAWPMessage(recordingState.current);
+              awpNode.port.postMessage({ type: 'startRecording' });
+              awpNode.port.onmessage = mkHandleAWPMessage(recordingState.current);
 
               recordingState.current.lastWrittenChunkIx = -1;
               recordingState.current.unwrittenChunks = {};
@@ -153,10 +153,10 @@ const getSampleRecorderSettings = (
           type: 'button',
           label: 'export recording',
           action: () => {
-            if (!awpNode.current || !recordingState.current.waveformRenderer) {
+            if (!awpNode || !recordingState.current.waveformRenderer) {
               return;
             }
-            awpNode.current!.port.postMessage({
+            awpNode.port.postMessage({
               type: 'exportRecording',
               format: 0,
               // TODO: Switch to only export selection
@@ -183,7 +183,7 @@ const buildDefaultRecordingState = (): RecordingState => ({
 });
 
 const SampleRecorderInner: React.FC<{
-  awpNode: React.MutableRefObject<AudioWorkletNode | null>;
+  awpNode: AudioWorkletNode | null;
 }> = ({ awpNode }) => {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({ type: 'notStarted' });
   const recordingState = useRef<RecordingState>(buildDefaultRecordingState());
@@ -203,7 +203,7 @@ const SampleRecorderInner: React.FC<{
 
 interface SampleRecorderProps {
   vcId: string;
-  awpNode: React.MutableRefObject<AudioWorkletNode | null>;
+  awpNode: AudioWorkletNode | null;
 }
 
 const SampleRecorder: React.FC<SampleRecorderProps> = ({ vcId, awpNode }) => {

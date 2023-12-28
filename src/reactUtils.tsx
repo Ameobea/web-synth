@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Provider, useStore } from 'react-redux';
 import type { AnyAction, Store } from 'redux';
+import { Writable, get } from 'svelte/store';
 
 interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
   /**
@@ -370,4 +371,16 @@ export function addProps<Props extends Record<string, any>, AddedProps extends R
 ): React.FC<Omit<Props, keyof AddedProps>> {
   const AddProps = (props: any) => <Component {...props} {...addedProps} />;
   return AddProps;
+}
+
+export function useWritableValue<T>(writable: Writable<T>): T {
+  const [value, setValue] = useState(get(writable));
+  useEffect(() => writable.subscribe(setValue), [writable]);
+  return value;
+}
+
+export function useMappedWritableValue<T, D>(writable: Writable<T>, map: (value: T) => D): D {
+  const [value, setValue] = useState(map(get(writable)));
+  useEffect(() => writable.subscribe(v => setValue(map(v))), [writable, map]);
+  return value;
 }

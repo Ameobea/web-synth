@@ -520,6 +520,7 @@ export default class FMSynth implements ForeignNode {
         'sawtooth oscillator': 6,
         'sample mapping': 7,
         'tuned sample': 8,
+        'white noise': 9,
       }[config.type] + (unisonEnabled ? 50 : 0);
 
     // Set the operator config along with any hyperparam config

@@ -15,6 +15,7 @@ pub use crate::init::*;
 static mut RNG: Pcg32 =
   unsafe { std::mem::transmute([5573589319906701683u64, 1442695040888963407u64]) };
 
+#[inline(always)]
 pub fn rng() -> &'static mut Pcg32 { unsafe { &mut RNG } }
 
 pub fn uuid_v4() -> Uuid {

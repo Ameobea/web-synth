@@ -348,6 +348,13 @@ impl<T: Oscillator + PhasedOscillator> UnisonOscillator<T> {
   }
 }
 
+#[derive(Clone, Copy)]
+pub struct WhiteNoiseEmitter;
+
+impl WhiteNoiseEmitter {
+  fn gen_sample(&mut self) -> f32 { common::rng().gen_range(-1., 1.) }
+}
+
 /// Taken from `fastapprox::fast` but with some checks/extra work removed since we know things
 /// statically that the compiler can't seem to figure out even with some coaxing
 mod fast {
@@ -555,6 +562,7 @@ pub enum OscillatorSource {
   UnisonSawtooth(UnisonOscillator<SawtoothOscillator>),
   SampleMapping(SampleMappingEmitter),
   TunedSample(TunedSampleEmitter),
+  WhiteNoise(WhiteNoiseEmitter),
 }
 
 impl OscillatorSource {
@@ -576,6 +584,7 @@ impl OscillatorSource {
       OscillatorSource::UnisonSawtooth(osc) => osc.get_phases(),
       OscillatorSource::SampleMapping(_) => Vec::new(),
       OscillatorSource::TunedSample(_) => Vec::new(),
+      OscillatorSource::WhiteNoise(_) => Vec::new(),
     }
   }
 
@@ -601,6 +610,7 @@ impl OscillatorSource {
         emitter.reset_phases()
       },
       OscillatorSource::TunedSample(_) => (),
+      OscillatorSource::WhiteNoise(_) => (),
     }
   }
 
@@ -620,6 +630,7 @@ impl OscillatorSource {
       OscillatorSource::UnisonSawtooth(osc) => osc.oscillators.len(),
       OscillatorSource::SampleMapping(_) => 1,
       OscillatorSource::TunedSample(_) => 1,
+      OscillatorSource::WhiteNoise(_) => 1,
     }
   }
 
@@ -639,6 +650,7 @@ impl OscillatorSource {
       OscillatorSource::UnisonSawtooth(osc) => osc.set_phase_at(new_phase, ix),
       OscillatorSource::SampleMapping(_) => unimplemented!(),
       OscillatorSource::TunedSample(_) => (),
+      OscillatorSource::WhiteNoise(_) => (),
     }
   }
 
@@ -721,6 +733,7 @@ impl OscillatorSource {
         },
       OscillatorSource::SampleMapping(_) => false,
       OscillatorSource::TunedSample(_) => false,
+      OscillatorSource::WhiteNoise(_) => false,
     }
   }
 }
@@ -842,6 +855,7 @@ impl OscillatorSource {
       OscillatorSource::SampleMapping(emitter) =>
         emitter.gen_sample(midi_number, sample_mapping_config),
       OscillatorSource::TunedSample(_) => todo!(),
+      OscillatorSource::WhiteNoise(emitter) => emitter.gen_sample(),
     }
   }
 }
@@ -2017,6 +2031,7 @@ fn build_oscillator_source(
     }),
     7 => OscillatorSource::SampleMapping(SampleMappingEmitter::new()),
     8 => OscillatorSource::TunedSample(TunedSampleEmitter {}),
+    9 => OscillatorSource::WhiteNoise(WhiteNoiseEmitter),
     52 => OscillatorSource::UnisonSine(UnisonOscillator::new(
       ParamSource::from_parts(
         param_4_value_type,

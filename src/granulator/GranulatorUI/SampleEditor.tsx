@@ -1,5 +1,5 @@
 import * as R from 'ramda';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 
@@ -7,7 +7,7 @@ export type WaveformInstance =
   | {
       type: 'loaded';
       instance: typeof import('src/waveform_renderer');
-      memory: typeof import('src/waveform_renderer_bg').memory;
+      memory: WebAssembly.Memory;
     }
   | { type: 'loading' }
   | { type: 'notInitialized' }
@@ -58,117 +58,128 @@ const SampleEditorStats: React.FC<SampleEditorStatsProps> = ({ startMarkPosMs, e
   </div>
 );
 
-const SampleEditorOverlay: React.FC<{
+interface SampleEditorOverlayProps {
   width: number;
   height: number;
   waveformRenderer: WaveformRenderer;
-}> = ({ width, height, waveformRenderer }) => {
-  const middleMouseButtonDown = useRef<{
-    clientX: number;
-    clientY: number;
-  } | null>(null);
-  const selectionDragging = useRef(false);
-  const leftMarkDragging = useRef(false);
-  const rightMarkDragging = useRef(false);
-  const lastDownMousePos = useRef(0);
-  const startMarkElem = useRef<SVGLineElement | null>(null);
-  const endMarkElem = useRef<SVGLineElement | null>(null);
-  const selectionElem = useRef<SVGRectElement | null>(null);
+}
 
-  const updateMarkElems = useCallback(
-    (bounds: { startMs: number; endMs: number }) => {
-      if (bounds.endMs === 0) {
-        return;
-      }
+interface DragState {
+  selectionDragging: boolean;
+  leftMarkDragging: boolean;
+  rightMarkDragging: boolean;
+  lastMousePos: number;
+  startMarkElem: SVGLineElement | null;
+  endMarkElem: SVGLineElement | null;
+  selectionElem: SVGRectElement | null;
+  dragStartPos: { clientX: number; clientY: number } | null;
+}
 
-      const selection = waveformRenderer.getSelection();
-      if (startMarkElem.current) {
-        const x = (
-          R.isNil(selection.startMarkPosMs)
-            ? 0
-            : posToPx(
-                waveformRenderer.getWidthPx(),
-                bounds.startMs,
-                bounds.endMs,
-                selection.startMarkPosMs ?? 0
-              )
-        ).toString();
-        startMarkElem.current.setAttribute('x1', x);
-        startMarkElem.current.setAttribute('x2', x);
-        startMarkElem.current.style.display = R.isNil(selection.startMarkPosMs) ? 'none' : 'inline';
-      }
-      if (endMarkElem.current) {
-        const x = (
-          R.isNil(selection.endMarkPosMs)
-            ? 0
-            : posToPx(
-                waveformRenderer.getWidthPx(),
-                bounds.startMs,
-                bounds.endMs,
-                selection.endMarkPosMs ?? 0
-              )
-        ).toString();
-        endMarkElem.current.setAttribute('x1', x);
-        endMarkElem.current.setAttribute('x2', x);
-        endMarkElem.current.style.display = R.isNil(selection.endMarkPosMs) ? 'none' : 'inline';
-      }
-      if (selectionElem.current) {
-        selectionElem.current.setAttribute(
-          'x',
-          (R.isNil(waveformRenderer.getSelection().startMarkPosMs)
-            ? 0
-            : posToPx(
-                width,
-                bounds.startMs,
-                bounds.endMs,
-                waveformRenderer.getSelection().startMarkPosMs!
-              ) + 1
-          ).toString()
-        );
-        selectionElem.current.setAttribute(
-          'width',
-          (R.isNil(waveformRenderer.getSelection().endMarkPosMs)
-            ? 0
-            : posToPx(
-                width,
-                bounds.startMs,
-                bounds.endMs,
-                waveformRenderer.getSelection().endMarkPosMs!
-              ) -
-              posToPx(
-                width,
-                bounds.startMs,
-                bounds.endMs,
-                waveformRenderer.getSelection().startMarkPosMs!
-              ) -
-              1
-          ).toString()
-        );
-        selectionElem.current.style.display = R.isNil(waveformRenderer.getSelection().endMarkPosMs)
-          ? 'none'
-          : 'inline';
-      }
-    },
-    [waveformRenderer, width]
-  );
+const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
+  width,
+  height,
+  waveformRenderer,
+}) => {
+  const dragState = useRef<DragState>({
+    selectionDragging: false,
+    leftMarkDragging: false,
+    rightMarkDragging: false,
+    lastMousePos: 0,
+    startMarkElem: null,
+    endMarkElem: null,
+    selectionElem: null,
+    dragStartPos: null,
+  });
+
+  const [bounds, setBounds] = useState(waveformRenderer.getBounds());
+  const [selection, setSelection] = useState(waveformRenderer.getSelection());
+  useEffect(() => {
+    const boundsChangeCb = (newBounds: { startMs: number; endMs: number }) =>
+      void setBounds(newBounds);
+    waveformRenderer.addEventListener('boundsChange', boundsChangeCb);
+
+    const selectionChangeCb = (newSelection: {
+      startMarkPosMs: number | null;
+      endMarkPosMs: number | null;
+    }) => void setSelection(newSelection);
+    waveformRenderer.addEventListener('selectionChange', selectionChangeCb);
+
+    return () => {
+      waveformRenderer.removeEventListener('boundsChange', boundsChangeCb);
+      waveformRenderer.removeEventListener('selectionChange', selectionChangeCb);
+    };
+  }, [waveformRenderer]);
 
   useEffect(() => {
-    const cb = (newBounds: { startMs: number; endMs: number }) => {
-      updateMarkElems(newBounds);
-    };
-    waveformRenderer.addEventListener('boundsChange', cb);
+    if (bounds.endMs === 0) {
+      return;
+    }
 
-    return () => waveformRenderer.removeEventListener('boundsChange', cb);
-  }, [updateMarkElems, waveformRenderer]);
+    if (dragState.current.startMarkElem) {
+      const x = (
+        R.isNil(selection.startMarkPosMs)
+          ? 0
+          : posToPx(
+              waveformRenderer.getWidthPx(),
+              bounds.startMs,
+              bounds.endMs,
+              selection.startMarkPosMs ?? 0
+            )
+      ).toString();
+      dragState.current.startMarkElem.setAttribute('x1', x);
+      dragState.current.startMarkElem.setAttribute('x2', x);
+      dragState.current.startMarkElem.style.display = R.isNil(selection.startMarkPosMs)
+        ? 'none'
+        : 'inline';
+    }
+    if (dragState.current.endMarkElem) {
+      const x = (
+        R.isNil(selection.endMarkPosMs)
+          ? 0
+          : posToPx(
+              waveformRenderer.getWidthPx(),
+              bounds.startMs,
+              bounds.endMs,
+              selection.endMarkPosMs ?? 0
+            )
+      ).toString();
+      dragState.current.endMarkElem.setAttribute('x1', x);
+      dragState.current.endMarkElem.setAttribute('x2', x);
+      dragState.current.endMarkElem.style.display = R.isNil(selection.endMarkPosMs)
+        ? 'none'
+        : 'inline';
+    }
+    if (dragState.current.selectionElem) {
+      dragState.current.selectionElem.setAttribute(
+        'x',
+        (R.isNil(selection.startMarkPosMs)
+          ? 0
+          : posToPx(width, bounds.startMs, bounds.endMs, selection.startMarkPosMs!) + 1
+        ).toString()
+      );
+      dragState.current.selectionElem.setAttribute(
+        'width',
+        (R.isNil(selection.endMarkPosMs)
+          ? 0
+          : posToPx(width, bounds.startMs, bounds.endMs, selection.endMarkPosMs!) -
+            posToPx(width, bounds.startMs, bounds.endMs, selection.startMarkPosMs!) -
+            1
+        ).toString()
+      );
+      dragState.current.selectionElem.style.display = R.isNil(selection.endMarkPosMs)
+        ? 'none'
+        : 'inline';
+    }
+  }, [bounds, bounds.endMs, bounds.startMs, selection, waveformRenderer, width]);
 
-  // Install mouse move handler if mouse button is down
+  // mouse move handler for panning
   useEffect(() => {
     const handler = (evt: MouseEvent) => {
-      if (!middleMouseButtonDown.current) {
+      if (!dragState.current.dragStartPos) {
         return;
       }
 
-      const diffX = middleMouseButtonDown.current!.clientX - evt.clientX;
+      const diffX = dragState.current.dragStartPos.clientX - evt.clientX;
       if (diffX === 0) {
         return;
       }
@@ -187,42 +198,54 @@ const SampleEditorOverlay: React.FC<{
         newEndMs = R.clamp(10, sampleLengthMs, newStartMs + (bounds.endMs - bounds.startMs));
       }
 
-      middleMouseButtonDown.current = { clientX: evt.clientX, clientY: evt.clientY };
+      dragState.current.dragStartPos = { clientX: evt.clientX, clientY: evt.clientY };
       waveformRenderer.setBounds(newStartMs, newEndMs);
     };
     document.addEventListener('mousemove', handler);
 
     return () => document.removeEventListener('mousemove', handler);
-  }, [height, middleMouseButtonDown, width, waveformRenderer]);
+  }, [height, width, waveformRenderer]);
 
-  const handleMouseDown = (evt: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+  const handleMouseDown = useCallback((evt: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
     if (evt.button !== 1) {
       return;
     }
 
-    middleMouseButtonDown.current = { clientX: evt.clientX, clientY: evt.clientY };
-  };
-  const handleMouseUp = (evt: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+    dragState.current.dragStartPos = { clientX: evt.clientX, clientY: evt.clientY };
+  }, []);
+  const handleMouseUp = useCallback((evt: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
     if (evt.button !== 1) {
       return;
     }
 
-    middleMouseButtonDown.current = null;
-  };
+    dragState.current.dragStartPos = null;
+  }, []);
 
+  // mouse move handler for moving + resizing selection
   useEffect(() => {
     const moveHandler = (evt: MouseEvent) => {
-      const diff = evt.clientX - lastDownMousePos.current;
+      const diff = evt.clientX - dragState.current.lastMousePos;
+      dragState.current.lastMousePos = evt.clientX;
+
+      const anyDragging =
+        dragState.current.selectionDragging ||
+        dragState.current.leftMarkDragging ||
+        dragState.current.rightMarkDragging;
+      if (!anyDragging) {
+        return;
+      }
+
       if (diff === 0) {
         return;
       }
+
       const bounds = waveformRenderer.getBounds();
       const { startMarkPosMs, endMarkPosMs } = waveformRenderer.getSelection();
       const diffMs = pxToMs(width, bounds.startMs, bounds.endMs, diff);
       const selectionWidthMs = endMarkPosMs! - startMarkPosMs!;
       const sampleLengthMs = waveformRenderer.getSampleLengthMs();
 
-      if (selectionDragging.current) {
+      if (dragState.current.selectionDragging) {
         let newStartMarkPosMs: number, newEndMarkPosMs: number;
         if (diff > 0) {
           newEndMarkPosMs = R.clamp(10, sampleLengthMs, endMarkPosMs! + diffMs);
@@ -235,49 +258,36 @@ const SampleEditorOverlay: React.FC<{
           startMarkPosMs: newStartMarkPosMs,
           endMarkPosMs: newEndMarkPosMs,
         });
-        updateMarkElems(waveformRenderer.getBounds());
-      } else if (leftMarkDragging.current) {
+      } else if (dragState.current.leftMarkDragging) {
         const newStartMarkPosMs = R.clamp(
           0,
           endMarkPosMs === null ? sampleLengthMs - 10 : endMarkPosMs - 10,
           startMarkPosMs! + diffMs
         );
         waveformRenderer.setSelection({ startMarkPosMs: newStartMarkPosMs, endMarkPosMs });
-        updateMarkElems(waveformRenderer.getBounds());
-      } else if (rightMarkDragging.current) {
+      } else if (dragState.current.rightMarkDragging) {
         const newEndMarkPosMs = R.clamp(
           startMarkPosMs! + 1,
           sampleLengthMs - 1,
           endMarkPosMs! + diffMs
         );
         waveformRenderer.setSelection({ startMarkPosMs, endMarkPosMs: newEndMarkPosMs });
-        updateMarkElems(waveformRenderer.getBounds());
       }
-
-      lastDownMousePos.current = evt.clientX;
     };
 
     document.addEventListener('mousemove', moveHandler);
     return () => document.removeEventListener('mousemove', moveHandler);
-  }, [updateMarkElems, waveformRenderer, width]);
+  }, [waveformRenderer, width]);
 
   useEffect(() => {
-    const mouseDownHandler = (evt: MouseEvent) => {
-      lastDownMousePos.current = evt.clientX;
-    };
-
     const mouseUpHandler = () => {
-      selectionDragging.current = false;
-      leftMarkDragging.current = false;
-      rightMarkDragging.current = false;
+      dragState.current.selectionDragging = false;
+      dragState.current.leftMarkDragging = false;
+      dragState.current.rightMarkDragging = false;
     };
 
     document.addEventListener('mouseup', mouseUpHandler);
-    document.addEventListener('mouseup', mouseDownHandler);
-    return () => {
-      document.removeEventListener('mouseup', mouseUpHandler);
-      document.removeEventListener('mouseup', mouseDownHandler);
-    };
+    return () => void document.removeEventListener('mouseup', mouseUpHandler);
   }, []);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -311,7 +321,6 @@ const SampleEditorOverlay: React.FC<{
 
   // We override these against React's wishes, but the value right now is likely to be correct
   // so setting it can only help.
-  const bounds = waveformRenderer.getBounds();
   const startMarkPosPx =
     bounds.endMs === 0
       ? 0
@@ -319,7 +328,7 @@ const SampleEditorOverlay: React.FC<{
           waveformRenderer.getWidthPx(),
           bounds.startMs,
           bounds.endMs,
-          waveformRenderer.getSelection().startMarkPosMs ?? 0
+          selection.startMarkPosMs ?? 0
         ).toString();
   const endMarkPosPx =
     bounds.endMs === 0
@@ -328,7 +337,7 @@ const SampleEditorOverlay: React.FC<{
           waveformRenderer.getWidthPx(),
           bounds.startMs,
           bounds.endMs,
-          waveformRenderer.getSelection().endMarkPosMs ?? 0
+          selection.endMarkPosMs ?? 0
         ).toString();
 
   const overlay = (
@@ -353,7 +362,6 @@ const SampleEditorOverlay: React.FC<{
               bounds.endMs
             ),
           });
-          updateMarkElems(waveformRenderer.getBounds());
         } else if (endMarkPosMs === null) {
           const newEndMarkPosMs = computeClickPosMs(
             evt.currentTarget,
@@ -370,7 +378,6 @@ const SampleEditorOverlay: React.FC<{
             startMarkPosMs,
             endMarkPosMs: newEndMarkPosMs,
           });
-          updateMarkElems(waveformRenderer.getBounds());
         }
       }}
       width={width}
@@ -381,42 +388,29 @@ const SampleEditorOverlay: React.FC<{
     >
       <rect
         x={
-          R.isNil(waveformRenderer.getSelection().startMarkPosMs) || bounds.endMs === 0
+          R.isNil(selection.startMarkPosMs) || bounds.endMs === 0
             ? 0
-            : posToPx(
-                width,
-                bounds.startMs,
-                bounds.endMs,
-                waveformRenderer.getSelection().startMarkPosMs!
-              ) + 1
+            : posToPx(width, bounds.startMs, bounds.endMs, selection.startMarkPosMs!) + 1
         }
         width={
-          R.isNil(waveformRenderer.getSelection().endMarkPosMs) || bounds.endMs === 0
+          R.isNil(selection.endMarkPosMs) || bounds.endMs === 0
             ? 0
-            : posToPx(
-                width,
-                bounds.startMs,
-                bounds.endMs,
-                waveformRenderer.getSelection().endMarkPosMs!
-              ) -
-              posToPx(
-                width,
-                bounds.startMs,
-                bounds.endMs,
-                waveformRenderer.getSelection().startMarkPosMs!
-              ) -
+            : posToPx(width, bounds.startMs, bounds.endMs, selection.endMarkPosMs!) -
+              posToPx(width, bounds.startMs, bounds.endMs, selection.startMarkPosMs!) -
               1
         }
         y={0}
         height={height}
         className='granulator-selection-indicator'
         onMouseDown={() => {
-          selectionDragging.current = true;
+          dragState.current.selectionDragging = true;
         }}
         style={{
-          display: R.isNil(waveformRenderer.getSelection().endMarkPosMs) ? 'none' : 'inline',
+          display: R.isNil(selection.endMarkPosMs) ? 'none' : 'inline',
         }}
-        ref={selectionElem}
+        ref={(elem: SVGRectElement | null) => {
+          dragState.current.selectionElem = elem;
+        }}
       />
       <line
         x1={startMarkPosPx}
@@ -424,14 +418,16 @@ const SampleEditorOverlay: React.FC<{
         y1={0}
         y2={height}
         style={{
-          display: R.isNil(waveformRenderer.getSelection().startMarkPosMs) ? 'none' : 'inline',
+          display: R.isNil(selection.startMarkPosMs) ? 'none' : 'inline',
         }}
         className={'granulator-start-bar'}
         onMouseDown={evt => {
-          leftMarkDragging.current = true;
+          dragState.current.leftMarkDragging = true;
           evt.stopPropagation();
         }}
-        ref={startMarkElem}
+        ref={startMarkElem => {
+          dragState.current.startMarkElem = startMarkElem;
+        }}
       />
       <line
         x1={endMarkPosPx}
@@ -439,14 +435,16 @@ const SampleEditorOverlay: React.FC<{
         y1={0}
         y2={height}
         style={{
-          display: R.isNil(waveformRenderer.getSelection().endMarkPosMs) ? 'none' : 'inline',
+          display: R.isNil(selection.endMarkPosMs) ? 'none' : 'inline',
         }}
         className={'granulator-end-bar'}
         onMouseDown={evt => {
-          rightMarkDragging.current = true;
+          dragState.current.rightMarkDragging = true;
           evt.stopPropagation();
         }}
-        ref={endMarkElem}
+        ref={endMarkElem => {
+          dragState.current.endMarkElem = endMarkElem;
+        }}
       />
     </svg>
   );
@@ -455,16 +453,18 @@ const SampleEditorOverlay: React.FC<{
     <>
       {overlay}
       <SampleEditorStats
-        startMarkPosMs={waveformRenderer.getSelection().startMarkPosMs}
-        endMarkPosMs={waveformRenderer.getSelection().endMarkPosMs}
+        startMarkPosMs={selection.startMarkPosMs}
+        endMarkPosMs={selection.endMarkPosMs}
       />
     </>
   );
 };
 
-const SampleEditor: React.FC<{
+interface SampleEditorProps {
   waveformRenderer: WaveformRenderer;
-}> = ({ waveformRenderer }) => (
+}
+
+const SampleEditor: React.FC<SampleEditorProps> = ({ waveformRenderer }) => (
   <div
     style={{ width: waveformRenderer.getWidthPx(), height: waveformRenderer.getHeightPx() + 140 }}
     className='granulator-wrapper'

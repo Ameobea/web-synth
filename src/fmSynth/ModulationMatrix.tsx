@@ -11,6 +11,8 @@ const formatOperatorConfig = (config: OperatorConfig) => {
     return 'S-MAP';
   } else if (config.type === 'tuned sample') {
     return 'SAMP';
+  } else if (config.type === 'white noise') {
+    return 'NOIS';
   }
 
   if (

@@ -613,7 +613,7 @@ const registerCustomAudioNode = (
     CustomAudioNode.prototype[key] = val;
   });
 
-  LiteGraph.registerNodeType(type, CustomAudioNode);
+  LiteGraph.registerNodeType(type, CustomAudioNode as any);
 };
 
 export const registerCustomAudioNodes = () =>

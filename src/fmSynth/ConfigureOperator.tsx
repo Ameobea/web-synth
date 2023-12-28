@@ -76,12 +76,9 @@ export type OperatorConfig =
       unisonDetune: ParamSource;
       unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
     }
-  | {
-      type: 'sample mapping';
-    }
-  | {
-      type: 'tuned sample';
-    };
+  | { type: 'sample mapping' }
+  | { type: 'tuned sample' }
+  | { type: 'white noise' };
 
 export const buildDefaultOperatorConfig = (
   type: OperatorConfig['type'] = 'sine oscillator'
@@ -124,6 +121,9 @@ export const buildDefaultOperatorConfig = (
       };
     }
     case 'sample mapping': {
+      return { type };
+    }
+    case 'white noise': {
       return { type };
     }
     default: {
@@ -392,6 +392,7 @@ const OperatorTypeSettings = [
       'wavetable',
       'param buffer',
       'sample mapping',
+      'white noise',
     ] as OperatorConfig['type'][],
   },
 ];

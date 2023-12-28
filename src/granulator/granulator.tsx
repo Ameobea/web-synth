@@ -2,7 +2,11 @@ import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import React, { Suspense } from 'react';
 
-import { ActiveSamplesByVcId, type GranulatorControlPanelState } from 'src/granulator/GranulatorUI';
+import {
+  ActiveSamplesByVcId,
+  type GranulatorUIProps,
+  type GranulatorControlPanelState,
+} from 'src/granulator/GranulatorUI';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import Loading from 'src/misc/Loading';
@@ -16,6 +20,7 @@ import {
 } from 'src/reactUtils';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { AsyncOnce } from 'src/util';
+import { get, writable } from 'svelte/store';
 
 const ctx = new AudioContext();
 
@@ -29,7 +34,7 @@ const GranulatorRegistered = new AsyncOnce(
   true
 );
 
-interface GranulatorInstance {
+export interface GranulatorInstance {
   node: AudioWorkletNode;
   startSample: OverridableAudioParam;
   endSample: OverridableAudioParam;
@@ -46,7 +51,7 @@ interface GranulatorInstance {
   selectedSample: SampleDescriptor | null;
 }
 
-export const GranulatorInstancesById = new Map<string, GranulatorInstance>();
+export const GranulatorInstancesById = writable(ImmMap<string, GranulatorInstance>());
 
 const GranulatorUI = React.lazy(() => import('./GranulatorUI'));
 
@@ -60,7 +65,7 @@ interface SerializedGranulator {
 }
 
 const serializeGranulator = (vcId: string): string => {
-  const inst = GranulatorInstancesById.get(vcId);
+  const inst = get(GranulatorInstancesById).get(vcId);
   if (!inst) {
     throw new Error(`No granulator instance with vcId=${vcId}`);
   }
@@ -119,18 +124,14 @@ const deserializeGranulator = (serialized: string): SerializedGranulator => {
   }
 };
 
-const LazyGranulatorUI: React.FC<{
-  vcId: string;
-  initialState: GranulatorControlPanelState;
-  selectedSample: SampleDescriptor | null;
-}> = props => (
+const LazyGranulatorUI: React.FC<GranulatorUIProps> = props => (
   <Suspense fallback={<Loading />}>
     <GranulatorUI {...props} />
   </Suspense>
 );
 
 export const build_granulator_audio_connectables = (vcId: string): AudioConnectables => {
-  const inst = GranulatorInstancesById.get(vcId);
+  const inst = get(GranulatorInstancesById).get(vcId);
   if (!inst) {
     return {
       vcId,
@@ -245,7 +246,7 @@ export const init_granulator = async (stateKey: string) => {
     } else {
       inst.endSample.manualControl.offset.value = -1;
     }
-    GranulatorInstancesById.set(vcId, inst);
+    GranulatorInstancesById.update(map => map.set(vcId, inst));
     updateConnectables(vcId, build_granulator_audio_connectables(vcId));
   });
 
@@ -268,7 +269,7 @@ export const cleanup_granulator = (stateKey: string) => {
   const serialized = serializeGranulator(vcId);
   localStorage.setItem(stateKey, serialized);
 
-  const inst = GranulatorInstancesById.get(vcId);
+  const inst = get(GranulatorInstancesById).get(vcId);
   if (inst) {
     inst.node.port.postMessage({ type: 'shutdown' });
     inst.startSample.dispose();
