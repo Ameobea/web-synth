@@ -64,6 +64,7 @@ pub fn create_view_context(vc_name: String) {
   debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
   let mut view_context = build_view(&vc_name, uuid);
   view_context.init();
+  view_context.hide();
   let vcm = get_vcm();
   vcm.add_view_context(uuid, vc_name, view_context);
 }

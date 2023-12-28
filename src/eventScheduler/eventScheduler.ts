@@ -178,14 +178,14 @@ Promise.all([
     fetch(
       process.env.ASSET_PATH +
         'event_scheduler.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer())
   ),
   retryAsync(() =>
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'EventSchedulerWorkletProcessor.js?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
     )
   ),
 ] as const)

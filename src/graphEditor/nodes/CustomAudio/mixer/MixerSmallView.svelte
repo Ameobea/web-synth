@@ -9,7 +9,7 @@
       new AudioContext().audioWorklet.addModule(
         process.env.ASSET_PATH +
           'MixerLevelDetectorAWP.js?cacheBust=' +
-          (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+          (window.location.href.includes('localhost') ? '' : genRandomStringID())
       ),
     true
   );

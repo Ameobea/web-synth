@@ -16,7 +16,7 @@ export const LevelDetectorWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'level_detector.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );
@@ -25,7 +25,7 @@ const LevelDetectorAWPRegistered = new AsyncOnce(
     new AudioContext().audioWorklet.addModule(
       process.env.ASSET_PATH +
         'LevelDetectorAWP.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ),
   true
 );

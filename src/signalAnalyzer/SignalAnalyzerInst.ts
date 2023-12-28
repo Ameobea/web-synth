@@ -20,7 +20,7 @@ const SignalAnalyzerAWPRegistered = new AsyncOnce(
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'SignalAnalyzerAWP.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ),
   true
 );

@@ -17,7 +17,7 @@ const MBDLDRustWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'multiband_diode_ladder_distortion.wasm?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );
@@ -35,7 +35,7 @@ const MBDLDAWPRegistered = new AsyncOnce(
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'MultibandDiodeLadderDistortionAWP.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ),
   true
 );

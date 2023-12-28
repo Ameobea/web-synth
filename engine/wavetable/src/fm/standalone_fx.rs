@@ -22,9 +22,9 @@ impl FMSynthFxCtx {
       // Compute derived length for the ADSR for this frame and set it in.  We only support
       // k-rate ADSR length params for now; I don't think it will be a problem
       let len_samples = self.adsr_params[adsr_ix]
-                .len_samples
-                // Cannot use ADSR or base frequency as param sources for ADSR length
-                .get(&self.param_buffers, &[], 0, 0.);
+        .len_samples
+        // Cannot use ADSR or base frequency as param sources for ADSR length
+        .get(&self.param_buffers, &[], 0, 0.);
       adsr.set_len(len_samples, None);
       adsr.render_frame(1., 0., 0.);
     }

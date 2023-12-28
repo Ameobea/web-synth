@@ -17,7 +17,7 @@ const SidechainAWPRegistered = new AsyncOnce(
     new AudioContext().audioWorklet.addModule(
       process.env.ASSET_PATH +
         'SidechainWorkletProcessor.js?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
     ),
   true
 );
@@ -26,7 +26,7 @@ const SidechainWasm = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'sidechain.wasm' +
-        (window.location.host.includes('localhost') ? '' : `?${crypto.randomUUID()}`)
+        (window.location.host.includes('localhost') ? '' : `?${genRandomStringID()}`)
     ).then(res => res.arrayBuffer()),
   true
 );

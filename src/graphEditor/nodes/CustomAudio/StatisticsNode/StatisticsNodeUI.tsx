@@ -3,12 +3,15 @@ import * as Chartist from 'chartist';
 
 import 'chartist/dist/chartist.min.css';
 import React, { useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 
 import { ReduxStore } from '.';
 
 const Histogram: React.FC = () => {
-  const { data } = useSelector((state: ReduxStore) => ({ data: state.statisticsNode.data }));
+  const { data } = useSelector(
+    (state: ReduxStore) => ({ data: state.statisticsNode.data }),
+    shallowEqual
+  );
   const histogramContainer = useRef<null | HTMLDivElement>(null);
   const chartHandle = useRef<Chartist.IChartistBarChart | null>(null);
 

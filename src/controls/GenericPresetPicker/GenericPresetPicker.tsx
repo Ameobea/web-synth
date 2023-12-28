@@ -160,7 +160,7 @@ export function mkGenericPresetPicker<T>(
   CustomPresetInfo?: React.FC<CustomPresetInfoProps<T>>
 ): React.FC<ModalCompProps<PresetDescriptor<T>>> {
   genericPresetDispatch(genericPresetPickerActions.setSelectedPresetID(null));
-  const presetQueryID = crypto.randomUUID() + '-presets';
+  const presetQueryID = genRandomStringID() + '-presets';
 
   const GenericPresetPicker: React.FC<ModalCompProps<PresetDescriptor<T>>> = ({
     onSubmit,

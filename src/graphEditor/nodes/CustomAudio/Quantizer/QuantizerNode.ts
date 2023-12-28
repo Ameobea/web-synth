@@ -21,7 +21,7 @@ const QuantizerWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'quantizer.wasm?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );
@@ -32,7 +32,7 @@ const QuantizerAWPRegistered = new AsyncOnce(
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'QuantizerAWP.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ),
   true
 );

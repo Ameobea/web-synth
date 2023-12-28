@@ -200,7 +200,7 @@ export default class FMSynth implements ForeignNode {
   private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
   public useLegacyWavetableControls = true;
-  public readonly debugID = crypto.randomUUID();
+  public readonly debugID = genRandomStringID();
 
   static typeName = 'FM Synthesizer';
   public nodeType = 'customAudio/fmSynth';

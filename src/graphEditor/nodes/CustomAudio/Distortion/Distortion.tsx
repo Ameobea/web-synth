@@ -14,14 +14,14 @@ const DistortionWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'distortion.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );
 const DistortionAWPRegistered = new AsyncOnce(
   () =>
     new AudioContext().audioWorklet.addModule(
-      process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + crypto.randomUUID()
+      process.env.ASSET_PATH + 'DistortionAWP.js?cacheBust=' + genRandomStringID()
     ),
   true
 );

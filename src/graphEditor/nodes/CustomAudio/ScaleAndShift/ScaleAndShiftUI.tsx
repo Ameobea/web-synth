@@ -3,8 +3,18 @@ import React, { useCallback, useMemo, useState } from 'react';
 import ReactControlPanel from 'react-control-panel';
 
 import './RangeInput.scss';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+import { Writable } from 'svelte/store';
+import ResponsePlotSvelte from './ResponsePlot.svelte';
+import { mkSvelteComponentShim } from 'src/svelteUtils';
 
-const ErrMsg: React.FC<{ msg: string }> = ({ msg }) => <span style={{ color: 'red' }}>{msg}</span>;
+const ResponsePlot = mkSvelteComponentShim(ResponsePlotSvelte);
+
+interface ErrMsgProps {
+  msg: string;
+}
+
+const ErrMsg: React.FC<ErrMsgProps> = ({ msg }) => <span style={{ color: 'red' }}>{msg}</span>;
 
 interface RangeInputProps {
   onChange: (newRange: [number, number]) => void;
@@ -73,27 +83,113 @@ export const RangeInput: React.FC<RangeInputProps> = ({
 
 const style = { width: 500 };
 
-interface ScaleAndShiftSmallViewProps {
-  initialState: ScaleAndShiftUIState;
-  onChange: (newState: ScaleAndShiftUIState) => void;
+export interface LinearToExponentialState {
+  enabled: boolean;
+  direction: 'linearToExponential' | 'exponentialToLinear';
+  /**
+   * This represents the ratio between the min and max values of the intermediate output range.
+   *
+   * So if we wanted to map a linear control value from a slider or similar to a frequency value
+   * for a filter cutoff, for example, a steepness value of (44_100 / 2) / 20 could be appropriate.
+   */
+  steepness: number;
 }
+
+const buildDefaultLinearToExponentialState = (enabled = false): LinearToExponentialState => ({
+  enabled,
+  direction: 'linearToExponential',
+  steepness: 44_100 / 2 / 20,
+});
 
 export interface ScaleAndShiftUIState {
   input_min_max: readonly [number, number];
   output_min_max: readonly [number, number];
   input_range: readonly [number, number];
   output_range: readonly [number, number];
+  linearToExponentialState?: LinearToExponentialState;
+}
+
+interface ConfigureLinearToExponentialProps {
+  state: LinearToExponentialState;
+  onChange: (newState: LinearToExponentialState) => void;
+}
+
+const ConfigureLinearToExponential: React.FC<ConfigureLinearToExponentialProps> = ({
+  state,
+  onChange,
+}) => {
+  const handleChange = useCallback(
+    (key: keyof LinearToExponentialState, val: any) => {
+      const newState: LinearToExponentialState = { ...state };
+      (newState as any)[key] = val;
+      onChange(newState);
+    },
+    [onChange, state]
+  );
+
+  const settings = useMemo(
+    (): ControlPanelSetting[] => [
+      {
+        label: 'direction',
+        type: 'select',
+        options: ['linearToExponential', 'exponentialToLinear'],
+      },
+      {
+        label: 'steepness',
+        type: 'range',
+        min: 1.1,
+        max: 100_000,
+        scale: 'log',
+      },
+    ],
+    []
+  );
+
+  return (
+    <ReactControlPanel state={state} onChange={handleChange} settings={settings} style={style} />
+  );
+};
+
+export interface ResponsePlotData {
+  input: Float32Array;
+  output: Float32Array;
+}
+
+interface ScaleAndShiftSmallViewProps {
+  initialState: ScaleAndShiftUIState;
+  onChange: (newState: ScaleAndShiftUIState) => void;
+  responsePlot: Writable<ResponsePlotData | null>;
 }
 
 const ScaleAndShiftSmallView: React.FC<ScaleAndShiftSmallViewProps> = ({
   initialState,
   onChange,
+  responsePlot,
 }) => {
   const [state, setState] = useState(initialState);
 
   const handleChange = useCallback(
-    (_key: string, _val: any, baseNewState: ScaleAndShiftUIState) => {
-      const newState = { ...state };
+    (key: string, val: any, baseNewState: ScaleAndShiftUIState) => {
+      let newState = { ...state };
+
+      if (key === 'convert linear/exponential') {
+        if (state.linearToExponentialState) {
+          newState = {
+            ...state,
+            linearToExponentialState: { ...state.linearToExponentialState, enabled: !!val },
+          };
+        } else {
+          newState = {
+            ...state,
+            linearToExponentialState: buildDefaultLinearToExponentialState(!!val),
+          };
+        }
+
+        onChange(newState);
+        setState(newState);
+        return;
+      }
+
       Object.entries(baseNewState).forEach(([key, val]) => {
         if (val) {
           newState[key as keyof typeof newState] = val;
@@ -133,8 +229,16 @@ const ScaleAndShiftSmallView: React.FC<ScaleAndShiftSmallViewProps> = ({
     },
     [onChange, state]
   );
+  const handleLinearExponentialChange = useCallback(
+    (newLinearToExponentialState: LinearToExponentialState) => {
+      const newState = { ...state, linearToExponentialState: newLinearToExponentialState };
+      onChange(newState);
+      setState(newState);
+    },
+    [onChange, state]
+  );
   const settings = useMemo(
-    () => [
+    (): ControlPanelSetting[] => [
       { label: 'input_min_max', type: 'custom', Comp: RangeInput },
       { label: 'output_min_max', type: 'custom', Comp: RangeInput },
       {
@@ -149,13 +253,39 @@ const ScaleAndShiftSmallView: React.FC<ScaleAndShiftSmallViewProps> = ({
         min: state.output_min_max[0],
         max: state.output_min_max[1],
       },
-      // TODO: Add support for transforming to/from linear/log and possibly other scales
+      {
+        label: 'convert linear/exponential',
+        type: 'checkbox',
+      },
     ],
     [state.input_min_max, state.output_min_max]
   );
+  const controlPanelState = useMemo(
+    () => ({
+      ...state,
+      'convert linear/exponential': !!state.linearToExponentialState?.enabled,
+    }),
+    [state]
+  );
 
   return (
-    <ReactControlPanel state={state} onChange={handleChange} style={style} settings={settings} />
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <ReactControlPanel
+        state={controlPanelState}
+        onChange={handleChange}
+        style={style}
+        settings={settings}
+      />
+      {state.linearToExponentialState?.enabled ? (
+        <>
+          <ConfigureLinearToExponential
+            state={state.linearToExponentialState}
+            onChange={handleLinearExponentialChange}
+          />
+          <ResponsePlot responsePlot={responsePlot} />
+        </>
+      ) : null}
+    </div>
   );
 };
 

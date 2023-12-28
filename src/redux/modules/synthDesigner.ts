@@ -329,7 +329,7 @@ const buildDefaultSynthModule = (
 
         fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
       },
-      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${crypto.randomUUID()}`,
+      audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
       useLegacyWavetableControls: false,
     });
 
@@ -422,7 +422,7 @@ export const deserializeSynthModule = (
       }
       fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
     },
-    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${crypto.randomUUID()}`,
+    audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
   });
 
   const base = buildDefaultSynthModule(

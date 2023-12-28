@@ -31,7 +31,7 @@
 
   export let store: Writable<QuantizerNodeUIState>;
 
-  const uniqueID = crypto.randomUUID();
+  const uniqueID = genRandomStringID();
   let parseErrorMessage: string | null;
 
   const handleQuantizationIntervalTypeChange = (evt: { currentTarget: HTMLSelectElement }) => {

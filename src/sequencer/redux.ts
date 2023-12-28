@@ -129,7 +129,7 @@ const actionGroups = {
         ...state,
         marks: [
           ...state.marks,
-          { marks: R.times(() => null, state.marks[0]!.marks.length), rowID: crypto.randomUUID() },
+          { marks: R.times(() => null, state.marks[0]!.marks.length), rowID: genRandomStringID() },
         ],
         voices: [...state.voices, { type: 'sample' as const, name: 'sample', gain: 1 }],
       }),
@@ -474,7 +474,7 @@ export const buildInitialState = (vcId: string): SequencerReduxState => ({
   activeBeats: [0],
   voices: [{ type: 'sample' as const, name: 'sample', gain: 1 }],
   sampleBank: {},
-  marks: [{ marks: R.times(() => null, DEFAULT_WIDTH), rowID: crypto.randomUUID() }],
+  marks: [{ marks: R.times(() => null, DEFAULT_WIDTH), rowID: genRandomStringID() }],
   bpm: 80,
   isPlaying: false,
   outputGainNode: new GainNode(ctx),

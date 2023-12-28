@@ -73,7 +73,7 @@ export const init_synth_designer = (stateKey: string) => {
             spectrumNode: new AnalyserNode(new AudioContext()),
             ...rest,
             isHidden: false,
-          } as SynthDesignerState)
+          }) as SynthDesignerState
       )
       .orNull()
   )

@@ -49,6 +49,10 @@ declare const process: {
   };
 };
 
-declare function dbg<T>(arg: T): T;
+declare global {
+  declare function dbg<T>(arg: T): T;
 
-declare function updateConnectables(vcId: string, newConnectables: AudioConnectables): void;
+  declare function updateConnectables(vcId: string, newConnectables: AudioConnectables): void;
+
+  declare function genRandomStringID(): string;
+}

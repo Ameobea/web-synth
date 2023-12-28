@@ -35,7 +35,7 @@ pub trait Effect {
   /// The buffer should be filled up from front to back.  For example, if the effect implementing
   /// this method has only 2 parameters, the buffer should be modified to set index 0 and 1 to
   /// `Some(_)` and index 2 and 3 should be left as `None`.
-  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]);
+  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; MAX_PARAM_COUNT]);
 
   fn apply(&mut self, rendered_params: &[f32], base_frequency: f32, sample: f32) -> f32;
 
@@ -46,7 +46,7 @@ pub trait Effect {
     base_frequencies: &[f32; FRAME_SIZE],
     samples: &mut [f32; FRAME_SIZE],
   ) {
-    let mut params_for_sample = [0.; 4];
+    let mut params_for_sample = [0.; MAX_PARAM_COUNT];
     // Fall back to the serial implementation if a SIMD one isn't available
     for sample_ix_within_frame in 0..FRAME_SIZE {
       for i in 0..rendered_params.len() {
@@ -634,7 +634,7 @@ impl Effect for EffectInstance {
     }
   }
 
-  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
+  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; MAX_PARAM_COUNT]) {
     match self {
       EffectInstance::SpectralWarping(e) => e.get_params(buf),
       EffectInstance::Wavecruncher(e) => e.get_params(buf),
@@ -656,10 +656,13 @@ pub struct EffectContainer {
   pub is_bypassed: bool,
 }
 
+const MAX_EFFECT_COUNT: usize = 16;
+const MAX_PARAM_COUNT: usize = 4;
+
 #[derive(Clone)]
 pub struct EffectChain {
-  effects: [Option<EffectContainer>; 16],
-  param_render_buf: Box<[[[f32; FRAME_SIZE]; 4]; 16]>,
+  effects: [Option<EffectContainer>; MAX_EFFECT_COUNT],
+  param_render_buf: Box<[[[f32; FRAME_SIZE]; MAX_PARAM_COUNT]; MAX_EFFECT_COUNT]>,
 }
 
 impl Default for EffectChain {
@@ -770,25 +773,22 @@ impl EffectChain {
 
 /// Given an arbitrary effect, queries the effect for its current list of parameters.  Then, renders
 /// the output of each of those parameters into a set of buffers.
-///
-/// Returns the number of params for the effect.
 fn render_effect_params<'a, E: Effect>(
   effect: &mut E,
   buffers: &mut [[f32; FRAME_SIZE]; 4],
   inputs: &RenderRawParams<'a>,
-) -> usize {
-  let mut params: [Option<&mut ParamSource>; 4] = [None, None, None, None];
+) {
+  let mut params: [Option<&mut ParamSource>; MAX_PARAM_COUNT] = [None, None, None, None];
   effect.get_params(&mut params);
 
   for (i, param) in params.into_iter().enumerate() {
     let param = match param {
       Some(param) => param,
-      None => return i,
+      None => return,
     };
     let output_buf = unsafe { buffers.get_unchecked_mut(i) };
     param.render_raw(inputs, output_buf)
   }
-  4
 }
 
 impl EffectChain {
@@ -810,7 +810,7 @@ impl EffectChain {
   }
 
   fn get_rendered_param(
-    param_render_buf: &[[[f32; FRAME_SIZE]; 4]; 16],
+    param_render_buf: &[[[f32; FRAME_SIZE]; MAX_PARAM_COUNT]; MAX_EFFECT_COUNT],
     effect_ix: usize,
     param_ix: usize,
     sample_ix_within_frame: usize,
@@ -831,7 +831,7 @@ impl EffectChain {
   ) -> f32 {
     let mut output = sample;
 
-    let mut params_for_sample: [f32; 4] = uninit();
+    let mut params_for_sample: [f32; MAX_PARAM_COUNT] = uninit();
     for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
       let effect = match effect {
         Some(effect_container) =>
@@ -843,7 +843,7 @@ impl EffectChain {
         None => break,
       };
 
-      for param_ix in 0..4 {
+      for param_ix in 0..MAX_PARAM_COUNT {
         params_for_sample[param_ix] = Self::get_rendered_param(
           &self.param_render_buf,
           effect_ix,
@@ -862,9 +862,7 @@ impl EffectChain {
     render_params: &RenderRawParams<'a>,
     samples: &mut [f32; FRAME_SIZE],
   ) {
-    let mut rendered_params: [[f32; FRAME_SIZE]; 4] = uninit();
-
-    for effect in &mut self.effects {
+    for (effect_ix, effect) in self.effects.iter_mut().enumerate() {
       let effect = match effect {
         Some(effect_container) =>
           if effect_container.is_bypassed {
@@ -874,10 +872,8 @@ impl EffectChain {
           },
         None => return,
       };
-      let param_count = render_effect_params(&mut **effect, &mut rendered_params, render_params);
-      let rendered_params =
-        unsafe { std::slice::from_raw_parts(rendered_params.as_ptr(), param_count) };
 
+      let rendered_params = &self.param_render_buf[effect_ix];
       effect.apply_all(rendered_params, &render_params.base_frequencies, samples);
     }
   }

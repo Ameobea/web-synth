@@ -42,7 +42,7 @@
     ],
   };
 
-  const checkboxID = `loop-checkbox-${crypto.randomUUID()}`;
+  const checkboxID = `loop-checkbox-${genRandomStringID()}`;
 
   const handleControlPanelChange = (key: string, value: any, _state: Record<string, any>) => {
     switch (key) {

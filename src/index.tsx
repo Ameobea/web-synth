@@ -12,10 +12,12 @@ import {
 import { getReactQueryClient } from 'src/reactUtils';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
-import { setEngine } from 'src/util';
+import { initGlobals, setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+
+initGlobals();
 
 const wasm = import('./engine');
 

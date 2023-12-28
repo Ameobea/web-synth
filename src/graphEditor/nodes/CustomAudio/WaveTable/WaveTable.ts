@@ -251,7 +251,7 @@ export default class WaveTable implements ForeignNode {
     await this.ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
         'WaveTableNodeProcessor.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     );
     this.workletHandle = new AudioWorkletNode(this.ctx, 'wavetable-node-processor', {
       numberOfInputs: 0,

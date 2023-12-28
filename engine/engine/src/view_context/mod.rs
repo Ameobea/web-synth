@@ -27,6 +27,7 @@ pub trait ViewContext {
   /// Hide the view context, removing any interfaces or UI elements from view.  All functionality
   /// should be preserved, and it should continue operating normally.
   fn hide(&mut self) {}
+
   /// Unhide the view context, re-creating any UI elements and interfaces to allow the user to
   /// interact with it.
   fn unhide(&mut self) {}

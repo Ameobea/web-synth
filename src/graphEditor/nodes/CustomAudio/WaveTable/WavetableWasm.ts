@@ -23,7 +23,7 @@ const fetchWavetableWasmBytes = async (): Promise<ArrayBuffer> => {
   let path =
     process.env.ASSET_PATH + (hasSIMDSupport ? 'wavetable.wasm' : 'wavetable_no_simd.wasm');
   if (!window.location.host.includes('localhost')) {
-    path += `?cacheBust=${crypto.randomUUID()}`;
+    path += `?cacheBust=${genRandomStringID()}`;
   }
   const res = fetch(path);
   return res.then(res => res.arrayBuffer());

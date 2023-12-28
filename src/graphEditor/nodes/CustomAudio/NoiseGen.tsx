@@ -27,7 +27,7 @@ const NoiseGenWasm = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'noise_gen.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );

@@ -36,7 +36,7 @@ pub fn write_pixel(
     );
   }
 
-  let mut target = unsafe { pixels.get_unchecked_mut(px_ix) };
+  let target = unsafe { pixels.get_unchecked_mut(px_ix) };
   target.0 = target.0.saturating_add(val.0);
   target.1 = target.1.saturating_add(val.1);
   target.2 = target.2.saturating_add(val.2);

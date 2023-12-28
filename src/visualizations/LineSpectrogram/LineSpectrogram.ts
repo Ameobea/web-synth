@@ -13,7 +13,7 @@ const LineSpectrogramWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'spectrum_viz_full.wasm?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );

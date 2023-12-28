@@ -1158,6 +1158,7 @@ impl FMSynthVoice {
     self.last_samples = *last_samples_per_operator;
     self.last_sample_frequencies_per_operator = *last_frequencies_per_operator;
 
+    self.effect_chain.pre_render_params(&render_params);
     self.effect_chain.apply_all(&render_params, output_buffer);
   }
 }

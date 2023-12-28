@@ -373,7 +373,7 @@ export class MIDIEditorUIManager {
     const lines: SerializedMIDILine[] = new Array(maxMIDINumber)
       .fill(null)
       .map((_, lineIx) => ({ notes: [], midiNumber: maxMIDINumber - lineIx }));
-    const id = crypto.randomUUID();
+    const id = genRandomStringID();
     const instance = new ManagedMIDIEditorUIInstance(
       this,
       instName,
@@ -424,7 +424,7 @@ export class MIDIEditorUIManager {
       buildDefaultCVOutputState(this.vcId, name),
       this.silentOutput
     );
-    const id = crypto.randomUUID();
+    const id = genRandomStringID();
     insts.push({ type: 'cvOutput', id, isExpanded: true, instance: cvOutput });
     this.instances.set(insts);
     setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));
@@ -537,7 +537,7 @@ export class MIDIEditorUIManager {
           this,
           inst.state.name,
           inst.state.view,
-          crypto.randomUUID(),
+          genRandomStringID(),
           inst.state.lines
         );
 
@@ -564,7 +564,7 @@ export class MIDIEditorUIManager {
         );
         return {
           type: 'cvOutput' as const,
-          id: crypto.randomUUID(),
+          id: genRandomStringID(),
           isExpanded: inst.state.isExpanded,
           instance,
         };

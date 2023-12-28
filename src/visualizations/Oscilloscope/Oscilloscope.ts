@@ -11,7 +11,7 @@ const OscilloscopeWasmBytes = new AsyncOnce(
     fetch(
       process.env.ASSET_PATH +
         'oscilloscope.wasm?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : crypto.randomUUID())
+        (window.location.href.includes('localhost') ? '' : genRandomStringID())
     ).then(res => res.arrayBuffer()),
   true
 );

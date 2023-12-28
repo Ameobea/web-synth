@@ -78,7 +78,7 @@ export const serializeLooper = (looperState: LooperInstState): string => {
 };
 
 const buildDefaultLooperBank = (): LooperBank => ({
-  id: crypto.randomUUID(),
+  id: genRandomStringID(),
   loadedComposition: null,
   lenBeats: 8,
   compositionLenBeats: null,

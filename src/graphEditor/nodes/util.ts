@@ -1,11 +1,6 @@
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
-(window as any).dbg = <T>(arg: T) => {
-  console.trace(arg);
-  return arg;
-};
-
 /**
  * Swaps out the auido node for an instance with a new one.  Disconnects the old one from all inputs and outputs and
  * then connects the new one in the same way.  If the node passes through inputs or the override can be set by the

@@ -50,7 +50,7 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
 
     const props = getProps();
 
-    // Check to see if we've already created a root for this node
+    // Check to see if we've already created a root for this node and unmount it if so
     let root: Root;
     const existingRootID = node.getAttribute('data-react-root-id');
     if (existingRootID) {
@@ -60,21 +60,22 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
           'Node was marked as having a root, but entry has been removed from the roots map'
         );
       }
+      root.render(<></>);
     } else {
       root = createRoot(node);
-      const rootID = crypto.randomUUID();
+      const rootID = genRandomStringID();
       node.setAttribute('data-react-root-id', rootID);
       RootsByID.set(rootID, root);
     }
 
     const wrap = R.compose(
-      (rendered: React.ReactChild) => {
+      (rendered: React.ReactNode) => {
         if (store) {
           return <Provider store={store}>{rendered}</Provider>;
         }
         return rendered;
       },
-      (rendered: React.ReactChild) => {
+      (rendered: React.ReactNode) => {
         if (enableReactQuery) {
           return (
             <QueryClientProvider client={getReactQueryClient()}>{rendered}</QueryClientProvider>
@@ -84,7 +85,11 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
       }
     );
     const rendered = wrap(<Comp {...props} />);
-    root.render(rendered);
+    // This seems to be necessary to get small views using the same component to update correctly
+    // when selecting a different node of the same type in the graph editor.
+    //
+    // It works in conjunction with rendering the empty fragment above.
+    setTimeout(() => root.render(rendered));
 
     if (predicate) {
       predicate(domID, node);
@@ -314,7 +319,7 @@ type ImageLoadPlaceholderProps = React.DetailedHTMLProps<
 >;
 
 export const mkImageLoadPlaceholder = (
-  placeholder: React.ReactChild,
+  placeholder: React.ReactNode,
   props: ImageLoadPlaceholderProps
 ): React.FC<ImageLoadPlaceholderProps> => {
   const ImageLoadPlaceholder = () => {

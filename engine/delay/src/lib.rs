@@ -10,9 +10,13 @@ pub struct DelayCtx {
   pub main_io_buffer: Box<[f32; FRAME_SIZE]>,
   pub delay_output_buffer: Box<[f32; FRAME_SIZE]>,
   // Params
+  pub last_delay_ms: f32,
   pub delay_ms: Box<[f32; FRAME_SIZE]>,
+  pub last_delay_gain: f32,
   pub delay_gain: Box<[f32; FRAME_SIZE]>,
+  pub last_feedback: f32,
   pub feedback: Box<[f32; FRAME_SIZE]>,
+  pub last_highpass_cutoff: f32,
   pub highpass_cutoff: Box<[f32; FRAME_SIZE]>,
   pub highpass_filter: ButterworthFilter,
 }
@@ -26,9 +30,13 @@ pub extern "C" fn init_delay_ctx() -> *mut DelayCtx {
     delay_line: dsp::circular_buffer::CircularBuffer::new(),
     main_io_buffer: Box::new(uninit()),
     delay_output_buffer: Box::new(uninit()),
+    last_delay_ms: 0.,
     delay_ms: Box::new(uninit()),
+    last_delay_gain: 0.,
     delay_gain: Box::new(uninit()),
+    last_feedback: 0.,
     feedback: Box::new(uninit()),
+    last_highpass_cutoff: 0.,
     highpass_cutoff: Box::new(uninit()),
     highpass_filter: ButterworthFilter::default(),
   };
@@ -71,10 +79,14 @@ pub extern "C" fn process_delay(ctx: *mut DelayCtx) {
 
   for sample_ix in 0..ctx.main_io_buffer.len() {
     let sample = ctx.main_io_buffer[sample_ix];
-    let delay_ms = ctx.delay_ms[sample_ix];
-    let delay_gain = ctx.delay_gain[sample_ix];
-    let feedback = ctx.feedback[sample_ix];
-    let highpass_cutoff = ctx.highpass_cutoff[sample_ix];
+    let delay_ms = dsp::smooth(&mut ctx.last_delay_ms, ctx.delay_ms[sample_ix], 0.99);
+    let delay_gain = dsp::smooth(&mut ctx.last_delay_gain, ctx.delay_gain[sample_ix], 0.99);
+    let feedback = dsp::smooth(&mut ctx.last_feedback, ctx.feedback[sample_ix], 0.99);
+    let highpass_cutoff = dsp::smooth(
+      &mut ctx.last_highpass_cutoff,
+      ctx.highpass_cutoff[sample_ix],
+      0.99,
+    );
 
     let delay_samples = delay_ms * (1. / 1000.) * SAMPLE_RATE as f32;
     let delayed_sample = ctx.delay_line.read_interpolated(-delay_samples);

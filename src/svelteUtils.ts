@@ -1,6 +1,7 @@
 import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
 import type { Unsubscribe as ReduxUnsubscribe, Store } from 'redux';
 import type { SvelteComponent } from 'svelte';
+
 import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
 const RenderedSvelteComponentsByDomID = new Map<string, SvelteComponent>();
@@ -158,9 +159,9 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
 export type SveltePropTypesOf<Comp> = Comp extends SvelteComponent<infer Props>
   ? Props
   : // handle it being the class itself
-  Comp extends new (args: { target: Element; props: infer Props }) => SvelteComponent<infer Props>
-  ? Props
-  : never;
+    Comp extends new (args: { target: Element; props: infer Props }) => SvelteComponent<infer Props>
+    ? Props
+    : never;
 
 /**
  * Creates a React component that renders the provided Svelte component.
@@ -168,7 +169,7 @@ export type SveltePropTypesOf<Comp> = Comp extends SvelteComponent<infer Props>
  * Adapted from: https://github.com/Rich-Harris/react-svelte/blob/master/index.js
  */
 export function mkSvelteComponentShim<Props extends Record<string, any>>(
-  Comp: new (args: { target: Element; props: Props }) => SvelteComponent<Props>
+  Comp: typeof SvelteComponent<Props>
 ) {
   class SvelteComponentShim extends React.Component<Props> {
     private instance: SvelteComponent<Props> | null = null;

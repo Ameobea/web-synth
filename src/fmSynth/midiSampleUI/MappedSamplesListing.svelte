@@ -53,7 +53,7 @@
           (state.mappedSamplesByMIDINumber[midiNumber]?.length ?? 0) > 0 || gatedNotes[midiNumber]
       );
 
-  const uniqueID = crypto.randomUUID();
+  const uniqueID = genRandomStringID();
 </script>
 
 <div class="root">
