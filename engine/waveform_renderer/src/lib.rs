@@ -160,3 +160,7 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32
 pub fn get_sample_count(ctx: *const WaveformRendererCtx) -> usize {
   unsafe { (*ctx).waveform_buf.len() }
 }
+
+#[cfg(feature = "bindgen")]
+#[wasm_bindgen]
+pub fn get_memory() -> JsValue { wasm_bindgen::memory() }

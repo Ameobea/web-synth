@@ -7,7 +7,7 @@ import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import BasicModal from 'src/misc/BasicModal';
-import { ReduxStore, store, useSelector } from 'src/redux';
+import { type ReduxStore, store, useSelector } from 'src/redux';
 import { addLocalSample } from 'src/sampleLibrary';
 
 const NoInput: React.FC = () => (
@@ -63,7 +63,7 @@ const handleExport = async (encoded: ArrayBuffer) => {
 };
 
 const mkHandleAWPMessage = (recordingState: RecordingState) =>
-  function handleAWPMessage(this: MessagePort, evt: MessageEvent<any>) {
+  async function handleAWPMessage(this: MessagePort, evt: MessageEvent<any>) {
     const inst = recordingState.waveformRenderer;
     if (!inst) {
       return;
@@ -75,7 +75,7 @@ const mkHandleAWPMessage = (recordingState: RecordingState) =>
           // We received an in-order chunk; write it into the samples buffer directly
           recordingState.lastWrittenChunkIx += 1;
           inst.appendSamples(evt.data.block);
-          inst.setBounds(inst.getBounds().startMs, inst.getSampleLengthMs());
+          inst.setBounds(inst.getBounds().startMs, await inst.getSampleLengthMs());
           return;
         }
 
@@ -128,9 +128,6 @@ const getSampleRecorderSettings = (
               if (!awpNode) {
                 console.warn('Recording not started because AWP not started');
                 return;
-              } else if (!recordingState.current.waveformRenderer.isInitialized()) {
-                console.warn('Recording not started because waveform renderer is not initialized');
-                return;
               }
 
               // Throw away previous recording context if there was one
@@ -182,9 +179,11 @@ const buildDefaultRecordingState = (): RecordingState => ({
   reRender: null,
 });
 
-const SampleRecorderInner: React.FC<{
+interface SampleRecorderInnerProps {
   awpNode: AudioWorkletNode | null;
-}> = ({ awpNode }) => {
+}
+
+const SampleRecorderInner: React.FC<SampleRecorderInnerProps> = ({ awpNode }) => {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({ type: 'notStarted' });
   const recordingState = useRef<RecordingState>(buildDefaultRecordingState());
   const settings = useMemo(

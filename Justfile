@@ -323,3 +323,8 @@ debug-line-spectrogram:
 build-line-spectrogram:
   cd ./engine/spectrum_viz && cargo build --release --target wasm32-unknown-unknown --no-default-features --features=line_viz && \
     cp ../target/wasm32-unknown-unknown/release/spectrum_viz.wasm ../../public/spectrum_viz_full.wasm
+
+build-waveform-renderer:
+  cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./engine/build
+  cp ./engine/build/waveform_renderer* ./src/

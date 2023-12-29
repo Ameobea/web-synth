@@ -7,6 +7,7 @@ import {
   type GranulatorUIProps,
   type GranulatorControlPanelState,
 } from 'src/granulator/GranulatorUI';
+import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import Loading from 'src/misc/Loading';
@@ -49,6 +50,7 @@ export interface GranulatorInstance {
   voice1MovementSamplesPerSample: OverridableAudioParam;
   voice2MovementSamplesPerSample: OverridableAudioParam;
   selectedSample: SampleDescriptor | null;
+  waveformRenderer: WaveformRenderer;
 }
 
 export const GranulatorInstancesById = writable(ImmMap<string, GranulatorInstance>());
@@ -196,6 +198,7 @@ export const init_granulator = async (stateKey: string) => {
     .getOrElseL(buildDefaultGranulatorState);
 
   const granularWasmPromise = GranularWasm.get();
+  const waveformRenderer = new WaveformRenderer();
   GranulatorRegistered.get().then(async () => {
     const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor', {
       channelCount: 1,
@@ -208,7 +211,7 @@ export const init_granulator = async (stateKey: string) => {
     node.port.postMessage({ type: 'setWasmBytes', wasmBytes: granularWasm });
 
     const params = node.parameters as any;
-    const inst = {
+    const inst: GranulatorInstance = {
       node,
       startSample: new OverridableAudioParam(ctx, params.get('start_sample')),
       endSample: new OverridableAudioParam(ctx, params.get('end_sample')),
@@ -235,6 +238,7 @@ export const init_granulator = async (stateKey: string) => {
         params.get('voice_2_movement_samples_per_sample')
       ),
       selectedSample: initialState.selectedSample,
+      waveformRenderer,
     };
     if (initialState.startSample !== null) {
       inst.startSample.manualControl.offset.value = initialState.startSample;
@@ -255,10 +259,11 @@ export const init_granulator = async (stateKey: string) => {
 
   mkContainerRenderHelper({
     Comp: LazyGranulatorUI,
-    getProps: () => ({
+    getProps: (): GranulatorUIProps => ({
       vcId,
       initialState: initialState.controlPanelState,
       selectedSample: initialState.selectedSample,
+      waveformRenderer,
     }),
   })(domId);
 };

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './Granulator.scss';
@@ -195,6 +195,7 @@ export interface GranulatorUIProps {
   vcId: string;
   initialState: GranulatorControlPanelState;
   selectedSample: SampleDescriptor | null;
+  waveformRenderer: WaveformRenderer;
 }
 
 interface ActiveSample {
@@ -202,7 +203,12 @@ interface ActiveSample {
   sampleData: AudioBuffer;
 }
 
-const GranulatorUI: React.FC<GranulatorUIProps> = ({ vcId, initialState, selectedSample }) => {
+const GranulatorUI: React.FC<GranulatorUIProps> = ({
+  vcId,
+  initialState,
+  selectedSample,
+  waveformRenderer,
+}) => {
   const [activeSample, setActiveSample] = useState<ActiveSample | null>(null);
   const inst = useMappedWritableValue(GranulatorInstancesById, map => map.get(vcId));
   useEffect(
@@ -214,12 +220,11 @@ const GranulatorUI: React.FC<GranulatorUIProps> = ({ vcId, initialState, selecte
     [inst, activeSample, vcId]
   );
 
-  const waveformRenderer = useRef(new WaveformRenderer(activeSample?.sampleData));
   useEffect(() => {
     if (activeSample) {
-      waveformRenderer.current.setSample(activeSample.sampleData);
+      waveformRenderer.setSample(activeSample.sampleData);
     }
-  }, [activeSample]);
+  }, [activeSample, waveformRenderer]);
 
   // Load the previously selected sample, if one was provided
   useEffect(() => {
@@ -243,7 +248,7 @@ const GranulatorUI: React.FC<GranulatorUIProps> = ({ vcId, initialState, selecte
 
     const startMarkPosSamples = inst.startSample.manualControl.offset.value;
     const endMarkPosSamples = inst.endSample.manualControl.offset.value;
-    waveformRenderer.current.setSelection({
+    waveformRenderer.setSelection({
       startMarkPosMs:
         startMarkPosSamples < 0
           ? null
@@ -253,22 +258,22 @@ const GranulatorUI: React.FC<GranulatorUIProps> = ({ vcId, initialState, selecte
           ? null
           : (endMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000,
     });
-  }, [activeSample?.sampleData.sampleRate, inst, vcId]);
+  }, [activeSample?.sampleData.sampleRate, inst, vcId, waveformRenderer]);
 
   useEffect(() => {
-    const waveformRendererInst = waveformRenderer.current;
+    const waveformRendererInst = waveformRenderer;
     const cb = (newSelection: { startMarkPosMs: number | null; endMarkPosMs: number | null }) => {
       if (!inst) {
         return;
       }
       inst.startSample.manualControl.offset.value =
-        msToSamples(newSelection.startMarkPosMs, waveformRenderer.current.getSampleRate()) ?? -1;
+        msToSamples(newSelection.startMarkPosMs, waveformRenderer.getSampleRate()) ?? -1;
       inst.endSample.manualControl.offset.value =
-        msToSamples(newSelection.endMarkPosMs, waveformRenderer.current.getSampleRate()) ?? -1;
+        msToSamples(newSelection.endMarkPosMs, waveformRenderer.getSampleRate()) ?? -1;
     };
     waveformRendererInst.addEventListener('selectionChange', cb);
     return () => waveformRendererInst.removeEventListener('selectionChange', cb);
-  }, [inst]);
+  }, [inst, waveformRenderer]);
 
   const [isLoadingSample, setIsLoadingSample] = useState(false);
 
@@ -305,7 +310,7 @@ const GranulatorUI: React.FC<GranulatorUIProps> = ({ vcId, initialState, selecte
 
       <GranularControlPanel initialState={initialState} inst={inst} />
 
-      {activeSample ? <SampleEditor waveformRenderer={waveformRenderer.current} /> : null}
+      {activeSample ? <SampleEditor waveformRenderer={waveformRenderer} /> : null}
 
       <hr />
       <SampleRecorder vcId={vcId} awpNode={inst?.node ?? null} />

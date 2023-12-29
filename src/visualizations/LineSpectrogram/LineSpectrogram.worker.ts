@@ -15,10 +15,6 @@ class LineSpectrogramWorker {
    */
   private runToken: number | null = null;
 
-  constructor() {
-    // TODO
-  }
-
   public handleMessage(evt: MessageEvent<LineSpectrogramWorkerMessage>) {
     switch (evt.data.type) {
       case 'setWasmBytes':
