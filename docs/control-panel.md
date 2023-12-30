@@ -2,7 +2,7 @@
 
 _This page is about the UI library used to create many parts of the web synth application.  For info about the control panel [[module]], see [[control-panel-module]]._
 
-![An example of a typical control panel in web synth, created using react-control-panel and controlling a bitcrusher effect](https://ameo.link/u/8uv.png)
+![An example of a typical control panel in web synth, created using react-control-panel and controlling a bitcrusher effect](https://i.ameo.link/8uv.png)
 
 A library called [react-control-panel](https://github.com/Ameobea/react-control-panel) which is a fork I created of the [control-panel](https://github.com/freeman-lab/control-panel) library is used for many of the UIs in web synth.  It allows defining UIs programatically via a list of settings and their parameters.  Since settings are defined using code, it's also possible for the available settings to change dynamically when other settings change.  This allows for UIs, even those with complex behaviors or non-trivial use cases, to be created quickly which is a big help for audio programming.
 

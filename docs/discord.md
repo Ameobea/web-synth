@@ -4,7 +4,7 @@
 
 Their voice chat makes use of [[opus]] for encoding/decoding.  This is evident since they don't seem to be stripping their binaries, at least not on Linux.  Using `perf` on the Discord process, it's possible to see several opus functions in the trace:
 
-![](https://ameo.link/u/97f.png)
+![](https://i.ameo.link/97f.png)
 
 Some of them, such as `opus_fft_impl`, are used in other projects that use Opus code.  The one I know I've seen it in before is [[rnnoise]], see the code directly: ![](https://github.com/xiph/rnnoise/blob/1cbdbcf1283499bbb2230a6b0f126eb9b236defd/src/kiss_fft.c#L518).
 

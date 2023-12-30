@@ -4,7 +4,7 @@ The **granular synthesizer** is a web synth [[module]] that implements [[granula
 
 Web synth implements a granular synthesis module which supports specifying static input samples from the [[sample-library]], viewing their waveforms visually, selecting a chunk of the waveform, and then picking grains from that section and playing them back according to a variety of options.
 
-![](https://ameo.link/u/8u9.png)
+![](https://i.ameo.link/8u9.png)
 
 The web synth granular synth is heavily based off of the [Clouds](https://mutable-instruments.net/modules/clouds/) Eurorack module created by Mutable Instruments.  In fact, some of the mutable instruments [source code](https://github.com/pichenettes/eurorack/tree/master/clouds) was used to help structure the web synth implementation.
 

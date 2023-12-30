@@ -1,6 +1,6 @@
 # spectrum visualization
 
-![](https://ameo.link/u/8us.png)
+![](https://i.ameo.link/8us.png)
 
 Web synth has a built-in **spectrum visualization** that shows the audio spectrum of sound.  One is currently included in the [[fm-synth]], the [[synth-designer]], and then [[code-editor]].  It is produced by taking the outputs of the [[web-audio]] `AnalyserNode` which correspond to the outputs of a fast fourier transform and plotting them over time.  Lower frequencies are at the bottom, and higher frequencies are towards the top.
 

@@ -1,6 +1,6 @@
 # global-beat-counter
 
-The **global beat counter** is used to synchronize tempo with all [[module]]s of the application.  It can be started and stopped using the button in the top right of the application: ![](https://ameo.link/u/8wb.png)
+The **global beat counter** is used to synchronize tempo with all [[module]]s of the application.  It can be started and stopped using the button in the top right of the application: ![](https://i.ameo.link/8wb.png)
 
 The global beat counter runs on the web audio rendering thread via `AudioWorkletProcessor` and keeps track of the current global beat there, incrementing it each frame based off the current live time from web audio.  It then exposes the current global beat to the main/UI thread via `SharedArrayBuffer`.  The global tempo is defined in the web audio graph and the current live tempo at each frame is used to compute how many beats passed meaning that the global tempo counter handles dynamically changing tempos.
 

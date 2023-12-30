@@ -62,6 +62,12 @@ pub fn clamp_normalize(min: f32, max: f32, val: f32) -> f32 {
 pub fn mix(v1_pct: f32, v1: f32, v2: f32) -> f32 { (v1_pct * v1) + (1. - v1_pct) * v2 }
 
 #[inline]
+pub fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+  let t = clamp(0., 1., (x - edge0) / (edge1 - edge0));
+  t * t * (3. - 2. * t)
+}
+
+#[inline]
 pub fn read_interpolated(buf: &[f32], index: f32) -> f32 {
   let base_ix = index.trunc() as usize;
   let next_ix = base_ix + 1;

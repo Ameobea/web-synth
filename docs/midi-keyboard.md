@@ -1,6 +1,6 @@
 # midi-keyboard
 
-![](https://ameo.link/u/9kh.png)
+![](https://i.ameo.link/9kh.png)
 
 The **midi keyboard** is a web synth [[module]] and [[view-context]] which supports generating and routing MIDI events from either the computer keyboard, a virtual keyboard on the screen, or an external MIDI device via WebMIDI.  It exposes [[audio-connectables]] that can be routed using the [[graph-editor]] to control other modules.
 

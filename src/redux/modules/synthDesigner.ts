@@ -14,7 +14,7 @@ import type { MIDINode } from 'src/patchNetwork/midiNode';
 import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import {
-  AbstractFilterModule,
+  type AbstractFilterModule,
   buildAbstractFilterModule,
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';

@@ -1,6 +1,6 @@
 # effect chain
 
-![](https://ameo.link/u/8ph.png)
+![](https://i.ameo.link/8ph.png)
 
 The [[fm-synth]]'s **effect chain** provides an interface to configure the effects that are applied to the output of the FM synth or to individual [[operator]]s.  Effects are applied from top to bottom with the output from each getting passed into the next.
 

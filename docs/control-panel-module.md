@@ -1,6 +1,6 @@
 # control panel module
 
-![A screenshot of a UI created using the control panel module, containing a MIDI keyboard, several sliders controlling different params, a spectrogram visualization, and a text note.](https://ameo.link/u/9ki.png)
+![A screenshot of a UI created using the control panel module, containing a MIDI keyboard, several sliders controlling different params, a spectrogram visualization, and a text note.](https://i.ameo.link/9ki.png)
 
 The **control panel module** is a [[view-context]] in web synth that can be used to create custom interactive UIs to control web synth compositions live and control different parts of them.
 

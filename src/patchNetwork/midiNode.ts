@@ -16,6 +16,11 @@ import {
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
  */
 export interface MIDIInputCbs {
+  /**
+   * If this is set, then this MIDI node opts into audio thread scheduling.  This means that instead of
+   * calling `onAttack` and `onRelease` directly, we will instead post a message to the audio thread
+   * mailbox with the MIDI event.
+   */
   enableRxAudioThreadScheduling?: { mailboxIDs: string[] };
   onAttack: (note: number, velocity: number) => void;
   onRelease: (note: number, velocity: number) => void;

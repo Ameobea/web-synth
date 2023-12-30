@@ -1,6 +1,6 @@
 # midi-quantizer-node
 
-![A screenshot of the MIDI quantizer node UI from web synth showing the octave selector, not selector, and some info about the node](https://ameo.link/u/9l3.jpeg)
+![A screenshot of the MIDI quantizer node UI from web synth showing the octave selector, not selector, and some info about the node](https://i.ameo.link/9l3.jpeg)
 
 The **midi quantizer node** is a [[patch-network]] node in web synth that can be created via the [[graph-editor]].  It takes input signals in the range of [-1, 1] and outputs MIDI notes in a configurable range.  This node is useful for modular synth-esque patches and compositions and is one of the nodes that bridges between signals (CV) and MIDI events that are usable with modules such as the [[synth-designer]].
 

@@ -1,4 +1,5 @@
-import { MIDINode } from 'src/patchNetwork/midiNode';
+import { UnreachableException } from 'ameo-utils';
+import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import type { SerializedSampler } from 'src/sampler/sampler';
 import { AsyncOnce, getEngine } from 'src/util';
@@ -27,6 +28,8 @@ const SamplerWasm = new AsyncOnce(
 
 export class SamplerInstance {
   private vcId: string;
+  private audioThreadMIDIEventMailboxID: string;
+  private midiInputCBs: MIDIInputCbs;
   public midiNode: MIDINode;
   public awpHandle: AudioWorkletNode | null = null;
   public activeSample: Writable<{
@@ -36,7 +39,23 @@ export class SamplerInstance {
 
   constructor(vcId: string, initialState: SerializedSampler) {
     this.vcId = vcId;
-    this.midiNode = new MIDINode();
+    this.audioThreadMIDIEventMailboxID = `sampler-${vcId}-${genRandomStringID()}`;
+    this.midiInputCBs = {
+      enableRxAudioThreadScheduling: { mailboxIDs: [this.audioThreadMIDIEventMailboxID] },
+      onAttack: () => {
+        throw new UnreachableException('Expected only audio thread MIDI events');
+      },
+      onRelease: () => {
+        throw new UnreachableException('Expected only audio thread MIDI events');
+      },
+      onClearAll: () => {
+        throw new UnreachableException('Expected only audio thread MIDI events');
+      },
+      onPitchBend: () => {
+        throw new UnreachableException('Expected only audio thread MIDI events');
+      },
+    };
+    this.midiNode = new MIDINode(() => this.midiInputCBs);
     this.setSelectedSample(initialState.activeSample);
 
     this.init();
@@ -48,8 +67,10 @@ export class SamplerInstance {
       numberOfInputs: 0,
       numberOfOutputs: 1,
       outputChannelCount: [2],
+      processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
     });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes: samplerWasm });
+    this.setSelectedSample(get(this.activeSample)?.descriptor ?? null);
 
     updateConnectables(this.vcId, getEngine()!.get_vc_connectables(this.vcId));
   }
@@ -57,15 +78,15 @@ export class SamplerInstance {
   public async setSelectedSample(descriptor: SampleDescriptor | null) {
     if (!descriptor) {
       this.activeSample.set(null);
+      this.awpHandle?.port.postMessage({ type: 'setSampleData', sampleData: new Float32Array() });
       return;
     }
 
     this.activeSample.set({ descriptor, sampleData: null });
     try {
-      const sampleData = await getSample(descriptor);
-      this.activeSample.set({ descriptor, sampleData });
+      const sampleData: AudioBuffer = await getSample(descriptor);
 
-      // if the selected sample changed in the meantime, abort
+      // if the selected sample changed while the data was loading, abort
       const curActiveSample = get(this.activeSample);
       if (
         !curActiveSample ||
@@ -74,6 +95,10 @@ export class SamplerInstance {
         this.activeSample.set(null);
         return;
       }
+
+      this.activeSample.set({ descriptor, sampleData });
+      const sampleDataBuffer = sampleData.getChannelData(0);
+      this.awpHandle?.port.postMessage({ type: 'setSampleData', sampleData: sampleDataBuffer });
     } catch (err) {
       console.error('Error loading sample: ', err);
       alert('Error loading sample: ' + err);

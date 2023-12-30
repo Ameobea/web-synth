@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
+import type { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 
 export type WaveformInstance =
   | {

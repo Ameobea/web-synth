@@ -1,11 +1,13 @@
 const PARAM_DESCRIPTORS = [];
+const FRAME_SIZE = 128;
+const BYTES_PER_F32 = 4;
 
 class SamplerAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return PARAM_DESCRIPTORS;
   }
 
-  constructor() {
+  constructor({ processorOptions }) {
     super();
 
     this.isShutdown = false;
@@ -15,6 +17,19 @@ class SamplerAWP extends AudioWorkletProcessor {
     this.pendingMessages = [];
 
     this.port.onmessage = evt => this.handleMessage(evt.data);
+
+    if (!processorOptions.mailboxID) {
+      throw new Error('SamplerAWP requires a mailboxID to be passed in processorOptions');
+    }
+    this.mailboxID = processorOptions.mailboxID;
+    globalThis.midiEventMailboxRegistry.addMailbox(processorOptions.mailboxID);
+  }
+
+  getWasmMemoryBuffer() {
+    if (this.wasmMemoryBuffer.buffer !== this.wasmInstance.exports.memory.buffer) {
+      this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+    }
+    return this.wasmMemoryBuffer;
   }
 
   async initWasmInstance(wasmBytes) {
@@ -46,20 +61,105 @@ class SamplerAWP extends AudioWorkletProcessor {
         this.isShutdown = true;
         break;
       }
+      case 'setSampleData': {
+        const { sampleData } = data;
+        let wasmMemory = this.getWasmMemoryBuffer();
+        const sampleDataPtr = this.wasmInstance.exports.sampler_get_sample_data_ptr(
+          this.ctxPtr,
+          sampleData.length
+        );
+        // Memory might have been reallocated, so we need to get the pointer again
+        wasmMemory = this.getWasmMemoryBuffer();
+        wasmMemory.set(sampleData, sampleDataPtr / BYTES_PER_F32);
+
+        // TODO TEMP
+        const midiNumber = 48;
+        this.wasmInstance.exports.sampler_set_selection(
+          this.ctxPtr,
+          midiNumber,
+          0,
+          sampleData.length,
+          40,
+          40,
+          1,
+          true
+        );
+
+        break;
+      }
+      case 'setSelection': {
+        const {
+          index,
+          startSampleIx,
+          endSampleIx,
+          crossfadeStartLenSamples,
+          crossfadeEndLenSamples,
+          playbackRate,
+          reverse,
+        } = data;
+        this.wasmInstance.exports.sampler_set_selection(
+          this.ctxPtr,
+          index,
+          startSampleIx,
+          endSampleIx,
+          crossfadeStartLenSamples,
+          crossfadeEndLenSamples,
+          playbackRate,
+          reverse
+        );
+        break;
+      }
+      case 'clearSelection': {
+        const { index } = data;
+        this.wasmInstance.exports.sampler_clear_selection(this.ctxPtr, index);
+        break;
+      }
       default: {
         console.error('Unhandled message type in sampler player AWP: ', data.type);
       }
     }
   }
 
-  process(_inputs, _outputs, _params) {
+  checkMailbox() {
+    if (!this.mailboxID) {
+      return;
+    }
+
+    let msg;
+    while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
+      const { eventType, param1 } = msg;
+      switch (eventType) {
+        case 0: {
+          this.wasmInstance.exports.sampler_handle_midi_attack(this.ctxPtr, param1);
+          break;
+        }
+        default:
+        // pass
+      }
+    }
+  }
+
+  process(_inputs, outputs, _params) {
     if (this.isShutdown) {
       return false;
     } else if (!this.ctxPtr) {
       return true;
     }
 
-    // TODO
+    this.checkMailbox();
+    this.wasmInstance.exports.sampler_process(this.ctxPtr);
+    const outputBufPtr = this.wasmInstance.exports.sampler_get_output_buf_ptr(this.ctxPtr);
+    const wasmMemory = this.getWasmMemoryBuffer();
+    const outputBuf = wasmMemory.subarray(
+      outputBufPtr / BYTES_PER_F32,
+      outputBufPtr / BYTES_PER_F32 + FRAME_SIZE
+    );
+
+    for (let i = 0; i < outputs.length; i++) {
+      for (let j = 0; j < outputs[i].length; j++) {
+        outputs[i][j].set(outputBuf);
+      }
+    }
 
     return true;
   }

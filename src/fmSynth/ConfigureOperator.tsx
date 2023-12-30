@@ -1,14 +1,9 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import type { SvelteComponent } from 'svelte';
 import type { Writable } from 'svelte/store';
 
-import {
-  renderModalWithControls,
-  renderSvelteModalWithControls,
-  type ModalCompProps,
-} from 'src/controls/Modal';
+import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
@@ -202,7 +197,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           label: 'configure wavetable',
           action: async () => {
             const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
-              .default as typeof SvelteComponent<ModalCompProps<WavetableBank>>;
+              .default;
             try {
               const wavetableBank =
                 await renderSvelteModalWithControls<WavetableBank>(WavetableConfigurator);

@@ -1,6 +1,6 @@
 # filter
 
-![](https://ameo.link/u/8ur.png)
+![](https://i.ameo.link/8ur.png)
 
 **Filters** are audio processing constructs that change the levels different frequency components of a sound.  Going into the details of how filters work is out of scope of this guide, but the filters used in web-synth are mostly simple.
 

@@ -1,6 +1,6 @@
 # sample-library
 
-![](https://ameo.link/u/8xl.png)
+![](https://i.ameo.link/8xl.png)
 
 There's not much here right now, but the **sample library** is a [[module]] that displays all available samples for the application, lets them be previewed/listened to, and allows for samples to be loaded in from either the local filesystem or remote server.  It is a frontend to the [[sample-manager]], which serves as the internal interface for interacting with samples in the application.
 
