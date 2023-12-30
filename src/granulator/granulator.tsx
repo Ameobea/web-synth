@@ -25,7 +25,7 @@ import { get, writable } from 'svelte/store';
 
 const ctx = new AudioContext();
 
-const GranulatorRegistered = new AsyncOnce(
+const GranulatorAWPRegistered = new AsyncOnce(
   () =>
     ctx.audioWorklet.addModule(
       process.env.ASSET_PATH +
@@ -199,7 +199,7 @@ export const init_granulator = async (stateKey: string) => {
 
   const granularWasmPromise = GranularWasm.get();
   const waveformRenderer = new WaveformRenderer();
-  GranulatorRegistered.get().then(async () => {
+  GranulatorAWPRegistered.get().then(async () => {
     const node = new AudioWorkletNode(ctx, 'granulator-audio-worklet-processor', {
       channelCount: 1,
       numberOfInputs: 1,

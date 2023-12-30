@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './Modal.scss';
-import { SvelteComponent } from 'svelte';
+import type { SvelteComponent } from 'svelte';
 
 export interface ModalCompProps<T> {
   onSubmit: (val: T) => void;

@@ -932,6 +932,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sampler"
+version = "0.1.0"
+dependencies = [
+ "dsp",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -184,7 +184,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         }
       }
     },
-    [actionCreators.synthDesigner, dispatch, getState, props.index]
+    [actionCreators.synthDesigner, dispatch, gainEnvelope, getState, props.index]
   );
 
   const state = useMemo(() => {

@@ -211,7 +211,7 @@ export const SampleListing: React.FC<SampleListingProps> = ({
   }
 
   return (
-    <div style={{ width: 500 }}>
+    <div>
       <SampleSearch value={sampleSearch} onChange={setSampleSearch} />
       <div className='sample-row' style={{ width: '100%', borderBottom: '1px solid #888' }}>
         <div />

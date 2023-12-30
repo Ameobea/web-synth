@@ -8,6 +8,7 @@ pub mod looper;
 pub mod midi_editor;
 pub mod midi_keyboard;
 pub mod sample_library;
+pub mod sampler;
 pub mod sequencer;
 pub mod signal_analyzer;
 pub mod sinsy;

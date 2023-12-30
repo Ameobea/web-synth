@@ -30,6 +30,7 @@ members = [
   "midi_renderer",
   "oscilloscope",
   "canvas_utils",
+  "sampler"
 ]
 
 [profile.release]

@@ -6,8 +6,8 @@ import './Granulator.scss';
 import { type GranulatorInstance, GranulatorInstancesById } from 'src/granulator/granulator';
 import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
 import SampleRecorder from 'src/granulator/GranulatorUI/SampleRecorder';
-import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
-import { getSample, SampleDescriptor } from 'src/sampleLibrary';
+import type { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
+import { getSample, type SampleDescriptor } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { useMappedWritableValue } from 'src/reactUtils';
 

@@ -1,4 +1,4 @@
-import { get, Writable, writable } from 'svelte/store';
+import { get, type Writable, writable } from 'svelte/store';
 
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';

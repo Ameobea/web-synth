@@ -1,7 +1,7 @@
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { getSentry } from 'src/sentry';
 import {
-  AbstractFilterModule,
+  type AbstractFilterModule,
   buildConnectedFilterChain,
   computeHigherOrderBiquadQFactors,
 } from 'src/synthDesigner/biquadFilterModule';

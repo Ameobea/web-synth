@@ -17,16 +17,16 @@ export class WaveformRenderer {
   private worker: Comlink.Remote<WaveformRendererWorker>;
   private sampleCount = 0;
   private bounds: WaveformBounds = { startMs: 0, endMs: 0 };
+  private selection: WaveformSelection = {
+    startMarkPosMs: null,
+    endMarkPosMs: null,
+  };
   private widthPx = 1400;
   private heightPx = 240;
   private isRendering = false;
   private needsRender = false;
   private sampleRate = 44100;
   private canvasCtx: CanvasRenderingContext2D | null = null;
-  private selection: WaveformSelection = {
-    startMarkPosMs: null,
-    endMarkPosMs: null,
-  };
 
   public getWidthPx() {
     return this.widthPx;
@@ -63,6 +63,9 @@ export class WaveformRenderer {
   }
 
   public reinitializeCtx(sample?: AudioBuffer | null) {
+    this.bounds = { startMs: 0, endMs: this.getSampleLengthMs() };
+    this.selection = { startMarkPosMs: null, endMarkPosMs: null };
+
     this.worker.reinitializeCtx(
       this.widthPx,
       this.heightPx,
@@ -138,13 +141,10 @@ export class WaveformRenderer {
     this.selectionChangedCbs.forEach(cb => cb({ ...this.selection }));
   }
 
-  public async setSample(sample: AudioBuffer) {
+  public setSample(sample: AudioBuffer) {
     this.sampleCount = sample.length;
     this.sampleRate = sample?.sampleRate ?? 44100;
     this.reinitializeCtx(sample);
-    if (this.bounds.endMs === 0) {
-      this.setBounds(0, await this.getSampleLengthMs());
-    }
     this.updateBoundsCbs();
     this.render();
   }

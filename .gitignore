@@ -54,3 +54,4 @@ public/multiband_diode_ladder_distortion.wasm
 public/midi_renderer.wasm
 public/oscilloscope.wasm
 public/spectrum_viz_full.wasm
+public/sampler.wasm

@@ -1,6 +1,6 @@
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
-import {
+import type {
   OscilloscopeUIState,
   OscilloscopeWindowType,
   OscilloscopeWorkerMessage,

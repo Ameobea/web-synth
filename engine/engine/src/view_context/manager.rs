@@ -10,9 +10,9 @@ use crate::{
     composition_sharing::mk_composition_sharing, control_panel::mk_control_panel,
     faust_editor::mk_faust_editor, filter_designer::mk_filter_designer, granulator::mk_granulator,
     graph_editor::mk_graph_editor, looper::mk_looper, midi_editor::mk_midi_editor,
-    midi_keyboard::mk_midi_keyboard, sample_library::mk_sample_library, sequencer::mk_sequencer,
-    signal_analyzer::mk_signal_analyzer, sinsy::mk_sinsy, synth_designer::mk_synth_designer,
-    welcome_page::mk_welcome_page,
+    midi_keyboard::mk_midi_keyboard, sample_library::mk_sample_library, sampler::mk_sampler,
+    sequencer::mk_sequencer, signal_analyzer::mk_signal_analyzer, sinsy::mk_sinsy,
+    synth_designer::mk_synth_designer, welcome_page::mk_welcome_page,
   },
   ViewContext,
 };
@@ -425,6 +425,7 @@ pub fn build_view(name: &str, uuid: Uuid) -> Box<dyn ViewContext> {
     "looper" => mk_looper(uuid),
     "welcome_page" => mk_welcome_page(uuid),
     "signal_analyzer" => mk_signal_analyzer(uuid),
+    "sampler" => mk_sampler(uuid),
     _ => panic!("No handler for view context with name {}", name),
   }
 }

@@ -12,7 +12,7 @@
 //                 extends to the end of the SAB.
 
 import {
-  OscilloscopeWindow,
+  type OscilloscopeWindow,
   OscilloscopeWindowType,
   type OscilloscopeWorkerMessage,
 } from 'src/visualizations/Oscilloscope/types';

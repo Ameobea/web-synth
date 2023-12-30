@@ -180,3 +180,12 @@ extern "C" {
   pub fn cleanup_signal_analyzer(state_key: &str);
   pub fn get_signal_analyzer_audio_connectables(state_key: &str) -> JsValue;
 }
+
+#[wasm_bindgen(raw_module = "./sampler/sampler")]
+extern "C" {
+  pub fn init_sampler(state_key: &str);
+  pub fn hide_sampler(state_key: &str);
+  pub fn unhide_sampler(state_key: &str);
+  pub fn cleanup_sampler(state_key: &str);
+  pub fn get_sampler_audio_connectables(state_key: &str) -> JsValue;
+}

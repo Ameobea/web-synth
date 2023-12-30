@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
-import { SvelteComponent } from 'svelte';
+import type { SvelteComponent } from 'svelte';
 import type { Writable } from 'svelte/store';
 
 import {

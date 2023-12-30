@@ -47,6 +47,7 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
     description:
       'Contains visualizations for analyzing sound including an oscilloscope and spectrogram',
   },
+  { name: 'sampler', displayName: 'Sampler' },
 ];
 
 const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -78,7 +79,7 @@ const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             return;
           }
 
-          engine.create_view_context(vc.name);
+          engine.create_view_context(vc.name, selectedModule);
           onClose();
         },
       },

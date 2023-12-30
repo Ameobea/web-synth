@@ -59,7 +59,7 @@ pub fn init() {
 
 /// Creates a new view context from the provided name and sets it as the main view context.
 #[wasm_bindgen]
-pub fn create_view_context(vc_name: String) {
+pub fn create_view_context(vc_name: String, display_name: String) {
   let uuid = uuid_v4();
   debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
   let mut view_context = build_view(&vc_name, uuid);
@@ -67,6 +67,7 @@ pub fn create_view_context(vc_name: String) {
   view_context.hide();
   let vcm = get_vcm();
   vcm.add_view_context(uuid, vc_name, view_context);
+  set_vc_title(uuid.to_string(), display_name)
 }
 
 #[wasm_bindgen]

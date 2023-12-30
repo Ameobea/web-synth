@@ -86,6 +86,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -148,6 +149,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
 
   just debug-sinsy
 
@@ -328,3 +330,11 @@ build-waveform-renderer:
   cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/waveform_renderer* ./src/
+
+build-sampler:
+  cd ./engine/sampler && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/sampler.wasm ../../public
+
+debug-sampler:
+  cd ./engine/sampler && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/sampler.wasm ../../public

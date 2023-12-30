@@ -26,7 +26,8 @@
     "react-hooks/exhaustive-deps": "warn",
     "@typescript-eslint/explicit-module-boundary-types": 0,
     "react/jsx-no-target-blank": 0,
-    "@typescript-eslint/no-empty-interface": "warn"
+    "@typescript-eslint/no-empty-interface": "warn",
+    "@typescript-eslint/consistent-type-imports": ["warn", { "disallowTypeAnnotations": false }]
   },
   "env": {
     "es6": true,

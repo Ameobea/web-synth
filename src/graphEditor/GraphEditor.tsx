@@ -268,7 +268,10 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
               return;
             }
 
-            engine.create_view_context(selectedNodeType.current);
+            const displayName = ViewContextDescriptors.find(
+              d => d.name === selectedNodeType.current
+            )!.displayName;
+            engine.create_view_context(selectedNodeType.current, displayName);
             return;
           }
 
