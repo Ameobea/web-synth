@@ -6,12 +6,36 @@ import { mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { Map as ImmMap } from 'immutable';
 import { SamplerInstance } from 'src/sampler/SamplerInstance';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
+import type { WaveformBounds } from 'src/granulator/GranulatorUI/WaveformRenderer';
+
+export interface SamplerSelection {
+  name?: string;
+  startSampleIx: number | null;
+  endSampleIx: number | null;
+  startCrossfadeLenSamples: number;
+  endCrossfadeLenSamples: number;
+  bounds?: WaveformBounds;
+}
+
+export const buildDefaultSamplerSelection = () => ({
+  name: undefined,
+  startSampleIx: null,
+  endSampleIx: null,
+  startCrossfadeLenSamples: 0,
+  endCrossfadeLenSamples: 0,
+});
 
 export interface SerializedSampler {
   activeSample: SampleDescriptor | null;
+  selections: SamplerSelection[];
+  activeSelectionIx: number | null;
 }
 
-const buildDefaultSamplerState = (): SerializedSampler => ({ activeSample: null });
+const buildDefaultSamplerState = (): SerializedSampler => ({
+  activeSample: null,
+  selections: [],
+  activeSelectionIx: null,
+});
 
 const SamplerInstancesById = new Map<string, SamplerInstance>();
 const ActiveSamplerSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();

@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Provider, useStore } from 'react-redux';
 import type { AnyAction, Store } from 'redux';
-import { Writable, get } from 'svelte/store';
+import { type Writable, get } from 'svelte/store';
 
 interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
   /**
@@ -383,4 +383,17 @@ export function useMappedWritableValue<T, D>(writable: Writable<T>, map: (value:
   const [value, setValue] = useState(map(get(writable)));
   useEffect(() => writable.subscribe(v => setValue(map(v))), [writable, map]);
   return value;
+}
+
+export function mkLazyComponent<Props extends Record<string, any>>(
+  load: () => Promise<{ default: React.ComponentType<Props> }>,
+  LoadingComp: React.ComponentType<Props> = () => <div>Loading...</div>
+): React.FC<Props> {
+  const LazyComp = React.lazy(load);
+  const LazyComponent = (props: Props) => (
+    <React.Suspense fallback={<LoadingComp {...props} />}>
+      <LazyComp {...(props as any)} />
+    </React.Suspense>
+  );
+  return LazyComponent;
 }

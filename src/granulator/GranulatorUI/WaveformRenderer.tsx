@@ -3,7 +3,7 @@ import * as Comlink from 'comlink';
 
 import type { WaveformRendererWorker } from 'src/granulator/GranulatorUI/WaveformRendererWorker.worker';
 
-interface WaveformSelection {
+export interface WaveformSelection {
   startMarkPosMs: number | null;
   endMarkPosMs: number | null;
 }
@@ -48,6 +48,14 @@ export class WaveformRenderer {
     if (R.isNil(startMarkPosMs) && !R.isNil(endMarkPosMs)) {
       throw new Error('Setting nil startMarkPosMs with non-nil endMarkPosMs');
     }
+
+    if (
+      this.selection.startMarkPosMs === startMarkPosMs &&
+      this.selection.endMarkPosMs === endMarkPosMs
+    ) {
+      return;
+    }
+
     this.selection = { startMarkPosMs, endMarkPosMs };
     this.updateSelectionCbs();
   }

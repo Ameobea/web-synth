@@ -1,10 +1,19 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import type { Writable } from 'svelte/store';
 
   import type { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
-  import { LineSpectrumUIInst } from 'src/visualizations/LineSpectrogram/LineSpectrogramUIInst';
+  import type { LineSpectrumUIInst } from 'src/visualizations/LineSpectrogram/LineSpectrogramUIInst';
   import type { LineSpectrogramUIState } from 'src/visualizations/LineSpectrogram/types';
+
+  let LineSpectrumUIInstComp:
+    | typeof import('src/visualizations/LineSpectrogram/LineSpectrogramUIInst').LineSpectrumUIInst
+    | null = null;
+  onMount(() =>
+    import('src/visualizations/LineSpectrogram/LineSpectrogramUIInst').then(module => {
+      LineSpectrumUIInstComp = module.LineSpectrumUIInst;
+    })
+  );
 
   export let inst: LineSpectrogram;
   export let store: Writable<LineSpectrogramUIState>;
@@ -25,9 +34,9 @@
 
   let container: HTMLDivElement | null = null;
   let uiInst: LineSpectrumUIInst | null = null;
-  $: if (container) {
+  $: if (container && LineSpectrumUIInstComp) {
     uiInst?.destroy();
-    uiInst = new LineSpectrumUIInst(
+    uiInst = new LineSpectrumUIInstComp(
       container,
       { width, height },
       $store.rangeDb[0],

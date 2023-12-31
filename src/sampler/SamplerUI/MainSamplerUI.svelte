@@ -1,17 +1,89 @@
 <script lang="ts">
+  import { filterNils } from 'ameo-utils';
   import { renderSvelteModalWithControls } from 'src/controls/Modal';
-  import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+  import SvelteControlPanel, {
+    ControlPanelSetting,
+  } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+  import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
+  import type {
+    WaveformRenderer,
+    WaveformSelection,
+  } from 'src/granulator/GranulatorUI/WaveformRenderer';
+  import ReactShim from 'src/misc/ReactShim.svelte';
   import type { SampleDescriptor } from 'src/sampleLibrary';
+  import type { SamplerInstance } from 'src/sampler/SamplerInstance';
+  import ConfigureSelection from 'src/sampler/SamplerUI/ConfigureSelection.svelte';
   import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
+  import SelectionListing from 'src/sampler/SamplerUI/SelectionListing.svelte';
+  import { buildDefaultSamplerSelection, type SamplerSelection } from 'src/sampler/sampler';
+  import { onMount } from 'svelte';
+  import { type Writable, get } from 'svelte/store';
 
   export let activeSample: { descriptor: SampleDescriptor; data?: AudioBuffer } | null;
+  export let selections: Writable<SamplerSelection[]>;
+  export let activeSelectionIx: Writable<number | null>;
+  export let inst: SamplerInstance;
   export let clearActiveSample: () => void;
-</script>
+  export let waveformRenderer: WaveformRenderer;
 
-<div class="root">
-  <p>Active sample: {activeSample?.descriptor.name ?? 'none'}</p>
-  <SvelteControlPanel
-    settings={[
+  $: if ($activeSelectionIx === null) {
+    waveformRenderer.setSelection({ endMarkPosMs: null, startMarkPosMs: null });
+  } else {
+    const selection = $selections[$activeSelectionIx];
+    waveformRenderer.setSelection({
+      startMarkPosMs: selection.startSampleIx,
+      endMarkPosMs: selection.endSampleIx,
+    });
+  }
+
+  const onWaveformRendererSelectionChange = (newSelection: WaveformSelection) => {
+    if ($activeSelectionIx === null) {
+      return;
+    }
+
+    inst.setSelection($activeSelectionIx, {
+      ...$selections[$activeSelectionIx],
+      startSampleIx: newSelection.startMarkPosMs,
+      endSampleIx: newSelection.endMarkPosMs,
+    });
+  };
+  onMount(() => {
+    waveformRenderer.addEventListener('selectionChange', onWaveformRendererSelectionChange);
+
+    return () =>
+      void waveformRenderer.removeEventListener(
+        'selectionChange',
+        onWaveformRendererSelectionChange
+      );
+  });
+
+  const deleteActiveSelection = () => {
+    if ($activeSelectionIx === null) {
+      return;
+    }
+
+    inst.deleteSelection($activeSelectionIx);
+  };
+
+  $: settings = ((): ControlPanelSetting[] =>
+    filterNils([
+      {
+        type: 'button',
+        action: () => {
+          selections.update(selections => [...selections, buildDefaultSamplerSelection()]);
+          if (get(selections).length === 1) {
+            activeSelectionIx.set(0);
+          }
+        },
+        label: 'add selection',
+      },
+      $activeSelectionIx !== null
+        ? {
+            type: 'button',
+            action: deleteActiveSelection,
+            label: 'delete selection',
+          }
+        : null,
       {
         type: 'button',
         action: async () => {
@@ -24,12 +96,63 @@
         },
         label: 'reset',
       },
-    ]}
-  />
+    ]))();
+
+  const handleSelectionChange = (newSelection: SamplerSelection) => {
+    if ($activeSelectionIx === null) {
+      console.error('no active selection');
+      return;
+    }
+
+    inst.setSelection($activeSelectionIx, newSelection);
+  };
+</script>
+
+<div class="root">
+  <p style="font-family: 'Hack', monospace; font-size: 14px; margin-top: 4px; margin-bottom: 8px;">
+    Active sample: {activeSample?.descriptor.name ?? 'none'}
+  </p>
+  <div class="main-pane">
+    <div style="display: flex; flex-direction: column;">
+      <SelectionListing
+        selections={$selections}
+        activeSelectionIx={$activeSelectionIx}
+        setActiveSelectionIx={newSelectionIx => void activeSelectionIx.set(newSelectionIx)}
+      />
+      <SvelteControlPanel {settings} />
+    </div>
+    <div class="configure-selection">
+      <div>
+        <ReactShim
+          Component={SampleEditor}
+          props={{ waveformRenderer, disabled: $activeSelectionIx === null }}
+        />
+      </div>
+      {#if $activeSelectionIx !== null}
+        <ConfigureSelection
+          selection={$selections[$activeSelectionIx]}
+          onChange={handleSelectionChange}
+        />
+      {/if}
+    </div>
+  </div>
 </div>
 
 <style lang="css">
   .root {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main-pane {
+    display: flex;
+    flex: 1;
+    flex-direction: row;
+    margin-top: 20px;
+  }
+
+  .configure-selection {
+    flex: 1;
     display: flex;
     flex-direction: column;
   }

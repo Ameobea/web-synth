@@ -3,35 +3,12 @@ import * as R from 'ramda';
 import React, { useCallback } from 'react';
 import { Range } from 'react-control-panel';
 
-import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { FilterType } from 'src/synthDesigner/FilterType';
 import { dbToLinear, linearToDb } from 'src/util';
-
-export enum FilterType {
-  Lowpass = 'lowpass',
-  LP4 = 'order 4 lowpass',
-  LP8 = 'order 8 lowpass',
-  LP16 = 'order 16 lowpass',
-  Highpass = 'highpass',
-  HP4 = 'order 4 highpass',
-  HP8 = 'order 8 highpass',
-  HP16 = 'order 16 highpass',
-  Bandpass = 'bandpass',
-  BP4 = 'order 4 bandpass',
-  BP8 = 'order 8 bandpass',
-  BP16 = 'order 16 bandpass',
-  DynaBP_50 = 'dynamic bandpass (50 Hz)',
-  DynaBP_100 = 'dynamic bandpass (100 Hz)',
-  DynaBP_200 = 'dynamic bandpass (200 Hz)',
-  DynaBP_400 = 'dynamic bandpass (400 Hz)',
-  DynaBP_800 = 'dynamic bandpass (800 Hz)',
-  Lowshelf = 'lowshelf',
-  Highshelf = 'highshelf',
-  Peaking = 'peaking',
-  Notch = 'notch',
-  Allpass = 'allpass',
-}
 
 /**
  * @returns `true` if the filter type is a primitive filter type (one which is natively supported by WebAudio's
@@ -228,15 +205,3 @@ export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
     vcId: undefined,
     adsrDebugName: 'getDefaultFilterParams SHOULD NOT SHOW UP',
   }).reduce((acc, { label, initial }) => ({ ...acc, [label]: initial }), {}) as FilterParams;
-
-export const buildDefaultFilter = (
-  type: FilterType.Lowpass | FilterType.Highpass | FilterType.Bandpass,
-  Q: number,
-  frequency?: number
-) => ({
-  type,
-  frequency: frequency ?? 440,
-  detune: 0,
-  gain: 0,
-  Q,
-});

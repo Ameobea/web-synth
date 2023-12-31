@@ -3,11 +3,11 @@ import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2';
 import {
   mkControlPanelADSR2WithSize,
   type ADSRWithOutputRange,
 } from 'src/controls/adsr2/ControlPanelADSR2';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import { getSynthDesignerReduxInfra, type FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';

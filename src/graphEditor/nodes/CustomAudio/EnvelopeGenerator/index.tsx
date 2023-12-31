@@ -3,9 +3,8 @@ import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
 import type { ADSRValues } from 'src/controls/adsr';
-import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
+import { type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import EnvelopeGeneratorSmallView from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView';
 import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequencySmallView.svelte';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -13,9 +12,10 @@ import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
-import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { mkContainerCleanupHelper, mkContainerRenderHelper, mkLazyComponent } from 'src/reactUtils';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 
 export interface EnvelopeGeneratorState {
   envelope: Adsr;
@@ -122,7 +122,10 @@ export class EnvelopeGenerator implements ForeignNode {
     });
 
     this.renderSmallView = mkContainerRenderHelper({
-      Comp: EnvelopeGeneratorSmallView,
+      Comp: mkLazyComponent(
+        () =>
+          import('src/graphEditor/nodes/CustomAudio/EnvelopeGenerator/EnvelopeGeneratorSmallView')
+      ),
       getProps: () => ({
         onChange: (envelope: Adsr | ADSRValues, lengthMS: number) => {
           this.adsrModule.setState(normalizeEnvelope(envelope));

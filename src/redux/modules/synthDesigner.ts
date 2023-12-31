@@ -3,7 +3,8 @@ import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import * as R from 'ramda';
 import type { Root as ReactDOMRoot } from 'react-dom/client';
 
-import { buildDefaultADSR2Envelope, type AudioThreadData } from 'src/controls/adsr2/adsr2';
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
+import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import FMSynth, {
   AdsrLengthMode,
   type Adsr,
@@ -13,12 +14,13 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
+import { FilterType } from 'src/synthDesigner/FilterType';
 import {
   type AbstractFilterModule,
   buildAbstractFilterModule,
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
-import { FilterType, getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
+import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 
 export interface FilterParams {

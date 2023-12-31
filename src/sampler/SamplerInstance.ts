@@ -1,7 +1,8 @@
 import { UnreachableException } from 'ameo-utils';
+import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
-import type { SerializedSampler } from 'src/sampler/sampler';
+import type { SamplerSelection, SerializedSampler } from 'src/sampler/sampler';
 import { AsyncOnce, getEngine } from 'src/util';
 import { type Writable, writable, get } from 'svelte/store';
 
@@ -26,16 +27,21 @@ const SamplerWasm = new AsyncOnce(
   true
 );
 
+interface ActiveSampleData {
+  descriptor: SampleDescriptor;
+  sampleData: AudioBuffer | null;
+}
+
 export class SamplerInstance {
   private vcId: string;
   private audioThreadMIDIEventMailboxID: string;
   private midiInputCBs: MIDIInputCbs;
   public midiNode: MIDINode;
   public awpHandle: AudioWorkletNode | null = null;
-  public activeSample: Writable<{
-    descriptor: SampleDescriptor;
-    sampleData: AudioBuffer | null;
-  } | null> = writable(null);
+  public activeSample: Writable<ActiveSampleData | null> = writable(null);
+  public selections: Writable<SamplerSelection[]>;
+  public activeSelectionIx: Writable<number | null>;
+  public waveformRenderer: WaveformRenderer;
 
   constructor(vcId: string, initialState: SerializedSampler) {
     this.vcId = vcId;
@@ -55,8 +61,16 @@ export class SamplerInstance {
         throw new UnreachableException('Expected only audio thread MIDI events');
       },
     };
+    this.activeSelectionIx = writable(initialState.activeSelectionIx);
+    this.selections = writable(initialState.selections);
     this.midiNode = new MIDINode(() => this.midiInputCBs);
     this.setSelectedSample(initialState.activeSample);
+    this.waveformRenderer = new WaveformRenderer();
+    this.activeSample.subscribe(activeSample => {
+      if (activeSample?.sampleData) {
+        this.waveformRenderer.setSample(activeSample.sampleData);
+      }
+    });
 
     this.init();
   }
@@ -114,9 +128,36 @@ export class SamplerInstance {
     }
   }
 
+  public deleteSelection(ix: number) {
+    const selections = get(this.selections);
+    const activeSelectionIx = get(this.activeSelectionIx);
+    if (ix === activeSelectionIx) {
+      this.activeSelectionIx.set(null);
+    }
+    this.selections.set([
+      ...selections.slice(0, ix),
+      ...selections.slice(ix + 1, selections.length),
+    ]);
+
+    // TODO: Update backend
+  }
+
+  public setSelection(ix: number, newSelection: SamplerSelection) {
+    const selections = get(this.selections);
+    if (!selections[ix]) {
+      throw new Error(`Selection at index ${ix} does not exist`);
+    }
+
+    const newSelections = [...selections];
+    newSelections[ix] = newSelection;
+    this.selections.set(newSelections);
+  }
+
   public serialize(): SerializedSampler {
     return {
       activeSample: get(this.activeSample)?.descriptor || null,
+      selections: get(this.selections),
+      activeSelectionIx: get(this.activeSelectionIx),
     };
   }
 

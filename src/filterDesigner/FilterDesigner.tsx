@@ -18,13 +18,11 @@ import {
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import FlatButton from 'src/misc/FlatButton';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import {
-  buildDefaultFilter,
-  FilterType,
-  getSettingsForFilterType,
-} from 'src/synthDesigner/filterHelpers';
+import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 import { linearToDb } from 'src/util';
 import buildPresets from './presets';
+import { FilterType } from 'src/synthDesigner/FilterType';
+import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
 
 const Presets = buildPresets();
 

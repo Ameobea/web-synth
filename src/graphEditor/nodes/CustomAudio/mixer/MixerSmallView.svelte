@@ -73,7 +73,7 @@
     type ControlPanelSetting,
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import { LevelDetectorWasmBytes } from 'src/graphEditor/nodes/CustomAudio/LevelDetectorNode/LevelDetectorNode';
-  import { MixerLevelsViz } from 'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz';
+  import type { MixerLevelsViz } from 'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz';
   import { logError } from 'src/sentry';
   import { AsyncOnce } from 'src/util';
 
@@ -171,7 +171,10 @@
 
   $: settings = buildSettings(mixer, inputCount, addInput, removeInput);
 
-  const buildMixerLevelsViz = (canvas: HTMLCanvasElement) => {
+  const buildMixerLevelsViz = (
+    canvas: HTMLCanvasElement,
+    MixerLevelsVizClass: typeof MixerLevelsViz
+  ) => {
     if (awpHandle) {
       for (let i = 0; i < inputCount; i++) {
         connectTrackToAWP(awpHandle, i, false);
@@ -179,7 +182,7 @@
     }
 
     vizInst?.destroy();
-    vizInst = new MixerLevelsViz(canvas, inputCount);
+    vizInst = new MixerLevelsVizClass(canvas, inputCount);
   };
 
   const handleChange = (key: string, val: number) => {
@@ -195,7 +198,9 @@
 </script>
 
 <div style="position: relative;">
-  <canvas use:buildMixerLevelsViz />
+  {#await import('src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz').then(viz => viz.MixerLevelsViz) then MixerLevelsViz}
+    <canvas use:buildMixerLevelsViz={MixerLevelsViz} />
+  {/await}
   <SvelteControlPanel
     {settings}
     width={500}

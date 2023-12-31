@@ -3,7 +3,6 @@ import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import {
   buildConfigureParamSourceSettings,
@@ -12,10 +11,12 @@ import {
 } from 'src/fmSynth/ParamSource';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { MIDINode } from 'src/patchNetwork/midiNode';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { msToSamples, samplesToMs } from 'src/util';
 
 export const PARAM_BUFFER_COUNT = 8;
+
+const LazyADSR2 = React.lazy(() => import('src/controls/adsr2/adsr2'));
 
 const updateState = (state: ParamSource, newState: Partial<ParamSource>): ParamSource => ({
   ...(state as any),
@@ -322,27 +323,29 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
               vcId={vcId}
             />
           )}
-          <ADSR2
-            width={490}
-            height={320}
-            initialState={{
-              ...adsrs[state['adsr index']],
-              lenSamples:
-                adsrs[state['adsr index']].lenSamples.type === 'constant'
-                  ? (adsrs[state['adsr index']].lenSamples as any).value
-                  : 1000,
-              outputRange: [state.shift, state.shift + state.scale],
-            }}
-            onChange={newAdsr => {
-              const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
-              onAdsrChange(adsrIx, {
-                ...newAdsr,
-                lenSamples: adsrs[state['adsr index']].lenSamples,
-              });
-            }}
-            vcId={vcId}
-            debugName={`fm synth adsr ${vcId} ${state['adsr index']}`}
-          />
+          <React.Suspense fallback={null}>
+            <LazyADSR2
+              width={490}
+              height={320}
+              initialState={{
+                ...adsrs[state['adsr index']],
+                lenSamples:
+                  adsrs[state['adsr index']].lenSamples.type === 'constant'
+                    ? (adsrs[state['adsr index']].lenSamples as any).value
+                    : 1000,
+                outputRange: [state.shift, state.shift + state.scale],
+              }}
+              onChange={newAdsr => {
+                const adsrIx = (state as Extract<typeof state, { type: 'adsr' }>)['adsr index'];
+                onAdsrChange(adsrIx, {
+                  ...newAdsr,
+                  lenSamples: adsrs[state['adsr index']].lenSamples,
+                });
+              }}
+              vcId={vcId}
+              debugName={`fm synth adsr ${vcId} ${state['adsr index']}`}
+            />
+          </React.Suspense>
         </>
       ) : null}
     </>
@@ -358,7 +361,7 @@ const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = props => {
 
   return (
     <TrainingMIDIControlIndexContext.Consumer>
-      {({ midiNode }) => <ConfigureParamSourceInner {...props} midiNode={midiNode} />}
+      {({ midiNode }) => <ConfigureParamSourceInner {...props} midiNode={midiNode!} />}
     </TrainingMIDIControlIndexContext.Consumer>
   );
 };

@@ -2,7 +2,7 @@
  * Attack-Decay-Sustain-Release control for volume envelope shaping.  Rendered entirely on the JS
  * side with callbacks into Wasm for value changes.
  */
-import React, { Fragment, SVGAttributes, useMemo, useRef } from 'react';
+import React, { Fragment, type SVGAttributes, useMemo, useRef } from 'react';
 import { Value } from 'react-control-panel';
 
 import { clamp, roundTo } from '../util';

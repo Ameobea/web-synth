@@ -84,10 +84,6 @@ pub extern "C" fn oscilloscope_renderer_set_view(
 ) {
   maybe_set_panic_hook();
 
-  log(&format!(
-    "oscilloscope_renderer_set_view: {}x{}@{}",
-    width, height, dpr
-  ));
   let viz = unsafe { &mut VIZ };
   viz.set_view(cur_bpm, VizView { width, height, dpr });
 }

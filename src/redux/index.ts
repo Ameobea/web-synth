@@ -4,10 +4,10 @@ import { buildStore } from 'jantix';
 import controlPanelModule from 'src/redux/modules/controlPanel';
 import equalizerModule from 'src/redux/modules/equalizer';
 import genericPresetPickerSlice, {
-  genericPresetPickerActions,
-  GenericPresetPickerState,
+  type genericPresetPickerActions,
+  type GenericPresetPickerState,
 } from 'src/redux/modules/genericPresetPicker';
-import looperSlice, { looperActions, LooperState } from 'src/redux/modules/looper';
+import looperSlice, { type looperActions, type LooperState } from 'src/redux/modules/looper';
 import midiKeyboardModule from 'src/redux/modules/midiKeyboard';
 import presetsModule, {
   fetchSynthPresets,

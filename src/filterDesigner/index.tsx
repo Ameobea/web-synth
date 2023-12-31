@@ -24,7 +24,7 @@ import {
 } from 'src/reactUtils';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import { FilterType } from 'src/synthDesigner/filterHelpers';
+import { FilterType } from 'src/synthDesigner/FilterType';
 
 const FilterDesigner = React.lazy(() => import('./FilterDesigner'));
 

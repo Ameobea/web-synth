@@ -8,12 +8,13 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import HelpIcon from 'src/misc/HelpIcon';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import type { ADSR2Module } from 'src/synthDesigner/ADSRModule';
+import type { FilterType } from 'src/synthDesigner/FilterType';
 import {
-  AbstractFilterModule,
+  type AbstractFilterModule,
   buildAbstractFilterModule,
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
-import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 import { msToSamples, samplesToMs } from 'src/util';
 
 export class FilterContainer {

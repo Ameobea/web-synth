@@ -1,7 +1,7 @@
 <script lang="ts">
   import { get, type Writable } from 'svelte/store';
 
-  import { MultibandCompressorControls } from 'src/controls/MultibandCompressor';
+  import type { MultibandCompressorControls } from 'src/controls/MultibandCompressor';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import CompressorControlPanel from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorControlPanel.svelte';
   import {
@@ -11,9 +11,14 @@
 
   export let store: Writable<CompressorNodeUIState>;
 
+  const MultibandCompressorControlsPromise = import('src/controls/MultibandCompressor');
+
   let activeControls: MultibandCompressorControls | null = null;
-  const renderMultibandCompressor = (canvas: HTMLCanvasElement) => {
-    const controls = new MultibandCompressorControls(canvas, store);
+  const renderMultibandCompressor = (
+    canvas: HTMLCanvasElement,
+    ImportedMultibandCompressorControls: typeof MultibandCompressorControls
+  ) => {
+    const controls = new ImportedMultibandCompressorControls(canvas, store);
     activeControls = controls;
 
     return { destroy: () => controls.dispose() };
@@ -44,12 +49,15 @@
     state={{ bypass: $store.bypass, mix: $store.mix, 'low latency mode': $store.lowLatencyMode }}
     onChange={handleTopControlPanelChange}
   />
-  <canvas
-    use:renderMultibandCompressor
-    width={500}
-    height={800}
-    style="min-width: 500px; min-height: 800px"
-  />
+  {#await MultibandCompressorControlsPromise then ControlsModule}
+    <canvas
+      use:renderMultibandCompressor={ControlsModule.MultibandCompressorControls}
+      width={500}
+      height={800}
+      style="min-width: 500px; min-height: 800px"
+    />
+  {/await}
+
   <CompressorControlPanel
     state={$store.low}
     onChange={newState => {

@@ -13,30 +13,6 @@
     margin-bottom: 10px;
   }
 
-  .preset-list {
-    border: 1px solid #484848;
-    margin-top: auto;
-    margin-bottom: auto;
-    margin-right: 14px;
-
-    .generic-preset-picker-row {
-      box-sizing: border-box;
-      line-height: 18px;
-      padding: 2px 4px;
-      cursor: pointer;
-      border-bottom: 1px solid #5d5d5d;
-    }
-
-    .generic-preset-picker-row[data-selected='true'] {
-      background-color: #2e7573;
-      color: #fff;
-    }
-
-    .generic-preset-picker-row:hover {
-      background-color: #5d5d5d;
-    }
-  }
-
   .select-preset-prompt {
     text-align: center;
     font-size: 22px;
@@ -80,6 +56,30 @@
         height: 30px;
       }
     }
+  }
+}
+
+.preset-list {
+  border: 1px solid #484848;
+  margin-top: auto;
+  margin-bottom: auto;
+  margin-right: 14px;
+
+  .generic-preset-picker-row {
+    box-sizing: border-box;
+    line-height: 18px;
+    padding: 2px 4px;
+    cursor: pointer;
+    border-bottom: 1px solid #5d5d5d;
+  }
+
+  .generic-preset-picker-row[data-selected='true'] {
+    background-color: #04d6cf66;
+    color: #fff;
+  }
+
+  .generic-preset-picker-row:hover {
+    background-color: #646464aa;
   }
 }
 

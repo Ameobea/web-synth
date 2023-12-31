@@ -72,19 +72,6 @@ class SamplerAWP extends AudioWorkletProcessor {
         wasmMemory = this.getWasmMemoryBuffer();
         wasmMemory.set(sampleData, sampleDataPtr / BYTES_PER_F32);
 
-        // TODO TEMP
-        const midiNumber = 48;
-        this.wasmInstance.exports.sampler_set_selection(
-          this.ctxPtr,
-          midiNumber,
-          0,
-          sampleData.length,
-          40,
-          40,
-          1,
-          true
-        );
-
         break;
       }
       case 'setSelection': {

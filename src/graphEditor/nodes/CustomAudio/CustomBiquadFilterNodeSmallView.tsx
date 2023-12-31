@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import { FilterType, getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { FilterType } from 'src/synthDesigner/FilterType';
+import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
 
 interface CustomBiquadFilterNodeSmallViewProps {
   node: ForeignNode<BiquadFilterNode>;

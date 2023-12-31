@@ -3,7 +3,7 @@ import { Map as ImmMap } from 'immutable';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import {
   buildDefaultSignalAnalyzerInstState,
-  SerializedSignalAnalyzerInst,
+  type SerializedSignalAnalyzerInst,
   SignalAnalyzerInst,
 } from 'src/signalAnalyzer/SignalAnalyzerInst';
 import SignalAnalyzerUI from 'src/signalAnalyzer/SignalAnalyzerUI.svelte';

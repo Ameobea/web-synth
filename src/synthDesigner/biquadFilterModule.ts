@@ -5,7 +5,7 @@ import { connectFilterChain } from 'src/filterDesigner/util';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { DynaBandpassFilterWrapper } from 'src/synthDesigner/DynaBandPassFilter';
-import { FilterType } from 'src/synthDesigner/filterHelpers';
+import { FilterType } from 'src/synthDesigner/FilterType';
 import { linearToDb } from 'src/util';
 
 // higher-order filter Q factors determined using this: https://www.earlevel.com/main/2016/09/29/cascading-filters/

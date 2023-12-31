@@ -1,11 +1,11 @@
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { getSentry } from 'src/sentry';
+import { FilterType } from 'src/synthDesigner/FilterType';
 import {
   type AbstractFilterModule,
   buildConnectedFilterChain,
   computeHigherOrderBiquadQFactors,
 } from 'src/synthDesigner/biquadFilterModule';
-import { FilterType } from 'src/synthDesigner/filterHelpers';
 import { AsyncOnce } from 'src/util';
 
 const ctx = new AudioContext();

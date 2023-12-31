@@ -3,15 +3,15 @@ import { shallowEqual, useDispatch, useSelector } from 'react-redux';
 
 import './MidiKeyboardOutputMappingConfigurator.scss';
 
-import { RangeInput } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
+import { RangeInput } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/RangeInput';
 import {
   get_midi_keyboard_audio_connectables,
-  MappedOutput,
+  type MappedOutput,
   midiKeyboardCtxByStateKey,
 } from 'src/midiKeyboard';
-import { ConnectableDescriptor } from 'src/patchNetwork';
+import type { ConnectableDescriptor } from 'src/patchNetwork';
 import { connect, updateConnectables } from 'src/patchNetwork/interface';
-import { actionCreators, getState, ReduxStore } from 'src/redux';
+import { actionCreators, getState, type ReduxStore } from 'src/redux';
 import type { MidiKeyboardMappedOutputDescriptor } from 'src/redux/modules/midiKeyboard';
 
 const OutputMappingScaleAndShiftControls: React.FC<{

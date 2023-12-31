@@ -2,7 +2,7 @@ import * as R from 'ramda';
 
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import { FilterType } from 'src/synthDesigner/filterHelpers';
+import { FilterType } from 'src/synthDesigner/FilterType';
 
 const ctx = new AudioContext();
 
@@ -85,7 +85,15 @@ export const setFilter = (
     params.type === FilterType.HP16 ||
     params.type === FilterType.LP4 ||
     params.type === FilterType.LP8 ||
-    params.type === FilterType.LP16
+    params.type === FilterType.LP16 ||
+    params.type === FilterType.BP4 ||
+    params.type === FilterType.BP8 ||
+    params.type === FilterType.BP16 ||
+    params.type === FilterType.DynaBP_100 ||
+    params.type === FilterType.DynaBP_200 ||
+    params.type === FilterType.DynaBP_400 ||
+    params.type === FilterType.DynaBP_50 ||
+    params.type === FilterType.DynaBP_800
   ) {
     console.error('Filter type not supported', params.type);
   } else {

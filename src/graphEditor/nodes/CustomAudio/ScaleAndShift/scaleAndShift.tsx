@@ -1,16 +1,18 @@
+import React from 'react';
 import { Map } from 'immutable';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import ScaleAndShiftSmallView, {
+import type {
   ResponsePlotData,
-  type ScaleAndShiftUIState,
+  ScaleAndShiftSmallViewProps,
+  ScaleAndShiftUIState,
 } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { AsyncOnce } from 'src/util';
-import { Writable, writable } from 'svelte/store';
+import { type Writable, writable } from 'svelte/store';
 
 const ScaleAndShiftAWPRegistered = new AsyncOnce(
   () =>
@@ -34,6 +36,16 @@ export const computeScaleAndShift = ({
 
   return { firstOffset, multiplier: firstMultiplier * secondMultiplier, secondOffset };
 };
+
+const LazyScaleAndShiftSmallView = React.lazy(
+  () => import('src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI')
+);
+
+const ScaleAndShiftSmallView: React.FC<ScaleAndShiftSmallViewProps> = props => (
+  <React.Suspense fallback={<div>Loading...</div>}>
+    <LazyScaleAndShiftSmallView {...props} />
+  </React.Suspense>
+);
 
 export class ScaleAndShiftNode implements ForeignNode {
   static typeName = 'Scale + Shift';

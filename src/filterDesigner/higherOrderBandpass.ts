@@ -1,6 +1,7 @@
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { FilterType } from 'src/synthDesigner/FilterType';
 import { computeHigherOrderBiquadQFactors } from 'src/synthDesigner/biquadFilterModule';
-import { buildDefaultFilter, FilterType } from 'src/synthDesigner/filterHelpers';
+import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
 
 export const buildHighOrderBandpassFilters = (
   order: number,

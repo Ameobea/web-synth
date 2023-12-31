@@ -41,7 +41,7 @@ return new Array(32).fill(null).map((_, i) => 1.0 / (i + 1));
     BuildWavetableSliderMode,
   } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
   import StackedWaveforms from 'src/fmSynth/Wavetable/StackedWaveforms.svelte';
-  import { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
+  import type { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
   import { HARMONICS_COUNT } from 'src/fmSynth/Wavetable/conf';
   import { logError } from 'src/sentry';
 

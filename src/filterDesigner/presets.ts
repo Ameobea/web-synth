@@ -1,8 +1,9 @@
 import { buildHighOrderBandpassFilters } from 'src/filterDesigner/higherOrderBandpass';
 import type { SerializedFilterDesigner } from 'src/filterDesigner/util';
 import { buildVocoderBandpassChainPreset } from 'src/filterDesigner/vocoder';
+import { FilterType } from 'src/synthDesigner/FilterType';
 import { computeHigherOrderBiquadQFactors } from 'src/synthDesigner/biquadFilterModule';
-import { buildDefaultFilter, FilterType } from 'src/synthDesigner/filterHelpers';
+import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
 
 export interface FilterDesignerPreset {
   name: string;

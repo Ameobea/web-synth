@@ -14,7 +14,6 @@ import { MicNode } from 'src/graphEditor/nodes/CustomAudio/audioUtils';
 import BandSplitterNode from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 import { CompressorNode } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 import { CSNSmallView } from 'src/graphEditor/nodes/CustomAudio/CSNSmallView';
-import CustomBiquadFilterNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView';
 import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGainNodeSmallView';
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
@@ -41,7 +40,7 @@ import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { addNode, removeNode } from 'src/patchNetwork/interface';
-import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { mkContainerCleanupHelper, mkContainerRenderHelper, mkLazyComponent } from 'src/reactUtils';
 import { getState } from 'src/redux';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
@@ -322,7 +321,9 @@ const CustomBiquadFilterNode = enhanceAudioNode({
     { name: 'gain', param: node.gain, defaultValue: 0 },
   ],
   paramKeys: ['frequency', 'Q', 'detune', 'gain', 'type'],
-  SmallViewRenderer: CustomBiquadFilterNodeSmallView,
+  SmallViewRenderer: mkLazyComponent(
+    () => import('src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView')
+  ),
 });
 
 const CustomDestinationNode = enhanceAudioNode({

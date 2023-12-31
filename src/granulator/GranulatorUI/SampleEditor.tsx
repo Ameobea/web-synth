@@ -62,6 +62,7 @@ interface SampleEditorOverlayProps {
   width: number;
   height: number;
   waveformRenderer: WaveformRenderer;
+  disabled?: boolean;
 }
 
 interface DragState {
@@ -79,6 +80,7 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
   width,
   height,
   waveformRenderer,
+  disabled,
 }) => {
   const dragState = useRef<DragState>({
     selectionDragging: false,
@@ -109,68 +111,6 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
       waveformRenderer.removeEventListener('selectionChange', selectionChangeCb);
     };
   }, [waveformRenderer]);
-
-  useEffect(() => {
-    if (bounds.endMs === 0) {
-      return;
-    }
-
-    if (dragState.current.startMarkElem) {
-      const x = (
-        R.isNil(selection.startMarkPosMs)
-          ? 0
-          : posToPx(
-              waveformRenderer.getWidthPx(),
-              bounds.startMs,
-              bounds.endMs,
-              selection.startMarkPosMs ?? 0
-            )
-      ).toString();
-      dragState.current.startMarkElem.setAttribute('x1', x);
-      dragState.current.startMarkElem.setAttribute('x2', x);
-      dragState.current.startMarkElem.style.display = R.isNil(selection.startMarkPosMs)
-        ? 'none'
-        : 'inline';
-    }
-    if (dragState.current.endMarkElem) {
-      const x = (
-        R.isNil(selection.endMarkPosMs)
-          ? 0
-          : posToPx(
-              waveformRenderer.getWidthPx(),
-              bounds.startMs,
-              bounds.endMs,
-              selection.endMarkPosMs ?? 0
-            )
-      ).toString();
-      dragState.current.endMarkElem.setAttribute('x1', x);
-      dragState.current.endMarkElem.setAttribute('x2', x);
-      dragState.current.endMarkElem.style.display = R.isNil(selection.endMarkPosMs)
-        ? 'none'
-        : 'inline';
-    }
-    if (dragState.current.selectionElem) {
-      dragState.current.selectionElem.setAttribute(
-        'x',
-        (R.isNil(selection.startMarkPosMs)
-          ? 0
-          : posToPx(width, bounds.startMs, bounds.endMs, selection.startMarkPosMs!) + 1
-        ).toString()
-      );
-      dragState.current.selectionElem.setAttribute(
-        'width',
-        (R.isNil(selection.endMarkPosMs)
-          ? 0
-          : posToPx(width, bounds.startMs, bounds.endMs, selection.endMarkPosMs!) -
-            posToPx(width, bounds.startMs, bounds.endMs, selection.startMarkPosMs!) -
-            1
-        ).toString()
-      );
-      dragState.current.selectionElem.style.display = R.isNil(selection.endMarkPosMs)
-        ? 'none'
-        : 'inline';
-    }
-  }, [bounds, bounds.endMs, bounds.startMs, selection, waveformRenderer, width]);
 
   // mouse move handler for panning
   useEffect(() => {
@@ -227,6 +167,10 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
       const diff = evt.clientX - dragState.current.lastMousePos;
       dragState.current.lastMousePos = evt.clientX;
 
+      if (disabled) {
+        return;
+      }
+
       const anyDragging =
         dragState.current.selectionDragging ||
         dragState.current.leftMarkDragging ||
@@ -277,7 +221,7 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
 
     document.addEventListener('mousemove', moveHandler);
     return () => document.removeEventListener('mousemove', moveHandler);
-  }, [waveformRenderer, width]);
+  }, [waveformRenderer, width, disabled]);
 
   useEffect(() => {
     const mouseUpHandler = () => {
@@ -301,12 +245,12 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
       const objectBounds = (evt.target as HTMLCanvasElement).getBoundingClientRect();
       const xPercent = (evt.clientX - objectBounds.left) / width;
 
-      // Zoom in 20%, taking pixels away from the left and right side according to where the user zoomed
+      // Zoom in 12%, taking pixels away from the left and right side according to where the user zoomed
       const bounds = waveformRenderer.getBounds();
       const widthMs = bounds.endMs - bounds.startMs;
       const sampleLengthMs = waveformRenderer.getSampleLengthMs();
-      const leftMsToAdd = xPercent * 0.2 * widthMs * (evt.deltaY > 0 ? -1 : 1);
-      const rightMsToAdd = (1 - xPercent) * 0.2 * widthMs * (evt.deltaY > 0 ? 1 : -1);
+      const leftMsToAdd = xPercent * 0.12 * widthMs * (evt.deltaY > 0 ? -1 : 1);
+      const rightMsToAdd = (1 - xPercent) * 0.12 * widthMs * (evt.deltaY > 0 ? 1 : -1);
       const newStartMs = R.clamp(0, Math.max(sampleLengthMs - 10, 0), bounds.startMs + leftMsToAdd);
       const newEndMs = R.clamp(newStartMs + 10, sampleLengthMs, bounds.endMs + rightMsToAdd);
       waveformRenderer.setBounds(newStartMs, newEndMs);
@@ -319,8 +263,6 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
     return () => node.removeEventListener('wheel', handler);
   }, [waveformRenderer, width]);
 
-  // We override these against React's wishes, but the value right now is likely to be correct
-  // so setting it can only help.
   const startMarkPosPx =
     bounds.endMs === 0
       ? 0
@@ -344,6 +286,10 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
     <svg
       className='granulator-overlay'
       onClick={evt => {
+        if (disabled) {
+          return;
+        }
+
         const bounds = waveformRenderer.getBounds();
         const sampleLengthMs = bounds.endMs - bounds.startMs;
         if (evt.button !== 0 || sampleLengthMs === 0) {
@@ -420,7 +366,7 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
         style={{
           display: R.isNil(selection.startMarkPosMs) ? 'none' : 'inline',
         }}
-        className={'granulator-start-bar'}
+        className='granulator-start-bar'
         onMouseDown={evt => {
           dragState.current.leftMarkDragging = true;
           evt.stopPropagation();
@@ -437,7 +383,7 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
         style={{
           display: R.isNil(selection.endMarkPosMs) ? 'none' : 'inline',
         }}
-        className={'granulator-end-bar'}
+        className='granulator-end-bar'
         onMouseDown={evt => {
           dragState.current.rightMarkDragging = true;
           evt.stopPropagation();
@@ -462,11 +408,16 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
 
 interface SampleEditorProps {
   waveformRenderer: WaveformRenderer;
+  disabled?: boolean;
 }
 
-const SampleEditor: React.FC<SampleEditorProps> = ({ waveformRenderer }) => (
+const SampleEditor: React.FC<SampleEditorProps> = ({ waveformRenderer, disabled }) => (
   <div
-    style={{ width: waveformRenderer.getWidthPx(), height: waveformRenderer.getHeightPx() + 140 }}
+    style={{
+      width: waveformRenderer.getWidthPx(),
+      height: waveformRenderer.getHeightPx() + 140,
+      position: 'relative',
+    }}
     className='granulator-wrapper'
   >
     <canvas
@@ -479,6 +430,7 @@ const SampleEditor: React.FC<SampleEditorProps> = ({ waveformRenderer }) => (
       width={waveformRenderer.getWidthPx()}
       height={waveformRenderer.getHeightPx()}
       waveformRenderer={waveformRenderer}
+      disabled={disabled}
     />
   </div>
 );
