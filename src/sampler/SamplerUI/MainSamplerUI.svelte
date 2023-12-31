@@ -16,6 +16,7 @@
   import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
   import SelectionListing from 'src/sampler/SamplerUI/SelectionListing.svelte';
   import { buildDefaultSamplerSelection, type SamplerSelection } from 'src/sampler/sampler';
+  import { msToSamples, samplesToMs } from 'src/util';
   import { onMount } from 'svelte';
   import { type Writable, get } from 'svelte/store';
 
@@ -31,8 +32,9 @@
   } else {
     const selection = $selections[$activeSelectionIx];
     waveformRenderer.setSelection({
-      startMarkPosMs: selection.startSampleIx,
-      endMarkPosMs: selection.endSampleIx,
+      startMarkPosMs:
+        selection.startSampleIx === null ? null : samplesToMs(selection.startSampleIx),
+      endMarkPosMs: selection.endSampleIx === null ? null : samplesToMs(selection.endSampleIx),
     });
   }
 
@@ -43,8 +45,10 @@
 
     inst.setSelection($activeSelectionIx, {
       ...$selections[$activeSelectionIx],
-      startSampleIx: newSelection.startMarkPosMs,
-      endSampleIx: newSelection.endMarkPosMs,
+      startSampleIx:
+        newSelection.startMarkPosMs === null ? null : msToSamples(newSelection.startMarkPosMs),
+      endSampleIx:
+        newSelection.endMarkPosMs === null ? null : msToSamples(newSelection.endMarkPosMs),
     });
   };
   onMount(() => {
@@ -125,13 +129,19 @@
       <div>
         <ReactShim
           Component={SampleEditor}
-          props={{ waveformRenderer, disabled: $activeSelectionIx === null }}
+          props={{
+            waveformRenderer,
+            disabled: $activeSelectionIx === null,
+            style: { marginTop: 0 },
+          }}
         />
       </div>
       {#if $activeSelectionIx !== null}
         <ConfigureSelection
           selection={$selections[$activeSelectionIx]}
+          selectionIx={$activeSelectionIx}
           onChange={handleSelectionChange}
+          {inst}
         />
       {/if}
     </div>

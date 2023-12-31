@@ -166,14 +166,14 @@ pub extern "C" fn sampler_get_output_buf_ptr(ctx: *mut SamplerCtx) -> *mut f32 {
 #[no_mangle]
 pub extern "C" fn sampler_set_selection(
   ctx: *mut SamplerCtx,
-  selection_ix: usize,
+  midi_number: usize,
   start_sample_ix: f32,
   end_sample_ix: f32,
   crossfade_start_len_samples: f32,
   crossfade_end_len_samples: f32,
   playback_rate: f32,
   reverse: bool,
-) {
+) -> usize {
   let ctx = unsafe { &mut *ctx };
 
   if start_sample_ix >= end_sample_ix {
@@ -190,7 +190,8 @@ pub extern "C" fn sampler_set_selection(
     playback_rate,
     reverse,
   };
-  ctx.selections_by_midi_number[selection_ix] = Some(config);
+  ctx.selections_by_midi_number[midi_number] = Some(config);
+  midi_number
 }
 
 #[no_mangle]

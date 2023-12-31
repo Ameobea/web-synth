@@ -409,14 +409,16 @@ const SampleEditorOverlay: React.FC<SampleEditorOverlayProps> = ({
 interface SampleEditorProps {
   waveformRenderer: WaveformRenderer;
   disabled?: boolean;
+  style?: React.CSSProperties;
 }
 
-const SampleEditor: React.FC<SampleEditorProps> = ({ waveformRenderer, disabled }) => (
+const SampleEditor: React.FC<SampleEditorProps> = ({ waveformRenderer, disabled, style }) => (
   <div
     style={{
       width: waveformRenderer.getWidthPx(),
       height: waveformRenderer.getHeightPx() + 140,
       position: 'relative',
+      ...(style ?? {}),
     }}
     className='granulator-wrapper'
   >

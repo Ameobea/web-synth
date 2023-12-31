@@ -15,6 +15,7 @@ class SamplerAWP extends AudioWorkletProcessor {
     this.wasmInstance = null;
     this.wasmMemoryBuffer = null;
     this.pendingMessages = [];
+    this.transmitMIDIAttack = false;
 
     this.port.onmessage = evt => this.handleMessage(evt.data);
 
@@ -76,17 +77,17 @@ class SamplerAWP extends AudioWorkletProcessor {
       }
       case 'setSelection': {
         const {
-          index,
+          midiNumber,
           startSampleIx,
           endSampleIx,
           crossfadeStartLenSamples,
           crossfadeEndLenSamples,
           playbackRate,
           reverse,
-        } = data;
+        } = data.selection;
         this.wasmInstance.exports.sampler_set_selection(
           this.ctxPtr,
-          index,
+          midiNumber,
           startSampleIx,
           endSampleIx,
           crossfadeStartLenSamples,
@@ -99,6 +100,10 @@ class SamplerAWP extends AudioWorkletProcessor {
       case 'clearSelection': {
         const { index } = data;
         this.wasmInstance.exports.sampler_clear_selection(this.ctxPtr, index);
+        break;
+      }
+      case 'captureNextMIDIAttack': {
+        this.transmitMIDIAttack = true;
         break;
       }
       default: {
@@ -118,6 +123,10 @@ class SamplerAWP extends AudioWorkletProcessor {
       switch (eventType) {
         case 0: {
           this.wasmInstance.exports.sampler_handle_midi_attack(this.ctxPtr, param1);
+          if (this.transmitMIDIAttack) {
+            this.port.postMessage({ type: 'midiAttack', midiNumber: param1 });
+            this.transmitMIDIAttack = false;
+          }
           break;
         }
         default:

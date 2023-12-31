@@ -14,15 +14,23 @@ export interface SamplerSelection {
   endSampleIx: number | null;
   startCrossfadeLenSamples: number;
   endCrossfadeLenSamples: number;
+  /**
+   * The bounds of the waveform in the UI.  Used for display only.
+   */
   bounds?: WaveformBounds;
+  midiNumber?: number;
+  playbackRate: number;
+  reverse?: boolean;
 }
 
-export const buildDefaultSamplerSelection = () => ({
+export const buildDefaultSamplerSelection = (): SamplerSelection => ({
   name: undefined,
   startSampleIx: null,
   endSampleIx: null,
   startCrossfadeLenSamples: 0,
   endCrossfadeLenSamples: 0,
+  playbackRate: 1,
+  reverse: false,
 });
 
 export interface SerializedSampler {

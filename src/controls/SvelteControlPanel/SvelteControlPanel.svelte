@@ -31,7 +31,7 @@
         step?: number;
         initial?: [number, number];
       }
-    | { type: 'button'; label: string; action: () => void }
+    | { type: 'button'; label: string; action: () => void; disabled?: boolean }
     | { type: 'checkbox'; label: string; initial?: boolean }
     | { type: 'text'; label: string; initial?: string }
     | { type: 'custom'; label: string; Comp: React.FC<any>; initial?: any };

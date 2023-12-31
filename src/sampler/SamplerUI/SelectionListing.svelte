@@ -36,5 +36,7 @@
     min-width: 298px;
     height: 350px;
     overflow-y: auto;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
   }
 </style>

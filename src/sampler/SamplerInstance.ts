@@ -36,6 +36,8 @@ export class SamplerInstance {
   private vcId: string;
   private audioThreadMIDIEventMailboxID: string;
   private midiInputCBs: MIDIInputCbs;
+  private midiAttackCBs: ((midiNumber: number) => void)[] = [];
+
   public midiNode: MIDINode;
   public awpHandle: AudioWorkletNode | null = null;
   public activeSample: Writable<ActiveSampleData | null> = writable(null);
@@ -84,14 +86,31 @@ export class SamplerInstance {
       processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
     });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes: samplerWasm });
+    this.awpHandle.port.onmessage = e => this.handleAWPMessage(e.data);
     this.setSelectedSample(get(this.activeSample)?.descriptor ?? null);
+    for (const selection of get(this.selections)) {
+      this.commitSelection(selection);
+    }
 
     updateConnectables(this.vcId, getEngine()!.get_vc_connectables(this.vcId));
+  }
+
+  private handleAWPMessage(msg: any) {
+    switch (msg.type) {
+      case 'midiAttack':
+        this.midiAttackCBs.forEach(cb => cb(msg.midiNumber));
+        this.midiAttackCBs = [];
+        break;
+      default:
+        console.error('Unhandled message type from sampler AWP: ', msg);
+    }
   }
 
   public async setSelectedSample(descriptor: SampleDescriptor | null) {
     if (!descriptor) {
       this.activeSample.set(null);
+      this.activeSelectionIx.set(null);
+      this.selections.set([]);
       this.awpHandle?.port.postMessage({ type: 'setSampleData', sampleData: new Float32Array() });
       return;
     }
@@ -128,18 +147,47 @@ export class SamplerInstance {
     }
   }
 
+  /**
+   * Sends a selection to the audio thread
+   */
+  private commitSelection(selection: SamplerSelection) {
+    if (!this.awpHandle || typeof selection.midiNumber !== 'number') {
+      return;
+    }
+
+    this.awpHandle.port.postMessage({
+      type: 'setSelection',
+      selection: {
+        midiNumber: selection.midiNumber,
+        startSampleIx: selection.startSampleIx,
+        endSampleIx: selection.endSampleIx,
+        crossfadeStartLenSamples: selection.startCrossfadeLenSamples,
+        crossfadeEndLenSamples: selection.endCrossfadeLenSamples,
+        playbackRate: selection.playbackRate,
+        reverse: selection.reverse ?? false,
+      },
+    });
+  }
+
   public deleteSelection(ix: number) {
     const selections = get(this.selections);
     const activeSelectionIx = get(this.activeSelectionIx);
     if (ix === activeSelectionIx) {
       this.activeSelectionIx.set(null);
     }
+
+    const oldSelection = selections[ix];
     this.selections.set([
       ...selections.slice(0, ix),
       ...selections.slice(ix + 1, selections.length),
     ]);
 
-    // TODO: Update backend
+    if (typeof oldSelection.midiNumber === 'number') {
+      this.awpHandle?.port.postMessage({
+        type: 'clearSelection',
+        midiNumber: oldSelection.midiNumber,
+      });
+    }
   }
 
   public setSelection(ix: number, newSelection: SamplerSelection) {
@@ -151,6 +199,23 @@ export class SamplerInstance {
     const newSelections = [...selections];
     newSelections[ix] = newSelection;
     this.selections.set(newSelections);
+
+    this.commitSelection(newSelection);
+  }
+
+  /**
+   * Listens for incoming MIDI events and returns the MIDI number of the first attack event received.
+   */
+  public captureNextMIDIAttack(): Promise<number> {
+    return new Promise<number>(resolve => {
+      if (!this.awpHandle) {
+        throw new Error('Cannot capture MIDI attacks before AWP initialized');
+      }
+
+      this.midiAttackCBs.push(resolve);
+
+      this.awpHandle.port.postMessage({ type: 'captureNextMIDIAttack' });
+    });
   }
 
   public serialize(): SerializedSampler {

@@ -5,7 +5,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
 
-  import ConfigureMidiMapping from 'src/fmSynth/midiSampleUI/ConfigureMIDIMapping.svelte';
+  import ConfigureMIDIMapping from 'src/fmSynth/midiSampleUI/ConfigureMIDIMapping.svelte';
   import MappedNoteRow from 'src/fmSynth/midiSampleUI/MappedNoteRow.svelte';
   import {
     buildDefaultMappedSampleData,
@@ -85,7 +85,7 @@
         isGated={!!gatedNotes[midiNumber]}
       />
       {#if selectedMIDINumber === midiNumber}
-        <ConfigureMidiMapping
+        <ConfigureMIDIMapping
           onClose={() => {
             selectedMIDINumber = null;
           }}

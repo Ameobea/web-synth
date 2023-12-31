@@ -8,7 +8,6 @@
 
   $: activeSampleStore = inst.activeSample;
   $: activeSample = $activeSampleStore;
-  $: activeSelectionIx = inst.activeSelectionIx;
 
   const onSamplePicked = (desc: SampleDescriptor | null) => inst.setSelectedSample(desc);
   const clearActiveSample = () => inst.setSelectedSample(null);
@@ -21,7 +20,7 @@
     <MainSamplerUI
       {activeSample}
       {clearActiveSample}
-      {activeSelectionIx}
+      activeSelectionIx={inst.activeSelectionIx}
       waveformRenderer={inst.waveformRenderer}
       selections={inst.selections}
       {inst}
