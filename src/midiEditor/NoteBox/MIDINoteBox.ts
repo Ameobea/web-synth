@@ -43,6 +43,7 @@ export class NoteDragHandle {
       this.parentNote.line.app.startResizingSelectedNotes(evt.data, this.side);
       evt.stopPropagation();
     });
+    // g.cacheAsBitmap = true;
     return g;
   }
 

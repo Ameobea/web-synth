@@ -81,7 +81,10 @@ export default class MIDIQuantizerNode implements ForeignNode {
       MIDIQuantizerWasmBytes.get(),
       MIDIQuantizerAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'midi-quantizer');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'midi-quantizer', {
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+    });
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
     this.awpHandle.port.onmessage = evt => this.handleMessage(evt.data);

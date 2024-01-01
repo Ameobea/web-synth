@@ -1,9 +1,9 @@
-import * as Comlink from 'comlink';
+import type * as Comlink from 'comlink';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
 import { destroyPIXIApp, makeDraggable } from 'src/controls/pixiUtils';
-import { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
+import type { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
 import { HARMONICS_COUNT } from 'src/fmSynth/Wavetable/conf';
 import WaveTable, {
   type WavetableDef,

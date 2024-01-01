@@ -78,12 +78,8 @@ interface EnhanceAudioNodeParams<T> {
   nodeType: string;
   name: string;
   buildConnectables: (
-    foreignNode: ForeignNode<T> & {
-      node: T;
-    }
-  ) => Omit<AudioConnectables, 'vcId'> & {
-    node: ForeignNode<T>;
-  };
+    foreignNode: ForeignNode<T> & { node: T }
+  ) => Omit<AudioConnectables, 'vcId'> & { node: ForeignNode<T> };
   getOverridableParams: (node: T) => {
     name: string;
     param: AudioParam;
@@ -150,9 +146,7 @@ const enhanceAudioNode = <T>({
     constructor(
       ctx: AudioContext,
       vcId: string,
-      params?: {
-        [key: string]: any;
-      } | null,
+      params?: { [key: string]: any } | null,
       lgNode?: any
     ) {
       this.node = new AudioNodeClass(ctx);
@@ -242,11 +236,7 @@ const CustomGainNode = enhanceAudioNode({
   AudioNodeClass: GainNode,
   nodeType: 'customAudio/gain',
   name: 'Gain',
-  buildConnectables: (
-    node: ForeignNode<GainNode> & {
-      node: GainNode;
-    }
-  ) => ({
+  buildConnectables: (node: ForeignNode<GainNode> & { node: GainNode }) => ({
     inputs: Map<string, ConnectableInput>(
       Object.entries({
         input: { node: node.node, type: 'customAudio' },
@@ -587,18 +577,12 @@ const registerCustomAudioNode = (
     if (!this.ignoreAdd) {
       addNode(this.id.toString(), this.connectables);
     }
-
-    if (this.onAddedCustom) {
-      this.onAddedCustom();
-    }
   };
 
   CustomAudioNode.prototype.onRemoved = function (this: any) {
     if (!this.ignoreRemove) {
       removeNode(this.id.toString());
-      if (this.onRemovedCustom) {
-        this.onRemovedCustom();
-      }
+      this.onRemovedCustom?.();
     }
   };
 

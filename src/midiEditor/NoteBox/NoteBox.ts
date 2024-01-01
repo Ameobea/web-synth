@@ -2,7 +2,7 @@ import { UnreachableException } from 'ameo-utils';
 
 import * as PIXI from 'src/controls/pixi';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
-import NoteLine from 'src/midiEditor/NoteLine';
+import type NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';
 
 export class NoteBox {
@@ -11,14 +11,13 @@ export class NoteBox {
   public graphics: PIXI.Graphics;
   private isSelected = false;
   private isCulled = true;
+  private currentlyRenderedProps: { widthPx: number; isSelected: boolean } | null = null;
 
-  constructor(line: NoteLine, note: Note) {
-    this.line = line;
-    this.note = note;
-    this.graphics = new PIXI.Graphics();
-    this.graphics.interactive = true;
-    this.graphics.cursor = 'pointer';
-    this.graphics.on('pointerdown', (evt: PIXI.InteractionEvent) => {
+  private buildGraphics(): PIXI.Graphics {
+    const graphics = new PIXI.Graphics();
+    graphics.interactive = true;
+    graphics.cursor = 'pointer';
+    graphics.on('pointerdown', (evt: PIXI.InteractionEvent) => {
       if (evt.data.button === 2) {
         this.line.app.deleteNote(this.note.id);
         return;
@@ -39,6 +38,14 @@ export class NoteBox {
 
       this.line.app.startDraggingSelectedNotes(evt.data);
     });
+
+    return graphics;
+  }
+
+  constructor(line: NoteLine, note: Note) {
+    this.line = line;
+    this.note = note;
+    this.graphics = this.buildGraphics();
   }
 
   public render() {
@@ -59,11 +66,22 @@ export class NoteBox {
       this.line.container.addChild(this.graphics);
     }
 
-    this.graphics.clear();
-    this.graphics.lineStyle(1, 0x333333);
-    this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
-    this.graphics.drawRect(1, 0, widthPx, conf.LINE_HEIGHT - 1);
-    this.graphics.endFill();
+    if (
+      !this.currentlyRenderedProps ||
+      this.currentlyRenderedProps.widthPx !== widthPx ||
+      this.currentlyRenderedProps.isSelected !== this.isSelected
+    ) {
+      console.log('rendering');
+      this.currentlyRenderedProps = { widthPx, isSelected: this.isSelected };
+      // this.graphics = this.buildGraphics();
+      this.graphics.clear();
+      this.graphics.lineStyle(1, 0x333333);
+      this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
+      this.graphics.drawRect(1, 0, widthPx, conf.LINE_HEIGHT - 1);
+      this.graphics.endFill();
+      // this.graphics.cacheAsBitmap = true;
+    }
+
     this.graphics.x = startPointPx;
   }
 

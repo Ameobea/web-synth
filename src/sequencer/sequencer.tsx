@@ -30,7 +30,7 @@ import {
   buildSequencerConfig,
   buildSequencerInputMIDINode,
   buildSequencerReduxInfra,
-  SchedulerScheme,
+  type SchedulerScheme,
   SequencerInstancesMap,
 } from './redux';
 import type {
@@ -126,7 +126,10 @@ const getIsSequencerVisible = (vcId: string): boolean => {
 
 const initSequenceAWP = async (vcId: string): Promise<AudioWorkletNode> => {
   await SequencerAWPRegistered.get();
-  const workletHandle = new AudioWorkletNode(ctx, 'sequencer-audio-worklet-node-processor');
+  const workletHandle = new AudioWorkletNode(ctx, 'sequencer-audio-worklet-node-processor', {
+    channelInterpretation: 'discrete',
+    channelCountMode: 'explicit',
+  });
 
   workletHandle.port.onmessage = msg => {
     switch (msg.data.type) {

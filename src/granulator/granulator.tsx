@@ -204,6 +204,8 @@ export const init_granulator = async (stateKey: string) => {
       channelCount: 1,
       numberOfInputs: 1,
       numberOfOutputs: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
     const granularWasm = await granularWasmPromise;
     // Once we've fetched the Wasm bytes for the granular's DSP instance, we send them to the AWP

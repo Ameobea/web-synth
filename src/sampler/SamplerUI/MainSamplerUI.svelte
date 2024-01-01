@@ -122,6 +122,8 @@
         selections={$selections}
         activeSelectionIx={$activeSelectionIx}
         setActiveSelectionIx={newSelectionIx => void activeSelectionIx.set(newSelectionIx)}
+        getMidiGateStatusBufferF32={() => inst.midiGateStatusBufferF32}
+        midiGateStatusUpdated={inst.midiGateStatusUpdated}
       />
       <SvelteControlPanel {settings} />
     </div>
@@ -142,6 +144,8 @@
           selectionIx={$activeSelectionIx}
           onChange={handleSelectionChange}
           {inst}
+          getMidiGateStatusBufferF32={() => inst.midiGateStatusBufferF32}
+          midiGateStatusUpdated={inst.midiGateStatusUpdated}
         />
       {/if}
     </div>

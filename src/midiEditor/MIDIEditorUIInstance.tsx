@@ -10,9 +10,9 @@ import type {
   SerializedMIDILine,
 } from 'src/midiEditor';
 import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
-import { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
+import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDINoteBox, {
-  NoteDragHandle,
+  type NoteDragHandle,
   NoteDragHandleSide,
 } from 'src/midiEditor/NoteBox/MIDINoteBox';
 import type { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
@@ -41,6 +41,8 @@ interface MIDIEditorPanningView {
   scrollHorizontalBeats: number;
   scrollVerticalPx: number;
 }
+
+const dpr = window.devicePixelRatio ?? 1;
 
 export default class MIDIEditorUIInstance {
   public width: number;
@@ -113,7 +115,7 @@ export default class MIDIEditorUIInstance {
 
     this.app = new PIXI.Application({
       antialias: true,
-      resolution: 2,
+      resolution: dpr,
       autoDensity: true,
       view: canvas,
       height,
@@ -156,7 +158,7 @@ export default class MIDIEditorUIInstance {
     this.linesContainer.x = conf.PIANO_KEYBOARD_WIDTH;
     this.linesContainer.y = conf.CURSOR_GUTTER_HEIGHT;
     // Clip stuff hidden at the top outside of it
-    this.linesContainer.mask = this.buildLinesContainerMask();
+    // this.linesContainer.mask = this.buildLinesContainerMask();
     this.app.stage.addChild(this.linesContainer);
 
     // Cursor gutter
@@ -184,7 +186,7 @@ export default class MIDIEditorUIInstance {
 
   private buildLinesContainerMask() {
     return new PIXI.Graphics()
-      .beginFill(0xff3300)
+      .beginFill(0xffffff)
       .drawRect(conf.PIANO_KEYBOARD_WIDTH, 10, this.width - conf.PIANO_KEYBOARD_WIDTH, this.height)
       .endFill();
   }
@@ -260,7 +262,7 @@ export default class MIDIEditorUIInstance {
     this.height = height;
     this.app.renderer.resize(width, height);
 
-    this.linesContainer.mask = this.buildLinesContainerMask();
+    // this.linesContainer.mask = this.buildLinesContainerMask();
     this.pianoKeys?.destroy();
     this.pianoKeys = new PianoKeys(this);
     this.cursorGutter.destroy();

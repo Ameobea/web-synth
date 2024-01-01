@@ -191,7 +191,11 @@ export class Sidechain {
       SidechainAWPRegistered.get(),
     ] as const);
 
-    this.awpNode = new AudioWorkletNode(this.ctx, 'sidechain-audio-worklet-node-processor');
+    this.awpNode = new AudioWorkletNode(this.ctx, 'sidechain-audio-worklet-node-processor', {
+      // TODO: breaks when this is set
+      // channelInterpretation: 'discrete',
+      // channelCountMode: 'explicit',
+    });
     this.awpNode.port.onmessage = e => {
       switch (e.data.type) {
         case 'wasmInitialized': {

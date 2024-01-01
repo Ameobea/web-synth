@@ -190,7 +190,10 @@ Promise.all([
   ),
 ] as const)
   .then(([wasmArrayBuffer]) => {
-    SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor');
+    SchedulerHandle = new AudioWorkletNode(ctx, 'event-scheduler-audio-worklet-node-processor', {
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+    });
     globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));
     SchedulerHandle.port.onmessage = evt => {
       if (typeof evt.data === 'number') {

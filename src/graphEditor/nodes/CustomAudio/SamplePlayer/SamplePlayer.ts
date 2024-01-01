@@ -98,7 +98,11 @@ export default class SamplePlayerNode implements ForeignNode {
       SamplePlayerWasmBytes.get(),
       SamplePlayerAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'sample-player-awp', { numberOfOutputs: 1 });
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'sample-player-awp', {
+      numberOfOutputs: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+    });
 
     this.sampleDescriptors.forEach((sampleDescriptor, i) => {
       const gainOAP = new OverridableAudioParam(

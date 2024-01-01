@@ -20,7 +20,7 @@ This library uses [[ciglet]], another library by [[sleepwalking]], internally fo
 
 Builds using `make`.  There is code in the makefile specifically for building with emscripten, so it's certainly compatible
 
-There are some instructions for buliding it on the website, but they aren't quite accurate and I had to make some other changes in order to get it building.  Once I followed the build instructions in the readme which consist of fetching + building deps and symlinking them into the `external` directory of the library, I had to edit `makefile` to add that `exports` directory to the include search path (add `-Iexports` to the compiler flags).
+There are some instructions for building it on the website, but they aren't quite accurate and I had to make some other changes in order to get it building.  Once I followed the build instructions in the readme which consist of fetching + building deps and symlinking them into the `external` directory of the library, I had to edit `makefile` to add that `exports` directory to the include search path (add `-Iexports` to the compiler flags).
 
 The makefile seems to be broken for the tests.  In order to get them building, I managed to come up with this command: `cc -DFP_TYPE=float -std=c99 -Wall -fPIC -pthread -DUSE_PTHREAD -I/usr/include/ -I/usr/include/ -I/usr/include/ -Iexternal -fopenmp -Og -g -D_DEBUG -o test/realtime test/test-llsmrt.c ./build/libllsm2.a ./external/ciglet/libciglet.a ./external/libgvps/build/libgvps.a ./external/libpyin/build/libpyin.a ./external/libgvps/build/libgvps.a -lm`
 

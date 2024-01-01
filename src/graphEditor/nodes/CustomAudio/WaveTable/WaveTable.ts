@@ -257,6 +257,8 @@ export default class WaveTable implements ForeignNode {
       numberOfInputs: 0,
       numberOfOutputs: 1,
       channelCount: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
 
     await this.initWaveTable();

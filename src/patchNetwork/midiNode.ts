@@ -1,4 +1,4 @@
-import { UnimplementedError, UnreachableException, type PromiseResolveType } from 'ameo-utils';
+import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import {
@@ -11,6 +11,7 @@ import {
   scheduleMIDIEventBeats,
   type EventToReschedule,
 } from 'src/eventScheduler';
+import { type Writable, writable } from 'svelte/store';
 
 /**
  * The set of functions that must be provided to a MIDI node that accepts input from other MIDI nodes.
@@ -29,9 +30,6 @@ export interface MIDIInputCbs {
   onGenericControl?: (controlIndex: number, controlValue: number) => void;
 }
 
-// hilarious
-export type MIDIAccess = PromiseResolveType<ReturnType<(typeof navigator)['requestMIDIAccess']>>;
-
 export const mkBuildPasthroughInputCBs = (node: MIDINode) => (): MIDIInputCbs => ({
   onAttack: (note, velocity) => node.onAttack(note, velocity),
   onRelease: (note, velocity) => node.onRelease(note, velocity),
@@ -41,9 +39,21 @@ export const mkBuildPasthroughInputCBs = (node: MIDINode) => (): MIDIInputCbs =>
     node.outputCbs.forEach(cbs => cbs.onGenericControl?.(controlIndex, controlValue)),
 });
 
-type MIDIEvent =
+export type MIDIEvent =
   | { type: MIDIEventType.Attack; note: number; velocity: number }
   | { type: MIDIEventType.Release; note: number; velocity: number };
+
+interface MIDINoteMetadata {
+  active: boolean;
+  name?: string;
+}
+
+interface MIDINodeMetadata {
+  /**
+   * Sparse map of note numbers to metadata about that note.
+   */
+  noteMetadata: Map<number, MIDINoteMetadata>;
+}
 
 /**
  * A `MIDINode` is a special kind of connectable that deals with polyphonic MIDI events.  They are connectable
@@ -53,6 +63,7 @@ export class MIDINode {
   private connectedInputs: MIDINode[] = [];
   private connectedOutputs: MIDINode[] = [];
   public getInputCbs: () => MIDIInputCbs;
+  public metadata: Writable<MIDINodeMetadata> = writable({ noteMetadata: new Map() });
   private cachedInputCbs: MIDIInputCbs | null = null;
   private connectionsChangedCbs: (() => void)[] = [];
 

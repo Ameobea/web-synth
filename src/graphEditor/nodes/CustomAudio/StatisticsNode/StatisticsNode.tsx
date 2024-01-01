@@ -114,7 +114,10 @@ class StatisticsNode extends ConstantSourceNode implements ForeignNode {
 
   private async initWorklet() {
     await StatisticsAWPRegistered.get();
-    this.workletHandle = new AudioWorkletNode(this.ctx, 'statistics-node-processor');
+    this.workletHandle = new AudioWorkletNode(this.ctx, 'statistics-node-processor', {
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+    });
     this.connect((this.workletHandle.parameters as any).get('input'));
     this.workletHandle.connect(this.gainNode);
 

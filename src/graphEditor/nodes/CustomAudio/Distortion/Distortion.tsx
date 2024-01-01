@@ -72,7 +72,10 @@ export default class DistortionNode implements ForeignNode {
       DistortionWasmBytes.get(),
       DistortionAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'distortion-awp');
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'distortion-awp', {
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+    });
     this.stretchFactorOAP = new OverridableAudioParam(
       this.ctx,
       (this.awpHandle.parameters as Map<string, AudioParam>).get('stretch factor')!

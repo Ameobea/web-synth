@@ -51,7 +51,7 @@ export class CursorGutter {
       conf.CURSOR_GUTTER_HEIGHT
     );
     g.x = conf.PIANO_KEYBOARD_WIDTH;
-    g.cacheAsBitmap = true;
+    // g.cacheAsBitmap = true;
     this.graphics = g;
     this.app.app.stage.addChild(g);
   }
@@ -99,7 +99,7 @@ export class Cursor {
       new PIXI.Point(0, 0),
     ]);
     g.endFill();
-    g.cacheAsBitmap = true;
+    // g.cacheAsBitmap = true;
 
     makeDraggable(g, this, false);
 

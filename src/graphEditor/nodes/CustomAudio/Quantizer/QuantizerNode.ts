@@ -82,6 +82,8 @@ export default class QuantizerNode implements ForeignNode {
       channelCount: 1,
       numberOfInputs: 0,
       numberOfOutputs: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });

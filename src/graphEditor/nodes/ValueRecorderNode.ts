@@ -40,6 +40,8 @@ export const createValueRecorder = async (
     numberOfInputs: 0,
     numberOfOutputs: 0,
     channelCount: 1,
+    channelInterpretation: 'discrete',
+    channelCountMode: 'explicit',
   });
 
   const param: ValueRecorder = (workletHandle.parameters as any).get('input');

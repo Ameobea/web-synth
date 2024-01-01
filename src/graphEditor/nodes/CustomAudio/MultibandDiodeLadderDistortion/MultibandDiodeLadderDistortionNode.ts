@@ -5,7 +5,7 @@ import { get, writable, type Writable } from 'svelte/store';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import MBDLDNodeSmallView from 'src/graphEditor/nodes/CustomAudio/MultibandDiodeLadderDistortion/MBDLDNodeSmallView.svelte';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { getSentry } from 'src/sentry';
@@ -134,6 +134,8 @@ export class MBDLDNode implements ForeignNode {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       channelCount: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
 
     const initialParams: MBDLDNodeState = get(this.store);

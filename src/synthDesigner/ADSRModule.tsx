@@ -105,6 +105,8 @@ export class ADSR2Module {
       numberOfInputs: 0,
       outputChannelCount: new Array(instanceCount).fill(1),
       processorOptions: { instanceCount },
+      channelCountMode: 'explicit',
+      channelInterpretation: 'discrete',
     });
     this.awp.port.onmessage = evt => {
       switch (evt.data.type) {

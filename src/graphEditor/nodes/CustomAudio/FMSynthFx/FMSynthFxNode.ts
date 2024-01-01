@@ -6,7 +6,7 @@ import { encodeEffect, type Effect } from 'src/fmSynth/Effect';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { WavetableWasmBytes } from 'src/graphEditor/nodes/CustomAudio/WaveTable/WavetableWasm';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { getSentry } from 'src/sentry';
@@ -86,6 +86,8 @@ export class FMSynthFxNode implements ForeignNode {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       channelCount: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
     updateConnectables(this.vcId, this.buildConnectables());
 

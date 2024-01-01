@@ -80,6 +80,8 @@ export class LevelDetectorNode implements ForeignNode {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       channelCount: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
 
     const awpParams = this.awpHandle.parameters as Map<string, AudioParam>;

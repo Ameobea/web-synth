@@ -53,7 +53,7 @@ export default class PianoKeys {
 
     this.app.lines.forEach((_line, lineIx) => this.drawKey(lineIx, g));
 
-    g.cacheAsBitmap = true;
+    // g.cacheAsBitmap = true;
     return g;
   }
 
@@ -68,7 +68,7 @@ export default class PianoKeys {
 
     this.app.lines.forEach((_line, lineIx) => this.drawLabel(lineIx, g));
 
-    g.cacheAsBitmap = true;
+    // g.cacheAsBitmap = true;
     g.zIndex = 2;
     return g;
   }
@@ -79,8 +79,8 @@ export default class PianoKeys {
     this.labelLayer = this.buildLabelsLayer();
     this.container = new PIXI.Container();
     this.container.sortableChildren = true;
-    this.container.mask = new PIXI.Graphics()
-      .beginFill(0xff3300)
+    const mask = new PIXI.Graphics()
+      .beginFill(0xffffff)
       .drawRect(
         0,
         conf.CURSOR_GUTTER_HEIGHT,
@@ -88,6 +88,14 @@ export default class PianoKeys {
         this.app.height - conf.CURSOR_GUTTER_HEIGHT
       )
       .endFill();
+
+    // Setting the mask on the container seems to make performance worse than disabling
+    // the bitmap caching on the children and setting the mask on them instead.
+
+    // this.container.mask = mask;
+    this.keysLayer.mask = mask;
+    this.labelLayer.mask = mask;
+
     this.container.addChild(this.keysLayer);
     this.container.addChild(this.labelLayer);
     this.app.app.stage.addChild(this.container);

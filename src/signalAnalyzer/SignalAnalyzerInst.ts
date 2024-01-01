@@ -1,4 +1,4 @@
-import { get, Writable, writable } from 'svelte/store';
+import { get, type Writable, writable } from 'svelte/store';
 
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
@@ -6,12 +6,12 @@ import { LineSpectrogramFFTSize } from 'src/visualizations/LineSpectrogram/conf'
 import { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
 import {
   buildDefaultLineSpecrogramUIState,
-  LineSpectrogramUIState,
+  type LineSpectrogramUIState,
 } from 'src/visualizations/LineSpectrogram/types';
 import { Oscilloscope } from 'src/visualizations/Oscilloscope/Oscilloscope';
 import {
   buildDefaultOscilloscopeUIState,
-  OscilloscopeUIState,
+  type OscilloscopeUIState,
 } from 'src/visualizations/Oscilloscope/types';
 
 const ctx = new AudioContext();
@@ -85,6 +85,8 @@ export class SignalAnalyzerInst {
       numberOfInputs: 1,
       channelCount: 1,
       numberOfOutputs: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
     this.awpHandle.port.onmessage = this.handleAWPMessage;
     this.input.connect(this.awpHandle);

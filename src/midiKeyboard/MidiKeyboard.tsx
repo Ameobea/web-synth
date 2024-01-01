@@ -21,26 +21,6 @@ const keyMap: { [key: string]: number } = keys.reduce(
   {}
 );
 
-declare interface MIDIInput extends EventTarget {
-  name: string;
-}
-
-declare type MIDIOutputMap = Iterable<[string, MIDIInput]>;
-
-declare interface MIDIAccess {
-  sysexEnabled: boolean;
-  outputs: MIDIOutputMap;
-  inputs: MIDIOutputMap;
-  onstatechange: null | ((evt: unknown) => void);
-}
-
-// Add in missing WebMIDI types to global scope
-declare global {
-  interface Navigator {
-    requestMIDIAccess: () => Promise<MIDIAccess>;
-  }
-}
-
 interface MidiKeyboardProps {
   octaveOffset: number;
   onOctaveOffsetChange: (newOctaveOffset: number) => void;

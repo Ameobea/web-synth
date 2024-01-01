@@ -214,10 +214,12 @@ export class LooperNode {
 
   private async init() {
     const [looperWasm] = await Promise.all([LooperWasm.get(), LooperAWPRegistered.get()]);
-    this.workletNode = new AudioWorkletNode(ctx, 'looper-awp');
+    this.workletNode = new AudioWorkletNode(ctx, 'looper-awp', { channelCountMode: 'explicit' });
     this.workletNode.port.postMessage({
       type: 'setWasmBytes',
       wasmBytes: looperWasm,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
     this.workletNode.port.onmessage = evt => {
       switch (evt.data.type) {

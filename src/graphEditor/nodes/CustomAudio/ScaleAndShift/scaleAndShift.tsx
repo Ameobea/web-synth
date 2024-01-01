@@ -127,6 +127,8 @@ export class ScaleAndShiftNode implements ForeignNode {
       this.awpHandle = new AudioWorkletNode(this.ctx, 'scale-and-shift-awp', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
+        channelInterpretation: 'discrete',
+        channelCountMode: 'explicit',
       });
       this.firstShifterNode.connect(this.awpHandle);
       this.awpHandle.port.onmessage = e => {

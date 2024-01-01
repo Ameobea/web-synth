@@ -131,6 +131,7 @@ export class VocoderNode implements ForeignNode {
       numberOfInputs: 2,
       numberOfOutputs: 1,
       channelCount: 1,
+      channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
     });
 

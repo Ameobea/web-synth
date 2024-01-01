@@ -136,7 +136,11 @@ export default class DelayNode implements ForeignNode {
       DelayWasmBytes.get(),
       DelayAWPRegistered.get(),
     ] as const);
-    this.awpHandle = new AudioWorkletNode(this.ctx, 'delay-awp', { numberOfOutputs: 2 });
+    this.awpHandle = new AudioWorkletNode(this.ctx, 'delay-awp', {
+      numberOfOutputs: 2,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+    });
     this.awpHandle.connect(this.delayOutput, 1);
 
     this.params.delayMs = new OverridableAudioParam(

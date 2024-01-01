@@ -2,9 +2,9 @@ import { UnreachableException, type IterableValueOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
-import { MIDINode, type MIDIAccess } from 'src/patchNetwork/midiNode';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
 
-export type BulitinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
+export type BuiltinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
 /**
  * Processes MIDI events from some hardware MIDI device
@@ -17,7 +17,7 @@ export class MIDIInput {
   private wasmMidiCtxPtr: number | undefined;
   private midiModule: typeof import('src/midi') | undefined;
   private midiAccess: MIDIAccess | undefined;
-  private midiInput: BulitinMIDIInput | undefined;
+  private midiInput: BuiltinMIDIInput | undefined;
   private midiMsgHandlerCb: ((evt: Event & { data: Uint8Array }) => void) | undefined;
   public pitchBendNode: ConstantSourceNode;
   public modWheelNode: ConstantSourceNode;
@@ -81,8 +81,8 @@ export class MIDIInput {
         this.modWheelNode.offset.value = modWheelValue;
       },
       (controlIndex: number, controlValue: number) =>
-        this.midiNode?.outputCbs.forEach(({ onGenericControl }) =>
-          onGenericControl?.(controlIndex, controlValue)
+        this.midiNode?.outputCbs.forEach(
+          ({ onGenericControl }) => onGenericControl?.(controlIndex, controlValue)
         )
     );
     this.wasmMidiCtxPtr = ctxPtr;

@@ -3,7 +3,7 @@ import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import type { SamplerSelection, SerializedSampler } from 'src/sampler/sampler';
-import { AsyncOnce, getEngine } from 'src/util';
+import { AsyncOnce, delay, getEngine } from 'src/util';
 import { type Writable, writable, get } from 'svelte/store';
 
 const ctx = new AudioContext();
@@ -37,13 +37,18 @@ export class SamplerInstance {
   private audioThreadMIDIEventMailboxID: string;
   private midiInputCBs: MIDIInputCbs;
   private midiAttackCBs: ((midiNumber: number) => void)[] = [];
+  private isShutdown = false;
+  private midiGateStatusBufferI32: Int32Array | null = null;
+  private midiGateStatusLoopStarted = false;
 
   public midiNode: MIDINode;
   public awpHandle: AudioWorkletNode | null = null;
   public activeSample: Writable<ActiveSampleData | null> = writable(null);
   public selections: Writable<SamplerSelection[]>;
   public activeSelectionIx: Writable<number | null>;
+  public midiGateStatusBufferF32: Float32Array | null = null;
   public waveformRenderer: WaveformRenderer;
+  public midiGateStatusUpdated = writable(0);
 
   constructor(vcId: string, initialState: SerializedSampler) {
     this.vcId = vcId;
@@ -84,6 +89,8 @@ export class SamplerInstance {
       numberOfOutputs: 1,
       outputChannelCount: [2],
       processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
     });
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes: samplerWasm });
     this.awpHandle.port.onmessage = e => this.handleAWPMessage(e.data);
@@ -101,9 +108,32 @@ export class SamplerInstance {
         this.midiAttackCBs.forEach(cb => cb(msg.midiNumber));
         this.midiAttackCBs = [];
         break;
+      case 'midiGateStatusSAB':
+        this.midiGateStatusBufferF32 = new Float32Array(msg.midiGateStatusSAB);
+        this.midiGateStatusBufferI32 = new Int32Array(msg.midiGateStatusSAB);
+        if (!this.midiGateStatusLoopStarted) {
+          this.startMidiGateStatusLoop();
+        }
+        break;
       default:
         console.error('Unhandled message type from sampler AWP: ', msg);
     }
+  }
+
+  private startMidiGateStatusLoop() {
+    this.midiGateStatusLoopStarted = true;
+    const bufI32 = this.midiGateStatusBufferI32!;
+
+    setTimeout(async () => {
+      while (!this.isShutdown) {
+        const { async, value } = Atomics.waitAsync(bufI32, 512, 0);
+        await value;
+        this.midiGateStatusUpdated.update(n => n + 1);
+        if (!async) {
+          await delay(5);
+        }
+      }
+    });
   }
 
   public async setSelectedSample(descriptor: SampleDescriptor | null) {
@@ -227,6 +257,7 @@ export class SamplerInstance {
   }
 
   public shutdown() {
+    this.isShutdown = true;
     if (this.awpHandle) {
       this.awpHandle.port.postMessage({ type: 'shutdown' });
       this.awpHandle.disconnect();

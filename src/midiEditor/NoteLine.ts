@@ -2,9 +2,10 @@ import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
-import MIDIEditorUIInstance, { type Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';
-import { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
+import type { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import * as conf from './conf';
 
 export interface NoteCreationState {
@@ -162,11 +163,10 @@ export default class NoteLine {
   }
 
   public handleViewChange() {
-    const newY = Math.max(
-      -conf.LINE_HEIGHT,
-      Math.round(this.index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx)
+    const newY = Math.round(
+      this.index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx
     );
-    const isCulled = this.container.y + conf.LINE_HEIGHT < 0 || this.container.y > this.app.height;
+    const isCulled = newY + conf.LINE_HEIGHT < 0 || newY > this.app.height;
     if (!isCulled && this.isCulled) {
       this.isCulled = isCulled;
       this.app.linesContainer.addChild(this.container);
@@ -215,12 +215,22 @@ export default class NoteLine {
       beat += 1;
     }
 
-    g.cacheAsBitmap = true;
+    // g.cacheAsBitmap = true;
     MarkersCache.set(markersCacheKey, g);
     return g.clone();
   }
 
   private renderMarkers() {
+    // return;
+    if (this.isCulled) {
+      if (this.graphics) {
+        this.container.removeChild(this.graphics);
+        this.graphics.destroy();
+        this.graphics = undefined;
+      }
+      return;
+    }
+
     if (
       !this.graphics ||
       this.lastPxPerBeat !== this.app.parentInstance.baseView.pxPerBeat ||

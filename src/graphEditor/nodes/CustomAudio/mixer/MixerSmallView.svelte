@@ -125,6 +125,8 @@
         awpHandle = new AudioWorkletNode(ctx, 'mixer-level-detector-awp', {
           numberOfInputs: MAX_MIXER_TRACK_COUNT,
           numberOfOutputs: 1, // Need 1 dummy output to drive audio graph
+          channelInterpretation: 'discrete',
+          channelCountMode: 'explicit',
         });
         awpHandle.connect(ctx.destination);
 

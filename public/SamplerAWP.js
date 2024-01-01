@@ -1,6 +1,7 @@
 const PARAM_DESCRIPTORS = [];
 const FRAME_SIZE = 128;
 const BYTES_PER_F32 = 4;
+const MIDI_GATE_STATUS_BUFFER_UPDATED_IX = 512;
 
 class SamplerAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -16,6 +17,26 @@ class SamplerAWP extends AudioWorkletProcessor {
     this.wasmMemoryBuffer = null;
     this.pendingMessages = [];
     this.transmitMIDIAttack = false;
+    this.midiGateStatusSAB = null;
+    this.midiGateStatusF32 = null;
+    this.midiGateStatusI32 = null;
+    if (
+      typeof SharedArrayBuffer !== 'undefined' &&
+      typeof Atomics !== 'undefined' &&
+      typeof Atomics.waitAsync === 'function'
+    ) {
+      this.midiGateStatusSAB = new SharedArrayBuffer((512 + 8) * BYTES_PER_F32);
+      this.midiGateStatusF32 = new Float32Array(this.midiGateStatusSAB);
+      this.midiGateStatusI32 = new Int32Array(this.midiGateStatusSAB);
+      this.port.postMessage({
+        type: 'midiGateStatusSAB',
+        midiGateStatusSAB: this.midiGateStatusSAB,
+      });
+    } else {
+      console.warn(
+        'SamplerAWP: SharedArrayBuffer not available, MIDI gate status will not be available'
+      );
+    }
 
     this.port.onmessage = evt => this.handleMessage(evt.data);
 
@@ -126,6 +147,17 @@ class SamplerAWP extends AudioWorkletProcessor {
           if (this.transmitMIDIAttack) {
             this.port.postMessage({ type: 'midiAttack', midiNumber: param1 });
             this.transmitMIDIAttack = false;
+          }
+          if (this.midiGateStatusF32) {
+            this.midiGateStatusF32[param1] = 1;
+            Atomics.notify(this.midiGateStatusI32, MIDI_GATE_STATUS_BUFFER_UPDATED_IX);
+          }
+          break;
+        }
+        case 1: {
+          if (this.midiGateStatusF32) {
+            this.midiGateStatusF32[param1] = 0;
+            Atomics.notify(this.midiGateStatusI32, MIDI_GATE_STATUS_BUFFER_UPDATED_IX);
           }
           break;
         }

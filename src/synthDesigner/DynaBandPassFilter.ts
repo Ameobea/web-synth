@@ -58,6 +58,8 @@ export class DynaBandPassFilter {
       channelCount: 1,
       numberOfInputs: 0,
       numberOfOutputs: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'discrete',
     });
     this.awpHandle.addEventListener('processorerror', e => {
       console.error('DynaBandPassFilterAWP processor error', e);

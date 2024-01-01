@@ -23,9 +23,11 @@ import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSentry } from 'src/sentry';
 import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { initGlobals, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FilterType } from 'src/synthDesigner/FilterType';
+
+initGlobals();
 
 const VOICE_COUNT = 10;
 const SAMPLE_RATE = 44_100;

@@ -338,6 +338,8 @@ export default class FMSynth implements ForeignNode {
       numberOfInputs: 0,
       numberOfOutputs: VOICE_COUNT * 2,
       channelCount: 1,
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
       processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
     });
 
@@ -856,8 +858,14 @@ export default class FMSynth implements ForeignNode {
       detune: this.detune,
       lastSeenMIDIControlValues: this.midiControlValuesCache.serialize(),
       wavetableState: serializeWavetableState(this.wavetableState),
-      gainEnvelope: this.gainEnvelope,
-      filterEnvelope: this.filterEnvelope,
+      gainEnvelope: {
+        ...this.gainEnvelope,
+        audioThreadData: R.omit(['buffer'], this.gainEnvelope.audioThreadData),
+      },
+      filterEnvelope: {
+        ...this.filterEnvelope,
+        audioThreadData: R.omit(['buffer'], this.filterEnvelope.audioThreadData),
+      },
       sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
       useLegacyWavetableControls: this.useLegacyWavetableControls,
     };
