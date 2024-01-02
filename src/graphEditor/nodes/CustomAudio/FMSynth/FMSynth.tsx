@@ -39,6 +39,7 @@ import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtil
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
 import { AsyncOnce, normalizeEnvelope } from 'src/util';
+import { EventScheduleInitialized } from 'src/eventScheduler';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -331,6 +332,7 @@ export default class FMSynth implements ForeignNode {
     const [wasmBytes] = await Promise.all([
       WavetableWasmBytes.get(),
       RegisterFMSynthAWP.get(),
+      EventScheduleInitialized,
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       // First `VOICE_COUNT` outputs are for the actual voice outputs

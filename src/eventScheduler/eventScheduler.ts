@@ -173,7 +173,7 @@ export const getCurGlobalBPM = () => {
 };
 
 // Init the scheduler AWP instance
-Promise.all([
+export const EventScheduleInitialized = Promise.all([
   retryAsync(() =>
     fetch(
       process.env.ASSET_PATH +

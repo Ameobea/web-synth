@@ -1,3 +1,6 @@
+// get the ball rolling on this ASAP in the loading process
+import 'src/eventScheduler/eventScheduler';
+
 import { filterNils, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -457,10 +460,15 @@ const unBypassFilter = () => {
   });
 };
 
-const PresetsControlPanel: React.FC<{
+interface PresetsControlPanelProps {
   setOctaveOffset: (newOctaveOffset: number) => void;
   reRenderAll: () => void;
-}> = ({ setOctaveOffset, reRenderAll }) => {
+}
+
+const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({
+  setOctaveOffset,
+  reRenderAll,
+}) => {
   const isLoadingPreset = useRef(false);
   const loadPreset = useCallback(
     (presetName: string) => {
