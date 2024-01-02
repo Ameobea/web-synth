@@ -2,6 +2,7 @@ import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
+import '@pixi/events';
 import { destroyPIXIApp } from 'src/controls/pixiUtils';
 import type {
   MIDIEditorInstance,
@@ -25,6 +26,7 @@ import {
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import * as conf from './conf';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 export interface Note {
   id: number;
@@ -117,13 +119,11 @@ export default class MIDIEditorUIInstance {
       antialias: true,
       resolution: dpr,
       autoDensity: true,
-      view: canvas,
+      view: canvas as PIXI.ICanvas,
       height,
       width,
       backgroundColor: conf.BACKGROUND_COLOR,
     });
-    const interactionManager: PIXI.InteractionManager = this.app.renderer.plugins.interaction;
-    interactionManager.cursorStyles['ew-resize'] = 'ew-resize';
 
     registerVcHideCb(this.vcId, this.onHiddenStatusChanged);
     this.isHidden = getIsVcHidden(this.vcId);
@@ -132,33 +132,28 @@ export default class MIDIEditorUIInstance {
     this.initEventHandlers();
     this.linesContainer = new PIXI.Container();
     this.linesContainer.interactive = true;
-    this.linesContainer.cursor = 'default';
+    this.linesContainer.interactiveChildren = true;
     this.linesContainer
-      .on('pointerdown', (evt: PIXI.InteractionEvent) => {
-        if (evt.data.button === 0) {
+      .on('pointerdown', (evt: FederatedPointerEvent) => {
+        if (evt.button === 0) {
           if (this.selectionBoxButtonDown && !this.selectionBox) {
-            this.selectionBox = new SelectionBox(
-              this,
-              evt.data.getLocalPosition(this.linesContainer)
-            );
+            this.selectionBox = new SelectionBox(this, evt.getLocalPosition(this.linesContainer));
           }
-        } else if (evt.data.button === 1) {
-          this.startPanning(evt.data);
+        } else if (evt.button === 1) {
+          this.startPanning(evt);
         }
       })
-      .on('pointermove', (evt: PIXI.InteractionEvent) => {
-        this.handlePan(evt.data);
-        this.handleResize(evt.data);
-        this.handleDrag(evt.data);
+      .on('pointermove', (evt: FederatedPointerEvent) => {
+        this.handlePan(evt);
+        this.handleResize(evt);
+        this.handleDrag(evt);
         if (this.selectionBox) {
-          this.selectionBox.update(evt.data.getLocalPosition(this.linesContainer));
+          this.selectionBox.update(evt.getLocalPosition(this.linesContainer));
         }
       });
 
     this.linesContainer.x = conf.PIANO_KEYBOARD_WIDTH;
     this.linesContainer.y = conf.CURSOR_GUTTER_HEIGHT;
-    // Clip stuff hidden at the top outside of it
-    // this.linesContainer.mask = this.buildLinesContainerMask();
     this.app.stage.addChild(this.linesContainer);
 
     // Cursor gutter
@@ -182,13 +177,6 @@ export default class MIDIEditorUIInstance {
         this.app.stage.addChild(this.loopCursor.graphics);
       }
     });
-  }
-
-  private buildLinesContainerMask() {
-    return new PIXI.Graphics()
-      .beginFill(0xffffff)
-      .drawRect(conf.PIANO_KEYBOARD_WIDTH, 10, this.width - conf.PIANO_KEYBOARD_WIDTH, this.height)
-      .endFill();
   }
 
   private buildNoteLines = (linesWithIDs: readonly Note[][]): NoteLine[] =>
@@ -262,7 +250,6 @@ export default class MIDIEditorUIInstance {
     this.height = height;
     this.app.renderer.resize(width, height);
 
-    // this.linesContainer.mask = this.buildLinesContainerMask();
     this.pianoKeys?.destroy();
     this.pianoKeys = new PianoKeys(this);
     this.cursorGutter.destroy();
@@ -443,7 +430,7 @@ export default class MIDIEditorUIInstance {
     return realNewEndPoint;
   }
 
-  private startPanning(data: PIXI.InteractionData) {
+  private startPanning(data: FederatedPointerEvent) {
     this.panningData = {
       startPoint: data.getLocalPosition(this.linesContainer),
       startView: {
@@ -460,7 +447,7 @@ export default class MIDIEditorUIInstance {
     );
   }
 
-  private handlePan(data: PIXI.InteractionData) {
+  private handlePan(data: FederatedPointerEvent) {
     if (!this.panningData) {
       return;
     }
@@ -485,7 +472,7 @@ export default class MIDIEditorUIInstance {
     this.panningData = null;
   }
 
-  public startResizingSelectedNotes(data: PIXI.InteractionData, side: NoteDragHandleSide) {
+  public startResizingSelectedNotes(data: FederatedPointerEvent, side: NoteDragHandleSide) {
     this.resizeData = {
       globalStartPoint: data.global.clone(),
       side,
@@ -520,7 +507,7 @@ export default class MIDIEditorUIInstance {
     }
   }
 
-  private handleResize(data: PIXI.InteractionData) {
+  private handleResize(data: FederatedPointerEvent) {
     if (!this.resizeData) {
       return;
     }
@@ -763,7 +750,7 @@ export default class MIDIEditorUIInstance {
     return Math.floor(adjustedY / conf.LINE_HEIGHT);
   }
 
-  public startDraggingSelectedNotes(data: PIXI.InteractionData) {
+  public startDraggingSelectedNotes(data: FederatedPointerEvent) {
     const localY = data.getLocalPosition(this.linesContainer).y;
     this.dragData = {
       globalStartPoint: data.global.clone(),
@@ -820,7 +807,7 @@ export default class MIDIEditorUIInstance {
     }
   }
 
-  public handleDrag(data: PIXI.InteractionData) {
+  public handleDrag(data: FederatedPointerEvent) {
     if (!this.dragData) {
       return;
     }

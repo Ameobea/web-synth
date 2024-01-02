@@ -19,6 +19,7 @@ import {
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import ConfigureStepControlPanel from './ConfigureStepControlPanel.svelte';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 const dpr = window.devicePixelRatio ?? 1;
 
@@ -54,7 +55,7 @@ PIXI.utils.skipHello();
  * the start and stop of the ramp it belongs to.
  */
 class RampHandle {
-  private dragData: PIXI.InteractionData | null = null;
+  private dragData: FederatedPointerEvent | null = null;
   private startStep: AdsrStep;
   private endStep: AdsrStep;
   private inst: ADSR2Instance;
@@ -162,8 +163,8 @@ class RampHandle {
     g.interactive = true;
     g.cursor = 'pointer';
 
-    g.on('pointerdown', (evt: any) => {
-      this.dragData = evt.data;
+    g.on('pointerdown', (evt: FederatedPointerEvent) => {
+      this.dragData = evt;
     })
       .on('pointerup', () => {
         this.dragData = null;
@@ -331,7 +332,7 @@ class RampCurve {
 class StepHandle {
   private inst: ADSR2Instance;
   private graphics!: PIXI.Graphics;
-  private dragData: PIXI.InteractionData | null = null;
+  private dragData: FederatedPointerEvent | null = null;
   public step: AdsrStep;
   private renderedRegion: RenderedRegion;
   private disableSnapToEnd: boolean;
@@ -380,10 +381,10 @@ class StepHandle {
     g.zIndex = 2;
 
     // Drag handling
-    g.buttonMode = true;
+    g.cursor = 'pointer';
     g.interactive = true;
-    g.on('pointerdown', (evt: any) => {
-      const originalEvent: PointerEvent = evt.data.originalEvent;
+    g.on('pointerdown', (evt: FederatedPointerEvent) => {
+      const originalEvent = evt.nativeEvent as PointerEvent;
 
       const clickTime = Date.now();
       const isDoubleClick = clickTime - this.lastClickTime < DOUBLE_CLICK_TIME_RANGE_MS;
@@ -402,7 +403,7 @@ class StepHandle {
         return;
       }
 
-      this.dragData = evt.data;
+      this.dragData = evt;
     })
       .on('pointerup', () => {
         this.dragData = null;
@@ -411,10 +412,9 @@ class StepHandle {
         this.dragData = null;
       })
       .on('pointermove', () => this.handlePointerMove())
-      .on('rightdown', (evt: any) => {
-        const data: PIXI.InteractionData = evt.data;
-        data.originalEvent.preventDefault();
-        data.originalEvent.stopPropagation();
+      .on('rightdown', (evt: FederatedPointerEvent) => {
+        evt.originalEvent.preventDefault();
+        evt.originalEvent.stopPropagation();
         this.delete();
       });
 
@@ -465,7 +465,7 @@ class StepHandle {
 class DragBar {
   private inst: ADSR2Instance;
   private g!: PIXI.Graphics;
-  public dragData: PIXI.InteractionData | null = null;
+  public dragData: FederatedPointerEvent | null = null;
   private onDrag: (newVal: number) => void;
   private lastClickTime = 0;
 
@@ -491,8 +491,8 @@ class DragBar {
 
     g.interactive = true;
     g.cursor = 'pointer';
-    g.on('pointerdown', (evt: PIXI.InteractionEvent) => {
-      const originalEvent = evt.data.originalEvent as PointerEvent;
+    g.on('pointerdown', (evt: FederatedPointerEvent) => {
+      const originalEvent = evt.nativeEvent as PointerEvent;
       if (originalEvent.button !== 0) {
         return;
       }
@@ -963,7 +963,7 @@ export class ADSR2Instance {
       this.app = new PIXI.Application({
         antialias: true,
         autoDensity: true,
-        view: canvas,
+        view: canvas as PIXI.ICanvas,
         height: height * dpr,
         width: width * dpr,
         backgroundColor: BACKGROUND_COLOR,
@@ -1049,10 +1049,9 @@ export class ADSR2Instance {
 
     bg.zIndex = -2;
     bg.interactive = true;
-    bg.on('click', (evt: any) => {
+    bg.on('click', (evt: FederatedPointerEvent) => {
       const now = this.ctx.currentTime;
-      const data: PIXI.InteractionData = evt.data;
-      const pos = data.getLocalPosition(bg.parent);
+      const pos = evt.getLocalPosition(bg.parent);
 
       if (!this.lastClick || this.lastClick.pos.x !== pos.x || this.lastClick.pos.y !== pos.y) {
         this.lastClick = { time: now, pos };
@@ -1163,7 +1162,7 @@ export class ADSR2Instance {
   ) {
     this.closeStepHandleConfigurator();
 
-    const parent = this.app?.renderer.view.parentElement;
+    const parent = this.app ? (this.app.renderer.view as HTMLCanvasElement).parentElement : null;
     if (!parent) {
       console.error('Could not find parent element of renderer');
       return;

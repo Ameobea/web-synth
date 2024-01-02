@@ -3,6 +3,7 @@ import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import type NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 export enum NoteDragHandleSide {
   Left,
@@ -30,8 +31,8 @@ export class NoteDragHandle {
     this.parentNote.graphics.addChild(g);
     g.interactive = true;
     g.cursor = 'ew-resize';
-    g.on('pointerdown', (evt: PIXI.InteractionEvent) => {
-      if (evt.data.button !== 0 || this.parentNote.line.app.selectionBoxButtonDown) {
+    g.on('pointerdown', (evt: FederatedPointerEvent) => {
+      if (evt.button !== 0 || this.parentNote.line.app.selectionBoxButtonDown) {
         return;
       }
 
@@ -40,7 +41,7 @@ export class NoteDragHandle {
         this.parentNote.line.app.selectNote(this.parentNote.note.id);
       }
 
-      this.parentNote.line.app.startResizingSelectedNotes(evt.data, this.side);
+      this.parentNote.line.app.startResizingSelectedNotes(evt, this.side);
       evt.stopPropagation();
     });
     // g.cacheAsBitmap = true;

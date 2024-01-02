@@ -4,6 +4,7 @@ import * as PIXI from 'src/controls/pixi';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import type NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 export class NoteBox {
   public line: NoteLine;
@@ -17,11 +18,11 @@ export class NoteBox {
     const graphics = new PIXI.Graphics();
     graphics.interactive = true;
     graphics.cursor = 'pointer';
-    graphics.on('pointerdown', (evt: PIXI.InteractionEvent) => {
-      if (evt.data.button === 2) {
+    graphics.on('pointerdown', (evt: FederatedPointerEvent) => {
+      if (evt.button === 2) {
         this.line.app.deleteNote(this.note.id);
         return;
-      } else if ((evt.data.originalEvent as any).button !== 0) {
+      } else if ((evt.originalEvent as any).button !== 0) {
         return;
       }
 
@@ -36,7 +37,7 @@ export class NoteBox {
       this.line.app.gateAllSelectedNotes();
       this.line.app.addMouseUpCB(() => this.line.app.ungateAllSelectedNotes());
 
-      this.line.app.startDraggingSelectedNotes(evt.data);
+      this.line.app.startDraggingSelectedNotes(evt);
     });
 
     return graphics;
@@ -71,15 +72,12 @@ export class NoteBox {
       this.currentlyRenderedProps.widthPx !== widthPx ||
       this.currentlyRenderedProps.isSelected !== this.isSelected
     ) {
-      console.log('rendering');
       this.currentlyRenderedProps = { widthPx, isSelected: this.isSelected };
-      // this.graphics = this.buildGraphics();
       this.graphics.clear();
       this.graphics.lineStyle(1, 0x333333);
       this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
       this.graphics.drawRect(1, 0, widthPx, conf.LINE_HEIGHT - 1);
       this.graphics.endFill();
-      // this.graphics.cacheAsBitmap = true;
     }
 
     this.graphics.x = startPointPx;

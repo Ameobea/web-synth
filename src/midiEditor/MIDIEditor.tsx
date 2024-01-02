@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
-import { SvelteComponent } from 'svelte';
+import type { SvelteComponent } from 'svelte';
 
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
@@ -26,7 +26,7 @@ import CollapsedMIDIEditor from 'src/midiEditor/CollapsedMIDIEditor.svelte';
 import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
 import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
-import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
+import type MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import EditableInstanceName from './EditableInstanceName.svelte';
 
 const ctx = new AudioContext();

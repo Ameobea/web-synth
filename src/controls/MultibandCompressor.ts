@@ -7,6 +7,7 @@ import type {
 } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 import { delay } from 'src/util';
 import * as PIXI from './pixi';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 const MARGIN_TOP_PX = 122;
 const COMPRESSOR_CONTROLS_HEIGHT_PX = 120;
@@ -45,11 +46,11 @@ class CompressorControls {
   private onThresholdChange: (bottomThreshold: number, topThreshold: number) => void;
 
   private bottomDragHandler: {
-    dragData: PIXI.InteractionData | null;
+    dragData: FederatedPointerEvent | null;
     handleDrag: (newPos: PIXI.Point) => void;
   };
   private topDragHandler: {
-    dragData: PIXI.InteractionData | null;
+    dragData: FederatedPointerEvent | null;
     handleDrag: (newPos: PIXI.Point) => void;
   };
 

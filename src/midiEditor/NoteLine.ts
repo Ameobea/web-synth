@@ -7,6 +7,7 @@ import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';
 import type { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import * as conf from './conf';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 export interface NoteCreationState {
   /**
@@ -21,7 +22,7 @@ export interface NoteCreationState {
 /**
  * A cache for storing line marker sprites keyed by `${pxPerBeat}-${beatsPerMeasure}`
  */
-const MarkersCache: Map<string, PIXI.Graphics> = new Map();
+const MarkersCache: Map<string, PIXI.Texture> = new Map();
 
 export default class NoteLine {
   public app: MIDIEditorUIInstance;
@@ -29,7 +30,7 @@ export default class NoteLine {
   public container: PIXI.Container;
   public background: PIXI.DisplayObject;
   public index: number;
-  private graphics: PIXI.Graphics | undefined;
+  private markers: PIXI.Sprite | undefined;
   private noteCreationState: NoteCreationState | null = null;
   private isCulled = true;
   /**
@@ -48,8 +49,15 @@ export default class NoteLine {
     this.app = app;
     this.index = index;
     this.container = new PIXI.Container();
+    this.container.interactiveChildren = true;
     this.background = new PIXI.Container();
-    this.background.hitArea = new PIXI.Rectangle(0, 0, this.app.width, conf.LINE_HEIGHT);
+    this.background.hitArea = new PIXI.Rectangle(
+      0,
+      // -conf.LINE_HEIGHT / 2,
+      0,
+      this.app.width,
+      conf.LINE_HEIGHT
+    );
     this.background.interactive = true;
     this.container.addChild(this.background);
     this.container.width = this.app.width;
@@ -68,14 +76,13 @@ export default class NoteLine {
 
   private installNoteCreationHandlers() {
     this.background
-      .on('pointerdown', (evt: any) => {
-        if (evt.data.button !== 0 || this.app.selectionBoxButtonDown) {
+      .on('pointerdown', (evt: FederatedPointerEvent) => {
+        if (evt.button !== 0 || this.app.selectionBoxButtonDown) {
           return;
         }
 
-        const data: PIXI.InteractionData = evt.data;
         const posBeats = this.app.parentInstance.snapBeat(
-          this.app.pxToBeats(data.getLocalPosition(this.background).x) +
+          this.app.pxToBeats(evt.getLocalPosition(this.background).x) +
             this.app.parentInstance.baseView.scrollHorizontalBeats
         );
         const isBlocked = !this.app.wasm!.instance.check_can_add_note(
@@ -102,14 +109,13 @@ export default class NoteLine {
           this.app.ungate(this.index);
         });
       })
-      .on('pointermove', (evt: any) => {
+      .on('pointermove', (evt: FederatedPointerEvent) => {
         if (!this.noteCreationState) {
           return;
         }
 
-        const data: PIXI.InteractionData = evt.data;
         const newPosBeats = this.app.parentInstance.snapBeat(
-          this.app.pxToBeats(data.getLocalPosition(this.background).x) +
+          this.app.pxToBeats(evt.getLocalPosition(this.background).x) +
             this.app.parentInstance.baseView.scrollHorizontalBeats
         );
         let [newStartPosBeats, newEndPosBeats] = [
@@ -183,22 +189,22 @@ export default class NoteLine {
     }
   }
 
-  private buildMarkers(): PIXI.Graphics {
+  private buildMarkers(): PIXI.Sprite {
     const markersCacheKey = `${this.app.parentInstance.baseView.pxPerBeat}-${this.app.parentInstance.baseView.beatsPerMeasure}`;
     const cached = MarkersCache.get(markersCacheKey);
     if (cached) {
-      return cached.clone();
+      return new PIXI.Sprite(cached);
     }
 
     const g = new PIXI.Graphics();
     // bottom border
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
     g.moveTo(0, conf.LINE_HEIGHT);
-    g.lineTo(this.app.width * 2, conf.LINE_HEIGHT);
+    g.lineTo(this.app.width, conf.LINE_HEIGHT);
 
     let beat = 0;
     const visibleBeats = this.app.width / this.app.parentInstance.baseView.pxPerBeat;
-    const endBeat = Math.floor(visibleBeats) + 20;
+    const endBeat = Math.floor(visibleBeats);
     while (beat <= endBeat) {
       const isMeasureLine = beat % this.app.parentInstance.baseView.beatsPerMeasure === 0;
       let x = this.app.beatsToPx(beat);
@@ -208,43 +214,47 @@ export default class NoteLine {
         g.moveTo(x, 0);
         g.lineTo(x, conf.LINE_HEIGHT - 0);
       } else {
-        g.lineStyle(0.8, conf.NOTE_MARK_COLOR);
-        g.moveTo(x, conf.LINE_HEIGHT * 0.87);
+        g.lineStyle(1, conf.NOTE_MARK_TICK_COLOR);
+        g.moveTo(x, conf.LINE_HEIGHT * 0.82);
         g.lineTo(x, conf.LINE_HEIGHT);
       }
       beat += 1;
     }
 
-    // g.cacheAsBitmap = true;
-    MarkersCache.set(markersCacheKey, g);
-    return g.clone();
+    const renderTexture = PIXI.RenderTexture.create({
+      width: this.app.width,
+      height: conf.LINE_HEIGHT,
+    });
+    this.app.app.renderer.render(g, { renderTexture });
+
+    MarkersCache.set(markersCacheKey, renderTexture);
+    return new PIXI.Sprite(renderTexture);
   }
 
   private renderMarkers() {
-    // return;
     if (this.isCulled) {
-      if (this.graphics) {
-        this.container.removeChild(this.graphics);
-        this.graphics.destroy();
-        this.graphics = undefined;
+      if (this.markers) {
+        this.container.removeChild(this.markers);
+        this.markers.destroy();
+        this.markers = undefined;
       }
       return;
     }
 
     if (
-      !this.graphics ||
+      !this.markers ||
       this.lastPxPerBeat !== this.app.parentInstance.baseView.pxPerBeat ||
       this.lastBeatsPerMeasure !== this.app.parentInstance.baseView.beatsPerMeasure
     ) {
-      if (this.graphics) {
-        this.container.removeChild(this.graphics);
-        this.graphics.destroy();
+      if (this.markers) {
+        this.container.removeChild(this.markers);
+        this.markers.destroy();
       }
 
-      this.graphics = this.buildMarkers();
-      this.container.addChild(this.graphics);
-      // after background, before notes
-      this.container.setChildIndex(this.graphics, 1);
+      this.markers = this.buildMarkers();
+      this.container.addChild(this.markers);
+      this.container.setChildIndex(this.markers, 0);
+      this.container.setChildIndex(this.background, 1);
       this.lastPxPerBeat = this.app.parentInstance.baseView.pxPerBeat;
       this.lastBeatsPerMeasure = this.app.parentInstance.baseView.beatsPerMeasure;
     }
@@ -253,7 +263,7 @@ export default class NoteLine {
       this.app.parentInstance.baseView.scrollHorizontalBeats %
       this.app.parentInstance.baseView.beatsPerMeasure
     );
-    this.graphics.x = this.app.beatsToPx(xOffsetBeats);
+    this.markers.x = this.app.beatsToPx(xOffsetBeats);
   }
 
   public destroy() {

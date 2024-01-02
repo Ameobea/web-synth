@@ -15,7 +15,7 @@ import {
 } from 'src/eventScheduler';
 import { getGlobalBpm } from 'src/globalMenu';
 import type { MIDIEditorInstance, SerializedMIDIEditorState } from 'src/midiEditor';
-import { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
+import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
 
 interface SchedulableNoteEvent {
   isAttack: boolean;

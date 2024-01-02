@@ -2,6 +2,7 @@ import * as PIXI from 'src/controls/pixi';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import { midiNumberToNoteName } from 'src/midiUtils';
 import * as conf from './conf';
+import type { FederatedPointerEvent } from '@pixi/events';
 
 const ActiveNoteMarker = new PIXI.Graphics()
   .beginFill(conf.NOTE_SELECTED_COLOR, 0.8)
@@ -10,10 +11,11 @@ const ActiveNoteMarker = new PIXI.Graphics()
 export default class PianoKeys {
   private app: MIDIEditorUIInstance;
   private container: PIXI.Container;
+  private staticContainer: PIXI.Container;
   private keysLayer: PIXI.Graphics;
   private labelLayer: PIXI.Graphics;
   private playingNoteMarkersByLineIx: Map<number, PIXI.Graphics> = new Map();
-  public dragData: PIXI.InteractionData | null = null;
+  public dragData: FederatedPointerEvent | null = null;
 
   private drawKey(lineIx: number, g: PIXI.Graphics) {
     const baseY = lineIx * conf.LINE_HEIGHT;
@@ -53,7 +55,6 @@ export default class PianoKeys {
 
     this.app.lines.forEach((_line, lineIx) => this.drawKey(lineIx, g));
 
-    // g.cacheAsBitmap = true;
     return g;
   }
 
@@ -68,7 +69,6 @@ export default class PianoKeys {
 
     this.app.lines.forEach((_line, lineIx) => this.drawLabel(lineIx, g));
 
-    // g.cacheAsBitmap = true;
     g.zIndex = 2;
     return g;
   }
@@ -78,39 +78,31 @@ export default class PianoKeys {
     this.keysLayer = this.buildKeysLayer();
     this.labelLayer = this.buildLabelsLayer();
     this.container = new PIXI.Container();
-    this.container.sortableChildren = true;
-    const mask = new PIXI.Graphics()
-      .beginFill(0xffffff)
-      .drawRect(
-        0,
-        conf.CURSOR_GUTTER_HEIGHT,
-        conf.PIANO_KEYBOARD_WIDTH,
-        this.app.height - conf.CURSOR_GUTTER_HEIGHT
-      )
-      .endFill();
 
-    // Setting the mask on the container seems to make performance worse than disabling
-    // the bitmap caching on the children and setting the mask on them instead.
+    this.staticContainer = new PIXI.Container();
+    this.staticContainer.addChild(this.keysLayer);
+    this.staticContainer.addChild(this.labelLayer);
+    this.staticContainer.cacheAsBitmap = true;
+    this.container.addChild(this.staticContainer);
 
-    // this.container.mask = mask;
-    this.keysLayer.mask = mask;
-    this.labelLayer.mask = mask;
-
-    this.container.addChild(this.keysLayer);
-    this.container.addChild(this.labelLayer);
     this.app.app.stage.addChild(this.container);
     this.handleViewChange();
 
     let downLineIx: number | null = null;
 
     this.container.interactive = true;
+    this.container.cursor = 'pointer';
     this.container
-      .on('pointerdown', (evt: PIXI.InteractionEvent) => {
-        if (evt.data.button !== 0) {
+      .on('pointerdown', (evt: FederatedPointerEvent) => {
+        if (evt.button !== 0) {
           return;
         }
 
-        const y = evt.data.getLocalPosition(this.container).y;
+        const y =
+          evt.getLocalPosition(this.container).y +
+          -this.app.view.scrollVerticalPx +
+          conf.CURSOR_GUTTER_HEIGHT +
+          0.5;
         downLineIx = this.computeLineIx(y);
         this.app.gate(downLineIx);
 
@@ -121,12 +113,16 @@ export default class PianoKeys {
           downLineIx = null;
         });
       })
-      .on('pointermove', (evt: PIXI.InteractionEvent) => {
+      .on('pointermove', (evt: FederatedPointerEvent) => {
         if (downLineIx === null) {
           return;
         }
 
-        const y = evt.data.getLocalPosition(this.container).y;
+        const y =
+          evt.getLocalPosition(this.container).y -
+          this.app.view.scrollVerticalPx +
+          conf.CURSOR_GUTTER_HEIGHT +
+          0.5;
         const newDownLineIx = this.computeLineIx(y);
         if (newDownLineIx === downLineIx) {
           return;
@@ -139,16 +135,7 @@ export default class PianoKeys {
 
   public handleViewChange() {
     const y = -this.app.view.scrollVerticalPx + conf.CURSOR_GUTTER_HEIGHT + 0.5;
-    this.keysLayer.y = y;
-    this.labelLayer.y = y;
-
-    for (const [lineIx, g] of this.playingNoteMarkersByLineIx.entries()) {
-      g.y =
-        -this.app.view.scrollVerticalPx +
-        conf.LINE_HEIGHT * lineIx +
-        conf.CURSOR_GUTTER_HEIGHT +
-        0.5;
-    }
+    this.container.y = y;
   }
 
   public setNotePlaying(lineIx: number, isPlaying: boolean) {
@@ -159,11 +146,7 @@ export default class PianoKeys {
 
     if (isPlaying) {
       const graphics = ActiveNoteMarker.clone();
-      graphics.y =
-        -this.app.view.scrollVerticalPx +
-        conf.LINE_HEIGHT * lineIx +
-        conf.CURSOR_GUTTER_HEIGHT +
-        0.5;
+      graphics.y = conf.LINE_HEIGHT * lineIx + 1;
       graphics.zIndex = 1;
       this.container.addChild(graphics);
       this.playingNoteMarkersByLineIx.set(lineIx, graphics);

@@ -1,3 +1,4 @@
+import type { FederatedPointerEvent } from '@pixi/events';
 import type * as Comlink from 'comlink';
 import * as R from 'ramda';
 
@@ -72,7 +73,7 @@ class VerticalSlider {
   private value: number;
   private ghostValue: number;
   private ghostTickMode: BuildWavetableSliderMode;
-  public dragData: PIXI.InteractionData | null = null;
+  public dragData: FederatedPointerEvent | null = null;
 
   public get graphics() {
     return this.bg;
@@ -146,10 +147,10 @@ class VerticalSlider {
     this.onChange(this.value);
   };
 
-  private onPointerDown = (event: PIXI.InteractionEvent) => {
-    const localPos = event.data.getLocalPosition(this.bg);
+  private onPointerDown = (event: FederatedPointerEvent) => {
+    const localPos = event.getLocalPosition(this.bg);
     this.handleChange(localPos.y);
-    this.dragData = event.data;
+    this.dragData = event;
   };
 
   public handleDrag = (newPos: PIXI.Point) => {
@@ -235,7 +236,7 @@ export class BuildWavetableInstance {
         antialias: true,
         autoDensity: true,
         resolution: dpr,
-        view: canvas,
+        view: canvas as PIXI.ICanvas,
         height: BUILD_WAVETABLE_INST_HEIGHT_PX,
         width: BUILD_WAVETABLE_INST_WIDTH_PX,
         backgroundColor: BACKGROUND_COLOR,

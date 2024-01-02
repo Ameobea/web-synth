@@ -1,19 +1,20 @@
+import type { FederatedPointerEvent } from '@pixi/events';
 import type * as PIXI from 'src/controls/pixi';
 import { logError } from 'src/sentry';
 
 export interface DragState {
-  dragData: PIXI.InteractionData | null;
+  dragData: FederatedPointerEvent | null;
   handleDrag: (newPos: PIXI.Point) => void;
 }
 
 export const makeDraggable = (g: PIXI.Graphics, parent: DragState, stopPropagation?: boolean) => {
   g.interactive = true;
-  g.on('pointerdown', (evt: PIXI.InteractionEvent) => {
-    if ((evt.data.originalEvent as any).button !== 0) {
+  g.on('pointerdown', (evt: FederatedPointerEvent) => {
+    if (evt.originalEvent.button !== 0) {
       return;
     }
 
-    parent.dragData = evt.data;
+    parent.dragData = evt;
     if (stopPropagation) {
       evt.stopPropagation();
     }

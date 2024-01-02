@@ -3,16 +3,16 @@ import { get, writable, type Writable } from 'svelte/store';
 
 import {
   get_midi_editor_audio_connectables,
-  MIDIEditorInstance,
-  MIDIEditorInstanceView,
-  SerializedMIDIEditorBaseInstance,
-  SerializedMIDIEditorInstance,
-  SerializedMIDIEditorState,
-  SerializedMIDILine,
+  type MIDIEditorInstance,
+  type MIDIEditorInstanceView,
+  type SerializedMIDIEditorBaseInstance,
+  type SerializedMIDIEditorInstance,
+  type SerializedMIDIEditorState,
+  type SerializedMIDILine,
 } from 'src/midiEditor';
 import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import { Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { renderMIDIMinimap } from 'src/midiEditor/Minimap/MinimapRenderer';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';

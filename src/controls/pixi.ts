@@ -1,11 +1,11 @@
 // Application plugins
-import { Application } from '@pixi/app';
+// import { Application } from '@pixi/app';
 // Renderer plugins
-import { BatchRenderer, Renderer } from '@pixi/core';
-import { InteractionManager } from '@pixi/interaction';
+// import { BatchRenderer, Renderer } from '@pixi/core';
+export { EventSystem } from '@pixi/events';
 
 import '@pixi/mixin-cache-as-bitmap';
-import { TickerPlugin } from '@pixi/ticker';
+// import { TickerPlugin } from '@pixi/ticker';
 import * as utils from '@pixi/utils';
 
 export * from '@pixi/constants';
@@ -22,10 +22,10 @@ export * from '@pixi/app';
 export * from '@pixi/graphics';
 
 export * from '@pixi/text';
-export * from '@pixi/interaction';
+// export * from '@pixi/interaction';
 
-Renderer.registerPlugin('batch', BatchRenderer);
+// Renderer.registerPlugin('batch', BatchRenderer);
 
-Renderer.registerPlugin('interaction', InteractionManager);
+// Renderer.registerPlugin('interaction', InteractionManager);
 
-Application.registerPlugin(TickerPlugin);
+// Application.registerPlugin(TickerPlugin);
