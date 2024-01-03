@@ -193,8 +193,10 @@ export class Sidechain {
 
     this.awpNode = new AudioWorkletNode(this.ctx, 'sidechain-audio-worklet-node-processor', {
       // TODO: breaks when this is set
-      // channelInterpretation: 'discrete',
-      // channelCountMode: 'explicit',
+      channelInterpretation: 'discrete',
+      channelCountMode: 'explicit',
+      numberOfOutputs: 1,
+      channelCount: 1,
     });
     this.awpNode.port.onmessage = e => {
       switch (e.data.type) {
@@ -213,8 +215,8 @@ export class Sidechain {
     this.awpNode.port.postMessage({ type: 'setWasmBytes', wasmBytes: sidechainWasm });
 
     // The output of the node gets sent into the gain node
-    this.awpNode.connect(this.gainNode.gain);
-    this.awpNode.connect(this.gainDebugNode);
+    this.awpNode.connect(this.gainNode.gain, 0);
+    this.awpNode.connect(this.gainDebugNode, 0);
 
     // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
     updateConnectables(this.vcId, this.buildConnectables());

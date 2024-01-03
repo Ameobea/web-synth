@@ -38,6 +38,9 @@ export interface Note {
 }
 
 PIXI.utils.skipHello();
+if (PIXI.settings.RENDER_OPTIONS) {
+  PIXI.settings.RENDER_OPTIONS.hello = false;
+}
 
 interface MIDIEditorPanningView {
   scrollHorizontalBeats: number;
@@ -90,6 +93,10 @@ export default class MIDIEditorUIInstance {
   private vcId: string;
   private isHidden: boolean;
   private destroyed = false;
+  /**
+   * A cache used by note lines for storing line marker sprites keyed by `${pxPerBeat}-${beatsPerMeasure}`
+   */
+  public markersCache: Map<string, PIXI.Texture> = new Map();
 
   private get beatSnapInterval(): number {
     return this.parentInstance.beatSnapInterval;

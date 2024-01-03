@@ -400,7 +400,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           activeInstance.current.snapAllSelectedNotes();
         }}
         title='Auto-snap all selected notes'
-        label='▥'
+        label={<div style={{ paddingTop: 4 }}>▥</div>}
         style={{ fontSize: 40, textAlign: 'center', lineHeight: '36px' }}
       />
       <div className='labeled-container'>
@@ -483,7 +483,21 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       <MIDIEditorControlButton
         onClick={() => handleMIDIFileUpload(activeInstance)}
         title='Upload MIDI File'
-        label='⭱'
+        label={
+          <svg
+            width='28px'
+            height='28px'
+            viewBox='0 0 24 24'
+            xmlns='http://www.w3.org/2000/svg'
+            fill='none'
+            stroke='white'
+            strokeWidth='2'
+            style={{ marginBottom: -4 }}
+          >
+            <path d='M12 19V6m0 0L7 11m5-5l5 5' />
+            <rect x='3' y='3' width='18' height='18' rx='2' ry='2' />
+          </svg>
+        }
         style={{ fontSize: 29, textAlign: 'center' }}
       />
       <MIDIEditorControlButton
@@ -498,7 +512,21 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           download(midiFileData, 'midi_composition.mid', 'audio/midi');
         }}
         title='Download MIDI File'
-        label='⭳'
+        label={
+          <svg
+            width='28px'
+            height='28px'
+            viewBox='0 0 24 24'
+            xmlns='http://www.w3.org/2000/svg'
+            fill='none'
+            stroke='white'
+            strokeWidth='2'
+            style={{ marginBottom: -4 }}
+          >
+            <path d='M12 5v13m0 0l5-5m-5 5l-5-5' />
+            <rect x='3' y='3' width='18' height='18' rx='2' ry='2' />
+          </svg>
+        }
         style={{ fontSize: 29, textAlign: 'center' }}
       />
 

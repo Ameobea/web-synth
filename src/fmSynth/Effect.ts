@@ -65,6 +65,13 @@ export type EffectInner =
   | {
       type: 'compressor';
       // TODO: Params
+    }
+  | {
+      type: 'chorus';
+      modulationDepth: ParamSource;
+      wet: ParamSource;
+      dry: ParamSource;
+      lfoRate: ParamSource;
     };
 
 export type Effect = EffectInner & {
@@ -77,7 +84,7 @@ type EncodedEffect = [
   EncodedParamSource | null,
   EncodedParamSource | null,
   EncodedParamSource | null,
-  EncodedParamSource | null
+  EncodedParamSource | null,
 ];
 
 export const encodeEffect = (effect: Effect | null): EncodedEffect => {
@@ -175,6 +182,15 @@ export const encodeEffect = (effect: Effect | null): EncodedEffect => {
     }
     case 'compressor': {
       return [9, null, null, null, null];
+    }
+    case 'chorus': {
+      return [
+        10,
+        encodeParamSource(effect.modulationDepth),
+        encodeParamSource(effect.wet),
+        encodeParamSource(effect.dry),
+        encodeParamSource(effect.lfoRate),
+      ];
     }
     default: {
       throw new UnimplementedError(`Effect not handled yet: ${(effect as any).type}`);

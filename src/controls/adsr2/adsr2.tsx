@@ -49,6 +49,9 @@ interface StepHandleConfiguratorCtx {
 }
 
 PIXI.utils.skipHello();
+if (PIXI.settings.RENDER_OPTIONS) {
+  PIXI.settings.RENDER_OPTIONS.hello = false;
+}
 
 /**
  * Controls the properties of a ramp curve.  Can be dragged, but must be bounded by the marks that define

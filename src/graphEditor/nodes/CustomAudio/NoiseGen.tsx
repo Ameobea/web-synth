@@ -262,6 +262,7 @@ export class NoiseGenNode {
     this.awpNode = new AudioWorkletNode(this.ctx, 'noise-generator-audio-worklet-node-processor', {
       numberOfOutputs: 1,
       numberOfInputs: 0,
+      channelCount: 1,
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
     });

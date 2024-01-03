@@ -1,7 +1,7 @@
 import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
-import { derived, get, Readable, Writable, writable } from 'svelte/store';
+import { derived, get, type Readable, type Writable, writable } from 'svelte/store';
 
 import { type SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';

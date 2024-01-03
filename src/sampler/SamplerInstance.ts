@@ -87,7 +87,7 @@ export class SamplerInstance {
     this.awpHandle = new AudioWorkletNode(ctx, 'sampler-awp', {
       numberOfInputs: 0,
       numberOfOutputs: 1,
-      outputChannelCount: [2],
+      channelCount: 1,
       processorOptions: { mailboxID: this.audioThreadMIDIEventMailboxID },
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',

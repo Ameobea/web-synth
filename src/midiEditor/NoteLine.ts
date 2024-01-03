@@ -19,11 +19,6 @@ export interface NoteCreationState {
   id: number | null;
 }
 
-/**
- * A cache for storing line marker sprites keyed by `${pxPerBeat}-${beatsPerMeasure}`
- */
-const MarkersCache: Map<string, PIXI.Texture> = new Map();
-
 export default class NoteLine {
   public app: MIDIEditorUIInstance;
   public notesByID: Map<number, NoteBox> = new Map();
@@ -191,9 +186,11 @@ export default class NoteLine {
 
   private buildMarkers(): PIXI.Sprite {
     const markersCacheKey = `${this.app.parentInstance.baseView.pxPerBeat}-${this.app.parentInstance.baseView.beatsPerMeasure}`;
-    const cached = MarkersCache.get(markersCacheKey);
-    if (cached) {
+    const cached = this.app.markersCache.get(markersCacheKey);
+    if (cached?.baseTexture?.valid) {
       return new PIXI.Sprite(cached);
+    } else {
+      cached?.destroy(true);
     }
 
     const g = new PIXI.Graphics();
@@ -227,7 +224,7 @@ export default class NoteLine {
     });
     this.app.app.renderer.render(g, { renderTexture });
 
-    MarkersCache.set(markersCacheKey, renderTexture);
+    this.app.markersCache.set(markersCacheKey, renderTexture);
     return new PIXI.Sprite(renderTexture);
   }
 

@@ -25,6 +25,7 @@ const EFFECT_TYPE_SETTING = {
     'moog filter',
     'comb filter',
     'compressor',
+    'chorus',
   ] as Effect['type'][],
 };
 
@@ -103,10 +104,16 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
       };
     }
     case 'compressor': {
+      return { type };
+    }
+    case 'chorus':
       return {
         type,
+        dry: { type: 'constant', value: 0.5 },
+        wet: { type: 'constant', value: 0.5 },
+        lfoRate: { type: 'constant', value: 0.5 },
+        modulationDepth: { type: 'constant', value: 0.5 },
       };
-    }
   }
 };
 
@@ -128,6 +135,7 @@ const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
 const moogFilterTheme = { ...baseTheme, background2: 'rgb(49,69,120)' };
 const combFilterTheme = { ...baseTheme, background2: 'rgb(36,64,21)' };
 const compressorTheme = { ...baseTheme, background2: 'rgb(16,24,21)' };
+const chorusTheme = { ...baseTheme, background2: 'rgb(181,97,184)' };
 
 const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
@@ -140,6 +148,7 @@ const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'moog filter': moogFilterTheme,
   'comb filter': combFilterTheme,
   compressor: compressorTheme,
+  chorus: chorusTheme,
 };
 
 const EMPTY_ADSRS: AdsrParams[] = [];
@@ -566,6 +575,61 @@ const ConfigureCompressor: EffectConfigurator<'compressor'> = ({
   vcId,
 }) => <>Compressor params TODO</>;
 
+const ConfigureChorus: EffectConfigurator<'chorus'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+  vcId,
+}) => (
+  <>
+    <ConfigureParamSource
+      title='dry'
+      adsrs={adsrsMemoHelper(state.dry, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={chorusTheme}
+      min={0}
+      max={1}
+      state={state.dry}
+      onChange={useCallback(dry => onChange({ dry }), [onChange])}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='wet'
+      adsrs={adsrsMemoHelper(state.wet, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={chorusTheme}
+      min={0}
+      max={1}
+      state={state.wet}
+      onChange={useCallback(wet => onChange({ wet }), [onChange])}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='lfo rate'
+      adsrs={adsrsMemoHelper(state.lfoRate, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={chorusTheme}
+      min={0}
+      max={1}
+      state={state.lfoRate}
+      onChange={useCallback(lfoRate => onChange({ lfoRate }), [onChange])}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='modulation depth'
+      adsrs={adsrsMemoHelper(state.modulationDepth, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={chorusTheme}
+      min={0}
+      max={1}
+      state={state.modulationDepth}
+      onChange={useCallback(modulationDepth => onChange({ modulationDepth }), [onChange])}
+      vcId={vcId}
+    />
+  </>
+);
+
 interface EffectManagementProps {
   effectIx: number;
   isBypassed: boolean;
@@ -661,6 +725,7 @@ const EFFECT_CONFIGURATOR_BY_EFFECT_TYPE: { [K in Effect['type']]: EffectConfigu
   'moog filter': React.memo(ConfigureMoogFilter),
   'comb filter': React.memo(ConfigureCombFilter),
   compressor: React.memo(ConfigureCompressor),
+  chorus: React.memo(ConfigureChorus),
 };
 
 interface ConfigureEffectSpecificProps {
