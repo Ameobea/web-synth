@@ -311,6 +311,7 @@ class RampCurve {
     const [start, ...points] = this.computeRampCurve(step1, step2);
     graphics.moveTo(start.x, start.y);
     points.forEach(({ x, y }) => graphics.lineTo(x, y));
+    graphics.cacheAsBitmap = true;
     this.inst.vizContainer.addChild(graphics);
     return graphics;
   }
@@ -325,8 +326,20 @@ class RampCurve {
   }
 
   public setRenderedRegion(renderedRegion: RenderedRegion) {
+    const oldRenderedRegionRange = this.renderedRegion.end - this.renderedRegion.start;
+    const newRenderedRegionRange = renderedRegion.end - renderedRegion.start;
+
+    const oldRenderedRegion = this.renderedRegion;
     this.renderedRegion = renderedRegion;
-    this.reRenderRampCurve(this.steps[0], this.steps[1]);
+    // if the change is just a horizontal shift, we can just move the curve and avoid re-rendering
+    if (oldRenderedRegionRange === newRenderedRegionRange && this.curve) {
+      const diffXPx =
+        computeTransformedXPosition(renderedRegion, this.inst.width, this.steps[1].x) -
+        computeTransformedXPosition(oldRenderedRegion, this.inst.width, this.steps[1].x);
+      this.curve.x += diffXPx;
+    } else {
+      this.reRenderRampCurve(this.steps[0], this.steps[1]);
+    }
     this.handle?.setRenderedRegion(renderedRegion);
   }
 
@@ -598,6 +611,7 @@ class ScaleMarkings {
   private lenMs: number;
   private logScale = false;
   private outputRange: readonly [number, number];
+  private container = new PIXI.Container();
   private texts: PIXI.Text[] = [];
 
   constructor(inst: ADSR2Instance, lenMs: number, outputRange: readonly [number, number]) {
@@ -627,6 +641,10 @@ class ScaleMarkings {
     this.g?.destroy();
     this.texts.forEach(text => text.destroy());
     this.texts = [];
+    this.inst.app?.stage.removeChild(this.container);
+    this.container.destroy({ children: true });
+    this.container = new PIXI.Container();
+    this.container.x = Math.min(0);
   }
 
   private computeHorizontalAxisLineCount() {
@@ -654,8 +672,10 @@ class ScaleMarkings {
         fontFamily: 'PT Sans',
         fill: 0xfcfcfc,
       });
-      text.x = Math.min(2 * dpr, 5);
-      this.inst.app?.stage.addChild(text);
+      // lock text to the left side of the canvas
+      text.anchor.set(0, 1);
+      text.x = -LEFT_GUTTER_WIDTH_PX;
+      this.container.addChild(text);
       return text;
     };
 
@@ -686,7 +706,10 @@ class ScaleMarkings {
     }
 
     this.g = g;
-    this.inst.vizContainer.addChildAt(g, 2);
+    this.container.addChild(g);
+    this.container.cacheAsBitmap = true;
+
+    this.inst.vizContainer.addChildAt(this.container, 2);
   }
 }
 
@@ -1007,13 +1030,6 @@ export class ADSR2Instance {
     this.vizContainer = new PIXI.Container();
     this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
     this.vizContainer.y = TOP_GUTTER_WIDTH_PX;
-    // This means that z-indices actually work
-    // this.vizContainer.sortableChildren = true;
-    // basically `overflow: hidden`, I think
-    this.vizContainer.mask = new PIXI.Graphics()
-      .beginFill(0xffffff)
-      .drawRect(LEFT_GUTTER_WIDTH_PX, TOP_GUTTER_WIDTH_PX, this.width - 1, this.height - 1)
-      .endFill();
 
     this.initBackgroundClickHandler();
 

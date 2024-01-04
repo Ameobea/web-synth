@@ -1,6 +1,6 @@
 import { get, writable, type Unsubscriber, type Writable } from 'svelte/store';
 
-import { ADSR2Instance, type RenderedRegion } from 'src/controls/adsr2/adsr2';
+import type { ADSR2Instance, RenderedRegion } from 'src/controls/adsr2/adsr2';
 import {
   AdsrLengthMode,
   type Adsr,
@@ -9,8 +9,8 @@ import {
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import {
   get_midi_editor_audio_connectables,
-  MIDIEditorBaseView,
-  MIDIEditorInstance,
+  type MIDIEditorBaseView,
+  type MIDIEditorInstance,
 } from 'src/midiEditor';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { ADSR2Module, EarlyReleaseModeType, type ADSR2Params } from 'src/synthDesigner/ADSRModule';
@@ -24,6 +24,8 @@ export interface CVOutputState {
 }
 
 export type SerializedCVOutputState = CVOutputState;
+
+const dpr = window.devicePixelRatio ?? 1;
 
 export const buildDefaultCVOutputState = (
   midiEditorVcId: string,
@@ -154,7 +156,7 @@ export class CVOutput {
     }
 
     const startBeat = scrollHorizontalBeats;
-    const endBeat = startBeat + this.uiInstance.width / pxPerBeat;
+    const endBeat = startBeat + this.uiInstance.width / dpr / pxPerBeat;
     const newRenderedRegion: RenderedRegion = { start: startBeat, end: endBeat };
     this.uiInstance.setRenderedRegion(newRenderedRegion);
   }

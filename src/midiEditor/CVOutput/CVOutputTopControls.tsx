@@ -2,7 +2,7 @@ import React from 'react';
 
 import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
 import './CVOutputTopControls.css';
-import { MIDIEditorInstance } from 'src/midiEditor';
+import type { MIDIEditorInstance } from 'src/midiEditor';
 
 interface CVOutputTopControlsProps {
   inst: MIDIEditorInstance;

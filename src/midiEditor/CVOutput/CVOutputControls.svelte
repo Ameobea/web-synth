@@ -22,7 +22,7 @@
 </script>
 
 {#if !$state.isExpanded}
-  <CollapsedCvOutputControls {name} {expand} {deleteOutput} />
+  <CollapsedCvOutputControls {name} {expand} {deleteOutput} {setName} />
 {:else}
   <CVOutputControlsInner
     {name}

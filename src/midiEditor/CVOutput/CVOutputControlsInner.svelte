@@ -1,3 +1,7 @@
+<script lang="ts" context="module">
+  const dpr = window.devicePixelRatio ?? 1;
+</script>
+
 <script lang="ts">
   import type { Writable } from 'svelte/store';
 
@@ -61,7 +65,7 @@
   </div>
 
   {#if width && width > 0}
-    <div style="margin-left: {PIANO_KEYBOARD_WIDTH - LEFT_GUTTER_WIDTH_PX}px;">
+    <div style="margin-left: {PIANO_KEYBOARD_WIDTH - LEFT_GUTTER_WIDTH_PX / dpr}px;">
       <SvelteADSR2
         {width}
         height={220}
