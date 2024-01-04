@@ -1660,6 +1660,7 @@ impl ParamSource {
 
 pub const OPERATOR_COUNT: usize = 8;
 pub const FRAME_SIZE: usize = 128;
+/// Sample rate in samples per second
 pub const SAMPLE_RATE: usize = 44_100;
 pub const MAX_PARAM_BUFFERS: usize = 16;
 
@@ -1719,7 +1720,7 @@ impl FMSynthContext {
   pub fn generate(&mut self, cur_bpm: f32, cur_frame_start_beat: f32) {
     for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
       let base_frequency_buffer =
-        unsafe { self.base_frequency_input_buffer.get_unchecked(voice_ix) };
+        unsafe { self.base_frequency_input_buffer.get_unchecked_mut(voice_ix) };
       if unsafe { *base_frequency_buffer.get_unchecked(0) } == 0. {
         for adsr in &mut voice.adsrs {
           if let Some(store_phase_to) = adsr.store_phase_to {
@@ -1728,7 +1729,18 @@ impl FMSynthContext {
         }
         continue;
       }
+
       let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
+      let was_done = voice.gain_envelope_generator.adsr.gate_status == GateStatus::Done;
+      voice
+        .gain_envelope_generator
+        .render_frame(1., 0., cur_bpm, cur_frame_start_beat);
+      let is_done = voice.gain_envelope_generator.adsr.gate_status == GateStatus::Done;
+      if !was_done && is_done {
+        base_frequency_buffer.fill(0.);
+        output_buffer.fill(0.);
+        continue;
+      }
 
       voice.gen_samples(
         &mut self.modulation_matrix,
@@ -1741,9 +1753,6 @@ impl FMSynthContext {
         &self.sample_mapping_manager,
       );
 
-      voice
-        .gain_envelope_generator
-        .render_frame(1., 0., cur_bpm, cur_frame_start_beat);
       // TODO: Skip rendering filter ADSR if not enabled
       // Currently hard-coded output range from [20, 44_100 / 2]
       let filter_adsr_shift = 20.;
@@ -1799,6 +1808,12 @@ impl FMSynthContext {
         }
       }
     }
+  }
+
+  fn clear_output_buffer(&mut self, voice_ix: usize) {
+    self.base_frequency_input_buffer[voice_ix].fill(0.);
+    let buf = &mut self.output_buffers[voice_ix];
+    buf.fill(0.);
   }
 }
 
@@ -1881,11 +1896,6 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
 #[no_mangle]
 pub unsafe extern "C" fn get_param_buffers_ptr(ctx: *mut FMSynthContext) -> *mut [f32; FRAME_SIZE] {
   (*ctx).param_buffers.as_mut_ptr()
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn get_base_frequency_input_buffer_ptr(ctx: *mut FMSynthContext) -> *mut f32 {
-  (*ctx).base_frequency_input_buffer.as_mut_ptr() as *mut _
 }
 
 #[no_mangle]
@@ -2356,9 +2366,7 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_clear_output_buffer(ctx: *mut FMSynthContext, voice_ix: usize) {
   let ctx = &mut (*ctx);
-  ctx.base_frequency_input_buffer[voice_ix].fill(0.);
-  let buf = &mut ctx.output_buffers[voice_ix];
-  buf.fill(0.);
+  ctx.clear_output_buffer(voice_ix)
 }
 
 #[no_mangle]

@@ -247,7 +247,7 @@ export class MultibandCompressorControls {
     const curState = get(store);
 
     this.app = new PIXI.Application({
-      view: canvas,
+      view: canvas as PIXI.ICanvas,
       width: canvas.width,
       height: canvas.height,
     });

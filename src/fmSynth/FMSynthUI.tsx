@@ -22,7 +22,7 @@ import HelpIcon from 'src/misc/HelpIcon';
 import { WaveformIcon } from 'src/misc/Icons';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { classNameIncludes } from 'src/util';
-import { buildWavyJonesInstance, WavyJones } from 'src/visualizations/WavyJones';
+import { buildWavyJonesInstance, type WavyJones } from 'src/visualizations/WavyJones';
 
 interface FMSynthState {
   modulationMatrix: ParamSource[][];

@@ -5,7 +5,7 @@ use crate::fm::{ParamSource, SAMPLE_RATE};
 use dsp::circular_buffer::CircularBuffer;
 
 const MAX_CHORUS_DELAY_SAMPLES: usize = SAMPLE_RATE / 20; // 50ms
-const NUM_TAPS: usize = 3;
+const NUM_TAPS: usize = 8;
 
 const TWO_PI: f32 = PI * 2.;
 
@@ -47,7 +47,7 @@ impl Effect for ChorusEffect {
       dsp::clamp(0., 1., rendered_params[2]),
       0.95,
     );
-    let lfo_rate = dsp::smooth(
+    let lfo_rate_hz = dsp::smooth(
       &mut self.last_lfo_rate,
       dsp::clamp(0., 20., rendered_params[3]),
       0.95,
@@ -55,8 +55,8 @@ impl Effect for ChorusEffect {
 
     // Update LFO phases
     for i in 0..NUM_TAPS {
-      self.lfo_phases[i] += TWO_PI * lfo_rate / SAMPLE_RATE as f32 * (i as f32 + 1.0);
-      if self.lfo_phases[i] > TWO_PI {
+      self.lfo_phases[i] += lfo_rate_hz * TWO_PI / SAMPLE_RATE as f32;
+      while self.lfo_phases[i] > TWO_PI {
         self.lfo_phases[i] -= TWO_PI;
       }
     }

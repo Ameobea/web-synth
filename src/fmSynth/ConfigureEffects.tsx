@@ -610,8 +610,9 @@ const ConfigureChorus: EffectConfigurator<'chorus'> = ({
       adsrs={adsrsMemoHelper(state.lfoRate, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={chorusTheme}
-      min={0}
-      max={1}
+      min={0.02}
+      max={8}
+      scale='log'
       state={state.lfoRate}
       onChange={useCallback(lfoRate => onChange({ lfoRate }), [onChange])}
       vcId={vcId}

@@ -10,7 +10,7 @@ export interface DragState {
 export const makeDraggable = (g: PIXI.Graphics, parent: DragState, stopPropagation?: boolean) => {
   g.interactive = true;
   g.on('pointerdown', (evt: FederatedPointerEvent) => {
-    if (evt.originalEvent.button !== 0) {
+    if ((evt.nativeEvent as PointerEvent).button !== 0) {
       return;
     }
 

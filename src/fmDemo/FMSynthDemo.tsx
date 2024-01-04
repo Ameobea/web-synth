@@ -12,10 +12,7 @@ import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR
 import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
 import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import FMSynth, {
-  AdsrLengthMode,
-  type Adsr,
-} from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, { type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
@@ -24,7 +21,6 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { useWindowSize } from 'src/reactUtils';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSentry } from 'src/sentry';
-import { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import { initGlobals, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
@@ -33,39 +29,11 @@ import { FilterType } from 'src/synthDesigner/FilterType';
 initGlobals();
 
 const VOICE_COUNT = 10;
-const SAMPLE_RATE = 44_100;
-
-const buildDefaultGainADSR = (): Adsr => ({
-  steps: [
-    { x: 0, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 0.005, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 0.7, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 1, y: 0, ramper: { type: 'exponential', exponent: 0.5 } },
-  ],
-  lenSamples: SAMPLE_RATE,
-  loopPoint: null,
-  releasePoint: 0.7,
-  audioThreadData: { phaseIndex: 255 },
-});
-
-const buildDefaultFilterEnvelope = (): Adsr => ({
-  steps: [
-    { x: 0, y: 0.8, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 0.04, y: 0.5, ramper: { type: 'exponential', exponent: 0.5 } },
-    { x: 1, y: 0.5, ramper: { type: 'exponential', exponent: 0.5 } },
-  ],
-  lenSamples: SAMPLE_RATE,
-  loopPoint: null,
-  releasePoint: 0.7,
-  audioThreadData: { phaseIndex: 0, debugName: '`buildDefaultFilterEnvelope`' },
-});
 
 const GlobalState: {
   octaveOffset: number;
   globalVolume: number;
-  gainEnvelope: Adsr;
   filterParams: FilterParams;
-  filterEnvelope: Adsr;
   filterBypassed: boolean;
   filterADSREnabled: boolean;
   selectedMIDIInputName?: string | undefined;
@@ -73,9 +41,7 @@ const GlobalState: {
 } = {
   octaveOffset: 1,
   globalVolume: 0.2,
-  gainEnvelope: buildDefaultGainADSR(),
   filterParams: getDefaultFilterParams(FilterType.Lowpass),
-  filterEnvelope: buildDefaultFilterEnvelope(),
   filterBypassed: false,
   filterADSREnabled: true,
   selectedMIDIInputName: undefined,
@@ -150,13 +116,12 @@ limiter.connect(ctx.destination);
 mainGain.connect(limiter);
 
 const serializeState = () => {
+  const serializedSynth = synth.serialize();
   const serialized: SerializedFMSynthDemoState = {
-    synth: synth.serialize(),
+    synth: serializedSynth,
     octaveOffset: GlobalState.octaveOffset,
     globalVolume: GlobalState.globalVolume,
-    gainEnvelope: adsrs.serialize(),
     filterParams: GlobalState.filterParams,
-    filterEnvelope: filterAdsrs.serialize(),
     filterBypassed: GlobalState.filterBypassed,
     filterADSREnabled: GlobalState.filterADSREnabled,
     selectedMIDIInputName: GlobalState.selectedMIDIInputName,
@@ -170,8 +135,6 @@ window.onbeforeunload = () => {
     localStorage.fmSynthDemoState = serializeState();
   }
 };
-
-const LastGateTimeByVoice = new Array(10).fill(0);
 
 let serialized: SerializedFMSynthDemoState | null = null;
 try {
@@ -203,13 +166,10 @@ if (!R.isNil(serialized?.filterBypassed)) {
 GlobalState.filterADSREnabled = serialized!.filterADSREnabled ?? true;
 GlobalState.selectedMIDIInputName = serialized!.selectedMIDIInputName;
 GlobalState.lastLoadedPreset = serialized!.lastLoadedPreset;
-if (serialized!.gainEnvelope) {
-  GlobalState.gainEnvelope = normalizeEnvelope(serialized!.gainEnvelope);
-}
 
 const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   const gain = new GainNode(ctx);
-  gain.gain.value = 0;
+  gain.gain.value = 1;
   const filterBypassed = serialized?.filterBypassed ?? false;
   if (filterBypassed) {
     gain.connect(mainGain);
@@ -218,60 +178,6 @@ const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
   }
   return gain;
 });
-const adsrs = (() => {
-  const base = GlobalState.gainEnvelope;
-  const adsr = new ADSR2Module(
-    ctx,
-    {
-      minValue: 0,
-      maxValue: 1,
-      length: base.lenSamples,
-      lengthMode: AdsrLengthMode.Samples,
-      loopPoint: base.loopPoint,
-      releaseStartPhase: base.releasePoint,
-      steps: base.steps,
-    },
-    VOICE_COUNT,
-    base.audioThreadData
-  );
-
-  adsr.getOutput().then(adsrOutput => {
-    voiceGains.forEach((voiceGain, i) => {
-      adsrOutput.connect(voiceGain.gain, i);
-    });
-  });
-  return adsr;
-})();
-
-const filterAdsrs = (() => {
-  const base = GlobalState.filterEnvelope;
-  GlobalState.filterEnvelope = base;
-  const adsr = new ADSR2Module(
-    ctx,
-    {
-      minValue: 80,
-      maxValue: 44_100 / 2,
-      length: base.lenSamples,
-      lengthMode: AdsrLengthMode.Samples,
-      loopPoint: base.loopPoint,
-      releaseStartPhase: base.releasePoint,
-      steps: base.steps,
-    },
-    VOICE_COUNT,
-    base.audioThreadData
-  );
-
-  adsr.getOutput().then(adsrOutput => {
-    filters.forEach((filter, i) => {
-      adsrOutput.connect(filter.csns.frequency, i);
-      // Filter is overridden if ADSR is disabled, meaning that the frequency slider from the UI
-      // controls the fliter's frequency completely
-      filter.csns.frequency.setIsOverridden(!GlobalState.filterADSREnabled);
-    });
-  });
-
-  return adsr;
-})();
 
 if (!R.isNil(serialized?.filterParams)) {
   GlobalState.filterParams = serialized!.filterParams;
@@ -313,38 +219,15 @@ const synth = new FMSynth(ctx, undefined, {
   midiNode: midiInputNode,
   onInitialized: () => {
     const awpNode = synth.getAWPNode()!;
+
     voiceGains.forEach((voiceGain, voiceIx) => awpNode.connect(voiceGain, voiceIx));
 
-    const onGate = (_midiNumber: number, voiceIx: number) => {
-      adsrs.gate(voiceIx);
-      filterAdsrs.gate(voiceIx);
-      LastGateTimeByVoice[voiceIx] = ctx.currentTime;
-    };
-
-    const onUngate = (_midiNumber: number, voiceIx: number) => {
-      adsrs.ungate(voiceIx);
-      filterAdsrs.ungate(voiceIx);
-
-      // We wait until the voice is done playing, accounting for the early-release phase and
-      // adding a little bit extra leeway
-      //
-      // We will need to make this dynamic if we make the length of the early release period
-      // user-configurable
-      const releaseLengthMs =
-        (1 - adsrs.getReleaseStartPhase()) * adsrs.getLengthMs() + (2_640 / 44_100) * 1000 + 60;
-
-      const expectedLastGateTime = LastGateTimeByVoice[voiceIx];
-      setTimeout(() => {
-        // If the voice has been re-gated since releasing, don't disconnect
-        if (LastGateTimeByVoice[voiceIx] !== expectedLastGateTime) {
-          return;
-        }
-
-        synth.clearOutputBuffer(voiceIx);
-      }, releaseLengthMs);
-    };
-
-    synth.registerGateUngateCallbacks(onGate, onUngate);
+    filters.forEach((filter, i) => {
+      awpNode.connect(filter.csns.frequency, VOICE_COUNT + i, 0);
+      // Filter is overridden if ADSR is disabled, meaning that the frequency slider from the UI
+      // controls the fliter's frequency completely
+      filter.csns.frequency.setIsOverridden(!GlobalState.filterADSREnabled);
+    });
   },
 });
 
@@ -356,12 +239,13 @@ const releaseNote = (midiNumber: number) => {
   midiInputNode.onRelease(midiNumber, 255);
 };
 
-const MainControlPanel: React.FC = ({}) => {
+const MainControlPanel: React.FC = () => {
   const [mainControlPanelState, setMainControlPanelState] = useState({
     'MAIN VOLUME': GlobalState.globalVolume,
-    'volume envelope length ms': samplesToMs(GlobalState.gainEnvelope.lenSamples),
+    'volume envelope length ms': samplesToMs(synth.gainEnvelope.lenSamples.value),
     'volume envelope': {
-      ...GlobalState.gainEnvelope,
+      ...synth.gainEnvelope,
+      lenSamples: synth.gainEnvelope.lenSamples.value,
       outputRange: [0, 1],
     },
   });
@@ -412,26 +296,24 @@ const MainControlPanel: React.FC = ({}) => {
             break;
           }
           case 'volume envelope': {
-            adsrs.setState({
-              ...val,
-              lenSamples: msToSamples(adsrs.getLengthMs()),
+            const adsr: Adsr = val;
+            synth.handleAdsrChange(-1, {
+              ...adsr,
+              lenSamples: { type: 'constant', value: adsr.lenSamples },
             });
-            setMainControlPanelState({
-              ...mainControlPanelState,
-              'volume envelope': {
-                ...val,
-                lenSamples: msToSamples(adsrs.getLengthMs()),
-              },
-            });
+            setMainControlPanelState({ ...mainControlPanelState, 'volume envelope': val });
             break;
           }
           case 'volume envelope length ms': {
-            adsrs.setLengthMs(val);
+            synth.handleAdsrChange(-1, {
+              ...synth.gainEnvelope,
+              lenSamples: { type: 'constant', value: msToSamples(val) },
+            });
             setMainControlPanelState({
               ...mainControlPanelState,
               'volume envelope': {
                 ...mainControlPanelState['volume envelope'],
-                lenSamples: msToSamples(adsrs.getLengthMs()),
+                lenSamples: msToSamples(val),
               },
               'volume envelope length ms': val,
             });
@@ -479,28 +361,42 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({
       GlobalState.lastLoadedPreset = presetName;
       const preset = R.clone(Presets[presetName]);
       serialized = preset;
+      const oldGainEnvelopeAudioThreadData = synth.gainEnvelope.audioThreadData;
       synth.deserialize(preset.synth);
 
       // Gain ADSRs
       const gainEnvelope: Adsr = {
-        ...normalizeEnvelope(preset.gainEnvelope),
-        audioThreadData: GlobalState.gainEnvelope.audioThreadData,
+        ...normalizeEnvelope(
+          preset.gainEnvelope ?? {
+            ...preset.synth.gainEnvelope,
+            lenSamples: preset.synth.gainEnvelope.lenSamples.value,
+          }
+        ),
+        audioThreadData: oldGainEnvelopeAudioThreadData,
       };
-      adsrs.setState(gainEnvelope);
-      adsrs.setLength(AdsrLengthMode.Samples, gainEnvelope.lenSamples);
-      GlobalState.gainEnvelope = gainEnvelope;
-      // Filter ADSRs
-      filterAdsrs.setState(normalizeEnvelope(preset.filterEnvelope));
+      synth.handleAdsrChange(-1, {
+        ...gainEnvelope,
+        audioThreadData: synth.gainEnvelope.audioThreadData,
+        lenSamples: { type: 'constant', value: gainEnvelope.lenSamples },
+      });
       // Octave offset
       setOctaveOffset(preset.octaveOffset);
       GlobalState.octaveOffset = preset.octaveOffset;
       // Filters
       const filterEnvelope = {
-        ...normalizeEnvelope(preset.filterEnvelope),
-        audioThreadData: GlobalState.filterEnvelope.audioThreadData,
+        ...normalizeEnvelope(
+          preset.filterEnvelope ?? {
+            ...preset.synth.filterEnvelope,
+            lenSamples: preset.synth.filterEnvelope.lenSamples.value,
+          }
+        ),
+        audioThreadData: synth.filterEnvelope.audioThreadData,
       };
-      GlobalState.filterEnvelope = filterEnvelope;
-      filterAdsrs.setState(filterEnvelope);
+      // Filter envelope
+      synth.handleAdsrChange(-2, {
+        ...filterEnvelope,
+        lenSamples: { type: 'constant', value: filterEnvelope.lenSamples },
+      });
       GlobalState.filterParams = preset.filterParams;
       filters.forEach(filter => filter.setAll(GlobalState.filterParams));
       if (preset.filterBypassed !== GlobalState.filterBypassed) {
@@ -788,10 +684,12 @@ const FMSynthDemo: React.FC = () => {
             />
             <FilterConfig
               filters={filters}
-              adsrs={filterAdsrs}
               initialState={{
                 params: GlobalState.filterParams,
-                envelope: normalizeEnvelope(GlobalState.filterEnvelope),
+                envelope: normalizeEnvelope({
+                  ...synth.filterEnvelope,
+                  lenSamples: synth.filterEnvelope.lenSamples.value,
+                }),
                 bypass: GlobalState.filterBypassed,
                 enableADSR: GlobalState.filterADSREnabled,
               }}
@@ -802,7 +700,10 @@ const FMSynthDemo: React.FC = () => {
                 enableADSR: boolean
               ) => {
                 GlobalState.filterParams = params;
-                GlobalState.filterEnvelope = envelope;
+                synth.handleAdsrChange(-2, {
+                  ...envelope,
+                  lenSamples: { type: 'constant', value: envelope.lenSamples },
+                });
                 if (GlobalState.filterADSREnabled !== enableADSR) {
                   filters.forEach(filter => filter.csns.frequency.setIsOverridden(!enableADSR));
                 }
@@ -817,7 +718,7 @@ const FMSynthDemo: React.FC = () => {
               }}
               vcId={undefined}
               adsrDebugName='fmSynthDemoFilter'
-              adsrAudioThreadData={filterAdsrs.audioThreadData}
+              synth={synth}
             />
           </>
         )}

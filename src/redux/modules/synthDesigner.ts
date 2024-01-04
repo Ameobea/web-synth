@@ -21,7 +21,7 @@ import {
   type FilterCSNs,
 } from 'src/synthDesigner/biquadFilterModule';
 import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import { msToSamples, normalizeEnvelope } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;
@@ -36,7 +36,6 @@ export interface Voice {
   // source is the inner gain node.
   outerGainNode: GainNode;
   filterNode: AbstractFilterModule;
-  lastGateOrUngateTime: number;
 }
 
 interface PolysynthContext {
@@ -214,53 +213,6 @@ const connectFMSynth = (stateKey: string, synthIx: number) => {
   updateConnectables(vcId, newConnectables);
 };
 
-const mkOnGate =
-  (getState: () => { synthDesigner: SynthDesignerState }) =>
-  (_midiNumber: number, voiceIx: number) => {
-    getState().synthDesigner.synths.forEach(synth => {
-      const targetVoice = synth.voices[voiceIx];
-
-      // We edit state directly w/o updating references because this is only needed internally
-      targetVoice.lastGateOrUngateTime = ctx.currentTime;
-    });
-  };
-
-const mkOnUngate =
-  (getState: () => { synthDesigner: SynthDesignerState }) =>
-  (_midiNumber: number, voiceIx: number) =>
-    getState().synthDesigner.synths.forEach(({ voices, fmSynth }, synthIx) => {
-      const targetVoice = voices[voiceIx];
-      // We edit state directly w/o updating references because this is only needed internally
-      const ungateTime = ctx.currentTime;
-      targetVoice.lastGateOrUngateTime = ungateTime;
-      const releaseLengthMs =
-        (1 - fmSynth.gainEnvelope.releasePoint) *
-        samplesToMs(fmSynth.gainEnvelope.lenSamples.value);
-
-      setTimeout(
-        () => {
-          const state = getState().synthDesigner;
-          const targetSynth = state.synths[synthIx];
-          if (!targetSynth) {
-            return;
-          }
-
-          // If a different note has started playing, we don't want to perform this
-          if (targetSynth.voices[voiceIx].lastGateOrUngateTime !== ungateTime) {
-            return;
-          }
-
-          targetSynth.fmSynth.clearOutputBuffer(voiceIx);
-        },
-        // We wait until the voice is done playing, accounting for the early-release phase and
-        // adding a little bit extra leeway
-        //
-        // We will need to make this dynamic if we make the length of the early release period
-        // user-configurable
-        releaseLengthMs + (2_640 / 44_100) * 1000 + 60
-      );
-    });
-
 export interface SynthDesignerState {
   synths: SynthModule[];
   wavyJonesInstance: AnalyserNode | undefined;
@@ -328,8 +280,6 @@ const buildDefaultSynthModule = (
         fmSynth.setFrequencyMultiplier(pitchMultiplier);
 
         connectFMSynth(stateKey, synthIx);
-
-        fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
       },
       audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
       useLegacyWavetableControls: false,
@@ -417,12 +367,6 @@ export const deserializeSynthModule = (
       fmSynth.setFrequencyMultiplier(pitchMultiplier);
 
       connectFMSynth(stateKey, synthIx);
-
-      const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
-      if (!getState) {
-        throw new Error(`Failed to get state for stateKey=${stateKey}`);
-      }
-      fmSynth.registerGateUngateCallbacks(mkOnGate(getState), mkOnUngate(getState));
     },
     audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
   });

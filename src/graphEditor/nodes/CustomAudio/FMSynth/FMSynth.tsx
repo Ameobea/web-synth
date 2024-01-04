@@ -647,7 +647,7 @@ export default class FMSynth implements ForeignNode {
     const newAdsr = {
       ...R.clone({ ...newAdsrRaw, audioThreadData: undefined }),
       audioThreadData: {
-        phaseIndex: adsrIx,
+        phaseIndex: adsrIx >= 0 ? adsrIx : adsrIx === -1 ? 255 : 254,
         buffer: this.audioThreadDataBuffer ?? undefined,
         debugName: `handleAdsrChange adsrIx=${adsrIx}`,
       },
@@ -871,15 +871,6 @@ export default class FMSynth implements ForeignNode {
       sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
       useLegacyWavetableControls: this.useLegacyWavetableControls,
     };
-  }
-
-  public clearOutputBuffer(voiceIx: number) {
-    if (!this.awpHandle) {
-      console.warn('Tried to clear FM synth output buffer before AWP initialized');
-      return;
-    }
-
-    this.awpHandle.port.postMessage({ type: 'clearOutputBuffer', voiceIx });
   }
 
   public setFrequencyMultiplier(frequencyMultiplier: number) {

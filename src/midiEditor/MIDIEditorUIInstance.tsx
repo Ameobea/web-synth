@@ -47,6 +47,19 @@ interface MIDIEditorPanningView {
   scrollVerticalPx: number;
 }
 
+interface DragData {
+  globalStartPoint: PIXI.Point;
+  originalPosBeatsByNoteId: Map<number, number>;
+  startLineIx: number;
+}
+
+interface ResizeData {
+  globalStartPoint: PIXI.Point;
+  side: NoteDragHandleSide;
+  originalPosBeatsByNoteId: Map<number, number>;
+  dragHandlesByNoteID: Map<number, NoteDragHandle>;
+}
+
 const dpr = window.devicePixelRatio ?? 1;
 
 export default class MIDIEditorUIInstance {
@@ -71,17 +84,8 @@ export default class MIDIEditorUIInstance {
   };
   private mouseUpCBs: (() => void)[] = [];
   private panningData: { startPoint: PIXI.Point; startView: MIDIEditorPanningView } | null = null;
-  private resizeData: {
-    globalStartPoint: PIXI.Point;
-    side: NoteDragHandleSide;
-    originalPosBeatsByNoteId: Map<number, number>;
-    dragHandlesByNoteID: Map<number, NoteDragHandle>;
-  } | null = null;
-  private dragData: {
-    globalStartPoint: PIXI.Point;
-    originalPosBeatsByNoteId: Map<number, number>;
-    startLineIx: number;
-  } | null = null;
+  private resizeData: ResizeData | null = null;
+  private dragData: DragData | null = null;
   private selectionBox: SelectionBox | null = null;
   public selectionBoxButtonDown = false;
   public cursor: Cursor;

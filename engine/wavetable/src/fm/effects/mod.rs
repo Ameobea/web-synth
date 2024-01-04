@@ -1,5 +1,6 @@
 use ::compressor::MultibandCompressor;
 use dsp::circular_buffer::CircularBuffer;
+use rand::Rng;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
@@ -346,6 +347,11 @@ impl EffectInstance {
         EffectInstance::Compressor(compressor)
       },
       10 => {
+        let mut lfo_phases = [0.; 8];
+        for i in 0..lfo_phases.len() {
+          lfo_phases[i] = common::rng().gen_range(0., std::f32::consts::PI * 2.);
+        }
+
         let chorus = ChorusEffect {
           buffer: Box::new(CircularBuffer::new()),
           modulation_depth: ParamSource::from_parts(
@@ -369,7 +375,7 @@ impl EffectInstance {
             param_3_float_val_2,
             param_3_float_val_3,
           ),
-          lfo_phases: [0.; 3],
+          lfo_phases,
           lfo_rate: ParamSource::from_parts(
             param_4_type,
             param_4_int_val,

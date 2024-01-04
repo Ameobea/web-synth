@@ -2,12 +2,11 @@ import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import HelpIcon from 'src/misc/HelpIcon';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
-import type { ADSR2Module } from 'src/synthDesigner/ADSRModule';
 import type { FilterType } from 'src/synthDesigner/FilterType';
 import {
   type AbstractFilterModule,
@@ -72,7 +71,6 @@ export class FilterContainer {
 
 const handleFilterChange = (
   filters: FilterContainer[],
-  adsrs: ADSR2Module,
   state: { params: FilterParams; envelope: Adsr; bypass: boolean; enableADSR: boolean },
   key: string,
   val: any
@@ -96,17 +94,14 @@ const handleFilterChange = (
       break;
     }
     case 'adsr length ms': {
-      adsrs.setLengthMs(val);
       newState.envelope.lenSamples = msToSamples(val);
       break;
     }
     case 'log scale': {
-      adsrs.setLogScale(val);
       newState.envelope.logScale = val;
       break;
     }
     case 'adsr': {
-      adsrs.setState(val);
       newState.envelope = val;
       break;
     }
@@ -129,21 +124,19 @@ interface FilterConfigProps {
     enableADSR: boolean;
   };
   filters: FilterContainer[];
-  adsrs: ADSR2Module;
   onChange: (params: FilterParams, envelope: Adsr, bypass: boolean, enableADSR: boolean) => void;
   vcId: string | undefined;
   adsrDebugName?: string;
-  adsrAudioThreadData: AudioThreadData;
+  synth: FMSynth;
 }
 
 const FilterConfig: React.FC<FilterConfigProps> = ({
   initialState,
   filters,
-  adsrs,
   onChange,
   vcId,
   adsrDebugName,
-  adsrAudioThreadData,
+  synth,
 }) => {
   const [state, setState] = useState(initialState);
 
@@ -151,7 +144,7 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
     () =>
       getSettingsForFilterType({
         filterType: state.params.type,
-        includeADSR: { adsrAudioThreadData },
+        includeADSR: { adsrAudioThreadData: synth.filterEnvelope.audioThreadData },
         includeBypass: true,
         vcId,
         adsrDebugName,
@@ -168,7 +161,7 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
           delete (s as any).initial;
           return s;
         }),
-    [state.enableADSR, state.params.type, vcId, adsrDebugName, adsrAudioThreadData]
+    [state.params.type, state.enableADSR, synth.filterEnvelope.audioThreadData, vcId, adsrDebugName]
   );
   const controlPanelState = useMemo(
     () => ({
@@ -193,7 +186,7 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
       settings={settings}
       state={controlPanelState}
       onChange={(key: string, val: any) => {
-        const newState = handleFilterChange(filters, adsrs, state, key, val);
+        const newState = handleFilterChange(filters, state, key, val);
         onChange(newState.params, newState.envelope, newState.bypass, newState.enableADSR);
         setState(newState);
       }}

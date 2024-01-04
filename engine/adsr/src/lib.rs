@@ -539,6 +539,8 @@ impl Adsr {
         return;
       },
       GateStatus::Releasing if self.phase >= 1. => {
+        self.phase = 1.;
+        self.gate_status = GateStatus::Done;
         // If we are done, we output our final value forever and freeze the output buffer,
         // not requiring any further rendering until we are re-gated
       },
