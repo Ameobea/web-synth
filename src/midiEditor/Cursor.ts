@@ -17,22 +17,8 @@ export class CursorGutter {
     g.drawRect(0, 0, this.app.width, conf.CURSOR_GUTTER_HEIGHT);
     g.endFill();
     g.interactive = true;
-    g.on('pointerdown', (evt: FederatedPointerEvent) => {
-      if (evt.button !== 0) {
-        return;
-      }
-      this.isDragging = true;
 
-      const xPx = evt.getLocalPosition(g).x - conf.PIANO_KEYBOARD_WIDTH;
-      const xBeats = this.app.parentInstance.snapBeat(
-        this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
-      );
-      this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
-
-      this.app.addMouseUpCB(() => {
-        this.isDragging = false;
-      });
-    }).on('pointermove', (evt: FederatedPointerEvent) => {
+    const handlePointerMove = (evt: FederatedPointerEvent) => {
       if (!this.isDragging) {
         return;
       }
@@ -45,6 +31,25 @@ export class CursorGutter {
         )
       );
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
+    };
+
+    g.on('pointerdown', (evt: FederatedPointerEvent) => {
+      if (evt.button !== 0) {
+        return;
+      }
+      this.isDragging = true;
+
+      const xPx = evt.getLocalPosition(g).x - conf.PIANO_KEYBOARD_WIDTH;
+      const xBeats = this.app.parentInstance.snapBeat(
+        this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
+      );
+      this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
+
+      this.app.app.stage.on('pointermove', handlePointerMove);
+      this.app.addMouseUpCB(() => {
+        this.isDragging = false;
+        this.app.app.stage.off('pointermove', handlePointerMove);
+      });
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
     g.moveTo(this.app.width, conf.CURSOR_GUTTER_HEIGHT).lineTo(0.5, conf.CURSOR_GUTTER_HEIGHT);

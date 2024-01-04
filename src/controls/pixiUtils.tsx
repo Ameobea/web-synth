@@ -9,10 +9,22 @@ export interface DragState {
 
 export const makeDraggable = (g: PIXI.Graphics, parent: DragState, stopPropagation?: boolean) => {
   g.interactive = true;
+
+  const pointerMoveCb = () => {
+    if (!parent.dragData) {
+      return;
+    }
+
+    const newPosition = parent.dragData.getLocalPosition(g.parent);
+    parent.handleDrag(newPosition);
+  };
+
   g.on('pointerdown', (evt: FederatedPointerEvent) => {
     if ((evt.nativeEvent as PointerEvent).button !== 0) {
       return;
     }
+
+    document.addEventListener('pointermove', pointerMoveCb);
 
     parent.dragData = evt;
     if (stopPropagation) {
@@ -21,17 +33,11 @@ export const makeDraggable = (g: PIXI.Graphics, parent: DragState, stopPropagati
   })
     .on('pointerup', () => {
       parent.dragData = null;
+      document.removeEventListener('pointermove', pointerMoveCb);
     })
     .on('pointerupoutside', () => {
       parent.dragData = null;
-    })
-    .on('pointermove', () => {
-      if (!parent.dragData) {
-        return;
-      }
-
-      const newPosition = parent.dragData.getLocalPosition(g.parent);
-      parent.handleDrag(newPosition);
+      document.removeEventListener('pointermove', pointerMoveCb);
     });
 };
 

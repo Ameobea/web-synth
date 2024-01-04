@@ -86,6 +86,7 @@ export default class MIDIEditorUIInstance {
   private panningData: { startPoint: PIXI.Point; startView: MIDIEditorPanningView } | null = null;
   private resizeData: ResizeData | null = null;
   private dragData: DragData | null = null;
+  private handlePointerMove: (evt: FederatedPointerEvent) => void;
   private selectionBox: SelectionBox | null = null;
   public selectionBoxButtonDown = false;
   public cursor: Cursor;
@@ -144,24 +145,28 @@ export default class MIDIEditorUIInstance {
     this.linesContainer = new PIXI.Container();
     this.linesContainer.interactive = true;
     this.linesContainer.interactiveChildren = true;
-    this.linesContainer
-      .on('pointerdown', (evt: FederatedPointerEvent) => {
-        if (evt.button === 0) {
-          if (this.selectionBoxButtonDown && !this.selectionBox) {
-            this.selectionBox = new SelectionBox(this, evt.getLocalPosition(this.linesContainer));
-          }
-        } else if (evt.button === 1) {
-          this.startPanning(evt);
+
+    this.handlePointerMove = (evt: FederatedPointerEvent) => {
+      this.handlePan(evt);
+      this.handleResize(evt);
+      this.handleDrag(evt);
+      if (this.selectionBox) {
+        this.selectionBox.update(evt.getLocalPosition(this.linesContainer));
+      }
+    };
+    this.app.stage.hitArea = this.app.screen;
+    this.app.stage.interactive = true;
+    this.app.stage.on('pointermove', this.handlePointerMove);
+
+    this.linesContainer.on('pointerdown', (evt: FederatedPointerEvent) => {
+      if (evt.button === 0) {
+        if (this.selectionBoxButtonDown && !this.selectionBox) {
+          this.selectionBox = new SelectionBox(this, evt.getLocalPosition(this.linesContainer));
         }
-      })
-      .on('pointermove', (evt: FederatedPointerEvent) => {
-        this.handlePan(evt);
-        this.handleResize(evt);
-        this.handleDrag(evt);
-        if (this.selectionBox) {
-          this.selectionBox.update(evt.getLocalPosition(this.linesContainer));
-        }
-      });
+      } else if (evt.button === 1) {
+        this.startPanning(evt);
+      }
+    });
 
     this.linesContainer.x = conf.PIANO_KEYBOARD_WIDTH;
     this.linesContainer.y = conf.CURSOR_GUTTER_HEIGHT;
@@ -1182,6 +1187,7 @@ export default class MIDIEditorUIInstance {
     document.removeEventListener('keyup', this.eventHandlerCBs.keyUp);
     document.removeEventListener('mouseup', this.eventHandlerCBs.mouseUp);
     document.removeEventListener('wheel', this.eventHandlerCBs.wheel);
+    this.app.stage.off('pointermove', this.handlePointerMove);
   }
 
   public onHiddenStatusChanged = (isHidden: boolean) => {

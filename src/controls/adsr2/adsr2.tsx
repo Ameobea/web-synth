@@ -166,22 +166,26 @@ class RampHandle {
     g.interactive = true;
     g.cursor = 'pointer';
 
+    const handlePointerMove = () => {
+      if (!this.dragData) {
+        return;
+      }
+
+      const newPosition = this.dragData.getLocalPosition(this.graphics.parent);
+      this.handleDrag(newPosition);
+    };
+
     g.on('pointerdown', (evt: FederatedPointerEvent) => {
       this.dragData = evt;
+      document.addEventListener('pointermove', handlePointerMove);
     })
       .on('pointerup', () => {
         this.dragData = null;
+        document.removeEventListener('pointermove', handlePointerMove);
       })
       .on('pointerupoutside', () => {
         this.dragData = null;
-      })
-      .on('pointermove', () => {
-        if (!this.dragData) {
-          return;
-        }
-
-        const newPosition = this.dragData.getLocalPosition(this.graphics.parent);
-        this.handleDrag(newPosition);
+        document.removeEventListener('pointermove', handlePointerMove);
       });
 
     this.graphics = g;
@@ -386,6 +390,9 @@ class StepHandle {
     // Drag handling
     g.cursor = 'pointer';
     g.interactive = true;
+
+    const handlePointerMove = () => this.handlePointerMove();
+
     g.on('pointerdown', (evt: FederatedPointerEvent) => {
       const originalEvent = evt.nativeEvent as PointerEvent;
 
@@ -407,17 +414,20 @@ class StepHandle {
       }
 
       this.dragData = evt;
+      document.addEventListener('pointermove', handlePointerMove);
     })
       .on('pointerup', () => {
         this.dragData = null;
+        document.removeEventListener('pointermove', handlePointerMove);
       })
       .on('pointerupoutside', () => {
         this.dragData = null;
+        document.removeEventListener('pointermove', handlePointerMove);
       })
-      .on('pointermove', () => this.handlePointerMove())
       .on('rightdown', (evt: FederatedPointerEvent) => {
         evt.originalEvent.preventDefault();
         evt.originalEvent.stopPropagation();
+        document.removeEventListener('pointermove', handlePointerMove);
         this.delete();
       });
 
@@ -494,6 +504,16 @@ class DragBar {
 
     g.interactive = true;
     g.cursor = 'pointer';
+
+    const handlePointerMove = () => {
+      if (!this.dragData) {
+        return;
+      }
+
+      const newPosition = this.dragData.getLocalPosition(g.parent);
+      this.handleDrag(newPosition);
+    };
+
     g.on('pointerdown', (evt: FederatedPointerEvent) => {
       const originalEvent = evt.nativeEvent as PointerEvent;
       if (originalEvent.button !== 0) {
@@ -533,23 +553,17 @@ class DragBar {
         return;
       }
 
-      this.dragData = evt.data;
+      this.dragData = evt;
+      document.addEventListener('pointermove', handlePointerMove);
     })
       .on('pointerup', () => {
         this.dragData = null;
+        document.removeEventListener('pointermove', handlePointerMove);
       })
       .on('pointerupoutside', () => {
         this.dragData = null;
-      })
-      .on('pointermove', () => {
-        if (!this.dragData) {
-          return;
-        }
-
-        const newPosition = this.dragData.getLocalPosition(g.parent);
-        this.handleDrag(newPosition);
+        document.removeEventListener('pointermove', handlePointerMove);
       });
-
     g.x = LEFT_GUTTER_WIDTH_PX + initialPos * this.inst.width;
     g.y = TOP_GUTTER_WIDTH_PX - 4;
     this.inst.app?.stage.addChild(g);
