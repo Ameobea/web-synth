@@ -150,7 +150,11 @@ export class CVOutput {
     this.handleViewChange(this.parentInstance.baseView);
   }
 
-  public handleViewChange({ pxPerBeat, scrollHorizontalBeats }: MIDIEditorBaseView) {
+  public handleViewChange({
+    pxPerBeat,
+    scrollHorizontalBeats,
+    beatsPerMeasure,
+  }: MIDIEditorBaseView) {
     if (!this.uiInstance) {
       return;
     }
@@ -159,6 +163,7 @@ export class CVOutput {
     const endBeat = startBeat + this.uiInstance.width / dpr / pxPerBeat;
     const newRenderedRegion: RenderedRegion = { start: startBeat, end: endBeat };
     this.uiInstance.setRenderedRegion(newRenderedRegion);
+    this.uiInstance.setBeatsPerMeasure(beatsPerMeasure);
   }
 
   public startPlayback() {

@@ -14,6 +14,7 @@
   export let enableInfiniteMode: boolean | undefined = false;
   export let disablePhaseVisualization: boolean | undefined = false;
   export let setFrozenOutputValue: ((frozenOutputValue: number) => void) | undefined;
+  export let beatsPerMeasure: number | undefined = undefined;
 </script>
 
 <ReactShim
@@ -30,5 +31,6 @@
     enableInfiniteMode,
     disablePhaseVisualization,
     setFrozenOutputValue,
+    beatsPerMeasure,
   }}
 />

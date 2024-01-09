@@ -48,7 +48,6 @@ interface StepHandleConfiguratorCtx {
   inst: ConfigureStepControlPanel;
 }
 
-PIXI.utils.skipHello();
 if (PIXI.settings.RENDER_OPTIONS) {
   PIXI.settings.RENDER_OPTIONS.hello = false;
 }
@@ -608,26 +607,20 @@ class DragBar {
 class ScaleMarkings {
   private inst: ADSR2Instance;
   private g!: PIXI.Graphics;
-  private lenMs: number;
   private logScale = false;
   private outputRange: readonly [number, number];
   private container = new PIXI.Container();
   private texts: PIXI.Text[] = [];
 
-  constructor(inst: ADSR2Instance, lenMs: number, outputRange: readonly [number, number]) {
+  constructor(inst: ADSR2Instance, outputRange: readonly [number, number]) {
     this.inst = inst;
-    this.lenMs = lenMs;
     this.outputRange = outputRange;
 
     this.render();
   }
 
-  public update(lenMs: number, outputRange: readonly [number, number], logScale: boolean) {
-    if (
-      lenMs === this.lenMs &&
-      R.equals(outputRange, this.outputRange) &&
-      this.logScale === logScale
-    ) {
+  public update(outputRange: readonly [number, number], logScale: boolean) {
+    if (R.equals(outputRange, this.outputRange) && this.logScale === logScale) {
       return;
     }
 
@@ -656,8 +649,11 @@ class ScaleMarkings {
 
     const g = new PIXI.Graphics();
     g.lineStyle(0.5, SCALE_MARKING_LINE_COLOR, 0.5, 0.5, false);
-    g.moveTo(this.inst.width / 2, 0);
-    g.lineTo(this.inst.width / 2, this.inst.height);
+
+    if (!this.inst.infiniteMode) {
+      g.moveTo(this.inst.width / 2, 0);
+      g.lineTo(this.inst.width / 2, this.inst.height);
+    }
 
     const createText = (scaledY: number) => {
       const formatted = numbro(scaledY).format({
@@ -710,6 +706,61 @@ class ScaleMarkings {
     this.container.cacheAsBitmap = true;
 
     this.inst.vizContainer.addChildAt(this.container, 2);
+  }
+}
+
+class MeasureLines {
+  private inst: ADSR2Instance;
+  private beatsPerMeasure: number;
+  private renderedRegion: RenderedRegion;
+  public g!: PIXI.Graphics;
+
+  constructor(inst: ADSR2Instance, beatsPerMeasure: number, renderedRegion: RenderedRegion) {
+    this.inst = inst;
+    this.beatsPerMeasure = beatsPerMeasure;
+    this.renderedRegion = renderedRegion;
+
+    this.render();
+  }
+
+  public destroy() {
+    this.g?.destroy();
+  }
+
+  private render() {
+    this.destroy();
+
+    const g = new PIXI.Graphics();
+    g.lineStyle(0.5, SCALE_MARKING_LINE_COLOR, 0.5, 0.5, false);
+
+    const startBeat =
+      this.renderedRegion.start -
+      (this.renderedRegion.start % this.beatsPerMeasure) +
+      this.beatsPerMeasure;
+    let curBeat = startBeat;
+    while (curBeat < this.renderedRegion.end) {
+      const x = computeTransformedXPosition(this.renderedRegion, this.inst.width, curBeat);
+      g.moveTo(x, 0);
+      g.lineTo(x, this.inst.height);
+      curBeat += this.beatsPerMeasure;
+    }
+
+    this.g = g;
+    this.inst.vizContainer.addChildAt(g, 2);
+  }
+
+  public update(beatsPerMeasure: number, renderedRegion: RenderedRegion) {
+    if (
+      beatsPerMeasure === this.beatsPerMeasure &&
+      renderedRegion.start === this.renderedRegion.start &&
+      renderedRegion.end === this.renderedRegion.end
+    ) {
+      return;
+    }
+
+    this.beatsPerMeasure = beatsPerMeasure;
+    this.renderedRegion = renderedRegion;
+    this.render();
   }
 }
 
@@ -778,6 +829,7 @@ export class ADSR2Instance {
    */
   public app: PIXI.Application | undefined;
   private lengthMs = 1000;
+  private beatsPerMeasure = 4;
   private outputRange: readonly [number, number] = [0, 1];
   private logScale = false;
   private lengthMode: AdsrLengthMode | undefined;
@@ -788,6 +840,7 @@ export class ADSR2Instance {
   private loopDragBar: DragBar | null = null;
   private releasePoint!: number;
   private releaseDragBar: DragBar | null = null;
+  private measureLines: MeasureLines | null = null;
   private onChange: (newState: ADSRWithOutputRange) => void;
   private lastClick: { time: number; pos: PIXI.Point } | null = null;
   private ctx: AudioContext;
@@ -828,7 +881,7 @@ export class ADSR2Instance {
 
   public onUpdated() {
     this.onChange(this.serialize());
-    this.scaleMarkings.update(this.lengthMs, this.outputRange, this.logScale);
+    this.scaleMarkings.update(this.outputRange, this.logScale);
   }
 
   private setSteps(newSteps: AdsrStep[]) {
@@ -843,8 +896,14 @@ export class ADSR2Instance {
     this.renderedRegion = renderedRegion;
     this.steps.forEach(step => step.setRenderedRegion(renderedRegion));
     this.sprites.rampCurves.forEach(curve => curve.setRenderedRegion(renderedRegion));
+    this.measureLines?.update(this.beatsPerMeasure, renderedRegion);
 
     this.maybeAddOrUpdateEndVirtualRampCurve();
+  }
+
+  public setBeatsPerMeasure(beatsPerMeasure: number) {
+    this.beatsPerMeasure = beatsPerMeasure;
+    this.measureLines?.update(beatsPerMeasure, this.renderedRegion);
   }
 
   private maybeAddOrUpdateEndVirtualRampCurve() {
@@ -885,9 +944,6 @@ export class ADSR2Instance {
       state.lenSamples = 1000;
     }
 
-    const newLengthMs = (state.lenSamples / SAMPLE_RATE) * 1000;
-    this.lengthMs = newLengthMs;
-
     if (!R.equals(this.steps.map(R.prop('step')), state.steps)) {
       this.setSteps(state.steps);
     }
@@ -915,16 +971,7 @@ export class ADSR2Instance {
     this.logScale = state.logScale ?? false;
     this.lengthMode = state.lengthMode;
     this.audioThreadData = state.audioThreadData;
-    this.scaleMarkings.update(this.lengthMs, this.outputRange, this.logScale);
-  }
-
-  public setLengthMs(newLengthMs: number) {
-    if (this.lengthMs === newLengthMs) {
-      return;
-    }
-
-    this.lengthMs = newLengthMs;
-    this.onUpdated();
+    this.scaleMarkings.update(this.outputRange, this.logScale);
   }
 
   public sortAndUpdateMarks(updatedMarkIx?: number) {
@@ -994,7 +1041,8 @@ export class ADSR2Instance {
     debugName?: string,
     infiniteMode?: boolean,
     disablePhaseVisualization?: boolean,
-    setFrozenOutputValue?: (frozenOutputValue: number) => void
+    setFrozenOutputValue?: (frozenOutputValue: number) => void,
+    beatsPerMeasure?: number
   ) {
     if (!debugName) {
       console.trace('No debug name provided for ADSR');
@@ -1026,6 +1074,7 @@ export class ADSR2Instance {
     this.outputRange = [...outputRange];
     this.logScale = initialState.logScale ?? false;
     this.lengthMode = initialState.lengthMode;
+    this.beatsPerMeasure = beatsPerMeasure ?? 4;
 
     this.vizContainer = new PIXI.Container();
     this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
@@ -1142,7 +1191,10 @@ export class ADSR2Instance {
       this.loopDragBar = this.buildLoopDragBar();
     }
 
-    if (!this.infiniteMode) {
+    if (this.infiniteMode) {
+      this.measureLines = new MeasureLines(this, this.beatsPerMeasure, this.renderedRegion);
+      this.app?.stage.addChild(this.measureLines.g);
+    } else {
       this.releaseDragBar = new DragBar(
         this,
         RELEASE_DRAG_BAR_COLOR,
@@ -1164,7 +1216,7 @@ export class ADSR2Instance {
       );
     }
 
-    this.scaleMarkings = new ScaleMarkings(this, this.lengthMs, this.outputRange);
+    this.scaleMarkings = new ScaleMarkings(this, this.outputRange);
 
     if (!phaseMarker) {
       return;
@@ -1294,6 +1346,7 @@ interface ADSR2Props {
   enableInfiniteMode?: boolean;
   disablePhaseVisualization?: boolean;
   setFrozenOutputValue?: (frozenOutputValue: number) => void;
+  beatsPerMeasure?: number;
 }
 
 const ADSR2_SETTINGS = [{ type: 'checkbox', label: 'loop' }];
@@ -1310,6 +1363,7 @@ const ADSR2: React.FC<ADSR2Props> = ({
   enableInfiniteMode,
   disablePhaseVisualization,
   setFrozenOutputValue,
+  beatsPerMeasure,
 }) => {
   const lastSize = useRef({ width, height });
   const instance = useRef<ADSR2Instance | null>(null);
@@ -1381,7 +1435,8 @@ const ADSR2: React.FC<ADSR2Props> = ({
             debugName,
             enableInfiniteMode,
             disablePhaseVisualization,
-            setFrozenOutputValue
+            setFrozenOutputValue,
+            beatsPerMeasure
           );
           instanceCb?.(instance.current);
         }}

@@ -37,7 +37,6 @@ export interface Note {
   length: number;
 }
 
-PIXI.utils.skipHello();
 if (PIXI.settings.RENDER_OPTIONS) {
   PIXI.settings.RENDER_OPTIONS.hello = false;
 }
