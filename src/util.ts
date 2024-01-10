@@ -26,6 +26,11 @@ export const msToSamples = (ms: number): number => (ms / 1000) * 44_100;
 
 export const samplesToMs = (samples: number): number => (samples / 44_100) * 1000;
 
+export const colorToHexString = (color: number): string => {
+  const hex = color.toString(16);
+  return `#${'0'.repeat(6 - hex.length)}${hex}`;
+};
+
 /**
  * Tries to parse the provided string out of JSON.
  **/

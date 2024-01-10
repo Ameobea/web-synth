@@ -13,6 +13,8 @@
   import type { CVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
   import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
   import { mkCVOutputSettingsPopup } from './CVOutputSettingsPopup';
+  import type { MIDIEditorBaseView } from 'src/midiEditor';
+  import Cursor from 'src/midiEditor/CVOutput/Cursor.svelte';
 
   export let name: string;
   export let setName: (name: string) => void;
@@ -21,6 +23,9 @@
   export let deleteOutput: () => void;
   export let registerInstance: (instance: ADSR2Instance) => void;
   export let setFrozenOutputValue: (frozenOutputValue: number) => void;
+  export let view: MIDIEditorBaseView;
+  export let getCursorPosBeats: () => number;
+  export let setCursorPosBeats: (newCursorPosBeats: number) => void;
 
   let width: number | undefined;
   let widthObserver: ResizeObserver | undefined;
@@ -89,6 +94,13 @@
         enableInfiniteMode={true}
         disablePhaseVisualization={true}
         {setFrozenOutputValue}
+      />
+      <Cursor
+        {width}
+        {view}
+        {getCursorPosBeats}
+        {setCursorPosBeats}
+        marginLeft={PIANO_KEYBOARD_WIDTH}
       />
     </div>
   {/if}

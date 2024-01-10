@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 
 import './MIDIEditor.scss';
-import type { SvelteComponent } from 'svelte';
 
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
@@ -537,25 +536,11 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
 
 const MIDIEditorControls = React.memo(MIDIEditorControlsInner);
 
-type CVOutputControlsProps = CVOutputControls extends SvelteComponent<infer Props, any>
-  ? Props
-  : never;
+const CVOutputControlsShim = mkSvelteComponentShim(CVOutputControls);
 
-const CVOutputControlsShim = mkSvelteComponentShim<CVOutputControlsProps>(CVOutputControls);
+const CollapsedMIDIEditorShim = mkSvelteComponentShim(CollapsedMIDIEditor);
 
-type CollapsedMIDIEditorProps = CollapsedMIDIEditor extends SvelteComponent<infer Props, any>
-  ? Props
-  : never;
-
-const CollapsedMIDIEditorShim =
-  mkSvelteComponentShim<CollapsedMIDIEditorProps>(CollapsedMIDIEditor);
-
-type EditableInstanceNameProps = EditableInstanceName extends SvelteComponent<infer Props, any>
-  ? Props
-  : never;
-
-const EditableInstanceNameShim =
-  mkSvelteComponentShim<EditableInstanceNameProps>(EditableInstanceName);
+const EditableInstanceNameShim = mkSvelteComponentShim(EditableInstanceName);
 
 class ActiveInstanceProxy {
   private uiManager: MIDIEditorUIManager;
@@ -721,6 +706,12 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
                 setFrozenOutputValue={newFrozenOutputValue =>
                   output.backend.setFrozenOutputValue(newFrozenOutputValue)
                 }
+                view={parentInstance.baseView.store}
+                getCursorPosBeats={() => parentInstance.playbackHandler.getCursorPosBeats()}
+                setCursorPosBeats={newCursorPosBeats => {
+                  console.log('Setting cursor pos beats: ', newCursorPosBeats);
+                  parentInstance.playbackHandler.setCursorPosBeats(newCursorPosBeats);
+                }}
               />
             );
           } else {
