@@ -69,98 +69,100 @@ export default class NoteLine {
     this.handleViewChange();
   }
 
-  private installNoteCreationHandlers() {
-    this.background
-      .on('pointerdown', (evt: FederatedPointerEvent) => {
-        if (evt.button !== 0 || this.app.selectionBoxButtonDown) {
-          return;
-        }
+  private handlePointerMove = (evt: FederatedPointerEvent) => {
+    if (!this.noteCreationState) {
+      return;
+    }
 
-        const posBeats = this.app.parentInstance.snapBeat(
-          this.app.pxToBeats(evt.getLocalPosition(this.background).x) +
-            this.app.parentInstance.baseView.scrollHorizontalBeats
-        );
-        const isBlocked = !this.app.wasm!.instance.check_can_add_note(
-          this.app.wasm!.noteLinesCtxPtr,
+    const newPosBeats = this.app.parentInstance.snapBeat(
+      this.app.pxToBeats(evt.getLocalPosition(this.background).x) +
+        this.app.parentInstance.baseView.scrollHorizontalBeats
+    );
+    let [newStartPosBeats, newEndPosBeats] = [
+      Math.min(newPosBeats, this.noteCreationState.originalPosBeats),
+      Math.max(newPosBeats, this.noteCreationState.originalPosBeats),
+    ];
+    const noteLengthPx = this.app.beatsToPx(newEndPosBeats - newStartPosBeats);
+    if (!this.app.wasm) {
+      throw new UnreachableException();
+    }
+    if (!R.isNil(this.noteCreationState.id) && noteLengthPx < conf.MIN_DRAWING_NOTE_WIDTH_PX) {
+      // End is too close to the start; delete the not that we had created here
+      this.app.deleteNote(this.noteCreationState.id);
+      this.noteCreationState.id = null;
+    } else {
+      // Resize the drawing note to match the new start and end point
+      if (
+        newStartPosBeats !== this.noteCreationState.startPositionBeats &&
+        !R.isNil(this.noteCreationState.id)
+      ) {
+        newStartPosBeats = this.app.resizeNoteHorizontalStart(
           this.index,
-          posBeats,
-          0
+          this.noteCreationState.startPositionBeats,
+          this.noteCreationState.id,
+          newStartPosBeats
         );
-        this.app.gate(this.index);
-        if (isBlocked) {
-          return;
-        }
-
-        this.app.deselectAllNotes();
-        this.noteCreationState = {
-          originalPosBeats: posBeats,
-          startPositionBeats: posBeats,
-          id: null,
-          endPositionBeats: posBeats,
-        };
-
-        this.app.addMouseUpCB(() => {
-          this.noteCreationState = null;
-          this.app.ungate(this.index);
-        });
-      })
-      .on('pointermove', (evt: FederatedPointerEvent) => {
-        if (!this.noteCreationState) {
-          return;
-        }
-
-        const newPosBeats = this.app.parentInstance.snapBeat(
-          this.app.pxToBeats(evt.getLocalPosition(this.background).x) +
-            this.app.parentInstance.baseView.scrollHorizontalBeats
+      } else if (
+        newEndPosBeats !== this.noteCreationState.endPositionBeats &&
+        !R.isNil(this.noteCreationState.id)
+      ) {
+        newEndPosBeats = this.app.resizeNoteHorizontalEnd(
+          this.index,
+          this.noteCreationState.startPositionBeats,
+          this.noteCreationState.id,
+          newEndPosBeats
         );
-        let [newStartPosBeats, newEndPosBeats] = [
-          Math.min(newPosBeats, this.noteCreationState.originalPosBeats),
-          Math.max(newPosBeats, this.noteCreationState.originalPosBeats),
-        ];
-        const noteLengthPx = this.app.beatsToPx(newEndPosBeats - newStartPosBeats);
-        if (!this.app.wasm) {
-          throw new UnreachableException();
-        }
-        if (!R.isNil(this.noteCreationState.id) && noteLengthPx < conf.MIN_DRAWING_NOTE_WIDTH_PX) {
-          // End is too close to the start; delete the not that we had created here
-          this.app.deleteNote(this.noteCreationState.id);
-          this.noteCreationState.id = null;
-        } else {
-          // Resize the drawing note to match the new start and end point
-          if (
-            newStartPosBeats !== this.noteCreationState.startPositionBeats &&
-            !R.isNil(this.noteCreationState.id)
-          ) {
-            newStartPosBeats = this.app.resizeNoteHorizontalStart(
-              this.index,
-              this.noteCreationState.startPositionBeats,
-              this.noteCreationState.id,
-              newStartPosBeats
-            );
-          } else if (
-            newEndPosBeats !== this.noteCreationState.endPositionBeats &&
-            !R.isNil(this.noteCreationState.id)
-          ) {
-            newEndPosBeats = this.app.resizeNoteHorizontalEnd(
-              this.index,
-              this.noteCreationState.startPositionBeats,
-              this.noteCreationState.id,
-              newEndPosBeats
-            );
-          }
-        }
+      }
+    }
 
-        this.noteCreationState.startPositionBeats = newStartPosBeats;
-        this.noteCreationState.endPositionBeats = newEndPosBeats;
+    this.noteCreationState.startPositionBeats = newStartPosBeats;
+    this.noteCreationState.endPositionBeats = newEndPosBeats;
 
-        if (R.isNil(this.noteCreationState.id) && noteLengthPx >= conf.MIN_DRAWING_NOTE_WIDTH_PX) {
-          this.noteCreationState.id = this.app.addNote(
-            this.index,
-            this.noteCreationState.startPositionBeats,
-            this.noteCreationState.endPositionBeats - this.noteCreationState.startPositionBeats
-          );
-        }
+    if (R.isNil(this.noteCreationState.id) && noteLengthPx >= conf.MIN_DRAWING_NOTE_WIDTH_PX) {
+      this.noteCreationState.id = this.app.addNote(
+        this.index,
+        this.noteCreationState.startPositionBeats,
+        this.noteCreationState.endPositionBeats - this.noteCreationState.startPositionBeats
+      );
+    }
+  };
+
+  private installNoteCreationHandlers() {
+    this.background.on('pointerdown', (evt: FederatedPointerEvent) => {
+      if (evt.button !== 0 || this.app.selectionBoxButtonDown) {
+        return;
+      }
+
+      const posBeats = this.app.parentInstance.snapBeat(
+        this.app.pxToBeats(evt.getLocalPosition(this.background).x) +
+          this.app.parentInstance.baseView.scrollHorizontalBeats
+      );
+      const isBlocked = !this.app.wasm!.instance.check_can_add_note(
+        this.app.wasm!.noteLinesCtxPtr,
+        this.index,
+        posBeats,
+        0
+      );
+      this.app.gate(this.index);
+      if (isBlocked) {
+        return;
+      }
+
+      this.app.deselectAllNotes();
+      this.noteCreationState = {
+        originalPosBeats: posBeats,
+        startPositionBeats: posBeats,
+        id: null,
+        endPositionBeats: posBeats,
+      };
+
+      this.app.addMouseUpCB(() => {
+        this.noteCreationState = null;
+        this.app.ungate(this.index);
       });
+    });
+
+    this.app.app.stage.on('pointermove', this.handlePointerMove);
   }
 
   public handleViewChange() {
@@ -269,5 +271,6 @@ export default class NoteLine {
     }
     this.container.destroy();
     this.app.linesContainer.removeChild(this.container);
+    this.app.app.stage.off('pointermove', this.handlePointerMove);
   }
 }

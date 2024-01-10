@@ -222,7 +222,7 @@ class RampHandle {
  * as well as optionally a handle entity for modifying the curve.
  */
 class RampCurve {
-  private curve: PIXI.Graphics;
+  private curve: PIXI.Graphics | null;
   private handle: RampHandle | null;
   private inst: ADSR2Instance;
   private renderedRegion: RenderedRegion;
@@ -266,26 +266,12 @@ class RampCurve {
       case 'exponential': {
         const widthPx = step2PosXPx - step1PosXPx;
         const heightPx = (1 - step2.y - (1 - step1.y)) * this.inst.height;
-        const isFullyOffScreen =
-          (step1PosXPx > this.inst.width && step2PosXPx > this.inst.width) ||
-          (step1PosXPx < 0 && step2PosXPx < 0);
-        const pointCount = isFullyOffScreen
-          ? 2
-          : Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
+        const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
 
         const pts = [];
         for (let i = 0; i <= pointCount; i++) {
           const pct = i / pointCount;
-          const x = step1.x + pct * (step2.x - step1.x);
           const y = Math.pow(pct, step2.ramper.exponent);
-
-          if (i !== 0 && i !== pointCount - 1) {
-            const isOnScreen =
-              x > this.renderedRegion.start - 0.01 && x < this.renderedRegion.end + 0.01;
-            if (!isOnScreen) {
-              continue;
-            }
-          }
 
           pts.push({
             x: step1PosXPx + pct * widthPx,
@@ -325,13 +311,26 @@ class RampCurve {
   }
 
   public setRenderedRegion(renderedRegion: RenderedRegion) {
+    const isFullyOffscreen =
+      (this.steps[0].x < renderedRegion.start && this.steps[1].x < renderedRegion.start) ||
+      (this.steps[0].x > renderedRegion.end && this.steps[1].x > renderedRegion.end);
+    if (isFullyOffscreen) {
+      this.destroy();
+      return;
+    }
+
+    if (!this.handle) {
+      this.handle = this.buildRampHandle(this.steps[0], this.steps[1]);
+    }
+
     const oldRenderedRegionRange = this.renderedRegion.end - this.renderedRegion.start;
     const newRenderedRegionRange = renderedRegion.end - renderedRegion.start;
 
     const oldRenderedRegion = this.renderedRegion;
     this.renderedRegion = renderedRegion;
     // if the change is just a horizontal shift, we can just move the curve and avoid re-rendering
-    if (oldRenderedRegionRange === newRenderedRegionRange && this.curve) {
+    const renderedRangeDiff = Math.abs(oldRenderedRegionRange - newRenderedRegionRange);
+    if (renderedRangeDiff < 0.0001 && this.curve) {
       const diffXPx =
         computeTransformedXPosition(renderedRegion, this.inst.width, this.steps[1].x) -
         computeTransformedXPosition(oldRenderedRegion, this.inst.width, this.steps[1].x);
@@ -343,8 +342,12 @@ class RampCurve {
   }
 
   public destroy() {
-    this.inst.vizContainer.removeChild(this.curve);
+    if (this.curve) {
+      this.inst.vizContainer.removeChild(this.curve);
+    }
+    this.curve = null;
     this.handle?.destroy();
+    this.handle = null;
   }
 }
 
@@ -647,6 +650,12 @@ class ScaleMarkings {
   private render() {
     this.destroy();
 
+    const bg = new PIXI.Graphics();
+    bg.beginFill(BACKGROUND_COLOR);
+    bg.drawRect(-LEFT_GUTTER_WIDTH_PX - 2, -20, LEFT_GUTTER_WIDTH_PX + 2.15, this.inst.height + 40);
+    bg.endFill();
+    this.container.addChild(bg);
+
     const g = new PIXI.Graphics();
     g.lineStyle(0.5, SCALE_MARKING_LINE_COLOR, 0.5, 0.5, false);
 
@@ -704,8 +713,9 @@ class ScaleMarkings {
     this.g = g;
     this.container.addChild(g);
     this.container.cacheAsBitmap = true;
+    this.container.zIndex = 5;
 
-    this.inst.vizContainer.addChildAt(this.container, 2);
+    this.inst.vizContainer.addChild(this.container);
   }
 }
 
@@ -745,8 +755,9 @@ class MeasureLines {
       curBeat += this.beatsPerMeasure;
     }
 
+    g.zIndex = 5;
     this.g = g;
-    this.inst.vizContainer.addChildAt(g, 2);
+    this.inst.vizContainer.addChild(g);
   }
 
   public update(beatsPerMeasure: number, renderedRegion: RenderedRegion) {
@@ -1077,6 +1088,7 @@ export class ADSR2Instance {
     this.beatsPerMeasure = beatsPerMeasure ?? 4;
 
     this.vizContainer = new PIXI.Container();
+    this.vizContainer.sortableChildren = true;
     this.vizContainer.x = LEFT_GUTTER_WIDTH_PX;
     this.vizContainer.y = TOP_GUTTER_WIDTH_PX;
 

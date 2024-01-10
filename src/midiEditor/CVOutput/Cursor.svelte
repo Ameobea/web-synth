@@ -5,7 +5,9 @@
   import { onMount } from 'svelte';
 
   export let marginLeft: number;
+  export let marginTop: number;
   export let width: number;
+  export let height: number;
   export let view: MIDIEditorBaseView;
   export let getCursorPosBeats: () => number;
   export let setCursorPosBeats: (pos: number) => void;
@@ -67,11 +69,11 @@
 
 <svg
   class="root"
-  viewBox={`0 0 ${width} 100%`}
+  viewBox={`0 0 ${width} {height}`}
   xmlns="http://www.w3.org/2000/svg"
-  style="width: {width}px; left: {marginLeft}px;"
+  style="width: {width}px; height: {height}px; left: {marginLeft}px; top: {marginTop}px;"
 >
-  <g transform={`translate(${left}, 0)`} style="pointer-events: all;">
+  <g transform={`translate(${left - 0.1}, 0)`} style="pointer-events: all;">
     <line
       x1="0"
       x2="0"

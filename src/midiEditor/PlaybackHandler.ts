@@ -254,6 +254,8 @@ export default class MIDIEditorPlaybackHandler {
       return false;
     }
 
+    cursorPosBeats = Math.max(cursorPosBeats, 0);
+
     if (this.isPlaying) {
       if (this.lastPlaybackSchedulParams.type === 'globalBeatCounter') {
         // TODO: Handle re-starting global event counter

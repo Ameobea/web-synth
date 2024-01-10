@@ -97,10 +97,12 @@
       />
       <Cursor
         {width}
+        height={210}
         {view}
         {getCursorPosBeats}
         {setCursorPosBeats}
         marginLeft={PIANO_KEYBOARD_WIDTH}
+        marginTop={19}
       />
     </div>
   {/if}
