@@ -11,12 +11,14 @@ use adsr::{
 use dsp::{midi_number_to_frequency, oscillator::PhasedOscillator};
 
 pub mod effects;
+mod filter;
 mod samples;
 mod standalone_fx;
 use crate::{WaveTable, WaveTableSettings};
 
 use self::{
   effects::EffectChain,
+  filter::FilterModule,
   samples::{
     init_sample_manager, sample_manager, SampleMappingEmitter, SampleMappingManager,
     SampleMappingOperatorConfig, TunedSampleEmitter,
@@ -877,6 +879,7 @@ pub struct FMSynthVoice {
   cached_modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
   pub gain_envelope_generator: ManagedAdsr,
   pub filter_envelope_generator: ManagedAdsr,
+  pub filter_module: FilterModule,
   pub last_gated_midi_number: usize,
 }
 
@@ -993,6 +996,7 @@ impl FMSynthVoice {
         length: 1_000.,
         length_mode: AdsrLengthMode::Ms,
       },
+      filter_module: FilterModule::default(),
       last_gated_midi_number: 0,
     }
   }
@@ -1663,6 +1667,7 @@ pub const FRAME_SIZE: usize = 128;
 /// Sample rate in samples per second
 pub const SAMPLE_RATE: usize = 44_100;
 pub const MAX_PARAM_BUFFERS: usize = 16;
+pub const FILTER_PARAM_BUFFER_COUNT: usize = 4;
 
 /// Holds the weights that controls how much each operator modulates each of the other operators,
 /// itself via feedback, and outputs
@@ -1702,7 +1707,11 @@ impl ModulationMatrix {
 pub struct FMSynthContext {
   pub voices: Vec<FMSynthVoice>,
   pub modulation_matrix: ModulationMatrix,
+  /// Generic param buffers containing values routed in from other modules.  Can be used to
+  /// modulate operators, etc.
   pub param_buffers: [[f32; FRAME_SIZE]; MAX_PARAM_BUFFERS],
+  /// Special param buffers used to modulate filter params from other modules.
+  pub filter_param_buffers: [[f32; FRAME_SIZE]; FILTER_PARAM_BUFFER_COUNT],
   pub operator_base_frequency_sources: [ParamSource; OPERATOR_COUNT],
   pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
   pub output_buffers: Vec<[f32; FRAME_SIZE]>,
@@ -1753,16 +1762,16 @@ impl FMSynthContext {
         &self.sample_mapping_manager,
       );
 
-      // TODO: Skip rendering filter ADSR if not enabled
-      // Currently hard-coded output range from [20, 44_100 / 2]
-      let filter_adsr_shift = 20.;
-      let filter_adsr_scale = 44_100. / 2. - filter_adsr_shift;
-      voice.filter_envelope_generator.render_frame(
-        filter_adsr_scale,
-        filter_adsr_shift,
-        cur_bpm,
-        cur_frame_start_beat,
-      );
+      if !voice.filter_module.is_bypassed {
+        voice.filter_module.apply_frame(
+          &mut voice.filter_envelope_generator,
+          output_buffer,
+          &self.filter_param_buffers,
+          cur_bpm,
+          cur_frame_start_beat,
+        );
+      }
+
       // TODO: SIMD-ify
       let gain_adsr_output = voice.gain_envelope_generator.adsr.get_cur_frame_output();
       for i in 0..FRAME_SIZE {
@@ -1828,6 +1837,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     voices: Vec::with_capacity(voice_count),
     modulation_matrix: ModulationMatrix::default(),
     param_buffers: uninit(),
+    filter_param_buffers: uninit(),
     operator_base_frequency_sources: uninit(),
     base_frequency_input_buffer: Vec::with_capacity(voice_count),
     output_buffers: Vec::with_capacity(voice_count),

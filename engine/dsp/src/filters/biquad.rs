@@ -25,9 +25,41 @@ pub enum FilterMode {
   Highshelf,
 }
 
+impl FilterMode {
+  pub fn needs_gain(&self) -> bool {
+    match self {
+      FilterMode::Lowpass => false,
+      FilterMode::Highpass => false,
+      FilterMode::Bandpass => false,
+      FilterMode::Notch => false,
+      FilterMode::Peak => true,
+      FilterMode::Lowshelf => true,
+      FilterMode::Highshelf => true,
+    }
+  }
+
+  pub fn needs_q(&self) -> bool {
+    match self {
+      FilterMode::Lowpass => true,
+      FilterMode::Highpass => true,
+      FilterMode::Bandpass => true,
+      FilterMode::Notch => true,
+      FilterMode::Peak => true,
+      FilterMode::Lowshelf => false,
+      FilterMode::Highshelf => false,
+    }
+  }
+}
+
 impl BiquadFilter {
   #[inline]
-  pub fn set_coefficients(&mut self, mode: FilterMode, q: f32, detune: f32, freq: f32, gain: f32) {
+  pub fn compute_coefficients(
+    mode: FilterMode,
+    q: f32,
+    detune: f32,
+    freq: f32,
+    gain: f32,
+  ) -> (f32, f32, f32, f32, f32) {
     // From: https://webaudio.github.io/web-audio-api/#filters-characteristics
     let computed_frequency = freq * 2.0f32.powf(detune / 1200.0);
     let normalized_freq = computed_frequency / NYQUIST;
@@ -42,21 +74,22 @@ impl BiquadFilter {
 
     let (b0, b1, b2, a0, a1, a2);
 
+    let w0_cos = w0.cos();
     match mode {
       FilterMode::Lowpass => {
-        b0 = (1. - w0.cos()) / 2.;
-        b1 = 1. - w0.cos();
-        b2 = (1. - w0.cos()) / 2.;
+        b0 = (1. - w0_cos) / 2.;
+        b1 = 1. - w0_cos;
+        b2 = (1. - w0_cos) / 2.;
         a0 = 1. + aqdb;
-        a1 = -2. * w0.cos();
+        a1 = -2. * w0_cos;
         a2 = 1. - aqdb;
       },
       FilterMode::Highpass => {
-        b0 = (1. + w0.cos()) / 2.;
-        b1 = -(1. + w0.cos());
-        b2 = (1. + w0.cos()) / 2.;
+        b0 = (1. + w0_cos) / 2.;
+        b1 = -(1. + w0_cos);
+        b2 = (1. + w0_cos) / 2.;
         a0 = 1. + aqdb;
-        a1 = -2. * w0.cos();
+        a1 = -2. * w0_cos;
         a2 = 1. - aqdb;
       },
       FilterMode::Bandpass => {
@@ -64,48 +97,60 @@ impl BiquadFilter {
         b1 = 0.;
         b2 = -aq;
         a0 = 1. + aq;
-        a1 = -2. * w0.cos();
+        a1 = -2. * w0_cos;
         a2 = 1. - aq;
       },
       FilterMode::Notch => {
         b0 = 1.;
-        b1 = -2. * w0.cos();
+        b1 = -2. * w0_cos;
         b2 = 1.;
         a0 = 1. + aq;
-        a1 = -2. * w0.cos();
+        a1 = -2. * w0_cos;
         a2 = 1. - aq;
       },
       FilterMode::Peak => {
         b0 = 1. + aq * A;
-        b1 = -2. * w0.cos();
+        b1 = -2. * w0_cos;
         b2 = 1. - aq * A;
         a0 = 1. + aq / A;
-        a1 = -2. * w0.cos();
+        a1 = -2. * w0_cos;
         a2 = 1. - aq / A;
       },
       FilterMode::Lowshelf => {
-        b0 = A * ((A + 1.) - (A - 1.) * w0.cos() + 2. * a_s * A.sqrt());
-        b1 = 2. * A * ((A - 1.) - (A + 1.) * w0.cos());
-        b2 = A * ((A + 1.) - (A - 1.) * w0.cos() - 2. * a_s * A.sqrt());
-        a0 = (A + 1.) + (A - 1.) * w0.cos() + 2. * a_s * A.sqrt();
-        a1 = -2. * ((A - 1.) + (A + 1.) * w0.cos());
-        a2 = (A + 1.) + (A - 1.) * w0.cos() - 2. * a_s * A.sqrt();
+        #[allow(non_snake_case)]
+        let A_sqrt = A.sqrt();
+        b0 = A * ((A + 1.) - (A - 1.) * w0_cos + 2. * a_s * A_sqrt);
+        b1 = 2. * A * ((A - 1.) - (A + 1.) * w0_cos);
+        b2 = A * ((A + 1.) - (A - 1.) * w0_cos - 2. * a_s * A_sqrt);
+        a0 = (A + 1.) + (A - 1.) * w0_cos + 2. * a_s * A_sqrt;
+        a1 = -2. * ((A - 1.) + (A + 1.) * w0_cos);
+        a2 = (A + 1.) + (A - 1.) * w0_cos - 2. * a_s * A_sqrt;
       },
       FilterMode::Highshelf => {
-        b0 = A * ((A + 1.) + (A - 1.) * w0.cos() + 2. * a_s * A.sqrt());
-        b1 = -2. * A * ((A - 1.) + (A + 1.) * w0.cos());
-        b2 = A * ((A + 1.) + (A - 1.) * w0.cos() - 2. * a_s * A.sqrt());
-        a0 = (A + 1.) - (A - 1.) * w0.cos() + 2. * a_s * A.sqrt();
-        a1 = 2. * ((A - 1.) - (A + 1.) * w0.cos());
-        a2 = (A + 1.) - (A - 1.) * w0.cos() - 2. * a_s * A.sqrt();
+        #[allow(non_snake_case)]
+        let A_sqrt = A.sqrt();
+        b0 = A * ((A + 1.) + (A - 1.) * w0_cos + 2. * a_s * A_sqrt);
+        b1 = -2. * A * ((A - 1.) + (A + 1.) * w0_cos);
+        b2 = A * ((A + 1.) + (A - 1.) * w0_cos - 2. * a_s * A_sqrt);
+        a0 = (A + 1.) - (A - 1.) * w0_cos + 2. * a_s * A_sqrt;
+        a1 = 2. * ((A - 1.) - (A + 1.) * w0_cos);
+        a2 = (A + 1.) - (A - 1.) * w0_cos - 2. * a_s * A_sqrt;
       },
     }
 
-    self.b0_over_a0 = b0 / a0;
-    self.b1_over_a0 = b1 / a0;
-    self.b2_over_a0 = b2 / a0;
-    self.a1_over_a0 = a1 / a0;
-    self.a2_over_a0 = a2 / a0;
+    (b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
+  }
+
+  #[inline]
+  pub fn set_coefficients(&mut self, mode: FilterMode, q: f32, detune: f32, freq: f32, gain: f32) {
+    let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
+      Self::compute_coefficients(mode, q, detune, freq, gain);
+
+    self.b0_over_a0 = b0_over_a0;
+    self.b1_over_a0 = b1_over_a0;
+    self.b2_over_a0 = b2_over_a0;
+    self.a1_over_a0 = a1_over_a0;
+    self.a2_over_a0 = a2_over_a0;
   }
 
   #[inline]
@@ -126,6 +171,44 @@ impl BiquadFilter {
     self.y = [output, self.y[0]];
 
     output
+  }
+
+  #[inline]
+  pub fn apply_with_coefficients(
+    &mut self,
+    input: f32,
+    b0_over_a0: f32,
+    b1_over_a0: f32,
+    b2_over_a0: f32,
+    a1_over_a0: f32,
+    a2_over_a0: f32,
+  ) -> f32 {
+    let output = b0_over_a0 * input + b1_over_a0 * self.x[0] + b2_over_a0 * self.x[1]
+      - a1_over_a0 * self.y[0]
+      - a2_over_a0 * self.y[1];
+
+    self.x = [input, self.x[0]];
+    self.y = [output, self.y[0]];
+
+    output
+  }
+
+  #[inline]
+  pub fn compute_coefficients_and_apply(
+    &mut self,
+    mode: FilterMode,
+    q: f32,
+    detune: f32,
+    freq: f32,
+    gain: f32,
+    input: f32,
+  ) -> f32 {
+    let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
+      Self::compute_coefficients(mode, q, detune, freq, gain);
+
+    self.apply_with_coefficients(
+      input, b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0,
+    )
   }
 }
 
@@ -262,7 +345,6 @@ impl<const BANK_COUNT: usize, const BANK_LENGTH: usize>
 
       output[band_ix] = outs;
     }
-    // }
   }
 }
 

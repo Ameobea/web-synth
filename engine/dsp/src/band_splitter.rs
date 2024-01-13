@@ -1,5 +1,8 @@
 use crate::{
-  filters::biquad::{BiquadFilter, FilterMode},
+  filters::{
+    biquad::{BiquadFilter, FilterMode},
+    filter_chain::apply_filter_chain_full,
+  },
   FRAME_SIZE,
 };
 
@@ -7,23 +10,6 @@ const BAND_SPLITTER_FILTER_ORDER: usize = 16;
 const BAND_SPLITTER_FILTER_CHAIN_LENGTH: usize = BAND_SPLITTER_FILTER_ORDER / 2;
 const LOW_BAND_CUTOFF: f32 = 88.3;
 const MID_BAND_CUTOFF: f32 = 2500.;
-
-fn apply_filter_chain_full<const N: usize>(
-  chain: &mut [BiquadFilter; N],
-  input_buf: [f32; FRAME_SIZE],
-  output_buf: &mut [f32; FRAME_SIZE],
-) {
-  let mut filtered = input_buf;
-  for filter in chain.iter_mut() {
-    for i in 0..FRAME_SIZE {
-      filtered[i] = filter.apply(filtered[i]);
-    }
-  }
-
-  for i in 0..FRAME_SIZE {
-    output_buf[i] = filtered[i];
-  }
-}
 
 pub struct BandSplitter {
   pub low_band_filter_chain: [BiquadFilter; BAND_SPLITTER_FILTER_CHAIN_LENGTH],
