@@ -84,14 +84,6 @@ const buildFilterSettings = (
       : Object.values(FilterType).filter(isFilterTypePrimitive),
     initial: FilterType.Lowpass,
   },
-  detune: {
-    type: 'range',
-    label: 'detune',
-    min: -200,
-    max: 200,
-    initial: 0,
-    step: 1,
-  },
   frequency: {
     type: 'range',
     label: 'frequency',
@@ -161,7 +153,6 @@ export const getSettingsForFilterType = ({
       includeBypass ? filterSettings.bypass : null,
       filterSettings.type,
       filterSettings.frequency,
-      filterSettings.detune,
       ...(() => {
         switch (filterType) {
           case FilterType.Lowshelf:

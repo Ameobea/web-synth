@@ -75,10 +75,9 @@ const FilterInstInner: React.FC<FilterInstProps> = ({
       type: params.type,
       frequency: params.frequency,
       Q: params.Q,
-      detune: params.detune,
       gain: params.gain,
     }),
-    [params.Q, params.detune, params.frequency, params.gain, params.type]
+    [params.Q, params.frequency, params.gain, params.type]
   );
   const handleChange = useCallback(
     (key: string, val: any) => {
@@ -176,7 +175,6 @@ class FilterDesigner {
         const responses = new Float32Array(DATA_SIZE);
         ScratchFilter.frequency.value = oaps.frequency.manualControl.offset.value;
         ScratchFilter.Q.value = oaps.Q.manualControl.offset.value;
-        ScratchFilter.detune.value = oaps.detune.manualControl.offset.value;
         ScratchFilter.gain.value = oaps.gain.manualControl.offset.value;
         ScratchFilter.type = filter.type;
         ScratchFilter.getFrequencyResponse(FREQUENCIES, responses, new Float32Array(DATA_SIZE));
@@ -345,7 +343,6 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
       const params = buildDefaultFilter(FilterType.Lowpass, 0.74);
       const oaps = {
         frequency: new OverridableAudioParam(ctx, newFilter.frequency, undefined, true),
-        detune: new OverridableAudioParam(ctx, newFilter.detune, undefined, true),
         Q: new OverridableAudioParam(ctx, newFilter.Q, undefined, true),
         gain: new OverridableAudioParam(ctx, newFilter.gain, undefined, true),
       };

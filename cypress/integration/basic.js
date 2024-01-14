@@ -20,7 +20,6 @@ context('Entrypoint', () => {
 
     cy.get('.control-panel-setting-label').should('contain.text', 'volume');
     cy.get('.control-panel-setting-label').should('contain.text', 'wavetable fm');
-    cy.get('.control-panel-setting-label').should('contain.text', 'detune');
     cy.get('.control-panel-setting-label').should('contain.text', 'order 2 wtable fm');
     cy.get('.control-panel-setting-label').should('contain.text', 'lfo len samples');
     cy.get('.control-panel-setting-label').should('contain.text', 'reverb room size');

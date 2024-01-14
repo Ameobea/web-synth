@@ -17,44 +17,44 @@ pub struct BandSplitter {
   pub high_band_filter_chain: [BiquadFilter; BAND_SPLITTER_FILTER_CHAIN_LENGTH],
 }
 
+// computed using `compute_higher_order_biquad_q_factors`
+const Q_FACTORS: [f32; 8] = [
+  -5.9786735, -5.638297, -4.929196, -3.7843077, -2.067771, 0.5116703, 4.7229195, 14.153371,
+];
+
 impl BandSplitter {
   pub fn new() -> Self {
-    // computed using `compute_higher_order_biquad_q_factors`
-    let q_factors = [
-      -5.9786735, -5.638297, -4.929196, -3.7843077, -2.067771, 0.5116703, 4.7229195, 14.153371,
-    ];
-
     let mut low_band_filter_chain = [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
     let mut mid_band_bottom_filter_chain =
       [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
     let mut mid_band_top_filter_chain =
       [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
     let mut high_band_filter_chain = [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
-    for i in 0..q_factors.len() {
+    for i in 0..Q_FACTORS.len() {
       low_band_filter_chain[i].set_coefficients(
         FilterMode::Lowpass,
-        q_factors[i],
+        Q_FACTORS[i],
         0.,
         LOW_BAND_CUTOFF,
         0.,
       );
       mid_band_bottom_filter_chain[i].set_coefficients(
         FilterMode::Highpass,
-        q_factors[i],
+        Q_FACTORS[i],
         0.,
         LOW_BAND_CUTOFF + 7.5,
         0.,
       );
       mid_band_top_filter_chain[i].set_coefficients(
         FilterMode::Lowpass,
-        q_factors[i],
+        Q_FACTORS[i],
         0.,
         MID_BAND_CUTOFF - 184.8,
         0.,
       );
       high_band_filter_chain[i].set_coefficients(
         FilterMode::Highpass,
-        q_factors[i],
+        Q_FACTORS[i],
         0.,
         MID_BAND_CUTOFF,
         0.,

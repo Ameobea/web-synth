@@ -18,7 +18,7 @@ use crate::{WaveTable, WaveTableSettings};
 
 use self::{
   effects::EffectChain,
-  filter::FilterModule,
+  filter::{FilterModule, FilterType},
   samples::{
     init_sample_manager, sample_manager, SampleMappingEmitter, SampleMappingManager,
     SampleMappingOperatorConfig, TunedSampleEmitter,
@@ -879,7 +879,7 @@ pub struct FMSynthVoice {
   cached_modulation_indices: [[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
   pub gain_envelope_generator: ManagedAdsr,
   pub filter_envelope_generator: ManagedAdsr,
-  pub filter_module: FilterModule,
+  pub(crate) filter_module: FilterModule,
   pub last_gated_midi_number: usize,
 }
 
@@ -1231,7 +1231,6 @@ impl ParamSource {
           last_val: _,
           cur_val: old_cur_val,
         } => {
-          // old_last_val.set(*old_cur_val);
           *old_cur_val = new_val;
         },
         other => *other = new,
@@ -2695,4 +2694,87 @@ pub unsafe extern "C" fn fm_synth_get_filter_adsr_output_buf_ptr(
     .adsr
     .get_cur_frame_output()
     .as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_filter_bypassed(ctx: *mut FMSynthContext, bypassed: bool) {
+  let ctx = unsafe { &mut *ctx };
+  for voice in &mut ctx.voices {
+    voice.filter_module.is_bypassed = bypassed;
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_filter_type(ctx: *mut FMSynthContext, filter_type: usize) {
+  let ctx = unsafe { &mut *ctx };
+  for voice in &mut ctx.voices {
+    let new_filter_type = FilterType::from_usize(filter_type);
+    voice.filter_module.set_filter_type(new_filter_type);
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_filter_q_param_source(
+  ctx: *mut FMSynthContext,
+  param_type: isize,
+  param_int_val: usize,
+  param_float_val: f32,
+  param_float_val_2: f32,
+  param_float_val_3: f32,
+) {
+  let ctx = unsafe { &mut *ctx };
+  let param = ParamSource::from_parts(
+    param_type as usize,
+    param_int_val,
+    param_float_val,
+    param_float_val_2,
+    param_float_val_3,
+  );
+  for voice in &mut ctx.voices {
+    voice.filter_module.set_q(param.clone())
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_filter_cutoff_frequency_param_source(
+  ctx: *mut FMSynthContext,
+  param_type: isize,
+  param_int_val: usize,
+  param_float_val: f32,
+  param_float_val_2: f32,
+  param_float_val_3: f32,
+) {
+  let ctx = unsafe { &mut *ctx };
+  let param = ParamSource::from_parts(
+    param_type as usize,
+    param_int_val,
+    param_float_val,
+    param_float_val_2,
+    param_float_val_3,
+  );
+  for voice in &mut ctx.voices {
+    voice.filter_module.set_cutoff_freq(param.clone())
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_filter_gain_param_source(
+  ctx: *mut FMSynthContext,
+  param_type: isize,
+  param_int_val: usize,
+  param_float_val: f32,
+  param_float_val_2: f32,
+  param_float_val_3: f32,
+) {
+  let ctx = unsafe { &mut *ctx };
+  let param = ParamSource::from_parts(
+    param_type as usize,
+    param_int_val,
+    param_float_val,
+    param_float_val_2,
+    param_float_val_3,
+  );
+  for voice in &mut ctx.voices {
+    voice.filter_module.set_gain(param.clone())
+  }
 }

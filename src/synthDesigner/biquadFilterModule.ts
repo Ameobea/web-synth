@@ -22,7 +22,6 @@ export const computeHigherOrderBiquadQFactors = (order: number): number[] => {
 export interface FilterCSNs {
   frequency: OverridableAudioParam;
   Q: OverridableAudioParam;
-  detune: OverridableAudioParam;
   gain: OverridableAudioParam;
 }
 
@@ -137,7 +136,6 @@ export class HigherOrderBiquadFilter implements AbstractFilterModule {
     this.inner.forEach(node => {
       // do not connect Q except for the last node since we artisinally craft the other Q factors to
       // preserve a butterworth frequency repsonse
-      csns.detune.outputCSN!.connect(node.detune);
       csns.frequency.outputCSN!.connect(node.frequency);
       csns.gain.outputCSN!.connect(node.gain);
     });
@@ -213,7 +211,6 @@ export class SingleBiquadFilterModule implements AbstractFilterModule {
 
     csns.frequency.outputCSN!.connect(this.inner.frequency);
     csns.Q.outputCSN!.connect(this.inner.Q);
-    csns.detune.outputCSN!.connect(this.inner.detune);
     csns.gain.outputCSN!.connect(this.inner.gain);
   }
 

@@ -64,7 +64,7 @@ const actionGroups = {
             const xControl = i !== 0 ? new OverridableAudioParam(ctx) : undefined;
             if (xControl) {
               xControl!.manualControl.offset.value = pt.x;
-              xControl.onOverrideStatusChange(() =>
+              xControl.registerOverrideStatusChangeCb(() =>
                 setTimeout(() =>
                   dispatch(actionCreators.equalizer.SET_KNOB_IS_MANUALLY_CONTROLLED(vcId, pt.index))
                 )

@@ -23,6 +23,7 @@ pub enum FilterMode {
   Peak,
   Lowshelf,
   Highshelf,
+  Allpass,
 }
 
 impl FilterMode {
@@ -35,6 +36,7 @@ impl FilterMode {
       FilterMode::Peak => true,
       FilterMode::Lowshelf => true,
       FilterMode::Highshelf => true,
+      FilterMode::Allpass => false,
     }
   }
 
@@ -47,6 +49,7 @@ impl FilterMode {
       FilterMode::Peak => true,
       FilterMode::Lowshelf => false,
       FilterMode::Highshelf => false,
+      FilterMode::Allpass => true,
     }
   }
 }
@@ -135,6 +138,14 @@ impl BiquadFilter {
         a0 = (A + 1.) - (A - 1.) * w0_cos + 2. * a_s * A_sqrt;
         a1 = 2. * ((A - 1.) - (A + 1.) * w0_cos);
         a2 = (A + 1.) - (A - 1.) * w0_cos - 2. * a_s * A_sqrt;
+      },
+      FilterMode::Allpass => {
+        b0 = 1. - aq;
+        b1 = -2. * w0_cos;
+        b2 = 1. + aq;
+        a0 = 1. + aq;
+        a1 = -2. * w0_cos;
+        a2 = 1. - aq;
       },
     }
 

@@ -42,8 +42,8 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
   input.gain.value = 1;
 
   const filterParams: FilterParams[] = [
-    { type: FilterType.Lowpass, frequency: 1000, Q: 0.71, gain: 0, detune: 0 },
-    { type: FilterType.Lowpass, frequency: 8800, Q: 11.71, gain: 0, detune: 0 },
+    { type: FilterType.Lowpass, frequency: 1000, Q: 0.71, gain: 0 },
+    { type: FilterType.Lowpass, frequency: 8800, Q: 11.71, gain: 0 },
   ];
 
   const filterGroups = [
@@ -55,7 +55,6 @@ const buildDefaultFilterDesignerState = (): FilterDesignerState => {
       filter.gain.value = 0;
       const oaps = {
         frequency: new OverridableAudioParam(ctx, filter.frequency, undefined, true),
-        detune: new OverridableAudioParam(ctx, filter.detune, undefined, true),
         Q: new OverridableAudioParam(ctx, filter.Q, undefined, true),
         gain: new OverridableAudioParam(ctx, filter.gain, undefined, true),
       };
@@ -149,24 +148,13 @@ export const get_filter_designer_audio_connectables = (
     node: state.input,
   });
   for (const [groupIx, group] of state.filterGroups.entries()) {
-    // acc
-    //       .set(`synth_${voiceIx}_filter_frequency`, {
-    //         node: synth.filterCSNs.frequency,
-    //         type: 'number',
-    //       })
-    //       .set(`synth_${voiceIx}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' })
-    //       .set(`synth_${voiceIx}_filter_detune`, {
-    //         node: synth.filterCSNs.detune,
-    //         type: 'number',
-    //       })
     for (const [filterIx, { filter }] of group.entries()) {
       inputs = inputs
         .set(`group_${groupIx}_filter_${filterIx}_frequency`, {
           node: filter.frequency,
           type: 'number',
         })
-        .set(`group_${groupIx}_filter_${filterIx}_q`, { node: filter.Q, type: 'number' })
-        .set(`group_${groupIx}_filter_${filterIx}_detune`, { node: filter.detune, type: 'number' });
+        .set(`group_${groupIx}_filter_${filterIx}_q`, { node: filter.Q, type: 'number' });
     }
   }
 

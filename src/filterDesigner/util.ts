@@ -11,7 +11,6 @@ export interface FilterDescriptor {
   filter: BiquadFilterNode;
   oaps: {
     frequency: OverridableAudioParam;
-    detune: OverridableAudioParam;
     Q: OverridableAudioParam;
     gain: OverridableAudioParam;
   };
@@ -53,7 +52,6 @@ export const deserializeFilterDesigner = (
       filter.gain.value = 0;
       const oaps = {
         frequency: new OverridableAudioParam(ctx, filter.frequency, undefined, true),
-        detune: new OverridableAudioParam(ctx, filter.detune, undefined, true),
         Q: new OverridableAudioParam(ctx, filter.Q, undefined, true),
         gain: new OverridableAudioParam(ctx, filter.gain, undefined, true),
       };
@@ -104,12 +102,10 @@ export const setFilter = (
 
   if (oaps) {
     oaps.frequency.manualControl.offset.value = frequency;
-    oaps.detune.manualControl.offset.value = params.detune;
     oaps.Q.manualControl.offset.value = params.Q ?? 1;
     oaps.gain.manualControl.offset.value = params.gain;
   } else {
     filter.frequency.value = frequency;
-    filter.detune.value = params.detune;
     filter.Q.value = params.Q ?? 1;
     filter.gain.value = params.gain;
   }

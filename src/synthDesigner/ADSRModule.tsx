@@ -71,7 +71,7 @@ export class ADSR2Module {
     params: ADSR2Params,
     instanceCount: number,
     audioThreadData?: AudioThreadData,
-    earlyReleaseMode: EarlyReleaseMode = { type: EarlyReleaseModeType.LinearMix, param: 2640 }
+    earlyReleaseMode: EarlyReleaseMode = { type: EarlyReleaseModeType.LinearMix, param: 6640 }
   ) {
     this.ctx = ctx;
     this.outputRange = [params.minValue ?? 0, params.maxValue ?? 1];

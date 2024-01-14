@@ -192,11 +192,7 @@ export const get_synth_designer_audio_connectables = (stateKey: string): AudioCo
             node: synth.filterCSNs.frequency,
             type: 'number',
           })
-          .set(`synth_${voiceIx}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' })
-          .set(`synth_${voiceIx}_filter_detune`, {
-            node: synth.filterCSNs.detune,
-            type: 'number',
-          });
+          .set(`synth_${voiceIx}_filter_q`, { node: synth.filterCSNs.Q, type: 'number' });
 
         const awpNode = synth.fmSynth!.getAWPNode();
         return new Array(PARAM_BUFFER_COUNT).fill(null as any).reduce(

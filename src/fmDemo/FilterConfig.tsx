@@ -29,12 +29,10 @@ export class FilterContainer {
     this.output = new GainNode(ctx);
     this.csns = {
       frequency: new OverridableAudioParam(ctx),
-      detune: new OverridableAudioParam(ctx),
       Q: new OverridableAudioParam(ctx),
       gain: new OverridableAudioParam(ctx),
     };
     this.csns.Q.manualControl.offset.value = params.Q ?? 0;
-    this.csns.detune.manualControl.offset.value = params.detune;
     this.csns.frequency.manualControl.offset.value = params.frequency;
     this.csns.gain.manualControl.offset.value = params.gain ?? 0;
 
@@ -43,7 +41,7 @@ export class FilterContainer {
     this.inner.getOutput().connect(this.output);
   }
 
-  public set(key: 'frequency' | 'detune' | 'gain' | 'Q', val: number) {
+  public set(key: 'frequency' | 'gain' | 'Q', val: number) {
     this.csns[key].manualControl.offset.value = val;
   }
   public setType(newType: FilterType) {
@@ -80,7 +78,6 @@ const handleFilterChange = (
     case 'frequency':
     case 'Q':
     case 'gain':
-    case 'detune':
       newState.params[key] = val;
       filters.forEach(filter => filter.set(key, val));
       break;

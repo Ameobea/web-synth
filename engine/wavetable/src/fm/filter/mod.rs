@@ -7,11 +7,18 @@ use dsp::{
   FRAME_SIZE,
 };
 
+use self::dynabandpass::DynabandpassFilter;
+
 use super::{ParamSource, RenderRawParams, FILTER_PARAM_BUFFER_COUNT};
+
+pub mod dynabandpass;
+
+const ZERO_FRAME: [f32; FRAME_SIZE] = [0.; FRAME_SIZE];
 
 #[derive(Clone, Copy)]
 #[repr(usize)]
-enum FilterType {
+#[allow(dead_code)]
+pub(crate) enum FilterType {
   Lowpass = 0,
   LP4 = 1,
   LP8 = 2,
@@ -36,13 +43,29 @@ enum FilterType {
   Allpass = 21,
 }
 
+impl FilterType {
+  pub fn from_usize(val: usize) -> Self {
+    if val > Self::Allpass as usize {
+      panic!("Invalid FilterType value: {}", val);
+    }
+    unsafe { std::mem::transmute(val) }
+  }
+}
+
 #[derive(Clone)]
-enum FilterState {
+pub(crate) enum FilterState {
   SimpleBiquad(FilterMode, BiquadFilter),
   Order4Biquad(FilterMode, [BiquadFilter; 2]),
   Order8Biquad(FilterMode, [BiquadFilter; 4]),
   Order16Biquad(FilterMode, [BiquadFilter; 8]),
+  DynaBandpass(DynabandpassFilter),
 }
+
+const PRECOMPUTED_ORDER_4_BASE_Q_FACTORS: [f32; 2] = [-5.3329067, 2.322607];
+const PRECOMPUTED_ORDER_8_BASE_Q_FACTORS: [f32; 4] = [-5.852078, -4.417527, -0.91537845, 8.174685];
+const PRECOMPUTED_ORDER_16_BASE_Q_FACTORS: [f32; 8] = [
+  -5.9786735, -5.638297, -4.929196, -3.7843077, -2.067771, 0.5116703, 4.7229195, 14.153371,
+];
 
 impl FilterState {
   pub fn new_simple_biquad(filter_mode: FilterMode) -> Self {
@@ -67,6 +90,7 @@ impl FilterState {
       FilterState::Order4Biquad(filter_mode, _) => *filter_mode,
       FilterState::Order8Biquad(filter_mode, _) => *filter_mode,
       FilterState::Order16Biquad(filter_mode, _) => *filter_mode,
+      FilterState::DynaBandpass(_) => panic!("DynaBandpass should be special-cased"),
     }
   }
 
@@ -95,6 +119,7 @@ impl FilterState {
         chain,
         frame,
         *filter_mode,
+        &PRECOMPUTED_ORDER_4_BASE_Q_FACTORS,
         q,
         cutoff_freq,
         gain,
@@ -103,6 +128,7 @@ impl FilterState {
         chain,
         frame,
         *filter_mode,
+        &PRECOMPUTED_ORDER_8_BASE_Q_FACTORS,
         q,
         cutoff_freq,
         gain,
@@ -112,10 +138,12 @@ impl FilterState {
           chain,
           frame,
           *filter_mode,
+          &PRECOMPUTED_ORDER_16_BASE_Q_FACTORS,
           q,
           cutoff_freq,
           gain,
         ),
+      FilterState::DynaBandpass(filter) => filter.apply_frame(frame, cutoff_freq),
     }
   }
 }
@@ -149,8 +177,6 @@ impl Default for FilterModule {
   }
 }
 
-const ZERO_FRAME: [f32; FRAME_SIZE] = [0.; FRAME_SIZE];
-
 impl FilterModule {
   pub fn set_filter_type(&mut self, new_filter_type: FilterType) {
     self.filter_type = new_filter_type;
@@ -167,20 +193,26 @@ impl FilterModule {
       FilterType::BP4 => FilterState::new_order4_biquad(FilterMode::Bandpass),
       FilterType::BP8 => FilterState::new_order8_biquad(FilterMode::Bandpass),
       FilterType::BP16 => FilterState::new_order16_biquad(FilterMode::Bandpass),
-      FilterType::DynaBp50 => FilterState::new_simple_biquad(FilterMode::Bandpass),
-      FilterType::DynaBp100 => FilterState::new_simple_biquad(FilterMode::Bandpass),
-      FilterType::DynaBp200 => FilterState::new_simple_biquad(FilterMode::Bandpass),
-      FilterType::DynaBp400 => FilterState::new_simple_biquad(FilterMode::Bandpass),
-      FilterType::DynaBp800 => FilterState::new_simple_biquad(FilterMode::Bandpass),
+      FilterType::DynaBp50 => FilterState::DynaBandpass(DynabandpassFilter::new(50.)),
+      FilterType::DynaBp100 => FilterState::DynaBandpass(DynabandpassFilter::new(100.)),
+      FilterType::DynaBp200 => FilterState::DynaBandpass(DynabandpassFilter::new(200.)),
+      FilterType::DynaBp400 => FilterState::DynaBandpass(DynabandpassFilter::new(400.)),
+      FilterType::DynaBp800 => FilterState::DynaBandpass(DynabandpassFilter::new(800.)),
       FilterType::Lowshelf => FilterState::new_simple_biquad(FilterMode::Lowshelf),
       FilterType::Highshelf => FilterState::new_simple_biquad(FilterMode::Highshelf),
       FilterType::Peaking => FilterState::new_simple_biquad(FilterMode::Peak),
       FilterType::Notch => FilterState::new_simple_biquad(FilterMode::Notch),
-      FilterType::Allpass => unimplemented!(),
+      FilterType::Allpass => FilterState::new_simple_biquad(FilterMode::Allpass),
     };
   }
 
-  // TODO: Setters for param sources
+  pub fn set_q(&mut self, new_q: ParamSource) { self.q.replace(new_q); }
+
+  pub fn set_cutoff_freq(&mut self, new_cutoff_freq: ParamSource) {
+    self.cutoff_freq.replace(new_cutoff_freq);
+  }
+
+  pub fn set_gain(&mut self, new_gain: ParamSource) { self.gain.replace(new_gain); }
 
   pub fn apply_frame(
     &mut self,

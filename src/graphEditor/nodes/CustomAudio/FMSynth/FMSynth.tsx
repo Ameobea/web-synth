@@ -40,6 +40,9 @@ import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/samp
 import { getSentry } from 'src/sentry';
 import { AsyncOnce, normalizeEnvelope } from 'src/util';
 import { EventScheduleInitialized } from 'src/eventScheduler';
+import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
+import { FilterType } from 'src/synthDesigner/FilterType';
 
 const OPERATOR_COUNT = 8;
 const VOICE_COUNT = 10;
@@ -197,6 +200,8 @@ export default class FMSynth implements ForeignNode {
     releasePoint: 0.7,
     audioThreadData: { phaseIndex: 254 },
   };
+  private filterBypassed = true;
+  private filterParams: FilterParams = buildDefaultFilter(FilterType.Lowpass, 1);
   private gateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
@@ -386,6 +391,8 @@ export default class FMSynth implements ForeignNode {
             this.setEffect(null, effectIx, effect)
           );
           this.handleDetuneChange(this.detune);
+          this.setFilterBypassed(this.filterBypassed);
+          this.setFilterParams(this.filterParams);
           this.sampleMappingStore.subscribe(this.handleSampleMappingStateChange);
 
           for (const cb of this.onInitializedCBs) {
@@ -620,6 +627,48 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
+  public setFilterBypassed(isBypassed: boolean) {
+    this.filterBypassed = isBypassed;
+    if (this.awpHandle) {
+      this.awpHandle.port.postMessage({ type: 'setFilterBypassed', isBypassed });
+    }
+  }
+
+  private encodeFilterType(filterType: FilterType): number {
+    return {
+      [FilterType.Lowpass]: 0,
+      [FilterType.LP4]: 1,
+      [FilterType.LP8]: 2,
+      [FilterType.LP16]: 3,
+      [FilterType.Highpass]: 4,
+      [FilterType.HP4]: 5,
+      [FilterType.HP8]: 6,
+      [FilterType.HP16]: 7,
+      [FilterType.Bandpass]: 8,
+      [FilterType.BP4]: 9,
+      [FilterType.BP8]: 10,
+      [FilterType.BP16]: 11,
+      [FilterType.DynaBP_50]: 12,
+      [FilterType.DynaBP_100]: 13,
+      [FilterType.DynaBP_200]: 14,
+      [FilterType.DynaBP_400]: 15,
+      [FilterType.DynaBP_800]: 16,
+      [FilterType.Lowshelf]: 17,
+      [FilterType.Highshelf]: 18,
+      [FilterType.Peaking]: 19,
+      [FilterType.Notch]: 20,
+      [FilterType.Allpass]: 21,
+    }[filterType];
+  }
+
+  public setFilterParams(params: FilterParams) {
+    this.filterParams = params;
+    if (this.awpHandle) {
+      const encodedFilterType = this.encodeFilterType(params.type);
+      // TODO
+    }
+  }
+
   public onInitialized(): Promise<FMSynth> {
     if (this.awpHandle) {
       return Promise.resolve(this);
@@ -836,6 +885,12 @@ export default class FMSynth implements ForeignNode {
     }
     if (!R.isNil(params.useLegacyWavetableControls)) {
       this.useLegacyWavetableControls = params.useLegacyWavetableControls;
+    }
+    if (!R.isNil(params.filterBypassed)) {
+      this.setFilterBypassed(params.filterBypassed);
+    }
+    if (!R.isNil(params.filterParams)) {
+      this.setFilterParams(params.filterParams);
     }
   }
 

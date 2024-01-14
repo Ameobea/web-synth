@@ -28,7 +28,6 @@ export interface FilterParams {
   frequency: number;
   Q?: number;
   gain: number;
-  detune: number;
 }
 
 export interface Voice {
@@ -225,7 +224,6 @@ const buildDefaultFilterCSNs = (): FilterCSNs => ({
   frequency: new OverridableAudioParam(ctx),
   Q: new OverridableAudioParam(ctx),
   gain: new OverridableAudioParam(ctx),
-  detune: new OverridableAudioParam(ctx),
 });
 
 const buildDefaultFilterModule = (
@@ -351,6 +349,8 @@ export const deserializeSynthModule = (
   const vcId = stateKey.split('_')[1]!;
   const fmSynth = new FMSynth(ctx, undefined, {
     ...(fmSynthConfig || {}),
+    filterBypassed,
+    filterParams,
     gainEnvelope: gainEnvelope
       ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
       : fmSynthConfig.gainEnvelope,

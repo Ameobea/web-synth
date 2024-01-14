@@ -354,6 +354,15 @@ class FMSynthAWP extends AudioWorkletProcessor {
           );
           break;
         }
+        case 'setFilterBypassed': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set filter bypassed before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.fm_synth_set_filter_bypassed(this.ctxPtr, evt.data.isBypassed);
+          break;
+        }
         case 'shutdown': {
           this.shutdown = true;
           break;
