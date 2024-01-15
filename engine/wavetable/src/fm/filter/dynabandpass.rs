@@ -39,8 +39,8 @@ fn compute_modified_dynabandpass_filter_bandwidth(
 fn compute_filter_cutoff_frequencies(center_frequency: f32, base_bandwidth: f32) -> (f32, f32) {
   let bandwidth =
     compute_modified_dynabandpass_filter_bandwidth(10., base_bandwidth, center_frequency);
-  let highpass_freq = dsp::clamp(10., NYQUIST, center_frequency - bandwidth / 2.);
-  let lowpass_freq = dsp::clamp(10., NYQUIST, center_frequency + bandwidth / 2.);
+  let highpass_freq = dsp::clamp(10., NYQUIST - 10., center_frequency - bandwidth / 2.);
+  let lowpass_freq = dsp::clamp(10., NYQUIST - 10., center_frequency + bandwidth / 2.);
   (lowpass_freq, highpass_freq)
 }
 
@@ -105,5 +105,15 @@ impl DynabandpassFilter {
       &PRECOMPUTED_BASE_Q_FACTORS,
       &self.highpass_cutoff_freqs,
     );
+
+    if frame
+      .iter()
+      .any(|&sample| sample.is_nan() || sample < -10. || sample > 10.)
+    {
+      panic!(
+        "{:?} \n\n\n {:?} \n\n\n {:?}",
+        self.lowpass_cutoff_freqs, self.highpass_cutoff_freqs, frame
+      );
+    }
   }
 }

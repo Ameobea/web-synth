@@ -107,7 +107,12 @@ const FilterEnvelopeControls: React.FC<FilterEnvelopeControlsProps> = ({
           return;
         }
         case 'adsr': {
-          dispatch(actionCreators.synthDesigner.SET_FILTER_ADSR(val, synthIx));
+          dispatch(
+            actionCreators.synthDesigner.SET_FILTER_ADSR(
+              { ...val, lenSamples: length, lengthMode },
+              synthIx
+            )
+          );
           return;
         }
         default:
@@ -115,7 +120,7 @@ const FilterEnvelopeControls: React.FC<FilterEnvelopeControlsProps> = ({
           return;
       }
     },
-    [actionCreators.synthDesigner, dispatch, lengthKey, lengthMode, synthIx]
+    [actionCreators.synthDesigner, dispatch, length, lengthKey, lengthMode, synthIx]
   );
 
   return (
@@ -182,10 +187,8 @@ export const Filter: React.FC<FilterProps> = ({
     (key: string, val: any) => {
       if (key === 'bypass') {
         dispatch(actionCreators.synthDesigner.SET_FILTER_IS_BYPASSED(synthIx, val));
-        return;
       } else if (key === 'enable envelope') {
         dispatch(actionCreators.synthDesigner.SET_FILTER_ENVELOPE_ENABLED(synthIx, val));
-        return;
       }
 
       dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key as any, val));

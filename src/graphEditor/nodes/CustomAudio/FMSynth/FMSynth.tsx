@@ -38,7 +38,7 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, dbToLinear, normalizeEnvelope } from 'src/util';
+import { AsyncOnce, normalizeEnvelope } from 'src/util';
 import { EventScheduleInitialized } from 'src/eventScheduler';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
@@ -172,6 +172,7 @@ export default class FMSynth implements ForeignNode {
   private onInitializedCBs: ((inst: FMSynth) => void)[] = [];
   private audioThreadDataBuffer: Float32Array | null = null;
   private detune: ParamSource | null = null;
+  private masterGain = 1;
   public midiControlValuesCache: MIDIControlValuesCache;
   private wavetableState: WavetableState = { wavetableBanks: [] };
   private wavetableBackendIxByName: string[] = [];
@@ -368,9 +369,8 @@ export default class FMSynth implements ForeignNode {
       EventScheduleInitialized,
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
-      // First `VOICE_COUNT` outputs are for the actual voice outputs
       numberOfInputs: 0,
-      numberOfOutputs: VOICE_COUNT,
+      numberOfOutputs: 1,
       channelCount: 1,
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
@@ -420,6 +420,7 @@ export default class FMSynth implements ForeignNode {
           this.handleDetuneChange(this.detune);
           this.setFilterBypassed(this.filterBypassed);
           this.setFilterParams(this.filterParams);
+          this.setMasterGain(this.masterGain);
           this.sampleMappingStore.subscribe(this.handleSampleMappingStateChange);
 
           for (const cb of this.onInitializedCBs) {
@@ -740,6 +741,12 @@ export default class FMSynth implements ForeignNode {
     }
   }
 
+  public setMasterGain(newMasterGain: number) {
+    this.masterGain = newMasterGain;
+    // Old behavior was to have a base gain of 1, but FM synth multiplies by it directly
+    this.awpHandle?.port.postMessage({ type: 'setMasterGain', masterGain: 1 + newMasterGain });
+  }
+
   public onInitialized(): Promise<FMSynth> {
     if (this.awpHandle) {
       return Promise.resolve(this);
@@ -964,6 +971,9 @@ export default class FMSynth implements ForeignNode {
     if (!R.isNil(params.filterParams)) {
       this.setFilterParams(params.filterParams);
     }
+    if (!R.isNil(params.masterGain)) {
+      this.masterGain = params.masterGain;
+    }
   }
 
   public shutdown() {
@@ -998,6 +1008,7 @@ export default class FMSynth implements ForeignNode {
       sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
       useLegacyWavetableControls: this.useLegacyWavetableControls,
       filterParamControlSources: this.filterParamControlSources,
+      masterGain: this.masterGain,
     };
   }
 

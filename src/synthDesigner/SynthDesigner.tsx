@@ -219,7 +219,11 @@ const AddAndPresetControlsInner: React.FC<AddAndPresetControlsProps> = ({ ...pro
 );
 const AddAndPresetControls = React.memo(AddAndPresetControlsInner);
 
-const SynthDesigner: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+interface SynthDesignerProps {
+  stateKey: string;
+}
+
+const SynthDesigner: React.FC<SynthDesignerProps> = ({ stateKey }) => {
   const vcId = stateKey.split('_')[1];
   const oscilloscopeNode = useRef<HTMLDivElement | null>(null);
   const { dispatch, actionCreators, getState } = getSynthDesignerReduxInfra(stateKey);

@@ -1714,6 +1714,8 @@ pub struct FMSynthContext {
   pub operator_base_frequency_sources: [ParamSource; OPERATOR_COUNT],
   pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
   pub output_buffers: Vec<[f32; FRAME_SIZE]>,
+  pub main_output_buffer: [f32; FRAME_SIZE],
+  pub master_gain: f32,
   pub frequency_multiplier: f32,
   pub most_recent_gated_voice_ix: usize,
   pub adsr_phase_buf: [f32; 256],
@@ -1784,6 +1786,22 @@ impl FMSynthContext {
         output_buffer[i] *= gain;
       }
     }
+
+    // Mix all voices together
+    self
+      .main_output_buffer
+      .copy_from_slice(unsafe { self.output_buffers.get_unchecked(0) });
+    for voice_ix in 1..self.voices.len() {
+      let voice_output = unsafe { self.output_buffers.get_unchecked(voice_ix) };
+      for i in 0..FRAME_SIZE {
+        self.main_output_buffer[i] += voice_output[i];
+      }
+    }
+
+    // Apply master gain
+    for i in 0..FRAME_SIZE {
+      self.main_output_buffer[i] *= self.master_gain;
+    }
   }
 
   pub fn update_operator_enabled_statuses(&mut self) {
@@ -1817,12 +1835,6 @@ impl FMSynthContext {
       }
     }
   }
-
-  fn clear_output_buffer(&mut self, voice_ix: usize) {
-    self.base_frequency_input_buffer[voice_ix].fill(0.);
-    let buf = &mut self.output_buffers[voice_ix];
-    buf.fill(0.);
-  }
 }
 
 #[no_mangle]
@@ -1840,6 +1852,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     operator_base_frequency_sources: uninit(),
     base_frequency_input_buffer: Vec::with_capacity(voice_count),
     output_buffers: Vec::with_capacity(voice_count),
+    main_output_buffer: uninit(),
     frequency_multiplier: 1.,
     most_recent_gated_voice_ix: 0,
     adsr_phase_buf: [0.; 256],
@@ -1847,6 +1860,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
     wavetables: Vec::new(),
     sample_mapping_manager: SampleMappingManager::default(),
     polysynth: uninit(),
+    master_gain: 1.,
   }));
 
   std::ptr::write(
@@ -1912,9 +1926,9 @@ pub unsafe extern "C" fn fm_synth_generate(
   ctx: *mut FMSynthContext,
   cur_bpm: f32,
   cur_frame_start_beat: f32,
-) -> *const [f32; FRAME_SIZE] {
+) -> *const f32 {
   (*ctx).generate(cur_bpm, cur_frame_start_beat);
-  (*ctx).output_buffers.as_ptr()
+  (*ctx).main_output_buffer.as_ptr()
 }
 
 #[no_mangle]
@@ -2375,12 +2389,6 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fm_synth_clear_output_buffer(ctx: *mut FMSynthContext, voice_ix: usize) {
-  let ctx = &mut (*ctx);
-  ctx.clear_output_buffer(voice_ix)
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_frequency_multiplier(
   ctx: *mut FMSynthContext,
   frequency_multiplier: f32,
@@ -2685,6 +2693,12 @@ pub extern "C" fn fm_synth_set_mapped_sample_config(
 }
 
 #[no_mangle]
+pub extern "C" fn fm_synth_set_master_gain(ctx: *mut FMSynthContext, gain: f32) {
+  let ctx = unsafe { &mut *ctx };
+  ctx.master_gain = gain;
+}
+
+#[no_mangle]
 pub extern "C" fn fm_synth_set_filter_bypassed(ctx: *mut FMSynthContext, bypassed: bool) {
   let ctx = unsafe { &mut *ctx };
   for voice in &mut ctx.voices {
@@ -2744,4 +2758,12 @@ pub extern "C" fn fm_synth_set_filter_gain(
   for voice in &mut ctx.voices {
     voice.filter_module.set_gain(param_source.clone())
   }
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_get_filter_param_buffers_ptr(
+  ctx: *mut FMSynthContext,
+) -> *mut [f32; FRAME_SIZE] {
+  let ctx = unsafe { &mut *ctx };
+  ctx.filter_param_buffers.as_mut_ptr()
 }

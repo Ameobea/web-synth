@@ -16,6 +16,21 @@ class FMSynthAWP extends AudioWorkletProcessor {
         defaultValue: 0,
         automationRate: 'a-rate',
       })),
+      {
+        name: 'filter_cutoff_freq',
+        defaultValue: 0,
+        automationRate: 'a-rate',
+      },
+      {
+        name: 'filter_q',
+        defaultValue: 0,
+        automationRate: 'a-rate',
+      },
+      {
+        name: 'filter_gain',
+        defaultValue: 0,
+        automationRate: 'a-rate',
+      },
     ];
   }
 
@@ -332,16 +347,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
           break;
         }
-        case 'clearOutputBuffer': {
-          if (!this.wasmInstance) {
-            console.warn('Tried to clear output buffer before Wasm instance loaded');
-            return;
-          }
-
-          this.wasmInstance.exports.fm_synth_clear_output_buffer(this.ctxPtr, evt.data.voiceIx);
-          this.tacentVoiceFlags[evt.data.voiceIx] = 1;
-          break;
-        }
         case 'setFrequencyMultiplier': {
           if (!this.wasmInstance) {
             console.warn('Tried to set frequency multiplier before Wasm instance loaded');
@@ -379,7 +384,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
 
           const { Q, controlSource } = evt.data;
-          console.log(Q);
           this.wasmInstance.exports.fm_synth_set_filter_q(this.ctxPtr, Q, controlSource);
           break;
         }
@@ -405,6 +409,15 @@ class FMSynthAWP extends AudioWorkletProcessor {
 
           const { gain, controlSource } = evt.data;
           this.wasmInstance.exports.fm_synth_set_filter_gain(this.ctxPtr, gain, controlSource);
+          break;
+        }
+        case 'setMasterGain': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set master gain before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.fm_synth_set_master_gain(this.ctxPtr, evt.data.masterGain);
           break;
         }
         case 'shutdown': {
@@ -481,7 +494,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
         log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
         debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }),
         on_gate_cb: (midiNumber, voiceIx) => {
-          this.tacentVoiceFlags[voiceIx] = 0;
           this.port.postMessage({ type: 'onGate', midiNumber, voiceIx });
         },
         on_ungate_cb: (midiNumber, voiceIx) =>
@@ -493,7 +505,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.wasmInstance.exports.memory.grow(1024 * 4);
     this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx(VOICE_COUNT);
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
-    this.tacentVoiceFlags = new Uint8Array(VOICE_COUNT).fill(1);
 
     outputWeights.forEach((paramSource, operatorIx) =>
       this.wasmInstance.exports.fm_synth_set_output_weight_value(
@@ -637,6 +648,33 @@ class FMSynthAWP extends AudioWorkletProcessor {
       }
     }
 
+    // TODO: Only copy filter param buffers if they're being used
+    const filterParamBuffersPtr = this.wasmInstance.exports.fm_synth_get_filter_param_buffers_ptr(
+      this.ctxPtr
+    );
+    const filterParamBuffer = wasmMemory.subarray(
+      filterParamBuffersPtr / BYTES_PER_F32,
+      filterParamBuffersPtr / BYTES_PER_F32 + 4 * FRAME_SIZE
+    );
+    const qParam = params['filter_q'];
+    const cutoffParam = params['filter_cutoff_freq'];
+    const gainParam = params['filter_gain'];
+    if (qParam.length === 1) {
+      filterParamBuffer.fill(qParam[0], 0, FRAME_SIZE);
+    } else {
+      filterParamBuffer.set(qParam, 0);
+    }
+    if (cutoffParam.length === 1) {
+      filterParamBuffer.fill(cutoffParam[0], FRAME_SIZE, FRAME_SIZE * 2);
+    } else {
+      filterParamBuffer.set(cutoffParam, FRAME_SIZE);
+    }
+    if (gainParam.length === 1) {
+      filterParamBuffer.fill(gainParam[0], FRAME_SIZE * 2, FRAME_SIZE * 3);
+    } else {
+      filterParamBuffer.set(gainParam, FRAME_SIZE * 2);
+    }
+
     const outputsPtr = this.wasmInstance.exports.fm_synth_generate(
       this.ctxPtr,
       globalThis.globalTempoBPM,
@@ -649,18 +687,8 @@ class FMSynthAWP extends AudioWorkletProcessor {
       0
     );
     wasmMemory = this.getWasmMemoryBuffer();
-    for (let voiceIx = 0; voiceIx < VOICE_COUNT; voiceIx++) {
-      const voiceIsTacent = this.tacentVoiceFlags[voiceIx];
-      if (voiceIsTacent) {
-        continue;
-      }
-
-      const outputSlice = wasmMemory.subarray(
-        (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR) / 4,
-        (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4
-      );
-      outputs[voiceIx]?.[0]?.set(outputSlice);
-    }
+    const outputSlice = wasmMemory.subarray(outputsPtr / 4, outputsPtr / 4 + FRAME_SIZE);
+    outputs[0]?.[0]?.set(outputSlice);
 
     // Copy current ADSR phases to shared buffer
     if (this.audioThreadDataBuffer && this.adsrPhasesBufPtr) {

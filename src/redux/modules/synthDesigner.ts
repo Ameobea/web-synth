@@ -27,12 +27,6 @@ export interface FilterParams {
   gain: number;
 }
 
-interface Voice {
-  // The node that is connected to whatever the synth module as a whole is connected to.  Its
-  // source is the inner gain node.
-  outerGainNode: GainNode;
-}
-
 interface PolysynthContext {
   module: typeof import('src/polysynth');
   ctxPtr: number;
@@ -41,7 +35,7 @@ interface PolysynthContext {
 export interface SynthModule {
   filterBypassed: boolean;
   filterEnvelopeEnabled?: boolean;
-  voices: Voice[];
+  outerGainNode: GainNode;
   fmSynth: FMSynth;
   filterParams: FilterParams;
   /**
@@ -59,8 +53,6 @@ export interface SynthModule {
 }
 
 const ctx = new AudioContext();
-
-const VOICE_COUNT = 10 as const;
 
 export const serializeSynthModule = (synth: SynthModule) => ({
   fmSynthConfig: synth.fmSynth.serialize(),
@@ -80,30 +72,27 @@ export const serializeSynthModule = (synth: SynthModule) => ({
  * Connects or disconnects the FM synth output for all voices to either the filter or the voice outer gain
  * node depending on whether the filter is bypassed.
  */
-const connectOscillators = (connect: boolean, synth: SynthModule) =>
-  synth.voices.forEach((voice, voiceIx) => {
-    const voiceDst = voice.outerGainNode;
+const connectOscillators = (connect: boolean, synth: SynthModule) => {
+  const fmSynthAWPNode = synth.fmSynth.getAWPNode();
+  if (!fmSynthAWPNode) {
+    console.error('`connectOscillators`: no fmSynthAWPNode');
+    return;
+  }
 
-    const fmSynthAWPNode = synth.fmSynth.getAWPNode();
-    if (!fmSynthAWPNode) {
-      console.error('`connectOscillators`: no fmSynthAWPNode');
-      return;
+  if (!connect) {
+    try {
+      fmSynthAWPNode.disconnect();
+    } catch (_err) {
+      // pass
     }
-
-    if (!connect) {
-      try {
-        fmSynthAWPNode.disconnect();
-      } catch (_err) {
-        // pass
-      }
-    } else {
-      fmSynthAWPNode.connect(voiceDst, voiceIx);
-    }
-  });
+  } else {
+    fmSynthAWPNode.connect(synth.outerGainNode);
+  }
+};
 
 const disposeSynthModule = (synth: SynthModule) => {
   synth.fmSynth.shutdown();
-  synth.voices.forEach(voice => void voice.outerGainNode.disconnect());
+  synth.outerGainNode.disconnect();
 };
 
 const connectFMSynth = (stateKey: string, synthIx: number) => {
@@ -149,6 +138,68 @@ const buildDefaultFilterEnvelope = (audioThreadData: AudioThreadData): Adsr => {
   return envelope;
 };
 
+interface InitAndConnectFilterCSNsArgs {
+  filterCSNs: FilterCSNs;
+  synthIx: number;
+  stateKey: string;
+  fmSynth: FMSynth;
+}
+
+const initAndConnectFilterCSNs = ({
+  filterCSNs,
+  synthIx,
+  stateKey,
+  fmSynth,
+}: InitAndConnectFilterCSNsArgs) => {
+  const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
+  if (!getState) {
+    throw new Error(`Failed to get state for stateKey=${stateKey}`);
+  }
+
+  filterCSNs.Q.connect(
+    (fmSynth.getAWPNode()!.parameters as Map<string, AudioParam>).get('filter_q')!
+  );
+  filterCSNs.frequency.connect(
+    (fmSynth.getAWPNode()!.parameters as Map<string, AudioParam>).get('filter_cutoff_freq')!
+  );
+  filterCSNs.gain.connect(
+    (fmSynth.getAWPNode()!.parameters as Map<string, AudioParam>).get('filter_gain')!
+  );
+
+  const handleFrequencyOverrideStatusChange = (isOverridden: boolean) => {
+    console.log({ isOverridden });
+    const targetSynth = getState().synthDesigner.synths[synthIx];
+    const controlSource = isOverridden
+      ? targetSynth.filterEnvelopeEnabled
+        ? FilterParamControlSource.Envelope
+        : FilterParamControlSource.Manual
+      : FilterParamControlSource.PatchNetwork;
+    fmSynth.handleFilterFrequencyChange(targetSynth.filterParams.frequency, controlSource);
+  };
+  filterCSNs.frequency.registerOverrideStatusChangeCb(handleFrequencyOverrideStatusChange);
+  handleFrequencyOverrideStatusChange(filterCSNs.frequency.getIsOverridden());
+
+  const handleQOverrideStatusChange = (isOverridden: boolean) => {
+    const targetSynth = getState().synthDesigner.synths[synthIx];
+    const controlSource = isOverridden
+      ? FilterParamControlSource.Manual
+      : FilterParamControlSource.PatchNetwork;
+    fmSynth.handleFilterQChange(targetSynth.filterParams.Q!, controlSource);
+  };
+  filterCSNs.Q.registerOverrideStatusChangeCb(handleQOverrideStatusChange);
+  handleQOverrideStatusChange(filterCSNs.Q.getIsOverridden());
+
+  const handleGainOverrideStatusChange = (isOverridden: boolean) => {
+    const targetSynth = getState().synthDesigner.synths[synthIx];
+    const controlSource = isOverridden
+      ? FilterParamControlSource.Manual
+      : FilterParamControlSource.PatchNetwork;
+    fmSynth.handleFilterGainChange(targetSynth.filterParams.gain, controlSource);
+  };
+  filterCSNs.gain.registerOverrideStatusChangeCb(handleGainOverrideStatusChange);
+  handleGainOverrideStatusChange(filterCSNs.gain.getIsOverridden());
+};
+
 const buildDefaultSynthModule = (
   wavyJonesInstance: AnalyserNode | undefined,
   stateKey: string,
@@ -159,6 +210,7 @@ const buildDefaultSynthModule = (
   providedFMSynth?: FMSynth
 ): SynthModule => {
   const filterCSNs = buildDefaultFilterCSNs();
+
   const filterParams = getDefaultFilterParams(filterType);
 
   const vcId = stateKey.split('_')[1]!;
@@ -174,27 +226,21 @@ const buildDefaultSynthModule = (
         const pitchMultiplier = getState().synthDesigner.synths[synthIx].pitchMultiplier;
         fmSynth.setFrequencyMultiplier(pitchMultiplier);
 
+        initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
+
         connectFMSynth(stateKey, synthIx);
       },
       audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
       useLegacyWavetableControls: false,
     });
 
+  const outerGainNode = ctx.createGain();
+  if (wavyJonesInstance) {
+    outerGainNode.connect(wavyJonesInstance);
+  }
   const inst: SynthModule = {
     filterBypassed: true,
-    voices: new Array(VOICE_COUNT).fill(null).map(() => {
-      const outerGainNode = new GainNode(ctx);
-      outerGainNode.gain.value = 1;
-
-      if (wavyJonesInstance) {
-        outerGainNode.connect(wavyJonesInstance);
-      }
-
-      return {
-        outerGainNode,
-        lastGateOrUngateTime: 0,
-      };
-    }),
+    outerGainNode,
     fmSynth,
     filterParams,
     filterCSNs,
@@ -237,6 +283,7 @@ export const deserializeSynthModule = (
     ...(fmSynthConfig || {}),
     filterBypassed,
     filterParams,
+    masterGain,
     gainEnvelope: gainEnvelope
       ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
       : fmSynthConfig.gainEnvelope,
@@ -251,6 +298,14 @@ export const deserializeSynthModule = (
       : fmSynthConfig.filterEnvelope,
     onInitialized: () => {
       fmSynth.setFrequencyMultiplier(pitchMultiplier);
+
+      const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
+      if (!getState) {
+        throw new Error(`Failed to get state for stateKey=${stateKey}`);
+      }
+      const targetSynth = getState().synthDesigner.synths[synthIx];
+      const filterCSNs = targetSynth.filterCSNs;
+      initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
 
       connectFMSynth(stateKey, synthIx);
     },
@@ -271,17 +326,11 @@ export const deserializeSynthModule = (
     filterEnvelope = buildDefaultFilterEnvelope(filterEnvelope.audioThreadData);
   }
 
-  const voices = base.voices.map(voice => {
-    voice.outerGainNode.gain.value = masterGain + 1;
-    return voice;
-  });
-
   const normalizedFilterEnvelope = normalizeEnvelope(filterEnvelope);
 
   const synthModule = {
     ...base,
     filterBypassed,
-    voices,
     masterGain,
     filterEnvelope: normalizedFilterEnvelope,
     filterADSRLength:
@@ -447,9 +496,7 @@ const actionGroups = {
       }
       (instance as any).isPaused = state.isHidden;
 
-      state.synths.forEach(synth =>
-        synth.voices.forEach(voice => voice.outerGainNode.connect(instance))
-      );
+      state.synths.forEach(synth => void synth.outerGainNode.connect(instance));
 
       return { ...state, wavyJonesInstance: instance };
     },
@@ -485,7 +532,7 @@ const actionGroups = {
           targetSynth.fmSynth.handleFilterGainChange(val as number, gainControlSource);
           break;
         default:
-          throw new UnreachableException(`Unhandled key: ${key}`);
+        // pass
       }
 
       const newSynth = {
@@ -504,9 +551,7 @@ const actionGroups = {
     subReducer: (state: SynthDesignerState, { synthIx, gain }) => {
       const targetSynth = getSynth(synthIx, state.synths);
       const newTargetSynth: SynthModule = { ...targetSynth, masterGain: gain };
-      newTargetSynth.voices.forEach(voice => {
-        voice.outerGainNode.gain.value = gain + 1;
-      });
+      newTargetSynth.fmSynth.setMasterGain(gain);
       return setSynth(synthIx, newTargetSynth, state);
     },
   }),
