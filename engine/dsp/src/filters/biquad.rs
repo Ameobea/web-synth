@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::{linear_to_db_checked, NYQUIST};
+use crate::{linear_to_db_checked, FRAME_SIZE, NYQUIST};
 
 /// Second-order biquad filter
 #[derive(Clone, Copy, Default)]
@@ -59,21 +59,21 @@ impl BiquadFilter {
   pub fn compute_coefficients(
     mode: FilterMode,
     q: f32,
-    detune: f32,
     freq: f32,
     gain: f32,
   ) -> (f32, f32, f32, f32, f32) {
     // From: https://webaudio.github.io/web-audio-api/#filters-characteristics
-    let computed_frequency = freq * 2.0f32.powf(detune / 1200.0);
+    let computed_frequency = freq;
     let normalized_freq = computed_frequency / NYQUIST;
     let w0 = PI * normalized_freq;
     #[allow(non_snake_case)]
-    let A = 10.0_f32.powf(gain / 40.0);
-    let aq = w0.sin() / (2.0 * q);
-    let aqdb = w0.sin() / (2.0 * 10.0f32.powf(q / 20.));
+    let A = 10.0_f32.powf(gain / 40.);
+    let w0_sin = w0.sin();
+    let aq = w0_sin / (2. * q);
+    let aqdb = w0_sin / (2. * 10.0f32.powf(q / 20.));
     #[allow(non_snake_case)]
     let S = 1.;
-    let a_s = (w0.sin() / 2.) * ((A + (1. / A)) * ((1. / S) - 1.) + 2.).sqrt();
+    let a_s = (w0_sin / 2.) * ((A + (1. / A)) * ((1. / S) - 1.) + 2.).sqrt();
 
     let (b0, b1, b2, a0, a1, a2);
 
@@ -153,9 +153,9 @@ impl BiquadFilter {
   }
 
   #[inline]
-  pub fn set_coefficients(&mut self, mode: FilterMode, q: f32, detune: f32, freq: f32, gain: f32) {
+  pub fn set_coefficients(&mut self, mode: FilterMode, q: f32, freq: f32, gain: f32) {
     let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
-      Self::compute_coefficients(mode, q, detune, freq, gain);
+      Self::compute_coefficients(mode, q, freq, gain);
 
     self.b0_over_a0 = b0_over_a0;
     self.b1_over_a0 = b1_over_a0;
@@ -165,10 +165,18 @@ impl BiquadFilter {
   }
 
   #[inline]
-  pub fn new(mode: FilterMode, q: f32, detune: f32, freq: f32, gain: f32) -> BiquadFilter {
+  pub fn new(mode: FilterMode, q: f32, freq: f32, gain: f32) -> BiquadFilter {
     let mut filter = BiquadFilter::default();
-    filter.set_coefficients(mode, q, detune, freq, gain);
+    filter.set_coefficients(mode, q, freq, gain);
     filter
+  }
+
+  /// Called when a voice is gated.  Resets internal filter states to make it like the filter has
+  /// been fed silence for an infinite amount of time.
+  #[inline]
+  pub fn reset(&mut self) {
+    self.x = [0.; 2];
+    self.y = [0.; 2];
   }
 
   #[inline]
@@ -209,17 +217,112 @@ impl BiquadFilter {
     &mut self,
     mode: FilterMode,
     q: f32,
-    detune: f32,
     freq: f32,
     gain: f32,
     input: f32,
   ) -> f32 {
     let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
-      Self::compute_coefficients(mode, q, detune, freq, gain);
+      Self::compute_coefficients(mode, q, freq, gain);
 
     self.apply_with_coefficients(
       input, b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0,
     )
+  }
+
+  #[inline]
+  pub fn compute_coefficients_and_apply_frame(
+    &mut self,
+    mode: FilterMode,
+    base_q: f32,
+    qs: &[f32; FRAME_SIZE],
+    freqs: &[f32; FRAME_SIZE],
+    gains: &[f32; FRAME_SIZE],
+    frame: &mut [f32; FRAME_SIZE],
+  ) {
+    let mut x = self.x;
+    let mut y = self.y;
+
+    for i in 0..FRAME_SIZE {
+      let freq = freqs[i];
+      let gain = gains[i];
+      let q = base_q + qs[i];
+      let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
+        Self::compute_coefficients(mode, q, freq, gain);
+
+      let input = frame[i];
+      let output = b0_over_a0 * input + b1_over_a0 * x[0] + b2_over_a0 * x[1]
+        - a1_over_a0 * y[0]
+        - a2_over_a0 * y[1];
+      frame[i] = output;
+
+      x = [input, x[0]];
+      y = [output, y[0]];
+    }
+
+    self.x = x;
+    self.y = y;
+  }
+
+  #[inline]
+  pub fn compute_coefficients_and_apply_frame_minimal(
+    &mut self,
+    mode: FilterMode,
+    cutoff_freq: &[f32; FRAME_SIZE],
+    q: f32,
+    frame: &mut [f32; FRAME_SIZE],
+  ) {
+    let mut x = self.x;
+    let mut y = self.y;
+
+    for i in 0..FRAME_SIZE {
+      let freq = cutoff_freq[i];
+      let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
+        Self::compute_coefficients(mode, q, freq, 0.);
+
+      let input = frame[i];
+      let output = b0_over_a0 * input + b1_over_a0 * x[0] + b2_over_a0 * x[1]
+        - a1_over_a0 * y[0]
+        - a2_over_a0 * y[1];
+      frame[i] = output;
+
+      x = [input, x[0]];
+      y = [output, y[0]];
+    }
+
+    self.x = x;
+    self.y = y;
+  }
+
+  #[inline]
+  pub fn compute_coefficients_and_apply_frame_static_q(
+    &mut self,
+    mode: FilterMode,
+    q: f32,
+    freqs: &[f32; FRAME_SIZE],
+    gains: &[f32; FRAME_SIZE],
+    frame: &mut [f32; FRAME_SIZE],
+  ) {
+    let mut x = self.x;
+    let mut y = self.y;
+
+    for i in 0..FRAME_SIZE {
+      let freq = freqs[i];
+      let gain = gains[i];
+      let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
+        Self::compute_coefficients(mode, q, freq, gain);
+
+      let input = frame[i];
+      let output = b0_over_a0 * input + b1_over_a0 * x[0] + b2_over_a0 * x[1]
+        - a1_over_a0 * y[0]
+        - a2_over_a0 * y[1];
+      frame[i] = output;
+
+      x = [input, x[0]];
+      y = [output, y[0]];
+    }
+
+    self.x = x;
+    self.y = y;
   }
 }
 

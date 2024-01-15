@@ -1,7 +1,7 @@
 use dsp::{
   circular_buffer::CircularBuffer,
   db_to_gain,
-  filters::biquad::{compute_higher_order_biquad_q_factors, BiquadFilter, FilterMode},
+  filters::biquad::{BiquadFilter, FilterMode},
   gain_to_db, one_pole, SAMPLE_RATE,
 };
 
@@ -80,42 +80,41 @@ pub struct MultibandCompressor {
   pub mix_state: f32,
 }
 
+// computed with `compute_higher_order_biquad_q_factors`
+const PRECOMPUTED_Q_FACTORS: [f32; BAND_SPLITTER_FILTER_ORDER / 2] = [
+  -5.9786735, -5.638297, -4.929196, -3.7843077, -2.067771, 0.5116703, 4.7229195, 14.153371,
+];
+
 impl Default for MultibandCompressor {
   fn default() -> Self {
-    let q_factors = compute_higher_order_biquad_q_factors(BAND_SPLITTER_FILTER_ORDER);
-    assert_eq!(q_factors.len(), BAND_SPLITTER_FILTER_CHAIN_LENGTH);
     let mut low_band_filter_chain = [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
     let mut mid_band_bottom_filter_chain =
       [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
     let mut mid_band_top_filter_chain =
       [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
     let mut high_band_filter_chain = [BiquadFilter::default(); BAND_SPLITTER_FILTER_CHAIN_LENGTH];
-    for i in 0..q_factors.len() {
+    for i in 0..PRECOMPUTED_Q_FACTORS.len() {
       low_band_filter_chain[i].set_coefficients(
         FilterMode::Lowpass,
-        q_factors[i],
-        0.,
+        PRECOMPUTED_Q_FACTORS[i],
         LOW_BAND_CUTOFF,
         0.,
       );
       mid_band_bottom_filter_chain[i].set_coefficients(
         FilterMode::Highpass,
-        q_factors[i],
-        0.,
+        PRECOMPUTED_Q_FACTORS[i],
         LOW_BAND_CUTOFF + 7.5,
         0.,
       );
       mid_band_top_filter_chain[i].set_coefficients(
         FilterMode::Lowpass,
-        q_factors[i],
-        0.,
+        PRECOMPUTED_Q_FACTORS[i],
         MID_BAND_CUTOFF - 184.8,
         0.,
       );
       high_band_filter_chain[i].set_coefficients(
         FilterMode::Highpass,
-        q_factors[i],
-        0.,
+        PRECOMPUTED_Q_FACTORS[i],
         MID_BAND_CUTOFF,
         0.,
       );

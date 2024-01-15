@@ -9,7 +9,7 @@ use dsp::{
 
 use self::dynabandpass::DynabandpassFilter;
 
-use super::{ParamSource, RenderRawParams, FILTER_PARAM_BUFFER_COUNT};
+use super::{AdsrState, ParamSource, RenderRawParams, FILTER_PARAM_BUFFER_COUNT};
 
 pub mod dynabandpass;
 
@@ -52,6 +52,53 @@ impl FilterType {
   }
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum FilterParamControlSource {
+  Manual = 0,
+  Envelope = 1,
+  Buffer = 2,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum FilterParamType {
+  Q,
+  CutoffFreq,
+  Gain,
+}
+
+impl FilterParamControlSource {
+  pub fn from_usize(val: usize) -> Self {
+    match val {
+      0 => FilterParamControlSource::Manual,
+      1 => FilterParamControlSource::Envelope,
+      2 => FilterParamControlSource::Buffer,
+      _ => panic!("Invalid filter param control source: {}", val),
+    }
+  }
+
+  pub fn to_param_source(self, param_type: FilterParamType, manual_val: f32) -> ParamSource {
+    match self {
+      FilterParamControlSource::Manual => ParamSource::new_constant(manual_val),
+      FilterParamControlSource::Envelope =>
+        if matches!(param_type, FilterParamType::CutoffFreq) {
+          let filter_adsr_shift = 20.;
+          let filter_adsr_scale = 44_100. / 2. - filter_adsr_shift;
+          ParamSource::PerVoiceADSR(AdsrState {
+            adsr_ix: 0,
+            scale: filter_adsr_scale,
+            shift: filter_adsr_shift,
+          })
+        } else {
+          panic!(
+            "Only cutoff frequency supports ADSR param source, but it was provided for \
+             {param_type:?}"
+          );
+        },
+      FilterParamControlSource::Buffer => ParamSource::ParamBuffer(param_type as usize),
+    }
+  }
+}
+
 #[derive(Clone)]
 pub(crate) enum FilterState {
   SimpleBiquad(FilterMode, BiquadFilter),
@@ -84,13 +131,35 @@ impl FilterState {
     Self::Order16Biquad(filter_mode, [BiquadFilter::default(); 8])
   }
 
-  pub fn get_filter_mode(&self) -> FilterMode {
+  pub fn get_filter_mode(&self) -> Option<FilterMode> {
     match self {
-      FilterState::SimpleBiquad(filter_mode, _) => *filter_mode,
-      FilterState::Order4Biquad(filter_mode, _) => *filter_mode,
-      FilterState::Order8Biquad(filter_mode, _) => *filter_mode,
-      FilterState::Order16Biquad(filter_mode, _) => *filter_mode,
-      FilterState::DynaBandpass(_) => panic!("DynaBandpass should be special-cased"),
+      FilterState::SimpleBiquad(filter_mode, _) => Some(*filter_mode),
+      FilterState::Order4Biquad(filter_mode, _) => Some(*filter_mode),
+      FilterState::Order8Biquad(filter_mode, _) => Some(*filter_mode),
+      FilterState::Order16Biquad(filter_mode, _) => Some(*filter_mode),
+      FilterState::DynaBandpass(_) => None,
+    }
+  }
+
+  /// Called when a voice is gated.  Resets internal filter states to make it like the filter has
+  /// been fed silence for an infinite amount of time.
+  #[inline]
+  pub fn reset(&mut self) {
+    match self {
+      FilterState::SimpleBiquad(_, biquad) => biquad.reset(),
+      FilterState::Order4Biquad(_, chain) =>
+        for filter in chain {
+          filter.reset();
+        },
+      FilterState::Order8Biquad(_, chain) =>
+        for filter in chain {
+          filter.reset();
+        },
+      FilterState::Order16Biquad(_, chain) =>
+        for filter in chain {
+          filter.reset();
+        },
+      FilterState::DynaBandpass(filter) => filter.reset(),
     }
   }
 
@@ -108,7 +177,6 @@ impl FilterState {
           let output = biquad.compute_coefficients_and_apply(
             *filter_mode,
             q[i],
-            0.,
             cutoff_freq[i],
             gain[i],
             input,
@@ -214,6 +282,11 @@ impl FilterModule {
 
   pub fn set_gain(&mut self, new_gain: ParamSource) { self.gain.replace(new_gain); }
 
+  /// Called when a voice is gated.  Resets internal filter states to make it like the filter has
+  /// been fed silence for an infinite amount of time.
+  #[inline]
+  pub fn reset(&mut self) { self.filter_state.reset(); }
+
   pub fn apply_frame(
     &mut self,
     filter_envelope_generator: &mut ManagedAdsr,
@@ -230,15 +303,7 @@ impl FilterModule {
       ParamSource::Constant { .. } => (),
       ParamSource::ParamBuffer(_) => (),
       ParamSource::PerVoiceADSR(_) => {
-        // Currently hard-coded output range from [20, 44_100 / 2]
-        let filter_adsr_shift = 20.;
-        let filter_adsr_scale = 44_100. / 2. - filter_adsr_shift;
-        filter_envelope_generator.render_frame(
-          filter_adsr_scale,
-          filter_adsr_shift,
-          cur_bpm,
-          cur_frame_start_beat,
-        );
+        filter_envelope_generator.render_frame(1., 0., cur_bpm, cur_frame_start_beat);
       },
       _ => panic!("Unsupported ParamSource for cutoff_freq"),
     }
@@ -255,7 +320,7 @@ impl FilterModule {
       .cutoff_freq
       .render_raw(&render_params, &mut self.rendered_cutoff_freq);
     let filter_mode = self.filter_state.get_filter_mode();
-    let gain = if filter_mode.needs_gain() {
+    let gain = if filter_mode.map(|mode| mode.needs_gain()).unwrap_or(false) {
       self
         .gain
         .render_raw(&render_params, &mut self.rendered_gain);
@@ -263,7 +328,7 @@ impl FilterModule {
     } else {
       &ZERO_FRAME
     };
-    let q = if filter_mode.needs_q() {
+    let q = if filter_mode.map(|mode| mode.needs_q()).unwrap_or(false) {
       self.q.render_raw(&render_params, &mut self.rendered_q);
       &self.rendered_q
     } else {

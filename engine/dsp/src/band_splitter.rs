@@ -34,28 +34,24 @@ impl BandSplitter {
       low_band_filter_chain[i].set_coefficients(
         FilterMode::Lowpass,
         Q_FACTORS[i],
-        0.,
         LOW_BAND_CUTOFF,
         0.,
       );
       mid_band_bottom_filter_chain[i].set_coefficients(
         FilterMode::Highpass,
         Q_FACTORS[i],
-        0.,
         LOW_BAND_CUTOFF + 7.5,
         0.,
       );
       mid_band_top_filter_chain[i].set_coefficients(
         FilterMode::Lowpass,
         Q_FACTORS[i],
-        0.,
         MID_BAND_CUTOFF - 184.8,
         0.,
       );
       high_band_filter_chain[i].set_coefficients(
         FilterMode::Highpass,
         Q_FACTORS[i],
-        0.,
         MID_BAND_CUTOFF,
         0.,
       );

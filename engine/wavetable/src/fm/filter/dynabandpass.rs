@@ -59,6 +59,7 @@ pub(crate) struct DynabandpassFilter {
 }
 
 impl DynabandpassFilter {
+  #[inline]
   pub fn new(bandwidth: f32) -> Self {
     Self {
       lowpass_filter_chain: [BiquadFilter::default(); DYNABANDPASS_FILTER_ORDER / 2],
@@ -69,6 +70,19 @@ impl DynabandpassFilter {
     }
   }
 
+  /// Called when a voice is gated.  Resets internal filter states to make it like the filter has
+  /// been fed silence for an infinite amount of time.
+  #[inline]
+  pub fn reset(&mut self) {
+    for filter in self.lowpass_filter_chain.iter_mut() {
+      filter.reset();
+    }
+    for filter in self.highpass_filter_chain.iter_mut() {
+      filter.reset();
+    }
+  }
+
+  #[inline]
   pub fn apply_frame(&mut self, frame: &mut [f32; FRAME_SIZE], cutoff_freqs: &[f32; FRAME_SIZE]) {
     for i in 0..FRAME_SIZE {
       let (lowpass_freq, highpass_freq) =

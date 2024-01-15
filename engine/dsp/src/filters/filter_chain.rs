@@ -30,20 +30,23 @@ pub fn apply_filter_chain_and_compute_coefficients<const N: usize>(
   cutoff_freq: &[f32; FRAME_SIZE],
   gain: &[f32; FRAME_SIZE],
 ) {
-  for i in 0..frame.len() {
-    let mut val = frame[i];
-    for (filter_ix, filter) in chain.into_iter().enumerate() {
-      let coeffs = BiquadFilter::compute_coefficients(
-        filter_mode,
-        precomputed_base_qs[filter_ix] + q[i],
-        0.,
-        cutoff_freq[i],
-        gain[i],
-      );
-      val = filter.apply_with_coefficients(val, coeffs.0, coeffs.1, coeffs.2, coeffs.3, coeffs.4);
-    }
-    frame[i] = val;
+  for filter_ix in 0..N - 1 {
+    let filter = &mut chain[filter_ix];
+    let q_val = precomputed_base_qs[filter_ix];
+    filter.compute_coefficients_and_apply_frame_static_q(
+      filter_mode,
+      q_val,
+      cutoff_freq,
+      gain,
+      frame,
+    );
   }
+
+  let filter_ix = N - 1;
+  let filter = &mut chain[filter_ix];
+  // Manual Q is only applied to the last filter in the chain
+  let base_q = precomputed_base_qs[filter_ix];
+  filter.compute_coefficients_and_apply_frame(filter_mode, base_q, q, cutoff_freq, gain, frame);
 }
 
 #[inline]
@@ -55,18 +58,11 @@ pub fn apply_filter_chain_and_compute_coefficients_minimal<const N: usize>(
   cutoff_freq: &[f32; FRAME_SIZE],
 ) {
   for (filter_ix, filter) in chain.into_iter().enumerate() {
-    for i in 0..frame.len() {
-      let coeffs = BiquadFilter::compute_coefficients(
-        filter_mode,
-        precomputed_base_qs[filter_ix],
-        0.,
-        cutoff_freq[i],
-        0.,
-      );
-
-      let mut val = frame[i];
-      val = filter.apply_with_coefficients(val, coeffs.0, coeffs.1, coeffs.2, coeffs.3, coeffs.4);
-      frame[i] = val;
-    }
+    filter.compute_coefficients_and_apply_frame_minimal(
+      filter_mode,
+      cutoff_freq,
+      precomputed_base_qs[filter_ix],
+      frame,
+    );
   }
 }

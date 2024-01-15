@@ -38,7 +38,7 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, normalizeEnvelope } from 'src/util';
+import { AsyncOnce, dbToLinear, normalizeEnvelope } from 'src/util';
 import { EventScheduleInitialized } from 'src/eventScheduler';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
@@ -135,6 +135,21 @@ interface ADSRParamsWithLenSamples extends AdsrParams {
   lenSamples: { type: 'constant'; value: number } | { type: 'beats to samples'; value: number };
 }
 
+export enum FilterParamControlSource {
+  /**
+   * Controlled directly by the filter UI
+   */
+  Manual = 0,
+  /**
+   * Controlled by the ADSR/envelope generator defined in the UI
+   */
+  Envelope = 1,
+  /**
+   * Controlled incoming CV from a different module connected to the filter
+   */
+  PatchNetwork = 2,
+}
+
 export default class FMSynth implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string | undefined;
@@ -202,6 +217,19 @@ export default class FMSynth implements ForeignNode {
   };
   private filterBypassed = true;
   private filterParams: FilterParams = buildDefaultFilter(FilterType.Lowpass, 1);
+  /**
+   * For each key, true if the corresponding param is being controlled manually using the
+   * filter UI.  Fals
+   */
+  private filterParamControlSources: {
+    Q: FilterParamControlSource;
+    frequency: FilterParamControlSource;
+    gain: FilterParamControlSource;
+  } = {
+    Q: FilterParamControlSource.Manual,
+    frequency: FilterParamControlSource.Manual,
+    gain: FilterParamControlSource.Manual,
+  };
   private gateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private ungateCallbacks: Set<(midiNumber: number, voiceIx: number) => void> = new Set();
   private fetchedSampleDescriptorHashes: Set<string> = new Set();
@@ -341,9 +369,8 @@ export default class FMSynth implements ForeignNode {
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       // First `VOICE_COUNT` outputs are for the actual voice outputs
-      // Second `VOICE_COUNT` outputs are for the outputs of the filter envelope generator
       numberOfInputs: 0,
-      numberOfOutputs: VOICE_COUNT * 2,
+      numberOfOutputs: VOICE_COUNT,
       channelCount: 1,
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
@@ -629,9 +656,7 @@ export default class FMSynth implements ForeignNode {
 
   public setFilterBypassed(isBypassed: boolean) {
     this.filterBypassed = isBypassed;
-    if (this.awpHandle) {
-      this.awpHandle.port.postMessage({ type: 'setFilterBypassed', isBypassed });
-    }
+    this.awpHandle?.port.postMessage({ type: 'setFilterBypassed', isBypassed });
   }
 
   private encodeFilterType(filterType: FilterType): number {
@@ -661,11 +686,57 @@ export default class FMSynth implements ForeignNode {
     }[filterType];
   }
 
+  public handleFilterTypeChange(newFilterType: FilterType) {
+    this.filterParams.type = newFilterType;
+    this.awpHandle?.port.postMessage({
+      type: 'setFilterType',
+      filterType: this.encodeFilterType(newFilterType),
+    });
+  }
+
+  public handleFilterQChange(newManualQ: number, controlSource: FilterParamControlSource) {
+    this.filterParams.Q = newManualQ;
+    this.filterParamControlSources.Q = controlSource;
+    this.awpHandle?.port.postMessage({
+      type: 'setFilterQ',
+      Q: newManualQ,
+      controlSource: controlSource,
+    });
+  }
+
+  public handleFilterFrequencyChange(
+    newManualFrequency: number,
+    controlSource: FilterParamControlSource
+  ) {
+    this.filterParams.frequency = newManualFrequency;
+    this.filterParamControlSources.frequency = controlSource;
+    this.awpHandle?.port.postMessage({
+      type: 'setFilterFrequency',
+      frequency: newManualFrequency,
+      controlSource: controlSource,
+    });
+  }
+
+  public handleFilterGainChange(newManualGain: number, controlSource: FilterParamControlSource) {
+    this.filterParams.gain = newManualGain;
+    this.filterParamControlSources.gain = controlSource;
+    this.awpHandle?.port.postMessage({
+      type: 'setFilterGain',
+      gain: newManualGain,
+      controlSource: controlSource,
+    });
+  }
+
   public setFilterParams(params: FilterParams) {
-    this.filterParams = params;
-    if (this.awpHandle) {
-      const encodedFilterType = this.encodeFilterType(params.type);
-      // TODO
+    this.handleFilterTypeChange(params.type);
+    if (!R.isNil(params.Q)) {
+      this.handleFilterQChange(params.Q, this.filterParamControlSources.Q);
+    }
+    if (!R.isNil(params.frequency)) {
+      this.handleFilterFrequencyChange(params.frequency, this.filterParamControlSources.frequency);
+    }
+    if (!R.isNil(params.gain)) {
+      this.handleFilterGainChange(params.gain, this.filterParamControlSources.gain);
     }
   }
 
@@ -674,9 +745,7 @@ export default class FMSynth implements ForeignNode {
       return Promise.resolve(this);
     }
 
-    return new Promise<FMSynth>(resolve => {
-      this.onInitializedCBs.push(() => resolve(this));
-    });
+    return new Promise<FMSynth>(resolve => void this.onInitializedCBs.push(() => resolve(this)));
   }
 
   public handleAdsrChange(adsrIx: number, newAdsrRaw: AdsrParams) {
@@ -889,6 +958,9 @@ export default class FMSynth implements ForeignNode {
     if (!R.isNil(params.filterBypassed)) {
       this.setFilterBypassed(params.filterBypassed);
     }
+    if (!R.isNil(params.filterParamControlSources)) {
+      this.filterParamControlSources = params.filterParamControlSources;
+    }
     if (!R.isNil(params.filterParams)) {
       this.setFilterParams(params.filterParams);
     }
@@ -925,6 +997,7 @@ export default class FMSynth implements ForeignNode {
       },
       sampleMappingState: serializeSampleMappingState(get(this.sampleMappingStore)),
       useLegacyWavetableControls: this.useLegacyWavetableControls,
+      filterParamControlSources: this.filterParamControlSources,
     };
   }
 

@@ -18,7 +18,7 @@ use crate::{WaveTable, WaveTableSettings};
 
 use self::{
   effects::EffectChain,
-  filter::{FilterModule, FilterType},
+  filter::{FilterModule, FilterParamControlSource, FilterParamType, FilterType},
   samples::{
     init_sample_manager, sample_manager, SampleMappingEmitter, SampleMappingManager,
     SampleMappingOperatorConfig, TunedSampleEmitter,
@@ -2358,6 +2358,8 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
   voice.filter_envelope_generator.adsr.store_phase_to =
     Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(FILTER_ENVELOPE_PHASE_BUF_INDEX));
 
+  voice.filter_module.reset();
+
   for operator in &mut voice.operators {
     if operator.randomize_start_phases {
       let oscillator_count = operator.oscillator_source.get_oscillator_count();
@@ -2683,20 +2685,6 @@ pub extern "C" fn fm_synth_set_mapped_sample_config(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fm_synth_get_filter_adsr_output_buf_ptr(
-  ctx: *mut FMSynthContext,
-  voice_ix: usize,
-) -> *const f32 {
-  let ctx = &mut *ctx;
-  let voice = &mut ctx.voices[voice_ix];
-  voice
-    .filter_envelope_generator
-    .adsr
-    .get_cur_frame_output()
-    .as_ptr()
-}
-
-#[no_mangle]
 pub extern "C" fn fm_synth_set_filter_bypassed(ctx: *mut FMSynthContext, bypassed: bool) {
   let ctx = unsafe { &mut *ctx };
   for voice in &mut ctx.voices {
@@ -2714,67 +2702,46 @@ pub extern "C" fn fm_synth_set_filter_type(ctx: *mut FMSynthContext, filter_type
 }
 
 #[no_mangle]
-pub extern "C" fn fm_synth_set_filter_q_param_source(
+pub extern "C" fn fm_synth_set_filter_q(
   ctx: *mut FMSynthContext,
-  param_type: isize,
-  param_int_val: usize,
-  param_float_val: f32,
-  param_float_val_2: f32,
-  param_float_val_3: f32,
+  manual_val: f32,
+  control_source: usize,
 ) {
   let ctx = unsafe { &mut *ctx };
-  let param = ParamSource::from_parts(
-    param_type as usize,
-    param_int_val,
-    param_float_val,
-    param_float_val_2,
-    param_float_val_3,
-  );
+  let control_source = FilterParamControlSource::from_usize(control_source);
+  let param_type = FilterParamType::Q;
+  let param_source = control_source.to_param_source(param_type, manual_val);
   for voice in &mut ctx.voices {
-    voice.filter_module.set_q(param.clone())
+    voice.filter_module.set_q(param_source.clone())
   }
 }
 
 #[no_mangle]
-pub extern "C" fn fm_synth_set_filter_cutoff_frequency_param_source(
+pub extern "C" fn fm_synth_set_filter_cutoff_frequency(
   ctx: *mut FMSynthContext,
-  param_type: isize,
-  param_int_val: usize,
-  param_float_val: f32,
-  param_float_val_2: f32,
-  param_float_val_3: f32,
+  manual_val: f32,
+  control_source: usize,
 ) {
   let ctx = unsafe { &mut *ctx };
-  let param = ParamSource::from_parts(
-    param_type as usize,
-    param_int_val,
-    param_float_val,
-    param_float_val_2,
-    param_float_val_3,
-  );
+  let control_source = FilterParamControlSource::from_usize(control_source);
+  let param_type = FilterParamType::CutoffFreq;
+  let param_source = control_source.to_param_source(param_type, manual_val);
   for voice in &mut ctx.voices {
-    voice.filter_module.set_cutoff_freq(param.clone())
+    voice.filter_module.set_cutoff_freq(param_source.clone())
   }
 }
 
 #[no_mangle]
-pub extern "C" fn fm_synth_set_filter_gain_param_source(
+pub extern "C" fn fm_synth_set_filter_gain(
   ctx: *mut FMSynthContext,
-  param_type: isize,
-  param_int_val: usize,
-  param_float_val: f32,
-  param_float_val_2: f32,
-  param_float_val_3: f32,
+  manual_val: f32,
+  control_source: usize,
 ) {
   let ctx = unsafe { &mut *ctx };
-  let param = ParamSource::from_parts(
-    param_type as usize,
-    param_int_val,
-    param_float_val,
-    param_float_val_2,
-    param_float_val_3,
-  );
+  let control_source = FilterParamControlSource::from_usize(control_source);
+  let param_type = FilterParamType::Gain;
+  let param_source = control_source.to_param_source(param_type, manual_val);
   for voice in &mut ctx.voices {
-    voice.filter_module.set_gain(param.clone())
+    voice.filter_module.set_gain(param_source.clone())
   }
 }

@@ -363,6 +363,50 @@ class FMSynthAWP extends AudioWorkletProcessor {
           this.wasmInstance.exports.fm_synth_set_filter_bypassed(this.ctxPtr, evt.data.isBypassed);
           break;
         }
+        case 'setFilterType': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set filter type before Wasm instance loaded');
+            return;
+          }
+
+          this.wasmInstance.exports.fm_synth_set_filter_type(this.ctxPtr, evt.data.filterType);
+          break;
+        }
+        case 'setFilterQ': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set filter type before Wasm instance loaded');
+            return;
+          }
+
+          const { Q, controlSource } = evt.data;
+          console.log(Q);
+          this.wasmInstance.exports.fm_synth_set_filter_q(this.ctxPtr, Q, controlSource);
+          break;
+        }
+        case 'setFilterFrequency': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set filter frequency before Wasm instance loaded');
+            return;
+          }
+
+          const { frequency, controlSource } = evt.data;
+          this.wasmInstance.exports.fm_synth_set_filter_cutoff_frequency(
+            this.ctxPtr,
+            frequency,
+            controlSource
+          );
+          break;
+        }
+        case 'setFilterGain': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set filter gain before Wasm instance loaded');
+            return;
+          }
+
+          const { gain, controlSource } = evt.data;
+          this.wasmInstance.exports.fm_synth_set_filter_gain(this.ctxPtr, gain, controlSource);
+          break;
+        }
         case 'shutdown': {
           this.shutdown = true;
           break;
@@ -616,19 +660,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
         (outputsPtr + voiceIx * OUTPUT_BYTES_PER_OPERATOR + OUTPUT_BYTES_PER_OPERATOR) / 4
       );
       outputs[voiceIx]?.[0]?.set(outputSlice);
-
-      const filterADSROutput = outputs[VOICE_COUNT + voiceIx]?.[0];
-      if (filterADSROutput) {
-        const ptr = this.wasmInstance.exports.fm_synth_get_filter_adsr_output_buf_ptr(
-          this.ctxPtr,
-          voiceIx
-        );
-        const outputsSlice = wasmMemory.subarray(
-          ptr / BYTES_PER_F32,
-          ptr / BYTES_PER_F32 + FRAME_SIZE
-        );
-        filterADSROutput.set(outputsSlice);
-      }
     }
 
     // Copy current ADSR phases to shared buffer

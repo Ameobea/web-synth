@@ -120,7 +120,7 @@ impl VocoderCtx {
         unsafe {
           let cutoff_freq = FILTER_PARAMS_BUF[(FILTERS_PER_BAND * band_ix + filter_ix) * 2];
           let q = FILTER_PARAMS_BUF[(FILTERS_PER_BAND * band_ix + filter_ix) * 2 + 1];
-          let filter = BiquadFilter::new(filter_type, q, 0., cutoff_freq, 0.);
+          let filter = BiquadFilter::new(filter_type, q, cutoff_freq, 0.);
           band_ptr.add(filter_ix).write(filter)
         };
       }

@@ -23,10 +23,12 @@ import { Filter as FilterModule } from './Filter';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
-const PresetsControlPanel: React.FC<{
+interface PresetsControlPanelProps {
   index: number;
   stateKey: string;
-}> = ({ index, stateKey }) => {
+}
+
+const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateKey }) => {
   const controlPanelContext = useRef<{ preset: string } | null>(null);
   const voicePresetIds = useSelector(voicePresetIdsSelector, shallowEqual);
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
