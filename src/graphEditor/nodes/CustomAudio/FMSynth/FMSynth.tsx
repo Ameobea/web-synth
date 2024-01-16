@@ -45,7 +45,6 @@ import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
 import { FilterType } from 'src/synthDesigner/FilterType';
 
 const OPERATOR_COUNT = 8;
-const VOICE_COUNT = 10;
 
 const ctx = new AudioContext();
 
@@ -695,36 +694,42 @@ export default class FMSynth implements ForeignNode {
     });
   }
 
-  public handleFilterQChange(newManualQ: number, controlSource: FilterParamControlSource) {
+  public handleFilterQChange(newManualQ: number, controlSource?: FilterParamControlSource) {
     this.filterParams.Q = newManualQ;
-    this.filterParamControlSources.Q = controlSource;
+    if (!R.isNil(controlSource)) {
+      this.filterParamControlSources.Q = controlSource;
+    }
     this.awpHandle?.port.postMessage({
       type: 'setFilterQ',
       Q: newManualQ,
-      controlSource: controlSource,
+      controlSource: this.filterParamControlSources.Q,
     });
   }
 
   public handleFilterFrequencyChange(
     newManualFrequency: number,
-    controlSource: FilterParamControlSource
+    controlSource?: FilterParamControlSource
   ) {
     this.filterParams.frequency = newManualFrequency;
-    this.filterParamControlSources.frequency = controlSource;
+    if (!R.isNil(controlSource)) {
+      this.filterParamControlSources.frequency = controlSource;
+    }
     this.awpHandle?.port.postMessage({
       type: 'setFilterFrequency',
       frequency: newManualFrequency,
-      controlSource: controlSource,
+      controlSource: this.filterParamControlSources.frequency,
     });
   }
 
-  public handleFilterGainChange(newManualGain: number, controlSource: FilterParamControlSource) {
+  public handleFilterGainChange(newManualGain: number, controlSource?: FilterParamControlSource) {
     this.filterParams.gain = newManualGain;
-    this.filterParamControlSources.gain = controlSource;
+    if (!R.isNil(controlSource)) {
+      this.filterParamControlSources.gain = controlSource;
+    }
     this.awpHandle?.port.postMessage({
       type: 'setFilterGain',
       gain: newManualGain,
-      controlSource: controlSource,
+      controlSource: this.filterParamControlSources.gain,
     });
   }
 
@@ -768,7 +773,13 @@ export default class FMSynth implements ForeignNode {
     const oldAdsr =
       adsrIx === -1 ? this.gainEnvelope : adsrIx === -2 ? this.filterEnvelope : this.adsrs[adsrIx];
 
-    const isLenOnlyChange = oldAdsr && !R.equals(oldAdsr.lenSamples, newAdsrRaw.lenSamples);
+    const isLenOnlyChange =
+      oldAdsr &&
+      !R.equals(oldAdsr.lenSamples, newAdsrRaw.lenSamples) &&
+      R.equals(oldAdsr.steps, newAdsrRaw.steps) &&
+      oldAdsr.releasePoint === newAdsrRaw.releasePoint &&
+      oldAdsr.loopPoint === newAdsrRaw.loopPoint &&
+      oldAdsr.logScale === newAdsrRaw.logScale;
     const newAdsr = {
       ...R.clone({ ...newAdsrRaw, audioThreadData: undefined }),
       audioThreadData: {

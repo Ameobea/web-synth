@@ -9,10 +9,13 @@ import { createRoot } from 'react-dom/client';
 
 import './fmDemo.scss';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
-import FilterConfig, { FilterContainer } from 'src/fmDemo/FilterConfig';
+import FilterConfig from 'src/fmDemo/FilterConfig';
 import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
-import FMSynth, { type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import FMSynth, {
+  FilterParamControlSource,
+  type Adsr,
+} from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import 'src/index.scss';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
@@ -27,8 +30,6 @@ import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FilterType } from 'src/synthDesigner/FilterType';
 
 initGlobals();
-
-const VOICE_COUNT = 10;
 
 const GlobalState: {
   octaveOffset: number;
@@ -66,11 +67,6 @@ if (!environmentIsValid) {
 const ctx = new AudioContext();
 const mainGain = new GainNode(ctx);
 mainGain.gain.value = 0.1;
-const filters = new Array(VOICE_COUNT).fill(null).map(() => {
-  const filter = new FilterContainer(ctx, GlobalState.filterParams);
-  filter.getOutput().connect(mainGain);
-  return filter;
-});
 
 // Disable context menu on mobile that can be caused by long holds on keys
 if (window.screen.width < 1000) {
@@ -167,21 +163,8 @@ GlobalState.filterADSREnabled = serialized!.filterADSREnabled ?? true;
 GlobalState.selectedMIDIInputName = serialized!.selectedMIDIInputName;
 GlobalState.lastLoadedPreset = serialized!.lastLoadedPreset;
 
-const voiceGains = new Array(VOICE_COUNT).fill(null).map((_i, voiceIx) => {
-  const gain = new GainNode(ctx);
-  gain.gain.value = 1;
-  const filterBypassed = serialized?.filterBypassed ?? false;
-  if (filterBypassed) {
-    gain.connect(mainGain);
-  } else {
-    gain.connect(filters[voiceIx].getInput());
-  }
-  return gain;
-});
-
 if (!R.isNil(serialized?.filterParams)) {
   GlobalState.filterParams = serialized!.filterParams;
-  filters.forEach(filter => filter.setAll(GlobalState.filterParams));
 }
 
 const baseTheme = {
@@ -219,15 +202,16 @@ const synth = new FMSynth(ctx, undefined, {
   midiNode: midiInputNode,
   onInitialized: () => {
     const awpNode = synth.getAWPNode()!;
+    awpNode.connect(mainGain);
 
-    voiceGains.forEach((voiceGain, voiceIx) => awpNode.connect(voiceGain, voiceIx));
-
-    filters.forEach((filter, i) => {
-      awpNode.connect(filter.csns.frequency, VOICE_COUNT + i, 0);
-      // Filter is overridden if ADSR is disabled, meaning that the frequency slider from the UI
-      // controls the fliter's frequency completely
-      filter.csns.frequency.setIsOverridden(!GlobalState.filterADSREnabled);
-    });
+    synth.setFilterParams(GlobalState.filterParams);
+    synth.setFilterBypassed(GlobalState.filterBypassed);
+    synth.handleFilterFrequencyChange(
+      GlobalState.filterParams.frequency,
+      GlobalState.filterADSREnabled
+        ? FilterParamControlSource.Envelope
+        : FilterParamControlSource.Manual
+    );
   },
 });
 
@@ -328,19 +312,9 @@ const MainControlPanel: React.FC = () => {
   );
 };
 
-const bypassFilter = () => {
-  voiceGains.forEach((node, voiceIx) => {
-    node.disconnect(filters[voiceIx].getInput());
-    node.connect(mainGain);
-  });
-};
+const bypassFilter = () => synth.setFilterBypassed(true);
 
-const unBypassFilter = () => {
-  voiceGains.forEach((node, voiceIx) => {
-    node.disconnect(mainGain);
-    node.connect(filters[voiceIx].getInput());
-  });
-};
+const unBypassFilter = () => synth.setFilterBypassed(false);
 
 interface PresetsControlPanelProps {
   setOctaveOffset: (newOctaveOffset: number) => void;
@@ -398,7 +372,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({
         lenSamples: { type: 'constant', value: filterEnvelope.lenSamples },
       });
       GlobalState.filterParams = preset.filterParams;
-      filters.forEach(filter => filter.setAll(GlobalState.filterParams));
+      synth.setFilterParams(GlobalState.filterParams);
       if (preset.filterBypassed !== GlobalState.filterBypassed) {
         if (preset.filterBypassed) {
           bypassFilter();
@@ -407,9 +381,12 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({
         }
       }
       GlobalState.filterBypassed = preset.filterBypassed;
-      if (GlobalState.filterADSREnabled !== (preset.filterADSREnabled ?? false)) {
-        filters.forEach(filter => filter.csns.frequency.setIsOverridden(!preset.filterADSREnabled));
-      }
+      synth.handleFilterFrequencyChange(
+        preset.filterParams.frequency,
+        preset.filterADSREnabled
+          ? FilterParamControlSource.Envelope
+          : FilterParamControlSource.Manual
+      );
       GlobalState.filterADSREnabled = preset.filterADSREnabled ?? false;
 
       // Disconnect main output to avoid any horrific artifacts while we're switching
@@ -683,7 +660,6 @@ const FMSynthDemo: React.FC = () => {
               isHidden={false}
             />
             <FilterConfig
-              filters={filters}
               initialState={{
                 params: GlobalState.filterParams,
                 envelope: normalizeEnvelope({
@@ -705,7 +681,10 @@ const FMSynthDemo: React.FC = () => {
                   lenSamples: { type: 'constant', value: envelope.lenSamples },
                 });
                 if (GlobalState.filterADSREnabled !== enableADSR) {
-                  filters.forEach(filter => filter.csns.frequency.setIsOverridden(!enableADSR));
+                  synth.handleFilterFrequencyChange(
+                    params.frequency,
+                    enableADSR ? FilterParamControlSource.Envelope : FilterParamControlSource.Manual
+                  );
                 }
                 GlobalState.filterADSREnabled = enableADSR;
 

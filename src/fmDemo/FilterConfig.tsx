@@ -68,7 +68,7 @@ export class FilterContainer {
 }
 
 const handleFilterChange = (
-  filters: FilterContainer[],
+  synth: FMSynth,
   state: { params: FilterParams; envelope: Adsr; bypass: boolean; enableADSR: boolean },
   key: string,
   val: any
@@ -76,14 +76,20 @@ const handleFilterChange = (
   const newState = { ...state, envelope: { ...state.envelope }, params: { ...state.params } };
   switch (key) {
     case 'frequency':
+      newState.params[key] = val;
+      synth.handleFilterFrequencyChange(val);
+      break;
     case 'Q':
+      newState.params[key] = val;
+      synth.handleFilterQChange(val);
+      break;
     case 'gain':
       newState.params[key] = val;
-      filters.forEach(filter => filter.set(key, val));
+      synth.handleFilterGainChange(val);
       break;
     case 'type': {
-      filters.forEach(filter => filter.setType(val));
       newState.params.type = val;
+      synth.handleFilterTypeChange(val);
       break;
     }
     case 'enable envelope': {
@@ -120,7 +126,6 @@ interface FilterConfigProps {
     bypass: boolean;
     enableADSR: boolean;
   };
-  filters: FilterContainer[];
   onChange: (params: FilterParams, envelope: Adsr, bypass: boolean, enableADSR: boolean) => void;
   vcId: string | undefined;
   adsrDebugName?: string;
@@ -129,7 +134,6 @@ interface FilterConfigProps {
 
 const FilterConfig: React.FC<FilterConfigProps> = ({
   initialState,
-  filters,
   onChange,
   vcId,
   adsrDebugName,
@@ -183,7 +187,7 @@ const FilterConfig: React.FC<FilterConfigProps> = ({
       settings={settings}
       state={controlPanelState}
       onChange={(key: string, val: any) => {
-        const newState = handleFilterChange(filters, state, key, val);
+        const newState = handleFilterChange(synth, state, key, val);
         onChange(newState.params, newState.envelope, newState.bypass, newState.enableADSR);
         setState(newState);
       }}

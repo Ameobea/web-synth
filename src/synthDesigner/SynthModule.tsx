@@ -150,7 +150,10 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         case 'gain envelope': {
           setGainEnvelope(val);
           const fmSynth = getState().synthDesigner.synths[props.index].fmSynth;
-          fmSynth.handleAdsrChange(-1, val);
+          fmSynth.handleAdsrChange(-1, {
+            ...val,
+            lenSamples: { type: 'constant', value: msToSamples(gainADSRLengthMs) },
+          });
           return;
         }
         case 'adsr length ms': {

@@ -202,7 +202,7 @@ pub fn init_wavetable(
   waveform_length: usize,
   base_frequency: f32,
 ) -> *mut WaveTable {
-  common::set_raw_panic_hook(crate::fm::log_err);
+  common::set_raw_panic_hook(crate::fm::log_panic);
 
   let settings = WaveTableSettings {
     waveforms_per_dimension,

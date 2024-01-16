@@ -26,12 +26,16 @@ use self::{
 };
 
 extern "C" {
+  pub(crate) fn log_panic(ptr: *const u8, len: usize);
+
   pub(crate) fn log_err(ptr: *const u8, len: usize);
 
   fn on_gate_cb(midi_number: usize, voice_ix: usize);
 
   fn on_ungate_cb(midi_number: usize, voice_ix: usize);
 }
+
+pub fn log_err_str(s: &str) { unsafe { log_err(s.as_ptr(), s.len()) } }
 
 pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
 const GAIN_ENVELOPE_PHASE_BUF_INDEX: usize = 255;
@@ -1726,6 +1730,8 @@ pub struct FMSynthContext {
     PolySynth<Box<dyn Fn(usize, usize, u8, Option<f32>)>, Box<dyn Fn(usize, usize, Option<f32>)>>,
 }
 
+static mut DID_LOG_NAN: bool = false;
+
 impl FMSynthContext {
   pub fn generate(&mut self, cur_bpm: f32, cur_frame_start_beat: f32) {
     for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
@@ -1801,6 +1807,25 @@ impl FMSynthContext {
     // Apply master gain
     for i in 0..FRAME_SIZE {
       self.main_output_buffer[i] *= self.master_gain;
+    }
+
+    let mut found_nan = false;
+    for sample in &mut self.main_output_buffer {
+      if sample.is_nan() || !sample.is_finite() {
+        found_nan = true;
+        *sample = 0.;
+      }
+    }
+
+    if found_nan {
+      if unsafe { !DID_LOG_NAN } {
+        unsafe {
+          DID_LOG_NAN = true;
+        }
+        log_err_str(&format!(
+          "NaN, Inf, or -Inf detected in output buffer from FM synth"
+        ));
+      }
     }
   }
 

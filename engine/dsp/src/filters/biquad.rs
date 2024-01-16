@@ -64,7 +64,7 @@ impl BiquadFilter {
   ) -> (f32, f32, f32, f32, f32) {
     // From: https://webaudio.github.io/web-audio-api/#filters-characteristics
     let computed_frequency = freq;
-    let normalized_freq = computed_frequency / NYQUIST;
+    let normalized_freq = crate::clamp(0.005, 0.99, computed_frequency / NYQUIST);
     let w0 = PI * normalized_freq;
     #[allow(non_snake_case)]
     let A = 10.0_f32.powf(gain / 40.);

@@ -159,6 +159,10 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     this.overrideStatusChangeCbs.push(cb);
   }
 
+  public deregisterOverrideStatusChangeCb(cb: (isOverridden: boolean) => void) {
+    this.overrideStatusChangeCbs = this.overrideStatusChangeCbs.filter(c => c !== cb);
+  }
+
   /**
    * Replaces the currently wrapped param with the new one provided, disconnecting the old one and re-connecting the new
    * one in its place.

@@ -50,6 +50,7 @@ export interface SynthModule {
   filterEnvelope: Adsr;
   filterADSRLength: number;
   pitchMultiplier: number;
+  filterOverrideStatusChangeCbs?: FilterOverrideStatusChangeCBs;
 }
 
 const ctx = new AudioContext();
@@ -93,6 +94,18 @@ const connectOscillators = (connect: boolean, synth: SynthModule) => {
 const disposeSynthModule = (synth: SynthModule) => {
   synth.fmSynth.shutdown();
   synth.outerGainNode.disconnect();
+  if (synth.filterOverrideStatusChangeCbs) {
+    console.log('de-registering');
+    synth.filterCSNs.frequency.deregisterOverrideStatusChangeCb(
+      synth.filterOverrideStatusChangeCbs.handleFrequencyOverrideStatusChange
+    );
+    synth.filterCSNs.Q.deregisterOverrideStatusChangeCb(
+      synth.filterOverrideStatusChangeCbs.handleQOverrideStatusChange
+    );
+    synth.filterCSNs.gain.deregisterOverrideStatusChangeCb(
+      synth.filterOverrideStatusChangeCbs.handleGainOverrideStatusChange
+    );
+  }
 };
 
 const connectFMSynth = (stateKey: string, synthIx: number) => {
@@ -145,12 +158,18 @@ interface InitAndConnectFilterCSNsArgs {
   fmSynth: FMSynth;
 }
 
+interface FilterOverrideStatusChangeCBs {
+  handleFrequencyOverrideStatusChange: (isOverridden: boolean) => void;
+  handleQOverrideStatusChange: (isOverridden: boolean) => void;
+  handleGainOverrideStatusChange: (isOverridden: boolean) => void;
+}
+
 const initAndConnectFilterCSNs = ({
   filterCSNs,
   synthIx,
   stateKey,
   fmSynth,
-}: InitAndConnectFilterCSNsArgs) => {
+}: InitAndConnectFilterCSNsArgs): FilterOverrideStatusChangeCBs => {
   const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
   if (!getState) {
     throw new Error(`Failed to get state for stateKey=${stateKey}`);
@@ -167,7 +186,6 @@ const initAndConnectFilterCSNs = ({
   );
 
   const handleFrequencyOverrideStatusChange = (isOverridden: boolean) => {
-    console.log({ isOverridden });
     const targetSynth = getState().synthDesigner.synths[synthIx];
     const controlSource = isOverridden
       ? targetSynth.filterEnvelopeEnabled
@@ -198,6 +216,12 @@ const initAndConnectFilterCSNs = ({
   };
   filterCSNs.gain.registerOverrideStatusChangeCb(handleGainOverrideStatusChange);
   handleGainOverrideStatusChange(filterCSNs.gain.getIsOverridden());
+
+  return {
+    handleFrequencyOverrideStatusChange,
+    handleQOverrideStatusChange,
+    handleGainOverrideStatusChange,
+  };
 };
 
 const buildDefaultSynthModule = (
@@ -219,14 +243,16 @@ const buildDefaultSynthModule = (
     new FMSynth(ctx, undefined, {
       filterEnvelope: filterEnvelope ? normalizeEnvelope(filterEnvelope) : filterEnvelope,
       onInitialized: () => {
-        const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
-        if (!getState) {
+        const state = SynthDesignerStateByStateKey.get(stateKey);
+        if (!state) {
           throw new Error(`Failed to get state for stateKey=${stateKey}`);
         }
+        const { getState, dispatch, actionCreators } = state;
         const pitchMultiplier = getState().synthDesigner.synths[synthIx].pitchMultiplier;
         fmSynth.setFrequencyMultiplier(pitchMultiplier);
 
-        initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
+        const cbs = initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
+        dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(synthIx, cbs));
 
         connectFMSynth(stateKey, synthIx);
       },
@@ -299,13 +325,15 @@ export const deserializeSynthModule = (
     onInitialized: () => {
       fmSynth.setFrequencyMultiplier(pitchMultiplier);
 
-      const getState = SynthDesignerStateByStateKey.get(stateKey)?.getState;
-      if (!getState) {
+      const state = SynthDesignerStateByStateKey.get(stateKey);
+      if (!state) {
         throw new Error(`Failed to get state for stateKey=${stateKey}`);
       }
+      const { getState, dispatch, actionCreators } = state;
       const targetSynth = getState().synthDesigner.synths[synthIx];
       const filterCSNs = targetSynth.filterCSNs;
-      initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
+      const cbs = initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
+      dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(synthIx, cbs));
 
       connectFMSynth(stateKey, synthIx);
     },
@@ -708,6 +736,20 @@ const actionGroups = {
   SET_POLYSYNTH_CTX: buildActionGroup({
     actionCreator: (ctx: PolysynthContext) => ({ type: 'SET_POLYSYNTH_CTX', ctx }),
     subReducer: (state: SynthDesignerState, { ctx }) => ({ ...state, polysynthCtx: ctx }),
+  }),
+  SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS: buildActionGroup({
+    actionCreator: (
+      synthIx: number,
+      cbs: FilterOverrideStatusChangeCBs | undefined
+    ): { type: 'SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS'; synthIx: number; cbs: any } => ({
+      type: 'SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS',
+      synthIx,
+      cbs,
+    }),
+    subReducer: (state: SynthDesignerState, { synthIx, cbs }) => {
+      const targetSynth = getSynth(synthIx, state.synths);
+      return setSynth(synthIx, { ...targetSynth, filterOverrideStatusChangeCbs: cbs }, state);
+    },
   }),
 };
 
