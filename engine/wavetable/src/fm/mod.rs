@@ -211,25 +211,19 @@ impl Oscillator for SawtoothOscillator {
     _sample_ix_within_frame: usize,
     _base_frequency: f32,
   ) -> f32 {
-    let sawtooth_lookup_table = dsp::lookup_tables::get_sawtooth_lookup_table();
-    if frequency.abs() < 1000. {
-      self.update_phase(frequency);
-      return dsp::read_interpolated(
-        sawtooth_lookup_table,
-        self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-      );
-    }
-
-    // 4x oversampling to avoid aliasing
+    // 4x oversampling to reduce aliasing
     let mut out = 0.;
+    let mut phase = self.phase;
     for _ in 0..4 {
-      self.update_phase_oversampled(4., frequency);
-      out += dsp::read_interpolated(
-        sawtooth_lookup_table,
-        self.phase * (sawtooth_lookup_table.len() - 2) as f32,
-      ) * 0.25;
+      phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+      out += if self.phase < 0.5 {
+        2. * self.phase
+      } else {
+        -1. + (2. * (self.phase - 0.5))
+      } * 0.25;
     }
 
+    self.phase = phase;
     out
   }
 }
@@ -2397,6 +2391,7 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
     Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(FILTER_ENVELOPE_PHASE_BUF_INDEX));
 
   voice.filter_module.reset();
+  voice.effect_chain.reset();
 
   for operator in &mut voice.operators {
     if operator.randomize_start_phases {
@@ -2409,6 +2404,7 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
       let initial_phases = &[0.];
       operator.oscillator_source.set_phase(initial_phases);
     }
+    operator.effect_chain.reset();
   }
 }
 

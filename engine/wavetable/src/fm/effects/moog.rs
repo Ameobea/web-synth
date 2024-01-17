@@ -1,5 +1,22 @@
 #![allow(non_snake_case)]
 //! Code based off of this: https://github.com/ddiakopoulos/MoogLadders/blob/master/src/ImprovedModel.h
+//
+// Original license:
+/*
+Copyright 2012 Stefano D'Angelo <zanga.mail@gmail.com>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+*/
 
 use std::f32::consts::PI;
 
@@ -45,10 +62,20 @@ impl Effect for MoogFilter {
     let resonance = unsafe { *rendered_params.get_unchecked(1) };
     let drive = unsafe { *rendered_params.get_unchecked(2) };
 
-    let mut dV0;
-    let mut dV1;
-    let mut dV2;
-    let mut dV3;
+    let mut dV0 = self.dV[0];
+    let mut dV1 = self.dV[1];
+    let mut dV2 = self.dV[2];
+    let mut dV3 = self.dV[3];
+
+    let mut tV0 = self.tV[0];
+    let mut tV1 = self.tV[1];
+    let mut tV2 = self.tV[2];
+    let mut tV3 = self.tV[3];
+
+    let mut V0 = self.V[0];
+    let mut V1 = self.V[1];
+    let mut V2 = self.V[2];
+    let mut V3 = self.V[3];
 
     let mut out_sample = 0.;
     // 2x oversampling
@@ -61,34 +88,48 @@ impl Effect for MoogFilter {
 
       let cutoff = dsp::clamp(1., 22_100., cutoff);
       let resonance = dsp::clamp(0., 20., resonance);
-      let drive = drive;
 
       let x = (PI * cutoff) / (SAMPLE_RATE * 2) as f32;
       let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
-      dV0 = -g * (tanh((drive * sample + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
-      self.V[0] += (dV0 + self.dV[0]) / (2.0 * (SAMPLE_RATE * 2) as f32);
-      self.dV[0] = dV0;
-      self.tV[0] = tanh(self.V[0] / (2.0 * VT));
+      let new_dV0 = -g * (tanh((drive * sample + resonance * V3) / (2. * VT)) + tV0);
+      V0 += (new_dV0 + dV0) / (2. * (SAMPLE_RATE * 2) as f32);
+      dV0 = new_dV0;
+      tV0 = tanh(V0 / (2. * VT));
 
-      dV1 = g * (self.tV[0] - self.tV[1]);
-      self.V[1] += (dV1 + self.dV[1]) / (2.0 * (SAMPLE_RATE * 2) as f32);
-      self.dV[1] = dV1;
-      self.tV[1] = tanh(self.V[1] / (2.0 * VT));
+      let new_dV1 = g * (tV0 - tV1);
+      V1 += (new_dV1 + dV1) / (2. * (SAMPLE_RATE * 2) as f32);
+      dV1 = new_dV1;
+      tV1 = tanh(V1 / (2. * VT));
 
-      dV2 = g * (self.tV[1] - self.tV[2]);
-      self.V[2] += (dV2 + self.dV[2]) / (2.0 * (SAMPLE_RATE * 2) as f32);
-      self.dV[2] = dV2;
-      self.tV[2] = tanh(self.V[2] / (2.0 * VT));
+      let new_dV2 = g * (tV1 - tV2);
+      V2 += (new_dV2 + dV2) / (2. * (SAMPLE_RATE * 2) as f32);
+      dV2 = new_dV2;
+      tV2 = tanh(V2 / (2. * VT));
 
-      dV3 = g * (self.tV[2] - self.tV[3]);
-      self.V[3] += (dV3 + self.dV[3]) / (2.0 * (SAMPLE_RATE * 2) as f32);
-      self.dV[3] = dV3;
-      self.tV[3] = tanh(self.V[3] / (2.0 * VT));
+      let new_dV3 = g * (tV2 - tV3);
+      V3 += (new_dV3 + dV3) / (2. * (SAMPLE_RATE * 2) as f32);
+      dV3 = new_dV3;
+      tV3 = tanh(V3 / (2. * VT));
 
-      out_sample += self.V[3];
+      out_sample += V3;
     }
     self.last_sample = sample;
+
+    self.tV[0] = tV0;
+    self.tV[1] = tV1;
+    self.tV[2] = tV2;
+    self.tV[3] = tV3;
+
+    self.dV[0] = dV0;
+    self.dV[1] = dV1;
+    self.dV[2] = dV2;
+    self.dV[3] = dV3;
+
+    self.V[0] = V0;
+    self.V[1] = V1;
+    self.V[2] = V2;
+    self.V[3] = V3;
 
     out_sample / 2.
   }
@@ -99,44 +140,38 @@ impl Effect for MoogFilter {
     _base_frequencies: &[f32; FRAME_SIZE],
     samples: &mut [f32; FRAME_SIZE],
   ) {
-    // if !self.last_sample.is_finite() {
-    //     self.last_sample = 0.;
-    // }
-    // if self.V.iter().any(|x| !x.is_finite()) {
-    //     self.V = [0.0; 4];
-    // }
-    // if self.dV.iter().any(|x| !x.is_finite()) {
-    //     self.dV = [0.0; 4];
-    // }
-    // if self.tV.iter().any(|x| !x.is_finite()) {
-    //     self.tV = [0.0; 4];
-    // }
-
-    let mut dV0;
-    let mut dV1;
-    let mut dV2;
-    let mut dV3;
-
     // Param orderings:
     // [cutoff, resonance, drive]
     let cutoffs = unsafe { rendered_params.get_unchecked(0) };
     let resonances = unsafe { rendered_params.get_unchecked(1) };
     let drives = unsafe { rendered_params.get_unchecked(2) };
 
+    let mut dV0 = self.dV[0];
+    let mut dV1 = self.dV[1];
+    let mut dV2 = self.dV[2];
+    let mut dV3 = self.dV[3];
+
+    let mut tV0 = self.tV[0];
+    let mut tV1 = self.tV[1];
+    let mut tV2 = self.tV[2];
+    let mut tV3 = self.tV[3];
+
+    let mut V0 = self.V[0];
+    let mut V1 = self.V[1];
+    let mut V2 = self.V[2];
+    let mut V3 = self.V[3];
+
     let mut last_sample = self.last_sample;
     for i in 0..samples.len() {
       let mut out_sample = 0.;
-
-      if i > 0 {
-        last_sample = samples[i - 1];
-      }
+      let cur_sample = unsafe { *samples.get_unchecked(i) };
 
       // 2x oversampling
       for j in 0..=1 {
         let sample = if j == 0 {
-          dsp::mix(0.5, last_sample, samples[i])
+          dsp::mix(0.5, last_sample, cur_sample)
         } else {
-          samples[i]
+          cur_sample
         };
 
         let cutoff = dsp::clamp(1., 22_100., cutoffs[i]);
@@ -146,31 +181,48 @@ impl Effect for MoogFilter {
         let x = (PI * cutoff) / (2 * SAMPLE_RATE) as f32;
         let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
-        dV0 = -g * (tanh((drive * sample + resonance * self.V[3]) / (2.0 * VT)) + self.tV[0]);
-        self.V[0] += (dV0 + self.dV[0]) / (2.0 * (2 * SAMPLE_RATE) as f32);
-        self.dV[0] = dV0;
-        self.tV[0] = tanh(self.V[0] / (2.0 * VT));
+        let new_dV0 = -g * (tanh((drive * sample + resonance * V3) / (2. * VT)) + tV0);
+        V0 += (new_dV0 + dV0) / (2. * (SAMPLE_RATE * 2) as f32);
+        dV0 = new_dV0;
+        tV0 = tanh(V0 / (2. * VT));
 
-        dV1 = g * (self.tV[0] - self.tV[1]);
-        self.V[1] += (dV1 + self.dV[1]) / (2.0 * (2 * SAMPLE_RATE) as f32);
-        self.dV[1] = dV1;
-        self.tV[1] = tanh(self.V[1] / (2.0 * VT));
+        let new_dV1 = g * (tV0 - tV1);
+        V1 += (new_dV1 + dV1) / (2. * (SAMPLE_RATE * 2) as f32);
+        dV1 = new_dV1;
+        tV1 = tanh(V1 / (2. * VT));
 
-        dV2 = g * (self.tV[1] - self.tV[2]);
-        self.V[2] += (dV2 + self.dV[2]) / (2.0 * (2 * SAMPLE_RATE) as f32);
-        self.dV[2] = dV2;
-        self.tV[2] = tanh(self.V[2] / (2.0 * VT));
+        let new_dV2 = g * (tV1 - tV2);
+        V2 += (new_dV2 + dV2) / (2. * (SAMPLE_RATE * 2) as f32);
+        dV2 = new_dV2;
+        tV2 = tanh(V2 / (2. * VT));
 
-        dV3 = g * (self.tV[2] - self.tV[3]);
-        self.V[3] += (dV3 + self.dV[3]) / (2.0 * (2 * SAMPLE_RATE) as f32);
-        self.dV[3] = dV3;
-        self.tV[3] = tanh(self.V[3] / (2.0 * VT));
+        let new_dV3 = g * (tV2 - tV3);
+        V3 += (new_dV3 + dV3) / (2. * (SAMPLE_RATE * 2) as f32);
+        dV3 = new_dV3;
+        tV3 = tanh(V3 / (2. * VT));
 
-        out_sample += self.V[3];
+        out_sample += V3;
       }
 
-      samples[i] = out_sample / 2.;
+      last_sample = cur_sample;
+      unsafe { *samples.get_unchecked_mut(i) = out_sample / 2. };
     }
+
+    self.tV[0] = tV0;
+    self.tV[1] = tV1;
+    self.tV[2] = tV2;
+    self.tV[3] = tV3;
+
+    self.dV[0] = dV0;
+    self.dV[1] = dV1;
+    self.dV[2] = dV2;
+    self.dV[3] = dV3;
+
+    self.V[0] = V0;
+    self.V[1] = V1;
+    self.V[2] = V2;
+    self.V[3] = V3;
+
     self.last_sample = last_sample;
   }
 

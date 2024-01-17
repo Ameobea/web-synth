@@ -29,7 +29,7 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
   #[inline]
   pub fn get(&self, ix: isize) -> f32 {
     debug_assert!(ix <= 0);
-    let ix = (self.head as isize + ix) % ((LENGTH - 1) as isize);
+    let ix = (self.head as isize + ix) % (LENGTH as isize);
 
     if ix >= 0 {
       self.buffer[ix as usize]
@@ -40,7 +40,11 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
 
   #[inline]
   pub fn read_interpolated(&self, sample_ix: f32) -> f32 {
-    debug_assert!(sample_ix <= 0.);
+    if cfg!(debug_assertions) {
+      if sample_ix > 0. {
+        panic!("sample_ix must be <= 0; found: {sample_ix}");
+      }
+    }
     if sample_ix == 0. {
       if cfg!(debug_assertions) {
         return self.buffer[self.head];
@@ -48,11 +52,14 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
         return *unsafe { self.buffer.get_unchecked(self.head) };
       }
     }
-    let base_ix = sample_ix.trunc();
-    let next_ix = base_ix + (1. * sample_ix.signum());
+    let base_ix = sample_ix.trunc() as isize;
+    let next_ix = base_ix - 1;
 
-    let base_val = self.get(base_ix as isize);
-    let next_val = self.get(next_ix as isize);
+    let base_val = self.get(base_ix);
+    let next_val = self.get(next_ix);
     crate::mix(1. - sample_ix.fract().abs(), base_val, next_val)
   }
+
+  #[inline]
+  pub fn fill(&mut self, val: f32) { self.buffer.fill(val); }
 }

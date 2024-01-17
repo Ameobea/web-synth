@@ -34,29 +34,29 @@ impl Effect for ChorusEffect {
   fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
     let depth = dsp::smooth(
       &mut self.last_modulation_depth,
-      dsp::clamp(0., 1., rendered_params[0]),
+      dsp::clamp(0., 1., unsafe { *rendered_params.get_unchecked(0) }),
       0.95,
     );
     let wet = dsp::smooth(
       &mut self.last_wet,
-      dsp::clamp(0., 1., rendered_params[1]),
+      dsp::clamp(0., 1., unsafe { *rendered_params.get_unchecked(1) }),
       0.95,
     );
     let dry = dsp::smooth(
       &mut self.last_dry,
-      dsp::clamp(0., 1., rendered_params[2]),
+      dsp::clamp(0., 1., unsafe { *rendered_params.get_unchecked(2) }),
       0.95,
     );
     let lfo_rate_hz = dsp::smooth(
       &mut self.last_lfo_rate,
-      dsp::clamp(0., 20., rendered_params[3]),
+      dsp::clamp(0., 20., unsafe { *rendered_params.get_unchecked(3) }),
       0.95,
     );
 
     // Update LFO phases
     for i in 0..NUM_TAPS {
-      self.lfo_phases[i] += lfo_rate_hz * TWO_PI / SAMPLE_RATE as f32;
-      while self.lfo_phases[i] > TWO_PI {
+      self.lfo_phases[i] += lfo_rate_hz / SAMPLE_RATE as f32;
+      if self.lfo_phases[i] > TWO_PI {
         self.lfo_phases[i] -= TWO_PI;
       }
     }
@@ -64,7 +64,9 @@ impl Effect for ChorusEffect {
     let mut chorus_sample = 0.0;
     for &phase in &self.lfo_phases {
       let lfo = phase.sin();
-      let delay_samples = ((MAX_CHORUS_DELAY_SAMPLES as f32) / 2.0) * depth * lfo;
+      // scale from [-1, 1] to [0, 1]
+      let lfo = (lfo + 1.) / 2.;
+      let delay_samples = (MAX_CHORUS_DELAY_SAMPLES as f32) * depth * lfo;
       chorus_sample += self.buffer.read_interpolated(-delay_samples);
     }
 
@@ -73,4 +75,6 @@ impl Effect for ChorusEffect {
 
     (sample * dry) + (chorus_sample * wet)
   }
+
+  fn reset(&mut self) { self.buffer.fill(0.); }
 }

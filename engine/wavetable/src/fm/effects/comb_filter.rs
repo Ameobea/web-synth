@@ -81,4 +81,9 @@ impl Effect for CombFilter {
       samples[sample_ix] = output;
     }
   }
+
+  fn reset(&mut self) {
+    self.input_buffer.fill(0.);
+    self.feedback_buffer.fill(0.);
+  }
 }

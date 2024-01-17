@@ -70,6 +70,11 @@ pub trait Effect {
       );
     }
   }
+
+  /// Resets the effect to its initial state.  Called after a voice is freshly gated.
+  ///
+  /// Useful for effects with internal state like delay lines.
+  fn reset(&mut self) {}
 }
 
 #[derive(Clone)]
@@ -737,6 +742,22 @@ impl Effect for EffectInstance {
       EffectInstance::Chorus(e) => e.get_params(buf),
     }
   }
+
+  fn reset(&mut self) {
+    match self {
+      EffectInstance::SpectralWarping(e) => e.reset(),
+      EffectInstance::Wavecruncher(e) => e.reset(),
+      EffectInstance::Bitcrusher(e) => e.reset(),
+      EffectInstance::Wavefolder(e) => e.reset(),
+      EffectInstance::SoftClipper(e) => e.reset(),
+      EffectInstance::ButterworthFilter(e) => e.reset(),
+      EffectInstance::Delay(e) => e.reset(),
+      EffectInstance::MoogFilter(e) => e.reset(),
+      EffectInstance::CombFilter(e) => e.reset(),
+      EffectInstance::Compressor(e) => e.reset(),
+      EffectInstance::Chorus(e) => e.reset(),
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -856,6 +877,14 @@ impl EffectChain {
     // Shift all effects after the removed one down to fill the empty space
     for effect_ix in effect_ix + 1..self.effects.len() {
       self.effects[effect_ix - 1] = self.effects[effect_ix].take();
+    }
+  }
+
+  pub fn reset(&mut self) {
+    for effect in self.effects.iter_mut() {
+      if let Some(effect) = effect {
+        effect.inst.reset();
+      }
     }
   }
 }

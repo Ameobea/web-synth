@@ -32,4 +32,6 @@ impl Effect for Delay {
 
     (sample * dry) + (delayed_sample * wet)
   }
+
+  fn reset(&mut self) { self.buffer.fill(0.); }
 }
