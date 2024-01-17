@@ -180,13 +180,27 @@ impl Oscillator for TriangleOscillator {
     _sample_ix_within_frame: usize,
     _base_frequency: f32,
   ) -> f32 {
-    self.update_phase(frequency);
+    // 4x oversampling to avoid aliasing
+    let mut out = 0.;
+    let mut phase = self.phase;
+    for _ in 0..4 {
+      phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+      out += if phase < 0.25 {
+        4. * phase
+      } else if phase < 0.5 {
+        let adjusted_phase = phase - 0.25;
+        1. - 4. * adjusted_phase
+      } else if phase < 0.75 {
+        let adjusted_phase = phase - 0.5;
+        -adjusted_phase * 4.
+      } else {
+        let adjusted_phase = phase - 0.75;
+        -1. + (adjusted_phase * 4.)
+      } * 0.25;
+    }
 
-    let triangle_lookup_table = dsp::lookup_tables::get_triangle_lookup_table();
-    dsp::read_interpolated(
-      triangle_lookup_table,
-      self.phase * (triangle_lookup_table.len() - 2) as f32,
-    )
+    self.phase = phase;
+    out
   }
 }
 
