@@ -6,7 +6,7 @@ use std::{cell::Cell, rc::Rc};
 
 use adsr::{
   exports::AdsrLengthMode, managed_adsr::ManagedAdsr, Adsr, AdsrStep, EarlyReleaseConfig,
-  EarlyReleaseStrategy, GateStatus, RampFn, RENDERED_BUFFER_SIZE,
+  GateStatus, RampFn, RENDERED_BUFFER_SIZE,
 };
 use dsp::{midi_number_to_frequency, oscillator::PhasedOscillator};
 
@@ -42,6 +42,8 @@ const GAIN_ENVELOPE_PHASE_BUF_INDEX: usize = 255;
 const FILTER_ENVELOPE_PHASE_BUF_INDEX: usize = 254;
 
 fn samples_to_ms(samples: f32) -> f32 { samples * 1000. / SAMPLE_RATE as f32 }
+
+const VOICE_COUNT: usize = 32;
 
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: usize) {
@@ -974,10 +976,7 @@ impl FMSynthVoice {
           None,
           0.975,
           shared_gain_adsr_rendered_buffer,
-          EarlyReleaseConfig {
-            strategy: EarlyReleaseStrategy::LinearMix,
-            len_samples: 3_400,
-          },
+          EarlyReleaseConfig::default(),
           false,
         ),
         length: 1_000.,
@@ -991,10 +990,7 @@ impl FMSynthVoice {
           None,
           0.975,
           shared_filter_adsr_rendered_buffer,
-          EarlyReleaseConfig {
-            strategy: EarlyReleaseStrategy::LinearMix,
-            len_samples: 3_400,
-          },
+          EarlyReleaseConfig::default(),
           false,
         ),
         length: 1_000.,
@@ -1669,7 +1665,7 @@ pub const OPERATOR_COUNT: usize = 8;
 pub const FRAME_SIZE: usize = 128;
 /// Sample rate in samples per second
 pub const SAMPLE_RATE: usize = 44_100;
-pub const MAX_PARAM_BUFFERS: usize = 16;
+pub const MAX_PARAM_BUFFERS: usize = 8;
 pub const FILTER_PARAM_BUFFER_COUNT: usize = 4;
 
 /// Holds the weights that controls how much each operator modulates each of the other operators,
@@ -1708,7 +1704,7 @@ impl ModulationMatrix {
 }
 
 pub struct FMSynthContext {
-  pub voices: Vec<FMSynthVoice>,
+  pub voices: Box<[FMSynthVoice; VOICE_COUNT]>,
   pub modulation_matrix: ModulationMatrix,
   /// Generic param buffers containing values routed in from other modules.  Can be used to
   /// modulate operators, etc.
@@ -1716,8 +1712,8 @@ pub struct FMSynthContext {
   /// Special param buffers used to modulate filter params from other modules.
   pub filter_param_buffers: [[f32; FRAME_SIZE]; FILTER_PARAM_BUFFER_COUNT],
   pub operator_base_frequency_sources: [ParamSource; OPERATOR_COUNT],
-  pub base_frequency_input_buffer: Vec<[f32; FRAME_SIZE]>,
-  pub output_buffers: Vec<[f32; FRAME_SIZE]>,
+  pub base_frequency_input_buffer: Box<[[f32; FRAME_SIZE]; VOICE_COUNT]>,
+  pub output_buffers: Box<[[f32; FRAME_SIZE]; VOICE_COUNT]>,
   pub main_output_buffer: [f32; FRAME_SIZE],
   pub master_gain: f32,
   pub frequency_multiplier: f32,
@@ -1726,8 +1722,11 @@ pub struct FMSynthContext {
   pub detune: Option<ParamSource>,
   pub wavetables: Vec<WaveTable>,
   pub sample_mapping_manager: SampleMappingManager,
-  pub polysynth:
-    PolySynth<Box<dyn Fn(usize, usize, u8, Option<f32>)>, Box<dyn Fn(usize, usize, Option<f32>)>>,
+  pub polysynth: PolySynth<
+    Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+    Box<dyn Fn(usize, usize, Option<f32>)>,
+    VOICE_COUNT,
+  >,
 }
 
 static mut DID_LOG_NAN: bool = false;
@@ -1852,7 +1851,7 @@ impl FMSynthContext {
         // zero out cached modulation indices to avoid having to do so every tick
         if !was_disabled && disabled {
           for dst_operator_ix in 0..OPERATOR_COUNT {
-            for voice in &mut self.voices {
+            for voice in &mut *self.voices {
               voice.cached_modulation_indices[operator_ix][dst_operator_ix] = [0.; FRAME_SIZE];
             }
           }
@@ -1864,19 +1863,19 @@ impl FMSynthContext {
 
 #[no_mangle]
 #[cold]
-pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthContext {
+pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
   dsp::lookup_tables::maybe_init_lookup_tables();
   init_sample_manager();
   common::set_raw_panic_hook(log_err);
 
   let ctx = Box::into_raw(Box::new(FMSynthContext {
-    voices: Vec::with_capacity(voice_count),
+    voices: Box::new(uninit()),
     modulation_matrix: ModulationMatrix::default(),
     param_buffers: uninit(),
     filter_param_buffers: uninit(),
     operator_base_frequency_sources: uninit(),
-    base_frequency_input_buffer: Vec::with_capacity(voice_count),
-    output_buffers: Vec::with_capacity(voice_count),
+    base_frequency_input_buffer: Box::new(uninit()),
+    output_buffers: Box::new(uninit()),
     main_output_buffer: uninit(),
     frequency_multiplier: 1.,
     most_recent_gated_voice_ix: 0,
@@ -1925,18 +1924,18 @@ pub unsafe extern "C" fn init_fm_synth_ctx(voice_count: usize) -> *mut FMSynthCo
   let shared_filter_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
     shared_filter_adsr_rendered_buffer.into();
 
-  for _ in 0..voice_count {
-    (*ctx).voices.push(FMSynthVoice::new(
-      Rc::clone(&shared_gain_adsr_rendered_buffer),
-      Rc::clone(&shared_filter_adsr_rendered_buffer),
-    ));
+  for i in 0..VOICE_COUNT {
+    std::ptr::write(
+      (*ctx).voices.as_mut_ptr().add(i),
+      FMSynthVoice::new(
+        Rc::clone(&shared_gain_adsr_rendered_buffer),
+        Rc::clone(&shared_filter_adsr_rendered_buffer),
+      ),
+    );
   }
   // Render the default gain and filter envelope for all voices
   (*ctx).voices[0].gain_envelope_generator.render();
   (*ctx).voices[0].filter_envelope_generator.render();
-
-  (*ctx).base_frequency_input_buffer.set_len(voice_count);
-  (*ctx).output_buffers.set_len(voice_count);
 
   ctx
 }
@@ -2204,7 +2203,7 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
   param_4_val_float_2: f32,
   param_4_val_float_3: f32,
 ) {
-  for voice in &mut (*ctx).voices {
+  for voice in &mut *(*ctx).voices {
     let operator = &mut voice.operators[operator_ix];
     let old_phases = operator.oscillator_source.get_phase();
     let new_oscillator_source = build_oscillator_source(
@@ -2321,7 +2320,7 @@ pub unsafe extern "C" fn fm_synth_set_effect(
   param_4_float_val_3: f32,
   is_bypassed: bool,
 ) {
-  for voice in &mut (*ctx).voices {
+  for voice in &mut *(*ctx).voices {
     let effect_chain = if operator_ix == -1 {
       &mut voice.effect_chain
     } else {
@@ -2472,7 +2471,7 @@ pub unsafe extern "C" fn set_adsr(
   let shared_buffer = Box::new([0.0f32; RENDERED_BUFFER_SIZE]);
   let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
 
-  for voice in &mut (*ctx).voices {
+  for voice in &mut *(*ctx).voices {
     let mut new_adsr = Adsr::new(
       ADSR_STEP_BUFFER[..step_count].to_owned(),
       if loop_point < 0. {
@@ -2589,7 +2588,7 @@ pub unsafe extern "C" fn set_adsr_length(
 
   if adsr_ix == -1 {
     // gain envelope
-    for voice in &mut (*ctx).voices {
+    for voice in &mut *(*ctx).voices {
       let adsr = &mut voice.gain_envelope_generator;
       match param {
         ParamSource::Constant { cur_val, .. } =>
@@ -2601,7 +2600,7 @@ pub unsafe extern "C" fn set_adsr_length(
     return;
   } else if adsr_ix == -2 {
     // filter envelope
-    for voice in &mut (*ctx).voices {
+    for voice in &mut *(*ctx).voices {
       let adsr = &mut voice.filter_envelope_generator;
       match param {
         ParamSource::Constant { cur_val, .. } =>
@@ -2614,7 +2613,7 @@ pub unsafe extern "C" fn set_adsr_length(
   }
   let adsr_ix = adsr_ix as usize;
 
-  for voice in &mut (*ctx).voices {
+  for voice in &mut *(*ctx).voices {
     voice.adsr_params[adsr_ix].len_samples = param.clone();
   }
 }
@@ -2726,7 +2725,7 @@ pub extern "C" fn fm_synth_set_master_gain(ctx: *mut FMSynthContext, gain: f32) 
 #[no_mangle]
 pub extern "C" fn fm_synth_set_filter_bypassed(ctx: *mut FMSynthContext, bypassed: bool) {
   let ctx = unsafe { &mut *ctx };
-  for voice in &mut ctx.voices {
+  for voice in &mut *ctx.voices {
     voice.filter_module.is_bypassed = bypassed;
   }
 }
@@ -2734,7 +2733,7 @@ pub extern "C" fn fm_synth_set_filter_bypassed(ctx: *mut FMSynthContext, bypasse
 #[no_mangle]
 pub extern "C" fn fm_synth_set_filter_type(ctx: *mut FMSynthContext, filter_type: usize) {
   let ctx = unsafe { &mut *ctx };
-  for voice in &mut ctx.voices {
+  for voice in &mut *ctx.voices {
     let new_filter_type = FilterType::from_usize(filter_type);
     voice.filter_module.set_filter_type(new_filter_type);
   }
@@ -2750,7 +2749,7 @@ pub extern "C" fn fm_synth_set_filter_q(
   let control_source = FilterParamControlSource::from_usize(control_source);
   let param_type = FilterParamType::Q;
   let param_source = control_source.to_param_source(param_type, manual_val);
-  for voice in &mut ctx.voices {
+  for voice in &mut *ctx.voices {
     voice.filter_module.set_q(param_source.clone())
   }
 }
@@ -2765,7 +2764,7 @@ pub extern "C" fn fm_synth_set_filter_cutoff_frequency(
   let control_source = FilterParamControlSource::from_usize(control_source);
   let param_type = FilterParamType::CutoffFreq;
   let param_source = control_source.to_param_source(param_type, manual_val);
-  for voice in &mut ctx.voices {
+  for voice in &mut *ctx.voices {
     voice.filter_module.set_cutoff_freq(param_source.clone())
   }
 }
@@ -2780,7 +2779,7 @@ pub extern "C" fn fm_synth_set_filter_gain(
   let control_source = FilterParamControlSource::from_usize(control_source);
   let param_type = FilterParamType::Gain;
   let param_source = control_source.to_param_source(param_type, manual_val);
-  for voice in &mut ctx.voices {
+  for voice in &mut *ctx.voices {
     voice.filter_module.set_gain(param_source.clone())
   }
 }

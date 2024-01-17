@@ -12,8 +12,11 @@ pub struct MsgHandlerContext {
   pub release_note: Function,
   pub pitch_bend: Option<Function>,
   pub mod_wheel: Option<Function>,
-  pub voice_manager:
-    PolySynth<Box<dyn Fn(usize, usize, u8, Option<f32>)>, Box<dyn Fn(usize, usize, Option<f32>)>>,
+  pub voice_manager: PolySynth<
+    Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+    Box<dyn Fn(usize, usize, Option<f32>)>,
+    16,
+  >,
   pub generic_control_handler: Option<Function>,
 }
 

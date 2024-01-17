@@ -214,6 +214,7 @@ export default class FMSynth implements ForeignNode {
     loopPoint: null,
     releasePoint: 0.7,
     audioThreadData: { phaseIndex: 254 },
+    logScale: true,
   };
   private filterBypassed = true;
   private filterParams: FilterParams = buildDefaultFilter(FilterType.Lowpass, 1);
@@ -808,6 +809,7 @@ export default class FMSynth implements ForeignNode {
         ...newAdsr,
         lenSamples: newAdsr.lenSamples,
         audioThreadData: this.filterEnvelope.audioThreadData,
+        logScale: true,
       };
     } else {
       this.adsrs[adsrIx] = newAdsr;
@@ -964,6 +966,7 @@ export default class FMSynth implements ForeignNode {
               ? { type: 'constant', value: filterEnvelope.lenSamples }
               : { type: 'beats to samples', value: filterEnvelope.lenSamples }
             : filterEnvelope.lenSamples,
+        logScale: true,
       };
       this.filterEnvelope.audioThreadData.phaseIndex = 254;
     }

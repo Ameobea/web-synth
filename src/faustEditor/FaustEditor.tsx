@@ -14,7 +14,7 @@ import {
   type FaustEditorReduxInfra,
 } from 'src/faustEditor';
 import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
-import { buildFaustWorkletNode, FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
+import { buildFaustWorkletNode, type FaustWorkletNode } from 'src/faustEditor/FaustAudioWorklet';
 import { buildSoulWorkletNode } from 'src/faustEditor/SoulAudioWorklet';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { useWindowSize } from 'src/reactUtils';
@@ -116,18 +116,20 @@ type CodeCompiler = (
   context: ValueOf<typeof faustEditorContextMap>
 ) => Promise<DynamicCodeWorkletNode>;
 
+interface MkCompileButtonClickHandlerArgs {
+  setErrMessage: (errMsg: string) => void;
+  vcId: string;
+  analyzerNode: AnalyserNode;
+  compiler?: CodeCompiler;
+}
+
 export const mkCompileButtonClickHandler =
   ({
     setErrMessage,
     vcId,
     analyzerNode,
     compiler = compileFaustInstance,
-  }: {
-    setErrMessage: (errMsg: string) => void;
-    vcId: string;
-    analyzerNode: AnalyserNode;
-    compiler?: CodeCompiler;
-  }) =>
+  }: MkCompileButtonClickHandlerArgs) =>
   async (): Promise<boolean> => {
     const context = faustEditorContextMap[vcId];
     let codeNode: DynamicCodeWorkletNode;

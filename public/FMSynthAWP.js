@@ -1,7 +1,6 @@
 const FRAME_SIZE = 128;
 const BYTES_PER_F32 = 32 / 8;
 const OUTPUT_BYTES_PER_OPERATOR = FRAME_SIZE * BYTES_PER_F32;
-const VOICE_COUNT = 10;
 const PARAM_COUNT = 8;
 const ADSR_PHASE_BUF_LENGTH = 256;
 
@@ -518,7 +517,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
     this.wasmInstance.exports.memory.grow(1024 * 4);
-    this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx(VOICE_COUNT);
+    this.ctxPtr = this.wasmInstance.exports.init_fm_synth_ctx();
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
 
     outputWeights.forEach((paramSource, operatorIx) =>

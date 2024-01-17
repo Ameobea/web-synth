@@ -142,7 +142,7 @@ impl Default for EarlyReleaseConfig {
   fn default() -> Self {
     EarlyReleaseConfig {
       strategy: EarlyReleaseStrategy::LinearMix,
-      len_samples: 2_640,
+      len_samples: SAMPLE_RATE / 4,
     }
   }
 }

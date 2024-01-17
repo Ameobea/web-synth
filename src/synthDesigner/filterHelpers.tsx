@@ -8,7 +8,7 @@ import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType } from 'src/synthDesigner/FilterType';
-import { dbToLinear, linearToDb } from 'src/util';
+import { clamp, dbToLinear, linearToDb } from 'src/util';
 
 /**
  * @returns `true` if the filter type is a primitive filter type (one which is natively supported by WebAudio's
@@ -45,7 +45,7 @@ const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
     console.error('Nil `Q` value but Q control panel setting rendered; reseting to default...');
     value = 1;
   }
-  let linearQ = dbToLinear(value);
+  let linearQ = clamp(0.3, 30, dbToLinear(value));
   if (Number.isNaN(linearQ)) {
     console.error('NaN `Q` value after converting from log to linear; logQ=' + value);
     linearQ = 1;

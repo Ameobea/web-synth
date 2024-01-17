@@ -2,7 +2,7 @@ use dsp::{
   circular_buffer::CircularBuffer,
   db_to_gain,
   filters::biquad::{BiquadFilter, FilterMode},
-  gain_to_db, one_pole, SAMPLE_RATE,
+  gain_to_db, SAMPLE_RATE,
 };
 
 const FRAME_SIZE: usize = 128;
@@ -16,7 +16,7 @@ pub enum SensingMethod {
 
 const BAND_SPLITTER_FILTER_ORDER: usize = 16;
 const BAND_SPLITTER_FILTER_CHAIN_LENGTH: usize = BAND_SPLITTER_FILTER_ORDER / 2;
-const MAX_LOOKAHEAD_SAMPLES: usize = SAMPLE_RATE as usize / 10;
+const MAX_LOOKAHEAD_SAMPLES: usize = SAMPLE_RATE as usize / 15;
 const LOW_BAND_CUTOFF: f32 = 88.3;
 const MID_BAND_CUTOFF: f32 = 2500.;
 const SAB_SIZE: usize = 16;
@@ -52,7 +52,7 @@ fn error(msg: &str) {
 // 10: mid band applied gain
 // 11: high band applied gain
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Compressor {
   pub bottom_envelope: f32,
   pub top_envelope: f32,
@@ -60,6 +60,21 @@ pub struct Compressor {
   pub last_output_level_db: f32,
   pub last_applied_gain: f32,
   pub lookback_period_squared_samples_sum: f32,
+  pub detected_level_history: CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
+}
+
+impl Default for Compressor {
+  fn default() -> Self {
+    Self {
+      bottom_envelope: 0.,
+      top_envelope: 0.,
+      last_detected_level_linear: 0.,
+      last_output_level_db: 0.,
+      last_applied_gain: 0.,
+      lookback_period_squared_samples_sum: 0.,
+      detected_level_history: CircularBuffer::new(),
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -293,6 +308,10 @@ impl Compressor {
         ),
       };
 
+      // I have no idea if this is right, and if I had to guess I'd say it's wrong
+      self.detected_level_history.set(detected_level_linear);
+      let detected_level_linear = self.detected_level_history.get(-lookahead_samples / 2);
+
       detected_level_db = gain_to_db(detected_level_linear);
 
       // Compute the envelope
@@ -446,7 +465,6 @@ impl MultibandCompressor {
     self.apply_bandsplitting(low_band_pre_gain, mid_band_pre_gain, high_band_pre_gain);
 
     self.output_buffer.fill(0.);
-    let mix = one_pole(&mut self.mix_state, mix, 0.1);
     if mix != 1. {
       let lookahead_samples = lookahead_samples as isize;
       for input_buf in &[
@@ -457,6 +475,7 @@ impl MultibandCompressor {
         for i in 0..FRAME_SIZE {
           let ix = -lookahead_samples - FRAME_SIZE as isize + i as isize;
           let input = input_buf.get(ix);
+          let mix = dsp::smooth(&mut self.mix_state, mix, 0.995);
           self.output_buffer[i] += input * (1. - mix);
         }
       }

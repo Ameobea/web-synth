@@ -83,7 +83,7 @@ const FilterEnvelopeControls: React.FC<FilterEnvelopeControlsProps> = ({
         }
       })(),
       [lengthKey]: length,
-      adsr: filterEnvelope,
+      adsr: { ...filterEnvelope, logScale: true },
     }),
     [lengthMode, lengthKey, length, filterEnvelope]
   );

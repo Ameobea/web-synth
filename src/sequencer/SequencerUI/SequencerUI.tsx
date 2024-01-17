@@ -100,12 +100,15 @@ const SequencerRow: React.FC<SequencerRowProps> = ({
     row: { marks },
     editingIx,
     curActiveMarkIx,
-  } = useSelector(({ sequencer }) => ({
-    row: sequencer.marks[rowIx],
-    editingIx:
-      sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
-    curActiveMarkIx: sequencer.curActiveMarkIx,
-  }));
+  } = useSelector(
+    ({ sequencer }) => ({
+      row: sequencer.marks[rowIx],
+      editingIx:
+        sequencer.markEditState?.voiceIx === rowIx ? sequencer.markEditState!.editingMarkIx : null,
+      curActiveMarkIx: sequencer.curActiveMarkIx,
+    }),
+    (a, b) => shallowEqual(a, b) && a.row.marks === b.row.marks
+  );
 
   return (
     <>

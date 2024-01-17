@@ -223,6 +223,7 @@ pub(crate) struct FilterModule {
   pub filter_state: FilterState,
   pub q: ParamSource,
   pub cutoff_freq: ParamSource,
+  pub last_cutoff_freq: f32,
   pub gain: ParamSource,
   pub rendered_q: [f32; FRAME_SIZE],
   pub rendered_cutoff_freq: [f32; FRAME_SIZE],
@@ -237,6 +238,7 @@ impl Default for FilterModule {
       filter_state: FilterState::new_simple_biquad(FilterMode::Lowpass),
       q: ParamSource::new_constant(1.),
       cutoff_freq: ParamSource::new_constant(440.),
+      last_cutoff_freq: 440.,
       gain: ParamSource::new_constant(0.),
       rendered_q: [0.; FRAME_SIZE],
       rendered_cutoff_freq: [0.; FRAME_SIZE],
@@ -319,6 +321,15 @@ impl FilterModule {
     self
       .cutoff_freq
       .render_raw(&render_params, &mut self.rendered_cutoff_freq);
+    if !matches!(self.cutoff_freq, ParamSource::Constant { .. }) {
+      for i in 0..FRAME_SIZE {
+        self.rendered_cutoff_freq[i] = dsp::smooth(
+          &mut self.last_cutoff_freq,
+          self.rendered_cutoff_freq[i],
+          0.95,
+        );
+      }
+    }
     let filter_mode = self.filter_state.get_filter_mode();
     let gain = if filter_mode.map(|mode| mode.needs_gain()).unwrap_or(false) {
       self

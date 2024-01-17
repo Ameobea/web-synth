@@ -12,19 +12,34 @@ class FMSynthFxAWP extends AudioWorkletProcessor {
     ];
   }
 
-  handleWasmPanic = (ptr, len) => {
+  readStringFromWasmMemory = (ptr, len) => {
     const mem = new Uint8Array(this.getWasmMemoryBuffer().buffer);
     const slice = mem.subarray(ptr, ptr + len);
-    const str = String.fromCharCode(...slice);
+    return String.fromCharCode(...slice);
+  };
+
+  handleWasmPanic = (ptr, len) => {
+    const str = this.readStringFromWasmMemory(ptr, len);
     throw new Error(str);
+  };
+
+  logErr = (ptr, len) => {
+    const str = this.readStringFromWasmMemory(ptr, len);
+    console.error(str);
+  };
+
+  log = (ptr, len) => {
+    const str = this.readStringFromWasmMemory(ptr, len);
+    console.log(str);
   };
 
   async initWasmInstance(wasmBytes) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, {
       env: {
-        log_err: this.handleWasmPanic,
-        log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
+        log_panic: this.handleWasmPanic,
+        log_err: (ptr, len) => this.logErr(ptr, len),
+        log_raw: (ptr, len, _level) => this.log(ptr, len),
         debug1: (v1, v2, v3) => console.log({ v1, v2, v3 }),
         on_gate_cb: () => {
           throw new Error('Unused by FM synth fx');

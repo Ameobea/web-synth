@@ -28,8 +28,6 @@ pub struct SynthCallbacks<
   pub trigger_release: TR,
 }
 
-pub const POLY_SYNTH_VOICE_COUNT: usize = 10; // TODO: Make this a configurable param
-
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum VoicePlayingStatus {
   Tacent,
@@ -60,6 +58,7 @@ pub struct PolySynth<
   TA: Fn(usize, usize, u8, Option<f32>),
   // voice_ix: usize, note_id: usize, offset: Option<f32>
   TR: Fn(usize, usize, Option<f32>),
+  const VOICE_COUNT: usize,
 > {
   /// Index of the first voice slot that is playing.  If no slots are playing, points to an
   /// arbitrary slot.
@@ -68,7 +67,7 @@ pub struct PolySynth<
   /// points to the voice that has been playing the longest.
   pub first_idle_voice_ix: usize,
   /// Maps each voice's index to what frequency it's currently playing
-  pub voices: [Voice; POLY_SYNTH_VOICE_COUNT],
+  pub voices: [Voice; VOICE_COUNT],
   /// The functions that will be called to carry out synth actions
   pub synth_cbs: SynthCallbacks<TA, TR>,
 }
@@ -81,17 +80,18 @@ impl<
     TA: Fn(usize, usize, u8, Option<f32>),
     // voice_ix: usize, note_id: usize, offset: Option<f32>
     TR: Fn(usize, usize, Option<f32>),
-  > PolySynth<TA, TR>
+    const VOICE_COUNT: usize,
+  > PolySynth<TA, TR, VOICE_COUNT>
 {
   fn find_ix_of_voice_playing(&self, note_id: usize) -> Option<usize> {
     // look for the index of the first voice that's playing the provided frequency
     let (search_range_1, search_range_2) = if self.voices[self.first_idle_voice_ix].is_playing() {
       // all voices active; have to search the whole range
-      (0..POLY_SYNTH_VOICE_COUNT, 0..0)
+      (0..VOICE_COUNT, 0..0)
     } else if self.first_active_voice_ix > self.first_idle_voice_ix {
       // range is split; idle range is in the middle
       (
-        self.first_active_voice_ix..POLY_SYNTH_VOICE_COUNT,
+        self.first_active_voice_ix..VOICE_COUNT,
         0..self.first_idle_voice_ix,
       )
     } else {
@@ -105,9 +105,9 @@ impl<
   }
 
   pub fn new(synth_cbs: SynthCallbacks<TA, TR>) -> Self {
-    let mut voices: [Voice; POLY_SYNTH_VOICE_COUNT] = uninit();
+    let mut voices: [Voice; VOICE_COUNT] = uninit();
     let voices_ptr = &mut voices as *mut _ as *mut Voice;
-    for i in 0..POLY_SYNTH_VOICE_COUNT {
+    for i in 0..VOICE_COUNT {
       unsafe { ptr::write(voices_ptr.add(i), Voice::new(i)) };
     }
 
@@ -134,7 +134,7 @@ impl<
     let played_voice_ix = self.voices[self.first_idle_voice_ix].src_ix;
 
     // bump the first idle index since we're adding a new active voice
-    if self.first_idle_voice_ix == (POLY_SYNTH_VOICE_COUNT - 1) {
+    if self.first_idle_voice_ix == (VOICE_COUNT - 1) {
       self.first_idle_voice_ix = 0;
     } else {
       self.first_idle_voice_ix += 1;
@@ -172,7 +172,7 @@ impl<
     let old_first_active_voice_ix = self.first_active_voice_ix;
 
     // Bump the first active pointer forward since we're getting rid of an active voice
-    if self.first_active_voice_ix != POLY_SYNTH_VOICE_COUNT - 1 {
+    if self.first_active_voice_ix != VOICE_COUNT - 1 {
       self.first_active_voice_ix += 1;
     } else {
       self.first_active_voice_ix = 0;
@@ -192,7 +192,7 @@ impl<
   }
 
   pub fn release_all(&mut self) {
-    for i in 0..POLY_SYNTH_VOICE_COUNT {
+    for i in 0..VOICE_COUNT {
       if let VoicePlayingStatus::Playing(note_id) = self.voices[i].playing {
         self.trigger_release(note_id, None);
       }
@@ -207,8 +207,11 @@ pub mod exports {
   use crate::*;
 
   pub struct PolySynthContext {
-    pub synth:
-      PolySynth<Box<dyn Fn(usize, usize, u8, Option<f32>)>, Box<dyn Fn(usize, usize, Option<f32>)>>,
+    pub synth: PolySynth<
+      Box<dyn Fn(usize, usize, u8, Option<f32>)>,
+      Box<dyn Fn(usize, usize, Option<f32>)>,
+      16,
+    >,
   }
 
   #[wasm_bindgen]

@@ -1,6 +1,7 @@
 import { filterNils } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
+import { shallowEqual } from 'react-redux';
 
 import type { SequencerReduxInfra } from 'src/sequencer/redux';
 
@@ -71,7 +72,8 @@ const SequencerSettings: React.FC<SequencerReduxInfra> = reduxInfra => {
       voiceCount: state.sequencer.voices.length,
       currentEditingVoiceIx: state.sequencer.currentEditingVoiceIx,
       markCount: state.sequencer.marks[0].marks.length,
-    })
+    }),
+    shallowEqual
   );
 
   const handleChange = useMemo(() => mkHandleChange(reduxInfra), [reduxInfra]);

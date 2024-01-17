@@ -708,10 +708,9 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
                 }
                 view={parentInstance.baseView.store}
                 getCursorPosBeats={() => parentInstance.playbackHandler.getCursorPosBeats()}
-                setCursorPosBeats={newCursorPosBeats => {
-                  console.log('Setting cursor pos beats: ', newCursorPosBeats);
-                  parentInstance.playbackHandler.setCursorPosBeats(newCursorPosBeats);
-                }}
+                setCursorPosBeats={newCursorPosBeats =>
+                  void parentInstance.playbackHandler.setCursorPosBeats(newCursorPosBeats)
+                }
               />
             );
           } else {
