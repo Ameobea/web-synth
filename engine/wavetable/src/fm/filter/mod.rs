@@ -321,15 +321,6 @@ impl FilterModule {
     self
       .cutoff_freq
       .render_raw(&render_params, &mut self.rendered_cutoff_freq);
-    if !matches!(self.cutoff_freq, ParamSource::Constant { .. }) {
-      for i in 0..FRAME_SIZE {
-        self.rendered_cutoff_freq[i] = dsp::smooth(
-          &mut self.last_cutoff_freq,
-          self.rendered_cutoff_freq[i],
-          0.95,
-        );
-      }
-    }
     let filter_mode = self.filter_state.get_filter_mode();
     let gain = if filter_mode.map(|mode| mode.needs_gain()).unwrap_or(false) {
       self

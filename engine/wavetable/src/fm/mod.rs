@@ -6,7 +6,7 @@ use std::{cell::Cell, rc::Rc};
 
 use adsr::{
   exports::AdsrLengthMode, managed_adsr::ManagedAdsr, Adsr, AdsrStep, EarlyReleaseConfig,
-  GateStatus, RampFn, RENDERED_BUFFER_SIZE,
+  EarlyReleaseStrategy, GateStatus, RampFn, RENDERED_BUFFER_SIZE,
 };
 use dsp::{midi_number_to_frequency, oscillator::PhasedOscillator};
 
@@ -984,7 +984,10 @@ impl FMSynthVoice {
           None,
           0.975,
           shared_gain_adsr_rendered_buffer,
-          EarlyReleaseConfig::default(),
+          EarlyReleaseConfig {
+            strategy: EarlyReleaseStrategy::LinearMix,
+            len_samples: SAMPLE_RATE / 10,
+          },
           false,
         ),
         length: 1_000.,

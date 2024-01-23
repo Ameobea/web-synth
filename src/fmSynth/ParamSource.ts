@@ -191,10 +191,8 @@ const buildTypeSetting = (excludedTypes?: ParamSource['type'][]) => ({
 
 export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): AdsrParams => ({
   steps: [
-    { x: 0, y: 0, ramper: { type: 'linear' } }, // start
-    { x: 0.05, y: 0.865, ramper: { type: 'exponential', exponent: 1 / 2 } }, // attack
-    { x: 0.12, y: 0.8, ramper: { type: 'exponential', exponent: 1 / 2 } }, // decay
-    { x: 0.93, y: 0.8, ramper: { type: 'exponential', exponent: 1 / 2 } }, // release
+    { x: 0, y: 0.8, ramper: { type: 'linear' } },
+    { x: 0.3, y: 0, ramper: { type: 'exponential', exponent: 1 / 2 } }, // attack
     { x: 1, y: 0, ramper: { type: 'exponential', exponent: 1 / 2 } }, // end
   ],
   lenSamples: { type: 'constant', value: 44100 },
@@ -265,7 +263,7 @@ export const buildConfigureParamSourceSettings = ({
         },
         {
           type: 'button',
-          label: 'add adsr',
+          label: 'add envelope generator',
           action: () => {
             onAdsrChange(
               adsrs.length,

@@ -31,7 +31,7 @@ impl SoftClipperAlgorithm {
     }
   }
 
-  fn apply_all(&self, samples: &mut [f32]) {
+  fn apply_all(&self, samples: &mut [f32; FRAME_SIZE]) {
     match self {
       SoftClipperAlgorithm::CubicNonlinearity =>
         for sample in samples {
@@ -63,17 +63,26 @@ impl SoftClipperAlgorithm {
 pub struct SoftClipper {
   pub pre_gain: ParamSource,
   pub post_gain: ParamSource,
+  pub mix: ParamSource,
   dc_blocker: DCBlocker,
   pub algorithm: SoftClipperAlgorithm,
+  scratch: [f32; FRAME_SIZE],
 }
 
 impl SoftClipper {
-  pub fn new(pre_gain: ParamSource, post_gain: ParamSource, algorithm: usize) -> Self {
+  pub fn new(
+    pre_gain: ParamSource,
+    post_gain: ParamSource,
+    mix: ParamSource,
+    algorithm: usize,
+  ) -> Self {
     SoftClipper {
       pre_gain,
       post_gain,
+      mix,
       dc_blocker: DCBlocker::default(),
       algorithm: unsafe { std::mem::transmute(algorithm as u32) },
+      scratch: [0.; FRAME_SIZE],
     }
   }
 }
@@ -96,19 +105,29 @@ impl Effect for SoftClipper {
     _base_frequencies: &[f32; FRAME_SIZE],
     samples: &mut [f32; FRAME_SIZE],
   ) {
+    let pre_gains = unsafe { rendered_params.get_unchecked(0) };
+    let post_gains = unsafe { rendered_params.get_unchecked(1) };
+    let mixes = unsafe { rendered_params.get_unchecked(2) };
+
     // apply pre-gain
-    for (sample_ix, sample) in samples.iter_mut().enumerate() {
+    for sample_ix in 0..FRAME_SIZE {
       unsafe {
-        *sample *= *rendered_params.get_unchecked(0).get_unchecked(sample_ix);
+        *self.scratch.get_unchecked_mut(sample_ix) =
+          *pre_gains.get_unchecked(sample_ix) * *samples.get_unchecked(sample_ix);
       }
     }
 
-    self.algorithm.apply_all(samples);
+    self.algorithm.apply_all(&mut self.scratch);
 
-    // apply post-gain
-    for (sample_ix, sample) in samples.iter_mut().enumerate() {
+    // apply post-gain and mix
+    for sample_ix in 0..FRAME_SIZE {
       unsafe {
-        *sample *= *rendered_params.get_unchecked(1).get_unchecked(sample_ix);
+        let mix = *mixes.get_unchecked(sample_ix);
+        let mix = dsp::clamp(0., 1., mix);
+        let post_gain = *post_gains.get_unchecked(sample_ix);
+        let dry_sample = *samples.get_unchecked(sample_ix);
+        *samples.get_unchecked_mut(sample_ix) =
+          (*self.scratch.get_unchecked(sample_ix) * mix + dry_sample * (1. - mix)) * post_gain;
       }
     }
   }
@@ -116,5 +135,6 @@ impl Effect for SoftClipper {
   fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
     buf[0] = Some(&mut self.pre_gain);
     buf[1] = Some(&mut self.post_gain);
+    buf[2] = Some(&mut self.mix);
   }
 }

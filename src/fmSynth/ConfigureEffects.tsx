@@ -66,7 +66,8 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
       return {
         type,
         preGain: { type: 'constant', value: 1.5 },
-        postGain: { type: 'constant', value: 1.5 },
+        postGain: { type: 'constant', value: 0.9 },
+        mix: { type: 'constant', value: 1 },
         algorithm: SoftClipperAlgorithm.CubicNonlinearity,
       };
     }
@@ -372,6 +373,17 @@ const ConfigureSoftClipper: EffectConfigurator<'soft clipper'> = ({
       max={5}
       state={state.postGain}
       onChange={useCallback(postGain => onChange({ postGain }), [onChange])}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='mix'
+      adsrs={adsrsMemoHelper(state.mix ?? { type: 'constant', value: 1 }, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={softClipperTheme}
+      min={0}
+      max={1}
+      state={state.mix ?? { type: 'constant', value: 1 }}
+      onChange={useCallback(mix => onChange({ mix }), [onChange])}
       vcId={vcId}
     />
   </>

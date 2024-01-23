@@ -39,6 +39,7 @@ export type EffectInner =
       type: 'soft clipper';
       preGain: ParamSource;
       postGain: ParamSource;
+      mix?: ParamSource;
       algorithm: SoftClipperAlgorithm;
     }
   | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource }
@@ -128,6 +129,7 @@ export const encodeEffect = (effect: Effect | null): EncodedEffect => {
         4,
         encodeParamSource(effect.preGain),
         encodeParamSource(effect.postGain),
+        encodeParamSource(effect.mix ?? { type: 'constant', value: 1 }),
         {
           valueType: -1,
           valParamInt: effect.algorithm,
@@ -135,7 +137,6 @@ export const encodeEffect = (effect: Effect | null): EncodedEffect => {
           valParamFloat2: 0,
           valParamFloat3: 0,
         },
-        null,
       ];
     }
     case 'butterworth filter': {
