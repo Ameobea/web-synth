@@ -95,6 +95,11 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
         return;
       }
 
+      // Disable search functionality on slash key for Firefox
+      if (evt.key === '/') {
+        evt.preventDefault();
+      }
+
       // Work around incredibly annoying Firefox functionality where the slash key opens
       // a "quick find" thing and takes focus away from the page
       const isEditing =

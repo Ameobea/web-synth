@@ -88,7 +88,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     globalThis.curBeat = 0;
     if (typeof SharedArrayBuffer !== 'undefined') {
       this.beatManagerSABInner = new SharedArrayBuffer(1024);
-      this.beatManagerSAB = new Float32Array(this.beatManagerSABInner);
+      this.beatManagerSAB = new Float64Array(this.beatManagerSABInner);
     }
     this.port.postMessage({ type: 'beatManagerSAB', beatManagerSAB: this.beatManagerSAB });
 
@@ -108,7 +108,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
             break;
           }
 
-          globalThis.curBeat = 0;
+          globalThis.curBeat = event.data.startBeat;
           this.lastRecordedTime = currentTime;
           globalThis.globalBeatCounterStarted = true;
           this.isStarted = true;
@@ -120,7 +120,6 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
             break;
           }
 
-          globalThis.curBeat = 0;
           globalThis.globalBeatCounterStarted = false;
           this.wasmInstance.exports.stop();
           this.isStarted = false;
@@ -281,6 +280,9 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
 
   updateGlobalBeats(globalTempoBPM) {
     globalThis.globalTempoBPM = globalTempoBPM;
+    if (this.beatManagerSAB) {
+      globalThis.curBeat = this.beatManagerSAB[0];
+    }
 
     if (this.isStarted) {
       const passedTime = currentTime - this.lastRecordedTime;

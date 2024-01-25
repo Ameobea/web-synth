@@ -39,7 +39,7 @@ import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtil
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
 import { AsyncOnce, normalizeEnvelope } from 'src/util';
-import { EventScheduleInitialized } from 'src/eventScheduler';
+import { EventSchedulerInitialized } from 'src/eventScheduler';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
 import { FilterType } from 'src/synthDesigner/FilterType';
@@ -366,7 +366,7 @@ export default class FMSynth implements ForeignNode {
     const [wasmBytes] = await Promise.all([
       WavetableWasmBytes.get(),
       RegisterFMSynthAWP.get(),
-      EventScheduleInitialized,
+      EventSchedulerInitialized,
     ] as const);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       numberOfInputs: 0,

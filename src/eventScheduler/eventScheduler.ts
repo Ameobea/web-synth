@@ -55,7 +55,7 @@ const registerCb = (cb: () => void): number => {
 
 export const cancelCb = (cbId: number) => RegisteredCbs.delete(cbId);
 
-let StartCBs: (() => void)[] = [];
+let StartCBs: ((startBeat: number) => void)[] = [];
 let StopCBs: (() => void)[] = [];
 let isStarted = false;
 let lastStartTime = 0;
@@ -65,14 +65,14 @@ export const getIsGlobalBeatCounterStarted = (): boolean => isStarted;
 /**
  * Registers a callback to be called when the global beat counter is started
  */
-export const registerGlobalStartCB = (cb: () => void) => StartCBs.push(cb);
+export const registerGlobalStartCB = (cb: (startBeat: number) => void) => StartCBs.push(cb);
 
 /**
  * Registers a callback to be called when the global beat counter is stopped
  */
 export const registerGlobalStopCB = (cb: () => void) => StopCBs.push(cb);
 
-export const unregisterStartCB = (cb: () => void) => {
+export const unregisterStartCB = (cb: (startBeat: number) => void) => {
   StartCBs = StartCBs.filter(ocb => ocb !== cb);
 };
 
@@ -99,12 +99,15 @@ export const useIsGlobalBeatCounterStarted = () => {
 };
 
 /**
- * Starts the global beat counter loop, resetting the current beat to zero.  Until this is called, no
- * events will be processed and the global current beat will remain at zero.
+ * Starts the global beat counter loop, resetting the current beat to the specified beat or
+ * zero if not provided.
+ *
+ * Until this is called, no events will be processed and the global current beat will remain
+ * at zero (or the last beat it reached before being stopped).
  *
  * Triggers all callbacks registered with `addStartCB` to be called.
  */
-export const startAll = () => {
+export const startAll = (startBeat = 0) => {
   if (isStarted) {
     console.warn("Tried to start global beat counter, but it's already started");
     return;
@@ -115,8 +118,8 @@ export const startAll = () => {
 
   isStarted = true;
   lastStartTime = ctx.currentTime;
-  SchedulerHandle.port.postMessage({ type: 'start' });
-  scheduleEventBeats(0, () => StartCBs.forEach(cb => cb()));
+  SchedulerHandle.port.postMessage({ type: 'start', startBeat });
+  scheduleEventBeats(0, () => StartCBs.forEach(cb => cb(startBeat)));
 };
 
 /**
@@ -152,7 +155,7 @@ const callCb = (cbId: number) => {
   cb();
 };
 
-let beatManagerSAB: Float32Array | null = null;
+let beatManagerSAB: Float64Array | null = null;
 
 /**
  * Returns the current beat of the global beat counter.  This value is updated directly from the web audio rendering thread
@@ -165,6 +168,24 @@ export const getCurBeat = (): number => {
   return beatManagerSAB[0];
 };
 
+/**
+ * Sets the current beat of the global beat counter.  This is used to sync the global beat counter with the UI when the user
+ * drags the playhead around.
+ */
+export const setCurBeat = (beat: number) => {
+  if (!beatManagerSAB) {
+    console.error('Tried to set beat before beat manager initialized');
+    return;
+  }
+
+  if (getIsGlobalBeatCounterStarted()) {
+    console.warn('Tried to set beat while beat counter was running');
+    return;
+  }
+
+  beatManagerSAB[0] = beat;
+};
+
 export const getCurGlobalBPM = () => {
   if (!beatManagerSAB) {
     return 0;
@@ -173,7 +194,7 @@ export const getCurGlobalBPM = () => {
 };
 
 // Init the scheduler AWP instance
-export const EventScheduleInitialized = Promise.all([
+export const EventSchedulerInitialized = Promise.all([
   retryAsync(() =>
     fetch(
       process.env.ASSET_PATH +

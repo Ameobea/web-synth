@@ -10,7 +10,7 @@ import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader'
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
-import { useIsGlobalBeatCounterStarted } from 'src/eventScheduler';
+import { getCurBeat, startAll } from 'src/eventScheduler';
 import type { MIDIEditorInstance, SerializedMIDIEditorState } from 'src/midiEditor';
 import { CVOutputTopControls } from 'src/midiEditor/CVOutput/CVOutputTopControls';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
@@ -27,8 +27,6 @@ import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import type MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import EditableInstanceName from './EditableInstanceName.svelte';
-
-const ctx = new AudioContext();
 
 const MIDIWasmModule = new AsyncOnce(() => import('src/midi'));
 
@@ -227,7 +225,6 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
   initialState,
   onChange: onChangeInner,
 }) => {
-  const isGlobalBeatCounterStarted = useIsGlobalBeatCounterStarted();
   const [state, setState] = useState(initialState);
   const [isRecording, setIsRecording] = useState(false);
   const [metronomeEnabled, setMetronomeEnabled] = useState(initialState.metronomeEnabled);
@@ -239,17 +236,12 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
   return (
     <div className='midi-editor-controls'>
       <MIDIEditorControlButton
-        disabled={isGlobalBeatCounterStarted}
         title='Start/Stop Playback'
         onClick={() => {
           if (playbackHandler.isPlaying) {
             playbackHandler.stopPlayback();
           } else {
-            playbackHandler.startPlayback({
-              type: 'localTempo',
-              bpm: state.bpm,
-              startTime: ctx.currentTime,
-            });
+            startAll(getCurBeat());
           }
         }}
         label='⏯'
