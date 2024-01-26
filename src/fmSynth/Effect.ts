@@ -34,7 +34,7 @@ export type EffectInner =
       bottomFoldWidth: ParamSource;
     }
   | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
-  | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource }
+  | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource; mix?: ParamSource }
   | {
       type: 'soft clipper';
       preGain: ParamSource;
@@ -122,7 +122,13 @@ export const encodeEffect = (effect: Effect | null): EncodedEffect => {
       ];
     }
     case 'wavefolder': {
-      return [3, encodeParamSource(effect.gain), encodeParamSource(effect.offset), null, null];
+      return [
+        3,
+        encodeParamSource(effect.gain),
+        encodeParamSource(effect.offset),
+        encodeParamSource(effect.mix ?? { type: 'constant', value: 1 }),
+        null,
+      ];
     }
     case 'soft clipper': {
       return [

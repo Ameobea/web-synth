@@ -210,8 +210,15 @@ impl EffectInstance {
           param_2_float_val_2,
           param_2_float_val_3,
         );
+        let mix = ParamSource::from_parts(
+          param_3_type,
+          param_3_int_val,
+          param_3_float_val,
+          param_3_float_val_2,
+          param_3_float_val_3,
+        );
 
-        EffectInstance::Wavefolder(Wavefolder::new(gain, offset))
+        EffectInstance::Wavefolder(Wavefolder::new(gain, offset, mix))
       },
       4 => {
         let pre_gain = ParamSource::from_parts(
@@ -503,6 +510,13 @@ impl EffectInstance {
           param_2_float_val,
           param_2_float_val_2,
           param_2_float_val_3,
+        ));
+        wavefolder.mix.replace(ParamSource::from_parts(
+          param_3_type,
+          param_3_int_val,
+          param_3_float_val,
+          param_3_float_val_2,
+          param_3_float_val_3,
         ));
         return true;
       },

@@ -1727,6 +1727,7 @@ pub struct FMSynthContext {
   pub output_buffers: Box<[[f32; FRAME_SIZE]; VOICE_COUNT]>,
   pub main_output_buffer: [f32; FRAME_SIZE],
   pub master_gain: f32,
+  pub last_master_gain: f32,
   pub frequency_multiplier: f32,
   pub most_recent_gated_voice_ix: usize,
   pub adsr_phase_buf: [f32; 256],
@@ -1816,7 +1817,8 @@ impl FMSynthContext {
 
     // Apply master gain
     for i in 0..FRAME_SIZE {
-      self.main_output_buffer[i] *= self.master_gain;
+      let master_gain = dsp::smooth(&mut self.last_master_gain, self.master_gain, 0.98);
+      self.main_output_buffer[i] *= master_gain;
     }
 
     let mut found_nan = false;
@@ -1896,6 +1898,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
     sample_mapping_manager: SampleMappingManager::default(),
     polysynth: uninit(),
     master_gain: 1.,
+    last_master_gain: 1.,
   }));
 
   std::ptr::write(

@@ -60,6 +60,7 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         type,
         gain: { type: 'constant', value: 1.5 },
         offset: { type: 'constant', value: 0 },
+        mix: { type: 'constant', value: 1 },
       };
     }
     case 'soft clipper': {
@@ -321,6 +322,17 @@ const ConfigureWavefolder: EffectConfigurator<'wavefolder'> = ({
       max={8}
       state={state.offset}
       onChange={useCallback(offset => onChange({ offset }), [onChange])}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='mix'
+      adsrs={adsrsMemoHelper(state.mix ?? { type: 'constant', value: 1 }, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={wavefolderTheme}
+      min={0}
+      max={1}
+      state={state.mix ?? { type: 'constant', value: 1 }}
+      onChange={useCallback(mix => onChange({ mix }), [onChange])}
       vcId={vcId}
     />
   </>
