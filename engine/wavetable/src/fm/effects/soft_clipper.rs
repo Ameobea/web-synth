@@ -6,14 +6,30 @@ use crate::fm::{ParamSource, FRAME_SIZE};
 #[repr(u32)]
 #[derive(Clone, Copy)]
 pub enum SoftClipperAlgorithm {
-  CubicNonlinearity,
-  Tanh,
-  XOverOnePlusAbsX,
-  HardClipper,
+  CubicNonlinearity = 0,
+  Tanh = 1,
+  XOverOnePlusAbsX = 2,
+  HardClipper = 3,
+  /// f(x,a) = x*(abs(x) + a)/(x^2 + (a-1)*abs(x) + 1)
+  ///
+  /// From: https://www.musicdsp.org/en/latest/Effects/41-waveshaper.html
+  ///
+  /// By: Bram de Jong
+  BramWaveShaper = 4,
 }
 
 impl SoftClipperAlgorithm {
-  fn apply(&self, sample: f32) -> f32 {
+  pub fn needs_pre_gain(&self) -> bool {
+    match self {
+      SoftClipperAlgorithm::CubicNonlinearity => true,
+      SoftClipperAlgorithm::Tanh => true,
+      SoftClipperAlgorithm::XOverOnePlusAbsX => true,
+      SoftClipperAlgorithm::HardClipper => true,
+      SoftClipperAlgorithm::BramWaveShaper => false,
+    }
+  }
+
+  fn apply(&self, sample: f32, gain_param: f32) -> f32 {
     match self {
       // Cubic non-linearity https://ccrma.stanford.edu/~jos/pasp/Soft_Clipping.html
       // Archive link https://web.archive.org/web/20200830021841/https://ccrma.stanford.edu/~jos/pasp/Soft_Clipping.html
@@ -28,10 +44,15 @@ impl SoftClipperAlgorithm {
       SoftClipperAlgorithm::Tanh => fastapprox::fast::tanh(sample),
       SoftClipperAlgorithm::XOverOnePlusAbsX => sample / (1. + sample.abs()),
       SoftClipperAlgorithm::HardClipper => dsp::clamp(-1., 1., sample),
+      SoftClipperAlgorithm::BramWaveShaper => {
+        let a = gain_param;
+        let abs_sample = sample.abs();
+        (sample * (abs_sample + a)) / (sample * sample + (a - 1.) * abs_sample + 1.)
+      },
     }
   }
 
-  fn apply_all(&self, samples: &mut [f32; FRAME_SIZE]) {
+  fn apply_all(&self, samples: &mut [f32; FRAME_SIZE], gains: &[f32; FRAME_SIZE]) {
     match self {
       SoftClipperAlgorithm::CubicNonlinearity =>
         for sample in samples {
@@ -54,6 +75,12 @@ impl SoftClipperAlgorithm {
       SoftClipperAlgorithm::HardClipper =>
         for sample in samples {
           *sample = dsp::clamp(-1., 1., *sample);
+        },
+      SoftClipperAlgorithm::BramWaveShaper =>
+        for (sample, gain) in samples.iter_mut().zip(gains.iter()) {
+          let a = *gain;
+          let abs_sample = sample.abs();
+          *sample = (*sample * (abs_sample + a)) / (*sample * *sample + (a - 1.) * abs_sample + 1.);
         },
     }
   }
@@ -88,12 +115,14 @@ impl SoftClipper {
 }
 
 impl Effect for SoftClipper {
-  fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
+  fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, mut sample: f32) -> f32 {
     let pre_gain = unsafe { *rendered_params.get_unchecked(0) };
     let post_gain = unsafe { *rendered_params.get_unchecked(1) };
-    let sample = sample * pre_gain;
+    if self.algorithm.needs_pre_gain() {
+      sample = sample * pre_gain;
+    }
 
-    let output_sample = self.algorithm.apply(sample);
+    let output_sample = self.algorithm.apply(sample, pre_gain);
     let output = output_sample * post_gain;
     // Filter out extremely lower frequencies / remove offset bias
     self.dc_blocker.apply(output)
@@ -109,15 +138,19 @@ impl Effect for SoftClipper {
     let post_gains = unsafe { rendered_params.get_unchecked(1) };
     let mixes = unsafe { rendered_params.get_unchecked(2) };
 
-    // apply pre-gain
-    for sample_ix in 0..FRAME_SIZE {
-      unsafe {
-        *self.scratch.get_unchecked_mut(sample_ix) =
-          *pre_gains.get_unchecked(sample_ix) * *samples.get_unchecked(sample_ix);
+    if self.algorithm.needs_pre_gain() {
+      // apply pre-gain
+      for sample_ix in 0..FRAME_SIZE {
+        unsafe {
+          *self.scratch.get_unchecked_mut(sample_ix) =
+            *pre_gains.get_unchecked(sample_ix) * *samples.get_unchecked(sample_ix);
+        }
       }
+    } else {
+      self.scratch.copy_from_slice(samples);
     }
 
-    self.algorithm.apply_all(&mut self.scratch);
+    self.algorithm.apply_all(&mut self.scratch, pre_gains);
 
     // apply post-gain and mix
     for sample_ix in 0..FRAME_SIZE {

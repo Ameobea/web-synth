@@ -342,7 +342,13 @@ const SOFT_CLIPPER_ALGORITHM_SETTINGS = [
   {
     type: 'select',
     label: 'algorithm',
-    options: { 'cubic nonlinearity': 0, tanh: 1, 'x / (1 + |x|)': 2, 'hard clipper': 3 },
+    options: {
+      'cubic nonlinearity': 0,
+      tanh: 1,
+      'x / (1 + |x|)': 2,
+      'hard clipper': 3,
+      'bram wave shaper': 4,
+    },
   },
 ];
 

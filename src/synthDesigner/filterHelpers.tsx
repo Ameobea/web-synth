@@ -57,15 +57,52 @@ const CustomQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
       label='Q'
       onChange={wrappedOnChange}
       value={linearQ}
+      steps={800}
       min={0.3}
       max={30}
-      steps={300}
       scale='log'
     />
   );
 };
 
+const LINEAR_Q_FILTER_TYPES = [
+  FilterType.Bandpass,
+  FilterType.BP4,
+  FilterType.BP8,
+  FilterType.BP16,
+  FilterType.Allpass,
+  FilterType.Peaking,
+  FilterType.Notch,
+];
+
+/**
+ * Some filter types (bandpass, allpass, peaking, and notch) interpret Q as a linear value with a minimum of
+ * 0 instead of a dB value.
+ *
+ * We still store Q as a dB value internally, but we want to render the scale as linear with a minimum of 0.
+ */
+const CustomLinearQSetting: React.FC<CustomQSettingProps> = ({ value, onChange }) => {
+  if (R.isNil(value)) {
+    console.error('Nil `Q` value but Q control panel setting rendered; reseting to default...');
+    value = 1;
+  }
+  const wrappedOnChange = useCallback((newQ: number) => onChange(linearToDb(newQ)), [onChange]);
+
+  return (
+    <Range
+      label='Q'
+      onChange={wrappedOnChange}
+      value={dbToLinear(value)}
+      steps={800}
+      scale='log'
+      min={0.001}
+      max={15}
+    />
+  );
+};
+
 const buildFilterSettings = (
+  filterType: FilterType,
   includeADSR: boolean,
   adsrDebugName?: string,
   adsrAudioThreadData?: AudioThreadData,
@@ -104,7 +141,9 @@ const buildFilterSettings = (
   q: {
     type: 'custom',
     label: 'Q',
-    Comp: React.memo(CustomQSetting),
+    Comp: LINEAR_Q_FILTER_TYPES.includes(filterType)
+      ? React.memo(CustomLinearQSetting)
+      : React.memo(CustomQSetting),
     renderContainer: false,
     initial: 1,
     steps: 1000,
@@ -143,6 +182,7 @@ export const getSettingsForFilterType = ({
   includeNonPrimitiveFilterTypes = true,
 }: GetSettingsForFilterTypeArgs) => {
   const filterSettings = buildFilterSettings(
+    filterType,
     !!includeADSR,
     adsrDebugName,
     undefined,
@@ -162,6 +202,12 @@ export const getSettingsForFilterType = ({
           case FilterType.Peaking: {
             return [filterSettings.gain, filterSettings.q];
           }
+          case FilterType.DynaBP_50:
+          case FilterType.DynaBP_100:
+          case FilterType.DynaBP_200:
+          case FilterType.DynaBP_400:
+          case FilterType.DynaBP_800:
+            return [];
           default: {
             return [filterSettings.q];
           }

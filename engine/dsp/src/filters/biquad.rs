@@ -58,7 +58,7 @@ impl BiquadFilter {
   #[inline]
   pub fn compute_coefficients(
     mode: FilterMode,
-    q: f32,
+    mut q: f32,
     freq: f32,
     gain: f32,
   ) -> (f32, f32, f32, f32, f32) {
@@ -69,6 +69,16 @@ impl BiquadFilter {
     #[allow(non_snake_case)]
     let A = 10.0_f32.powf(gain / 40.);
     let w0_sin = w0.sin();
+
+    // for bandpass, notch, allpass, and peak filters, Q is a linear value with a minimum of 0.0001
+    // https://webaudio.github.io/web-audio-api/#dom-biquadfilternode-q
+    if matches!(
+      mode,
+      FilterMode::Bandpass | FilterMode::Notch | FilterMode::Allpass | FilterMode::Peak
+    ) {
+      q = crate::clamp(0.0001, 1000., crate::db_to_gain(q));
+    }
+
     let aq = w0_sin / (2. * q);
     let aqdb = w0_sin / (2. * 10.0f32.powf(q / 20.));
     #[allow(non_snake_case)]
