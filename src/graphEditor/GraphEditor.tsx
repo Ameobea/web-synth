@@ -3,7 +3,7 @@
  * components of an audio composition.
  */
 import { filterNils, UnreachableException } from 'ameo-utils';
-import { LGraph, LGraphCanvas, LGraphNode, LiteGraph } from 'litegraph.js';
+import { LGraph, LGraphCanvas, type LGraphNode, LiteGraph } from 'litegraph.js';
 
 import 'litegraph.js/css/litegraph.css';
 import * as R from 'ramda';
@@ -230,6 +230,43 @@ const handleNodeSelectAction = async ({
   }
 };
 
+/**
+ *
+ * @returns An array of tuples of the form [displayName, nodeType] for all VCs as well as
+ *          foreign graph editor connectables nodes.
+ */
+const buildSortedNodeEntries = () => {
+  const nodeEntries = Object.entries(LiteGraph.registered_node_types)
+    .filter(([key]) => key.startsWith('customAudio/'))
+    .map(([key, NodeClass]) => [NodeClass.typeName as string, key] as const);
+  const vcEntries = ViewContextDescriptors.map(vc => [vc.displayName, vc.name] as const);
+  return R.sortBy(([name]) => name.toLowerCase(), [...nodeEntries, ...vcEntries]);
+};
+
+/**
+ *
+ * @param nodeType The node type from `buildSortedNodeEntries`
+ */
+const createNode = (lGraphInstance: LGraph | null, nodeType: string) => {
+  const isVc = !nodeType.startsWith('customAudio/');
+  if (isVc) {
+    const engine = getEngine();
+    if (!engine) {
+      return;
+    }
+
+    const displayName = ViewContextDescriptors.find(d => d.name === nodeType)!.displayName;
+    engine.create_view_context(nodeType, displayName);
+    return;
+  }
+
+  if (!lGraphInstance) {
+    return;
+  }
+  const node = LiteGraph.createNode(nodeType);
+  lGraphInstance.add(node);
+};
+
 interface GraphControlsProps {
   lGraphInstance: LGraph | null;
 }
@@ -238,14 +275,7 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
   const selectedNodeType = useRef<string>('customAudio/LFO');
 
   const settings = useMemo(() => {
-    const nodeEntries = Object.entries(LiteGraph.registered_node_types)
-      .filter(([key]) => key.startsWith('customAudio/'))
-      .map(([key, NodeClass]) => [NodeClass.typeName as string, key] as const);
-    const vcEntries = ViewContextDescriptors.map(vc => [vc.displayName, vc.name] as const);
-    const sortedNodeEntries = R.sortBy(
-      ([name]) => name.toLowerCase(),
-      [...nodeEntries, ...vcEntries]
-    );
+    const sortedNodeEntries = buildSortedNodeEntries();
 
     return filterNils([
       lGraphInstance
@@ -260,27 +290,7 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
       {
         type: 'button',
         label: 'add node',
-        action: () => {
-          const isVc = !selectedNodeType.current.startsWith('customAudio/');
-          if (isVc) {
-            const engine = getEngine();
-            if (!engine) {
-              return;
-            }
-
-            const displayName = ViewContextDescriptors.find(
-              d => d.name === selectedNodeType.current
-            )!.displayName;
-            engine.create_view_context(selectedNodeType.current, displayName);
-            return;
-          }
-
-          if (!lGraphInstance) {
-            return;
-          }
-          const node = LiteGraph.createNode(selectedNodeType.current);
-          lGraphInstance.add(node);
-        },
+        action: () => void createNode(lGraphInstance, selectedNodeType.current),
       },
     ]);
   }, [lGraphInstance, selectedNodeType]);
@@ -447,6 +457,26 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           isNowSelected: false,
           curSelectedNodeRef,
         });
+      };
+
+      const sortedNodeEntries = buildSortedNodeEntries();
+      const displayNames = sortedNodeEntries.map(([displayName]) => displayName);
+      const lowerDisplayNames = displayNames.map(displayName => displayName.toLowerCase());
+      canvas.onSearchBox = (_helper, value, _graphCanvas) => {
+        if (!value) {
+          return [...displayNames];
+        }
+
+        const lowerValue = value.toLowerCase().trim();
+        return displayNames.filter((displayName, i) => lowerDisplayNames[i].includes(lowerValue));
+      };
+      canvas.onSearchBoxSelection = (name, _evt, _graphCanvas) => {
+        const entry = sortedNodeEntries.find(([displayName]) => displayName === name);
+        if (!entry) {
+          throw new Error(`No entry found for node type "${name}"`);
+        }
+        const [, nodeType] = entry;
+        createNode(graph, nodeType);
       };
 
       const isHidden = getIsVcHidden(vcId);
