@@ -107,7 +107,7 @@ export const useIsGlobalBeatCounterStarted = () => {
  *
  * Triggers all callbacks registered with `addStartCB` to be called.
  */
-export const startAll = (startBeat = 0) => {
+export const startAll = (startBeat = getCurBeat()) => {
   if (isStarted) {
     console.warn("Tried to start global beat counter, but it's already started");
     return;

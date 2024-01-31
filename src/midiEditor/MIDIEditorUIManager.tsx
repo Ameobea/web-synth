@@ -157,7 +157,8 @@ export class ManagedMIDIEditorUIInstance {
       noteLinesCtxPtr,
       startBeatInclusive ?? 0,
       endBeatExclusive ?? -1,
-      cb
+      cb,
+      true
     );
   };
 

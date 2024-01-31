@@ -135,7 +135,6 @@ export default class MIDIEditorPlaybackHandler {
    * to determine if a given playback session has ended or not.
    */
   private playbackGeneration: number | null = null;
-  private lastPlaybackStartBeat = 0;
   private cbs: {
     start: (startBeat: number) => void;
     stop: () => void;
@@ -343,6 +342,11 @@ export default class MIDIEditorPlaybackHandler {
         return;
       }
 
+      const firstLoopRemainder = loopLengthBeats - (startBeat % loopLengthBeats);
+      const curSegmentAbsoluteStartBeat =
+        startBeat - (loopLengthBeats - firstLoopRemainder) + loopIx * loopLengthBeats;
+      const curSegmentAbsoluteEndBeat = curSegmentAbsoluteStartBeat + loopLengthBeats;
+
       const insts = get(this.inst.uiManager.instances);
       for (const inst of insts) {
         if (inst.type !== 'midiEditor') {
@@ -350,21 +354,20 @@ export default class MIDIEditorPlaybackHandler {
         }
         const instance = inst.instance;
 
-        const offset = loopLengthBeats * loopIx;
         // If we're starting in the middle of a loop on the first loop iteration, filter out notes that
         // start before the starting cursor position
         const notesInRange = this.getNotesInRange(
           instance,
-          loopIx === 0 ? startBeat : 0,
+          loopIx === 0 ? startBeat % loopLengthBeats : 0,
           loopPoint,
-          offset
+          curSegmentAbsoluteStartBeat
         );
 
         this.scheduleNotes(instance, notesInRange);
       }
 
       // Schedule an event before the loop ends to recursively schedule another.
-      const curSegmentAbsoluteEndBeat = loopLengthBeats * (loopIx + 1);
+
       scheduleEventBeats(curSegmentAbsoluteEndBeat - Math.min(1, loopLengthBeats / 2), () =>
         scheduleAnother(loopIx + 1)
       );
@@ -408,7 +411,6 @@ export default class MIDIEditorPlaybackHandler {
       }
     }
 
-    this.lastPlaybackStartBeat = startBeat;
     this.playbackGeneration = Math.random();
     if (this.loopPoint === null) {
       this.scheduleOneshot(startBeat);

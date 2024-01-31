@@ -104,7 +104,7 @@ const reschedule = (state: SequencerReduxState): SequencerReduxState => {
 };
 
 interface SequencerInst extends SequencerReduxInfra {
-  onGlobalStart: () => void;
+  onGlobalStart: (startBeat: number) => void;
   onGlobalStop: () => void;
 }
 
@@ -173,8 +173,12 @@ const actionGroups = {
       }),
   }),
   TOGGLE_IS_PLAYING: buildActionGroup({
-    actionCreator: (vcId: string) => ({ type: 'TOGGLE_IS_PLAYING', vcId }),
-    subReducer: (state: SequencerReduxState, { vcId }) => {
+    actionCreator: (vcId: string, startBeat?: number) => ({
+      type: 'TOGGLE_IS_PLAYING',
+      vcId,
+      startBeat,
+    }),
+    subReducer: (state: SequencerReduxState, { vcId, startBeat }) => {
       if (!state.awpHandle) {
         return state;
       }
@@ -185,7 +189,7 @@ const actionGroups = {
         state.awpHandle.port.postMessage({ type: 'stop' });
         return { ...state, isPlaying: false, curActiveMarkIx: null };
       } else {
-        state.awpHandle.port.postMessage({ type: 'start' });
+        state.awpHandle.port.postMessage({ type: 'start', startBeat: startBeat ?? 0 });
         return reschedule({
           ...state,
           isPlaying: true,

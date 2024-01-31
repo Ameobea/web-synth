@@ -132,12 +132,16 @@ pub fn iter_notes(
 /// 1. an `is_attack` flag which is true if the note is starting and false if the note is ending
 /// 2. line index
 /// 3. beat
+///
+/// If `include_partial_notes` is true, then notes that intersect the start or end of the selection
+/// will be included but truncated to the bounds of the selection.
 #[wasm_bindgen]
 pub fn iter_notes_with_cb(
   lines: *const NoteLines,
   start_beat_inclusive: f64,
   end_beat_exclusive: f64,
   cb: Function,
+  include_partial_notes: bool,
 ) {
   let notes = unsafe { &*lines };
 
@@ -147,8 +151,14 @@ pub fn iter_notes_with_cb(
     note: Note,
   }
 
+  struct NoteEvent {
+    is_attack: bool,
+    line_ix: usize,
+    beat: f64,
+  }
+
   let mut unreleased_notes: HashMap<u32, UnreleasedNote> = HashMap::default();
-  let mut events: Vec<(bool, usize, f64)> = Vec::default();
+  let mut events: Vec<NoteEvent> = Vec::default();
   let iter = notes.lines.iter().enumerate().flat_map(|(line_ix, line)| {
     line
       .inner
@@ -165,7 +175,11 @@ pub fn iter_notes_with_cb(
   for (line_ix, pos, entry) in iter {
     match entry {
       NoteEntry::NoteStart { note } => {
-        events.push((true, line_ix, pos));
+        events.push(NoteEvent {
+          is_attack: true,
+          line_ix,
+          beat: pos,
+        });
         let existing = unreleased_notes.insert(note.id, UnreleasedNote {
           line_ix,
           start_point: pos,
@@ -178,8 +192,21 @@ pub fn iter_notes_with_cb(
       },
       NoteEntry::NoteEnd { note_id } => {
         let existing = unreleased_notes.remove(&note_id);
-        if existing.is_some() {
-          events.push((false, line_ix, pos));
+
+        if existing.is_none() && include_partial_notes {
+          events.push(NoteEvent {
+            is_attack: true,
+            line_ix,
+            beat: start_beat_inclusive,
+          });
+        }
+
+        if existing.is_some() || include_partial_notes {
+          events.push(NoteEvent {
+            is_attack: false,
+            line_ix,
+            beat: pos,
+          });
         }
       },
       NoteEntry::StartAndEnd {
@@ -189,10 +216,18 @@ pub fn iter_notes_with_cb(
         // release before attack
         let existing = unreleased_notes.remove(&end_note_id);
         if existing.is_some() {
-          events.push((false, line_ix, pos));
+          events.push(NoteEvent {
+            is_attack: false,
+            line_ix,
+            beat: pos,
+          });
         }
 
-        events.push((true, line_ix, pos));
+        events.push(NoteEvent {
+          is_attack: true,
+          line_ix,
+          beat: pos,
+        });
         let existing = unreleased_notes.insert(start_note.id, UnreleasedNote {
           line_ix,
           start_point: pos,
@@ -212,10 +247,27 @@ pub fn iter_notes_with_cb(
   }
   for note in unreleased_notes.values() {
     let release_time = note.start_point + note.note.length;
-    events.push((false, note.line_ix, release_time));
+    events.push(NoteEvent {
+      is_attack: false,
+      line_ix: note.line_ix,
+      beat: release_time,
+    });
   }
 
-  for (is_attack, line_ix, beat) in events {
+  events.sort_unstable_by(|a, b| {
+    FloatOrd(a.beat)
+      .cmp(&FloatOrd(b.beat))
+      .then_with(|| a.line_ix.cmp(&b.line_ix))
+      // attacks before releases
+      .then_with(|| a.is_attack.cmp(&b.is_attack).reverse())
+  });
+
+  for NoteEvent {
+    is_attack,
+    line_ix,
+    beat,
+  } in events
+  {
     let _ = cb.call3(
       &JsValue::NULL,
       &JsValue::from(is_attack),

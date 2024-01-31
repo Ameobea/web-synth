@@ -329,12 +329,12 @@ export const init_sequencer = (stateKey: string) => {
     console.error(`Existing entry in sequencer redux infra map for vcId ${vcId}; overwriting...`);
   }
 
-  const onGlobalStart = () => {
+  const onGlobalStart = (startBeat: number) => {
     const isPlaying = reduxInfra.getState().sequencer.isPlaying;
     if (isPlaying) {
       reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
     }
-    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId));
+    reduxInfra.dispatch(reduxInfra.actionCreators.sequencer.TOGGLE_IS_PLAYING(vcId, startBeat));
   };
   registerGlobalStartCB(onGlobalStart);
   const onGlobalStop = () => {

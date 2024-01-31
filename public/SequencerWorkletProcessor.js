@@ -16,8 +16,8 @@ class SequencerWorkletProcessor extends AudioWorkletProcessor {
           break;
         }
         case 'start': {
-          this.startBeat = globalThis.curBeat;
-          this.lastBeat = -1;
+          this.startBeat = evt.data.startBeat ?? globalThis.curBeat;
+          this.lastBeat = Math.trunc(evt.data.startBeat / this.config.beatRatio);
           break;
         }
         case 'stop': {
@@ -44,7 +44,7 @@ class SequencerWorkletProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    const beatsSinceStart = globalThis.curBeat - this.startBeat;
+    const beatsSinceStart = globalThis.curBeat;
     const curQuantizedBeat = Math.trunc(beatsSinceStart / this.config.beatRatio);
 
     if (curQuantizedBeat !== this.lastBeat) {
