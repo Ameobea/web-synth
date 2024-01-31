@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { UnreachableException } from 'ameo-utils';
   import type * as Comlink from 'comlink';
 
   import { getWavetablePreset, type WavetablePresetDescriptor } from 'src/api';
   import type { PresetDescriptor } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
   import BuildWavetable from 'src/fmSynth/Wavetable/BuildWavetable.svelte';
   import type { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
+  import { UnreachableError } from 'src/util';
 
   export let preset: PresetDescriptor<WavetablePresetDescriptor>;
   export let worker: Comlink.Remote<WavetableConfiguratorWorker>;
@@ -24,10 +24,10 @@
   <div class="spacer" style="height: 10px" />
   <BuildWavetable
     onSubmit={() => {
-      throw new UnreachableException();
+      throw new UnreachableError();
     }}
     onCancel={() => {
-      throw new UnreachableException();
+      throw new UnreachableError();
     }}
     hideSaveControls
     initialInstState={preset}

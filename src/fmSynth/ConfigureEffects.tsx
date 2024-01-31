@@ -1,4 +1,3 @@
-import { filterNils } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -10,6 +9,7 @@ import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSyn
 import FlatButton from 'src/misc/FlatButton';
 import HelpIcon from 'src/misc/HelpIcon';
 import { getSentry } from 'src/sentry';
+import { filterNils } from 'src/util';
 
 const EFFECT_TYPE_SETTING = {
   type: 'select',

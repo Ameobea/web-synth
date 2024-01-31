@@ -1,4 +1,3 @@
-import { filterNils, UnreachableException } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import React, { Suspense } from 'react';
@@ -24,7 +23,7 @@ import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
 import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, UnreachableError, filterNils } from 'src/util';
 import {
   buildInitialState,
   buildSequencerConfig,
@@ -280,7 +279,7 @@ export const get_sequencer_audio_connectables = (vcId: string): AudioConnectable
   const reduxInfra = SequencerInstancesMap.get(vcId);
 
   if (!reduxInfra) {
-    throw new UnreachableException(
+    throw new UnreachableError(
       "Expected to find redux infra for sequencer when initializing, but didn't find it"
     );
   }

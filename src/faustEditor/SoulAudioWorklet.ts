@@ -1,8 +1,7 @@
-import { UnreachableException, ValueOf } from 'ameo-utils';
-
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
-import { faustEditorContextMap } from 'src/faustEditor';
-import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import type { faustEditorContextMap } from 'src/faustEditor';
+import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import { UnreachableError, type ValueOf } from 'src/util';
 
 export default class SoulAudioWorklet extends AudioWorkletNode implements DynamicCodeWorkletNode {
   private jsonDef: any;
@@ -41,7 +40,7 @@ export default class SoulAudioWorklet extends AudioWorkletNode implements Dynami
     _setParamValue?: (key: string, val: number) => void
   ) {
     if (!this.jsonDef) {
-      throw new UnreachableException(
+      throw new UnreachableError(
         'Tried to get param settings for soul worklet before initialization'
       );
     }

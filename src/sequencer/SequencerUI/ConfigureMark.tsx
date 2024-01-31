@@ -1,9 +1,9 @@
-import { UnreachableException } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import { shallowEqual } from 'react-redux';
 
 import type { SequencerMark, SequencerReduxInfra, VoiceTarget } from 'src/sequencer/redux';
+import { UnreachableError } from 'src/util';
 
 const buildConfigureMarksSettings = (markState: SequencerMark | null | undefined) => {
   if (!markState) {
@@ -24,7 +24,7 @@ const buildConfigureMarksSettings = (markState: SequencerMark | null | undefined
       return [{ type: 'range', label: 'gain', min: 0, max: 5 }];
     }
     default: {
-      throw new UnreachableException('Unhandled mark type: ' + (markState as any).type);
+      throw new UnreachableError('Unhandled mark type: ' + (markState as any).type);
     }
   }
 };
@@ -40,7 +40,7 @@ const buildConfigureMarksControlPanelState = (
   switch (markState.type) {
     case 'gate': {
       if (voice.type !== 'gate') {
-        throw new UnreachableException();
+        throw new UnreachableError();
       }
       return markState.params
         ? { 'output value': markState.params.outputValue, ungate: markState.params.ungate ?? true }
@@ -48,18 +48,18 @@ const buildConfigureMarksControlPanelState = (
     }
     case 'midi': {
       if (voice.type !== 'midi') {
-        throw new UnreachableException();
+        throw new UnreachableError();
       }
       return {};
     }
     case 'sample': {
       if (voice.type !== 'sample') {
-        throw new UnreachableException();
+        throw new UnreachableError();
       }
       return markState.params ?? { gain: voice.gain };
     }
     default: {
-      throw new UnreachableException('Unhandled mark type: ' + (markState as any).type);
+      throw new UnreachableError('Unhandled mark type: ' + (markState as any).type);
     }
   }
 };
@@ -97,7 +97,7 @@ const buildConfigureMarksControlPanelChangeHandler =
         break;
       }
       default: {
-        throw new UnreachableException('Unhandled voice type: ' + (voice as any).type);
+        throw new UnreachableError('Unhandled voice type: ' + (voice as any).type);
       }
     }
   };

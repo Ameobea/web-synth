@@ -1,4 +1,4 @@
-import {
+import type {
   FileSystemDirectoryHandle,
   FileSystemFileHandle,
 } from 'src/fsAccess/drivers/nativeFS/NativeFSTypes';

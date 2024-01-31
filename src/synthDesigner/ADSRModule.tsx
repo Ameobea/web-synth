@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { buildDefaultAdsrEnvelope, type ADSRValues } from 'src/controls/adsr';
@@ -9,7 +8,7 @@ import {
   type AdsrStep,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, msToSamples, samplesToMs } from 'src/util';
+import { AsyncOnce, UnreachableError, msToSamples, samplesToMs } from 'src/util';
 
 const ADSR2AWPRegistered = new AsyncOnce(
   () =>
@@ -143,7 +142,7 @@ export class ADSR2Module {
           case AdsrLengthMode.Beats:
             return this.params.length;
           default:
-            throw new UnreachableException(`Unhandled length mode: ${this.params.lengthMode}`);
+            throw new UnreachableError(`Unhandled length mode: ${this.params.lengthMode}`);
         }
       })(),
       lengthMode: this.params.lengthMode,
@@ -234,7 +233,7 @@ export class ADSR2Module {
           case AdsrLengthMode.Beats:
             return newLength;
           default:
-            throw new UnreachableException(`Unhandled length mode: ${lengthMode}`);
+            throw new UnreachableError(`Unhandled length mode: ${lengthMode}`);
         }
       })(),
       lengthMode: lengthMode ?? AdsrLengthMode.Samples,

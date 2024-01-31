@@ -1,10 +1,10 @@
-import { filterNils, UnimplementedError, type ArrayElementOf, type ValueOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import { UnimplementedError, type ArrayElementOf, type ValueOf, filterNils } from 'src/util';
 
 interface BaseUiDef {
   label: string;

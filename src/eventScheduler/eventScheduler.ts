@@ -1,9 +1,8 @@
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import { useEffect, useState } from 'react';
 
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 import { getSentry } from 'src/sentry';
-import { retryAsync } from 'src/util';
+import { UnimplementedError, UnreachableError, retryAsync } from 'src/util';
 
 export enum MIDIEventType {
   Attack = 0,
@@ -253,7 +252,7 @@ export const EventSchedulerInitialized = Promise.all([
         const { eventType, param0, param1 } = evt;
         SchedulerHandle!.port.postMessage({ type: 'postMIDIEvent', eventType, param0, param1 });
       } else {
-        throw new UnreachableException();
+        throw new UnreachableError();
       }
     });
     PendingEvents = [];

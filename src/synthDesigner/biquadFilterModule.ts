@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { connectFilterChain } from 'src/filterDesigner/util';
@@ -6,12 +5,12 @@ import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { DynaBandpassFilterWrapper } from 'src/synthDesigner/DynaBandPassFilter';
 import { FilterType } from 'src/synthDesigner/FilterType';
-import { linearToDb } from 'src/util';
+import { UnreachableError, linearToDb } from 'src/util';
 
 // higher-order filter Q factors determined using this: https://www.earlevel.com/main/2016/09/29/cascading-filters/
 export const computeHigherOrderBiquadQFactors = (order: number): number[] => {
   if (order % 2 !== 0 || order <= 0) {
-    throw new UnreachableException('order must be even and greater than 0');
+    throw new UnreachableError('order must be even and greater than 0');
   }
 
   return R.range(0, order / 2).map(i =>
@@ -123,7 +122,7 @@ export class HigherOrderBiquadFilter implements AbstractFilterModule {
         );
       }
       default: {
-        throw new UnreachableException('must supply higher order filter type to this class');
+        throw new UnreachableError('must supply higher order filter type to this class');
       }
     }
   }
@@ -186,9 +185,7 @@ export class SingleBiquadFilterModule implements AbstractFilterModule {
         return node;
       }
       default: {
-        throw new UnreachableException(
-          'must supply simple filter type to `SingleBiquadFilterModule`'
-        );
+        throw new UnreachableError('must supply simple filter type to `SingleBiquadFilterModule`');
       }
     }
   }
@@ -257,7 +254,7 @@ export const buildAbstractFilterModule = (
     }
 
     default: {
-      throw new UnreachableException(`Unhandled filter type: ${type}`);
+      throw new UnreachableError(`Unhandled filter type: ${type}`);
     }
   }
 };

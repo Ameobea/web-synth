@@ -1,4 +1,3 @@
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -17,6 +16,7 @@ import {
   type ControlPanelConnection,
   type ControlPanelInstanceState,
 } from 'src/redux/modules/controlPanel';
+import { UnimplementedError, UnreachableError } from 'src/util';
 
 interface ConfigureInputInnerProps {
   info: ControlInfo;
@@ -119,7 +119,7 @@ const mkConfigureInput = (
             break;
           }
           default: {
-            throw new UnreachableException(`Unhandled key in control panel: ${key}`);
+            throw new UnreachableError(`Unhandled key in control panel: ${key}`);
           }
         }
       },
@@ -313,7 +313,7 @@ const buildSettingForControl = (
       };
     }
     default:
-      throw new UnreachableException(`Unhandled control type: ${(info as any).type}`);
+      throw new UnreachableError(`Unhandled control type: ${(info as any).type}`);
   }
 };
 

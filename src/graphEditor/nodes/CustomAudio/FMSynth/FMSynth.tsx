@@ -1,4 +1,3 @@
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import * as React from 'react';
@@ -38,7 +37,7 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, normalizeEnvelope } from 'src/util';
+import { AsyncOnce, normalizeEnvelope, UnimplementedError, UnreachableError } from 'src/util';
 import { EventSchedulerInitialized } from 'src/eventScheduler';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
@@ -510,7 +509,7 @@ export default class FMSynth implements ForeignNode {
 
   private setOperatorBaseFrequencySource(operatorIx: number, source: ParamSource) {
     if (!this.awpHandle) {
-      throw new UnreachableException();
+      throw new UnreachableError();
     }
 
     this.awpHandle.port.postMessage({
@@ -792,7 +791,7 @@ export default class FMSynth implements ForeignNode {
     if (adsrIx === -1) {
       const newLenSamples = newAdsr.lenSamples;
       if (newLenSamples.type !== 'constant') {
-        throw new UnreachableException('Only constant gain envelope length is supported');
+        throw new UnreachableError('Only constant gain envelope length is supported');
       }
       this.gainEnvelope = { ...newAdsr, lenSamples: newLenSamples };
     } else if (adsrIx === -2) {
@@ -800,7 +799,7 @@ export default class FMSynth implements ForeignNode {
         newAdsr.lenSamples.type !== 'constant' &&
         newAdsr.lenSamples.type !== 'beats to samples'
       ) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Only constant and beats to samples filter envelope length is supported'
         );
       }

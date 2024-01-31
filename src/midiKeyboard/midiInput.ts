@@ -1,8 +1,8 @@
-import { UnreachableException, type IterableValueOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
 import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { UnreachableError, type IterableValueOf } from 'src/util';
 
 export type BuiltinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
@@ -64,7 +64,7 @@ export class MIDIInput {
           return input;
         }
 
-        throw new UnreachableException();
+        throw new UnreachableError();
       });
 
     // Register input handlers for the MIDI input so that MIDI events trigger our output callbacks
@@ -81,8 +81,8 @@ export class MIDIInput {
         this.modWheelNode.offset.value = modWheelValue;
       },
       (controlIndex: number, controlValue: number) =>
-        this.midiNode?.outputCbs.forEach(
-          ({ onGenericControl }) => onGenericControl?.(controlIndex, controlValue)
+        this.midiNode?.outputCbs.forEach(({ onGenericControl }) =>
+          onGenericControl?.(controlIndex, controlValue)
         )
     );
     this.wasmMidiCtxPtr = ctxPtr;

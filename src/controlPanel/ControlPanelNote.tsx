@@ -1,15 +1,15 @@
-import { UnimplementedError } from 'ameo-utils';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { useDispatch } from 'react-redux';
 import showdown from 'showdown';
 import showdownXssFilter from 'showdown-xss-filter';
 
-import { ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
+import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import { useDraggable } from 'src/reactUtils';
 import { actionCreators } from 'src/redux';
-import { ControlPanelVisualizationDescriptor } from 'src/redux/modules/controlPanel';
+import type { ControlPanelVisualizationDescriptor } from 'src/redux/modules/controlPanel';
+import { UnimplementedError } from 'src/util';
 
 const MarkdownRenderer = new showdown.Converter({ extensions: [showdownXssFilter] });
 MarkdownRenderer.setFlavor('github');

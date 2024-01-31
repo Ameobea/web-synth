@@ -1,7 +1,7 @@
-import { filterNils } from 'ameo-utils';
 import React from 'react';
 
 import './BasicModal.scss';
+import { filterNils } from 'src/util';
 
 const BasicModal: React.FC<React.DetailsHTMLAttributes<HTMLDivElement>> = ({
   children,

@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import React, { Suspense } from 'react';
@@ -20,6 +19,7 @@ import {
   serializeLooper,
   type LooperInstState,
 } from 'src/redux/modules/looper';
+import { UnreachableError } from 'src/util';
 
 const LazyLooperUI = React.lazy(() => import('src/looper/LooperUI/LooperUI'));
 
@@ -115,7 +115,7 @@ export const unhide_looper = (stateKey: string) => {
 export const get_looper_audio_connectables = (vcId: string): AudioConnectables => {
   const ctx = LooperCtxsByVcId.get(vcId);
   if (!ctx) {
-    throw new UnreachableException('Missing state for looper vcId=' + vcId);
+    throw new UnreachableError('Missing state for looper vcId=' + vcId);
   }
   const moduleCount = getState().looper.stateByVcId[vcId].modules.length;
 

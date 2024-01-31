@@ -1,4 +1,3 @@
-import type { ArrayElementOf } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map, Set } from 'immutable';
 import { LiteGraph } from 'litegraph.js';
@@ -11,6 +10,7 @@ import type {
 } from 'src/graphEditor/LiteGraphTypes';
 import type { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
 import type { ReduxStore } from 'src/redux';
+import type { ArrayElementOf } from 'src/util';
 
 const createAudioConnectablesNode = (
   connectables: AudioConnectables,

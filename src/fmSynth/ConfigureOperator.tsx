@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import React, { Suspense, useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import type { Writable } from 'svelte/store';
@@ -14,7 +13,7 @@ import type { UploadWavetableModalProps } from 'src/fmSynth/Wavetable/UploadWave
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
-import { base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
+import { UnreachableError, base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
 import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
 
 interface UnisonPhaseRandomizationConfig {
@@ -122,7 +121,7 @@ export const buildDefaultOperatorConfig = (
       return { type };
     }
     default: {
-      throw new UnreachableException('Unhandled type in `buildDefaultOperatorConfig`: ' + type);
+      throw new UnreachableError('Unhandled type in `buildDefaultOperatorConfig`: ' + type);
     }
   }
 };

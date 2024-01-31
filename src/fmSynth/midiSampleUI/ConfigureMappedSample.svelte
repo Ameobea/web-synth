@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-  import { filterNils } from 'ameo-utils';
+  import { filterNils } from 'src/util';
 
   const buildMappedSampleControlPanelSettings = (
     lenSamples: number | null | undefined

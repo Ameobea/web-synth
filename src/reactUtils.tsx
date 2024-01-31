@@ -397,3 +397,33 @@ export function mkLazyComponent<Props extends Record<string, any>>(
   );
   return LazyComponent;
 }
+
+/**
+ *
+ * @returns A unique random string ID that will be static over the life of the component
+ */
+export const useUniqueId = (): string => {
+  const ref = useRef<string>(genRandomStringID());
+  return ref.current;
+};
+
+interface ANewTabProps extends React.HTMLProps<HTMLAnchorElement> {
+  to: string;
+  text?: string;
+  noreferrer?: boolean;
+}
+
+/**
+ * Link that opens in a new tab.
+ */
+export const ANewTab: React.FC<ANewTabProps> = ({
+  to,
+  children,
+  text,
+  noreferrer = false,
+  ...props
+}) => (
+  <a href={to} target='_blank' rel={`noopener${noreferrer ? ' noreferrer' : ''}`} {...props}>
+    {children || text || ''}
+  </a>
+);

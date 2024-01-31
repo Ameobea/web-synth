@@ -1,10 +1,9 @@
-import { UnreachableException } from 'ameo-utils';
-
 import * as PIXI from 'src/controls/pixi';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import type NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';
 import type { FederatedPointerEvent } from '@pixi/events';
+import { UnreachableError } from 'src/util';
 
 export class NoteBox {
   public line: NoteLine;
@@ -85,7 +84,7 @@ export class NoteBox {
 
   public handleDrag(newDesiredStartPos: number) {
     if (!this.line.app.wasm) {
-      throw new UnreachableException();
+      throw new UnreachableError();
     }
 
     this.note.startPoint = this.line.app.wasm.instance.move_note_horizontal(

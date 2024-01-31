@@ -1,5 +1,5 @@
-import { filterNils } from 'ameo-utils/util';
 import React from 'react';
+import { filterNils } from 'src/util';
 
 interface MIDIEditorControlButtonProps {
   onClick: () => void;

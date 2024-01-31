@@ -2,7 +2,7 @@
  * View context that creates a MIDI keyboard that is controllable via the normal keyboard and capable of being
  * connected to MIDI modules.
  */
-import { UnreachableException } from 'ameo-utils';
+
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
@@ -25,7 +25,7 @@ import {
   type MidiKeyboardStateItem,
 } from 'src/redux/modules/midiKeyboard';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import { tryParseJson } from 'src/util';
+import { tryParseJson, UnreachableError } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -203,7 +203,7 @@ export const cleanup_midi_keyboard = (stateKey: string): string => {
   const vcId = stateKey.split('_')[1]!;
   const ctx = midiKeyboardCtxByStateKey.get(stateKey);
   if (!ctx) {
-    throw new UnreachableException(
+    throw new UnreachableError(
       `No MIDI keyboard instance found for state key ${stateKey} when cleaning up`
     );
   }

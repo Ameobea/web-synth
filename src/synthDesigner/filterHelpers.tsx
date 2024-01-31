@@ -1,4 +1,3 @@
-import { filterNils } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback } from 'react';
 import { Range } from 'react-control-panel';
@@ -8,7 +7,7 @@ import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType } from 'src/synthDesigner/FilterType';
-import { clamp, dbToLinear, linearToDb } from 'src/util';
+import { clamp, dbToLinear, filterNils, linearToDb } from 'src/util';
 
 /**
  * @returns `true` if the filter type is a primitive filter type (one which is natively supported by WebAudio's

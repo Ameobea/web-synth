@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { Map } from 'immutable';
 import * as R from 'ramda';
 
@@ -9,7 +8,7 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, UnreachableError } from 'src/util';
 import WaveTableSmallView from './WaveTableSmallView.svelte';
 
 // Manually generate some waveforms... for science
@@ -79,7 +78,7 @@ export const getWavetableWasmInstance = () => WavetableWasmInstance.get();
 
 export const getWavetableWasmInstancePreloaded = () => {
   if (!wavetableWasmInstance) {
-    throw new UnreachableException('Tried to access wavetable Wasm instance before it was loaded');
+    throw new UnreachableError('Tried to access wavetable Wasm instance before it was loaded');
   }
   return wavetableWasmInstance;
 };

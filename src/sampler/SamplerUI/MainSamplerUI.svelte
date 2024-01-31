@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { filterNils } from 'ameo-utils';
   import { renderSvelteModalWithControls } from 'src/controls/Modal';
   import SvelteControlPanel, {
-    ControlPanelSetting,
+    type ControlPanelSetting,
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import SampleEditor from 'src/granulator/GranulatorUI/SampleEditor';
   import type {
@@ -16,7 +15,7 @@
   import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
   import SelectionListing from 'src/sampler/SamplerUI/SelectionListing.svelte';
   import { buildDefaultSamplerSelection, type SamplerSelection } from 'src/sampler/sampler';
-  import { msToSamples, samplesToMs } from 'src/util';
+  import { filterNils, msToSamples, samplesToMs } from 'src/util';
   import { onMount } from 'svelte';
   import { type Writable, get } from 'svelte/store';
 

@@ -1,9 +1,9 @@
-import { filterNils } from 'ameo-utils';
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import { shallowEqual } from 'react-redux';
 
 import type { SequencerReduxInfra } from 'src/sequencer/redux';
+import { filterNils } from 'src/util';
 
 const mkHandleChange =
   ({

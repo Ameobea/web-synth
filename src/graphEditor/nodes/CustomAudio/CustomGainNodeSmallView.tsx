@@ -1,7 +1,7 @@
 import React from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
+import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 
 const CustomGainNodeSmallView: React.FC<{ node: ForeignNode<BiquadFilterNode> }> = ({ node }) => (
   <ControlPanel

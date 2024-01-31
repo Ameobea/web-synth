@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { Set as ImmSet } from 'immutable';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
@@ -6,6 +5,7 @@ import { Keyboard, Piano } from 'react-piano';
 
 import 'react-piano/dist/styles.css';
 import './MidiKeyboard.scss';
+import { UnreachableError } from 'src/util';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 32;
@@ -59,7 +59,7 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
       } else if (action.type === 'CLEAR') {
         return ImmSet();
       } else {
-        throw new UnreachableException();
+        throw new UnreachableError();
       }
     },
     [onAttack, onRelease]

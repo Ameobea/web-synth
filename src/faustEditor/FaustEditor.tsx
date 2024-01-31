@@ -1,4 +1,3 @@
-import { filterNils, type ValueOf, type Without } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -20,6 +19,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { useWindowSize } from 'src/reactUtils';
 import type { Effect } from 'src/redux/modules/effects';
 import { getSentry } from 'src/sentry';
+import { filterNils, type ValueOf, type Without } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 export type FaustEditorReduxStore = ReturnType<

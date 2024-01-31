@@ -21,7 +21,6 @@ return new Array(32).fill(null).map((_, i) => 1.0 / (i + 1));
 </script>
 
 <script lang="ts">
-  import type { PromiseResolveType } from 'ameo-utils';
   import type * as Comlink from 'comlink';
 
   import {
@@ -44,6 +43,7 @@ return new Array(32).fill(null).map((_, i) => 1.0 / (i + 1));
   import type { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
   import { HARMONICS_COUNT } from 'src/fmSynth/Wavetable/conf';
   import { logError } from 'src/sentry';
+  import type { PromiseResolveType } from 'src/util';
 
   export let onSubmit: (val: WavetablePreset) => void;
   export let onCancel: () => void;

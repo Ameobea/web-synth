@@ -1,6 +1,4 @@
 <script lang="ts" context="module">
-  import { filterNils } from 'ameo-utils';
-
   import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
@@ -11,7 +9,7 @@
 </script>
 
 <script lang="ts">
-  import { samplesToMs } from 'src/util';
+  import { filterNils, samplesToMs } from 'src/util';
 
   export let top: number;
   export let left: number;

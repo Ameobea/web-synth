@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
-import { ReduxStore } from 'src/redux';
+import type { ReduxStore } from 'src/redux';
 
 const Conf = {
   disabledColor: '#292929',

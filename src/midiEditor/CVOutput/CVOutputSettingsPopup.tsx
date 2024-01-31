@@ -3,7 +3,7 @@ import ControlPanel from 'react-control-panel';
 
 import type { CVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 import './CVOutputSettingsPopup.css';
-import { UnreachableException } from 'ameo-utils';
+import { UnreachableError } from 'src/util';
 
 interface CVOutputSettingsPopupProps {
   onSubmit: (newState: CVOutputState) => void;
@@ -31,7 +31,7 @@ export const mkCVOutputSettingsPopup = (
 
     const handleSubmit = useCallback(() => {
       if (!panelCtx.current) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Somehow submitted CVOutputSettingsPopup without a control panel context getting set'
         );
       }

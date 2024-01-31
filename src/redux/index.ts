@@ -1,4 +1,3 @@
-import type { ValueOf } from 'ameo-utils';
 import { buildStore } from 'jantix';
 
 import controlPanelModule from 'src/redux/modules/controlPanel';
@@ -15,6 +14,7 @@ import presetsModule, {
 } from 'src/redux/modules/presets';
 import sinsyModule from 'src/redux/modules/sinsy';
 import viewContextManagerModule from 'src/redux/modules/viewContextManager';
+import type { ValueOf } from 'src/util';
 
 const modules = {
   viewContextManager: viewContextManagerModule,

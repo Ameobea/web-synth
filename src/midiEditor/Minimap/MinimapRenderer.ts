@@ -1,7 +1,7 @@
 import * as Comlink from 'comlink';
 
-import { SerializedMIDILine } from 'src/midiEditor';
-import { MIDIMinimapRendererWorker } from 'src/midiEditor/Minimap/MinimapRenderer.worker';
+import type { SerializedMIDILine } from 'src/midiEditor';
+import type { MIDIMinimapRendererWorker } from 'src/midiEditor/Minimap/MinimapRenderer.worker';
 import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 

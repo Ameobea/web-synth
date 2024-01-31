@@ -1,9 +1,8 @@
-import { UnreachableException } from 'ameo-utils';
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import type { SamplerSelection, SerializedSampler } from 'src/sampler/sampler';
-import { AsyncOnce, delay, getEngine } from 'src/util';
+import { AsyncOnce, UnreachableError, delay, getEngine } from 'src/util';
 import { type Writable, writable, get } from 'svelte/store';
 
 const ctx = new AudioContext();
@@ -56,16 +55,16 @@ export class SamplerInstance {
     this.midiInputCBs = {
       enableRxAudioThreadScheduling: { mailboxIDs: [this.audioThreadMIDIEventMailboxID] },
       onAttack: () => {
-        throw new UnreachableException('Expected only audio thread MIDI events');
+        throw new UnreachableError('Expected only audio thread MIDI events');
       },
       onRelease: () => {
-        throw new UnreachableException('Expected only audio thread MIDI events');
+        throw new UnreachableError('Expected only audio thread MIDI events');
       },
       onClearAll: () => {
-        throw new UnreachableException('Expected only audio thread MIDI events');
+        throw new UnreachableError('Expected only audio thread MIDI events');
       },
       onPitchBend: () => {
-        throw new UnreachableException('Expected only audio thread MIDI events');
+        throw new UnreachableError('Expected only audio thread MIDI events');
       },
     };
     this.activeSelectionIx = writable(initialState.activeSelectionIx);

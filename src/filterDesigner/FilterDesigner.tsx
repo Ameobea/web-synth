@@ -1,4 +1,3 @@
-import { filterNils } from 'ameo-utils';
 import type { ScaleLogarithmic, Selection } from 'd3';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -19,7 +18,7 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import FlatButton from 'src/misc/FlatButton';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
-import { linearToDb } from 'src/util';
+import { filterNils, linearToDb } from 'src/util';
 import buildPresets from './presets';
 import { FilterType } from 'src/synthDesigner/FilterType';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';

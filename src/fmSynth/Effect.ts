@@ -1,10 +1,9 @@
-import { UnimplementedError } from 'ameo-utils';
-
 import {
   encodeParamSource,
   type EncodedParamSource,
   type ParamSource,
 } from 'src/fmSynth/ParamSource';
+import { UnimplementedError } from 'src/util';
 
 export enum ButterworthFilterMode {
   Lowpass = 0,

@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
@@ -8,6 +7,7 @@ import MIDINoteBox from 'src/midiEditor/NoteBox/MIDINoteBox';
 import type { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import * as conf from './conf';
 import type { FederatedPointerEvent } from '@pixi/events';
+import { UnreachableError } from 'src/util';
 
 export interface NoteCreationState {
   /**
@@ -84,7 +84,7 @@ export default class NoteLine {
     ];
     const noteLengthPx = this.app.beatsToPx(newEndPosBeats - newStartPosBeats);
     if (!this.app.wasm) {
-      throw new UnreachableException();
+      throw new UnreachableError();
     }
     if (!R.isNil(this.noteCreationState.id) && noteLengthPx < conf.MIN_DRAWING_NOTE_WIDTH_PX) {
       // End is too close to the start; delete the not that we had created here

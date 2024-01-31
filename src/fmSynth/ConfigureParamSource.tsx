@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -12,7 +11,7 @@ import {
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import { msToSamples, samplesToMs } from 'src/util';
+import { msToSamples, samplesToMs, UnreachableError } from 'src/util';
 
 export const PARAM_BUFFER_COUNT = 8;
 
@@ -110,7 +109,7 @@ const ConfigureADSRLengthMS: React.FC<ConfigureADSRLengthMSProps> = ({
     title='adsr length ms'
     adsrs={EMPTY_ADSRS}
     onAdsrChange={useCallback(() => {
-      throw new UnreachableException('Cannot use ADSRs when configuring `adsr_length_ms`');
+      throw new UnreachableError('Cannot use ADSRs when configuring `adsr_length_ms`');
     }, [])}
     state={useMemo(
       () =>

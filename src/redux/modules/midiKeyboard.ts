@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { buildActionGroup, buildModule } from 'jantix';
 import * as R from 'ramda';
 
@@ -10,7 +9,7 @@ import {
 } from 'src/midiKeyboard';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { mkLinearToLog } from 'src/util';
+import { UnreachableError, mkLinearToLog } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -47,7 +46,7 @@ export type MidiKeyboardState = { [stateKey: string]: MidiKeyboardStateItem };
 const getMidiKeyboardCtx = (stateKey: string): MIDIKeyboardCtx => {
   const midiKeyboardCtx = midiKeyboardCtxByStateKey.get(stateKey);
   if (!midiKeyboardCtx) {
-    throw new UnreachableException(`No ctx entry found for midi keyboard state key ${stateKey}`);
+    throw new UnreachableError(`No ctx entry found for midi keyboard state key ${stateKey}`);
   }
   return midiKeyboardCtx;
 };
@@ -89,7 +88,7 @@ const updateMappedOutputCSN = (
 
   const output = midiKeyboardCtx.mappedOutputs[outputIx];
   if (!output) {
-    throw new UnreachableException(`No mapped output found at index ${outputIx}`);
+    throw new UnreachableError(`No mapped output found at index ${outputIx}`);
   }
 
   const outputValue = computeMappedOutputValue(outputDescriptor, lastRawValue);
@@ -111,7 +110,7 @@ export const buildFreshOutputDescriptorsByControlIndex = (
   mappedOutputDescriptors.forEach((outputDescriptor, outputIx) => {
     const output = mappedOutputs[outputIx];
     if (!output) {
-      throw new UnreachableException(`No mapped output found at index ${outputIx}`);
+      throw new UnreachableError(`No mapped output found at index ${outputIx}`);
     }
 
     const existing = map.get(outputDescriptor.controlIndex);
@@ -206,14 +205,14 @@ const actionGroups = {
     }),
     subReducer: (state: MidiKeyboardState, { stateKey, midiInputName }) => {
       if (!state[stateKey].midiInput) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           `No \`midiInput\` for stateKey=${stateKey} but we're handling input change`
         );
       }
       if (midiInputName) {
         const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
         if (!midiNode) {
-          throw new UnreachableException(
+          throw new UnreachableError(
             'No MIDI node found for midi keyboard with `stateKey`: ' + stateKey
           );
         }
@@ -241,7 +240,7 @@ const actionGroups = {
     subReducer: (state: MidiKeyboardState, { stateKey, mode }) => {
       const mutableCtx = midiKeyboardCtxByStateKey.get(stateKey);
       if (!mutableCtx) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'No mutable ctx found for midi keyboard with `stateKey`: ' + stateKey
         );
       }

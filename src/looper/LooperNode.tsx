@@ -1,5 +1,3 @@
-import { filterNils } from 'ameo-utils';
-
 import type { SavedMIDIComposition } from 'src/api';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { looperDispatch } from 'src/redux';
@@ -10,7 +8,7 @@ import {
   type LooperTransitionAlgorithm,
 } from 'src/redux/modules/looper';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, filterNils } from 'src/util';
 
 const ctx = new AudioContext();
 

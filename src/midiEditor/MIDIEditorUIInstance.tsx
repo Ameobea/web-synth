@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import * as PIXI from 'src/controls/pixi';
@@ -27,6 +26,7 @@ import {
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import * as conf from './conf';
 import type { FederatedPointerEvent } from '@pixi/events';
+import { UnreachableError } from 'src/util';
 
 export interface Note {
   id: number;
@@ -295,7 +295,7 @@ export default class MIDIEditorUIInstance {
     NoteBoxClass: typeof NoteBox = MIDINoteBox
   ): number {
     if (!this.wasm) {
-      throw new UnreachableException('Tried to create note before Wasm initialized');
+      throw new UnreachableError('Tried to create note before Wasm initialized');
     }
     const id = this.wasm.instance.create_note(
       this.wasm.noteLinesCtxPtr,
@@ -315,12 +315,12 @@ export default class MIDIEditorUIInstance {
     this.selectedNoteIDs.delete(id);
     const note = this.allNotesByID.get(id);
     if (!note) {
-      throw new UnreachableException(
+      throw new UnreachableError(
         `Tried to delete note with id=${id} but it wasn't in the all notes map`
       );
     }
     if (!this.wasm) {
-      throw new UnreachableException('Tried to delete note before wasm initialized');
+      throw new UnreachableError('Tried to delete note before wasm initialized');
     }
     this.wasm.instance.delete_note(
       this.wasm.noteLinesCtxPtr,
@@ -340,9 +340,7 @@ export default class MIDIEditorUIInstance {
 
     const note = this.allNotesByID.get(id);
     if (!note) {
-      throw new UnreachableException(
-        `Tried to select note id=${id} but no note in map with that id`
-      );
+      throw new UnreachableError(`Tried to select note id=${id} but no note in map with that id`);
     }
     note.setIsSelected(true);
     this.selectedNoteIDs.add(id);
@@ -351,9 +349,7 @@ export default class MIDIEditorUIInstance {
   public deselectNote(id: number) {
     const note = this.allNotesByID.get(id);
     if (!note) {
-      throw new UnreachableException(
-        `Tried to deselect note id=${id} but no note in map with that id`
-      );
+      throw new UnreachableError(`Tried to deselect note id=${id} but no note in map with that id`);
     }
     note.setIsSelected(false);
     const wasRemoved = this.selectedNoteIDs.delete(id);
@@ -376,11 +372,11 @@ export default class MIDIEditorUIInstance {
   ) {
     const note = this.allNotesByID.get(id);
     if (!note) {
-      throw new UnreachableException(
+      throw new UnreachableError(
         `Tried to resize note id=${id} but not found in all notes mapping`
       );
     } else if (!this.wasm) {
-      throw new UnreachableException('Tried to resize note before Wasm initialized');
+      throw new UnreachableError('Tried to resize note before Wasm initialized');
     }
 
     // Prevent the note from being resized to be too small by forcing its length to remain above
@@ -417,11 +413,11 @@ export default class MIDIEditorUIInstance {
   ): number {
     const note = this.allNotesByID.get(id);
     if (!note) {
-      throw new UnreachableException(
+      throw new UnreachableError(
         `Tried to resize note id=${id} but not found in all notes mapping`
       );
     } else if (!this.wasm) {
-      throw new UnreachableException('Tried to resize note before Wasm initialized');
+      throw new UnreachableError('Tried to resize note before Wasm initialized');
     }
 
     // Prevent the note from being resized to be too small by forcing its length to remain above
@@ -497,7 +493,7 @@ export default class MIDIEditorUIInstance {
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId);
       if (!note) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           `Note id ${noteId} is selected but is not in the global mapping`
         );
       }
@@ -511,7 +507,7 @@ export default class MIDIEditorUIInstance {
         if (note instanceof MIDINoteBox) {
           return note as MIDINoteBox;
         }
-        throw new UnreachableException("Cannot resize notes that don't have drag handles");
+        throw new UnreachableError("Cannot resize notes that don't have drag handles");
       })();
       this.resizeData.dragHandlesByNoteID.set(
         noteId,
@@ -530,7 +526,7 @@ export default class MIDIEditorUIInstance {
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId);
       if (!note) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           `Note id ${noteId} is selected but is not in the global mapping`
         );
       }
@@ -538,7 +534,7 @@ export default class MIDIEditorUIInstance {
 
       const originalPosBeats = this.resizeData.originalPosBeatsByNoteId.get(noteId);
       if (R.isNil(originalPosBeats)) {
-        throw new UnreachableException(`No original pos beats recorded for note id ${noteId}`);
+        throw new UnreachableError(`No original pos beats recorded for note id ${noteId}`);
       }
       handle.handleDrag(this.resizeData.globalStartPoint, data.global, originalPosBeats);
     }
@@ -776,7 +772,7 @@ export default class MIDIEditorUIInstance {
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId);
       if (!note) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           `Note id ${noteId} is selected but is not in the global mapping`
         );
       }
@@ -834,14 +830,12 @@ export default class MIDIEditorUIInstance {
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId);
       if (!note) {
-        throw new UnreachableException(`Note id ${noteId} is selected but not in global mapping`);
+        throw new UnreachableError(`Note id ${noteId} is selected but not in global mapping`);
       }
 
       const originalPosBeats = this.dragData.originalPosBeatsByNoteId.get(noteId);
       if (R.isNil(originalPosBeats)) {
-        throw new UnreachableException(
-          `Note id ${noteId} is selected but not in original pos mapping`
-        );
+        throw new UnreachableError(`Note id ${noteId} is selected but not in original pos mapping`);
       }
       const newDesiredStartPosBeats = Math.max(
         this.parentInstance.snapBeat(originalPosBeats + xDiffBeats),
@@ -859,7 +853,7 @@ export default class MIDIEditorUIInstance {
     // We check to see if *all* of the selected notes can successfully be moved to their new vertical positions
     // and only move them if there are no conflicts.
     if (!this.wasm) {
-      throw new UnreachableException('Tried to drag notes before wasm initialized');
+      throw new UnreachableError('Tried to drag notes before wasm initialized');
     }
     const allSelectedNotes: NoteBox[] = [];
     const ungatedLineIndices: Set<number> = new Set();

@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -18,7 +17,7 @@ import { voicePresetIdsSelector } from 'src/redux/modules/presets';
 import { getSynthDesignerReduxInfra, type SynthModule } from 'src/redux/modules/synthDesigner';
 import { getSentry } from 'src/sentry';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
-import { msToSamples, samplesToMs } from 'src/util';
+import { UnreachableError, msToSamples, samplesToMs } from 'src/util';
 import { Filter as FilterModule } from './Filter';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
@@ -189,7 +188,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
         }
       }
     },
-    [actionCreators.synthDesigner, dispatch, gainEnvelope, getState, props.index]
+    [actionCreators.synthDesigner, dispatch, gainADSRLengthMs, gainEnvelope, getState, props.index]
   );
 
   const state = useMemo(() => {
@@ -256,7 +255,7 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
   const getFMSynthOutput = useCallback(async () => {
     const output = get_synth_designer_audio_connectables(stateKey).outputs.get('masterOutput');
     if (!output || output.type !== 'customAudio') {
-      throw new UnreachableException('Missing `masterGain` on synth designer audio connectables');
+      throw new UnreachableError('Missing `masterGain` on synth designer audio connectables');
     }
     return output.node as AudioNode;
   }, [stateKey]);

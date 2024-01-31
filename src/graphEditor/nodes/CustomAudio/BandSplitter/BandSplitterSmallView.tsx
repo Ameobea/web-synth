@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import { SerializedBandSplitterNode } from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
+import type { SerializedBandSplitterNode } from 'src/graphEditor/nodes/CustomAudio/BandSplitter/BandSplitterNode';
 
 export interface BandSplitterSmallViewProps {
   initialState: SerializedBandSplitterNode;

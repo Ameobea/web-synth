@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import * as R from 'ramda';
 import React, { useMemo } from 'react';
@@ -9,7 +8,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { getSample } from 'src/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 import { get_sequencer_audio_connectables } from 'src/sequencer/sequencer';
-import { truncateWithElipsis } from 'src/util';
+import { UnreachableError, truncateWithElipsis } from 'src/util';
 import type { SequencerReduxInfra, VoiceTarget } from '../redux';
 
 interface InputCompCommonProps<T> extends SequencerReduxInfra {
@@ -180,7 +179,7 @@ const GateInput: React.FC<InputCompCommonProps<'gate'>> = ({
   );
 
   if (voice.type !== 'gate') {
-    throw new UnreachableException();
+    throw new UnreachableError();
   }
 
   const settings = useMemo(
@@ -254,7 +253,7 @@ const GateInput: React.FC<InputCompCommonProps<'gate'>> = ({
             );
             break;
           default:
-            throw new UnreachableException('Unhandled setting label: ' + key);
+            throw new UnreachableError('Unhandled setting label: ' + key);
         }
       })}
     />

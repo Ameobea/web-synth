@@ -20,7 +20,7 @@ const retryAsync = async (
       await delay(delayMs);
     }
   }
-  throw new UnreachableException();
+  throw new UnreachableError();
 };
 
 window.WavyJones = function (context, elem, width, height) {

@@ -217,10 +217,6 @@ export class MixerLevelsViz {
     this.audioThreadBuffer = audioThreadBuffer;
   };
 
-  public setInputCount = (inputCount: number) => {
-    // TODO
-  };
-
   public destroy = () => {
     destroyPIXIApp(this.app);
     CachedLevelMeterTicksTexture?.destroy();

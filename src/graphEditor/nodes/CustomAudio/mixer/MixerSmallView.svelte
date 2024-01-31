@@ -65,7 +65,6 @@
 </script>
 
 <script lang="ts">
-  import { UnreachableException } from 'ameo-utils';
   import React from 'react';
   import { onDestroy, onMount } from 'svelte';
 
@@ -75,7 +74,7 @@
   import { LevelDetectorWasmBytes } from 'src/graphEditor/nodes/CustomAudio/LevelDetectorNode/LevelDetectorNode';
   import type { MixerLevelsViz } from 'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz';
   import { logError } from 'src/sentry';
-  import { AsyncOnce } from 'src/util';
+  import { AsyncOnce, UnreachableError } from 'src/util';
 
   const ctx = new AudioContext();
   export let mixer: MixerNode;
@@ -84,7 +83,6 @@
   let awpHandle: AudioWorkletNode | null = null;
   let audioThreadBuffer: Float32Array | null = null;
   let vizInst: MixerLevelsViz | null = null;
-  $: vizInst?.setInputCount(inputCount);
   $: if (audioThreadBuffer) {
     vizInst?.setAudioThreadBuffer(audioThreadBuffer);
   }
@@ -95,7 +93,7 @@
     const gainParamName = `track_${trackIx}_gain`;
     const gainParam = (awpHandle.parameters as Map<string, AudioParam>).get(gainParamName);
     if (!gainParam) {
-      throw new UnreachableException(`Missing expected gain param "${gainParamName}"`);
+      throw new UnreachableError(`Missing expected gain param "${gainParamName}"`);
     }
     if (disconnect) {
       try {

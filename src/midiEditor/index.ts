@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import { derived, get, type Readable, type Writable, writable } from 'svelte/store';
@@ -14,6 +13,7 @@ import {
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
+import { UnreachableError } from 'src/util';
 
 interface OldMIDIEditorView {
   /**
@@ -360,7 +360,7 @@ export const cleanup_midi_editor = (vcId: string) => {
   const stateKey = `midiEditor_${vcId}`;
   const inst = Instances.get(vcId);
   if (!inst) {
-    throw new UnreachableException(
+    throw new UnreachableError(
       `Tried to cleanup MIDI editor with vcId=${vcId} that isn't in instance map`
     );
   }
@@ -377,7 +377,7 @@ export const cleanup_midi_editor = (vcId: string) => {
 export const get_midi_editor_audio_connectables = (vcId: string): AudioConnectables => {
   const inst = Instances.get(vcId);
   if (!inst) {
-    throw new UnreachableException(`No MIDI editor instance in map with vcId=${vcId}`);
+    throw new UnreachableError(`No MIDI editor instance in map with vcId=${vcId}`);
   }
 
   const insts = get(inst.uiManager.instances);

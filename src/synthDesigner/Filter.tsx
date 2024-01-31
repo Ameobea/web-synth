@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -11,6 +10,7 @@ import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import { getSynthDesignerReduxInfra, type FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { UnreachableError } from 'src/util';
 
 const style = { width: 600 };
 
@@ -21,7 +21,7 @@ const getDefaultLengthForAdsrLengthMode = (lengthMode: AdsrLengthMode) => {
     case AdsrLengthMode.Samples:
       return 1000;
     default:
-      throw new UnreachableException(`Unknown length mode: ${lengthMode}`);
+      throw new UnreachableError(`Unknown length mode: ${lengthMode}`);
   }
 };
 
@@ -79,7 +79,7 @@ const FilterEnvelopeControls: React.FC<FilterEnvelopeControlsProps> = ({
           case AdsrLengthMode.Samples:
             return [true, false];
           default:
-            throw new UnreachableException(`Unexpected length mode: ${lengthMode}`);
+            throw new UnreachableError(`Unexpected length mode: ${lengthMode}`);
         }
       })(),
       [lengthKey]: length,

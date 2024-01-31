@@ -1,4 +1,3 @@
-import { UnimplementedError } from 'ameo-utils';
 import * as R from 'ramda';
 
 import { listRemoteSamples as listRemoteSamplesFromServer } from 'src/api';
@@ -13,6 +12,7 @@ import {
 import { cacheSample, getAllCachedSamples, getCachedSample } from 'src/sampleLibrary/sampleCache';
 import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 import SampleManager from 'src/sampleLibrary/SampleManager';
+import { UnimplementedError } from 'src/util';
 
 export interface SampleDescriptor {
   isLocal: boolean;

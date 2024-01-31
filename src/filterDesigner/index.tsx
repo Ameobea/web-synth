@@ -1,5 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
-import type { PropTypesOf } from 'ameo-utils/dist/util/react';
 import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
@@ -25,6 +23,7 @@ import {
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import { FilterType } from 'src/synthDesigner/FilterType';
+import { UnreachableError, type PropTypesOf } from 'src/util';
 
 const FilterDesigner = React.lazy(() => import('./FilterDesigner'));
 
@@ -133,7 +132,7 @@ export const get_filter_designer_audio_connectables = (
 ): AudioConnectables => {
   const state = stateOverride ?? StatesByVcId.get(vcId);
   if (!state) {
-    throw new UnreachableException('Missing state for filter designer vcId=' + vcId);
+    throw new UnreachableError('Missing state for filter designer vcId=' + vcId);
   }
   if (
     state.filterGroups.length === 0 ||

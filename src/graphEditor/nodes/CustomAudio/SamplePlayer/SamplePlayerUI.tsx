@@ -1,4 +1,3 @@
-import { filterNils } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useReducer, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -9,6 +8,7 @@ import type {
 } from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayer';
 import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
+import { filterNils } from 'src/util';
 
 const MAX_SAMPLE_COUNT = 8;
 

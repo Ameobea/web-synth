@@ -1,9 +1,8 @@
-import { filterNils, UnimplementedError, UnreachableException } from 'ameo-utils';
-
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { ConfigureParamSourceInnerProps } from 'src/fmSynth/ConfigureParamSource';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
+import { UnimplementedError, UnreachableError, filterNils } from 'src/util';
 
 /**
  * A parameter/value generator function.  Used to produce the frequency input values for
@@ -81,7 +80,7 @@ export const buildDefaultParamSource = (
       };
     }
     default: {
-      throw new UnreachableException('Invalid operator state type: ' + type);
+      throw new UnreachableError('Invalid operator state type: ' + type);
     }
   }
 };

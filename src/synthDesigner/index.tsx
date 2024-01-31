@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { Option, Try } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import React from 'react';
@@ -18,6 +17,7 @@ import buildSynthDesignerRedux, {
   type SynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
 import SynthDesigner from './SynthDesigner';
+import { UnreachableError } from 'src/util';
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
 
@@ -32,22 +32,22 @@ const buildSynthDesignerMIDINode = (): MIDINode =>
     return {
       enableRxAudioThreadScheduling: { mailboxIDs: [] },
       onAttack: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
       onRelease: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
       onPitchBend: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
       onClearAll: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },

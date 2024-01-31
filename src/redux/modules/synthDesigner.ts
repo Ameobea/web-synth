@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import * as R from 'ramda';
 import type { Root as ReactDOMRoot } from 'react-dom/client';
@@ -18,7 +17,7 @@ import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { FilterType } from 'src/synthDesigner/FilterType';
 import type { FilterCSNs } from 'src/synthDesigner/biquadFilterModule';
 import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { msToSamples, normalizeEnvelope } from 'src/util';
+import { UnreachableError, msToSamples, normalizeEnvelope } from 'src/util';
 
 export interface FilterParams {
   type: FilterType;
@@ -425,22 +424,22 @@ const maybeUpdateMIDINode = (state: SynthDesignerState) => {
     return {
       enableRxAudioThreadScheduling: { mailboxIDs },
       onAttack: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
       onRelease: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
       onPitchBend: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
       onClearAll: () => {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'
         );
       },

@@ -1,4 +1,3 @@
-import { UnimplementedError, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 
 import {
@@ -11,6 +10,7 @@ import {
   scheduleMIDIEventBeats,
   type EventToReschedule,
 } from 'src/eventScheduler';
+import { UnimplementedError, UnreachableError } from 'src/util';
 import { type Writable, writable } from 'svelte/store';
 
 /**
@@ -71,7 +71,7 @@ export class MIDINode {
     this.getInputCbs =
       getInputCbs ??
       (() => {
-        throw new UnreachableException("MIDI node doesn't accept inputs");
+        throw new UnreachableError("MIDI node doesn't accept inputs");
       });
 
     registerGlobalStopCB(() => {

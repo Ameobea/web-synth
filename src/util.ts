@@ -1,4 +1,3 @@
-import { filterNils, UnreachableException } from 'ameo-utils';
 import { Option, Try } from 'funfix-core';
 import * as R from 'ramda';
 
@@ -110,6 +109,18 @@ export function base64ToArrayBuffer(base64: string) {
 
 export const delay = (delayMs: number) => new Promise(resolve => setTimeout(resolve, delayMs));
 
+export class UnreachableError extends Error {
+  constructor(val?: string) {
+    super(val ? `entered unreachable code: ${val}` : 'entered unreachable code');
+  }
+}
+
+export class UnimplementedError extends Error {
+  constructor(val?: string) {
+    super(val ? `not implemented: ${val}` : 'entered unimplemented code');
+  }
+}
+
 export const retryAsync = async <T>(
   fn: () => Promise<T>,
   attempts = 3,
@@ -128,7 +139,7 @@ export const retryAsync = async <T>(
       await delay(delayMs);
     }
   }
-  throw new UnreachableException();
+  throw new UnreachableError();
 };
 
 export class AsyncOnce<T> {
@@ -305,3 +316,13 @@ export const initGlobals = () => {
         return `${s4()}${s4()}-${s4()}${s4()}-${s4()}${s4()}-${s4()}${s4()}`;
       };
 };
+
+export type Without<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+export type ValueOf<T> = T[keyof T];
+export type ArrayElementOf<T> = T extends (infer U)[] ? U : never;
+export type PropTypesOf<T> = T extends React.ComponentType<infer P> ? P : never;
+export type PromiseResolveType<T> = T extends Promise<infer U> ? U : never;
+export type IterableValueOf<I> = I extends Iterable<[any, infer V]> ? V : never;
+
+export const filterNils = <T>(arr: (T | null | undefined)[]): T[] =>
+  arr.filter((x): x is T => x != null);

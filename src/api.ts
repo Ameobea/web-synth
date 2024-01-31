@@ -1,14 +1,13 @@
-import type { Without } from 'ameo-utils';
-
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { BuildWavetableInstanceState } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
-import { SerializedMIDIEditorInstance } from 'src/midiEditor';
+import type { SerializedMIDIEditorInstance } from 'src/midiEditor';
 import { getLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
 import type { SerializedLooperInstState } from 'src/redux/modules/looper';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import type { SampleDescriptor } from 'src/sampleLibrary';
+import type { Without } from 'src/util';
 
 const buildURL = (path: string) => `${BACKEND_BASE_URL}${path}`;
 

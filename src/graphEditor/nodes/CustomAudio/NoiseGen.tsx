@@ -1,4 +1,3 @@
-import { filterNils } from 'ameo-utils';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
@@ -11,7 +10,7 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, filterNils } from 'src/util';
 
 const NoiseGenAWPRegistered = new AsyncOnce(
   () =>

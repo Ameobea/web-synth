@@ -1,7 +1,6 @@
 // get the ball rolling on this ASAP in the loading process
 import 'src/eventScheduler/eventScheduler';
 
-import { filterNils, UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -25,7 +24,14 @@ import { useWindowSize } from 'src/reactUtils';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSentry } from 'src/sentry';
 import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
-import { initGlobals, msToSamples, normalizeEnvelope, samplesToMs } from 'src/util';
+import {
+  UnreachableError,
+  filterNils,
+  initGlobals,
+  msToSamples,
+  normalizeEnvelope,
+  samplesToMs,
+} from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FilterType } from 'src/synthDesigner/FilterType';
 
@@ -181,10 +187,10 @@ const midiInput = new MIDIInput(ctx, midiInputNode, GlobalState.selectedMIDIInpu
 const midiOutput = new MIDINode(() => ({
   enableRxAudioThreadScheduling: { mailboxIDs: ['fm-synth-demo-fm-synth'] },
   onAttack: (_note, _velocity) => {
-    throw new UnreachableException();
+    throw new UnreachableError();
   },
   onRelease: (_note, _velocity) => {
-    throw new UnreachableException();
+    throw new UnreachableError();
   },
   onClearAll: () => {
     // no-op; this will never get sent directly from user MIDI devices and only exists

@@ -1,9 +1,9 @@
 import { buildActionGroup, buildStore as buildJantixStore, buildModule } from 'jantix';
 
 import { faustEditorContextMap } from 'src/faustEditor';
-import { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
+import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
 import buildControlPanelComponent from 'src/faustEditor/uiBuilder';
-import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { getSentry } from 'src/sentry';
 
 /**

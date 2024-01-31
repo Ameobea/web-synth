@@ -2,4 +2,6 @@ import { buildModule } from 'jantix';
 
 const actionGroups = {};
 
-export default buildModule<{}, typeof actionGroups>({}, actionGroups);
+interface CompositionSharingReduxState {}
+
+export default buildModule<CompositionSharingReduxState, typeof actionGroups>({}, actionGroups);

@@ -1,5 +1,3 @@
-import { UnimplementedError } from 'ameo-utils';
-import type { PropTypesOf } from 'ameo-utils/dist/util/react';
 import { Option } from 'funfix-core';
 import React, { Suspense } from 'react';
 
@@ -15,11 +13,11 @@ import { actionCreators, dispatch, getState, store } from 'src/redux';
 import { buildDefaultSinsyState } from 'src/redux/modules/sinsy';
 import type { SinsyState } from 'src/redux/modules/sinsy';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, UnimplementedError, type PropTypesOf } from 'src/util';
 
 const SinsyUI = React.lazy(() => import('./SinsyUI'));
 
-const LazySinsyUI: React.FC<PropTypesOf<typeof import('./SinsyUI')['default']>> = props => (
+const LazySinsyUI: React.FC<PropTypesOf<(typeof import('./SinsyUI'))['default']>> = props => (
   <Suspense fallback={<Loading />}>
     <SinsyUI {...props} />
   </Suspense>

@@ -1,7 +1,7 @@
 import React from 'react';
 
-import MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
-import { MIDINode } from 'src/patchNetwork/midiNode';
+import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
 
 const TrainingMIDIControlIndexContext = React.createContext<{
   midiNode?: MIDINode | null;

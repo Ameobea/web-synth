@@ -2,7 +2,7 @@
  * Defines an interactive graph editor that can be used to route connections between different
  * components of an audio composition.
  */
-import { filterNils, UnreachableException } from 'ameo-utils';
+
 import { LGraph, LGraphCanvas, type LGraphNode, LiteGraph } from 'litegraph.js';
 
 import 'litegraph.js/css/litegraph.css';
@@ -17,7 +17,7 @@ import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
 import { getState, type ReduxStore } from 'src/redux';
-import { getEngine, tryParseJson } from 'src/util';
+import { UnreachableError, filterNils, getEngine, tryParseJson } from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 import {
   getIsVcHidden,
@@ -74,7 +74,7 @@ LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
       case null:
         break;
       default:
-        throw new UnreachableException(`Unknown menu option: ${label}`);
+        throw new UnreachableError(`Unknown menu option: ${label}`);
     }
   };
 

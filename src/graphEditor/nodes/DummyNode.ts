@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import type { MIDIEvent, MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
-import { writable } from 'svelte/store';
+import type { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 
 const noop = () => {};
 

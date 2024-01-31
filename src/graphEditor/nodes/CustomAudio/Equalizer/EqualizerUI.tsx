@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useMemo, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -8,6 +7,7 @@ import './Equalizer.scss';
 import { NEGATIVE_VALUE_DIVIDER_INTERVAL } from 'src/graphEditor/nodes/CustomAudio/Equalizer/Equalizer';
 import { actionCreators, dispatch, store, type ReduxStore } from 'src/redux';
 import { EQUALIZER_LEVEL_COUNT, type EqualizerPoint } from 'src/redux/modules/equalizer';
+import { UnreachableError } from 'src/util';
 
 interface EqualizerLineProps {
   points: EqualizerPoint[];
@@ -230,7 +230,7 @@ const EqualizerControlPanel: React.FC<EqualizerControlPanelProps> = ({ vcId }) =
             break;
           }
           default: {
-            throw new UnreachableException(
+            throw new UnreachableError(
               `Unhandled equalizer small view control panel label: ${label}`
             );
           }

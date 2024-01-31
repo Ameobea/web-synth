@@ -1,4 +1,3 @@
-import type { ArrayElementOf } from 'ameo-utils/types';
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
@@ -11,7 +10,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, type ArrayElementOf } from 'src/util';
 
 const SamplePlayerWasmBytes = new AsyncOnce(
   () =>

@@ -1,9 +1,9 @@
-import { ANewTab } from 'ameo-utils/dist/util/react';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './BrowserNotSupported.scss';
 import 'src/index.scss';
+import { ANewTab } from 'src/reactUtils';
 
 const BrowserNotSupported: React.FC<{ mobileSupported?: boolean }> = ({
   mobileSupported = false,
@@ -13,7 +13,7 @@ const BrowserNotSupported: React.FC<{ mobileSupported?: boolean }> = ({
 
     <p>
       Your current browser isn&apos;t supported by this application. It makes use of modern Web
-      Audio APIs su ch as{' '}
+      Audio APIs such as{' '}
       <ANewTab to='https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode'>
         <code>AudioWorkletNode</code>
       </ANewTab>{' '}

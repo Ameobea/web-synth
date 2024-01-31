@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import numbro from 'numbro';
 import * as R from 'ramda';
 import React, { useEffect, useRef } from 'react';
@@ -12,7 +11,7 @@ import {
   type Adsr,
   type AdsrStep,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { mkLinearToLog } from 'src/util';
+import { UnreachableError, mkLinearToLog } from 'src/util';
 import {
   getIsVcHidden,
   registerVcHideCb,
@@ -89,7 +88,7 @@ class RampHandle {
         );
       }
       default: {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
         );
       }
@@ -126,7 +125,7 @@ class RampHandle {
         break;
       }
       default: {
-        throw new UnreachableException(
+        throw new UnreachableError(
           'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
         );
       }
@@ -993,7 +992,7 @@ export class ADSR2Instance {
     }
     while (this.sprites.rampCurves.length > this.steps.length - (this.infiniteMode ? 0 : 1)) {
       if (!R.isNil(updatedMarkIx)) {
-        throw new UnreachableException(
+        throw new UnreachableError(
           "Can't have an updated mark index when there are more ramps than expected"
         );
       }
@@ -1168,12 +1167,12 @@ export class ADSR2Instance {
 
   private buildLoopDragBar() {
     if (R.isNil(this.loopPoint)) {
-      throw new UnreachableException();
+      throw new UnreachableError();
     }
 
     return new DragBar(this, LOOP_DRAG_BAR_COLOR, this.loopPoint, (newLoopPos: number) => {
       if (newLoopPos < 0 || newLoopPos > 1) {
-        throw new UnreachableException();
+        throw new UnreachableError();
       }
 
       // constrain loop point to be before the release point
@@ -1213,7 +1212,7 @@ export class ADSR2Instance {
         this.releasePoint,
         (newReleasePos: number) => {
           if (newReleasePos < 0 || newReleasePos > 1) {
-            throw new UnreachableException();
+            throw new UnreachableError();
           }
 
           // release has to be after the loop point, if there is one

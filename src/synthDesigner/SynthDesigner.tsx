@@ -1,4 +1,3 @@
-import { UnreachableException } from 'ameo-utils';
 import * as R from 'ramda';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
@@ -19,6 +18,7 @@ import {
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { buildWavyJonesInstance, type WavyJones } from 'src/visualizations/WavyJones';
 import SynthModuleComp from './SynthModule';
+import { UnreachableError } from 'src/util';
 
 interface AddModuleControlsProps {
   stateKey: string;
@@ -194,7 +194,7 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
           return;
         }
 
-        throw new UnreachableException();
+        throw new UnreachableError();
       }}
     />
   );

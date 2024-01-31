@@ -4,8 +4,8 @@ import ControlPanel from 'react-control-panel';
 import { useSelector } from 'react-redux';
 
 import './SinsyUI.scss';
-import FileUploader, { FileUploaderValue } from 'src/controls/FileUploader';
-import { actionCreators, dispatch, ReduxStore } from 'src/redux';
+import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
+import { actionCreators, dispatch, type ReduxStore } from 'src/redux';
 import { loadHTSVoice } from 'src/vocalSynthesis/sinsyViewContext';
 
 const SinsyUI: React.FC<{ vcId: string }> = ({ vcId }) => {
