@@ -1,5 +1,6 @@
 use self::oscilloscope::{PreviousWindow, Viz, WindowLength};
 use canvas_utils::VizView;
+use common::ref_static_mut;
 use f0_estimation::YinCtx;
 
 pub(crate) mod conf;
@@ -84,13 +85,13 @@ pub extern "C" fn oscilloscope_renderer_set_view(
 ) {
   maybe_set_panic_hook();
 
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.set_view(cur_bpm, VizView { width, height, dpr });
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_set_window(window_mode: u8, window_length: f32) {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   let window = WindowLength::from_parts(window_mode, window_length);
   viz.set_window(window);
 }
@@ -98,7 +99,7 @@ pub extern "C" fn oscilloscope_renderer_set_window(window_mode: u8, window_lengt
 /// Process all samples in `FRAME_DATA_BUFFER` and update the viz
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_process(cur_bpm: f32, cur_beat: f32, cur_time: f32) {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.process(cur_bpm, cur_beat, cur_time);
 }
 
@@ -109,44 +110,44 @@ pub extern "C" fn oscilloscope_renderer_get_frame_data_ptr() -> *const f32 {
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_commit_samples() {
-  let viz = unsafe { &mut VIZ };
-  let frame_data = unsafe { &FRAME_DATA_BUFFER };
+  let viz = ref_static_mut!(VIZ);
+  let frame_data = ref_static_mut!(FRAME_DATA_BUFFER);
   viz.commit_samples(frame_data);
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_get_image_data_buf_ptr() -> *const u8 {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.get_image_data().as_ptr()
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_get_image_data_buf_len() -> usize {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.get_image_data().len()
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_set_frozen(frozen: bool) {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.set_frozen(frozen);
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_set_frame_by_frame(frame_by_frame: bool) {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.set_frame_by_frame(frame_by_frame);
 }
 
 /// Returns pointer to zero-terminated string
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_get_detected_f0_display() -> *const u8 {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.yin_ctx.get_detected_f0_display()
 }
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_set_snap_f0_to_midi(snap_f0_to_midi: bool) {
-  let viz = unsafe { &mut VIZ };
+  let viz = ref_static_mut!(VIZ);
   viz.snap_f0_to_midi = snap_f0_to_midi;
 }

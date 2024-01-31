@@ -16,7 +16,7 @@ static mut RNG: Pcg32 =
   unsafe { std::mem::transmute([5573589319906701683u64, 1442695040888963407u64]) };
 
 #[inline(always)]
-pub fn rng() -> &'static mut Pcg32 { unsafe { &mut RNG } }
+pub fn rng() -> &'static mut Pcg32 { ref_static_mut!(RNG) }
 
 pub fn uuid_v4() -> Uuid {
   let entropy: (u64, i64) = rng().gen();
@@ -33,4 +33,13 @@ pub fn set_raw_panic_hook(log_err: unsafe extern "C" fn(ptr: *const u8, len: usi
   };
 
   std::panic::set_hook(Box::new(hook))
+}
+
+/// Implements `&mut *std::ptr::addr_of_mut!(x)` to work around the annoying new Rust rules on
+/// referencing static muts
+#[macro_export]
+macro_rules! ref_static_mut {
+  ($x:expr) => {
+    unsafe { &mut *std::ptr::addr_of_mut!($x) }
+  };
 }

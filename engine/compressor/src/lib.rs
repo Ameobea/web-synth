@@ -197,7 +197,7 @@ fn detect_level_peak(
   buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
   lookahead_samples: isize,
   sample_ix_in_frame: usize,
-  old_max: f32,
+  _old_max: f32,
 ) -> f32 {
   // Try to fast-path.  If the old max hasn't been removed from the lookahead buffer yet and it's
   // still the max, then we can just return it.
@@ -278,7 +278,7 @@ impl Compressor {
     top_threshold_db: f32,
     bottom_ratio: f32,
     top_ratio: f32,
-    knee: f32,
+    _knee: f32,
     sensing_method: SensingMethod,
     post_gain: f32,
   ) -> f32 {

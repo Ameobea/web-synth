@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+use common::ref_static_mut;
 use waveform_renderer::WaveformRendererCtx;
 
 extern "C" {
@@ -81,7 +82,7 @@ fn get_waveform_renderer_ctx() -> &'static mut WaveformRendererCtx {
 pub extern "C" fn wavegen_render_waveform() -> *const u8 {
   common::set_raw_panic_hook(log_err);
 
-  let state = unsafe { &mut ENCODED_STATE_BUF };
+  let state = ref_static_mut!(ENCODED_STATE_BUF);
   let magnitudes = &mut state[..HARMONIC_COUNT];
   // normalize magnitudes
   let max_magnitude = magnitudes.iter().fold(0.0f32, |acc, x| acc.max(*x));

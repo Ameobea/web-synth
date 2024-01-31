@@ -1,3 +1,5 @@
+use common::ref_static_mut;
+
 extern "C" {
   fn play_note(note: usize);
 
@@ -37,7 +39,7 @@ impl MIDIQuantizerState {
 }
 
 static mut STATE: MIDIQuantizerState = MIDIQuantizerState::default();
-fn state() -> &'static mut MIDIQuantizerState { unsafe { &mut STATE } }
+fn state() -> &'static mut MIDIQuantizerState { ref_static_mut!(STATE) }
 
 #[no_mangle]
 pub extern "C" fn set_octave_range(low: isize, high: isize) {

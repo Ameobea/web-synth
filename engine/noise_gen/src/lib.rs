@@ -1,4 +1,4 @@
-use common::rng;
+use common::{ref_static_mut, rng};
 use rand::prelude::*;
 
 #[derive(Clone, Copy)]
@@ -87,14 +87,18 @@ pub unsafe extern "C" fn generate() -> *const f32 {
     NoiseType::Pink => todo!(),
     NoiseType::Brown => todo!(),
   };
-  for out in &mut OUTPUT {
+  for out in ref_static_mut!(OUTPUT) {
     let sample = generator() * GAIN;
 
     if QUANTIZATION_FACTOR > 0 {
       LAST_VAL = dsp::quantize(-1., 1., QUANTIZATION_FACTOR as f32, sample);
     } else {
       if SMOOTHING_COEFFICIENT != 0. {
-        dsp::one_pole(&mut LAST_VAL, sample, 1. - SMOOTHING_COEFFICIENT);
+        dsp::one_pole(
+          ref_static_mut!(LAST_VAL),
+          sample,
+          1. - SMOOTHING_COEFFICIENT,
+        );
       } else {
         LAST_VAL = sample;
       }

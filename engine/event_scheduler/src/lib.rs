@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 
+use common::ref_static_mut;
 use float_ord::FloatOrd;
 use heapless::binary_heap::{BinaryHeap, Min};
 
@@ -127,7 +128,7 @@ fn handle_event(evt: ScheduledEvent) {
 
 #[no_mangle]
 pub extern "C" fn run(raw_cur_time: f64, cur_beats: f64) {
-  let scheduled_events = unsafe { &mut SCHEDULED_EVENTS };
+  let scheduled_events = ref_static_mut!(SCHEDULED_EVENTS);
   loop {
     match scheduled_events.peek() {
       None => break,
@@ -139,7 +140,7 @@ pub extern "C" fn run(raw_cur_time: f64, cur_beats: f64) {
     handle_event(evt);
   }
 
-  let scheduled_beat_events = unsafe { &mut SCHEDULED_BEAT_EVENTS };
+  let scheduled_beat_events = ref_static_mut!(SCHEDULED_BEAT_EVENTS);
   loop {
     match scheduled_beat_events.peek() {
       None => break,
@@ -172,8 +173,8 @@ pub unsafe extern "C" fn alloc_ids_buffer(count: usize) -> *mut i32 {
 #[no_mangle]
 pub extern "C" fn cancel_events_by_ids() -> usize {
   let ids = unsafe { &*IDS_BUFFER }.as_slice();
-  let scheduled_events = unsafe { &mut SCHEDULED_EVENTS };
-  let scheduled_beat_events = unsafe { &mut SCHEDULED_BEAT_EVENTS };
+  let scheduled_events = ref_static_mut!(SCHEDULED_EVENTS);
+  let scheduled_beat_events = ref_static_mut!(SCHEDULED_BEAT_EVENTS);
 
   let mut actually_cancelled_evt_count = 0;
 

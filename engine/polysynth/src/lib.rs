@@ -2,12 +2,11 @@
 //! is playing and passing the correct commands through to the WebAudio synths.
 
 #[cfg(feature = "wasm-bindgen")]
-#[macro_use]
-extern crate wasm_bindgen;
-#[cfg(feature = "wasm-bindgen")]
 extern crate common;
 #[cfg(feature = "wasm-bindgen")]
 extern crate js_sys;
+#[cfg(feature = "wasm-bindgen")]
+extern crate wasm_bindgen;
 
 #[macro_use]
 extern crate log;

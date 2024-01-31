@@ -5,6 +5,7 @@
 //! Several aspects of this design draw significant inspiration from the Clouds eurorack module made
 //! by Mutable Instruments and associated code which is available on Github: https://github.com/pichenettes/eurorack
 
+use common::ref_static_mut;
 use dsp::{clamp, filters::butterworth::ButterworthFilter, mix, read_interpolated, smooth};
 use rand::prelude::*;
 
@@ -28,7 +29,7 @@ impl Default for ReverseState {
 }
 
 static mut SCRATCH: [(f32, f32); 8192] = [(0.0, 0.0); 8192];
-fn scratch() -> &'static mut [(f32, f32); 8192] { unsafe { &mut SCRATCH } }
+fn scratch() -> &'static mut [(f32, f32); 8192] { ref_static_mut!(SCRATCH) }
 
 #[derive(Clone)]
 pub struct GranularVoice {

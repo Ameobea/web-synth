@@ -1,3 +1,4 @@
+use common::ref_static_mut;
 use dsp::FRAME_SIZE;
 
 #[repr(u8)]
@@ -53,7 +54,7 @@ static mut STATE: QuantizerState = QuantizerState {
   quantization_interval: 1.,
   mode: QuantizationMode::Round,
 };
-fn state() -> &'static mut QuantizerState { unsafe { &mut STATE } }
+fn state() -> &'static mut QuantizerState { ref_static_mut!(STATE) }
 
 #[no_mangle]
 pub extern "C" fn set_quantization_state(quantization_interval: f32, mode: u8) {
@@ -63,7 +64,7 @@ pub extern "C" fn set_quantization_state(quantization_interval: f32, mode: u8) {
 }
 
 static mut IO_BUFFER: [f32; FRAME_SIZE] = [0.; FRAME_SIZE];
-fn io_buf() -> &'static mut [f32; FRAME_SIZE] { unsafe { &mut IO_BUFFER } }
+fn io_buf() -> &'static mut [f32; FRAME_SIZE] { ref_static_mut!(IO_BUFFER) }
 
 #[no_mangle]
 pub extern "C" fn get_io_buf_ptr() -> *mut f32 { io_buf().as_mut_ptr() }

@@ -10,3 +10,4 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 heapless = { version = "0.7", default-features = false }
 float-ord = "0.3"
+common = { path = "../common" }

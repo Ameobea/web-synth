@@ -10,3 +10,4 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 dsp = { path = "../dsp" }
 canvas_utils = { path = "../canvas_utils" }
+common = { path = "../common" }
