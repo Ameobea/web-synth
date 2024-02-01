@@ -27,6 +27,9 @@ import {
 import * as conf from './conf';
 import type { FederatedPointerEvent } from '@pixi/events';
 import { UnreachableError } from 'src/util';
+import type { Unsubscribe } from 'redux';
+import { subscribeToConnections, type ConnectionDescriptor } from 'src/redux/modules/vcmUtils';
+import { MIDINode, type MIDINodeMetadata } from 'src/patchNetwork/midiNode';
 
 export interface Note {
   id: number;
@@ -94,8 +97,12 @@ export default class MIDIEditorUIInstance {
   public loopCursor: LoopCursor | null;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
   public noteMetadataByNoteID: Map<number, any> = new Map();
-  private vcId: string;
+  public vcId: string;
   private isHidden: boolean;
+  private unsubscribeConnectablesUpdates: Unsubscribe;
+  private midiMetadataUnsubscribers: (() => void)[] = [];
+  private isUnsubscribingMIDIMetadataListeners = false;
+  private connectedOutputMIDINodeMetadataStores: { [outputName: string]: MIDINodeMetadata } = {};
   private destroyed = false;
   /**
    * A cache used by note lines for storing line marker sprites keyed by `${pxPerBeat}-${beatsPerMeasure}`
@@ -180,6 +187,10 @@ export default class MIDIEditorUIInstance {
       this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
       this.parentInstance.playbackHandler?.recordingCtx?.tick();
     });
+
+    this.unsubscribeConnectablesUpdates = subscribeToConnections(this.vcId, newConnections =>
+      this.handleConnectionsChanged(newConnections)
+    );
 
     this.init().then(() => {
       if (this.destroyed) {
@@ -1192,6 +1203,64 @@ export default class MIDIEditorUIInstance {
     }
   };
 
+  private handleConnectionsChanged = (
+    newConnections:
+      | {
+          inputs: ConnectionDescriptor[];
+          outputs: ConnectionDescriptor[];
+        }
+      | undefined
+  ) => {
+    this.unsubMIDIMetadataListeners();
+
+    const connectedOutputs = newConnections?.outputs || [];
+    connectedOutputs.forEach((conn, outputName) => {
+      if (!(conn.rxNode instanceof MIDINode)) {
+        return;
+      }
+
+      const unsubInner = conn.rxNode.metadata.subscribe(metadata => {
+        this.connectedOutputMIDINodeMetadataStores[outputName] = metadata;
+        this.handleMIDIOutputMetadataChange();
+      });
+      const unsub = () => {
+        delete this.connectedOutputMIDINodeMetadataStores[outputName];
+        unsubInner();
+        this.handleMIDIOutputMetadataChange();
+      };
+      this.midiMetadataUnsubscribers.push(unsub);
+    });
+  };
+
+  private unsubMIDIMetadataListeners() {
+    this.isUnsubscribingMIDIMetadataListeners = true;
+    this.midiMetadataUnsubscribers.forEach(unsub => unsub());
+    this.midiMetadataUnsubscribers = [];
+    this.isUnsubscribingMIDIMetadataListeners = false;
+  }
+
+  private handleMIDIOutputMetadataChange() {
+    if (this.isUnsubscribingMIDIMetadataListeners) {
+      return;
+    }
+
+    const labelByLineIx: Map<number, string> = new Map();
+
+    for (const metadata of Object.values(this.connectedOutputMIDINodeMetadataStores)) {
+      for (const [midiNumber, noteMetadata] of metadata.noteMetadata) {
+        const lineIx = this.lines.length - midiNumber;
+        if (noteMetadata.name && !labelByLineIx.has(lineIx)) {
+          labelByLineIx.set(lineIx, noteMetadata.name);
+        }
+      }
+    }
+
+    this.lines.forEach((line, lineIx) => {
+      const label = labelByLineIx.get(lineIx);
+      line.setLabel(label);
+    });
+  }
+
   public destroy() {
     if (this.destroyed) {
       console.error('MIDI editor already destroyed');
@@ -1200,6 +1269,8 @@ export default class MIDIEditorUIInstance {
 
     this.destroyed = true;
     this.cleanupEventHandlers();
+    this.unsubscribeConnectablesUpdates();
+    this.unsubMIDIMetadataListeners();
     try {
       destroyPIXIApp(this.app);
     } catch (err) {

@@ -2,7 +2,7 @@
   import SvelteControlPanel, {
     type ControlPanelSetting,
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
-  import { SamplerSelection } from 'src/sampler/sampler';
+  import type { SamplerSelection } from 'src/sampler/sampler';
   import { mkMIDINumberDisplay } from './MIDINumberDisplay';
 </script>
 

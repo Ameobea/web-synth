@@ -28,6 +28,9 @@ export default class NoteLine {
   private markers: PIXI.Sprite | undefined;
   private noteCreationState: NoteCreationState | null = null;
   private isCulled = true;
+  private isDestroyed = false;
+  private labelText: PIXI.Text | undefined;
+
   /**
    * Used for markings caching to determine whether we need to re-render markings or not
    */
@@ -265,7 +268,33 @@ export default class NoteLine {
     this.markers.x = this.app.beatsToPx(xOffsetBeats);
   }
 
+  public setLabel(text: string | undefined) {
+    if (text) {
+      if (!this.labelText) {
+        this.labelText = new PIXI.Text(text, {
+          fontSize: 12,
+          fill: conf.LINE_LABEL_COLOR,
+          fontFamily: 'Hack',
+        });
+        this.labelText.x = 4;
+        this.labelText.y = 1;
+        this.container.addChild(this.labelText);
+      } else {
+        this.labelText.text = text;
+      }
+    } else if (this.labelText) {
+      this.container.removeChild(this.labelText);
+      this.labelText.destroy();
+      this.labelText = undefined;
+    }
+  }
+
   public destroy() {
+    if (this.isDestroyed) {
+      console.warn('Attempted to destroy a note line that was already destroyed');
+    }
+    this.isDestroyed = true;
+
     for (const note of this.notesByID.values()) {
       note.destroy();
     }

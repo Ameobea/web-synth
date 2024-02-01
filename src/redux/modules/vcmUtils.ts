@@ -1,6 +1,8 @@
 import { Option } from 'funfix-core';
 import { Map } from 'immutable';
 import * as R from 'ramda';
+import { shallowEqual } from 'react-redux';
+import type { Unsubscribe } from 'redux';
 
 import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 import { OverridableAudioNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
@@ -14,8 +16,8 @@ import type {
 } from 'src/patchNetwork';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { reinitializeWithComposition } from 'src/persistance';
-import { getState } from 'src/redux';
-import { getEngine } from 'src/util';
+import { getState, store } from 'src/redux';
+import { filterNils, getEngine, UnreachableError } from 'src/util';
 import { setGlobalVolume } from 'src/ViewContextManager/GlobalVolumeSlider';
 
 /**
@@ -190,4 +192,102 @@ export const initializeDefaultVCMState = () => {
     alert('Error loading composition: ' + res.value);
   }
   setGlobalVolume(20);
+};
+
+export interface ConnectionDescriptor {
+  txVcId: string;
+  rxVcId: string;
+  txPortName: string;
+  rxPortName: string;
+  txNode: AudioNode | MIDINode;
+  rxNode: AudioNode | MIDINode | AudioParam;
+}
+
+/**
+ * Subscribes to changes in the connections to/from the given VC ID.
+ *
+ * @returns An `Unsubscribe` function that can be called to unsubscribe from the store.
+ */
+export const subscribeToConnections = (
+  vcId: string,
+  cb: (
+    newConnections: { inputs: ConnectionDescriptor[]; outputs: ConnectionDescriptor[] } | undefined
+  ) => void
+): Unsubscribe => {
+  const buildConnectionDescriptor = ([from, to]: [
+    ConnectableDescriptor,
+    ConnectableDescriptor,
+  ]): ConnectionDescriptor | null => {
+    const txNode = getState()
+      .viewContextManager.patchNetwork.connectables.get(from.vcId)
+      ?.outputs.get(from.name)?.node;
+    if (!txNode) {
+      return null;
+    }
+    if (txNode instanceof AudioParam) {
+      throw new UnreachableError('`AudioParam`s cannot be source nodes');
+    }
+
+    const rxNode = getState()
+      .viewContextManager.patchNetwork.connectables.get(to.vcId)
+      ?.inputs.get(to.name)?.node;
+    if (!rxNode) {
+      return null;
+    }
+
+    return {
+      txVcId: from.vcId,
+      rxVcId: to.vcId,
+      txPortName: from.name,
+      rxPortName: to.name,
+      txNode,
+      rxNode,
+    };
+  };
+
+  const getConnectionsForVc = () => {
+    const conns = getState().viewContextManager.patchNetwork.connections.filter(
+      ([from, to]) => from.vcId === vcId || to.vcId === vcId
+    );
+    return filterNils(
+      R.sortWith(
+        [
+          R.ascend(([from, _to]) => from.vcId),
+          R.ascend(([from, _to]) => from.name),
+          R.ascend(([_from, to]) => to.vcId),
+          R.ascend(([_from, to]) => to.name),
+        ],
+        conns
+      ).map(buildConnectionDescriptor)
+    );
+  };
+
+  const connectionsEqual = (a: ConnectionDescriptor[], b: ConnectionDescriptor[]): boolean => {
+    if (a.length !== b.length) {
+      return false;
+    }
+    return a.every((conn, ix) => shallowEqual(conn, b[ix]));
+  };
+
+  let lastConnections: [ConnectableDescriptor, ConnectableDescriptor][] =
+    getState().viewContextManager.patchNetwork.connections;
+  let lastConnectables = getConnectionsForVc();
+
+  return store.subscribe(() => {
+    // Fast path if no connections have changed
+    const newConnections = getState().viewContextManager.patchNetwork.connections;
+    if (newConnections === lastConnections) {
+      return;
+    }
+    lastConnections = newConnections;
+
+    const connectables = getConnectionsForVc();
+
+    if (!connectionsEqual(connectables, lastConnectables)) {
+      const [inputs, outputs] = R.partition(conn => conn.rxVcId === vcId, connectables);
+
+      cb({ inputs, outputs });
+      lastConnectables = connectables;
+    }
+  });
 };

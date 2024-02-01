@@ -34,7 +34,7 @@ class SamplerAWP extends AudioWorkletProcessor {
       });
     } else {
       console.warn(
-        'SamplerAWP: SharedArrayBuffer not available, MIDI gate status will not be available'
+        'SamplerAWP: `SharedArrayBuffer`, `Atomics`, or `Atomics.waitAsync` not available, MIDI gate status will not be available'
       );
     }
 

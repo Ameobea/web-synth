@@ -43,14 +43,14 @@ export type MIDIEvent =
   | { type: MIDIEventType.Attack; note: number; velocity: number }
   | { type: MIDIEventType.Release; note: number; velocity: number };
 
-interface MIDINoteMetadata {
+export interface MIDINoteMetadata {
   active: boolean;
   name?: string;
 }
 
-interface MIDINodeMetadata {
+export interface MIDINodeMetadata {
   /**
-   * Sparse map of note numbers to metadata about that note.
+   * Sparse map of MIDI numbers to metadata about that note.
    */
   noteMetadata: Map<number, MIDINoteMetadata>;
 }

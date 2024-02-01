@@ -1,6 +1,7 @@
 import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
 import type { Unsubscribe as ReduxUnsubscribe, Store } from 'redux';
 import type { SvelteComponent } from 'svelte';
+import type { Writable } from 'svelte/store';
 
 import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
@@ -88,7 +89,7 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
   reduxStore: Store<State>,
   selector: (state: State) => Slice,
   dispatchUpdateAction: (newSlice: Slice) => void
-) {
+): Writable<Slice> {
   const subscribers: Set<SubscribeInvalidateTuple<Slice>> = new Set();
 
   let reduxUnsubscribe: ReduxUnsubscribe | null = null;
@@ -156,12 +157,16 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
   return { set, update, subscribe };
 }
 
-export type SveltePropTypesOf<Comp> = Comp extends SvelteComponent<infer Props>
-  ? Props
-  : // handle it being the class itself
-    Comp extends new (args: { target: Element; props: infer Props }) => SvelteComponent<infer Props>
+export type SveltePropTypesOf<Comp> =
+  Comp extends SvelteComponent<infer Props>
     ? Props
-    : never;
+    : // handle it being the class itself
+      Comp extends new (args: {
+          target: Element;
+          props: infer Props;
+        }) => SvelteComponent<infer Props>
+      ? Props
+      : never;
 
 /**
  * Creates a React component that renders the provided Svelte component.

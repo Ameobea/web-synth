@@ -1,5 +1,5 @@
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
-import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import { type MIDIInputCbs, MIDINode, type MIDINoteMetadata } from 'src/patchNetwork/midiNode';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import type { SamplerSelection, SerializedSampler } from 'src/sampler/sampler';
 import { AsyncOnce, UnreachableError, delay, getEngine } from 'src/util';
@@ -77,6 +77,8 @@ export class SamplerInstance {
         this.waveformRenderer.setSample(activeSample.sampleData);
       }
     });
+
+    this.updateMIDINodeMetadata();
 
     this.init();
   }
@@ -225,11 +227,34 @@ export class SamplerInstance {
       throw new Error(`Selection at index ${ix} does not exist`);
     }
 
+    const nameChanged = selections[ix].name !== newSelection.name;
+    const midiNumberChanged = selections[ix].midiNumber !== newSelection.midiNumber;
+
     const newSelections = [...selections];
     newSelections[ix] = newSelection;
     this.selections.set(newSelections);
 
     this.commitSelection(newSelection);
+
+    if (nameChanged || midiNumberChanged) {
+      this.updateMIDINodeMetadata();
+    }
+  }
+
+  private updateMIDINodeMetadata() {
+    const selections = get(this.selections);
+    const newNoteMetadata: Map<number, MIDINoteMetadata> = new Map();
+
+    for (const selection of selections) {
+      if (typeof selection.midiNumber === 'number') {
+        newNoteMetadata.set(selection.midiNumber, {
+          active: true,
+          name: selection.name || undefined,
+        });
+      }
+    }
+
+    this.midiNode.metadata.update(metadata => ({ ...metadata, noteMetadata: newNoteMetadata }));
   }
 
   /**

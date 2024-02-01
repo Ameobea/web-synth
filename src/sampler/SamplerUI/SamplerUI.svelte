@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SampleDescriptor } from 'src/sampleLibrary';
+  import type { SampleDescriptor } from 'src/sampleLibrary';
   import type { SamplerInstance } from 'src/sampler/SamplerInstance';
   import MainSamplerUI from 'src/sampler/SamplerUI/MainSamplerUI.svelte';
   import PickSample from 'src/sampler/SamplerUI/PickSample.svelte';
