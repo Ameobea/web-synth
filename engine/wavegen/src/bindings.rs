@@ -67,7 +67,7 @@ fn get_waveform_renderer_ctx() -> &'static mut WaveformRendererCtx {
 
   let ctx = Box::into_raw(Box::new(WaveformRendererCtx::new(
     WAVEFORM_LENGTH_SAMPLES as u32,
-    SAMPLE_RATE,
+    SAMPLE_RATE as f32,
     WAVEFORM_WIDTH_PX,
     WAVEFORM_HEIGHT_PX,
   )));
@@ -100,7 +100,7 @@ pub extern "C" fn wavegen_render_waveform() -> *const u8 {
     dsp::lookup_tables::maybe_init_lookup_tables();
   }
   build_waveform(&mut ctx.waveform_buf, magnitudes, phases, fast);
-  waveform_renderer::render_waveform(ctx, 0, 100_000_000)
+  waveform_renderer::render_waveform(ctx, 0., 100_000_000.)
 }
 
 #[no_mangle]

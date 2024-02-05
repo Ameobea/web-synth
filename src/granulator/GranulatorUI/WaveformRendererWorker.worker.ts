@@ -38,6 +38,11 @@ export class WaveformRendererWorker {
   }
 
   public async render(bounds: WaveformBounds, widthPx: number, heightPx: number) {
+    if (bounds.endMs <= bounds.startMs) {
+      console.error('Invalid bounds:', bounds);
+      return new Uint8ClampedArray(widthPx * heightPx * BYTES_PER_PX);
+    }
+
     const inst = await this.inst;
     const imageDataPtr = inst.render_waveform(this.ctxPtr, bounds.startMs, bounds.endMs);
     return new Uint8ClampedArray(

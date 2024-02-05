@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 const BYTES_PER_PX: usize = 4; // RGBA
 
 pub struct WaveformRendererCtx {
-  pub sample_rate: u32,
+  pub sample_rate: f32,
   pub width_px: u32,
   pub height_px: u32,
   pub waveform_buf: Vec<f32>,
@@ -14,18 +14,22 @@ pub struct WaveformRendererCtx {
 impl WaveformRendererCtx {
   pub fn new(
     waveform_length_samples: u32,
-    sample_rate: u32,
+    sample_rate: f32,
     width_px: u32,
     height_px: u32,
   ) -> Self {
     let mut image_data_buf =
       Vec::with_capacity(width_px as usize * height_px as usize * BYTES_PER_PX);
     unsafe { image_data_buf.set_len(width_px as usize * height_px as usize * BYTES_PER_PX) };
+
+    let mut waveform_buf = Vec::with_capacity(waveform_length_samples as usize);
+    unsafe { waveform_buf.set_len(waveform_length_samples as usize) };
+
     WaveformRendererCtx {
       sample_rate,
       width_px,
       height_px,
-      waveform_buf: Vec::with_capacity(waveform_length_samples as usize),
+      waveform_buf,
       image_data_buf,
     }
   }
@@ -35,7 +39,7 @@ impl WaveformRendererCtx {
 #[wasm_bindgen]
 pub fn create_waveform_renderer_ctx(
   waveform_length_samples: u32,
-  sample_rate: u32,
+  sample_rate: f32,
   width_px: u32,
   height_px: u32,
 ) -> *mut WaveformRendererCtx {
@@ -43,19 +47,12 @@ pub fn create_waveform_renderer_ctx(
 
   wbg_logging::maybe_init();
 
-  let mut ctx = Box::new(WaveformRendererCtx::new(
+  Box::into_raw(Box::new(WaveformRendererCtx::new(
     waveform_length_samples,
     sample_rate,
     width_px,
     height_px,
-  ));
-  unsafe {
-    ctx.waveform_buf.set_len(waveform_length_samples as usize);
-    ctx
-      .image_data_buf
-      .set_len(width_px as usize * height_px as usize * BYTES_PER_PX);
-  }
-  Box::into_raw(ctx)
+  )))
 }
 
 #[cfg(feature = "bindgen")]
@@ -79,7 +76,7 @@ pub fn get_waveform_buf_ptr(ctx: *mut WaveformRendererCtx) -> *mut f32 {
 }
 
 #[inline(always)]
-fn ms_to_samples(sample_rate: u32, ms: u32) -> u32 { (ms * sample_rate) / 1000 }
+fn ms_to_samples(sample_rate: f32, ms: f32) -> u32 { ((ms * sample_rate) / 1000.) as u32 }
 
 #[inline(always)]
 fn sample_to_y_val(sample: f32, half_height: f32, max_distance_from_0: f32) -> u32 {
@@ -88,7 +85,7 @@ fn sample_to_y_val(sample: f32, half_height: f32, max_distance_from_0: f32) -> u
 }
 
 #[cfg_attr(feature = "bindgen", wasm_bindgen)]
-pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32) -> *const u8 {
+pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: f32, end_ms: f32) -> *const u8 {
   let ctx = unsafe { &mut *ctx };
 
   if ctx.waveform_buf.is_empty() {
@@ -117,11 +114,18 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: u32, end_ms: u32
 
   let start_sample_ix = ms_to_samples(ctx.sample_rate, start_ms).min(ctx.waveform_buf.len() as u32);
   let end_sample_ix = ms_to_samples(ctx.sample_rate, end_ms).min(ctx.waveform_buf.len() as u32);
-  debug_assert!(end_sample_ix > start_sample_ix);
+  assert!(
+    end_sample_ix > start_sample_ix,
+    "Start sample after end? start_ms={}, end_ms={}, start_sample_ix={}, end_sample_ix={}",
+    start_ms,
+    end_ms,
+    start_sample_ix,
+    end_sample_ix
+  );
 
   let len_samples = end_sample_ix - start_sample_ix;
   let samples_per_px = (len_samples / ctx.width_px).max(1);
-  debug_assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
+  assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
 
   let max_distance_from_0 = ctx.waveform_buf[start_sample_ix as usize..end_sample_ix as usize]
     .iter()
