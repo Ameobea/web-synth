@@ -164,7 +164,6 @@ interface ViewContextTabProps {
   uuid: string;
   title?: string;
   active: boolean;
-  i: number;
 }
 
 interface VCMTabRenamerProps {
@@ -274,10 +273,11 @@ interface ViewContextSwitcherProps {
  * backend every time there is a change.
  */
 export const ViewContextSwitcher: React.FC<ViewContextSwitcherProps> = ({ engine }) => {
-  const { activeViewContexts, activeViewContextIx } = useSelector(
+  const { activeViewContexts, activeViewContextId, activeSubgraphID } = useSelector(
     (state: ReduxStore) => ({
       activeViewContexts: state.viewContextManager.activeViewContexts,
-      activeViewContextIx: state.viewContextManager.activeViewContextIx,
+      activeViewContextId: state.viewContextManager.activeViewContextId,
+      activeSubgraphID: state.viewContextManager.activeSubgraphID,
     }),
     shallowEqual
   );
@@ -295,15 +295,16 @@ export const ViewContextSwitcher: React.FC<ViewContextSwitcherProps> = ({ engine
       }}
       onWheel={handleScroll}
     >
-      {activeViewContexts.map((props, i) => (
-        <ViewContextTab
-          engine={engine}
-          {...props}
-          i={i}
-          key={i}
-          active={activeViewContextIx === i}
-        />
-      ))}
+      {activeViewContexts
+        .filter(vc => vc.subgraphId === activeSubgraphID)
+        .map(props => (
+          <ViewContextTab
+            engine={engine}
+            {...props}
+            key={props.uuid}
+            active={props.uuid === activeViewContextId}
+          />
+        ))}
     </div>
   );
 };

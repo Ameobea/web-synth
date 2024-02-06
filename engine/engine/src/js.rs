@@ -5,14 +5,16 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(raw_module = "./vcInterop")]
 extern "C" {
   pub fn init_view_contexts(
-    active_context_ix: usize,
+    active_context_id: &str,
     view_context_definitions: &str,
     connections_json: &str,
     foreign_connectables_json: &str,
+    active_subgraph_id: &str,
+    subgraphs_by_id_json: &str,
   );
   pub fn add_view_context(id: &str, name: &str);
   pub fn delete_view_context(id: &str);
-  pub fn set_active_vc_ix(new_ix: usize);
+  pub fn set_active_vc_id(new_id: &str);
   pub fn list_foreign_node_used_samples(id: &str) -> Vec<JsValue>;
   /// Returns the ID of the active view context to display after initializing
   pub fn initialize_default_vcm_state();

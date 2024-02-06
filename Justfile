@@ -198,6 +198,11 @@ debug-engine:
   cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/debug/engine.wasm --browser --remove-producers-section --out-dir ./build && \
   cp ./build/* ../src
 
+build-engine:
+  cd ./engine/engine && cargo build --release --target wasm32-unknown-unknown && \
+  cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/release/engine.wasm --browser --remove-producers-section --out-dir ./build && \
+  cp ./build/* ../src
+
 build-wavetable:
   cd ./engine/wavetable && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/wavetable.wasm ../../public

@@ -40,7 +40,9 @@ interface TagPickerProps {
 
 const TagPicker: React.FC<TagPickerProps> = ({ getExistingTags, value, onChange }) => {
   const { data: existingTags, error } = useQuery('existingTags', () =>
-    getExistingTags().then(tags => R.sortWith([R.prop('name'), tag => tag.count ?? 0], tags))
+    getExistingTags().then(tags =>
+      R.sortWith([R.ascend(R.prop('name')), tag => tag.count ?? 0], tags)
+    )
   );
   const [enteredTagName, setEnteredTagNameInner] = useState('');
   const staticEnteredTagName = useRef('');

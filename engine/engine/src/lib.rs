@@ -7,7 +7,6 @@ extern crate log;
 
 use std::{ptr, str::FromStr};
 
-use miniserde::json;
 use prelude::js::js_random;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -57,7 +56,8 @@ pub fn init() {
   unsafe { VIEW_CONTEXT_MANAGER = Box::into_raw(vcm) };
 }
 
-/// Creates a new view context from the provided name and sets it as the main view context.
+/// Creates a new view context from the provided name in the active subgraph and sets it as the main
+/// view context for that subgraph.
 #[wasm_bindgen]
 pub fn create_view_context(vc_name: String, display_name: String) {
   let uuid = uuid_v4();
@@ -66,7 +66,7 @@ pub fn create_view_context(vc_name: String, display_name: String) {
   view_context.init();
   view_context.hide();
   let vcm = get_vcm();
-  vcm.add_view_context(uuid, vc_name, view_context);
+  vcm.add_view_context(uuid, vc_name, view_context, vcm.active_subgraph_id);
   set_vc_title(uuid.to_string(), display_name)
 }
 
@@ -90,7 +90,14 @@ pub fn delete_vc_by_id(id: &str) {
 pub fn switch_view_context(uuid_str: &str) {
   let uuid =
     Uuid::from_str(uuid_str).expect("Invalid UUID string passed to `switch_view_context`!");
-  get_vcm().set_active_view_by_id(uuid);
+  get_vcm().set_active_view(uuid);
+}
+
+#[wasm_bindgen]
+pub fn add_subgraph() {
+  let vcm = get_vcm();
+  let new_subgraph_id = vcm.add_subgraph();
+  vcm.set_active_subgraph(new_subgraph_id);
 }
 
 #[wasm_bindgen]
@@ -98,9 +105,9 @@ pub fn reset_vcm() {
   info!("Resetting VCM...");
   get_vcm().reset();
   info!(
-    "Finished reset; current context count: {}, active_ix: {}",
+    "Finished reset; current context count: {}, active_id: {}",
     get_vcm().contexts.len(),
-    get_vcm().active_context_ix
+    get_vcm().active_context_id
   );
 }
 
@@ -133,7 +140,7 @@ pub fn get_vc_connectables(vc_id: &str) -> JsValue {
 #[wasm_bindgen]
 pub fn set_connections(connections_json: &str) {
   let connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)> =
-    match json::from_str(connections_json) {
+    match serde_json::from_str(connections_json) {
       Ok(conns) => conns,
       Err(err) => {
         error!("Failed to deserialize provided connections JSON: {:?}", err);
@@ -147,7 +154,7 @@ pub fn set_connections(connections_json: &str) {
 #[wasm_bindgen]
 pub fn set_foreign_connectables(foreign_connectables_json: &str) {
   let foreign_connectables: Vec<ForeignConnectable> =
-    match json::from_str(foreign_connectables_json) {
+    match serde_json::from_str(foreign_connectables_json) {
       Ok(conns) => conns,
       Err(err) => {
         error!(

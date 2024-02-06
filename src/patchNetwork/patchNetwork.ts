@@ -35,6 +35,12 @@ export interface ConnectableDescriptor {
   name: string;
 }
 
+export interface SubgraphDescriptor {
+  id: string;
+  name: string;
+  activeVcId: string;
+}
+
 export interface PatchNetwork {
   connectables: Map<string, AudioConnectables>;
   connections: [ConnectableDescriptor, ConnectableDescriptor][];

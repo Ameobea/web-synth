@@ -1,9 +1,9 @@
 <script lang="ts" context="module">
-  import { Writable } from 'svelte/store';
+  import type { Writable } from 'svelte/store';
 
   import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
-  import { LineSpectrogramUIState } from 'src/visualizations/LineSpectrogram/types';
+  import type { LineSpectrogramUIState } from 'src/visualizations/LineSpectrogram/types';
 
   const settings: ControlPanelSetting[] = [
     { type: 'interval', label: 'min/max dB', min: -100, max: 10 },

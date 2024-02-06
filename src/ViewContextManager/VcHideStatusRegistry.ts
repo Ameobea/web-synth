@@ -43,8 +43,9 @@ export const getIsVcHidden = (vcId: string): boolean => {
     return false;
   }
   const state = mainReduxGetState();
-  const vc =
-    state.viewContextManager.activeViewContexts[state.viewContextManager.activeViewContextIx];
+  const vc = state.viewContextManager.activeViewContexts.find(
+    vc => vc.uuid === state.viewContextManager.activeViewContextId
+  );
   if (!vc) {
     console.warn(
       `Tried to check if vcId=${vcId} is hidden, but no active VC was found in Redux state`

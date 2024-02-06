@@ -15,3 +15,4 @@ common = { path = "../common" }
 wbg_logging = { path = "../wbg_logging" }
 float-ord = "0.3"
 js-sys = "0.3"
+fxhash = "0.2"

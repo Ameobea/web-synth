@@ -1,6 +1,7 @@
-use std::{collections::HashMap, ops::Bound};
+use std::ops::Bound;
 
 use float_ord::FloatOrd;
+use fxhash::FxHashMap;
 use js_sys::Function;
 use wasm_bindgen::prelude::*;
 
@@ -157,7 +158,7 @@ pub fn iter_notes_with_cb(
     beat: f64,
   }
 
-  let mut unreleased_notes: HashMap<u32, UnreleasedNote> = HashMap::default();
+  let mut unreleased_notes: FxHashMap<u32, UnreleasedNote> = FxHashMap::default();
   let mut events: Vec<NoteEvent> = Vec::default();
   let iter = notes.lines.iter().enumerate().flat_map(|(line_ix, line)| {
     line

@@ -1,6 +1,7 @@
 use canvas_utils::VizView;
 
 use self::{conf::FFT_BUFFER_SIZE, viz::LineSpectrumCtx};
+use common::ref_static_mut;
 
 pub(self) mod conf;
 pub(crate) mod cubic_spline;
@@ -51,7 +52,7 @@ static mut CTX: LineSpectrumCtx = LineSpectrumCtx {
   image_data_buf: Vec::new(),
 };
 
-fn ctx() -> &'static mut LineSpectrumCtx { unsafe { &mut CTX } }
+fn ctx() -> &'static mut LineSpectrumCtx { ref_static_mut!(CTX) }
 
 #[no_mangle]
 pub extern "C" fn line_spectrogram_set_view(width_px: usize, height_px: usize, dpr: usize) {

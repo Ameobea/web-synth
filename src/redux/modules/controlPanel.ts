@@ -558,7 +558,7 @@ const actionGroups = {
     }),
     subReducer: (state: ControlPanelState, { controlPanelVcId, name }): ControlPanelState => {
       const instanceState = state.stateByPanelInstance[controlPanelVcId];
-      const preset = instanceState.presets.find(R.propEq('name' as const, name));
+      const preset = instanceState.presets.find(preset => preset.name === name);
       if (!preset) {
         console.error(`Tried to load preset named ${name} but it wasn't found`);
         return state;

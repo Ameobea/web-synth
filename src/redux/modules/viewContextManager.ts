@@ -7,6 +7,7 @@ import type {
   AudioConnectables,
   ConnectableDescriptor,
   PatchNetwork,
+  SubgraphDescriptor,
 } from 'src/patchNetwork/patchNetwork';
 import {
   connectNodes,
@@ -17,13 +18,15 @@ import {
 import { getEngine } from 'src/util';
 
 export interface VCMState {
-  activeViewContexts: { name: string; uuid: string; title?: string }[];
-  activeViewContextIx: number;
+  activeViewContexts: { name: string; uuid: string; title?: string; subgraphId: string }[];
+  activeViewContextId: string;
+  activeSubgraphID: string;
   patchNetwork: PatchNetwork;
   /**
    * If true, this indicates that the patch network has been populated from any persisted state
    */
   isLoaded: boolean;
+  subgraphsByID: { [subgraphID: string]: SubgraphDescriptor };
 }
 
 const actionGroups = {
@@ -33,16 +36,26 @@ const actionGroups = {
   }),
   SET_VCM_STATE: buildActionGroup({
     actionCreator: (
-      newState: Pick<VCMState, 'activeViewContextIx' | 'activeViewContexts'> & {
-        foreignConnectables: { type: string; id: string; params?: { [key: string]: any } | null }[];
+      newState: Pick<VCMState, 'activeViewContextId' | 'activeViewContexts' | 'subgraphsByID'> & {
+        foreignConnectables: {
+          type: string;
+          id: string;
+          subgraphId: string;
+          params?: { [key: string]: any } | null;
+        }[];
       },
-      getPatchNetworkReturnVal: PatchNetwork
+      getPatchNetworkReturnVal: PatchNetwork,
+      activeSubgraphID: string
     ) => ({
       type: 'SET_VCM_STATE',
       newState,
       patchNetwork: getPatchNetworkReturnVal,
+      activeSubgraphID,
     }),
-    subReducer: (state: VCMState, { patchNetwork: newPatchNetwork, newState }) => {
+    subReducer: (
+      state: VCMState,
+      { patchNetwork: newPatchNetwork, newState, activeSubgraphID }
+    ) => {
       const engine = getEngine();
       if (!engine) {
         console.error('Tried to init patch betwork before engine was initialized');
@@ -55,7 +68,7 @@ const actionGroups = {
 
       maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
 
-      return { ...newState, patchNetwork: newPatchNetwork, isLoaded: true };
+      return { ...newState, patchNetwork: newPatchNetwork, isLoaded: true, activeSubgraphID };
     },
   }),
   CONNECT: buildActionGroup({
@@ -364,7 +377,10 @@ const actionGroups = {
     actionCreator: (uuid: string, name: string) => ({ type: 'ADD_VIEW_CONTEXT', uuid, name }),
     subReducer: (state: VCMState, { uuid, name }) => ({
       ...state,
-      activeViewContexts: [...state.activeViewContexts, { uuid, name }],
+      activeViewContexts: [
+        ...state.activeViewContexts,
+        { uuid, name, subgraphId: state.activeSubgraphID },
+      ],
     }),
   }),
   DELETE_VIEW_CONTEXT: buildActionGroup({
@@ -374,23 +390,25 @@ const actionGroups = {
       activeViewContexts: state.activeViewContexts.filter(entry => entry.uuid !== uuid),
     }),
   }),
-  SET_ACTIVE_VC_IX: buildActionGroup({
-    actionCreator: (newActiveVcIx: number) => ({ type: 'SET_ACTIVE_VC_IX', newActiveVcIx }),
-    subReducer: (state: VCMState, { newActiveVcIx }) => ({
+  SET_ACTIVE_VC_ID: buildActionGroup({
+    actionCreator: (newActiveVcId: string) => ({ type: 'SET_ACTIVE_VC_ID', newActiveVcId }),
+    subReducer: (state: VCMState, { newActiveVcId }) => ({
       ...state,
-      activeViewContextIx: newActiveVcIx,
+      activeViewContextId: newActiveVcId,
     }),
   }),
 };
 
 const initialState: VCMState = {
   activeViewContexts: [],
-  activeViewContextIx: 0,
+  activeViewContextId: '',
+  activeSubgraphID: '',
   patchNetwork: {
     connectables: Map(),
     connections: [],
   },
   isLoaded: false,
+  subgraphsByID: {},
 };
 
 export default buildModule<VCMState, typeof actionGroups>(initialState, actionGroups);

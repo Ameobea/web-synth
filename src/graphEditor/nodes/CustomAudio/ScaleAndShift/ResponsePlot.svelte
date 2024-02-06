@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { Writable } from 'svelte/store';
-  import { ResponsePlotData } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
+  import type { Writable } from 'svelte/store';
+  import type { ResponsePlotData } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/ScaleAndShiftUI';
 
   // Constants for styling
   const PLOT_HEIGHT = 250;

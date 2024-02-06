@@ -2,11 +2,11 @@
   import type { Writable } from 'svelte/store';
 
   import SvelteControlPanel, {
-    ControlPanelSetting,
+    type ControlPanelSetting,
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { Oscilloscope } from 'src/visualizations/Oscilloscope/Oscilloscope';
   import {
-    OscilloscopeUIState,
+    type OscilloscopeUIState,
     OscilloscopeWindowType,
   } from 'src/visualizations/Oscilloscope/types';
 

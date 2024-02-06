@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "skipLibCheck": true,
-    "module": "es2020",
-    "target": "es2018",
+    "module": "es2022",
+    "target": "es2022",
     "resolveJsonModule": true,
     "allowJs": true,
     "moduleResolution": "node",
@@ -18,7 +18,7 @@
     "suppressImplicitAnyIndexErrors": false,
     "noUnusedLocals": true,
     "typeRoots": ["./node_modules/@types"],
-    "types": ["svelte", "node"],
+    "types": ["node"],
     "jsx": "react",
     "baseUrl": ".",
     "verbatimModuleSyntax": true,
