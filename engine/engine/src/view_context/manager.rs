@@ -154,9 +154,12 @@ impl ViewContextManager {
     &mut self,
     uuid: Uuid,
     name: String,
-    view_context: Box<dyn ViewContext>,
+    mut view_context: Box<dyn ViewContext>,
     subgraph_id: Uuid,
   ) -> usize {
+    view_context.init();
+    view_context.hide();
+
     let created_ix = self.add_view_context_inner(
       MinimalViewContextDefinition {
         uuid: uuid.to_string(),
@@ -167,7 +170,7 @@ impl ViewContextManager {
       view_context,
     );
 
-    js::add_view_context(&uuid.to_string(), &name);
+    js::add_view_context(&uuid.to_string(), &name, &subgraph_id.to_string());
 
     self.save_all();
     created_ix
@@ -226,6 +229,7 @@ impl ViewContextManager {
     self.connections = vcm_state.patch_network_connections;
     self.foreign_connectables = vcm_state.foreign_connectables;
 
+    self.active_subgraph_id = vcm_state.active_subgraph_id;
     self.subgraphs_by_id = vcm_state.subgraphs_by_id;
     if self.subgraphs_by_id.is_empty() {
       self
@@ -272,7 +276,7 @@ impl ViewContextManager {
 
     self.get_active_view_mut().unhide();
 
-    self.commit();
+    self.init_vcs();
   }
 
   /// Retrieves the active `ViewContextManager`
@@ -310,7 +314,7 @@ impl ViewContextManager {
 
   /// Updates the UI with an up-to-date listing of active view contexts and persist the current
   /// VCM state to `localStorage`.
-  pub fn commit(&mut self) {
+  pub fn init_vcs(&mut self) {
     let minimal_view_context_definitions: Vec<MinimalViewContextDefinition> = self
       .contexts
       .iter()
@@ -346,13 +350,45 @@ impl ViewContextManager {
         name: format!("Subgraph {}", new_subgraph_id),
         active_vc_id: new_graph_editor_vc_id,
       });
+    self.add_view_context(
+      new_graph_editor_vc_id,
+      "graph_editor".to_string(),
+      mk_graph_editor(new_graph_editor_vc_id),
+      new_subgraph_id,
+    );
     self.save_all();
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
     new_subgraph_id
   }
 
   pub fn set_active_subgraph(&mut self, subgraph_id: Uuid) {
+    if self.active_subgraph_id == subgraph_id {
+      return;
+    }
+
+    // Hide all VCs from the old subgraph
+    for vc in self.contexts.iter_mut() {
+      if vc.definition.subgraph_id == self.active_subgraph_id {
+        vc.context.hide();
+      }
+    }
+
+    self
+      .subgraphs_by_id
+      .get_mut(&self.active_subgraph_id)
+      .unwrap()
+      .active_vc_id = self.active_context_id;
     self.active_subgraph_id = subgraph_id;
+    self.set_active_view(self.subgraphs_by_id[&subgraph_id].active_vc_id);
+
     self.save_all();
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
   }
 
   pub fn get_vc_position(&self, id: Uuid) -> Option<usize> {
@@ -442,6 +478,13 @@ impl ViewContextManager {
 
     let mut subgraphs_by_id = self.subgraphs_by_id.clone();
     if let Some(subgraph_def) = subgraphs_by_id.get_mut(&self.active_subgraph_id) {
+      if !self.subgraphs_by_id.contains_key(&self.active_subgraph_id) {
+        error!(
+          "Tried to serialize VCM with active subgraphId={} but it wasn't found",
+          self.active_subgraph_id
+        );
+      }
+
       subgraph_def.active_vc_id = self.active_context_id;
     }
 

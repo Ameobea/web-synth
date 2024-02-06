@@ -78,9 +78,9 @@ export const init_view_contexts = (
   );
 };
 
-export const add_view_context = (id: string, name: string) => {
+export const add_view_context = (id: string, name: string, subgraphID: string) => {
   const engine = getEngine()!; // Must exist because this gets called *from the engine*.
-  dispatch(actionCreators.viewContextManager.ADD_VIEW_CONTEXT(id, name));
+  dispatch(actionCreators.viewContextManager.ADD_VIEW_CONTEXT(id, name, subgraphID));
   dispatch(
     actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, engine.get_vc_connectables(id))
   );
@@ -103,6 +103,20 @@ export const set_active_vc_id = (newActiveVcId: string) => {
   onVcHideStatusChange(newActiveVcId, false);
 
   dispatch(actionCreators.viewContextManager.SET_ACTIVE_VC_ID(newActiveVcId));
+};
+
+export const set_subgraphs = (activeSubgraphID: string, subgraphsByIdJSON: string) => {
+  const subgraphsByID = tryParseJson<{ [subgraphID: string]: SubgraphDescriptor }>(
+    subgraphsByIdJSON,
+    {},
+    'Failed to parse subgraphs JSON; using an empty list but that will probably create invalid connections.'
+  );
+  console.log('Setting subgraphs', activeSubgraphID, subgraphsByID);
+  dispatch(actionCreators.viewContextManager.SET_SUBGRAPHS(activeSubgraphID, subgraphsByID));
+};
+
+export const set_vc_title = (id: string, title: string) => {
+  dispatch(actionCreators.viewContextManager.SET_VC_TITLE(id, title));
 };
 
 export const list_foreign_node_used_samples = (id: string): SampleDescriptor[] => {

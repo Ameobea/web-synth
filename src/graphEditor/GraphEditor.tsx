@@ -25,6 +25,7 @@ import {
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { registerAllCustomNodes } from './nodes';
+import type { AudioConnectables } from 'src/patchNetwork';
 
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
 const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;
@@ -91,6 +92,8 @@ LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
   if (nodeID && typeof nodeID === 'string' && nodeID.length === 36) {
     getEngine()!.switch_view_context(nodeID);
   }
+
+  ((node as any).connectables as AudioConnectables | undefined)?.node?.onNodeDblClicked?.();
 };
 
 /**
@@ -237,8 +240,11 @@ const handleNodeSelectAction = async ({
  */
 const buildSortedNodeEntries = () => {
   const nodeEntries = Object.entries(LiteGraph.registered_node_types)
-    .filter(([key]) => key.startsWith('customAudio/'))
-    .map(([key, NodeClass]) => [NodeClass.typeName as string, key] as const);
+    .filter(
+      ([key, NodeClass]) =>
+        key.startsWith('customAudio/') && (NodeClass as any).manuallyCreatable !== false
+    )
+    .map(([key, NodeClass]) => [(NodeClass as any).typeName as string, key] as const);
   const vcEntries = ViewContextDescriptors.map(vc => [vc.displayName, vc.name] as const);
   return R.sortBy(([name]) => name.toLowerCase(), [...nodeEntries, ...vcEntries]);
 };
@@ -247,7 +253,11 @@ const buildSortedNodeEntries = () => {
  *
  * @param nodeType The node type from `buildSortedNodeEntries`
  */
-const createNode = (lGraphInstance: LGraph | null, nodeType: string) => {
+const createNode = (
+  lGraphInstance: LGraph | null,
+  nodeType: string,
+  params?: Record<string, any> | null
+) => {
   const isVc = !nodeType.startsWith('customAudio/');
   if (isVc) {
     const engine = getEngine();
@@ -264,7 +274,22 @@ const createNode = (lGraphInstance: LGraph | null, nodeType: string) => {
     return;
   }
   const node = LiteGraph.createNode(nodeType);
+  // Hacky way of providing some initial params for this node
+  (node as any).foreignNodeParams = params;
   lGraphInstance.add(node);
+};
+
+/**
+ * Adds a new subgraph to the engine and creates a subgraph portal node in the current graph so that
+ * the new subgraph can be moved into and connected to.
+ */
+const addSubgraph = (graph: LGraph) => {
+  const addedSubgraphID = getEngine()!.add_subgraph();
+  const curSubgraphID = getState().viewContextManager.activeSubgraphID;
+  createNode(graph, 'customAudio/subgraphPortal', {
+    txSubgraphID: curSubgraphID,
+    rxSubgraphID: addedSubgraphID,
+  });
 };
 
 interface GraphControlsProps {
@@ -290,7 +315,7 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
       {
         type: 'button',
         label: 'add node',
-        action: () => void createNode(lGraphInstance, selectedNodeType.current),
+        action: () => createNode(lGraphInstance, selectedNodeType.current),
       },
     ]);
   }, [lGraphInstance, selectedNodeType]);
@@ -459,7 +484,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         });
       };
 
-      const sortedNodeEntries = buildSortedNodeEntries();
+      const sortedNodeEntries = [['Add Subgraph', 'ADD_SUBGRAPH'], ...buildSortedNodeEntries()];
       const displayNames = sortedNodeEntries.map(([displayName]) => displayName);
       const lowerDisplayNames = displayNames.map(displayName => displayName.toLowerCase());
       canvas.onSearchBox = (_helper, value, _graphCanvas) => {
@@ -476,7 +501,11 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           throw new Error(`No entry found for node type "${name}"`);
         }
         const [, nodeType] = entry;
-        createNode(graph, nodeType);
+        if (nodeType === 'ADD_SUBGRAPH') {
+          addSubgraph(graph);
+        } else {
+          createNode(graph, nodeType);
+        }
       };
 
       const isHidden = getIsVcHidden(vcId);

@@ -14,8 +14,8 @@
       "error",
       {
         "destructuring": "any",
-        "ignoreReadBeforeAssign": false
-      }
+        "ignoreReadBeforeAssign": false,
+      },
     ],
     "@typescript-eslint/explicit-function-return-type": 0,
     "@typescript-eslint/no-explicit-any": 0,
@@ -26,12 +26,12 @@
     "react-hooks/exhaustive-deps": "warn",
     "@typescript-eslint/explicit-module-boundary-types": 0,
     "react/jsx-no-target-blank": 0,
-    "@typescript-eslint/no-empty-interface": "warn",
-    "@typescript-eslint/consistent-type-imports": ["warn", { "disallowTypeAnnotations": false }]
+    "@typescript-eslint/no-empty-interface": "off",
+    "@typescript-eslint/consistent-type-imports": ["warn", { "disallowTypeAnnotations": false }],
   },
   "env": {
     "es6": true,
-    "browser": true
+    "browser": true,
   },
   "extends": ["plugin:@typescript-eslint/recommended", "plugin:react/recommended", "prettier"],
   "parser": "@typescript-eslint/parser",
@@ -39,9 +39,9 @@
     "sourceType": "module",
     "ecmaFeatures": {
       "experimentalObjectRestSpread": true,
-      "jsx": true
+      "jsx": true,
     },
-    "ecmaVersion": 2017
+    "ecmaVersion": 2017,
   },
   "plugins": ["@typescript-eslint", "react", "react-hooks"],
   "globals": {
@@ -49,6 +49,6 @@
     "ga": true,
     "module": true,
     "__dirname": true,
-    "require": true
-  }
+    "require": true,
+  },
 }

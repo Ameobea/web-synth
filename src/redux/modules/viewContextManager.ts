@@ -204,7 +204,7 @@ const actionGroups = {
 
       const engine = getEngine();
       if (!engine) {
-        console.error('Engine handle was not set when trying to delete node');
+        console.error('Engine handle was not set when trying to add patch network node');
         return state;
       }
 
@@ -374,13 +374,15 @@ const actionGroups = {
     },
   }),
   ADD_VIEW_CONTEXT: buildActionGroup({
-    actionCreator: (uuid: string, name: string) => ({ type: 'ADD_VIEW_CONTEXT', uuid, name }),
-    subReducer: (state: VCMState, { uuid, name }) => ({
+    actionCreator: (uuid: string, name: string, subgraphID: string) => ({
+      type: 'ADD_VIEW_CONTEXT',
+      uuid,
+      name,
+      subgraphID,
+    }),
+    subReducer: (state: VCMState, { uuid, name, subgraphID }) => ({
       ...state,
-      activeViewContexts: [
-        ...state.activeViewContexts,
-        { uuid, name, subgraphId: state.activeSubgraphID },
-      ],
+      activeViewContexts: [...state.activeViewContexts, { uuid, name, subgraphId: subgraphID }],
     }),
   }),
   DELETE_VIEW_CONTEXT: buildActionGroup({
@@ -395,6 +397,30 @@ const actionGroups = {
     subReducer: (state: VCMState, { newActiveVcId }) => ({
       ...state,
       activeViewContextId: newActiveVcId,
+    }),
+  }),
+  SET_SUBGRAPHS: buildActionGroup({
+    actionCreator: (
+      activeSubgraphID: string,
+      subgraphsByID: { [subgraphID: string]: SubgraphDescriptor }
+    ) => ({
+      type: 'SET_SUBGRAPHS',
+      activeSubgraphID,
+      subgraphsByID,
+    }),
+    subReducer: (state: VCMState, { activeSubgraphID, subgraphsByID }) => ({
+      ...state,
+      activeSubgraphID,
+      subgraphsByID,
+    }),
+  }),
+  SET_VC_TITLE: buildActionGroup({
+    actionCreator: (uuid: string, title: string) => ({ type: 'SET_VC_TITLE', uuid, title }),
+    subReducer: (state: VCMState, { uuid, title }) => ({
+      ...state,
+      activeViewContexts: state.activeViewContexts.map(entry =>
+        entry.uuid === uuid ? { ...entry, title } : entry
+      ),
     }),
   }),
 };

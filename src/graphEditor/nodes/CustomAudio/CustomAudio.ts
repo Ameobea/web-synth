@@ -45,6 +45,7 @@ import { getState } from 'src/redux';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { FMSynthFxNode } from './FMSynthFx/FMSynthFxNode';
+import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 
 const ctx = new AudioContext();
 
@@ -59,6 +60,11 @@ export interface ForeignNode<T = any> {
    * The underlying `AudioNode` that powers this custom node, if applicable.
    */
   node?: T;
+  /**
+   * Set to `false` if this node shouldn't be able to be created by the user via the graph editor's generic
+   * "add node" menus.
+   */
+  manuallyCreatable?: boolean;
   serialize(): { [key: string]: any };
   buildConnectables(): AudioConnectables & { node: ForeignNode };
   nodeType: string;
@@ -71,6 +77,7 @@ export interface ForeignNode<T = any> {
   renderSmallView?: (domId: string) => void;
   cleanupSmallView?: (domId: string) => void;
   listUsedSamples?: () => SampleDescriptor[];
+  onNodeDblClicked?: () => void;
 }
 
 interface EnhanceAudioNodeParams<T> {
@@ -493,6 +500,9 @@ export const audioNodeGetters: {
   'customAudio/multibandDiodeLadderDistortion': {
     nodeGetter: MBDLDNode,
   },
+  'customAudio/subgraphPortal': {
+    nodeGetter: SubgraphPortalNode,
+  },
 };
 
 const registerCustomAudioNode = (
@@ -501,7 +511,7 @@ const registerCustomAudioNode = (
     ctx: AudioContext,
     vcId: string,
     params?: { [key: string]: any }
-  ) => ForeignNode) & { typeName: string },
+  ) => ForeignNode) & { typeName: string; manuallyCreatable?: boolean },
   protoParams: { [key: string]: any }
 ) => {
   function CustomAudioNode(this: any) {
@@ -515,6 +525,7 @@ const registerCustomAudioNode = (
   }
 
   CustomAudioNode.typeName = nodeGetter.typeName;
+  CustomAudioNode.manuallyCreatable = nodeGetter.manuallyCreatable ?? true;
 
   CustomAudioNode.prototype.onAdded = function (this: any) {
     if (R.isNil(this.id)) {
@@ -541,7 +552,7 @@ const registerCustomAudioNode = (
       // patch network when changing state and we only have `AudioConnectables` there which only hold the foreign node.
       this.connectables.node.lgNode = this;
     } else {
-      const foreignNode = new nodeGetter(ctx, id);
+      const foreignNode = new nodeGetter(ctx, id, this.foreignNodeParams);
       // Set the same reference as above
       foreignNode.lgNode = this;
       this.title = nodeGetter.typeName;

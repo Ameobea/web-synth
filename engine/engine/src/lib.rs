@@ -62,9 +62,7 @@ pub fn init() {
 pub fn create_view_context(vc_name: String, display_name: String) {
   let uuid = uuid_v4();
   debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
-  let mut view_context = build_view(&vc_name, uuid);
-  view_context.init();
-  view_context.hide();
+  let view_context = build_view(&vc_name, uuid);
   let vcm = get_vcm();
   vcm.add_view_context(uuid, vc_name, view_context, vcm.active_subgraph_id);
   set_vc_title(uuid.to_string(), display_name)
@@ -94,10 +92,18 @@ pub fn switch_view_context(uuid_str: &str) {
 }
 
 #[wasm_bindgen]
-pub fn add_subgraph() {
+pub fn add_subgraph() -> String {
   let vcm = get_vcm();
   let new_subgraph_id = vcm.add_subgraph();
-  vcm.set_active_subgraph(new_subgraph_id);
+  new_subgraph_id.to_string()
+}
+
+#[wasm_bindgen]
+pub fn set_active_subgraph_id(subgraph_id: &str) {
+  let uuid =
+    Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `set_active_subgraph_id`!");
+  let vcm = get_vcm();
+  vcm.set_active_subgraph(uuid);
 }
 
 #[wasm_bindgen]
@@ -120,8 +126,8 @@ pub fn set_vc_title(uuid_str: String, title: String) {
       uuid
     )
   });
-  vc_entry.definition.title = Some(title);
-  get_vcm().commit();
+  vc_entry.definition.title = Some(title.clone());
+  js::set_vc_title(&uuid_str, &title);
 }
 
 #[wasm_bindgen]

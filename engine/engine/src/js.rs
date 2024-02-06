@@ -12,9 +12,11 @@ extern "C" {
     active_subgraph_id: &str,
     subgraphs_by_id_json: &str,
   );
-  pub fn add_view_context(id: &str, name: &str);
+  pub fn add_view_context(id: &str, name: &str, subgraph_id: &str);
   pub fn delete_view_context(id: &str);
   pub fn set_active_vc_id(new_id: &str);
+  pub fn set_subgraphs(active_subgraph_id: &str, subgraphs_by_id_json: &str);
+  pub fn set_vc_title(uuid_str: &str, title: &str);
   pub fn list_foreign_node_used_samples(id: &str) -> Vec<JsValue>;
   /// Returns the ID of the active view context to display after initializing
   pub fn initialize_default_vcm_state();
