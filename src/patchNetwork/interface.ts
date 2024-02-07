@@ -11,9 +11,6 @@ export const connect = (from: ConnectableDescriptor, to: ConnectableDescriptor) 
 export const disconnect = (from: ConnectableDescriptor, to: ConnectableDescriptor) =>
   dispatch(actionCreators.viewContextManager.DISCONNECT(from, to));
 
-export const addNode = (vcId: string, connectables: AudioConnectables) =>
-  dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(vcId, connectables));
-
 export const removeNode = (vcId: string) =>
   dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(vcId));
 

@@ -3,8 +3,12 @@
  * components of an audio composition.
  */
 
-import { LGraph, LGraphCanvas, type LGraphNode, LiteGraph } from 'litegraph.js';
+import { LGraph, LGraphCanvas, LiteGraph, type LGraphNode } from 'litegraph.js';
 
+import type {
+  LiteGraphConnectablesNode,
+  LiteGraph as LiteGraphInstance,
+} from 'src/graphEditor/LiteGraphTypes';
 import 'litegraph.js/css/litegraph.css';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +20,7 @@ import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
-import { getState, type ReduxStore } from 'src/redux';
+import { actionCreators, dispatch, getState, type ReduxStore } from 'src/redux';
 import { UnreachableError, filterNils, getEngine, tryParseJson } from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 import {
@@ -26,6 +30,10 @@ import {
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { registerAllCustomNodes } from './nodes';
 import type { AudioConnectables } from 'src/patchNetwork';
+import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/nodes/CustomAudio';
+import { removeNode } from 'src/patchNetwork/interface';
+
+const ctx = new AudioContext();
 
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
 const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;
@@ -41,7 +49,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
     'Pin',
     'Resize',
   ];
-  const filteredOptions = options.filter(item => {
+  let filteredOptions = options.filter(item => {
     if (!item) {
       return true;
     }
@@ -57,12 +65,25 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
   }
 
   // Remove duplicate subsequent nulls which map to dividers in the menu
-  return filteredOptions.filter((opt, i) => {
+  filteredOptions = filteredOptions.filter((opt, i) => {
     if (i > 0 && opt === null && filteredOptions[i - 1] === null) {
       return false;
     }
     return true;
   });
+
+  // Patch the remove option to delete the node directly from the patch network
+  const removeOption = filteredOptions.find(opt => opt?.content === 'Remove');
+  if (!removeOption) {
+    throw new Error('Failed to find "Remove" option in node menu');
+  }
+
+  removeOption.callback = (_value, _options, _event, _parentMenu, node) => {
+    const vcId = node.id.toString();
+    removeNode(vcId);
+  };
+
+  return filteredOptions;
 };
 LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
   const options = ['Delete'];
@@ -113,20 +134,26 @@ export const saveStateForInstance = (stateKey: string) => {
   const state = instance.serialize();
   const selectedNodes: { [key: string]: any } =
     instance.list_of_graphcanvas?.[0]?.selected_nodes ?? {};
-  state.selectedNodeVcId = Object.values(selectedNodes)[0]?.connectables?.vcId;
+  (state as any).selectedNodeVcId = Object.values(selectedNodes)[0]?.connectables?.vcId;
 
   localStorage.setItem(stateKey, JSON.stringify(state));
 
   GraphEditorInstances.delete(stateKey);
 };
 
-const getLGNodeByVcId = (vcId: string) => {
+const getLGNodesByVcId = (vcId: string) => {
+  const nodes = [];
+
   for (const instance of GraphEditorInstances.values()) {
-    if (instance._nodes_by_id[vcId]) {
-      return instance._nodes_by_id[vcId];
+    if ((instance as any as LiteGraphInstance)._nodes_by_id[vcId]) {
+      const node = (instance as any as LiteGraphInstance)._nodes_by_id[vcId];
+      if (node) {
+        nodes.push(node);
+      }
     }
   }
-  return null;
+
+  return nodes;
 };
 
 const FlowingIntervalHandles = new Map<string, NodeJS.Timeout>();
@@ -136,10 +163,12 @@ export const setConnectionFlowingStatus = (
   isFlowing: boolean
 ) => {
   if (!isFlowing) {
-    const node = getLGNodeByVcId(vcId);
-    const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;
-    if (!!node && outputIx !== -1) {
-      node.clearTriggeredSlot(outputIx);
+    const nodes = getLGNodesByVcId(vcId);
+    for (const node of nodes) {
+      const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;
+      if (!!node && outputIx !== -1) {
+        node.clearTriggeredSlot(outputIx);
+      }
     }
 
     const intervalHandle = FlowingIntervalHandles.get(vcId);
@@ -153,21 +182,23 @@ export const setConnectionFlowingStatus = (
   }
 
   const setFlowingCb = () => {
-    const node = getLGNodeByVcId(vcId);
+    const nodes = getLGNodesByVcId(vcId);
 
-    const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;
+    for (const node of nodes) {
+      const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;
 
-    if (node === null || outputIx === -1) {
-      const intervalHandle = FlowingIntervalHandles.get(vcId);
-      // Node or connection must have gone away
-      if (!R.isNil(intervalHandle)) {
-        clearInterval(intervalHandle);
-        FlowingIntervalHandles.delete(vcId);
+      if (node === null || outputIx === -1) {
+        const intervalHandle = FlowingIntervalHandles.get(vcId);
+        // Node or connection must have gone away
+        if (!R.isNil(intervalHandle)) {
+          clearInterval(intervalHandle);
+          FlowingIntervalHandles.delete(vcId);
+        }
+        return;
       }
-      return;
-    }
 
-    node.triggerSlot(outputIx);
+      node.triggerSlot(outputIx);
+    }
   };
 
   const intervalHandle = setInterval(setFlowingCb, 1000);
@@ -253,11 +284,7 @@ const buildSortedNodeEntries = () => {
  *
  * @param nodeType The node type from `buildSortedNodeEntries`
  */
-const createNode = (
-  lGraphInstance: LGraph | null,
-  nodeType: string,
-  params?: Record<string, any> | null
-) => {
+const createNode = (nodeType: string, subgraphId: string, params?: Record<string, any> | null) => {
   const isVc = !nodeType.startsWith('customAudio/');
   if (isVc) {
     const engine = getEngine();
@@ -270,27 +297,17 @@ const createNode = (
     return;
   }
 
-  if (!lGraphInstance) {
-    return;
-  }
-  const node = LiteGraph.createNode(nodeType);
-  // Hacky way of providing some initial params for this node
-  (node as any).foreignNodeParams = params;
-  lGraphInstance.add(node);
+  const id = buildNewForeignConnectableID().toString();
+  const node = new audioNodeGetters[nodeType]!.nodeGetter(ctx, id, params);
+  const connectables = node.buildConnectables();
+  dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, connectables, subgraphId));
 };
 
 /**
  * Adds a new subgraph to the engine and creates a subgraph portal node in the current graph so that
  * the new subgraph can be moved into and connected to.
  */
-const addSubgraph = (graph: LGraph) => {
-  const addedSubgraphID = getEngine()!.add_subgraph();
-  const curSubgraphID = getState().viewContextManager.activeSubgraphID;
-  createNode(graph, 'customAudio/subgraphPortal', {
-    txSubgraphID: curSubgraphID,
-    rxSubgraphID: addedSubgraphID,
-  });
-};
+const addSubgraph = () => getEngine()!.add_subgraph();
 
 interface GraphControlsProps {
   lGraphInstance: LGraph | null;
@@ -315,7 +332,8 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
       {
         type: 'button',
         label: 'add node',
-        action: () => createNode(lGraphInstance, selectedNodeType.current),
+        action: () =>
+          createNode(selectedNodeType.current, getState().viewContextManager.activeSubgraphID),
       },
     ]);
   }, [lGraphInstance, selectedNodeType]);
@@ -354,9 +372,21 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     },
     [setCurSelectedNodeInner]
   );
-  const { patchNetwork, activeViewContexts, isLoaded } = useSelector(
-    (state: ReduxStore) =>
-      R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager),
+  const vcId = stateKey.split('_')[1];
+  const { patchNetwork, activeViewContexts, isLoaded, subgraphID } = useSelector(
+    (state: ReduxStore) => {
+      const subgraphID = state.viewContextManager.activeViewContexts.find(
+        vc => vc.uuid === vcId
+      )?.subgraphId;
+      if (!subgraphID) {
+        throw new Error('Unable to determine subgraph ID for graph editor');
+      }
+
+      return {
+        ...R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager),
+        subgraphID,
+      };
+    },
     shallowEqual
   );
 
@@ -374,7 +404,6 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const vcId = stateKey.split('_')[1];
   const smallViewDOMId = `graph-editor_${vcId}_small-view-dom-id`;
 
   useEffect(() => {
@@ -473,7 +502,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           curSelectedNodeRef,
         });
       };
-      graph.onNodeRemoved = node => {
+      (graph as any).onNodeRemoved = (node: LGraphNode) => {
         handleNodeSelectAction({
           smallViewDOMId,
           lgNode: node,
@@ -502,9 +531,9 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         }
         const [, nodeType] = entry;
         if (nodeType === 'ADD_SUBGRAPH') {
-          addSubgraph(graph);
+          addSubgraph();
         } else {
-          createNode(graph, nodeType);
+          createNode(nodeType, subgraphID);
         }
       };
 
@@ -521,7 +550,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       // Set an entry into the mapping so that we can get the current instance's state before unmounting
       GraphEditorInstances.set(stateKey, graph);
     })();
-  }, [curSelectedNode, setCurSelectedNode, smallViewDOMId, stateKey, vcId]);
+  }, [curSelectedNode, setCurSelectedNode, smallViewDOMId, stateKey, subgraphID, vcId]);
 
   const lastPatchNetwork = useRef<typeof patchNetwork | null>(null);
   useEffect(() => {
@@ -529,7 +558,12 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       return;
     }
 
-    updateGraph(lGraphInstance, patchNetwork, activeViewContexts);
+    updateGraph(
+      lGraphInstance as any as LiteGraphInstance,
+      patchNetwork,
+      activeViewContexts,
+      subgraphID
+    );
     lastPatchNetwork.current = patchNetwork;
 
     // If there is a currently selected node, it may have been de-selected as a result of being modified.  Try
@@ -538,7 +572,9 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       return;
     }
 
-    const node = lGraphInstance._nodes.find(node => node.connectables?.vcId === selectedNodeVCID);
+    const node = (lGraphInstance as any)._nodes.find(
+      (node: LiteGraphConnectablesNode) => node.connectables?.vcId === selectedNodeVCID
+    );
     if (!node) {
       setSelectedNodeVCID(null);
       return;
@@ -547,7 +583,14 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     setCurSelectedNode(node);
     lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
     lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
-  }, [patchNetwork, lGraphInstance, activeViewContexts, selectedNodeVCID, setCurSelectedNode]);
+  }, [
+    patchNetwork,
+    lGraphInstance,
+    activeViewContexts,
+    selectedNodeVCID,
+    setCurSelectedNode,
+    subgraphID,
+  ]);
 
   // Set node from serialized state when we first render
   useEffect(() => {
@@ -569,17 +612,17 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     }
 
     if (state.selectedNodeVcId) {
-      const node = lGraphInstance._nodes.find(
+      const node = (lGraphInstance as any as LiteGraphInstance)._nodes.find(
         node => node.connectables?.vcId === state.selectedNodeVcId
-      );
+      ) as any;
       setCurSelectedNode(node);
       setSelectedNodeVCID(state.selectedNodeVcId);
       lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
-      lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected(node);
+      lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
     }
 
     state.nodes.forEach(({ id, pos }) => {
-      const node = lGraphInstance._nodes_by_id[id];
+      const node = (lGraphInstance as any as LiteGraphInstance)._nodes_by_id[id];
       if (!node) {
         return;
       }

@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -176,6 +177,13 @@ impl ViewContextManager {
     created_ix
   }
 
+  /// This triggers a fresh FC to get created on the frontend along with its associated node.
+  ///
+  /// The frontend will then commit the FCs back here
+  fn add_foreign_connectable(&mut self, fc: ForeignConnectable) {
+    js::add_foreign_connectable(&serde_json::to_string(&fc).unwrap());
+  }
+
   pub fn get_vc_by_id_mut(&mut self, uuid: Uuid) -> Option<&mut ViewContextEntry> {
     self
       .get_vc_position(uuid)
@@ -347,20 +355,40 @@ impl ViewContextManager {
       .subgraphs_by_id
       .insert(new_subgraph_id, SubgraphDescriptor {
         id: new_subgraph_id,
-        name: format!("Subgraph {}", new_subgraph_id),
+        name: "New Subgraph".to_owned(),
         active_vc_id: new_graph_editor_vc_id,
       });
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
+
+    // Start out the new subgraph with a graph editor
     self.add_view_context(
       new_graph_editor_vc_id,
       "graph_editor".to_string(),
       mk_graph_editor(new_graph_editor_vc_id),
       new_subgraph_id,
     );
-    self.save_all();
-    js::set_subgraphs(
-      &self.active_subgraph_id.to_string(),
-      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
-    );
+
+    // Add ssubgraph portals to and from the subgraph so the user can navigate between them
+    self.add_foreign_connectable(ForeignConnectable {
+      _type: "customAudio/subgraphPortal".to_owned(),
+      id: String::new(),
+      serialized_state: Some(
+        json!({ "txSubgraphID": self.active_subgraph_id, "rxSubgraphID": new_subgraph_id }),
+      ),
+      subgraph_id: self.active_subgraph_id,
+    });
+    self.add_foreign_connectable(ForeignConnectable {
+      _type: "customAudio/subgraphPortal".to_owned(),
+      id: String::new(),
+      serialized_state: Some(
+        json!({ "txSubgraphID": new_subgraph_id, "rxSubgraphID": self.active_subgraph_id }),
+      ),
+      subgraph_id: new_subgraph_id,
+    });
+
     new_subgraph_id
   }
 

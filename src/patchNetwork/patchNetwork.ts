@@ -1,14 +1,14 @@
 import { Option } from 'funfix-core';
 import { Map } from 'immutable';
 
-import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
+import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
 import { audioNodeGetters, type ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import { connectNodes, disconnectNodes, getConnectedPair } from 'src/redux/modules/vcmUtils';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
 import { getEngine } from 'src/util';
 import type { MIDINode } from './midiNode';
 
-export type ConnectableType = 'midi' | 'number' | 'customAudio';
+export type ConnectableType = 'midi' | 'number' | 'customAudio' | 'any';
 export interface ConnectableInput {
   node: AudioParam | AudioNode | MIDINode;
   type: ConnectableType;
@@ -41,6 +41,13 @@ export interface SubgraphDescriptor {
   activeVcId: string;
 }
 
+export interface ForeignConnectable {
+  type: string;
+  id: string;
+  serializedState: any;
+  subgraphId: string;
+}
+
 export interface PatchNetwork {
   connectables: Map<string, AudioConnectables>;
   connections: [ConnectableDescriptor, ConnectableDescriptor][];
@@ -53,11 +60,7 @@ export interface PatchNetwork {
 export const initPatchNetwork = (
   oldPatchNetwork: PatchNetwork,
   viewContexts: VCMState['activeViewContexts'],
-  foreignConnectables: {
-    type: string;
-    id: string;
-    serializedState?: { [key: string]: any } | null;
-  }[],
+  foreignConnectables: ForeignConnectable[],
   connections: VCMState['patchNetwork']['connections'],
   ctx: AudioContext
 ): PatchNetwork => {
@@ -130,7 +133,11 @@ export const initPatchNetwork = (
       return false;
     }
 
-    if (connectedPair[0].type !== connectedPair[1].type) {
+    if (
+      connectedPair[0].type !== connectedPair[1].type &&
+      connectedPair[0].type !== 'any' &&
+      connectedPair[1].type !== 'any'
+    ) {
       console.error(
         'Invalid connection found when initializing patch network; mis-matched types: ',
         { ...connectedPair[0], name: from.name, vcId: from.vcId },
@@ -143,7 +150,7 @@ export const initPatchNetwork = (
     try {
       (connectedPair[0].node as any).connect(
         connectedPair[1].node,
-        connectedPair[0].node instanceof PlaceholderInput ? to : undefined
+        connectedPair[0].node instanceof PlaceholderOutput ? to : undefined
       );
       connectNodes(connectedPair[0].node, connectedPair[1].node, to);
     } catch (err) {

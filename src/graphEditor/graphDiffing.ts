@@ -1,6 +1,6 @@
 import { Option } from 'funfix-core';
-import { Map, Set } from 'immutable';
-import { LiteGraph } from 'litegraph.js';
+import { Map as ImmMap, Set as ImmSet } from 'immutable';
+import { type LGraph, LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 
 import type {
@@ -9,7 +9,7 @@ import type {
   LiteGraphNode,
 } from 'src/graphEditor/LiteGraphTypes';
 import type { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
-import type { ReduxStore } from 'src/redux';
+import { getState, type ReduxStore } from 'src/redux';
 import type { ArrayElementOf } from 'src/util';
 
 const createAudioConnectablesNode = (
@@ -22,7 +22,7 @@ const createAudioConnectablesNode = (
     typeOverride || 'audio/audioConnectables',
     title,
     {}
-  ) as LiteGraphConnectablesNode;
+  ) as any as LiteGraphConnectablesNode;
   node.id = vcId.toString();
   node.setConnectables(connectables);
   return node;
@@ -46,30 +46,46 @@ const getVcTitle = (
 export const updateGraph = (
   graph: LiteGraphInstance,
   patchNetwork: PatchNetwork,
-  activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts']
+  activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts'],
+  subgraphID: string
 ) => {
-  const { modifiedNodes, unchangedNodes, addedNodes } = [
-    ...patchNetwork.connectables.entries(),
-  ].reduce(
-    (acc, [key, connectables]) => {
-      const pairNode = graph._nodes_by_id[key];
+  const allVcIDsInSubgraph = new Set<string>();
 
-      if (R.isNil(pairNode)) {
-        return { ...acc, addedNodes: acc.addedNodes.add(key) };
-      } else if (connectables !== pairNode.connectables) {
-        return { ...acc, modifiedNodes: acc.modifiedNodes.add(key) };
+  const { modifiedNodes, unchangedNodes, addedNodes } = [...patchNetwork.connectables.entries()]
+    .filter(
+      ([vcId]) =>
+        getState().viewContextManager.activeViewContexts.some(
+          vc => vc.uuid === vcId && vc.subgraphId === subgraphID
+        ) ||
+        getState().viewContextManager.foreignConnectables.some(
+          fc => fc.id === vcId && fc.subgraphId === subgraphID
+        )
+    )
+    .reduce(
+      (acc, [key, connectables]) => {
+        allVcIDsInSubgraph.add(key);
+        const pairNode = graph._nodes_by_id[key];
+
+        if (R.isNil(pairNode)) {
+          return { ...acc, addedNodes: acc.addedNodes.add(key) };
+        } else if (connectables !== pairNode.connectables) {
+          return { ...acc, modifiedNodes: acc.modifiedNodes.add(key) };
+        }
+
+        return { ...acc, unchangedNodes: acc.unchangedNodes.add(key) };
+      },
+      {
+        modifiedNodes: ImmSet<string>(),
+        unchangedNodes: ImmSet<string>(),
+        addedNodes: ImmSet<string>(),
       }
-
-      return { ...acc, unchangedNodes: acc.unchangedNodes.add(key) };
-    },
-    { modifiedNodes: Set<string>(), unchangedNodes: Set<string>(), addedNodes: Set<string>() }
-  );
+    );
 
   // Any node present in the map that hasn't been accounted for already has been deleted
-  const deletedNodes: Set<string> = Object.keys(graph._nodes_by_id).reduce(
+  const deletedNodes: ImmSet<string> = Object.keys(graph._nodes_by_id).reduce(
     (acc, key) =>
       ![modifiedNodes, unchangedNodes, addedNodes].find(set => set.has(key)) ? acc.add(key) : acc,
-    Set() as Set<string>
+    ImmSet<string>()
   );
 
   // Now, we just have to handle all of these computed diffs to synchronize the LiteGraph graph with the patch network
@@ -94,7 +110,7 @@ export const updateGraph = (
     // If this is a brand new node, place it in the middle of the viewport
     if (!params) {
       // format: [ startx, starty, width, height ]
-      const visibleArea: Float32Array = graph.list_of_graphcanvas[0].visible_area;
+      const visibleArea = (graph as any as LGraph).list_of_graphcanvas[0].visible_area;
 
       if (visibleArea) {
         const centerX = visibleArea[0] + visibleArea[2] / 2;
@@ -123,7 +139,7 @@ export const updateGraph = (
     // Don't trigger patch network actions since these changes are purely presentational
     node.ignoreRemove = true;
     graph.remove(node);
-    createAndAddNode(key, { ignoreAdd: true, pos });
+    createAndAddNode(key, { pos });
   });
 
   // At this point, all nodes should be created/removed and have up-to-date `AudioConnectables`.  We must now run through the list
@@ -132,11 +148,14 @@ export const updateGraph = (
   // We start by looping through the list of connections and checking if they all exist.  If they do not, we perform the connection now.
   //
   // Keep track of connections so that we can efficiently go back and check for missing connections later.
-  type ConnectionsMap = Map<string, ArrayElementOf<(typeof patchNetwork)['connections']>[]>;
-  const connectionsByNode: ConnectionsMap = patchNetwork.connections.reduce(
+  type ConnectionsMap = ImmMap<string, ArrayElementOf<(typeof patchNetwork)['connections']>[]>;
+  const subgraphLocalConnections = patchNetwork.connections.filter(
+    ([tx, rx]) => allVcIDsInSubgraph.has(tx.vcId) && allVcIDsInSubgraph.has(rx.vcId)
+  );
+  const connectionsByNode: ConnectionsMap = subgraphLocalConnections.reduce(
     (acc, connection) =>
       acc.set(connection[0].vcId, [...(acc.get(connection[0].vcId) || []), connection]),
-    Map() as ConnectionsMap
+    ImmMap() as ConnectionsMap
   );
 
   const getNode = (id: string) => {
@@ -186,7 +205,7 @@ export const updateGraph = (
     }
   });
 
-  patchNetwork.connections.forEach(connection => {
+  subgraphLocalConnections.forEach(connection => {
     // Check to see if we have an actual existing connection between the two nodes/ports and create one if we don't
 
     const srcNode = getNode(connection[0].vcId);
@@ -227,5 +246,5 @@ export const updateGraph = (
     if (!connectionExists) {
       srcNode.connect(srcSlotIx, dstNode, dstSlotIx);
     }
-  }, Map() as ConnectionsMap);
+  }, ImmMap() as ConnectionsMap);
 };

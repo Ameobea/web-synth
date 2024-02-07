@@ -4,7 +4,7 @@ import * as R from 'ramda';
 import { shallowEqual } from 'react-redux';
 import type { Unsubscribe } from 'redux';
 
-import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
+import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
 import { OverridableAudioNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DefaultComposition from 'src/init-composition.json';
 import type {
@@ -37,10 +37,19 @@ export const commitForeignConnectables = (
           throw new Error(`Foreign connectable with non-numeric \`vcId\` found: "${vcId}"`);
         }
 
+        const subgraphId =
+          getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === vcId)
+            ?.subgraphId ??
+          getState().viewContextManager.foreignConnectables.find(fc => fc.id === vcId)?.subgraphId;
+        if (!subgraphId) {
+          throw new Error(`vcId=${vcId} was not found in any view context or foreign connectable`);
+        }
+
         return {
           id: vcId.toString(),
           type: node.nodeType,
           serializedState: node.serialize ? node.serialize() : null,
+          subgraphId,
         };
       })
     )
@@ -59,7 +68,7 @@ export const connectNodes = (
     dst.setIsOverridden(false);
   }
 
-  (src as any).connect(dst, src instanceof PlaceholderInput ? dstDescriptor : undefined);
+  (src as any).connect(dst, src instanceof PlaceholderOutput ? dstDescriptor : undefined);
 };
 
 export const disconnectNodes = (
@@ -73,7 +82,7 @@ export const disconnectNodes = (
   }
 
   try {
-    (src as any).disconnect(dst, src instanceof PlaceholderInput ? dstDescriptor : undefined);
+    (src as any).disconnect(dst, src instanceof PlaceholderOutput ? dstDescriptor : undefined);
   } catch (err) {
     if (
       err instanceof DOMException &&

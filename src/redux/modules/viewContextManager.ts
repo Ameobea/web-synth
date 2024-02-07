@@ -6,6 +6,7 @@ import * as R from 'ramda';
 import type {
   AudioConnectables,
   ConnectableDescriptor,
+  ForeignConnectable,
   PatchNetwork,
   SubgraphDescriptor,
 } from 'src/patchNetwork/patchNetwork';
@@ -19,6 +20,7 @@ import { getEngine } from 'src/util';
 
 export interface VCMState {
   activeViewContexts: { name: string; uuid: string; title?: string; subgraphId: string }[];
+  foreignConnectables: ForeignConnectable[];
   activeViewContextId: string;
   activeSubgraphID: string;
   patchNetwork: PatchNetwork;
@@ -36,14 +38,10 @@ const actionGroups = {
   }),
   SET_VCM_STATE: buildActionGroup({
     actionCreator: (
-      newState: Pick<VCMState, 'activeViewContextId' | 'activeViewContexts' | 'subgraphsByID'> & {
-        foreignConnectables: {
-          type: string;
-          id: string;
-          subgraphId: string;
-          params?: { [key: string]: any } | null;
-        }[];
-      },
+      newState: Pick<
+        VCMState,
+        'activeViewContextId' | 'activeViewContexts' | 'subgraphsByID' | 'foreignConnectables'
+      >,
       getPatchNetworkReturnVal: PatchNetwork,
       activeSubgraphID: string
     ) => ({
@@ -99,7 +97,11 @@ const actionGroups = {
       }
       const [fromConnectable, toConnectable] = connectedPair;
 
-      if (fromConnectable.type !== toConnectable.type) {
+      if (
+        fromConnectable.type !== toConnectable.type &&
+        fromConnectable.type !== 'any' &&
+        toConnectable.type !== 'any'
+      ) {
         console.warn(
           'Tried to connect two connectables of different types: ',
           fromConnectable,
@@ -192,12 +194,13 @@ const actionGroups = {
     },
   }),
   ADD_PATCH_NETWORK_NODE: buildActionGroup({
-    actionCreator: (vcId: string, connectables: AudioConnectables | null) => ({
+    actionCreator: (vcId: string, connectables: AudioConnectables | null, subgraphId: string) => ({
       type: 'ADD_PATCH_NETWORK_NODE',
       vcId,
       connectables,
+      subgraphId,
     }),
-    subReducer: (state: VCMState, { vcId, connectables }) => {
+    subReducer: (state: VCMState, { vcId, connectables, subgraphId }) => {
       if (!connectables || state.patchNetwork.connectables.has(vcId)) {
         return state;
       }
@@ -214,7 +217,21 @@ const actionGroups = {
       };
       maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
 
-      return { ...state, patchNetwork: newPatchNetwork };
+      return {
+        ...state,
+        patchNetwork: newPatchNetwork,
+        foreignConnectables: connectables.node
+          ? [
+              ...state.foreignConnectables,
+              {
+                type: connectables.node.nodeType,
+                id: vcId,
+                subgraphId,
+                serializedState: connectables.node.serialize ? connectables.node.serialize() : null,
+              },
+            ]
+          : state.foreignConnectables,
+      };
     },
   }),
   REMOVE_PATCH_NETWORK_NODE: buildActionGroup({
@@ -256,7 +273,11 @@ const actionGroups = {
       };
       maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
 
-      return { ...state, patchNetwork: newPatchNetwork };
+      return {
+        ...state,
+        patchNetwork: newPatchNetwork,
+        foreignConnectables: state.foreignConnectables.filter(fc => fc.id !== vcId),
+      };
     },
   }),
   UPDATE_CONNECTABLES: buildActionGroup({
@@ -385,6 +406,23 @@ const actionGroups = {
       activeViewContexts: [...state.activeViewContexts, { uuid, name, subgraphId: subgraphID }],
     }),
   }),
+  ADD_FOREIGN_CONNECTABLE: buildActionGroup({
+    actionCreator: (id: string, fc: ForeignConnectable) => ({
+      type: 'ADD_FOREIGN_CONNECTABLE',
+      id,
+      fc,
+    }),
+    subReducer: (state: VCMState, { id, fc }) => {
+      if (state.foreignConnectables.some(f => f.id === id)) {
+        throw new Error(`Tried to add foreign connectable with ID ${id} but one already exists`);
+      }
+
+      return {
+        ...state,
+        foreignConnectables: [...state.foreignConnectables, { ...fc, id }],
+      };
+    },
+  }),
   DELETE_VIEW_CONTEXT: buildActionGroup({
     actionCreator: (uuid: string) => ({ type: 'DELETE_VIEW_CONTEXT', uuid }),
     subReducer: (state: VCMState, { uuid }) => ({
@@ -427,6 +465,7 @@ const actionGroups = {
 
 const initialState: VCMState = {
   activeViewContexts: [],
+  foreignConnectables: [],
   activeViewContextId: '',
   activeSubgraphID: '',
   patchNetwork: {

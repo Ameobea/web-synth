@@ -1,7 +1,14 @@
 import { Map as ImmMap } from 'immutable';
 
-import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
+import type {
+  AudioConnectables,
+  ConnectableDescriptor,
+  ConnectableInput,
+  ConnectableOutput,
+  ConnectableType,
+} from 'src/patchNetwork';
+import { actionCreators, dispatch, getState } from 'src/redux';
 import type { ControlPanelInstanceState } from 'src/redux/modules/controlPanel';
 import { UnimplementedError } from 'src/util';
 
@@ -22,7 +29,22 @@ export const buildControlPanelAudioConnectables = (
 
   const outputs = existingConnections.set('Add a new control...', {
     type: 'number',
-    node: new PlaceholderInput(ctx, vcId),
+    node: new PlaceholderOutput(
+      ctx,
+      vcId,
+      () => {
+        const instanceState = getState().controlPanel.stateByPanelInstance[vcId];
+        return buildControlPanelAudioConnectables(vcId, instanceState);
+      },
+      (inputName: string, type: ConnectableType, rxConnectableDescriptor: ConnectableDescriptor) =>
+        void dispatch(
+          actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(
+            vcId,
+            rxConnectableDescriptor.vcId,
+            inputName
+          )
+        )
+    ),
   });
 
   return {

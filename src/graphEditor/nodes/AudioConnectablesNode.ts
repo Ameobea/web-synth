@@ -28,7 +28,7 @@ LGAudioConnectables.prototype.setConnectables = function (
   this.connectables.vcId = this.id.toString();
 
   if (connectables.node) {
-    this.title = connectables.node.name;
+    this.title = (connectables.node as any).name;
   }
 
   [...connectables.inputs.entries()].forEach(([name, input]) => {
@@ -39,15 +39,15 @@ LGAudioConnectables.prototype.setConnectables = function (
       if (!R.isNil(value)) {
         this.setProperty(name, value);
       }
-      this.addInput(name, input.type);
+      this.addInput(name, input.type === 'any' ? 0 : input.type);
     } else {
-      this.addInput(name, input.type);
+      this.addInput(name, input.type === 'any' ? 0 : input.type);
     }
   });
 
   [...connectables.outputs.entries()].forEach(([name, output]) => {
     // TODO: Look up this type dynamically?
-    this.addOutput(name, output.type);
+    this.addOutput(name, output.type === 'any' ? 0 : output.type);
   });
 };
 

@@ -1,11 +1,16 @@
 import { initPatchNetwork } from 'src/patchNetwork';
-import type { ConnectableDescriptor, SubgraphDescriptor } from 'src/patchNetwork';
+import type {
+  ConnectableDescriptor,
+  ForeignConnectable,
+  SubgraphDescriptor,
+} from 'src/patchNetwork';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getEngine, tryParseJson } from 'src/util';
 import { onVcHideStatusChange } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { actionCreators, dispatch, getState } from './redux';
+import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/nodes/CustomAudio';
 
 const ctx = new AudioContext();
 
@@ -29,9 +34,7 @@ export const init_view_contexts = (
     'Failed to parse provided connections out of JSON'
   );
 
-  const foreignConnectables = tryParseJson<
-    { type: string; id: string; subgraphId: string; serializedState: string }[]
-  >(
+  const foreignConnectables = tryParseJson<ForeignConnectable[]>(
     foreignConnectablesJson,
     [],
     'Failed to parse foreign nodes JSON; using an empty list but that will probably create invalid connections.'
@@ -47,15 +50,8 @@ export const init_view_contexts = (
 
   const newVCMState: Pick<
     VCMState,
-    'activeViewContextId' | 'activeViewContexts' | 'subgraphsByID'
-  > & {
-    foreignConnectables: {
-      type: string;
-      id: string;
-      subgraphId: string;
-      params?: { [key: string]: any } | null;
-    }[];
-  } = {
+    'activeViewContextId' | 'activeViewContexts' | 'subgraphsByID' | 'foreignConnectables'
+  > = {
     activeViewContextId,
     activeViewContexts: activeViewContexts.map(({ minimal_def, ...rest }) => ({
       ...minimal_def,
@@ -69,7 +65,7 @@ export const init_view_contexts = (
   const patchNetwork = initPatchNetwork(
     getState().viewContextManager.patchNetwork,
     newVCMState.activeViewContexts,
-    newVCMState.foreignConnectables,
+    foreignConnectables,
     connections,
     ctx
   );
@@ -82,7 +78,22 @@ export const add_view_context = (id: string, name: string, subgraphID: string) =
   const engine = getEngine()!; // Must exist because this gets called *from the engine*.
   dispatch(actionCreators.viewContextManager.ADD_VIEW_CONTEXT(id, name, subgraphID));
   dispatch(
-    actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, engine.get_vc_connectables(id))
+    actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(
+      id,
+      engine.get_vc_connectables(id),
+      subgraphID
+    )
+  );
+};
+
+export const add_foreign_connectable = (fcJSON: string) => {
+  const fc: ForeignConnectable = JSON.parse(fcJSON);
+  console.log({ fc });
+  const id = buildNewForeignConnectableID().toString();
+  const node = new audioNodeGetters[fc.type]!.nodeGetter(ctx, id, fc.serializedState);
+  const connectables = node.buildConnectables();
+  dispatch(
+    actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, connectables, fc.subgraphId)
   );
 };
 
@@ -111,7 +122,6 @@ export const set_subgraphs = (activeSubgraphID: string, subgraphsByIdJSON: strin
     {},
     'Failed to parse subgraphs JSON; using an empty list but that will probably create invalid connections.'
   );
-  console.log('Setting subgraphs', activeSubgraphID, subgraphsByID);
   dispatch(actionCreators.viewContextManager.SET_SUBGRAPHS(activeSubgraphID, subgraphsByID));
 };
 

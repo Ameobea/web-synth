@@ -5,7 +5,7 @@
  */
 import { Option } from 'funfix-core';
 import { Map } from 'immutable';
-import { LiteGraph } from 'litegraph.js';
+import { type LGraphNode, LiteGraph } from 'litegraph.js';
 import * as R from 'ramda';
 import type React from 'react';
 
@@ -39,7 +39,6 @@ import { VocoderNode } from 'src/graphEditor/nodes/CustomAudio/Vocoder/VocoderNo
 import WaveTable from 'src/graphEditor/nodes/CustomAudio/WaveTable/WaveTable';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { addNode, removeNode } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper, mkLazyComponent } from 'src/reactUtils';
 import { getState } from 'src/redux';
 import type { SampleDescriptor } from 'src/sampleLibrary';
@@ -56,6 +55,10 @@ export interface ForeignNode<T = any> {
    * The `ForeignNode` and its connectables by extension are the only things that are allowed to be stateful here.
    */
   lgNode?: any;
+  /**
+   * Callback invoked when a LG node is generated for this nodee
+   */
+  onAddedToLG?: (lgNode: LGraphNode) => void;
   /**
    * The underlying `AudioNode` that powers this custom node, if applicable.
    */
@@ -505,6 +508,15 @@ export const audioNodeGetters: {
   },
 };
 
+/**
+ * FCs are expected to always have numeric IDs, and we count up from 1
+ */
+export const buildNewForeignConnectableID = () =>
+  [...getState().viewContextManager.patchNetwork.connectables.keys()]
+    .filter((id: string) => !Number.isNaN(+id))
+    .map(id => +id)
+    .reduce((acc, id) => Math.max(acc, id), 0) + 1;
+
 const registerCustomAudioNode = (
   type: string,
   nodeGetter: (new (
@@ -516,11 +528,7 @@ const registerCustomAudioNode = (
 ) => {
   function CustomAudioNode(this: any) {
     if (R.isNil(this.id)) {
-      this.id =
-        [...getState().viewContextManager.patchNetwork.connectables.keys()]
-          .filter((id: string) => !Number.isNaN(+id))
-          .map(id => +id)
-          .reduce((acc, id) => Math.max(acc, id), 0) + 1;
+      this.id = buildNewForeignConnectableID();
     }
   }
 
@@ -551,10 +559,12 @@ const registerCustomAudioNode = (
       // foreign node without holding a reference to this node, which is very helpful since we need to do that from the
       // patch network when changing state and we only have `AudioConnectables` there which only hold the foreign node.
       this.connectables.node.lgNode = this;
+      this.connectables.node.onAddedToLG?.(this);
     } else {
       const foreignNode = new nodeGetter(ctx, id, this.foreignNodeParams);
       // Set the same reference as above
       foreignNode.lgNode = this;
+      foreignNode.onAddedToLG?.(this);
       this.title = nodeGetter.typeName;
       const connectables = foreignNode.buildConnectables();
       if (connectables.vcId !== id) {
@@ -574,26 +584,15 @@ const registerCustomAudioNode = (
           if (!R.isNil(value)) {
             this.setProperty(name, value);
           }
-          this.addInput(name, input.type);
+          (this as LGraphNode).addInput(name, input.type === 'any' ? (0 as any) : input.type);
         } else {
-          this.addInput(name, input.type);
+          (this as LGraphNode).addInput(name, input.type === 'any' ? (0 as any) : input.type);
         }
       });
 
       [...connectables.outputs.entries()].forEach(([name, output]) => {
-        this.addOutput(name, output.type);
+        this.addOutput(name, output.type === 'any' ? (0 as any) : output.type);
       });
-    }
-
-    if (!this.ignoreAdd) {
-      addNode(this.id.toString(), this.connectables);
-    }
-  };
-
-  CustomAudioNode.prototype.onRemoved = function (this: any) {
-    if (!this.ignoreRemove) {
-      removeNode(this.id.toString());
-      this.onRemovedCustom?.();
     }
   };
 
