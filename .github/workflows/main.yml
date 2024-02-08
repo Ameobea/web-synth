@@ -139,7 +139,7 @@ jobs:
 
       # Run Cypress tests
       - name: Cypress Run
-        uses: cypress-io/github-action@v2
+        uses: cypress-io/github-action@v6
         with:
           browser: chrome
           start: yarn cypress:serve
