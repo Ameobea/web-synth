@@ -378,9 +378,6 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       const subgraphID = state.viewContextManager.activeViewContexts.find(
         vc => vc.uuid === vcId
       )?.subgraphId;
-      if (!subgraphID) {
-        throw new Error('Unable to determine subgraph ID for graph editor');
-      }
 
       return {
         ...R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager),
@@ -533,6 +530,9 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         if (nodeType === 'ADD_SUBGRAPH') {
           addSubgraph();
         } else {
+          if (!subgraphID) {
+            throw new Error('No subgraph ID');
+          }
           createNode(nodeType, subgraphID);
         }
       };
@@ -554,7 +554,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
   const lastPatchNetwork = useRef<typeof patchNetwork | null>(null);
   useEffect(() => {
-    if (lastPatchNetwork.current === patchNetwork || !lGraphInstance) {
+    if (lastPatchNetwork.current === patchNetwork || !lGraphInstance || !subgraphID) {
       return;
     }
 

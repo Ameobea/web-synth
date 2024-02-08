@@ -33,4 +33,10 @@ context('Entrypoint', () => {
       .should('have.attr', 'data-selected', 'true')
       .and('contain.text', '0.24');
   });
+
+  it('Should render the standalone FM synth demo without errors', () => {
+    cy.visit('http://localhost:9000/fm.html');
+
+    cy.get('.ReactPiano__Keyboard').should('exist');
+  });
 });

@@ -1,6 +1,6 @@
-import * as Chartist from 'chartist';
+import { BarChart } from 'chartist';
 
-import 'chartist/dist/chartist.min.css';
+import 'chartist/dist/index.css';
 import React, { useEffect, useRef } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 
@@ -13,7 +13,7 @@ const Histogram: React.FC = () => {
     shallowEqual
   );
   const histogramContainer = useRef<null | HTMLDivElement>(null);
-  const chartHandle = useRef<Chartist.IChartistBarChart | null>(null);
+  const chartHandle = useRef<BarChart | null>(null);
 
   const uniqueId = useUniqueId();
   const histogramContainerId = `histogram-${uniqueId}`;
@@ -23,8 +23,8 @@ const Histogram: React.FC = () => {
       return;
     }
 
-    chartHandle.current = new Chartist.Bar(`#${histogramContainerId}`, { series: [] }, {});
-    return () => chartHandle.current!.detach();
+    chartHandle.current = new BarChart(`#${histogramContainerId}`, { series: [] }, {});
+    return () => void chartHandle.current!.detach();
   }, [histogramContainer, histogramContainerId]);
 
   useEffect(() => {
