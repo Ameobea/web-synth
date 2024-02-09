@@ -16,6 +16,8 @@ import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
 import { get, writable, type Writable } from 'svelte/store';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
+import SubgraphPortalSmallView from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalSmallView.svelte';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 
 interface SubgraphPortalNodeState {
   txSubgraphID: string;
@@ -24,22 +26,25 @@ interface SubgraphPortalNodeState {
   registeredOutputs: { [name: string]: { type: ConnectableType } };
 }
 
+export type PortMap = {
+  [name: string]: { type: ConnectableType; node: AudioNode | MIDINode };
+};
+
 export class SubgraphPortalNode implements ForeignNode {
   private vcId: string;
   private txSubgraphID!: string;
   private rxSubgraphID!: string;
-  private registeredInputs: Writable<{
-    [name: string]: { type: ConnectableType; node: AudioNode | MIDINode };
-  }> = writable({});
-  private registeredOutputs: Writable<{
-    [name: string]: { type: ConnectableType; node: AudioNode | MIDINode };
-  }> = writable({});
+  private registeredInputs: Writable<PortMap> = writable({});
+  private registeredOutputs: Writable<PortMap> = writable({});
   private placeholderInput: PlaceholderInput;
   private placeholderOutput: PlaceholderOutput;
 
   static typeName = 'Subgraph Portal';
   static manuallyCreatable = false;
   public nodeType = 'customAudio/subgraphPortal';
+
+  public renderSmallView: ForeignNode['renderSmallView'];
+  public cleanupSmallView: ForeignNode['cleanupSmallView'];
 
   public paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
@@ -66,6 +71,32 @@ export class SubgraphPortalNode implements ForeignNode {
       this.addOutput,
       'Add new output...'
     );
+
+    this.renderSmallView = mkSvelteContainerRenderHelper({
+      Comp: SubgraphPortalSmallView,
+      getProps: () => ({
+        inputs: this.registeredInputs,
+        outputs: this.registeredOutputs,
+        deletePort: (ports: Writable<PortMap>, name: string) => {
+          ports.update(ports => {
+            const newPorts = { ...ports };
+            delete newPorts[name];
+            return newPorts;
+          });
+          updateConnectables(this.vcId, this.buildConnectables());
+        },
+        renamePort: (ports: Writable<PortMap>, oldName: string, newName: string) => {
+          ports.update(ports => {
+            const newPorts = { ...ports };
+            newPorts[newName] = newPorts[oldName];
+            delete newPorts[oldName];
+            return newPorts;
+          });
+          updateConnectables(this.vcId, this.buildConnectables());
+        },
+      }),
+    });
+    this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
   }
 
   public onAddedToLG(lgNode: LGraphNode) {
@@ -106,7 +137,13 @@ export class SubgraphPortalNode implements ForeignNode {
     this.rxSubgraphID = params.rxSubgraphID;
 
     if (params.registeredInputs) {
-      this.registeredInputs.set(params.registeredInputs);
+      this.registeredInputs.set(
+        Object.fromEntries(
+          Object.entries(
+            params.registeredInputs as SubgraphPortalNodeState['registeredInputs']
+          ).map(([k, v]) => [k, { type: v.type, node: new DummyNode(k) }])
+        )
+      );
     }
     if (params.registeredOutputs) {
       this.registeredOutputs.set(
@@ -156,7 +193,6 @@ export class SubgraphPortalNode implements ForeignNode {
     type: ConnectableType,
     txConnectableDescriptor: ConnectableDescriptor
   ) => {
-    console.log({ inputName, type, txConnectableDescriptor });
     this.registeredInputs.update(inputs => ({
       ...inputs,
       [inputName]: {

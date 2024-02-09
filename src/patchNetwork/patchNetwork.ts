@@ -9,6 +9,23 @@ import { getEngine } from 'src/util';
 import type { MIDINode } from './midiNode';
 
 export type ConnectableType = 'midi' | 'number' | 'customAudio' | 'any';
+
+export const formatConnectableType = (type: ConnectableType): string => {
+  switch (type) {
+    case 'midi':
+      return 'MIDI';
+    case 'number':
+      return 'CV';
+    case 'customAudio':
+      return 'Audio';
+    case 'any':
+      return 'Any';
+    default:
+      console.error('Invalid connectable type: ', type);
+      return 'Unknown';
+  }
+};
+
 export interface ConnectableInput {
   node: AudioParam | AudioNode | MIDINode;
   type: ConnectableType;

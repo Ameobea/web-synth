@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import type { MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
+import type { MIDIInputCbs, MIDINode, MIDINodeMetadata } from 'src/patchNetwork/midiNode';
+import { writable, type Writable } from 'svelte/store';
 
 const noop = () => {};
 
@@ -9,6 +10,9 @@ const noop = () => {};
  * as loading and lazy initialization.
  */
 export default class DummyNode extends GainNode implements AudioNode, MIDINode {
+  protected connectedInputs: MIDINode[] = [];
+  protected connectedOutputs: MIDINode[] = [];
+
   public name = '';
 
   constructor(name?: string) {
@@ -36,6 +40,10 @@ export default class DummyNode extends GainNode implements AudioNode, MIDINode {
   public onAttack = () => {};
   public onRelease = () => {};
   public clearAll = () => {};
+
+  public onConnectionsChanged = () => {};
+
+  public metadata: Writable<MIDINodeMetadata> = writable({ noteMetadata: new Map() });
 
   public getInputCbs = () => ({
     onAttack: noop,

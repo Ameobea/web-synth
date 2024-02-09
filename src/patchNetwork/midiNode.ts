@@ -60,8 +60,8 @@ export interface MIDINodeMetadata {
  * in the patch network with a connection type of 'midi'.
  */
 export class MIDINode {
-  private connectedInputs: MIDINode[] = [];
-  private connectedOutputs: MIDINode[] = [];
+  protected connectedInputs: MIDINode[] = [];
+  protected connectedOutputs: MIDINode[] = [];
   public getInputCbs: () => MIDIInputCbs;
   public metadata: Writable<MIDINodeMetadata> = writable({ noteMetadata: new Map() });
   private cachedInputCbs: MIDIInputCbs | null = null;

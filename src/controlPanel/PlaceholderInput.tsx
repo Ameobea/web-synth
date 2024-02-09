@@ -1,8 +1,9 @@
+import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { AudioConnectables, ConnectableDescriptor, ConnectableType } from 'src/patchNetwork';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { actionCreators, dispatch, getState } from 'src/redux';
 
-export class PlaceholderInput extends GainNode implements AudioNode {
+export class PlaceholderInput extends DummyNode {
   private vcId: string;
   private getConnectables: () => AudioConnectables;
   private addInput: (
@@ -23,7 +24,7 @@ export class PlaceholderInput extends GainNode implements AudioNode {
     ) => void,
     label = 'Add a new input...'
   ) {
-    super(ctx);
+    super(label);
     this.vcId = vcId;
     this.getConnectables = getConnectables;
     this.addInput = addInput;
