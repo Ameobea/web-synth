@@ -49,7 +49,6 @@ export class PlaceholderOutput extends GainNode implements AudioNode {
 
     setTimeout(() => {
       // Disconnect from the dummy "add a new control", create a new input for it, and re-connect it to that
-
       dispatch(
         actionCreators.viewContextManager.DISCONNECT(
           { vcId: this.vcId, name: this.label },
@@ -61,7 +60,7 @@ export class PlaceholderOutput extends GainNode implements AudioNode {
       while (
         getState()
           .viewContextManager.patchNetwork.connectables.get(this.vcId)
-          ?.inputs.has(outputName)
+          ?.outputs.has(outputName)
       ) {
         outputName += '_1';
       }

@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
+use common::uuid_v4;
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-  js::initialize_default_vcm_state,
-  prelude::*,
+  js,
   views::{
     composition_sharing::mk_composition_sharing, control_panel::mk_control_panel,
     faust_editor::mk_faust_editor, filter_designer::mk_filter_designer, granulator::mk_granulator,
@@ -16,6 +16,10 @@ use crate::{
     sequencer::mk_sequencer, signal_analyzer::mk_signal_analyzer, sinsy::mk_sinsy,
     synth_designer::mk_synth_designer, welcome_page::mk_welcome_page,
   },
+};
+
+use super::{
+  active_view_history::{ActiveView, ActiveViewHistory},
   ViewContext,
 };
 
@@ -74,7 +78,7 @@ pub struct SubgraphDescriptor {
   pub active_vc_id: Uuid,
 }
 
-pub struct ViewContextManager {
+pub(crate) struct ViewContextManager {
   pub active_context_id: Uuid,
   pub contexts: Vec<ViewContextEntry>,
   pub connections: Vec<(ConnectionDescriptor, ConnectionDescriptor)>,
@@ -82,6 +86,7 @@ pub struct ViewContextManager {
   pub subgraphs_by_id: FxHashMap<Uuid, SubgraphDescriptor>,
   /// Nil UUID corresponds to the root graph
   pub active_subgraph_id: Uuid,
+  pub active_view_history: ActiveViewHistory,
 }
 
 impl Default for ViewContextManager {
@@ -93,6 +98,7 @@ impl Default for ViewContextManager {
       foreign_connectables: Vec::new(),
       subgraphs_by_id: Default::default(),
       active_subgraph_id: Uuid::nil(),
+      active_view_history: ActiveViewHistory::default(),
     }
   }
 }
@@ -129,6 +135,8 @@ struct ViewContextManagerState {
   /// Nil UUID corresponds to the root graph
   #[serde(default = "Uuid::nil")]
   pub active_subgraph_id: Uuid,
+  #[serde(default)]
+  pub active_view_history: ActiveViewHistory,
 }
 
 fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
@@ -248,6 +256,13 @@ impl ViewContextManager {
           active_vc_id: self.active_context_id,
         });
     }
+
+    self.active_view_history = vcm_state.active_view_history;
+    if !self.active_context_id.is_nil() && self.active_view_history.history.is_empty() {
+      self
+        .active_view_history
+        .set_active_view(self.active_subgraph_id, self.active_context_id);
+    }
   }
 
   fn load_vcm_state() -> Option<ViewContextManagerState> {
@@ -285,22 +300,6 @@ impl ViewContextManager {
     self.get_active_view_mut().unhide();
 
     self.init_vcs();
-  }
-
-  /// Retrieves the active `ViewContextManager`
-  pub fn get_active_view(&self) -> &dyn ViewContext {
-    self
-      .contexts
-      .iter()
-      .find(|vc| vc.id == self.active_context_id)
-      .unwrap_or_else(|| {
-        panic!(
-          "Tried to get active VC with ID {} but it wasn't found",
-          self.active_context_id
-        )
-      })
-      .context
-      .as_ref()
   }
 
   /// Retrieves the active `ViewContextManager`
@@ -355,7 +354,7 @@ impl ViewContextManager {
       .subgraphs_by_id
       .insert(new_subgraph_id, SubgraphDescriptor {
         id: new_subgraph_id,
-        name: "New Subgraph".to_owned(),
+        name: "Subgraph".to_owned(),
         active_vc_id: new_graph_editor_vc_id,
       });
     js::set_subgraphs(
@@ -392,7 +391,15 @@ impl ViewContextManager {
     new_subgraph_id
   }
 
-  pub fn set_active_subgraph(&mut self, subgraph_id: Uuid) {
+  pub fn delete_subgraph(&mut self, subgraph_id: Uuid) {
+    self
+      .active_view_history
+      .filter(|active_view| active_view.subgraph_id != subgraph_id);
+
+    todo!();
+  }
+
+  pub fn set_active_subgraph(&mut self, subgraph_id: Uuid, skip_history: bool) {
     if self.active_subgraph_id == subgraph_id {
       return;
     }
@@ -410,13 +417,64 @@ impl ViewContextManager {
       .unwrap()
       .active_vc_id = self.active_context_id;
     self.active_subgraph_id = subgraph_id;
-    self.set_active_view(self.subgraphs_by_id[&subgraph_id].active_vc_id);
+    self.set_active_view(self.subgraphs_by_id[&subgraph_id].active_vc_id, true);
+    if !skip_history {
+      self
+        .active_view_history
+        .set_active_view(self.active_subgraph_id, self.active_context_id);
+    }
 
     self.save_all();
     js::set_subgraphs(
       &self.active_subgraph_id.to_string(),
       &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
     );
+  }
+
+  fn set_view(&mut self, subgraph_id: Uuid, vc_id: Uuid) -> Result<(), ()> {
+    if self.subgraphs_by_id.contains_key(&subgraph_id)
+      && self.contexts.iter().any(|vc| vc.id == vc_id)
+    {
+      self.set_active_subgraph(subgraph_id, true);
+      self.set_active_view(vc_id, true);
+      Ok(())
+    } else {
+      Err(())
+    }
+  }
+
+  pub fn undo_view_change(&mut self) {
+    loop {
+      match self.active_view_history.undo() {
+        Some(ActiveView { subgraph_id, vc_id }) => {
+          if self.set_view(subgraph_id, vc_id).is_ok() {
+          } else {
+            self
+              .active_view_history
+              .clear(self.active_subgraph_id, self.active_context_id);
+          }
+          break;
+        },
+        None => break,
+      }
+    }
+  }
+
+  pub fn redo_view_change(&mut self) {
+    loop {
+      match self.active_view_history.redo() {
+        Some(ActiveView { subgraph_id, vc_id }) => {
+          if self.set_view(subgraph_id, vc_id).is_ok() {
+          } else {
+            self
+              .active_view_history
+              .clear(self.active_subgraph_id, self.active_context_id);
+          }
+          break;
+        },
+        None => break,
+      }
+    }
   }
 
   pub fn get_vc_position(&self, id: Uuid) -> Option<usize> {
@@ -478,6 +536,10 @@ impl ViewContextManager {
       }
     }
 
+    self
+      .active_view_history
+      .filter(|active_view| active_view.vc_id != id);
+
     js::delete_view_context(&id.to_string());
     if self.active_context_id != old_active_vc_id {
       js::set_active_vc_id(&self.active_context_id.to_string());
@@ -524,6 +586,7 @@ impl ViewContextManager {
       foreign_connectables: self.foreign_connectables.clone(),
       subgraphs_by_id,
       active_subgraph_id: self.active_subgraph_id,
+      active_view_history: self.active_view_history.clone(),
     }
   }
 
@@ -540,7 +603,7 @@ impl ViewContextManager {
     js::set_localstorage_key(VCM_STATE_KEY, &serialized_state);
   }
 
-  pub fn set_active_view(&mut self, view_id: Uuid) {
+  pub fn set_active_view(&mut self, view_id: Uuid, skip_history: bool) {
     self.save_all();
     self.get_active_view_mut().hide();
     self.active_context_id = view_id;
@@ -552,6 +615,11 @@ impl ViewContextManager {
           self.active_subgraph_id
         );
       },
+    }
+    if !skip_history {
+      self
+        .active_view_history
+        .set_active_view(self.active_subgraph_id, view_id);
     }
     self.get_active_view_mut().unhide();
     js::set_active_vc_id(&view_id.to_string());
@@ -593,7 +661,7 @@ impl ViewContextManager {
     self.connections.clear();
     self.foreign_connectables.clear();
 
-    initialize_default_vcm_state();
+    js::initialize_default_vcm_state();
   }
 }
 

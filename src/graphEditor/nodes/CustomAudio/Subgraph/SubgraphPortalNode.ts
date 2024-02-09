@@ -14,6 +14,8 @@ import { getState } from 'src/redux';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
 import { get, writable, type Writable } from 'svelte/store';
+import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 
 interface SubgraphPortalNodeState {
   txSubgraphID: string;
@@ -27,13 +29,13 @@ export class SubgraphPortalNode implements ForeignNode {
   private txSubgraphID!: string;
   private rxSubgraphID!: string;
   private registeredInputs: Writable<{
-    [name: string]: { type: ConnectableType; dummyNode: DummyNode };
+    [name: string]: { type: ConnectableType; node: AudioNode | MIDINode };
   }> = writable({});
   private registeredOutputs: Writable<{
-    [name: string]: { type: ConnectableType; dummyNode: DummyNode };
+    [name: string]: { type: ConnectableType; node: AudioNode | MIDINode };
   }> = writable({});
-  private dummyInput: DummyNode;
-  private dummyOutput: PlaceholderOutput;
+  private placeholderInput: PlaceholderInput;
+  private placeholderOutput: PlaceholderOutput;
 
   static typeName = 'Subgraph Portal';
   static manuallyCreatable = false;
@@ -50,14 +52,20 @@ export class SubgraphPortalNode implements ForeignNode {
     this.vcId = vcId;
     this.deserialize(params);
 
-    this.dummyOutput = new PlaceholderOutput(
+    this.placeholderInput = new PlaceholderInput(
+      ctx,
+      this.vcId,
+      () => this.buildConnectables(),
+      this.addInput,
+      'Add new input...'
+    );
+    this.placeholderOutput = new PlaceholderOutput(
       ctx,
       this.vcId,
       () => this.buildConnectables(),
       this.addOutput,
       'Add new output...'
     );
-    this.dummyInput = new DummyNode('Add new input...');
   }
 
   public onAddedToLG(lgNode: LGraphNode) {
@@ -105,7 +113,7 @@ export class SubgraphPortalNode implements ForeignNode {
         Object.fromEntries(
           Object.entries(
             params.registeredOutputs as SubgraphPortalNodeState['registeredOutputs']
-          ).map(([k, v]) => [k, { type: v.type, dummyNode: new DummyNode(k) }])
+          ).map(([k, v]) => [k, { type: v.type, node: new DummyNode(k) }])
         )
       );
     }
@@ -120,36 +128,90 @@ export class SubgraphPortalNode implements ForeignNode {
       ...outputs,
       [outputName]: {
         type,
-        dummyNode: new DummyNode(rxConnectableDescriptor.name),
+        node: new DummyNode(rxConnectableDescriptor.name),
       },
     }));
+    updateConnectables(this.vcId, this.buildConnectables());
+
+    // Find other subgraph portals that have our rx as their tx and add inputs to them to match this one
+    for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
+      if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
+        if (connectables.node.txSubgraphID === this.rxSubgraphID) {
+          console.log(connectables.node, {
+            thisVcId: this.vcId,
+            otherVcId: connectables.node.vcId,
+          });
+          connectables.node.registeredInputs.update(inputs => ({
+            ...inputs,
+            [outputName]: { type, node: new DummyNode(rxConnectableDescriptor.name) },
+          }));
+          updateConnectables(connectables.node.vcId, connectables.node.buildConnectables());
+        }
+      }
+    }
+  };
+
+  private addInput = (
+    inputName: string,
+    type: ConnectableType,
+    txConnectableDescriptor: ConnectableDescriptor
+  ) => {
+    console.log({ inputName, type, txConnectableDescriptor });
+    this.registeredInputs.update(inputs => ({
+      ...inputs,
+      [inputName]: {
+        type,
+        node: new DummyNode(txConnectableDescriptor.name),
+      },
+    }));
+    updateConnectables(this.vcId, this.buildConnectables());
+
+    // Find other subgraph portals that have our tx as their rx and add outputs to them to match this one
+    for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
+      if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
+        if (connectables.node.rxSubgraphID === this.txSubgraphID) {
+          connectables.node.registeredOutputs.update(outputs => ({
+            ...outputs,
+            [inputName]: { type, node: new DummyNode(txConnectableDescriptor.name) },
+          }));
+          updateConnectables(connectables.node.vcId, connectables.node.buildConnectables());
+        }
+      }
+    }
   };
 
   buildConnectables(): AudioConnectables & { node: ForeignNode } {
-    let outputs = ImmMap<string, ConnectableOutput>().set(this.dummyOutput.label, {
+    let inputs = ImmMap<string, ConnectableInput>().set(this.placeholderInput.label, {
       type: 'any',
-      node: this.dummyOutput,
+      node: this.placeholderInput,
+    });
+    for (const [name, descriptor] of Object.entries(get(this.registeredInputs))) {
+      inputs = inputs.set(name, {
+        type: 'any',
+        node: descriptor.node,
+      });
+    }
+
+    let outputs = ImmMap<string, ConnectableOutput>().set(this.placeholderOutput.label, {
+      type: 'any',
+      node: this.placeholderOutput,
     });
     for (const [name, descriptor] of Object.entries(get(this.registeredOutputs))) {
       outputs = outputs.set(name, {
         type: 'any',
-        node: descriptor.dummyNode,
+        node: descriptor.node,
       });
     }
 
     return {
       vcId: this.vcId,
-      inputs: ImmMap<string, ConnectableInput>().set(this.dummyInput.name, {
-        type: 'any',
-        node: this.dummyOutput,
-      }),
+      inputs,
       outputs,
       node: this,
     };
   }
 
   public onNodeDblClicked() {
-    console.log(this);
     getEngine()!.set_active_subgraph_id(this.rxSubgraphID);
   }
 }

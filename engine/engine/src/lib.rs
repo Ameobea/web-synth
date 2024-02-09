@@ -7,24 +7,22 @@ extern crate log;
 
 use std::{ptr, str::FromStr};
 
-use prelude::js::js_random;
+use common::uuid_v4;
+use js::js_random;
 use uuid::Uuid;
+use view_context::manager::{ConnectionDescriptor, ViewContextManager};
 use wasm_bindgen::prelude::*;
 
 pub mod js;
-pub mod prelude;
 pub mod view_context;
 pub mod views;
-use crate::{
-  prelude::*,
-  view_context::manager::{build_view, ForeignConnectable},
-};
+use crate::view_context::manager::{build_view, ForeignConnectable};
 
 /// The global view context manager that holds all of the view contexts for the application.
 static mut VIEW_CONTEXT_MANAGER: *mut ViewContextManager = ptr::null_mut();
 
 /// Retrieves the global `ViewContextManager` for the application
-pub fn get_vcm() -> &'static mut ViewContextManager {
+pub(crate) fn get_vcm() -> &'static mut ViewContextManager {
   if cfg!(debug_assertions) && unsafe { VIEW_CONTEXT_MANAGER.is_null() } {
     panic!("VIEW_CONTEXT_MANAGER is null");
   }
@@ -88,7 +86,7 @@ pub fn delete_vc_by_id(id: &str) {
 pub fn switch_view_context(uuid_str: &str) {
   let uuid =
     Uuid::from_str(uuid_str).expect("Invalid UUID string passed to `switch_view_context`!");
-  get_vcm().set_active_view(uuid);
+  get_vcm().set_active_view(uuid, false);
 }
 
 #[wasm_bindgen]
@@ -99,12 +97,24 @@ pub fn add_subgraph() -> String {
 }
 
 #[wasm_bindgen]
+pub fn delete_subgraph(subgraph_id: &str) {
+  let uuid = Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `delete_subgraph`!");
+  get_vcm().delete_subgraph(uuid);
+}
+
+#[wasm_bindgen]
 pub fn set_active_subgraph_id(subgraph_id: &str) {
   let uuid =
     Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `set_active_subgraph_id`!");
   let vcm = get_vcm();
-  vcm.set_active_subgraph(uuid);
+  vcm.set_active_subgraph(uuid, false);
 }
+
+#[wasm_bindgen]
+pub fn undo_view_change() { get_vcm().undo_view_change(); }
+
+#[wasm_bindgen]
+pub fn redo_view_change() { get_vcm().redo_view_change(); }
 
 #[wasm_bindgen]
 pub fn reset_vcm() {

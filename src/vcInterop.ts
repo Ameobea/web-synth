@@ -88,7 +88,6 @@ export const add_view_context = (id: string, name: string, subgraphID: string) =
 
 export const add_foreign_connectable = (fcJSON: string) => {
   const fc: ForeignConnectable = JSON.parse(fcJSON);
-  console.log({ fc });
   const id = buildNewForeignConnectableID().toString();
   const node = new audioNodeGetters[fc.type]!.nodeGetter(ctx, id, fc.serializedState);
   const connectables = node.buildConnectables();

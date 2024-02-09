@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
+mod active_view_history;
 pub mod manager;
-pub use self::manager::ViewContextManager;
 
 #[wasm_bindgen(raw_module = "./redux/modules/vcmUtils")]
 extern "C" {

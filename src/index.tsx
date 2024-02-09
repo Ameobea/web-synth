@@ -12,7 +12,7 @@ import {
 import { getReactQueryClient } from 'src/reactUtils';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
-import { initGlobals, setEngine } from 'src/util';
+import { getEngine, initGlobals, setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
@@ -47,6 +47,23 @@ const createViewContextManagerUI = (engine: typeof import('./engine')) => {
   );
 };
 
+export const handleGlobalMouseDown = (evt: MouseEvent) => {
+  if (evt.button === 3) {
+    evt.preventDefault();
+    getEngine()?.undo_view_change();
+  } else if (evt.button === 4) {
+    evt.preventDefault();
+    getEngine()?.redo_view_change();
+  }
+};
+
+// Match my VS code experience with mouse buttons for "go back" and "go forward"
+const registerBackForwardsMouseHandlers = () => {
+  document.addEventListener('mouseup', evt => {
+    handleGlobalMouseDown(evt);
+  });
+};
+
 if (typeof AudioWorkletNode === 'undefined') {
   createBrowserNotSupportedMessage();
 } else {
@@ -54,6 +71,8 @@ if (typeof AudioWorkletNode === 'undefined') {
 
   wasm.then(async engine => {
     setEngine(engine);
+
+    registerBackForwardsMouseHandlers();
 
     registerMainReduxGetState(getState);
 

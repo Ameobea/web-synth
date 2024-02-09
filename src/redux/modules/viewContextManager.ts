@@ -110,7 +110,7 @@ const actionGroups = {
         return state;
       }
 
-      connectNodes(fromConnectable.node, toConnectable.node, to);
+      connectNodes(fromConnectable.node, toConnectable.node, from, to);
 
       const newConnections = [
         ...connections,
@@ -379,7 +379,7 @@ const actionGroups = {
             return;
           }
 
-          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node, to);
+          connectNodes(newConnectedPair[0].node, newConnectedPair[1].node, from, to);
         }
 
         return true;

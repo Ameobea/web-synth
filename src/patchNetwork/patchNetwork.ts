@@ -152,7 +152,7 @@ export const initPatchNetwork = (
         connectedPair[1].node,
         connectedPair[0].node instanceof PlaceholderOutput ? to : undefined
       );
-      connectNodes(connectedPair[0].node, connectedPair[1].node, to);
+      connectNodes(connectedPair[0].node, connectedPair[1].node, from, to);
     } catch (err) {
       console.error('Error connecting nodes: ', err);
       console.error({ connectedPair, from, to });

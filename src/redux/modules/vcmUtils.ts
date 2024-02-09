@@ -5,6 +5,7 @@ import { shallowEqual } from 'react-redux';
 import type { Unsubscribe } from 'redux';
 
 import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
+import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 import { OverridableAudioNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import DefaultComposition from 'src/init-composition.json';
 import type {
@@ -61,6 +62,7 @@ export const commitForeignConnectables = (
 export const connectNodes = (
   src: AudioNode | MIDINode,
   dst: AudioNode | MIDINode | AudioParam,
+  srcDescriptor: ConnectableDescriptor,
   dstDescriptor: ConnectableDescriptor
 ) => {
   // We handle the special case of an `OverridableAudioParam` or `OverridableAudioNode` here, notifying it of its potentially new status
@@ -69,6 +71,10 @@ export const connectNodes = (
   }
 
   (src as any).connect(dst, src instanceof PlaceholderOutput ? dstDescriptor : undefined);
+
+  if (dst instanceof PlaceholderInput) {
+    dst.connect(src, srcDescriptor);
+  }
 };
 
 export const disconnectNodes = (

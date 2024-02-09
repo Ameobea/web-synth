@@ -32,6 +32,7 @@ import { registerAllCustomNodes } from './nodes';
 import type { AudioConnectables } from 'src/patchNetwork';
 import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/nodes/CustomAudio';
 import { removeNode } from 'src/patchNetwork/interface';
+import { handleGlobalMouseDown } from 'src';
 
 const ctx = new AudioContext();
 
@@ -115,6 +116,15 @@ LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
   }
 
   ((node as any).connectables as AudioConnectables | undefined)?.node?.onNodeDblClicked?.();
+};
+
+// Prevent litegraph from swallowing mouse navigation events
+const oldAdjustMouseEvent = LGraphCanvas.prototype.adjustMouseEvent;
+LGraphCanvas.prototype.adjustMouseEvent = function (this: LGraphCanvas, evt: any) {
+  oldAdjustMouseEvent.apply(this, [evt]);
+  if (evt.type === 'mouseup' && (evt.which === 4 || evt.which === 5)) {
+    handleGlobalMouseDown(evt);
+  }
 };
 
 /**
