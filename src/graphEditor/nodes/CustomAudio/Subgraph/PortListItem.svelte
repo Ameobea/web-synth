@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
   import type { MIDINode } from 'src/patchNetwork/midiNode';
   import { formatConnectableType, type ConnectableType } from 'src/patchNetwork/patchNetwork';
 
@@ -16,7 +17,9 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div role="button" on:click={onDelete} tabindex="0">×</div>
   </div>
-  <div class="port-name">{name}</div>
+  <div class="port-name">
+    <EditableInstanceName left={0} {name} setName={onRename} --position="relative" />
+  </div>
   <div class="port-type">{formatConnectableType(port.type)}</div>
 </div>
 

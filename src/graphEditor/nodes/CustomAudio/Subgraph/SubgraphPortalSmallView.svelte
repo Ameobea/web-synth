@@ -5,7 +5,7 @@
 
   export let inputs: Writable<PortMap>;
   export let outputs: Writable<PortMap>;
-  export let renamePort: (ports: Writable<PortMap>, oldName: string, newName: string) => void;
+  export let renamePort: (side: 'input' | 'output', oldName: string, newName: string) => void;
   export let deletePort: (ports: Writable<PortMap>, name: string) => void;
 </script>
 
@@ -13,13 +13,13 @@
   <PortList
     title="Inputs"
     ports={inputs}
-    renamePort={(oldName, newName) => renamePort(inputs, oldName, newName)}
+    renamePort={(oldName, newName) => renamePort('input', oldName, newName)}
     deletePort={name => deletePort(inputs, name)}
   />
   <PortList
     title="Outputs"
     ports={outputs}
-    renamePort={(oldName, newName) => renamePort(outputs, oldName, newName)}
+    renamePort={(oldName, newName) => renamePort('output', oldName, newName)}
     deletePort={name => deletePort(outputs, name)}
   />
 </div>

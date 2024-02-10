@@ -5,6 +5,7 @@
   export let setName: (name: string) => void;
   export let left: number | undefined = undefined;
   export let right: number | undefined = undefined;
+  export let style: string | undefined = undefined;
 
   let isEditingName = false;
   let nameWrapperHovered = false;
@@ -77,13 +78,17 @@
   .name-wrapper {
     margin-left: 4px;
     margin-top: -3px;
-    position: absolute;
+    position: var(--position, absolute);
     user-select: none;
   }
 
   .name-wrapper,
   input[type='text'] {
-    font-family: Hack, Oxygen Mono, Menlo, monospace;
+    font-family:
+      Hack,
+      Oxygen Mono,
+      Menlo,
+      monospace;
     font-size: 13px;
   }
 

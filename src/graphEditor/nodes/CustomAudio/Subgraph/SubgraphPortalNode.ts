@@ -10,7 +10,7 @@ import type {
 import { Map as ImmMap } from 'immutable';
 import { getEngine } from 'src/util';
 import type { LGraphNode } from 'litegraph.js';
-import { getState } from 'src/redux';
+import { actionCreators, dispatch, getState } from 'src/redux';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
 import { get, writable, type Writable } from 'svelte/store';
@@ -85,15 +85,8 @@ export class SubgraphPortalNode implements ForeignNode {
           });
           updateConnectables(this.vcId, this.buildConnectables());
         },
-        renamePort: (ports: Writable<PortMap>, oldName: string, newName: string) => {
-          ports.update(ports => {
-            const newPorts = { ...ports };
-            newPorts[newName] = newPorts[oldName];
-            delete newPorts[oldName];
-            return newPorts;
-          });
-          updateConnectables(this.vcId, this.buildConnectables());
-        },
+        renamePort: (side: 'input' | 'output', oldName: string, newName: string) =>
+          void this.renamePort(side, oldName, newName),
       }),
     });
     this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
@@ -107,6 +100,45 @@ export class SubgraphPortalNode implements ForeignNode {
     lgNode.shape = 1;
     lgNode.graph?.setDirtyCanvas(true, false);
   }
+
+  private renamePort = (side: 'input' | 'output', oldName: string, newName: string) => {
+    const ports = side === 'input' ? this.registeredInputs : this.registeredOutputs;
+    if (!get(ports)[oldName]) {
+      return;
+    }
+
+    ports.update(ports => {
+      const newPorts = { ...ports };
+      newPorts[newName] = newPorts[oldName];
+      delete newPorts[oldName];
+      return newPorts;
+    });
+
+    const oldConns = getState().viewContextManager.patchNetwork.connections;
+    updateConnectables(this.vcId, this.buildConnectables());
+
+    // Reconnect any connections to this port that were severed by the rename
+    for (const [tx, rx] of oldConns) {
+      if (side === 'input' && rx.vcId === this.vcId && rx.name === oldName) {
+        const newRx = { ...rx, name: newName };
+        dispatch(actionCreators.viewContextManager.CONNECT(tx, newRx));
+      } else if (side === 'output' && tx.vcId === this.vcId && tx.name === oldName) {
+        const newTx = { ...tx, name: newName };
+        dispatch(actionCreators.viewContextManager.CONNECT(newTx, rx));
+      }
+    }
+
+    // Rename ports on other subgraph portals
+    for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
+      if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
+        if (side === 'input' && connectables.node.txSubgraphID === this.rxSubgraphID) {
+          connectables.node.renamePort('output', oldName, newName);
+        } else if (side === 'output' && connectables.node.rxSubgraphID === this.txSubgraphID) {
+          connectables.node.renamePort('input', oldName, newName);
+        }
+      }
+    }
+  };
 
   public serialize(): SubgraphPortalNodeState {
     return {
