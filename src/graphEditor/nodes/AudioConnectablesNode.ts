@@ -1,8 +1,7 @@
 /**
  * Defines a graph node that wraps an `AudioConnectables` instance.  It
  */
-import { LiteGraph } from 'litegraph.js';
-import * as R from 'ramda';
+import { type LGraphNode, LiteGraph } from 'litegraph.js';
 
 import type {
   LiteGraphLink,
@@ -20,35 +19,47 @@ export function LGAudioConnectables(this: any) {
 }
 
 LGAudioConnectables.prototype.setConnectables = function (
-  this: any,
+  this: LGraphNode,
   connectables: AudioConnectables
 ) {
   // Store the raw inputs and outputs for later direct access
-  this.connectables = connectables;
-  this.connectables.vcId = this.id.toString();
+  (this as any).connectables = connectables;
+  (this as any).connectables.vcId = this.id.toString();
 
-  if (connectables.node) {
-    this.title = (connectables.node as any).name;
+  // Clear existing inputs and outputs that aren't in the new connectables
+  //
+  // We don't want to delete all inputs and outputs and recreate them because that
+  // triggers patch network changes
+  let i = 0;
+  while (this.inputs && i < this.inputs.length) {
+    if (!connectables.inputs.has(this.inputs[i].name)) {
+      this.removeInput(i);
+      i = 0;
+    }
+    i += 1;
+  }
+  i = 0;
+  while (this.outputs && i < this.outputs.length) {
+    if (!connectables.outputs.has(this.outputs[i].name)) {
+      this.removeOutput(i);
+      i = 0;
+    }
+    i += 1;
   }
 
   [...connectables.inputs.entries()].forEach(([name, input]) => {
-    if (input.node instanceof AudioParam) {
-      this.addProperty(name, input.node.value, input.type);
-      this.addProperty(name, input.node, input.type);
-      const value = (connectables.node as any)?.node?.[name]?.value;
-      if (!R.isNil(value)) {
-        this.setProperty(name, value);
-      }
-      this.addInput(name, input.type === 'any' ? 0 : input.type);
-    } else {
-      this.addInput(name, input.type === 'any' ? 0 : input.type);
+    if (!this.inputs || !this.inputs.find(i => i.name === name)) {
+      this.addInput(name, input.type === 'any' ? (0 as any) : input.type);
     }
   });
 
   [...connectables.outputs.entries()].forEach(([name, output]) => {
-    // TODO: Look up this type dynamically?
-    this.addOutput(name, output.type === 'any' ? 0 : output.type);
+    if (!this.outputs || !this.outputs.find(i => i.name === name)) {
+      this.addOutput(name, output.type === 'any' ? (0 as any) : output.type);
+    }
   });
+
+  this.graph?.setDirtyCanvas(true, false);
 };
 
 LGAudioConnectables.prototype.onPropertyChanged = function (name: string, value: any) {
@@ -108,4 +119,4 @@ LGAudioConnectables.prototype.onConnectionsChange = function (
 };
 
 export const registerAudioConnectablesNode = () =>
-  LiteGraph.registerNodeType('audio/audioConnectables', LGAudioConnectables);
+  LiteGraph.registerNodeType('audio/audioConnectables', LGAudioConnectables as any);

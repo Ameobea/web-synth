@@ -10,7 +10,7 @@ import type {
 import { Map as ImmMap } from 'immutable';
 import { getEngine } from 'src/util';
 import type { LGraphNode } from 'litegraph.js';
-import { actionCreators, dispatch, getState } from 'src/redux';
+import { actionCreators, dispatch, getState, store } from 'src/redux';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
 import { get, writable, type Writable } from 'svelte/store';
@@ -30,12 +30,134 @@ export type PortMap = {
   [name: string]: { type: ConnectableType; node: AudioNode | MIDINode };
 };
 
+let watcherInitialized = false;
+const maybeInitSubgraphConnectablesWatcher = () => {
+  if (watcherInitialized) {
+    return;
+  }
+  watcherInitialized = true;
+
+  let lastConnections = getState().viewContextManager.patchNetwork.connections;
+  store.subscribe(() => {
+    const connections = getState().viewContextManager.patchNetwork.connections;
+    if (connections === lastConnections) {
+      return;
+    }
+    lastConnections = connections;
+
+    let connectables = getState().viewContextManager.patchNetwork.connectables;
+    for (const [tx] of connections) {
+      const txConnectables = connectables.get(tx.vcId);
+      if (txConnectables?.outputs.get(tx.name)?.node instanceof PlaceholderOutput) {
+        continue;
+      }
+      const txSubgraphNode = txConnectables?.node;
+      const subgraphPortName = tx.name;
+
+      if (txSubgraphNode instanceof SubgraphPortalNode) {
+        // We've found a subgraph that is serving as a tx for a connection
+        //
+        // We need find the rx connectable on the corresponding portal, find the tx connected
+        // to it, and connect it to the rx here
+        const matchingSubgraphPortals = Array.from(connectables.values()).filter(
+          c =>
+            !!c.node &&
+            c.node instanceof SubgraphPortalNode &&
+            c.node.rxSubgraphID === txSubgraphNode.txSubgraphID
+        );
+
+        const matchingConns: {
+          portal: SubgraphPortalNode;
+          tx: ConnectableDescriptor;
+          rx: ConnectableDescriptor;
+        }[] = [];
+        for (const portal of matchingSubgraphPortals) {
+          matchingConns.push(
+            ...connections
+              .filter(([_tx2, rx2]) => rx2.vcId === portal.vcId && rx2.name === subgraphPortName)
+              .map(([tx2, rx2]) => ({
+                portal: portal.node! as any as SubgraphPortalNode,
+                tx: tx2,
+                rx: rx2,
+              }))
+          );
+        }
+
+        const registeredOutputs = get(txSubgraphNode.registeredOutputs);
+        if (matchingConns.length === 0) {
+          // No inputs connected to the other side of this portal
+          //
+          // If we previously had a node patched through that has since been disconnected, replace
+          // the node with a dummy node
+          if (!(registeredOutputs[subgraphPortName]?.node instanceof DummyNode)) {
+            // console.log('Unpatching tx connectables node from subgraph portal', {
+            //   subgraphPortName,
+            //   txSubgraphNode,
+            // });
+            txSubgraphNode.registeredOutputs.update(inputs => {
+              const newInputs = { ...inputs };
+              newInputs[subgraphPortName] = {
+                type: newInputs[subgraphPortName].type,
+                node: new DummyNode(subgraphPortName),
+              };
+              return newInputs;
+            });
+            updateConnectables(txSubgraphNode.vcId, txSubgraphNode.buildConnectables());
+          }
+          continue;
+        } else if (matchingConns.length > 1) {
+          console.warn('Found multiple matching connections for a subgraph portal', matchingConns);
+        }
+        const matchingConn = matchingConns[0];
+
+        const wantedTxConnectable = connectables
+          .get(matchingConn.tx.vcId)
+          ?.outputs.get(matchingConn.tx.name);
+        if (!wantedTxConnectable) {
+          console.warn('Could not find matching tx connectable for subgraph portal', matchingConn);
+          continue;
+        }
+
+        // If the node has already been patched in, don't do it again
+        if (registeredOutputs[subgraphPortName]?.node === wantedTxConnectable.node) {
+          continue;
+        } else if (!registeredOutputs[subgraphPortName]) {
+          console.warn('Could not find matching input for subgraph portal', {
+            matchingConn,
+            registeredOutputs,
+            subgraphPortName,
+          });
+          continue;
+        } else if (registeredOutputs[subgraphPortName].type !== wantedTxConnectable.type) {
+          console.warn('Type mismatch for subgraph portal', {
+            matchingConn,
+            registeredOutputs,
+            subgraphPortName,
+          });
+          continue;
+        }
+
+        // console.log('Patching tx connectables node into subgraph portal', {
+        //   subgraphPortName,
+        //   wantedTxConnectables: wantedTxConnectable,
+        // });
+        txSubgraphNode.registeredOutputs.update(inputs => ({
+          ...inputs,
+          [subgraphPortName]: { type: wantedTxConnectable.type, node: wantedTxConnectable.node },
+        }));
+        updateConnectables(txSubgraphNode.vcId, txSubgraphNode.buildConnectables());
+        connectables = getState().viewContextManager.patchNetwork.connectables;
+      }
+    }
+  });
+};
+
 export class SubgraphPortalNode implements ForeignNode {
-  private vcId: string;
-  private txSubgraphID!: string;
-  private rxSubgraphID!: string;
-  private registeredInputs: Writable<PortMap> = writable({});
-  private registeredOutputs: Writable<PortMap> = writable({});
+  public vcId: string;
+  public txSubgraphID!: string;
+  public rxSubgraphID!: string;
+  public registeredInputs: Writable<PortMap> = writable({});
+  public registeredOutputs: Writable<PortMap> = writable({});
   private placeholderInput: PlaceholderInput;
   private placeholderOutput: PlaceholderOutput;
 
@@ -54,6 +176,9 @@ export class SubgraphPortalNode implements ForeignNode {
     if (!vcId) {
       throw new Error('`SubgraphPortalNode` must be created with a `vcId`');
     }
+
+    maybeInitSubgraphConnectablesWatcher();
+
     this.vcId = vcId;
     this.deserialize(params);
 
@@ -206,10 +331,6 @@ export class SubgraphPortalNode implements ForeignNode {
     for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
       if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
         if (connectables.node.txSubgraphID === this.rxSubgraphID) {
-          console.log(connectables.node, {
-            thisVcId: this.vcId,
-            otherVcId: connectables.node.vcId,
-          });
           connectables.node.registeredInputs.update(inputs => ({
             ...inputs,
             [outputName]: { type, node: new DummyNode(rxConnectableDescriptor.name) },

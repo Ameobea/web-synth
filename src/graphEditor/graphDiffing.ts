@@ -134,12 +134,15 @@ export const updateGraph = (
     if (!node) {
       throw new Error("Tried to remove a node that didn't exist");
     }
-    const { pos } = node;
 
+    // The old 4-year-old way of doing this:
+    // const { pos } = node;
     // Don't trigger patch network actions since these changes are purely presentational
-    node.ignoreRemove = true;
-    graph.remove(node);
-    createAndAddNode(key, { pos });
+    // graph.remove(node);
+    // createAndAddNode(key, { pos });
+
+    // new way that seems to work with no problems:
+    (node as any).setConnectables?.(patchNetwork.connectables.get(key)!);
   });
 
   // At this point, all nodes should be created/removed and have up-to-date `AudioConnectables`.  We must now run through the list

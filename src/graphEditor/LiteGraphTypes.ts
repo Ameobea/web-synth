@@ -24,7 +24,6 @@ export interface LiteGraphNode {
   connect: (srcSlotIx: number, dstNode: LiteGraphNode, dstSlotIx: number) => void;
   disconnectOutput: (srcSlot: number | string, dstNode: LiteGraphNode) => boolean;
   pos: [number, number];
-  ignoreRemove?: boolean;
   connectables?: AudioConnectables;
   clearTriggeredSlot: (slotIx: number, linkIx?: number) => void;
   triggerSlot: (slotIx: number, param?: any, linkIx?: number) => void;

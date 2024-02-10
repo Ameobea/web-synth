@@ -5,7 +5,6 @@
   export let setName: (name: string) => void;
   export let left: number | undefined = undefined;
   export let right: number | undefined = undefined;
-  export let style: string | undefined = undefined;
 
   let isEditingName = false;
   let nameWrapperHovered = false;
