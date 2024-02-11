@@ -111,6 +111,12 @@ pub fn set_active_subgraph_id(subgraph_id: &str) {
 }
 
 #[wasm_bindgen]
+pub fn rename_subgraph(subgraph_id: &str, new_name: String) {
+  let uuid = Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `rename_subgraph`!");
+  get_vcm().rename_subgraph(uuid, new_name);
+}
+
+#[wasm_bindgen]
 pub fn undo_view_change() { get_vcm().undo_view_change(); }
 
 #[wasm_bindgen]

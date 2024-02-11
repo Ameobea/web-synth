@@ -160,6 +160,7 @@ export class SubgraphPortalNode implements ForeignNode {
   public registeredOutputs: Writable<PortMap> = writable({});
   private placeholderInput: PlaceholderInput;
   private placeholderOutput: PlaceholderOutput;
+  public lgNode?: LGraphNode;
 
   static typeName = 'Subgraph Portal';
   static manuallyCreatable = false;
@@ -212,6 +213,14 @@ export class SubgraphPortalNode implements ForeignNode {
         },
         renamePort: (side: 'input' | 'output', oldName: string, newName: string) =>
           void this.renamePort(side, oldName, newName),
+        setSubgraphName: (newSubgraphName: string) => {
+          getEngine()!.rename_subgraph(this.rxSubgraphID, newSubgraphName);
+          if (this.lgNode) {
+            this.lgNode.title = newSubgraphName;
+            this.lgNode.graph?.setDirtyCanvas(true, false);
+          }
+        },
+        rxSubgraphID: this.rxSubgraphID,
       }),
     });
     this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });

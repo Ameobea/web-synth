@@ -1,7 +1,8 @@
 import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
 import type { Unsubscribe as ReduxUnsubscribe, Store } from 'redux';
-import type { SvelteComponent } from 'svelte';
-import type { Writable } from 'svelte/store';
+import { getState, store, type ReduxStore } from 'src/redux';
+import { onDestroy, type SvelteComponent } from 'svelte';
+import { writable, type Writable } from 'svelte/store';
 
 import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
@@ -155,6 +156,34 @@ export function buildSvelteReduxStoreBridge<State, Slice>(
   };
 
   return { set, update, subscribe };
+}
+
+/**
+ * Subscribes to a Redux store using the provided `selector` and returns the result as a Svelte store.
+ *
+ * Automatically unsubscribes from the Redux store when the Svelte component is destroyed.
+ *
+ * NOTE: The provided `selector` must remain static.
+ */
+export function svelteStoreFromRedux<Slice>(
+  selector: (state: ReduxStore) => Slice
+): Writable<Slice> {
+  let lastSlice = selector(getState());
+  const svelteStore = writable(lastSlice);
+
+  const unsub = store.subscribe(() => {
+    const slice = selector(getState());
+    if (slice === lastSlice) {
+      return;
+    }
+    lastSlice = slice;
+
+    svelteStore.set(slice);
+  });
+
+  onDestroy(() => void unsub());
+
+  return svelteStore;
 }
 
 export type SveltePropTypesOf<Comp> =

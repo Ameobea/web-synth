@@ -431,6 +431,18 @@ impl ViewContextManager {
     );
   }
 
+  pub fn rename_subgraph(&mut self, subgraph_id: Uuid, new_name: String) {
+    let subgraph = self
+      .subgraphs_by_id
+      .get_mut(&subgraph_id)
+      .expect("Tried to rename a subgraph that doesn't exist.  This should never happen.");
+    subgraph.name = new_name;
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
+  }
+
   fn set_view(&mut self, subgraph_id: Uuid, vc_id: Uuid) -> Result<(), ()> {
     if self.subgraphs_by_id.contains_key(&subgraph_id)
       && self.contexts.iter().any(|vc| vc.id == vc_id)

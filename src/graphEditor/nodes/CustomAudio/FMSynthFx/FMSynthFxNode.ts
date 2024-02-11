@@ -71,6 +71,10 @@ export class FMSynthFxNode implements ForeignNode {
       getProps: () => ({
         store: this.store,
         onChange: (ix: number, newState: Partial<Effect> | null) => this.handleChange(ix, newState),
+        commitAll: () => {
+          const state = get(this.store);
+          state.effects.forEach((effect, effectIx) => this.commitEffect(effectIx, effect));
+        },
       }),
     });
 

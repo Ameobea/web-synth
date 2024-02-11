@@ -6,16 +6,17 @@
   import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
   import type { FMSynthFxState } from 'src/graphEditor/nodes/CustomAudio/FMSynthFx/FMSynthFxNode';
   import type { Effect } from 'src/fmSynth/Effect';
-  import { UnreachableError } from 'src/util';
 
   export let store: Writable<FMSynthFxState>;
   export let onChange: (ix: number, newState: Partial<Effect> | null) => void;
+  export let commitAll: () => void;
 
   let state: (Effect | null)[] = $store.effects;
   $: state = $store.effects;
 
-  const setOperatorEffects = (newOperatorEffects: (Effect | null)[]) => {
-    throw new UnreachableError('Should never set operator-specific fx in FMSynthFxSmallView');
+  const setOperatorEffects = (newFx: (Effect | null)[]) => {
+    store.set({ effects: newFx });
+    commitAll();
   };
   let adsrs: AdsrParams[] = []; // TODO
   let onAdsrChange: AdsrChangeHandler = (adsrIx: number, newParams: AdsrParams) => {

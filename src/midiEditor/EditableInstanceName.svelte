@@ -54,7 +54,7 @@
     class="edit-name"
     style="visibility: {nameWrapperHovered && !isEditingName
       ? 'visible'
-      : 'hidden'}; font-size: 16px;"
+      : 'hidden'}; font-size: var(--icon-font-size, 16px);"
     on:click={e => {
       e.stopPropagation();
       isEditingName = true;
@@ -88,7 +88,7 @@
       Oxygen Mono,
       Menlo,
       monospace;
-    font-size: 13px;
+    font-size: var(--font-size, 13px);
   }
 
   .edit-name {
