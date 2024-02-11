@@ -96,6 +96,10 @@ export const add_foreign_connectable = (fcJSON: string) => {
   );
 };
 
+export const delete_foreign_connectable = (id: string) => {
+  dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(id));
+};
+
 export const delete_view_context = (id: string) => {
   dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(id));
   dispatch(actionCreators.viewContextManager.DELETE_VIEW_CONTEXT(id));

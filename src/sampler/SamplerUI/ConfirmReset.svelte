@@ -1,13 +1,17 @@
 <script lang="ts">
   export let onSubmit: () => void;
   export let onCancel: () => void;
+
+  export let message = 'Are you sure you want to reset completely to scratch?';
+  export let resetMessage = 'Reset';
+  export let cancelMessage = 'Cancel';
 </script>
 
 <div class="root">
-  <p>Are you sure you want to reset completely to scratch?</p>
+  <p>{message}</p>
   <div class="buttons-container">
-    <button on:click={onSubmit}>Reset</button>
-    <button on:click={onCancel}>Cancel</button>
+    <button on:click={onSubmit}>{resetMessage}</button>
+    <button on:click={onCancel}>{cancelMessage}</button>
   </div>
 </div>
 

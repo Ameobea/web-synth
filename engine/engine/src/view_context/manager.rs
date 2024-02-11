@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use common::uuid_v4;
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -391,14 +391,6 @@ impl ViewContextManager {
     new_subgraph_id
   }
 
-  pub fn delete_subgraph(&mut self, subgraph_id: Uuid) {
-    self
-      .active_view_history
-      .filter(|active_view| active_view.subgraph_id != subgraph_id);
-
-    todo!();
-  }
-
   pub fn set_active_subgraph(&mut self, subgraph_id: Uuid, skip_history: bool) {
     if self.active_subgraph_id == subgraph_id {
       return;
@@ -441,6 +433,149 @@ impl ViewContextManager {
       &self.active_subgraph_id.to_string(),
       &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
     );
+  }
+
+  /// Recursively deletes the specified subgraph, all VCs and foreign connectables within it, and
+  /// all child subgraphs as determined by subgraph portals.
+  pub fn delete_subgraph(&mut self, subgraph_id_to_delete: Uuid) {
+    struct SubgraphConn {
+      pub tx: Uuid,
+      pub rx: Uuid,
+      pub portal_id: String,
+    }
+
+    // First, we determine the hierarchy of all subgraphs based on the subgraph portals
+    let mut all_subgraph_connections: Vec<SubgraphConn> = Vec::new();
+    for fc in &self.foreign_connectables {
+      if fc._type == "customAudio/subgraphPortal" {
+        let serialized_state = fc.serialized_state.as_ref().unwrap();
+        let tx_subgraph_id = Uuid::from_str(
+          serialized_state["txSubgraphID"]
+            .as_str()
+            .expect("txSubgraphID was not a string"),
+        )
+        .expect("txSubgraphID was not a valid UUID");
+        let rx_subgraph_id = Uuid::from_str(
+          serialized_state["rxSubgraphID"]
+            .as_str()
+            .expect("rxSubgraphID was not a string"),
+        )
+        .expect("rxSubgraphID was not a valid UUID");
+        all_subgraph_connections.push(SubgraphConn {
+          tx: tx_subgraph_id,
+          rx: rx_subgraph_id,
+          portal_id: fc.id.clone(),
+        });
+      }
+    }
+
+    // Now, we need to find all subgraphs that are children of the subgraph we're deleting
+    //
+    // However, there's a complication.  All subgraph portals are bidirectional.  We only want to
+    // delete subgraphs that are children of the subgraph we're deleting, not siblings or parents.
+    //
+    // To achieve this, we first do a BFS starting from the root subgraph to identify all subgraphs
+    // that are above the subgraph we're deleting.
+    //
+    // Then, we do a BFS starting from the subgraph we're deleting to identify all subgraphs that
+    // are below it.
+    let mut safe_subgraphs: FxHashSet<Uuid> = FxHashSet::default();
+    safe_subgraphs.insert(Uuid::nil());
+    let mut subgraphs_to_delete: FxHashSet<Uuid> = FxHashSet::default();
+    let mut queue: Vec<Uuid> = vec![Uuid::nil()];
+    while !queue.is_empty() {
+      let subgraph_id = queue.pop().unwrap();
+      for conn in &all_subgraph_connections {
+        if conn.tx == subgraph_id {
+          if conn.rx == subgraph_id_to_delete {
+            continue;
+          }
+
+          let is_new = safe_subgraphs.insert(conn.rx);
+          if is_new {
+            queue.push(conn.rx);
+          }
+        }
+      }
+    }
+
+    subgraphs_to_delete.insert(subgraph_id_to_delete);
+    queue.push(subgraph_id_to_delete);
+    while !queue.is_empty() {
+      let subgraph_id = queue.pop().unwrap();
+      for conn in &all_subgraph_connections {
+        if conn.tx == subgraph_id {
+          if subgraphs_to_delete.contains(&conn.rx) || safe_subgraphs.contains(&conn.rx) {
+            continue;
+          }
+
+          subgraphs_to_delete.insert(conn.rx);
+          queue.push(conn.rx);
+        }
+      }
+    }
+
+    // Find all VCs and FCs that are in the subgraphs we're deleting
+    let vcs_to_delete: Vec<Uuid> = self
+      .contexts
+      .iter()
+      .filter(|vc| subgraphs_to_delete.contains(&vc.definition.subgraph_id))
+      .map(|vc| vc.id)
+      .collect();
+    let mut fc_ids_to_delete: Vec<String> = self
+      .foreign_connectables
+      .iter()
+      .filter(|fc| subgraphs_to_delete.contains(&fc.subgraph_id))
+      .map(|fc| fc.id.clone())
+      .collect();
+
+    // Also delete all subgraph portals that point to any of the deleted subgraphs
+    for conn in &all_subgraph_connections {
+      if subgraphs_to_delete.contains(&conn.tx) || subgraphs_to_delete.contains(&conn.rx) {
+        fc_ids_to_delete.push(conn.portal_id.clone());
+      }
+    }
+    fc_ids_to_delete.sort_unstable();
+    fc_ids_to_delete.dedup();
+
+    // Delete all VCs and FCs that are in the subgraphs we're deleting
+    info!(
+      "About to delete {} VCs and {} FCs while deleting subgraph id={subgraph_id_to_delete}",
+      vcs_to_delete.len(),
+      fc_ids_to_delete.len(),
+    );
+    for vc_id in &vcs_to_delete {
+      self.delete_vc_by_id(*vc_id);
+    }
+    for fc_id in &fc_ids_to_delete {
+      self.delete_foreign_connectable_by_id(fc_id);
+    }
+
+    // Finally, delete the subgraphs themselves
+    for subgraph_id in &subgraphs_to_delete {
+      self.subgraphs_by_id.remove(&subgraph_id);
+      if self.active_subgraph_id == *subgraph_id {
+        self.active_subgraph_id = Uuid::nil();
+      }
+    }
+    info!(
+      "Deleted subgraph id={} along with {} other child subgraph(s)",
+      subgraph_id_to_delete,
+      subgraphs_to_delete.len() - 1
+    );
+
+    // Update view history to remove entries referencing deleted subgraphs or VCs
+    self.active_view_history.filter(|active_view| {
+      subgraphs_to_delete.contains(&active_view.subgraph_id)
+        || vcs_to_delete.contains(&active_view.vc_id)
+    });
+
+    // Save the updated state
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
+    self.save_all();
   }
 
   fn set_view(&mut self, subgraph_id: Uuid, vc_id: Uuid) -> Result<(), ()> {
@@ -557,6 +692,12 @@ impl ViewContextManager {
       js::set_active_vc_id(&self.active_context_id.to_string());
     }
 
+    self.save_all();
+  }
+
+  fn delete_foreign_connectable_by_id(&mut self, id: &str) {
+    self.foreign_connectables.retain(|fc| fc.id != id);
+    js::delete_foreign_connectable(&id.to_string());
     self.save_all();
   }
 

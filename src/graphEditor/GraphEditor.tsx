@@ -21,7 +21,7 @@ import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
 import { actionCreators, dispatch, getState, type ReduxStore } from 'src/redux';
-import { UnreachableError, filterNils, getEngine, tryParseJson } from 'src/util';
+import { NIL_UUID, UnreachableError, filterNils, getEngine, tryParseJson } from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 import {
   getIsVcHidden,
@@ -33,8 +33,31 @@ import type { AudioConnectables } from 'src/patchNetwork';
 import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/nodes/CustomAudio';
 import { removeNode } from 'src/patchNetwork/interface';
 import { handleGlobalMouseDown } from 'src';
+import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
+import { renderSvelteModalWithControls } from 'src/controls/Modal';
+import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
+import type { SveltePropTypesOf } from 'src/svelteUtils';
 
 const ctx = new AudioContext();
+
+const confirmAndDeleteSubgraph = async (subgraphID: string) => {
+  const subgraphName = getState().viewContextManager.subgraphsByID[subgraphID]?.name ?? 'Unknown';
+  try {
+    await renderSvelteModalWithControls<void, SveltePropTypesOf<typeof ConfirmReset>>(
+      ConfirmReset,
+      true,
+      {
+        message: `Are you sure you want to delete the subgraph "${subgraphName}"?`,
+        cancelMessage: 'Cancel',
+        resetMessage: 'Delete',
+      }
+    );
+  } catch (_err) {
+    return; // cancelled
+  }
+
+  getEngine()!.delete_subgraph(subgraphID);
+};
 
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
 const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;
@@ -73,16 +96,30 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
     return true;
   });
 
-  // Patch the remove option to delete the node directly from the patch network
   const removeOption = filteredOptions.find(opt => opt?.content === 'Remove');
   if (!removeOption) {
     throw new Error('Failed to find "Remove" option in node menu');
   }
 
-  removeOption.callback = (_value, _options, _event, _parentMenu, node) => {
-    const vcId = node.id.toString();
-    removeNode(vcId);
-  };
+  const innerNode = ((node as any).connectables as AudioConnectables | undefined)?.node;
+  if (innerNode && innerNode instanceof SubgraphPortalNode) {
+    // If this portal is linking to the root node, don't allow deletion
+    if (innerNode.rxSubgraphID === NIL_UUID) {
+      filteredOptions = filteredOptions.filter(opt => opt?.content !== 'Remove');
+    } else {
+      // Replace the "Remove" option with "Delete Subgraph"
+      removeOption.content = 'Delete Subgraph';
+      removeOption.callback = () =>
+        void confirmAndDeleteSubgraph((innerNode as SubgraphPortalNode).rxSubgraphID);
+    }
+  } else {
+    // Patch the remove option to delete the node directly from the patch network
+
+    removeOption.callback = (_value, _options, _event, _parentMenu, node) => {
+      const vcId = node.id.toString();
+      removeNode(vcId);
+    };
+  }
 
   return filteredOptions;
 };

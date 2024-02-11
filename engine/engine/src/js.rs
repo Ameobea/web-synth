@@ -14,6 +14,7 @@ extern "C" {
   );
   pub fn add_view_context(id: &str, name: &str, subgraph_id: &str);
   pub fn add_foreign_connectable(fc_json: &str);
+  pub fn delete_foreign_connectable(id: &str);
   pub fn delete_view_context(id: &str);
   pub fn set_active_vc_id(new_id: &str);
   pub fn set_subgraphs(active_subgraph_id: &str, subgraphs_by_id_json: &str);

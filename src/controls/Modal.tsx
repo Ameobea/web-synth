@@ -54,9 +54,10 @@ export function renderModalWithControls<T>(
   });
 }
 
-export function renderSvelteModalWithControls<T>(
+export function renderSvelteModalWithControls<T, Props extends ModalCompProps<T>>(
   Comp: typeof SvelteComponent<ModalCompProps<T>>,
-  clickBackdropToClose = true
+  clickBackdropToClose = true,
+  extraProps?: Partial<Omit<Props, 'onSubmit' | 'onCancel'>>
 ): Promise<T> {
   const bodyNode = document.getElementsByTagName('body')[0]!;
   const modalNode = document.createElement('div');
@@ -90,6 +91,7 @@ export function renderSvelteModalWithControls<T>(
           unmount();
           reject();
         },
+        ...(extraProps || {}),
       },
     });
   });
