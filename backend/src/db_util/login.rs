@@ -16,7 +16,7 @@ use crate::{
 
 fn hash_password(password: &str) -> Result<String, scrypt::password_hash::Error> {
     let salt = SaltString::generate(&mut OsRng);
-    let params = scrypt::Params::new(15, 2, 2).unwrap();
+    let params = scrypt::Params::new(15, 2, 2, scrypt::Params::RECOMMENDED_LEN).unwrap();
     let hash = Scrypt
         .hash_password_customized(
             password.as_bytes(),

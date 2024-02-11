@@ -7,11 +7,11 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 
-diesel = { version = "1.4.5", features = ["mysql", "chrono"] }
+diesel = { version = "2.0", features = ["mysql", "chrono"] }
 
 hex = "0.4"
 
-itertools = "0.10"
+itertools = "0.12"
 
 lazy_static = "1.4.0"
 
@@ -21,9 +21,9 @@ hound = "3.4"
 
 reqwest = { version = "0.11", features = ["gzip", "brotli"] }
 
-rocket = { version = "0.5.0-rc.2", features = ["json"] }
-rocket_sync_db_pools = { version = "0.1.0-rc.2", features = ["diesel_mysql_pool"] }
-rocket_async_compression = "0.2.0"
+rocket = { version = "0.5", features = ["json"] }
+rocket_sync_db_pools = { version = "0.1", features = ["diesel_mysql_pool"] }
+rocket_async_compression = "0.5.0"
 
 serde_json = "1.0"
 serde = "1.0"
@@ -33,9 +33,9 @@ sha2 = "0.10"
 
 tokio = { version = "1.24", features = ["macros", "rt-multi-thread"] }
 
-scrypt = "0.10.0"
-base64 = "0.20.0"
+scrypt = "0.11.0"
+base64 = "0.21.0"
 
-rust-s3 = { version = "0.32.3", features = [] }
+rust-s3 = { version = "0.33", features = [] }
 aws-region = { version = "0.25.0", features = ["serde"] }
 urlencoding = "2.1"

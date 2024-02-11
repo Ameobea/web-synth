@@ -36,7 +36,7 @@ pub struct SerializedMIDIEditorState {
 }
 
 #[derive(Insertable)]
-#[table_name = "midi_compositions"]
+#[diesel(table_name = midi_compositions)]
 pub struct InsertableMIDIComposition {
     pub name: String,
     pub description: String,
@@ -75,7 +75,7 @@ pub struct MIDIComposition {
 }
 
 #[derive(Insertable)]
-#[table_name = "midi_compositions_tags"]
+#[diesel(table_name = midi_compositions_tags)]
 pub struct NewMidiCompositionTag {
     pub midi_composition_id: i64,
     pub tag_id: i64,

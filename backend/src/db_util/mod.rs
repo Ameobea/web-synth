@@ -15,9 +15,14 @@ pub mod private_sample_libraries;
 // Facilitate getting the primary key of the last inserted item
 //
 // https://github.com/diesel-rs/diesel/issues/1011#issuecomment-315536931
-no_arg_sql_function!(last_insert_id, diesel::types::Bigint);
+sql_function! {
+    fn last_insert_id() -> BigInt;
+}
 
-pub fn get_and_create_tag_ids(conn: &MysqlConnection, tags: Vec<String>) -> QueryResult<Vec<i64>> {
+pub fn get_and_create_tag_ids(
+    conn: &mut MysqlConnection,
+    tags: Vec<String>,
+) -> QueryResult<Vec<i64>> {
     use crate::schema::tags;
 
     let tags_clone = tags.clone();

@@ -15,7 +15,7 @@ pub struct Effect {
 }
 
 #[derive(Deserialize, Insertable)]
-#[table_name = "effects"]
+#[diesel(table_name = effects)]
 pub struct InsertableEffect {
     pub title: String,
     pub description: String,

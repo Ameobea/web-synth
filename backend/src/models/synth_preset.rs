@@ -246,7 +246,7 @@ pub struct ReceivedSynthPresetEntry {
 }
 
 #[derive(Insertable)]
-#[table_name = "synth_presets"]
+#[diesel(table_name = synth_presets)]
 pub struct NewSynthPresetEntry {
     pub title: String,
     pub description: String,
@@ -272,7 +272,7 @@ pub struct UserProvidedNewSynthVoicePreset {
 }
 
 #[derive(Insertable)]
-#[table_name = "voice_presets"]
+#[diesel(table_name = voice_presets)]
 pub struct NewSynthVoicePresetEntry {
     pub title: String,
     pub description: String,

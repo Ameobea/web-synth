@@ -134,8 +134,7 @@ pub async fn create_wavetable_preset(
         .run(move |conn| -> QueryResult<i64> {
             use crate::schema::{wavetable_presets, wavetable_presets_tags};
 
-            let conn = &*conn;
-            conn.transaction(move || {
+            conn.transaction(move |conn| {
                 diesel::insert_into(wavetable_presets::table)
                     .values(NewWavetablePreset {
                         name,
@@ -147,7 +146,7 @@ pub async fn create_wavetable_preset(
                         user_id,
                     })
                     .execute(conn)?;
-                let created_preset_id = diesel::select(last_insert_id).first(conn)?;
+                let created_preset_id = diesel::select(last_insert_id()).first(conn)?;
 
                 // Insert tags
                 let tag_count = tags.len();

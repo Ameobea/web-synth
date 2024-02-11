@@ -8,14 +8,14 @@ use rocket::{
 use crate::schema::{login_tokens, users};
 
 #[derive(Insertable)]
-#[table_name = "users"]
+#[diesel(table_name = users)]
 pub struct NewUser {
     pub username: String,
     pub hashed_password: String,
 }
 
 #[derive(Insertable)]
-#[table_name = "login_tokens"]
+#[diesel(table_name = login_tokens)]
 pub struct NewLoginToken {
     pub user_id: i64,
     pub token: String,

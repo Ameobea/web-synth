@@ -61,7 +61,7 @@ pub struct SaveWavetablePresetRequest {
 }
 
 #[derive(Insertable)]
-#[table_name = "wavetable_presets"]
+#[diesel(table_name = wavetable_presets)]
 pub struct NewWavetablePreset {
     pub name: String,
     pub description: String,
@@ -70,7 +70,7 @@ pub struct NewWavetablePreset {
 }
 
 #[derive(Insertable)]
-#[table_name = "wavetable_presets_tags"]
+#[diesel(table_name = wavetable_presets_tags)]
 pub struct NewWavetablePresetTag {
     pub wavetable_preset_id: i64,
     pub tag_id: i64,

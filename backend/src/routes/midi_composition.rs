@@ -109,11 +109,11 @@ pub async fn save_midi_composition(
     let tags = composition.tags.clone();
 
     conn.run(|conn| {
-        conn.transaction(|| -> QueryResult<()> {
+        conn.transaction(|conn| -> QueryResult<()> {
             diesel::insert_into(midi_compositions::table)
                 .values(insertable_comp)
                 .execute(conn)?;
-            let created_preset_id = diesel::select(last_insert_id).first(conn)?;
+            let created_preset_id = diesel::select(last_insert_id()).first(conn)?;
 
             // Insert tags
             let tag_count = tags.len();

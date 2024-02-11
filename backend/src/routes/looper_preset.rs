@@ -133,8 +133,7 @@ pub async fn create_looper_preset(
 
     let created_preset_id = conn
         .run(move |conn| -> QueryResult<i64> {
-            let conn = &*conn;
-            conn.transaction(move || {
+            conn.transaction(move |conn| {
                 diesel::insert_into(looper_presets::table)
                     .values(NewLooperPreset {
                         name,
@@ -143,7 +142,7 @@ pub async fn create_looper_preset(
                         user_id,
                     })
                     .execute(conn)?;
-                let created_preset_id = diesel::select(last_insert_id).first(conn)?;
+                let created_preset_id = diesel::select(last_insert_id()).first(conn)?;
 
                 // Insert tags
                 let tag_count = tags.len();

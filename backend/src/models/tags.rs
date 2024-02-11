@@ -1,7 +1,7 @@
 use crate::schema::tags;
 
 #[derive(Insertable)]
-#[table_name = "tags"]
+#[diesel(table_name = tags)]
 pub struct NewTag {
     pub tag: String,
 }

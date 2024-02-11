@@ -41,7 +41,7 @@ pub struct LooperPresetDescriptor {
 }
 
 #[derive(Insertable)]
-#[table_name = "looper_presets"]
+#[diesel(table_name = looper_presets)]
 pub struct NewLooperPreset {
     pub name: String,
     pub description: String,
@@ -50,7 +50,7 @@ pub struct NewLooperPreset {
 }
 
 #[derive(Insertable)]
-#[table_name = "looper_presets_tags"]
+#[diesel(table_name = looper_presets_tags)]
 pub struct NewLooperPresetTag {
     pub looper_preset_id: i64,
     pub tag_id: i64,

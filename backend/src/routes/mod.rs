@@ -107,12 +107,12 @@ pub async fn save_composition(
 
     let saved_composition_id = conn
         .run(move |conn| {
-            conn.transaction(|| -> QueryResult<i64> {
+            conn.transaction(|conn| -> QueryResult<i64> {
                 diesel::insert_into(schema::compositions::table)
                     .values(&new_composition)
                     .execute(conn)?;
 
-                let saved_comp_id = diesel::select(last_insert_id).first(conn)?;
+                let saved_comp_id = diesel::select(last_insert_id()).first(conn)?;
 
                 // Insert tags
                 let tag_count = tags.len();

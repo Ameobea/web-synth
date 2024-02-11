@@ -12,7 +12,7 @@ pub struct NewCompositionRequest {
 }
 
 #[derive(Insertable)]
-#[table_name = "compositions"]
+#[diesel(table_name = compositions)]
 pub struct NewComposition {
     pub title: String,
     pub description: String,
@@ -42,7 +42,7 @@ pub struct Composition {
 }
 
 #[derive(Insertable)]
-#[table_name = "compositions_tags"]
+#[diesel(table_name = compositions_tags)]
 pub struct NewCompositionTag {
     pub composition_id: i64,
     pub tag_id: i64,
