@@ -28,5 +28,5 @@ pub struct SerializedSubgraphPreset {
     )>,
     pub subgraphs: Vec<(Uuid, serde_json::Map<String, serde_json::Value>)>,
     pub base_subgraph_id: Uuid,
-    pub connnecting_subgraph_id: Uuid,
+    pub connnecting_subgraph_id: Option<Uuid>,
 }

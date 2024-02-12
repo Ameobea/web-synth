@@ -160,7 +160,7 @@ pub struct SerializedSubgraph {
   pub subgraphs: Vec<(Uuid, SubgraphDescriptor)>,
   pub base_subgraph_id: Uuid,
   /// ID of the subgraph which links to the subgraph being serialized
-  pub connnecting_subgraph_id: Uuid,
+  pub connnecting_subgraph_id: Option<Uuid>,
 }
 
 fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
@@ -644,9 +644,18 @@ impl ViewContextManager {
   }
 
   /// Assumes all frontend state has been committed to the backend already (`onBeforeUnload()`)
-  pub fn serialize_subgraph(&self, subgraph_id: Uuid) -> SerializedSubgraph {
-    let (_all_subgraph_connections, included_subgraph_ids) =
-      self.get_child_subgraph_ids(subgraph_id);
+  pub fn serialize_subgraph(
+    &self,
+    subgraph_id: Uuid,
+    subgraph_name_override: Option<&str>,
+  ) -> SerializedSubgraph {
+    let included_subgraph_ids = if subgraph_id.is_nil() {
+      self.subgraphs_by_id.keys().cloned().collect()
+    } else {
+      let (_all_subgraph_connections, included_subgraph_ids) =
+        self.get_child_subgraph_ids(subgraph_id);
+      included_subgraph_ids
+    };
 
     let fcs = self
       .foreign_connectables
@@ -719,7 +728,15 @@ impl ViewContextManager {
       .subgraphs_by_id
       .iter()
       .filter(|(id, _)| included_subgraph_ids.contains(id))
-      .map(|(id, desc)| (*id, desc.clone()))
+      .map(|(id, desc)| {
+        let mut desc = desc.clone();
+        if let Some(name_override) = subgraph_name_override {
+          if desc.id == subgraph_id {
+            desc.name = name_override.to_owned();
+          }
+        }
+        (*id, desc)
+      })
       .collect::<Vec<_>>();
 
     SerializedSubgraph {
@@ -728,7 +745,11 @@ impl ViewContextManager {
       intra_conns,
       subgraphs,
       base_subgraph_id: subgraph_id,
-      connnecting_subgraph_id: self.active_subgraph_id,
+      connnecting_subgraph_id: if subgraph_id.is_nil() {
+        None
+      } else {
+        Some(self.active_subgraph_id)
+      },
     }
   }
 
@@ -784,7 +805,7 @@ impl ViewContextManager {
             let rx_subgraph_uuid = Uuid::from_str(rx_subgraph_id).unwrap();
             if fc.subgraph_id == serialized.base_subgraph_id
               && mapped_tx_subgraph_id == Some(serialized.base_subgraph_id)
-              && rx_subgraph_uuid == serialized.connnecting_subgraph_id
+              && Some(rx_subgraph_uuid) == serialized.connnecting_subgraph_id
             {
               info!(
                 "Re-pointing subgraph portal rx to active subgraph.  Old ID: {}, new ID: {}",
@@ -904,23 +925,29 @@ impl ViewContextManager {
           name: conn.1.name.clone(),
         },
       ));
+      js::add_connection(&new_tx_id, &conn.0.name, &new_rx_id, &conn.1.name);
     }
     js::set_connections(&serde_json::to_string(&self.connections).unwrap());
 
     // Finally, add a subgraph portal in the active subgraph pointing to the new subgraph with its
     // inputs set to correspond to the one we re-pointed ealier
-    if let Some(base_portal_state) = base_portal_state {
-      let tx_subgraph_id = self.active_subgraph_id;
-      let rx_subgraph_id = serialized.base_subgraph_id;
-      let inputs = base_portal_state.get("registeredOutputs").cloned();
-      let outputs = base_portal_state.get("registeredInputs").cloned();
-      info!(
-        "Creating subgraph portal from active subgraph to new subgraph; tx={}, rx={}, \
-         inputs={:?}, outputs={:?}",
-        tx_subgraph_id, rx_subgraph_id, inputs, outputs
-      );
-      self.add_subgraph_portal(tx_subgraph_id, rx_subgraph_id, inputs, outputs);
-    }
+    let tx_subgraph_id = self.active_subgraph_id;
+    let rx_subgraph_id = serialized.base_subgraph_id;
+    let (inputs, outputs) = if let Some(base_portal_state) = base_portal_state {
+      (
+        base_portal_state.get("registeredOutputs").cloned(),
+        base_portal_state.get("registeredInputs").cloned(),
+      )
+    } else {
+      self.add_subgraph_portal(rx_subgraph_id, tx_subgraph_id, None, None);
+      (None, None)
+    };
+    info!(
+      "Creating subgraph portal from active subgraph to new subgraph; tx={}, rx={}, inputs={:?}, \
+       outputs={:?}",
+      tx_subgraph_id, rx_subgraph_id, inputs, outputs
+    );
+    self.add_subgraph_portal(tx_subgraph_id, rx_subgraph_id, inputs, outputs);
 
     self.save_all();
 

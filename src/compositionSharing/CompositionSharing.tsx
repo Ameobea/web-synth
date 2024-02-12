@@ -21,7 +21,8 @@ import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
 import { getSample, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { getEngine } from 'src/util';
+import { NIL_UUID, getEngine } from 'src/util';
+import { saveSubgraphPreset } from 'src/graphEditor/GraphEditor';
 
 export interface CompositionDefinition {
   id: number;
@@ -343,6 +344,9 @@ const CompositionSharing: React.FC = () => (
         Load Composition
       </button>
     </div>
+    <button style={{ marginTop: 40 }} onClick={() => saveSubgraphPreset(NIL_UUID, true)}>
+      Save as Subgraph
+    </button>
   </div>
 );
 

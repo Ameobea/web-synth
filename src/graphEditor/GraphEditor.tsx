@@ -82,7 +82,11 @@ const confirmAndDeleteSubgraph = async (subgraphID: string) => {
   getEngine()!.delete_subgraph(subgraphID);
 };
 
-const saveSubgraphPreset = async (subgraphID: string) => {
+/**
+ * If `overrideName` is set to `true`, then the name of the created base subgraph will be set to
+ * the name of the preset.
+ */
+export const saveSubgraphPreset = async (subgraphID: string, overrideName = false) => {
   let desc;
   try {
     desc = await renderGenericPresetSaverWithModal({
@@ -96,7 +100,10 @@ const saveSubgraphPreset = async (subgraphID: string) => {
   // Commit all state to the engine
   const engine = getEngine()!;
   onBeforeUnload(engine);
-  const serializedSubgraph = getEngine()!.serialize_subgraph(subgraphID);
+  const serializedSubgraph = getEngine()!.serialize_subgraph(
+    subgraphID,
+    overrideName ? desc.name : ''
+  );
   engine.init();
 
   try {

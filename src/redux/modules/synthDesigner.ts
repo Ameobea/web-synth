@@ -94,7 +94,6 @@ const disposeSynthModule = (synth: SynthModule) => {
   synth.fmSynth.shutdown();
   synth.outerGainNode.disconnect();
   if (synth.filterOverrideStatusChangeCbs) {
-    console.log('de-registering');
     synth.filterCSNs.frequency.deregisterOverrideStatusChangeCb(
       synth.filterOverrideStatusChangeCbs.handleFrequencyOverrideStatusChange
     );
@@ -254,6 +253,8 @@ const buildDefaultSynthModule = (
         dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(synthIx, cbs));
 
         connectFMSynth(stateKey, synthIx);
+
+        maybeUpdateMIDINode(getState().synthDesigner);
       },
       audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
       useLegacyWavetableControls: false,
@@ -335,6 +336,8 @@ export const deserializeSynthModule = (
       dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(synthIx, cbs));
 
       connectFMSynth(stateKey, synthIx);
+
+      maybeUpdateMIDINode(getState().synthDesigner);
     },
     audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
   });

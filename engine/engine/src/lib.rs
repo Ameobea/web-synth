@@ -117,10 +117,17 @@ pub fn rename_subgraph(subgraph_id: &str, new_name: String) {
 }
 
 #[wasm_bindgen]
-pub fn serialize_subgraph(subgraph_id: &str) -> String {
+pub fn serialize_subgraph(subgraph_id: &str, subgraph_name_override: &str) -> String {
   let uuid =
     Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `serialize_subgraph`!");
-  let serialized = get_vcm().serialize_subgraph(uuid);
+  let serialized = get_vcm().serialize_subgraph(
+    uuid,
+    if subgraph_name_override.is_empty() {
+      None
+    } else {
+      Some(subgraph_name_override)
+    },
+  );
   serde_json::to_string(&serialized).unwrap()
 }
 

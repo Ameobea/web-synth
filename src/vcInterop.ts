@@ -97,6 +97,12 @@ export const add_foreign_connectable = (fcJSON: string): string => {
   return id;
 };
 
+/**
+ * Sets connections to match the engine.
+ *
+ * Does _NOT_ perform any actual connection/disconnection operations; it assumes that
+ * the patch network state already matches the provided list.
+ */
 export const set_connections = (connectionsJson: string) => {
   const connections = tryParseJson<[ConnectableDescriptor, ConnectableDescriptor][]>(
     connectionsJson,
@@ -104,6 +110,20 @@ export const set_connections = (connectionsJson: string) => {
     'Failed to parse provided connections out of JSON'
   );
   dispatch(actionCreators.viewContextManager.SET_CONNECTIONS(connections));
+};
+
+export const add_connection = (
+  fromVcId: string,
+  fromPortName: string,
+  toVcId: string,
+  toPortName: string
+) => {
+  dispatch(
+    actionCreators.viewContextManager.CONNECT(
+      { vcId: fromVcId, name: fromPortName },
+      { vcId: toVcId, name: toPortName }
+    )
+  );
 };
 
 export const delete_foreign_connectable = (id: string) => {

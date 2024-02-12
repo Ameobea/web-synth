@@ -88,6 +88,7 @@
   flex-direction: column;
   width: calc(max(63vw, 600px));
   height: calc(max(75vh, 450px));
+  min-height: 500px;
 
   .generic-preset-saver-form {
     display: flex;

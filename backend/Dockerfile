@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y curl libmariadbclient-dev-compat build-
 
 # Install rust
 RUN curl https://sh.rustup.rs/ -sSf | \
-  sh -s -- -y --default-toolchain nightly-2022-08-10
+  sh -s -- -y --default-toolchain nightly-2024-02-02
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
