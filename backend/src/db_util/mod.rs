@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use diesel::{prelude::*, QueryResult};
+use fxhash::FxHashMap;
 use itertools::Itertools;
 use rocket::serde::json::Json;
 
@@ -70,7 +71,7 @@ pub async fn build_tags_with_counts(
             String::from("DB error loading preset tags from DB")
         })?;
 
-    let mut counts_by_tag: HashMap<String, i64> = HashMap::new();
+    let mut counts_by_tag: FxHashMap<String, i64> = FxHashMap::default();
     for looper_preset_tag in all_looper_preset_tags {
         let tag = looper_preset_tag.tag.clone();
         let count = counts_by_tag.entry(tag).or_insert(0);

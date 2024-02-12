@@ -86,7 +86,7 @@ export const add_view_context = (id: string, name: string, subgraphID: string) =
   );
 };
 
-export const add_foreign_connectable = (fcJSON: string) => {
+export const add_foreign_connectable = (fcJSON: string): string => {
   const fc: ForeignConnectable = JSON.parse(fcJSON);
   const id = buildNewForeignConnectableID().toString();
   const node = new audioNodeGetters[fc.type]!.nodeGetter(ctx, id, fc.serializedState);
@@ -94,6 +94,16 @@ export const add_foreign_connectable = (fcJSON: string) => {
   dispatch(
     actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, connectables, fc.subgraphId)
   );
+  return id;
+};
+
+export const set_connections = (connectionsJson: string) => {
+  const connections = tryParseJson<[ConnectableDescriptor, ConnectableDescriptor][]>(
+    connectionsJson,
+    [],
+    'Failed to parse provided connections out of JSON'
+  );
+  dispatch(actionCreators.viewContextManager.SET_CONNECTIONS(connections));
 };
 
 export const delete_foreign_connectable = (id: string) => {

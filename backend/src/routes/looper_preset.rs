@@ -8,12 +8,10 @@ use crate::{
         login::get_logged_in_user_id,
     },
     models::{
-        looper_preset::{
-            LooperPresetDescriptor, NewLooperPreset, NewLooperPresetTag, SaveLooperPresetRequest,
-            SerializedLooperInstState,
-        },
+        looper_preset::{NewLooperPreset, NewLooperPresetTag, SerializedLooperInstState},
         tags::{EntityIdTag, TagCount},
         user::MaybeLoginToken,
+        GenericPresetDescriptor, SaveGenericPresetRequest,
     },
     WebSynthDbConn,
 };
@@ -21,7 +19,7 @@ use crate::{
 #[get("/looper_presets")]
 pub async fn get_looper_presets(
     conn: WebSynthDbConn,
-) -> Result<Json<Vec<LooperPresetDescriptor>>, String> {
+) -> Result<Json<Vec<GenericPresetDescriptor>>, String> {
     use crate::schema::{looper_presets, looper_presets_tags, tags, users};
 
     let (looper_presets, preset_tags) = conn
@@ -64,7 +62,7 @@ pub async fn get_looper_presets(
                 .map(|tag| tag.tag.clone())
                 .collect_vec();
 
-            LooperPresetDescriptor {
+            GenericPresetDescriptor {
                 id,
                 name,
                 description,
@@ -115,15 +113,15 @@ pub async fn get_looper_preset_by_id(
 #[post("/looper_preset", data = "<looper_preset>")]
 pub async fn create_looper_preset(
     conn: WebSynthDbConn,
-    looper_preset: Json<SaveLooperPresetRequest>,
+    looper_preset: Json<SaveGenericPresetRequest<SerializedLooperInstState>>,
     login_token: MaybeLoginToken,
 ) -> Result<Json<i64>, String> {
     use crate::schema::{looper_presets, looper_presets_tags};
 
     let user_id = get_logged_in_user_id(&conn, login_token).await;
 
-    let SaveLooperPresetRequest {
-        serialized_looper_inst_state,
+    let SaveGenericPresetRequest {
+        preset: serialized_looper_inst_state,
         name,
         description,
         tags,

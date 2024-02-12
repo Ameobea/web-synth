@@ -21,6 +21,7 @@ diesel::table! {
 diesel::table! {
     effects (id) {
         id -> Bigint,
+        #[max_length = 255]
         title -> Varchar,
         description -> Text,
         code -> Text,
@@ -88,9 +89,29 @@ diesel::table! {
 
 diesel::table! {
     remote_sample_urls (id, name) {
+        #[max_length = 100]
         id -> Varchar,
+        #[max_length = 668]
         name -> Varchar,
         sample_url -> Text,
+    }
+}
+
+diesel::table! {
+    subgraph_preset_tags (id) {
+        id -> Bigint,
+        subgraph_preset_id -> Bigint,
+        tag_id -> Bigint,
+    }
+}
+
+diesel::table! {
+    subgraph_presets (id) {
+        id -> Bigint,
+        user_id -> Nullable<Bigint>,
+        title -> Text,
+        description -> Text,
+        content -> Longtext,
     }
 }
 
@@ -160,6 +181,9 @@ diesel::joinable!(midi_compositions -> users (user_id));
 diesel::joinable!(midi_compositions_tags -> midi_compositions (midi_composition_id));
 diesel::joinable!(midi_compositions_tags -> tags (tag_id));
 diesel::joinable!(private_sample_libraries -> users (user_id));
+diesel::joinable!(subgraph_preset_tags -> subgraph_presets (subgraph_preset_id));
+diesel::joinable!(subgraph_preset_tags -> tags (tag_id));
+diesel::joinable!(subgraph_presets -> users (user_id));
 diesel::joinable!(synth_presets -> users (user_id));
 diesel::joinable!(voice_presets -> users (user_id));
 diesel::joinable!(wavetable_presets -> users (user_id));
@@ -177,6 +201,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     midi_compositions_tags,
     private_sample_libraries,
     remote_sample_urls,
+    subgraph_preset_tags,
+    subgraph_presets,
     synth_presets,
     tags,
     users,

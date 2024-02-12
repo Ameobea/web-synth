@@ -11,14 +11,14 @@ pub struct WelcomePage {
 
 impl WelcomePage {
   pub fn new(uuid: Uuid) -> Self { WelcomePage { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("welcomePage_{}", self.uuid) }
 }
 
 impl ViewContext for WelcomePage {
   fn init(&mut self) { js::init_welcome_page(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("welcomePage_{}", self.uuid) }
 
   fn cleanup(&mut self) { js::cleanup_welcome_page(&self.get_state_key()); }
 

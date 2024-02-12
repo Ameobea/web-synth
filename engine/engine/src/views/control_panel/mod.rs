@@ -9,8 +9,6 @@ pub struct ControlPanel {
 
 impl ControlPanel {
   pub fn new(uuid: Uuid) -> Self { ControlPanel { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("controlPanel_{}", self.uuid) }
 }
 
 impl ViewContext for ControlPanel {
@@ -19,6 +17,8 @@ impl ViewContext for ControlPanel {
   fn cleanup(&mut self) { js::cleanup_control_panel(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("controlPanel_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_control_panel(&self.get_state_key()); }
 

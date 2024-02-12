@@ -13,8 +13,6 @@ pub struct GraphEditor {
 
 impl GraphEditor {
   pub fn new(uuid: Uuid) -> Self { GraphEditor { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("graphEditor_{}", self.uuid) }
 }
 
 impl ViewContext for GraphEditor {
@@ -23,6 +21,8 @@ impl ViewContext for GraphEditor {
   fn cleanup(&mut self) { js::cleanup_graph_editor(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("graphEditor_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_graph_editor(&self.get_state_key()); }
 

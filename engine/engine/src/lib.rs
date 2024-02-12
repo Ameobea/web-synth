@@ -10,7 +10,7 @@ use std::{ptr, str::FromStr};
 use common::uuid_v4;
 use js::js_random;
 use uuid::Uuid;
-use view_context::manager::{ConnectionDescriptor, ViewContextManager};
+use view_context::manager::{ConnectionDescriptor, SerializedSubgraph, ViewContextManager};
 use wasm_bindgen::prelude::*;
 
 pub mod js;
@@ -114,6 +114,22 @@ pub fn set_active_subgraph_id(subgraph_id: &str) {
 pub fn rename_subgraph(subgraph_id: &str, new_name: String) {
   let uuid = Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `rename_subgraph`!");
   get_vcm().rename_subgraph(uuid, new_name);
+}
+
+#[wasm_bindgen]
+pub fn serialize_subgraph(subgraph_id: &str) -> String {
+  let uuid =
+    Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `serialize_subgraph`!");
+  let serialized = get_vcm().serialize_subgraph(uuid);
+  serde_json::to_string(&serialized).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn load_serialized_subgraph(serialized: &str) -> String {
+  let deserialized: SerializedSubgraph =
+    serde_json::from_str(serialized).expect("Failed to deserialize provided subgraph JSON");
+
+  get_vcm().load_serialized_subgraph(deserialized).to_string()
 }
 
 #[wasm_bindgen]

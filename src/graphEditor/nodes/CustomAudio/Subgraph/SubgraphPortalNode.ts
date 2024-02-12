@@ -63,7 +63,8 @@ const maybeInitSubgraphConnectablesWatcher = () => {
           c =>
             !!c.node &&
             c.node instanceof SubgraphPortalNode &&
-            c.node.rxSubgraphID === txSubgraphNode.txSubgraphID
+            c.node.rxSubgraphID === txSubgraphNode.txSubgraphID &&
+            c.node.txSubgraphID === txSubgraphNode.rxSubgraphID
         );
 
         const matchingConns: {

@@ -10,8 +10,6 @@ pub struct MIDIEditor {
 
 impl MIDIEditor {
   pub fn new(vc_id: Uuid) -> Self { MIDIEditor { vc_id } }
-
-  pub fn get_state_key(&self) -> String { format!("midiEditor_{}", self.vc_id) }
 }
 
 impl ViewContext for MIDIEditor {
@@ -20,6 +18,8 @@ impl ViewContext for MIDIEditor {
   fn cleanup(&mut self) { js::cleanup_midi_editor(&self.vc_id.to_string()) }
 
   fn get_id(&self) -> String { self.vc_id.to_string() }
+
+  fn get_state_key(&self) -> String { format!("midiEditor_{}", self.vc_id) }
 
   fn hide(&mut self) { js::hide_midi_editor(&self.get_state_key()); }
 

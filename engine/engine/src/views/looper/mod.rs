@@ -9,8 +9,6 @@ pub struct Looper {
 
 impl Looper {
   pub fn new(uuid: Uuid) -> Self { Looper { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("looper_{}", self.uuid) }
 }
 
 impl ViewContext for Looper {
@@ -26,6 +24,8 @@ impl ViewContext for Looper {
   }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("looper_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_looper(&self.get_state_key()); }
 

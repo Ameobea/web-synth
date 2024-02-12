@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use base64::Engine;
 use diesel::{prelude::*, QueryResult};
 use scrypt::{
     password_hash::{
@@ -38,7 +39,7 @@ pub fn generate_login_token() -> String {
     let mut rng = OsRng;
     let mut bytes = [0u8; 64];
     rng.fill_bytes(&mut bytes);
-    base64::encode(&bytes)
+    base64::engine::general_purpose::STANDARD.encode(&bytes)
 }
 
 pub async fn get_user_by_username(

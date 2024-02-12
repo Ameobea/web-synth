@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use diesel::{self, prelude::*};
+use fxhash::FxHashMap;
 use itertools::Itertools;
 use rocket::serde::json::Json;
 
@@ -33,6 +32,8 @@ pub use self::{looper_preset::*, midi_composition::*, remote_samples::*};
 pub mod login;
 mod wavetable_preset;
 pub use self::wavetable_preset::*;
+mod subgraph_preset;
+pub use self::subgraph_preset::*;
 
 #[get("/")]
 pub fn index() -> &'static str { "Application successfully started!" }
@@ -289,7 +290,7 @@ pub async fn get_synth_presets(
     )?;
 
     // build a mapping of voice preset id to voice preset
-    let mut voice_presets_by_id: HashMap<i64, SynthVoicePresetEntry> = HashMap::new();
+    let mut voice_presets_by_id: FxHashMap<i64, SynthVoicePresetEntry> = FxHashMap::default();
     for (id_, title_, description_, body_, user_id_) in voice_presets_ {
         let body_ = serde_json::from_str(&body_).map_err(|err| -> String {
             error!("Error parsing voice preset entry stored in DB: {:?}", err);

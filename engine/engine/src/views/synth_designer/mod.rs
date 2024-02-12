@@ -14,8 +14,6 @@ pub struct SynthDesigner {
 
 impl SynthDesigner {
   pub fn new(uuid: Uuid) -> Self { SynthDesigner { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("synthDesigner_{}", self.uuid) }
 }
 
 impl ViewContext for SynthDesigner {
@@ -32,6 +30,8 @@ impl ViewContext for SynthDesigner {
   }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("synthDesigner_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_synth_designer(&self.get_state_key()); }
 

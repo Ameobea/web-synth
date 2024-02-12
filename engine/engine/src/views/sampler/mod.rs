@@ -10,8 +10,6 @@ pub struct Sampler {
 
 impl Sampler {
   pub fn new(uuid: Uuid) -> Self { Sampler { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("sampler_{}", self.uuid) }
 }
 
 impl ViewContext for Sampler {
@@ -20,6 +18,8 @@ impl ViewContext for Sampler {
   fn cleanup(&mut self) { js::cleanup_sampler(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("sampler_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_sampler(&self.get_state_key()); }
 

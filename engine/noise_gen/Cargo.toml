@@ -8,7 +8,6 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rand_pcg = "0.3"
 rand = "0.7"
 common = { path = "../common" }
 dsp = { path = "../dsp" }

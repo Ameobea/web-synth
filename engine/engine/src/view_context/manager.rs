@@ -35,7 +35,7 @@ pub const VCM_STATE_KEY: &str = "vcmState";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MinimalViewContextDefinition {
   pub name: String,
-  pub uuid: String,
+  pub uuid: Uuid,
   pub title: Option<String>,
   #[serde(default = "Uuid::nil", rename = "subgraphId")]
   pub subgraph_id: Uuid,
@@ -110,7 +110,7 @@ pub struct ViewContextDefinition {
 
 /// Represents a connection between two `ViewContext`s.  It holds the ID of the src and dst VC along
 /// with the name of the input and output that are connected.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionDescriptor {
   #[serde(rename = "vcId")]
   pub vc_id: String,
@@ -123,7 +123,7 @@ pub struct ConnectionDescriptor {
 struct ViewContextManagerState {
   /// This contains the IDs of all managed VCs.  The actual `ViewContextDefinition`s for each of
   /// them are found in separate `localStorage` entries.
-  pub view_context_ids: Vec<String>,
+  pub view_context_ids: Vec<Uuid>,
   #[serde(rename = "active_view_ix")]
   pub deprecated_active_view_ix: usize,
   #[serde(default = "Uuid::nil")]
@@ -139,6 +139,30 @@ struct ViewContextManagerState {
   pub active_view_history: ActiveViewHistory,
 }
 
+#[derive(Debug)]
+struct SubgraphConn {
+  pub tx: Uuid,
+  pub rx: Uuid,
+  pub portal_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SerializedVCD {
+  pub def: MinimalViewContextDefinition,
+  pub localstorage_val: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SerializedSubgraph {
+  pub fcs: Vec<ForeignConnectable>,
+  pub vcs: Vec<SerializedVCD>,
+  pub intra_conns: Vec<(ConnectionDescriptor, ConnectionDescriptor)>,
+  pub subgraphs: Vec<(Uuid, SubgraphDescriptor)>,
+  pub base_subgraph_id: Uuid,
+  /// ID of the subgraph which links to the subgraph being serialized
+  pub connnecting_subgraph_id: Uuid,
+}
+
 fn get_vc_key(uuid: Uuid) -> String { format!("vc_{}", uuid) }
 
 impl ViewContextManager {
@@ -149,7 +173,7 @@ impl ViewContextManager {
     view_context: Box<dyn ViewContext>,
   ) -> usize {
     self.contexts.push(ViewContextEntry {
-      id: Uuid::from_str(&definition.uuid).expect("Invalid UUID in `ViewContextEntry`"),
+      id: definition.uuid,
       definition,
       context: view_context,
       touched: false,
@@ -171,7 +195,7 @@ impl ViewContextManager {
 
     let created_ix = self.add_view_context_inner(
       MinimalViewContextDefinition {
-        uuid: uuid.to_string(),
+        uuid,
         name: name.clone(),
         title: None,
         subgraph_id,
@@ -222,10 +246,7 @@ impl ViewContextManager {
         },
       };
 
-      let mut view_context = build_view(
-        &definition.minimal_def.name,
-        Uuid::from_str(&definition.minimal_def.uuid).unwrap(),
-      );
+      let mut view_context = build_view(&definition.minimal_def.name, definition.minimal_def.uuid);
 
       view_context.init();
       view_context.hide();
@@ -345,6 +366,35 @@ impl ViewContextManager {
     self.save_all()
   }
 
+  fn add_subgraph_portal(
+    &mut self,
+    tx_subgraph_id: Uuid,
+    rx_subgraph_id: Uuid,
+    inputs: Option<serde_json::Value>,
+    outputs: Option<serde_json::Value>,
+  ) {
+    let mut serialized_state =
+      json!({ "txSubgraphID": tx_subgraph_id, "rxSubgraphID": rx_subgraph_id });
+    if let Some(inputs) = inputs {
+      serialized_state["registeredInputs"] = inputs;
+    }
+    if let Some(outputs) = outputs {
+      serialized_state["registeredOutputs"] = outputs;
+    }
+
+    self.add_foreign_connectable(ForeignConnectable {
+      _type: "customAudio/subgraphPortal".to_owned(),
+      id: String::new(),
+      serialized_state: Some(serialized_state),
+      subgraph_id: tx_subgraph_id,
+    });
+  }
+
+  fn add_bidirectional_subgraph_portal(&mut self, tx_subgraph_id: Uuid, rx_subgraph_id: Uuid) {
+    self.add_subgraph_portal(tx_subgraph_id, rx_subgraph_id, None, None);
+    self.add_subgraph_portal(rx_subgraph_id, tx_subgraph_id, None, None);
+  }
+
   /// Creates a new subgraph that contains a graph editor as its single view context
   pub fn add_subgraph(&mut self) -> Uuid {
     let new_subgraph_id = uuid_v4();
@@ -370,23 +420,8 @@ impl ViewContextManager {
       new_subgraph_id,
     );
 
-    // Add ssubgraph portals to and from the subgraph so the user can navigate between them
-    self.add_foreign_connectable(ForeignConnectable {
-      _type: "customAudio/subgraphPortal".to_owned(),
-      id: String::new(),
-      serialized_state: Some(
-        json!({ "txSubgraphID": self.active_subgraph_id, "rxSubgraphID": new_subgraph_id }),
-      ),
-      subgraph_id: self.active_subgraph_id,
-    });
-    self.add_foreign_connectable(ForeignConnectable {
-      _type: "customAudio/subgraphPortal".to_owned(),
-      id: String::new(),
-      serialized_state: Some(
-        json!({ "txSubgraphID": new_subgraph_id, "rxSubgraphID": self.active_subgraph_id }),
-      ),
-      subgraph_id: new_subgraph_id,
-    });
+    // Add subgraph portals to and from the subgraph so the user can navigate between them
+    self.add_bidirectional_subgraph_portal(new_subgraph_id, self.active_subgraph_id);
 
     new_subgraph_id
   }
@@ -435,16 +470,11 @@ impl ViewContextManager {
     );
   }
 
-  /// Recursively deletes the specified subgraph, all VCs and foreign connectables within it, and
-  /// all child subgraphs as determined by subgraph portals.
-  pub fn delete_subgraph(&mut self, subgraph_id_to_delete: Uuid) {
-    struct SubgraphConn {
-      pub tx: Uuid,
-      pub rx: Uuid,
-      pub portal_id: String,
-    }
-
-    // First, we determine the hierarchy of all subgraphs based on the subgraph portals
+  /// Using subgraph portals, creates an edge list of all connections between subgraphs in the VCM.
+  ///
+  /// Since all subgraph portals are bidirectional, this returns both the forward and reverse
+  /// connections.
+  fn get_all_subgraph_conns(&self) -> Vec<SubgraphConn> {
     let mut all_subgraph_connections: Vec<SubgraphConn> = Vec::new();
     for fc in &self.foreign_connectables {
       if fc._type == "customAudio/subgraphPortal" {
@@ -469,51 +499,86 @@ impl ViewContextManager {
       }
     }
 
-    // Now, we need to find all subgraphs that are children of the subgraph we're deleting
+    all_subgraph_connections
+  }
+
+  /// Returns `(all_subgraph_connections, child_subgraphs)`, where `all_subgraph_connections` is
+  /// a list of all subgraph portals in the VCM, and `child_subgraphs` is a list of all subgraphs
+  /// that are children of the subgraph with the specified ID - including the subgraph itself.
+  fn get_child_subgraph_ids(
+    &self,
+    target_subgraph_id: Uuid,
+  ) -> (Vec<SubgraphConn>, FxHashSet<Uuid>) {
+    if target_subgraph_id.is_nil() {
+      panic!("This function doesn't work for getting the children of the root subgraph");
+    }
+
+    // First, we determine the hierarchy of all subgraphs based on the subgraph portals
+    let all_subgraph_connections = self.get_all_subgraph_conns();
+
+    // Now, we need to find all subgraphs that are children of the target subgraph
     //
     // However, there's a complication.  All subgraph portals are bidirectional.  We only want to
-    // delete subgraphs that are children of the subgraph we're deleting, not siblings or parents.
+    // delete subgraphs that are children of the target subgraph, not siblings or parents.
     //
     // To achieve this, we first do a BFS starting from the root subgraph to identify all subgraphs
-    // that are above the subgraph we're deleting.
+    // that are above the target subgraph.
     //
-    // Then, we do a BFS starting from the subgraph we're deleting to identify all subgraphs that
-    // are below it.
-    let mut safe_subgraphs: FxHashSet<Uuid> = FxHashSet::default();
-    safe_subgraphs.insert(Uuid::nil());
-    let mut subgraphs_to_delete: FxHashSet<Uuid> = FxHashSet::default();
+    // Then, we do a BFS starting from the target subgraph to identify all subgraphs that are below
+    // it.
+    let mut excluded_subgraphs: FxHashSet<Uuid> = FxHashSet::default();
+    excluded_subgraphs.insert(Uuid::nil());
+    let mut child_subgraphs: FxHashSet<Uuid> = FxHashSet::default();
     let mut queue: Vec<Uuid> = vec![Uuid::nil()];
     while !queue.is_empty() {
       let subgraph_id = queue.pop().unwrap();
-      for conn in &all_subgraph_connections {
-        if conn.tx == subgraph_id {
-          if conn.rx == subgraph_id_to_delete {
-            continue;
-          }
 
-          let is_new = safe_subgraphs.insert(conn.rx);
-          if is_new {
-            queue.push(conn.rx);
-          }
+      let conns_from_subgraph = all_subgraph_connections
+        .iter()
+        .filter(|conn| conn.tx == subgraph_id);
+
+      for conn in conns_from_subgraph {
+        if conn.rx == subgraph_id {
+          error!(
+            "Subgraph portal with tx=rx={:?} is a self-loop",
+            subgraph_id
+          );
+          continue;
+        } else if conn.rx == target_subgraph_id {
+          continue;
         }
-      }
-    }
 
-    subgraphs_to_delete.insert(subgraph_id_to_delete);
-    queue.push(subgraph_id_to_delete);
-    while !queue.is_empty() {
-      let subgraph_id = queue.pop().unwrap();
-      for conn in &all_subgraph_connections {
-        if conn.tx == subgraph_id {
-          if subgraphs_to_delete.contains(&conn.rx) || safe_subgraphs.contains(&conn.rx) {
-            continue;
-          }
-
-          subgraphs_to_delete.insert(conn.rx);
+        let is_new = excluded_subgraphs.insert(conn.rx);
+        if is_new {
           queue.push(conn.rx);
         }
       }
     }
+
+    child_subgraphs.insert(target_subgraph_id);
+    queue.push(target_subgraph_id);
+    while !queue.is_empty() {
+      let subgraph_id = queue.pop().unwrap();
+      for conn in &all_subgraph_connections {
+        if conn.tx == subgraph_id {
+          if child_subgraphs.contains(&conn.rx) || excluded_subgraphs.contains(&conn.rx) {
+            continue;
+          }
+
+          child_subgraphs.insert(conn.rx);
+          queue.push(conn.rx);
+        }
+      }
+    }
+
+    (all_subgraph_connections, child_subgraphs)
+  }
+
+  /// Recursively deletes the specified subgraph, all VCs and foreign connectables within it, and
+  /// all child subgraphs as determined by subgraph portals.
+  pub fn delete_subgraph(&mut self, subgraph_id_to_delete: Uuid) {
+    let (all_subgraph_connections, subgraphs_to_delete) =
+      self.get_child_subgraph_ids(subgraph_id_to_delete);
 
     // Find all VCs and FCs that are in the subgraphs we're deleting
     let vcs_to_delete: Vec<Uuid> = self
@@ -576,6 +641,290 @@ impl ViewContextManager {
       &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
     );
     self.save_all();
+  }
+
+  /// Assumes all frontend state has been committed to the backend already (`onBeforeUnload()`)
+  pub fn serialize_subgraph(&self, subgraph_id: Uuid) -> SerializedSubgraph {
+    let (_all_subgraph_connections, included_subgraph_ids) =
+      self.get_child_subgraph_ids(subgraph_id);
+
+    let fcs = self
+      .foreign_connectables
+      .iter()
+      .filter(|fc| included_subgraph_ids.contains(&fc.subgraph_id))
+      .cloned()
+      .collect::<Vec<ForeignConnectable>>();
+    let vcs = self
+      .contexts
+      .iter()
+      .filter(|vc| included_subgraph_ids.contains(&vc.definition.subgraph_id))
+      .map(|vc| {
+        let state_key = vc.context.get_state_key();
+        let state = js::get_localstorage_key(&state_key);
+
+        SerializedVCD {
+          def: vc.definition.clone(),
+          localstorage_val: state,
+        }
+      })
+      .collect::<Vec<SerializedVCD>>();
+    // Connections that are fully within the subgraph and its children, so will be included in the
+    // serialized state
+    let intra_conns = self
+      .connections
+      .iter()
+      .filter(|(src, dst)| {
+        let get_subgraph_id = |vc_id: &str| -> Option<Uuid> {
+          self
+            .foreign_connectables
+            .iter()
+            .find_map(|fc| {
+              if fc.id == *vc_id {
+                Some(fc.subgraph_id)
+              } else {
+                None
+              }
+            })
+            .or_else(|| {
+              self.contexts.iter().find_map(|vc| {
+                if vc.id.to_string() == *vc_id {
+                  Some(vc.definition.subgraph_id)
+                } else {
+                  None
+                }
+              })
+            })
+        };
+
+        let Some(tx_subgraph_id) = get_subgraph_id(&src.vc_id) else {
+          error!("Couldn't find subgraph ID for VC ID {}", src.vc_id);
+          return false;
+        };
+        if !included_subgraph_ids.contains(&tx_subgraph_id) {
+          return false;
+        };
+        let Some(rx_subgraph_id) = get_subgraph_id(&dst.vc_id) else {
+          error!("Couldn't find subgraph ID for VC ID {}", dst.vc_id);
+          return false;
+        };
+        if !included_subgraph_ids.contains(&rx_subgraph_id) {
+          return false;
+        };
+
+        true
+      })
+      .cloned()
+      .collect::<Vec<_>>();
+    let subgraphs = self
+      .subgraphs_by_id
+      .iter()
+      .filter(|(id, _)| included_subgraph_ids.contains(id))
+      .map(|(id, desc)| (*id, desc.clone()))
+      .collect::<Vec<_>>();
+
+    SerializedSubgraph {
+      fcs,
+      vcs,
+      intra_conns,
+      subgraphs,
+      base_subgraph_id: subgraph_id,
+      connnecting_subgraph_id: self.active_subgraph_id,
+    }
+  }
+
+  /// Given a `SerializedSubgraph` containing the state for a subgraph any 0 or more child
+  /// subgraphs, creates all entities (VCs, FCs, and subgraphs) and connections in the VCM.
+  ///
+  /// Handles generating new random IDs for all entities to avoid conflicts when loading the same
+  /// saved subgraph multiple times.
+  ///
+  /// Creates subgraph portals between the current active subgraph and the new subgraph.
+  ///
+  /// Returns the ID of the new subgraph.
+  pub fn load_serialized_subgraph(&mut self, mut serialized: SerializedSubgraph) -> Uuid {
+    let mut new_uuid_by_old_uuid = FxHashMap::default();
+    let mut new_sid_by_old_sid = FxHashMap::default();
+
+    for (id, desc) in &mut serialized.subgraphs {
+      let new_id = uuid_v4();
+      new_uuid_by_old_uuid.insert(*id, new_id);
+      self.subgraphs_by_id.insert(new_id, desc.clone());
+      desc.id = new_id;
+      *id = new_id;
+    }
+    serialized.base_subgraph_id = new_uuid_by_old_uuid[&serialized.base_subgraph_id];
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
+
+    let mut base_portal_state = None;
+    for fc in &mut serialized.fcs {
+      fc.subgraph_id = new_uuid_by_old_uuid[&fc.subgraph_id];
+
+      // If this is a subgraph portal linking to the connecting subgraph, we need to re-point it to
+      // link with the current active subgraph instead
+      if fc._type == "customAudio/subgraphPortal" {
+        // TODO: Create a struct for this
+        if let Some(serde_json::Value::Object(state)) = &mut fc.serialized_state {
+          let mapped_tx_subgraph_id = if let Some(serde_json::Value::String(tx_subgraph_id)) =
+            state.get_mut("txSubgraphID")
+          {
+            let mapped_id = new_uuid_by_old_uuid[&Uuid::from_str(tx_subgraph_id).unwrap()];
+            *tx_subgraph_id = mapped_id.to_string();
+            Some(mapped_id)
+          } else {
+            error!(
+              "Mising/invalid `txSubgraphID` in serialized state for subgraph portal FC {:?}",
+              state
+            );
+            None
+          };
+          if let Some(serde_json::Value::String(rx_subgraph_id)) = state.get_mut("rxSubgraphID") {
+            let rx_subgraph_uuid = Uuid::from_str(rx_subgraph_id).unwrap();
+            if fc.subgraph_id == serialized.base_subgraph_id
+              && mapped_tx_subgraph_id == Some(serialized.base_subgraph_id)
+              && rx_subgraph_uuid == serialized.connnecting_subgraph_id
+            {
+              info!(
+                "Re-pointing subgraph portal rx to active subgraph.  Old ID: {}, new ID: {}",
+                rx_subgraph_uuid, self.active_subgraph_id
+              );
+              *rx_subgraph_id = self.active_subgraph_id.to_string();
+
+              if base_portal_state.is_some() {
+                error!("Found more than one subgraph portal linking to the connecting subgraph");
+              }
+              base_portal_state = Some(state.clone());
+            } else {
+              *rx_subgraph_id = new_uuid_by_old_uuid[&rx_subgraph_uuid].to_string();
+            }
+          } else {
+            error!(
+              "Mising/invalid `rxSubgraphID` in serialized state for subgraph portal FC {:?}",
+              state
+            );
+          }
+        } else {
+          error!(
+            "Mising/invalid serialized state for subgraph portal FC {:?}",
+            fc
+          );
+        }
+      }
+
+      let new_id = js::add_foreign_connectable(&serde_json::to_string(fc).unwrap());
+      new_sid_by_old_sid.insert(fc.id.clone(), new_id.clone());
+      fc.id = new_id;
+      self.foreign_connectables.push(fc.clone());
+    }
+
+    fn map_id(
+      new_uuid_by_old_uuid: &FxHashMap<Uuid, Uuid>,
+      new_sid_by_old_sid: &FxHashMap<String, String>,
+      old_id: &str,
+    ) -> String {
+      if let Ok(uuid) = Uuid::from_str(old_id) {
+        new_uuid_by_old_uuid[&uuid].to_string()
+      } else {
+        new_sid_by_old_sid[old_id].clone()
+      }
+    }
+
+    for vc in &mut serialized.vcs {
+      vc.def.subgraph_id = new_uuid_by_old_uuid[&vc.def.subgraph_id];
+      let new_id = uuid_v4();
+      new_uuid_by_old_uuid.insert(vc.def.uuid, new_id);
+      vc.def.uuid = new_id;
+    }
+
+    for vc in &mut serialized.vcs {
+      let ctx = build_view(&vc.def.name, vc.def.uuid);
+      if let Some(val) = &mut vc.localstorage_val {
+        // Another special case we have to update is graph editors.
+        //
+        // Graph editors have to hold IDs of the nodes in their state, and since we're mapping the
+        // state around, this causes the positions of nodes to get messed up.
+        if vc.def.name == "graph_editor" {
+          let mut state: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(val).unwrap();
+
+          // Keys to update: `last_node_id`, `nodes`, `selectedNodeVcId`
+          if let Some(serde_json::Value::String(last_node_id)) = state.get_mut("last_node_id") {
+            *last_node_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, last_node_id);
+          }
+          if let Some(serde_json::Value::String(selected_node_vc_id)) =
+            state.get_mut("selectedNodeVcId")
+          {
+            *selected_node_vc_id = map_id(
+              &new_uuid_by_old_uuid,
+              &new_sid_by_old_sid,
+              selected_node_vc_id,
+            );
+          }
+          if let Some(serde_json::Value::Array(nodes)) = state.get_mut("nodes") {
+            for node in nodes {
+              if let Some(serde_json::Value::String(vc_id)) = node.get_mut("id") {
+                *vc_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, vc_id);
+              }
+            }
+          }
+
+          *val = serde_json::to_string(&state).unwrap();
+        }
+
+        let new_localstorage_key = ctx.get_state_key();
+        js::set_localstorage_key(&new_localstorage_key, val);
+      }
+
+      self.add_view_context(vc.def.uuid, vc.def.name.clone(), ctx, vc.def.subgraph_id);
+    }
+
+    for (id, mut desc) in serialized.subgraphs {
+      let new_id = new_uuid_by_old_uuid[&desc.active_vc_id];
+      desc.active_vc_id = new_id;
+      self.subgraphs_by_id.insert(id, desc.clone());
+    }
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
+
+    for conn in &mut serialized.intra_conns {
+      let new_tx_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, &conn.0.vc_id);
+      let new_rx_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, &conn.1.vc_id);
+
+      self.connections.push((
+        ConnectionDescriptor {
+          vc_id: new_tx_id.clone(),
+          name: conn.0.name.clone(),
+        },
+        ConnectionDescriptor {
+          vc_id: new_rx_id.clone(),
+          name: conn.1.name.clone(),
+        },
+      ));
+    }
+    js::set_connections(&serde_json::to_string(&self.connections).unwrap());
+
+    // Finally, add a subgraph portal in the active subgraph pointing to the new subgraph with its
+    // inputs set to correspond to the one we re-pointed ealier
+    if let Some(base_portal_state) = base_portal_state {
+      let tx_subgraph_id = self.active_subgraph_id;
+      let rx_subgraph_id = serialized.base_subgraph_id;
+      let inputs = base_portal_state.get("registeredOutputs").cloned();
+      let outputs = base_portal_state.get("registeredInputs").cloned();
+      info!(
+        "Creating subgraph portal from active subgraph to new subgraph; tx={}, rx={}, \
+         inputs={:?}, outputs={:?}",
+        tx_subgraph_id, rx_subgraph_id, inputs, outputs
+      );
+      self.add_subgraph_portal(tx_subgraph_id, rx_subgraph_id, inputs, outputs);
+    }
+
+    self.save_all();
+
+    serialized.base_subgraph_id
   }
 
   fn set_view(&mut self, subgraph_id: Uuid, vc_id: Uuid) -> Result<(), ()> {

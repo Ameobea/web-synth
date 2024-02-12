@@ -21,6 +21,12 @@ const config = {
         loader: 'babel-loader',
       },
       {
+        test: /\.m?js/,
+        resolve: {
+          fullySpecified: false,
+        },
+      },
+      {
         test: /\.hbs$/,
         use: 'handlebars-loader',
       },

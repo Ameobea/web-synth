@@ -29,17 +29,6 @@ pub struct SerializedLooperInstState {
     pub active_module_ix: usize,
 }
 
-#[derive(Serialize, Queryable)]
-#[serde(rename_all = "camelCase")]
-pub struct LooperPresetDescriptor {
-    pub id: i64,
-    pub name: String,
-    pub description: String,
-    pub tags: Vec<String>,
-    pub user_id: Option<i64>,
-    pub user_name: Option<String>,
-}
-
 #[derive(Insertable)]
 #[diesel(table_name = looper_presets)]
 pub struct NewLooperPreset {
@@ -54,13 +43,4 @@ pub struct NewLooperPreset {
 pub struct NewLooperPresetTag {
     pub looper_preset_id: i64,
     pub tag_id: i64,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SaveLooperPresetRequest {
-    pub name: String,
-    pub description: String,
-    pub tags: Vec<String>,
-    pub serialized_looper_inst_state: SerializedLooperInstState,
 }

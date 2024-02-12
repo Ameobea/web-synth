@@ -9,8 +9,6 @@ pub struct Granulator {
 
 impl Granulator {
   pub fn new(uuid: Uuid) -> Self { Granulator { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("granulator_{}", self.uuid) }
 }
 
 impl ViewContext for Granulator {
@@ -19,6 +17,8 @@ impl ViewContext for Granulator {
   fn cleanup(&mut self) { js::cleanup_granulator(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("granulator_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_granulator(&self.get_state_key()); }
 

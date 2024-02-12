@@ -11,8 +11,6 @@ pub struct MIDIKeyboard {
 
 impl MIDIKeyboard {
   pub fn new(uuid: Uuid) -> Self { MIDIKeyboard { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("MIDIKeyboard_{}", self.uuid) }
 }
 
 impl ViewContext for MIDIKeyboard {
@@ -24,6 +22,8 @@ impl ViewContext for MIDIKeyboard {
   }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("MIDIKeyboard_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_midi_keyboard(&self.get_state_key()); }
 

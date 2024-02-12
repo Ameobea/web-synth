@@ -195,7 +195,7 @@ export const getExistingMIDICompositionTags = async (): Promise<
     return res.json();
   });
 
-export interface LooperPreset {
+export interface GenericPresetDescriptor {
   id: number;
   name: string;
   description: string;
@@ -204,7 +204,7 @@ export interface LooperPreset {
   userName: string | null | undefined;
 }
 
-export const fetchLooperPresets = async (): Promise<LooperPreset[]> =>
+export const fetchLooperPresets = async (): Promise<GenericPresetDescriptor[]> =>
   fetch(`${BACKEND_BASE_URL}/looper_presets`).then(async res => {
     if (!res.ok) {
       throw await res.text();
@@ -216,7 +216,7 @@ export const saveLooperPreset = async (preset: {
   name: string;
   description: string;
   tags: string[];
-  serializedLooperInstState: SerializedLooperInstState;
+  preset: SerializedLooperInstState;
 }) => {
   const maybeLoginToken = await getLoginToken();
   return fetch(`${BACKEND_BASE_URL}/looper_preset`, {
@@ -243,6 +243,53 @@ export const getExistingLooperPresetTags = async (): Promise<{ name: string; cou
 
 export const getLooperPreset = async (id: number): Promise<SerializedLooperInstState> =>
   fetch(`${BACKEND_BASE_URL}/looper_preset/${id}`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export type SubgraphPreset = { [key: string]: any }; // opaque; handled in engine
+
+export const saveSubgraphPreset = async (preset: {
+  name: string;
+  description: string;
+  tags: string[];
+  preset: SubgraphPreset;
+}) => {
+  const maybeLoginToken = await getLoginToken();
+  return fetch(`${BACKEND_BASE_URL}/subgraph_preset`, {
+    body: JSON.stringify(preset),
+    method: 'POST',
+    headers: {
+      Authorization: maybeLoginToken,
+    },
+  }).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+};
+
+export const fetchSubgraphPresets = async (): Promise<GenericPresetDescriptor[]> =>
+  fetch(`${BACKEND_BASE_URL}/subgraph_presets`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getExistingSubgraphPresetTags = async (): Promise<{ name: string; count: number }[]> =>
+  fetch(`${BACKEND_BASE_URL}/subgraph_preset_tags`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getSubgraphPreset = async (id: number | string): Promise<SubgraphPreset> =>
+  fetch(`${BACKEND_BASE_URL}/subgraph_preset/${id}`).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }

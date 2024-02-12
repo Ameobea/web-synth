@@ -1,7 +1,8 @@
 import type { AudioConnectables } from 'src/patchNetwork';
+import type { Renderable, ToastOptions } from 'svelte-french-toast';
 
 declare module 'litegraph.js' {
-  import {
+  import type {
     LiteGraphNode,
     LiteGraph as LiteGraphInstance,
     LiteGraphLink,
@@ -51,6 +52,10 @@ declare const process: {
 
 declare global {
   declare function dbg<T>(arg: T): T;
+
+  declare function toast(msg: Renderable, options?: ToastOptions): void;
+  declare function toastSuccess(msg: Renderable, options?: ToastOptions): void;
+  declare function toastError(msg: Renderable, options?: ToastOptions): void;
 
   declare function updateConnectables(vcId: string, newConnectables: AudioConnectables): void;
 

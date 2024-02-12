@@ -10,8 +10,6 @@ pub struct Sequencer {
 
 impl Sequencer {
   pub fn new(uuid: Uuid) -> Self { Sequencer { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("sequencer_{}", self.uuid) }
 }
 
 impl ViewContext for Sequencer {
@@ -20,6 +18,8 @@ impl ViewContext for Sequencer {
   fn cleanup(&mut self) { js::cleanup_sequencer(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("sequencer_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_sequencer(&self.get_state_key()); }
 

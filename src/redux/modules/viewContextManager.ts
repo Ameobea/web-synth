@@ -69,6 +69,27 @@ const actionGroups = {
       return { ...newState, patchNetwork: newPatchNetwork, isLoaded: true, activeSubgraphID };
     },
   }),
+  SET_CONNECTIONS: buildActionGroup({
+    actionCreator: (connections: [ConnectableDescriptor, ConnectableDescriptor][]) => ({
+      type: 'SET_CONNECTIONS',
+      connections,
+    }),
+    subReducer: (state: VCMState, { connections }) => {
+      const engine = getEngine();
+      if (!engine) {
+        console.error('Engine handle was not set when trying to set connections');
+        return state;
+      }
+
+      const newPatchNetwork = {
+        ...state.patchNetwork,
+        connections,
+      };
+      maybeUpdateVCM(engine, state.patchNetwork, newPatchNetwork);
+
+      return { ...state, patchNetwork: newPatchNetwork };
+    },
+  }),
   CONNECT: buildActionGroup({
     actionCreator: (from: ConnectableDescriptor, to: ConnectableDescriptor) => ({
       type: 'CONNECT',

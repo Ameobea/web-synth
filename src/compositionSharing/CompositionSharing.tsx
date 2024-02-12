@@ -78,14 +78,17 @@ const uploadLocalSamples = async (localSamples: SampleDescriptor[]) => {
 
 const checkForLocalSamples = async () => {
   const activeSamples: SampleDescriptor[] = getEngine()!.get_active_samples();
-  const activeLocalSamples = activeSamples.reduce((acc, descriptor) => {
-    if (!descriptor.isLocal) {
-      return acc;
-    }
+  const activeLocalSamples = activeSamples.reduce(
+    (acc, descriptor) => {
+      if (!descriptor.isLocal) {
+        return acc;
+      }
 
-    acc.set(descriptor.name, descriptor);
-    return acc;
-  }, new Map() as Map<string, SampleDescriptor>);
+      acc.set(descriptor.name, descriptor);
+      return acc;
+    },
+    new Map() as Map<string, SampleDescriptor>
+  );
 
   if (activeLocalSamples.size === 0) {
     return null;
@@ -267,6 +270,7 @@ const ShareComposition: React.FC = () => {
               description: description ?? '',
               tags: tags ?? [],
             });
+            toastSuccess(`Successfully saved as composition ${savedCompositionID}`);
             setSavedCompositionID(savedCompositionID);
           } catch (err) {
             if (!err) {

@@ -9,7 +9,7 @@ import {
   getExistingLooperPresetTags,
   getLooperPreset,
   saveLooperPreset,
-  type LooperPreset,
+  type GenericPresetDescriptor,
 } from 'src/api';
 import {
   pickPresetWithModal,
@@ -339,7 +339,7 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
             const wrappedFetchLooperPresets = () =>
               fetchLooperPresets().then(presets =>
                 presets.map(
-                  (preset): PresetDescriptor<LooperPreset> => ({
+                  (preset): PresetDescriptor<GenericPresetDescriptor> => ({
                     id: preset.id,
                     name: preset.name,
                     description: preset.description,
@@ -377,9 +377,7 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
                 name: preset.name,
                 description: preset.description ?? '',
                 tags: preset.tags ?? [],
-                serializedLooperInstState: deserializeLooper(
-                  serializeLooper(getState().looper.stateByVcId[vcId])
-                ),
+                preset: deserializeLooper(serializeLooper(getState().looper.stateByVcId[vcId])),
               });
               console.log('Successfully created preset with id: ', id);
             } catch (err) {

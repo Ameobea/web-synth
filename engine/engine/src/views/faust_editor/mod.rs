@@ -14,8 +14,6 @@ pub struct FaustEditor {
 
 impl FaustEditor {
   pub fn new(uuid: Uuid) -> Self { FaustEditor { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("faustEditor_{}", self.uuid) }
 }
 
 impl ViewContext for FaustEditor {
@@ -28,6 +26,8 @@ impl ViewContext for FaustEditor {
   fn cleanup(&mut self) { js::cleanup_faust_editor(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("faustEditor_{}", self.uuid) }
 
   fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 

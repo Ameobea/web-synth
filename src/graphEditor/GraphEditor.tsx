@@ -34,29 +34,83 @@ import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/
 import { removeNode } from 'src/patchNetwork/interface';
 import { handleGlobalMouseDown } from 'src';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
-import { renderSvelteModalWithControls } from 'src/controls/Modal';
+import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
 import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
 import type { SveltePropTypesOf } from 'src/svelteUtils';
+import { onBeforeUnload } from 'src/persistance';
+import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import {
+  fetchSubgraphPresets,
+  getExistingSubgraphPresetTags,
+  getSubgraphPreset,
+  saveSubgraphPreset as saveSubgraphPresetAPI,
+} from 'src/api';
+import { logError } from 'src/sentry';
+import {
+  mkGenericPresetPicker,
+  type PresetDescriptor,
+} from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 
 const ctx = new AudioContext();
 
 const confirmAndDeleteSubgraph = async (subgraphID: string) => {
   const subgraphName = getState().viewContextManager.subgraphsByID[subgraphID]?.name ?? 'Unknown';
-  try {
-    await renderSvelteModalWithControls<void, SveltePropTypesOf<typeof ConfirmReset>>(
-      ConfirmReset,
-      true,
-      {
-        message: `Are you sure you want to delete the subgraph "${subgraphName}"?`,
-        cancelMessage: 'Cancel',
-        resetMessage: 'Delete',
-      }
+  const isEmpty =
+    getState().viewContextManager.activeViewContexts.every(
+      vc => vc.name === 'graph_editor' || vc.subgraphId !== subgraphID
+    ) &&
+    getState().viewContextManager.foreignConnectables.every(
+      fc => fc.type === 'customAudio/subgraphPortal' || fc.subgraphId !== subgraphID
     );
+
+  if (!isEmpty) {
+    try {
+      await renderSvelteModalWithControls<void, SveltePropTypesOf<typeof ConfirmReset>>(
+        ConfirmReset,
+        true,
+        {
+          message: `Are you sure you want to delete the subgraph "${subgraphName}"?`,
+          cancelMessage: 'Cancel',
+          resetMessage: 'Delete',
+        }
+      );
+    } catch (_err) {
+      return; // cancelled
+    }
+  }
+
+  getEngine()!.delete_subgraph(subgraphID);
+};
+
+const saveSubgraphPreset = async (subgraphID: string) => {
+  let desc;
+  try {
+    desc = await renderGenericPresetSaverWithModal({
+      description: true,
+      getExistingTags: getExistingSubgraphPresetTags,
+    });
   } catch (_err) {
     return; // cancelled
   }
 
-  getEngine()!.delete_subgraph(subgraphID);
+  // Commit all state to the engine
+  const engine = getEngine()!;
+  onBeforeUnload(engine);
+  const serializedSubgraph = getEngine()!.serialize_subgraph(subgraphID);
+  engine.init();
+
+  try {
+    await saveSubgraphPresetAPI({
+      description: desc.description ?? '',
+      name: desc.name,
+      preset: JSON.parse(serializedSubgraph),
+      tags: desc.tags ?? [],
+    });
+    toastSuccess('Subgraph preset saved');
+  } catch (err) {
+    logError('Error saving subgraph preset', err);
+    toastError('Error saving subgraph preset: ' + `${err}`);
+  }
 };
 
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
@@ -111,6 +165,17 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
       removeOption.content = 'Delete Subgraph';
       removeOption.callback = () =>
         void confirmAndDeleteSubgraph((innerNode as SubgraphPortalNode).rxSubgraphID);
+
+      // Add a "Save Subgraph" option after the "Delete Subgraph" option
+      filteredOptions.splice(
+        filteredOptions.indexOf(removeOption) + 1,
+        0,
+        {
+          content: 'Save Subgraph',
+          callback: () => void saveSubgraphPreset(innerNode.rxSubgraphID),
+        },
+        null
+      );
     }
   } else {
     // Patch the remove option to delete the node directly from the patch network
@@ -356,6 +421,27 @@ const createNode = (nodeType: string, subgraphId: string, params?: Record<string
  */
 const addSubgraph = () => getEngine()!.add_subgraph();
 
+const addSavedSubgraph = async () => {
+  let pickedPreset: PresetDescriptor<number>;
+  try {
+    pickedPreset = await renderModalWithControls(
+      mkGenericPresetPicker(() =>
+        fetchSubgraphPresets().then(presets => presets.map(p => ({ ...p, preset: p.id })))
+      )
+    );
+  } catch (_err) {
+    return; // cancelled
+  }
+
+  try {
+    const preset = await getSubgraphPreset(pickedPreset.id);
+    getEngine()!.load_serialized_subgraph(JSON.stringify(preset));
+  } catch (err) {
+    logError('Error fetching subgraph preset', err);
+    toastError('Error fetching subgraph preset: ' + `${err}`);
+  }
+};
+
 interface GraphControlsProps {
   lGraphInstance: LGraph | null;
 }
@@ -557,7 +643,12 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         });
       };
 
-      const sortedNodeEntries = [['Add Subgraph', 'ADD_SUBGRAPH'], ...buildSortedNodeEntries()];
+      const sortedNodeEntries = [
+        ['Add Empty Subgraph', 'ADD_SUBGRAPH'],
+        ['Add Saved Subgraph', 'ADD_SAVED_SUBGRAPH'],
+        ['---', '---'],
+        ...buildSortedNodeEntries(),
+      ];
       const displayNames = sortedNodeEntries.map(([displayName]) => displayName);
       const lowerDisplayNames = displayNames.map(displayName => displayName.toLowerCase());
       canvas.onSearchBox = (_helper, value, _graphCanvas) => {
@@ -574,8 +665,12 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
           throw new Error(`No entry found for node type "${name}"`);
         }
         const [, nodeType] = entry;
-        if (nodeType === 'ADD_SUBGRAPH') {
+        if (!nodeType || nodeType === '---') {
+          return;
+        } else if (nodeType === 'ADD_SUBGRAPH') {
           addSubgraph();
+        } else if (nodeType === 'ADD_SAVED_SUBGRAPH') {
+          addSavedSubgraph();
         } else {
           if (!subgraphID) {
             throw new Error('No subgraph ID');
@@ -661,11 +756,17 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     if (state.selectedNodeVcId) {
       const node = (lGraphInstance as any as LiteGraphInstance)._nodes.find(
         node => node.connectables?.vcId === state.selectedNodeVcId
-      ) as any;
+      ) as any as LGraphNode | undefined;
       setCurSelectedNode(node);
-      setSelectedNodeVCID(state.selectedNodeVcId);
-      lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
-      lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
+      setSelectedNodeVCID(node ? state.selectedNodeVcId : null);
+      if (node) {
+        lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
+        lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
+      } else {
+        console.warn(
+          `Failed to find node with ID=${state.selectedNodeVcId} which was marked as selected in the serialized state`
+        );
+      }
     }
 
     state.nodes.forEach(({ id, pos }) => {

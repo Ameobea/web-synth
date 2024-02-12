@@ -10,8 +10,6 @@ pub struct SampleLibrary {
 
 impl SampleLibrary {
   pub fn new(uuid: Uuid) -> Self { SampleLibrary { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("SampleLibrary_{}", self.uuid) }
 }
 
 impl ViewContext for SampleLibrary {
@@ -20,6 +18,8 @@ impl ViewContext for SampleLibrary {
   fn cleanup(&mut self) { js::cleanup_sample_library(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("SampleLibrary_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_sample_library(&self.get_state_key()); }
 

@@ -4,12 +4,18 @@ version = "0.1.0"
 authors = ["Casey Primozic <me@ameo.link>"]
 edition = "2021"
 
+# enable debug info in release mode
+[profile.release]
+debug = true
+
 [dependencies]
 dotenv = "0.15.0"
 
 diesel = { version = "2.0", features = ["mysql", "chrono"] }
 
 hex = "0.4"
+
+fxhash = "0.2"
 
 itertools = "0.12"
 
@@ -31,10 +37,12 @@ serde_derive = "1.0"
 
 sha2 = "0.10"
 
+uuid = { version = "1.0", features = ["serde"] }
+
 tokio = { version = "1.24", features = ["macros", "rt-multi-thread"] }
 
 scrypt = "0.11.0"
-base64 = "0.21.0"
+base64 = "0.21"
 
 rust-s3 = { version = "0.33", features = [] }
 aws-region = { version = "0.25.0", features = ["serde"] }

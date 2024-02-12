@@ -10,8 +10,6 @@ pub struct SignalAnalyzer {
 
 impl SignalAnalyzer {
   pub fn new(uuid: Uuid) -> Self { SignalAnalyzer { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("SignalAnalyzer_{}", self.uuid) }
 }
 
 impl ViewContext for SignalAnalyzer {
@@ -20,6 +18,8 @@ impl ViewContext for SignalAnalyzer {
   fn cleanup(&mut self) { js::cleanup_signal_analyzer(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("SignalAnalyzer_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_signal_analyzer(&self.get_state_key()); }
 

@@ -16,6 +16,7 @@ import { getEngine, initGlobals, setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
+import { createGlobalToaster } from 'src/misc/GlobalToaster';
 
 initGlobals();
 
@@ -45,6 +46,11 @@ const createViewContextManagerUI = (engine: typeof import('./engine')) => {
       <ViewContextSwitcher engine={engine} />
     </Provider>
   );
+};
+
+const createGlobalUI = (engine: typeof import('./engine')) => {
+  createViewContextManagerUI(engine);
+  createGlobalToaster();
 };
 
 export const handleGlobalMouseDown = (evt: MouseEvent) => {
@@ -97,6 +103,6 @@ if (typeof AudioWorkletNode === 'undefined') {
 
     window.addEventListener('beforeunload', () => onBeforeUnload(engine));
 
-    createViewContextManagerUI(engine);
+    createGlobalUI(engine);
   });
 }

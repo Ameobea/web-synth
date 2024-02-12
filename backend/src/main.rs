@@ -92,6 +92,10 @@ async fn main() {
             routes::get_wavetable_preset_by_id,
             routes::create_wavetable_preset,
             routes::get_wavetable_preset_tags,
+            routes::get_subgraph_presets,
+            routes::get_subgraph_preset_by_id,
+            routes::create_subgraph_preset,
+            routes::get_subgraph_preset_tags,
         ])
         .attach(CorsFairing);
 

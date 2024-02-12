@@ -10,8 +10,6 @@ pub struct Sinsy {
 
 impl Sinsy {
   pub fn new(uuid: Uuid) -> Self { Sinsy { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("Sinsy_{}", self.uuid) }
 }
 
 impl ViewContext for Sinsy {
@@ -20,6 +18,8 @@ impl ViewContext for Sinsy {
   fn cleanup(&mut self) { js::cleanup_sinsy(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("Sinsy_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_sinsy(&self.get_state_key()); }
 

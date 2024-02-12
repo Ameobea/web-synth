@@ -13,14 +13,14 @@ pub struct CompositionSharing {
 
 impl CompositionSharing {
   pub fn new(uuid: Uuid) -> Self { CompositionSharing { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("compositionSharing_{}", self.uuid) }
 }
 
 impl ViewContext for CompositionSharing {
   fn init(&mut self) { js::init_composition_sharing(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("compositionSharing_{}", self.uuid) }
 
   fn cleanup(&mut self) { js::cleanup_composition_sharing(&self.get_state_key()); }
 

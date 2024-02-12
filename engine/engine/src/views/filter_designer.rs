@@ -9,8 +9,6 @@ pub struct FilterDesigner {
 
 impl FilterDesigner {
   pub fn new(uuid: Uuid) -> Self { FilterDesigner { uuid } }
-
-  pub fn get_state_key(&self) -> String { format!("filterDesigner_{}", self.uuid) }
 }
 
 impl ViewContext for FilterDesigner {
@@ -26,6 +24,8 @@ impl ViewContext for FilterDesigner {
   }
 
   fn get_id(&self) -> String { self.uuid.to_string() }
+
+  fn get_state_key(&self) -> String { format!("filterDesigner_{}", self.uuid) }
 
   fn hide(&mut self) { js::hide_filter_designer(&self.get_state_key()); }
 
