@@ -34,21 +34,18 @@ export const RangeInput: React.FC<RangeInputProps> = ({
     newDisplayValue[ix] = evt.target.value;
     setDisplayValue(newDisplayValue);
 
-    const newValue = +evt.target.value;
-    if (Number.isNaN(newValue)) {
+    const [newMin, newMax] = [+newDisplayValue[0], +newDisplayValue[1]];
+    if (Number.isNaN(newMin) || Number.isNaN(newMax)) {
       setErrMsg('Non-numerical values entered');
       return;
-    } else if ((ix === 0 && value[1] < newValue) || (ix === 1 && value[0] > newValue)) {
+    } else if (newMin >= newMax) {
       setErrMsg('Invalid range');
       return;
     }
 
-    const newRange = [...value] as [number, number];
-    newRange[ix] = newValue;
+    const newRange = [newMin, newMax] as [number, number];
     onChange(newRange);
-    if (setErrMsg !== null) {
-      setErrMsg(null);
-    }
+    setErrMsg(null);
   };
 
   return (

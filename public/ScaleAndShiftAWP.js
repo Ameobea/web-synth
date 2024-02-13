@@ -16,6 +16,10 @@ const mkLinearToExponential = (xMin, xMax, yMin, yMax, steepness) => {
   }
 
   const inputRange = xMax - xMin;
+  if (inputRange <= 0) {
+    console.warn('Found invalid input range, returning a constant function.', { xMin, xMax });
+    return () => yMin;
+  }
   const outputRange = yMax - yMin;
 
   return x => {
@@ -35,6 +39,10 @@ const mkExponentialToLinear = (yMin, yMax, xMin, xMax, steepness) => {
   }
 
   const inputRange = xMax - xMin;
+  if (inputRange <= 0) {
+    console.warn('Found invalid input range, returning a constant function.', { xMin, xMax });
+    return () => yMin;
+  }
   const outputRange = yMax - yMin;
 
   return y => {
@@ -104,9 +112,15 @@ class ScaleAndShiftAWP extends AudioWorkletProcessor {
     const input = new Float32Array(SAMPLE_COUNT);
     const output = new Float32Array(SAMPLE_COUNT);
     const step = (this.inputMax - this.inputMin) / (SAMPLE_COUNT - 1);
+    const inputRange = this.inputMax - this.inputMin;
+
     for (let i = 0; i < SAMPLE_COUNT; i += 1) {
       input[i] = this.inputMin + i * step;
-      output[i] = this.convert(input[i]);
+      if (inputRange <= 0) {
+        output[i] = +'x';
+      } else {
+        output[i] = this.convert(input[i]);
+      }
     }
     this.port.postMessage({ type: 'responsePlot', input, output });
   }

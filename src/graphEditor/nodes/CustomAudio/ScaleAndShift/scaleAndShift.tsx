@@ -114,7 +114,7 @@ export class ScaleAndShiftNode implements ForeignNode {
     if (!this.uiState.linearToExponentialState?.enabled) {
       if (this.awpHandle) {
         try {
-          this.awpHandle.disconnect();
+          this.firstShifterNode.disconnect(this.awpHandle);
         } catch (_err) {
           // pass
         }

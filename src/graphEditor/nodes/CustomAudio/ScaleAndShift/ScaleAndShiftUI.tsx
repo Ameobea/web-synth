@@ -129,28 +129,12 @@ const ScaleAndShiftSmallView: React.FC<ScaleAndShiftSmallViewProps> = ({
       const clampedNewState = {
         ...newState,
         input_range: [
-          R.clamp(
-            newState.input_min_max[0],
-            Math.min(newState.input_min_max[1], newState.input_range[1]),
-            newState.input_range[0]
-          ),
-          R.clamp(
-            Math.max(newState.input_min_max[0], newState.input_range[0]),
-            newState.input_min_max[1],
-            newState.input_range[1]
-          ),
+          R.clamp(newState.input_min_max[0], newState.input_min_max[1], newState.input_range[0]),
+          R.clamp(newState.input_min_max[0], newState.input_min_max[1], newState.input_range[1]),
         ] as const,
         output_range: [
-          R.clamp(
-            newState.output_min_max[0],
-            Math.min(newState.output_min_max[1], newState.output_range[1]),
-            newState.output_range[0]
-          ),
-          R.clamp(
-            Math.max(newState.output_min_max[0], newState.output_range[0]),
-            newState.output_min_max[1],
-            newState.output_range[1]
-          ),
+          R.clamp(newState.output_min_max[0], newState.output_min_max[1], newState.output_range[0]),
+          R.clamp(newState.output_min_max[0], newState.output_min_max[1], newState.output_range[1]),
         ] as const,
       };
 

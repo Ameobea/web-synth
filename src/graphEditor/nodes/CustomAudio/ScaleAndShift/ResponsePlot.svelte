@@ -65,6 +65,10 @@
       .attr('fill', LINE_COLOR);
 
     const updatePlot = (data: ResponsePlotData) => {
+      svgElement.selectAll('.grid').remove();
+      svgElement.selectAll('.line').remove();
+      svgElement.selectAll('.error-text').remove();
+
       const xExtent = d3.extent(data.input);
       const yExtent = d3.extent(data.output);
       if (
@@ -73,8 +77,21 @@
         yExtent[0] === undefined ||
         yExtent[1] === undefined
       ) {
-        throw new Error('Invalid data');
+        xAxisElem.style('display', 'none');
+        yAxisElem.style('display', 'none');
+        svgElement
+          .append('text')
+          .attr('class', 'error-text')
+          .attr('x', INNER_WIDTH / 2)
+          .attr('y', INNER_HEIGHT / 2)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'red')
+          .text('Invalid Range');
+        return;
       }
+
+      xAxisElem.style('display', null);
+      yAxisElem.style('display', null);
 
       xScale.domain(xExtent);
       yScale.domain(yExtent);
@@ -84,7 +101,6 @@
       yAxisElem.call(yAxis);
 
       // Add grid lines
-      svgElement.selectAll('.grid').remove();
       svgElement
         .append('g')
         .attr('class', 'grid')
@@ -107,9 +123,6 @@
         )
         .attr('transform', `translate(0,${INNER_HEIGHT})`)
         .attr('stroke-opacity', 0.1);
-
-      // clear old line
-      svgElement.selectAll('.line').remove();
 
       svgElement
         .append('path')
