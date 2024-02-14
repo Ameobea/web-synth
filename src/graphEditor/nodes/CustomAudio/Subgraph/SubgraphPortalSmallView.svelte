@@ -8,7 +8,7 @@
   export let inputs: Writable<PortMap>;
   export let outputs: Writable<PortMap>;
   export let renamePort: (side: 'input' | 'output', oldName: string, newName: string) => void;
-  export let deletePort: (ports: Writable<PortMap>, name: string) => void;
+  export let deletePort: (side: 'input' | 'output', name: string) => void;
   export let setSubgraphName: (newName: string) => void;
   export let rxSubgraphID: string;
 
@@ -32,13 +32,13 @@
     title="Inputs"
     ports={inputs}
     renamePort={(oldName, newName) => renamePort('input', oldName, newName)}
-    deletePort={name => deletePort(inputs, name)}
+    deletePort={name => deletePort('input', name)}
   />
   <PortList
     title="Outputs"
     ports={outputs}
     renamePort={(oldName, newName) => renamePort('output', oldName, newName)}
-    deletePort={name => deletePort(outputs, name)}
+    deletePort={name => deletePort('output', name)}
   />
 </div>
 

@@ -214,6 +214,28 @@ const actionGroups = {
       return { ...state, patchNetwork: newPatchNetwork };
     },
   }),
+  SET_FOREIGN_CONNECTABLES: buildActionGroup({
+    actionCreator: (foreignConnectables: ForeignConnectable[]) => ({
+      type: 'SET_FOREIGN_CONNECTABLES',
+      foreignConnectables,
+    }),
+    subReducer: (state: VCMState, { foreignConnectables }) => ({ ...state, foreignConnectables }),
+  }),
+  SET_VIEW_CONTEXTS: buildActionGroup({
+    actionCreator: (
+      activeViewContextId: string,
+      activeViewContexts: { name: string; uuid: string; title?: string; subgraphId: string }[]
+    ) => ({
+      type: 'SET_VIEW_CONTEXTS',
+      activeViewContextId,
+      activeViewContexts,
+    }),
+    subReducer: (state: VCMState, { activeViewContextId, activeViewContexts }) => ({
+      ...state,
+      activeViewContexts,
+      activeViewContextId,
+    }),
+  }),
   ADD_PATCH_NETWORK_NODE: buildActionGroup({
     actionCreator: (vcId: string, connectables: AudioConnectables | null, subgraphId: string) => ({
       type: 'ADD_PATCH_NETWORK_NODE',

@@ -3,11 +3,14 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
-import { store } from 'src/redux';
+import { getState, store } from 'src/redux';
 import GraphEditor, { saveStateForInstance } from './GraphEditor';
+import { tryParseJson } from 'src/util';
+import type { LGraph } from 'litegraph.js';
+import { updateGraph } from 'src/graphEditor/graphDiffing';
 
 interface GraphEditorCtx {
-  lgraphHandle: any;
+  lgraphHandle: LGraph | null;
   root: Root;
 }
 
@@ -95,4 +98,47 @@ export const cleanup_graph_editor = (stateKey: string) => {
   graphEditorReactRootNode?.remove();
 
   GraphEditorCtxsByVcId.delete(vcId);
+};
+
+/**
+ * First, updates the graph to match the patch network.  Then, arranges the nodes in the graph.  If `nodeIDsOptJSON` is
+ * provided, only the nodes with the given IDs will be arranged.  If it is not provided, all nodes will be arranged.
+ */
+export const arrange_graph_editor_nodes = (
+  vcId: string,
+  nodeIDsOptJSON: string,
+  offsetX: number,
+  offsetY: number
+) => {
+  const nodeIDs = tryParseJson<string[] | null>(
+    nodeIDsOptJSON,
+    null,
+    'Failed to parse node IDs JSON'
+  );
+  const ctx = GraphEditorCtxsByVcId.get(vcId);
+  if (!ctx) {
+    console.error(`No graph editor ctx found with vcId=${vcId} when trying to arrange nodes`);
+    return;
+  }
+
+  const { lgraphHandle } = ctx;
+  if (!lgraphHandle) {
+    console.warn(`No lgraph handle found for vcId=${vcId} when trying to arrange nodes`);
+    return;
+  }
+
+  const { patchNetwork, activeViewContexts, foreignConnectables } = getState().viewContextManager;
+  const subgraphID = activeViewContexts.find(vc => vc.uuid === vcId)!.subgraphId;
+  if (!subgraphID) {
+    throw new Error(`No subgraph ID found for vcId=${vcId}`);
+  }
+  updateGraph(
+    lgraphHandle as any,
+    patchNetwork,
+    activeViewContexts,
+    foreignConnectables,
+    subgraphID
+  );
+
+  (lgraphHandle.arrange as any)(undefined, undefined, nodeIDs, [offsetX, offsetY]);
 };

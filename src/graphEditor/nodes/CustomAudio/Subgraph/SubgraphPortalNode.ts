@@ -204,14 +204,7 @@ export class SubgraphPortalNode implements ForeignNode {
       getProps: () => ({
         inputs: this.registeredInputs,
         outputs: this.registeredOutputs,
-        deletePort: (ports: Writable<PortMap>, name: string) => {
-          ports.update(ports => {
-            const newPorts = { ...ports };
-            delete newPorts[name];
-            return newPorts;
-          });
-          updateConnectables(this.vcId, this.buildConnectables());
-        },
+        deletePort: (side: 'input' | 'output', name: string) => void this.deletePort(side, name),
         renamePort: (side: 'input' | 'output', oldName: string, newName: string) =>
           void this.renamePort(side, oldName, newName),
         setSubgraphName: (newSubgraphName: string) => {
@@ -235,6 +228,42 @@ export class SubgraphPortalNode implements ForeignNode {
     lgNode.shape = 1;
     lgNode.graph?.setDirtyCanvas(true, false);
   }
+
+  private deletePort = (side: 'input' | 'output', name: string) => {
+    const ports = side === 'input' ? this.registeredInputs : this.registeredOutputs;
+    if (!get(ports)[name]) {
+      return;
+    }
+
+    ports.update(ports => {
+      const newPorts = { ...ports };
+      delete newPorts[name];
+      return newPorts;
+    });
+    updateConnectables(this.vcId, this.buildConnectables());
+
+    // Find other subgraph portals that have our rx as their tx or vice versa and remove the
+    // corresponding port from them
+    for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
+      if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
+        if (side === 'output' && connectables.node.txSubgraphID === this.rxSubgraphID) {
+          connectables.node.registeredInputs.update(inputs => {
+            const newInputs = { ...inputs };
+            delete newInputs[name];
+            return newInputs;
+          });
+          updateConnectables(connectables.node.vcId, connectables.node.buildConnectables());
+        } else if (side === 'input' && connectables.node.rxSubgraphID === this.txSubgraphID) {
+          connectables.node.registeredOutputs.update(outputs => {
+            const newOutputs = { ...outputs };
+            delete newOutputs[name];
+            return newOutputs;
+          });
+          updateConnectables(connectables.node.vcId, connectables.node.buildConnectables());
+        }
+      }
+    }
+  };
 
   private renamePort = (side: 'input' | 'output', oldName: string, newName: string) => {
     const ports = side === 'input' ? this.registeredInputs : this.registeredOutputs;

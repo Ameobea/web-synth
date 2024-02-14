@@ -1,3 +1,4 @@
+use downcast_rs::{impl_downcast, Downcast};
 use wasm_bindgen::prelude::*;
 
 mod active_view_history;
@@ -8,7 +9,7 @@ extern "C" {
   pub fn create_empty_audio_connectables(vc_id: &str) -> JsValue;
 }
 
-pub trait ViewContext {
+pub trait ViewContext: Downcast {
   /// Set up the view context to be the primary/active view of the application.  This may involve
   /// things like subscribing to/loading external data sources, creating DOM nodes, etc.
   fn init(&mut self) {}
@@ -49,7 +50,7 @@ pub trait ViewContext {
   fn render_small_view(&mut self, _target_dom_id: &str) {}
 
   /// Unrenders whatever was created by `render_small_view` in the `<div>` element with the
-  /// provided `id`\
+  /// provided `id`.
   fn cleanup_small_view(&mut self, _target_dom_id: &str) {}
 
   /// Return a list of sample descriptors for all samples that are currently in use by this VC.
@@ -58,3 +59,4 @@ pub trait ViewContext {
   /// doesn't explicitly depend on the user selecting a new sample.
   fn list_used_samples(&self) -> Vec<JsValue> { Vec::new() }
 }
+impl_downcast!(ViewContext);

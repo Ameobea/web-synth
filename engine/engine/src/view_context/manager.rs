@@ -9,12 +9,22 @@ use uuid::Uuid;
 use crate::{
   js,
   views::{
-    composition_sharing::mk_composition_sharing, control_panel::mk_control_panel,
-    faust_editor::mk_faust_editor, filter_designer::mk_filter_designer, granulator::mk_granulator,
-    graph_editor::mk_graph_editor, looper::mk_looper, midi_editor::mk_midi_editor,
-    midi_keyboard::mk_midi_keyboard, sample_library::mk_sample_library, sampler::mk_sampler,
-    sequencer::mk_sequencer, signal_analyzer::mk_signal_analyzer, sinsy::mk_sinsy,
-    synth_designer::mk_synth_designer, welcome_page::mk_welcome_page,
+    composition_sharing::mk_composition_sharing,
+    control_panel::mk_control_panel,
+    faust_editor::mk_faust_editor,
+    filter_designer::mk_filter_designer,
+    granulator::mk_granulator,
+    graph_editor::{mk_graph_editor, GraphEditor},
+    looper::mk_looper,
+    midi_editor::mk_midi_editor,
+    midi_keyboard::mk_midi_keyboard,
+    sample_library::mk_sample_library,
+    sampler::mk_sampler,
+    sequencer::mk_sequencer,
+    signal_analyzer::mk_signal_analyzer,
+    sinsy::mk_sinsy,
+    synth_designer::mk_synth_designer,
+    welcome_page::mk_welcome_page,
   },
 };
 
@@ -110,7 +120,7 @@ pub struct ViewContextDefinition {
 
 /// Represents a connection between two `ViewContext`s.  It holds the ID of the src and dst VC along
 /// with the name of the input and output that are connected.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ConnectionDescriptor {
   #[serde(rename = "vcId")]
   pub vc_id: String,
@@ -643,6 +653,29 @@ impl ViewContextManager {
     self.save_all();
   }
 
+  /// Returns the subgraph ID of the provided VC or FC id
+  fn get_subgraph_id(&self, vc_id: &str) -> Option<Uuid> {
+    self
+      .foreign_connectables
+      .iter()
+      .find_map(|fc| {
+        if fc.id == *vc_id {
+          Some(fc.subgraph_id)
+        } else {
+          None
+        }
+      })
+      .or_else(|| {
+        self.contexts.iter().find_map(|vc| {
+          if vc.id.to_string() == *vc_id {
+            Some(vc.definition.subgraph_id)
+          } else {
+            None
+          }
+        })
+      })
+  }
+
   /// Assumes all frontend state has been committed to the backend already (`onBeforeUnload()`)
   pub fn serialize_subgraph(
     &self,
@@ -683,36 +716,14 @@ impl ViewContextManager {
       .connections
       .iter()
       .filter(|(src, dst)| {
-        let get_subgraph_id = |vc_id: &str| -> Option<Uuid> {
-          self
-            .foreign_connectables
-            .iter()
-            .find_map(|fc| {
-              if fc.id == *vc_id {
-                Some(fc.subgraph_id)
-              } else {
-                None
-              }
-            })
-            .or_else(|| {
-              self.contexts.iter().find_map(|vc| {
-                if vc.id.to_string() == *vc_id {
-                  Some(vc.definition.subgraph_id)
-                } else {
-                  None
-                }
-              })
-            })
-        };
-
-        let Some(tx_subgraph_id) = get_subgraph_id(&src.vc_id) else {
+        let Some(tx_subgraph_id) = self.get_subgraph_id(&src.vc_id) else {
           error!("Couldn't find subgraph ID for VC ID {}", src.vc_id);
           return false;
         };
         if !included_subgraph_ids.contains(&tx_subgraph_id) {
           return false;
         };
-        let Some(rx_subgraph_id) = get_subgraph_id(&dst.vc_id) else {
+        let Some(rx_subgraph_id) = self.get_subgraph_id(&dst.vc_id) else {
           error!("Couldn't find subgraph ID for VC ID {}", dst.vc_id);
           return false;
         };
@@ -952,6 +963,117 @@ impl ViewContextManager {
     self.save_all();
 
     serialized.base_subgraph_id
+  }
+
+  /// Moves the specified VC/FCs to the specified subgraph, updating the state and committing it to
+  /// `localStorage` as well as the frontend.
+  ///
+  /// Severs any connections that would cross a subgraph boundary as a result of the move.
+  pub fn move_vfcs_to_subgraph(&mut self, vfc_ids: Vec<String>, target_subgraph_id: Uuid) {
+    let mut vc_ids_to_move = Vec::new();
+    let mut fc_ids_to_move = Vec::new();
+    // If the VC we're moving is the active VC for the subgraph it's being moved from, we need to
+    // set a new active VC for that subgraph
+    let mut subgraph_ids_needing_new_active_vc = FxHashSet::default();
+
+    for vfc_id in &vfc_ids {
+      if let Ok(uuid) = Uuid::from_str(&vfc_id) {
+        if let Some(vc) = self.contexts.iter_mut().find(|vc| vc.id == uuid) {
+          vc.definition.subgraph_id = target_subgraph_id;
+          vc_ids_to_move.push(uuid);
+
+          if self.subgraphs_by_id[&vc.definition.subgraph_id].active_vc_id == vc.id {
+            subgraph_ids_needing_new_active_vc.insert(vc.definition.subgraph_id);
+            vc.context.hide();
+          }
+        }
+      } else {
+        if let Some(fc) = self
+          .foreign_connectables
+          .iter_mut()
+          .find(|fc| fc.id.as_str() == vfc_id.as_str())
+        {
+          fc.subgraph_id = target_subgraph_id;
+          fc_ids_to_move.push(vfc_id);
+        }
+      }
+    }
+
+    info!(
+      "Moving {} vc(s) and {} fc(s) to subgraph id={}",
+      vc_ids_to_move.len(),
+      fc_ids_to_move.len(),
+      target_subgraph_id
+    );
+
+    let mut conns_to_remove = Vec::new();
+    self.connections = std::mem::take(&mut self.connections)
+      .into_iter()
+      .filter(|(tx, rx)| {
+        let src_subgraph_id = self.get_subgraph_id(&tx.vc_id).unwrap();
+        let dst_subgraph_id = self.get_subgraph_id(&rx.vc_id).unwrap();
+        if src_subgraph_id == target_subgraph_id && dst_subgraph_id == target_subgraph_id {
+          true
+        } else if src_subgraph_id == target_subgraph_id || dst_subgraph_id == target_subgraph_id {
+          conns_to_remove.push((tx.clone(), rx.clone()));
+          false
+        } else {
+          true
+        }
+      })
+      .collect();
+
+    info!("Removing {} connections", conns_to_remove.len());
+    for (tx, rx) in conns_to_remove {
+      js::delete_connection(&tx.vc_id, &tx.name, &rx.vc_id, &rx.name);
+    }
+
+    js::set_foreign_connectables(&serde_json::to_string(&self.foreign_connectables).unwrap());
+    js::set_view_contexts(
+      &self.active_context_id.to_string(),
+      &serde_json::to_string(
+        &self
+          .contexts
+          .iter()
+          .map(|vc| &vc.definition)
+          .collect::<Vec<_>>(),
+      )
+      .unwrap(),
+    );
+
+    for subgraph_id in subgraph_ids_needing_new_active_vc {
+      let new_active_vc_opt = self
+        .contexts
+        .iter_mut()
+        .find(|vc| vc.definition.subgraph_id == subgraph_id);
+      if let Some(vc) = new_active_vc_opt {
+        vc.context.unhide();
+        self
+          .subgraphs_by_id
+          .get_mut(&subgraph_id)
+          .unwrap()
+          .active_vc_id = vc.id;
+        if self.active_subgraph_id == subgraph_id {
+          self.active_context_id = vc.id;
+        }
+      }
+    }
+    js::set_subgraphs(
+      &self.active_subgraph_id.to_string(),
+      &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
+    );
+
+    // Trigger all graph editor VCs in the subgraph the nodes were moved into to arrange the nodes
+    // that were moved into it
+    for vc in &self.contexts {
+      if vc.definition.subgraph_id == target_subgraph_id && vc.definition.name == "graph_editor" {
+        let graph_editor = match vc.context.as_any().downcast_ref::<GraphEditor>() {
+          Some(ge) => ge,
+          None => continue,
+        };
+        graph_editor.arrange_nodes(Some(&vfc_ids), (20, 400));
+      }
+    }
   }
 
   fn set_view(&mut self, subgraph_id: Uuid, vc_id: Uuid) -> Result<(), ()> {

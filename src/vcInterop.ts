@@ -112,6 +112,28 @@ export const set_connections = (connectionsJson: string) => {
   dispatch(actionCreators.viewContextManager.SET_CONNECTIONS(connections));
 };
 
+export const set_foreign_connectables = (foreignConnectablesJson: string) => {
+  const foreignConnectables = tryParseJson<ForeignConnectable[]>(
+    foreignConnectablesJson,
+    [],
+    'Failed to parse foreign nodes JSON; using an empty list but that will probably create invalid connections.'
+  );
+  dispatch(actionCreators.viewContextManager.SET_FOREIGN_CONNECTABLES(foreignConnectables));
+};
+
+export const set_view_contexts = (activeViewContextId: string, activeViewContextsJson: string) => {
+  const activeViewContexts = tryParseJson<
+    { name: string; uuid: string; title?: string; subgraphId: string }[]
+  >(
+    activeViewContextsJson,
+    [],
+    'Failed to parse JSON of `activeViewContexts`; clearing all view contexts'
+  );
+  dispatch(
+    actionCreators.viewContextManager.SET_VIEW_CONTEXTS(activeViewContextId, activeViewContexts)
+  );
+};
+
 export const add_connection = (
   fromVcId: string,
   fromPortName: string,
@@ -120,6 +142,20 @@ export const add_connection = (
 ) => {
   dispatch(
     actionCreators.viewContextManager.CONNECT(
+      { vcId: fromVcId, name: fromPortName },
+      { vcId: toVcId, name: toPortName }
+    )
+  );
+};
+
+export const delete_connection = (
+  fromVcId: string,
+  fromPortName: string,
+  toVcId: string,
+  toPortName: string
+) => {
+  dispatch(
+    actionCreators.viewContextManager.DISCONNECT(
       { vcId: fromVcId, name: fromPortName },
       { vcId: toVcId, name: toPortName }
     )

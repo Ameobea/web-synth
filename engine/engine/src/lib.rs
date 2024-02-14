@@ -119,7 +119,7 @@ pub fn rename_subgraph(subgraph_id: &str, new_name: String) {
 #[wasm_bindgen]
 pub fn serialize_subgraph(subgraph_id: &str, subgraph_name_override: &str) -> String {
   let uuid =
-    Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `serialize_subgraph`!");
+    Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `serialize_subgraph`");
   let serialized = get_vcm().serialize_subgraph(
     uuid,
     if subgraph_name_override.is_empty() {
@@ -129,6 +129,15 @@ pub fn serialize_subgraph(subgraph_id: &str, subgraph_name_override: &str) -> St
     },
   );
   serde_json::to_string(&serialized).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn move_vfcs_to_subgraph(vc_ids: &str, subgraph_id: &str) {
+  let uuid =
+    Uuid::from_str(subgraph_id).expect("Invalid UUID string passed to `move_vcs_to_subgraph`");
+  let vc_ids: Vec<String> =
+    serde_json::from_str(vc_ids).expect("Invalid JSON passed to `move_vcs_to_subgraph`");
+  get_vcm().move_vfcs_to_subgraph(vc_ids, uuid);
 }
 
 #[wasm_bindgen]

@@ -110,6 +110,8 @@ export const disconnectNodes = (
   }
 };
 
+let vcmUpdateQueued = false;
+
 /**
  * Checks to see if connections and/or foreign nodes have changed between two versions of the patch network.
  * If they have, trigger the Rust VCM state to be updated with the new state.
@@ -119,6 +121,10 @@ export const maybeUpdateVCM = (
   oldPatchNetwork: PatchNetwork,
   newPatchNetwork: PatchNetwork
 ) => {
+  if (vcmUpdateQueued) {
+    return;
+  }
+
   const connectionsUnchanged =
     oldPatchNetwork.connections.length === newPatchNetwork.connections.length &&
     oldPatchNetwork.connections.every(conn =>
@@ -138,17 +144,22 @@ export const maybeUpdateVCM = (
   if (connectionsUnchanged && foreignConnectablesUnchanged) {
     return;
   }
+  vcmUpdateQueued = true;
 
   setTimeout(() => {
-    const freshPatchNetwork = getState().viewContextManager.patchNetwork;
-    const freshForeignConnectables = freshPatchNetwork.connectables.filter(({ node }) => !!node);
+    try {
+      const freshPatchNetwork = getState().viewContextManager.patchNetwork;
+      const freshForeignConnectables = freshPatchNetwork.connectables.filter(({ node }) => !!node);
 
-    if (!connectionsUnchanged) {
-      engine.set_connections(JSON.stringify(freshPatchNetwork.connections));
-    }
+      if (!connectionsUnchanged) {
+        engine.set_connections(JSON.stringify(freshPatchNetwork.connections));
+      }
 
-    if (!foreignConnectablesUnchanged) {
-      commitForeignConnectables(engine, freshForeignConnectables);
+      if (!foreignConnectablesUnchanged) {
+        commitForeignConnectables(engine, freshForeignConnectables);
+      }
+    } finally {
+      vcmUpdateQueued = false;
     }
   });
 };

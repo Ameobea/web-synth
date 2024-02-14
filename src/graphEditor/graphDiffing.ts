@@ -9,7 +9,7 @@ import type {
   LiteGraphNode,
 } from 'src/graphEditor/LiteGraphTypes';
 import type { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
-import { getState, type ReduxStore } from 'src/redux';
+import { type ReduxStore } from 'src/redux';
 import type { ArrayElementOf } from 'src/util';
 
 const createAudioConnectablesNode = (
@@ -47,44 +47,50 @@ export const updateGraph = (
   graph: LiteGraphInstance,
   patchNetwork: PatchNetwork,
   activeViewContexts: ReduxStore['viewContextManager']['activeViewContexts'],
+  foreignConnectables: ReduxStore['viewContextManager']['foreignConnectables'],
   subgraphID: string
 ) => {
   const allVcIDsInSubgraph = new Set<string>();
 
-  const { modifiedNodes, unchangedNodes, addedNodes } = [...patchNetwork.connectables.entries()]
-    .filter(
-      ([vcId]) =>
-        getState().viewContextManager.activeViewContexts.some(
-          vc => vc.uuid === vcId && vc.subgraphId === subgraphID
-        ) ||
-        getState().viewContextManager.foreignConnectables.some(
-          fc => fc.id === vcId && fc.subgraphId === subgraphID
-        )
-    )
-    .reduce(
-      (acc, [key, connectables]) => {
-        allVcIDsInSubgraph.add(key);
-        const pairNode = graph._nodes_by_id[key];
-
-        if (R.isNil(pairNode)) {
-          return { ...acc, addedNodes: acc.addedNodes.add(key) };
-        } else if (connectables !== pairNode.connectables) {
-          return { ...acc, modifiedNodes: acc.modifiedNodes.add(key) };
-        }
-
-        return { ...acc, unchangedNodes: acc.unchangedNodes.add(key) };
-      },
-      {
-        modifiedNodes: ImmSet<string>(),
-        unchangedNodes: ImmSet<string>(),
-        addedNodes: ImmSet<string>(),
+  const { modifiedNodes, unchangedNodes, addedNodes } = [
+    ...patchNetwork.connectables.entries(),
+  ].reduce(
+    (acc, [vcId, connectables]) => {
+      const pairNode = graph._nodes_by_id[vcId];
+      const isInSubgraph =
+        activeViewContexts.some(vc => vc.uuid === vcId && vc.subgraphId === subgraphID) ||
+        foreignConnectables.some(fc => fc.id === vcId && fc.subgraphId === subgraphID);
+      if (isInSubgraph) {
+        allVcIDsInSubgraph.add(vcId);
       }
-    );
+
+      if (!isInSubgraph) {
+        if (pairNode) {
+          (pairNode as any).ignoreDeletion = true;
+          graph.remove(pairNode);
+        }
+        return acc;
+      }
+
+      if (R.isNil(pairNode)) {
+        return { ...acc, addedNodes: acc.addedNodes.add(vcId) };
+      } else if (connectables !== pairNode.connectables) {
+        return { ...acc, modifiedNodes: acc.modifiedNodes.add(vcId) };
+      }
+
+      return { ...acc, unchangedNodes: acc.unchangedNodes.add(vcId) };
+    },
+    {
+      modifiedNodes: ImmSet<string>(),
+      unchangedNodes: ImmSet<string>(),
+      addedNodes: ImmSet<string>(),
+    }
+  );
 
   // Any node present in the map that hasn't been accounted for already has been deleted
   const deletedNodes: ImmSet<string> = Object.keys(graph._nodes_by_id).reduce(
     (acc, key) =>
-      ![modifiedNodes, unchangedNodes, addedNodes].find(set => set.has(key)) ? acc.add(key) : acc,
+      [modifiedNodes, unchangedNodes, addedNodes].find(set => set.has(key)) ? acc : acc.add(key),
     ImmSet<string>()
   );
 
@@ -97,7 +103,7 @@ export const updateGraph = (
     const newNode = createAudioConnectablesNode(
       connectables,
       id,
-      foreignAudioNode ? foreignAudioNode.name : getVcTitle(activeViewContexts, id),
+      foreignAudioNode ? (foreignAudioNode as any).name : getVcTitle(activeViewContexts, id),
       foreignAudioNode ? foreignAudioNode.nodeType : null
     );
 
@@ -134,14 +140,6 @@ export const updateGraph = (
     if (!node) {
       throw new Error("Tried to remove a node that didn't exist");
     }
-
-    // The old 4-year-old way of doing this:
-    // const { pos } = node;
-    // Don't trigger patch network actions since these changes are purely presentational
-    // graph.remove(node);
-    // createAndAddNode(key, { pos });
-
-    // new way that seems to work with no problems:
     (node as any).setConnectables?.(patchNetwork.connectables.get(key)!);
   });
 
@@ -190,6 +188,13 @@ export const updateGraph = (
       .getOrElse(false);
 
     if (linkExists) {
+      return;
+    }
+    // If both the source and destination nodes were moved out of this subgraph, ignore the connection
+    if (
+      !allVcIDsInSubgraph.has(origin_id.toString()) &&
+      !allVcIDsInSubgraph.has(target_id.toString())
+    ) {
       return;
     }
 

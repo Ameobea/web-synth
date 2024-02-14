@@ -11,6 +11,7 @@ import { getSentry } from 'src/sentry';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { AsyncOnce, SAMPLE_RATE, samplesToMs } from 'src/util';
 import CompressorSmallView from './CompressorSmallView.svelte';
+import type { LGraphNode } from 'litegraph.js';
 
 export interface CompressorBandState {
   gain: number;
@@ -125,6 +126,10 @@ export class CompressorNode implements ForeignNode {
   public paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };
   } = {};
+
+  public onAddedToLG(lgNode: LGraphNode) {
+    lgNode.setSize([165, 40]);
+  }
 
   constructor(ctx: AudioContext, vcId?: string, params?: { [key: string]: any } | null) {
     this.ctx = ctx;

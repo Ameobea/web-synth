@@ -13,6 +13,16 @@ pub struct GraphEditor {
 
 impl GraphEditor {
   pub fn new(uuid: Uuid) -> Self { GraphEditor { uuid } }
+
+  pub fn arrange_nodes(&self, node_ids: Option<&[String]>, offset_px: (usize, usize)) {
+    let serialized_node_ids = serde_json::to_string(&node_ids).unwrap();
+    js::arrange_graph_editor_nodes(
+      &self.uuid.to_string(),
+      &serialized_node_ids,
+      offset_px.0,
+      offset_px.1,
+    );
+  }
 }
 
 impl ViewContext for GraphEditor {

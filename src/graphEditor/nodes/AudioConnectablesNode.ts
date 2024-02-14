@@ -16,6 +16,7 @@ export function LGAudioConnectables(this: any) {
   this.properties = {};
 
   this.ctx = new AudioContext();
+  (this as LGraphNode).shape = 1;
 }
 
 LGAudioConnectables.prototype.setConnectables = function (
@@ -105,6 +106,10 @@ LGAudioConnectables.prototype.onConnectionsChange = function (
       `No input with index ${linkInfo.target_slot} on node with id ${linkInfo.target_id}`,
       linkInfo
     );
+  }
+
+  if ((srcNode as any).ignoreDeletion || (dstNode as any).ignoreDeletion) {
+    return;
   }
 
   const from: ConnectableDescriptor = { vcId: linkInfo.origin_id.toString(), name: srcOutput.name };

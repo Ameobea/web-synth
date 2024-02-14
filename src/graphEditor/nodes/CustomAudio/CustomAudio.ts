@@ -550,6 +550,7 @@ const registerCustomAudioNode = (
       // foreign node without holding a reference to this node, which is very helpful since we need to do that from the
       // patch network when changing state and we only have `AudioConnectables` there which only hold the foreign node.
       this.connectables.node.lgNode = this;
+      (this as LGraphNode).shape = 1;
       this.connectables.node.onAddedToLG?.(this);
     } else {
       const foreignNode = new nodeGetter(ctx, id, this.foreignNodeParams);

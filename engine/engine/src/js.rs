@@ -15,7 +15,15 @@ extern "C" {
   pub fn add_view_context(id: &str, name: &str, subgraph_id: &str);
   pub fn add_foreign_connectable(fc_json: &str) -> String;
   pub fn add_connection(from_vc_id: &str, from_port_name: &str, to_vc_id: &str, to_port_name: &str);
+  pub fn delete_connection(
+    from_vc_id: &str,
+    from_port_name: &str,
+    to_vc_id: &str,
+    to_port_name: &str,
+  );
   pub fn set_connections(connections_json: &str);
+  pub fn set_foreign_connectables(foreign_connectables_json: &str);
+  pub fn set_view_contexts(active_vc_id: &str, view_context_minimal_defs_json: &str);
   pub fn delete_foreign_connectable(id: &str);
   pub fn delete_view_context(id: &str);
   pub fn set_active_vc_id(new_id: &str);
@@ -67,6 +75,7 @@ extern "C" {
   pub fn hide_graph_editor(state_key: &str);
   pub fn unhide_graph_editor(state_key: &str);
   pub fn cleanup_graph_editor(state_key: &str);
+  pub fn arrange_graph_editor_nodes(vc_id: &str, node_ids: &str, offset_x: usize, offset_y: usize);
 }
 
 #[wasm_bindgen(raw_module = "./midiEditor")]

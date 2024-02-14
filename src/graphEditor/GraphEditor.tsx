@@ -3,7 +3,7 @@
  * components of an audio composition.
  */
 
-import { LGraph, LGraphCanvas, LiteGraph, type LGraphNode } from 'litegraph.js';
+import { type ContextMenu, LGraph, LGraphCanvas, LiteGraph, type LGraphNode } from 'litegraph.js';
 
 import type {
   LiteGraphConnectablesNode,
@@ -45,7 +45,7 @@ import {
   getSubgraphPreset,
   saveSubgraphPreset as saveSubgraphPresetAPI,
 } from 'src/api';
-import { logError } from 'src/sentry';
+import { getSentry, logError } from 'src/sentry';
 import {
   mkGenericPresetPicker,
   type PresetDescriptor,
@@ -120,9 +120,66 @@ export const saveSubgraphPreset = async (subgraphID: string, overrideName = fals
   }
 };
 
+/**
+ * Positions every node in a more readable manner
+ *
+ * Copied from LiteGraph source code to add the third and fourth arguments.
+ *
+ * If `nodeIDs` is set, then only those nodes will be arranged.
+ */
+LGraph.prototype.arrange = function (
+  this: LGraph,
+  margin?: number | undefined,
+  layout?: string | undefined,
+  nodeIDs?: string[] | null | undefined,
+  offset?: [number, number] | undefined
+) {
+  margin = margin || 100;
+
+  let nodes: LGraphNode[] = this.computeExecutionOrder(false, true);
+  if (nodeIDs) {
+    nodes = nodes.filter(node => nodeIDs.includes(node.id.toString()));
+  }
+  const columns: any[][] = [];
+  for (let i = 0; i < nodes.length; ++i) {
+    const node = nodes[i];
+    const col = (node as any)._level || 1;
+    if (!columns[col]) {
+      columns[col] = [];
+    }
+    columns[col].push(node);
+  }
+
+  let x = margin;
+  const VERTICAL_LAYOUT = (LiteGraph as any).VERTICAL_LAYOUT;
+
+  for (let i = 0; i < columns.length; ++i) {
+    const column = columns[i];
+    if (!column) {
+      continue;
+    }
+    let max_size = 100;
+    let y = margin + LiteGraph.NODE_TITLE_HEIGHT;
+    for (let j = 0; j < column.length; ++j) {
+      const node = column[j];
+      node.pos[0] = (layout == VERTICAL_LAYOUT ? y : x) + (offset?.[0] ?? 0);
+      node.pos[1] = (layout == VERTICAL_LAYOUT ? x : y) + (offset?.[1] ?? 0);
+      const max_size_index = layout == VERTICAL_LAYOUT ? 1 : 0;
+      if (node.size[max_size_index] > max_size) {
+        max_size = node.size[max_size_index];
+      }
+      const node_size_index = layout == VERTICAL_LAYOUT ? 0 : 1;
+      y += node.size[node_size_index] + margin + LiteGraph.NODE_TITLE_HEIGHT;
+    }
+    x += max_size + margin;
+  }
+
+  this.setDirtyCanvas(true, true);
+};
+
 LGraphCanvas.prototype.getCanvasMenuOptions = () => [];
 const oldGetNodeMenuOptions = LGraphCanvas.prototype.getNodeMenuOptions;
-LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
+LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: LGraphNode) {
   const options = oldGetNodeMenuOptions.apply(this, [node]);
   const OptionsToRemove = [
     'Title',
@@ -144,10 +201,6 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
 
     return true;
   });
-
-  while (filteredOptions[0] === null) {
-    filteredOptions.splice(0, 1);
-  }
 
   // Remove duplicate subsequent nulls which map to dividers in the menu
   filteredOptions = filteredOptions.filter((opt, i) => {
@@ -191,6 +244,61 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (node: LGraphNode) {
       const vcId = node.id.toString();
       removeNode(vcId);
     };
+  }
+
+  const moveToSubgraph = {
+    content: 'Move Selected to Subgraph',
+    callback: (_menuEntry: any, options: any, event: any, parentMenu: ContextMenu) => {
+      const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
+      const validMoveToSubgraphs = R.sortWith(
+        [R.ascend(([_id, desc]) => desc.name.toLocaleLowerCase())],
+        Object.entries(getState().viewContextManager.subgraphsByID).filter(
+          ([id]) => id !== activeSubgraphID
+        )
+      );
+      new LiteGraph.ContextMenu(
+        [
+          ...validMoveToSubgraphs.map(([id, desc]) => ({ title: desc.name, content: id })),
+          { title: 'New Subgraph', content: 'NEW_SUBGRAPH' },
+        ],
+        {
+          event: event,
+          callback: ({ content }: { title: string; content: string }) => {
+            const targetSubgraphID = content === 'NEW_SUBGRAPH' ? addSubgraph() : content;
+            const selectedVFcIds = Object.keys(this.selected_nodes);
+            setTimeout(() => {
+              getEngine()!.move_vfcs_to_subgraph(JSON.stringify(selectedVFcIds), targetSubgraphID);
+              getSentry()?.captureMessage('Moved nodes to subgraph');
+            });
+          },
+          parentMenu,
+        }
+      );
+    },
+  };
+
+  if (Object.keys(this.selected_nodes).length > 1) {
+    const alignSelectedToIx = filteredOptions.findIndex(
+      opt => opt?.content === 'Align Selected To'
+    );
+    if (alignSelectedToIx === -1) {
+      throw new Error('Failed to find "Align Selected To" option in node menu');
+    }
+    filteredOptions.splice(alignSelectedToIx + 1, 0, moveToSubgraph, null);
+  } else {
+    // Put before "Remove"
+    const removeOptionIx = filteredOptions.indexOf(removeOption);
+    if (removeOptionIx === -1) {
+      console.error(
+        'Failed to find "Remove" option in node menu; not adding "Move to Subgraph" option'
+      );
+    } else {
+      filteredOptions.splice(removeOptionIx, 0, moveToSubgraph, null);
+    }
+  }
+
+  while (filteredOptions[0] === null) {
+    filteredOptions.splice(0, 1);
   }
 
   return filteredOptions;
@@ -513,19 +621,20 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     [setCurSelectedNodeInner]
   );
   const vcId = stateKey.split('_')[1];
-  const { patchNetwork, activeViewContexts, isLoaded, subgraphID } = useSelector(
-    (state: ReduxStore) => {
+  const { patchNetwork, activeViewContexts, foreignConnectables, isLoaded, subgraphID } =
+    useSelector((state: ReduxStore) => {
       const subgraphID = state.viewContextManager.activeViewContexts.find(
         vc => vc.uuid === vcId
       )?.subgraphId;
 
       return {
-        ...R.pick(['patchNetwork', 'activeViewContexts', 'isLoaded'], state.viewContextManager),
+        ...R.pick(
+          ['patchNetwork', 'activeViewContexts', 'foreignConnectables', 'isLoaded'],
+          state.viewContextManager
+        ),
         subgraphID,
       };
-    },
-    shallowEqual
-  );
+    }, shallowEqual);
 
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight - 130);
   useEffect(() => {
@@ -595,6 +704,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       await registerAllCustomNodes();
 
       const graph = new LGraph();
+      (graph as any).subgraphID = subgraphID;
       Object.keys(LiteGraph.registered_node_types)
         .filter(
           nodeType =>
@@ -607,6 +717,9 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         key => delete LiteGraph.searchbox_extras[key]
       );
       const canvas = new LGraphCanvas(`#${stateKey}_canvas`, graph);
+      canvas.title_text_font = '15px "PT Sans", Arial, sans-serif';
+      // canvas.inner_text_font = 'normal 12px "PT Sans"';
+      // canvas.ctx.letterSpacing = '-0.5px';
       lGraphCanvasRef.current = canvas;
 
       canvas.onNodeSelected = node => {
@@ -701,9 +814,8 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     })();
   }, [curSelectedNode, setCurSelectedNode, smallViewDOMId, stateKey, subgraphID, vcId]);
 
-  const lastPatchNetwork = useRef<typeof patchNetwork | null>(null);
   useEffect(() => {
-    if (lastPatchNetwork.current === patchNetwork || !lGraphInstance || !subgraphID) {
+    if (!lGraphInstance || !subgraphID) {
       return;
     }
 
@@ -711,9 +823,9 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       lGraphInstance as any as LiteGraphInstance,
       patchNetwork,
       activeViewContexts,
+      foreignConnectables,
       subgraphID
     );
-    lastPatchNetwork.current = patchNetwork;
 
     // If there is a currently selected node, it may have been de-selected as a result of being modified.  Try
     // to re-select it if it still exists.
@@ -739,6 +851,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
     selectedNodeVCID,
     setCurSelectedNode,
     subgraphID,
+    foreignConnectables,
   ]);
 
   // Set node from serialized state when we first render
