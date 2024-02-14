@@ -53,6 +53,7 @@ class WaveTableNodeProcessor extends AudioWorkletProcessor {
           throw new Error('this should only be called by the FM synth');
         },
         log_err: (ptr, len) => this.handleWasmPanic(ptr, len),
+        log_panic: (ptr, len) => this.handleWasmPanic(ptr, len),
         log_raw: (ptr, len, _level) => this.handleWasmPanic(ptr, len),
       },
     };

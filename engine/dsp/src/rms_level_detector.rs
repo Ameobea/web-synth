@@ -40,7 +40,7 @@ impl<const TEND_TOWARDS_ZERO: bool> RMSLevelDetector<TEND_TOWARDS_ZERO> {
 
     // To deal with floating point precision issues, we tend the sum towards zero slightly so
     // that it doesn't get stuck at a non-zero value when the input is silent.
-    if TEND_TOWARDS_ZERO {
+    if TEND_TOWARDS_ZERO && sample.abs() < 0.001 {
       self.sum *= 0.999999;
     }
 

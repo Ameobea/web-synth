@@ -1,7 +1,6 @@
 import { buildStore } from 'jantix';
 
 import controlPanelModule from 'src/redux/modules/controlPanel';
-import equalizerModule from 'src/redux/modules/equalizer';
 import genericPresetPickerSlice, {
   type genericPresetPickerActions,
   type GenericPresetPickerState,
@@ -21,7 +20,6 @@ const modules = {
   midiKeyboard: midiKeyboardModule,
   presets: presetsModule,
   controlPanel: controlPanelModule,
-  equalizer: equalizerModule,
   sinsy: sinsyModule,
 };
 

@@ -47,3 +47,6 @@ base64 = "0.21"
 rust-s3 = { version = "0.33", features = [] }
 aws-region = { version = "0.25.0", features = ["serde"] }
 urlencoding = "2.1"
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.5"

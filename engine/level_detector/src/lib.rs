@@ -13,7 +13,7 @@ impl Default for LevelDetectorCtx {
   fn default() -> Self {
     Self {
       io_buffer: [0.0; FRAME_SIZE],
-      detector: RMSLevelDetector::new(10), // Will be set dynamically during processing
+      detector: RMSLevelDetector::new(10), // Window size will be set dynamically during processing
     }
   }
 }

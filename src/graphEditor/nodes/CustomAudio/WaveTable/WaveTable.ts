@@ -92,6 +92,7 @@ export default class WaveTable implements ForeignNode {
 
   static typeName = 'Wave Table Synthesizer';
   public nodeType = 'customAudio/wavetable';
+  public static manuallyCreatable = false;
 
   public paramOverrides: {
     [name: string]: { param: OverridableAudioParam; override: ConstantSourceNode };

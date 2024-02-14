@@ -651,7 +651,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
       };
 
       const sortedNodeEntries = [
-        ['Add Empty Subgraph', 'ADD_SUBGRAPH'],
+        ['Add Empty Subgraph', 'ADD_EMPTY_SUBGRAPH'],
         ['Add Saved Subgraph', 'ADD_SAVED_SUBGRAPH'],
         ['---', '---'],
         ...buildSortedNodeEntries(),
@@ -674,7 +674,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         const [, nodeType] = entry;
         if (!nodeType || nodeType === '---') {
           return;
-        } else if (nodeType === 'ADD_SUBGRAPH') {
+        } else if (nodeType === 'ADD_EMPTY_SUBGRAPH') {
           addSubgraph();
         } else if (nodeType === 'ADD_SAVED_SUBGRAPH') {
           addSavedSubgraph();

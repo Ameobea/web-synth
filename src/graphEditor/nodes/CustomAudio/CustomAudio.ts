@@ -18,7 +18,6 @@ import CustomGainNodeSmallView from 'src/graphEditor/nodes/CustomAudio/CustomGai
 import CustomDelayNode from 'src/graphEditor/nodes/CustomAudio/Delay/Delay';
 import DistortionNode from 'src/graphEditor/nodes/CustomAudio/Distortion/Distortion';
 import { EnvelopeGenerator } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
-import { Equalizer } from 'src/graphEditor/nodes/CustomAudio/Equalizer';
 import FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { LevelDetectorNode } from 'src/graphEditor/nodes/CustomAudio/LevelDetectorNode/LevelDetectorNode';
 import { LFONode } from 'src/graphEditor/nodes/CustomAudio/LFONode';
@@ -440,14 +439,6 @@ export const audioNodeGetters: {
   },
   'customAudio/envelopeGenerator': {
     nodeGetter: EnvelopeGenerator,
-  },
-  'customAudio/Equalizer': {
-    nodeGetter: Equalizer,
-    protoParams: {
-      onRemovedCustom: function () {
-        this.connectables.node.shutdown();
-      },
-    },
   },
   'customAudio/Sidechain': {
     nodeGetter: Sidechain,

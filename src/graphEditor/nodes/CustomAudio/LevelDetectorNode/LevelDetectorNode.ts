@@ -42,6 +42,7 @@ export class LevelDetectorNode implements ForeignNode {
   private vcId: string | undefined;
   private ctx: AudioContext;
   private awpHandle: AudioWorkletNode | undefined;
+  private detectedLevelSAB: Writable<Float32Array | null> = writable(null);
   private dummyInput = new DummyNode();
   private state: Writable<LevelDetectorNodeState>;
   private windowSizeSamples: OverridableAudioParam | DummyNode = new DummyNode();
@@ -66,7 +67,11 @@ export class LevelDetectorNode implements ForeignNode {
 
     this.renderSmallView = mkSvelteContainerRenderHelper({
       Comp: LevelDetectorNodeSmallView,
-      getProps: () => ({}),
+      getProps: () => ({
+        state: this.state,
+        detectedLevelSAB: this.detectedLevelSAB,
+        onChange: (newState: LevelDetectorNodeState) => this.state.set(newState),
+      }),
     });
     this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
   }
@@ -100,6 +105,19 @@ export class LevelDetectorNode implements ForeignNode {
       type: 'setWasmBytes',
       wasmBytes,
     });
+    this.awpHandle.port.onmessage = e => {
+      if (typeof e.data !== 'object') {
+        console.error('Received non-object message from LevelDetectorAWP:', e.data);
+        return;
+      }
+      switch (e.data.type) {
+        case 'detectedLevelSAB':
+          this.detectedLevelSAB.set(new Float32Array(e.data.sab as SharedArrayBuffer));
+          break;
+        default:
+          console.error('Received unknown message type from LevelDetectorAWP:', e.data.type);
+      }
+    };
   }
 
   public serialize(): LevelDetectorNodeState {

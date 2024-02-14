@@ -95,26 +95,21 @@ impl Oscillator for SineOscillator {
     _base_frequency: f32,
   ) -> f32 {
     let sine_lookup_table = dsp::lookup_tables::get_sine_lookup_table();
-    if frequency.abs() < 1000. {
-      self.update_phase(frequency);
-      return dsp::read_interpolated(
+
+    // 4x oversampling to avoid aliasing
+    let mut out = 0.;
+    let mut phase = self.phase;
+    let oversample_ratio = 4usize;
+    for _ in 0..oversample_ratio {
+      phase = Self::compute_new_phase_oversampled(phase, oversample_ratio as f32, frequency);
+      out += dsp::read_interpolated(
         sine_lookup_table,
-        self.phase * (sine_lookup_table.len() - 2) as f32,
+        phase * (sine_lookup_table.len() - 2) as f32,
       );
     }
 
-    // 2x oversampling to avoid aliasing
-    let mut out = 0.;
-    let oversample_ratio = 2usize;
-    for _ in 0..oversample_ratio {
-      self.update_phase_oversampled(oversample_ratio as f32, frequency);
-      out += dsp::read_interpolated(
-        sine_lookup_table,
-        self.phase * (sine_lookup_table.len() - 2) as f32,
-      ) * (1. / (oversample_ratio as f32));
-    }
-
-    out
+    self.phase = phase;
+    out / oversample_ratio as f32
   }
 }
 
@@ -139,21 +134,20 @@ impl Oscillator for SquareOscillator {
     _sample_ix_within_frame: usize,
     _base_frequency: f32,
   ) -> f32 {
-    if frequency.abs() < 1000. {
-      self.update_phase(frequency);
-      return if self.phase < 0.5 { 1. } else { -1. };
-    }
-
     // 4x oversampling to avoid aliasing
     let mut out = 0.;
-    self.update_phase_oversampled(4., frequency);
-    out += if self.phase < 0.5 { 0.25 } else { -0.25 };
-    self.update_phase_oversampled(4., frequency);
-    out += if self.phase < 0.5 { 0.25 } else { -0.25 };
-    self.update_phase_oversampled(4., frequency);
-    out += if self.phase < 0.5 { 0.25 } else { -0.25 };
-    self.update_phase_oversampled(4., frequency);
-    out += if self.phase < 0.5 { 0.25 } else { -0.25 };
+    let mut phase = self.phase;
+
+    phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+    out += if phase < 0.5 { 0.25 } else { -0.25 };
+
+    self.phase = phase;
 
     out
   }
@@ -181,10 +175,11 @@ impl Oscillator for TriangleOscillator {
     _base_frequency: f32,
   ) -> f32 {
     // 4x oversampling to avoid aliasing
+    let oversample_factor = 4usize;
     let mut out = 0.;
     let mut phase = self.phase;
-    for _ in 0..4 {
-      phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
+    for _ in 0..oversample_factor {
+      phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
       out += if phase < 0.25 {
         4. * phase
       } else if phase < 0.5 {
@@ -196,11 +191,11 @@ impl Oscillator for TriangleOscillator {
       } else {
         let adjusted_phase = phase - 0.75;
         -1. + (adjusted_phase * 4.)
-      } * 0.25;
+      }
     }
 
     self.phase = phase;
-    out
+    out / oversample_factor as f32
   }
 }
 
@@ -226,19 +221,20 @@ impl Oscillator for SawtoothOscillator {
     _base_frequency: f32,
   ) -> f32 {
     // 4x oversampling to reduce aliasing
+    let oversample_factor = 4usize;
     let mut out = 0.;
     let mut phase = self.phase;
-    for _ in 0..4 {
-      phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-      out += if self.phase < 0.5 {
-        2. * self.phase
+    for _ in 0..oversample_factor {
+      phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+      out += if phase < 0.5 {
+        2. * phase
       } else {
-        -1. + (2. * (self.phase - 0.5))
-      } * 0.25;
+        -1. + (2. * (phase - 0.5))
+      };
     }
 
     self.phase = phase;
-    out
+    out / oversample_factor as f32
   }
 }
 
@@ -500,15 +496,19 @@ impl Oscillator for WaveTableHandle {
     ];
 
     // 4x oversampling to avoid aliasing
+    let oversample_factor = 4usize;
     let mut sample = 0.;
-    for _ in 0..4 {
-      self.update_phase_oversampled(4., frequency);
+    let mut phase = self.phase;
+    for _ in 0..oversample_factor {
+      phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
       sample += wavetable.get_sample(
-        self.phase * (wavetable.settings.waveform_length - 1) as f32,
+        phase * (wavetable.settings.waveform_length - 1) as f32,
         &mixes,
       );
     }
-    sample * 0.25
+
+    self.phase = phase;
+    sample / oversample_factor as f32
   }
 }
 

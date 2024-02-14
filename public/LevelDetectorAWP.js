@@ -18,6 +18,11 @@ class LevelDetectorWorkletProcessor extends AudioWorkletProcessor {
     this.wasmInstance = null;
     this.ctxPtr = 0;
     this.wasmMemoryBuffer = null;
+    this.detectedLevelSAB =
+      typeof SharedArrayBuffer === 'undefined' ? null : new SharedArrayBuffer(4 * BYTES_PER_F32);
+    this.detectedLevelBufF32 = this.detectedLevelSAB
+      ? new Float32Array(this.detectedLevelSAB)
+      : null;
 
     this.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -30,6 +35,10 @@ class LevelDetectorWorkletProcessor extends AudioWorkletProcessor {
         }
       }
     };
+
+    if (this.detectedLevelBufF32) {
+      this.port.postMessage({ type: 'detectedLevelSAB', sab: this.detectedLevelSAB });
+    }
   }
 
   handleWasmPanic = (ptr, len) => {
@@ -70,6 +79,10 @@ class LevelDetectorWorkletProcessor extends AudioWorkletProcessor {
 
     const windowSizeSamples = params.window_size_samples[0];
     this.wasmInstance.exports.level_detector_process(this.ctxPtr, windowSizeSamples);
+
+    if (this.detectedLevelBufF32) {
+      this.detectedLevelBufF32[0] = ioBuf[ioBuf.length - 1];
+    }
 
     output.set(ioBuf);
 

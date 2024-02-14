@@ -6,6 +6,7 @@
         min: number;
         max: number;
         step?: number;
+        steps?: number;
         scale?: 'log';
         initial?: number;
       }
