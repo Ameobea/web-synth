@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/react';
-import { Integrations } from '@sentry/tracing';
 
 export const getSentry = (): typeof Sentry | undefined => {
   // Don't clutter up sentry logs with debug stuff
@@ -17,7 +16,7 @@ export const initSentry = () => {
 
   Sentry.init({
     dsn: 'https://fe6f2402504d4e2383ff4566e3676cc5@sentry.ameo.design/6',
-    integrations: [new Integrations.BrowserTracing()],
+    integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 1.0,
     beforeBreadcrumb: (breadcrumb, hint) => {
       if (breadcrumb.category === 'ui.click') {
