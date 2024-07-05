@@ -83,6 +83,9 @@ pub fn delete_vc_by_id(id: &str) {
 }
 
 #[wasm_bindgen]
+pub fn swap_vc_positions(ix0: usize, ix1: usize) { get_vcm().swap_vc_positions(ix0, ix1); }
+
+#[wasm_bindgen]
 pub fn switch_view_context(uuid_str: &str) {
   let uuid =
     Uuid::from_str(uuid_str).expect("Invalid UUID string passed to `switch_view_context`!");

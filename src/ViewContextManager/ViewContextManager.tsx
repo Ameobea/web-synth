@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
+import { useDrag, useDrop, DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import { GlobalVolumeSlider } from './GlobalVolumeSlider';
 import './ViewContextManager.scss';
@@ -38,6 +40,7 @@ interface ViewContextIconProps extends React.HtmlHTMLAttributes<HTMLDivElement> 
   displayName: string | undefined;
   style?: React.CSSProperties;
   onClick: (evt: React.MouseEvent) => void;
+  fref?: React.Ref<HTMLDivElement>;
 }
 
 const ViewContextIcon: React.FC<ViewContextIconProps> = ({
@@ -45,9 +48,11 @@ const ViewContextIcon: React.FC<ViewContextIconProps> = ({
   style,
   onClick,
   children,
+  fref,
   ...rest
 }) => (
   <div
+    ref={fref}
     role='button'
     title={displayName}
     className='view-context-icon'
@@ -158,14 +163,6 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
   );
 };
 
-interface ViewContextTabProps {
-  engine: typeof import('src/engine');
-  name: string;
-  uuid: string;
-  title?: string;
-  active: boolean;
-}
-
 interface VCMTabRenamerProps {
   value: string;
   setValue: (newValue: string) => void;
@@ -206,20 +203,64 @@ const VCTabCloseIcon: React.FC<VCTabCloseIconProps> = ({ onClick }) => (
   </div>
 );
 
-const ViewContextTab: React.FC<ViewContextTabProps> = ({ engine, name, uuid, title, active }) => {
+const ItemTypes = {
+  TAB: 'tab',
+};
+
+interface ViewContextTabProps {
+  engine: typeof import('src/engine');
+  name: string;
+  uuid: string;
+  title?: string;
+  active: boolean;
+  index: number;
+  moveTab: (from: number, to: number) => void;
+}
+
+const ViewContextTab: React.FC<ViewContextTabProps> = ({
+  engine,
+  name,
+  uuid,
+  title,
+  active,
+  index,
+  moveTab,
+}) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renamingTitle, setRenamingTitle] = useState(title || '');
 
   const displayName = title || name;
 
+  const ref = useRef(null);
+
+  const [{ isDragging }, drag] = useDrag({
+    type: ItemTypes.TAB,
+    item: { index },
+    collect: monitor => ({ isDragging: monitor.isDragging() }),
+  });
+
+  const [, drop] = useDrop({
+    accept: ItemTypes.TAB,
+    hover: (draggedItem: { index: number }) => {
+      if (draggedItem.index !== index) {
+        moveTab(draggedItem.index, index);
+        draggedItem.index = index;
+      }
+    },
+  });
+
+  drag(drop(ref));
+
   return (
     <ViewContextIcon
       name={name}
       displayName={displayName}
-      key={uuid}
+      fref={ref}
       style={{
         ...styles.viewContextTab,
+        opacity: isDragging ? 0.5 : 1,
         backgroundColor: active ? '#419282' : undefined,
+        cursor: 'grab',
       }}
       onClick={() => {
         if (!active) {
@@ -282,29 +323,43 @@ export const ViewContextSwitcher: React.FC<ViewContextSwitcherProps> = ({ engine
     shallowEqual
   );
   const [horizontalScroll, setHorizontalScroll] = useState(0);
+  const [tabs, setTabs] = useState(activeViewContexts);
+
+  useEffect(() => {
+    setTabs(activeViewContexts.filter(vc => vc.subgraphId === activeSubgraphID));
+  }, [activeViewContexts, activeSubgraphID]);
+
   const handleScroll: React.WheelEventHandler<HTMLDivElement> = useCallback(
     e => void setHorizontalScroll(prev => Math.max(prev + e.deltaY * 0.6, 0)),
     []
   );
 
+  const moveTab = (fromIndex: number, toIndex: number) => {
+    const origFromIndex = activeViewContexts.findIndex(vc => vc.uuid === tabs[fromIndex].uuid);
+    const origToIndex = activeViewContexts.findIndex(vc => vc.uuid === tabs[toIndex].uuid);
+    engine.swap_vc_positions(origFromIndex, origToIndex);
+  };
+
   return (
-    <div
-      style={{
-        ...styles.viewContextSwitcher,
-        transform: `translateX(-${horizontalScroll}px)`,
-      }}
-      onWheel={handleScroll}
-    >
-      {activeViewContexts
-        .filter(vc => vc.subgraphId === activeSubgraphID)
-        .map(props => (
+    <DndProvider backend={HTML5Backend}>
+      <div
+        style={{
+          ...styles.viewContextSwitcher,
+          transform: `translateX(-${horizontalScroll}px)`,
+        }}
+        onWheel={handleScroll}
+      >
+        {tabs.map((props, index) => (
           <ViewContextTab
             engine={engine}
             {...props}
             key={props.uuid}
             active={props.uuid === activeViewContextId}
+            index={index}
+            moveTab={moveTab}
           />
         ))}
-    </div>
+      </div>
+    </DndProvider>
   );
 };

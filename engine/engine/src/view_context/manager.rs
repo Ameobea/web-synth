@@ -227,13 +227,11 @@ impl ViewContextManager {
   }
 
   pub fn get_vc_by_id_mut(&mut self, uuid: Uuid) -> Option<&mut ViewContextEntry> {
-    self
-      .get_vc_position(uuid)
-      .map(move |ix| &mut self.contexts[ix])
+    self.contexts.iter_mut().find(|vc| vc.id == uuid)
   }
 
   pub fn get_vc_by_id(&self, uuid: Uuid) -> Option<&ViewContextEntry> {
-    self.get_vc_position(uuid).map(move |ix| &self.contexts[ix])
+    self.contexts.iter().find(|vc| vc.id == uuid)
   }
 
   fn init_from_state_snapshot(&mut self, vcm_state: ViewContextManagerState) {
@@ -790,6 +788,18 @@ impl ViewContextManager {
       &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
     );
 
+    #[derive(Clone, Deserialize)]
+    struct SerializedSubgraphState {
+      #[serde(rename = "txSubgraphID")]
+      tx_subgraph_id: Uuid,
+      #[serde(rename = "rxSubgraphID")]
+      rx_subgraph_id: Uuid,
+      #[serde(rename = "registeredInputs")]
+      registered_inputs: Option<serde_json::Value>,
+      #[serde(rename = "registeredOutputs")]
+      registered_outputs: Option<serde_json::Value>,
+    }
+
     let mut base_portal_state = None;
     for fc in &mut serialized.fcs {
       fc.subgraph_id = new_uuid_by_old_uuid[&fc.subgraph_id];
@@ -797,51 +807,37 @@ impl ViewContextManager {
       // If this is a subgraph portal linking to the connecting subgraph, we need to re-point it to
       // link with the current active subgraph instead
       if fc._type == "customAudio/subgraphPortal" {
-        // TODO: Create a struct for this
-        if let Some(serde_json::Value::Object(state)) = &mut fc.serialized_state {
-          let mapped_tx_subgraph_id = if let Some(serde_json::Value::String(tx_subgraph_id)) =
-            state.get_mut("txSubgraphID")
-          {
-            let mapped_id = new_uuid_by_old_uuid[&Uuid::from_str(tx_subgraph_id).unwrap()];
-            *tx_subgraph_id = mapped_id.to_string();
-            Some(mapped_id)
-          } else {
-            error!(
-              "Mising/invalid `txSubgraphID` in serialized state for subgraph portal FC {:?}",
-              state
-            );
-            None
-          };
-          if let Some(serde_json::Value::String(rx_subgraph_id)) = state.get_mut("rxSubgraphID") {
-            let rx_subgraph_uuid = Uuid::from_str(rx_subgraph_id).unwrap();
-            if fc.subgraph_id == serialized.base_subgraph_id
-              && mapped_tx_subgraph_id == Some(serialized.base_subgraph_id)
-              && Some(rx_subgraph_uuid) == serialized.connnecting_subgraph_id
-            {
-              info!(
-                "Re-pointing subgraph portal rx to active subgraph.  Old ID: {}, new ID: {}",
-                rx_subgraph_uuid, self.active_subgraph_id
-              );
-              *rx_subgraph_id = self.active_subgraph_id.to_string();
-
-              if base_portal_state.is_some() {
-                error!("Found more than one subgraph portal linking to the connecting subgraph");
-              }
-              base_portal_state = Some(state.clone());
-            } else {
-              *rx_subgraph_id = new_uuid_by_old_uuid[&rx_subgraph_uuid].to_string();
-            }
-          } else {
-            error!(
-              "Mising/invalid `rxSubgraphID` in serialized state for subgraph portal FC {:?}",
-              state
-            );
-          }
-        } else {
+        let Some(state) = fc.serialized_state.clone() else {
           error!(
             "Mising/invalid serialized state for subgraph portal FC {:?}",
             fc
           );
+          continue;
+        };
+        let Ok(mut state) = serde_json::from_value::<SerializedSubgraphState>(state) else {
+          error!("Error deserializing subgraph portal state for FC {:?}", fc);
+          continue;
+        };
+
+        let mapped_tx_subgraph_id = new_uuid_by_old_uuid[&state.tx_subgraph_id];
+        state.tx_subgraph_id = mapped_tx_subgraph_id;
+
+        if fc.subgraph_id == serialized.base_subgraph_id
+          && mapped_tx_subgraph_id == serialized.base_subgraph_id
+          && Some(state.rx_subgraph_id) == serialized.connnecting_subgraph_id
+        {
+          info!(
+            "Re-pointing subgraph portal rx to active subgraph.  Old ID: {}, new ID: {}",
+            state.rx_subgraph_id, self.active_subgraph_id
+          );
+          state.rx_subgraph_id = self.active_subgraph_id;
+
+          if base_portal_state.is_some() {
+            error!("Found more than one subgraph portal linking to the connecting subgraph");
+          }
+          base_portal_state = Some(state.clone());
+        } else {
+          state.rx_subgraph_id = new_uuid_by_old_uuid[&state.rx_subgraph_id];
         }
       }
 
@@ -946,8 +942,8 @@ impl ViewContextManager {
     let rx_subgraph_id = serialized.base_subgraph_id;
     let (inputs, outputs) = if let Some(base_portal_state) = base_portal_state {
       (
-        base_portal_state.get("registeredOutputs").cloned(),
-        base_portal_state.get("registeredInputs").cloned(),
+        base_portal_state.registered_outputs,
+        base_portal_state.registered_inputs,
       )
     } else {
       self.add_subgraph_portal(rx_subgraph_id, tx_subgraph_id, None, None);
@@ -1124,6 +1120,22 @@ impl ViewContextManager {
 
   pub fn get_vc_position(&self, id: Uuid) -> Option<usize> {
     self.contexts.iter().position(|vc_entry| vc_entry.id == id)
+  }
+
+  pub fn swap_vc_positions(&mut self, a: usize, b: usize) {
+    self.contexts.swap(a, b);
+    js::set_view_contexts(
+      &self.active_context_id.to_string(),
+      &serde_json::to_string(
+        &self
+          .contexts
+          .iter()
+          .map(|vc| &vc.definition)
+          .collect::<Vec<_>>(),
+      )
+      .unwrap(),
+    );
+    self.save_all();
   }
 
   /// Removes the view context with the supplied ID, calling its `.cleanup()` function, deleting
