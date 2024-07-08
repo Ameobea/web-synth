@@ -1,7 +1,7 @@
 import * as R from 'ramda';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import { Provider, shallowEqual } from 'react-redux';
+import { Provider, shallowEqual, useSelector } from 'react-redux';
 
 import { saveSynthVoicePreset } from 'src/api';
 import {
@@ -12,13 +12,22 @@ import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPic
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import type { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { getState, store, useSelector } from 'src/redux';
-import { voicePresetIdsSelector } from 'src/redux/modules/presets';
+import { getState, store, type ReduxStore } from 'src/redux';
 import { getSynthDesignerReduxInfra, type SynthModule } from 'src/redux/modules/synthDesigner';
 import { getSentry } from 'src/sentry';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
 import { UnreachableError, msToSamples, samplesToMs } from 'src/util';
 import { Filter as FilterModule } from './Filter';
+import {
+  mkGenericPresetPicker,
+  type PresetDescriptor,
+} from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { renderModalWithControls } from 'src/controls/Modal';
+import {
+  voicePresetIdsSelector,
+  type SynthVoicePreset,
+  type SynthVoicePresetEntry,
+} from 'src/redux/modules/presets';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
@@ -28,50 +37,40 @@ interface PresetsControlPanelProps {
 }
 
 const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateKey }) => {
-  const controlPanelContext = useRef<{ preset: string } | null>(null);
-  const voicePresetIds = useSelector(voicePresetIdsSelector, shallowEqual);
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
+  const allVoicePresets = useSelector((state: ReduxStore) => {
+    if (typeof state.presets.voicePresets === 'string') {
+      return null;
+    }
+    return state.presets.voicePresets.map(
+      (preset): PresetDescriptor<SynthVoicePreset> => ({
+        ...preset,
+        name: preset.title,
+        preset: preset.body,
+      })
+    );
+  }, shallowEqual);
 
-  const ctxCb = useCallback((ctx: { preset: string }) => {
-    controlPanelContext.current = ctx;
-  }, []);
-  const settings = useMemo(
-    () => [
-      {
-        label: 'preset',
-        type: 'select',
-        options: { blank: 'blank', ...voicePresetIds },
-        initial: 'blank',
-      },
+  const settings = useMemo(() => {
+    if (!allVoicePresets) {
+      return [{ label: 'loading...', type: 'button', disabled: true }];
+    }
+
+    return [
       {
         label: 'load preset',
         type: 'button',
-        action: () => {
-          if (!controlPanelContext.current) {
-            console.error('Control panel context never set!');
-            return;
-          }
-
-          const presetId = controlPanelContext.current.preset;
-          getSentry()?.captureMessage('Load synth designer voice preset', { tags: { presetId } });
-          const allVoicePresets = getState().presets.voicePresets;
-          if (typeof allVoicePresets === 'string') {
-            console.error("Somehow voice presets aren't loaded at this point...");
-            return;
-          }
-
-          const preset =
-            presetId === 'blank' ? null : allVoicePresets.find(R.propEq(+presetId, 'id'));
-          if (preset === undefined) {
-            console.error(
-              `No voice preset found with id ${presetId} even though we have one with that id in the control panel`
+        action: async () => {
+          let pickedPreset: PresetDescriptor<SynthVoicePreset>;
+          try {
+            pickedPreset = await renderModalWithControls(
+              mkGenericPresetPicker(() => allVoicePresets!)
             );
-            return;
+          } catch (_err) {
+            return; // cancelled
           }
 
-          dispatch(
-            actionCreators.synthDesigner.SET_VOICE_STATE(index, preset ? preset.body : null)
-          );
+          dispatch(actionCreators.synthDesigner.SET_VOICE_STATE(index, pickedPreset.preset));
         },
       },
       {
@@ -85,13 +84,10 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
           await saveSynthVoicePreset({ title, description: description ?? '', body: presetBody });
         },
       },
-    ],
-    [actionCreators.synthDesigner, dispatch, index, stateKey, voicePresetIds]
-  );
+    ];
+  }, [actionCreators.synthDesigner, allVoicePresets, dispatch, index, stateKey]);
 
-  return (
-    <ControlPanel proxy contextCb={ctxCb} style={PRESETS_CONTROL_PANEL_STYLE} settings={settings} />
-  );
+  return <ControlPanel proxy style={PRESETS_CONTROL_PANEL_STYLE} settings={settings} />;
 };
 
 interface SynthControlPanelProps extends Pick<SynthModule, 'masterGain' | 'pitchMultiplier'> {

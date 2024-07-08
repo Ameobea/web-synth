@@ -155,7 +155,7 @@ export interface CustomPresetInfoProps<T> {
 }
 
 export function mkGenericPresetPicker<T>(
-  getPresets: () => Promise<PresetDescriptor<T>[]>,
+  getPresets: () => Promise<PresetDescriptor<T>[]> | PresetDescriptor<T>[],
   style?: React.CSSProperties,
   CustomPresetInfo?: React.FC<CustomPresetInfoProps<T>>
 ): React.FC<ModalCompProps<PresetDescriptor<T>>> {
