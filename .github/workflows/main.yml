@@ -100,9 +100,9 @@ jobs:
         # Built with `cargo install --target x86_64-unknown-linux-musl -f just`
       - name: Install `just`
         run: curl https://web-synth-ci-binaries.ameo.design/just -o ~/bin/just && chmod +x ~/bin/just
-        # Downloaded from Github like https://github.com/rustwasm/wasm-bindgen/releases/tag/0.2.82
+        # Downloaded from Github like https://github.com/rustwasm/wasm-bindgen/releases/tag/0.2.92
       - name: Install `wasm-bindgen-cli`
-        run: curl https://web-synth-ci-binaries.ameo.design/wasm-bindgen -o ~/bin/wasm-bindgen && chmod +x ~/bin/wasm-bindgen
+        run: curl https://web-synth-ci-binaries.ameo.design/wasm-bindgen-0-2-92 -o ~/bin/wasm-bindgen && chmod +x ~/bin/wasm-bindgen
       - name: Install `wasm-opt`
         run: curl https://web-synth-ci-binaries.ameo.design/wasm-opt -o ~/bin/wasm-opt && chmod +x ~/bin/wasm-opt
       - name: Install `wasm-strip`

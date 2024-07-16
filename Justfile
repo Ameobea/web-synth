@@ -183,6 +183,9 @@ deploy:
   # phost update notes patch ./dist
   rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" ./dist/* debian@synth.ameo.dev:/var/www/synth.ameo.dev/
 
+deploy-headless:
+  phost update web-synth-headless-test patch dist/headless
+
 loc:
   tokei --exclude src/vocalSynthesis/hts_engine_API --exclude src/vocalSynthesis/sinsy .
 

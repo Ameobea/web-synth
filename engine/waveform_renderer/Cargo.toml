@@ -8,7 +8,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = { version = "=0.2.82", optional = true }
+wasm-bindgen = { version = "=0.2.92", optional = true }
 common = { path = "../common", default-features = false, features = [] }
 wbg_logging = { path = "../wbg_logging", optional = true }
 log = { version = "0.4", features = ["release_max_level_warn"] }
