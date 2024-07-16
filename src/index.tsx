@@ -12,11 +12,12 @@ import {
 import { getReactQueryClient } from 'src/reactUtils';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
-import { getEngine, initGlobals, setEngine } from 'src/util';
+import { initGlobals, setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import { createGlobalToaster } from 'src/misc/GlobalToaster';
+import { registerBackForwardsMouseHandlers } from 'src/globalInputHandlers';
 
 initGlobals();
 
@@ -33,41 +34,31 @@ document.addEventListener('touchstart', () => ctx.resume(), { once: true });
 document.addEventListener('touchend', () => ctx.resume(), { once: true });
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
-  createRoot(document.getElementById('view-context-manager')!).render(
-    <ReactQueryProvider client={getReactQueryClient()}>
-      <Provider store={store}>
-        <ViewContextManager engine={engine} />
-      </Provider>
-    </ReactQueryProvider>
-  );
+  const vcmNode = document.getElementById('view-context-manager');
 
-  createRoot(document.getElementById('view-context-switcher')!).render(
-    <Provider store={store}>
-      <ViewContextSwitcher engine={engine} />
-    </Provider>
-  );
+  if (vcmNode) {
+    createRoot(vcmNode).render(
+      <ReactQueryProvider client={getReactQueryClient()}>
+        <Provider store={store}>
+          <ViewContextManager engine={engine} />
+        </Provider>
+      </ReactQueryProvider>
+    );
+  }
+
+  const vcmSwitcherNode = document.getElementById('view-context-switcher');
+  if (vcmSwitcherNode) {
+    createRoot(vcmSwitcherNode).render(
+      <Provider store={store}>
+        <ViewContextSwitcher engine={engine} />
+      </Provider>
+    );
+  }
 };
 
 const createGlobalUI = (engine: typeof import('./engine')) => {
   createViewContextManagerUI(engine);
   createGlobalToaster();
-};
-
-export const handleGlobalMouseDown = (evt: MouseEvent) => {
-  if (evt.button === 3) {
-    evt.preventDefault();
-    getEngine()?.undo_view_change();
-  } else if (evt.button === 4) {
-    evt.preventDefault();
-    getEngine()?.redo_view_change();
-  }
-};
-
-// Match my VS code experience with mouse buttons for "go back" and "go forward"
-const registerBackForwardsMouseHandlers = () => {
-  document.addEventListener('mouseup', evt => {
-    handleGlobalMouseDown(evt);
-  });
 };
 
 if (typeof AudioWorkletNode === 'undefined') {
@@ -101,8 +92,10 @@ if (typeof AudioWorkletNode === 'undefined') {
       }
     }
 
-    window.addEventListener('beforeunload', () => onBeforeUnload(engine));
+    if (!(window as any).isHeadless) {
+      window.addEventListener('beforeunload', () => onBeforeUnload(engine));
 
-    createGlobalUI(engine);
+      createGlobalUI(engine);
+    }
   });
 }

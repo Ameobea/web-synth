@@ -32,7 +32,6 @@ import { registerAllCustomNodes } from './nodes';
 import type { AudioConnectables } from 'src/patchNetwork';
 import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/nodes/CustomAudio';
 import { removeNode } from 'src/patchNetwork/interface';
-import { handleGlobalMouseDown } from 'src';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
 import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
@@ -50,6 +49,7 @@ import {
   mkGenericPresetPicker,
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { handleGlobalMouseDown } from 'src/globalInputHandlers';
 
 const ctx = new AudioContext();
 
