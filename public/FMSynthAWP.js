@@ -581,7 +581,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
   }
 
   getWasmMemoryBuffer() {
-    if (this.wasmMemoryBuffer.buffer !== this.wasmInstance.exports.memory.buffer) {
+    if (this.wasmMemoryBuffer?.buffer !== this.wasmInstance.exports.memory.buffer) {
       this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
     }
     return this.wasmMemoryBuffer;

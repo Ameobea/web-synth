@@ -985,7 +985,7 @@ impl FMSynthVoice {
           0.975,
           shared_gain_adsr_rendered_buffer,
           EarlyReleaseConfig {
-            strategy: EarlyReleaseStrategy::LinearMix,
+            strategy: EarlyReleaseStrategy::ScanToMatchThenFollow,
             len_samples: SAMPLE_RATE / 10,
           },
           false,
@@ -2539,6 +2539,7 @@ pub unsafe extern "C" fn set_adsr(
       let gate_status = old_adsr.gate_status;
       let store_phase_to = old_adsr.store_phase_to;
 
+      new_adsr.early_release_config = old_adsr.early_release_config.clone();
       new_adsr.phase = match gate_status {
         GateStatus::GatedFrozen => release_start_phase,
         GateStatus::Done => 1.,

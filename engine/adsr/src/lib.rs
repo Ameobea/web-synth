@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked)]
+#![feature(get_mut_unchecked, array_windows)]
 
 use std::rc::Rc;
 
@@ -94,7 +94,7 @@ pub enum GateStatus {
 }
 
 /// Method that we use if releasing the ADSR before we reach the release point
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum EarlyReleaseStrategy {
   /// We mix linearly between the start value (value of the ADSR when it was released) and the
   /// value at the release point linearly
@@ -104,6 +104,12 @@ pub enum EarlyReleaseStrategy {
   FastEnvelopeFollow,
   /// We output the value at the point at which the ADSR was released forever
   Freeze,
+  /// We scan through the envelope after the release point to find the first point at which it has
+  /// a value which is the same as the current value, do a fast linear mix to that point, and then
+  /// follow the envelope at normal speed from there.
+  ///
+  /// If no such point is found, behaves like `LinearMix`.
+  ScanToMatchThenFollow,
 }
 
 /// Determines how we handle releasing if the ADSR is ungated before the release point
@@ -112,6 +118,7 @@ pub struct EarlyReleaseConfig {
   pub strategy: EarlyReleaseStrategy,
   pub len_samples: usize,
 }
+
 impl EarlyReleaseConfig {
   pub(crate) fn from_parts(
     early_release_mode_type: usize,
@@ -129,6 +136,10 @@ impl EarlyReleaseConfig {
       2 => EarlyReleaseConfig {
         strategy: EarlyReleaseStrategy::Freeze,
         len_samples: 0,
+      },
+      3 => EarlyReleaseConfig {
+        strategy: EarlyReleaseStrategy::ScanToMatchThenFollow,
+        len_samples: early_release_mode_param,
       },
       _ => panic!(
         "Invalid early release mode type: {}",
@@ -226,12 +237,55 @@ impl Adsr {
 
   pub fn ungate(&mut self) {
     if self.phase < self.release_start_phase {
+      let cur_y = dsp::read_interpolated(
+        &*self.rendered,
+        self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
+      );
+
+      'scan: {
+        if self.early_release_config.strategy != EarlyReleaseStrategy::ScanToMatchThenFollow {
+          break 'scan;
+        }
+
+        let release_start_ix = ((self.release_start_phase * (RENDERED_BUFFER_SIZE - 2) as f32)
+          as usize)
+          .saturating_sub(2);
+
+        // scan through the release portion of the rendered buffer to find the first point where
+        // the value is almost the same as the current value
+        let Some(post_release_start_ix) = self.rendered[release_start_ix..]
+          .array_windows::<2>()
+          .position(|&[a, b]| (a <= cur_y && cur_y <= b) || (b <= cur_y && cur_y <= a))
+        else {
+          // No match found in the release; behave like `LinearMix`
+          break 'scan;
+        };
+
+        let [a, b] = [
+          self.rendered[release_start_ix + post_release_start_ix],
+          self.rendered[release_start_ix + post_release_start_ix + 1],
+        ];
+        let ix = post_release_start_ix as f32
+          + if a == cur_y || a == b {
+            0.
+          } else if b == cur_y {
+            1.
+          } else {
+            (cur_y - a) / (b - a)
+          };
+        self.phase = dsp::clamp(
+          0.,
+          1.,
+          (ix + release_start_ix as f32) / ((RENDERED_BUFFER_SIZE - 2) as f32),
+        );
+
+        self.gate_status = GateStatus::Releasing;
+        return;
+      }
+
       self.gate_status = GateStatus::EarlyRelease {
         start_x: self.phase,
-        start_y: dsp::read_interpolated(
-          &*self.rendered,
-          self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
-        ),
+        start_y: cur_y,
         release_start_point_y: dsp::read_interpolated(
           &*self.rendered,
           self.release_start_phase * (RENDERED_BUFFER_SIZE - 2) as f32,
@@ -333,7 +387,9 @@ impl Adsr {
         return;
       } else {
         match self.early_release_config.strategy {
-          EarlyReleaseStrategy::LinearMix | EarlyReleaseStrategy::FastEnvelopeFollow => {
+          EarlyReleaseStrategy::LinearMix
+          | EarlyReleaseStrategy::FastEnvelopeFollow
+          | EarlyReleaseStrategy::ScanToMatchThenFollow => {
             self.phase = self.release_start_phase;
             self.gate_status = GateStatus::Releasing;
           },
@@ -428,7 +484,8 @@ impl Adsr {
 
         match self.early_release_config.strategy {
           EarlyReleaseStrategy::FastEnvelopeFollow => todo!(),
-          EarlyReleaseStrategy::LinearMix =>
+          // `ScanToMatchThenFollow` behaves like `LinearMix` if we don't find a match
+          EarlyReleaseStrategy::LinearMix | EarlyReleaseStrategy::ScanToMatchThenFollow =>
             dsp::mix(early_release_phase, release_start_point_y, start_y),
           EarlyReleaseStrategy::Freeze => start_y,
         }
