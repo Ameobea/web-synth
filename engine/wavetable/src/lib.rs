@@ -21,6 +21,7 @@ pub struct WaveTableSettings {
 }
 
 impl WaveTableSettings {
+  #[inline(always)]
   pub fn get_samples_per_dimension(&self) -> usize {
     self.waveforms_per_dimension * self.waveform_length
   }
@@ -74,7 +75,7 @@ impl WaveTable {
       (sample_ix.ceil() as usize).min(self.samples.len() - 1),
     );
 
-    if waveform_offset_samples + sample_hi_ix >= self.samples.len() {
+    if cfg!(debug_assertions) && waveform_offset_samples + sample_hi_ix >= self.samples.len() {
       panic!(
         "sample_hi_ix: {}, waveform_offset_samples: {}, samples.len(): {}, waveform_ix: {}, \
          dimension_ix: {}, sample_ix: {}",
@@ -110,6 +111,10 @@ impl WaveTable {
 
   fn sample_dimension(&self, dimension_ix: usize, waveform_ix: f32, sample_ix: f32) -> f32 {
     let waveform_mix = waveform_ix.fract();
+    if waveform_mix == 0. {
+      return self.sample_waveform(dimension_ix, waveform_ix as usize, sample_ix);
+    }
+
     let (waveform_low_ix, waveform_hi_ix) =
       (waveform_ix.floor() as usize, waveform_ix.ceil() as usize);
 
@@ -120,7 +125,6 @@ impl WaveTable {
   }
 
   pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
-    // debug_assert!(sample_ix < (self.settings.waveform_length - 1) as f32);
     if cfg!(debug_assertions) {
       if sample_ix < 0.0 || sample_ix >= (self.settings.waveform_length - 1) as f32 {
         panic!(
@@ -130,8 +134,12 @@ impl WaveTable {
       }
     }
 
-    let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
-    let base_sample = self.sample_dimension(0, waveform_ix, sample_ix);
+    let base_sample = if self.settings.waveforms_per_dimension == 1 {
+      self.sample_waveform(0, 0, sample_ix)
+    } else {
+      let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
+      self.sample_dimension(0, waveform_ix, sample_ix)
+    };
 
     // For each higher dimension, mix the base sample from the lowest dimension with the output
     // of the next dimension until a final sample is produced
@@ -139,7 +147,11 @@ impl WaveTable {
     for dimension_ix in 1..self.settings.dimension_count {
       let waveform_ix =
         mixes[dimension_ix * 2] * ((self.settings.waveforms_per_dimension - 1) as f32);
-      let sample_for_dimension = self.sample_dimension(dimension_ix, waveform_ix, sample_ix);
+      let sample_for_dimension = if self.settings.waveforms_per_dimension == 1 {
+        self.sample_waveform(dimension_ix, 0, sample_ix)
+      } else {
+        self.sample_dimension(dimension_ix, waveform_ix, sample_ix)
+      };
       sample = mix(mixes[dimension_ix * 2 + 1], sample, sample_for_dimension);
     }
 

@@ -84,11 +84,12 @@ export const saveComposition = async (
   title: string,
   description: string,
   serializedComposition: { [key: string]: string },
-  tags: string[]
+  tags: string[],
+  parentID?: number | null
 ): Promise<number> =>
   fetch(`${BACKEND_BASE_URL}/compositions`, {
     method: 'POST',
-    body: JSON.stringify({ title, description, content: serializedComposition, tags }),
+    body: JSON.stringify({ title, description, content: serializedComposition, tags, parentID }),
     headers: {
       'Content-Type': 'application/json',
       Authorization: await getLoginToken(),

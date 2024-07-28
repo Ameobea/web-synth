@@ -62,20 +62,9 @@ impl Effect for MoogFilter {
     let resonance = unsafe { *rendered_params.get_unchecked(1) };
     let drive = unsafe { *rendered_params.get_unchecked(2) };
 
-    let mut dV0 = self.dV[0];
-    let mut dV1 = self.dV[1];
-    let mut dV2 = self.dV[2];
-    let mut dV3 = self.dV[3];
-
-    let mut tV0 = self.tV[0];
-    let mut tV1 = self.tV[1];
-    let mut tV2 = self.tV[2];
-    let mut tV3 = self.tV[3];
-
-    let mut V0 = self.V[0];
-    let mut V1 = self.V[1];
-    let mut V2 = self.V[2];
-    let mut V3 = self.V[3];
+    let [mut dV0, mut dV1, mut dV2, mut dV3] = self.dV;
+    let [mut tV0, mut tV1, mut tV2, mut tV3] = self.tV;
+    let [mut V0, mut V1, mut V2, mut V3] = self.V;
 
     let mut out_sample = 0.;
     // 2x oversampling
@@ -116,20 +105,9 @@ impl Effect for MoogFilter {
     }
     self.last_sample = sample;
 
-    self.tV[0] = tV0;
-    self.tV[1] = tV1;
-    self.tV[2] = tV2;
-    self.tV[3] = tV3;
-
-    self.dV[0] = dV0;
-    self.dV[1] = dV1;
-    self.dV[2] = dV2;
-    self.dV[3] = dV3;
-
-    self.V[0] = V0;
-    self.V[1] = V1;
-    self.V[2] = V2;
-    self.V[3] = V3;
+    self.tV = [tV0, tV1, tV2, tV3];
+    self.dV = [dV0, dV1, dV2, dV3];
+    self.V = [V0, V1, V2, V3];
 
     out_sample / 2.
   }
@@ -146,25 +124,14 @@ impl Effect for MoogFilter {
     let resonances = unsafe { rendered_params.get_unchecked(1) };
     let drives = unsafe { rendered_params.get_unchecked(2) };
 
-    let mut dV0 = self.dV[0];
-    let mut dV1 = self.dV[1];
-    let mut dV2 = self.dV[2];
-    let mut dV3 = self.dV[3];
-
-    let mut tV0 = self.tV[0];
-    let mut tV1 = self.tV[1];
-    let mut tV2 = self.tV[2];
-    let mut tV3 = self.tV[3];
-
-    let mut V0 = self.V[0];
-    let mut V1 = self.V[1];
-    let mut V2 = self.V[2];
-    let mut V3 = self.V[3];
+    let [mut dV0, mut dV1, mut dV2, mut dV3] = self.dV;
+    let [mut tV0, mut tV1, mut tV2, mut tV3] = self.tV;
+    let [mut V0, mut V1, mut V2, mut V3] = self.V;
 
     let mut last_sample = self.last_sample;
-    for i in 0..samples.len() {
+    for sample_ix in 0..samples.len() {
       let mut out_sample = 0.;
-      let cur_sample = unsafe { *samples.get_unchecked(i) };
+      let cur_sample = unsafe { *samples.get_unchecked(sample_ix) };
 
       // 2x oversampling
       for j in 0..=1 {
@@ -174,9 +141,9 @@ impl Effect for MoogFilter {
           cur_sample
         };
 
-        let cutoff = dsp::clamp(1., 22_100., cutoffs[i]);
-        let resonance = dsp::clamp(0., 20., resonances[i]);
-        let drive = drives[i];
+        let cutoff = dsp::clamp(1., 22_100., cutoffs[sample_ix]);
+        let resonance = dsp::clamp(0., 20., resonances[sample_ix]);
+        let drive = drives[sample_ix];
 
         let x = (PI * cutoff) / (2 * SAMPLE_RATE) as f32;
         let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
@@ -205,23 +172,12 @@ impl Effect for MoogFilter {
       }
 
       last_sample = cur_sample;
-      unsafe { *samples.get_unchecked_mut(i) = out_sample / 2. };
+      unsafe { *samples.get_unchecked_mut(sample_ix) = out_sample / 2. };
     }
 
-    self.tV[0] = tV0;
-    self.tV[1] = tV1;
-    self.tV[2] = tV2;
-    self.tV[3] = tV3;
-
-    self.dV[0] = dV0;
-    self.dV[1] = dV1;
-    self.dV[2] = dV2;
-    self.dV[3] = dV3;
-
-    self.V[0] = V0;
-    self.V[1] = V1;
-    self.V[2] = V2;
-    self.V[3] = V3;
+    self.tV = [tV0, tV1, tV2, tV3];
+    self.dV = [dV0, dV1, dV2, dV3];
+    self.V = [V0, V1, V2, V3];
 
     self.last_sample = last_sample;
   }

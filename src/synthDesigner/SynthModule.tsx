@@ -1,4 +1,3 @@
-import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useSelector } from 'react-redux';
@@ -12,9 +11,8 @@ import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPic
 import { ConnectedFMSynthUI } from 'src/fmSynth/FMSynthUI';
 import type { Adsr, AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { getState, store, type ReduxStore } from 'src/redux';
+import { store, type ReduxStore } from 'src/redux';
 import { getSynthDesignerReduxInfra, type SynthModule } from 'src/redux/modules/synthDesigner';
-import { getSentry } from 'src/sentry';
 import { get_synth_designer_audio_connectables, getVoicePreset } from 'src/synthDesigner';
 import { UnreachableError, msToSamples, samplesToMs } from 'src/util';
 import { Filter as FilterModule } from './Filter';
@@ -23,11 +21,7 @@ import {
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderModalWithControls } from 'src/controls/Modal';
-import {
-  voicePresetIdsSelector,
-  type SynthVoicePreset,
-  type SynthVoicePresetEntry,
-} from 'src/redux/modules/presets';
+import { type SynthVoicePreset } from 'src/redux/modules/presets';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
@@ -38,18 +32,23 @@ interface PresetsControlPanelProps {
 
 const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateKey }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
-  const allVoicePresets = useSelector((state: ReduxStore) => {
+  const allVoicePresetsRaw = useSelector((state: ReduxStore) => {
     if (typeof state.presets.voicePresets === 'string') {
       return null;
     }
-    return state.presets.voicePresets.map(
-      (preset): PresetDescriptor<SynthVoicePreset> => ({
-        ...preset,
-        name: preset.title,
-        preset: preset.body,
-      })
-    );
+    return state.presets.voicePresets;
   }, shallowEqual);
+  const allVoicePresets = useMemo(
+    () =>
+      allVoicePresetsRaw?.map(
+        (preset): PresetDescriptor<SynthVoicePreset> => ({
+          ...preset,
+          name: preset.title,
+          preset: preset.body,
+        })
+      ),
+    [allVoicePresetsRaw]
+  );
 
   const settings = useMemo(() => {
     if (!allVoicePresets) {

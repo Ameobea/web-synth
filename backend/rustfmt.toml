@@ -16,3 +16,5 @@ match_arm_blocks = false
 overflow_delimited_expr = true
 edition = "2018"
 normalize_doc_attributes = true
+# todo: enable \/ and format project
+# tab_spaces = 2

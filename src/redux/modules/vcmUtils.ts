@@ -16,7 +16,7 @@ import type {
   PatchNetwork,
 } from 'src/patchNetwork';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import { reinitializeWithComposition } from 'src/persistance';
+import { reinitializeWithComposition, setCurLoadedCompositionId } from 'src/persistance';
 import { getState, store } from 'src/redux';
 import { filterNils, getEngine, UnreachableError } from 'src/util';
 import { setGlobalVolume } from 'src/ViewContextManager/GlobalVolumeSlider';
@@ -209,6 +209,7 @@ export const create_empty_audio_connectables = (vcId: string): AudioConnectables
 export const initializeDefaultVCMState = () => {
   const engine = getEngine()!;
   const allViewContextIds = getState().viewContextManager.activeViewContexts.map(R.prop('uuid'));
+  setCurLoadedCompositionId(null);
   const res = reinitializeWithComposition(
     { type: 'parsed', value: DefaultComposition },
     engine,

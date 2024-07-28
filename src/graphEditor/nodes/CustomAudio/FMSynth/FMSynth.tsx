@@ -483,8 +483,6 @@ export default class FMSynth implements ForeignNode {
       return;
     }
 
-    console.log('Loading wavetable into backend', backendIx, bank);
-
     this.lastSetWavetableData = setWavetableData;
     this.awpHandle.port.postMessage({
       type: 'setWavetableData',

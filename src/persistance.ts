@@ -1,3 +1,4 @@
+import * as R from 'ramda';
 import Dexie from 'dexie';
 import download from 'downloadjs';
 import { Either } from 'funfix-core';
@@ -19,8 +20,8 @@ export const serializeAndDownloadComposition = () => {
  */
 export const reinitializeWithComposition = (
   compositionBody:
-    | { type: 'serialized'; value: string }
-    | { type: 'parsed'; value: { [key: string]: string } },
+    | { type: 'serialized'; value: string; id?: number | null }
+    | { type: 'parsed'; value: { [key: string]: string }; id?: number | null },
   engine: typeof import('./engine'),
   allViewContextIds: string[]
 ): Either<string, void> => {
@@ -53,6 +54,10 @@ export const reinitializeWithComposition = (
   ) {
     console.log('Setting global tempo to', deserialized.globalTempo);
     setGlobalBpm(+deserialized.globalTempo);
+  }
+
+  if (!R.isNil(compositionBody.id)) {
+    setCurLoadedCompositionId(compositionBody.id);
   }
 
   // Trigger applicaion to refresh using the newly set `localStorage` content
@@ -129,6 +134,18 @@ export const loadSharedComposition = async (
   ) {
     console.log('Setting global tempo to', deserialized.globalTempo);
     setGlobalBpm(+deserialized.globalTempo);
+  }
+};
+
+export const getCurLoadedCompositionId = async (): Promise<number | null> => {
+  const [id] = await currentLoadedCompositionIdTable.toArray();
+  return id ? +id : null;
+};
+
+export const setCurLoadedCompositionId = async (id: number | null) => {
+  await currentLoadedCompositionIdTable.clear();
+  if (id !== null) {
+    await currentLoadedCompositionIdTable.add(id, ['']);
   }
 };
 

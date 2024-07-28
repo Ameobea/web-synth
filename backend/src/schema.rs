@@ -7,6 +7,8 @@ diesel::table! {
         description -> Text,
         content -> Longtext,
         user_id -> Nullable<Bigint>,
+        composition_version -> Integer,
+        parent_id -> Nullable<Bigint>,
     }
 }
 

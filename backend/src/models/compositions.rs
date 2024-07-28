@@ -9,6 +9,9 @@ pub struct NewCompositionRequest {
     pub content: Map<String, Value>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    #[serde(rename = "parentID")]
+    pub parent_id: Option<i64>,
 }
 
 #[derive(Insertable)]
@@ -18,6 +21,17 @@ pub struct NewComposition {
     pub description: String,
     pub content: String,
     pub user_id: Option<i64>,
+    pub composition_version: i32,
+    pub parent_id: Option<i64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionVersion {
+    pub id: i64,
+    pub title: String,
+    pub description: String,
+    pub composition_version: i32,
 }
 
 #[derive(Serialize)]
@@ -29,6 +43,7 @@ pub struct CompositionDescriptor {
     pub tags: Vec<String>,
     pub user_id: Option<i64>,
     pub user_name: Option<String>,
+    pub versions: Vec<CompositionVersion>,
 }
 
 #[derive(Serialize, Queryable)]
@@ -39,6 +54,8 @@ pub struct Composition {
     pub description: String,
     pub content: String,
     pub user_id: Option<i64>,
+    pub composition_version: i32,
+    pub parent_id: Option<i64>,
 }
 
 #[derive(Insertable)]

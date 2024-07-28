@@ -10,8 +10,8 @@ use crate::{
     },
     models::{
         compositions::{
-            Composition, CompositionDescriptor, NewComposition, NewCompositionRequest,
-            NewCompositionTag,
+            Composition, CompositionDescriptor, CompositionVersion, NewComposition,
+            NewCompositionRequest, NewCompositionTag,
         },
         effects::{Effect, InsertableEffect},
         synth_preset::{
@@ -95,6 +95,65 @@ pub async fn save_composition(
     login_token: MaybeLoginToken,
 ) -> Result<Json<i64>, String> {
     let user_id = get_logged_in_user_id(&conn, login_token).await;
+
+    // if adding a version to an existing composition, the user must be logged in and own the parent
+    let (parent_id, composition_version) = if let Some(parent_id) = composition.0.parent_id {
+        let Some(user_id) = user_id else {
+            return Err("User must be logged in to save a new version of a composition".to_owned());
+        };
+
+        let (id, parent_id) = match conn
+            .run(
+                move |conn| -> QueryResult<Option<(i64, Option<i64>, Option<i64>)>> {
+                    schema::compositions::table
+                        .filter(schema::compositions::dsl::id.eq(parent_id))
+                        .select((
+                            schema::compositions::dsl::id,
+                            schema::compositions::dsl::parent_id,
+                            schema::compositions::dsl::user_id,
+                        ))
+                        .order_by(schema::compositions::dsl::composition_version.asc())
+                        .first(conn)
+                        .optional()
+                },
+            )
+            .await
+        {
+            Ok(Some((id, parent_id, parent_user_id))) => {
+                if parent_user_id != Some(user_id) {
+                    return Err("User does not own the parent composition".to_owned());
+                }
+
+                (id, parent_id)
+            },
+            Ok(None) => return Err("Parent composition not found".to_owned()),
+            Err(err) => {
+                error!("Error querying parent composition: {:?}", err);
+                return Err("Error querying parent composition from the database".to_owned());
+            },
+        };
+
+        let root_parent_id = parent_id.unwrap_or(id);
+        let latest_version: Option<i32> = conn
+            .run(move |conn| {
+                schema::compositions::table
+                    .filter(schema::compositions::dsl::parent_id.eq(Some(root_parent_id)))
+                    .select(diesel::dsl::max(
+                        schema::compositions::dsl::composition_version,
+                    ))
+                    .first::<Option<i32>>(conn)
+            })
+            .await
+            .map_err(|err| {
+                error!("Error querying composition version: {:?}", err);
+                "Error querying composition version from the database".to_owned()
+            })?;
+
+        (Some(root_parent_id), latest_version.unwrap_or(0) + 1)
+    } else {
+        (None, 0)
+    };
+
     let new_composition = NewComposition {
         title: composition.0.title,
         description: composition.0.description,
@@ -103,8 +162,14 @@ pub async fn save_composition(
             format!("Failed to serialize composition to JSON string")
         })?,
         user_id,
+        composition_version,
+        parent_id,
     };
-    let tags: Vec<String> = std::mem::take(&mut composition.0.tags);
+    let tags: Vec<String> = if new_composition.parent_id.is_none() {
+        std::mem::take(&mut composition.0.tags)
+    } else {
+        Vec::new()
+    };
 
     let saved_composition_id = conn
         .run(move |conn| {
@@ -148,26 +213,38 @@ pub async fn save_composition(
     Ok(Json(saved_composition_id))
 }
 
+async fn query_composition_by_id(
+    conn: WebSynthDbConn,
+    composition_id: i64,
+) -> QueryResult<Option<Composition>> {
+    use crate::schema::compositions;
+
+    conn.run(move |conn| {
+        compositions::table
+            .filter(
+                compositions::dsl::id
+                    .eq(composition_id)
+                    .or(compositions::dsl::parent_id.eq(composition_id)),
+            )
+            .order_by(compositions::dsl::composition_version.desc())
+            .first::<Composition>(conn)
+            .optional()
+    })
+    .await
+}
+
 #[get("/compositions/<composition_id>")]
 pub async fn get_composition_by_id(
     conn: WebSynthDbConn,
     composition_id: i64,
 ) -> Result<Option<Json<Composition>>, String> {
-    use crate::schema::compositions::dsl::*;
-
-    let composition_opt = match conn
-        .run(move |conn| compositions.find(composition_id).first::<Composition>(conn))
+    query_composition_by_id(conn, composition_id)
         .await
-    {
-        Ok(composition) => Some(Json(composition)),
-        Err(diesel::NotFound) => None,
-        Err(err) => {
-            error!("Error querying composition by id: {:?}", err);
-            return Err("Error querying composition by id from the database".to_string());
-        },
-    };
-
-    Ok(composition_opt)
+        .map_err(|err| {
+            error!("Error querying composition: {:?}", err);
+            "Error querying composition from the database".to_string()
+        })
+        .map(|comp| comp.map(Json))
 }
 
 #[get("/compositions")]
@@ -178,7 +255,7 @@ pub async fn get_compositions(
 
     let (all_compos, all_compos_tags) = conn
         .run(
-            |conn| -> QueryResult<(Vec<(_, _, _, _, _)>, Vec<EntityIdTag>)> {
+            |conn| -> QueryResult<(Vec<(_, _, _, _, Option<i64>, i32, _)>, Vec<EntityIdTag>)> {
                 let all_compos = compositions::table
                     .left_join(
                         users::table.on(compositions::dsl::user_id.eq(users::dsl::id.nullable())),
@@ -188,8 +265,11 @@ pub async fn get_compositions(
                         compositions::dsl::title,
                         compositions::dsl::description,
                         compositions::dsl::user_id,
+                        compositions::dsl::parent_id,
+                        compositions::dsl::composition_version,
                         users::dsl::username.nullable(),
                     ))
+                    .order_by(compositions::dsl::id.asc())
                     .load(conn)?;
 
                 let all_compos_tags: Vec<EntityIdTag> = compositions_tags::table
@@ -201,7 +281,7 @@ pub async fn get_compositions(
         )
         .await
         .map_err(|err| {
-            error!("Error querying compositions: {:?}", err);
+            error!("Error querying compositions: {err:?}");
             "Error querying compositions from the database".to_string()
         })?;
 
@@ -209,26 +289,49 @@ pub async fn get_compositions(
         .into_iter()
         .into_group_map_by(|tag| tag.entity_id);
 
-    let all_compos = all_compos
-        .into_iter()
-        .map(|(id, title, description, user_id, user_name)| {
-            let tags = tags_by_compo_id
-                .remove(&id)
-                .unwrap_or_default()
-                .iter()
-                .map(|tag| tag.tag.clone())
-                .collect_vec();
+    let mut compositions_by_root_id: FxHashMap<i64, CompositionDescriptor> = FxHashMap::default();
 
-            CompositionDescriptor {
+    for (id, title, description, user_id, parent_id, composition_version, user_name) in all_compos {
+        if let Some(parent_id) = parent_id {
+            let Some(parent) = compositions_by_root_id.get_mut(&parent_id) else {
+                error!(
+                    "Composition with parent_id={parent_id} not found; versions should have been \
+                     ordered after the parent"
+                );
+                continue;
+            };
+
+            parent.versions.push(CompositionVersion {
                 id,
                 title,
                 description,
-                tags,
-                user_id,
-                user_name,
-            }
-        })
-        .collect_vec();
+                composition_version,
+            });
+
+            continue;
+        }
+
+        let tags = tags_by_compo_id
+            .remove(&id)
+            .unwrap_or_default()
+            .iter()
+            .map(|tag| tag.tag.clone())
+            .collect_vec();
+
+        let descriptor = CompositionDescriptor {
+            id,
+            title,
+            description,
+            tags,
+            user_id,
+            user_name,
+            versions: Vec::new(),
+        };
+        compositions_by_root_id.insert(id, descriptor);
+    }
+
+    let mut all_compos = compositions_by_root_id.into_values().collect_vec();
+    all_compos.sort_unstable_by_key(|comp| comp.id);
 
     Ok(Json(all_compos))
 }

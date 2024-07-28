@@ -16,7 +16,7 @@ pub mod private_sample_libraries;
 // Facilitate getting the primary key of the last inserted item
 //
 // https://github.com/diesel-rs/diesel/issues/1011#issuecomment-315536931
-sql_function! {
+define_sql_function! {
     fn last_insert_id() -> BigInt;
 }
 

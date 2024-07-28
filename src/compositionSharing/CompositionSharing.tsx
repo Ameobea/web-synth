@@ -1,7 +1,11 @@
 import * as R from 'ramda';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
-import { onBeforeUnload, reinitializeWithComposition } from '../persistance';
+import {
+  getCurLoadedCompositionId,
+  onBeforeUnload,
+  reinitializeWithComposition,
+} from '../persistance';
 import './CompositionSharing.scss';
 import {
   fetchAllSharedCompositions,
@@ -24,12 +28,21 @@ import { getSentry } from 'src/sentry';
 import { NIL_UUID, getEngine } from 'src/util';
 import { saveSubgraphPreset } from 'src/graphEditor/GraphEditor';
 
+export interface CompositionVersion {
+  id: number;
+  title: string;
+  description: string;
+  compositionVersion: number;
+}
+
 export interface CompositionDefinition {
   id: number;
   title: string;
   description: string;
   content: string;
+  tags: string[];
   userId: number | null | undefined;
+  versions: CompositionVersion[];
 }
 
 const mkLocalSamplesConfirmation = (localSamples: SampleDescriptor[]) => {
@@ -138,7 +151,7 @@ const updateSamplesInSave = (
   );
 };
 
-const removeCompositionSharingFromVCMState = (serializedVcmState: any) => {
+const removeCompositionSharingFromVCMState = (serializedVcmState: string) => {
   const vcmState = JSON.parse(serializedVcmState);
 
   // Select control panel, graph editor, synth designer in that order if exist as the default active view
@@ -184,15 +197,19 @@ const removeCompositionSharingFromVCMState = (serializedVcmState: any) => {
   });
 };
 
+interface SerializeAndSaveCompositionArgs {
+  title: string;
+  description: string;
+  tags: string[];
+  parentID?: number | null;
+}
+
 const serializeAndSaveComposition = async ({
   title,
   description,
   tags,
-}: {
-  title: string;
-  description: string;
-  tags: string[];
-}): Promise<number> => {
+  parentID,
+}: SerializeAndSaveCompositionArgs): Promise<number> => {
   // Check to see if any local compositions are in use by the composition.  If so, check confirm with
   // the user whether or not they should be uploaded and handle converting them to remote samples.
   const samples = await checkForLocalSamples();
@@ -227,7 +244,7 @@ const serializeAndSaveComposition = async ({
   let compositionID: number | null = null;
   let saveCompositionError: any = null;
   try {
-    compositionID = await saveComposition(title, description, compositionData, tags);
+    compositionID = await saveComposition(title, description, compositionData, tags, parentID);
   } catch (err) {
     console.error('Error saving composition: ', err);
     saveCompositionError = err;
@@ -242,49 +259,67 @@ const serializeAndSaveComposition = async ({
   throw saveCompositionError;
 };
 
+const handleSave = async (parentID: number | null): Promise<number | null> => {
+  try {
+    const {
+      name: title,
+      description,
+      tags,
+    } = await renderGenericPresetSaverWithModal({
+      description: true,
+      tags: !parentID,
+      getExistingTags: getExistingCompositionTags,
+    });
+
+    getSentry()?.captureMessage('Saving composition', {
+      tags: {
+        title,
+        description,
+        tags: tags?.join(','),
+        parentID,
+      },
+    });
+    const savedCompositionID = await serializeAndSaveComposition({
+      title,
+      description: description ?? '',
+      tags: tags ?? [],
+      parentID,
+    });
+    toastSuccess(`Successfully saved as composition ${savedCompositionID}`);
+    return savedCompositionID;
+  } catch (err) {
+    if (!err) {
+      return null;
+    }
+
+    getSentry()?.captureException(err);
+    alert('Error saving composition: ' + err);
+
+    return null;
+  }
+};
+
 const ShareComposition: React.FC = () => {
   const [savedCompositionID, setSavedCompositionID] = useState<number | null>(null);
+  const [curEditingCompositionID, setCurEditingCompositionID] = useState<number | null>(null);
+  useEffect(() => void getCurLoadedCompositionId().then(setCurEditingCompositionID), []);
+
+  const handleSaveInner = useCallback(
+    async (parentID: number | null) => {
+      const savedCompositionID = await handleSave(parentID);
+      setSavedCompositionID(savedCompositionID);
+    },
+    [setSavedCompositionID]
+  );
 
   return (
     <>
-      <button
-        onClick={async () => {
-          try {
-            const {
-              name: title,
-              description,
-              tags,
-            } = await renderGenericPresetSaverWithModal({
-              description: true,
-              getExistingTags: getExistingCompositionTags,
-            });
-
-            getSentry()?.captureMessage('Saving composition', {
-              tags: {
-                title,
-                description,
-                tags: tags?.join(','),
-              },
-            });
-            const savedCompositionID = await serializeAndSaveComposition({
-              title,
-              description: description ?? '',
-              tags: tags ?? [],
-            });
-            toastSuccess(`Successfully saved as composition ${savedCompositionID}`);
-            setSavedCompositionID(savedCompositionID);
-          } catch (err) {
-            if (!err) {
-              return;
-            }
-
-            getSentry()?.captureException(err);
-            alert('Error saving composition: ' + err);
-          }
-        }}
-      >
-        Share Current Composition
-      </button>
+      <button onClick={() => handleSaveInner(null)}>Save as New Composition</button>
+      {curEditingCompositionID !== null ? (
+        <button onClick={() => handleSaveInner(curEditingCompositionID)}>
+          Save as New Version
+        </button>
+      ) : null}
       {savedCompositionID !== null ? (
         <span style={{ color: 'green' }}>Composition {savedCompositionID} saved successfully!</span>
       ) : null}
@@ -335,7 +370,7 @@ const CompositionSharing: React.FC = () => (
             R.prop('uuid')
           );
           reinitializeWithComposition(
-            { type: 'serialized', value: composition.content },
+            { type: 'serialized', value: composition.content, id: +compID },
             getEngine()!,
             allViewContextIds
           );

@@ -13,6 +13,10 @@ import './GenericPresetPicker.scss';
 interface GenericPresetSaverArgs {
   getExistingTags?: () => Promise<{ name: string; count?: number }[]>;
   description?: boolean;
+  /**
+   * default: true
+   */
+  tags?: boolean;
 }
 
 interface TagProps {
@@ -147,7 +151,7 @@ const mkGenericPresetSaver = (args: GenericPresetSaverArgs) => {
             </div>
           ) : null}
         </div>
-        {args.getExistingTags ? (
+        {args.tags !== false && args.getExistingTags ? (
           <TagPicker
             getExistingTags={args.getExistingTags}
             value={state.tags}

@@ -485,7 +485,7 @@ impl Oscillator for WaveTableHandle {
     //         .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency),
     // ];
 
-    // Only 1D wavetables are supported for now, so we can make thing a bit simpler
+    // Only 1D wavetables are supported for now, so we can make this thing a bit simpler
     let mixes: [f32; 4] = [
       self
         .dim_0_intra_mix
