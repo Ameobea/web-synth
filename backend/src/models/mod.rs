@@ -13,19 +13,19 @@ pub mod wavetable_preset;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveGenericPresetRequest<T> {
-    pub name: String,
-    pub description: String,
-    pub tags: Vec<String>,
-    pub preset: T,
+  pub name: String,
+  pub description: String,
+  pub tags: Vec<String>,
+  pub preset: T,
 }
 
 #[derive(Serialize, Queryable)]
 #[serde(rename_all = "camelCase")]
 pub struct GenericPresetDescriptor {
-    pub id: i64,
-    pub name: String,
-    pub description: String,
-    pub tags: Vec<String>,
-    pub user_id: Option<i64>,
-    pub user_name: Option<String>,
+  pub id: i64,
+  pub name: String,
+  pub description: String,
+  pub tags: Vec<String>,
+  pub user_id: Option<i64>,
+  pub user_name: Option<String>,
 }

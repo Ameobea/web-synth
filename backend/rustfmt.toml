@@ -7,8 +7,6 @@ format_strings = true
 merge_imports = true
 match_block_trailing_comma = true
 reorder_impl_items = true
-report_todo = "Always"
-report_fixme = "Always"
 use_field_init_shorthand = true
 use_try_shorthand = true
 wrap_comments = true
@@ -16,5 +14,4 @@ match_arm_blocks = false
 overflow_delimited_expr = true
 edition = "2018"
 normalize_doc_attributes = true
-# todo: enable \/ and format project
-# tab_spaces = 2
+tab_spaces = 2
