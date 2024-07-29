@@ -2,10 +2,10 @@ import { Set as ImmSet } from 'immutable';
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { Keyboard, Piano } from 'react-piano';
-
 import 'react-piano/dist/styles.css';
-import './MidiKeyboard.css';
+
 import { UnreachableError } from 'src/util';
+import './MidiKeyboard.css';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;
 const START_NOTE = 32;
@@ -15,9 +15,11 @@ Keyboard.propTypes = undefined;
 
 // prettier-ignore
 const keys = ['a','z', 's', 'x', 'c', 'f', 'v', 'g', 'b', 'n', 'j', 'm', 'k', ',', 'l', '.', '/', "'"];
+// prettier-ignore
+const keyCodes = ['KeyA', 'KeyZ', 'KeyS', 'KeyX', 'KeyC', 'KeyF', 'KeyV', 'KeyG', 'KeyB', 'KeyN', 'KeyJ', 'KeyM', 'KeyK', 'Comma', 'KeyL', 'Period', 'Slash', 'Quote'];
 
-const keyMap: { [key: string]: number } = keys.reduce(
-  (acc, key, i) => ({ ...acc, [key]: START_NOTE + i }),
+const keyCodeMap: { [code: string]: number } = keyCodes.reduce(
+  (acc, code, i) => ({ ...acc, [code]: START_NOTE + i }),
   {}
 );
 
@@ -86,12 +88,11 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
 
   useEffect(() => {
     const handleDown = (evt: KeyboardEvent) => {
-      // Discard keypresses while control key pressed
       if (evt.ctrlKey) {
         return;
       }
-      const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
-      if (R.isNil(keyMap[evt.key.toLowerCase()])) {
+      const midiNumber = keyCodeMap[evt.code] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
+      if (R.isNil(keyCodeMap[evt.code])) {
         return;
       }
 
@@ -118,8 +119,8 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
       playNote(midiNumber);
     };
     const handleUp = (evt: KeyboardEvent) => {
-      const midiNumber = keyMap[evt.key.toLowerCase()] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
-      if (R.isNil(keyMap[evt.key.toLowerCase()])) {
+      const midiNumber = keyCodeMap[evt.code] + octaveOffset * MIDI_NOTES_PER_OCTAVE;
+      if (R.isNil(keyCodeMap[evt.code])) {
         return;
       }
       releaseNote(midiNumber);

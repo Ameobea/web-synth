@@ -252,13 +252,15 @@ type EmbeddingBrowserUIProps =
 const EmbeddingBrowserReactShim =
   mkSvelteComponentShim<EmbeddingBrowserUIProps>(EmbeddingBrowserUI);
 
+interface SelectedSampleState {
+  sample: SampleDescriptor;
+  index: number;
+}
+
 const SampleLibraryUI: React.FC = () => {
   const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
 
-  const [selectedSample, setSelectedSample] = useState<{
-    sample: SampleDescriptor;
-    index: number;
-  } | null>(null);
+  const [selectedSample, setSelectedSample] = useState<SelectedSampleState | null>(null);
 
   if (!Array.isArray(allSamples)) {
     return (
