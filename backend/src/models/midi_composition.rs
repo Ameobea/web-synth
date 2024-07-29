@@ -1,3 +1,5 @@
+use chrono::NaiveDateTime;
+
 use crate::schema::{midi_compositions, midi_compositions_tags};
 
 #[derive(Serialize, Deserialize)]
@@ -51,6 +53,7 @@ pub struct QueryableMIDIComposition {
     pub description: String,
     pub composition_json: String,
     pub user_id: Option<i64>,
+    pub created_at: Option<NaiveDateTime>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,6 +75,7 @@ pub struct MIDIComposition {
     pub composition: SerializedMIDIEditorState,
     pub tags: Vec<String>,
     pub user_id: Option<i64>,
+    pub created_at: Option<NaiveDateTime>,
 }
 
 #[derive(Insertable)]

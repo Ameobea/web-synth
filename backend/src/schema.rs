@@ -9,6 +9,7 @@ diesel::table! {
         user_id -> Nullable<Bigint>,
         composition_version -> Integer,
         parent_id -> Nullable<Bigint>,
+        created_at -> Nullable<Timestamp>,
     }
 }
 
@@ -47,6 +48,7 @@ diesel::table! {
         description -> Text,
         serialized_looper_inst_state -> Longtext,
         user_id -> Nullable<Bigint>,
+        created_at -> Nullable<Timestamp>,
     }
 }
 
@@ -65,6 +67,7 @@ diesel::table! {
         description -> Text,
         composition_json -> Text,
         user_id -> Nullable<Bigint>,
+        created_at -> Nullable<Timestamp>,
     }
 }
 
@@ -114,6 +117,7 @@ diesel::table! {
         title -> Text,
         description -> Text,
         content -> Longtext,
+        created_at -> Nullable<Timestamp>,
     }
 }
 
@@ -124,6 +128,7 @@ diesel::table! {
         description -> Text,
         body -> Text,
         user_id -> Nullable<Bigint>,
+        created_at -> Nullable<Timestamp>,
     }
 }
 
@@ -150,6 +155,7 @@ diesel::table! {
         description -> Text,
         body -> Longtext,
         user_id -> Nullable<Bigint>,
+        created_at -> Nullable<Timestamp>,
     }
 }
 
@@ -160,6 +166,7 @@ diesel::table! {
         description -> Text,
         serialized_wavetable_inst_state -> Longtext,
         user_id -> Nullable<Bigint>,
+        created_at -> Nullable<Timestamp>,
     }
 }
 

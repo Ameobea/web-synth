@@ -1,3 +1,5 @@
+use chrono::NaiveDateTime;
+
 use crate::schema::{wavetable_presets, wavetable_presets_tags};
 
 #[derive(Queryable, Serialize, Deserialize)]
@@ -7,6 +9,7 @@ pub struct WavetablePreset {
     pub description: String,
     pub serialized_wavetable_inst_state: String,
     pub user_id: Option<i64>,
+    pub created_at: Option<NaiveDateTime>,
 }
 
 #[derive(Serialize, Deserialize)]

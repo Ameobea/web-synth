@@ -255,7 +255,7 @@ pub async fn get_compositions(
 
     let (all_compos, all_compos_tags) = conn
         .run(
-            |conn| -> QueryResult<(Vec<(_, _, _, _, Option<i64>, i32, _)>, Vec<EntityIdTag>)> {
+            |conn| -> QueryResult<(Vec<(_, _, _, _, Option<i64>, i32, _, _)>, Vec<EntityIdTag>)> {
                 let all_compos = compositions::table
                     .left_join(
                         users::table.on(compositions::dsl::user_id.eq(users::dsl::id.nullable())),
@@ -267,6 +267,7 @@ pub async fn get_compositions(
                         compositions::dsl::user_id,
                         compositions::dsl::parent_id,
                         compositions::dsl::composition_version,
+                        compositions::dsl::created_at,
                         users::dsl::username.nullable(),
                     ))
                     .order_by(compositions::dsl::id.asc())
@@ -291,7 +292,9 @@ pub async fn get_compositions(
 
     let mut compositions_by_root_id: FxHashMap<i64, CompositionDescriptor> = FxHashMap::default();
 
-    for (id, title, description, user_id, parent_id, composition_version, user_name) in all_compos {
+    for (id, title, description, user_id, parent_id, composition_version, created_at, user_name) in
+        all_compos
+    {
         if let Some(parent_id) = parent_id {
             let Some(parent) = compositions_by_root_id.get_mut(&parent_id) else {
                 error!(
@@ -306,6 +309,7 @@ pub async fn get_compositions(
                 title,
                 description,
                 composition_version,
+                created_at,
             });
 
             continue;
@@ -326,6 +330,7 @@ pub async fn get_compositions(
             user_id,
             user_name,
             versions: Vec::new(),
+            created_at,
         };
         compositions_by_root_id.insert(id, descriptor);
     }

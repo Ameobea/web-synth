@@ -1,12 +1,12 @@
 import * as R from 'ramda';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useState } from 'react';
 
 import {
   getCurLoadedCompositionId,
   onBeforeUnload,
   reinitializeWithComposition,
 } from '../persistance';
-import './CompositionSharing.scss';
+import './CompositionSharing.css';
 import {
   fetchAllSharedCompositions,
   getExistingCompositionTags,
@@ -16,6 +16,7 @@ import {
 } from 'src/api';
 import {
   pickPresetWithModal,
+  type CustomPresetInfoProps,
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
@@ -33,6 +34,7 @@ export interface CompositionVersion {
   title: string;
   description: string;
   compositionVersion: number;
+  createdAt?: Date | null;
 }
 
 export interface CompositionDefinition {
@@ -42,7 +44,8 @@ export interface CompositionDefinition {
   content: string;
   tags: string[];
   userId: number | null | undefined;
-  versions: CompositionVersion[];
+  versions?: CompositionVersion[];
+  createdAt?: Date | null;
 }
 
 const mkLocalSamplesConfirmation = (localSamples: SampleDescriptor[]) => {
@@ -327,6 +330,57 @@ const ShareComposition: React.FC = () => {
   );
 };
 
+interface CompositionCreatedAtDisplayProps {
+  createdAt: Date | null | undefined;
+}
+
+const DtFormatter = Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' });
+
+const CompositionCreatedAtDisplay: React.FC<CompositionCreatedAtDisplayProps> = ({ createdAt }) => {
+  if (!createdAt) {
+    return <i>-</i>;
+  }
+
+  return <>{DtFormatter.format(createdAt)}</>;
+};
+
+const CompositionCustomDetails: React.FC<
+  CustomPresetInfoProps<Omit<CompositionDefinition, 'content'>>
+> = ({ preset }) => {
+  const versions = preset.preset.versions;
+  if (!versions || versions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className='composition-custom-details'>
+      <h2>Version History</h2>
+      <div className='composition-versions-listing'>
+        <Fragment>
+          <div className='composition-title'>
+            <i>Original</i>
+          </div>
+          <div className='composition-created-at'>
+            <CompositionCreatedAtDisplay createdAt={preset.preset.createdAt} />
+          </div>
+          <div className='composition-description' />
+        </Fragment>
+        {(preset.preset.versions ?? []).map(
+          ({ compositionVersion, title, description, createdAt }) => (
+            <Fragment key={compositionVersion}>
+              <div className='composition-title'>{title}</div>
+              <div className='composition-created-at'>
+                <CompositionCreatedAtDisplay createdAt={createdAt} />
+              </div>
+              <div className='composition-description'>{description}</div>
+            </Fragment>
+          )
+        )}
+      </div>
+    </div>
+  );
+};
+
 const CompositionSharing: React.FC = () => (
   <div className='composition-sharing'>
     <h2>Share or Load Online Composition</h2>
@@ -339,14 +393,20 @@ const CompositionSharing: React.FC = () => (
       <ShareComposition />
       <button
         onClick={async () => {
-          const wrappedGetAllSharedCompositions = (): Promise<PresetDescriptor<any>[]> =>
+          const wrappedGetAllSharedCompositions = (): Promise<
+            PresetDescriptor<Omit<CompositionDefinition, 'content'>>[]
+          > =>
             fetchAllSharedCompositions().then(compositions =>
-              compositions.map(comp => ({ ...comp, name: comp.title, preset: null }))
+              compositions.map(comp => ({ ...comp, name: comp.title, preset: comp }))
             );
 
           let compID: string | number = '';
           try {
-            const pickedComp = await pickPresetWithModal(wrappedGetAllSharedCompositions);
+            const pickedComp = await pickPresetWithModal(
+              wrappedGetAllSharedCompositions,
+              undefined,
+              CompositionCustomDetails
+            );
             compID = pickedComp.id;
           } catch (err) {
             if (!err) {

@@ -51,12 +51,26 @@ export const saveSynthPreset = async (preset: {
   });
 };
 
+const parseCompositionDefinition = (composition: CompositionDefinition): CompositionDefinition => {
+  if (typeof composition.createdAt === 'string') {
+    composition.createdAt = new Date(composition.createdAt);
+  }
+  if (composition.versions) {
+    for (const version of composition.versions) {
+      if (typeof version.createdAt === 'string') {
+        version.createdAt = new Date(version.createdAt);
+      }
+    }
+  }
+  return composition;
+};
+
 export const fetchAllSharedCompositions = (): Promise<Omit<CompositionDefinition, 'content'>[]> =>
   fetch(`${BACKEND_BASE_URL}/compositions`).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }
-    return res.json();
+    return ((await res.json()) as CompositionDefinition[]).map(parseCompositionDefinition);
   });
 
 export const getExistingCompositionTags = async (): Promise<{ name: string; count: number }[]> =>
@@ -76,8 +90,7 @@ export const getLoadedComposition = async (compositionID: string | number) => {
     alert(`Error loading composition: ${await res.text()}`);
     return;
   }
-  const composition: CompositionDefinition = await res.json();
-  return composition;
+  return parseCompositionDefinition(await res.json());
 };
 
 export const saveComposition = async (
@@ -165,10 +178,20 @@ export interface SavedMIDIComposition {
   tags: string[];
   userId: number | null | undefined;
   userName: string | null | undefined;
+  createdAt?: Date | null;
 }
 
+const parseSavedMIDIComposition = (composition: SavedMIDIComposition): SavedMIDIComposition => {
+  if (typeof composition.createdAt === 'string') {
+    composition.createdAt = new Date(composition.createdAt);
+  }
+  return composition;
+};
+
 export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]> =>
-  fetch(`${BACKEND_BASE_URL}/midi_compositions`).then(res => res.json());
+  fetch(`${BACKEND_BASE_URL}/midi_compositions`).then(async res =>
+    ((await res.json()) as SavedMIDIComposition[]).map(parseSavedMIDIComposition)
+  );
 
 export const saveMIDIComposition = async (
   name: string,
@@ -186,9 +209,12 @@ export const saveMIDIComposition = async (
   });
 };
 
-export const getExistingMIDICompositionTags = async (): Promise<
-  { name: string; count: number }[]
-> =>
+interface MIDICompositionTag {
+  name: string;
+  count: number;
+}
+
+export const getExistingMIDICompositionTags = async (): Promise<MIDICompositionTag[]> =>
   fetch(`${BACKEND_BASE_URL}/midi_composition_tags`).then(async res => {
     if (!res.ok) {
       throw await res.text();

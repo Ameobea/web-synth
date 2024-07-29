@@ -241,6 +241,10 @@ export function mkGenericPresetPicker<T>(
   >;
 }
 
-export function pickPresetWithModal<T>(getPresets: () => Promise<PresetDescriptor<T>[]>) {
-  return renderModalWithControls(mkGenericPresetPicker(getPresets));
+export function pickPresetWithModal<T>(
+  getPresets: () => Promise<PresetDescriptor<T>[]>,
+  style?: React.CSSProperties,
+  CustomPresetInfo?: React.FC<CustomPresetInfoProps<T>>
+) {
+  return renderModalWithControls(mkGenericPresetPicker(getPresets, style, CustomPresetInfo));
 }
