@@ -4,7 +4,7 @@ import { shallowEqual } from 'react-redux';
 import type { SequencerMark, SequencerReduxInfra, SequencerReduxState } from '../redux';
 import InputSelect from './InputSelect';
 import SequencerSettings from './SequencerSettings';
-import './SequencerUI.scss';
+import './SequencerUI.css';
 
 import FlatButton from 'src/misc/FlatButton';
 import ConfigureMark from 'src/sequencer/SequencerUI/ConfigureMark';

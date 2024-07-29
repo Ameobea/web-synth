@@ -6,6 +6,7 @@
     width: 20px;
     padding: 0;
   }
+
   button:hover {
     font-weight: bold;
   }
@@ -58,15 +59,16 @@
 
   svg {
     position: fixed;
-  }
-  svg .x-axis,
-  svg .y-axis {
-    text {
+
+    .x-axis text,
+    .y-axis text {
       font: 10px sans-serif;
     }
 
-    path,
-    line {
+    .x-axis path,
+    .x-axis line,
+    .y-axis path,
+    .y-axis line {
       fill: none;
       shape-rendering: crispEdges;
     }

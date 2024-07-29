@@ -5,10 +5,10 @@
 .granulator {
   margin-left: 10px;
   margin-right: 10px;
+}
 
-  hr {
-    margin-top: 20px;
-  }
+.granulator hr {
+  margin-top: 20px;
 }
 
 .waveform-renderer {
@@ -21,6 +21,7 @@
   display: none;
   cursor: ew-resize;
 }
+
 .granulator-end-bar {
   stroke: rgb(168, 0, 28);
   stroke-width: 4px;
@@ -32,10 +33,10 @@
   position: absolute;
   left: 10px;
   z-index: 2;
+}
 
-  > * {
-    z-index: 2;
-  }
+.granulator-overlay > * {
+  z-index: 2;
 }
 
 .granulator-selection-indicator {
@@ -43,12 +44,10 @@
   cursor: grab;
 }
 
-.sample-recorder {
-  h2 {
-    text-align: center;
-    margin-bottom: 12px;
-    margin-top: 8px;
-  }
+.sample-recorder h2 {
+  text-align: center;
+  margin-bottom: 12px;
+  margin-top: 8px;
 }
 
 .sample-editor-stats {
@@ -57,26 +56,26 @@
   margin-top: 20px;
   margin-bottom: 20px;
   background-color: #232323;
+}
 
-  .sample-editor-stats-item {
-    display: flex;
-    flex-direction: row;
-    margin-right: 6px;
-    margin-bottom: 6px;
-    padding: 2px;
+.sample-editor-stats .sample-editor-stats-item {
+  display: flex;
+  flex-direction: row;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  padding: 2px;
+}
 
-    .sample-editor-stats-item-label {
-      display: block;
-      margin-right: 10px;
-      font-weight: bold;
+.sample-editor-stats .sample-editor-stats-item .sample-editor-stats-item-label {
+  display: block;
+  margin-right: 10px;
+  font-weight: bold;
+}
 
-      ::after {
-        content: ':';
-      }
-    }
+.sample-editor-stats .sample-editor-stats-item .sample-editor-stats-item-label::after {
+  content: ':';
+}
 
-    .sample-editor-stats-item-value {
-      display: block;
-    }
-  }
+.sample-editor-stats .sample-editor-stats-item .sample-editor-stats-item-value {
+  display: block;
 }

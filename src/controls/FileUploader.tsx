@@ -1,6 +1,6 @@
 import React from 'react';
 
-import './FileUploader.scss';
+import './FileUploader.css';
 
 interface ControlPanelCustomComponentProps<T> {
   value: T;

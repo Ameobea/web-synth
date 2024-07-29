@@ -26,7 +26,7 @@
     padding: 4px 2px;
   }
 
-  .global-menu-item:hover {
+  global-menu-item:hover {
     background-color: #666;
   }
 
@@ -90,5 +90,3 @@
   left: 0;
   top: 0;
 }
-
-

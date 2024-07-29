@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import './GlobalVolume.scss';
+import './GlobalVolume.css';
 import { getEngine } from 'src/util';
 
 interface ViewContextDescriptor {

@@ -11,5 +11,12 @@
   "importOrderMergeDuplicateImports": true,
   "importOrderParserPlugins": ["typescript", "jsx", "decorators-legacy"],
   "importOrderBuiltinModulesToTop": true,
-  "parser": "babel-ts"
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "options": {
+        "parser": "babel-ts"
+      }
+    }
+  ]
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import './MidiImportDialog.scss';
+import './MidiImportDialog.css';
 import { renderModalWithControls } from './Modal';
 
 export interface MidiTrackInfo {

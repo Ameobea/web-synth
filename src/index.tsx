@@ -18,6 +18,8 @@ import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
 import { createGlobalToaster } from 'src/misc/GlobalToaster';
 import { registerBackForwardsMouseHandlers } from 'src/globalInputHandlers';
+import './index.css';
+import './colors.css';
 
 initGlobals();
 

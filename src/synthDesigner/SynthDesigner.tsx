@@ -1,14 +1,13 @@
-import * as R from 'ramda';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useSelector } from 'react-redux';
 
-import './SynthDesigner.scss';
+import './SynthDesigner.css';
 import { saveSynthPreset } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, type ReduxStore } from 'src/redux';
-import { voicePresetIdsSelector } from 'src/redux/modules/presets';
+import { type SynthPresetEntry, type SynthVoicePresetEntry } from 'src/redux/modules/presets';
 import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import {
   get_synth_designer_audio_connectables,
@@ -18,7 +17,11 @@ import {
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { buildWavyJonesInstance, type WavyJones } from 'src/visualizations/WavyJones';
 import SynthModuleComp from './SynthModule';
-import { UnreachableError } from 'src/util';
+import {
+  mkGenericPresetPicker,
+  type PresetDescriptor,
+} from 'src/controls/GenericPresetPicker/GenericPresetPicker';
+import { renderModalWithControls } from 'src/controls/Modal';
 
 interface AddModuleControlsProps {
   stateKey: string;
@@ -32,14 +35,8 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
   synthDesignerActionCreators,
   synthDesignerDispatch,
 }) => {
-  const { voicePresets, voicePresetIds } = useSelector(
-    (state: ReduxStore) => ({
-      voicePresets: state.presets.voicePresets,
-      voicePresetIds: voicePresetIdsSelector(state),
-    }),
-    shallowEqual
-  );
-  const controlPanelContext = useRef<{ [label: string]: any } | undefined>();
+  const voicePresets = useSelector((state: ReduxStore) => state.presets.voicePresets, shallowEqual);
+
   const settings = useMemo(() => {
     if (typeof voicePresets === 'string') {
       return [];
@@ -47,53 +44,52 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
 
     return [
       {
-        label: 'preset',
-        type: 'select',
-        options: { blank: 'blank', ...voicePresetIds },
-        initial: 'blank',
-      },
-      {
-        label: 'add synth module',
+        label: 'add empty',
         type: 'button',
         action: () => {
-          if (!controlPanelContext.current) {
-            throw new Error('Control panel context not set!');
+          const vcId = stateKey.split('_')[1]!;
+          synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
+          const newConnectables = get_synth_designer_audio_connectables(stateKey);
+          updateConnectables(vcId, newConnectables);
+        },
+      },
+      {
+        label: 'add from preset',
+        type: 'button',
+        disabled: !Array.isArray(voicePresets),
+        action: async () => {
+          if (!Array.isArray(voicePresets)) {
+            return;
           }
 
-          const selectedVoicePresetId: number = controlPanelContext.current['preset'];
-          const selectedVoicePreset = voicePresets?.[selectedVoicePresetId]?.body;
+          let pickedPreset: PresetDescriptor<SynthVoicePresetEntry>;
+          try {
+            pickedPreset = await renderModalWithControls(
+              mkGenericPresetPicker(() =>
+                voicePresets.map(preset => ({ ...preset, preset, name: preset.title }))
+              )
+            );
+          } catch (_err) {
+            return; // cancelled
+          }
 
           const vcId = stateKey.split('_')[1]!;
           synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           synthDesignerDispatch(
-            synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, selectedVoicePreset)
+            synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, pickedPreset.preset.body)
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           updateConnectables(vcId, newConnectables);
         },
       },
     ];
-  }, [
-    stateKey,
-    synthDesignerActionCreators.synthDesigner,
-    synthDesignerDispatch,
-    voicePresetIds,
-    voicePresets,
-  ]);
+  }, [stateKey, synthDesignerActionCreators.synthDesigner, synthDesignerDispatch, voicePresets]);
 
   if (typeof voicePresets === 'string') {
     return <>Loading...</>;
   }
 
-  return (
-    <ControlPanel
-      title='voice preset'
-      contextCb={(ctx: { [label: string]: any }) => {
-        controlPanelContext.current = ctx;
-      }}
-      settings={settings}
-    />
-  );
+  return <ControlPanel title='module' settings={settings} />;
 };
 
 interface FullPresetControlsProps {
@@ -110,12 +106,6 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
   dispatch,
 }) => {
   const synthPresets = useSelector((state: ReduxStore) => state.presets.synthPresets, shallowEqual);
-  const [state, setState] = useState<{ preset: number | undefined | null }>({ preset: undefined });
-  useEffect(() => {
-    if (typeof synthPresets !== 'string' && !state.preset && synthPresets.length > 0) {
-      setState({ preset: synthPresets[0]?.id });
-    }
-  }, [synthPresets, state]);
 
   const settings = useMemo(() => {
     if (typeof synthPresets === 'string') {
@@ -124,17 +114,23 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
 
     return [
       {
-        label: 'preset',
-        type: 'select',
-        options: Object.fromEntries(synthPresets.map(preset => [preset.title, preset.id])),
-        initial: synthPresets[0]?.id,
-      },
-      {
         type: 'button',
         label: 'load full preset',
-        action: () => {
-          if (R.isNil(state.preset)) {
+        disabled: !Array.isArray(synthPresets),
+        action: async () => {
+          if (!Array.isArray(synthPresets)) {
             return;
+          }
+
+          let pickedPreset: PresetDescriptor<SynthPresetEntry>;
+          try {
+            pickedPreset = await renderModalWithControls(
+              mkGenericPresetPicker(() =>
+                synthPresets.map(preset => ({ ...preset, preset, name: preset.title }))
+              )
+            );
+          } catch (_err) {
+            return; // cancelled
           }
 
           const synths = getState().synthDesigner.synths;
@@ -151,11 +147,7 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
             }
           }
 
-          dispatch(
-            actionCreators.synthDesigner.SET_SYNTH_PRESET(
-              synthPresets.find(preset => preset.id == state.preset)!
-            )
-          );
+          dispatch(actionCreators.synthDesigner.SET_SYNTH_PRESET(pickedPreset.preset));
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           const vcId = stateKey.split('_')[1]!;
           updateConnectables(vcId, newConnectables);
@@ -177,27 +169,13 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
         },
       },
     ];
-  }, [synthPresets, state.preset, dispatch, actionCreators.synthDesigner, stateKey, getState]);
+  }, [actionCreators.synthDesigner, dispatch, getState, stateKey, synthPresets]);
 
   if (typeof synthPresets === 'string') {
     return <>Loading...</>;
   }
 
-  return (
-    <ControlPanel
-      title='synth preset'
-      state={state}
-      settings={settings}
-      onChange={(key: string, val: any, _state: any) => {
-        if (key === 'preset') {
-          setState({ preset: val });
-          return;
-        }
-
-        throw new UnreachableError();
-      }}
-    />
-  );
+  return <ControlPanel title='synth' settings={settings} />;
 };
 
 const FullPresetControls = React.memo(FullPresetControlsInner);

@@ -1,5 +1,3 @@
-@import 'src/colors.scss';
-
 @keyframes borderColor {
   0% {
     border-color: #0a414e;
@@ -52,7 +50,7 @@
     text-align: center;
     text-transform: uppercase;
     color: #ddd;
-    min-height: 20px;
+    min-height: 22px;
   }
 
   .operator-square,
@@ -92,11 +90,10 @@
 
       .operator-select {
         cursor: pointer;
-        background-color: $highlight-2;
+        background-color: var(--highlight-2);
       }
       .operator-select[data-hovered='true'] {
-        $hover-color: lighten($highlight-2, 0.4);
-        background-color: mix($hover-color, $highlight-3, $weight: 40%);
+        background-color: #a1b95d;
       }
       .operator-select.operator-selected {
         background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);
@@ -104,7 +101,7 @@
         animation: borderColor 15s infinite linear, selectedUI 8s ease infinite;
       }
       .operator-select.operator-selected[data-hovered='true'] {
-        background: mix(#ff0, #e8180e, $weight: 40%);
+        background: #f17408;
       }
 
       .operator-square {
@@ -153,7 +150,7 @@
     flex-direction: row;
 
     .main-effect-chain-selector {
-      background-color: $highlight-5;
+      background-color: var(--highlight-5);
       text-align: center;
       cursor: pointer;
       padding: 3px;
@@ -175,7 +172,7 @@
       flex: 0;
       margin-left: 4px;
       padding-top: 2px;
-      background-color: $highlight-5;
+      background-color: var(--highlight-5);
       border: 1px solid #181818;
       padding: 0px 0px 2px 0px;
       max-height: 24px;

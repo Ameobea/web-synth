@@ -87,11 +87,3 @@ export const fetchSynthVoicePresets = async () => {
   );
   dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS(presets));
 };
-
-export const voicePresetIdsSelector = createSelector(
-  (state: ReduxStore) => state.presets.voicePresets,
-  (voicePresets): { [title: string]: number } =>
-    typeof voicePresets === 'string'
-      ? {}
-      : voicePresets.reduce((acc, { id, title }) => ({ ...acc, [title]: id }), {})
-);

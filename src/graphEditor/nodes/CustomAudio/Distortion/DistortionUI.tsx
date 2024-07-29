@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import './DistortionUI.scss';
+import './DistortionUI.css';
 
 const DistortionUI: React.FC<{ onChange: (newValue: number) => void }> = ({ onChange }) => {
   const settings = useMemo(

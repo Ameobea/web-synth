@@ -4,7 +4,7 @@ import { useDrag, useDrop, DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import { GlobalVolumeSlider } from './GlobalVolumeSlider';
-import './ViewContextManager.scss';
+import './ViewContextManager.css';
 import {
   getIsGlobalBeatCounterStarted,
   registerGlobalStartCB,

@@ -159,28 +159,8 @@ run-frontend:
   yarn start
 
 deploy:
-  # cd backend && just docker-build
-  # docker tag ameo/notes-backend:latest $BACKEND_IMAGE_NAME
-  # docker push $BACKEND_IMAGE_NAME
+  # cd backend && just build-and-deploy
 
-  # cd faust-compiler && just docker-build
-  # docker tag ameo/faust-compiler-server:latest $FAUST_COMPILER_IMAGE_NAME
-  # docker push $FAUST_COMPILER_IMAGE_NAME
-
-  # gcloud config set run/region $GCLOUD_REGION
-
-  # gcloud beta run deploy $BACKEND_SERVICE_NAME \
-  #   --platform managed \
-  #   --set-env-vars="ROCKET_DATABASES=$ROCKET_DATABASES,AUTH_TOKEN=$AUTH_TOKEN,ROCKET_ADDRESS=0.0.0.0" \
-  #   --image $BACKEND_IMAGE_NAME
-
-  # gcloud beta run deploy $FAUST_COMPILER_SERVICE_NAME \
-  #   --platform managed \
-  #   --set-env-vars="FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js,SOUL_WORKLET_TEMPLATE_FILE_NAME=/opt/SoulAWP.template.js,AUTH_TOKEN=$AUTH_TOKEN" \
-  #   --image $FAUST_COMPILER_IMAGE_NAME
-
-  # just build-all
-  # phost update notes patch ./dist
   rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" ./dist/* debian@synth.ameo.dev:/var/www/synth.ameo.dev/
 
 deploy-headless:
@@ -188,13 +168,6 @@ deploy-headless:
 
 loc:
   tokei --exclude src/vocalSynthesis/hts_engine_API --exclude src/vocalSynthesis/sinsy .
-
-build-docker-ci:
-  docker build -t $CI_BUILDER_DOCKER_IMAGE_NAME -f Dockerfile.CI .
-
-push-docker-ci:
-  docker login docker.pkg.github.com --username $GITHUB_USERNAME -p $GITHUB_TOKEN
-  docker push $CI_BUILDER_DOCKER_IMAGE_NAME
 
 debug-engine:
   cd ./engine/engine && cargo build --target wasm32-unknown-unknown && \

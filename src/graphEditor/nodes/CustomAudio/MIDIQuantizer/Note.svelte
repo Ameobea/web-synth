@@ -16,7 +16,7 @@
   <slot />
 </div>
 
-<style lang="scss">
+<style lang="css">
   .note {
     box-sizing: border-box;
     display: flex;

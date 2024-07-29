@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 import { createRoot } from 'react-dom/client';
 
-import './fmDemo.scss';
+import './fmDemo.css';
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
 import FilterConfig from 'src/fmDemo/FilterConfig';
 import { Presets, type SerializedFMSynthDemoState } from 'src/fmDemo/presets';
@@ -15,7 +15,8 @@ import FMSynth, {
   FilterParamControlSource,
   type Adsr,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import 'src/index.scss';
+import 'src/index.css';
+import 'src/colors.css';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import BrowserNotSupported from 'src/misc/BrowserNotSupported';

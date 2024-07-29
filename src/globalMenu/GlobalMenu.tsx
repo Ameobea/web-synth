@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 import React, { useEffect, useRef, useState } from 'react';
 
-import './GlobalMenu.scss';
+import './GlobalMenu.css';
 import { useQuery } from 'react-query';
 
 import { getLoggedInUsername } from 'src/api';

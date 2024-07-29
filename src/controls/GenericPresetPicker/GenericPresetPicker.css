@@ -71,15 +71,15 @@
     padding: 2px 4px;
     cursor: pointer;
     border-bottom: 1px solid #5d5d5d;
-  }
 
-  .generic-preset-picker-row[data-selected='true'] {
-    background-color: #04d6cf66;
-    color: #fff;
-  }
+    &[data-selected='true'] {
+      background-color: #04d6cf66;
+      color: #fff;
+    }
 
-  .generic-preset-picker-row:hover {
-    background-color: #646464aa;
+    &:hover {
+      background-color: #646464aa;
+    }
   }
 }
 
@@ -160,13 +160,13 @@
   border: 1px solid #ccc;
   border-radius: 9px;
   user-select: none;
-}
 
-.tag-picker-tag[data-selected='false']:hover {
-  background-color: rgb(141, 69, 129);
-}
+  &[data-selected='false']:hover {
+    background-color: rgb(141, 69, 129);
+  }
 
-.tag-picker-tag[data-selected='true'] {
-  background-color: rgb(182, 59, 161);
-  color: #fff;
+  &[data-selected='true'] {
+    background-color: rgb(182, 59, 161);
+    color: #fff;
+  }
 }

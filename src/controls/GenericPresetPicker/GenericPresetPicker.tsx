@@ -16,7 +16,7 @@ import {
 import { genericPresetDispatch, store, type ReduxStore } from 'src/redux';
 import { genericPresetPickerActions } from 'src/redux/modules/genericPresetPicker';
 // prettier-ignore
-import './GenericPresetPicker.scss';
+import './GenericPresetPicker.css';
 
 interface SearchBarProps {
   value: string;

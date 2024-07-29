@@ -16,3 +16,11 @@ run:
 
 release:
   cargo run --release
+
+build-and-deploy:
+  #!/bin/bash
+
+  just docker-build
+  docker save ameo/notes-backend:latest | bzip2 > /tmp/notes-backend.tar.bz2
+  scp /tmp/notes-backend.tar.bz2 debian@ameo.dev:/tmp/notes-backend.tar.bz2
+  ssh debian@ameo.dev -t "cat /tmp/notes-backend.tar.bz2 | bunzip2 | docker load && docker kill web-synth-backend && docker container rm web-synth-backend && docker run -d --name web-synth-backend --restart always -p 5400:5400 -e ROCKET_DATABASES='$ROCKET_DATABASES' -e AUTH_TOKEN='$AUTH_TOKEN' -e PORT=5400 -e ROCKET_PORT=5400 ameo/notes-backend:latest && rm /tmp/notes-backend.tar.bz2" && rm /tmp/notes-backend.tar.bz2

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { Keyboard, Piano } from 'react-piano';
 
 import 'react-piano/dist/styles.css';
-import './MidiKeyboard.scss';
+import './MidiKeyboard.css';
 import { UnreachableError } from 'src/util';
 
 const MIDI_NOTES_PER_OCTAVE = 12 as const;

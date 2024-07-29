@@ -125,18 +125,18 @@
   </div>
 </div>
 
-<style lang="scss">
+<style lang="css">
   .midi-quantizer-node-ui {
     width: 500px;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 0px 8px;
+  }
 
-    h3 {
-      margin-top: 8px;
-      margin-bottom: 4px;
-    }
+  .midi-quantizer-node-ui h3 {
+    margin-top: 8px;
+    margin-bottom: 4px;
   }
 
   .octave-range {
@@ -162,20 +162,20 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+  }
 
-    .note-row {
-      display: flex;
-      flex-direction: row;
-      align-items: flex-start;
-      flex: 1;
-      width: 100%;
-      margin-bottom: 4px;
-      box-sizing: border-box;
+  .active-note-select .note-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    flex: 1;
+    width: 100%;
+    margin-bottom: 4px;
+    box-sizing: border-box;
+  }
 
-      .note-spacer {
-        width: 30px;
-        height: 30px;
-      }
-    }
+  .active-note-selecg .note-row .note-spacer {
+    width: 30px;
+    height: 30px;
   }
 </style>

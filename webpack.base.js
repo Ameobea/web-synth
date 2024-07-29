@@ -35,25 +35,6 @@ const config = {
         use: ['style-loader', 'css-loader'],
       },
       {
-        test: /\.scss$/,
-        use: [
-          {
-            loader: 'style-loader',
-          },
-          {
-            loader: 'css-loader',
-          },
-          {
-            loader: 'sass-loader',
-            options: {
-              sassOptions: {
-                includePaths: ['src'],
-              },
-            },
-          },
-        ],
-      },
-      {
         test: /\.svelte$/,
         use: {
           loader: 'svelte-loader',

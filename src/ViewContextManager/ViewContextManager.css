@@ -1,5 +1,3 @@
-@import 'colors.scss';
-
 #view-context-manager {
   position: absolute;
   right: 0;
@@ -23,14 +21,14 @@
   color: #fff;
   border: 1px solid #666;
   cursor: pointer;
-  background-color: $highlight-5;
+  background-color: var(--highlight-5);
   font-size: 13.5px;
   user-select: none;
 }
 
 input.view-context-switcher-tab-renamer {
   width: 90%;
-  background-color: $highlight-2;
+  background-color: var(--highlight-2);
   color: #111;
   margin-right: 5%;
   margin-left: 5%;
@@ -41,16 +39,16 @@ input.view-context-switcher-tab-renamer {
 }
 
 .vc-close-tab-icon {
-  color: $highlight-4;
+  color: var(--highlight-4);
   font-size: 20px;
   font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
   margin-right: 4px;
   margin-left: 3px;
   cursor: pointer;
-}
 
-.vc-close-tab-icon:hover {
-  font-weight: bolder;
+  &:hover {
+    font-weight: bolder;
+  }
 }
 
 .vc-switcher-tab-title {

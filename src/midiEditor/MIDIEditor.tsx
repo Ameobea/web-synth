@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
-import './MIDIEditor.scss';
+import './MIDIEditor.css';
 
 import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';

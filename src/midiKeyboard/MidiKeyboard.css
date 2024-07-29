@@ -30,6 +30,7 @@
     text-align: center;
     width: 20px;
   }
+
   .octave-changer {
     display: flex;
     flex-direction: column;
@@ -38,9 +39,11 @@
     button:nth-child(1) {
       margin-bottom: 1px;
     }
+
     button:nth-child(2) {
       margin-top: 2px;
     }
+
     button {
       flex: 1;
       width: 40px;

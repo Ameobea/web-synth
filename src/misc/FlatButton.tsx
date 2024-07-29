@@ -1,6 +1,6 @@
 import React, { type ButtonHTMLAttributes } from 'react';
 
-import './FlatButton.scss';
+import './FlatButton.css';
 
 const FlatButton: React.FC<ButtonHTMLAttributes<HTMLButtonElement>> = ({ ...props }) => (
   <button

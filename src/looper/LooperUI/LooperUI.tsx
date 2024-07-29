@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { shallowEqual, useSelector } from 'react-redux';
 
-import './LooperUI.scss';
+import './LooperUI.css';
 import {
   fetchLooperPresets,
   getExistingLooperPresetTags,

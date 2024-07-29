@@ -8,7 +8,7 @@ import type { PresetDescriptor } from 'src/controls/GenericPresetPicker/GenericP
 import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import { withReactQueryClient } from 'src/reactUtils';
-import './GenericPresetPicker.scss';
+import './GenericPresetPicker.css';
 
 interface GenericPresetSaverArgs {
   getExistingTags?: () => Promise<{ name: string; count?: number }[]>;

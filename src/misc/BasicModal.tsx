@@ -1,6 +1,6 @@
 import React from 'react';
 
-import './BasicModal.scss';
+import './BasicModal.css';
 import { filterNils } from 'src/util';
 
 const BasicModal: React.FC<React.DetailsHTMLAttributes<HTMLDivElement>> = ({

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import './GlobalVolume.scss';
+import './GlobalVolume.css';
 
 const ctx = new AudioContext();
 

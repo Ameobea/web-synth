@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { shallowEqual, useDispatch, useSelector } from 'react-redux';
 
-import './MidiKeyboardOutputMappingConfigurator.scss';
+import './MidiKeyboardOutputMappingConfigurator.css';
 
 import { RangeInput } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/RangeInput';
 import {

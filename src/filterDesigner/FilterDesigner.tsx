@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 
 import d3 from './d3';
-import './FilterDesigner.scss';
+import './FilterDesigner.css';
 import {
   connectFilterChain,
   deserializeFilterDesigner,

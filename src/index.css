@@ -1,21 +1,21 @@
 * {
   scrollbar-color: rgb(27, 27, 27);
 
-  ::-webkit-scrollbar {
+  &::-webkit-scrollbar {
     width: 12px;
     height: 12px;
   }
 
-  ::-webkit-scrollbar-track {
+  &::-webkit-scrollbar-track {
     background: rgb(27, 27, 27);
   }
 
-  ::-webkit-scrollbar-thumb {
+  &::-webkit-scrollbar-thumb {
     background: #424242;
     outline: 1px solid #333;
   }
 
-  ::-webkit-scrollbar-corner {
+  &::-webkit-scrollbar-corner {
     background: rgb(27, 27, 27);
   }
 }
@@ -36,32 +36,16 @@ body {
   width: 100%;
 }
 
-svg.notes {
-  background-color: transparent;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
 main#content {
   left: 0;
   top: 32px;
   position: absolute;
 }
 
-#canvases {
-  height: 100vh;
-  width: 100vw;
-  overflow-x: hidden;
-}
-
-#canvases-wrapper {
-  position: relative;
-}
-
 a {
   color: #ff2e88;
 }
+
 a:visited {
   color: #a89984;
 }

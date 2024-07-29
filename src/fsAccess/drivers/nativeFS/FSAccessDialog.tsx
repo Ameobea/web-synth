@@ -1,6 +1,6 @@
 import React from 'react';
 
-import './FSAccessDialog.scss';
+import './FSAccessDialog.css';
 
 const FSAccessDialog: React.FC<{
   onSubmit: (val: void) => void;

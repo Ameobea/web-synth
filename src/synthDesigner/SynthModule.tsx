@@ -80,7 +80,11 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
             description: true,
           });
           const presetBody = getVoicePreset(stateKey, index);
-          await saveSynthVoicePreset({ title, description: description ?? '', body: presetBody });
+          try {
+            await saveSynthVoicePreset({ title, description: description ?? '', body: presetBody });
+          } catch (_err) {
+            // cancelled
+          }
         },
       },
     ];
@@ -211,7 +215,7 @@ const SynthControlPanelInner: React.FC<SynthControlPanelProps> = props => {
   const settings = useMemo(() => buildSynthControlPanelSettings(vcId), [vcId]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'rgb(35, 35, 35)' }}>
       <ControlPanel
         title='SYNTH'
         settings={settings}

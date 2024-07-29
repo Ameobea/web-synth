@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
 import ReactControlPanel from 'react-control-panel';
 
-import './RangeInput.scss';
+import './RangeInput.css';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 import type { Writable } from 'svelte/store';
 import ResponsePlotSvelte from './ResponsePlot.svelte';

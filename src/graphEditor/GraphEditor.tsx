@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 import { shallowEqual, useSelector } from 'react-redux';
 
-import './GraphEditor.scss';
+import './GraphEditor.css';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';

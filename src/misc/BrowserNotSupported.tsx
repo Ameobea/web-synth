@@ -1,8 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import './BrowserNotSupported.scss';
-import 'src/index.scss';
+import './BrowserNotSupported.css';
+import 'src/index.css';
+import 'src/colors.css';
 import { ANewTab } from 'src/reactUtils';
 
 const BrowserNotSupported: React.FC<{ mobileSupported?: boolean }> = ({

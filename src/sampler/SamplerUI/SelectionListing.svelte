@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SamplerSelection } from 'src/sampler/sampler';
-  import '../../controls/GenericPresetPicker/GenericPresetPicker.scss';
+  import '../../controls/GenericPresetPicker/GenericPresetPicker.css';
   import SelectionListingItem from 'src/sampler/SamplerUI/SelectionListingItem.svelte';
   import type { Writable } from 'svelte/store';
 

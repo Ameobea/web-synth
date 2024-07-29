@@ -4,7 +4,7 @@ import ControlPanel from 'react-control-panel';
 import type { Writable } from 'svelte/store';
 
 import ConfigureOperator, { type OperatorConfig, type WavetableState } from './ConfigureOperator';
-import './FMSynth.scss';
+import './FMSynth.css';
 import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureModulationIndex from 'src/fmSynth/ConfigureModulationIndex';
 import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';

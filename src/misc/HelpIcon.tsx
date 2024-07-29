@@ -2,7 +2,7 @@ import React from 'react';
 import { Tooltip, type Position } from 'react-tippy';
 
 import 'react-tippy/dist/tippy.css';
-import './HelpIcon.scss';
+import './HelpIcon.css';
 
 interface HelpIconIconProps
   extends React.DetailedHTMLProps<React.HTMLAttributes<SVGSVGElement>, SVGSVGElement> {

@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 import { useSelector } from 'react-redux';
 
-import './SinsyUI.scss';
+import './SinsyUI.css';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
 import { actionCreators, dispatch, type ReduxStore } from 'src/redux';
 import { loadHTSVoice } from 'src/vocalSynthesis/sinsyViewContext';

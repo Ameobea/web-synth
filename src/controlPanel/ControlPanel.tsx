@@ -2,7 +2,7 @@ import { Option } from 'funfix-core';
 import * as R from 'ramda';
 import React, { Suspense } from 'react';
 
-import './ControlPanel.scss';
+import './ControlPanel.css';
 import { buildControlPanelAudioConnectables } from 'src/controlPanel/getConnectables';
 import Loading from 'src/misc/Loading';
 import type { AudioConnectables } from 'src/patchNetwork';

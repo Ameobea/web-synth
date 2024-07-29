@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
 
-import './SampleLibraryUI.scss';
+import './SampleLibraryUI.css';
 import type { SvelteComponent } from 'svelte';
 
 import Loading from 'src/misc/Loading';
@@ -246,9 +246,8 @@ export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
   </div>
 );
 
-type EmbeddingBrowserUIProps = EmbeddingBrowserUI extends SvelteComponent<infer Props, any>
-  ? Props
-  : never;
+type EmbeddingBrowserUIProps =
+  EmbeddingBrowserUI extends SvelteComponent<infer Props, any> ? Props : never;
 
 const EmbeddingBrowserReactShim =
   mkSvelteComponentShim<EmbeddingBrowserUIProps>(EmbeddingBrowserUI);
