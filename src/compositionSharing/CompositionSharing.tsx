@@ -3,6 +3,7 @@ import React, { Fragment, useCallback, useEffect, useState } from 'react';
 
 import {
   getCurLoadedCompositionId,
+  getLoginToken,
   onBeforeUnload,
   reinitializeWithComposition,
 } from '../persistance';
@@ -26,7 +27,7 @@ import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
 import { getSample, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { NIL_UUID, getEngine } from 'src/util';
+import { NIL_UUID, formatDateTime, getEngine } from 'src/util';
 import { saveSubgraphPreset } from 'src/graphEditor/GraphEditor';
 
 export interface CompositionVersion {
@@ -263,6 +264,14 @@ const serializeAndSaveComposition = async ({
 };
 
 const handleSave = async (parentID: number | null): Promise<number | null> => {
+  if (parentID) {
+    const isLoggedIn = !!(await getLoginToken());
+    if (!isLoggedIn) {
+      alert('You must be logged in to save a new version of a composition');
+      return null;
+    }
+  }
+
   try {
     const {
       name: title,
@@ -272,6 +281,7 @@ const handleSave = async (parentID: number | null): Promise<number | null> => {
       description: true,
       tags: !parentID,
       getExistingTags: getExistingCompositionTags,
+      title: parentID ? 'Save New Version' : 'Save Composition',
     });
 
     getSentry()?.captureMessage('Saving composition', {
@@ -316,17 +326,18 @@ const ShareComposition: React.FC = () => {
   );
 
   return (
-    <>
+    <div className='buttons-section'>
       <button onClick={() => handleSaveInner(null)}>Save as New Composition</button>
       {curEditingCompositionID !== null ? (
         <button onClick={() => handleSaveInner(curEditingCompositionID)}>
           Save as New Version
         </button>
       ) : null}
+      <button onClick={() => saveSubgraphPreset(NIL_UUID, true)}>Save as Subgraph</button>
       {savedCompositionID !== null ? (
         <span style={{ color: 'green' }}>Composition {savedCompositionID} saved successfully!</span>
       ) : null}
-    </>
+    </div>
   );
 };
 
@@ -334,14 +345,12 @@ interface CompositionCreatedAtDisplayProps {
   createdAt: Date | null | undefined;
 }
 
-const DtFormatter = Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short' });
-
 const CompositionCreatedAtDisplay: React.FC<CompositionCreatedAtDisplayProps> = ({ createdAt }) => {
   if (!createdAt) {
     return <i>-</i>;
   }
 
-  return <>{DtFormatter.format(createdAt)}</>;
+  return <>{formatDateTime(createdAt)}</>;
 };
 
 const CompositionCustomDetails: React.FC<
@@ -357,6 +366,7 @@ const CompositionCustomDetails: React.FC<
       <h2>Version History</h2>
       <div className='composition-versions-listing'>
         <Fragment>
+          <div className='composition-id'>{preset.id}</div>
           <div className='composition-title'>
             <i>Original</i>
           </div>
@@ -366,8 +376,9 @@ const CompositionCustomDetails: React.FC<
           <div className='composition-description' />
         </Fragment>
         {(preset.preset.versions ?? []).map(
-          ({ compositionVersion, title, description, createdAt }) => (
+          ({ compositionVersion, title, description, createdAt, id }) => (
             <Fragment key={compositionVersion}>
+              <div className='composition-id'>{id}</div>
               <div className='composition-title'>{title}</div>
               <div className='composition-created-at'>
                 <CompositionCreatedAtDisplay createdAt={createdAt} />
@@ -381,6 +392,58 @@ const CompositionCustomDetails: React.FC<
   );
 };
 
+const LoadComposition: React.FC = () => (
+  <div className='buttons-section'>
+    <button
+      onClick={async () => {
+        const wrappedGetAllSharedCompositions = (): Promise<
+          PresetDescriptor<Omit<CompositionDefinition, 'content'>>[]
+        > =>
+          fetchAllSharedCompositions().then(compositions =>
+            compositions.map(comp => ({ ...comp, name: comp.title, preset: comp }))
+          );
+
+        let compID: string | number = '';
+        try {
+          const pickedComp = await pickPresetWithModal(
+            wrappedGetAllSharedCompositions,
+            undefined,
+            CompositionCustomDetails
+          );
+          compID = pickedComp.id;
+        } catch (err) {
+          if (!err) {
+            return;
+          }
+          console.error(
+            'Error picking composition or getting list of shared compositions from the API: ',
+            err
+          );
+          alert(
+            'Error getting list of compositions from the API or rendering preset picker: ' + err
+          );
+          return;
+        }
+
+        const composition = await getLoadedComposition(compID);
+        if (!composition) {
+          return;
+        }
+        const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
+          R.prop('uuid')
+        );
+        reinitializeWithComposition(
+          { type: 'serialized', value: composition.content, id: +compID },
+          getEngine()!,
+          allViewContextIds
+        );
+      }}
+    >
+      Load Composition
+    </button>
+  </div>
+);
+
 const CompositionSharing: React.FC = () => (
   <div className='composition-sharing'>
     <h2>Share or Load Online Composition</h2>
@@ -391,57 +454,8 @@ const CompositionSharing: React.FC = () => (
 
     <div className='buttons-container'>
       <ShareComposition />
-      <button
-        onClick={async () => {
-          const wrappedGetAllSharedCompositions = (): Promise<
-            PresetDescriptor<Omit<CompositionDefinition, 'content'>>[]
-          > =>
-            fetchAllSharedCompositions().then(compositions =>
-              compositions.map(comp => ({ ...comp, name: comp.title, preset: comp }))
-            );
-
-          let compID: string | number = '';
-          try {
-            const pickedComp = await pickPresetWithModal(
-              wrappedGetAllSharedCompositions,
-              undefined,
-              CompositionCustomDetails
-            );
-            compID = pickedComp.id;
-          } catch (err) {
-            if (!err) {
-              return;
-            }
-            console.error(
-              'Error picking composition or getting list of shared compositions from the API: ',
-              err
-            );
-            alert(
-              'Error getting list of compositions from the API or rendering preset picker: ' + err
-            );
-            return;
-          }
-
-          const composition = await getLoadedComposition(compID);
-          if (!composition) {
-            return;
-          }
-          const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
-            R.prop('uuid')
-          );
-          reinitializeWithComposition(
-            { type: 'serialized', value: composition.content, id: +compID },
-            getEngine()!,
-            allViewContextIds
-          );
-        }}
-      >
-        Load Composition
-      </button>
+      <LoadComposition />
     </div>
-    <button style={{ marginTop: 40 }} onClick={() => saveSubgraphPreset(NIL_UUID, true)}>
-      Save as Subgraph
-    </button>
   </div>
 );
 

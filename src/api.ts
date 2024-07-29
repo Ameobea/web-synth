@@ -53,12 +53,12 @@ export const saveSynthPreset = async (preset: {
 
 const parseCompositionDefinition = (composition: CompositionDefinition): CompositionDefinition => {
   if (typeof composition.createdAt === 'string') {
-    composition.createdAt = new Date(composition.createdAt);
+    composition.createdAt = new Date(`${composition.createdAt}Z`);
   }
   if (composition.versions) {
     for (const version of composition.versions) {
       if (typeof version.createdAt === 'string') {
-        version.createdAt = new Date(version.createdAt);
+        version.createdAt = new Date(`${version.createdAt}Z`);
       }
     }
   }
@@ -183,7 +183,7 @@ export interface SavedMIDIComposition {
 
 const parseSavedMIDIComposition = (composition: SavedMIDIComposition): SavedMIDIComposition => {
   if (typeof composition.createdAt === 'string') {
-    composition.createdAt = new Date(composition.createdAt);
+    composition.createdAt = new Date(`${composition.createdAt}Z`);
   }
   return composition;
 };

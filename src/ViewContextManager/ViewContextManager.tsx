@@ -9,6 +9,7 @@ import {
   getIsGlobalBeatCounterStarted,
   registerGlobalStartCB,
   registerGlobalStopCB,
+  setCurBeat,
   startAll,
   stopAll,
   unregisterStartCB,
@@ -18,6 +19,7 @@ import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import type { ReduxStore } from 'src/redux';
 import { getSentry } from 'src/sentry';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
+import RestartPlayback from './Icons/RestartPlayback.svg';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -126,6 +128,26 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
         name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
       >
         {globalBeatCounterStarted ? '⏹️' : '▶️'}
+      </ViewContextIcon>
+      <ViewContextIcon
+        displayName='Start Global Playback From Beginning'
+        onClick={() => {
+          if (globalBeatCounterStarted) {
+            stopAll();
+          }
+          setCurBeat(0);
+          startAll();
+        }}
+        style={{
+          backgroundColor: 'rgb(26, 130, 24)',
+          justifyContent: 'space-around',
+          fontSize: 27,
+        }}
+        name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
+      >
+        <div style={{ display: 'flex', padding: 4, width: 32, height: 24 }}>
+          <RestartPlayback style={{ width: 24, height: 24 }} />
+        </div>
       </ViewContextIcon>
       <ViewContextIcon
         displayName='Set Global Volume'

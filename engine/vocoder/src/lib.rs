@@ -14,7 +14,11 @@ extern "C" {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-extern "C" fn log_err(ptr: *const u8, len: usize) {}
+extern "C" fn log_err(ptr: *const u8, len: usize) {
+  let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
+  let s = std::str::from_utf8(slice).unwrap();
+  eprintln!("{}", s);
+}
 
 const SAMPLE_RATE: usize = 44_100;
 const BAND_ORDER: usize = 16; // 24;

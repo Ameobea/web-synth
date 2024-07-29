@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="113.21778mm"
+   height="113.22433mm"
+   viewBox="0 0 113.21778 113.22433"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1">
+    <marker
+       style="overflow:visible"
+       id="Triangle"
+       refX="0"
+       refY="0"
+       orient="auto"
+       markerWidth="4.5"
+       markerHeight="5.5"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="none"
+       markerUnits="userSpaceOnUse">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135" />
+    </marker>
+  </defs>
+  <g
+     id="layer1"
+     transform="translate(-61.6099,-89.534254)">
+    <path
+       style="fill:none;stroke:#efefef;stroke-width:13.2292;stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Triangle);paint-order:normal"
+       transform="rotate(-53.188987)"
+       d="M -6.4174405,151.89263 C -21.268729,132.4274 -48.030958,126.57985 -69.647498,138.07685 c -21.616538,11.497 -31.727922,36.95619 -23.889769,60.15143 7.838155,23.19524 31.319909,37.30261 55.479411,33.33093 24.159502,-3.97168 41.8891601,-24.85397 41.8891586,-49.33776"
+       id="path1" />
+  </g>
+</svg>

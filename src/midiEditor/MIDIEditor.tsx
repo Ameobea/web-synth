@@ -263,7 +263,13 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           playbackHandler.startRecording(activeInstance.current.managedInst);
         }}
         title={isRecording ? 'Stop recording MIDI' : 'Start recording MIDI'}
-        label={<div style={{ marginLeft: -1 }}>⏺</div>}
+        label={
+          <div style={{ marginLeft: -1 }}>
+            <svg width='46' height='46' xmlns='http://www.w3.org/2000/svg'>
+              <circle cx='23' cy='23' r='12' fill='red' />
+            </svg>
+          </div>
+        }
         style={{
           fontSize: 46,
           textAlign: 'center',
@@ -291,7 +297,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             }}
           />
         }
-        title={state.loopEnabled ? 'Disable Metronome' : 'Enable Metronome'}
+        title={state.metronomeEnabled ? 'Disable Metronome' : 'Enable Metronome'}
         style={{
           fontSize: 15,
           textAlign: 'center',

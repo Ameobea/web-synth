@@ -32,7 +32,7 @@ export type EffectInner =
       bottomFoldPosition: ParamSource;
       bottomFoldWidth: ParamSource;
     }
-  | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource }
+  | { type: 'bitcrusher'; sampleRate: ParamSource; bitDepth: ParamSource; mix?: ParamSource }
   | { type: 'wavefolder'; gain: ParamSource; offset: ParamSource; mix?: ParamSource }
   | {
       type: 'soft clipper';
@@ -116,7 +116,7 @@ export const encodeEffect = (effect: Effect | null): EncodedEffect => {
         2,
         encodeParamSource(effect.sampleRate),
         encodeParamSource(effect.bitDepth),
-        null,
+        encodeParamSource(effect.mix ?? { type: 'constant', value: 1 }),
         null,
       ];
     }

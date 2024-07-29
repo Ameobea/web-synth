@@ -291,6 +291,17 @@ const ConfigureBitcrusher: EffectConfigurator<'bitcrusher'> = ({
       onChange={useCallback(bitDepth => onChange({ bitDepth }), [onChange])}
       vcId={vcId}
     />
+    <ConfigureParamSource
+      title='mix'
+      adsrs={adsrsMemoHelper(state.mix ?? { type: 'constant', value: 1 }, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={bitcrusherTheme}
+      min={0}
+      max={1}
+      state={state.mix ?? { type: 'constant', value: 1 }}
+      onChange={useCallback(mix => onChange({ mix }), [onChange])}
+      vcId={vcId}
+    />
   </>
 );
 

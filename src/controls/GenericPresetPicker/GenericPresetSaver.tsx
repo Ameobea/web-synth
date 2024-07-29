@@ -12,11 +12,22 @@ import './GenericPresetPicker.css';
 
 interface GenericPresetSaverArgs {
   getExistingTags?: () => Promise<{ name: string; count?: number }[]>;
+  /**
+   * Whether to show the description section.
+   *
+   * default: false
+   */
   description?: boolean;
   /**
+   * Whether to show the tags section.
+   *
    * default: true
    */
   tags?: boolean;
+  /**
+   * The title displayed in the modal.
+   */
+  title?: string;
 }
 
 interface TagProps {
@@ -130,7 +141,7 @@ const mkGenericPresetSaver = (args: GenericPresetSaverArgs) => {
 
     return (
       <BasicModal className='generic-preset-saver'>
-        <h2>Save Preset</h2>
+        <h2>{args.title ?? 'Save Preset'}</h2>
 
         <div className='generic-preset-saver-form'>
           <div>

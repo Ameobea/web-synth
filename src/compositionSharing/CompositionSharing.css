@@ -4,47 +4,61 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-}
 
-.composition-sharing h2 {
-  text-align: center;
-  font-size: 32px;
-  margin-bottom: 8px;
-}
+  .buttons-container {
+    display: flex;
+    flex-direction: row;
 
-.composition-sharing p {
-  font-size: 18px;
-}
+    .buttons-section {
+      display: flex;
+      flex-direction: column;
+    }
+  }
 
-.composition-sharing button {
-  margin-top: 20px;
-  margin-left: 50px;
-  margin-right: 50px;
-  height: 40px;
-  width: 400px;
-  font-size: 20px;
+  h2 {
+    text-align: center;
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+
+  p {
+    font-size: 18px;
+  }
+
+  button {
+    margin-top: 20px;
+    margin-left: 50px;
+    margin-right: 50px;
+    height: 40px;
+    width: 400px;
+    font-size: 20px;
+  }
 }
 
 .composition-custom-details {
   padding: 8px;
-}
 
-.composition-custom-details ul {
-  padding-inline-start: 26px;
-}
+  ul {
+    padding-inline-start: 26px;
+  }
 
-.composition-custom-details h2 {
-  margin-top: 6px;
-  text-align: left !important;
-  font-size: 20px;
+  h2 {
+    margin-top: 6px;
+    text-align: left !important;
+    font-size: 20px;
+  }
 }
 
 .composition-versions-listing {
   display: grid;
-  grid-template-columns: fit-content(30%) fit-content(20%) 1fr;
+  grid-template-columns: fit-content(20%) fit-content(30%) fit-content(20%) 1fr;
   grid-template-rows: auto;
   align-items: center;
   gap: 2px;
+}
+
+.composition-id {
+  padding-right: 4px;
 }
 
 .composition-title {
@@ -52,9 +66,13 @@
   font-size: 16px;
 }
 
+.composition-id,
 .composition-created-at {
   font-size: 14px;
   color: #aaa;
+}
+
+.composition-created-at {
   padding-left: 10px;
   padding-right: 10px;
 }

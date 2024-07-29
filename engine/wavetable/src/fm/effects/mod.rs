@@ -192,8 +192,15 @@ impl EffectInstance {
           param_2_float_val_2,
           param_2_float_val_3,
         );
+        let mix = ParamSource::from_parts(
+          param_3_type,
+          param_3_int_val,
+          param_3_float_val,
+          param_3_float_val_2,
+          param_3_float_val_3,
+        );
 
-        EffectInstance::Bitcrusher(Bitcrusher::new(sample_rate, bit_depth))
+        EffectInstance::Bitcrusher(Bitcrusher::new(sample_rate, bit_depth, mix))
       },
       3 => {
         let gain = ParamSource::from_parts(
@@ -488,6 +495,13 @@ impl EffectInstance {
           param_2_float_val,
           param_2_float_val_2,
           param_2_float_val_3,
+        ));
+        bitcrusher.mix.replace(ParamSource::from_parts(
+          param_3_type,
+          param_3_int_val,
+          param_3_float_val,
+          param_3_float_val_2,
+          param_3_float_val_3,
         ));
         return true;
       },
@@ -928,10 +942,7 @@ fn render_effect_params<'a, E: Effect>(
   effect.get_params(&mut params);
 
   for (i, param) in params.into_iter().enumerate() {
-    let param = match param {
-      Some(param) => param,
-      None => return,
-    };
+    let Some(param) = param else { return };
     let output_buf = unsafe { buffers.get_unchecked_mut(i) };
     param.render_raw(inputs, output_buf)
   }

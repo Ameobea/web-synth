@@ -328,3 +328,17 @@ export type IterableValueOf<I> = I extends Iterable<[any, infer V]> ? V : never;
 
 export const filterNils = <T>(arr: (T | null | undefined)[]): T[] =>
   arr.filter((x): x is T => x != null);
+
+const YearFormatter = new Intl.DateTimeFormat('en', { year: 'numeric' });
+const MonthFormatter = new Intl.DateTimeFormat('en', { month: '2-digit' });
+const DayFormatter = new Intl.DateTimeFormat('en', { day: '2-digit' });
+const TimeFormatter = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' });
+
+export const formatDateTime = (date: Date) => {
+  const year = YearFormatter.format(date);
+  const month = MonthFormatter.format(date);
+  const day = DayFormatter.format(date);
+  const time = TimeFormatter.format(date);
+
+  return `${year}-${month}-${day} ${time}`;
+};

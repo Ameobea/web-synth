@@ -50,6 +50,12 @@ declare const process: {
   };
 };
 
+declare module '*.svg' {
+  const ReactComponent: React.FunctionComponent<React.SVGProps<SVGSVGElement> & { title?: string }>;
+
+  export default ReactComponent;
+}
+
 declare global {
   declare function dbg<T>(arg: T): T;
 
