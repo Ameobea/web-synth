@@ -2,6 +2,7 @@ import * as R from 'ramda';
 import React, { Fragment, useCallback, useEffect, useState } from 'react';
 
 import {
+  clearLocalComposition,
   getCurLoadedCompositionId,
   getLoginToken,
   onBeforeUnload,
@@ -432,6 +433,7 @@ const LoadComposition: React.FC = () => (
         const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
           R.prop('uuid')
         );
+        await clearLocalComposition();
         reinitializeWithComposition(
           { type: 'serialized', value: composition.content, id: +compID },
           getEngine()!,

@@ -14,9 +14,10 @@ import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVO
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { renderMIDIMinimap } from 'src/midiEditor/Minimap/MinimapRenderer';
-import { updateConnectables } from 'src/patchNetwork/interface';
+import { connect, updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { AsyncOnce } from 'src/util';
+import { getState } from 'src/redux';
 
 const NoteContainerWasm = new AsyncOnce(() => import('src/note_container'), true);
 
@@ -359,7 +360,7 @@ export class MIDIEditorUIManager {
 
   public addMIDIEditorInstance(defaultActive = true) {
     const instances = get(this.instances);
-    let instName = `midi_${instances.length}`;
+    let instName = 'midi';
     while (
       instances.find(
         inst =>
@@ -476,12 +477,12 @@ export class MIDIEditorUIManager {
 
   public renameInstance(oldName: string, newName: string) {
     const insts = get(this.instances);
-    const cvOutput = insts.find(inst => inst.instance.name === oldName);
-    if (!cvOutput) {
+    const inst = insts.find(inst => inst.instance.name === oldName);
+    if (!inst) {
       console.error(`Could not find CV output with name ${oldName} to rename`);
       return;
     }
-    const output = cvOutput.instance;
+    const output = inst.instance;
 
     while (insts.some(inst => inst.instance.name === newName)) {
       newName = `${newName}_1`;
@@ -489,7 +490,26 @@ export class MIDIEditorUIManager {
     output.name = newName;
 
     this.instances.set(insts);
-    setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));
+
+    const connections = getState().viewContextManager.patchNetwork.connections;
+    const oldInputName = `${oldName}_in`;
+    const oldOutputName = `${oldName}_out`;
+    const connectedInputs = connections.filter(
+      ([_from, to]) => to.vcId === this.vcId && to.name === oldInputName
+    );
+    const connectedOutputs = connections.filter(
+      ([from]) => from.vcId === this.vcId && from.name === oldOutputName
+    );
+    setTimeout(() => {
+      updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId));
+
+      for (const [from, to] of connectedInputs) {
+        connect(from, { ...to, name: `${newName}_in` });
+      }
+      for (const [from, to] of connectedOutputs) {
+        connect({ ...from, name: `${newName}_out` }, to);
+      }
+    });
   }
 
   public gateInstance(instanceID: string, lineIx: number) {

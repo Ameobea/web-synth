@@ -26,6 +26,10 @@
   user-select: none;
 }
 
+.view-context-icon:active {
+  filter: brightness(0.9);
+}
+
 input.view-context-switcher-tab-renamer {
   width: 90%;
   background-color: var(--highlight-2);

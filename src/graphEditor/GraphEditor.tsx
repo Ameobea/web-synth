@@ -92,7 +92,7 @@ export const saveSubgraphPreset = async (subgraphID: string, overrideName = fals
     desc = await renderGenericPresetSaverWithModal({
       description: true,
       getExistingTags: getExistingSubgraphPresetTags,
-      title: 'Save as Subgraph',
+      title: 'Save Subgraph',
     });
   } catch (_err) {
     return; // cancelled

@@ -149,6 +149,8 @@ export const setCurLoadedCompositionId = async (id: number | null) => {
   }
 };
 
+export const clearLocalComposition = () => localCompositionTable.clear();
+
 export const maybeRestoreLocalComposition = async () => {
   const hasSavedLocalComposition = (await localCompositionTable.count()) > 0;
   if (!hasSavedLocalComposition) {
@@ -161,7 +163,7 @@ export const maybeRestoreLocalComposition = async () => {
   Object.entries(savedComp).forEach(([key, val]) => localStorage.setItem(key, val as any));
 
   await currentLoadedCompositionIdTable.clear();
-  await localCompositionTable.clear();
+  await clearLocalComposition();
 };
 
 /**
