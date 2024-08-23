@@ -11,7 +11,7 @@ debug = true
 [dependencies]
 dotenv = "0.15.0"
 
-diesel = { version = "2.0", features = ["mysql", "chrono"] }
+diesel = { version = "2.2", features = ["mysql", "chrono"] }
 
 hex = "0.4"
 
