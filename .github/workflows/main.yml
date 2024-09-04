@@ -11,41 +11,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
         with:
           submodules: 'recursive'
 
       # Caching
-      # \/ Disabled due to (what sems to be) a bug in the `actions/cache` action (issue filed)
+      # \/ Disabled due to (what seems to be) a bug in the `actions/cache` action (issue filed)
       # - name: Cache cargo binaries
       #   id: cache-cargo-binaries
-      #   uses: actions/cache@v1
+      #   uses: actions/cache@v3
       #   with:
       #     path: ~/.cargo/bin
       #     key: ${{ runner.os }}_nightly-2024-07-02_cargo-registry_just-0.5.1_wasm-bindgen-cli-0.2.54
       - name: Cache cargo registry
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-cargo-registry
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache cargo index
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-cargo-index
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache Rust lib build artifacts
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-target-dir
         with:
           path: ./engine/target
           key: ${{ runner.os }}-build-${{ env.cache-name }}_nightly-2024-07-02_${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache node modules
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-node-modules
         with:
@@ -57,20 +57,20 @@ jobs:
             ${{ runner.os }}-
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - uses: actions/cache@v2
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_ENV # Updated set-output to GITHUB_ENV
+      - uses: actions/cache@v3
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          path: ${{ env.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Cache Emscripten
         id: cache-emscripten-system-libraries
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
-          path: ${{env.EM_CACHE_FOLDER}}
-          key: ${{env.EM_VERSION}}-${{ runner.os }}
+          path: ${{ env.EM_CACHE_FOLDER }}
+          key: ${{ env.EM_VERSION }}-${{ runner.os }}
 
       # Set up build environment + toolchains with Rust nightly with Wasm support and NodeJS
       - name: Install minimal Rust nightly
@@ -82,18 +82,18 @@ jobs:
         run: rustup default nightly-2024-07-02
       - name: Install Rust Wasm support
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v3
         with:
           node-version: '17.4'
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v7
         with:
-          version: ${{env.EM_VERSION}}
-          actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
+          version: ${{ env.EM_VERSION }}
+          actions-cache-folder: ${{ env.EM_CACHE_FOLDER }}
       - name: Install SVGO SVG optimizer
         run: yarn global add svgo
       - name: Add globally installed yarn binaries to path
-        run: echo `yarn global bin` >> $GITHUB_PATH
+        run: echo "$(yarn global bin)" >> $GITHUB_PATH
 
       - name: Create custom binaries directory
         run: mkdir ~/bin
@@ -130,7 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
 
       - name: Download built site artifacts
         uses: actions/download-artifact@v4.1.7
