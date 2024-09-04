@@ -124,7 +124,7 @@ jobs:
         uses: actions/upload-artifact@v4.4.0
         with:
           name: dist
-          path: dist
+          path: ./dist
 
   cypress-test:
     runs-on: ubuntu-latest
@@ -136,6 +136,7 @@ jobs:
         uses: actions/download-artifact@v4.1.7
         with:
           name: dist
+          path: ./dist
 
       # Run Cypress tests
       - name: Cypress Run
@@ -173,5 +174,6 @@ jobs:
         uses: actions/download-artifact@v4.1.7
         with:
           name: dist
+          path: ./dist
       - name: Deploy
         run: phost update notes patch ./dist

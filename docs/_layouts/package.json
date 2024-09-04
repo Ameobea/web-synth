@@ -5,7 +5,6 @@
   "version": "1.0.0",
   "dependencies": {
     "gatsby": "^3.0",
-    "gatsby-plugin-gtag": "^1.0.13",
     "gatsby-plugin-plausible": "^0.0.7",
     "gatsby-theme-garden": "=0.1.66",
     "react": "^16.3",
