@@ -121,7 +121,7 @@ jobs:
           FAUST_COMPILER_ENDPOINT: 'https://faust-compiler.ameo.design'
 
       - name: Upload built site as artifacts
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: dist
           path: dist
@@ -150,7 +150,7 @@ jobs:
           # pass the Dashboard record key as an environment variable
           CYPRESS_RECORD_KEY: 58905cf6-d1cb-43de-b6cd-b55954039c1a
       - name: Upload recorded video as an artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4.4.0
         if: failure()
         with:
           name: cypress_recordings
