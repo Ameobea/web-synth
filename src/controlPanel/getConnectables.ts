@@ -36,7 +36,7 @@ export const buildControlPanelAudioConnectables = (
         const instanceState = getState().controlPanel.stateByPanelInstance[vcId];
         return buildControlPanelAudioConnectables(vcId, instanceState);
       },
-      (inputName: string, type: ConnectableType, rxConnectableDescriptor: ConnectableDescriptor) =>
+      (inputName: string, _type: ConnectableType, rxConnectableDescriptor: ConnectableDescriptor) =>
         void dispatch(
           actionCreators.controlPanel.ADD_CONTROL_PANEL_CONNECTION(
             vcId,

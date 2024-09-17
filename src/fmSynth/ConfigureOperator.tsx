@@ -198,8 +198,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
             const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
               .default;
             try {
-              const wavetableBank =
-                await renderSvelteModalWithControls<WavetableBank>(WavetableConfigurator);
+              const wavetableBank = await renderSvelteModalWithControls(WavetableConfigurator);
               setWavetableState({
                 ...wavetableState,
                 wavetableBanks: [wavetableBank],
@@ -259,7 +258,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
               ...wavetableState,
               wavetableBanks: [...wavetableState.wavetableBanks, wavetableBank],
             });
-          } catch (err) {
+          } catch (_err) {
             // pass
           }
         },

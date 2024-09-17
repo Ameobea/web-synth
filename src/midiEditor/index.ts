@@ -322,7 +322,7 @@ export const init_midi_editor = (vcId: string) => {
     .flatMap(k => {
       try {
         return Option.of(JSON.parse(k));
-      } catch (err) {
+      } catch (_err) {
         console.warn('Failed to parse stored MIDI editor state; returning default');
         return Option.none();
       }

@@ -26,6 +26,7 @@ export default class NoteLine {
   public background: PIXI.DisplayObject;
   public index: number;
   private markers: PIXI.Sprite | undefined;
+  private lines: PIXI.Sprite | undefined;
   private noteCreationState: NoteCreationState | null = null;
   private isCulled = true;
   private isDestroyed = false;
@@ -36,6 +37,7 @@ export default class NoteLine {
    */
   private lastPxPerBeat = 0;
   private lastBeatsPerMeasure = 0;
+  private lastWidthPx = 0;
 
   constructor(
     app: MIDIEditorUIInstance,
@@ -189,6 +191,21 @@ export default class NoteLine {
     }
   }
 
+  private buildLines(): PIXI.Sprite {
+    const g = new PIXI.Graphics();
+    g.lineStyle(1, conf.LINE_BORDER_COLOR);
+    g.moveTo(0, conf.LINE_HEIGHT);
+    g.lineTo(this.app.width, conf.LINE_HEIGHT);
+
+    const renderTexture = PIXI.RenderTexture.create({
+      width: this.app.width,
+      height: conf.LINE_HEIGHT,
+    });
+    this.app.app.renderer.render(g, { renderTexture });
+
+    return new PIXI.Sprite(renderTexture);
+  }
+
   private buildMarkers(): PIXI.Sprite {
     const markersCacheKey = `${this.app.parentInstance.baseView.pxPerBeat}-${this.app.parentInstance.baseView.beatsPerMeasure}`;
     const cached = this.app.markersCache.get(markersCacheKey);
@@ -199,14 +216,10 @@ export default class NoteLine {
     }
 
     const g = new PIXI.Graphics();
-    // bottom border
-    g.lineStyle(1, conf.LINE_BORDER_COLOR);
-    g.moveTo(0, conf.LINE_HEIGHT);
-    g.lineTo(this.app.width, conf.LINE_HEIGHT);
 
     let beat = 0;
     const visibleBeats = this.app.width / this.app.parentInstance.baseView.pxPerBeat;
-    const endBeat = Math.floor(visibleBeats);
+    const endBeat = Math.ceil(visibleBeats);
     while (beat <= endBeat) {
       const isMeasureLine = beat % this.app.parentInstance.baseView.beatsPerMeasure === 0;
       let x = this.app.beatsToPx(beat);
@@ -259,6 +272,18 @@ export default class NoteLine {
       this.container.setChildIndex(this.background, 1);
       this.lastPxPerBeat = this.app.parentInstance.baseView.pxPerBeat;
       this.lastBeatsPerMeasure = this.app.parentInstance.baseView.beatsPerMeasure;
+    }
+
+    if (!this.lines || this.lastWidthPx !== this.app.width) {
+      if (this.lines) {
+        this.container.removeChild(this.lines);
+        this.lines.destroy();
+      }
+
+      this.lines = this.buildLines();
+      this.container.addChild(this.lines);
+      this.container.setChildIndex(this.lines, 2);
+      this.lastWidthPx = this.app.width;
     }
 
     const xOffsetBeats = -(

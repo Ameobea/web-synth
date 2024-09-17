@@ -1,9 +1,8 @@
 import { buildActionGroup, buildModule } from 'jantix';
-import { createSelector } from 'reselect';
 
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { ADSRValues } from 'src/controls/adsr';
-import { actionCreators, dispatch, type ReduxStore } from 'src/redux';
+import { actionCreators, dispatch } from 'src/redux';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 
 export interface SynthPresetEntry {
@@ -65,7 +64,7 @@ const fetchWithRetries = async <T>(
   for (let i = 0; i < attemptCount; i++) {
     try {
       return fetcher();
-    } catch (err) {
+    } catch (_err) {
       console.warn(attemptFailMsg || `Failed to fetch; attempts: ${i + 1}`);
     }
   }

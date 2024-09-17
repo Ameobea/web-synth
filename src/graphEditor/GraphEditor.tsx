@@ -249,7 +249,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
 
   const moveToSubgraph = {
     content: 'Move Selected to Subgraph',
-    callback: (_menuEntry: any, options: any, event: any, parentMenu: ContextMenu) => {
+    callback: (_menuEntry: any, _options: any, event: any, parentMenu: ContextMenu) => {
       const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
       const validMoveToSubgraphs = R.sortWith(
         [R.ascend(([_id, desc]) => desc.name.toLocaleLowerCase())],
@@ -778,7 +778,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         }
 
         const lowerValue = value.toLowerCase().trim();
-        return displayNames.filter((displayName, i) => lowerDisplayNames[i].includes(lowerValue));
+        return displayNames.filter((_displayName, i) => lowerDisplayNames[i].includes(lowerValue));
       };
       canvas.onSearchBoxSelection = (name, _evt, _graphCanvas) => {
         const entry = sortedNodeEntries.find(([displayName]) => displayName === name);

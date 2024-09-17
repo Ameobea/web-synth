@@ -1066,7 +1066,7 @@ export class ADSR2Instance {
         width: width * dpr,
         backgroundColor: BACKGROUND_COLOR,
       });
-    } catch (err) {
+    } catch (_err) {
       console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
     }
 

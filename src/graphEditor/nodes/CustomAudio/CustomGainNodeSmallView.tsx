@@ -1,22 +1,32 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 
-const CustomGainNodeSmallView: React.FC<{ node: ForeignNode<BiquadFilterNode> }> = ({ node }) => (
+interface CustomGainNodeSmallViewProps {
+  node: ForeignNode<BiquadFilterNode>;
+}
+
+const CustomGainNodeSmallView: React.FC<CustomGainNodeSmallViewProps> = ({ node }) => (
   <ControlPanel
-    settings={[
-      {
-        type: 'range',
-        label: 'gain',
-        min: -1,
-        max: 5,
-        initial: node.paramOverrides.gain.override.offset.value,
+    settings={useMemo(
+      () => [
+        {
+          type: 'range',
+          label: 'gain',
+          min: -1,
+          max: 5,
+          initial: node.paramOverrides.gain.override.offset.value,
+        },
+      ],
+      [node.paramOverrides.gain.override.offset.value]
+    )}
+    onChange={useCallback(
+      (_key: string, val: number) => {
+        node.paramOverrides.gain.override.offset.value = val;
       },
-    ]}
-    onChange={(_key: string, val: number) => {
-      node.paramOverrides.gain.override.offset.value = val;
-    }}
+      [node.paramOverrides.gain.override.offset]
+    )}
     style={{ width: 500 }}
   />
 );

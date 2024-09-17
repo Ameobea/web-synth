@@ -267,7 +267,7 @@ const buildCodeEditorControlPanelSettings = ({
           reduxInfra.dispatch(
             reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
           );
-        } catch (err) {
+        } catch (_err) {
           // pass
         }
       },

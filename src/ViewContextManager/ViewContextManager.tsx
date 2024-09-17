@@ -145,7 +145,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
         }}
         name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
       >
-        <div style={{ display: 'flex', padding: 4, width: 32, height: 24 }}>
+        <div style={{ display: 'flex', padding: 4, width: 32, height: 24, marginTop: -6 }}>
           <div
             className='restart-playback-icon-container'
             dangerouslySetInnerHTML={{ __html: RestartPlayback }}

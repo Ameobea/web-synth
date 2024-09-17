@@ -44,6 +44,7 @@ import type { SampleDescriptor } from 'src/sampleLibrary';
 import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { FMSynthFxNode } from './FMSynthFx/FMSynthFxNode';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
+import { BPMNode } from 'src/graphEditor/nodes/CustomAudio/BPM/BPMNode';
 
 const ctx = new AudioContext();
 
@@ -78,7 +79,16 @@ export interface ForeignNode<T = any> {
   };
   renderSmallView?: (domId: string) => void;
   cleanupSmallView?: (domId: string) => void;
+  /**
+   * This method should be implemented by nodes that load samples.  It should return a list of all the samples that
+   * are currently being used by this node.  This is used during composition sharing to make sure that any local
+   * samples are converted into remote samples before saving so that they are available to other users loading
+   * the composition.
+   */
   listUsedSamples?: () => SampleDescriptor[];
+  /**
+   * This will be called when the node is double-clicked in the graph editor.
+   */
   onNodeDblClicked?: () => void;
 }
 
@@ -496,6 +506,9 @@ export const audioNodeGetters: {
   },
   'customAudio/subgraphPortal': {
     nodeGetter: SubgraphPortalNode,
+  },
+  'customAudio/bpm': {
+    nodeGetter: BPMNode,
   },
 };
 

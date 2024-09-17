@@ -14,7 +14,7 @@ export class PlaceholderInput extends DummyNode {
   public label: string;
 
   constructor(
-    ctx: AudioContext,
+    _ctx: AudioContext,
     vcId: string,
     getConnectables: () => AudioConnectables,
     addInput: (

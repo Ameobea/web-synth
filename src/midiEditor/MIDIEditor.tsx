@@ -447,7 +447,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             });
             const composition = activeInstance.current!.serialize(true);
             await saveMIDIComposition(name, description ?? '', composition, tags ?? []);
-          } catch (err) {
+          } catch (_err) {
             return;
           }
         }}
