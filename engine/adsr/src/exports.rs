@@ -112,7 +112,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
     }
   };
   if needs_init {
-    let hook = move |info: &std::panic::PanicInfo| {
+    let hook = move |info: &std::panic::PanicHookInfo| {
       let msg = format!("PANIC: {}", info.to_string());
       let bytes = msg.into_bytes();
       let len = bytes.len();

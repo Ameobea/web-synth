@@ -19,7 +19,7 @@
     "noUnusedLocals": true,
     "typeRoots": ["./node_modules/@types"],
     "types": ["node"],
-    "jsx": "react",
+    "jsx": "react-jsx",
     "baseUrl": ".",
     "verbatimModuleSyntax": true,
     "paths": {

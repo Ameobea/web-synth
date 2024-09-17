@@ -24,7 +24,7 @@ pub fn uuid_v4() -> Uuid {
 }
 
 pub fn set_raw_panic_hook(log_err: unsafe extern "C" fn(ptr: *const u8, len: usize)) {
-  let hook = move |info: &std::panic::PanicInfo| {
+  let hook = move |info: &std::panic::PanicHookInfo| {
     let msg = format!("PANIC: {}", info.to_string());
     let bytes = msg.into_bytes();
     let len = bytes.len();

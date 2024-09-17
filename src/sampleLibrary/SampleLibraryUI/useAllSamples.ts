@@ -25,7 +25,7 @@ export const getSampleDisplayName = (descriptor: SampleDescriptor) => {
   try {
     const parsed = parsePath(descriptor.name);
     return parsed.name;
-  } catch (err) {
+  } catch (_err) {
     return descriptor.name;
   }
 };

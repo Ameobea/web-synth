@@ -65,7 +65,7 @@ fn maybe_set_panic_hook() {
     DID_SET_PANIC_HOOK = true;
   }
 
-  let hook = move |info: &std::panic::PanicInfo| {
+  let hook = move |info: &std::panic::PanicHookInfo| {
     let msg = format!("PANIC: {}", info.to_string());
     let bytes = msg.into_bytes();
     let len = bytes.len();

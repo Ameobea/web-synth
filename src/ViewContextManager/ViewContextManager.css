@@ -89,3 +89,9 @@ input.view-context-switcher-tab-renamer {
     box-sizing: border-box;
   }
 }
+
+.restart-playback-icon-container svg {
+  width: 24px;
+  height: 24px;
+  margin-top: -3px;
+}

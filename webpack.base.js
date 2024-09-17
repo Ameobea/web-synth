@@ -18,7 +18,10 @@ const config = {
       {
         test: /\.(tsx?)|(js)$/,
         exclude: /node_modules/,
-        loader: 'babel-loader',
+        loader: 'ts-loader',
+        options: {
+          transpileOnly: true,
+        },
       },
       {
         test: /\.m?js/,
@@ -36,17 +39,7 @@ const config = {
       },
       {
         test: /\.svg$/,
-        use: [
-          {
-            loader: 'babel-loader',
-          },
-          {
-            loader: 'react-svg-loader',
-            options: {
-              jsx: true, // true outputs JSX tags
-            },
-          },
-        ],
+        loader: 'svg-inline-loader',
       },
       {
         test: /\.svelte$/,

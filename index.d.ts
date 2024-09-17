@@ -51,9 +51,8 @@ declare const process: {
 };
 
 declare module '*.svg' {
-  const ReactComponent: React.FunctionComponent<React.SVGProps<SVGSVGElement> & { title?: string }>;
-
-  export default ReactComponent;
+  const content: string;
+  export default content;
 }
 
 declare global {

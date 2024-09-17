@@ -1,5 +1,3 @@
-#![feature(new_uninit)]
-
 use std::mem::MaybeUninit;
 
 use dsp::{
