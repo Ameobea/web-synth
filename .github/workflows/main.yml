@@ -19,33 +19,33 @@ jobs:
       # \/ Disabled due to (what seems to be) a bug in the `actions/cache` action (issue filed)
       # - name: Cache cargo binaries
       #   id: cache-cargo-binaries
-      #   uses: actions/cache@v3
+      #   uses: actions/cache@v4
       #   with:
       #     path: ~/.cargo/bin
       #     key: ${{ runner.os }}_nightly-2024-09-16_cargo-registry_just-0.5.1_wasm-bindgen-cli-0.2.54
       - name: Cache cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cache-cargo-registry
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache cargo index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cache-cargo-index
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache Rust lib build artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cache-target-dir
         with:
           path: ./engine/target
           key: ${{ runner.os }}-build-${{ env.cache-name }}_nightly-2024-09-16_${{ hashFiles('engine/Cargo.lock') }}
       - name: Cache node modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cache-node-modules
         with:
@@ -58,7 +58,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_ENV # Updated set-output to GITHUB_ENV
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
           path: ${{ env.dir }}
@@ -67,7 +67,7 @@ jobs:
             ${{ runner.os }}-yarn-
       - name: Cache Emscripten
         id: cache-emscripten-system-libraries
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.EM_CACHE_FOLDER }}
           key: ${{ env.EM_VERSION }}-${{ runner.os }}
