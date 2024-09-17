@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
@@ -82,9 +82,9 @@ jobs:
         run: rustup default nightly-2024-09-16
       - name: Install Rust Wasm support
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: '17.4'
+          node-version: '22.3'
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v7
         with:
@@ -130,7 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Download built site artifacts
         uses: actions/download-artifact@v4.1.7
