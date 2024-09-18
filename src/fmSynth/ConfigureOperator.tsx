@@ -135,7 +135,7 @@ export interface WavetableBank {
 }
 
 export interface WavetableState {
-  wavetableBanks: WavetableBank[];
+  wavetableBanks: readonly WavetableBank[];
 }
 
 export const serializeWavetableState = (state: WavetableState) => {
@@ -161,7 +161,7 @@ export const deserializeWavetableState = (
 interface ConfigureWavetableIndexProps {
   selectedWavetableName: string | null;
   wavetableState: WavetableState;
-  setWavetableState: (newState: WavetableState) => void;
+  setWavetableState: React.Dispatch<React.SetStateAction<WavetableState>>;
   setSelectedWavetableName: (newName: string | null) => void;
   useLegacyControls: boolean;
   setUseLegacyControls: (newVal: boolean) => void;
@@ -198,12 +198,15 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
             const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
               .default;
             try {
-              const wavetableBank = await renderSvelteModalWithControls(WavetableConfigurator);
-              setWavetableState({
+              const newBank = await renderSvelteModalWithControls(WavetableConfigurator);
+              while (wavetableState.wavetableBanks.some(bank => bank.name === newBank.name)) {
+                newBank.name = `${newBank.name}_1`;
+              }
+              setWavetableState(wavetableState => ({
                 ...wavetableState,
-                wavetableBanks: [wavetableBank],
-              });
-              setSelectedWavetableName(wavetableBank.name);
+                wavetableBanks: Object.freeze([...wavetableState.wavetableBanks, newBank]),
+              }));
+              setSelectedWavetableName(newBank.name);
             } catch (_err) {
               // cancelled
             }
@@ -229,12 +232,12 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           }
 
           // TODO: Check to see if the wavetable is in use by any operators and prevent if so
-          setWavetableState({
+          setWavetableState(wavetableState => ({
             ...wavetableState,
             wavetableBanks: wavetableState.wavetableBanks.filter(
               bank => bank.name !== state.wavetable
             ),
-          });
+          }));
         },
       },
       {
@@ -253,11 +256,11 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           );
           try {
             const wavetableBank = await renderModalWithControls(WrappedUploadWavetableModal);
-            console.log('Wavetable bank constructed successfully: ', wavetableBank);
-            setWavetableState({
+            console.log('Wavetable bank imported successfully: ', wavetableBank);
+            setWavetableState(wavetableState => ({
               ...wavetableState,
               wavetableBanks: [...wavetableState.wavetableBanks, wavetableBank],
-            });
+            }));
           } catch (_err) {
             // pass
           }
@@ -291,7 +294,7 @@ interface ConfigureWavetableProps {
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   wavetableState: WavetableState;
-  setWavetableState: (newState: WavetableState) => void;
+  setWavetableState: React.Dispatch<React.SetStateAction<WavetableState>>;
   vcId: string | undefined;
   useLegacyControls: boolean;
   setUseLegacyControls: (newVal: boolean) => void;
@@ -364,7 +367,7 @@ interface ConfigureOperatorProps {
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   wavetableState: WavetableState;
-  setWavetableState: (newState: WavetableState) => void;
+  setWavetableState: React.Dispatch<React.SetStateAction<WavetableState>>;
   vcId: string | undefined;
   sampleMappingStore: Writable<SampleMappingState>;
   registerGateUngateCallbacks: GateUngateCallbackRegistrar;

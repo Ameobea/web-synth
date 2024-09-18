@@ -112,13 +112,13 @@ export default [
       '@typescript-eslint/explicit-module-boundary-types': 0,
       'react/jsx-no-target-blank': 0,
       '@typescript-eslint/no-empty-interface': 'off',
-
       '@typescript-eslint/consistent-type-imports': [
         'warn',
         {
           disallowTypeAnnotations: false,
         },
       ],
+      'react/react-in-jsx-scope': 0,
     },
   },
 ];

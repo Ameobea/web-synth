@@ -156,7 +156,9 @@ const updateSamplesInSave = (
   );
 };
 
-const removeCompositionSharingFromVCMState = (serializedVcmState: string) => {
+const removeCompositionSharingFromVCMState = (composition: Record<string, any>) => {
+  const serializedVcmState = composition.vcmState;
+  const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
   const vcmState = JSON.parse(serializedVcmState);
 
   // Select control panel, graph editor, synth designer in that order if exist as the default active view
@@ -166,6 +168,10 @@ const removeCompositionSharingFromVCMState = (serializedVcmState: string) => {
     const state = localStorage[`vc_${vcId}`];
     try {
       const parsedState = JSON.parse(state);
+      if (parsedState.minimal_def.subgraphId !== activeSubgraphID) {
+        continue;
+      }
+
       const score =
         (
           {
@@ -178,8 +184,9 @@ const removeCompositionSharingFromVCMState = (serializedVcmState: string) => {
       if (score >= bestScore) {
         bestScore = score;
         vcmState.active_view_ix = i;
+        vcmState.active_view_id = vcId;
       }
-    } catch (e) {
+    } catch (_err) {
       continue;
     }
   }
@@ -194,12 +201,47 @@ const removeCompositionSharingFromVCMState = (serializedVcmState: string) => {
 
       try {
         const parsedState = JSON.parse(state);
-        return parsedState?.minimal_def?.name !== 'composition_sharing';
-      } catch (e) {
+        if (parsedState?.minimal_def?.name !== 'composition_sharing') {
+          return true;
+        }
+
+        delete composition[`vc_${vcId}`];
+        return false;
+      } catch (_err) {
         return true;
       }
     }),
   });
+};
+
+/**
+ * There was a long-standing bug where state entries for MIDI editors weren't cleared out of `localStorage`
+ * properly when the MIDI editor was deleted.  This prevents a ton of wasted space from getting used up
+ * in saved compositions by cleaning them out.
+ */
+const removeOrphanEntriesFromComposition = (composition: Record<string, any>) => {
+  const activeViewContexts = getState().viewContextManager.activeViewContexts;
+  for (const key of Object.keys(composition)) {
+    if (key.startsWith('vc_')) {
+      const vcId = key.split('vc_')[1];
+      if (!activeViewContexts.some(vc => vc.uuid === vcId)) {
+        delete composition[key];
+        localStorage.removeItem(key);
+      }
+
+      continue;
+    }
+
+    if (!key.startsWith('midiEditor_')) {
+      continue;
+    }
+
+    const vcId = key.split('midiEditor_')[1];
+    if (!activeViewContexts.some(vc => vc.uuid === vcId)) {
+      delete composition[key];
+      localStorage.removeItem(key);
+    }
+  }
 };
 
 interface SerializeAndSaveCompositionArgs {
@@ -224,13 +266,15 @@ const serializeAndSaveComposition = async ({
   onBeforeUnload(engine);
 
   let compositionData = R.clone({ ...localStorage } as any);
-  compositionData.vcmState = removeCompositionSharingFromVCMState(compositionData.vcmState);
+  compositionData.vcmState = removeCompositionSharingFromVCMState(compositionData);
+  removeOrphanEntriesFromComposition(compositionData);
+
   if (samples) {
     const [jsonEntries, passthruEntries] = R.partition(([_key, val]) => {
       try {
         JSON.parse(val as any);
         return true;
-      } catch (err) {
+      } catch (_err) {
         return false;
       }
     }, Object.entries(compositionData));

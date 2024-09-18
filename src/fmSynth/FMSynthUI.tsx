@@ -248,10 +248,10 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   ]);
 
   const onOperatorChange = (selectedOperatorIx: number, newConf: OperatorConfig) => {
-    setState({
+    setState(state => ({
       ...state,
       operatorConfigs: R.set(R.lensIndex(selectedOperatorIx), newConf, state.operatorConfigs),
-    });
+    }));
     onOperatorConfigChange(selectedOperatorIx, newConf);
   };
 
@@ -583,10 +583,16 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                   adsrs={state.adsrs}
                   onAdsrChange={handleAdsrChange}
                   wavetableState={state.wavetableState}
-                  setWavetableState={newWavetableState => {
-                    setState(state => ({ ...state, wavetableState: newWavetableState }));
-                    setWavetableState(newWavetableState);
-                  }}
+                  setWavetableState={newWavetableStateOrFunc =>
+                    void setState(state => {
+                      const newWavetableState =
+                        typeof newWavetableStateOrFunc === 'function'
+                          ? newWavetableStateOrFunc(state.wavetableState)
+                          : newWavetableStateOrFunc;
+                      setWavetableState(newWavetableState);
+                      return { ...state, wavetableState: newWavetableState };
+                    })
+                  }
                   vcId={vcId}
                   sampleMappingStore={sampleMappingStore}
                   registerGateUngateCallbacks={registerGateUngateCallbacks}

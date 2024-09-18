@@ -134,6 +134,8 @@ struct ViewContextManagerState {
   /// This contains the IDs of all managed VCs.  The actual `ViewContextDefinition`s for each of
   /// them are found in separate `localStorage` entries.
   pub view_context_ids: Vec<Uuid>,
+  /// This was used previously to identify which VC was active.  Now that subgraphs exist, this is
+  /// only used as backwards compatibility to deal with old saved states.
   #[serde(rename = "active_view_ix")]
   pub deprecated_active_view_ix: usize,
   #[serde(default = "Uuid::nil")]

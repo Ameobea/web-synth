@@ -452,9 +452,6 @@ export default class FMSynth implements ForeignNode {
 
   private maybeLoadWavetableIntoBackend(bank: WavetableBank) {
     const loadedIndex = this.wavetableBackendIxByName.findIndex(n => n === bank.name);
-    // if (isAlreadyLoaded) {
-    // return;
-    // }
 
     const backendIx = loadedIndex === -1 ? this.wavetableBackendIxByName.length : loadedIndex;
     if (loadedIndex === -1) {

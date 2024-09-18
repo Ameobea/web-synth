@@ -25,7 +25,7 @@ impl ViewContext for MIDIEditor {
 
   fn unhide(&mut self) { js::unhide_midi_editor(&self.get_state_key()); }
 
-  fn dispose(&mut self) { js::delete_localstorage_key(&self.vc_id.to_string()); }
+  fn dispose(&mut self) { js::delete_localstorage_key(&self.get_state_key()); }
 
   fn get_audio_connectables(&self) -> JsValue {
     js::get_midi_editor_audio_connectables(self.vc_id.to_string().as_str())
