@@ -28,12 +28,14 @@
 
   export let onSubmit: (val: WavetableBank) => void;
   export let onCancel: () => void;
+  export let curPreset: WavetablePreset | undefined = undefined;
 
   const worker: Comlink.Remote<WavetableConfiguratorWorker> = Comlink.wrap(
     new Worker(new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url))
   );
 
-  let route: Route = Route.BrowseWavetables;
+  let initialPreset = curPreset;
+  let route: Route = initialPreset ? Route.BuildWavetable : Route.BrowseWavetables;
 
   const renderPresetToBank = async (
     preset: WavetablePreset,
@@ -62,6 +64,7 @@
       samples: concatenatedSamples,
       samplesPerWaveform: BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES,
       waveformsPerDimension: preset.waveforms.length,
+      preset,
     };
   };
 
@@ -129,8 +132,10 @@
     />
   {:else if route === Route.BuildWavetable}
     <BuildWavetable
+      initialInstState={curPreset}
       onSubmit={handleBuildWavetableSubmit}
       onCancel={() => {
+        initialPreset = undefined;
         route = Route.BrowseWavetables;
       }}
       {worker}

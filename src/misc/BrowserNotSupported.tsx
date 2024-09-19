@@ -6,9 +6,11 @@ import 'src/index.css';
 import 'src/colors.css';
 import { ANewTab } from 'src/reactUtils';
 
-const BrowserNotSupported: React.FC<{ mobileSupported?: boolean }> = ({
-  mobileSupported = false,
-}) => (
+interface BrowserNotSupportedProps {
+  mobileSupported?: boolean;
+}
+
+const BrowserNotSupported: React.FC<BrowserNotSupportedProps> = ({ mobileSupported = false }) => (
   <div className='browser-not-supported'>
     <h1>Your Browser Isn&apos;t Supported</h1>
 

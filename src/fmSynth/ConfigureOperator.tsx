@@ -15,6 +15,7 @@ import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSyn
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { UnreachableError, base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
 import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
+import type { WavetablePreset } from 'src/api';
 
 interface UnisonPhaseRandomizationConfig {
   enabled: boolean;
@@ -132,6 +133,7 @@ export interface WavetableBank {
   samplesPerWaveform: number;
   waveformsPerDimension: number;
   baseFrequency: number;
+  preset?: WavetablePreset;
 }
 
 export interface WavetableState {
@@ -197,8 +199,16 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
           action: async () => {
             const WavetableConfigurator = (await import('./Wavetable/WavetableConfigurator.svelte'))
               .default;
+            const curBank = wavetableState.wavetableBanks.find(
+              bank => bank.name === selectedWavetableName
+            );
+            console.log({ curBank });
             try {
-              const newBank = await renderSvelteModalWithControls(WavetableConfigurator);
+              const newBank = await renderSvelteModalWithControls(
+                WavetableConfigurator,
+                undefined,
+                { curPreset: curBank?.preset }
+              );
               while (wavetableState.wavetableBanks.some(bank => bank.name === newBank.name)) {
                 newBank.name = `${newBank.name}_1`;
               }
@@ -274,7 +284,8 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
     ];
   }, [
     useLegacyControls,
-    wavetableState,
+    wavetableState.wavetableBanks,
+    selectedWavetableName,
     setWavetableState,
     setSelectedWavetableName,
     state.wavetable,

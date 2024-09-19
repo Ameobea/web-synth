@@ -262,6 +262,7 @@ export const getHasSIMDSupport = () => WebAssembly.validate(new Uint8Array([0,97
 
 // Adapted from https://github.com/Tokimon/vanillajs-browser-helpers/blob/master/src/inView.ts
 // License: MIT
+// TODO: should replace this with `IntersectionObserver`
 export function elemInView(elm: HTMLElement) {
   const rect = elm.getBoundingClientRect();
   const vpWidth = window.innerWidth;
@@ -348,4 +349,9 @@ export const formatDateTime = (date: Date) => {
   const time = TimeFormatter.format(date);
 
   return `${year}-${month}-${day} ${time}`;
+};
+
+export const isSafari = () => {
+  const ua = navigator.userAgent;
+  return ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Android');
 };

@@ -12,7 +12,7 @@ import {
 import { getReactQueryClient } from 'src/reactUtils';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
-import { initGlobals, setEngine } from 'src/util';
+import { initGlobals, isSafari, setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
 import { ViewContextManager, ViewContextSwitcher } from './ViewContextManager';
@@ -20,6 +20,7 @@ import { createGlobalToaster } from 'src/misc/GlobalToaster';
 import { registerBackForwardsMouseHandlers } from 'src/globalInputHandlers';
 import './index.css';
 import './colors.css';
+import { createSafariNotification } from 'src/misc/SafariNotification';
 
 initGlobals();
 
@@ -61,6 +62,9 @@ const createViewContextManagerUI = (engine: typeof import('./engine')) => {
 const createGlobalUI = (engine: typeof import('./engine')) => {
   createViewContextManagerUI(engine);
   createGlobalToaster();
+  if (isSafari()) {
+    createSafariNotification();
+  }
 };
 
 if (typeof AudioWorkletNode === 'undefined') {

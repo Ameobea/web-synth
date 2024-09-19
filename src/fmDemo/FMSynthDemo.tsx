@@ -35,6 +35,7 @@ import {
 } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 import { FilterType } from 'src/synthDesigner/FilterType';
+import { SafariNotification } from 'src/misc/SafariNotification';
 
 initGlobals();
 
@@ -629,6 +630,7 @@ const FMSynthDemo: React.FC = () => {
 
   return (
     <div className='fm-synth-demo'>
+      <SafariNotification />
       <div className='fm-synth-demo-controls' style={{ height }}>
         <div className='fm-synth-main-control-panel'>
           <MainControlPanel />

@@ -210,7 +210,7 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
                 ? [state.shift, state.shift + state.scale]
                 : undefined,
             adsr: adsr ? adsr : undefined,
-            'log scale': adsr ? adsr.logScale ?? false : undefined,
+            'log scale': adsr ? (adsr.logScale ?? false) : undefined,
             range: state.type === 'random' ? [state.min, state.max] : undefined,
             'update interval samples':
               state.type === 'random' ? state.updateIntervalSamples : undefined,

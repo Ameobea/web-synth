@@ -44,6 +44,7 @@ const ConfigureModulationIndex: React.FC<ConfigureModulationIndexProps> = ({
       )}
       min={-30}
       max={30}
+      defaultVal={0}
       excludedTypes={EXCLUDED_TYPES}
       adsrs={adsrs}
       onAdsrChange={onAdsrChange}

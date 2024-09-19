@@ -1,0 +1,47 @@
+.safari-notification {
+  position: sticky;
+  top: 0;
+  background-color: #ffd966;
+  color: #333;
+  padding: 4px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  z-index: 1000;
+  border-bottom: 2px solid #e69138;
+  line-height: 1.5;
+  text-align: center;
+  margin-top: -2px;
+}
+
+.safari-notification-message {
+  flex: 1 1 70%;
+  margin: 0;
+  font-size: 1.15em;
+}
+
+.safari-notification-button {
+  flex: 1 1 30%;
+  margin-top: 10px;
+  padding: 10px 15px;
+  background-color: #333;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.safari-notification-button:hover {
+  background-color: #555;
+}
+
+@media (min-width: 600px) {
+  .safari-notification {
+    flex-wrap: nowrap;
+  }
+
+  .safari-notification-button {
+    margin-top: 0;
+    max-width: 150px;
+  }
+}
