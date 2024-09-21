@@ -68,10 +68,11 @@ export default class NoteLine {
       this.app.allNotesByID.set(note.id, noteBox);
       this.notesByID.set(note.id, noteBox);
     });
+
+    this.handleViewChange();
     if (enableNoteCreation) {
       this.installNoteCreationHandlers();
     }
-    this.handleViewChange();
   }
 
   private handlePointerMove = (evt: FederatedPointerEvent) => {
@@ -133,7 +134,7 @@ export default class NoteLine {
   };
 
   private installNoteCreationHandlers() {
-    this.background.on('pointerdown', (evt: FederatedPointerEvent) => {
+    const handlePointerDown = (evt: FederatedPointerEvent) => {
       if (evt.button !== 0 || this.app.selectionBoxButtonDown) {
         return;
       }
@@ -165,7 +166,10 @@ export default class NoteLine {
         this.noteCreationState = null;
         this.app.ungate(this.index);
       });
-    });
+    };
+
+    this.background.on('pointerdown', handlePointerDown);
+    this.lines?.on('pointerdown', handlePointerDown);
 
     this.app.app.stage.on('pointermove', this.handlePointerMove);
   }
@@ -281,6 +285,7 @@ export default class NoteLine {
       }
 
       this.lines = this.buildLines();
+      this.lines.interactive = true;
       this.container.addChild(this.lines);
       this.container.setChildIndex(this.lines, 2);
       this.lastWidthPx = this.app.width;

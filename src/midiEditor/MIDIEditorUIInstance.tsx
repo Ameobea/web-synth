@@ -9,7 +9,7 @@ import type {
   SerializedMIDIEditorInstance,
   SerializedMIDILine,
 } from 'src/midiEditor';
-import { Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
+import { BookmarkCursor, Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
 import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
 import MIDINoteBox, {
   type NoteDragHandle,
@@ -30,6 +30,7 @@ import { UnreachableError } from 'src/util';
 import type { Unsubscribe } from 'redux';
 import { subscribeToConnections, type ConnectionDescriptor } from 'src/redux/modules/vcmUtils';
 import { MIDINode, type MIDINodeMetadata } from 'src/patchNetwork/midiNode';
+import { get } from 'svelte/store';
 
 export interface Note {
   id: number;
@@ -95,6 +96,8 @@ export default class MIDIEditorUIInstance {
   private pianoKeys: PianoKeys | undefined;
   private cursorGutter: CursorGutter;
   public loopCursor: LoopCursor | null;
+  private bookmarkCursor: BookmarkCursor | null = null;
+  private unsubBookmarkPosBeatsChanges: Unsubscribe;
   private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
   public noteMetadataByNoteID: Map<number, any> = new Map();
   public vcId: string;
@@ -142,6 +145,11 @@ export default class MIDIEditorUIInstance {
       width,
       backgroundColor: conf.BACKGROUND_COLOR,
     });
+
+    this.handleBookmarkPosBeatsChange(get(parentInstance.uiManager.bookmarkPosBeats));
+    this.unsubBookmarkPosBeatsChanges = parentInstance.uiManager.bookmarkPosBeats.subscribe(
+      this.handleBookmarkPosBeatsChange
+    );
 
     registerVcHideCb(this.vcId, this.onHiddenStatusChanged);
     this.isHidden = getIsVcHidden(this.vcId);
@@ -202,8 +210,28 @@ export default class MIDIEditorUIInstance {
       if (this.loopCursor) {
         this.app.stage.addChild(this.loopCursor.graphics);
       }
+      if (this.bookmarkCursor) {
+        this.app.stage.addChild(this.bookmarkCursor.graphics);
+      }
     });
   }
+
+  private handleBookmarkPosBeatsChange = (newBookmarkPosBeats: number | null) => {
+    if (typeof newBookmarkPosBeats === 'number') {
+      if (!this.bookmarkCursor) {
+        this.bookmarkCursor = new BookmarkCursor(this, newBookmarkPosBeats);
+        this.app.stage.addChild(this.bookmarkCursor.graphics);
+      } else {
+        this.bookmarkCursor.setPosBeats(newBookmarkPosBeats);
+      }
+    } else {
+      if (this.bookmarkCursor) {
+        this.app.stage.removeChild(this.bookmarkCursor.graphics);
+        this.bookmarkCursor.destroy();
+        this.bookmarkCursor = null;
+      }
+    }
+  };
 
   private buildNoteLines = (linesWithIDs: readonly Note[][]): NoteLine[] =>
     linesWithIDs.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
@@ -285,12 +313,20 @@ export default class MIDIEditorUIInstance {
     this.cursor = new Cursor(this);
     this.app.stage.addChild(this.cursor.graphics);
 
+    // need to destroy and re-create since the height is different and the
+    // graphics are cached
     if (this.loopCursor) {
       this.app.stage.removeChild(this.loopCursor.graphics);
       this.loopCursor.destroy();
       const loopPoint = this.loopCursor.getPosBeats();
       this.loopCursor = new LoopCursor(this, loopPoint);
       this.app.stage.addChild(this.loopCursor.graphics);
+    }
+    if (this.bookmarkCursor) {
+      this.app.stage.removeChild(this.bookmarkCursor.graphics);
+      this.bookmarkCursor.destroy();
+      this.bookmarkCursor = null;
+      this.handleBookmarkPosBeatsChange(get(this.parentInstance.uiManager.bookmarkPosBeats));
     }
 
     this.handleViewChange();
@@ -652,7 +688,7 @@ export default class MIDIEditorUIInstance {
       }
     }
 
-    // Step 2: Move all small notes that are < half the beat snap interval where possible, leaving the in
+    // Step 2: Move all small notes that are < half the beat snap interval where possible, leaving them in
     // place in case of conflicts.  We do not change their lengths to avoid them collapsing into zero length.
     for (const [lineIx, notes] of selectedNotesByLineIx.entries()) {
       // Sort the notes to make them in order by start beat
@@ -1011,6 +1047,7 @@ export default class MIDIEditorUIInstance {
     this.lines.forEach(line => line.handleViewChange());
     this.cursor.handleViewChange();
     this.loopCursor?.handleViewChange();
+    this.bookmarkCursor?.handleViewChange();
     this.pianoKeys?.handleViewChange();
   }
 
@@ -1192,6 +1229,7 @@ export default class MIDIEditorUIInstance {
     document.removeEventListener('mouseup', this.eventHandlerCBs.mouseUp);
     document.removeEventListener('wheel', this.eventHandlerCBs.wheel);
     this.app.stage.off('pointermove', this.handlePointerMove);
+    this.unsubBookmarkPosBeatsChanges();
   }
 
   public onHiddenStatusChanged = (isHidden: boolean) => {

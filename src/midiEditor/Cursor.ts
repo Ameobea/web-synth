@@ -9,6 +9,13 @@ export class CursorGutter {
   private isDragging = false;
   private graphics: PIXI.Graphics;
 
+  private getPosBeats = (evt: FederatedPointerEvent): number => {
+    const xPx = evt.getLocalPosition(this.graphics).x - conf.PIANO_KEYBOARD_WIDTH;
+    return this.app.parentInstance.snapBeat(
+      Math.max(0, this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx))
+    );
+  };
+
   constructor(app: MIDIEditorUIInstance) {
     this.app = app;
 
@@ -23,13 +30,7 @@ export class CursorGutter {
         return;
       }
 
-      const xPx = evt.getLocalPosition(g).x - conf.PIANO_KEYBOARD_WIDTH;
-      const xBeats = this.app.parentInstance.snapBeat(
-        Math.max(
-          0,
-          this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
-        )
-      );
+      const xBeats = this.getPosBeats(evt);
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
     };
 
@@ -39,10 +40,7 @@ export class CursorGutter {
       }
       this.isDragging = true;
 
-      const xPx = evt.getLocalPosition(g).x - conf.PIANO_KEYBOARD_WIDTH;
-      const xBeats = this.app.parentInstance.snapBeat(
-        this.app.parentInstance.baseView.scrollHorizontalBeats + this.app.pxToBeats(xPx)
-      );
+      const xBeats = this.getPosBeats(evt);
       this.app.parentInstance.playbackHandler.setCursorPosBeats(xBeats);
 
       this.app.app.stage.on('pointermove', handlePointerMove);
@@ -50,6 +48,10 @@ export class CursorGutter {
         this.isDragging = false;
         this.app.app.stage.off('pointermove', handlePointerMove);
       });
+    }).on('rightclick', evt => {
+      const xBeats = this.getPosBeats(evt);
+      this.app.parentInstance.uiManager.bookmarkPosBeats.set(xBeats);
+      localStorage.bookmarkPosBeats = xBeats;
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
     g.moveTo(this.app.width, conf.CURSOR_GUTTER_HEIGHT).lineTo(0.5, conf.CURSOR_GUTTER_HEIGHT);
@@ -70,7 +72,9 @@ export class Cursor {
   protected posBeats = 0;
   public graphics: PIXI.Graphics;
   public dragData: FederatedPointerEvent | null = null;
-  protected color = conf.CURSOR_COLOR;
+  protected get color(): number {
+    return conf.CURSOR_COLOR;
+  }
 
   public handleDrag(newPos: PIXI.Point) {
     const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
@@ -110,9 +114,12 @@ export class Cursor {
     return g;
   }
 
-  constructor(inst: MIDIEditorUIInstance) {
+  constructor(inst: MIDIEditorUIInstance, initialPosBeats?: number) {
     this.app = inst;
     this.graphics = this.buildGraphics();
+    if (typeof initialPosBeats === 'number') {
+      this.setPosBeats(initialPosBeats);
+    }
   }
 
   public setPosBeats(posBeats: number) {
@@ -145,13 +152,8 @@ export class Cursor {
 }
 
 export class LoopCursor extends Cursor {
-  protected color = conf.LOOP_CURSOR_COLOR;
-
-  constructor(inst: MIDIEditorUIInstance, loopPoint: number) {
-    super(inst);
-    this.graphics.destroy();
-    this.graphics = this.buildGraphics();
-    this.setPosBeats(loopPoint);
+  protected get color(): number {
+    return conf.LOOP_CURSOR_COLOR;
   }
 
   public handleDrag(newPos: PIXI.Point) {
@@ -166,9 +168,35 @@ export class LoopCursor extends Cursor {
       ),
       0
     );
-    const didUpdate = this.app.parentInstance.setLoopPoint(newPosBeats);
-    if (!didUpdate) {
-      return;
-    }
+    this.app.parentInstance.setLoopPoint(newPosBeats);
+  }
+}
+
+export class BookmarkCursor extends Cursor {
+  protected get color(): number {
+    return conf.BOOKMARK_CURSOR_COLOR;
+  }
+
+  constructor(inst: MIDIEditorUIInstance, initialPosBeats?: number) {
+    super(inst, initialPosBeats);
+    this.graphics.on('rightclick', () => {
+      this.app.parentInstance.uiManager.bookmarkPosBeats.set(null);
+      delete localStorage.bookmarkPosBeats;
+    });
+  }
+
+  public handleDrag(newPos: PIXI.Point) {
+    const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
+    const newPosBeats = this.app.parentInstance.snapBeat(
+      Math.max(
+        this.app.pxToBeats(normalizedX) + this.app.parentInstance.baseView.scrollHorizontalBeats,
+        0
+      )
+    );
+
+    this.setPosBeats(newPosBeats);
+
+    localStorage.bookmarkPosBeats = newPosBeats;
+    this.app.parentInstance.uiManager.bookmarkPosBeats.set(newPosBeats);
   }
 }
