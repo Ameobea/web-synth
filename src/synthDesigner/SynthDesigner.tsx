@@ -1,13 +1,18 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
-import { Provider, shallowEqual, useSelector } from 'react-redux';
+import { Provider, shallowEqual, useDispatch, useSelector } from 'react-redux';
 
 import './SynthDesigner.css';
 import { saveSynthPreset } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, type ReduxStore } from 'src/redux';
-import { type SynthPresetEntry, type SynthVoicePresetEntry } from 'src/redux/modules/presets';
+import {
+  fetchSynthPresets,
+  type SynthPresetEntry,
+  type SynthVoicePresetEntry,
+} from 'src/redux/modules/presets';
+import { actionCreators } from 'src/redux';
 import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import {
   get_synth_designer_audio_connectables,
@@ -22,19 +27,19 @@ import {
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderModalWithControls } from 'src/controls/Modal';
+import { VoicePresetFetchError } from 'src/synthDesigner/VoicePresetFetchError';
 
 interface AddModuleControlsProps {
   stateKey: string;
   synthDesignerActionCreators: SynthDesignerReduxInfra['actionCreators'];
-  synthDesignerDispatch: SynthDesignerReduxInfra['dispatch'];
   synthDesignerGetState: SynthDesignerReduxInfra['getState'];
 }
 
 const AddModuleControls: React.FC<AddModuleControlsProps> = ({
   stateKey,
   synthDesignerActionCreators,
-  synthDesignerDispatch,
 }) => {
+  const dispatch = useDispatch();
   const voicePresets = useSelector((state: ReduxStore) => state.presets.voicePresets, shallowEqual);
 
   const settings = useMemo(() => {
@@ -48,7 +53,7 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
         type: 'button',
         action: () => {
           const vcId = stateKey.split('_')[1]!;
-          synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
+          dispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           updateConnectables(vcId, newConnectables);
         },
@@ -74,8 +79,8 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
           }
 
           const vcId = stateKey.split('_')[1]!;
-          synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
-          synthDesignerDispatch(
+          dispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
+          dispatch(
             synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, pickedPreset.preset.body)
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
@@ -83,10 +88,12 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
         },
       },
     ];
-  }, [stateKey, synthDesignerActionCreators.synthDesigner, synthDesignerDispatch, voicePresets]);
+  }, [stateKey, synthDesignerActionCreators.synthDesigner, dispatch, voicePresets]);
 
-  if (typeof voicePresets === 'string') {
-    return <>Loading...</>;
+  if (voicePresets === 'FETCH_ERROR') {
+    return <VoicePresetFetchError />;
+  } else if (typeof voicePresets === 'string') {
+    return <div className='presets-loading'>Loading...</div>;
   }
 
   return <ControlPanel title='module' settings={settings} />;
@@ -96,15 +103,14 @@ interface FullPresetControlsProps {
   actionCreators: SynthDesignerReduxInfra['actionCreators'];
   stateKey: string;
   getState: SynthDesignerReduxInfra['getState'];
-  dispatch: SynthDesignerReduxInfra['dispatch'];
 }
 
 const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
-  actionCreators,
+  actionCreators: { synthDesigner: synthDesignerActionCreators },
   stateKey,
   getState,
-  dispatch,
 }) => {
+  const dispatch = useDispatch();
   const synthPresets = useSelector((state: ReduxStore) => state.presets.synthPresets, shallowEqual);
 
   const settings = useMemo(() => {
@@ -143,11 +149,11 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
             }
 
             for (let i = 0; i < synths.length; i++) {
-              dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(synths.length - 1 - i));
+              dispatch(synthDesignerActionCreators.DELETE_SYNTH_MODULE(synths.length - 1 - i));
             }
           }
 
-          dispatch(actionCreators.synthDesigner.SET_SYNTH_PRESET(pickedPreset.preset));
+          dispatch(synthDesignerActionCreators.SET_SYNTH_PRESET(pickedPreset.preset));
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           const vcId = stateKey.split('_')[1]!;
           updateConnectables(vcId, newConnectables);
@@ -169,10 +175,24 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
         },
       },
     ];
-  }, [actionCreators.synthDesigner, dispatch, getState, stateKey, synthPresets]);
+  }, [synthDesignerActionCreators, dispatch, getState, stateKey, synthPresets]);
 
-  if (typeof synthPresets === 'string') {
-    return <>Loading...</>;
+  if (synthPresets === 'FETCH_ERROR') {
+    return (
+      <div className='preset-fetch-error'>
+        Error fetching synth presets
+        <button
+          onClick={() => {
+            dispatch(actionCreators.presets.SET_SYNTH_PRESETS('FETCHING'));
+            fetchSynthPresets();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  } else if (typeof synthPresets === 'string') {
+    return <div className='presets-loading'>Loading...</div>;
   }
 
   return <ControlPanel title='synth' settings={settings} />;
@@ -191,7 +211,6 @@ const AddAndPresetControlsInner: React.FC<AddAndPresetControlsProps> = ({ ...pro
       actionCreators={props.synthDesignerActionCreators}
       stateKey={props.stateKey}
       getState={props.synthDesignerGetState}
-      dispatch={props.synthDesignerDispatch}
     />
   </Provider>
 );
@@ -238,13 +257,13 @@ const SynthDesigner: React.FC<SynthDesignerProps> = ({ stateKey }) => {
             stateKey={stateKey}
             isHidden={isHidden}
             vcId={vcId}
+            deleteDisabled={synths.length <= 1}
           />
         ))}
 
         <AddAndPresetControls
           stateKey={stateKey}
           synthDesignerActionCreators={actionCreators}
-          synthDesignerDispatch={dispatch}
           synthDesignerGetState={getState}
         />
       </div>

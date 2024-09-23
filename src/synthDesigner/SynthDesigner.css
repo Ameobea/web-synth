@@ -78,3 +78,20 @@
     monospace;
   cursor: pointer;
 }
+
+.synth-designer {
+  .presets-loading, .preset-fetch-error {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 4px;
+  }
+
+  .preset-fetch-error {
+    color: red;
+
+    button {
+      margin-left: 6px;
+    }
+  }
+}

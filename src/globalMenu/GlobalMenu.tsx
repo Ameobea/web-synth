@@ -15,6 +15,7 @@ import {
   setLoginToken,
 } from 'src/persistance';
 import { getState } from 'src/redux';
+import { noop } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -83,9 +84,13 @@ const LoginStatus: React.FC = () => {
     return getLoggedInUsername();
   });
 
-  useEffect(() => {
-    getLoginToken().then(token => setLoggedIn(!!token));
-  }, []);
+  useEffect(
+    () =>
+      void getLoginToken()
+        .then(token => setLoggedIn(!!token))
+        .catch(noop),
+    []
+  );
 
   const handleLoginButtonClick = async () => {
     try {

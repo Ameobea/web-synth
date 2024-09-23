@@ -27,17 +27,22 @@
     thisCompositionLoading = true;
     getSentry()?.captureMessage(`Welcome page demo tile clicked: ${title}`);
 
-    const composition = await getLoadedComposition(compositionID);
-    if (!composition) {
-      return;
+    try {
+      const composition = await getLoadedComposition(compositionID);
+      if (!composition) {
+        return;
+      }
+      const allViewContextIds = getState().viewContextManager.activeViewContexts.map(c => c.uuid);
+      reinitializeWithComposition(
+        { type: 'serialized', value: composition.content },
+        getEngine()!,
+        allViewContextIds
+      );
+      setGlobalVolume(20);
+    } catch (err) {
+      isLoadingComposition = false;
+      thisCompositionLoading = false;
     }
-    const allViewContextIds = getState().viewContextManager.activeViewContexts.map(c => c.uuid);
-    reinitializeWithComposition(
-      { type: 'serialized', value: composition.content },
-      getEngine()!,
-      allViewContextIds
-    );
-    setGlobalVolume(20);
   };
 </script>
 

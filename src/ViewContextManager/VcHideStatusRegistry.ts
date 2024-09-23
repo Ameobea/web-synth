@@ -1,4 +1,7 @@
-import type { ReduxStore } from 'src/redux';
+import { useEffect, useState } from 'react';
+import { getState, type ReduxStore } from 'src/redux';
+import { onDestroy, onMount } from 'svelte';
+import { writable, type Readable } from 'svelte/store';
 
 type VcHideCb = (isHidden: boolean) => void;
 
@@ -26,6 +29,32 @@ export const unregisterVcHideCb = (vcId: string, cb: VcHideCb) => {
   VcHideCbsByVcId.set(vcId, newCbs);
 };
 
+export const useIsVcHidden = (vcId: string): boolean => {
+  const [isHidden, setIsHidden] = useState(
+    getState().viewContextManager.activeViewContextId === vcId
+  );
+  useEffect(() => {
+    registerVcHideCb(vcId, setIsHidden);
+    return () => unregisterVcHideCb(vcId, setIsHidden);
+  }, [vcId]);
+
+  return isHidden;
+};
+
+// TODO: I feel like this would be an actually good use of Runes in Svelte 5
+export const createVcIsHiddenStore = (vcId: string): Readable<boolean> => {
+  const store = writable(getState().viewContextManager.activeViewContextId === vcId);
+  const cb = (newIsHidden: boolean) => store.set(newIsHidden);
+  onMount(() => registerVcHideCb(vcId, cb));
+  onDestroy(() => unregisterVcHideCb(vcId, cb));
+  return { subscribe: store.subscribe };
+};
+
+/**
+ * This is called from the Rust engine and handles calling the callbacks registered by `registerVcHideCb`.
+ *
+ * It should not be called outside of that spot.
+ */
 export const onVcHideStatusChange = (vcId: string, isHidden: boolean) =>
   VcHideCbsByVcId.get(vcId)?.forEach(cb => cb(isHidden));
 

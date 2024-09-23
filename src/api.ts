@@ -7,6 +7,7 @@ import type { Effect } from 'src/redux/modules/effects';
 import type { SerializedLooperInstState } from 'src/redux/modules/looper';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import type { SampleDescriptor } from 'src/sampleLibrary';
+import { getSentry, logError } from 'src/sentry';
 import type { Without } from 'src/util';
 
 const buildURL = (path: string) => `${BACKEND_BASE_URL}${path}`;
@@ -82,15 +83,26 @@ export const getExistingCompositionTags = async (): Promise<{ name: string; coun
   });
 
 export const getLoadedComposition = async (compositionID: string | number) => {
-  const res = await fetch(`${BACKEND_BASE_URL}/compositions/${compositionID}`);
-  if (res.status === 404) {
-    alert(`Composition with id "${compositionID}" not found`);
-    return;
-  } else if (!res.ok) {
-    alert(`Error loading composition: ${await res.text()}`);
-    return;
+  try {
+    const res = await fetch(`${BACKEND_BASE_URL}/compositions/${compositionID}`);
+    if (res.status === 404) {
+      getSentry()?.captureMessage("Tried to load composition that wasn't found", {
+        extra: { compositionID },
+      });
+      toastError(`Composition with id "${compositionID}" not found`);
+      return;
+    } else if (!res.ok) {
+      getSentry()?.captureMessage('Error loading composition', { extra: { compositionID } });
+      toastError(`Error loading composition: ${await res.text()}`);
+      return;
+    }
+
+    return parseCompositionDefinition(await res.json());
+  } catch (err) {
+    logError('Error fetching composition', err);
+    toastError(`Error fetching composition: ${err}`);
+    throw err;
   }
-  return parseCompositionDefinition(await res.json());
 };
 
 export const saveComposition = async (

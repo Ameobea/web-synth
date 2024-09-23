@@ -43,7 +43,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   errorConsole: {
     display: 'flex',
     flex: 1,
-    color: '#eee',
+    color: '#e00',
     marginLeft: 10,
     fontFamily: "'Oxygen Mono', monospace",
     maxHeight: 600,

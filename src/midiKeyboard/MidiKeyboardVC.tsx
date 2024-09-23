@@ -10,6 +10,7 @@ import MidiKeyboardOutputMappingConfigurator from 'src/midiKeyboard/MidiKeyboard
 import Loading from 'src/misc/Loading';
 import { actionCreators, dispatch, useSelector, type ReduxStore } from 'src/redux';
 import { MidiKeyboardMode } from 'src/redux/modules/midiKeyboard';
+import { useIsVcHidden } from 'src/ViewContextManager/VcHideStatusRegistry';
 
 const mkOctaveCountSelector = () =>
   createSelector(
@@ -107,7 +108,12 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
     [midiNode]
   );
 
-  if (!midiNode) {
+  const vcId = stateKey.split('_')[1];
+  const isHidden = useIsVcHidden(vcId);
+
+  if (isHidden) {
+    return null;
+  } else if (!midiNode) {
     return <Loading />;
   }
 

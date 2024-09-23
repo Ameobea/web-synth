@@ -106,10 +106,15 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
           getSentry()?.captureMessage('Reset Everything button clicked');
           engine.reset_vcm();
         }}
-        style={{ backgroundColor: '#730505', justifyContent: 'space-around', fontSize: 36 }}
+        style={{
+          backgroundColor: '#730505',
+          justifyContent: 'space-around',
+          fontSize: 36,
+          lineHeight: 0,
+        }}
         name='Delete'
       >
-        ×
+        <div style={{ marginBottom: -4 }}>×</div>
       </ViewContextIcon>
       <ViewContextIcon
         displayName={globalBeatCounterStarted ? 'Stop Global Playback' : 'Start Global Playback'}
@@ -145,7 +150,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
         }}
         name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
       >
-        <div style={{ display: 'flex', padding: 4, width: 32, height: 24, marginTop: -6 }}>
+        <div style={{ display: 'flex', padding: 4, width: 32, height: 24, marginTop: -5 }}>
           <div
             className='restart-playback-icon-container'
             dangerouslySetInnerHTML={{ __html: RestartPlayback }}

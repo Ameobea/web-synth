@@ -1,12 +1,11 @@
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import WelcomePageUI from './WelcomePage.svelte';
+import WelcomePageWrapper from './WelcomePageWrapper.svelte';
 
 const buildWelcomePageDOMNodeID = (vcId: string) => `welcomePage-${vcId}`;
 
 export const init_welcome_page = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-  // Create the base dom node to render the composition sharing interface
   const welcomePageBase = document.createElement('div');
   welcomePageBase.id = buildWelcomePageDOMNodeID(vcId);
   welcomePageBase.setAttribute(
@@ -16,7 +15,7 @@ export const init_welcome_page = (stateKey: string) => {
 
   document.getElementById('content')!.appendChild(welcomePageBase);
 
-  mkSvelteContainerRenderHelper({ Comp: WelcomePageUI, getProps: () => ({}) })(
+  mkSvelteContainerRenderHelper({ Comp: WelcomePageWrapper, getProps: () => ({ vcId }) })(
     buildWelcomePageDOMNodeID(vcId)
   );
 };

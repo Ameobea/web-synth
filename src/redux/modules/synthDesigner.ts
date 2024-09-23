@@ -319,7 +319,7 @@ export const deserializeSynthModule = (
           lenSamples:
             (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
               ? msToSamples(filterADSRLength ?? 1000)
-              : filterADSRLength ?? 1,
+              : (filterADSRLength ?? 1),
         }
       : fmSynthConfig.filterEnvelope,
     onInitialized: () => {
@@ -489,6 +489,7 @@ const actionGroups = {
         console.error(`Tried to remove synth ix ${index} but we only have ${state.synths.length}`);
         return state;
       }
+
       disposeSynthModule(removedModule);
 
       const newState = {

@@ -4,6 +4,7 @@ import { BACKEND_BASE_URL } from 'src/conf';
 import type { ADSRValues } from 'src/controls/adsr';
 import { actionCreators, dispatch } from 'src/redux';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
+import { retryAsync } from 'src/util';
 
 export interface SynthPresetEntry {
   id: number;
@@ -27,8 +28,8 @@ export interface SynthVoicePresetEntry {
 }
 
 export type PresetsState = {
-  synthPresets: 'NOT_FETCHED' | 'FETCHING' | SynthPresetEntry[];
-  voicePresets: 'NOT_FETCHED' | 'FETCHING' | SynthVoicePresetEntry[];
+  synthPresets: 'NOT_FETCHED' | 'FETCHING' | 'FETCH_ERROR' | SynthPresetEntry[];
+  voicePresets: 'NOT_FETCHED' | 'FETCHING' | 'FETCH_ERROR' | SynthVoicePresetEntry[];
 };
 
 const buildInitialState = (): PresetsState => ({
@@ -55,34 +56,31 @@ const actionGroups = {
 
 export default buildModule<PresetsState, typeof actionGroups>(buildInitialState(), actionGroups);
 
-const fetchWithRetries = async <T>(
-  attemptCount: number,
-  fetcher: () => Promise<T>,
-  attemptFailMsg?: string,
-  batchFailMsg?: string
-): Promise<T> => {
-  for (let i = 0; i < attemptCount; i++) {
-    try {
-      return fetcher();
-    } catch (_err) {
-      console.warn(attemptFailMsg || `Failed to fetch; attempts: ${i + 1}`);
-    }
-  }
-  throw new Error(batchFailMsg || `Failed to fetch after ${attemptCount} attempts`);
-};
-
 export const fetchSynthPresets = async () => {
   dispatch(actionCreators.presets.SET_SYNTH_PRESETS('FETCHING'));
-  const presets: SynthPresetEntry[] = await fetchWithRetries(3, () =>
-    fetch(`${BACKEND_BASE_URL}/synth_presets`).then(res => res.json())
-  );
-  dispatch(actionCreators.presets.SET_SYNTH_PRESETS(presets));
+
+  try {
+    const presets = await retryAsync(
+      () => fetch(`${BACKEND_BASE_URL}/synth_presets`).then(res => res.json()),
+      3
+    );
+    dispatch(actionCreators.presets.SET_SYNTH_PRESETS(presets));
+  } catch (err) {
+    console.error(`Error fetching synth presets: ${err}`);
+    dispatch(actionCreators.presets.SET_SYNTH_PRESETS('FETCH_ERROR'));
+  }
 };
 
 export const fetchSynthVoicePresets = async () => {
   dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS('FETCHING'));
-  const presets: SynthVoicePresetEntry[] = await fetchWithRetries(3, () =>
-    fetch(`${BACKEND_BASE_URL}/synth_voice_presets`).then(res => res.json())
-  );
-  dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS(presets));
+  try {
+    const presets: SynthVoicePresetEntry[] = await retryAsync(
+      () => fetch(`${BACKEND_BASE_URL}/synth_voice_presets`).then(res => res.json()),
+      3
+    );
+    dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS(presets));
+  } catch (err) {
+    console.error(`Error fetching synth voice presets: ${err}`);
+    dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS('FETCH_ERROR'));
+  }
 };

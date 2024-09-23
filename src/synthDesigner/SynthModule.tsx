@@ -22,6 +22,7 @@ import {
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { type SynthVoicePreset } from 'src/redux/modules/presets';
+import { VoicePresetFetchError } from 'src/synthDesigner/VoicePresetFetchError';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
 
@@ -32,27 +33,27 @@ interface PresetsControlPanelProps {
 
 const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateKey }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
-  const allVoicePresetsRaw = useSelector((state: ReduxStore) => {
-    if (typeof state.presets.voicePresets === 'string') {
-      return null;
-    }
-    return state.presets.voicePresets;
-  }, shallowEqual);
+  const allVoicePresetsRaw = useSelector(
+    (state: ReduxStore) => state.presets.voicePresets,
+    shallowEqual
+  );
   const allVoicePresets = useMemo(
     () =>
-      allVoicePresetsRaw?.map(
-        (preset): PresetDescriptor<SynthVoicePreset> => ({
-          ...preset,
-          name: preset.title,
-          preset: preset.body,
-        })
-      ),
+      typeof allVoicePresetsRaw === 'string'
+        ? allVoicePresetsRaw
+        : allVoicePresetsRaw.map(
+            (preset): PresetDescriptor<SynthVoicePreset> => ({
+              ...preset,
+              name: preset.title,
+              preset: preset.body,
+            })
+          ),
     [allVoicePresetsRaw]
   );
 
   const settings = useMemo(() => {
-    if (!allVoicePresets) {
-      return [{ label: 'loading...', type: 'button', disabled: true }];
+    if (typeof allVoicePresets === 'string') {
+      return null;
     }
 
     return [
@@ -63,7 +64,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
           let pickedPreset: PresetDescriptor<SynthVoicePreset>;
           try {
             pickedPreset = await renderModalWithControls(
-              mkGenericPresetPicker(() => allVoicePresets!)
+              mkGenericPresetPicker(() => allVoicePresets)
             );
           } catch (_err) {
             return; // cancelled
@@ -90,7 +91,13 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
     ];
   }, [actionCreators.synthDesigner, allVoicePresets, dispatch, index, stateKey]);
 
-  return <ControlPanel proxy style={PRESETS_CONTROL_PANEL_STYLE} settings={settings} />;
+  if (settings) {
+    return <ControlPanel proxy style={PRESETS_CONTROL_PANEL_STYLE} settings={settings} />;
+  } else if (allVoicePresets === 'FETCH_ERROR') {
+    return <VoicePresetFetchError />;
+  } else {
+    return <span className='presets-loading'>Loading...</span>;
+  }
 };
 
 interface SynthControlPanelProps extends Pick<SynthModule, 'masterGain' | 'pitchMultiplier'> {
@@ -235,6 +242,7 @@ interface SynthModuleCompProps {
   stateKey: string;
   isHidden: boolean;
   vcId: string;
+  deleteDisabled: boolean;
   children?: React.ReactNode;
 }
 
@@ -245,6 +253,7 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
   children = null,
   isHidden,
   vcId,
+  deleteDisabled,
 }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const filterEnvelope = useMemo(
@@ -262,8 +271,16 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
   return (
     <div className='synth-module'>
       <div
+        role='button'
+        tabIndex={0}
+        aria-disabled={deleteDisabled}
         className='synth-remove-button'
+        style={deleteDisabled ? { color: 'rgb(94, 94, 94)' } : undefined}
         onClick={() => {
+          if (deleteDisabled) {
+            return;
+          }
+
           dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(index));
           const vcId = stateKey.split('_')[1]!;
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
@@ -310,4 +327,5 @@ const SynthModuleComp: React.FC<SynthModuleCompProps> = ({ ...props }) => (
     <SynthModuleCompInner {...props} />
   </Provider>
 );
+
 export default React.memo(SynthModuleComp);
