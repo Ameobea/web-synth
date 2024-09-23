@@ -20,7 +20,8 @@ import type { ReduxStore } from 'src/redux';
 import { getSentry } from 'src/sentry';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
 import RestartPlaybackIcon from './Icons/RestartPlayback.svg';
-import PlayIcon from './Icons/PlayIcon.svg';
+import PlayIcon from './Icons/Play.svg';
+import StopIcon from './Icons/Stop.svg';
 import ResetEverythingIcon from './Icons/ResetEverything.svg';
 import PlusIcon from './Icons/Plus.svg';
 
@@ -126,11 +127,10 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
         style={{ backgroundColor: 'rgb(26, 130, 24)' }}
         name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
       >
-        {globalBeatCounterStarted ? (
-          '⏹️'
-        ) : (
-          <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: PlayIcon }} />
-        )}
+        <div
+          className='svg-wrapper'
+          dangerouslySetInnerHTML={{ __html: globalBeatCounterStarted ? StopIcon : PlayIcon }}
+        />
       </ViewContextIcon>
       <ViewContextIcon
         displayName='Start Global Playback From Beginning'
@@ -201,7 +201,7 @@ const ViewContextTabRenamer: React.FC<VCMTabRenamerProps> = ({ value, setValue, 
       type='text'
       value={value}
       onChange={e => setValue(e.target.value)}
-      onKeyPress={e => {
+      onKeyDown={e => {
         if (e.key === 'Enter') {
           submit();
         }
