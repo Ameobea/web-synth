@@ -19,7 +19,10 @@ import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import type { ReduxStore } from 'src/redux';
 import { getSentry } from 'src/sentry';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
-import RestartPlayback from './Icons/RestartPlayback.svg';
+import RestartPlaybackIcon from './Icons/RestartPlayback.svg';
+import PlayIcon from './Icons/PlayIcon.svg';
+import ResetEverythingIcon from './Icons/ResetEverything.svg';
+import PlusIcon from './Icons/Plus.svg';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -106,15 +109,10 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
           getSentry()?.captureMessage('Reset Everything button clicked');
           engine.reset_vcm();
         }}
-        style={{
-          backgroundColor: '#730505',
-          justifyContent: 'space-around',
-          fontSize: 36,
-          lineHeight: 0,
-        }}
-        name='Delete'
+        style={{ backgroundColor: '#730505', padding: 1 }}
+        name='Reset Everything'
       >
-        <div style={{ marginBottom: -4 }}>×</div>
+        <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: ResetEverythingIcon }} />
       </ViewContextIcon>
       <ViewContextIcon
         displayName={globalBeatCounterStarted ? 'Stop Global Playback' : 'Start Global Playback'}
@@ -125,14 +123,14 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
             startAll();
           }
         }}
-        style={{
-          backgroundColor: 'rgb(26, 130, 24)',
-          justifyContent: 'space-around',
-          fontSize: 27,
-        }}
+        style={{ backgroundColor: 'rgb(26, 130, 24)' }}
         name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
       >
-        {globalBeatCounterStarted ? '⏹️' : '▶️'}
+        {globalBeatCounterStarted ? (
+          '⏹️'
+        ) : (
+          <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: PlayIcon }} />
+        )}
       </ViewContextIcon>
       <ViewContextIcon
         displayName='Start Global Playback From Beginning'
@@ -143,19 +141,10 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
           setCurBeat(0);
           startAll();
         }}
-        style={{
-          backgroundColor: 'rgb(26, 130, 24)',
-          justifyContent: 'space-around',
-          fontSize: 27,
-        }}
-        name={globalBeatCounterStarted ? 'Stop Global Play' : 'Start Global Play'}
+        style={{ backgroundColor: 'rgb(26, 130, 24)', padding: 3 }}
+        name='Restart Playback'
       >
-        <div style={{ display: 'flex', padding: 4, width: 32, height: 24, marginTop: -5 }}>
-          <div
-            className='restart-playback-icon-container'
-            dangerouslySetInnerHTML={{ __html: RestartPlayback }}
-          />
-        </div>
+        <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: RestartPlaybackIcon }} />
       </ViewContextIcon>
       <ViewContextIcon
         displayName='Set Global Volume'
@@ -184,9 +173,8 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
 
           setModulePickerOpen(true);
         }}
-        style={{ justifyContent: 'space-around', fontSize: 36 }}
+        dangerouslySetInnerHTML={{ __html: PlusIcon }}
       >
-        <b>+</b>
         {modulePickerOpen ? <AddModulePicker onClose={() => setModulePickerOpen(false)} /> : null}
       </ViewContextIcon>
     </div>

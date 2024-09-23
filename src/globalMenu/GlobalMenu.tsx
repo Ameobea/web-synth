@@ -16,6 +16,7 @@ import {
 } from 'src/persistance';
 import { getState } from 'src/redux';
 import { noop } from 'src/util';
+import HamburgerMenuIcon from '../ViewContextManager/Icons/HamburgerMenu.svg';
 
 const ctx = new AudioContext();
 
@@ -193,9 +194,8 @@ const GlobalMenuButton: React.FC<{ engine: typeof import('../engine') }> = ({ en
         role='button'
         onClick={() => setIsOpen(true)}
         className='global-menu-button'
-      >
-        ☰
-      </div>
+        dangerouslySetInnerHTML={{ __html: HamburgerMenuIcon }}
+      ></div>
 
       <GlobalMenu engine={engine} closeMenu={() => setIsOpen(false)} isOpen={isOpen} />
       {isOpen ? (
