@@ -51,13 +51,7 @@ export default class NoteLine {
     this.container = new PIXI.Container();
     this.container.interactiveChildren = true;
     this.background = new PIXI.Container();
-    this.background.hitArea = new PIXI.Rectangle(
-      0,
-      // -conf.LINE_HEIGHT / 2,
-      0,
-      this.app.width,
-      conf.LINE_HEIGHT
-    );
+    this.background.hitArea = new PIXI.Rectangle(0, 0, this.app.width, conf.LINE_HEIGHT);
     this.background.interactive = true;
     this.container.addChild(this.background);
     this.container.width = this.app.width;
@@ -211,7 +205,8 @@ export default class NoteLine {
   }
 
   private buildMarkers(): PIXI.Sprite {
-    const markersCacheKey = `${this.app.parentInstance.baseView.pxPerBeat}-${this.app.parentInstance.baseView.beatsPerMeasure}`;
+    const pxPerBeat = this.app.parentInstance.baseView.pxPerBeat;
+    const markersCacheKey = `${pxPerBeat}-${this.app.parentInstance.baseView.beatsPerMeasure}`;
     const cached = this.app.markersCache.get(markersCacheKey);
     if (cached?.baseTexture?.valid) {
       return new PIXI.Sprite(cached);
@@ -221,11 +216,20 @@ export default class NoteLine {
 
     const g = new PIXI.Graphics();
 
+    let beatsPerTick = 1;
+    let beatsPerMeasureLine = this.app.parentInstance.baseView.beatsPerMeasure;
+    let pxPerMeasure = this.app.beatsToPx(beatsPerMeasureLine);
+    while (pxPerMeasure < conf.MIN_MEASURE_WIDTH_PX) {
+      beatsPerMeasureLine *= 2;
+      beatsPerTick *= 2;
+      pxPerMeasure = this.app.beatsToPx(beatsPerMeasureLine);
+    }
+
     let beat = 0;
     const visibleBeats = this.app.width / this.app.parentInstance.baseView.pxPerBeat;
     const endBeat = Math.ceil(visibleBeats);
     while (beat <= endBeat) {
-      const isMeasureLine = beat % this.app.parentInstance.baseView.beatsPerMeasure === 0;
+      const isMeasureLine = beat % beatsPerMeasureLine === 0;
       let x = this.app.beatsToPx(beat);
       if (isMeasureLine) {
         x = Math.round(x);
@@ -237,7 +241,7 @@ export default class NoteLine {
         g.moveTo(x, conf.LINE_HEIGHT * 0.82);
         g.lineTo(x, conf.LINE_HEIGHT);
       }
-      beat += 1;
+      beat += beatsPerTick;
     }
 
     const renderTexture = PIXI.RenderTexture.create({

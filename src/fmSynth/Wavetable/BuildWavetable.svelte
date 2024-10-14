@@ -16,7 +16,7 @@
   });
 
   const DEFAULT_WAVETABLE_SOURCE_CODE = `// Sawtooth wave
-return new Array(32).fill(null).map((_, i) => 1.0 / (i + 1));
+return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
 `;
 </script>
 
@@ -82,9 +82,7 @@ return new Array(32).fill(null).map((_, i) => 1.0 / (i + 1));
       .then(newRenderedWaveformSamples => {
         renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
       })
-      .catch(err => {
-        logError('Error rendering initial wavetable', err);
-      });
+      .catch(err => void logError('Error rendering initial wavetable', err));
   }
 
   const setActiveWaveformIx = (newIx: number, skipSerialize?: boolean) => {

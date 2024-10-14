@@ -9,6 +9,7 @@ export const NOTE_MARK_TICK_COLOR = 0x5c5c5c;
 export const SELECTION_BOX_BORDER_COLOR = 0xa0a0a0;
 export const SELECTION_BOX_FILL_COLOR = 0xcacaca;
 export const MIN_DRAWING_NOTE_WIDTH_PX = 6;
+export const MIN_MEASURE_WIDTH_PX = 16;
 /**
  * After scrolling `SCROLL_ZOOM_DOUBLE_INTERVAL_PX` pixels, the zoom factor (px per beat) will be either doubled if scrolling
  * up (negative scroll delta) or halved if scrolling down (positive scroll delta)

@@ -6,6 +6,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { GlobalVolumeSlider } from './GlobalVolumeSlider';
 import './ViewContextManager.css';
 import {
+  BookmarkPosBeats,
   getIsGlobalBeatCounterStarted,
   registerGlobalStartCB,
   registerGlobalStopCB,
@@ -24,6 +25,7 @@ import PlayIcon from './Icons/Play.svg';
 import StopIcon from './Icons/Stop.svg';
 import ResetEverythingIcon from './Icons/ResetEverything.svg';
 import PlusIcon from './Icons/Plus.svg';
+import { useSvelteStore } from 'src/reactUtils';
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -96,6 +98,8 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
       unregisterStopCB(stopCb);
     };
   }, []);
+  const bookmarkPosBeats = useSvelteStore(BookmarkPosBeats);
+  const hasBookmark = bookmarkPosBeats !== null;
 
   return (
     <div style={styles.root}>
@@ -133,12 +137,16 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
         />
       </ViewContextIcon>
       <ViewContextIcon
-        displayName='Start Global Playback From Beginning'
+        displayName={
+          hasBookmark
+            ? 'Start Global Playback From Bookmark'
+            : 'Start Global Playback From Beginning'
+        }
         onClick={() => {
           if (globalBeatCounterStarted) {
             stopAll();
           }
-          setCurBeat(0);
+          setCurBeat(bookmarkPosBeats ?? 0);
           startAll();
         }}
         style={{ backgroundColor: 'rgb(26, 130, 24)', padding: 3 }}

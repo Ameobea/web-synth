@@ -31,6 +31,7 @@ import type { Unsubscribe } from 'redux';
 import { subscribeToConnections, type ConnectionDescriptor } from 'src/redux/modules/vcmUtils';
 import { MIDINode, type MIDINodeMetadata } from 'src/patchNetwork/midiNode';
 import { get } from 'svelte/store';
+import { BookmarkPosBeats } from 'src/eventScheduler';
 
 export interface Note {
   id: number;
@@ -146,8 +147,8 @@ export default class MIDIEditorUIInstance {
       backgroundColor: conf.BACKGROUND_COLOR,
     });
 
-    this.handleBookmarkPosBeatsChange(get(parentInstance.uiManager.bookmarkPosBeats));
-    this.unsubBookmarkPosBeatsChanges = parentInstance.uiManager.bookmarkPosBeats.subscribe(
+    this.handleBookmarkPosBeatsChange(get(BookmarkPosBeats));
+    this.unsubBookmarkPosBeatsChanges = BookmarkPosBeats.subscribe(
       this.handleBookmarkPosBeatsChange
     );
 
@@ -326,7 +327,7 @@ export default class MIDIEditorUIInstance {
       this.app.stage.removeChild(this.bookmarkCursor.graphics);
       this.bookmarkCursor.destroy();
       this.bookmarkCursor = null;
-      this.handleBookmarkPosBeatsChange(get(this.parentInstance.uiManager.bookmarkPosBeats));
+      this.handleBookmarkPosBeatsChange(get(BookmarkPosBeats));
     }
 
     this.handleViewChange();

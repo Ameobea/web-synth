@@ -207,7 +207,6 @@ export class MIDIEditorUIManager {
     height: window.innerHeight,
   };
   public scrollHorizontalPx: Writable<number>;
-  public bookmarkPosBeats: Writable<number | null> = writable(null);
   private silentOutput: GainNode;
   private ctx: AudioContext;
   private vcId: string;
@@ -552,17 +551,6 @@ export class MIDIEditorUIManager {
     this.vcId = vcId;
     this.silentOutput = new GainNode(ctx);
     this.silentOutput.gain.value = 0;
-
-    if (localStorage.bookmarkPosBeats) {
-      try {
-        this.bookmarkPosBeats.set(parseFloat(localStorage.bookmarkPosBeats));
-      } catch (_err) {
-        console.warn(
-          'Failed to parse `bookmarkPosBeats` from localStorage; found: ',
-          localStorage.bookmarkPosBeats
-        );
-      }
-    }
 
     const instances = initialState.instances.map(inst => {
       if (inst.type === 'midiEditor') {

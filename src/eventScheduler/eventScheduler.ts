@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
 import { getSentry } from 'src/sentry';
 import { UnimplementedError, UnreachableError, retryAsync } from 'src/util';
+import { writable, type Writable } from 'svelte/store';
 
 export enum MIDIEventType {
   Attack = 0,
@@ -153,6 +154,24 @@ const callCb = (cbId: number) => {
   RegisteredCbs.delete(cbId);
   cb();
 };
+
+export const BookmarkPosBeats: Writable<number | null> = writable(
+  (() => {
+    if (localStorage?.bookmarkPosBeats) {
+      try {
+        return parseFloat(localStorage.bookmarkPosBeats);
+      } catch (_err) {
+        console.warn(
+          'Failed to parse `bookmarkPosBeats` from localStorage; found: ',
+          localStorage.bookmarkPosBeats
+        );
+        return null;
+      }
+    } else {
+      return null;
+    }
+  })()
+);
 
 let beatManagerSAB: Float64Array | null = null;
 

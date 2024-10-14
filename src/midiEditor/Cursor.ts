@@ -3,6 +3,7 @@ import { makeDraggable } from 'src/controls/pixiUtils';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import * as conf from './conf';
 import type { FederatedPointerEvent } from '@pixi/events';
+import { BookmarkPosBeats } from 'src/eventScheduler';
 
 export class CursorGutter {
   private app: MIDIEditorUIInstance;
@@ -50,7 +51,7 @@ export class CursorGutter {
       });
     }).on('rightclick', evt => {
       const xBeats = this.getPosBeats(evt);
-      this.app.parentInstance.uiManager.bookmarkPosBeats.set(xBeats);
+      BookmarkPosBeats.set(xBeats);
       localStorage.bookmarkPosBeats = xBeats;
     });
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
@@ -180,7 +181,7 @@ export class BookmarkCursor extends Cursor {
   constructor(inst: MIDIEditorUIInstance, initialPosBeats?: number) {
     super(inst, initialPosBeats);
     this.graphics.on('rightclick', () => {
-      this.app.parentInstance.uiManager.bookmarkPosBeats.set(null);
+      BookmarkPosBeats.set(null);
       delete localStorage.bookmarkPosBeats;
     });
   }
@@ -197,6 +198,6 @@ export class BookmarkCursor extends Cursor {
     this.setPosBeats(newPosBeats);
 
     localStorage.bookmarkPosBeats = newPosBeats;
-    this.app.parentInstance.uiManager.bookmarkPosBeats.set(newPosBeats);
+    BookmarkPosBeats.set(newPosBeats);
   }
 }

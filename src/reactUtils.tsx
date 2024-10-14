@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Provider, useStore } from 'react-redux';
 import type { AnyAction, Store } from 'redux';
-import { type Writable, get } from 'svelte/store';
+import { type Readable, type Writable, get } from 'svelte/store';
 
 interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
   /**
@@ -427,3 +427,9 @@ export const ANewTab: React.FC<ANewTabProps> = ({
     {children || text || ''}
   </a>
 );
+
+export function useSvelteStore<T>(store: Readable<T>): T {
+  const [value, setValue] = useState(get(store));
+  useEffect(() => store.subscribe(setValue), [store]);
+  return value;
+}
