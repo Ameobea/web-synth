@@ -29,6 +29,7 @@ interface MidiKeyboardProps {
   onAttack: (midiNumber: number) => void;
   onRelease: (midiNumber: number) => void;
   style?: React.CSSProperties;
+  isHidden?: boolean;
 }
 
 export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
@@ -37,6 +38,7 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
   onAttack,
   onRelease,
   style,
+  isHidden,
 }) => {
   const reducer = useCallback(
     (
@@ -136,6 +138,10 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
   }, [octaveOffset, playNote, releaseNote]);
 
   const activeNotes = useMemo(() => alreadyDownNotes.toArray(), [alreadyDownNotes]);
+
+  if (isHidden) {
+    return null;
+  }
 
   return (
     <div

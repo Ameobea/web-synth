@@ -31,7 +31,7 @@ export const unregisterVcHideCb = (vcId: string, cb: VcHideCb) => {
 
 export const useIsVcHidden = (vcId: string): boolean => {
   const [isHidden, setIsHidden] = useState(
-    getState().viewContextManager.activeViewContextId === vcId
+    getState().viewContextManager.activeViewContextId !== vcId
   );
   useEffect(() => {
     registerVcHideCb(vcId, setIsHidden);

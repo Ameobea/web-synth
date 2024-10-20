@@ -32,14 +32,14 @@ import { VoicePresetFetchError } from 'src/synthDesigner/VoicePresetFetchError';
 interface AddModuleControlsProps {
   stateKey: string;
   synthDesignerActionCreators: SynthDesignerReduxInfra['actionCreators'];
-  synthDesignerGetState: SynthDesignerReduxInfra['getState'];
+  synthDesignerDispatch: SynthDesignerReduxInfra['dispatch'];
 }
 
 const AddModuleControls: React.FC<AddModuleControlsProps> = ({
   stateKey,
   synthDesignerActionCreators,
+  synthDesignerDispatch,
 }) => {
-  const dispatch = useDispatch();
   const voicePresets = useSelector((state: ReduxStore) => state.presets.voicePresets, shallowEqual);
 
   const settings = useMemo(() => {
@@ -53,7 +53,7 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
         type: 'button',
         action: () => {
           const vcId = stateKey.split('_')[1]!;
-          dispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
+          synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           updateConnectables(vcId, newConnectables);
         },
@@ -79,8 +79,8 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
           }
 
           const vcId = stateKey.split('_')[1]!;
-          dispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
-          dispatch(
+          synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
+          synthDesignerDispatch(
             synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, pickedPreset.preset.body)
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
@@ -88,7 +88,7 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
         },
       },
     ];
-  }, [stateKey, synthDesignerActionCreators.synthDesigner, dispatch, voicePresets]);
+  }, [stateKey, synthDesignerActionCreators.synthDesigner, synthDesignerDispatch, voicePresets]);
 
   if (voicePresets === 'FETCH_ERROR') {
     return <VoicePresetFetchError />;
@@ -265,6 +265,7 @@ const SynthDesigner: React.FC<SynthDesignerProps> = ({ stateKey }) => {
           stateKey={stateKey}
           synthDesignerActionCreators={actionCreators}
           synthDesignerGetState={getState}
+          synthDesignerDispatch={dispatch}
         />
       </div>
 

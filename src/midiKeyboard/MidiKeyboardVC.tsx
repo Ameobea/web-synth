@@ -111,13 +111,15 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
   const vcId = stateKey.split('_')[1];
   const isHidden = useIsVcHidden(vcId);
 
-  if (isHidden) {
-    return null;
-  } else if (!midiNode) {
+  if (!midiNode) {
     return <Loading />;
   }
 
   if (mode === MidiKeyboardMode.MidiInput) {
+    if (isHidden) {
+      return null;
+    }
+
     return (
       <div className='midi-keyboard-vc'>
         <MidiKeyboardModePicker stateKey={stateKey} />
@@ -147,6 +149,7 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
         onOctaveOffsetChange={onOctaveOffsetChange}
         onAttack={onAttack}
         onRelease={onRelease}
+        isHidden={isHidden}
       />
     </div>
   );
