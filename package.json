@@ -28,9 +28,9 @@
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
     "html-webpack-plugin": "^5.6",
+    "http-server": "^14.1.1",
     "prettier": "^3.3.3",
     "prettier-plugin-svelte": "^3.3.2",
-    "serve": "^14.2.4",
     "style-loader": "^4.0.0",
     "svelte-loader": "^3.2.4",
     "svelte-preprocess": "^6.0.3",
@@ -51,7 +51,7 @@
     "prettier": "prettier --write \"src/**/*.{ts,js,tsx}\"",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --browser chrome --record --key 58905cf6-d1cb-43de-b6cd-b55954039c1a",
-    "cypress:serve": "serve -C -s -p 9000 dist"
+    "cypress:serve": "http-server dist -p 9000 -c-1 --silent"
   },
   "dependencies": {
     "@pixi/app": "^7.4.2",
