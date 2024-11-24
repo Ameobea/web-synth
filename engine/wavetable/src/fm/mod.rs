@@ -604,6 +604,26 @@ impl OscillatorSource {
     }
   }
 
+  pub fn get_phase_count(&self) -> usize {
+    match self {
+      OscillatorSource::Wavetable(_) => 1,
+      OscillatorSource::ParamBuffer(_) => 0,
+      OscillatorSource::Sine(_) => 1,
+      OscillatorSource::ExponentialOscillator(_) => 1,
+      OscillatorSource::Square(_) => 1,
+      OscillatorSource::Triangle(_) => 1,
+      OscillatorSource::Sawtooth(_) => 1,
+      OscillatorSource::UnisonSine(osc) => osc.oscillators.len(),
+      OscillatorSource::UnisonWavetable(osc) => osc.oscillators.len(),
+      OscillatorSource::UnisonSquare(osc) => osc.oscillators.len(),
+      OscillatorSource::UnisonTriangle(osc) => osc.oscillators.len(),
+      OscillatorSource::UnisonSawtooth(osc) => osc.oscillators.len(),
+      OscillatorSource::SampleMapping(_) => 0,
+      OscillatorSource::TunedSample(_) => 0,
+      OscillatorSource::WhiteNoise(_) => 0,
+    }
+  }
+
   pub fn set_phase(&mut self, new_phases: &[f32]) {
     let new_phase = new_phases.get(0).copied().unwrap_or_default();
     match self {
@@ -672,6 +692,10 @@ impl OscillatorSource {
 
   /// Given a new operator source, if the new one is the same type as the old one, we
   pub fn maybe_update(&mut self, other: &OscillatorSource) -> bool {
+    if self.get_phase_count() != other.get_phase_count() {
+      return false;
+    }
+
     match self {
       OscillatorSource::Sine(_) => false,
       OscillatorSource::Wavetable(wt) =>
