@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 futures = "0.3"
 # Disable logging staticly in release, making all log calls into no-ops
-log = { version = "0.4", features = ["release_max_level_warn"] }
+log = { version = "0.4", features = [] }
 miniserde = "0.1.16"
 js-sys = "0.3"
 wasm-bindgen = "=0.2.92"

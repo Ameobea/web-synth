@@ -11,7 +11,7 @@ pub fn maybe_init() {
   let log_level = if cfg!(debug_assertions) {
     log::Level::Trace
   } else {
-    log::Level::Warn
+    log::Level::Info
   };
   wasm_logger::init(wasm_logger::Config::new(log_level));
 }

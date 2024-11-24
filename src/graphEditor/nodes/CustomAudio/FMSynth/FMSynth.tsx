@@ -1106,15 +1106,17 @@ export default class FMSynth implements ForeignNode {
           type: 'number',
           node: this.awpHandle
             ? (this.awpHandle.parameters as any).get('voice_14_base_frequency')
-            : new DummyNode(),
+            : new DummyNode('fm-synth-frequency'),
         })
         .set('param_0', {
           type: 'number',
-          node: this.awpHandle ? (this.awpHandle.parameters as any).get('0') : new DummyNode(),
+          node: this.awpHandle
+            ? (this.awpHandle.parameters as any).get('0')
+            : new DummyNode('fm-synth-param-0'),
         }),
       outputs: ImmMap<string, ConnectableOutput>().set('output', {
         type: 'customAudio',
-        node: this.awpHandle ? this.awpHandle : new DummyNode(),
+        node: this.awpHandle ? this.awpHandle : new DummyNode('fm-synth-output'),
       }),
       vcId: this.vcId!,
       node: this,

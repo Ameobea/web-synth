@@ -790,7 +790,7 @@ impl ViewContextManager {
       &serde_json::to_string(&self.subgraphs_by_id).unwrap(),
     );
 
-    #[derive(Clone, Deserialize)]
+    #[derive(Clone, Serialize, Deserialize)]
     struct SerializedSubgraphState {
       #[serde(rename = "txSubgraphID")]
       tx_subgraph_id: Uuid,
@@ -822,6 +822,10 @@ impl ViewContextManager {
         };
 
         let mapped_tx_subgraph_id = new_uuid_by_old_uuid[&state.tx_subgraph_id];
+        info!(
+          "Re-pointing subgraph portal tx. Old ID: {}, new ID: {}",
+          state.tx_subgraph_id, mapped_tx_subgraph_id
+        );
         state.tx_subgraph_id = mapped_tx_subgraph_id;
 
         if fc.subgraph_id == serialized.base_subgraph_id
@@ -841,6 +845,8 @@ impl ViewContextManager {
         } else {
           state.rx_subgraph_id = new_uuid_by_old_uuid[&state.rx_subgraph_id];
         }
+
+        fc.serialized_state = Some(serde_json::to_value(state).unwrap());
       }
 
       let new_id = js::add_foreign_connectable(&serde_json::to_string(fc).unwrap());

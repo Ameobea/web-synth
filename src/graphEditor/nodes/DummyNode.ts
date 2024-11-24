@@ -20,23 +20,22 @@ export default class DummyNode extends GainNode implements AudioNode, MIDINode {
     if (name) {
       this.name = name;
     }
+
+    this.inputCbs = Object.freeze({
+      onAttack: () => {},
+      onRelease: () => {},
+      onPitchBend: () => {},
+      onClearAll: () => {},
+      __dummyNodeName: this.name,
+    } as MIDIInputCbs);
+    this.cachedInputCbs = this.inputCbs;
   }
 
   public outputCbs = [];
   private outputCbs_: MIDIInputCbs[] = [];
 
-  private cachedInputCbs = {
-    onAttack: () => {},
-    onRelease: () => {},
-    onPitchBend: () => {},
-    onClearAll: () => {},
-  };
-  private inputCbs = {
-    onAttack: () => {},
-    onRelease: () => {},
-    onPitchBend: () => {},
-    onClearAll: () => {},
-  };
+  private cachedInputCbs: MIDIInputCbs;
+  private inputCbs: MIDIInputCbs;
   public onAttack = () => {};
   public onRelease = () => {};
   public clearAll = () => {};
@@ -45,12 +44,7 @@ export default class DummyNode extends GainNode implements AudioNode, MIDINode {
 
   public metadata: Writable<MIDINodeMetadata> = writable({ noteMetadata: new Map() });
 
-  public getInputCbs = () => ({
-    onAttack: noop,
-    onRelease: noop,
-    onPitchBend: noop,
-    onClearAll: noop,
-  });
+  public getInputCbs = () => this.inputCbs;
 
   public connect(destinationNode: any) {
     return destinationNode;
