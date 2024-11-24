@@ -7,8 +7,8 @@ export default defineConfig({
   e2e: {
     specPattern: 'cypress/e2e/**/*.{js,jsx,ts,tsx}',
     // delete videos for tests without errors
-    setupNodeEvents(on, config) {
-      on('after:spec', (spec: Cypress.Spec, results: CypressCommandLine.RunResult) => {
+    setupNodeEvents(on, _config) {
+      on('after:spec', (_spec: Cypress.Spec, results: CypressCommandLine.RunResult) => {
         if (results && results.video) {
           // Do we have failures for any retry attempts?
           const failures = results.tests.some(test =>
@@ -22,5 +22,7 @@ export default defineConfig({
       });
     },
   },
+  viewportWidth: 1920,
+  viewportHeight: 1080,
   video: true,
 });

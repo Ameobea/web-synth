@@ -145,11 +145,9 @@ jobs:
           browser: chrome
           start: yarn cypress:serve
           wait-on: 'http://localhost:9000'
-          record: true
         timeout-minutes: 30
         env:
-          # pass the Dashboard record key as an environment variable
-          CYPRESS_RECORD_KEY: 58905cf6-d1cb-43de-b6cd-b55954039c1a
+          CYPRESS_NO_COMMAND_LOG: 0
       - name: Upload recorded video as an artifact
         uses: actions/upload-artifact@v4.4.0
         if: failure()
