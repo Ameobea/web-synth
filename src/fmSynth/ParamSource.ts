@@ -12,7 +12,7 @@ export type ParamSource =
   | { type: 'param buffer'; 'buffer index': number }
   | { type: 'constant'; value: number }
   | { type: 'adsr'; 'adsr index': number; scale: number; shift: number }
-  | { type: 'base frequency multiplier'; multiplier: number }
+  | { type: 'base frequency multiplier'; multiplier: number; offsetHz?: number }
   | {
       type: 'midi control';
       midiControlIndex: number;
@@ -110,7 +110,7 @@ export const encodeParamSource = (source: ParamSource | null | undefined): Encod
         valueType: 3,
         valParamInt: 0,
         valParamFloat: source.multiplier,
-        valParamFloat2: 0,
+        valParamFloat2: source.offsetHz ?? 0,
         valParamFloat3: 0,
       };
     }
@@ -292,6 +292,13 @@ export const buildConfigureParamSourceSettings = ({
           min: 0,
           max: 16,
           step: 0.125,
+        },
+        {
+          type: 'range',
+          label: 'offset hz',
+          min: -100,
+          max: 100,
+          step: 0.1,
         },
       ];
     }

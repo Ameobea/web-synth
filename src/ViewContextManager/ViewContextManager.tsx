@@ -181,8 +181,8 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
 
           setModulePickerOpen(true);
         }}
-        dangerouslySetInnerHTML={{ __html: PlusIcon }}
       >
+        <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: PlusIcon }} />
         {modulePickerOpen ? <AddModulePicker onClose={() => setModulePickerOpen(false)} /> : null}
       </ViewContextIcon>
     </div>

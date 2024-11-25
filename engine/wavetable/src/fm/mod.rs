@@ -1229,7 +1229,10 @@ pub enum ParamSource {
   /// The value of this parameter is determined by the output of a per-voice ADSR that is
   /// triggered every time that voice is triggered.
   PerVoiceADSR(AdsrState),
-  BaseFrequencyMultiplier(f32),
+  BaseFrequencyMultiplier {
+    multiplier: f32,
+    offset_hz: f32,
+  },
   MIDIControlValue {
     control_index: usize,
     scale: f32,
@@ -1358,7 +1361,10 @@ impl ParamSource {
         }) * scale
           + shift
       },
-      ParamSource::BaseFrequencyMultiplier(multiplier) => base_frequency * multiplier,
+      ParamSource::BaseFrequencyMultiplier {
+        multiplier,
+        offset_hz,
+      } => base_frequency * *multiplier + offset_hz,
       ParamSource::MIDIControlValue {
         control_index,
         scale,
@@ -1420,7 +1426,10 @@ impl ParamSource {
         scale: value_param_float,
         shift: value_param_float_2,
       }),
-      3 => ParamSource::BaseFrequencyMultiplier(value_param_float),
+      3 => ParamSource::BaseFrequencyMultiplier {
+        multiplier: value_param_float,
+        offset_hz: value_param_float_2,
+      },
       4 => ParamSource::MIDIControlValue {
         control_index: value_param_int,
         scale: value_param_float,
@@ -1482,16 +1491,21 @@ impl ParamSource {
           }
         }
       },
-      ParamSource::BaseFrequencyMultiplier(multiplier) => {
+      ParamSource::BaseFrequencyMultiplier {
+        multiplier,
+        offset_hz,
+      } => {
         let base_input_ptr = base_frequencies.as_ptr() as *const v128;
         let base_output_ptr = output_buf.as_ptr() as *mut v128;
         let multiplier = f32x4_splat(*multiplier);
+        let offset = f32x4_splat(*offset_hz);
 
         for i in 0..FRAME_SIZE / 4 {
           unsafe {
             let v = v128_load(base_input_ptr.add(i));
             let multiplied = f32x4_mul(v, multiplier);
-            v128_store(base_output_ptr.add(i), multiplied);
+            let added = f32x4_add(multiplied, offset);
+            v128_store(base_output_ptr.add(i), added);
           }
         }
       },
@@ -1612,10 +1626,14 @@ impl ParamSource {
       ParamSource::ParamBuffer(buffer_ix) => {
         output_buf.clone_from_slice(unsafe { param_buffers.get_unchecked(*buffer_ix) });
       },
-      ParamSource::BaseFrequencyMultiplier(multiplier) =>
+      ParamSource::BaseFrequencyMultiplier {
+        multiplier,
+        offset_hz,
+      } =>
         for i in 0..FRAME_SIZE {
           unsafe {
-            *output_buf.get_unchecked_mut(i) = (*base_frequencies.get_unchecked(i)) * *multiplier;
+            *output_buf.get_unchecked_mut(i) =
+              (*base_frequencies.get_unchecked(i)) * *multiplier + *offset_hz;
           };
         },
       ParamSource::PerVoiceADSR(AdsrState {
@@ -1950,7 +1968,10 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
       .operator_base_frequency_sources
       .as_mut_ptr()
       .add(i)
-      .write(ParamSource::BaseFrequencyMultiplier(1.));
+      .write(ParamSource::BaseFrequencyMultiplier {
+        multiplier: 1.,
+        offset_hz: 0.,
+      });
   }
   let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
     Box::new([0.242424; RENDERED_BUFFER_SIZE]);

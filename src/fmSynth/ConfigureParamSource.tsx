@@ -203,6 +203,7 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
         state={useMemo(
           () => ({
             ...state,
+            'offset hz': state.type === 'base frequency multiplier' ? state.offsetHz : undefined,
             'buffer index':
               state.type === 'param buffer' ? state['buffer index'].toString() : undefined,
             'output range':
@@ -265,6 +266,13 @@ const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> =
                 break;
               }
               onChange(updateState(state, { multiplier: value }));
+              break;
+            }
+            case 'offset hz': {
+              if (window.isNaN(value)) {
+                break;
+              }
+              onChange(updateState(state, { offsetHz: value }));
               break;
             }
             case 'enable smoothing': {

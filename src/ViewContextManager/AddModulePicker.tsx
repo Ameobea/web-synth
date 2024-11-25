@@ -50,7 +50,11 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
   { name: 'sampler', displayName: 'Sampler' },
 ];
 
-const AddModulePicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+interface AddModulePickerProps {
+  onClose: () => void;
+}
+
+const AddModulePicker: React.FC<AddModulePickerProps> = ({ onClose }) => {
   const [selectedModule, setSelectedModule] = useState(ViewContextDescriptors[0].displayName);
 
   const settings = useMemo(
