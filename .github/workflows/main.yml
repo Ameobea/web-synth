@@ -57,9 +57,9 @@ jobs:
             ${{ runner.os }}-
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_ENV # Updated set-output to GITHUB_ENV
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_ENV
       - uses: actions/cache@v4
-        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        id: yarn-cache
         with:
           path: ${{ env.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}

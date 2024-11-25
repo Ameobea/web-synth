@@ -50,8 +50,8 @@
     "typecheck": "tsc --noEmit",
     "prettier": "prettier --write \"src/**/*.{ts,js,tsx}\"",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run --browser chrome --record --key 58905cf6-d1cb-43de-b6cd-b55954039c1a",
-    "cypress:serve": "http-server dist -p 9000 -P http://localhost:9000? -c-1 --silent"
+    "cypress:run": "cypress run --browser chrome",
+    "cypress:serve": "http-server dist -p 9000 -P http://127.0.0.1:9000? -c-1"
   },
   "dependencies": {
     "@pixi/app": "^7.4.2",
