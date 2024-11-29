@@ -4,6 +4,7 @@ import ControlPanel from 'react-control-panel';
 
 import './GlobalVolume.css';
 import { getEngine } from 'src/util';
+import { createPortal } from 'react-dom';
 
 interface ViewContextDescriptor {
   name: string;
@@ -93,27 +94,33 @@ const AddModulePicker: React.FC<AddModulePickerProps> = ({ onClose }) => {
 
   return (
     <>
-      <div
-        className='global-menu-backdrop'
-        onClick={evt => {
-          evt.stopPropagation();
-          onClose();
-        }}
-      />
-      <div className='add-module-picker-container'>
-        <ControlPanel
-          width={300}
-          settings={settings}
-          state={useMemo(() => ({ module: selectedModule }), [selectedModule])}
-          onChange={useCallback((_key: string, value: any) => {
-            setSelectedModule(value);
-          }, [])}
-        />
-        <div className='module-description'>
-          {ViewContextDescriptors.find(vc => vc.displayName === selectedModule)?.description ??
-            null}
-        </div>
-      </div>
+      {createPortal(
+        <div
+          className='global-menu-backdrop'
+          onClick={evt => {
+            evt.stopPropagation();
+            onClose();
+          }}
+        />,
+        document.getElementById('content')!
+      )}
+      {createPortal(
+        <div className='add-module-picker-container'>
+          <ControlPanel
+            width={300}
+            settings={settings}
+            state={useMemo(() => ({ module: selectedModule }), [selectedModule])}
+            onChange={useCallback((_key: string, value: any) => {
+              setSelectedModule(value);
+            }, [])}
+          />
+          <div className='module-description'>
+            {ViewContextDescriptors.find(vc => vc.displayName === selectedModule)?.description ??
+              null}
+          </div>
+        </div>,
+        document.getElementById('content')!
+      )}
     </>
   );
 };

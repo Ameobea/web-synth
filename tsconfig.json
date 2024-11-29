@@ -29,7 +29,7 @@
   "paths": {
     "src/*": ["src/**/*"]
   },
-  "include": ["./index.d.ts", "src/**/*"],
+  "include": ["./index.d.ts", "src/**/*", "svg.d.ts"],
   "exclude": [
     "node_modules",
     "dist",

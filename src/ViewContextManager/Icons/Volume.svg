@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="6 0 100 100"
+   version="1.1"
+   width="100"
+   height="100"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <rect
+     x="7.2984352"
+     y="30.954384"
+     width="21.60424"
+     height="40.572498"
+     fill="#ffffff"
+     style="stroke-width:1.20867" />
+  <polygon
+     points="35,35 35,65 55,50 "
+     fill="#ffffff"
+     transform="matrix(-1.5246993,0,0,-2.1552527,106.30052,158.79655)" />
+  <path
+     d="m 61.86183,19.957597 q 29.822402,29.822405 0,59.644807"
+     stroke="#ffffff"
+     stroke-width="7.95265"
+     fill="none" />
+  <path
+     d="m 71.802631,10.016796 q 39.763209,39.763206 0,79.526409"
+     stroke="#ffffff"
+     stroke-width="7.95265"
+     fill="none" />
+</svg>

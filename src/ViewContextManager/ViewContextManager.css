@@ -74,6 +74,7 @@ input.view-context-switcher-tab-renamer {
 .global-volume-slider-container {
   z-index: 10000000;
   position: absolute;
+  top: 60px;
   right: 41px;
   background-color: #181818;
   height: 132px;
@@ -85,15 +86,18 @@ input.view-context-switcher-tab-renamer {
 .add-module-picker-container {
   z-index: 10000000;
   position: absolute;
+  top: 120px;
   right: 41px;
   background-color: #181818;
+  max-width: 300px;
 
   .module-description {
     font-size: 13.5px;
     font-family: 'Hack', 'Input Mono', 'Input', 'Oxygen Mono', monospace;
-    padding: 6px 2px;
+    padding: 6px 4px;
     min-height: 28px;
     box-sizing: border-box;
+    border: 1px solid #88888833;
   }
 }
 

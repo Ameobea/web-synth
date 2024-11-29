@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import './GlobalVolume.css';
 
@@ -18,28 +19,34 @@ export const GlobalVolumeSlider: React.FC<GlobalVolumeSliderProps> = ({ onClose 
 
   return (
     <>
-      <div
-        className='global-menu-backdrop'
-        onClick={evt => {
-          evt.stopPropagation();
-          onClose();
-        }}
-      />
-      <div className='global-volume-slider-container'>
-        <input
-          type='range'
-          min={0}
-          max={100}
-          className='vertical-range-slider'
-          style={{ position: 'absolute', left: -44 }}
-          value={value}
-          onChange={evt => {
-            const value = +evt.target.value;
-            setValue(value);
-            setGlobalVolume(value);
+      {createPortal(
+        <div
+          className='global-menu-backdrop'
+          onClick={evt => {
+            evt.stopPropagation();
+            onClose();
           }}
-        />
-      </div>
+        />,
+        document.getElementById('content')!
+      )}
+      {createPortal(
+        <div className='global-volume-slider-container'>
+          <input
+            type='range'
+            min={0}
+            max={100}
+            className='vertical-range-slider'
+            style={{ position: 'absolute', left: -44 }}
+            value={value}
+            onChange={evt => {
+              const value = +evt.target.value;
+              setValue(value);
+              setGlobalVolume(value);
+            }}
+          />
+        </div>,
+        document.getElementById('content')!
+      )}
     </>
   );
 };

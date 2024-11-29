@@ -24,6 +24,7 @@ import RestartPlaybackIcon from './Icons/RestartPlayback.svg';
 import PlayIcon from './Icons/Play.svg';
 import StopIcon from './Icons/Stop.svg';
 import ResetEverythingIcon from './Icons/ResetEverything.svg';
+import VolumeIcon from './Icons/Volume.svg';
 import PlusIcon from './Icons/Plus.svg';
 import { useSvelteStore } from 'src/reactUtils';
 
@@ -165,7 +166,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
         name='Set Global Volume'
       >
         <>
-          🔊
+          <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: VolumeIcon }} />
           {volumeSliderOpen ? (
             <GlobalVolumeSlider onClose={() => setVolumeSliderOpen(false)} />
           ) : null}

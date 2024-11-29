@@ -50,11 +50,6 @@ declare const process: {
   };
 };
 
-declare module '*.svg' {
-  const content: string;
-  export default content;
-}
-
 declare global {
   declare function dbg<T>(arg: T): T;
 
