@@ -11,7 +11,7 @@ import ConfigureOutputWeight from 'src/fmSynth/ConfigureOutputWeight';
 import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/Effect';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
-import ModulationMatrix from 'src/fmSynth/ModulationMatrix';
+import ModulationMatrix, { EffectDots } from 'src/fmSynth/ModulationMatrix';
 import { buildDefaultParamSource, type ParamSource } from 'src/fmSynth/ParamSource';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -471,6 +471,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
           modulationIndices={state.modulationMatrix}
           operatorConfigs={state.operatorConfigs}
           outputWeights={state.outputWeights}
+          operatorEffects={state.operatorEffects}
           selectedUI={selectedUI}
           onOutputWeightSelected={useCallback(
             (operatorIx: number) => setSelectedUI({ type: 'outputWeight', operatorIx }),
@@ -487,6 +488,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
             onClick={() => setSelectedUI({ type: 'mainEffectChain' })}
           >
             MAIN EFFECT CHAIN
+            <EffectDots effects={state.mainEffectChain} />
           </div>
           <div
             role='button'

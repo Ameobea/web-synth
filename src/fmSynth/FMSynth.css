@@ -91,6 +91,7 @@
       .operator-select {
         cursor: pointer;
         background-color: var(--highlight-2);
+        position: relative;
       }
       .operator-select[data-hovered='true'] {
         background-color: #a1b95d;
@@ -142,6 +143,15 @@
     }
   }
 
+  .effect-dot {
+    border-radius: 100%;
+    width: 4px;
+    height: 4px;
+    position: absolute;
+    bottom: 0.5px;
+    border: 1px solid #ccc;
+  }
+
   .bottom-button-wrapper {
     width: 440px;
     margin-left: auto;
@@ -158,6 +168,7 @@
       border: 1px solid #181818;
       flex: 1;
       user-select: none;
+      position: relative
     }
     .main-effect-chain-selector[data-active='true'] {
       background: linear-gradient(300deg, #ce463f, #e8180e, #c60346, #bf0bb8);

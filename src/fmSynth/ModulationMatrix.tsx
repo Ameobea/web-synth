@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { ThemesByType } from 'src/fmSynth/ConfigureEffects';
 
 import type { OperatorConfig } from 'src/fmSynth/ConfigureOperator';
+import type { Effect } from 'src/fmSynth/Effect';
 import type { UISelection } from 'src/fmSynth/FMSynthUI';
 import type { ParamSource } from 'src/fmSynth/ParamSource';
 import TrainingMIDIControlIndexContext from 'src/fmSynth/TrainingMIDIControlIndexContext';
 import type MIDIControlValuesCache from 'src/graphEditor/nodes/CustomAudio/FMSynth/MIDIControlValuesCache';
+import { filterNils } from 'src/util';
 
 const formatOperatorConfig = (config: OperatorConfig) => {
   if (config.type === 'sample mapping') {
@@ -120,6 +123,32 @@ const FormattedParamSource: React.FC<FormattedParamSourceProps> = ({ param }) =>
   }
 };
 
+interface EffectDotProps {
+  effect: Effect;
+  effectIx: number;
+}
+
+const EffectDot: React.FC<EffectDotProps> = ({ effect, effectIx }) => (
+  <div
+    className='effect-dot'
+    style={{ background: ThemesByType[effect.type].background2, left: effectIx * 6 }}
+  />
+);
+
+interface EffectDotsProps {
+  effects: (Effect | null)[];
+}
+
+export const EffectDots: React.FC<EffectDotsProps> = ({ effects }) => (
+  <>
+    {filterNils(effects)
+      .slice(0, 7)
+      .map((effect, i) => (
+        <EffectDot key={i} effect={effect} effectIx={i} />
+      ))}
+  </>
+);
+
 interface OutputWeightSquareProps {
   operatorIx: number;
   outputWeights: ParamSource[];
@@ -192,6 +221,7 @@ interface ModulationMatrixProps {
   modulationIndices: ParamSource[][];
   operatorConfigs: OperatorConfig[];
   outputWeights: ParamSource[];
+  operatorEffects: (Effect | null)[][];
   onOutputWeightSelected: (operatorIx: number) => void;
   synthID: string;
 }
@@ -204,6 +234,7 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
   modulationIndices,
   operatorConfigs,
   outputWeights,
+  operatorEffects,
   onOutputWeightSelected,
   synthID,
 }) => {
@@ -217,7 +248,7 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
       <div className='hovered-modulation-entity'>{hoveredModulationEntity}</div>
       <div className='modulation-matrix' onMouseLeave={() => setHoveredColIx(null)}>
         {modulationIndices.map((row, srcOperatorIx) => (
-          <div className={'operator-row'} key={srcOperatorIx}>
+          <div className='operator-row' key={srcOperatorIx}>
             <div
               data-hovered={hoveredColIx === srcOperatorIx ? 'true' : 'false'}
               className={
@@ -235,6 +266,7 @@ export const ModulationMatrix: React.FC<ModulationMatrixProps> = ({
               }}
             >
               {formatOperatorConfig(operatorConfigs[srcOperatorIx])}
+              <EffectDots effects={operatorEffects[srcOperatorIx]} />
             </div>
             {row.map((val, dstOperatorIx) => (
               <div

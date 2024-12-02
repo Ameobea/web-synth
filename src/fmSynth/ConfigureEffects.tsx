@@ -139,7 +139,7 @@ const combFilterTheme = { ...baseTheme, background2: 'rgb(36,64,21)' };
 const compressorTheme = { ...baseTheme, background2: 'rgb(16,24,21)' };
 const chorusTheme = { ...baseTheme, background2: 'rgb(181,97,184)' };
 
-const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
+export const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   'spectral warping': spectralWarpTheme,
   wavecruncher: wavecruncherTheme,
   bitcrusher: bitcrusherTheme,
