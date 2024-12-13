@@ -915,10 +915,7 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
 
         <div style={{ display: 'flex', width: 400, flex: 1, flexDirection: 'column' }}>
           {selectedNodeVCID ? (
-            <FlatButton
-              style={{ marginBottom: 4 }}
-              onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}
-            >
+            <FlatButton onClick={() => getEngine()!.switch_view_context(selectedNodeVCID)}>
               Show Full UI
             </FlatButton>
           ) : null}

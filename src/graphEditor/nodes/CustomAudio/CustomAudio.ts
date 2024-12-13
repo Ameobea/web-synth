@@ -45,6 +45,7 @@ import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { FMSynthFxNode } from './FMSynthFx/FMSynthFxNode';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 import { BPMNode } from 'src/graphEditor/nodes/CustomAudio/BPM/BPMNode';
+import { DestinationNodeSmallViewShim } from 'src/graphEditor/nodes/CustomAudio/Destination/DestinationNodeSmallView';
 
 const ctx = new AudioContext();
 
@@ -335,19 +336,18 @@ const CustomBiquadFilterNode = enhanceAudioNode({
   ),
 });
 
+export class CustomAudioDestinationNode extends GainNode {
+  constructor(ctx: AudioContext) {
+    super(ctx);
+    return (ctx as any).globalVolume as GainNode;
+  }
+}
+
 const CustomDestinationNode = enhanceAudioNode({
-  AudioNodeClass: class CustomAudioDestinationNode {
-    constructor(ctx: AudioContext) {
-      return (ctx as any).globalVolume as GainNode;
-    }
-  },
+  AudioNodeClass: CustomAudioDestinationNode,
   nodeType: 'customAudio/destination',
   name: 'Destination',
-  buildConnectables: (
-    foreignNode: ForeignNode<GainNode> & {
-      node: GainNode;
-    }
-  ) => ({
+  buildConnectables: (foreignNode: ForeignNode<GainNode> & { node: GainNode }) => ({
     inputs: Map<string, ConnectableInput>().set('input', {
       node: foreignNode.node,
       type: 'customAudio',
@@ -355,6 +355,7 @@ const CustomDestinationNode = enhanceAudioNode({
     outputs: Map<string, ConnectableOutput>(),
     node: foreignNode,
   }),
+  SmallViewRenderer: DestinationNodeSmallViewShim,
   getOverridableParams: () => [],
   paramKeys: [],
 });
@@ -364,9 +365,7 @@ const NativeCompressorNode = enhanceAudioNode({
   nodeType: 'customAudio/nativeCompressor',
   name: 'Native Compressor',
   buildConnectables: (
-    foreignNode: ForeignNode<DynamicsCompressorNode> & {
-      node: DynamicsCompressorNode;
-    }
+    foreignNode: ForeignNode<DynamicsCompressorNode> & { node: DynamicsCompressorNode }
   ) => ({
     inputs: Map<string, ConnectableInput>(
       Object.entries({
