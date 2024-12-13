@@ -31,7 +31,8 @@ members = [
   "midi_renderer",
   "oscilloscope",
   "canvas_utils",
-  "sampler"
+  "sampler",
+  "safety_limiter"
 ]
 
 [profile.release]
