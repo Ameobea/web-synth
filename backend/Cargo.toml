@@ -44,7 +44,7 @@ tokio = { version = "1.24", features = ["macros", "rt-multi-thread"] }
 scrypt = "0.11.0"
 base64 = "0.22"
 
-rust-s3 = { version = "0.34", features = [] }
+rust-s3 = { version = "0.35", features = [] }
 aws-region = { version = "0.25.0", features = ["serde"] }
 urlencoding = "2.1"
 

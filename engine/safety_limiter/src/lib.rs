@@ -77,6 +77,9 @@ fn process(envelope: &mut f32, sample: f32) -> f32 {
 }
 
 #[no_mangle]
+pub extern "C" fn safety_limiter_get_io_buffer_ptr() -> *mut f32 { io_buf().as_mut_ptr() }
+
+#[no_mangle]
 pub extern "C" fn safety_limiter_process() {
   let state = state();
   let io_buf = io_buf();
