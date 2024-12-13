@@ -45,7 +45,7 @@ import { LGAudioConnectables } from '../AudioConnectablesNode';
 import { FMSynthFxNode } from './FMSynthFx/FMSynthFxNode';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 import { BPMNode } from 'src/graphEditor/nodes/CustomAudio/BPM/BPMNode';
-import { DestinationNodeSmallViewShim } from 'src/graphEditor/nodes/CustomAudio/Destination/DestinationNodeSmallView';
+import { CustomDestinationNode } from 'src/graphEditor/nodes/CustomAudio/Destination/CustomDestinationNode';
 
 const ctx = new AudioContext();
 
@@ -334,30 +334,6 @@ const CustomBiquadFilterNode = enhanceAudioNode({
   SmallViewRenderer: mkLazyComponent(
     () => import('src/graphEditor/nodes/CustomAudio/CustomBiquadFilterNodeSmallView')
   ),
-});
-
-export class CustomAudioDestinationNode extends GainNode {
-  constructor(ctx: AudioContext) {
-    super(ctx);
-    return (ctx as any).globalVolume as GainNode;
-  }
-}
-
-const CustomDestinationNode = enhanceAudioNode({
-  AudioNodeClass: CustomAudioDestinationNode,
-  nodeType: 'customAudio/destination',
-  name: 'Destination',
-  buildConnectables: (foreignNode: ForeignNode<GainNode> & { node: GainNode }) => ({
-    inputs: Map<string, ConnectableInput>().set('input', {
-      node: foreignNode.node,
-      type: 'customAudio',
-    }),
-    outputs: Map<string, ConnectableOutput>(),
-    node: foreignNode,
-  }),
-  SmallViewRenderer: DestinationNodeSmallViewShim,
-  getOverridableParams: () => [],
-  paramKeys: [],
 });
 
 const NativeCompressorNode = enhanceAudioNode({
