@@ -1,4 +1,4 @@
-#![feature(const_maybe_uninit_assume_init, get_mut_unchecked)]
+#![feature(get_mut_unchecked)]
 
 pub mod fm;
 

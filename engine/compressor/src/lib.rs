@@ -1,3 +1,5 @@
+#![feature(const_float_methods)]
+
 use dsp::{
   circular_buffer::CircularBuffer,
   db_to_gain,
@@ -224,7 +226,7 @@ fn detect_level_peak(
 
 /// Given the attack time in milliseconds, compute the coefficient for a one-pole lowpass filter to
 /// be used in the envelope follower.
-fn compute_attack_coefficient(attack_time_ms: f32) -> f32 {
+pub const fn compute_attack_coefficient(attack_time_ms: f32) -> f32 {
   let attack_time_s = (attack_time_ms * 0.001).max(0.0001);
   let attack_time_samples = attack_time_s * SAMPLE_RATE;
   let attack_coefficient = 1. - 1. / attack_time_samples;
@@ -233,7 +235,7 @@ fn compute_attack_coefficient(attack_time_ms: f32) -> f32 {
 
 /// Given the release time in milliseconds, compute the coefficient for a one-pole highpass filter
 /// to be used in the envelope follower.
-fn compute_release_coefficient(release_time_ms: f32) -> f32 {
+pub const fn compute_release_coefficient(release_time_ms: f32) -> f32 {
   let release_time_s = (release_time_ms * 0.001).max(0.0001);
   let release_time_samples = release_time_s * SAMPLE_RATE;
   let release_coefficient = 1. / release_time_samples;
@@ -547,6 +549,7 @@ impl MultibandCompressor {
   }
 }
 
+#[cfg(feature = "exports")]
 #[no_mangle]
 pub extern "C" fn init_compressor() -> *mut MultibandCompressor {
   use std::fmt::Write;
@@ -561,24 +564,28 @@ pub extern "C" fn init_compressor() -> *mut MultibandCompressor {
   Box::into_raw(Box::new(compressor))
 }
 
+#[cfg(feature = "exports")]
 #[no_mangle]
 pub extern "C" fn get_compressor_input_buf_ptr(compressor: *mut MultibandCompressor) -> *mut f32 {
   let compressor = unsafe { &mut *compressor };
   compressor.input_buffer.as_mut_ptr()
 }
 
+#[cfg(feature = "exports")]
 #[no_mangle]
 pub extern "C" fn get_compressor_output_buf_ptr(compressor: *mut MultibandCompressor) -> *mut f32 {
   let compressor = unsafe { &mut *compressor };
   compressor.output_buffer.as_mut_ptr()
 }
 
+#[cfg(feature = "exports")]
 #[no_mangle]
 pub extern "C" fn get_sab_ptr(compressor: *mut MultibandCompressor) -> *mut f32 {
   let compressor = unsafe { &mut *compressor };
   compressor.sab.as_mut_ptr()
 }
 
+#[cfg(feature = "exports")]
 #[no_mangle]
 pub extern "C" fn process_compressor(
   compressor: *mut MultibandCompressor,

@@ -466,6 +466,7 @@ export default class FMSynth implements ForeignNode {
       samples: bank.samples,
     };
     if (
+      this.lastSetWavetableData.wavetableIx === setWavetableData.wavetableIx &&
       this.lastSetWavetableData.baseFrequency === setWavetableData.baseFrequency &&
       this.lastSetWavetableData.waveformsPerDimension === setWavetableData.waveformsPerDimension &&
       this.lastSetWavetableData.waveformLength === setWavetableData.waveformLength &&

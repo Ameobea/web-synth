@@ -76,7 +76,7 @@ pub fn get_waveform_buf_ptr(ctx: *mut WaveformRendererCtx) -> *mut f32 {
 }
 
 #[inline(always)]
-fn ms_to_samples(sample_rate: f32, ms: f32) -> u32 { ((ms * sample_rate) / 1000.) as u32 }
+const fn ms_to_samples(sample_rate: f32, ms: f32) -> u32 { ((ms * sample_rate) / 1000.) as u32 }
 
 #[inline(always)]
 fn sample_to_y_val(sample: f32, half_height: f32, max_distance_from_0: f32) -> u32 {

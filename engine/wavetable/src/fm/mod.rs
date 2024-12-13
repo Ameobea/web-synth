@@ -2699,7 +2699,8 @@ pub extern "C" fn fm_synth_get_wavetable_data_ptr(
     ctx.wavetables[wavetable_ix] = new_wavetable;
   } else if ctx.wavetables.len() != wavetable_ix {
     panic!(
-      "Tried to set wavetable index {} but only {} wavetables exist",
+      "Tried to set wavetable index {} but only {} wavetables exist.  Wavetable bank indices are \
+       managed by the JS code in `FmSynth.tsx`; it's not our fault!",
       wavetable_ix,
       ctx.wavetables.len()
     );

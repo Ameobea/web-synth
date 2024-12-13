@@ -274,11 +274,7 @@ class FaustAudioWorkletProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < Math.min(outputs.length, this.dspOutChannels.length); i++) {
       const dspOutput = this.dspOutChannels[i];
       for (let channelIx = 0; channelIx < outputs[i].length; channelIx++) {
-        // If we send NaNs or out-of-range values, computer gets very upset and destroys
-        // my entire system audio on Linux until I shut down this AWP.
-        for (let sampleIx = 0; sampleIx < outputs[i][channelIx].length; sampleIx++) {
-          outputs[i][channelIx][sampleIx] = clamp(-1.0, 1.0, dspOutput[sampleIx]);
-        }
+        outputs[i][channelIx].set(dspOutput);
       }
     }
 

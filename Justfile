@@ -87,6 +87,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -319,3 +320,7 @@ build-sampler:
 debug-sampler:
   cd ./engine/sampler && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/sampler.wasm ../../public
+
+debug-safety-limiter:
+  cd ./engine/safety_limiter && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/safety_limiter.wasm ../../public
