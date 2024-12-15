@@ -859,11 +859,11 @@ impl ViewContextManager {
       new_uuid_by_old_uuid: &FxHashMap<Uuid, Uuid>,
       new_sid_by_old_sid: &FxHashMap<String, String>,
       old_id: &str,
-    ) -> String {
+    ) -> Option<String> {
       if let Ok(uuid) = Uuid::from_str(old_id) {
-        new_uuid_by_old_uuid[&uuid].to_string()
+        new_uuid_by_old_uuid.get(&uuid).map(|u| u.to_string())
       } else {
-        new_sid_by_old_sid[old_id].clone()
+        new_sid_by_old_sid.get(old_id).cloned()
       }
     }
 
@@ -887,23 +887,60 @@ impl ViewContextManager {
 
           // Keys to update: `last_node_id`, `nodes`, `selectedNodeVcId`
           if let Some(serde_json::Value::String(last_node_id)) = state.get_mut("last_node_id") {
-            *last_node_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, last_node_id);
+            if let Some(mapped_last_node_id) =
+              map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, last_node_id)
+            {
+              *last_node_id = mapped_last_node_id
+            } else {
+              error!(
+                "`last_node_id` {last_node_id} from graph editor id {} in serialized subgraph is \
+                 not in the subgraph",
+                vc.def.uuid
+              );
+              *last_node_id = String::new();
+            };
           }
           if let Some(serde_json::Value::String(selected_node_vc_id)) =
             state.get_mut("selectedNodeVcId")
           {
-            *selected_node_vc_id = map_id(
+            if let Some(mapped_selected_node_id) = map_id(
               &new_uuid_by_old_uuid,
               &new_sid_by_old_sid,
               selected_node_vc_id,
-            );
+            ) {
+              *selected_node_vc_id = mapped_selected_node_id
+            } else {
+              error!(
+                "`selected_node_vc_id` {selected_node_vc_id} from graph editor id {} in \
+                 serialized subgraph is not in the subgraph",
+                vc.def.uuid
+              );
+              *selected_node_vc_id = String::new();
+            };
           }
           if let Some(serde_json::Value::Array(nodes)) = state.get_mut("nodes") {
-            for node in nodes {
+            // for node in nodes {
+
+            // }
+            nodes.retain_mut(|node| {
               if let Some(serde_json::Value::String(vc_id)) = node.get_mut("id") {
-                *vc_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, vc_id);
+                if let Some(mapped_vc_id) =
+                  map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, vc_id)
+                {
+                  *vc_id = mapped_vc_id;
+                  true
+                } else {
+                  error!(
+                    "`node.id` {vc_id} from graph editor id {} in serialized subgraph is not in \
+                     the subgraph",
+                    vc.def.uuid
+                  );
+                  false
+                }
+              } else {
+                false
               }
-            }
+            })
           }
 
           *val = serde_json::to_string(&state).unwrap();
@@ -927,8 +964,20 @@ impl ViewContextManager {
     );
 
     for conn in &mut serialized.intra_conns {
-      let new_tx_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, &conn.0.vc_id);
-      let new_rx_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, &conn.1.vc_id);
+      let new_tx_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, &conn.0.vc_id)
+        .unwrap_or_else(|| {
+          panic!(
+            "Intra conn {conn:?} contains tx ID ({}) which wasn't found in the subgraph",
+            conn.0.vc_id
+          )
+        });
+      let new_rx_id = map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, &conn.1.vc_id)
+        .unwrap_or_else(|| {
+          panic!(
+            "Intra conn {conn:?} contains tx ID ({}) which wasn't found in the subgraph",
+            conn.1.vc_id
+          )
+        });
 
       self.connections.push((
         ConnectionDescriptor {

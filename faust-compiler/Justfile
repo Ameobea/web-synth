@@ -19,3 +19,11 @@ docker-run:
 
 run:
   go build && ./faust-compiler-server
+
+build-and-deploy:
+  #!/bin/bash
+
+  just docker-build
+  docker save ameo/faust-compiler-server:latest | bzip2 > /tmp/faust-compiler-server.tar.bz2
+  scp /tmp/faust-compiler-server.tar.bz2 debian@ameo.dev:/tmp/faust-compiler-server.tar.bz2
+  ssh debian@ameo.dev -t "cat /tmp/faust-compiler-server.tar.bz2 | bunzip2 | docker load && docker kill web-synth-faust-compiler && docker container rm web-synth-faust-compiler && docker run -d --name web-synth-faust-compiler -p 5401:5401 --restart=always -e SOUL_WORKLET_TEMPLATE_FILE_NAME=/opt/SoulAWP.template.js -e AUTH_TOKEN=jkl23489234lkiJKJjk892384928 -e GOOGLE_APPLICATION_CREDENTIALS=/opt/svc.json -e PORT=5401 -e FAUST_WORKLET_TEMPLATE_FILE_NAME=/opt/faustWorkletTemplate.template.js -v /opt/conf/web-synth/service_account.json:/opt/svc.json ameo/faust-compiler-server:latest && rm /tmp/faust-compiler-server.tar.bz2" && rm /tmp/faust-compiler-server.tar.bz2

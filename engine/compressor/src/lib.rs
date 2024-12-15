@@ -309,6 +309,9 @@ impl Compressor {
           &mut self.lookback_period_squared_samples_sum,
         ),
       };
+      if detected_level_linear.is_nan() || !detected_level_db.is_finite() {
+        detected_level_linear = 0.;
+      }
 
       // I have no idea if this is right, and if I had to guess I'd say it's wrong
       self.detected_level_history.set(detected_level_linear);
@@ -556,7 +559,7 @@ pub extern "C" fn init_compressor() -> *mut MultibandCompressor {
   std::panic::set_hook(Box::new(|panic_info| {
     // log with `error`
     let mut buf = String::new();
-    let _ = write!(buf, "panic: {:?}", panic_info);
+    let _ = write!(buf, "panic: {}", panic_info.to_string());
     error(&buf);
   }));
 

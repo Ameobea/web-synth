@@ -151,6 +151,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
 
   just debug-sinsy
 

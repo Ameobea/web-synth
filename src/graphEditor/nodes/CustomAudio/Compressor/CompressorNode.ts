@@ -141,7 +141,6 @@ export class CompressorNode implements ForeignNode {
     if (params) {
       this.deserialize(params as CompressorNodeUIState);
     }
-    this.onChange(get(this.store));
 
     let unsubscribe: (() => void) | undefined;
 
