@@ -93,7 +93,7 @@ export const loadHTSVoice = async (htsVoiceName: string): Promise<Uint8Array | s
   // Currently we special-case the nitech voice
   // TODO: Cache in indexdb or service worker or something
   if (htsVoiceName === 'nitech_jp_song070_f001') {
-    const data = await fetch('https://ameo.link/u/8tg.htsvoice').then(res => res.arrayBuffer());
+    const data = await fetch('https://i.ameo.link/8tg.htsvoice').then(res => res.arrayBuffer());
     return new Uint8Array(data);
   }
 

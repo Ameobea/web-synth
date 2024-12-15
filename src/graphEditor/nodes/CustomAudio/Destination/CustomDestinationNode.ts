@@ -44,6 +44,7 @@ export class CustomDestinationNode extends GainNode implements ForeignNode {
   private state: Writable<CustomDestinationNodeState> = writable(
     buildDefaultCustomDestinationNodeState()
   );
+  private sab = writable<Float32Array | null>(null);
 
   static typeName = 'Destination';
   public nodeType = 'customAudio/destination';
@@ -70,7 +71,7 @@ export class CustomDestinationNode extends GainNode implements ForeignNode {
 
     this.renderSmallView = mkSvelteContainerRenderHelper({
       Comp: CustomDestinationNodeSmallView,
-      getProps: () => ({ state: this.state, node: this }),
+      getProps: () => ({ state: this.state, node: this, sab: this.sab }),
     });
 
     this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });
@@ -81,8 +82,23 @@ export class CustomDestinationNode extends GainNode implements ForeignNode {
     this.setSafetyLimiterEnabled(state.safetyLimiterEnabled);
   }
 
-  // TODO: allow one caller of this method at once
+  // prevent `setSafetyLimiterEnabled` from being called multiple times in parallel
+  private setSafetyLimiterEnabledCalling = false;
+  private setSafetyLimiterEnabledQueue: boolean[] = [];
+
+  private handleAWPMessage(evt: MessageEvent) {
+    if (evt.data.type === 'sab') {
+      this.sab.set(new Float32Array(evt.data.sab));
+    }
+  }
+
   public async setSafetyLimiterEnabled(enabled: boolean) {
+    if (this.setSafetyLimiterEnabledCalling) {
+      this.setSafetyLimiterEnabledQueue.push(enabled);
+      return;
+    }
+    this.setSafetyLimiterEnabledCalling = true;
+
     if (enabled && !this.safetyLimiterConnected) {
       this.safetyLimiterConnected = true;
       if (!this.safetyLimiterAWPHandle) {
@@ -97,6 +113,7 @@ export class CustomDestinationNode extends GainNode implements ForeignNode {
           channelInterpretation: 'discrete',
           channelCountMode: 'explicit',
         });
+        this.safetyLimiterAWPHandle.port.onmessage = evt => this.handleAWPMessage(evt);
         this.safetyLimiterAWPHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
 
         this.safetyLimiterAWPHandle.connect(this.globalVolumeNode, 0, 0);
@@ -123,6 +140,12 @@ export class CustomDestinationNode extends GainNode implements ForeignNode {
       }
 
       this.connect(this.globalVolumeNode, 0, 0);
+    }
+
+    this.setSafetyLimiterEnabledCalling = false;
+    if (this.setSafetyLimiterEnabledQueue.length > 0) {
+      const nextEnabled = this.setSafetyLimiterEnabledQueue.shift()!;
+      await this.setSafetyLimiterEnabled(nextEnabled);
     }
   }
 

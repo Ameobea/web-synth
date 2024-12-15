@@ -207,10 +207,10 @@ class CompressorAWP extends AudioWorkletProcessor {
     this.outputBufPtr = 0;
     this.bypass = false;
 
-    this.port.onmessage = async evt => {
+    this.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
-          await this.initWasm(evt.data.wasmBytes);
+          this.initWasm(evt.data.wasmBytes);
           break;
         }
         case 'shutdown': {
@@ -274,6 +274,7 @@ class CompressorAWP extends AudioWorkletProcessor {
     if (!input || !output || !this.ctxPtr) {
       return true;
     } else if (this.isShutdown) {
+      console.warn('compressor shut down');
       return false;
     }
 

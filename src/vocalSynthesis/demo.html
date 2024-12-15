@@ -31,7 +31,7 @@
       /*'https://ameo.link/u/8tg.htsvoice'*/
       'http://localhost:8080/8tg.htsvoice'
     ).then(res => res.arrayBuffer());
-    const song = fetch('https://ameo.link/u/8th.xml').then(res => res.text());
+    const song = fetch('https://i.ameo.link/8th.xml').then(res => res.text());
     const moduleLoaded = new Promise((resolve) => {
       Module.onRuntimeInitialized = function() {
         window.Module = Module;
