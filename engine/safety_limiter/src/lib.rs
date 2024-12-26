@@ -1,5 +1,4 @@
-use std::ptr::{addr_of, addr_of_mut};
-
+use common::ref_static_mut;
 use dsp::db_to_gain;
 
 static mut IO_BUFFER: [f32; dsp::FRAME_SIZE] = [0.0; dsp::FRAME_SIZE];
@@ -12,9 +11,9 @@ const SAB_SIZE: usize = 3;
 static mut SAB: [f32; SAB_SIZE] = [0.; SAB_SIZE];
 
 #[no_mangle]
-pub extern "C" fn safety_limiter_get_sab_buf_ptr() -> *const f32 { addr_of!(SAB) as *const _ }
+pub extern "C" fn safety_limiter_get_sab_buf_ptr() -> *const f32 { &raw const SAB as *const _ }
 
-fn sab() -> &'static mut [f32; SAB_SIZE] { unsafe { &mut *addr_of_mut!(SAB) } }
+fn sab() -> &'static mut [f32; SAB_SIZE] { ref_static_mut!(SAB) }
 
 const LOOKAHEAD_SAMPLE_COUNT: usize = 40;
 
@@ -41,9 +40,9 @@ const RELEASE_COEFFICIENT: f32 = 0.003;
 const THRESHOLD: f32 = 6.;
 const RATIO: f32 = 200.;
 
-fn io_buf() -> &'static mut [f32; dsp::FRAME_SIZE] { unsafe { &mut *addr_of_mut!(IO_BUFFER) } }
+fn io_buf() -> &'static mut [f32; dsp::FRAME_SIZE] { ref_static_mut!(IO_BUFFER) }
 
-fn state() -> &'static mut SafetyLimiterState { unsafe { &mut *addr_of_mut!(STATE) } }
+fn state() -> &'static mut SafetyLimiterState { ref_static_mut!(STATE) }
 
 fn detect_level_peak_and_apply_envelope(envelope: &mut f32, lookahead_sample: f32) -> f32 {
   let abs_lookahead_sample = if lookahead_sample.is_normal() {

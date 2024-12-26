@@ -13,7 +13,7 @@ extern "C" {
   fn debug1(v: i32);
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 struct MidiEvent {
   pub mailbox_ix: usize,
   pub param_0: f32,
@@ -21,7 +21,7 @@ struct MidiEvent {
   pub event_type: u8,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 struct ScheduledEvent {
   pub time: f64,
   pub cb_id: i32,
@@ -57,10 +57,18 @@ impl PartialOrd for ScheduledEvent {
 static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, Min, 1048576> = BinaryHeap::new();
 static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, Min, 1048576> = BinaryHeap::new();
 
+fn scheduled_events() -> &'static mut BinaryHeap<ScheduledEvent, Min, 1048576> {
+  ref_static_mut!(SCHEDULED_EVENTS)
+}
+
+fn scheduled_beat_events() -> &'static mut BinaryHeap<ScheduledEvent, Min, 1048576> {
+  ref_static_mut!(SCHEDULED_BEAT_EVENTS)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn stop() {
-  SCHEDULED_EVENTS.clear();
-  SCHEDULED_BEAT_EVENTS.clear();
+  scheduled_events().clear();
+  scheduled_beat_events().clear();
 }
 
 #[no_mangle]
@@ -69,13 +77,13 @@ pub extern "C" fn schedule(time: f64, cb_id: i32) {
     panic!();
   }
 
-  unsafe {
-    SCHEDULED_EVENTS.push_unchecked(ScheduledEvent {
+  scheduled_events()
+    .push(ScheduledEvent {
       time,
       cb_id,
       midi_evt: None,
     })
-  }
+    .expect("`SCHEDULED_EVENTS` is full");
 }
 
 #[no_mangle]
@@ -102,13 +110,13 @@ pub extern "C" fn schedule_beats(
     None
   };
 
-  unsafe {
-    SCHEDULED_BEAT_EVENTS.push_unchecked(ScheduledEvent {
+  scheduled_beat_events()
+    .push(ScheduledEvent {
       time: beats,
       cb_id,
       midi_evt,
     })
-  }
+    .expect("`SCHEDULED_BEAT_EVENTS` is full");
 }
 
 fn handle_event(evt: ScheduledEvent) {
@@ -128,27 +136,25 @@ fn handle_event(evt: ScheduledEvent) {
 
 #[no_mangle]
 pub extern "C" fn run(raw_cur_time: f64, cur_beats: f64) {
-  let scheduled_events = ref_static_mut!(SCHEDULED_EVENTS);
   loop {
-    match scheduled_events.peek() {
+    match scheduled_events().peek() {
       None => break,
       Some(evt) if evt.time > raw_cur_time => break,
       _ => (),
     }
 
-    let evt = unsafe { scheduled_events.pop_unchecked() };
+    let evt = unsafe { scheduled_events().pop_unchecked() };
     handle_event(evt);
   }
 
-  let scheduled_beat_events = ref_static_mut!(SCHEDULED_BEAT_EVENTS);
   loop {
-    match scheduled_beat_events.peek() {
+    match scheduled_beat_events().peek() {
       None => break,
       Some(evt) if evt.time > cur_beats => break,
       _ => (),
     }
 
-    let evt = unsafe { scheduled_beat_events.pop_unchecked() };
+    let evt = unsafe { scheduled_beat_events().pop_unchecked() };
     handle_event(evt);
   }
 }
@@ -173,12 +179,10 @@ pub unsafe extern "C" fn alloc_ids_buffer(count: usize) -> *mut i32 {
 #[no_mangle]
 pub extern "C" fn cancel_events_by_ids() -> usize {
   let ids = unsafe { &*IDS_BUFFER }.as_slice();
-  let scheduled_events = ref_static_mut!(SCHEDULED_EVENTS);
-  let scheduled_beat_events = ref_static_mut!(SCHEDULED_BEAT_EVENTS);
 
   let mut actually_cancelled_evt_count = 0;
 
-  let new_scheduled_events = scheduled_events
+  let new_scheduled_events = scheduled_events()
     .iter()
     .filter(|evt| {
       let should_remove = ids.contains(&evt.cb_id);
@@ -189,12 +193,14 @@ pub extern "C" fn cancel_events_by_ids() -> usize {
     })
     .cloned()
     .collect::<Vec<_>>();
-  scheduled_events.clear();
+  scheduled_events().clear();
   for evt in new_scheduled_events {
-    unsafe { scheduled_events.push_unchecked(evt) }
+    scheduled_events()
+      .push(evt)
+      .expect("`SCHEDULED_EVENTS` is full")
   }
 
-  let new_scheduled_beat_events = scheduled_beat_events
+  let new_scheduled_beat_events = scheduled_beat_events()
     .iter()
     .filter(|evt| {
       let should_remove = ids.contains(&evt.cb_id);
@@ -205,9 +211,11 @@ pub extern "C" fn cancel_events_by_ids() -> usize {
     })
     .cloned()
     .collect::<Vec<_>>();
-  scheduled_beat_events.clear();
+  scheduled_beat_events().clear();
   for evt in new_scheduled_beat_events {
-    unsafe { scheduled_beat_events.push_unchecked(evt) }
+    scheduled_beat_events()
+      .push(evt)
+      .expect("`SCHEDULED_BEAT_EVENTS` is full")
   }
 
   actually_cancelled_evt_count

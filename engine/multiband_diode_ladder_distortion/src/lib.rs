@@ -15,23 +15,21 @@ pub extern "C" fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn get_input_buf_ptr() -> *mut f32 {
-  std::ptr::addr_of_mut!(INPUT_BUFFER) as *mut f32
-}
+pub extern "C" fn get_input_buf_ptr() -> *mut f32 { &raw mut INPUT_BUFFER as *mut f32 }
 
 #[no_mangle]
 pub extern "C" fn get_low_output_buf_ptr() -> *mut f32 {
-  std::ptr::addr_of_mut!(LOW_BAND_OUTPUT_BUFFER) as *mut f32
+  &raw mut LOW_BAND_OUTPUT_BUFFER as *mut f32
 }
 
 #[no_mangle]
 pub extern "C" fn get_mid_output_buf_ptr() -> *mut f32 {
-  std::ptr::addr_of_mut!(MID_BAND_OUTPUT_BUFFER) as *mut f32
+  &raw mut MID_BAND_OUTPUT_BUFFER as *mut f32
 }
 
 #[no_mangle]
 pub extern "C" fn get_high_output_buf_ptr() -> *mut f32 {
-  std::ptr::addr_of_mut!(HIGH_BAND_OUTPUT_BUFFER) as *mut f32
+  &raw mut HIGH_BAND_OUTPUT_BUFFER as *mut f32
 }
 
 #[no_mangle]

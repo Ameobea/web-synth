@@ -72,7 +72,46 @@ const buildDefaultModulationIndices = (): ParamSource[][] => {
 export type RampFn =
   | { type: 'linear' }
   | { type: 'instant' }
-  | { type: 'exponential'; exponent: number };
+  | { type: 'exponential'; exponent: number }
+  | {
+      type: 'bezier';
+      /**
+       * Control points' X values are normalized to be between that of the start
+       * and end point of the curve it defines
+       */
+      controlPoints: { x: number; y: number }[];
+    };
+
+export const encodeRampFnType = (rampFnType: RampFn['type']): number =>
+  ({ linear: 0, instant: 1, exponential: 2, bezier: 3 })[rampFnType];
+
+export const encodeRampFnParams = (
+  startStep: AdsrStep | undefined,
+  endStep: AdsrStep,
+  ramper: RampFn
+): [number, number, number, number] => {
+  switch (ramper.type) {
+    case 'exponential':
+      return [ramper.exponent, 0, 0, 0];
+    case 'bezier':
+      if (ramper.controlPoints.length === 2) {
+        // control points' X coords are stored as normalized values between the curve's
+        // start and end points, so we have to convert them back into absolute values
+        const startX = startStep?.x ?? 0;
+        const endX = endStep.x;
+        const x1 = startX + ramper.controlPoints[0].x * (endX - startX);
+        const x2 = startX + ramper.controlPoints[1].x * (endX - startX);
+
+        return [x1, ramper.controlPoints[0].y, x2, ramper.controlPoints[1].y];
+      } else {
+        throw new Error(
+          `Invalid number of control points for bezier ramp; expected 2, got ${ramper.controlPoints.length}`
+        );
+      }
+    default:
+      return [0, 0, 0, 0];
+  }
+};
 
 /**
  * Corresponds to `AdsrStep` in the Wasm engine
@@ -344,16 +383,16 @@ export default class FMSynth implements ForeignNode {
     this.cleanupSmallView = mkContainerCleanupHelper({ preserveRoot: true });
   }
 
-  private encodeAdsrStep(step: AdsrStep) {
-    const param = step.ramper.type === 'exponential' ? step.ramper.exponent : 0;
-    const ramper = { linear: 0, instant: 1, exponential: 2 }[step.ramper.type];
-    return { x: step.x, y: step.y, ramper, param };
+  private encodeAdsrStep(prevStep: AdsrStep | undefined, step: AdsrStep) {
+    const params = encodeRampFnParams(prevStep, step, step.ramper);
+    const ramper = encodeRampFnType(step.ramper.type);
+    return { x: step.x, y: step.y, ramper, params };
   }
 
   private encodeAdsr(adsr: AdsrParams, adsrIx: number) {
     return {
       adsrIx,
-      steps: adsr.steps.map(step => this.encodeAdsrStep(step)),
+      steps: adsr.steps.map((step, stepIx) => this.encodeAdsrStep(adsr.steps[stepIx - 1], step)),
       lenSamples: encodeParamSource(adsr.lenSamples),
       releasePoint: adsr.releasePoint,
       loopPoint: adsr.loopPoint,
@@ -824,7 +863,9 @@ export default class FMSynth implements ForeignNode {
       this.awpHandle.port.postMessage({
         type: 'setAdsr',
         adsrIx,
-        steps: newAdsr.steps.map(step => this.encodeAdsrStep(step)),
+        steps: newAdsr.steps.map((step, stepIx) =>
+          this.encodeAdsrStep(newAdsr.steps[stepIx - 1], step)
+        ),
         lenSamples: encodeParamSource(newAdsr.lenSamples),
         releasePoint: newAdsr.releasePoint,
         loopPoint: newAdsr.loopPoint,

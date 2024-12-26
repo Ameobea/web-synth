@@ -1,6 +1,10 @@
 use std::rc::Rc;
 
-use crate::{managed_adsr::ManagedAdsr, Adsr, AdsrStep, RampFn, RENDERED_BUFFER_SIZE};
+use common::ref_static_mut;
+
+use crate::{
+  managed_adsr::ManagedAdsr, Adsr, AdsrLengthMode, AdsrStep, RampFn, RENDERED_BUFFER_SIZE,
+};
 
 extern "C" {
   fn log_err(msg: *const u8, len: usize);
@@ -28,23 +32,32 @@ fn round_tiny_to_zero(val: f32) -> f32 {
   }
 }
 
+/// Number of `f32`s needed to encode one step in the encoded ADSR step format
+const STEP_F32_COUNT: usize = 7;
+
 fn decode_steps(encoded_steps: &[f32]) -> Vec<AdsrStep> {
   assert_eq!(
-    encoded_steps.len() % 4,
+    encoded_steps.len() % STEP_F32_COUNT,
     0,
-    "`encoded_steps` length must be divisible by 4"
+    "`encoded_steps` length must be divisible by {STEP_F32_COUNT}"
   );
   encoded_steps
-    .chunks_exact(4)
-    .map(|vals| match vals {
-      &[x, y, ramp_fn_type, ramp_fn_param] => {
+    .array_chunks::<STEP_F32_COUNT>()
+    .map(
+      |&[x, y, ramp_fn_type, ramp_fn_param_0, ramp_fn_param_1, ramp_fn_param_2, ramp_fn_param_3]| {
         let ramper = match ramp_fn_type {
           x if x == 0. => RampFn::Instant,
           x if x == 1. => RampFn::Linear,
           x if x == 2. => RampFn::Exponential {
-            exponent: ramp_fn_param,
+            exponent: ramp_fn_param_0,
           },
-          _ => unreachable!("Invalid ramp fn type val"),
+          x if x == 3. => RampFn::Bezier {
+            x1: ramp_fn_param_0,
+            y1: ramp_fn_param_1,
+            x2: ramp_fn_param_2,
+            y2: ramp_fn_param_3,
+          },
+          other => unreachable!("Invalid ramp fn type val: {other}"),
         };
         AdsrStep {
           x: round_tiny_to_zero(x),
@@ -52,30 +65,23 @@ fn decode_steps(encoded_steps: &[f32]) -> Vec<AdsrStep> {
           ramper,
         }
       },
-      _ => unreachable!(),
-    })
+    )
     .collect()
 }
 
 static mut ENCODED_ADSR_STEP_BUF: Vec<f32> = Vec::new();
 
-/// Resizes the step buffer to hold at least `step_count` steps (`step_count * 4` f32s)
+/// Resizes the step buffer to hold at least `step_count` steps (`step_count * STEP_F32_COUNT` f32s)
 #[no_mangle]
 pub unsafe extern "C" fn get_encoded_adsr_step_buf_ptr(step_count: usize) -> *mut f32 {
-  let needed_capacity = step_count * 4;
-  if ENCODED_ADSR_STEP_BUF.capacity() < needed_capacity {
-    let additional = needed_capacity - ENCODED_ADSR_STEP_BUF.capacity();
-    ENCODED_ADSR_STEP_BUF.reserve(additional);
+  let needed_capacity = step_count * STEP_F32_COUNT;
+  let encoded_step_buf = ref_static_mut!(ENCODED_ADSR_STEP_BUF);
+  if encoded_step_buf.capacity() < needed_capacity {
+    let additional = needed_capacity - encoded_step_buf.capacity();
+    encoded_step_buf.reserve(additional);
   }
-  ENCODED_ADSR_STEP_BUF.set_len(needed_capacity);
-  ENCODED_ADSR_STEP_BUF.as_mut_ptr()
-}
-
-#[derive(Clone, Copy)]
-#[repr(u32)]
-pub enum AdsrLengthMode {
-  Ms = 0,
-  Beats = 1,
+  encoded_step_buf.set_len(needed_capacity);
+  encoded_step_buf.as_mut_ptr()
 }
 
 impl AdsrLengthMode {
@@ -126,7 +132,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
   let length_mode = AdsrLengthMode::from_u32(length_mode);
 
   let rendered: Rc<[f32; RENDERED_BUFFER_SIZE]> = Rc::new([0.0f32; RENDERED_BUFFER_SIZE]);
-  let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
+  let decoded_steps = decode_steps(ref_static_mut!(ENCODED_ADSR_STEP_BUF).as_slice());
   assert!(adsr_count > 0);
 
   let mut adsrs = Vec::with_capacity(adsr_count);
@@ -164,7 +170,7 @@ pub unsafe extern "C" fn create_adsr_ctx(
 
 #[no_mangle]
 pub unsafe extern "C" fn update_adsr_steps(ctx: *mut AdsrContext) {
-  let decoded_steps = decode_steps(ENCODED_ADSR_STEP_BUF.as_slice());
+  let decoded_steps = decode_steps(ref_static_mut!(ENCODED_ADSR_STEP_BUF).as_slice());
   for adsr in &mut (*ctx).adsrs {
     adsr.adsr.set_steps(decoded_steps.clone());
   }

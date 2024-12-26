@@ -4,7 +4,7 @@ use super::Effect;
 use crate::fm::{ParamSource, SAMPLE_RATE};
 use dsp::circular_buffer::CircularBuffer;
 
-const MAX_CHORUS_DELAY_SAMPLES: usize = SAMPLE_RATE / 20; // 50ms
+pub const MAX_CHORUS_DELAY_SAMPLES: usize = SAMPLE_RATE / 20; // 50ms
 const NUM_TAPS: usize = 8;
 
 const TWO_PI: f32 = PI * 2.;

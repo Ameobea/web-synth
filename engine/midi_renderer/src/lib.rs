@@ -1,5 +1,6 @@
 //! Renders MIDI notes into a SVG that can be displayed as a minimap.
 
+use common::ref_static_mut;
 use svg::{node::element::Rectangle, Document};
 
 use crate::conf::{MINIMAP_HEIGHT_PX, MIN_MIDI_NUMBER_RANGE, NOTE_COLOR};
@@ -10,11 +11,12 @@ static mut ENCODED_DATA_BUFFER: Vec<u8> = Vec::new();
 
 #[no_mangle]
 pub extern "C" fn get_encoded_notes_buf_ptr(encoded_byte_length: usize) -> *mut u8 {
+  let mut buf = Vec::with_capacity(encoded_byte_length);
   unsafe {
-    ENCODED_DATA_BUFFER = Vec::with_capacity(encoded_byte_length);
-    ENCODED_DATA_BUFFER.set_len(encoded_byte_length);
-    ENCODED_DATA_BUFFER.as_mut_ptr()
+    buf.set_len(encoded_byte_length);
+    ENCODED_DATA_BUFFER = buf;
   }
+  ref_static_mut!(ENCODED_DATA_BUFFER).as_mut_ptr()
 }
 
 static mut RENDERED_SVG_TEXT: String = String::new();
@@ -28,7 +30,7 @@ struct EncodedMIDINote {
 
 #[no_mangle]
 pub extern "C" fn midi_minimap_render_minimap(_beats_per_measure: f32) -> *const u8 {
-  let data_buf: &[u8] = unsafe { ENCODED_DATA_BUFFER.as_slice() };
+  let data_buf: &[u8] = ref_static_mut!(ENCODED_DATA_BUFFER).as_slice();
   assert_eq!(data_buf.len() % 12, 0);
   let encoded_notes: &[EncodedMIDINote] = unsafe {
     std::slice::from_raw_parts(
@@ -87,9 +89,11 @@ pub extern "C" fn midi_minimap_render_minimap(_beats_per_measure: f32) -> *const
   let svg_text: String = doc.to_string();
   unsafe {
     RENDERED_SVG_TEXT = svg_text;
-    RENDERED_SVG_TEXT.as_bytes().as_ptr()
   }
+  ref_static_mut!(RENDERED_SVG_TEXT).as_bytes().as_ptr()
 }
 
 #[no_mangle]
-pub extern "C" fn midi_minimap_get_svg_text_length() -> usize { unsafe { RENDERED_SVG_TEXT.len() } }
+pub extern "C" fn midi_minimap_get_svg_text_length() -> usize {
+  ref_static_mut!(RENDERED_SVG_TEXT).len()
+}

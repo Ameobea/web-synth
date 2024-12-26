@@ -198,8 +198,8 @@ pub extern "C" fn set_gain_envelope_ptr(len: usize) -> *mut f32 {
 
   unsafe {
     GAIN_ENVELOPE_LEN = len;
-    GAIN_ENVELOPE_BUF.as_mut_ptr()
   }
+  &raw mut GAIN_ENVELOPE_BUF as *mut _
 }
 
 fn decode_gain_envelope() -> Vec<f32> {

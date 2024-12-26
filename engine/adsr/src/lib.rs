@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked, array_windows)]
+#![feature(get_mut_unchecked, array_windows, array_chunks)]
 
 use std::rc::Rc;
 
@@ -20,21 +20,40 @@ pub const RENDERED_BUFFER_SIZE: usize = SAMPLE_RATE;
 const FRAME_SIZE: usize = 128;
 
 #[derive(Clone, Copy)]
+#[repr(u32)]
+pub enum AdsrLengthMode {
+  Ms = 0,
+  Beats = 1,
+}
+
+#[derive(Clone, Copy)]
 pub enum RampFn {
   Instant,
   Linear,
   Exponential { exponent: f32 },
+  Bezier { x1: f32, y1: f32, x2: f32, y2: f32 },
 }
 
 impl RampFn {
-  pub fn from_u32(type_val: u32, param: f32) -> Self {
+  pub fn from_u32(type_val: u32, param0: f32, param1: f32, param2: f32, param3: f32) -> Self {
     match type_val {
       0 => Self::Instant,
       1 => Self::Linear,
-      2 => Self::Exponential { exponent: param },
+      2 => Self::Exponential { exponent: param0 },
+      3 => Self::Bezier {
+        x1: param0,
+        y1: param1,
+        x2: param2,
+        y2: param3,
+      },
       _ => panic!("Invlaid ramper fn type: {}", type_val),
     }
   }
+}
+
+fn eval_cubic_bezier(y0: f32, y1: f32, y2: f32, y3: f32, t: f32) -> f32 {
+  let mt = 1. - t;
+  y0 * mt.powi(3) + 3. * y1 * mt.powi(2) * t + 3. * y2 * mt * t.powi(2) + y3 * t.powi(3)
 }
 
 fn compute_pos(prev_step: &AdsrStep, next_step: &AdsrStep, phase: f32) -> f32 {
@@ -53,7 +72,12 @@ fn compute_pos(prev_step: &AdsrStep, next_step: &AdsrStep, phase: f32) -> f32 {
       let y_diff = next_step.y - prev_step.y;
       let x = (phase - prev_step.x) / distance;
       prev_step.y + x.powf(exponent) * y_diff
-      // prev_step.y + even_faster_pow(x, exponent) * y_diff
+    },
+    RampFn::Bezier { y1, y2, .. } => {
+      let y0 = prev_step.y;
+      let y3 = next_step.y;
+      let t = (phase - prev_step.x) / (next_step.x - prev_step.x);
+      eval_cubic_bezier(y0, y1, y2, y3, t)
     },
   }
 }
@@ -120,6 +144,7 @@ pub struct EarlyReleaseConfig {
 }
 
 impl EarlyReleaseConfig {
+  #[cfg(feature = "exports")]
   pub(crate) fn from_parts(
     early_release_mode_type: usize,
     early_release_mode_param: usize,

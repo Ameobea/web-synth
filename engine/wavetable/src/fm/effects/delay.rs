@@ -3,7 +3,7 @@ use dsp::circular_buffer::CircularBuffer;
 use super::Effect;
 use crate::fm::{ParamSource, SAMPLE_RATE};
 
-const MAX_DELAY_SAMPLES: usize = SAMPLE_RATE * 10;
+pub const MAX_DELAY_SAMPLES: usize = SAMPLE_RATE * 10;
 
 #[derive(Clone)]
 pub struct Delay {

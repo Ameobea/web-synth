@@ -414,10 +414,7 @@ export class SubgraphPortalNode implements ForeignNode {
       node: this.placeholderInput,
     });
     for (const [name, descriptor] of Object.entries(get(this.registeredInputs))) {
-      inputs = inputs.set(name, {
-        type: 'any',
-        node: descriptor.node,
-      });
+      inputs = inputs.set(name, descriptor);
     }
 
     let outputs = ImmMap<string, ConnectableOutput>().set(this.placeholderOutput.label, {
@@ -425,10 +422,7 @@ export class SubgraphPortalNode implements ForeignNode {
       node: this.placeholderOutput,
     });
     for (const [name, descriptor] of Object.entries(get(this.registeredOutputs))) {
-      outputs = outputs.set(name, {
-        type: 'any',
-        node: descriptor.node,
-      });
+      outputs = outputs.set(name, descriptor);
     }
 
     return {

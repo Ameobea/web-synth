@@ -105,7 +105,7 @@ pub extern "C" fn oscilloscope_renderer_process(cur_bpm: f32, cur_beat: f32, cur
 
 #[no_mangle]
 pub extern "C" fn oscilloscope_renderer_get_frame_data_ptr() -> *const f32 {
-  unsafe { FRAME_DATA_BUFFER.as_ptr() }
+  &raw const FRAME_DATA_BUFFER as *const _
 }
 
 #[no_mangle]

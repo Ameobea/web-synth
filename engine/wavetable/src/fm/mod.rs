@@ -2,10 +2,10 @@
 use core::arch::wasm32::*;
 use polysynth::{PolySynth, SynthCallbacks};
 use rand::Rng;
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, mem::MaybeUninit, rc::Rc};
 
 use adsr::{
-  exports::AdsrLengthMode, managed_adsr::ManagedAdsr, Adsr, AdsrStep, EarlyReleaseConfig,
+  managed_adsr::ManagedAdsr, Adsr, AdsrLengthMode, AdsrStep, EarlyReleaseConfig,
   EarlyReleaseStrategy, GateStatus, RampFn, RENDERED_BUFFER_SIZE,
 };
 use dsp::{midi_number_to_frequency, oscillator::PhasedOscillator};
@@ -37,7 +37,9 @@ extern "C" {
 
 pub fn log_err_str(s: &str) { unsafe { log_err(s.as_ptr(), s.len()) } }
 
-pub static mut MIDI_CONTROL_VALUES: [f32; 1024] = [0.; 1024];
+const MAX_MIDI_CONTROL_VALUE_COUNT: usize = 1024;
+pub static mut MIDI_CONTROL_VALUES: [f32; MAX_MIDI_CONTROL_VALUE_COUNT] =
+  [0.; MAX_MIDI_CONTROL_VALUE_COUNT];
 const GAIN_ENVELOPE_PHASE_BUF_INDEX: usize = 255;
 const FILTER_ENVELOPE_PHASE_BUF_INDEX: usize = 254;
 
@@ -47,7 +49,7 @@ const VOICE_COUNT: usize = 32;
 
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: usize) {
-  if index >= MIDI_CONTROL_VALUES.len() || value > 127 {
+  if index >= MAX_MIDI_CONTROL_VALUE_COUNT || value > 127 {
     panic!();
   }
 
@@ -986,16 +988,7 @@ impl FMSynthVoice {
       output: 0.,
       adsrs: Vec::new(),
       adsr_params: Vec::new(),
-      operators: [
-        Operator::default(),
-        Operator::default(),
-        Operator::default(),
-        Operator::default(),
-        Operator::default(),
-        Operator::default(),
-        Operator::default(),
-        Operator::default(),
-      ],
+      operators: std::array::from_fn(|_| Operator::default()),
       last_samples: [0.0; OPERATOR_COUNT],
       last_sample_frequencies_per_operator: [0.0; OPERATOR_COUNT],
       effect_chain: EffectChain::default(),
@@ -1923,25 +1916,31 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
   init_sample_manager();
   common::set_raw_panic_hook(log_err);
 
-  let ctx = Box::into_raw(Box::new(FMSynthContext {
-    voices: Box::new(uninit()),
-    modulation_matrix: ModulationMatrix::default(),
-    param_buffers: uninit(),
-    filter_param_buffers: uninit(),
-    operator_base_frequency_sources: uninit(),
-    base_frequency_input_buffer: Box::new(uninit()),
-    output_buffers: Box::new(uninit()),
-    main_output_buffer: uninit(),
-    frequency_multiplier: 1.,
-    most_recent_gated_voice_ix: 0,
-    adsr_phase_buf: [0.; 256],
-    detune: None,
-    wavetables: Vec::new(),
-    sample_mapping_manager: SampleMappingManager::default(),
-    polysynth: uninit(),
-    master_gain: 1.,
-    last_master_gain: 1.,
-  }));
+  let mut ctx: Box<MaybeUninit<FMSynthContext>> = Box::new_uninit();
+  unsafe {
+    let voices_ptr = &mut (*ctx.as_mut_ptr()).voices;
+    std::ptr::write(voices_ptr, Box::new_uninit().assume_init());
+    let modulation_matrix_ptr = &mut (*ctx.as_mut_ptr()).modulation_matrix;
+    std::ptr::write(modulation_matrix_ptr, ModulationMatrix::default());
+    let base_frequency_input_buffer_ptr = &mut (*ctx.as_mut_ptr()).base_frequency_input_buffer;
+    std::ptr::write(
+      base_frequency_input_buffer_ptr,
+      Box::new_uninit().assume_init(),
+    );
+    let output_buffers_ptr = &mut (*ctx.as_mut_ptr()).output_buffers;
+    std::ptr::write(output_buffers_ptr, Box::new_uninit().assume_init());
+    (*ctx.as_mut_ptr()).frequency_multiplier = 1.;
+    (*ctx.as_mut_ptr()).most_recent_gated_voice_ix = 0;
+    (*ctx.as_mut_ptr()).adsr_phase_buf = [0.; 256];
+    (*ctx.as_mut_ptr()).detune = None;
+    let wavetables_ptr = &mut (*ctx.as_mut_ptr()).wavetables;
+    std::ptr::write(wavetables_ptr, Vec::new());
+    let sample_mapping_manager_ptr = &mut (*ctx.as_mut_ptr()).sample_mapping_manager;
+    std::ptr::write(sample_mapping_manager_ptr, SampleMappingManager::default());
+    (*ctx.as_mut_ptr()).master_gain = 1.;
+    (*ctx.as_mut_ptr()).last_master_gain = 1.;
+  }
+  let ctx = Box::into_raw(ctx.assume_init());
 
   std::ptr::write(
     &mut (*ctx).polysynth,
@@ -1973,13 +1972,17 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
         offset_hz: 0.,
       });
   }
+  // let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
+  //   Box::new([0.242424; RENDERED_BUFFER_SIZE]);
   let shared_gain_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
-    Box::new([0.242424; RENDERED_BUFFER_SIZE]);
+    Box::new_uninit().assume_init();
   let shared_gain_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
     shared_gain_adsr_rendered_buffer.into();
 
+  // let shared_filter_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
+  //   Box::new([0.424242; RENDERED_BUFFER_SIZE]);
   let shared_filter_adsr_rendered_buffer: Box<[f32; RENDERED_BUFFER_SIZE]> =
-    Box::new([0.424242; RENDERED_BUFFER_SIZE]);
+    Box::new_uninit().assume_init();
   let shared_filter_adsr_rendered_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> =
     shared_filter_adsr_rendered_buffer.into();
 
@@ -2507,11 +2510,20 @@ static mut ADSR_STEP_BUFFER: [AdsrStep; 512] = [AdsrStep {
 }; 512];
 
 #[no_mangle]
-pub unsafe extern "C" fn set_adsr_step_buffer(i: usize, x: f32, y: f32, ramper: u32, param: f32) {
+pub unsafe extern "C" fn set_adsr_step_buffer(
+  i: usize,
+  x: f32,
+  y: f32,
+  ramper: u32,
+  param0: f32,
+  param1: f32,
+  param2: f32,
+  param3: f32,
+) {
   ADSR_STEP_BUFFER[i] = AdsrStep {
     x,
     y,
-    ramper: RampFn::from_u32(ramper, param),
+    ramper: RampFn::from_u32(ramper, param0, param1, param2, param3),
   }
 }
 

@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked)]
+#![feature(get_mut_unchecked, new_zeroed_alloc)]
 
 pub mod fm;
 

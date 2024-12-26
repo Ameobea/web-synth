@@ -4,6 +4,8 @@ import { buildDefaultAdsrEnvelope, type ADSRValues } from 'src/controls/adsr';
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import {
   AdsrLengthMode,
+  encodeRampFnParams,
+  encodeRampFnType,
   type Adsr,
   type AdsrStep,
 } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
@@ -87,12 +89,22 @@ export class ADSR2Module {
   }
 
   private static encodeADSRSteps(steps: AdsrStep[]): Float32Array {
-    const encoded = new Float32Array(steps.length * 4);
+    const ENCODED_STEP_SIZE = 7;
+
+    const encoded = new Float32Array(steps.length * ENCODED_STEP_SIZE);
     steps.forEach((step, i) => {
-      encoded[i * 4] = step.x;
-      encoded[i * 4 + 1] = step.y;
-      encoded[i * 4 + 2] = { instant: 0, linear: 1, exponential: 2 }[step.ramper.type];
-      encoded[i * 4 + 3] = step.ramper.type === 'exponential' ? step.ramper.exponent : 0;
+      const params: [number, number, number, number] = encodeRampFnParams(
+        steps[i - 1],
+        step,
+        step.ramper
+      );
+      encoded[i * ENCODED_STEP_SIZE] = step.x;
+      encoded[i * ENCODED_STEP_SIZE + 1] = step.y;
+      encoded[i * ENCODED_STEP_SIZE + 2] = encodeRampFnType(step.ramper.type);
+      encoded[i * ENCODED_STEP_SIZE + 3] = params[0];
+      encoded[i * ENCODED_STEP_SIZE + 4] = params[1];
+      encoded[i * ENCODED_STEP_SIZE + 5] = params[2];
+      encoded[i * ENCODED_STEP_SIZE + 6] = params[3];
     });
     return encoded;
   }

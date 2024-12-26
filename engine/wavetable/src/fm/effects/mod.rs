@@ -93,7 +93,7 @@ pub enum EffectInstance {
 }
 
 impl EffectInstance {
-  /// Construts a new effect instance from the raw params passed over from JS
+  /// Constructs a new effect instance from the raw params passed over from JS
   pub fn from_parts(
     effect_type: usize,
     param_1_type: usize,
@@ -266,8 +266,11 @@ impl EffectInstance {
         EffectInstance::ButterworthFilter(ButterworthFilter::new(mode, cutoff_freq))
       },
       6 => {
+        let buffer: Box<CircularBuffer<{ delay::MAX_DELAY_SAMPLES }>> =
+          unsafe { Box::new_zeroed().assume_init() };
+
         let delay = Delay {
-          buffer: Box::new(CircularBuffer::new()),
+          buffer,
           delay_samples: ParamSource::from_parts(
             param_1_type,
             param_1_int_val,
@@ -328,9 +331,14 @@ impl EffectInstance {
         EffectInstance::MoogFilter(moog_filter)
       },
       8 => {
+        let input_buffer: Box<CircularBuffer<{ comb_filter::MAX_DELAY_SAMPLES }>> =
+          unsafe { Box::new_zeroed().assume_init() };
+        let feedback_buffer: Box<CircularBuffer<{ comb_filter::MAX_DELAY_SAMPLES }>> =
+          unsafe { Box::new_zeroed().assume_init() };
+
         let comb_filter = CombFilter {
-          input_buffer: Box::new(CircularBuffer::new()),
-          feedback_buffer: Box::new(CircularBuffer::new()),
+          input_buffer,
+          feedback_buffer,
           delay_samples: ParamSource::from_parts(
             param_1_type,
             param_1_int_val,
@@ -378,8 +386,11 @@ impl EffectInstance {
           lfo_phases[i] = common::rng().gen_range(0., std::f32::consts::PI * 2.);
         }
 
+        let buffer: Box<CircularBuffer<{ chorus::MAX_CHORUS_DELAY_SAMPLES }>> =
+          unsafe { Box::new_zeroed().assume_init() };
+
         let chorus = ChorusEffect {
-          buffer: Box::new(CircularBuffer::new()),
+          buffer,
           modulation_depth: ParamSource::from_parts(
             param_1_type,
             param_1_int_val,

@@ -146,10 +146,17 @@ pub struct AudioThreadData {
   debug_name: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Point2D {
+  x: f32,
+  y: f32,
+}
+
 // export type RampFn =
 //   | { type: 'linear' }
 //   | { type: 'instant' }
 //   | { type: 'exponential'; exponent: number };
+//   | { type: 'bezier'; controlPoints: { x: number; y: number }[]; }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum RampFn {
@@ -159,6 +166,8 @@ pub enum RampFn {
   Instant,
   #[serde(rename = "exponential")]
   Exponential { exponent: f32 },
+  #[serde(rename = "bezier")]
+  Bezier { control_points: Vec<Point2D> },
 }
 
 // export interface AdsrStep {

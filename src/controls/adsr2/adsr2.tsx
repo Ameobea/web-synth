@@ -51,6 +51,63 @@ if (PIXI.settings.RENDER_OPTIONS) {
   PIXI.settings.RENDER_OPTIONS.hello = false;
 }
 
+const evalCubicBezier = (
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  t: number
+) => {
+  // the control point X values (x1 and x2) are normalized to be between x0 and x3,
+  // so they must be scaled back to the original range first
+  x1 = x0 + x1 * (x3 - x0);
+  x2 = x0 + x2 * (x3 - x0);
+
+  const mt = 1 - t;
+  const x = mt * mt * mt * x0 + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3;
+  const y = mt * mt * mt * y0 + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3;
+  return { x, y };
+};
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+const computeCubicBezierControlPoints = (
+  startPoint: Point,
+  handlePos: Point,
+  endPoint: Point
+): { clampedHandlePos: Point; controlPoints: [Point, Point] } => {
+  // TODO: Add link to note deriving this
+  const controlPoint = {
+    x: (4 / 3) * handlePos.x - (1 / 6) * startPoint.x - (1 / 6) * endPoint.x,
+    y: (4 / 3) * handlePos.y - (1 / 6) * startPoint.y - (1 / 6) * endPoint.y,
+  };
+  const xMin = Math.min(startPoint.x, endPoint.x);
+  const xMax = Math.max(startPoint.x, endPoint.x);
+  controlPoint.x = R.clamp(xMin, xMax, controlPoint.x);
+  controlPoint.y = R.clamp(0, 1, controlPoint.y);
+
+  const clampedHandlePos = {
+    x: (1 / 8) * startPoint.x + (3 / 4) * controlPoint.x + (1 / 8) * endPoint.x,
+    y: (1 / 8) * startPoint.y + (3 / 4) * controlPoint.y + (1 / 8) * endPoint.y,
+  };
+
+  // The control point's X value needs to be normalized to the range between
+  // the start and end points.
+  //
+  // This allows the start and end points to be adjusted without the possibility
+  // of invalidating the control points.
+  controlPoint.x = (controlPoint.x - startPoint.x) / (endPoint.x - startPoint.x);
+
+  return { controlPoints: [controlPoint, controlPoint], clampedHandlePos };
+};
+
 /**
  * Controls the properties of a ramp curve.  Can be dragged, but must be bounded by the marks that define
  * the start and stop of the ramp it belongs to.
@@ -87,6 +144,23 @@ class RampHandle {
           this.inst.height - (this.startStep.y * this.inst.height + y * rampHeightPx)
         );
       }
+      case 'bezier': {
+        const { x, y } = evalCubicBezier(
+          this.startStep.x,
+          this.startStep.y,
+          this.endStep.ramper.controlPoints[0].x,
+          this.endStep.ramper.controlPoints[0].y,
+          this.endStep.ramper.controlPoints[1].x,
+          this.endStep.ramper.controlPoints[1].y,
+          this.endStep.x,
+          this.endStep.y,
+          0.5
+        );
+        return new PIXI.Point(
+          computeTransformedXPosition(this.renderedRegion, this.inst.width, x),
+          (1 - y) * this.inst.height
+        );
+      }
       default: {
         throw new UnreachableError(
           'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
@@ -96,11 +170,11 @@ class RampHandle {
   }
 
   private computeNewEndPoint(pos: PIXI.Point) {
-    // handle inverted direction of y axis compared to what we want
-    pos.y = this.inst.height - pos.y;
-
     switch (this.endStep.ramper.type) {
       case 'exponential': {
+        // handle inverted direction of y axis compared to what we want
+        pos.y = this.inst.height - pos.y;
+
         const x = R.clamp(
           0.01,
           0.99,
@@ -124,6 +198,24 @@ class RampHandle {
         this.endStep.ramper.exponent = exponent;
         break;
       }
+      case 'bezier': {
+        const { controlPoints: newControlPoints, clampedHandlePos } =
+          computeCubicBezierControlPoints(
+            { x: this.startStep.x, y: this.startStep.y },
+            {
+              x: computeReverseTransformedXPosition(this.renderedRegion, this.inst.width, pos.x),
+              y: 1 - pos.y / this.inst.height,
+            },
+            { x: this.endStep.x, y: this.endStep.y }
+          );
+
+        this.endStep.ramper.controlPoints = newControlPoints ?? [];
+        this.graphics.position.set(
+          computeTransformedXPosition(this.renderedRegion, this.inst.width, clampedHandlePos.x),
+          (1 - clampedHandlePos.y) * this.inst.height
+        );
+        break;
+      }
       default: {
         throw new UnreachableError(
           'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
@@ -133,17 +225,29 @@ class RampHandle {
   }
 
   private handleDrag(newPos: PIXI.Point) {
-    // Always constrain drags to the area defined by the marks
+    // Always constrain drags to the area defined by the marks, except for bezier
+    // curve which can have its handle's Y coord go outside of the Y bounds of the
+    // start/end points.
     newPos.x = R.clamp(
       computeTransformedXPosition(this.renderedRegion, this.inst.width, this.startStep.x),
       computeTransformedXPosition(this.renderedRegion, this.inst.width, this.endStep.x),
       newPos.x
     );
-    newPos.y = R.clamp(
-      Math.min((1 - this.startStep.y) * this.inst.height, (1 - this.endStep.y) * this.inst.height),
-      Math.max((1 - this.startStep.y) * this.inst.height, (1 - this.endStep.y) * this.inst.height),
-      newPos.y
-    );
+    const minY =
+      this.endStep.ramper.type === 'bezier'
+        ? 0
+        : Math.min(
+            (1 - this.startStep.y) * this.inst.height,
+            (1 - this.endStep.y) * this.inst.height
+          );
+    const maxY =
+      this.endStep.ramper.type === 'bezier'
+        ? this.inst.height
+        : Math.max(
+            (1 - this.startStep.y) * this.inst.height,
+            (1 - this.endStep.y) * this.inst.height
+          );
+    newPos.y = R.clamp(minY, maxY, newPos.y);
     this.graphics.position.set(newPos.x, newPos.y);
 
     this.computeNewEndPoint(newPos);
@@ -242,7 +346,8 @@ class RampCurve {
 
   private buildRampHandle(startStep: AdsrStep, endStep: AdsrStep) {
     switch (endStep.ramper.type) {
-      case 'exponential': {
+      case 'exponential':
+      case 'bezier': {
         return new RampHandle(this.inst, this, startStep, endStep, this.renderedRegion);
       }
       default: {
@@ -251,7 +356,7 @@ class RampCurve {
     }
   }
 
-  private computeRampCurve(step1: AdsrStep, step2: AdsrStep): { x: number; y: number }[] {
+  private computeRampCurve(step1: AdsrStep, step2: AdsrStep): Point[] {
     const step1PosXPx = computeTransformedXPosition(this.renderedRegion, this.inst.width, step1.x);
     const step2PosXPx = computeTransformedXPosition(this.renderedRegion, this.inst.width, step2.x);
 
@@ -285,6 +390,37 @@ class RampCurve {
           { x: step2PosXPx, y: (1 - step1.y) * this.inst.height },
           { x: step2PosXPx, y: (1 - step2.y) * this.inst.height },
         ];
+      }
+      case 'bezier': {
+        if (step2.ramper.controlPoints.length !== 2) {
+          throw new Error(
+            `Invalid number of control points; expected 2, got ${step2.ramper.controlPoints.length}`
+          );
+        }
+
+        const x0 = step1.x;
+        const y0 = step1.y;
+        const x1 = step2.ramper.controlPoints[0].x;
+        const y1 = step2.ramper.controlPoints[0].y;
+        const x2 = step2.ramper.controlPoints[1].x;
+        const y2 = step2.ramper.controlPoints[1].y;
+        const x3 = step2.x;
+        const y3 = step2.y;
+
+        const widthPx = (x3 - x0) * this.inst.width;
+        const pointCount = Math.ceil(widthPx / INTERPOLATED_SEGMENT_LENGTH_PX) + 1;
+
+        const pts = [];
+        for (let i = 0; i <= pointCount; i++) {
+          const t = i / pointCount;
+          const { x, y } = evalCubicBezier(x0, y0, x1, y1, x2, y2, x3, y3, t);
+          pts.push({
+            x: computeTransformedXPosition(this.renderedRegion, this.inst.width, x),
+            y: (1 - y) * this.inst.height,
+          });
+        }
+
+        return pts;
       }
     }
   }
@@ -1097,9 +1233,19 @@ export class ADSR2Instance {
       this.deserialize(initialState);
     } else {
       this.steps = [
-        { x: 0, y: 0.5, ramper: { type: 'linear' as const } },
-        { x: 0.5, y: 0.8, ramper: { type: 'exponential' as const, exponent: 1.5 } },
-        { x: 1, y: 0.5, ramper: { type: 'exponential' as const, exponent: 1.1 } },
+        { ramper: { type: 'instant' as const }, x: 0, y: 0 },
+        {
+          x: 0.006,
+          y: 1,
+          ramper: {
+            type: 'bezier' as const,
+            controlPoints: [
+              { x: 0.4, y: 0.47 },
+              { x: 0.4, y: 0.47 },
+            ],
+          },
+        },
+        { ramper: { type: 'instant' as const }, x: 1, y: 0 },
       ].map(step => new StepHandle(this, step, this.renderedRegion, this.infiniteMode));
       this.releasePoint = 0.8;
     }
@@ -1112,12 +1258,32 @@ export class ADSR2Instance {
   }
 
   private addStep(pos: PIXI.Point) {
+    const normalizedPosX = computeReverseTransformedXPosition(
+      this.renderedRegion,
+      this.width,
+      pos.x
+    );
+    const prevStep = this.steps.findLast(step => step.step.x < normalizedPosX)?.step ?? {
+      x: 0,
+      y: 0.5,
+      ramper: { type: 'linear' },
+    };
+    const normalizedPosY = 1 - pos.y / this.height;
+    const midpointX = (prevStep.x + normalizedPosX) / 2;
+    const midpointY = (prevStep.y + normalizedPosY) / 2;
+
+    const { controlPoints } = computeCubicBezierControlPoints(
+      prevStep,
+      { x: midpointX, y: midpointY },
+      { x: normalizedPosX, y: normalizedPosY }
+    );
+
     const step = new StepHandle(
       this,
       {
         x: computeReverseTransformedXPosition(this.renderedRegion, this.width, pos.x),
         y: 1 - pos.y / this.height,
-        ramper: { type: 'exponential' as const, exponent: 0.1 },
+        ramper: { type: 'bezier' as const, controlPoints },
       },
       this.renderedRegion,
       this.infiniteMode
@@ -1251,9 +1417,9 @@ export class ADSR2Instance {
   }
 
   public openStepHandleConfigurator(
-    step: { x: number; y: number },
+    step: Point,
     evt: PointerEvent,
-    onSubmit: (newStep: { x: number; y: number }) => void,
+    onSubmit: (newStep: Point) => void,
     enableY = true
   ) {
     this.closeStepHandleConfigurator();

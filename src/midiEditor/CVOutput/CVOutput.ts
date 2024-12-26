@@ -40,8 +40,28 @@ export const buildDefaultCVOutputState = (
     // temp value that will be changed when steps are added to the envelope
     lenSamples: 44_100 * 100,
     steps: [
-      { x: 0, y: 0, ramper: { type: 'exponential', exponent: 1 } },
-      { x: 4, y: 1, ramper: { type: 'exponential', exponent: 1 } },
+      {
+        x: 0,
+        y: 0,
+        ramper: {
+          type: 'bezier',
+          controlPoints: [
+            { x: 0.5, y: 0.5 },
+            { x: 0.5, y: 0.5 },
+          ],
+        },
+      },
+      {
+        x: 4,
+        y: 1,
+        ramper: {
+          type: 'bezier',
+          controlPoints: [
+            { x: 0.5, y: 0.5 },
+            { x: 0.5, y: 0.5 },
+          ],
+        },
+      },
     ],
     loopPoint: null,
     releasePoint: 1,
@@ -123,7 +143,13 @@ export class CVOutput {
         normalizedSteps.push({
           ...normalizedSteps[normalizedSteps.length - 1],
           x: 1,
-          ramper: { type: 'linear' },
+          ramper: {
+            type: 'bezier',
+            controlPoints: [
+              { x: 0.5, y: 0.5 },
+              { x: 0.5, y: 0.5 },
+            ],
+          },
         });
       }
 

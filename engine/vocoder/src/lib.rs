@@ -47,6 +47,7 @@ pub struct LevelDetectionBand(RMSLevelDetector<false>);
 
 impl LevelDetectionBand {
   fn new(band_center_freq_hz: f32) -> Self {
+    // TODO: I'm pretty sure this value isn't good and contributes to poor vocoder quality
     let window_size_samples = compute_level_detection_window_samples(band_center_freq_hz);
     LevelDetectionBand(RMSLevelDetector::new(window_size_samples.ceil() as usize))
   }
@@ -98,9 +99,7 @@ const FILTER_PARAMS_BUF_LEN: usize = BAND_COUNT * FILTERS_PER_BAND * 2;
 pub static mut FILTER_PARAMS_BUF: [f32; FILTER_PARAMS_BUF_LEN] = [0.; FILTER_PARAMS_BUF_LEN];
 
 #[no_mangle]
-pub extern "C" fn get_filter_params_buf_ptr() -> *mut f32 {
-  unsafe { FILTER_PARAMS_BUF.as_mut_ptr() }
-}
+pub extern "C" fn get_filter_params_buf_ptr() -> *mut f32 { &raw mut FILTER_PARAMS_BUF as *mut _ }
 
 #[inline(always)]
 fn uninit<T>() -> T { unsafe { MaybeUninit::uninit().assume_init() } }

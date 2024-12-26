@@ -35,11 +35,11 @@ pub fn set_raw_panic_hook(log_err: unsafe extern "C" fn(ptr: *const u8, len: usi
   std::panic::set_hook(Box::new(hook))
 }
 
-/// Implements `&mut *std::ptr::addr_of_mut!(x)` to work around the annoying new Rust rules on
+/// Implements `&mut *&raw mut x` to work around the annoying new Rust rules on
 /// referencing static muts
 #[macro_export]
 macro_rules! ref_static_mut {
   ($x:expr) => {
-    unsafe { &mut *std::ptr::addr_of_mut!($x) }
+    unsafe { &mut *&raw mut $x }
   };
 }

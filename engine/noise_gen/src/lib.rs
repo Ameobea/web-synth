@@ -106,5 +106,5 @@ pub unsafe extern "C" fn generate() -> *const f32 {
     *out = LAST_VAL;
   }
 
-  OUTPUT.as_ptr()
+  &raw const OUTPUT as *const f32
 }

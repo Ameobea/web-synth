@@ -1,5 +1,3 @@
-#![feature(const_float_methods)]
-
 use dsp::{
   circular_buffer::CircularBuffer,
   db_to_gain,

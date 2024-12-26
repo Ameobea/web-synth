@@ -9,3 +9,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 svg = "0.13"
+common = { path = "../common", default-features = false}

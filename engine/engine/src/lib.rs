@@ -228,12 +228,13 @@ pub fn set_foreign_connectables(foreign_connectables_json: &str) {
 #[wasm_bindgen]
 pub fn render_small_view(vc_id: &str, target_dom_id: &str) {
   let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `render_small_view`!");
-  let vc_entry = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
-    panic!(
-      "Attempted to get audio connectables of VC with ID {} but it wasn't found",
-      vc_id
-    )
-  });
+  let Some(vc_entry) = get_vcm().get_vc_by_id_mut(uuid) else {
+    error!(
+      "Attempted to get audio connectables of VC with ID {vc_id} while trying to render small \
+       view, but it wasn't found",
+    );
+    return;
+  };
 
   vc_entry.context.render_small_view(target_dom_id);
 }
@@ -241,12 +242,13 @@ pub fn render_small_view(vc_id: &str, target_dom_id: &str) {
 #[wasm_bindgen]
 pub fn cleanup_small_view(vc_id: &str, target_dom_id: &str) {
   let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `cleanup_small_view`!");
-  let vc_entry = get_vcm().get_vc_by_id_mut(uuid).unwrap_or_else(|| {
-    panic!(
-      "Attempted to get audio connectables of VC with ID {} but it wasn't found",
-      vc_id
-    )
-  });
+  let Some(vc_entry) = get_vcm().get_vc_by_id_mut(uuid) else {
+    error!(
+      "Attempted to get audio connectables of VC with ID {vc_id} while cleaning up small view, \
+       but it wasn't found",
+    );
+    return;
+  };
 
   vc_entry.context.cleanup_small_view(target_dom_id);
 }

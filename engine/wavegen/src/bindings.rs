@@ -56,9 +56,7 @@ static mut WAVEFORM_RENDERER_CTX: *mut WaveformRendererCtx = std::ptr::null_mut(
 static mut ENCODED_STATE_BUF: [f32; HARMONIC_COUNT * 2] = [0.; HARMONIC_COUNT * 2];
 
 #[no_mangle]
-pub extern "C" fn get_encoded_state_buf_ptr() -> *mut f32 {
-  unsafe { ENCODED_STATE_BUF.as_mut_ptr() }
-}
+pub extern "C" fn get_encoded_state_buf_ptr() -> *mut f32 { &raw mut ENCODED_STATE_BUF as *mut _ }
 
 fn get_waveform_renderer_ctx() -> &'static mut WaveformRendererCtx {
   if !unsafe { WAVEFORM_RENDERER_CTX.is_null() } {

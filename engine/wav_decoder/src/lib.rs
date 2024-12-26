@@ -1,12 +1,13 @@
 #[macro_use]
 extern crate log;
 
+use common::ref_static_mut;
 use wasm_bindgen::prelude::*;
 
 static mut ERROR_MESSAGE: String = String::new();
 
 #[wasm_bindgen]
-pub fn get_error_message() -> String { unsafe { ERROR_MESSAGE.clone() } }
+pub fn get_error_message() -> String { ref_static_mut!(ERROR_MESSAGE).clone() }
 
 #[wasm_bindgen]
 pub fn decode_wav(data: Vec<u8>) -> Vec<f32> {
@@ -16,9 +17,9 @@ pub fn decode_wav(data: Vec<u8>) -> Vec<f32> {
   let mut reader = match hound::WavReader::new(data.as_slice()) {
     Ok(r) => r,
     Err(e) => {
-      error!("Error parsing wav file: {}", e);
+      error!("Error parsing wav file: {e}");
       unsafe {
-        ERROR_MESSAGE = format!("Error parsing wav file: {}", e);
+        ERROR_MESSAGE = format!("Error parsing wav file: {e}");
       }
       return Vec::new();
     },
@@ -41,9 +42,9 @@ pub fn decode_wav(data: Vec<u8>) -> Vec<f32> {
   match res {
     Ok(samples) => samples,
     Err(err) => {
-      error!("Error decoding wav file: {:?}", err);
+      error!("Error decoding wav file: {err:?}");
       unsafe {
-        ERROR_MESSAGE = format!("Error decoding wav file: {:?}", err);
+        ERROR_MESSAGE = format!("Error decoding wav file: {err:?}");
       }
       Vec::new()
     },

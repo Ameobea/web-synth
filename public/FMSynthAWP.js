@@ -204,9 +204,9 @@ class FMSynthAWP extends AudioWorkletProcessor {
           }
 
           const { adsrIx, steps, lenSamples, releasePoint, loopPoint, logScale } = evt.data;
-          steps.forEach(({ x, y, ramper, param }, stepIx) => {
-            this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
-          });
+          steps.forEach(({ x, y, ramper, params }, stepIx) =>
+            this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, ...params)
+          );
           this.wasmInstance.exports.set_adsr(
             this.ctxPtr,
             adsrIx,
@@ -532,9 +532,9 @@ class FMSynthAWP extends AudioWorkletProcessor {
       )
     );
     adsrs.forEach(({ steps, lenSamples, releasePoint, loopPoint, logScale, adsrIx }) => {
-      steps.forEach(({ x, y, ramper, param }, stepIx) => {
-        this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, param);
-      });
+      steps.forEach(({ x, y, ramper, params }, stepIx) =>
+        this.wasmInstance.exports.set_adsr_step_buffer(stepIx, x, y, ramper, ...params)
+      );
       this.wasmInstance.exports.set_adsr(
         this.ctxPtr,
         adsrIx,

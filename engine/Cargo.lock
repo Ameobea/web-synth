@@ -6,6 +6,7 @@ version = 4
 name = "adsr"
 version = "0.1.0"
 dependencies = [
+ "common",
  "dsp",
 ]
 
@@ -497,6 +498,7 @@ dependencies = [
 name = "midi_renderer"
 version = "0.1.0"
 dependencies = [
+ "common",
  "svg",
 ]
 
@@ -877,6 +879,7 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 name = "safety_limiter"
 version = "0.1.0"
 dependencies = [
+ "common",
  "compressor",
  "dsp",
 ]
