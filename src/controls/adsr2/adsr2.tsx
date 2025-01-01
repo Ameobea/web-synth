@@ -18,6 +18,7 @@ import {
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import ConfigureStepControlPanel from './ConfigureStepControlPanel.svelte';
+import ConfigureRampControlPanel from './ConfigureRampControlPanel.svelte';
 import type { FederatedPointerEvent } from '@pixi/events';
 
 const dpr = window.devicePixelRatio ?? 1;
@@ -83,7 +84,8 @@ const computeCubicBezierControlPoints = (
   handlePos: Point,
   endPoint: Point
 ): { clampedHandlePos: Point; controlPoints: [Point, Point] } => {
-  // TODO: Add link to note deriving this
+  // This was derived using the method detailed here:
+  // https://cprimozic.net/notes/posts/creating-constrained-bezier-curves-for-an-envelope-generator/
   const controlPoint = {
     x: (4 / 3) * handlePos.x - (1 / 6) * startPoint.x - (1 / 6) * endPoint.x,
     y: (4 / 3) * handlePos.y - (1 / 6) * startPoint.y - (1 / 6) * endPoint.y,
@@ -120,6 +122,8 @@ class RampHandle {
   private parentRamp: RampCurve;
   private graphics!: PIXI.Graphics;
   private renderedRegion: RenderedRegion;
+  private lastClickTime = 0;
+  configurator: { inst: ConfigureRampControlPanel } | null = null;
 
   private computeInitialPos(): PIXI.Point {
     const rampStartPx = computeTransformedXPosition(
@@ -161,10 +165,20 @@ class RampHandle {
           (1 - y) * this.inst.height
         );
       }
-      default: {
-        throw new UnreachableError(
-          'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
+      case 'linear': {
+        return new PIXI.Point(
+          rampStartPx + 0.5 * rampWidthPx,
+          this.inst.height - (this.startStep.y * this.inst.height + 0.5 * rampHeightPx)
         );
+      }
+      case 'instant': {
+        return new PIXI.Point(
+          rampStartPx + rampWidthPx,
+          this.inst.height - this.startStep.y * this.inst.height
+        );
+      }
+      default: {
+        throw new Error(`Unimplemented ramp type: ${(this.endStep.ramper as any).type}`);
       }
     }
   }
@@ -216,10 +230,27 @@ class RampHandle {
         );
         break;
       }
-      default: {
-        throw new UnreachableError(
-          'Ramp type does not support modifying curve: ' + this.endStep.ramper.type
+      case 'linear': {
+        const a = (this.endStep.y - this.startStep.y) / (this.endStep.x - this.startStep.x);
+        const b = this.startStep.y - a * this.startStep.x;
+
+        const x = computeReverseTransformedXPosition(this.renderedRegion, this.inst.width, pos.x);
+        const yOnLine = a * x + b;
+        const yPx = (1 - yOnLine) * this.inst.height;
+        this.graphics.position.set(pos.x, yPx);
+        break;
+      }
+      case 'instant': {
+        const transformedX = computeTransformedXPosition(
+          this.renderedRegion,
+          this.inst.width,
+          this.endStep.x
         );
+        this.graphics.position.set(transformedX, (1 - this.startStep.y) * this.inst.height);
+        break;
+      }
+      default: {
+        throw new UnreachableError(`Unhandled ramp type: ${(this.endStep.ramper as any).type}`);
       }
     }
   }
@@ -257,6 +288,68 @@ class RampHandle {
     this.inst.onUpdated();
   }
 
+  private openConfigurator(x: number, y: number) {
+    const parent = this.inst.app
+      ? (this.inst.app.renderer.view as HTMLCanvasElement).parentElement
+      : null;
+    if (!parent) {
+      console.error('Could not find parent element of renderer');
+      return;
+    }
+
+    this.configurator = {
+      inst: new ConfigureRampControlPanel({
+        props: {
+          top: y - 50,
+          left: x,
+          onCancel: () => this.closeConfigurator(),
+          initialRampFnType: this.endStep.ramper.type,
+          onSubmit: newRampFnType => {
+            switch (newRampFnType) {
+              case 'bezier': {
+                this.endStep.ramper.type = 'bezier';
+                (this.endStep.ramper as any).controlPoints = [
+                  { x: 0, y: 0 },
+                  { x: 0, y: 0 },
+                ];
+                break;
+              }
+              case 'exponential': {
+                this.endStep.ramper.type = 'exponential';
+                (this.endStep.ramper as any).exponent = 1;
+                break;
+              }
+              default: {
+                this.endStep.ramper.type = newRampFnType;
+              }
+            }
+
+            this.handleDrag(this.graphics.position);
+            this.computeNewEndPoint(this.graphics.position);
+            this.parentRamp.reRenderRampCurve(this.startStep, this.endStep);
+            this.inst.onUpdated();
+
+            this.closeConfigurator();
+          },
+        },
+        target: parent,
+      }),
+    };
+  }
+
+  private closeConfigurator() {
+    this.configurator?.inst.$destroy();
+    this.configurator = null;
+  }
+
+  private toggleConfigurator(x: number, y: number) {
+    if (this.configurator) {
+      this.closeConfigurator();
+    } else {
+      this.openConfigurator(x, y);
+    }
+  }
+
   private render() {
     const g = new PIXI.Graphics();
     g.lineStyle(0);
@@ -278,6 +371,14 @@ class RampHandle {
     };
 
     g.on('pointerdown', (evt: FederatedPointerEvent) => {
+      const clickTime = Date.now();
+      const isDoubleClick = clickTime - this.lastClickTime < DOUBLE_CLICK_TIME_RANGE_MS;
+      this.lastClickTime = clickTime;
+
+      if (evt.nativeEvent.button !== 0 || isDoubleClick) {
+        this.toggleConfigurator(evt.x, evt.y);
+      }
+
       this.dragData = evt;
       document.addEventListener('pointermove', handlePointerMove);
     })
@@ -341,19 +442,7 @@ class RampCurve {
     this.inst = inst;
     this.renderedRegion = renderedRegion;
     this.curve = this.renderRampCurve(startStep, endStep);
-    this.handle = this.buildRampHandle(startStep, endStep);
-  }
-
-  private buildRampHandle(startStep: AdsrStep, endStep: AdsrStep) {
-    switch (endStep.ramper.type) {
-      case 'exponential':
-      case 'bezier': {
-        return new RampHandle(this.inst, this, startStep, endStep, this.renderedRegion);
-      }
-      default: {
-        return null;
-      }
-    }
+    this.handle = new RampHandle(this.inst, this, startStep, endStep, this.renderedRegion);
   }
 
   private computeRampCurve(step1: AdsrStep, step2: AdsrStep): Point[] {
@@ -455,7 +544,13 @@ class RampCurve {
     }
 
     if (!this.handle) {
-      this.handle = this.buildRampHandle(this.steps[0], this.steps[1]);
+      this.handle = new RampHandle(
+        this.inst,
+        this,
+        this.steps[0],
+        this.steps[1],
+        this.renderedRegion
+      );
     }
 
     const oldRenderedRegionRange = this.renderedRegion.end - this.renderedRegion.start;
