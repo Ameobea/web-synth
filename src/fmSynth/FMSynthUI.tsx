@@ -688,7 +688,7 @@ const ConnectedFMSynthUIInner: React.FC<ConnectedFMSynthUIProps> = ({
         },
         [synth]
       )}
-      adsrs={synth.getAdsrs()}
+      adsrs={dbg(synth.getAdsrs())}
       onAdsrChange={useCallback(
         (adsrIx: number, newAdsr: AdsrParams) => synth.handleAdsrChange(adsrIx, newAdsr),
         [synth]

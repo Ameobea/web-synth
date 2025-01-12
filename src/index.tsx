@@ -66,7 +66,7 @@ const createGlobalUI = (engine: typeof import('./engine')) => {
   }
 };
 
-if (typeof AudioWorkletNode === 'undefined') {
+if (typeof WebAssembly === 'undefined' || typeof AudioWorkletNode === 'undefined') {
   createBrowserNotSupportedMessage();
 } else {
   initSentry();

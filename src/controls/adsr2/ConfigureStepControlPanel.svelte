@@ -83,7 +83,12 @@
   };
 </script>
 
-<div class="adsr2-configure-step-control-panel" style="top:{top}px; left:{left}px;">
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div
+  class="adsr2-configure-step-control-panel"
+  style="top:{top}px; left:{left}px;"
+  on:contextmenu={e => e.preventDefault()}
+>
   <SvelteControlPanel
     {settings}
     {state}

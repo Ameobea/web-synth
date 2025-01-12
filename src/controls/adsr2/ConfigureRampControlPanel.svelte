@@ -35,7 +35,12 @@
   const handleChange = (key: string, val: any) => state.update(s => ({ ...s, [key]: val }));
 </script>
 
-<div class="adsr2-configure-ramp-control-panel" style="top:{top}px; left:{left}px;">
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div
+  class="adsr2-configure-ramp-control-panel"
+  style="top:{top}px; left:{left}px;"
+  on:contextmenu={e => e.preventDefault()}
+>
   <SvelteControlPanel
     {settings}
     state={$state}

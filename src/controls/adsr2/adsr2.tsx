@@ -377,6 +377,7 @@ class RampHandle {
 
       if (evt.nativeEvent.button !== 0 || isDoubleClick) {
         this.toggleConfigurator(evt.x, evt.y);
+        return;
       }
 
       this.dragData = evt;
