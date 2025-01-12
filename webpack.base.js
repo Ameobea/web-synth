@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
@@ -6,6 +7,11 @@ const sveltePreprocess = require('svelte-preprocess');
 
 const mode = process.env.NODE_ENV || 'development';
 const prod = mode === 'production';
+
+const hbsTemplateParams = {
+  fontCSS: fs.readFileSync(path.resolve(__dirname, 'public/ibm-plex-sans.css'), 'utf8'),
+  indexCSS: fs.readFileSync(path.resolve(__dirname, 'public/index.css'), 'utf8'),
+};
 
 /**
  * @type {import('webpack').Configuration}
@@ -78,6 +84,8 @@ const config = {
       title: 'Web Synth - Realtime Browser Audio Synthesis Plaform',
       minify: true,
       template: 'src/index.hbs',
+      templateParameters: hbsTemplateParams,
+      filename: 'index.html',
       chunks: ['index'],
     }),
     new HtmlWebpackPlugin({
@@ -85,6 +93,7 @@ const config = {
       title: 'Rust + Wasm-powered FM Synthesizer',
       minify: true,
       template: 'src/fm-synth-demo.hbs',
+      templateParameters: hbsTemplateParams,
       filename: 'fm.html',
       hash: true,
       chunks: ['fmDemo'],

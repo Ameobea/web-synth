@@ -12,7 +12,7 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: 240px;
+  width: 360px;
   height: 100vh;
   z-index: 10000000;
   background-color: #121212;
@@ -53,6 +53,15 @@
     button {
       margin-top: 2px;
     }
+  }
+
+  .latency-hint-dirty-message {
+    font-family: 'IBM Plex Sans', 'Open Sans', 'Roboto', sans-serif;
+    font-style: italic;
+    font-size: 14px;
+    margin-top: 4px;
+    display: block;
+    margin-bottom: 4px;
   }
 }
 

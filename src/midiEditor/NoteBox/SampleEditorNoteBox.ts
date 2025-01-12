@@ -12,7 +12,7 @@ class SampleEditorNoteBoxLabel {
   constructor(noteBox: NoteBox, labelText: string, widthPx: number) {
     this.noteBox = noteBox;
     this.text = new PIXI.Text(labelText, {
-      fontFamily: 'PT Sans',
+      fontFamily: 'IBM Plex Sans',
       fontSize: conf.SAMPLE_EDITOR_LABEL_FONT_SIZE,
       fill: conf.SAMPLE_EDITOR_LABEL_TEXT_COLOR,
       align: 'left',

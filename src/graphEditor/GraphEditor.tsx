@@ -718,8 +718,8 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         key => delete LiteGraph.searchbox_extras[key]
       );
       const canvas = new LGraphCanvas(`#${stateKey}_canvas`, graph);
-      canvas.title_text_font = '15px "PT Sans", Arial, sans-serif';
-      // canvas.inner_text_font = 'normal 12px "PT Sans"';
+      canvas.title_text_font = '15px "IBM Plex Sans", Arial, sans-serif';
+      // canvas.inner_text_font = 'normal 12px "IBM Plex Sans"';
       // canvas.ctx.letterSpacing = '-0.5px';
       lGraphCanvasRef.current = canvas;
 

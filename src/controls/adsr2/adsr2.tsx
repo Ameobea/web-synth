@@ -904,7 +904,7 @@ class ScaleMarkings {
       });
       const text = new PIXI.Text(formatted, {
         fontSize: 8.5 * dpr,
-        fontFamily: 'PT Sans',
+        fontFamily: 'IBM Plex Sans',
         fill: 0xfcfcfc,
       });
       // lock text to the left side of the canvas

@@ -36,6 +36,7 @@
 
     <title>{{ htmlWebpackPlugin.options.title }}</title>
     <script type="text/javascript">
+      window.RealAudioContext = window.AudioContext;
       // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
       // other, causing errors when connecting betwen different components.
       //
@@ -49,6 +50,9 @@
       let latencyHint = 'interactive';
       if (localStorage.getItem('latencyHint')) {
         latencyHint = +localStorage.getItem('latencyHint');
+        if (Number.isNaN(latencyHint) || latencyHint <= 0) {
+          latencyHint = 'interactive';
+        }
       } else if (navigator.platform.includes("Linux")) {
         // Get the host operating system's base audio context and use that for latency hint computation
         const _ctx = new AudioContext();
@@ -56,6 +60,7 @@
         _ctx.close();
         latencyHint = 800 / hostSampleRate;
       }
+      window.latencyHint = latencyHint;
 
       const globalContext = new AudioContext({
         sampleRate: 44100,
@@ -79,21 +84,16 @@
         return globalContext;
       };
     </script>
-    <link href="https://fonts.googleapis.com/css?family=PT+Sans&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <link rel="preconnect" href="https://web-synth.b-cdn.net" crossorigin>
+    <style>
+      {{{ fontCSS }}}
+    </style>
     <script src="/wavyjones.js" type="text/javascript"></script>
-    <link rel="stylesheet" href="/index.css" type="text/css" media="print" onload="this.media='all'" />
+    <style>
+      {{{ indexCSS }}}
+    </style>
     <link rel="stylesheet" href="/hack-subset.css" media="print" onload="this.media='all'" />
 
-    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=G-B1ES83ZTMR"></script> -->
-    <script>
-      if (!window.location.href.includes('localhost')) {
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-
-        gtag('config', 'G-B1ES83ZTMR');
-      }
-    </script>
     <script async defer data-domain="notes.ameo.design" src="https://pause.ameo.dev/js/pause.js"></script>
   </head>
 

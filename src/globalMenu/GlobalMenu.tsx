@@ -1,8 +1,9 @@
 import * as R from 'ramda';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './GlobalMenu.css';
 import { useQuery } from 'react-query';
+import ControlPanel from 'react-control-panel';
 
 import { getLoggedInUsername } from 'src/api';
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
@@ -17,21 +18,28 @@ import {
 import { getState } from 'src/redux';
 import { noop } from 'src/util';
 import HamburgerMenuIcon from '../ViewContextManager/Icons/HamburgerMenu.svg';
+import HelpIcon from 'src/misc/HelpIcon';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
 const ctx = new AudioContext();
 
 interface GlobalMenuItemProps {
-  onClick: () => void;
+  onClick?: () => void;
   children?: React.ReactNode;
+  style?: React.CSSProperties;
 }
 
-const GlobalMenuItem: React.FC<GlobalMenuItemProps> = ({ children, onClick }) => (
-  <div className='global-menu-item' role='menuitem' onClick={onClick}>
+const GlobalMenuItem: React.FC<GlobalMenuItemProps> = ({ children, onClick, style }) => (
+  <div className='global-menu-item' role='menuitem' onClick={onClick} style={style}>
     {children}
   </div>
 );
 
-const RetractGlobalMenuButton: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+interface RetractGlobalMenuButtonProps {
+  onClose: () => void;
+}
+
+const RetractGlobalMenuButton: React.FC<RetractGlobalMenuButtonProps> = ({ onClose }) => (
   <button onClick={onClose} className='retract-global-menu-button'>
     &#x226b;
   </button>
@@ -72,6 +80,87 @@ const GlobalTempoControl: React.FC = () => {
         }}
       />
     </div>
+  );
+};
+
+const getBaseLatencyHintOverride = () => {
+  const ctx = new (window as any).RealAudioContext();
+  const hostSampleRate = ctx.sampleRate;
+  ctx.close();
+  return 800 / hostSampleRate;
+};
+
+const LatencyHintConfig: React.FC = () => {
+  const initialState = useRef(
+    (() => {
+      const startLatency = (window as any).latencyHint as 'interactive' | number | null | undefined;
+      return {
+        'set automatically': typeof startLatency !== 'number',
+        'latency hint (sec)':
+          typeof startLatency === 'number' ? startLatency : getBaseLatencyHintOverride(),
+      };
+    })()
+  );
+  const [state, setState] = useState(initialState.current);
+
+  const settings = useMemo((): ControlPanelSetting[] => {
+    if (state['set automatically']) {
+      return [{ type: 'checkbox', label: 'set automatically' }];
+    }
+
+    return [
+      { type: 'checkbox', label: 'set automatically' },
+      {
+        type: 'range',
+        label: 'latency hint (sec)',
+        min: 0.0001,
+        max: 0.05,
+        step: 0.001,
+      },
+    ];
+  }, [state]);
+
+  const handleChange = useCallback((_key: string, _val: any, newState: any) => {
+    if (newState['set automatically']) {
+      localStorage.latencyHint = 'interactive';
+    } else {
+      localStorage.latencyHint = newState['latency hint (sec)'];
+    }
+    setState(newState);
+  }, []);
+
+  const isDirty = (() => {
+    if (state['set automatically'] !== initialState.current['set automatically']) {
+      return true;
+    }
+
+    if (
+      !state['set automatically'] &&
+      state['latency hint (sec)'] !== initialState.current['latency hint (sec)']
+    ) {
+      return true;
+    }
+
+    return false;
+  })();
+
+  return (
+    <GlobalMenuItem style={{ cursor: 'default', padding: 0 }}>
+      <h4 style={{ marginTop: 4, marginBottom: 0, display: 'flex', gap: 4 }}>
+        Latency Hint <HelpIcon link='latency-hint' />
+      </h4>
+      <ControlPanel width={360} settings={settings} state={state} onChange={handleChange} />
+      {isDirty ? (
+        <div>
+          <span className='latency-hint-dirty-message'>
+            Changes are not applied until the application is reloaded.
+          </span>
+          <button style={{ marginBottom: 2 }} onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      ) : null}
+    </GlobalMenuItem>
   );
 };
 
@@ -132,7 +221,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) =>
   const loadCompositionUploader = useRef<HTMLInputElement | null>(null);
 
   return (
-    <div className='global-menu' role='menu' style={isOpen ? undefined : { right: -300 }}>
+    <div className='global-menu' role='menu' style={isOpen ? undefined : { right: -400 }}>
       <RetractGlobalMenuButton onClose={closeMenu} />
       <GlobalTempoControl />
       <GlobalMenuItem
@@ -179,12 +268,18 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) =>
         </>
       </GlobalMenuItem>
 
+      <LatencyHintConfig />
+
       <LoginStatus />
     </div>
   );
 };
 
-const GlobalMenuButton: React.FC<{ engine: typeof import('../engine') }> = ({ engine }) => {
+interface GlobalMenuButtonProps {
+  engine: typeof import('../engine');
+}
+
+const GlobalMenuButton: React.FC<GlobalMenuButtonProps> = ({ engine }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

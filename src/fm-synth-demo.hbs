@@ -8,6 +8,7 @@
     <meta name="description" content="An 8-operator, polyphonic FM synthesizer running completely in the web browser via Rust compiled to WebAssembly with SIMD acceleration. A demo from the larger web synth platform I'm building.">
 
     <script type="text/javascript">
+      window.RealAudioContext = window.AudioContext;
       // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
       // other, causing errors when connecting betwen different components.
       //
@@ -28,6 +29,7 @@
         _ctx.close();
         latencyHint = 800 / hostSampleRate;
       }
+      window.latencyHint = latencyHint;
 
       const globalContext = new AudioContext({
         sampleRate: 44100,
@@ -44,21 +46,36 @@
 
     <script src="/wavyjones.js" type="text/javascript"></script>
 
-    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=G-B1ES83ZTMR"></script> -->
-    <script>
-      if (!window.location.href.includes('localhost')) {
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-
-        gtag('config', 'G-B1ES83ZTMR');
-      }
-    </script>
     <script async defer data-domain="notes.ameo.design" src="https://pause.ameo.dev/js/pause.js"></script>
 
-    <link href="https://fonts.googleapis.com/css?family=PT+Sans&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/index.css" type="text/css" />
-    <link rel="stylesheet" href="./fm.css" type="text/css" />
+    <link rel="preconnect" href="https://web-synth.b-cdn.net" crossorigin>
+    <style>
+      {{{ fontCSS }}}
+    </style>
+    <style>
+      {{{ indexCSS }}}
+    </style>
+    <style>
+      #simd-status,
+      #fm-synth-links {
+        position: absolute;
+        bottom: 0;
+        font-family: 'Oxygen Mono', 'Hack', monospace;
+        font-size: 13px;
+      }
+
+      #simd-status {
+        right: 7px;
+        display: none;
+        text-align: right;
+      }
+
+      #fm-synth-links {
+        left: 7px;
+        text-align: left;
+        line-height: 1.7;
+      }
+    </style>
     <link rel="stylesheet" href="/hack-subset.css" />
 
     <!-- Opengraph -->

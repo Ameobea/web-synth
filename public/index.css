@@ -20,7 +20,7 @@ h2,
 h3,
 h4,
 h5 {
-  font-family: 'PT Sans';
+  font-family: 'IBM Plex Sans', 'Open Sans', 'Roboto', sans-serif;
 }
 
 .control-panel .container input {

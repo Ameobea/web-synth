@@ -1,7 +1,6 @@
 import * as R from 'ramda';
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
-import { createPortal } from 'react-dom';
 import { shallowEqual, useSelector } from 'react-redux';
 
 import ControlPanelMidiKeyboard from 'src/controlPanel/ControlPanelMidiKeyboard';

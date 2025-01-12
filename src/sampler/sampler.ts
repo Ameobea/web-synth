@@ -1,8 +1,8 @@
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkContainerCleanupHelper, mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
+import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import SamplerUI from 'src/sampler/SamplerUI/SamplerUI.svelte';
-import { mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { Map as ImmMap } from 'immutable';
 import { SamplerInstance } from 'src/sampler/SamplerInstance';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -97,7 +97,7 @@ export const cleanup_sampler = (stateKey: string) => {
 
   inst.shutdown();
 
-  mkContainerCleanupHelper()(getSamplerDOMElementId(vcId));
+  mkSvelteContainerCleanupHelper()(getSamplerDOMElementId(vcId));
 };
 
 export const get_sampler_audio_connectables = (stateKey: string): AudioConnectables => {

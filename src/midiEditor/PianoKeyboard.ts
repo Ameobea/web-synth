@@ -41,7 +41,7 @@ export default class PianoKeys {
     const isBlackKey = noteName.includes('♭') || noteName.includes('♯');
 
     const text = new PIXI.Text(noteName, {
-      fontFamily: 'PT Sans',
+      fontFamily: 'IBM Plex Sans',
       fontSize: 13,
       fill: isBlackKey ? conf.WHITE_NOTE_COLOR : conf.BLACK_NOTE_COLOR,
     });
