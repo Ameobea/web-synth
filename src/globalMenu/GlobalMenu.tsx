@@ -20,6 +20,10 @@ import { noop } from 'src/util';
 import HamburgerMenuIcon from '../ViewContextManager/Icons/HamburgerMenu.svg';
 import HelpIcon from 'src/misc/HelpIcon';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+import TapInBPMSvelte from './TapInBPM.svelte';
+import { mkSvelteComponentShim } from 'src/svelteUtils';
+
+const TapInBPM = mkSvelteComponentShim<{ onSubmit: (bpm: number) => void }>(TapInBPMSvelte);
 
 const ctx = new AudioContext();
 
@@ -77,6 +81,13 @@ const GlobalTempoControl: React.FC = () => {
           } else {
             setTempo(value);
           }
+        }}
+      />
+
+      <TapInBPM
+        onSubmit={newBPM => {
+          setTempo(newBPM.toFixed(2));
+          setGlobalBpm(newBPM);
         }}
       />
     </div>

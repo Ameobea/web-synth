@@ -145,11 +145,11 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
   }
 
   setEncodedSteps(encodedSteps) {
-    if (encodedSteps.length % 4 !== 0) {
-      throw new Error('Expected encoded steps length to be divisible by 4');
+    if (encodedSteps.length % 7 !== 0) {
+      throw new Error('Expected encoded steps length to be divisible by 47');
     }
     const encodedStepBufPtr = this.wasmInstance.exports.get_encoded_adsr_step_buf_ptr(
-      encodedSteps.length / 4
+      encodedSteps.length / 7
     );
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
     const stepBuf = this.wasmMemoryBuffer.subarray(
