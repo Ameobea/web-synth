@@ -20,7 +20,7 @@ It seems to support voices from [[glowtts]]; the web interface allows for downlo
 [tts]: tts "tts"
 [vocal-synthesis]: vocal-synthesis "vocal synthesis"
 [glowtts]: glowtts "glowtts"
-[GAN]: gan "GAN"
+[GAN]: GAN "GAN"
 [vocoder]: vocoder "vocoder"
 [phoneme]: phoneme "phoneme"
 [mel-spectrogram]: mel-spectrogram "mel-spectrogram"

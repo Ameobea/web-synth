@@ -357,3 +357,15 @@ export const isSafari = () => {
 };
 
 export const noop = () => {};
+
+/**
+ * Unescapes HTML entities in a string, converting a string like "a &amp; b" to "a & b".
+ *
+ * This the trick of creating a HTML element and reading its text content, which is expensive so this shouldn't be
+ * used in performance-critical code.
+ */
+export const unescapeHTML = (html: string) => {
+  const el = document.createElement('div');
+  el.innerHTML = html;
+  return el.innerText;
+};

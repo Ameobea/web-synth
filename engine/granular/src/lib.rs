@@ -31,6 +31,10 @@ impl Default for ReverseState {
 static mut SCRATCH: [(f32, f32); 8192] = [(0.0, 0.0); 8192];
 fn scratch() -> &'static mut [(f32, f32); 8192] { ref_static_mut!(SCRATCH) }
 
+extern "C" {
+  fn log_err(ptr: *const u8, len: usize);
+}
+
 #[derive(Clone)]
 pub struct GranularVoice {
   /// The index at which the current grain starts in the waveform buffer, absolute to the buffer
@@ -67,7 +71,7 @@ pub struct Grain {
 }
 
 impl Grain {
-  fn compute_linear_envelope_volume(&self, pos_in_grain: f32, linear_slope_length: f32) -> f32 {
+  fn compute_linear_envelope_volume(pos_in_grain: f32, linear_slope_length: f32) -> f32 {
     let pos_in_grain = if pos_in_grain < 0.5 {
       pos_in_grain
     } else {
@@ -84,8 +88,8 @@ impl Grain {
   /// `slope_linearity` determines the envelope mix between the linear slope determined by
   /// `linear_slope_length` and the sine.  It's a simple 0 to 1 mix between the linear slope and
   /// the sine.
-  fn get_volume(&self, pos_in_grain: f32, linear_slope_length: f32, slope_linearity: f32) -> f32 {
-    let linear_slope = self.compute_linear_envelope_volume(pos_in_grain, linear_slope_length);
+  fn get_volume(pos_in_grain: f32, linear_slope_length: f32, slope_linearity: f32) -> f32 {
+    let linear_slope = Self::compute_linear_envelope_volume(pos_in_grain, linear_slope_length);
     let sine_slope = (pos_in_grain * std::f32::consts::PI).sin();
     mix(slope_linearity, linear_slope, sine_slope)
   }
@@ -111,7 +115,7 @@ impl Grain {
       self.samples_read_so_far
     };
 
-    let gain = self.get_volume(pos_in_grain, linear_slope_length, slope_linearity);
+    let gain = Self::get_volume(pos_in_grain, linear_slope_length, slope_linearity);
     let sample = read_interpolated(buf, self.start_sample_ix + sample_ix);
     (gain, sample)
   }
@@ -381,6 +385,7 @@ impl GranularCtx {
 #[no_mangle]
 pub fn create_granular_instance() -> *mut GranularCtx {
   common::maybe_init(None);
+  common::set_raw_panic_hook(log_err);
   let ctx = Box::new(GranularCtx::default());
   Box::into_raw(ctx)
 }
@@ -451,8 +456,8 @@ pub fn render_granular(
     ctx.last_end_sample_ix = ctx.last_start_sample_ix;
   }
 
-  let linear_slope_length = clamp(0.001, 1.0, linear_slope_length);
-  let slope_linearity = clamp(0.001, 1.0, slope_linearity);
+  let linear_slope_length = clamp(0., 1., linear_slope_length);
+  let slope_linearity = clamp(0., 1., slope_linearity);
 
   for i in 0..FRAME_SIZE {
     let sample = ctx.get_sample(
@@ -478,4 +483,14 @@ pub fn render_granular(
   }
 
   ctx.rendered_output.as_ptr()
+}
+
+#[test]
+fn crossfade_correctness() {
+  // setting `linear_slope_length` to 0 should cause no crossfade to be applied
+
+  for pos in [0., 0.2, 0.4, 0.6, 0.8, 0.999] {
+    let volume = Grain::get_volume(pos, 0., 1.);
+    assert_eq!(volume, 1.);
+  }
 }

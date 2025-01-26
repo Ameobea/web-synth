@@ -207,10 +207,6 @@ export const init_granulator = async (stateKey: string) => {
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
     });
-    const granularWasm = await granularWasmPromise;
-    // Once we've fetched the Wasm bytes for the granular's DSP instance, we send them to the AWP
-    // to be instantiated and start.
-    node.port.postMessage({ type: 'setWasmBytes', wasmBytes: granularWasm });
 
     const params = node.parameters as any;
     const inst: GranulatorInstance = {
@@ -252,6 +248,12 @@ export const init_granulator = async (stateKey: string) => {
     } else {
       inst.endSample.manualControl.offset.value = -1;
     }
+
+    const granularWasm = await granularWasmPromise;
+    // Once we've fetched the Wasm bytes for the granular's DSP instance, we send them to the AWP
+    // to be instantiated and start.
+    node.port.postMessage({ type: 'setWasmBytes', wasmBytes: granularWasm });
+
     GranulatorInstancesById.update(map => map.set(vcId, inst));
     updateConnectables(vcId, build_granulator_audio_connectables(vcId));
   });

@@ -1,12 +1,12 @@
 # envelope generator
 
-![](https://i.ameo.link/8um.png)
+![A screenshot of the envelope generator UI used in web synth.  It shows a curve with points that can be dragged to shape the curve.  It is overlaid on a labeled grid to show the output range of different Y values of the curve.](https://i.ameo.link/8um.png)
 
 **Envelope Generators**, also known as **ADSRs**, are components that can be used to define how a value changes over time.  By dragging the different handlers, the level of the output over time can be set precisely.
 
 Envelope generators are very versatile and can be used to modulate almost anything in web synth.  By default, ADSRs output values between 0 and 1.  Usually, you want values in a different range though.  When envelope generators are embedded in different [[control-panel]]s, there is often an "output range" setting that can be used to configure the range of values that it outputs:
 
-![](https://i.ameo.link/8un.png)
+![A screenshot of the range input used to control the output range of the envelope generator contained in the control panel.](https://i.ameo.link/8un.png)
 
 Additionally, in the [[graph-editor]], the [[scale-and-shift]] node can be used to convert outputs from 0 to 1 and whatever output range you'd like.
 

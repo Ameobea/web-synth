@@ -65,7 +65,7 @@ fn gen_stepped_random() -> f32 {
   unsafe {
     if STEPPED_RANDOM_STATE.samples_since_last_update >= STEPPED_RANDOM_STATE.update_freq_samples {
       STEPPED_RANDOM_STATE.val = rng().gen_range(-1., 1.);
-      STEPPED_RANDOM_STATE.samples_since_last_update = 0;
+      STEPPED_RANDOM_STATE.samples_since_last_update = 1;
     } else {
       STEPPED_RANDOM_STATE.samples_since_last_update += 1;
     }
@@ -74,6 +74,7 @@ fn gen_stepped_random() -> f32 {
 }
 
 static mut LAST_VAL: f32 = 0.;
+
 #[no_mangle]
 pub unsafe extern "C" fn generate() -> *const f32 {
   let generator = match NOISE_TYPE {
@@ -88,7 +89,7 @@ pub unsafe extern "C" fn generate() -> *const f32 {
     NoiseType::Brown => todo!(),
   };
   for out in ref_static_mut!(OUTPUT) {
-    let sample = generator() * GAIN;
+    let sample = generator();
 
     if QUANTIZATION_FACTOR > 0 {
       LAST_VAL = dsp::quantize(-1., 1., QUANTIZATION_FACTOR as f32, sample);
@@ -103,7 +104,7 @@ pub unsafe extern "C" fn generate() -> *const f32 {
         LAST_VAL = sample;
       }
     }
-    *out = LAST_VAL;
+    *out = LAST_VAL * GAIN;
   }
 
   &raw const OUTPUT as *const f32

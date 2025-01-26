@@ -21,7 +21,14 @@ import { updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
 import { actionCreators, dispatch, getState, type ReduxStore } from 'src/redux';
-import { NIL_UUID, UnreachableError, filterNils, getEngine, tryParseJson } from 'src/util';
+import {
+  NIL_UUID,
+  UnreachableError,
+  filterNils,
+  getEngine,
+  tryParseJson,
+  unescapeHTML,
+} from 'src/util';
 import { ViewContextDescriptors } from 'src/ViewContextManager/AddModulePicker';
 import {
   getIsVcHidden,
@@ -781,9 +788,10 @@ const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
         return displayNames.filter((_displayName, i) => lowerDisplayNames[i].includes(lowerValue));
       };
       canvas.onSearchBoxSelection = (name, _evt, _graphCanvas) => {
-        const entry = sortedNodeEntries.find(([displayName]) => displayName === name);
+        const unescapedName = unescapeHTML(name);
+        const entry = sortedNodeEntries.find(([displayName]) => displayName === unescapedName);
         if (!entry) {
-          throw new Error(`No entry found for node type "${name}"`);
+          throw new Error(`No entry found for node type "${unescapedName}"`);
         }
         const [, nodeType] = entry;
         if (!nodeType || nodeType === '---') {

@@ -77,7 +77,17 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
   }
 
   async initWasm(wasmBytes) {
-    const importObject = { env: {} };
+    const importObject = {
+      env: {
+        log_err: (ptr, len) => {
+          const memory = new Uint8Array(this.wasmInstance.exports.memory.buffer);
+          const str = Array.from(memory.subarray(ptr, ptr + len))
+            .map(v => String.fromCharCode(v))
+            .join('');
+          console.error(str);
+        },
+      },
+    };
 
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);

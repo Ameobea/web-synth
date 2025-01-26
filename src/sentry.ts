@@ -15,7 +15,7 @@ export const initSentry = () => {
   }
 
   Sentry.init({
-    dsn: 'https://fe6f2402504d4e2383ff4566e3676cc5@sentry.ameo.design/6',
+    dsn: 'https://013dd3a6743b7aec9a2e165574202833@sentry.ameo.design/14',
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 1.0,
     beforeBreadcrumb: (breadcrumb, hint) => {
