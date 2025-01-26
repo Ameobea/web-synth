@@ -37,7 +37,7 @@
     <DemoTile
       title="Modern Talking Wavetable"
       description="The famous Modern Talking wavetable imported into Web Synth with FM and other web synth features"
-      compositionID="46"
+      compositionID="154"
       {isLoadingComposition}
       image="/demo-images/modern-talking.jpg"
       imageAlt="A screenshot of the web synth control panel for the modern talking demo. Shows several sliders for controlling frequency modulation, volume, detune, LFO envelope length, and reverb room size.  Has a colorful spectrogram on the right showing the frequencies in the sound produced by the synthesizer.  Has an on-screen MIDI keyboard on the bottom that can be used to control the demo; the notes are labeled with keys on the computer keyboard."

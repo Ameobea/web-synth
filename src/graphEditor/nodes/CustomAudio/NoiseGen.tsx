@@ -6,6 +6,7 @@ import ControlPanel from 'react-control-panel';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
+import HelpIcon from 'src/misc/HelpIcon';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
@@ -96,9 +97,10 @@ const NoiseGenSmallView: React.FC<NoiseGenSmallViewProps> = ({ onChange, node })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <p style={{ marginLeft: 4 }}>
-        <code>Outputs values in the range [-1, 1]</code>
-      </p>
+      <h2 style={{ marginTop: 2, marginBottom: 2, paddingLeft: 2, paddingRight: 2 }}>
+        Noise & Random
+        <HelpIcon link='noise-and-random-node' style={{ marginLeft: 8 }} />
+      </h2>
       <ControlPanel
         settings={settings}
         onChange={(key: string, val: any) => {
@@ -114,6 +116,9 @@ const NoiseGenSmallView: React.FC<NoiseGenSmallViewProps> = ({ onChange, node })
         }}
         width={500}
       />
+      <p style={{ marginLeft: 4 }}>
+        <code>Outputs values in the range [-1, 1] (multiplied by gain)</code>
+      </p>
     </div>
   );
 };
