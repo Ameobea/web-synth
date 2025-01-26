@@ -147,13 +147,13 @@ export const get_filter_designer_audio_connectables = (
     node: state.input,
   });
   for (const [groupIx, group] of state.filterGroups.entries()) {
-    for (const [filterIx, { filter }] of group.entries()) {
+    for (const [filterIx, { oaps }] of group.entries()) {
       inputs = inputs
         .set(`group_${groupIx}_filter_${filterIx}_frequency`, {
-          node: filter.frequency,
+          node: oaps.frequency,
           type: 'number',
         })
-        .set(`group_${groupIx}_filter_${filterIx}_q`, { node: filter.Q, type: 'number' });
+        .set(`group_${groupIx}_filter_${filterIx}_q`, { node: oaps.Q, type: 'number' });
     }
   }
 

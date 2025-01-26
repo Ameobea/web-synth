@@ -202,7 +202,6 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
             const curBank = wavetableState.wavetableBanks.find(
               bank => bank.name === selectedWavetableName
             );
-            console.log({ curBank });
             try {
               const newBank = await renderSvelteModalWithControls(
                 WavetableConfigurator,

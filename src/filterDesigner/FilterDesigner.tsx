@@ -498,7 +498,7 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
       selectedPresetName,
     };
 
-    return state.filterGroups.reduce((acc, group, groupIx) => {
+    return state.filterGroups.reduce((acc, _group, groupIx) => {
       if (R.isNil(state.lockedFrequencyByGroup)) {
         return acc;
       }
@@ -570,7 +570,7 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
           state={controlPanelState}
           onChange={handleChange}
         />
-        {state.filterGroups.map((group, groupIx) => (
+        {state.filterGroups.map((_group, groupIx) => (
           <ConfigureFilterGroup
             state={state}
             setState={setState}
