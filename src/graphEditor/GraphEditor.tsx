@@ -57,6 +57,7 @@ import {
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { handleGlobalMouseDown } from 'src/globalInputHandlers';
+import { delete_view_context } from 'src/vcInterop';
 
 const ctx = new AudioContext();
 
@@ -250,7 +251,12 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
 
     removeOption.callback = (_value, _options, _event, _parentMenu, node) => {
       const vcId = node.id.toString();
-      removeNode(vcId);
+      const isVc = vcId.length === 36;
+      if (isVc) {
+        getEngine()!.delete_vc_by_id(vcId);
+      } else {
+        removeNode(vcId);
+      }
     };
   }
 
