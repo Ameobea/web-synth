@@ -17,9 +17,9 @@
     <!-- svelte-ignore security-anchor-rel-noreferrer -->
     <a target="_blank" href="https://github.com/ameobea/web-synth">GitHub</a>
     <!-- svelte-ignore security-anchor-rel-noreferrer -->
-    <a target="_blank" href="https://www.youtube.com/watch?v=kgkpJk0P7Uo">Demo Video</a>
+    <a target="_blank" href="https://www.youtube.com/watch?v=42ytPljgJ_U">Demo Video</a>
     <!-- svelte-ignore security-anchor-rel-noreferrer -->
-    <a target="_blank" href="https://notes.ameo.design/docs/">Docs</a>
+    <a target="_blank" href="https://synth.ameo.dev/docs/">Docs</a>
   </div>
 
   <h2 style="margin-bottom: 10px;">Demos</h2>

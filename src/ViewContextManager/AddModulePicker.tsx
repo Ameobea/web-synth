@@ -25,17 +25,68 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
     description:
       "Compile code written in either Faust or Soul into WebAssembly on the fly and load into the audio graph live.  Produces working UIs based off of the code's params, connectables for modulation, and preset saving/loading.",
   },
-  { name: 'graph_editor', displayName: 'Graph Editor' },
-  { name: 'composition_sharing', displayName: 'Composition Sharing' },
-  { name: 'synth_designer', displayName: 'Synth Designer' },
-  { name: 'midi_keyboard', displayName: 'MIDI Keyboard' },
-  { name: 'sequencer', displayName: 'Sequencer' },
-  { name: 'sample_library', displayName: 'Sample Library' },
-  { name: 'control_panel', displayName: 'Control Panel' },
-  { name: 'granulator', displayName: 'Granular Synthesizer' },
-  { name: 'filter_designer', displayName: 'Filter Designer' },
-  { name: 'sinsy', displayName: 'Sinsy' },
-  { name: 'looper', displayName: 'Looper' },
+  {
+    name: 'graph_editor',
+    displayName: 'Graph Editor',
+    description:
+      'View and edit the audio graph powering web synth.  Add new nodes/modules and connect them together to create patches.',
+  },
+  {
+    name: 'composition_sharing',
+    displayName: 'Composition Sharing',
+    description: 'Save and load compositions, as well as view compositions from other users',
+  },
+  {
+    name: 'synth_designer',
+    displayName: 'Synth Designer',
+    description:
+      'Versatile polyphonic synthesizer supporting FM, Wavetable, and sample-based synthesis.  Includes extensive support for modulation and many built-in effects and filters.',
+  },
+  {
+    name: 'midi_keyboard',
+    displayName: 'MIDI Keyboard',
+    description:
+      'Use your computer keyboard or a hardware MIDI device to drive synthesizers or other modules in web synth',
+  },
+  {
+    name: 'sequencer',
+    displayName: 'Sequencer',
+    description:
+      'Define looping sequence of samples to play back.  NOTE: using "sample mapping" mode in the synth designer and sequencing via the MIDI editor often works better and supports much more versatile options.',
+  },
+  {
+    name: 'sample_library',
+    displayName: 'Sample Library',
+    description: 'Load, browser, and manage external audio samples',
+  },
+  {
+    name: 'control_panel',
+    displayName: 'Control Panel',
+    description:
+      'Build a customizable UI for your composition.  Supports controls like buttons and sliders as well as MIDI input and inline visualizations.',
+  },
+  {
+    name: 'granulator',
+    displayName: 'Granular Synthesizer',
+    description:
+      'Load a sample and generate sound from it using granular synthesis.  Supports variable-rate playback for time stretching and pitch shifting as well as modulation of parameters.',
+  },
+  {
+    name: 'filter_designer',
+    displayName: 'Filter Designer',
+    description:
+      'Build-your-own equalizer by composing many biquad filters in series or parallel.  Supports filter parameter modulation.',
+  },
+  {
+    name: 'sinsy',
+    displayName: 'Sinsy',
+    description: 'DEPRECATED and likely not working experiment with vocal synthesis using Sinsy',
+  },
+  {
+    name: 'looper',
+    displayName: 'Looper',
+    description: 'Supports playback and sequencing of MIDI compositions',
+  },
   {
     name: 'welcome_page',
     displayName: 'Welcome Page',
@@ -48,7 +99,12 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
     description:
       'Contains visualizations for analyzing sound including an oscilloscope and spectrogram',
   },
-  { name: 'sampler', displayName: 'Sampler' },
+  {
+    name: 'sampler',
+    displayName: 'Sampler',
+    description:
+      'Chop up, manipulate, and play back pieces of samples in response to incoming MIDI events.  Useful for creating vocal chops and stuff like that.',
+  },
 ];
 
 interface AddModulePickerProps {

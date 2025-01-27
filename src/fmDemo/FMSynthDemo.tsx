@@ -612,7 +612,7 @@ const FMSynthDemo: React.FC = () => {
           <br />
           <a href='/docs/fm-synth'>Docs</a>
           <br />
-          <a href='https://www.youtube.com/watch?v=N4mZn9ZczDM'>Demo video + walkthrough</a>
+          <a href='https://www.youtube.com/watch?v=42ytPljgJ_U'>Demo video + walkthrough</a>
         </div>
 
         <div className='midi-keyboard-wrapper' style={{ bottom: 0, position: 'absolute' }}>

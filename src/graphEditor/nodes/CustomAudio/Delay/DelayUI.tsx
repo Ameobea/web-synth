@@ -10,7 +10,7 @@ const buildDelaySettings = (initialParams: {
   {
     type: 'range',
     label: 'delay ms',
-    min: 1,
+    min: 0.02,
     max: 60 * 1000,
     scale: 'log',
     initial: initialParams.delayMs,
