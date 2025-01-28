@@ -28,4 +28,5 @@ pub struct GenericPresetDescriptor {
   pub tags: Vec<String>,
   pub user_id: Option<i64>,
   pub user_name: Option<String>,
+  pub is_featured: bool,
 }

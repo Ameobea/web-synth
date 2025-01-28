@@ -10,6 +10,7 @@ diesel::table! {
         composition_version -> Integer,
         parent_id -> Nullable<Bigint>,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -29,6 +30,7 @@ diesel::table! {
         description -> Text,
         code -> Text,
         user_id -> Nullable<Bigint>,
+        is_featured -> Bool,
     }
 }
 
@@ -49,6 +51,7 @@ diesel::table! {
         serialized_looper_inst_state -> Longtext,
         user_id -> Nullable<Bigint>,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -68,6 +71,7 @@ diesel::table! {
         composition_json -> Text,
         user_id -> Nullable<Bigint>,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -118,6 +122,7 @@ diesel::table! {
         description -> Text,
         content -> Longtext,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -129,6 +134,7 @@ diesel::table! {
         body -> Text,
         user_id -> Nullable<Bigint>,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -156,6 +162,7 @@ diesel::table! {
         body -> Longtext,
         user_id -> Nullable<Bigint>,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -167,6 +174,7 @@ diesel::table! {
         serialized_wavetable_inst_state -> Longtext,
         user_id -> Nullable<Bigint>,
         created_at -> Nullable<Timestamp>,
+        is_featured -> Bool,
     }
 }
 
@@ -200,22 +208,22 @@ diesel::joinable!(wavetable_presets_tags -> tags (tag_id));
 diesel::joinable!(wavetable_presets_tags -> wavetable_presets (wavetable_preset_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  compositions,
-  compositions_tags,
-  effects,
-  login_tokens,
-  looper_presets,
-  looper_presets_tags,
-  midi_compositions,
-  midi_compositions_tags,
-  private_sample_libraries,
-  remote_sample_urls,
-  subgraph_preset_tags,
-  subgraph_presets,
-  synth_presets,
-  tags,
-  users,
-  voice_presets,
-  wavetable_presets,
-  wavetable_presets_tags,
+    compositions,
+    compositions_tags,
+    effects,
+    login_tokens,
+    looper_presets,
+    looper_presets_tags,
+    midi_compositions,
+    midi_compositions_tags,
+    private_sample_libraries,
+    remote_sample_urls,
+    subgraph_preset_tags,
+    subgraph_presets,
+    synth_presets,
+    tags,
+    users,
+    voice_presets,
+    wavetable_presets,
+    wavetable_presets_tags,
 );

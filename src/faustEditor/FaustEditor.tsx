@@ -262,6 +262,7 @@ const buildCodeEditorControlPanelSettings = ({
               preset: effect,
               userID: effect.userId,
               userName: effect.userName,
+              isFeatured: effect.isFeatured,
             }));
           });
           reduxInfra.dispatch(

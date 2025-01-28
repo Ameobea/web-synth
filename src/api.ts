@@ -191,6 +191,7 @@ export interface SavedMIDIComposition {
   userId: number | null | undefined;
   userName: string | null | undefined;
   createdAt?: Date | null;
+  isFeatured?: boolean;
 }
 
 const parseSavedMIDIComposition = (composition: SavedMIDIComposition): SavedMIDIComposition => {
@@ -241,6 +242,7 @@ export interface GenericPresetDescriptor {
   tags: string[];
   userId: number | null | undefined;
   userName: string | null | undefined;
+  isFeatured?: boolean;
 }
 
 export const fetchLooperPresets = async (): Promise<GenericPresetDescriptor[]> =>
@@ -353,6 +355,7 @@ export interface WavetablePresetDescriptor {
   tags: string[];
   userId: number | null | undefined;
   userName: string | null | undefined;
+  isFeatured?: boolean;
 }
 
 export interface SaveWaveformPresetRequest {

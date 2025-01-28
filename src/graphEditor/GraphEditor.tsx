@@ -57,7 +57,6 @@ import {
   type PresetDescriptor,
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { handleGlobalMouseDown } from 'src/globalInputHandlers';
-import { delete_view_context } from 'src/vcInterop';
 
 const ctx = new AudioContext();
 
@@ -317,6 +316,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
 
   return filteredOptions;
 };
+
 LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
   const options = ['Delete'];
 
@@ -340,6 +340,7 @@ LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
 
   return false;
 };
+
 LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
   const nodeID = node.id as string | number;
   if (nodeID && typeof nodeID === 'string' && nodeID.length === 36) {

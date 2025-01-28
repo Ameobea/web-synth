@@ -12,6 +12,8 @@ pub struct Effect {
   pub code: String,
   pub user_id: Option<i64>,
   pub user_name: Option<String>,
+  #[serde(default)]
+  pub is_featured: bool,
 }
 
 #[derive(Deserialize, Insertable)]

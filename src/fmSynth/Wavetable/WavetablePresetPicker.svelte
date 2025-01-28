@@ -31,6 +31,7 @@
           description: preset.description,
           tags: preset.tags,
           preset,
+          isFeatured: preset.isFeatured,
         }))
       ),
     { width: '100%', height: 'calc(100% - 20px)', boxSizing: 'border-box' },

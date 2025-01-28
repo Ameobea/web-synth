@@ -15,8 +15,9 @@ import {
 } from 'src/reactUtils';
 import { genericPresetDispatch, store, type ReduxStore } from 'src/redux';
 import { genericPresetPickerActions } from 'src/redux/modules/genericPresetPicker';
-// prettier-ignore
+import StarIcon from './Star.svg';
 import './GenericPresetPicker.css';
+import { clamp } from 'src/util';
 
 interface SearchBarProps {
   value: string;
@@ -43,6 +44,7 @@ export interface PresetDescriptor<T> {
   preset: T;
   userID?: number | null;
   userName?: string | null;
+  isFeatured?: boolean;
 }
 
 interface PresetRowProps {
@@ -65,8 +67,12 @@ function mkPresetRow<T>(filteredPresets: PresetDescriptor<T>[]): React.FC<Preset
         onClick={() =>
           genericPresetDispatch(genericPresetPickerActions.setSelectedPresetID(preset.id))
         }
+        title={preset.name}
       >
-        {preset.name}
+        {preset.isFeatured ? (
+          <div className='svg-wrapper' dangerouslySetInnerHTML={{ __html: StarIcon }} />
+        ) : null}
+        <div className='preset-name'>{preset.name}</div>
       </div>
     );
   };
@@ -162,11 +168,23 @@ export function mkGenericPresetPicker<T>(
   genericPresetDispatch(genericPresetPickerActions.setSelectedPresetID(null));
   const presetQueryID = genRandomStringID() + '-presets';
 
+  const getSortedPresets = async () => {
+    const presets = await getPresets();
+    // put featured presets first, then sort by date modified descending
+    return R.sortWith(
+      [
+        R.descend((preset: PresetDescriptor<T>) => preset.isFeatured ?? false),
+        R.descend((preset: PresetDescriptor<T>) => preset.id),
+      ],
+      presets
+    );
+  };
+
   const GenericPresetPicker: React.FC<ModalCompProps<PresetDescriptor<T>>> = ({
     onSubmit,
     onCancel,
   }) => {
-    const { data: presets, error: fetchPresetsError } = useQuery(presetQueryID, getPresets);
+    const { data: presets, error: fetchPresetsError } = useQuery(presetQueryID, getSortedPresets);
     const windowSize = useWindowSize();
     const { ref: leftBarContainerRef, size: leftBarContainerSize } = useContainerSize();
     const [searchValue, setSearchValue] = useState('');
@@ -200,7 +218,7 @@ export function mkGenericPresetPicker<T>(
       );
     }
 
-    const presetListWidth = Math.max(windowSize.width * 0.18, 200);
+    const presetListWidth = clamp(300, 500, windowSize.width * 0.18);
 
     return (
       <GenericPresetPickerContainer style={style}>

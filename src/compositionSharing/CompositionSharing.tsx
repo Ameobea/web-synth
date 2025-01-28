@@ -48,6 +48,7 @@ export interface CompositionDefinition {
   userId: number | null | undefined;
   versions?: CompositionVersion[];
   createdAt?: Date | null;
+  isFeatured?: boolean;
 }
 
 const mkLocalSamplesConfirmation = (localSamples: SampleDescriptor[]) => {

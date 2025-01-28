@@ -25,6 +25,7 @@ export interface SynthVoicePresetEntry {
   description: string;
   body: SynthVoicePreset;
   userId: number | null | undefined;
+  isFeatured?: boolean;
 }
 
 export type PresetsState = {

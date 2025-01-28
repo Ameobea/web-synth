@@ -5,4 +5,5 @@ export interface Effect {
   code: string;
   userId: number | null;
   userName: string | null;
+  isFeatured?: boolean;
 }

@@ -347,6 +347,7 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
                     preset: preset,
                     userID: preset.userId,
                     userName: preset.userName,
+                    isFeatured: preset.isFeatured,
                   })
                 )
               );
@@ -357,7 +358,7 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
               const preset = await getLooperPreset(selectedPreset.id);
               console.log('Loaded looper preset: ', preset);
               loadLooperPreset(vcId, preset);
-            } catch (err) {
+            } catch (_err) {
               // pass
             }
           }}

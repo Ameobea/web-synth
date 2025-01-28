@@ -54,6 +54,7 @@ pub struct QueryableMIDIComposition {
   pub composition_json: String,
   pub user_id: Option<i64>,
   pub created_at: Option<NaiveDateTime>,
+  pub is_featured: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -76,6 +77,8 @@ pub struct MIDIComposition {
   pub tags: Vec<String>,
   pub user_id: Option<i64>,
   pub created_at: Option<NaiveDateTime>,
+  #[serde(default)]
+  pub is_featured: bool,
 }
 
 #[derive(Insertable)]

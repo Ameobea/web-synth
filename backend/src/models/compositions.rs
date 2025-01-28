@@ -46,6 +46,7 @@ pub struct CompositionDescriptor {
   pub user_name: Option<String>,
   pub versions: Vec<CompositionVersion>,
   pub created_at: Option<chrono::NaiveDateTime>,
+  pub is_featured: bool,
 }
 
 #[derive(Serialize, Queryable)]
@@ -59,6 +60,7 @@ pub struct Composition {
   pub composition_version: i32,
   pub parent_id: Option<i64>,
   pub created_at: Option<chrono::NaiveDateTime>,
+  pub is_featured: bool,
 }
 
 #[derive(Insertable)]

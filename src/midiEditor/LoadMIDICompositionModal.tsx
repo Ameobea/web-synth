@@ -11,6 +11,7 @@ const wrappedGetSavedMIDICompositions = () =>
       preset: comp,
       userId: comp.userId,
       userName: comp.userName,
+      isFeatured: comp.isFeatured,
     }))
   );
 

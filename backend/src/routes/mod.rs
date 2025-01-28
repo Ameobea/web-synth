@@ -76,6 +76,7 @@ pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, Str
           effects::code,
           effects::user_id,
           users::username.nullable(),
+          effects::is_featured,
         ))
         .load(conn)
     })
@@ -255,7 +256,10 @@ pub async fn get_compositions(
 
   let (all_compos, all_compos_tags) = conn
     .run(
-      |conn| -> QueryResult<(Vec<(_, _, _, _, Option<i64>, i32, _, _)>, Vec<EntityIdTag>)> {
+      |conn| -> QueryResult<(
+        Vec<(_, _, _, _, Option<i64>, i32, _, _, bool)>,
+        Vec<EntityIdTag>,
+      )> {
         let all_compos = compositions::table
           .left_join(users::table.on(compositions::dsl::user_id.eq(users::dsl::id.nullable())))
           .select((
@@ -267,6 +271,7 @@ pub async fn get_compositions(
             compositions::dsl::composition_version,
             compositions::dsl::created_at,
             users::dsl::username.nullable(),
+            compositions::dsl::is_featured,
           ))
           .order_by(compositions::dsl::id.asc())
           .load(conn)?;
@@ -290,8 +295,17 @@ pub async fn get_compositions(
 
   let mut compositions_by_root_id: FxHashMap<i64, CompositionDescriptor> = FxHashMap::default();
 
-  for (id, title, description, user_id, parent_id, composition_version, created_at, user_name) in
-    all_compos
+  for (
+    id,
+    title,
+    description,
+    user_id,
+    parent_id,
+    composition_version,
+    created_at,
+    user_name,
+    is_featured,
+  ) in all_compos
   {
     if let Some(parent_id) = parent_id {
       let Some(parent) = compositions_by_root_id.get_mut(&parent_id) else {
@@ -329,6 +343,7 @@ pub async fn get_compositions(
       user_name,
       versions: Vec::new(),
       created_at,
+      is_featured,
     };
     compositions_by_root_id.insert(id, descriptor);
   }
@@ -360,8 +375,8 @@ pub async fn get_synth_presets(
   use crate::schema::{synth_presets, voice_presets};
 
   let (synth_presets_, voice_presets_): (
-    Vec<(i64, String, String, String, Option<i64>)>,
-    Vec<(i64, String, String, String, Option<i64>)>,
+    Vec<(i64, String, String, String, Option<i64>, bool)>,
+    Vec<(i64, String, String, String, Option<i64>, bool)>,
   ) = tokio::try_join!(
     conn0.run(|conn| {
       synth_presets::table
@@ -371,6 +386,7 @@ pub async fn get_synth_presets(
           synth_presets::description,
           synth_presets::body,
           synth_presets::user_id,
+          synth_presets::is_featured,
         ))
         .load(conn)
         .map_err(|err| {
@@ -386,6 +402,7 @@ pub async fn get_synth_presets(
           voice_presets::description,
           voice_presets::body,
           voice_presets::user_id,
+          voice_presets::is_featured,
         ))
         .load(conn)
         .map_err(|err| {
@@ -397,7 +414,7 @@ pub async fn get_synth_presets(
 
   // build a mapping of voice preset id to voice preset
   let mut voice_presets_by_id: FxHashMap<i64, SynthVoicePresetEntry> = FxHashMap::default();
-  for (id_, title_, description_, body_, user_id_) in voice_presets_ {
+  for (id_, title_, description_, body_, user_id_, is_featured) in voice_presets_ {
     let body_ = serde_json::from_str(&body_).map_err(|err| -> String {
       error!("Error parsing voice preset entry stored in DB: {:?}", err);
       "Error parsing voice preset entry stored in DB".into()
@@ -409,6 +426,7 @@ pub async fn get_synth_presets(
       description: description_,
       body: body_,
       user_id: user_id_,
+      is_featured,
     };
 
     voice_presets_by_id.insert(voice_preset.id, voice_preset);
@@ -417,7 +435,7 @@ pub async fn get_synth_presets(
   let presets = synth_presets_
         .into_iter()
         .map(
-            |(synth_preset_id, title_, description_, body_, user_id_)| -> Result<InlineSynthPresetEntry, String> {
+            |(synth_preset_id, title_, description_, body_, user_id_, is_featured)| -> Result<InlineSynthPresetEntry, String> {
                 let body_: SynthPreset =
                     serde_json::from_str(&body_).map_err(|err| -> String {
                         error!("Invalid synth preset body provided: {:?}", err);
@@ -432,6 +450,7 @@ pub async fn get_synth_presets(
                     description: description_,
                     body: inlined_body,
                     user_id: user_id_,
+                    is_featured
                 })
             },
         )
@@ -446,25 +465,25 @@ pub async fn create_synth_preset(
   preset: Json<ReceivedSynthPresetEntry>,
   login_token: MaybeLoginToken,
 ) -> Result<(), String> {
-  use crate::schema::synth_presets::dsl::*;
+  use crate::schema::synth_presets;
 
-  let user_id_ = get_logged_in_user_id(&conn, login_token).await;
+  let user_id = get_logged_in_user_id(&conn, login_token).await;
 
-  let body_: String = serde_json::to_string(&preset.body).map_err(|err| -> String {
+  let body: String = serde_json::to_string(&preset.body).map_err(|err| -> String {
     let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
-    error!("{}", err_msg);
+    error!("{err_msg}");
     err_msg
   })?;
   let entry = NewSynthPresetEntry {
     title: preset.0.title,
     description: preset.0.description,
-    body: body_,
-    user_id: user_id_,
+    body,
+    user_id,
   };
 
   conn
     .run(move |conn| {
-      diesel::insert_into(synth_presets)
+      diesel::insert_into(synth_presets::table)
         .values(&entry)
         .execute(conn)
     })
@@ -480,12 +499,19 @@ pub async fn create_synth_preset(
 pub async fn get_synth_voice_presets(
   conn: WebSynthDbConn,
 ) -> Result<Json<Vec<SynthVoicePresetEntry>>, String> {
-  use crate::schema::voice_presets::dsl::*;
+  use crate::schema::voice_presets;
 
   let all_presets = conn
     .run(|conn| {
-      voice_presets
-        .select((id, title, description, body, user_id))
+      voice_presets::table
+        .select((
+          voice_presets::dsl::id,
+          voice_presets::dsl::title,
+          voice_presets::dsl::description,
+          voice_presets::dsl::body,
+          voice_presets::dsl::user_id,
+          voice_presets::dsl::is_featured,
+        ))
         .load(conn)
     })
     .await
@@ -496,18 +522,26 @@ pub async fn get_synth_voice_presets(
   let all_presets: Vec<SynthVoicePresetEntry> = all_presets
     .into_iter()
     .map(
-      |(id_, title_, description_, body_, user_id_): (i64, String, String, String, Option<i64>)| {
-        let preset: VoiceDefinition = serde_json::from_str(&body_).map_err(|err| -> String {
+      |(id, title, description, body, user_id, is_featured): (
+        i64,
+        String,
+        String,
+        String,
+        Option<i64>,
+        bool,
+      )| {
+        let preset: VoiceDefinition = serde_json::from_str(&body).map_err(|err| -> String {
           let err_msg = format!("Error parsing provided synth definition: {:?}", err);
           error!("{}", err_msg);
           err_msg
         })?;
         Ok(SynthVoicePresetEntry {
-          id: id_,
-          title: title_,
-          description: description_,
+          id,
+          title,
+          description,
           body: preset,
-          user_id: user_id_,
+          user_id,
+          is_featured,
         })
       },
     )
@@ -521,11 +555,11 @@ pub async fn create_synth_voice_preset(
   voice_preset: Json<UserProvidedNewSynthVoicePreset>,
   login_token: MaybeLoginToken,
 ) -> Result<(), String> {
-  use crate::schema::voice_presets::dsl::*;
+  use crate::schema::voice_presets;
 
-  let user_id_ = get_logged_in_user_id(&conn, login_token).await;
+  let user_id = get_logged_in_user_id(&conn, login_token).await;
 
-  let body_: String = serde_json::to_string(&voice_preset.0.body).map_err(|err| -> String {
+  let body: String = serde_json::to_string(&voice_preset.0.body).map_err(|err| -> String {
     let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
     error!("{}", err_msg);
     err_msg
@@ -533,13 +567,13 @@ pub async fn create_synth_voice_preset(
   let entry = NewSynthVoicePresetEntry {
     title: voice_preset.0.title,
     description: voice_preset.0.description,
-    body: body_,
-    user_id: user_id_,
+    body,
+    user_id,
   };
 
   conn
     .run(move |conn| {
-      diesel::insert_into(voice_presets)
+      diesel::insert_into(voice_presets::table)
         .values(&entry)
         .execute(conn)
     })

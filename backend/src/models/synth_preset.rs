@@ -236,6 +236,7 @@ pub struct SynthPresetEntry {
   pub title: String,
   pub description: String,
   pub body: SynthPreset,
+  pub is_featured: bool,
 }
 
 #[derive(Serialize)]
@@ -245,6 +246,7 @@ pub struct InlineSynthPresetEntry {
   pub description: String,
   pub body: InlineSynthPreset,
   pub user_id: Option<i64>,
+  pub is_featured: bool,
 }
 
 #[derive(Deserialize)]
@@ -271,6 +273,8 @@ pub struct SynthVoicePresetEntry {
   pub description: String,
   pub body: VoiceDefinition,
   pub user_id: Option<i64>,
+  #[serde(default)]
+  pub is_featured: bool,
 }
 
 #[derive(Deserialize)]

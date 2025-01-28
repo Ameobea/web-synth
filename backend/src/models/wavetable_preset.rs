@@ -10,6 +10,8 @@ pub struct WavetablePreset {
   pub serialized_wavetable_inst_state: String,
   pub user_id: Option<i64>,
   pub created_at: Option<NaiveDateTime>,
+  #[serde(default)]
+  pub is_featured: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -52,6 +54,7 @@ pub struct WavetablePresetDescriptor {
   pub tags: Vec<String>,
   pub user_id: Option<i64>,
   pub user_name: Option<String>,
+  pub is_featured: bool,
 }
 
 #[derive(Deserialize)]

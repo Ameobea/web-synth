@@ -31,8 +31,9 @@ pub async fn get_looper_presets(
           looper_presets::dsl::description,
           users::dsl::id.nullable(),
           users::dsl::username.nullable(),
+          looper_presets::dsl::is_featured,
         ))
-        .load::<(i64, String, String, Option<i64>, Option<String>)>(conn)?;
+        .load::<(i64, String, String, Option<i64>, Option<String>, bool)>(conn)?;
 
       let preset_tags: Vec<EntityIdTag> = looper_presets_tags::table
         .inner_join(tags::table)
@@ -53,7 +54,7 @@ pub async fn get_looper_presets(
 
   let looper_presets = looper_presets
     .into_iter()
-    .map(|(id, name, description, user_id, user_name)| {
+    .map(|(id, name, description, user_id, user_name, is_featured)| {
       let tags = tags_by_preset_id
         .remove(&id)
         .unwrap_or_default()
@@ -68,6 +69,7 @@ pub async fn get_looper_presets(
         tags,
         user_id,
         user_name,
+        is_featured,
       }
     })
     .collect_vec();
