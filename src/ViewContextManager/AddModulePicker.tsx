@@ -5,11 +5,24 @@ import ControlPanel from 'react-control-panel';
 import './GlobalVolume.css';
 import { getEngine } from 'src/util';
 import { createPortal } from 'react-dom';
+import { VirtualVCDefinitions } from 'src/ViewContextManager/virtualVCDefinitions';
 
-interface ViewContextDescriptor {
+export interface ViewContextDescriptor {
   name: string;
+  /**
+   * If set, this will be the VC type used under the hood.  Used for virtual VCs so they can have unique
+   * names but share the underlying implementation.
+   */
+  nameAlias?: string;
   displayName: string;
   description?: string;
+  /**
+   * This will be set into localStorage for the VC's state key if provided to override the default
+   * initial state.
+   *
+   * It can be used to implement virtual VCs like reverb that use the code editor under the hood.
+   */
+  initialState?: string;
 }
 
 export const ViewContextDescriptors: ViewContextDescriptor[] = [
@@ -105,6 +118,8 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
     description:
       'Chop up, manipulate, and play back pieces of samples in response to incoming MIDI events.  Useful for creating vocal chops and stuff like that.',
   },
+  // -- virtual VCs --
+  ...VirtualVCDefinitions,
 ];
 
 interface AddModulePickerProps {

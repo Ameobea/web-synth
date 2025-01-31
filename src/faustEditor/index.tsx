@@ -64,7 +64,7 @@ export const init_faust_editor = (stateKey: string) => {
           parsed.polyphonyState = buildDefaultFaustEditorPolyphonyState();
         }
         return Option.of(parsed);
-      } catch (err) {
+      } catch (_err) {
         console.error('Error parsing localstorage content for Faust editor; resetting to scratch.');
         return Option.none();
       }

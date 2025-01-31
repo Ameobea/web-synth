@@ -57,12 +57,18 @@ pub fn init() {
 /// Creates a new view context from the provided name in the active subgraph and sets it as the main
 /// view context for that subgraph.
 #[wasm_bindgen]
-pub fn create_view_context(vc_name: String, display_name: String) {
+pub fn create_view_context(vc_name: String, display_name: String, initial_state: Option<String>) {
   let uuid = uuid_v4();
   debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
   let view_context = build_view(&vc_name, uuid);
   let vcm = get_vcm();
-  vcm.add_view_context(uuid, vc_name, view_context, vcm.active_subgraph_id);
+  vcm.add_view_context(
+    uuid,
+    vc_name,
+    view_context,
+    vcm.active_subgraph_id,
+    initial_state,
+  );
   set_vc_title(uuid.to_string(), display_name)
 }
 

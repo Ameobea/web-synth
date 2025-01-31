@@ -201,7 +201,13 @@ impl ViewContextManager {
     name: String,
     mut view_context: Box<dyn ViewContext>,
     subgraph_id: Uuid,
+    initial_state: Option<String>,
   ) -> usize {
+    if let Some(initial_state) = initial_state {
+      let new_localstorage_key = view_context.get_state_key();
+      js::set_localstorage_key(&new_localstorage_key, &initial_state);
+    }
+
     view_context.init();
     view_context.hide();
 
@@ -428,6 +434,7 @@ impl ViewContextManager {
       "graph_editor".to_string(),
       mk_graph_editor(new_graph_editor_vc_id),
       new_subgraph_id,
+      None,
     );
 
     // Add subgraph portals to and from the subgraph so the user can navigate between them
@@ -919,9 +926,6 @@ impl ViewContextManager {
             };
           }
           if let Some(serde_json::Value::Array(nodes)) = state.get_mut("nodes") {
-            // for node in nodes {
-
-            // }
             nodes.retain_mut(|node| {
               if let Some(serde_json::Value::String(vc_id)) = node.get_mut("id") {
                 if let Some(mapped_vc_id) =
@@ -945,12 +949,15 @@ impl ViewContextManager {
 
           *val = serde_json::to_string(&state).unwrap();
         }
-
-        let new_localstorage_key = ctx.get_state_key();
-        js::set_localstorage_key(&new_localstorage_key, val);
       }
 
-      self.add_view_context(vc.def.uuid, vc.def.name.clone(), ctx, vc.def.subgraph_id);
+      self.add_view_context(
+        vc.def.uuid,
+        vc.def.name.clone(),
+        ctx,
+        vc.def.subgraph_id,
+        vc.localstorage_val.clone(),
+      );
     }
 
     for (id, mut desc) in serialized.subgraphs {

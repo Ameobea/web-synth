@@ -531,15 +531,22 @@ const createNode = (nodeType: string, subgraphId: string, params?: Record<string
   if (isVc) {
     const engine = getEngine();
     if (!engine) {
+      console.error('Engine not initialized when creating a VC from the graph editor');
       return;
     }
 
-    const displayName = ViewContextDescriptors.find(d => d.name === nodeType)!.displayName;
-    engine.create_view_context(nodeType, displayName);
+    const desc =
+      ViewContextDescriptors.find(d => d.nameAlias === nodeType) ??
+      ViewContextDescriptors.find(d => d.name === nodeType);
+    if (!desc) {
+      throw new UnreachableError(`Could not find VC descriptor for ${nodeType}`);
+    }
+    engine.create_view_context(desc.nameAlias ?? desc.name, desc.displayName, desc.initialState);
     return;
   }
 
   const id = buildNewForeignConnectableID().toString();
+  // TODO: will also need to handle virtual FCs here
   const node = new audioNodeGetters[nodeType]!.nodeGetter(ctx, id, params);
   const connectables = node.buildConnectables();
   dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, connectables, subgraphId));
