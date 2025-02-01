@@ -996,10 +996,22 @@ export default class MIDIEditorUIInstance {
   public serializeLines(): SerializedMIDILine[] {
     return this.lines.map((line, lineIx) => ({
       midiNumber: this.lines.length - lineIx,
-      notes: [...line.notesByID.values()].map(note => ({
-        startPoint: note.note.startPoint,
-        length: note.note.length,
-      })),
+      notes: [...line.notesByID.values()]
+        .map(note => ({
+          startPoint: note.note.startPoint,
+          length: note.note.length,
+        }))
+        .filter(note => {
+          if (note.startPoint < 0) {
+            console.error(
+              'Found invalid note with start point < 0 when serializing MIDI lines',
+              note
+            );
+            return false;
+          }
+
+          return true;
+        }),
     }));
   }
 

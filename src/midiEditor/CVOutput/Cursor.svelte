@@ -69,7 +69,7 @@
 
 <svg
   class="root"
-  viewBox={`0 0 ${width} {height}`}
+  viewBox={`0 0 ${width} ${height}`}
   xmlns="http://www.w3.org/2000/svg"
   style="width: {width}px; height: {height}px; left: {marginLeft}px; top: {marginTop}px;"
 >

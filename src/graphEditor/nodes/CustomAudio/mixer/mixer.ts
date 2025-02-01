@@ -1,7 +1,7 @@
 import { Map } from 'immutable';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
-import MixerSmallView from 'src/graphEditor/nodes/CustomAudio/mixer/MixerSmallView.svelte';
+import MixerSmallView from './MixerSmallView.svelte';
 import { OverridableAudioNode, type OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';

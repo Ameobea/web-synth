@@ -211,6 +211,11 @@ build-midi:
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/midi.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/midi* ./src/
 
+build-note-container:
+  cd ./engine/note_container && cargo build --release --target wasm32-unknown-unknown && \
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./engine/build
+  cp ./engine/build/note_container* ./src/
+
 debug-note-container:
   cd ./engine/note_container && cargo build --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/note_container.wasm --browser --remove-producers-section --out-dir ./engine/build

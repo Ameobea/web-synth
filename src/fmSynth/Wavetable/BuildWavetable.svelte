@@ -306,6 +306,7 @@ return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
                 presetState.sourceCode = newSourceCode;
               }}
               mode="javascript"
+              height={300}
             />
             <SvelteControlPanel
               style={{ width: 440 }}
