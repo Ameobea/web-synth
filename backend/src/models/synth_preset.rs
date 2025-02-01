@@ -110,6 +110,7 @@ pub struct FilterParams {
   pub q: Option<f64>,
   #[serde(default)]
   pub gain: f64,
+  #[serde(default)]
   pub detune: f64,
 }
 

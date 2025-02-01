@@ -73,9 +73,19 @@ impl NoteContainer {
   }
 
   pub fn add_note(&mut self, start_point: f64, note: Note) {
-    assert!(note.length.is_normal() && note.length > 0.);
-    assert!(start_point >= 0.);
-    println!("Inserting {:?} at {}", note, start_point);
+    debug_assert!(note.length.is_normal() && note.length > 0.);
+    if !note.length.is_normal() {
+      error!(
+        "Tried to add note with invalid length of {}; ignoring",
+        note.length
+      );
+      return;
+    }
+    debug_assert!(start_point >= 0.);
+    if start_point < 0. {
+      error!("Found note with invalid start point of {start_point}; ignoring");
+      return;
+    }
 
     let end_point = start_point + note.length;
     // We check to see if there are any notes intersecting the point we're trying to insert

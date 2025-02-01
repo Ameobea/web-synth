@@ -5,6 +5,9 @@
 
 #![feature(vec_into_raw_parts)]
 
+#[macro_use]
+extern crate log;
+
 pub mod exports;
 pub mod note_container;
 pub mod note_lines;
