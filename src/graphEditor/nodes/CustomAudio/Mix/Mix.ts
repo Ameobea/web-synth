@@ -92,7 +92,7 @@ export class MixNode {
       inputs: ImmMap<string, ConnectableInput>()
         .set('input a', { type: mode, node: this.dummyInputA })
         .set('input b', { type: mode, node: this.dummyInputB })
-        .set('mix', { type: 'customAudio', node: this.mixOAP }),
+        .set('mix', { type: 'number', node: this.mixOAP }),
       outputs: ImmMap<string, ConnectableOutput>().set('output', {
         node: this.awpNode,
         type: mode,
