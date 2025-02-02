@@ -94,10 +94,10 @@ const maybeInitSubgraphConnectablesWatcher = () => {
         // If we previously had a node patched through that has since been disconnected, replace
         // the node with a dummy node
         if (!(registeredOutputs[subgraphPortName]?.node instanceof DummyNode)) {
-          console.log('Unpatching tx connectables node from subgraph portal', {
-            subgraphPortName,
-            txSubgraphNode,
-          });
+          // console.log('Unpatching tx connectables node from subgraph portal', {
+          //   subgraphPortName,
+          //   txSubgraphNode,
+          // });
           txSubgraphNode.registeredOutputs.update(inputs => {
             const newInputs = { ...inputs };
             newInputs[subgraphPortName] = {
@@ -141,10 +141,10 @@ const maybeInitSubgraphConnectablesWatcher = () => {
         continue;
       }
 
-      console.log('Patching tx connectables node into subgraph portal', {
-        subgraphPortName,
-        wantedTxConnectables: wantedTxConnectable,
-      });
+      // console.log('Patching tx connectables node into subgraph portal', {
+      //   subgraphPortName,
+      //   wantedTxConnectables: wantedTxConnectable,
+      // });
       txSubgraphNode.registeredOutputs.update(inputs => ({
         ...inputs,
         [subgraphPortName]: { type: wantedTxConnectable.type, node: wantedTxConnectable.node },

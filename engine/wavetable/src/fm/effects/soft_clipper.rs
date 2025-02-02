@@ -13,6 +13,7 @@ pub enum SoftClipperAlgorithm {
   /// f(x,a) = x*(abs(x) + a)/(x^2 + (a-1)*abs(x) + 1)
   ///
   /// From: https://www.musicdsp.org/en/latest/Effects/41-waveshaper.html
+  /// Backup: https://web.archive.org/web/20240624055545/https://www.musicdsp.org/en/latest/Effects/41-waveshaper.html
   ///
   /// By: Bram de Jong
   BramWaveShaper = 4,

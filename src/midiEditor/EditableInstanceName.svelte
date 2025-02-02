@@ -79,6 +79,7 @@
     margin-top: -3px;
     position: var(--position, absolute);
     user-select: none;
+    z-index: 1;
   }
 
   .name-wrapper,

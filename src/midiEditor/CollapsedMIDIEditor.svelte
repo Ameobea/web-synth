@@ -62,7 +62,7 @@
     ✕
   </button>
   <EditableInstanceName
-    left={PIANO_KEYBOARD_WIDTH + 2}
+    left={24}
     name={inst.name}
     setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
   />

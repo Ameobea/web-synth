@@ -310,7 +310,17 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
         const group = state.filterGroups[groupIx];
         // can't delete all filters
         if (group.length === 1) {
-          return state;
+          if (state.filterGroups.length === 1) {
+            return state;
+          }
+
+          disconnectFilterChain(group.map(g => g.filter));
+          const newState = {
+            ...state,
+            filterGroups: state.filterGroups.filter((_, ix) => ix !== groupIx),
+          };
+          updateConnectables?.(newState);
+          return newState;
         }
 
         disconnectFilterChain(group.map(g => g.filter));

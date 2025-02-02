@@ -25,7 +25,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, mode, height }
     value={value}
     style={{ border: '1px solid #555' }}
     setOptions={{ useWorker: false }}
-    height={`${height ?? 500}`}
+    height={`${height ?? '500px'}`}
   />
 );
 

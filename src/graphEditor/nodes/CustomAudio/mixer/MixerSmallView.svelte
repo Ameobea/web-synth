@@ -55,6 +55,7 @@
         label: `input_${i}_gain`,
         min: -1,
         max: 1,
+        step: 0.01,
         initial: param.manualControl.offset.value,
       });
       settings.push(spacer());

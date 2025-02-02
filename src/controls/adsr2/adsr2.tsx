@@ -691,6 +691,7 @@ class StepHandle {
     this.inst.steps.splice(ourIndex, 1);
     this.destroy();
     this.inst.sortAndUpdateMarks();
+    this.inst.onUpdated();
   }
 
   constructor(
