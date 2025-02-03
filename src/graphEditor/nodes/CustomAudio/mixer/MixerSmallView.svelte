@@ -160,6 +160,7 @@
     if (awpHandle) {
       connectTrackToAWP(awpHandle, inputCount - 1, false);
     }
+    vizInst?.addInput();
   };
   const removeInput = () => {
     if (awpHandle) {
@@ -168,6 +169,7 @@
 
     mixer.removeInput();
     inputCount = inputCount - 1;
+    vizInst?.removeInput();
   };
 
   $: settings = buildSettings(mixer, inputCount, addInput, removeInput);

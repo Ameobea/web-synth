@@ -179,7 +179,7 @@ export class MixerLevelsViz {
         backgroundColor: BACKGROUND_COLOR,
       });
     } catch (err) {
-      logError('Failed to initialize PixiJS applicationl; WebGL not supported?');
+      logError('Failed to initialize PixiJS application; WebGL not supported?');
       throw err;
     }
 
@@ -211,6 +211,40 @@ export class MixerLevelsViz {
       this.levelMetersContainer.addChild(meter.displayObject);
     }
     this.app.stage.addChild(this.levelMetersContainer);
+  };
+
+  private updateVizLayout = () => {
+    const inputCount = this.levelMeters.length;
+    const newHeight =
+      BASE_MARGIN_TOP_PX +
+      (inputCount > 2 ? MORE_THAN_TWO_INPUTS_ADDITIONAL_MARGIN_TOP_PX : 0) +
+      (MIXER_LEVELS_VIZ_HEIGHT_PER_INPUT_PX + LEVEL_METER_VERTICAL_SPACING_PX) * inputCount;
+    this.app.renderer.resize(MIXER_LEVELS_VIZ_WIDTH_PX, newHeight);
+
+    for (let i = 0; i < inputCount; i++) {
+      this.levelMeters[i].displayObject.y =
+        BASE_MARGIN_TOP_PX +
+        (inputCount > 2 ? MORE_THAN_TWO_INPUTS_ADDITIONAL_MARGIN_TOP_PX : 0) +
+        i * (LEVEL_METER_VERTICAL_SPACING_PX + MIXER_LEVELS_VIZ_HEIGHT_PER_INPUT_PX);
+    }
+  };
+
+  public addInput = () => {
+    const newMeter = new LevelMeter(this.app.renderer as PIXI.Renderer);
+    this.levelMeters.push(newMeter);
+    this.levelMetersContainer.addChild(newMeter.displayObject);
+    this.updateVizLayout();
+  };
+
+  public removeInput = () => {
+    if (this.levelMeters.length === 0) {
+      return;
+    }
+
+    const removedMeter = this.levelMeters.pop()!;
+    this.levelMetersContainer.removeChild(removedMeter.displayObject);
+    removedMeter.displayObject.destroy({ children: true });
+    this.updateVizLayout();
   };
 
   public setAudioThreadBuffer = (audioThreadBuffer: Float32Array) => {

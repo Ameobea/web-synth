@@ -498,19 +498,17 @@ impl Oscillator for WaveTableHandle {
     ];
 
     // 4x oversampling to avoid aliasing
-    let oversample_factor = 4usize;
-    let mut sample = 0.;
+    const OVERSAMPLE_FACTOR: usize = 4usize;
     let mut phase = self.phase;
-    for _ in 0..oversample_factor {
-      phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-      sample += wavetable.get_sample(
-        phase * (wavetable.settings.waveform_length - 1) as f32,
-        &mixes,
-      );
-    }
+    let sample_indices: [f32; OVERSAMPLE_FACTOR] = std::array::from_fn(|_| {
+      phase = Self::compute_new_phase_oversampled(phase, OVERSAMPLE_FACTOR as f32, frequency);
+      phase * (wavetable.settings.waveform_length - 1) as f32
+    });
+
+    let sample = wavetable.get_sample_oversampled::<OVERSAMPLE_FACTOR>(sample_indices, &mixes);
 
     self.phase = phase;
-    sample / oversample_factor as f32
+    sample
   }
 }
 

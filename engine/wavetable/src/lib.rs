@@ -109,6 +109,42 @@ impl WaveTable {
     // )
   }
 
+  fn sample_waveform_oversampled<const OVERSAMPLE_FACTOR: usize>(
+    &self,
+    dimension_ix: usize,
+    waveform_ix: usize,
+    sample_indices: [f32; OVERSAMPLE_FACTOR],
+  ) -> f32 {
+    let waveform_offset_samples = (dimension_ix * self.settings.get_samples_per_dimension())
+      + (waveform_ix * self.settings.waveform_length);
+
+    let mut sample_acc = 0.;
+    for sample_ix in sample_indices {
+      let sample_mix = sample_ix.fract();
+      let (sample_low_ix, sample_hi_ix) = (
+        sample_ix.floor() as usize,
+        (sample_ix.ceil() as usize).min(self.samples.len() - 1),
+      );
+
+      let (low_sample, high_sample) = (
+        unsafe {
+          *self
+            .samples
+            .get_unchecked(waveform_offset_samples + sample_low_ix)
+        },
+        unsafe {
+          *self
+            .samples
+            .get_unchecked(waveform_offset_samples + sample_hi_ix)
+        },
+      );
+
+      sample_acc += mix(sample_mix, low_sample, high_sample);
+    }
+
+    sample_acc / OVERSAMPLE_FACTOR as f32
+  }
+
   fn sample_dimension(&self, dimension_ix: usize, waveform_ix: f32, sample_ix: f32) -> f32 {
     let waveform_mix = waveform_ix.fract();
     if waveform_mix == 0. {
@@ -124,6 +160,28 @@ impl WaveTable {
     mix(waveform_mix, low_sample, high_sample)
   }
 
+  fn sample_dimension_oversampled<const OVERSAMPLE_FACTOR: usize>(
+    &self,
+    dimension_ix: usize,
+    waveform_ix: f32,
+    sample_indices: [f32; OVERSAMPLE_FACTOR],
+  ) -> f32 {
+    let waveform_mix = waveform_ix.fract();
+    if waveform_mix == 0. {
+      return self.sample_waveform_oversampled(dimension_ix, waveform_ix as usize, sample_indices);
+    }
+
+    let (waveform_low_ix, waveform_hi_ix) =
+      (waveform_ix.floor() as usize, waveform_ix.ceil() as usize);
+
+    let low_sample =
+      self.sample_waveform_oversampled(dimension_ix, waveform_low_ix, sample_indices);
+    let high_sample =
+      self.sample_waveform_oversampled(dimension_ix, waveform_hi_ix, sample_indices);
+
+    mix(waveform_mix, low_sample, high_sample)
+  }
+
   pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
     if cfg!(debug_assertions) {
       if sample_ix < 0.0 || sample_ix >= (self.settings.waveform_length - 1) as f32 {
@@ -135,11 +193,20 @@ impl WaveTable {
     }
 
     let base_sample = if self.settings.waveforms_per_dimension == 1 {
+      return self.sample_waveform(0, 0, sample_ix);
+    } else if self.settings.waveforms_per_dimension == 1 {
       self.sample_waveform(0, 0, sample_ix)
     } else {
       let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
       self.sample_dimension(0, waveform_ix, sample_ix)
     };
+
+    // for legacy reasons, there are always two dimensions that have their data duplicated across
+    // both dims.  The mix is set to 0, so there's no reason to waste compute sampling +
+    // interoplating.
+    if self.settings.dimension_count == 2 && mixes[1 * 2 + 1] == 0. {
+      return base_sample;
+    }
 
     // For each higher dimension, mix the base sample from the lowest dimension with the output
     // of the next dimension until a final sample is produced
@@ -156,6 +223,30 @@ impl WaveTable {
     }
 
     sample
+  }
+
+  pub fn get_sample_oversampled<const OVERSAMPLE_FACTOR: usize>(
+    &self,
+    sample_indices: [f32; OVERSAMPLE_FACTOR],
+    mixes: &[f32],
+  ) -> f32 {
+    let base_sample = if self.settings.waveforms_per_dimension == 1 {
+      return self.sample_waveform_oversampled::<OVERSAMPLE_FACTOR>(0, 0, sample_indices);
+    } else if self.settings.waveforms_per_dimension == 1 {
+      self.sample_waveform_oversampled::<OVERSAMPLE_FACTOR>(0, 0, sample_indices)
+    } else {
+      let waveform_ix = mixes[0] * ((self.settings.waveforms_per_dimension - 1) as f32);
+      self.sample_dimension_oversampled::<OVERSAMPLE_FACTOR>(0, waveform_ix, sample_indices)
+    };
+
+    // for legacy reasons, there are always two dimensions that have their data duplicated across
+    // both dims.  The mix is set to 0, so there's no reason to waste compute sampling +
+    // interoplating.
+    if self.settings.dimension_count == 2 && mixes[1 * 2 + 1] == 0. {
+      return base_sample;
+    }
+
+    unimplemented!()
   }
 }
 
