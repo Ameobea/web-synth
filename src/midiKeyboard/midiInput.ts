@@ -2,7 +2,7 @@ import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import { UnreachableError, type IterableValueOf } from 'src/util';
+import { delay, UnreachableError, type IterableValueOf } from 'src/util';
 
 export type BuiltinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
 
@@ -28,9 +28,17 @@ export class MIDIInput {
     let access: MIDIAccess;
     let midiModule: typeof import('src/midi');
     try {
+      // sometimes these requests just go into the ether, so kick off a few after a delay in case the first one gets lost
+      const accessPromise: Promise<MIDIAccess> = Promise.race([
+        navigator.requestMIDIAccess(),
+        delay(100).then(() => navigator.requestMIDIAccess()),
+        delay(500).then(() => navigator.requestMIDIAccess()),
+        delay(1000).then(() => navigator.requestMIDIAccess()),
+      ]);
+
       // Request MIDI access and load the Wasm MIDI module at the same time
       [access, midiModule] = await Promise.all([
-        navigator.requestMIDIAccess(),
+        accessPromise,
         this.midiModule || import('src/midi'),
       ] as [Promise<typeof access>, Promise<typeof midiModule>]);
     } catch (err) {

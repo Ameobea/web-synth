@@ -132,10 +132,22 @@ export class UnimplementedError extends Error {
 export const retryAsync = async <T>(
   fn: () => Promise<T>,
   attempts = 3,
-  delayMs = 50
+  delayMs = 50,
+  timeout: number | null = null
 ): Promise<T> => {
   for (let i = 0; i < attempts; i++) {
     try {
+      if (typeof timeout === 'number') {
+        const res = await Promise.race([
+          fn().then(res => ({ type: 'ok' as const, res })),
+          delay(timeout).then(() => ({ type: 'timeout' as const })),
+        ]);
+        if (res.type === 'timeout') {
+          throw new Error('timeout');
+        }
+        return res.res;
+      }
+
       const res = await fn();
       return res;
     } catch (err) {
