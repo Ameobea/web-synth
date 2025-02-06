@@ -104,7 +104,7 @@ export default class PianoKeys {
           conf.CURSOR_GUTTER_HEIGHT +
           0.5;
         downLineIx = this.computeLineIx(y);
-        this.app.gate(downLineIx);
+        this.app.gate(downLineIx, 90);
 
         this.app.addMouseUpCB(() => {
           if (downLineIx !== null) {
@@ -128,7 +128,7 @@ export default class PianoKeys {
           return;
         }
         this.app.ungate(downLineIx);
-        this.app.gate(newDownLineIx);
+        this.app.gate(newDownLineIx, 90);
         downLineIx = newDownLineIx;
       });
   }

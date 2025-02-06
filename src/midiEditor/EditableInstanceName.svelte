@@ -5,6 +5,7 @@
   export let setName: (name: string) => void;
   export let left: number | undefined = undefined;
   export let right: number | undefined = undefined;
+  export let transparent = false;
 
   let isEditingName = false;
   let nameWrapperHovered = false;
@@ -48,7 +49,9 @@
       class="name-input"
     />
   {:else}
-    <span style="pointer-events: none">{name}</span>
+    <span style="pointer-events: none" class={transparent ? 'name-transparent' : undefined}
+      >{name}</span
+    >
   {/if}
   <span
     class="edit-name"
@@ -100,5 +103,11 @@
     height: 20px;
     margin-bottom: 4px;
     margin-top: -2px;
+  }
+
+  .name-transparent {
+    background: rgba(0, 0, 0, 0.8);
+    padding-left: 5px;
+    margin-left: -4px;
   }
 </style>

@@ -23,7 +23,7 @@ export default class NoteLine {
   public app: MIDIEditorUIInstance;
   public notesByID: Map<number, NoteBox> = new Map();
   public container: PIXI.Container;
-  public background: PIXI.DisplayObject;
+  public background: PIXI.Graphics;
   public index: number;
   private markers: PIXI.Sprite | undefined;
   private lines: PIXI.Sprite | undefined;
@@ -31,6 +31,7 @@ export default class NoteLine {
   private isCulled = true;
   private isDestroyed = false;
   private labelText: PIXI.Text | undefined;
+  private enableNoteCreation;
 
   /**
    * Used for markings caching to determine whether we need to re-render markings or not
@@ -48,9 +49,25 @@ export default class NoteLine {
   ) {
     this.app = app;
     this.index = index;
+    this.enableNoteCreation = enableNoteCreation;
     this.container = new PIXI.Container();
+    this.container.sortableChildren = true;
     this.container.interactiveChildren = true;
-    this.background = new PIXI.Container();
+    const midiNumber = this.app.managedInst.lineCount - this.index;
+    const noteInOctaveIx = midiNumber % 12;
+    const isAccidental =
+      noteInOctaveIx === 1 ||
+      noteInOctaveIx === 3 ||
+      noteInOctaveIx === 6 ||
+      noteInOctaveIx === 8 ||
+      noteInOctaveIx === 10;
+    this.background = new PIXI.Graphics();
+    this.background.zIndex = 0;
+    this.background.beginFill(
+      isAccidental ? conf.BLACK_NOTE_LINE_COLOR : conf.WHITE_NOTE_LINE_COLOR
+    );
+    this.background.drawRect(0, 0, this.app.width, conf.LINE_HEIGHT - 1);
+    this.background.endFill();
     this.background.hitArea = new PIXI.Rectangle(0, 0, this.app.width, conf.LINE_HEIGHT);
     this.background.interactive = true;
     this.container.addChild(this.background);
@@ -58,7 +75,11 @@ export default class NoteLine {
     this.container.y = index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx;
 
     notes.forEach(note => {
-      const noteBox = new NoteBoxClass(this, note);
+      const noteBox = new NoteBoxClass(
+        this,
+        note,
+        this.app.parentInstance.uiManager.velocityDisplayEnabled
+      );
       this.app.allNotesByID.set(note.id, noteBox);
       this.notesByID.set(note.id, noteBox);
     });
@@ -122,12 +143,18 @@ export default class NoteLine {
       this.noteCreationState.id = this.app.addNote(
         this.index,
         this.noteCreationState.startPositionBeats,
-        this.noteCreationState.endPositionBeats - this.noteCreationState.startPositionBeats
+        this.noteCreationState.endPositionBeats - this.noteCreationState.startPositionBeats,
+        // TODO: velocity correct here?
+        this.app.managedInst.lastSetNoteVelocity
       );
     }
   };
 
+  private uninstallNoteCreationHandlers: (() => void) | undefined;
   private installNoteCreationHandlers() {
+    this.uninstallNoteCreationHandlers?.();
+    this.uninstallNoteCreationHandlers = undefined;
+
     const handlePointerDown = (evt: FederatedPointerEvent) => {
       if (evt.button !== 0 || this.app.selectionBoxButtonDown) {
         return;
@@ -143,7 +170,7 @@ export default class NoteLine {
         posBeats,
         0
       );
-      this.app.gate(this.index);
+      this.app.gate(this.index, 90);
       if (isBlocked) {
         return;
       }
@@ -163,14 +190,23 @@ export default class NoteLine {
     };
 
     this.background.on('pointerdown', handlePointerDown);
-    this.lines?.on('pointerdown', handlePointerDown);
+    const lines = this.lines;
+    if (lines) {
+      lines.on('pointerdown', handlePointerDown);
+    }
 
     this.app.app.stage.on('pointermove', this.handlePointerMove);
+
+    this.uninstallNoteCreationHandlers = () => {
+      this.background.off('pointerdown', handlePointerDown);
+      lines?.off('pointerdown', handlePointerDown);
+      this.app.app.stage.off('pointermove', this.handlePointerMove);
+    };
   }
 
   public handleViewChange() {
     const newY = Math.round(
-      this.index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx
+      this.index * conf.LINE_HEIGHT - this.app.managedInst.view.scrollVerticalPx + 0.5
     );
     const isCulled = newY + conf.LINE_HEIGHT < 0 || newY > this.app.height;
     if (!isCulled && this.isCulled) {
@@ -184,6 +220,7 @@ export default class NoteLine {
     this.container.y = newY;
 
     this.renderMarkers();
+    this.container.sortChildren();
     for (const note of this.notesByID.values()) {
       note.render();
     }
@@ -191,6 +228,7 @@ export default class NoteLine {
 
   private buildLines(): PIXI.Sprite {
     const g = new PIXI.Graphics();
+    g.zIndex = 2;
     g.lineStyle(1, conf.LINE_BORDER_COLOR);
     g.moveTo(0, conf.LINE_HEIGHT);
     g.lineTo(this.app.width, conf.LINE_HEIGHT);
@@ -215,6 +253,7 @@ export default class NoteLine {
     }
 
     const g = new PIXI.Graphics();
+    g.zIndex = 3;
 
     let beatsPerTick = 1;
     let beatsPerMeasureLine = this.app.parentInstance.baseView.beatsPerMeasure;
@@ -256,11 +295,17 @@ export default class NoteLine {
 
   private renderMarkers() {
     if (this.isCulled) {
+      this.uninstallNoteCreationHandlers?.();
+
       if (this.markers) {
         this.container.removeChild(this.markers);
         this.markers.destroy();
         this.markers = undefined;
       }
+
+      this.lines?.destroy();
+      this.lines = undefined;
+
       return;
     }
 
@@ -276,8 +321,6 @@ export default class NoteLine {
 
       this.markers = this.buildMarkers();
       this.container.addChild(this.markers);
-      this.container.setChildIndex(this.markers, 0);
-      this.container.setChildIndex(this.background, 1);
       this.lastPxPerBeat = this.app.parentInstance.baseView.pxPerBeat;
       this.lastBeatsPerMeasure = this.app.parentInstance.baseView.beatsPerMeasure;
     }
@@ -291,8 +334,11 @@ export default class NoteLine {
       this.lines = this.buildLines();
       this.lines.interactive = true;
       this.container.addChild(this.lines);
-      this.container.setChildIndex(this.lines, 2);
       this.lastWidthPx = this.app.width;
+
+      if (this.enableNoteCreation) {
+        this.installNoteCreationHandlers();
+      }
     }
 
     const xOffsetBeats = -(

@@ -223,13 +223,9 @@ const synth = new FMSynth(ctx, undefined, {
   },
 });
 
-const playNote = (midiNumber: number) => {
-  midiInputNode.onAttack(midiNumber, 255);
-};
+const playNote = (midiNumber: number) => void midiInputNode.onAttack(midiNumber, 90);
 
-const releaseNote = (midiNumber: number) => {
-  midiInputNode.onRelease(midiNumber, 255);
-};
+const releaseNote = (midiNumber: number) => void midiInputNode.onRelease(midiNumber, 90);
 
 const MainControlPanel: React.FC = () => {
   const [mainControlPanelState, setMainControlPanelState] = useState({

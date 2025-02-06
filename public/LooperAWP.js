@@ -117,7 +117,7 @@ class LooperAWP extends AudioWorkletProcessor {
 
     if (mailboxIDs) {
       for (const mailboxID of mailboxIDs) {
-        globalThis.midiEventMailboxRegistry.submitEvent(mailboxID, 0, note, 255);
+        globalThis.midiEventMailboxRegistry.submitEvent(mailboxID, 0, note, 90);
       }
     }
   };
@@ -132,7 +132,7 @@ class LooperAWP extends AudioWorkletProcessor {
 
     if (this.mailboxIDsByModuleIx[moduleIx]) {
       for (const mailboxID of mailboxIDs) {
-        globalThis.midiEventMailboxRegistry.submitEvent(mailboxID, 1, note, 255);
+        globalThis.midiEventMailboxRegistry.submitEvent(mailboxID, 1, note, 90);
       }
     }
   };

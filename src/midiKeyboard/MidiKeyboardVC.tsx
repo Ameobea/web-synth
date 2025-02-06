@@ -100,11 +100,11 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
     [stateKey]
   );
   const onAttack = useCallback(
-    (midiNumber: number) => midiNode?.onAttack(midiNumber, 255),
+    (midiNumber: number) => midiNode?.onAttack(midiNumber, 90),
     [midiNode]
   );
   const onRelease = useCallback(
-    (midiNumber: number) => midiNode?.onRelease(midiNumber, 255),
+    (midiNumber: number) => midiNode?.onRelease(midiNumber, 90),
     [midiNode]
   );
 

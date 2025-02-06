@@ -45,11 +45,11 @@ pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
 
     midi_events.push(AbsoluteEvent::new_midi(
       start_ticks,
-      MidiMessage::note_on(note.line_ix as u8, 255, 0),
+      MidiMessage::note_on(note.line_ix as u8, 90, 0),
     ));
     midi_events.push(AbsoluteEvent::new_midi(
       end_ticks,
-      MidiMessage::note_off(note.line_ix as u8, 255, 0),
+      MidiMessage::note_off(note.line_ix as u8, 90, 0),
     ))
   }
   midi_events.sort_unstable_by_key(|evt| evt.get_time());

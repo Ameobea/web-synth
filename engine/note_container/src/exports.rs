@@ -2,7 +2,7 @@ use std::ops::Bound;
 
 use float_ord::FloatOrd;
 use fxhash::FxHashMap;
-use js_sys::Function;
+use js_sys::{Array, Function};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -40,6 +40,7 @@ pub fn create_note(
   start_point: f64,
   length: f64,
   note_id: u32,
+  velocity: u8,
 ) -> u32 {
   let notes = unsafe { &mut *lines };
   let container = &mut notes.lines[line_ix];
@@ -51,6 +52,7 @@ pub fn create_note(
   container.add_note(start_point, Note {
     id: note_id,
     length,
+    velocity,
   });
   note_id
 }
@@ -99,6 +101,19 @@ pub fn resize_note_horizontal_end(
   let notes = unsafe { &mut *lines };
   let container = &mut notes.lines[line_ix];
   container.resize_note_end(start_point, note_id, new_end_point)
+}
+
+#[wasm_bindgen]
+pub fn set_note_velocity(
+  lines: *mut NoteLines,
+  line_ix: usize,
+  start_point: f64,
+  note_id: u32,
+  new_velocity: u8,
+) {
+  let notes = unsafe { &mut *lines };
+  let container = &mut notes.lines[line_ix];
+  container.set_note_velocity(start_point, note_id, new_velocity)
 }
 
 #[wasm_bindgen]
@@ -156,6 +171,7 @@ pub fn iter_notes_with_cb(
     is_attack: bool,
     line_ix: usize,
     beat: f64,
+    velocity: u8,
   }
 
   let mut unreleased_notes: FxHashMap<u32, UnreleasedNote> = FxHashMap::default();
@@ -180,6 +196,7 @@ pub fn iter_notes_with_cb(
           is_attack: true,
           line_ix,
           beat: pos,
+          velocity: note.velocity,
         });
         let existing = unreleased_notes.insert(note.id, UnreleasedNote {
           line_ix,
@@ -195,10 +212,27 @@ pub fn iter_notes_with_cb(
         let existing = unreleased_notes.remove(&note_id);
 
         if existing.is_none() && include_partial_notes {
+          let start_evt_range = notes.lines[line_ix].inner.range((
+            Bound::Included(FloatOrd(0.)),
+            Bound::Excluded(FloatOrd(pos)),
+          ));
+          let (_start_pos, start_note) = start_evt_range
+            .rev()
+            .find_map(|(pos, entry)| match entry {
+              NoteEntry::NoteStart { note } if note.id == *note_id => Some((pos, note)),
+              _ => None,
+            })
+            .unwrap_or_else(|| {
+              panic!(
+                "Missing start event for end event at beat={} with note_id={note_id}",
+                pos,
+              )
+            });
           events.push(NoteEvent {
             is_attack: true,
             line_ix,
             beat: start_beat_inclusive,
+            velocity: start_note.velocity,
           });
         }
 
@@ -207,6 +241,7 @@ pub fn iter_notes_with_cb(
             is_attack: false,
             line_ix,
             beat: pos,
+            velocity: 90,
           });
         }
       },
@@ -221,6 +256,7 @@ pub fn iter_notes_with_cb(
             is_attack: false,
             line_ix,
             beat: pos,
+            velocity: 90,
           });
         }
 
@@ -228,6 +264,7 @@ pub fn iter_notes_with_cb(
           is_attack: true,
           line_ix,
           beat: pos,
+          velocity: start_note.velocity,
         });
         let existing = unreleased_notes.insert(start_note.id, UnreleasedNote {
           line_ix,
@@ -252,6 +289,7 @@ pub fn iter_notes_with_cb(
       is_attack: false,
       line_ix: note.line_ix,
       beat: release_time,
+      velocity: 90,
     });
   }
 
@@ -267,13 +305,17 @@ pub fn iter_notes_with_cb(
     is_attack,
     line_ix,
     beat,
+    velocity,
   } in events
   {
-    let _ = cb.call3(
+    let _ = cb.apply(
       &JsValue::NULL,
-      &JsValue::from(is_attack),
-      &JsValue::from(line_ix as u32),
-      &JsValue::from(beat),
+      &Array::of4(
+        &JsValue::from(is_attack),
+        &JsValue::from(line_ix as u32),
+        &JsValue::from(beat),
+        &JsValue::from(velocity),
+      ),
     );
   }
 }

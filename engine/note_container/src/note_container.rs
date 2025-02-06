@@ -9,6 +9,7 @@ use float_ord::FloatOrd;
 pub struct Note {
   pub id: u32,
   pub length: f64,
+  pub velocity: u8,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,11 +22,12 @@ pub enum NoteEntry {
 impl NoteEntry {
   pub fn get_ids(&self) -> (u32, Option<u32>) {
     match self {
-      NoteEntry::NoteStart { note } => (note.id, None),
+      NoteEntry::NoteStart { note, .. } => (note.id, None),
       NoteEntry::NoteEnd { note_id } => (*note_id, None),
       NoteEntry::StartAndEnd {
         start_note,
         end_note_id,
+        ..
       } => (start_note.id, Some(*end_note_id)),
     }
   }
@@ -529,6 +531,7 @@ impl NoteContainer {
           start_note: Note {
             id: note.id,
             length: end_point - real_new_start_point,
+            velocity: note.velocity,
           },
           end_note_id,
         });
@@ -539,11 +542,36 @@ impl NoteContainer {
           note: Note {
             id: note.id,
             length: end_point - real_new_start_point,
+            velocity: note.velocity,
           },
         });
     }
 
     real_new_start_point
+  }
+
+  pub fn set_note_velocity(&mut self, start_point: f64, note_id: u32, new_velocity: u8) {
+    let entry = self
+      .inner
+      .get_mut(&FloatOrd(start_point))
+      .unwrap_or_else(|| {
+        panic!("No note found at start point={start_point} when setting velocity")
+      });
+    let found_note = match entry {
+      NoteEntry::NoteStart { note } => note,
+      NoteEntry::NoteEnd { .. } =>
+        panic!("Found note end event at beat={start_point} but expected note start"),
+      NoteEntry::StartAndEnd { start_note, .. } => start_note,
+    };
+    if note_id != found_note.id {
+      panic!(
+        "Tried to set velocity for note at start_point={start_point}, but its id didn't match \
+         what was requested on the frontend.  Frontend requested id={note_id}; actual id={}",
+        found_note.id
+      );
+    }
+
+    found_note.velocity = new_velocity;
   }
 
   pub fn iter_notes(&self, acc: &mut HashSet<u32>, mut start_point: f64, end_point: f64) {
@@ -584,7 +612,11 @@ impl NoteContainer {
 #[test]
 pub fn basic_insertion_removal() {
   let mut container = NoteContainer::default();
-  let note = Note { id: 0, length: 1. };
+  let note = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., note);
   let removed = container.remove_note(1., note.id);
   assert_eq!(note, removed);
@@ -593,8 +625,16 @@ pub fn basic_insertion_removal() {
 #[test]
 pub fn add_remove_touching_notes() {
   let mut container = NoteContainer::default();
-  let note1 = Note { id: 0, length: 1. };
-  let note2 = Note { id: 1, length: 1. };
+  let note1 = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let note2 = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(0., note1);
   container.add_note(1., note2);
   let removed1 = container.remove_note(0., note1.id);
@@ -606,7 +646,11 @@ pub fn add_remove_touching_notes() {
 #[test]
 pub fn simple_nonblocking_horizontal_move() {
   let mut container = NoteContainer::default();
-  let note = Note { id: 0, length: 1. };
+  let note = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., note);
   container.move_note_horizontal(1., note.id, 5.);
   let removed = container.remove_note(5., note.id);
@@ -616,7 +660,11 @@ pub fn simple_nonblocking_horizontal_move() {
 #[test]
 pub fn move_note_self_intersecting_left() {
   let mut container = NoteContainer::default();
-  let note = Note { id: 0, length: 1. };
+  let note = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., note);
   container.move_note_horizontal(1., note.id, 0.8);
   let removed = container.remove_note(0.8, note.id);
@@ -626,7 +674,11 @@ pub fn move_note_self_intersecting_left() {
 #[test]
 pub fn move_note_self_intersecting_right() {
   let mut container = NoteContainer::default();
-  let note = Note { id: 0, length: 1. };
+  let note = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., note);
   container.move_note_horizontal(1., note.id, 1.2);
   let removed = container.remove_note(1.2, note.id);
@@ -637,8 +689,16 @@ pub fn move_note_self_intersecting_right() {
 #[should_panic]
 pub fn insert_overlapping_bad() {
   let mut container = NoteContainer::default();
-  let note1 = Note { id: 0, length: 1. };
-  let note2 = Note { id: 1, length: 1. };
+  let note1 = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let note2 = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., note1);
   container.add_note(1.2, note2);
 }
@@ -647,21 +707,37 @@ pub fn insert_overlapping_bad() {
 #[should_panic]
 pub fn insert_nan_bad() {
   let mut container = NoteContainer::default();
-  container.add_note(std::f64::NAN, Note { id: 0, length: 2. });
+  container.add_note(std::f64::NAN, Note {
+    id: 0,
+    length: 2.,
+    velocity: 90,
+  });
 }
 
 #[test]
 #[should_panic]
 pub fn insert_zero_length_note_bad() {
   let mut container = NoteContainer::default();
-  container.add_note(0., Note { id: 0, length: 0. });
+  container.add_note(0., Note {
+    id: 0,
+    length: 0.,
+    velocity: 90,
+  });
 }
 
 #[test]
 pub fn move_horizontal_left_blocked() {
   let mut container = NoteContainer::default();
-  let note1 = Note { id: 0, length: 1. };
-  let note2 = Note { id: 1, length: 1. };
+  let note1 = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let note2 = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., note1);
   container.add_note(5., note2);
   let new_note2_start_point = container.move_note_horizontal(5., note2.id, 1.);
@@ -672,8 +748,16 @@ pub fn move_horizontal_left_blocked() {
 #[test]
 pub fn move_horizontal_right_blocked() {
   let mut container = NoteContainer::default();
-  let note1 = Note { id: 0, length: 1. };
-  let note2 = Note { id: 1, length: 1. };
+  let note1 = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let note2 = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(5., note1);
   container.add_note(1., note2);
   let new_note2_start_point = container.move_note_horizontal(1., note2.id, 4.5);
@@ -684,9 +768,21 @@ pub fn move_horizontal_right_blocked() {
 #[test]
 pub fn move_horizontal_snug_fit() {
   let mut container = NoteContainer::default();
-  let note_left = Note { id: 0, length: 1. };
-  let note_right = Note { id: 1, length: 2. };
-  let moving_note = Note { id: 2, length: 1. };
+  let note_left = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let note_right = Note {
+    id: 1,
+    length: 2.,
+    velocity: 90,
+  };
+  let moving_note = Note {
+    id: 2,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(2., note_left);
   container.add_note(4., note_right);
   container.add_note(0., moving_note);
@@ -697,7 +793,11 @@ pub fn move_horizontal_snug_fit() {
 #[test]
 pub fn resize_note_infallable() {
   let mut container = NoteContainer::default();
-  let note = Note { id: 0, length: 2. };
+  let note = Note {
+    id: 0,
+    length: 2.,
+    velocity: 90,
+  };
   container.add_note(1., note);
   let new_end_point = container.resize_note_end(1., note.id, 2.);
   assert_eq!(new_end_point, 2.);
@@ -708,7 +808,11 @@ pub fn resize_note_infallable() {
   let entry = container.inner.remove(&FloatOrd(1.5)).unwrap();
   assert_eq!(
     NoteEntry::NoteStart {
-      note: Note { id: 0, length: 0.5 }
+      note: Note {
+        id: 0,
+        length: 0.5,
+        velocity: 90,
+      }
     },
     entry
   );
@@ -717,8 +821,16 @@ pub fn resize_note_infallable() {
 #[test]
 pub fn resize_note_start_blocked() {
   let mut container = NoteContainer::default();
-  let blocking_note = Note { id: 0, length: 1. };
-  let resizing_note = Note { id: 1, length: 1. };
+  let blocking_note = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let resizing_note = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(1., blocking_note);
   container.add_note(4., resizing_note);
   let new_start_point = container.resize_note_start(4., resizing_note.id, 0.5);
@@ -728,8 +840,16 @@ pub fn resize_note_start_blocked() {
 #[test]
 pub fn resize_note_end_blocked() {
   let mut container = NoteContainer::default();
-  let blocking_note = Note { id: 0, length: 1. };
-  let resizing_note = Note { id: 1, length: 1. };
+  let blocking_note = Note {
+    id: 0,
+    length: 1.,
+    velocity: 90,
+  };
+  let resizing_note = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(4., blocking_note);
   container.add_note(1., resizing_note);
   let new_end_point = container.resize_note_end(1., resizing_note.id, 6.);
@@ -743,8 +863,13 @@ pub fn prevent_moving_inside_other_notes() {
   let big_note = Note {
     id: 0,
     length: 100.,
+    velocity: 90,
   };
-  let moving_note = Note { id: 1, length: 1. };
+  let moving_note = Note {
+    id: 1,
+    length: 1.,
+    velocity: 90,
+  };
   container.add_note(0., big_note);
   container.add_note(105., moving_note);
   let new_start_point = container.move_note_horizontal(105., 1, 80.);

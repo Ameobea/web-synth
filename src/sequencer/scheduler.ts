@@ -35,9 +35,9 @@ export const SequencerBeatPlayerByVoiceType: {
     const beatDurationMS = (60 / getGlobalBpm()) * 1000;
     const holdDurationMS = beatDurationMS * 0.72;
 
-    midiOutput.onAttack(mark?.note ?? voice.note, 255);
+    midiOutput.onAttack(mark?.note ?? voice.note, 90);
     scheduleEventTimeAbsolute(ctx.currentTime + holdDurationMS / 1000, () =>
-      midiOutput.onRelease(mark?.note ?? voice.note, 255)
+      midiOutput.onRelease(mark?.note ?? voice.note, 90)
     );
   },
   sample: (

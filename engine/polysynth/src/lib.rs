@@ -272,7 +272,7 @@ pub mod exports {
     let ctx = unsafe { &mut *ctx };
     ctx
       .synth
-      .trigger_attack(note_id, velocity.unwrap_or(255), offset);
+      .trigger_attack(note_id, velocity.unwrap_or(90), offset);
   }
 
   #[wasm_bindgen]

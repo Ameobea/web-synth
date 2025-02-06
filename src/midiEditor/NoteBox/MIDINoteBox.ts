@@ -1,9 +1,11 @@
+import type { FederatedPointerEvent, FederatedWheelEvent } from '@pixi/events';
+
 import * as PIXI from 'src/controls/pixi';
 import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
 import { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
 import type NoteLine from 'src/midiEditor/NoteLine';
 import * as conf from '../conf';
-import type { FederatedPointerEvent } from '@pixi/events';
+import { clamp } from 'src/util';
 
 export enum NoteDragHandleSide {
   Left,
@@ -25,7 +27,7 @@ export class NoteDragHandle {
 
   private buildInitialGraphics(): PIXI.Graphics {
     const g = new PIXI.Graphics();
-    g.beginFill(0x585858, 0.2);
+    g.beginFill(conf.NOTE_DRAG_HANDLE_COLOR, 0.2);
     g.drawRect(0, 1, 20, conf.LINE_HEIGHT - 2);
     g.endFill();
     this.parentNote.graphics.addChild(g);
@@ -104,15 +106,79 @@ export class NoteDragHandle {
   }
 }
 
+class NoteVelocityDisplay {
+  private parentNote: NoteBox;
+  private graphics: PIXI.Graphics;
+
+  constructor(parentNote: NoteBox) {
+    this.parentNote = parentNote;
+    this.graphics = this.buildInitialGraphics();
+  }
+
+  private buildInitialGraphics() {
+    const g = new PIXI.Graphics();
+    this.parentNote.graphics.addChild(g);
+    return g;
+  }
+
+  public render() {
+    const noteWidth = this.parentNote.getWidthPx();
+    const velocity = this.parentNote.note.velocity ?? 90;
+    const width = Math.floor(((noteWidth - 2) * velocity) / 127);
+    const height = clamp(4, conf.LINE_HEIGHT, Math.floor(conf.LINE_HEIGHT / 3));
+    this.graphics.clear();
+    this.graphics.beginFill(conf.NOTE_VELOCITY_BAR_COLOR);
+    this.graphics.drawRect(2, conf.LINE_HEIGHT - height - 0.5, width, height);
+    this.graphics.endFill();
+  }
+
+  public destroy() {
+    this.parentNote.graphics.removeChild(this.graphics);
+    this.graphics.destroy();
+  }
+}
+
 export default class MIDINoteBox extends NoteBox {
   public leftDragHandle: NoteDragHandle;
   public rightDragHandle: NoteDragHandle;
+  private velocityDisplay: NoteVelocityDisplay | null = null;
 
-  constructor(line: NoteLine, note: Note) {
-    super(line, note);
+  constructor(line: NoteLine, note: Note, velocityDisplayEnabled: boolean) {
+    super(line, note, velocityDisplayEnabled);
+
+    this.graphics.on('wheelcapture', this.handleWheel);
+
+    if (velocityDisplayEnabled) {
+      this.velocityDisplay = new NoteVelocityDisplay(this);
+      this.velocityDisplay.render();
+    }
 
     this.leftDragHandle = new NoteDragHandle(this, NoteDragHandleSide.Left);
     this.rightDragHandle = new NoteDragHandle(this, NoteDragHandleSide.Right);
+  }
+
+  private handleWheel = (evt: FederatedWheelEvent) => {
+    if (!this.velocityDisplay) {
+      return;
+    }
+
+    evt.preventDefault();
+    const delta = evt.deltaY;
+    const velocity = this.note.velocity ?? 90;
+    const newVelocity = clamp(0, 127, velocity - Math.sign(delta));
+    // TODO: This should be applied to all selected notes instead of just this note
+    this.line.app.setNoteVelocity(this.note.id, newVelocity);
+  };
+
+  public setVelocityDisplayEnabled(enabled: boolean) {
+    if (enabled && !this.velocityDisplay) {
+      this.velocityDisplay = new NoteVelocityDisplay(this);
+    } else if (!enabled && this.velocityDisplay) {
+      this.velocityDisplay.destroy();
+      this.velocityDisplay = null;
+    }
+
+    this.render();
   }
 
   public render() {
@@ -120,6 +186,7 @@ export default class MIDINoteBox extends NoteBox {
 
     this.leftDragHandle.render();
     this.rightDragHandle.render();
+    this.velocityDisplay?.render();
   }
 
   public destory() {

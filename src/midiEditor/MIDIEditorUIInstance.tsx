@@ -40,6 +40,7 @@ export interface Note {
    * Length of the note in beats
    */
   length: number;
+  velocity?: number;
 }
 
 if (PIXI.settings.RENDER_OPTIONS) {
@@ -99,8 +100,8 @@ export default class MIDIEditorUIInstance {
   public loopCursor: LoopCursor | null;
   private bookmarkCursor: BookmarkCursor | null = null;
   private unsubBookmarkPosBeatsChanges: Unsubscribe;
-  private clipboard: { startPoint: number; length: number; lineIx: number }[] = [];
-  public noteMetadataByNoteID: Map<number, any> = new Map();
+  private clipboard: { startPoint: number; length: number; lineIx: number; velocity: number }[] =
+    [];
   public vcId: string;
   private isHidden: boolean;
   private unsubscribeConnectablesUpdates: Unsubscribe;
@@ -145,7 +146,23 @@ export default class MIDIEditorUIInstance {
       height,
       width,
       backgroundColor: conf.BACKGROUND_COLOR,
+      eventFeatures: { wheel: false },
     });
+
+    // The default wheel event handler installed by PIXI is passive, and we need to be able to
+    // prevent default on wheel events to support scrolling on elements without scrolling the
+    // page.  So, we override the default event with a custom one that is forced to not be passive.
+    const events = this.app.renderer.events;
+    events.domElement.removeEventListener('wheel', (events as any).onWheel);
+    events.domElement.addEventListener(
+      'wheel',
+      nativeEvent => {
+        const wheelEvent = (events as any).normalizeWheelEvent(nativeEvent);
+        events.rootBoundary.rootTarget = events.renderer.lastObjectRendered as any;
+        events.rootBoundary.mapEvent(wheelEvent);
+      },
+      { passive: false }
+    );
 
     this.handleBookmarkPosBeatsChange(get(BookmarkPosBeats));
     this.unsubBookmarkPosBeatsChanges = BookmarkPosBeats.subscribe(
@@ -262,13 +279,14 @@ export default class MIDIEditorUIInstance {
     const linesWithIDs: Note[][] = new Array(newState.lines.length).fill(null).map(() => []);
     for (const { midiNumber, notes } of newState.lines) {
       const lineIx = newState.lines.length - midiNumber;
-      for (const { length, startPoint } of notes) {
+      for (const { length, startPoint, velocity } of notes) {
         const id = this.wasm.instance.create_note(
           this.wasm.noteLinesCtxPtr,
           lineIx,
           startPoint,
           length,
-          0
+          0,
+          velocity ?? 90
         );
         linesWithIDs[lineIx].push({ id, startPoint, length });
       }
@@ -290,6 +308,7 @@ export default class MIDIEditorUIInstance {
     // Set other misc. state
     this.setLoopPoint(this.parentInstance.playbackHandler.getLoopPoint());
     this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
+    this.managedInst.lastSetNoteVelocity = newState.lastSetNoteVelocity ?? 90;
   }
 
   public pxToBeats(px: number) {
@@ -340,6 +359,7 @@ export default class MIDIEditorUIInstance {
     lineIx: number,
     startPoint: number,
     length: number,
+    velocity: number,
     NoteBoxClass: typeof NoteBox = MIDINoteBox
   ): number {
     if (!this.wasm) {
@@ -350,9 +370,14 @@ export default class MIDIEditorUIInstance {
       lineIx,
       startPoint,
       length,
-      0
+      0,
+      velocity
     );
-    const noteBox = new NoteBoxClass(this.lines[lineIx], { id, startPoint, length });
+    const noteBox = new NoteBoxClass(
+      this.lines[lineIx],
+      { id, startPoint, length, velocity },
+      this.parentInstance.uiManager.velocityDisplayEnabled
+    );
     this.lines[lineIx].notesByID.set(id, noteBox);
     this.allNotesByID.set(id, noteBox);
     this.selectNote(id);
@@ -489,6 +514,24 @@ export default class MIDIEditorUIInstance {
     return realNewEndPoint;
   }
 
+  public setNoteVelocity(noteID: number, newVelocity: number) {
+    const note = this.allNotesByID.get(noteID);
+    if (!note) {
+      throw new UnreachableError(
+        `Tried to set velocity of note id=${noteID} but not found in all notes mapping`
+      );
+    }
+    note.note.velocity = newVelocity;
+    this.wasm!.instance.set_note_velocity(
+      this.wasm!.noteLinesCtxPtr,
+      note.line.index,
+      note.note.startPoint,
+      noteID,
+      newVelocity
+    );
+    note.render();
+  }
+
   private startPanning(data: FederatedPointerEvent) {
     this.panningData = {
       startPoint: data.getLocalPosition(this.linesContainer),
@@ -596,6 +639,7 @@ export default class MIDIEditorUIInstance {
         lineIx: note.line.index,
         startPoint: note.note.startPoint,
         length: note.note.length,
+        velocity: note.note.velocity ?? 90,
       });
     }
   }
@@ -623,6 +667,7 @@ export default class MIDIEditorUIInstance {
 
     const createdNoteIDs: number[] = [];
     // Then we create + select all notes
+    console.log(this.clipboard);
     this.clipboard.forEach(note => {
       const normalizedStartPoint = note.startPoint - startBeat + cursorPosBeats;
       const canCreate = wasm.instance.check_can_add_note(
@@ -635,7 +680,7 @@ export default class MIDIEditorUIInstance {
         return;
       }
 
-      const id = this.addNote(note.lineIx, normalizedStartPoint, note.length);
+      const id = this.addNote(note.lineIx, normalizedStartPoint, note.length, note.velocity);
       createdNoteIDs.push(id);
     });
 
@@ -713,14 +758,22 @@ export default class MIDIEditorUIInstance {
             lineIx,
             note.startPoint,
             note.length,
-            note.id
+            note.id,
+            note.velocity ?? 90
           );
           return;
         }
 
         // We're good to move the note, so re-insert at the snapped start point
         note.startPoint = snappedStart;
-        wasm.instance.create_note(wasm.noteLinesCtxPtr, lineIx, snappedStart, note.length, note.id);
+        wasm.instance.create_note(
+          wasm.noteLinesCtxPtr,
+          lineIx,
+          snappedStart,
+          note.length,
+          note.id,
+          note.velocity ?? 90
+        );
       });
     }
 
@@ -753,7 +806,8 @@ export default class MIDIEditorUIInstance {
             line.index,
             note.startPoint,
             note.length,
-            note.id
+            note.id,
+            note.velocity ?? 90
           );
         } else {
           note.length += snappedStart - note.startPoint;
@@ -763,7 +817,8 @@ export default class MIDIEditorUIInstance {
             line.index,
             note.startPoint,
             note.length,
-            note.id
+            note.id,
+            note.velocity ?? 90
           );
         }
       }
@@ -785,7 +840,8 @@ export default class MIDIEditorUIInstance {
             line.index,
             note.startPoint,
             note.length,
-            note.id
+            note.id,
+            note.velocity ?? 90
           );
         } else {
           note.length = newLength;
@@ -794,7 +850,8 @@ export default class MIDIEditorUIInstance {
             line.index,
             note.startPoint,
             note.length,
-            note.id
+            note.id,
+            note.velocity ?? 90
           );
         }
       }
@@ -802,6 +859,12 @@ export default class MIDIEditorUIInstance {
 
     // Since we manually updated note lengths, re-render everything
     this.handleViewChange();
+  }
+
+  public setVelocityDisplayEnabled(velocityDisplayEnabled: boolean) {
+    this.lines.forEach(line =>
+      line.notesByID.forEach(note => note.setVelocityDisplayEnabled(velocityDisplayEnabled))
+    );
   }
 
   public computeLineIndex(localY: number) {
@@ -830,8 +893,8 @@ export default class MIDIEditorUIInstance {
     }
   }
 
-  public gate(lineIx: number) {
-    this.parentInstance.gate(this.managedInst.id, lineIx);
+  public gate(lineIx: number, velocity: number) {
+    this.parentInstance.gate(this.managedInst.id, lineIx, velocity);
     this.pianoKeys?.setNotePlaying(lineIx, true);
   }
 
@@ -849,11 +912,21 @@ export default class MIDIEditorUIInstance {
   }
 
   public gateAllSelectedNotes() {
-    const allGatedLineIndices = new Set(
-      [...this.selectedNoteIDs].map(noteId => this.allNotesByID.get(noteId)!.line.index)
-    );
-    for (const lineIx of allGatedLineIndices) {
-      this.gate(lineIx);
+    const gatedVelocitiesByLineIx: Map<number, number> = new Map();
+    for (const noteID of this.selectedNoteIDs) {
+      const noteBox = this.allNotesByID.get(noteID)!;
+      const lineIx = noteBox.line.index;
+      if (!gatedVelocitiesByLineIx.has(lineIx)) {
+        gatedVelocitiesByLineIx.set(lineIx, noteBox.note.velocity ?? 90);
+      } else {
+        gatedVelocitiesByLineIx.set(
+          lineIx,
+          Math.max(gatedVelocitiesByLineIx.get(lineIx)!, noteBox.note.velocity ?? 90)
+        );
+      }
+    }
+    for (const [lineIx, velocity] of gatedVelocitiesByLineIx) {
+      this.gate(lineIx, velocity);
     }
   }
 
@@ -905,14 +978,16 @@ export default class MIDIEditorUIInstance {
     }
     const allSelectedNotes: NoteBox[] = [];
     const ungatedLineIndices: Set<number> = new Set();
-    const gatedLineIndices: Set<number> = new Set();
+    const gatedLineIndicesToVelocity: Map<number, number> = new Map();
     for (const noteId of this.selectedNoteIDs.values()) {
       const note = this.allNotesByID.get(noteId)!;
       allSelectedNotes.push(note);
 
       ungatedLineIndices.add(note.line.index);
       const newLineIndex = note.line.index + lineDiff;
-      gatedLineIndices.add(newLineIndex);
+      const velocity = note.note.velocity ?? 90;
+      const newVelocity = Math.max(gatedLineIndicesToVelocity.get(newLineIndex) ?? 0, velocity);
+      gatedLineIndicesToVelocity.set(newLineIndex, newVelocity);
       if (newLineIndex < 0 || newLineIndex >= this.lines.length) {
         return;
       }
@@ -932,8 +1007,8 @@ export default class MIDIEditorUIInstance {
     for (const lineIx of ungatedLineIndices) {
       this.ungate(lineIx);
     }
-    for (const lineIx of gatedLineIndices) {
-      this.gate(lineIx);
+    for (const [lineIx, velocity] of gatedLineIndicesToVelocity) {
+      this.gate(lineIx, velocity);
     }
 
     // No conflicts, we can move all of them!  However, we need to make sure that we move them in order of
@@ -943,9 +1018,7 @@ export default class MIDIEditorUIInstance {
       const diff = a.line.index - b.line.index;
       return diff * (lineDiff > 0 ? -1 : 1);
     });
-    allSelectedNotes.forEach(note => {
-      this.moveNoteToLine(note, note.line.index + lineDiff);
-    });
+    allSelectedNotes.forEach(note => this.moveNoteToLine(note, note.line.index + lineDiff));
   }
 
   private moveNoteToLine(note: NoteBox, newLineIx: number) {
@@ -962,7 +1035,8 @@ export default class MIDIEditorUIInstance {
       newLineIx,
       note.note.startPoint,
       note.note.length,
-      note.note.id
+      note.note.id,
+      note.note.velocity ?? 90
     );
     note.line = this.lines[newLineIx];
     note.line.container.addChild(note.graphics);
@@ -1000,6 +1074,7 @@ export default class MIDIEditorUIInstance {
         .map(note => ({
           startPoint: note.note.startPoint,
           length: note.note.length,
+          velocity: note.note.velocity,
         }))
         .filter(note => {
           if (note.startPoint < 0) {
@@ -1021,6 +1096,7 @@ export default class MIDIEditorUIInstance {
       view: R.clone(this.view),
       isExpanded,
       name: this.managedInst.name,
+      lastSetNoteVelocity: this.managedInst.lastSetNoteVelocity,
     };
   }
 

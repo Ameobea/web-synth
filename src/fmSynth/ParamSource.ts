@@ -191,8 +191,30 @@ const buildTypeSetting = (excludedTypes?: ParamSource['type'][]) => ({
 export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): AdsrParams => ({
   steps: [
     { x: 0, y: 0.8, ramper: { type: 'linear' } },
-    { x: 0.3, y: 0, ramper: { type: 'exponential', exponent: 1 / 2 } }, // attack
-    { x: 1, y: 0, ramper: { type: 'exponential', exponent: 1 / 2 } }, // end
+    // attack
+    {
+      x: 0.3,
+      y: 0,
+      ramper: {
+        type: 'bezier',
+        controlPoints: [
+          { x: 0.5, y: 0.1 },
+          { x: 0.5, y: 0.1 },
+        ],
+      },
+    },
+    // end
+    {
+      x: 1,
+      y: 0,
+      ramper: {
+        type: 'bezier',
+        controlPoints: [
+          { x: 0.5, y: 0 },
+          { x: 0.5, y: 0 },
+        ],
+      },
+    },
   ],
   lenSamples: { type: 'constant', value: 44100 },
   loopPoint: null,

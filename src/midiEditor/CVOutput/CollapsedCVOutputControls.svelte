@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
 
   export let name: string;
@@ -16,6 +15,6 @@
   aria-label="Expand"
   role="button"
 >
-  › <EditableInstanceName left={PIANO_KEYBOARD_WIDTH + 2} {name} {setName} />
+  › <EditableInstanceName left={24} {name} {setName} />
   <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
 </div>

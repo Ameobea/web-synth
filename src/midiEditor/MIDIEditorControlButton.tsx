@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { filterNils } from 'src/util';
 
 interface MIDIEditorControlButtonProps {

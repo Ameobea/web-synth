@@ -98,10 +98,10 @@ export default class MIDIQuantizerNode implements ForeignNode {
   private handleMessage = (data: Record<string, any>) => {
     switch (data.type) {
       case 'playNote':
-        this.midiNode.onAttack(data.note, 255);
+        this.midiNode.onAttack(data.note, 90);
         break;
       case 'releaseNote':
-        this.midiNode.onRelease(data.note, 255);
+        this.midiNode.onRelease(data.note, 90);
         break;
       default:
         console.error(`Unhandled message type in MIDIQuantizerNode: ${data.type}`);

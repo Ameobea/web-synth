@@ -919,6 +919,8 @@ pub struct FMSynthVoice {
   pub filter_envelope_generator: ManagedAdsr,
   pub(crate) filter_module: FilterModule,
   pub last_gated_midi_number: usize,
+  /// Computed from the velocity param of MIDI events and multiplied into all outgoing samples.
+  pub velocity_gain_multiplier: f32,
 }
 
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
@@ -1024,6 +1026,7 @@ impl FMSynthVoice {
       },
       filter_module: FilterModule::default(),
       last_gated_midi_number: 0,
+      velocity_gain_multiplier: 1.,
     }
   }
 
@@ -1204,6 +1207,12 @@ impl FMSynthVoice {
 
     self.effect_chain.pre_render_params(&render_params);
     self.effect_chain.apply_all(&render_params, output_buffer);
+
+    // finally, apply the gain multiplier computed from the velocity of the MIDI event that
+    // triggered this voice
+    for sample in output_buffer {
+      *sample *= self.velocity_gain_multiplier;
+    }
   }
 }
 
@@ -1944,10 +1953,10 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
     &mut (*ctx).polysynth,
     PolySynth::new(SynthCallbacks {
       trigger_attack: Box::new(
-        move |voice_ix: usize, note_id: usize, _velocity: u8, _offset: Option<f32>| {
+        move |voice_ix: usize, note_id: usize, velocity: u8, _offset: Option<f32>| {
           let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
           (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
-          gate_voice_inner(ctx, voice_ix, note_id);
+          gate_voice_inner(ctx, voice_ix, note_id, velocity);
           on_gate_cb(note_id, voice_ix);
         },
       ),
@@ -2425,11 +2434,24 @@ pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gate(ctx: *mut FMSynthContext, midi_number: usize) {
-  (*ctx).polysynth.trigger_attack(midi_number, 0, None);
+pub unsafe extern "C" fn gate(ctx: *mut FMSynthContext, midi_number: usize, velocity: u8) {
+  (*ctx).polysynth.trigger_attack(midi_number, velocity, None);
 }
 
-unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_number: usize) {
+/// Converts the MIDI velocity value in [0, 127] to a gain multiplier.  This maps the velocities to
+/// a logarithmic range of gain multipliers to match how volumes are percieved.
+///
+/// A velocity of 90 maps to a gain of almost exactly 1.
+fn midi_velocity_to_gain(velocity: u8) -> f32 {
+  2. * (velocity as f32 * velocity as f32) / (127. * 127.)
+}
+
+unsafe fn gate_voice_inner(
+  ctx: *mut FMSynthContext,
+  voice_ix: usize,
+  midi_number: usize,
+  velocity: u8,
+) {
   // Stop recording phases for the last recently gated voice so the new one can record them
   let old_phases_voice = &mut (*ctx).voices[(*ctx).most_recent_gated_voice_ix];
   for adsr in &mut old_phases_voice.adsrs {
@@ -2455,6 +2477,7 @@ unsafe fn gate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize, midi_numbe
   voice.filter_envelope_generator.adsr.gate(0.);
   voice.filter_envelope_generator.adsr.store_phase_to =
     Some(((*ctx).adsr_phase_buf.as_mut_ptr() as *mut f32).add(FILTER_ENVELOPE_PHASE_BUF_INDEX));
+  voice.velocity_gain_multiplier = midi_velocity_to_gain(velocity);
 
   voice.filter_module.reset();
   voice.effect_chain.reset();

@@ -52,6 +52,7 @@ export interface MIDIEditorInstanceView {
 export interface SerializedMIDINote {
   startPoint: number;
   length: number;
+  velocity?: number;
 }
 
 export interface SerializedMIDILine {
@@ -64,6 +65,7 @@ export interface SerializedMIDIEditorInstance {
   lines: SerializedMIDILine[];
   isExpanded: boolean;
   view: MIDIEditorInstanceView;
+  lastSetNoteVelocity?: number;
 }
 
 export type SerializedMIDIEditorBaseInstance =
@@ -80,6 +82,7 @@ export interface SerializedMIDIEditorState {
   metronomeEnabled: boolean;
   beatSnapInterval: number;
   cursorPosBeats: number;
+  velocityDisplayEnabled?: boolean;
 }
 
 const buildDefaultMIDIEditorInstanceState = (): SerializedMIDIEditorInstance => {
@@ -104,6 +107,7 @@ const buildDefaultMIDIEditorState = (): SerializedMIDIEditorState => ({
   cursorPosBeats: 0,
   version: 2,
   view: { pxPerBeat: 32, scrollHorizontalBeats: 0, beatsPerMeasure: 4 },
+  velocityDisplayEnabled: false,
 });
 
 const normalizeSerializedMIDIEditorState = (
@@ -147,6 +151,7 @@ const normalizeSerializedMIDIEditorState = (
       scrollHorizontalBeats: oldState.view.scrollHorizontalBeats,
       beatsPerMeasure: oldState.view.beatsPerMeasure,
     },
+    velocityDisplayEnabled: false,
   };
 };
 
@@ -222,11 +227,12 @@ export class MIDIEditorInstance {
       scrollHorizontalBeats: this.baseView.scrollHorizontalBeats,
       version: 2,
       view: this.baseView.inner,
+      velocityDisplayEnabled: this.uiManager.velocityDisplayEnabled,
     };
   }
 
-  public gate(instanceID: string, lineIx: number) {
-    this.uiManager.gateInstance(instanceID, lineIx);
+  public gate(instanceID: string, lineIx: number, velocity: number) {
+    this.uiManager.gateInstance(instanceID, lineIx, velocity);
   }
 
   public ungate(instanceID: string, lineIx: number) {
@@ -249,6 +255,10 @@ export class MIDIEditorInstance {
   public setPxPerBeat(pxPerBeat: number) {
     this.baseView.pxPerBeat = pxPerBeat;
     this.uiManager.updateAllViews();
+  }
+
+  public setVelocityDisplayEnabled(enabled: boolean) {
+    this.uiManager.setVelocityDisplayEnabled(enabled);
   }
 
   public setLoopEnabled(enabled: boolean) {

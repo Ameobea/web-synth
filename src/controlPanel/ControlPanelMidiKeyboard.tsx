@@ -44,8 +44,8 @@ const ControlPanelMidiKeyboard: React.FC<ControlPanelMidiKeyboardProps> = ({
       ),
     [name, vcId]
   );
-  const onAttack = useCallback((note: number) => midiNode.onAttack(note, 255), [midiNode]);
-  const onRelease = useCallback((note: number) => midiNode.onRelease(note, 255), [midiNode]);
+  const onAttack = useCallback((note: number) => midiNode.onAttack(note, 90), [midiNode]);
+  const onRelease = useCallback((note: number) => midiNode.onRelease(note, 90), [midiNode]);
 
   return (
     <div className='control-panel-midi-keyboard' style={{ top: position.y, left: position.x }}>

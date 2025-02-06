@@ -65,6 +65,7 @@
     left={24}
     name={inst.name}
     setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
+    transparent
   />
   <div
     class="midi-editor-minimap-container"

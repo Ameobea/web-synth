@@ -15,6 +15,7 @@ export class NoteBox {
 
   private buildGraphics(): PIXI.Graphics {
     const graphics = new PIXI.Graphics();
+    graphics.zIndex = 5;
     graphics.interactive = true;
     graphics.cursor = 'pointer';
     graphics.on('pointerdown', (evt: FederatedPointerEvent) => {
@@ -42,10 +43,14 @@ export class NoteBox {
     return graphics;
   }
 
-  constructor(line: NoteLine, note: Note) {
+  constructor(line: NoteLine, note: Note, _velocityDisplayEnabled: boolean) {
     this.line = line;
     this.note = note;
     this.graphics = this.buildGraphics();
+  }
+
+  public setVelocityDisplayEnabled(_enabled: boolean) {
+    // no-op
   }
 
   public render() {
@@ -75,7 +80,7 @@ export class NoteBox {
       this.graphics.clear();
       this.graphics.lineStyle(1, 0x333333);
       this.graphics.beginFill(this.isSelected ? conf.NOTE_SELECTED_COLOR : conf.NOTE_COLOR);
-      this.graphics.drawRect(1, 0, widthPx, conf.LINE_HEIGHT - 1);
+      this.graphics.drawRect(1, 0, widthPx, conf.LINE_HEIGHT);
       this.graphics.endFill();
     }
 

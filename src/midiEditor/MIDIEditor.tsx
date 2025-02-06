@@ -227,6 +227,9 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
 }) => {
   const [state, setState] = useState(initialState);
   const [isRecording, setIsRecording] = useState(false);
+  const [velocityDisplayEnabled, setVelocityDisplayEnabled] = useState(
+    parentInst.uiManager.velocityDisplayEnabled
+  );
   const [metronomeEnabled, setMetronomeEnabled] = useState(initialState.metronomeEnabled);
   const onChange = (newState: MIDIEditorControlsState) => {
     onChangeInner(newState);
@@ -344,6 +347,18 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         }
         title='Copy selection'
         style={{ fontSize: 24, textAlign: 'center' }}
+      />
+      <MIDIEditorControlButton
+        onClick={() => {
+          parentInst.uiManager.setVelocityDisplayEnabled(
+            !parentInst.uiManager.velocityDisplayEnabled
+          );
+          setVelocityDisplayEnabled(!velocityDisplayEnabled);
+        }}
+        label='𝆏 𝆑'
+        title='Toggle velocity display'
+        style={{ fontSize: 24, textAlign: 'center', lineHeight: '36px' }}
+        active={velocityDisplayEnabled}
       />
       <MIDIEditorControlButton
         onClick={() => {

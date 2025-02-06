@@ -222,10 +222,10 @@ export class LooperNode {
     this.workletNode.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'playNote':
-          this.midiNodes[evt.data.moduleIx]?.onAttack(evt.data.note, 255);
+          this.midiNodes[evt.data.moduleIx]?.onAttack(evt.data.note, 90);
           break;
         case 'releaseNote':
-          this.midiNodes[evt.data.moduleIx]?.onRelease(evt.data.note, 255);
+          this.midiNodes[evt.data.moduleIx]?.onRelease(evt.data.note, 90);
           break;
         case 'phaseSAB':
           this.phaseSAB = new Float32Array(evt.data.phaseSAB);

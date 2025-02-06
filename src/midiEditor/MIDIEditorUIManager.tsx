@@ -31,6 +31,7 @@ export class ManagedMIDIEditorUIInstance {
   public midiOutput: MIDINode;
   public midiInputCBs: MIDIInputCbs;
   public lines: SerializedMIDILine[];
+  public lastSetNoteVelocity: number;
   private onWasmInitCBs: ((linesWithIDs: readonly Note[][]) => void)[] = [];
   public wasm:
     | {
@@ -46,13 +47,15 @@ export class ManagedMIDIEditorUIInstance {
     name: string,
     view: MIDIEditorInstanceView,
     id: string,
-    lines: SerializedMIDILine[]
+    lines: SerializedMIDILine[],
+    lastSetNoteVelocity: number | undefined
   ) {
     this.manager = manager;
     this.id = id;
     this.name = name;
     this.view = view;
     this.lines = lines;
+    this.lastSetNoteVelocity = lastSetNoteVelocity ?? 90;
     this.midiInputCBs = this.buildInstanceMIDIInputCbs();
 
     this.midiInput = new MIDINode(() => this.midiInputCBs);
@@ -72,9 +75,9 @@ export class ManagedMIDIEditorUIInstance {
     const linesWithIDs: Note[][] = new Array(lines.length).fill(null).map(() => []);
     for (const { midiNumber, notes } of lines) {
       const lineIx = lines.length - midiNumber;
-      for (const { length, startPoint } of notes) {
-        const id = wasm.create_note(noteLinesCtxPtr, lineIx, startPoint, length, 0);
-        linesWithIDs[lineIx].push({ id, startPoint, length });
+      for (const { length, startPoint, velocity } of notes) {
+        const id = wasm.create_note(noteLinesCtxPtr, lineIx, startPoint, length, 0, velocity ?? 90);
+        linesWithIDs[lineIx].push({ id, startPoint, length, velocity });
       }
     }
 
@@ -147,7 +150,13 @@ export class ManagedMIDIEditorUIInstance {
   public iterNotesWithCB = (
     startBeatInclusive: number | null | undefined,
     endBeatExclusive: number | null | undefined,
-    cb: (isAttack: boolean, lineIx: number, rawBeat: number, noteID: number) => void
+    cb: (
+      isAttack: boolean,
+      lineIx: number,
+      rawBeat: number,
+      noteID: number,
+      velocity: number
+    ) => void
   ) => {
     if (!this.wasm) {
       throw new Error('Wasm instance not initialized; cannot get Wasm instance');
@@ -163,12 +172,12 @@ export class ManagedMIDIEditorUIInstance {
     );
   };
 
-  public gate(lineIx: number) {
-    this.midiInputCBs.onAttack(this.lineCount - lineIx, 255);
+  public gate(lineIx: number, velocity: number) {
+    this.midiInputCBs.onAttack(this.lineCount - lineIx, velocity);
   }
 
   public ungate(lineIx: number) {
-    this.midiInputCBs.onRelease(this.lineCount - lineIx, 255);
+    this.midiInputCBs.onRelease(this.lineCount - lineIx, 90);
   }
 
   public stopPlayback() {
@@ -211,6 +220,7 @@ export class MIDIEditorUIManager {
   private ctx: AudioContext;
   private vcId: string;
   public activeUIInstance: MIDIEditorUIInstance | undefined;
+  public velocityDisplayEnabled: boolean;
 
   public setActiveUIInstanceID(id: string) {
     const instances = get(this.instances);
@@ -381,7 +391,8 @@ export class MIDIEditorUIManager {
       instName,
       { scrollVerticalPx: 0 },
       id,
-      lines
+      lines,
+      undefined
     );
     instances.push({ type: 'midiEditor', id, isExpanded: defaultActive, instance });
     this.resizeInstances(instances);
@@ -512,13 +523,13 @@ export class MIDIEditorUIManager {
     });
   }
 
-  public gateInstance(instanceID: string, lineIx: number) {
+  public gateInstance(instanceID: string, lineIx: number, velocity: number) {
     const inst = this.getMIDIEditorInstanceByID(instanceID);
     if (!inst) {
       return;
     }
 
-    inst.gate(lineIx);
+    inst.gate(lineIx, velocity);
   }
 
   public ungateInstance(instanceID: string, lineIx: number) {
@@ -547,6 +558,7 @@ export class MIDIEditorUIManager {
   ) {
     this.parentInst = parentInst;
     this.scrollHorizontalPx = writable(initialState.view.scrollHorizontalBeats);
+    this.velocityDisplayEnabled = initialState.velocityDisplayEnabled ?? false;
     this.ctx = ctx;
     this.vcId = vcId;
     this.silentOutput = new GainNode(ctx);
@@ -559,7 +571,8 @@ export class MIDIEditorUIManager {
           inst.state.name,
           inst.state.view,
           genRandomStringID(),
-          inst.state.lines
+          inst.state.lines,
+          inst.state.lastSetNoteVelocity
         );
 
         if (!inst.state.isExpanded) {
@@ -594,6 +607,15 @@ export class MIDIEditorUIManager {
       }
     });
     this.instances = writable(instances);
+  }
+
+  public setVelocityDisplayEnabled(enabled: boolean) {
+    this.velocityDisplayEnabled = enabled;
+    for (const inst of get(this.instances)) {
+      if (inst.type === 'midiEditor' && inst.isExpanded) {
+        inst.instance.uiInst?.setVelocityDisplayEnabled(enabled);
+      }
+    }
   }
 
   public updateAllViews() {

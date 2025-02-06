@@ -594,15 +594,16 @@ class FMSynthAWP extends AudioWorkletProcessor {
 
     let msg;
     while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
-      const { eventType, param1 } = msg;
+      const { eventType, param1, param2 } = msg;
       switch (eventType) {
         case 0: // Attack
+          console.log({ param1, param2 });
           if (!this.wasmInstance) {
             console.warn('Tried gating before Wasm instance loaded');
             break;
           }
 
-          this.wasmInstance.exports.gate(this.ctxPtr, param1);
+          this.wasmInstance.exports.gate(this.ctxPtr, param1, param2);
           break;
         case 1: // Release
           if (!this.wasmInstance) {

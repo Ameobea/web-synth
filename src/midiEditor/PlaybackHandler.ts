@@ -20,6 +20,7 @@ import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIMan
 interface SchedulableNoteEvent {
   isAttack: boolean;
   lineIx: number;
+  velocity: number;
 }
 
 class RecordingContext {
@@ -92,7 +93,7 @@ class RecordingContext {
       return;
     }
 
-    const noteID = uiInstance.addNote(lineIx, curBeat, 0.001);
+    const noteID = uiInstance.addNote(lineIx, curBeat, 0.001, 90);
     this.downNoteIdsByMIDINumber.set(midiNumber, noteID);
   }
 
@@ -247,14 +248,14 @@ export default class MIDIEditorPlaybackHandler {
     offset = 0
   ): Map<number, SchedulableNoteEvent[]> {
     const noteEventsByBeat: Map<number, SchedulableNoteEvent[]> = new Map();
-    const cb = (isAttack: boolean, lineIx: number, rawBeat: number) => {
+    const cb = (isAttack: boolean, lineIx: number, rawBeat: number, velocity: number) => {
       const beat = rawBeat + offset;
       let entry = noteEventsByBeat.get(beat);
       if (!entry) {
         entry = [];
         noteEventsByBeat.set(beat, entry);
       }
-      entry.push({ isAttack, lineIx });
+      entry.push({ isAttack, lineIx, velocity });
     };
     inst.iterNotesWithCB(startBeatInclusive, endBeatExclusive, cb);
 
@@ -282,12 +283,12 @@ export default class MIDIEditorPlaybackHandler {
         });
       };
 
-      for (const { isAttack, lineIx } of entries) {
+      for (const { isAttack, lineIx, velocity } of entries) {
         const midiNumber = lineCount - lineIx;
         managedInst.midiOutput.scheduleEvent(beat, {
           type: isAttack ? MIDIEventType.Attack : MIDIEventType.Release,
           note: midiNumber,
-          velocity: 255,
+          velocity,
         });
       }
 
@@ -310,7 +311,7 @@ export default class MIDIEditorPlaybackHandler {
       }
 
       for (const lineIx of map.values()) {
-        inst.midiInput.onRelease(inst.lineCount - lineIx, 255);
+        inst.midiInput.onRelease(inst.lineCount - lineIx, 90);
         inst.uiInst?.onUngated(lineIx);
       }
     }
