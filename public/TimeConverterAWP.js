@@ -58,6 +58,7 @@ class TimeConverterAWP extends AudioWorkletProcessor {
     this.isShutdown = false;
     this.state = { fromUnit: 'beats', toUnit: 'milliseconds' };
     this.multiplier = 1;
+    this.didReportInitialized = false;
     this.onStateChanged();
 
     this.port.onmessage = evt => {
@@ -69,7 +70,10 @@ class TimeConverterAWP extends AudioWorkletProcessor {
         case 'setState': {
           this.state = evt.data.state;
           this.onStateChanged();
-          this.port.postMessage({ type: 'initialized' });
+          if (!this.didReportInitialized) {
+            this.didReportInitialized = true;
+            this.port.postMessage({ type: 'initialized' });
+          }
           break;
         }
         default:
