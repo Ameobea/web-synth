@@ -47,6 +47,7 @@ import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/S
 import { BPMNode } from 'src/graphEditor/nodes/CustomAudio/BPM/BPMNode';
 import { CustomDestinationNode } from 'src/graphEditor/nodes/CustomAudio/Destination/CustomDestinationNode';
 import { MixNode } from 'src/graphEditor/nodes/CustomAudio/Mix/Mix';
+import { TimeConverterNode } from 'src/graphEditor/nodes/CustomAudio/TimeConverter/TimeConverterNode';
 
 const ctx = new AudioContext();
 
@@ -488,6 +489,9 @@ export const audioNodeGetters: {
   },
   'customAudio/mix': {
     nodeGetter: MixNode,
+  },
+  'customAudio/timeConverter': {
+    nodeGetter: TimeConverterNode,
   },
 };
 

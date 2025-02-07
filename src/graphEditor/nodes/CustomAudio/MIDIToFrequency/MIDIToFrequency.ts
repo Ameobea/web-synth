@@ -55,6 +55,7 @@ export class MIDIToFrequencyNode {
     this.gateCSN.offset.setValueAtTime(0, this.ctx.currentTime);
   }
 
+  // TODO: This should be moved to audio thread to get more accurate scheduling
   private getMIDIInputCbs = (): MIDIInputCbs => ({
     onAttack: (note, _velocity) => {
       this.gate();
