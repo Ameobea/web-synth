@@ -117,6 +117,7 @@ impl Oscillator for SineOscillator {
 
 #[derive(Clone)]
 pub struct SquareOscillator {
+  pub duty_cycle: ParamSource,
   pub phase: f32,
 }
 
@@ -131,23 +132,28 @@ impl Oscillator for SquareOscillator {
     &mut self,
     frequency: f32,
     _wavetables: &[WaveTable],
-    _param_buffers: &[[f32; FRAME_SIZE]],
-    _adsrs: &[Adsr],
-    _sample_ix_within_frame: usize,
-    _base_frequency: f32,
+    param_buffers: &[[f32; FRAME_SIZE]],
+    adsrs: &[Adsr],
+    sample_ix_within_frame: usize,
+    base_frequency: f32,
   ) -> f32 {
     // 4x oversampling to avoid aliasing
     let mut out = 0.;
     let mut phase = self.phase;
+    let duty_cycle =
+      self
+        .duty_cycle
+        .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+    let duty_cycle = dsp::clamp(0.0001, 0.9999, duty_cycle);
 
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    out += if phase < duty_cycle { 0.25 } else { -0.25 };
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    out += if phase < duty_cycle { 0.25 } else { -0.25 };
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    out += if phase < duty_cycle { 0.25 } else { -0.25 };
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < 0.5 { 0.25 } else { -0.25 };
+    out += if phase < duty_cycle { 0.25 } else { -0.25 };
 
     self.phase = phase;
 
@@ -749,6 +755,11 @@ impl OscillatorSource {
           osc
             .unison_detune_range_semitones
             .replace(other.unison_detune_range_semitones.clone());
+
+          let duty_cycle = other.oscillators[0].duty_cycle.clone();
+          for osc in &mut osc.oscillators {
+            osc.duty_cycle.replace(duty_cycle.clone());
+          }
           true
         } else {
           false
@@ -2147,6 +2158,13 @@ fn build_oscillator_source(
       ),
     }),
     4 => OscillatorSource::Square(SquareOscillator {
+      duty_cycle: ParamSource::from_parts(
+        param_0_value_type,
+        param_0_val_int,
+        param_0_val_float,
+        param_0_val_float_2,
+        param_0_val_float_3,
+      ),
       phase: old_phases.get(0).copied().unwrap_or_default(),
     }),
     5 => OscillatorSource::Triangle(TriangleOscillator {
@@ -2213,7 +2231,19 @@ fn build_oscillator_source(
         param_4_val_float_2,
         param_4_val_float_3,
       ),
-      initialize_phases(old_phases, vec![SquareOscillator { phase: 0. }; unison]),
+      initialize_phases(old_phases, vec![
+        SquareOscillator {
+          duty_cycle: ParamSource::from_parts(
+            param_0_value_type,
+            param_0_val_int,
+            param_0_val_float,
+            param_0_val_float_2,
+            param_0_val_float_3,
+          ),
+          phase: 0.
+        };
+        unison
+      ]),
     )),
     55 => OscillatorSource::UnisonTriangle(UnisonOscillator::new(
       ParamSource::from_parts(

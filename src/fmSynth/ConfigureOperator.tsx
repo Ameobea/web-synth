@@ -56,6 +56,7 @@ export type OperatorConfig =
       unison: number;
       unisonDetune: ParamSource;
       unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
+      dutyCycle?: ParamSource;
     }
   | {
       type: 'triangle oscillator';
@@ -526,6 +527,19 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           onChange={newFrequency => onChange({ ...config, frequency: newFrequency })}
           min={0}
           max={20000}
+          adsrs={adsrs}
+          onAdsrChange={onAdsrChange}
+          vcId={vcId}
+        />
+      ) : null}
+      {config.type === 'square oscillator' ? (
+        <ConfigureParamSource
+          title='duty cycle'
+          state={config.dutyCycle ?? { type: 'constant', value: 0.5 }}
+          onChange={newDutyCycle => onChange({ ...config, dutyCycle: newDutyCycle })}
+          min={0.005}
+          max={0.995}
+          step={0.005}
           adsrs={adsrs}
           onAdsrChange={onAdsrChange}
           vcId={vcId}

@@ -19,6 +19,7 @@ import {
   buildDefaultAdsr,
   buildDefaultParamSource,
   encodeParamSource,
+  type EncodedParamSource,
   type ParamSource,
 } from 'src/fmSynth/ParamSource';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
@@ -619,13 +620,18 @@ export default class FMSynth implements ForeignNode {
               param5: unisonDetune ? encodeParamSource(unisonDetune) : null,
             };
           default: {
-            if (!unisonDetune) {
-              return {};
+            const params: Record<string, EncodedParamSource> = {};
+
+            if (unisonDetune) {
+              params.param5 = encodeParamSource(unisonDetune);
+            }
+            if (config.type === 'square oscillator') {
+              params.param1 = encodeParamSource(
+                config.dutyCycle ?? { type: 'constant', value: 0.5 }
+              );
             }
 
-            return {
-              param5: encodeParamSource(unisonDetune),
-            };
+            return params;
           }
         }
       })(),
