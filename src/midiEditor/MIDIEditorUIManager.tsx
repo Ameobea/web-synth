@@ -397,6 +397,7 @@ export class MIDIEditorUIManager {
     instances.push({ type: 'midiEditor', id, isExpanded: defaultActive, instance });
     this.resizeInstances(instances);
     this.instances.set(instances);
+    updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId));
   }
 
   public removeInstanceByID(id: string) {
