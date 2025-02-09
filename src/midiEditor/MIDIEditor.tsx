@@ -1,7 +1,9 @@
 import download from 'downloadjs';
 import * as R from 'ramda';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import './MIDIEditor.css';
 
@@ -27,6 +29,7 @@ import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import type MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import EditableInstanceName from './EditableInstanceName.svelte';
+import { DragActivationContext, DraggableInstance, DragHandle } from './DnD';
 
 const MIDIWasmModule = new AsyncOnce(() => import('src/midi'));
 
@@ -205,7 +208,7 @@ const handleMIDIFileUpload = async (
   } catch (err) {
     if (err) {
       console.error('Error importing MIDI: ', err);
-      // TODO: Display to user?
+      toastError(`Error importing MIDI: ${err}`);
     }
   }
 };
@@ -555,6 +558,132 @@ const CollapsedMIDIEditorShim = mkSvelteComponentShim(CollapsedMIDIEditor);
 
 const EditableInstanceNameShim = mkSvelteComponentShim(EditableInstanceName);
 
+interface MIDIEditorInstanceCompProps {
+  instance: Extract<ManagedInstance, { type: 'midiEditor' }>;
+  instIx: number;
+  parentInstance: MIDIEditorInstance;
+  lastCanvasRefsByInstID: React.MutableRefObject<{ [key: string]: HTMLCanvasElement }>;
+  windowSize: { width: number; height: number };
+  vcId: string;
+}
+
+const MIDIEditorInstanceComp: React.FC<MIDIEditorInstanceCompProps> = ({
+  instance,
+  instIx,
+  parentInstance,
+  lastCanvasRefsByInstID,
+  windowSize,
+  vcId,
+}) => {
+  const activateDrag = useContext(DragActivationContext);
+  const inst = instance.instance;
+
+  if (!instance.isExpanded) {
+    return (
+      <div className='collapsed-midi-editor-instance'>
+        <CollapsedMIDIEditorShim
+          parentInstance={parentInstance}
+          inst={inst}
+          pxPerBeat={parentInstance.baseView.pxPerBeatStore}
+          scrollHorizontalBeats={parentInstance.baseView.scrollHorizontalBeatsStore}
+          expand={() => parentInstance.uiManager.expandUIInstance(inst.id)}
+          instIx={instIx}
+          activateDrag={activateDrag}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className='expanded-midi-editor-instance'>
+      <div className='instance-header'>
+        <button
+          className='collapse-midi-editor-instance'
+          onClick={() => parentInstance.uiManager.collapseUIInstance(inst.id)}
+        >
+          ⌄
+        </button>
+        <DragHandle style={{ position: 'absolute', left: 28 }} activateDrag={activateDrag} />
+        <EditableInstanceNameShim
+          left={PIANO_KEYBOARD_WIDTH + 2}
+          name={inst.name}
+          setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
+        />
+        <button
+          className='delete-cv-output-button'
+          onClick={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}
+          style={instIx === 0 ? { right: 30 } : undefined}
+        >
+          ✕
+        </button>
+      </div>
+      <canvas
+        ref={canvas => {
+          if (!canvas) {
+            return;
+          }
+          if (canvas === lastCanvasRefsByInstID.current[inst.id]) {
+            return;
+          }
+          lastCanvasRefsByInstID.current[inst.id] = canvas;
+
+          parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
+          const managedInst = parentInstance.uiManager.getMIDIEditorInstanceByID(inst.id)!;
+          const instanceHeight = parentInstance.uiManager.computeUIInstanceHeight();
+          const newInst = new MIDIEditorUIInstance(
+            windowSize.width,
+            instanceHeight,
+            canvas,
+            parentInstance,
+            managedInst,
+            vcId
+          );
+          parentInstance.uiManager.setUIInstanceForID(inst.id, newInst);
+        }}
+        onMouseDown={evt => {
+          parentInstance.uiManager.setActiveUIInstanceID(inst.id);
+          evt.preventDefault();
+          evt.stopPropagation();
+        }}
+        onContextMenu={evt => {
+          evt.preventDefault();
+          evt.stopPropagation();
+        }}
+      />
+    </div>
+  );
+};
+
+interface CVOutputInstanceCompProps {
+  output: Extract<ManagedInstance, { type: 'cvOutput' }>['instance'];
+  parentInstance: MIDIEditorInstance;
+}
+
+const CVOutputInstanceComp: React.FC<CVOutputInstanceCompProps> = ({ output, parentInstance }) => {
+  const activateDrag = useContext(DragActivationContext);
+
+  return (
+    <div className='cv-output-instance'>
+      <CVOutputControlsShim
+        name={output.name}
+        state={output.state}
+        deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
+        setName={newName => parentInstance.renameCVOutput(output.name, newName)}
+        registerInstance={uiInstance => output.registerUIInstance(uiInstance)}
+        setFrozenOutputValue={newFrozenOutputValue =>
+          output.backend.setFrozenOutputValue(newFrozenOutputValue)
+        }
+        view={parentInstance.baseView.store}
+        getCursorPosBeats={() => parentInstance.playbackHandler.getCursorPosBeats()}
+        setCursorPosBeats={newCursorPosBeats =>
+          void parentInstance.playbackHandler.setCursorPosBeats(newCursorPosBeats)
+        }
+        activateDrag={activateDrag}
+      />
+    </div>
+  );
+};
+
 class ActiveInstanceProxy {
   private uiManager: MIDIEditorUIManager;
 
@@ -620,118 +749,66 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
     [parentInstance.uiManager]
   );
 
+  const moveInstance = useCallback(
+    (dragIndex: number, hoverIndex: number) => {
+      const updatedInstances = [...instances];
+      const [removed] = updatedInstances.splice(dragIndex, 1);
+      updatedInstances.splice(hoverIndex, 0, removed);
+      parentInstance.uiManager.instances.set(updatedInstances);
+    },
+    [instances, parentInstance.uiManager]
+  );
+
   return (
-    <div className='midi-editor'>
-      <MIDIEditorControls
-        parentInst={parentInstance}
-        activeInstance={activeInstanceProxy}
-        initialState={initialStateForControls.current}
-        onChange={handleChange}
-        playbackHandler={parentInstance.playbackHandler}
-      />
-      <div className='spacer' style={{ height: 64 }} />
-      <div>
-        {instances.map((instance, instIx) => {
-          if (instance.type === 'midiEditor') {
-            const inst = instance.instance;
-            if (instance.isExpanded) {
+    <DndProvider backend={HTML5Backend}>
+      <div className='midi-editor'>
+        <MIDIEditorControls
+          parentInst={parentInstance}
+          activeInstance={activeInstanceProxy}
+          initialState={initialStateForControls.current}
+          onChange={handleChange}
+          playbackHandler={parentInstance.playbackHandler}
+        />
+        <div className='spacer' style={{ height: 64 }} />
+        <div>
+          {instances.map((instance, instIx) => {
+            if (instance.type === 'midiEditor') {
               return (
-                <div key={inst.id} className='expanded-midi-editor-instance'>
-                  <button
-                    className='collapse-midi-editor-instance'
-                    onClick={() => parentInstance.uiManager.collapseUIInstance(inst.id)}
-                  >
-                    ⌄
-                  </button>
-                  <EditableInstanceNameShim
-                    left={PIANO_KEYBOARD_WIDTH + 2}
-                    name={inst.name}
-                    setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
+                <DraggableInstance
+                  key={instance.id}
+                  index={instIx}
+                  instanceKey={instance.id}
+                  moveInstance={moveInstance}
+                >
+                  <MIDIEditorInstanceComp
+                    instance={instance}
+                    instIx={instIx}
+                    parentInstance={parentInstance}
+                    lastCanvasRefsByInstID={lastCanvasRefsByInstID}
+                    windowSize={windowSize}
+                    vcId={vcId}
                   />
-                  <button
-                    className='delete-cv-output-button'
-                    onClick={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}
-                    style={instIx === 0 ? { right: 30 } : undefined}
-                  >
-                    ✕
-                  </button>
-                  <canvas
-                    ref={canvas => {
-                      if (!canvas) {
-                        return;
-                      }
-
-                      if (canvas === lastCanvasRefsByInstID.current[inst.id]) {
-                        return;
-                      }
-                      lastCanvasRefsByInstID.current[inst.id] = canvas;
-
-                      parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
-                      const managedInst = parentInstance.uiManager.getMIDIEditorInstanceByID(
-                        inst.id
-                      )!;
-                      const instanceHeight = parentInstance.uiManager.computeUIInstanceHeight();
-                      const newInst = new MIDIEditorUIInstance(
-                        windowSize.width,
-                        instanceHeight,
-                        canvas,
-                        parentInstance,
-                        managedInst,
-                        vcId
-                      );
-                      parentInstance.uiManager.setUIInstanceForID(inst.id, newInst);
-                    }}
-                    onMouseDown={evt => {
-                      parentInstance.uiManager.setActiveUIInstanceID(inst.id);
-                      evt.preventDefault();
-                      evt.stopPropagation();
-                    }}
-                    onContextMenu={evt => {
-                      evt.preventDefault();
-                      evt.stopPropagation();
-                    }}
-                  />
-                </div>
+                </DraggableInstance>
               );
+            } else if (instance.type === 'cvOutput') {
+              const output = instance.instance;
+              return (
+                <DraggableInstance
+                  key={output.name}
+                  index={instIx}
+                  instanceKey={output.name}
+                  moveInstance={moveInstance}
+                >
+                  <CVOutputInstanceComp output={output} parentInstance={parentInstance} />
+                </DraggableInstance>
+              );
+            } else {
+              throw new Error('Unknown instance type');
             }
-
-            return (
-              <CollapsedMIDIEditorShim
-                key={inst.id}
-                parentInstance={parentInstance}
-                inst={inst}
-                pxPerBeat={parentInstance.baseView.pxPerBeatStore}
-                scrollHorizontalBeats={parentInstance.baseView.scrollHorizontalBeatsStore}
-                expand={() => parentInstance.uiManager.expandUIInstance(inst.id)}
-                instIx={instIx}
-              />
-            );
-          } else if (instance.type === 'cvOutput') {
-            const output = instance.instance;
-            return (
-              <CVOutputControlsShim
-                key={output.name}
-                name={output.name}
-                state={output.state}
-                deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
-                setName={newName => parentInstance.renameCVOutput(output.name, newName)}
-                registerInstance={uiInstance => output.registerUIInstance(uiInstance)}
-                setFrozenOutputValue={newFrozenOutputValue =>
-                  output.backend.setFrozenOutputValue(newFrozenOutputValue)
-                }
-                view={parentInstance.baseView.store}
-                getCursorPosBeats={() => parentInstance.playbackHandler.getCursorPosBeats()}
-                setCursorPosBeats={newCursorPosBeats =>
-                  void parentInstance.playbackHandler.setCursorPosBeats(newCursorPosBeats)
-                }
-              />
-            );
-          } else {
-            throw new Error('Unknown instance type');
-          }
-        })}
+          })}
+        </div>
       </div>
-    </div>
+    </DndProvider>
   );
 };
 

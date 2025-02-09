@@ -15,6 +15,7 @@
   import { mkCVOutputSettingsPopup } from './CVOutputSettingsPopup';
   import type { MIDIEditorBaseView } from 'src/midiEditor';
   import Cursor from 'src/midiEditor/CVOutput/Cursor.svelte';
+  import SvelteDragHandle from 'src/midiEditor/SvelteDragHandle.svelte';
 
   export let name: string;
   export let setName: (name: string) => void;
@@ -26,6 +27,7 @@
   export let view: MIDIEditorBaseView;
   export let getCursorPosBeats: () => number;
   export let setCursorPosBeats: (newCursorPosBeats: number) => void;
+  export let activateDrag: () => void;
 
   let width: number | undefined;
   let widthObserver: ResizeObserver | undefined;
@@ -54,7 +56,11 @@
     role="button"
   >
     ⌄
-    <EditableInstanceName {name} {setName} left={PIANO_KEYBOARD_WIDTH} />
+    <SvelteDragHandle
+      {activateDrag}
+      style={{ zIndex: 2, top: 0, left: 28, position: 'absolute', height: 16 }}
+    />
+    <EditableInstanceName {name} {setName} left={60} />
     <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
   </header>
 

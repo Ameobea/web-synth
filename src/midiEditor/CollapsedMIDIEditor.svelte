@@ -5,6 +5,7 @@
   import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
   import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
   import EditableInstanceName from './EditableInstanceName.svelte';
+  import SvelteDragHandle from 'src/midiEditor/SvelteDragHandle.svelte';
 
   export let parentInstance: MIDIEditorInstance;
   export let inst: ManagedMIDIEditorUIInstance;
@@ -12,6 +13,7 @@
   export let scrollHorizontalBeats: Readable<number>;
   export let expand: () => void;
   export let instIx: number;
+  export let activateDrag: () => void;
 
   let minimapContainer: HTMLDivElement | null = null;
   let svg: SVGSVGElement | null = null;
@@ -54,6 +56,10 @@
   >
     ›
   </button>
+  <SvelteDragHandle
+    style={{ zIndex: 2, top: -1, left: 28, position: 'absolute', height: 16 }}
+    {activateDrag}
+  />
   <button
     class="delete-cv-output-button"
     on:click={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}
@@ -62,7 +68,7 @@
     ✕
   </button>
   <EditableInstanceName
-    left={24}
+    left={60}
     name={inst.name}
     setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
     transparent

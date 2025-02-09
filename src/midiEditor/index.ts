@@ -285,7 +285,7 @@ export class MIDIEditorInstance {
   }
 
   /**
-   * Retruns `true` if the loop point was actually updated and `false` if it wasn't updated due to
+   * Returns `true` if the loop point was actually updated and `false` if it wasn't updated due to
    * playback currently being active or something else.
    */
   public setLoopPoint(loopPoint: number | null): boolean {

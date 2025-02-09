@@ -1,10 +1,12 @@
 <script lang="ts">
   import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
+  import SvelteDragHandle from 'src/midiEditor/SvelteDragHandle.svelte';
 
   export let name: string;
   export let expand: () => void;
   export let deleteOutput: () => void;
   export let setName: (name: string) => void;
+  export let activateDrag: () => void;
 </script>
 
 <div
@@ -15,6 +17,10 @@
   aria-label="Expand"
   role="button"
 >
-  › <EditableInstanceName left={24} {name} {setName} />
+  › <SvelteDragHandle
+    {activateDrag}
+    style={{ zIndex: 2, top: 0, left: 28, position: 'absolute', height: 16 }}
+  />
+  <EditableInstanceName left={60} {name} {setName} />
   <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
 </div>

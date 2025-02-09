@@ -119,6 +119,7 @@ export default [
         },
       ],
       'react/react-in-jsx-scope': 0,
+      curly: ['warn', 'all'],
     },
   },
 ];

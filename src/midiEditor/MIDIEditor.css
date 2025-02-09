@@ -81,6 +81,26 @@
       }
     }
   }
+
+  .drag-handle {
+    width: 30px;
+    height: 18px;
+    border: 1px solid #999;
+    cursor: grab;
+
+    /* vertical ridges to indicate that it's a handle */
+    background-image: repeating-linear-gradient(
+      90deg,
+      #888,
+      #888 2px,
+      #444 1px,
+      #444 4px
+    );
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+  }
 }
 
 .expanded-midi-editor-instance {

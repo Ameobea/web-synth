@@ -16,6 +16,7 @@
   export let view: Writable<MIDIEditorBaseView>;
   export let getCursorPosBeats: () => number;
   export let setCursorPosBeats: (newCursorPosBeats: number) => void;
+  export let activateDrag: () => void;
 
   const expand = () => {
     $state.isExpanded = true;
@@ -26,7 +27,7 @@
 </script>
 
 {#if !$state.isExpanded}
-  <CollapsedCvOutputControls {name} {expand} {deleteOutput} {setName} />
+  <CollapsedCvOutputControls {name} {expand} {deleteOutput} {setName} {activateDrag} />
 {:else}
   <CVOutputControlsInner
     {name}
@@ -39,5 +40,6 @@
     view={$view}
     {getCursorPosBeats}
     {setCursorPosBeats}
+    {activateDrag}
   />
 {/if}
