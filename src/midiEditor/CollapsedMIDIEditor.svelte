@@ -92,6 +92,7 @@
 
   .expand-midi-editor-instance {
     z-index: 2;
+    width: 27px;
   }
 
   .midi-editor-minimap-container {
