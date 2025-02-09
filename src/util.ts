@@ -165,7 +165,7 @@ export const retryAsync = async <T>(
 export class AsyncOnce<T> {
   private retry: boolean | { attempts?: number; delayMs?: number };
   private getter: () => Promise<T>;
-  private pending: Promise<T> | null = null;
+  public pending: Promise<T> | null = null;
   private res: Option<T> = Option.none();
 
   constructor(

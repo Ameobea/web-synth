@@ -60,6 +60,7 @@ export class ScaleAndShiftNode implements ForeignNode {
   private secondShifterNode: ConstantSourceNode;
   private uiState: ScaleAndShiftUIState;
   private awpHandle: AudioWorkletNode | null = null;
+  private didInitializeAWP = false;
   /**
    * If the scale+shift node is in linear-to-exponential mode, the AWP will compute a response
    * plot for full input range to the output range and send it here.
@@ -112,25 +113,23 @@ export class ScaleAndShiftNode implements ForeignNode {
 
   private async maybeInitAWP() {
     if (!this.uiState.linearToExponentialState?.enabled) {
-      if (this.awpHandle) {
-        try {
-          this.firstShifterNode.disconnect(this.awpHandle);
-        } catch (_err) {
-          // pass
-        }
-      }
       return;
     }
 
     if (!this.awpHandle) {
+      if (this.didInitializeAWP) {
+        return;
+      }
+      this.didInitializeAWP = true;
+
       await ScaleAndShiftAWPRegistered.get();
       this.awpHandle = new AudioWorkletNode(this.ctx, 'scale-and-shift-awp', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         channelInterpretation: 'discrete',
         channelCountMode: 'explicit',
+        channelCount: 1,
       });
-      this.firstShifterNode.connect(this.awpHandle);
       this.awpHandle.port.onmessage = e => {
         switch (e.data.type) {
           case 'responsePlot':
@@ -219,11 +218,10 @@ export class ScaleAndShiftNode implements ForeignNode {
 
   public buildConnectables() {
     let inputs = Map<string, ConnectableInput>().set('input', {
-      // We expose the param here directly to bypass the overriding.  That's stupidly confusing.
-      //
-      // Basically, we need to add the input and either the first scaler input or the first scaler
-      // manual control.  The Overridable param handles the second part, and we handle the first here.
-      node: this.firstShifter.wrappedParam,
+      node:
+        this.awpHandle && this.uiState.linearToExponentialState?.enabled
+          ? this.awpHandle
+          : this.firstShifter.wrappedParam,
       type: 'number',
     });
     inputs = this.uiState.linearToExponentialState?.enabled
