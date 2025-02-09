@@ -3,7 +3,13 @@ import React, { useCallback, useMemo } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import ConfigureParamSource from 'src/fmSynth/ConfigureParamSource';
-import { ButterworthFilterMode, SoftClipperAlgorithm, type Effect } from 'src/fmSynth/Effect';
+import {
+  BiquadFilterMode,
+  biquadFilterNeedsGain,
+  ButterworthFilterMode,
+  SoftClipperAlgorithm,
+  type Effect,
+} from 'src/fmSynth/Effect';
 import type { ParamSource } from 'src/fmSynth/ParamSource';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import FlatButton from 'src/misc/FlatButton';
@@ -21,6 +27,7 @@ const EFFECT_TYPE_SETTING = {
     'wavefolder',
     'soft clipper',
     'butterworth filter',
+    'biquad filter',
     'delay',
     'moog filter',
     'comb filter',
@@ -79,6 +86,15 @@ const buildDefaultEffect = (type: Effect['type']): Effect => {
         cutoffFrequency: { type: 'constant', value: 400 },
       };
     }
+    case 'biquad filter': {
+      return {
+        type,
+        mode: BiquadFilterMode.Lowpass,
+        cutoffFrequency: { type: 'constant', value: 400 },
+        q: { type: 'constant', value: 1 },
+        gain: { type: 'constant', value: 0 },
+      };
+    }
     case 'delay': {
       return {
         type,
@@ -133,6 +149,11 @@ const bitcrusherTheme = { ...baseTheme, background2: 'rgb(24,14,4)' };
 const wavefolderTheme = { ...baseTheme, background2: 'rgb(24,38,41)' };
 const softClipperTheme = { ...baseTheme, background2: 'rgb(36,4,4)' };
 const butterworthFilterTheme = { ...baseTheme, background2: 'rgb(49,22,13)' };
+const biquadFilterTheme = {
+  ...baseTheme,
+  background2: 'rgb(3, 194, 220)',
+  text2: 'rgb(80,80,80)',
+};
 const delayTheme = { ...baseTheme, background2: 'rgb(13,107,89)' };
 const moogFilterTheme = { ...baseTheme, background2: 'rgb(49,69,120)' };
 const combFilterTheme = { ...baseTheme, background2: 'rgb(36,64,21)' };
@@ -146,6 +167,7 @@ export const ThemesByType: { [K in Effect['type']]: { [key: string]: any } } = {
   wavefolder: wavefolderTheme,
   'soft clipper': softClipperTheme,
   'butterworth filter': butterworthFilterTheme,
+  'biquad filter': biquadFilterTheme,
   delay: delayTheme,
   'moog filter': moogFilterTheme,
   'comb filter': combFilterTheme,
@@ -450,6 +472,74 @@ const ConfigureButterworthFilter: EffectConfigurator<'butterworth filter'> = ({
   </>
 );
 
+const ConfigureBiquadFilter: EffectConfigurator<'biquad filter'> = ({
+  state,
+  onChange,
+  adsrs,
+  onAdsrChange,
+  vcId,
+}) => (
+  <>
+    <ControlPanel
+      settings={[
+        {
+          type: 'select',
+          label: 'type',
+          options: {
+            lowpass: 0,
+            highpass: 1,
+            bandpass: 2,
+            notch: 3,
+            peak: 4,
+            lowshelf: 5,
+            highshelf: 6,
+          },
+        },
+      ]}
+      width={500}
+      onChange={(_key: string, val: number) => onChange({ ...state, mode: +val })}
+      state={{ type: +state.mode }}
+    />
+    <ConfigureParamSource
+      title='frequency'
+      adsrs={adsrsMemoHelper(state.cutoffFrequency, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={biquadFilterTheme}
+      min={10}
+      max={20_000}
+      scale='log'
+      state={state.cutoffFrequency}
+      onChange={cutoffFrequency => onChange({ ...state, cutoffFrequency })}
+      vcId={vcId}
+    />
+    <ConfigureParamSource
+      title='q'
+      adsrs={adsrsMemoHelper(state.q, adsrs)}
+      onAdsrChange={onAdsrChange}
+      theme={biquadFilterTheme}
+      min={0.3}
+      max={30}
+      scale='log'
+      state={state.q}
+      onChange={q => onChange({ ...state, q })}
+      vcId={vcId}
+    />
+    {biquadFilterNeedsGain(+state.mode) ? (
+      <ConfigureParamSource
+        title='gain db'
+        adsrs={adsrsMemoHelper(state.gain, adsrs)}
+        onAdsrChange={onAdsrChange}
+        theme={biquadFilterTheme}
+        min={-40}
+        max={40}
+        state={state.gain}
+        onChange={gain => onChange({ ...state, gain })}
+        vcId={vcId}
+      />
+    ) : null}
+  </>
+);
+
 const ConfigureDelay: EffectConfigurator<'delay'> = ({
   state,
   onChange,
@@ -609,11 +699,11 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
 );
 
 const ConfigureCompressor: EffectConfigurator<'compressor'> = ({
-  state,
-  onChange,
-  adsrs,
-  onAdsrChange,
-  vcId,
+  state: _state,
+  onChange: _onChange,
+  adsrs: _adsrs,
+  onAdsrChange: _onAdsrChange,
+  vcId: _vcId,
 }) => <>Compressor params TODO</>;
 
 const ConfigureChorus: EffectConfigurator<'chorus'> = ({
@@ -763,6 +853,7 @@ const EFFECT_CONFIGURATOR_BY_EFFECT_TYPE: { [K in Effect['type']]: EffectConfigu
   wavefolder: React.memo(ConfigureWavefolder),
   'soft clipper': React.memo(ConfigureSoftClipper),
   'butterworth filter': React.memo(ConfigureButterworthFilter),
+  'biquad filter': React.memo(ConfigureBiquadFilter),
   delay: React.memo(ConfigureDelay),
   'moog filter': React.memo(ConfigureMoogFilter),
   'comb filter': React.memo(ConfigureCombFilter),

@@ -1,5 +1,8 @@
 use ::compressor::MultibandCompressor;
-use dsp::circular_buffer::CircularBuffer;
+use dsp::{
+  circular_buffer::CircularBuffer,
+  filters::biquad::{BiquadFilter, FilterMode},
+};
 use rand::Rng;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
@@ -8,6 +11,7 @@ use crate::fm::effects::comb_filter::CombFilter;
 
 use super::{uninit, ParamSource, RenderRawParams, FRAME_SIZE};
 
+pub mod biquad_filter;
 pub mod bitcrusher;
 pub mod butterworth_filter;
 pub mod chorus;
@@ -20,6 +24,7 @@ pub mod spectral_warping;
 pub mod wavefolder;
 
 use self::{
+  biquad_filter::BiquadFilterEffect,
   bitcrusher::Bitcrusher,
   butterworth_filter::{ButterworthFilter, ButterworthFilterMode},
   chorus::ChorusEffect,
@@ -85,6 +90,7 @@ pub enum EffectInstance {
   Wavefolder(Wavefolder),
   SoftClipper(SoftClipper),
   ButterworthFilter(ButterworthFilter),
+  BiquadFilter(BiquadFilterEffect),
   Delay(Delay),
   MoogFilter(MoogFilter),
   CombFilter(CombFilter),
@@ -428,6 +434,36 @@ impl EffectInstance {
 
         EffectInstance::Chorus(chorus)
       },
+      11 => {
+        let filter_mode = FilterMode::from_int(param_1_int_val);
+        let biquad_filter_eff = BiquadFilterEffect {
+          inner: BiquadFilter::default(),
+          mode: filter_mode,
+          cutoff_freq: ParamSource::from_parts(
+            param_2_type,
+            param_2_int_val,
+            param_2_float_val,
+            param_2_float_val_2,
+            param_2_float_val_3,
+          ),
+          q: ParamSource::from_parts(
+            param_3_type,
+            param_3_int_val,
+            param_3_float_val,
+            param_3_float_val_2,
+            param_3_float_val_3,
+          ),
+          gain: ParamSource::from_parts(
+            param_4_type,
+            param_4_int_val,
+            param_4_float_val,
+            param_4_float_val_2,
+            param_4_float_val_3,
+          ),
+        };
+
+        EffectInstance::BiquadFilter(biquad_filter_eff)
+      },
       _ => panic!("Invalid effect type: {}", effect_type),
     }
   }
@@ -736,6 +772,40 @@ impl EffectInstance {
         ));
         return true;
       },
+      11 => {
+        let biquad_filter = match self {
+          EffectInstance::BiquadFilter(biquad_filter) => biquad_filter,
+          _ => return false,
+        };
+
+        let mode = FilterMode::from_int(param_1_int_val);
+        let cutoff_freq = ParamSource::from_parts(
+          param_2_type,
+          param_2_int_val,
+          param_2_float_val,
+          param_2_float_val_2,
+          param_2_float_val_3,
+        );
+        let q = ParamSource::from_parts(
+          param_3_type,
+          param_3_int_val,
+          param_3_float_val,
+          param_3_float_val_2,
+          param_3_float_val_3,
+        );
+        let gain = ParamSource::from_parts(
+          param_4_type,
+          param_4_int_val,
+          param_4_float_val,
+          param_4_float_val_2,
+          param_4_float_val_3,
+        );
+        biquad_filter.mode = mode;
+        biquad_filter.cutoff_freq.replace(cutoff_freq);
+        biquad_filter.q.replace(q);
+        biquad_filter.gain.replace(gain);
+        return true;
+      },
       _ => false,
     }
   }
@@ -750,6 +820,7 @@ impl Effect for EffectInstance {
       EffectInstance::Wavefolder(e) => e.apply(rendered_params, base_frequency, sample),
       EffectInstance::SoftClipper(e) => e.apply(rendered_params, base_frequency, sample),
       EffectInstance::ButterworthFilter(e) => e.apply(rendered_params, base_frequency, sample),
+      EffectInstance::BiquadFilter(e) => e.apply(rendered_params, base_frequency, sample),
       EffectInstance::Delay(e) => e.apply(rendered_params, base_frequency, sample),
       EffectInstance::MoogFilter(e) => e.apply(rendered_params, base_frequency, sample),
       EffectInstance::CombFilter(e) => e.apply(rendered_params, base_frequency, sample),
@@ -772,6 +843,7 @@ impl Effect for EffectInstance {
       EffectInstance::SoftClipper(e) => e.apply_all(rendered_params, base_frequencies, samples),
       EffectInstance::ButterworthFilter(e) =>
         e.apply_all(rendered_params, base_frequencies, samples),
+      EffectInstance::BiquadFilter(e) => e.apply_all(rendered_params, base_frequencies, samples),
       EffectInstance::Delay(e) => e.apply_all(rendered_params, base_frequencies, samples),
       EffectInstance::MoogFilter(e) => e.apply_all(rendered_params, base_frequencies, samples),
       EffectInstance::CombFilter(e) => e.apply_all(rendered_params, base_frequencies, samples),
@@ -788,6 +860,7 @@ impl Effect for EffectInstance {
       EffectInstance::Wavefolder(e) => e.get_params(buf),
       EffectInstance::SoftClipper(e) => e.get_params(buf),
       EffectInstance::ButterworthFilter(e) => e.get_params(buf),
+      EffectInstance::BiquadFilter(e) => e.get_params(buf),
       EffectInstance::Delay(e) => e.get_params(buf),
       EffectInstance::MoogFilter(e) => e.get_params(buf),
       EffectInstance::CombFilter(e) => e.get_params(buf),
@@ -804,6 +877,7 @@ impl Effect for EffectInstance {
       EffectInstance::Wavefolder(e) => e.reset(),
       EffectInstance::SoftClipper(e) => e.reset(),
       EffectInstance::ButterworthFilter(e) => e.reset(),
+      EffectInstance::BiquadFilter(e) => e.reset(),
       EffectInstance::Delay(e) => e.reset(),
       EffectInstance::MoogFilter(e) => e.reset(),
       EffectInstance::CombFilter(e) => e.reset(),

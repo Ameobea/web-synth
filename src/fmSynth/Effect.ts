@@ -11,6 +11,35 @@ export enum ButterworthFilterMode {
   Bandpass = 2,
 }
 
+export enum BiquadFilterMode {
+  Lowpass = 0,
+  Highpass = 1,
+  Bandpass = 2,
+  Notch = 3,
+  Peak = 4,
+  Lowshelf = 5,
+  Highshelf = 6,
+  Allpass = 7,
+}
+
+export const biquadFilterNeedsGain = (mode: BiquadFilterMode) => {
+  switch (mode) {
+    case BiquadFilterMode.Lowpass:
+    case BiquadFilterMode.Highpass:
+    case BiquadFilterMode.Bandpass:
+    case BiquadFilterMode.Notch:
+    case BiquadFilterMode.Allpass:
+      return false;
+    case BiquadFilterMode.Peak:
+    case BiquadFilterMode.Lowshelf:
+    case BiquadFilterMode.Highshelf:
+      return true;
+    default:
+      const unreachable: never = mode;
+      throw new Error(`unreachable: ${unreachable}`);
+  }
+};
+
 export enum SoftClipperAlgorithm {
   CubicNonlinearity = 0,
   Tanh = 1,
@@ -42,6 +71,13 @@ export type EffectInner =
       algorithm: SoftClipperAlgorithm;
     }
   | { type: 'butterworth filter'; mode: ButterworthFilterMode; cutoffFrequency: ParamSource }
+  | {
+      type: 'biquad filter';
+      mode: BiquadFilterMode;
+      cutoffFrequency: ParamSource;
+      q: ParamSource;
+      gain: ParamSource;
+    }
   | {
       type: 'delay';
       delaySamples: ParamSource;
@@ -157,6 +193,21 @@ export const encodeEffect = (effect: Effect | null): EncodedEffect => {
         encodeParamSource(effect.cutoffFrequency),
         null,
         null,
+      ];
+    }
+    case 'biquad filter': {
+      return [
+        11,
+        {
+          valueType: -1,
+          valParamInt: effect.mode,
+          valParamFloat: 0,
+          valParamFloat2: 0,
+          valParamFloat3: 0,
+        },
+        encodeParamSource(effect.cutoffFrequency),
+        encodeParamSource(effect.q),
+        encodeParamSource(effect.gain),
       ];
     }
     case 'delay': {

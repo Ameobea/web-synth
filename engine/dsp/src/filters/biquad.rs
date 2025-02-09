@@ -52,6 +52,20 @@ impl FilterMode {
       FilterMode::Allpass => true,
     }
   }
+
+  pub fn from_int(val: usize) -> Self {
+    match val {
+      0 => Self::Lowpass,
+      1 => Self::Highpass,
+      2 => Self::Bandpass,
+      3 => Self::Notch,
+      4 => Self::Peak,
+      5 => Self::Lowshelf,
+      6 => Self::Highshelf,
+      7 => Self::Allpass,
+      _ => panic!("Invalid filter mode: {val}"),
+    }
+  }
 }
 
 impl BiquadFilter {
