@@ -666,7 +666,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
       adsrs={adsrsMemoHelper(state.feedforwardGain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={combFilterTheme}
-      min={0}
+      min={-1}
       max={1}
       state={state.feedforwardGain}
       onChange={useCallback(feedforwardGain => onChange({ feedforwardGain }), [onChange])}
@@ -689,7 +689,7 @@ const ConfigureCombFilter: EffectConfigurator<'comb filter'> = ({
       adsrs={adsrsMemoHelper(state.feedbackGain, adsrs)}
       onAdsrChange={onAdsrChange}
       theme={combFilterTheme}
-      min={0}
+      min={-1}
       max={1}
       state={state.feedbackGain}
       onChange={useCallback(feedbackGain => onChange({ feedbackGain }), [onChange])}

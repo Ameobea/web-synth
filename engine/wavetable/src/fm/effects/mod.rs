@@ -47,7 +47,11 @@ pub trait Effect {
 
   fn apply(&mut self, rendered_params: &[f32], base_frequency: f32, sample: f32) -> f32;
 
-  /// Apply the effect to the buffer of samples in-place
+  /// Apply the effect to the buffer of samples in-place.
+  ///
+  /// This has a default implementation which calls the serial `apply()` function in a loop, but it
+  /// is better to override this for individual effects that can perform it to a full frame in a
+  /// more efficient manner.
   fn apply_all(
     &mut self,
     rendered_params: &[[f32; FRAME_SIZE]],

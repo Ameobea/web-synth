@@ -209,6 +209,9 @@ pub fn iter_notes_with_cb(
         );
       },
       NoteEntry::NoteEnd { note_id } => {
+        if pos == start_beat_inclusive {
+          continue;
+        }
         let existing = unreleased_notes.remove(&note_id);
 
         if existing.is_none() && include_partial_notes {

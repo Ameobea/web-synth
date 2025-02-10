@@ -24,23 +24,30 @@ impl Effect for CombFilter {
   }
 
   fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, input_sample: f32) -> f32 {
-    let delay_samples = dsp::clamp(0., MAX_DELAY_SAMPLES as f32 - 1., rendered_params[0]);
+    let feedforward_delay_samples =
+      dsp::clamp(0., MAX_DELAY_SAMPLES as f32 - 1., rendered_params[0]);
     let feedback_delay_samples = dsp::clamp(0., MAX_DELAY_SAMPLES as f32 - 1., rendered_params[1]);
-    let feedback_gain = dsp::clamp(0., 1., rendered_params[2]);
-    let feedforward_gain = dsp::clamp(0., 1., rendered_params[3]);
+    let feedback_gain = dsp::clamp(-1., 1., rendered_params[2]);
+    let feedforward_gain = dsp::clamp(-1., 1., rendered_params[3]);
 
     // Feedforward: y[n] = x[n] + a * x[n - K]
     //
     // Feedback:    y[n] = x[n] + a * y[n - K]
 
-    let with_feedforward = input_sample
-      + feedforward_gain * self.input_buffer.read_interpolated(-feedback_delay_samples);
     self.input_buffer.set(input_sample);
 
-    let with_feedback =
-      with_feedforward + feedback_gain * self.feedback_buffer.read_interpolated(-delay_samples);
-    self.feedback_buffer.set(with_feedforward);
-    with_feedback
+    let feedforward = feedforward_gain
+      * self
+        .input_buffer
+        .read_interpolated(-feedforward_delay_samples);
+    let feedback = feedback_gain
+      * self
+        .feedback_buffer
+        .read_interpolated(-feedback_delay_samples);
+
+    let output = input_sample + feedforward + feedback;
+    self.feedback_buffer.set(output);
+    output
   }
 
   fn apply_all(
@@ -49,35 +56,40 @@ impl Effect for CombFilter {
     _base_frequencies: &[f32; FRAME_SIZE],
     samples: &mut [f32; FRAME_SIZE],
   ) {
-    let delay_samples = rendered_params[0];
+    let feedforward_delay_samples = rendered_params[0];
     let feedback_delay_samples = rendered_params[1];
     let feedback_gain = rendered_params[2];
     let feedforward_gain = rendered_params[3];
 
     for sample_ix in 0..samples.len() {
-      let delay_samples = dsp::clamp(0., MAX_DELAY_SAMPLES as f32 - 1., delay_samples[sample_ix]);
+      let delay_samples = dsp::clamp(
+        0.,
+        MAX_DELAY_SAMPLES as f32 - 1.,
+        feedforward_delay_samples[sample_ix],
+      );
       let feedback_delay_samples = dsp::clamp(
         0.,
         MAX_DELAY_SAMPLES as f32 - 1.,
         feedback_delay_samples[sample_ix],
       );
-      let feedback_gain = dsp::clamp(0., 1., feedback_gain[sample_ix]);
-      let feedforward_gain = dsp::clamp(0., 1., feedforward_gain[sample_ix]);
+      let feedback_gain = dsp::clamp(-1., 1., feedback_gain[sample_ix]);
+      let feedforward_gain = dsp::clamp(-1., 1., feedforward_gain[sample_ix]);
 
       // Feedforward: y[n] = x[n] + a * x[n - K]
       //
       // Feedback:    y[n] = x[n] + a * y[n - K]
 
       let input_sample = samples[sample_ix];
-
       self.input_buffer.set(input_sample);
-      let with_feedforward = input_sample
-        + feedforward_gain * self.input_buffer.read_interpolated(-feedback_delay_samples);
 
-      let output = with_feedforward + self.feedback_buffer.get(0);
-      let with_feedback =
-        with_feedforward + feedback_gain * self.feedback_buffer.read_interpolated(-delay_samples);
-      self.feedback_buffer.set(-with_feedback);
+      let feedforward = feedforward_gain * self.input_buffer.read_interpolated(-delay_samples);
+      let feedback = feedback_gain
+        * self
+          .feedback_buffer
+          .read_interpolated(-feedback_delay_samples);
+
+      let output = input_sample + feedforward + feedback;
+      self.feedback_buffer.set(output);
       samples[sample_ix] = output;
     }
   }

@@ -1,6 +1,6 @@
 use dsp::filters::biquad::{BiquadFilter, FilterMode};
 
-use crate::fm::ParamSource;
+use crate::fm::{ParamSource, FRAME_SIZE};
 
 use super::Effect;
 
@@ -28,5 +28,25 @@ impl Effect for BiquadFilterEffect {
     self
       .inner
       .compute_coefficients_and_apply(self.mode, q, cutoff_freq, gain, sample)
+  }
+
+  fn apply_all(
+    &mut self,
+    rendered_params: &[[f32; FRAME_SIZE]],
+    _base_frequencies: &[f32; FRAME_SIZE],
+    samples: &mut [f32; FRAME_SIZE],
+  ) {
+    let cutoff_freqs = &rendered_params[0];
+    let qs = &rendered_params[1];
+    let gains = &rendered_params[2];
+
+    self.inner.compute_coefficients_and_apply_frame(
+      self.mode,
+      0.,
+      qs,
+      cutoff_freqs,
+      gains,
+      samples,
+    );
   }
 }
