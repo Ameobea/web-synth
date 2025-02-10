@@ -19,7 +19,7 @@
 >
   › <SvelteDragHandle
     {activateDrag}
-    style={{ zIndex: 2, top: 0, left: 28, position: 'absolute', height: 16 }}
+    style={{ zIndex: 2, top: 0, left: 28, position: 'absolute' }}
   />
   <EditableInstanceName left={60} {name} {setName} />
   <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>

@@ -192,8 +192,8 @@ pub struct Adsr {
   pub early_release_config: EarlyReleaseConfig,
   steps: Vec<AdsrStep>,
   /// If provided, once the ADSR hits point `release_start_phase`, it will loop back to
-  /// `loop_point` until it is released.
-  loop_point: Option<f32>,
+  /// `loop_start_point` until it is released.
+  loop_start_point: Option<f32>,
   /// Contains the rendered waveform the for ADSR from start to end, used as an optimization to
   /// avoid having to compute ramp points every sample
   rendered: Rc<[f32; RENDERED_BUFFER_SIZE]>,
@@ -242,7 +242,7 @@ impl Adsr {
       },
       early_release_config,
       steps,
-      loop_point,
+      loop_start_point: loop_point,
       rendered,
       cur_frame_output: Box::new([0.; FRAME_SIZE]),
       len_samples,
@@ -254,8 +254,41 @@ impl Adsr {
     }
   }
 
+  /// Computes the phase that `self` would have after running for `beat` beats accounting for loop
+  /// behavior.
+  fn compute_phase_given_beats(&self, len_beats: f32, beat: f32) -> f32 {
+    match self.loop_start_point {
+      Some(loop_start_point_phase) => {
+        let loop_start_point_beats = loop_start_point_phase * len_beats;
+        if beat < loop_start_point_beats {
+          // currently in the space before the start of the loop, so we haven't looped yet
+          beat / len_beats
+        } else {
+          let loop_len_phase = self.release_start_phase - loop_start_point_phase;
+          let loop_len_beats = loop_len_phase * len_beats;
+          let loop_phase = ((beat - loop_start_point_beats) / loop_len_beats).fract();
+          let pos_beats = loop_start_point_beats + loop_phase * loop_len_beats;
+          debug_assert!(
+            pos_beats >= 0. && pos_beats <= len_beats,
+            "invalid pos_beats={pos_beats}; len_beats={len_beats}"
+          );
+          pos_beats / len_beats
+        }
+      },
+      None => beat / len_beats,
+    }
+  }
+
   pub fn gate(&mut self, cur_beat: f32) {
-    self.phase = 0.;
+    self.phase = match self.len_beats {
+      Some(len_beats) => self.compute_phase_given_beats(len_beats, cur_beat),
+      None => 0.,
+    };
+    debug_assert!(
+      self.phase >= 0. && self.phase <= 1.,
+      "bad phase computed after gating; phase={}",
+      self.phase
+    );
     self.gated_beat = cur_beat;
     self.gate_status = GateStatus::Gated;
   }
@@ -433,8 +466,8 @@ impl Adsr {
       // phase we count ourselves and the expected phase at the end of the current frame as
       // computed from the current beat from the global beat counter.
 
-      let cur_loop_progress_beats = (cur_frame_start_beat - self.gated_beat).max(0.);
-      let cur_frame_expected_start_phase = cur_loop_progress_beats / len_beats;
+      let cur_frame_expected_start_phase =
+        self.compute_phase_given_beats(len_beats, cur_frame_start_beat);
 
       let cur_frame_phase_length = self.cached_phase_diff_per_sample * FRAME_SIZE as f32;
       let cur_sample_expected_phase = cur_frame_expected_start_phase
@@ -458,30 +491,32 @@ impl Adsr {
     if matches!(self.gate_status, GateStatus::Gated) && self.phase >= self.release_start_phase {
       // Disable the global beat sync if we've reset the loop since we can no longer
       // accurately track things
+      // TODO: ^^^ ??????
       *cur_frame_start_phase = -100.;
 
-      if let Some(loop_start) = self.loop_point {
+      if let Some(loop_start) = self.loop_start_point {
         if self.release_start_phase <= loop_start {
           self.phase = loop_start;
-          if let Some(len_beats) = self.len_beats {
-            let loop_len_normalized = self.release_start_phase - loop_start;
-            let loop_len_beats = loop_len_normalized * len_beats;
-            self.gated_beat += loop_len_beats;
-          }
           return;
         }
+
         let overflow_amount = self.phase - self.release_start_phase;
         let loop_size = self.release_start_phase - loop_start;
         self.phase = loop_start + ((overflow_amount / loop_size).fract() * loop_size);
-        if let Some(len_beats) = self.len_beats {
-          let loop_len_normalized = self.release_start_phase - loop_start;
-          let loop_len_beats = loop_len_normalized * len_beats;
-          self.gated_beat += loop_len_beats;
-        }
+        debug_assert!(
+          self.phase >= 0. && self.phase <= 1.,
+          "bad phase: {}",
+          self.phase
+        );
       } else {
         // Lock our phase to the release point if we're still gated.  Transitioning to
         // `GateStatus::GatedFrozen` is handled in `render_frame()`.
         self.phase = self.release_start_phase;
+        debug_assert!(
+          self.phase >= 0. && self.phase <= 1.,
+          "bad phase: {}",
+          self.phase
+        );
       }
     }
   }
@@ -516,7 +551,11 @@ impl Adsr {
         }
       },
       _ => {
-        debug_assert!(self.phase >= 0. && self.phase <= 1.);
+        debug_assert!(
+          self.phase >= 0. && self.phase <= 1.,
+          "bad phase: {}",
+          self.phase
+        );
         dsp::read_interpolated(
           &*self.rendered,
           self.phase * (RENDERED_BUFFER_SIZE - 2) as f32,
@@ -593,7 +632,9 @@ impl Adsr {
   pub fn render_frame(&mut self, scale: f32, shift: f32, cur_frame_start_beat: f32) {
     let mut cur_frame_start_phase = self.phase;
     match self.gate_status {
-      GateStatus::Gated if self.loop_point.is_none() && self.phase >= self.release_start_phase => {
+      GateStatus::Gated
+        if self.loop_start_point.is_none() && self.phase >= self.release_start_phase =>
+      {
         let final_sample = self.get_sample(
           &mut cur_frame_start_phase,
           cur_frame_start_beat,
@@ -683,7 +724,7 @@ impl Adsr {
   }
 
   pub fn set_loop_point(&mut self, new_loop_point: Option<f32>) {
-    self.loop_point = new_loop_point;
+    self.loop_start_point = new_loop_point;
     // TODO: Do we need to adjust gate status here if we're gated when this happens??  Almost
     // certainly, perhaps other situations as well
   }
@@ -692,7 +733,7 @@ impl Adsr {
   pub fn set_steps(&mut self, new_steps: Vec<AdsrStep>) { self.steps = new_steps; }
 
   pub fn set_release_start_phase(&mut self, new_release_start_phase: f32) {
-    self.release_start_phase = match self.loop_point {
+    self.release_start_phase = match self.loop_start_point {
       Some(loop_point) => new_release_start_phase.max(loop_point),
       _ => new_release_start_phase,
     };

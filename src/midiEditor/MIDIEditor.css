@@ -87,6 +87,7 @@
     height: 18px;
     border: 1px solid #999;
     cursor: grab;
+    box-sizing: border-box;
 
     /* vertical ridges to indicate that it's a handle */
     background-image: repeating-linear-gradient(
@@ -121,4 +122,5 @@
   height: 18px;
   line-height: 4px;
   user-select: none;
+  width: 28px;
 }

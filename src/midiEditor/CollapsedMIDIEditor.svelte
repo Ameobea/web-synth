@@ -53,13 +53,11 @@
   <button
     class="expand-midi-editor-instance"
     on:click={() => parentInstance.uiManager.expandUIInstance(inst.id)}
+    style="top: -1px;"
   >
     ›
   </button>
-  <SvelteDragHandle
-    style={{ zIndex: 2, top: -1, left: 28, position: 'absolute', height: 16 }}
-    {activateDrag}
-  />
+  <SvelteDragHandle style={{ zIndex: 2, top: -1, left: 28, position: 'absolute' }} {activateDrag} />
   <button
     class="delete-cv-output-button"
     on:click={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}

@@ -220,12 +220,14 @@ pub fn iter_notes_with_cb(
             .rev()
             .find_map(|(pos, entry)| match entry {
               NoteEntry::NoteStart { note } if note.id == *note_id => Some((pos, note)),
+              NoteEntry::StartAndEnd { start_note, .. } if start_note.id == *note_id =>
+                Some((pos, start_note)),
               _ => None,
             })
             .unwrap_or_else(|| {
               panic!(
-                "Missing start event for end event at beat={} with note_id={note_id}",
-                pos,
+                "Missing start event for end event at line_ix={line_ix}, beat={pos} with \
+                 note_id={note_id}",
               )
             });
           events.push(NoteEvent {

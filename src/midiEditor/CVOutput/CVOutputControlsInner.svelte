@@ -58,7 +58,7 @@
     ⌄
     <SvelteDragHandle
       {activateDrag}
-      style={{ zIndex: 2, top: 0, left: 28, position: 'absolute', height: 16 }}
+      style={{ zIndex: 2, top: 0, left: 28, position: 'absolute' }}
     />
     <EditableInstanceName {name} {setName} left={60} />
     <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
@@ -122,9 +122,8 @@
   }
 
   header {
-    height: 19px;
+    height: 18px;
     font-size: 14px;
-    line-height: 8px;
   }
 
   .open-settings-button {
@@ -137,7 +136,7 @@
     line-height: 10px;
     padding-top: 2px;
     position: absolute;
-    top: 19px;
+    top: 18px;
     left: 0px;
     border: 1px solid #333;
     cursor: pointer;
