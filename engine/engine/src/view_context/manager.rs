@@ -1202,6 +1202,24 @@ impl ViewContextManager {
     self.save_all();
   }
 
+  pub fn persist_vc_state(&self, vc_id: Uuid) {
+    let vc = self
+      .contexts
+      .iter()
+      .find(|vc| vc.id == vc_id)
+      .expect("Tried to persist state of a VC that doesn't exist");
+    vc.context.persist_state();
+  }
+
+  pub fn get_state_key(&self, vc_id: Uuid) -> String {
+    let vc = self
+      .contexts
+      .iter()
+      .find(|vc| vc.id == vc_id)
+      .expect("Tried to get state key of a VC that doesn't exist");
+    vc.context.get_state_key()
+  }
+
   /// Removes the view context with the supplied ID, calling its `.cleanup()` function, deleting
   /// its `localStorage` key, and updating the root `localStorage` key to no longer list it.
   pub fn delete_vc_by_id(&mut self, id: Uuid) {

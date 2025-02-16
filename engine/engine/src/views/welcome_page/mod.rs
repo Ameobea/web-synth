@@ -20,6 +20,8 @@ impl ViewContext for WelcomePage {
 
   fn get_state_key(&self) -> String { format!("welcomePage_{}", self.uuid) }
 
+  fn persist_state(&self) { js::persist_welcome_page(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_welcome_page(&self.get_state_key()); }
 
   fn hide(&mut self) { js::hide_welcome_page(&self.get_state_key()); }

@@ -37,7 +37,11 @@ import {
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { registerAllCustomNodes } from './nodes';
 import type { AudioConnectables } from 'src/patchNetwork';
-import { audioNodeGetters, buildNewForeignConnectableID } from 'src/graphEditor/nodes/CustomAudio';
+import {
+  audioNodeGetters,
+  buildNewForeignConnectableID,
+  type ForeignNode,
+} from 'src/graphEditor/nodes/CustomAudio';
 import { removeNode } from 'src/patchNetwork/interface';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
@@ -290,6 +294,45 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
     },
   };
 
+  const duplicate = {
+    content: 'Duplicate Node',
+    callback: (
+      _menuEntry: any,
+      _options: any,
+      _event: any,
+      _parentMenu: ContextMenu,
+      node: LGraphNode
+    ) => {
+      const vcId = node.id.toString();
+      const isVc = vcId.length === 36;
+      if (isVc) {
+        const engine = getEngine()!;
+        engine.persist_vc_state(vcId);
+        const {
+          minimal_def: { name: nodeType },
+        } = JSON.parse(localStorage[`vc_${vcId}`]) as { minimal_def: { name: string } };
+        const stateKey = engine.get_state_key(vcId);
+        const serializedState = localStorage[stateKey];
+        let displayName = ViewContextDescriptors.find(d => d.name === nodeType)?.displayName;
+        if (!displayName) {
+          console.error(`No descriptor for node type ${nodeType} when duplicating node`);
+          displayName = nodeType;
+        }
+        engine.create_view_context(nodeType, displayName, serializedState);
+      } else {
+        const innerNode: ForeignNode = (node as any).connectables.node!;
+        const nodeType = innerNode.nodeType;
+        if (!nodeType) {
+          throw new Error("Missing node type; dod't think this happened.");
+        }
+
+        const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
+        const serialized = innerNode.serialize();
+        createNode(nodeType, activeSubgraphID, serialized);
+      }
+    },
+  };
+
   if (Object.keys(this.selected_nodes).length > 1) {
     const alignSelectedToIx = filteredOptions.findIndex(
       opt => opt?.content === 'Align Selected To'
@@ -307,6 +350,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
       );
     } else {
       filteredOptions.splice(removeOptionIx, 0, moveToSubgraph, null);
+      filteredOptions.splice(removeOptionIx + 1, 0, duplicate, null);
     }
   }
 
@@ -362,7 +406,7 @@ LGraphCanvas.prototype.adjustMouseEvent = function (this: LGraphCanvas, evt: any
 /**
  * Mapping of `stateKey`s to the graph instances that that they manage
  */
-const GraphEditorInstances: Map<string, LGraph> = new Map();
+export const GraphEditorInstances: Map<string, LGraph> = new Map();
 (window as any).GraphEditorInstances = GraphEditorInstances;
 (window as any).LiteGraph = LiteGraph;
 
@@ -379,8 +423,6 @@ export const saveStateForInstance = (stateKey: string) => {
   (state as any).selectedNodeVcId = Object.values(selectedNodes)[0]?.connectables?.vcId;
 
   localStorage.setItem(stateKey, JSON.stringify(state));
-
-  GraphEditorInstances.delete(stateKey);
 };
 
 const getLGNodesByVcId = (vcId: string) => {
@@ -627,7 +669,11 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
   );
 };
 
-const GraphEditor: React.FC<{ stateKey: string }> = ({ stateKey }) => {
+interface GraphEditorProps {
+  stateKey: string;
+}
+
+const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
   const isInitialized = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lGraphCanvasRef = useRef<LGraphCanvas | null>(null);

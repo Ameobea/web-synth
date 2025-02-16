@@ -14,6 +14,8 @@ impl ControlPanel {
 impl ViewContext for ControlPanel {
   fn init(&mut self) { js::init_control_panel(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_control_panel(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_control_panel(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

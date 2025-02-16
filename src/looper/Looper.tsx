@@ -79,6 +79,16 @@ export const init_looper = (stateKey: string) => {
   })(domId);
 };
 
+export const persist_looper = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  const looperInstState = getState().looper.stateByVcId[vcId];
+  if (!looperInstState) {
+    throw new Error(`Missing looper state for vcId=${vcId}`);
+  }
+  const serialized = serializeLooper(looperInstState);
+  localStorage.setItem(stateKey, serialized);
+};
+
 export const cleanup_looper = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 

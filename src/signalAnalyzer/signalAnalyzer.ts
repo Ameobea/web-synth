@@ -70,13 +70,17 @@ export const unhide_signal_analyzer = (stateKey: string) => {
   inst.resume();
 };
 
-export const cleanup_signal_analyzer = (stateKey: string) => {
+export const persist_signal_analyzer = (stateKey: string) => {
   const inst = SignalAnalyzerInstsByStateKey.get(stateKey);
   if (!inst) {
     throw new Error(`No signal analyzer instance found for state key ${stateKey}`);
   }
   const state = inst.serialize();
   localStorage.setItem(stateKey, JSON.stringify(state));
+};
+
+export const cleanup_signal_analyzer = (stateKey: string) => {
+  persist_signal_analyzer(stateKey);
 
   SignalAnalyzerInstsByStateKey.delete(stateKey);
   mkSvelteContainerCleanupHelper({ preserveRoot: false })(stateKey);

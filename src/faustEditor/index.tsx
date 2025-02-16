@@ -148,7 +148,7 @@ export const unhide_faust_editor = (vcId: string) => {
   rootNode.style.display = 'block';
 };
 
-export const cleanup_faust_editor = (stateKey: string) => {
+export const persist_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   const instanceCtx = faustEditorContextMap[vcId];
@@ -156,14 +156,6 @@ export const cleanup_faust_editor = (stateKey: string) => {
     instanceCtx.reduxInfra.getState().faustEditor;
 
   const editorContent = get_faust_editor_content(vcId);
-  delete faustEditorContextMap[vcId];
-
-  const faustEditorReactRootNode = document.getElementById(buildRootNodeId(vcId));
-  if (!faustEditorReactRootNode) {
-    return editorContent;
-  }
-
-  mkContainerCleanupHelper()(buildRootNodeId(vcId));
 
   const serializedState: SerializedFaustEditor = {
     editorContent,
@@ -184,6 +176,20 @@ export const cleanup_faust_editor = (stateKey: string) => {
     optimize,
   };
   localStorage.setItem(stateKey, JSON.stringify(serializedState));
+};
+
+export const cleanup_faust_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+
+  persist_faust_editor(stateKey);
+  delete faustEditorContextMap[vcId];
+
+  const faustEditorReactRootNode = document.getElementById(buildRootNodeId(vcId));
+  if (!faustEditorReactRootNode) {
+    return;
+  }
+
+  mkContainerCleanupHelper()(buildRootNodeId(vcId));
 };
 
 export const render_faust_editor_small_view = (vcId: string, domId: string) => {

@@ -9,7 +9,7 @@ import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 's
 
 export const MAX_MIXER_TRACK_COUNT = 16;
 
-export class MixerNode {
+export class MixerNode implements ForeignNode {
   public gainNodes: GainNode[];
   public gainParams: OverridableAudioNode[];
   private outputNode: GainNode;

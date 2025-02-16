@@ -23,6 +23,8 @@ impl ViewContext for FaustEditor {
 
   fn unhide(&mut self) { js::unhide_faust_editor(&self.get_id()); }
 
+  fn persist_state(&self) { js::persist_faust_editor(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_faust_editor(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

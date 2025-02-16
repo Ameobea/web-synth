@@ -28,6 +28,8 @@ impl GraphEditor {
 impl ViewContext for GraphEditor {
   fn init(&mut self) { js::init_graph_editor(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_graph_editor(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_graph_editor(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

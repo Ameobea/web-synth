@@ -24,6 +24,10 @@ export const hide_welcome_page = mkContainerHider(buildWelcomePageDOMNodeID);
 
 export const unhide_welcome_page = mkContainerUnhider(buildWelcomePageDOMNodeID);
 
+export const persist_welcome_page = (_stateKey: string) => {
+  // No state to persist currently
+};
+
 export const cleanup_welcome_page = (stateKey: string): string => {
   const vcId = stateKey.split('_')[1]!;
 

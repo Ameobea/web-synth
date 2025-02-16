@@ -107,6 +107,18 @@ export const init_filter_designer = async (stateKey: string) => {
   })(domId);
 };
 
+export const persist_filter_designer = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+
+  const state = StatesByVcId.get(vcId);
+  if (!state) {
+    throw new Error(`Missing filter designer state for vcId=${vcId}`);
+  }
+
+  const serialized = serializeFilterDesigner(state);
+  localStorage.setItem(stateKey, serialized);
+};
+
 export const cleanup_filter_designer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 

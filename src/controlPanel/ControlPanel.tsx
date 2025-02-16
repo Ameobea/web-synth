@@ -122,6 +122,8 @@ export const hide_control_panel = (stateKey: string) => {
   mkContainerHider(getRootNodeID)(stateKey);
 };
 
+export const persist_control_panel = (stateKey: string) => void saveStateForInstance(stateKey);
+
 export const unhide_control_panel = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
   dispatch(actionCreators.controlPanel.SET_CONTROL_PANEL_HIDDEN(vcId, false));

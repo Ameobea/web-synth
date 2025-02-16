@@ -7,7 +7,7 @@ import { RangeInput } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/Rang
 import {
   get_midi_keyboard_audio_connectables,
   type MappedOutput,
-  midiKeyboardCtxByStateKey,
+  MidiKeyboardCtxByStateKey,
 } from 'src/midiKeyboard';
 import type { ConnectableDescriptor } from 'src/patchNetwork';
 import { connect, updateConnectables } from 'src/patchNetwork/interface';
@@ -88,7 +88,7 @@ const OutputMappingRow: React.FC<OutputMappingRowProps> = ({
               if (editingName === output.name) {
                 return;
               }
-              const ctx = midiKeyboardCtxByStateKey.get(stateKey)!;
+              const ctx = MidiKeyboardCtxByStateKey.get(stateKey)!;
               const vcId = stateKey.split('_')[1]!;
 
               // Validate that name is unique
@@ -167,7 +167,7 @@ const MidiKeyboardOutputMappingConfigurator: React.FC<{
     (state: ReduxStore) => state.midiKeyboard[stateKey].mappedOutputs,
     shallowEqual
   );
-  const mutableCtx = midiKeyboardCtxByStateKey.get(stateKey);
+  const mutableCtx = MidiKeyboardCtxByStateKey.get(stateKey);
   if (!mutableCtx) {
     return null;
   }

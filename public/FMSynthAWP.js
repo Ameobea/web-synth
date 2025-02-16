@@ -597,7 +597,6 @@ class FMSynthAWP extends AudioWorkletProcessor {
       const { eventType, param1, param2 } = msg;
       switch (eventType) {
         case 0: // Attack
-          console.log({ param1, param2 });
           if (!this.wasmInstance) {
             console.warn('Tried gating before Wasm instance loaded');
             break;

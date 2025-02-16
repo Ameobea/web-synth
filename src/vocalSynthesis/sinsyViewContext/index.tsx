@@ -77,11 +77,16 @@ export const hide_sinsy = mkContainerHider(getSinsyDOMElementId);
 
 export const unhide_sinsy = mkContainerUnhider(getSinsyDOMElementId);
 
-export const cleanup_sinsy = (stateKey: string) => {
+export const persist_sinsy = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
   const serializedState = JSON.stringify(getState().sinsy.instances[vcId]);
   localStorage.setItem(stateKey, serializedState);
+};
 
+export const cleanup_sinsy = (stateKey: string) => {
+  persist_sinsy(stateKey);
+
+  const vcId = stateKey.split('_')[1];
   mkContainerCleanupHelper({})(getSinsyDOMElementId(vcId));
 };
 

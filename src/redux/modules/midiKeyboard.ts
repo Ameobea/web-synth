@@ -5,7 +5,7 @@ import {
   get_midi_keyboard_audio_connectables,
   type MappedOutput,
   type MIDIKeyboardCtx,
-  midiKeyboardCtxByStateKey,
+  MidiKeyboardCtxByStateKey,
 } from 'src/midiKeyboard';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { updateConnectables } from 'src/patchNetwork/interface';
@@ -44,7 +44,7 @@ export interface MidiKeyboardStateItem {
 export type MidiKeyboardState = { [stateKey: string]: MidiKeyboardStateItem };
 
 const getMidiKeyboardCtx = (stateKey: string): MIDIKeyboardCtx => {
-  const midiKeyboardCtx = midiKeyboardCtxByStateKey.get(stateKey);
+  const midiKeyboardCtx = MidiKeyboardCtxByStateKey.get(stateKey);
   if (!midiKeyboardCtx) {
     throw new UnreachableError(`No ctx entry found for midi keyboard state key ${stateKey}`);
   }
@@ -210,7 +210,7 @@ const actionGroups = {
         );
       }
       if (midiInputName) {
-        const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
+        const midiNode = MidiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
         if (!midiNode) {
           throw new UnreachableError(
             'No MIDI node found for midi keyboard with `stateKey`: ' + stateKey
@@ -238,7 +238,7 @@ const actionGroups = {
       mode,
     }),
     subReducer: (state: MidiKeyboardState, { stateKey, mode }) => {
-      const mutableCtx = midiKeyboardCtxByStateKey.get(stateKey);
+      const mutableCtx = MidiKeyboardCtxByStateKey.get(stateKey);
       if (!mutableCtx) {
         throw new UnreachableError(
           'No mutable ctx found for midi keyboard with `stateKey`: ' + stateKey

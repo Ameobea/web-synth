@@ -62,6 +62,7 @@ extern "C" {
   pub fn init_faust_editor(state_key: &str);
   pub fn hide_faust_editor(vc_id: &str);
   pub fn unhide_faust_editor(vc_id: &str);
+  pub fn persist_faust_editor(state_key: &str);
   pub fn cleanup_faust_editor(vc_id: &str);
   pub fn get_faust_editor_content(vc_id: &str) -> String;
   pub fn get_faust_editor_connectables(vc_id: &str) -> JsValue;
@@ -74,6 +75,7 @@ extern "C" {
   pub fn init_graph_editor(state_key: &str);
   pub fn hide_graph_editor(state_key: &str);
   pub fn unhide_graph_editor(state_key: &str);
+  pub fn persist_graph_editor(state_key: &str);
   pub fn cleanup_graph_editor(state_key: &str);
   pub fn arrange_graph_editor_nodes(vc_id: &str, node_ids: &str, offset_x: usize, offset_y: usize);
 }
@@ -83,6 +85,7 @@ extern "C" {
   pub fn hide_midi_editor(state_key: &str);
   pub fn unhide_midi_editor(state_key: &str);
   pub fn init_midi_editor(vc_id: &str);
+  pub fn persist_midi_editor(state_key: &str);
   pub fn cleanup_midi_editor(vc_id: &str);
   pub fn get_midi_editor_audio_connectables(vc_id: &str) -> JsValue;
 }
@@ -92,6 +95,7 @@ extern "C" {
   pub fn init_composition_sharing(state_key: &str);
   pub fn hide_composition_sharing(state_key: &str);
   pub fn unhide_composition_sharing(state_key: &str);
+  pub fn persist_composition_sharing(state_key: &str);
   pub fn cleanup_composition_sharing(state_key: &str);
 }
 
@@ -100,6 +104,7 @@ extern "C" {
   pub fn init_synth_designer(state_key: &str);
   pub fn hide_synth_designer(vc_id: &str);
   pub fn unhide_synth_designer(vc_id: &str);
+  pub fn persist_synth_designer(state_key: &str);
   pub fn cleanup_synth_designer(state_key: &str) -> String;
   pub fn get_synth_designer_audio_connectables(state_key: &str) -> JsValue;
 }
@@ -109,6 +114,7 @@ extern "C" {
   pub fn init_midi_keyboard(state_key: &str);
   pub fn hide_midi_keyboard(state_key: &str);
   pub fn unhide_midi_keyboard(state_key: &str);
+  pub fn persist_midi_keyboard(state_key: &str);
   pub fn cleanup_midi_keyboard(state_key: &str) -> String;
   pub fn get_midi_keyboard_audio_connectables(state_key: &str) -> JsValue;
   pub fn render_midi_keyboard_small_view(state_key: &str, target_dom_id: &str);
@@ -121,6 +127,7 @@ extern "C" {
   pub fn cleanup_sequencer(state_key: &str);
   pub fn hide_sequencer(state_key: &str);
   pub fn unhide_sequencer(state_key: &str);
+  pub fn persist_sequencer(state_key: &str);
   pub fn get_sequencer_audio_connectables(state_key: &str) -> JsValue;
   pub fn render_sequencer_small_view(vc_id: &str, target_dom_id: &str);
   pub fn cleanup_sequencer_small_view(vc_id: &str, target_dom_id: &str);
@@ -133,6 +140,7 @@ extern "C" {
   pub fn cleanup_sample_library(state_key: &str);
   pub fn hide_sample_library(state_key: &str);
   pub fn unhide_sample_library(state_key: &str);
+  pub fn persist_sample_library(state_key: &str);
 }
 
 #[wasm_bindgen(raw_module = "./controlPanel")]
@@ -141,6 +149,7 @@ extern "C" {
   pub fn cleanup_control_panel(state_key: &str);
   pub fn hide_control_panel(state_key: &str);
   pub fn unhide_control_panel(state_key: &str);
+  pub fn persist_control_panel(state_key: &str);
   pub fn get_control_panel_audio_connectables(state_key: &str) -> JsValue;
 }
 
@@ -150,6 +159,7 @@ extern "C" {
   pub fn cleanup_granulator(state_key: &str);
   pub fn hide_granulator(state_key: &str);
   pub fn unhide_granulator(state_key: &str);
+  pub fn persist_granulator(state_key: &str);
   pub fn build_granulator_audio_connectables(state_key: &str) -> JsValue;
   pub fn granulator_list_used_samples(vc_id: &str) -> Vec<JsValue>;
 }
@@ -159,6 +169,7 @@ extern "C" {
   pub fn init_filter_designer(state_key: &str);
   pub fn hide_filter_designer(vc_id: &str);
   pub fn unhide_filter_designer(vc_id: &str);
+  pub fn persist_filter_designer(state_key: &str);
   pub fn cleanup_filter_designer(state_key: &str);
   pub fn get_filter_designer_audio_connectables(vc_id: &str) -> JsValue;
 }
@@ -168,6 +179,7 @@ extern "C" {
   pub fn init_sinsy(state_key: &str);
   pub fn hide_sinsy(vc_id: &str);
   pub fn unhide_sinsy(vc_id: &str);
+  pub fn persist_sinsy(state_key: &str);
   pub fn cleanup_sinsy(state_key: &str);
   pub fn get_sinsy_audio_connectables(vc_id: &str) -> JsValue;
 }
@@ -177,6 +189,7 @@ extern "C" {
   pub fn init_looper(state_key: &str);
   pub fn hide_looper(vc_id: &str);
   pub fn unhide_looper(vc_id: &str);
+  pub fn persist_looper(state_key: &str);
   pub fn cleanup_looper(state_key: &str);
   pub fn get_looper_audio_connectables(vc_id: &str) -> JsValue;
 }
@@ -186,6 +199,7 @@ extern "C" {
   pub fn init_welcome_page(state_key: &str);
   pub fn hide_welcome_page(state_key: &str);
   pub fn unhide_welcome_page(state_key: &str);
+  pub fn persist_welcome_page(state_key: &str);
   pub fn cleanup_welcome_page(state_key: &str);
 }
 
@@ -194,6 +208,7 @@ extern "C" {
   pub fn init_signal_analyzer(state_key: &str);
   pub fn hide_signal_analyzer(state_key: &str);
   pub fn unhide_signal_analyzer(state_key: &str);
+  pub fn persist_signal_analyzer(state_key: &str);
   pub fn cleanup_signal_analyzer(state_key: &str);
   pub fn get_signal_analyzer_audio_connectables(state_key: &str) -> JsValue;
 }
@@ -203,6 +218,7 @@ extern "C" {
   pub fn init_sampler(state_key: &str);
   pub fn hide_sampler(state_key: &str);
   pub fn unhide_sampler(state_key: &str);
+  pub fn persist_sampler(state_key: &str);
   pub fn cleanup_sampler(state_key: &str);
   pub fn get_sampler_audio_connectables(state_key: &str) -> JsValue;
 }

@@ -272,11 +272,16 @@ export const init_granulator = async (stateKey: string) => {
   })(domId);
 };
 
-export const cleanup_granulator = (stateKey: string) => {
+export const persist_granulator = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-
   const serialized = serializeGranulator(vcId);
   localStorage.setItem(stateKey, serialized);
+};
+
+export const cleanup_granulator = (stateKey: string) => {
+  persist_granulator(stateKey);
+
+  const vcId = stateKey.split('_')[1]!;
 
   const inst = get(GranulatorInstancesById).get(vcId);
   if (inst) {

@@ -20,6 +20,10 @@ pub trait ViewContext: Downcast {
   /// Returns the `localStorage` key under which this VC's serialized state should be stored.
   fn get_state_key(&self) -> String;
 
+  /// This should trigger the VC to serialize its current state and write it to
+  /// `localStorage[stateKey]`.
+  fn persist_state(&self);
+
   /// Clean up any external resources such as DOM elements that were created by the view context,
   /// making the application ready for the creation of a new one.  This does not mean that the
   /// `ViewContext` is being deleted, merely that it is being "un-rendered."

@@ -1,10 +1,9 @@
-import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { getState, store } from 'src/redux';
-import GraphEditor, { saveStateForInstance } from './GraphEditor';
+import GraphEditor, { GraphEditorInstances, saveStateForInstance } from './GraphEditor';
 import { tryParseJson } from 'src/util';
 import type { LGraph } from 'litegraph.js';
 import { updateGraph } from 'src/graphEditor/graphDiffing';
@@ -80,6 +79,8 @@ export const unhide_graph_editor = (stateKey: string) => {
   mkContainerUnhider(vcId => `graphEditor_${vcId}`)(stateKey);
 };
 
+export const persist_graph_editor = (stateKey: string) => void saveStateForInstance(stateKey);
+
 export const cleanup_graph_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1];
   const graphEditorReactRootNode = document.getElementById(stateKey);
@@ -87,6 +88,7 @@ export const cleanup_graph_editor = (stateKey: string) => {
   // doesn't seem to trigger lifecycle methods/execute the return value of `useEffect` so we have
   // to handle this explicitly.
   saveStateForInstance(stateKey);
+  GraphEditorInstances.delete(stateKey);
 
   const ctx = GraphEditorCtxsByVcId.get(vcId);
   if (!ctx) {

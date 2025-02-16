@@ -1,6 +1,5 @@
 import { Option, Try } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
-import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 
@@ -147,9 +146,18 @@ export const unhide_synth_designer = (stateKey: string) => {
   rootNode.style.display = 'block';
 };
 
-export const cleanup_synth_designer = (stateKey: string): string => {
+const serializeSynthDesigner = (stateKey: string) => {
   const { synths } = getSynthDesignerReduxInfra(stateKey).getState().synthDesigner;
-  const designerState = JSON.stringify({ synths: synths.map(serializeSynthModule) });
+  return JSON.stringify({ synths: synths.map(serializeSynthModule) });
+};
+
+export const persist_synth_designer = (stateKey: string) => {
+  const designerState = serializeSynthDesigner(stateKey);
+  localStorage.setItem(stateKey, designerState);
+};
+
+export const cleanup_synth_designer = (stateKey: string): string => {
+  const designerState = serializeSynthDesigner(stateKey);
   const vcId = stateKey.split('_')[1]!;
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {

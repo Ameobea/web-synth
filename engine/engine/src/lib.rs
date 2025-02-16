@@ -259,6 +259,18 @@ pub fn cleanup_small_view(vc_id: &str, target_dom_id: &str) {
   vc_entry.context.cleanup_small_view(target_dom_id);
 }
 
+#[wasm_bindgen]
+pub fn persist_vc_state(vc_id: &str) {
+  let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `persist_vc_state`!");
+  get_vcm().persist_vc_state(uuid);
+}
+
+#[wasm_bindgen]
+pub fn get_state_key(vc_id: &str) -> String {
+  let uuid = Uuid::from_str(&vc_id).expect("Invalid UUID string passed to `get_state_key`!");
+  get_vcm().get_state_key(uuid)
+}
+
 /// Returns a list of all samples that are in active use by any VC.  The list is non-deduped and
 /// can't be due to limitations of the API's use of `JsValue`.
 #[wasm_bindgen]

@@ -3,7 +3,7 @@ import ControlPanel from 'react-control-panel';
 import { shallowEqual } from 'react-redux';
 import { createSelector } from 'reselect';
 
-import { midiKeyboardCtxByStateKey } from 'src/midiKeyboard';
+import { MidiKeyboardCtxByStateKey } from 'src/midiKeyboard';
 import { MidiKeyboard } from 'src/midiKeyboard/MidiKeyboard';
 import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 import MidiKeyboardOutputMappingConfigurator from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
@@ -93,7 +93,7 @@ export const MidiKeyboardVC: React.FC<MidiKeyboardVCProps> = ({
     [midiInput, midiInputNames]
   );
 
-  const midiNode = midiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
+  const midiNode = MidiKeyboardCtxByStateKey.get(stateKey)?.midiNode;
   const onOctaveOffsetChange = useCallback(
     (newOctaveOffset: number) =>
       dispatch(actionCreators.midiKeyboard.SET_OCTAVE_OFFSET(stateKey, newOctaveOffset)),

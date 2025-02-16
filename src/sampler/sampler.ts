@@ -85,6 +85,16 @@ export const init_sampler = (stateKey: string) => {
   })(domId);
 };
 
+export const persist_sampler = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  const inst = SamplerInstancesById.get(vcId);
+  if (!inst) {
+    throw new Error(`No sampler instance found for vcId ${vcId}`);
+  }
+  const serialized = inst.serialize();
+  localStorage.setItem(stateKey, JSON.stringify(serialized));
+};
+
 export const cleanup_sampler = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 

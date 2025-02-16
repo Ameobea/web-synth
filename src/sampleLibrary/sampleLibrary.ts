@@ -207,6 +207,10 @@ export const init_sample_library = (stateKey: string) => {
 
 export const cleanup_sample_library = mkContainerCleanupHelper();
 
+export const persist_sample_library = (_stateKey: string) => {
+  // No state to persist currently
+};
+
 export const hide_sample_library = mkContainerHider((vcId: string) => `SampleLibrary_${vcId}`);
 
 export const unhide_sample_library = mkContainerUnhider((vcId: string) => `SampleLibrary_${vcId}`);

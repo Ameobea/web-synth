@@ -40,6 +40,10 @@ export const hide_composition_sharing = mkContainerHider(buildCompositionSharing
 
 export const unhide_composition_sharing = mkContainerUnhider(buildCompositionSharingDOMNodeID);
 
+export const persist_composition_sharing = (_stateKey: string) => {
+  // No state to persist currently
+};
+
 export const cleanup_composition_sharing = (stateKey: string): string => {
   const vcId = stateKey.split('_')[1]!;
   const ctx = CtxsByVcId.get(vcId);

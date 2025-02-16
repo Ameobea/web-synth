@@ -15,6 +15,8 @@ impl Sampler {
 impl ViewContext for Sampler {
   fn init(&mut self) { js::init_sampler(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_sampler(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_sampler(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

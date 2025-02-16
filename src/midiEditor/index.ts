@@ -366,6 +366,19 @@ export const init_midi_editor = (vcId: string) => {
   })(domID);
 };
 
+export const persist_midi_editor = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1];
+  const inst = Instances.get(vcId);
+  if (!inst) {
+    throw new UnreachableError(
+      `Tried to persist MIDI editor with vcId=${vcId} that isn't in instance map`
+    );
+  }
+
+  const serializedState = JSON.stringify(inst.serialize());
+  localStorage.setItem(stateKey, serializedState);
+};
+
 export const cleanup_midi_editor = (vcId: string) => {
   const stateKey = `midiEditor_${vcId}`;
   const inst = Instances.get(vcId);

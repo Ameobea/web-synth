@@ -22,6 +22,8 @@ impl ViewContext for CompositionSharing {
 
   fn get_state_key(&self) -> String { format!("compositionSharing_{}", self.uuid) }
 
+  fn persist_state(&self) { js::persist_composition_sharing(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_composition_sharing(&self.get_state_key()); }
 
   fn hide(&mut self) { js::hide_composition_sharing(&self.get_state_key()); }

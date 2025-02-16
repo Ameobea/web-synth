@@ -14,6 +14,8 @@ impl Looper {
 impl ViewContext for Looper {
   fn init(&mut self) { js::init_looper(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_looper(&self.get_state_key()); }
+
   fn cleanup(&mut self) {
     let state_key = self.get_state_key();
     js::cleanup_looper(&state_key);

@@ -16,6 +16,8 @@ impl MIDIKeyboard {
 impl ViewContext for MIDIKeyboard {
   fn init(&mut self) { js::init_midi_keyboard(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_midi_keyboard(&self.get_state_key()); }
+
   fn cleanup(&mut self) {
     let state = js::cleanup_midi_keyboard(&self.get_state_key());
     js::set_localstorage_key(&self.get_state_key(), &state);

@@ -14,6 +14,8 @@ impl Granulator {
 impl ViewContext for Granulator {
   fn init(&mut self) { js::init_granulator(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_granulator(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_granulator(&self.get_state_key()); }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

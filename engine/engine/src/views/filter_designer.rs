@@ -14,6 +14,11 @@ impl FilterDesigner {
 impl ViewContext for FilterDesigner {
   fn init(&mut self) { js::init_filter_designer(&self.get_state_key()); }
 
+  fn persist_state(&self) {
+    let state_key = self.get_state_key();
+    js::persist_filter_designer(&state_key);
+  }
+
   fn cleanup(&mut self) {
     let state_key = self.get_state_key();
     js::cleanup_filter_designer(&state_key);

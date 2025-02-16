@@ -15,6 +15,8 @@ impl SignalAnalyzer {
 impl ViewContext for SignalAnalyzer {
   fn init(&mut self) { js::init_signal_analyzer(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_signal_analyzer(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_signal_analyzer(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

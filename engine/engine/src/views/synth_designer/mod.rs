@@ -19,6 +19,8 @@ impl SynthDesigner {
 impl ViewContext for SynthDesigner {
   fn init(&mut self) { js::init_synth_designer(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_synth_designer(&self.get_state_key()); }
+
   fn cleanup(&mut self) {
     let state_key = self.get_state_key();
     let serialized_state = js::cleanup_synth_designer(&state_key);

@@ -56,7 +56,7 @@ export interface MIDIKeyboardCtx {
   deregisterGenericControlCb: (cb: GenericControlCb) => void;
 }
 
-export const midiKeyboardCtxByStateKey: Map<string, MIDIKeyboardCtx> = new Map();
+export const MidiKeyboardCtxByStateKey: Map<string, MIDIKeyboardCtx> = new Map();
 
 const getMidiKeyboardDomId = (vcId: string) => `midiKeyboard_${vcId}`;
 
@@ -76,7 +76,7 @@ export const init_midi_keyboard = (stateKey: string) => {
       uiGenericControlCbs = uiGenericControlCbs.filter(ocb => ocb !== cb);
     },
   };
-  midiKeyboardCtxByStateKey.set(stateKey, midiKeyboardCtx);
+  MidiKeyboardCtxByStateKey.set(stateKey, midiKeyboardCtx);
 
   // Spy on generic control values produced by the underlying MIDI Node and udpate the last seen raw values map
 
@@ -199,27 +199,13 @@ const getMidiKeyboardDomElem = (stateKey: string): HTMLDivElement | null => {
   return elem as HTMLDivElement;
 };
 
-export const cleanup_midi_keyboard = (stateKey: string): string => {
-  const vcId = stateKey.split('_')[1]!;
-  const ctx = midiKeyboardCtxByStateKey.get(stateKey);
-  if (!ctx) {
-    throw new UnreachableError(
-      `No MIDI keyboard instance found for state key ${stateKey} when cleaning up`
-    );
-  }
-  midiKeyboardCtxByStateKey.delete(stateKey);
-
-  const elem = getMidiKeyboardDomElem(stateKey);
-  if (!elem) {
-    return '';
-  }
-
-  mkContainerCleanupHelper()(getMidiKeyboardDomId(vcId));
-
+const serializeMIDIKeyboard = (
+  ctx: MIDIKeyboardCtx,
+  stateKey: string
+): SerializedMidiKeyboardState => {
   const instanceState = getState().midiKeyboard[stateKey];
   if (!instanceState) {
-    console.error(`No MIDI keyboard state for MIDI keyboard with state key ${stateKey}`);
-    return '';
+    throw new Error(`No MIDI keyboard state for MIDI keyboard with state key ${stateKey}`);
   }
 
   const lastSeenRawMIDIControlValuesByControlIndex: { [controlIndex: number]: number } = {};
@@ -229,7 +215,7 @@ export const cleanup_midi_keyboard = (stateKey: string): string => {
   ] of ctx.lastSeenRawMIDIControlValuesByControlIndex.entries()) {
     lastSeenRawMIDIControlValuesByControlIndex[controlIndex] = controlValue;
   }
-  const toSerialize: SerializedMidiKeyboardState = {
+  const serialized: SerializedMidiKeyboardState = {
     ...instanceState,
     midiInput: null,
     lastSeenModWheel: instanceState.midiInput?.modWheelNode.offset.value ?? 0,
@@ -240,8 +226,43 @@ export const cleanup_midi_keyboard = (stateKey: string): string => {
       name: ctx.mappedOutputs[outputIx].name,
     })),
   };
-  delete toSerialize.midiInput;
-  return JSON.stringify(toSerialize);
+  delete serialized.midiInput;
+
+  return serialized;
+};
+
+export const persist_midi_keyboard = (stateKey: string) => {
+  const ctx = MidiKeyboardCtxByStateKey.get(stateKey);
+  if (!ctx) {
+    throw new UnreachableError(
+      `No MIDI keyboard instance found for state key ${stateKey} when persisting`
+    );
+  }
+
+  const serialized = serializeMIDIKeyboard(ctx, stateKey);
+  localStorage.setItem(stateKey, JSON.stringify(serialized));
+};
+
+export const cleanup_midi_keyboard = (stateKey: string): string => {
+  const vcId = stateKey.split('_')[1]!;
+  const ctx = MidiKeyboardCtxByStateKey.get(stateKey);
+  if (!ctx) {
+    throw new UnreachableError(
+      `No MIDI keyboard instance found for state key ${stateKey} when cleaning up`
+    );
+  }
+
+  const serialized = serializeMIDIKeyboard(ctx, stateKey);
+  MidiKeyboardCtxByStateKey.delete(stateKey);
+
+  const elem = getMidiKeyboardDomElem(stateKey);
+  if (!elem) {
+    return '';
+  }
+
+  mkContainerCleanupHelper()(getMidiKeyboardDomId(vcId));
+
+  return JSON.stringify(serialized);
 };
 
 export const hide_midi_keyboard = (stateKey: string) => {
@@ -262,7 +283,7 @@ export const unhide_midi_keyboard = (stateKey: string) => {
 
 export const get_midi_keyboard_audio_connectables = (stateKey: string): AudioConnectables => {
   const vcId = stateKey.split('_')[1]!;
-  const ctx = midiKeyboardCtxByStateKey.get(stateKey);
+  const ctx = MidiKeyboardCtxByStateKey.get(stateKey);
   if (!ctx) {
     console.warn(`No ctx found for midi keyboard VC with VC ID "${vcId}"`);
     return create_empty_audio_connectables(vcId);
@@ -295,7 +316,7 @@ export const get_midi_keyboard_audio_connectables = (stateKey: string): AudioCon
 
 export const render_midi_keyboard_small_view = (stateKey: string, domId: string) => {
   const vcId = stateKey.split('_')[1]!;
-  const ctx = midiKeyboardCtxByStateKey.get(stateKey);
+  const ctx = MidiKeyboardCtxByStateKey.get(stateKey);
   if (!ctx) {
     console.warn(`No ctx found for midi keyboard VC with VC ID "${vcId}"`);
     return create_empty_audio_connectables(vcId);

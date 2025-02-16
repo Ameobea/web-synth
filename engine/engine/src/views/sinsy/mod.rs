@@ -15,6 +15,8 @@ impl Sinsy {
 impl ViewContext for Sinsy {
   fn init(&mut self) { js::init_sinsy(&self.get_state_key()); }
 
+  fn persist_state(&self) { js::persist_sinsy(&self.get_state_key()); }
+
   fn cleanup(&mut self) { js::cleanup_sinsy(&self.get_state_key()) }
 
   fn get_id(&self) -> String { self.uuid.to_string() }

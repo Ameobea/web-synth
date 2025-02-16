@@ -357,6 +357,12 @@ export const init_sequencer = (stateKey: string) => {
   })(domId);
 };
 
+export const persist_sequencer = (stateKey: string) => {
+  const vcId = stateKey.split('_')[1]!;
+  const serialized = serializeSequencer(vcId);
+  localStorage.setItem(stateKey, serialized);
+};
+
 export const cleanup_sequencer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 

@@ -436,7 +436,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       </div>
       <div className='labeled-container' style={{ marginLeft: -7 }}>
         <label style={{ lineHeight: '9px' }}>
-          Notes per
+          Beats per
           <br />
           Measure
         </label>
@@ -444,7 +444,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           type='number'
           value={state.beatsPerMeasure}
           onChange={evt =>
-            onChange({ ...state, beatsPerMeasure: clamp(0, 63, Math.round(+evt.target.value)) })
+            onChange({ ...state, beatsPerMeasure: clamp(2, 63, Math.round(+evt.target.value)) })
           }
           // Prevent the horrifying behavior of pasting into the input when the middle mouse button
           // is clicked
