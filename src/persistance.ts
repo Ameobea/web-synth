@@ -9,6 +9,7 @@ import { stopAll } from 'src/eventScheduler/eventScheduler';
 import { setGlobalBpm } from 'src/globalMenu';
 import { actionCreators, dispatch, getState } from 'src/redux';
 import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
+import { getEngine } from 'src/util';
 
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
@@ -29,7 +30,7 @@ export const reinitializeWithComposition = (
   if (compositionBody.type === 'serialized') {
     try {
       deserialized = JSON.parse(compositionBody.value);
-    } catch (err) {
+    } catch (_err) {
       return Either.left('Failed to parse provided JSON');
     }
   } else {
@@ -73,6 +74,18 @@ localCompDbClient.version(1).stores({
 });
 const localCompositionTable = localCompDbClient.table('localComposition');
 const currentLoadedCompositionIdTable = localCompDbClient.table('currentLoadedCompositionId');
+
+export const persistAllVCsAndFCs = () => {
+  const engine = getEngine()!;
+  const allVCs = getState().viewContextManager.activeViewContexts;
+  for (const vc of allVCs) {
+    engine.persist_vc_state(vc.uuid);
+  }
+  commitForeignConnectables(
+    engine,
+    getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
+  );
+};
 
 export const onBeforeUnload = (engine: typeof import('src/engine')) => {
   // Commit the whole patch network's foreign connectables, serializing + saving their state in the process

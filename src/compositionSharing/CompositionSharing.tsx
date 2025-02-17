@@ -5,7 +5,7 @@ import {
   clearLocalComposition,
   getCurLoadedCompositionId,
   getLoginToken,
-  onBeforeUnload,
+  persistAllVCsAndFCs,
   reinitializeWithComposition,
 } from '../persistance';
 import './CompositionSharing.css';
@@ -262,9 +262,7 @@ const serializeAndSaveComposition = async ({
   // the user whether or not they should be uploaded and handle converting them to remote samples.
   const samples = await checkForLocalSamples();
 
-  // Trigger all VCs to save to localStorage, tearing them down in the process.
-  const engine = getEngine()!;
-  onBeforeUnload(engine);
+  persistAllVCsAndFCs();
 
   let compositionData = R.clone({ ...localStorage } as any);
   compositionData.vcmState = removeCompositionSharingFromVCMState(compositionData);
@@ -298,9 +296,6 @@ const serializeAndSaveComposition = async ({
   } catch (err) {
     console.error('Error saving composition: ', err);
     saveCompositionError = err;
-  } finally {
-    // Re-initialize
-    engine.init();
   }
 
   if (compositionID !== null) {

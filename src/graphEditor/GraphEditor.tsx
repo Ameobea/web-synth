@@ -47,7 +47,7 @@ import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/S
 import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
 import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
 import type { SveltePropTypesOf } from 'src/svelteUtils';
-import { onBeforeUnload } from 'src/persistance';
+import { persistAllVCsAndFCs } from 'src/persistance';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import {
   fetchSubgraphPresets,
@@ -110,13 +110,11 @@ export const saveSubgraphPreset = async (subgraphID: string, overrideName = fals
   }
 
   // Commit all state to the engine
-  const engine = getEngine()!;
-  onBeforeUnload(engine);
+  persistAllVCsAndFCs();
   const serializedSubgraph = getEngine()!.serialize_subgraph(
     subgraphID,
     overrideName ? desc.name : ''
   );
-  engine.init();
 
   try {
     await saveSubgraphPresetAPI({
@@ -130,6 +128,15 @@ export const saveSubgraphPreset = async (subgraphID: string, overrideName = fals
     logError('Error saving subgraph preset', err);
     toastError('Error saving subgraph preset: ' + `${err}`);
   }
+};
+
+const duplicateSubgraph = (subgraphID: string) => {
+  persistAllVCsAndFCs();
+  const subgraphName =
+    getState().viewContextManager.subgraphsByID[subgraphID]?.name ?? 'Cloned Subgraph';
+  const serializedSubgraph = getEngine()!.serialize_subgraph(subgraphID, subgraphName);
+
+  getEngine()!.load_serialized_subgraph(serializedSubgraph);
 };
 
 /**
@@ -238,7 +245,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
       removeOption.callback = () =>
         void confirmAndDeleteSubgraph((innerNode as SubgraphPortalNode).rxSubgraphID);
 
-      // Add a "Save Subgraph" option after the "Delete Subgraph" option
+      // Add "Save Subgraph" and "Duplicate Subgraph" options after the "Delete Subgraph" option
       filteredOptions.splice(
         filteredOptions.indexOf(removeOption) + 1,
         0,
@@ -246,7 +253,10 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
           content: 'Save Subgraph',
           callback: () => void saveSubgraphPreset(innerNode.rxSubgraphID),
         },
-        null
+        {
+          content: 'Duplicate Subgraph',
+          callback: () => void duplicateSubgraph(innerNode.rxSubgraphID),
+        }
       );
     }
   } else {
@@ -349,8 +359,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
         'Failed to find "Remove" option in node menu; not adding "Move to Subgraph" option'
       );
     } else {
-      filteredOptions.splice(removeOptionIx, 0, moveToSubgraph, null);
-      filteredOptions.splice(removeOptionIx + 1, 0, duplicate, null);
+      filteredOptions.splice(removeOptionIx, 0, moveToSubgraph, duplicate, null);
     }
   }
 

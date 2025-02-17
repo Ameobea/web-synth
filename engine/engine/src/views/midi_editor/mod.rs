@@ -15,7 +15,7 @@ impl MIDIEditor {
 impl ViewContext for MIDIEditor {
   fn init(&mut self) { js::init_midi_editor(&self.vc_id.to_string()); }
 
-  fn persist_state(&self) { js::persist_midi_editor(&self.vc_id.to_string()); }
+  fn persist_state(&self) { js::persist_midi_editor(&self.get_state_key()); }
 
   fn cleanup(&mut self) { js::cleanup_midi_editor(&self.vc_id.to_string()) }
 
