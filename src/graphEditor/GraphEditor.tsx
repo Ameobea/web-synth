@@ -17,7 +17,7 @@ import { shallowEqual, useSelector } from 'react-redux';
 
 import './GraphEditor.css';
 import { hide_graph_editor, setLGraphHandle } from 'src/graphEditor';
-import { updateGraph } from 'src/graphEditor/graphDiffing';
+import { InitialPosByVcID, updateGraph } from 'src/graphEditor/graphDiffing';
 import { LGAudioConnectables } from 'src/graphEditor/nodes/AudioConnectablesNode';
 import FlatButton from 'src/misc/FlatButton';
 import { actionCreators, dispatch, getState, type ReduxStore } from 'src/redux';
@@ -36,13 +36,13 @@ import {
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { registerAllCustomNodes } from './nodes';
-import type { AudioConnectables } from 'src/patchNetwork';
+import type { AudioConnectables, ViewContextDefinition } from 'src/patchNetwork';
 import {
   audioNodeGetters,
   buildNewForeignConnectableID,
   type ForeignNode,
 } from 'src/graphEditor/nodes/CustomAudio';
-import { removeNode } from 'src/patchNetwork/interface';
+import { connect, removeNode } from 'src/patchNetwork/interface';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
 import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
@@ -128,6 +128,54 @@ export const saveSubgraphPreset = async (subgraphID: string, overrideName = fals
     logError('Error saving subgraph preset', err);
     toastError('Error saving subgraph preset: ' + `${err}`);
   }
+};
+
+const duplicateNode = (node: LGraphNode, pos?: { x: number; y: number }) => {
+  const vcId = node.id.toString();
+  const isVc = vcId.length === 36;
+
+  let createdVcId: string;
+  if (isVc) {
+    const engine = getEngine()!;
+    engine.persist_vc_state(vcId);
+    const {
+      minimal_def: { name: nodeType },
+    } = JSON.parse(localStorage[`vc_${vcId}`]) as ViewContextDefinition;
+    const stateKey = engine.get_state_key(vcId);
+    const serializedState = localStorage[stateKey];
+    let displayName = ViewContextDescriptors.find(d => d.name === nodeType)?.displayName;
+    if (!displayName) {
+      console.error(`No descriptor for node type ${nodeType} when duplicating node`);
+      displayName = nodeType;
+    }
+
+    createdVcId = engine.create_view_context(nodeType, displayName, serializedState);
+  } else {
+    const innerNode: ForeignNode = (node as any).connectables.node!;
+    const nodeType = innerNode.nodeType;
+    if (!nodeType) {
+      throw new Error("Missing node type; dod't think this happened.");
+    }
+
+    const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
+    const serialized = innerNode.serialize();
+    createdVcId = createNode(nodeType, activeSubgraphID, serialized);
+  }
+
+  // VCs are created on the Rust side and are sync'd to Redux as a side effect.
+  //
+  // FCs are created by adding them to the patch network in Redux state which is then sync'd
+  // to the Rust side for persistence.
+  //
+  // Whenever Redux is updated, the graph editor will diff its nodes + connections against
+  // what's in Redux and create/delete/update its nodes + connections accordingly.
+  //
+  // Entries in this map will be used to place the newly created node once that happens.
+  if (pos) {
+    InitialPosByVcID.set(createdVcId, pos);
+  }
+
+  return createdVcId;
 };
 
 const duplicateSubgraph = (subgraphID: string) => {
@@ -273,8 +321,9 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
     };
   }
 
+  const selectedNodeCount = Object.keys(this.selected_nodes).length;
   const moveToSubgraph = {
-    content: 'Move Selected to Subgraph',
+    content: selectedNodeCount > 1 ? 'Move Selected to Subgraph' : 'Move to Subgraph',
     callback: (_menuEntry: any, _options: any, event: any, parentMenu: ContextMenu) => {
       const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
       const validMoveToSubgraphs = R.sortWith(
@@ -305,52 +354,68 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
   };
 
   const duplicate = {
-    content: 'Duplicate Node',
+    content: selectedNodeCount > 1 ? 'Duplicate Selected Nodes' : 'Duplicate Node',
     callback: (
       _menuEntry: any,
-      _options: any,
-      _event: any,
-      _parentMenu: ContextMenu,
-      node: LGraphNode
+      { event }: { event: MouseEvent & { canvasX: number; canvasY: number } }
     ) => {
-      const vcId = node.id.toString();
-      const isVc = vcId.length === 36;
-      if (isVc) {
-        const engine = getEngine()!;
-        engine.persist_vc_state(vcId);
-        const {
-          minimal_def: { name: nodeType },
-        } = JSON.parse(localStorage[`vc_${vcId}`]) as { minimal_def: { name: string } };
-        const stateKey = engine.get_state_key(vcId);
-        const serializedState = localStorage[stateKey];
-        let displayName = ViewContextDescriptors.find(d => d.name === nodeType)?.displayName;
-        if (!displayName) {
-          console.error(`No descriptor for node type ${nodeType} when duplicating node`);
-          displayName = nodeType;
-        }
-        engine.create_view_context(nodeType, displayName, serializedState);
-      } else {
-        const innerNode: ForeignNode = (node as any).connectables.node!;
-        const nodeType = innerNode.nodeType;
-        if (!nodeType) {
-          throw new Error("Missing node type; dod't think this happened.");
-        }
-
-        const activeSubgraphID = getState().viewContextManager.activeSubgraphID;
-        const serialized = innerNode.serialize();
-        createNode(nodeType, activeSubgraphID, serialized);
+      const basePos = [event.canvasX, event.canvasY + 180];
+      const nodesToDuplicate = Object.values(this.selected_nodes);
+      if (nodesToDuplicate.length === 0) {
+        return;
       }
+
+      const newIDByOldID: Map<string, string> = new Map();
+
+      const baseNodePos = nodesToDuplicate[0].pos;
+      for (const node of nodesToDuplicate) {
+        const pos = {
+          x: basePos[0] + node.pos[0] - baseNodePos[0],
+          y: basePos[1] + node.pos[1] - baseNodePos[1],
+        };
+        const newID = duplicateNode(node, pos);
+        newIDByOldID.set(node.id.toString(), newID);
+      }
+
+      const srcNodeIDs = new Set();
+      for (const node of nodesToDuplicate) {
+        const vcId = node.id.toString();
+        srcNodeIDs.add(vcId);
+      }
+
+      // re-create connections between duplicated nodes
+      const intraConnections = getState().viewContextManager.patchNetwork.connections.filter(
+        ([{ vcId: txId }, { vcId: rxId }]) => srcNodeIDs.has(txId) && srcNodeIDs.has(rxId)
+      );
+      setTimeout(() => {
+        for (const [tx, rx] of intraConnections) {
+          const txId = newIDByOldID.get(tx.vcId);
+          const rxId = newIDByOldID.get(rx.vcId);
+          if (txId && rxId) {
+            connect({ ...tx, vcId: txId }, { ...rx, vcId: rxId });
+          }
+        }
+      });
     },
   };
 
-  if (Object.keys(this.selected_nodes).length > 1) {
+  const selectionContainsSubgraphPortalNode = Object.values(this.selected_nodes).some(
+    node => ((node as any).connectables as AudioConnectables).node instanceof SubgraphPortalNode
+  );
+  if (selectionContainsSubgraphPortalNode) {
+    // The case of moving subgraphs into other subgraphs is complicated and would require special
+    // handling, and I'm not bothering to implement it right now.
+    //
+    // Also, we have a dedicated option for duplicating subgraphs, so we won't add the VC/FC
+    // duplicate option either.
+  } else if (Object.keys(this.selected_nodes).length > 1) {
     const alignSelectedToIx = filteredOptions.findIndex(
       opt => opt?.content === 'Align Selected To'
     );
     if (alignSelectedToIx === -1) {
       throw new Error('Failed to find "Align Selected To" option in node menu');
     }
-    filteredOptions.splice(alignSelectedToIx + 1, 0, moveToSubgraph, null);
+    filteredOptions.splice(alignSelectedToIx + 1, 0, moveToSubgraph, duplicate);
   } else {
     // Put before "Remove"
     const removeOptionIx = filteredOptions.indexOf(removeOption);
@@ -576,14 +641,18 @@ const buildSortedNodeEntries = () => {
 /**
  *
  * @param nodeType The node type from `buildSortedNodeEntries`
+ * @returns The created node's ID
  */
-const createNode = (nodeType: string, subgraphId: string, params?: Record<string, any> | null) => {
+const createNode = (
+  nodeType: string,
+  subgraphId: string,
+  params?: Record<string, any> | null
+): string => {
   const isVc = !nodeType.startsWith('customAudio/');
   if (isVc) {
     const engine = getEngine();
     if (!engine) {
-      console.error('Engine not initialized when creating a VC from the graph editor');
-      return;
+      throw new Error('Engine not initialized when creating a VC from the graph editor');
     }
 
     const desc =
@@ -592,8 +661,11 @@ const createNode = (nodeType: string, subgraphId: string, params?: Record<string
     if (!desc) {
       throw new UnreachableError(`Could not find VC descriptor for ${nodeType}`);
     }
-    engine.create_view_context(desc.nameAlias ?? desc.name, desc.displayName, desc.initialState);
-    return;
+    return engine.create_view_context(
+      desc.nameAlias ?? desc.name,
+      desc.displayName,
+      desc.initialState
+    );
   }
 
   const id = buildNewForeignConnectableID().toString();
@@ -601,6 +673,7 @@ const createNode = (nodeType: string, subgraphId: string, params?: Record<string
   const node = new audioNodeGetters[nodeType]!.nodeGetter(ctx, id, params);
   const connectables = node.buildConnectables();
   dispatch(actionCreators.viewContextManager.ADD_PATCH_NETWORK_NODE(id, connectables, subgraphId));
+  return id;
 };
 
 /**

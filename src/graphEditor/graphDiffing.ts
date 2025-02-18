@@ -12,6 +12,8 @@ import type { AudioConnectables, PatchNetwork } from 'src/patchNetwork';
 import { type ReduxStore } from 'src/redux';
 import type { ArrayElementOf } from 'src/util';
 
+export const InitialPosByVcID: Map<string, { x: number; y: number }> = new Map();
+
 const createAudioConnectablesNode = (
   connectables: AudioConnectables,
   vcId: string,
@@ -126,6 +128,11 @@ export const updateGraph = (
     }
 
     graph.add(newNode);
+    const initialPos = InitialPosByVcID.get(id);
+    if (initialPos) {
+      newNode.pos = [initialPos.x, initialPos.y];
+      graph.setDirtyCanvas(true, true);
+    }
   };
 
   // Create all new nodes, leaving them unconnected for now

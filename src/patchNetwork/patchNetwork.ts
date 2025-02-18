@@ -26,6 +26,29 @@ export const formatConnectableType = (type: ConnectableType): string => {
   }
 };
 
+/**
+ * This matches the `MinimalViewContextDefinition` type in the Rust code.
+ */
+export interface MinimalViewContextDefinition {
+  name: string;
+  uuid: string;
+  title?: string;
+  subgraphId: string;
+}
+
+/**
+ * This matches the `ViewContextDefinition` type in the Rust code.
+ *
+ * This is stored in `localStorage` under keys like `vc_{uuid}` and holds metadata about view
+ * contexts like their name and thype, but not their actual state.
+ *
+ * Their actual state is stored under `localStorage` entries like `synthDesigner_{uuid}` and
+ * those keys are returned by `get_state_key()` methods on the Rust/Wasm side.
+ */
+export interface ViewContextDefinition {
+  minimal_def: MinimalViewContextDefinition;
+}
+
 export interface ConnectableInput {
   node: AudioParam | AudioNode | MIDINode;
   type: ConnectableType;

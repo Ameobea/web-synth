@@ -114,6 +114,11 @@ const actionGroups = {
 
       const connectedPair = getConnectedPair(connectables, from, to);
       if (!connectedPair) {
+        console.warn(
+          `Tried to connect ${JSON.stringify(
+            from
+          )} to ${JSON.stringify(to)} but one of them wasn't found in the connectables map`
+        );
         return state;
       }
       const [fromConnectable, toConnectable] = connectedPair;

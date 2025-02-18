@@ -3,6 +3,7 @@ import type {
   ConnectableDescriptor,
   ForeignConnectable,
   SubgraphDescriptor,
+  ViewContextDefinition,
 } from 'src/patchNetwork';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import type { VCMState } from 'src/redux/modules/viewContextManager';
@@ -22,11 +23,11 @@ export const init_view_contexts = (
   activeSubgraphID: string,
   subgraphsJson: string
 ): void => {
-  const activeViewContexts = tryParseJson<
-    {
-      minimal_def: { name: string; uuid: string; title?: string; subgraphId: string };
-    }[]
-  >(activeVcsJson, [], 'Failed to parse JSON of `activeViewContexts`; clearing all view contexts');
+  const activeViewContexts = tryParseJson<ViewContextDefinition[]>(
+    activeVcsJson,
+    [],
+    'Failed to parse JSON of `activeViewContexts`; clearing all view contexts'
+  );
 
   const connections = tryParseJson<[ConnectableDescriptor, ConnectableDescriptor][]>(
     connectionsJson,
