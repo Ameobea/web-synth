@@ -297,7 +297,7 @@ export const FaustEditorControlPanel: React.FC<FaustEditorControlPanelProps> = (
 
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const stopInstance = useMemo(() => mkStopInstanceHandler(vcId), [vcId]);
-  const saveCode = useCallback(async (effect: Without<Effect, 'id'>) => {
+  const saveCode = useCallback(async (effect: Omit<Effect, 'id'>) => {
     try {
       await saveEffect(effect);
       setSaveStatus('Successfully saved!');

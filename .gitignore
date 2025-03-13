@@ -56,3 +56,4 @@ public/oscilloscope.wasm
 public/spectrum_viz_full.wasm
 public/sampler.wasm
 public/safety_limiter.wasm
+public/equalizer.wasm

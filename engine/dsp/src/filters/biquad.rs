@@ -26,6 +26,10 @@ pub enum FilterMode {
   Allpass,
 }
 
+impl Default for FilterMode {
+  fn default() -> Self { FilterMode::Lowpass }
+}
+
 impl FilterMode {
   pub fn needs_gain(&self) -> bool {
     match self {
@@ -174,6 +178,107 @@ impl BiquadFilter {
     }
 
     (b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
+  }
+
+  /// Computes the frequency and phase response of the biquad filter at a specified test frequency.
+  ///
+  /// Returns `(magnitude_db, phase_rads)`.
+  pub fn compute_response(
+    mode: FilterMode,
+    q: f32,
+    cutoff_freq: f32,
+    gain: f32,
+    test_freq: f32,
+    sample_rate: f32,
+  ) -> (f32, f32) {
+    let (b0, b1, b2, a1, a2) = Self::compute_coefficients(mode, q, cutoff_freq, gain);
+    let omega = 2. * PI * test_freq / sample_rate;
+    Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega)
+  }
+
+  /// Computes the frequency and phase response of the biquad filter over a logarithmically spaced
+  /// grid from `start_freq` to the nyquist.
+  ///
+  /// `start_freq` must be non-zero and smaller than the nyquist (`sample_rate/2`).
+  ///
+  /// Returns (frequencies_hz, magnitude_db, phase_rads)
+  pub fn compute_response_grid(
+    mode: FilterMode,
+    q: f32,
+    cutoff_freq: f32,
+    gain: f32,
+    start_freq: f32,
+    sample_rate: f32,
+    grid_points: usize,
+  ) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    assert!(start_freq > 0., "start frequency must be > 0");
+    assert!(
+      start_freq < NYQUIST,
+      "start frequency must be less than the nyquist"
+    );
+    assert!(grid_points > 0, "need at least one grid point to sample");
+
+    let (b0, b1, b2, a1, a2) = Self::compute_coefficients(mode, q, cutoff_freq, gain);
+
+    let mut freqs = Vec::with_capacity(grid_points);
+    let mut mags = Vec::with_capacity(grid_points);
+    let mut phases = Vec::with_capacity(grid_points);
+    if grid_points == 1 {
+      let omega = 2. * PI * start_freq / sample_rate;
+      let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
+      freqs.push(start_freq);
+      mags.push(mag_db);
+      phases.push(phase);
+      return (freqs, mags, phases);
+    }
+
+    let multiplier = (NYQUIST / start_freq).powf(1. / ((grid_points - 1) as f32));
+    for i in 0..grid_points {
+      let freq = start_freq * multiplier.powi(i as i32);
+      let omega = 2. * PI * freq / sample_rate;
+      let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
+      freqs.push(freq);
+      mags.push(mag_db);
+      phases.push(phase);
+    }
+
+    (freqs, mags, phases)
+  }
+
+  /// Helper function that computes the magnitude and phase response given precomputed coefficients.
+  ///
+  /// `omega` is the angular frequency (in rads/sample) at which to sample the response.
+  ///
+  /// Returns `(magnitude_db, phase_rads)`
+  fn compute_response_from_coefficients(
+    b0: f32,
+    b1: f32,
+    b2: f32,
+    a1: f32,
+    a2: f32,
+    omega: f32,
+  ) -> (f32, f32) {
+    let cos_omega = omega.cos();
+    let sin_omega = omega.sin();
+    let cos_2omega = (2. * omega).cos();
+    let sin_2omega = (2. * omega).sin();
+
+    let num_re = b0 + b1 * cos_omega + b2 * cos_2omega;
+    let num_im = -(b1 * sin_omega + b2 * sin_2omega);
+
+    let den_re = 1. + a1 * cos_omega + a2 * cos_2omega;
+    let den_im = -(a1 * sin_omega + a2 * sin_2omega);
+
+    let num_mag = (num_re * num_re + num_im * num_im).sqrt();
+    let den_mag = (den_re * den_re + den_im * den_im).sqrt();
+    let h_mag = num_mag / den_mag;
+    let magnitude_db = 20. * h_mag.log10();
+
+    let num_phase = num_im.atan2(num_re);
+    let den_phase = den_im.atan2(den_re);
+    let phase = num_phase - den_phase;
+
+    (magnitude_db, phase)
   }
 
   #[inline]
@@ -486,7 +591,12 @@ impl<const BANK_COUNT: usize, const BANK_LENGTH: usize>
   }
 }
 
+/// Computes Q factors that can be set on a group of biquad filters of a given order connected in
+/// series to generate a flat frequency response that starts dropping off exactly at the cutoff
+/// frequency without boosting at all above.
+///
 /// higher-order filter Q factors determined using this: https://www.earlevel.com/main/2016/09/29/cascading-filters/
+/// (wayback: https://web.archive.org/web/20241203113520/https://www.earlevel.com/main/2016/09/29/cascading-filters/)
 #[inline]
 pub fn compute_higher_order_biquad_q_factors(order: usize) -> Vec<f32> {
   if order % 2 != 0 || order <= 0 {

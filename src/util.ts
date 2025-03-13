@@ -326,7 +326,7 @@ export const initGlobals = () => {
     return arg;
   };
 
-  (window as any).genRandomStringID = window.crypto
+  (window as any).genRandomStringID = (window.crypto as any)?.randomUUID
     ? () => crypto.randomUUID()
     : () => {
         const s4 = () =>
@@ -339,7 +339,6 @@ export const initGlobals = () => {
 
 export const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
-export type Without<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
 export type ValueOf<T> = T[keyof T];
 export type ArrayElementOf<T> = T extends (infer U)[] ? U : never;
 export type PropTypesOf<T> = T extends React.ComponentType<infer P> ? P : never;

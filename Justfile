@@ -88,6 +88,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -330,3 +331,11 @@ debug-sampler:
 debug-safety-limiter:
   cd ./engine/safety_limiter && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/safety_limiter.wasm ../../public
+
+build-equalizer:
+  cd ./engine/equalizer && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/equalizer.wasm ../../public
+
+debug-equalizer:
+  cd ./engine/equalizer && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/equalizer.wasm ../../public

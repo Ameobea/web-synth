@@ -667,7 +667,6 @@ export default class MIDIEditorUIInstance {
 
     const createdNoteIDs: number[] = [];
     // Then we create + select all notes
-    console.log(this.clipboard);
     this.clipboard.forEach(note => {
       const normalizedStartPoint = note.startPoint - startBeat + cursorPosBeats;
       const canCreate = wasm.instance.check_can_add_note(

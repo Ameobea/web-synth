@@ -118,6 +118,12 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
     description:
       'Chop up, manipulate, and play back pieces of samples in response to incoming MIDI events.  Useful for creating vocal chops and stuff like that.',
   },
+  {
+    name: 'equalizer',
+    displayName: 'Equalizer',
+    description:
+      'Visual parametric EQ supporting multiple bands and modulation of filter parameters',
+  },
   // -- virtual VCs --
   ...VirtualVCDefinitions,
 ];

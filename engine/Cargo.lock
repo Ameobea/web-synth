@@ -223,6 +223,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "equalizer"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dsp",
+]
+
+[[package]]
 name = "event_scheduler"
 version = "0.1.0"
 dependencies = [

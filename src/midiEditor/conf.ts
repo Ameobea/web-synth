@@ -4,6 +4,7 @@ export const NOTE_COLOR = 0x70ff03;
 export const NOTE_SELECTED_COLOR = 0xe309c6;
 export const NOTE_DRAG_HANDLE_COLOR = 0x585858;
 export const NOTE_VELOCITY_BAR_COLOR = 0x09803e;
+export const NOTE_VELOCITY_HANDLE_COLOR = 0x043d20;
 export const MEASURE_LINE_COLOR = 0x606060;
 export const LINE_BORDER_COLOR = 0x444444;
 export const NOTE_MARK_COLOR = 0x737373;

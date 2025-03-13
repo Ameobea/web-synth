@@ -35,8 +35,7 @@ export const biquadFilterNeedsGain = (mode: BiquadFilterMode) => {
     case BiquadFilterMode.Highshelf:
       return true;
     default:
-      const unreachable: never = mode;
-      throw new Error(`unreachable: ${unreachable}`);
+      mode satisfies never;
   }
 };
 

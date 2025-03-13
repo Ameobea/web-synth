@@ -1,5 +1,6 @@
 pub mod composition_sharing;
 pub mod control_panel;
+pub mod equalizer;
 pub mod faust_editor;
 pub mod filter_designer;
 pub mod granulator;

@@ -167,7 +167,7 @@ export const fetchEffects = (): Promise<Effect[]> =>
     return res.json();
   });
 
-export const saveEffect = async (effect: Without<Effect, 'id'>) => {
+export const saveEffect = async (effect: Omit<Effect, 'id'>) => {
   const maybeLoginToken = await getLoginToken();
   return fetch(`${BACKEND_BASE_URL}/effects`, {
     method: 'POST',

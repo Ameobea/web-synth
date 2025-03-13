@@ -32,7 +32,8 @@ members = [
   "oscilloscope",
   "canvas_utils",
   "sampler",
-  "safety_limiter"
+  "safety_limiter",
+  "equalizer"
 ]
 
 [profile.release]

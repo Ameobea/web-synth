@@ -222,3 +222,13 @@ extern "C" {
   pub fn cleanup_sampler(state_key: &str);
   pub fn get_sampler_audio_connectables(state_key: &str) -> JsValue;
 }
+
+#[wasm_bindgen(raw_module = "./equalizer/equalizer")]
+extern "C" {
+  pub fn init_equalizer(state_key: &str);
+  pub fn hide_equalizer(state_key: &str);
+  pub fn unhide_equalizer(state_key: &str);
+  pub fn persist_equalizer(state_key: &str);
+  pub fn cleanup_equalizer(state_key: &str);
+  pub fn get_equalizer_audio_connectables(state_key: &str) -> JsValue;
+}

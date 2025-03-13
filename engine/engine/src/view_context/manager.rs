@@ -11,6 +11,7 @@ use crate::{
   views::{
     composition_sharing::mk_composition_sharing,
     control_panel::mk_control_panel,
+    equalizer::mk_equalizer,
     faust_editor::mk_faust_editor,
     filter_designer::mk_filter_designer,
     granulator::mk_granulator,
@@ -1428,6 +1429,7 @@ pub fn build_view(name: &str, uuid: Uuid) -> Box<dyn ViewContext> {
     "welcome_page" => mk_welcome_page(uuid),
     "signal_analyzer" => mk_signal_analyzer(uuid),
     "sampler" => mk_sampler(uuid),
+    "equalizer" => mk_equalizer(uuid),
     _ => panic!("No handler for view context with name {}", name),
   }
 }

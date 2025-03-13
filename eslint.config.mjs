@@ -119,6 +119,7 @@ export default [
         },
       ],
       'react/react-in-jsx-scope': 0,
+      '@typescript-eslint/no-unsafe-function-type': 0,
       curly: ['warn', 'all'],
     },
   },
