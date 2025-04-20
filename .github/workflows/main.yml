@@ -3,7 +3,7 @@ name: Build, Test, and Deploy
 on: [push]
 
 env:
-  EM_VERSION: 2.0.14
+  EM_VERSION: 4.0.5
   EM_CACHE_FOLDER: 'emsdk-cache'
 
 jobs:
@@ -90,6 +90,7 @@ jobs:
         with:
           version: ${{ env.EM_VERSION }}
           actions-cache-folder: ${{ env.EM_CACHE_FOLDER }}
+          cache-key: emsdk-${{ env.EM_VERSION }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install SVGO SVG optimizer
         run: yarn global add svgo
       - name: Add globally installed yarn binaries to path
