@@ -5,6 +5,7 @@ import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import EqualizerUI from 'src/equalizer/EqualizerUI/EqualizerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { EqualizerInstance } from 'src/equalizer/EqualizerInstance';
+import { rwritable, type TransparentWritable } from 'src/util';
 
 export enum EqualizerFilterType {
   Lowpass = 0,
@@ -31,12 +32,15 @@ export interface EqualizerState {
 
 const buildDefaultEqualizerState = (): EqualizerState => ({
   bands: [
-    { filterType: EqualizerFilterType.Lowshelf, frequency: 100, q: 1, gain: 0 },
+    { filterType: EqualizerFilterType.Lowshelf, frequency: 100, q: 1, gain: 8 },
     { filterType: EqualizerFilterType.Highshelf, frequency: 10000, q: 1, gain: 0 },
   ],
 });
 
-const EqualizerInstancesById = new Map<string, EqualizerInstance>();
+const EqualizerCtxById = new Map<
+  string,
+  { inst: EqualizerInstance; uiState: TransparentWritable<{ hidden: boolean }> }
+>();
 
 const getEqualizerDOMElementId = (vcId: string) => `equalizer-${vcId}`;
 
@@ -67,8 +71,9 @@ export const init_equalizer = (stateKey: string) => {
     : buildDefaultEqualizerState();
 
   const ctx = new AudioContext();
-  const inst = new EqualizerInstance(ctx, vcId, initialState);
-  EqualizerInstancesById.set(vcId, inst);
+  const uiState = rwritable({ hidden: false });
+  const inst = new EqualizerInstance(ctx, vcId, initialState, uiState);
+  EqualizerCtxById.set(vcId, { inst, uiState });
 
   mkSvelteContainerRenderHelper({
     Comp: EqualizerUI,
@@ -78,47 +83,68 @@ export const init_equalizer = (stateKey: string) => {
 
 export const persist_equalizer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-  const inst = EqualizerInstancesById.get(vcId);
-  if (!inst) {
-    throw new Error(`No equalizer instance found for vcId ${vcId}`);
+  const ctx = EqualizerCtxById.get(vcId);
+  if (!ctx) {
+    throw new Error(`No equalizer ctx found for vcId ${vcId}`);
   }
-  const serialized = inst.serialize();
+  const serialized = ctx.inst.serialize();
   localStorage.setItem(stateKey, JSON.stringify(serialized));
 };
 
 export const cleanup_equalizer = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
-  const inst = EqualizerInstancesById.get(vcId);
-  if (!inst) {
-    throw new Error(`No equalizer instance found for vcId ${vcId}`);
+  const ctx = EqualizerCtxById.get(vcId);
+  if (!ctx) {
+    throw new Error(`No equalizer ctx found for vcId ${vcId}`);
   }
-  const serialized = inst.serialize();
+  const serialized = ctx.inst.serialize();
   localStorage.setItem(stateKey, JSON.stringify(serialized));
 
-  inst.shutdown();
+  ctx.inst.shutdown();
 
   mkSvelteContainerCleanupHelper()(getEqualizerDOMElementId(vcId));
 };
 
 export const get_equalizer_audio_connectables = (stateKey: string): AudioConnectables => {
   const vcId = stateKey.split('_')[1]!;
-  const inst = EqualizerInstancesById.get(vcId);
-  if (!inst) {
-    throw new Error(`No equalizer instance found for vcId ${vcId}`);
+  const ctx = EqualizerCtxById.get(vcId);
+  if (!ctx) {
+    throw new Error(`No equalizer ctx found for vcId ${vcId}`);
   }
 
   return {
     vcId,
     inputs: ImmMap<string, ConnectableInput>().set('input', {
       type: 'customAudio',
-      node: inst.awpHandle,
+      node: ctx.inst.awpHandle,
     }),
     outputs: ImmMap<string, ConnectableOutput>().set('output', {
       type: 'customAudio',
-      node: inst.awpHandle,
+      node: ctx.inst.awpHandle,
     }),
   };
 };
 
-export const hide_equalizer = mkContainerHider(getEqualizerDOMElementId);
-export const unhide_equalizer = mkContainerUnhider(getEqualizerDOMElementId);
+export const hide_equalizer = (stateKey: string) => {
+  mkContainerHider(getEqualizerDOMElementId)(stateKey);
+
+  const vcId = stateKey.split('_')[1]!;
+  const ctx = EqualizerCtxById.get(vcId);
+  if (!ctx) {
+    throw new Error(`No equalizer ctx found for vcId ${vcId}`);
+  }
+
+  ctx.uiState.update(state => ({ ...state, hidden: true }));
+};
+
+export const unhide_equalizer = (stateKey: string) => {
+  mkContainerUnhider(getEqualizerDOMElementId)(stateKey);
+
+  const vcId = stateKey.split('_')[1]!;
+  const ctx = EqualizerCtxById.get(vcId);
+  if (!ctx) {
+    throw new Error(`No equalizer ctx found for vcId ${vcId}`);
+  }
+
+  ctx.uiState.update(state => ({ ...state, hidden: false }));
+};

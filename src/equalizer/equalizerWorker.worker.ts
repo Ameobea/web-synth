@@ -1,6 +1,9 @@
 import * as Comlink from 'comlink';
 
 import type { EqualizerBand, EqualizerState } from 'src/equalizer/equalizer';
+import d3 from './d3';
+
+const SAMPLE_RATE = 44_100;
 
 export class EqualizerWorker {
   private wasmInstance!: WebAssembly.Instance;
@@ -60,9 +63,7 @@ export class EqualizerWorker {
     );
   };
 
-  public computeResponses = (
-    gridSize: number
-  ): { freqs: Float32Array; mags: Float32Array; phases: Float32Array } => {
+  public computeResponses = (gridSize: number, widthPx: number, heightPx: number) => {
     (this.wasmInstance.exports.equalizer_compute_responses as Function)(this.ctxPtr, gridSize);
 
     const freqsPtr = (this.wasmInstance.exports.equalizer_get_response_freqs_ptr as Function)(
@@ -71,16 +72,28 @@ export class EqualizerWorker {
     const magsPtr = (this.wasmInstance.exports.equalizer_get_response_mags_ptr as Function)(
       this.ctxPtr
     );
-    const phasesPtr = (this.wasmInstance.exports.equalizer_get_response_phases_ptr as Function)(
-      this.ctxPtr
-    );
+    // const phasesPtr = (this.wasmInstance.exports.equalizer_get_response_phases_ptr as Function)(
+    //   this.ctxPtr
+    // );
     const memory = this.getWasmMemoryBuffer();
 
     const freqs = new Float32Array(memory.buffer, freqsPtr, gridSize);
     const mags = new Float32Array(memory.buffer, magsPtr, gridSize);
-    const phases = new Float32Array(memory.buffer, phasesPtr, gridSize);
+    // const phases = new Float32Array(memory.buffer, phasesPtr, gridSize);
 
-    return Comlink.transfer({ freqs, mags, phases }, [freqs.buffer, mags.buffer, phases.buffer]);
+    const xScale = d3
+      .scaleLog()
+      .domain([10, SAMPLE_RATE / 2])
+      .range([0, widthPx]);
+    // TODO: Verify if this domain is good for response plot and unify with FFT viz
+    const yScale = d3.scaleLinear([heightPx, 0]).domain([-50, 50]);
+    const magResponsePath = d3
+      .line<number>()
+      .x((_d, i) => xScale(freqs[i]))
+      .y(d => yScale(d))
+      .curve(d3.curveMonotoneX)(mags)!;
+
+    return { magResponsePath };
   };
 }
 

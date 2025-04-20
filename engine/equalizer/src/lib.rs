@@ -128,6 +128,7 @@ impl Default for EqualizerInst {
   }
 }
 
+#[no_mangle]
 pub extern "C" fn equalizer_init() -> *mut EqualizerInst {
   maybe_init();
 
@@ -135,11 +136,13 @@ pub extern "C" fn equalizer_init() -> *mut EqualizerInst {
   Box::into_raw(ctx)
 }
 
+#[no_mangle]
 pub extern "C" fn equalizer_get_io_buf_ptr(ctx: *mut EqualizerInst) -> *mut f32 {
   let ctx = unsafe { &mut *ctx };
   addr_of_mut!(ctx.io_buf) as *mut f32
 }
 
+#[no_mangle]
 pub extern "C" fn equalizer_set_band(
   ctx: *mut EqualizerInst,
   band_ix: usize,
@@ -158,6 +161,7 @@ pub extern "C" fn equalizer_set_band(
     .push(EqualizerBand::new(filter_type, frequency, q, gain));
 }
 
+#[no_mangle]
 pub extern "C" fn equalizer_process(ctx: *mut EqualizerInst) {
   let ctx = unsafe { &mut *ctx };
 
@@ -168,6 +172,7 @@ pub extern "C" fn equalizer_process(ctx: *mut EqualizerInst) {
   }
 }
 
+#[no_mangle]
 pub extern "C" fn equalizer_compute_responses(ctx: *mut EqualizerInst, grid_size: usize) {
   let ctx = unsafe { &mut *ctx };
 
@@ -229,17 +234,20 @@ pub extern "C" fn equalizer_compute_responses(ctx: *mut EqualizerInst, grid_size
   ctx.response_buffers.phases_rads = angles;
 }
 
-pub extern "C" fn equalizer_get_response_freqs_ptr(ctx: *mut EqualizerInst) -> *mut f32 {
-  let ctx = unsafe { &mut *ctx };
-  addr_of_mut!(ctx.response_buffers.freqs) as *mut f32
+#[no_mangle]
+pub extern "C" fn equalizer_get_response_freqs_ptr(ctx: *const EqualizerInst) -> *const f32 {
+  let ctx = unsafe { &*ctx };
+  ctx.response_buffers.freqs.as_ptr() as *const f32
 }
 
-pub extern "C" fn equalizer_get_response_mags_ptr(ctx: *mut EqualizerInst) -> *mut f32 {
-  let ctx = unsafe { &mut *ctx };
-  addr_of_mut!(ctx.response_buffers.magnitudes_db) as *mut f32
+#[no_mangle]
+pub extern "C" fn equalizer_get_response_mags_ptr(ctx: *const EqualizerInst) -> *const f32 {
+  let ctx = unsafe { &*ctx };
+  ctx.response_buffers.magnitudes_db.as_ptr() as *const f32
 }
 
-pub extern "C" fn equalizer_get_response_phases_ptr(ctx: *mut EqualizerInst) -> *mut f32 {
-  let ctx = unsafe { &mut *ctx };
-  addr_of_mut!(ctx.response_buffers.phases_rads) as *mut f32
+#[no_mangle]
+pub extern "C" fn equalizer_get_response_phases_ptr(ctx: *const EqualizerInst) -> *const f32 {
+  let ctx = unsafe { &*ctx };
+  ctx.response_buffers.phases_rads.as_ptr() as *const f32
 }

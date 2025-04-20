@@ -16,7 +16,7 @@ class EqualizerAWP extends AudioWorkletProcessor {
     this.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
-          this.initWasmInstance(data.wasmBytes);
+          this.initWasmInstance(evt.data.wasmBytes);
           break;
         }
         case 'shutdown': {
@@ -26,7 +26,9 @@ class EqualizerAWP extends AudioWorkletProcessor {
         case 'setInitialState': {
           this.ctxPtr = this.wasmInstance.exports.equalizer_init();
           this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
-          const { bands } = evt.data;
+          const {
+            state: { bands },
+          } = evt.data;
           for (let bandIx = 0; bandIx < bands.length; bandIx++) {
             const { filterType, frequency, q, gain } = bands[bandIx];
             this.wasmInstance.exports.equalizer_set_band(

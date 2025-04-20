@@ -3,6 +3,7 @@ import * as R from 'ramda';
 
 import type { ADSRValues } from 'src/controls/adsr';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+import { writable, type Writable } from 'svelte/store';
 
 export const SAMPLE_RATE = 44_100;
 
@@ -379,4 +380,42 @@ export const unescapeHTML = (html: string) => {
   const el = document.createElement('div');
   el.innerHTML = html;
   return el.innerText;
+};
+
+/**
+ * Same as `Writable` from `svelte/store` but with the current value
+ * available as a property.  This means you don't have to use `get()` to
+ * access the current value.
+ */
+export interface TransparentWritable<T> extends Writable<T> {
+  current: T;
+}
+
+export const rwritable = <T>(value: T): TransparentWritable<T> => {
+  const inner = writable(value);
+
+  const inst: TransparentWritable<T> = {
+    subscribe: inner.subscribe,
+    set: () => {
+      throw new Error('Unreachable');
+    },
+    update: () => {
+      throw new Error('Unreachable');
+    },
+    current: value,
+  };
+
+  inst.set = (newValue: T) => {
+    inst.current = newValue;
+    inner.set(newValue);
+  };
+
+  inst.update = (updater: (value: T) => T) =>
+    inner.update(oldVal => {
+      const newVal = updater(oldVal);
+      inst.current = newVal;
+      return newVal;
+    });
+
+  return inst;
 };

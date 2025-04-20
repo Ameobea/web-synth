@@ -104,6 +104,11 @@ export default class MIDIEditorUIInstance {
     [];
   public vcId: string;
   private isHidden: boolean;
+  /**
+   * Used to lazily resize when the instance is unhidden to avoid doing expensive resize work when
+   * the instance is hidden
+   */
+  private deferredSize: { width: number; height: number } | undefined;
   private unsubscribeConnectablesUpdates: Unsubscribe;
   private midiMetadataUnsubscribers: (() => void)[] = [];
   private isUnsubscribingMIDIMetadataListeners = false;
@@ -320,6 +325,13 @@ export default class MIDIEditorUIInstance {
   }
 
   public setSize(width: number, height: number) {
+    // If the instance is hidden, defer running this expensive code until the instance
+    // is unhidden again.  This makes resizing more responsive for other VCs
+    if (this.isHidden) {
+      this.deferredSize = { width, height };
+      return;
+    }
+
     this.width = width;
     this.height = height;
     this.app.renderer.resize(width, height);
@@ -1326,6 +1338,13 @@ export default class MIDIEditorUIInstance {
       this.app.ticker.stop();
     } else {
       this.app.ticker.start();
+
+      if (this.deferredSize) {
+        if (this.deferredSize.width !== this.width || this.deferredSize.height !== this.height) {
+          this.setSize(this.deferredSize.width, this.deferredSize.height);
+        }
+        this.deferredSize = undefined;
+      }
     }
   };
 

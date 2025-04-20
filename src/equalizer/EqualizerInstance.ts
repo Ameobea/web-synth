@@ -4,7 +4,10 @@ import * as Comlink from 'comlink';
 import type { EqualizerBand, EqualizerState } from 'src/equalizer/equalizer';
 import type { EqualizerWorker } from 'src/equalizer/equalizerWorker.worker';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
-import { AsyncOnce } from 'src/util';
+import { AsyncOnce, type TransparentWritable } from 'src/util';
+import type { Unsubscriber } from 'svelte/store';
+
+const RESPONSES_GRID_SIZE = 1024;
 
 const EqualizerAWPInitialized = new AsyncOnce(
   () =>
@@ -27,16 +30,28 @@ const EqualizerWasm = new AsyncOnce(
 
 export class EqualizerInstance {
   private ctx: AudioContext;
-  private vcId: string;
+  public vcId: string;
   public state: EqualizerState;
+  private uiState: TransparentWritable<{ hidden: boolean }>;
+  private unsubscribeUIState: Unsubscriber;
   public awpHandle: AudioWorkletNode | DummyNode;
   private worker: Comlink.Remote<EqualizerWorker>;
+  private workerReadyP!: Promise<void>;
   private ready = false;
 
-  constructor(ctx: AudioContext, vcId: string, initialState: EqualizerState) {
+  constructor(
+    ctx: AudioContext,
+    vcId: string,
+    initialState: EqualizerState,
+    uiState: TransparentWritable<{ hidden: boolean }>
+  ) {
     this.ctx = ctx;
     this.vcId = vcId;
     this.state = R.clone(initialState);
+    this.uiState = uiState;
+    this.unsubscribeUIState = uiState.subscribe(_newUIState => {
+      this.maybeComputeAndPlotResponse();
+    });
     this.awpHandle = new DummyNode('equalizer');
     this.worker = Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url)));
 
@@ -45,7 +60,7 @@ export class EqualizerInstance {
 
   private async init() {
     const [wasmBytes] = await Promise.all([EqualizerWasm.get(), EqualizerAWPInitialized.get()]);
-    this.worker.setWasmBytes(wasmBytes);
+    this.workerReadyP = this.worker.setWasmBytes(wasmBytes);
     this.awpHandle = new AudioWorkletNode(this.ctx, 'equalizer-awp', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
@@ -57,15 +72,16 @@ export class EqualizerInstance {
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
   }
 
-  private handleAWPMessage(evt: MessageEvent) {
+  private async handleAWPMessage(evt: MessageEvent) {
     const awpHandle = this.awpHandle as AudioWorkletNode;
 
     switch (evt.data.type) {
       case 'ready': {
-        this.ready = true;
+        await this.workerReadyP;
         awpHandle.port.postMessage({ type: 'setInitialState', state: this.state });
         this.worker.setInitialState(this.state);
-        // TODO: Compute response + update viz
+        this.ready = true;
+        this.maybeComputeAndPlotResponse();
         break;
       }
       default:
@@ -73,12 +89,34 @@ export class EqualizerInstance {
     }
   }
 
+  public maybeComputeAndPlotResponse = async () => {
+    if (this.uiState.current.hidden || !this.ready) {
+      return;
+    }
+
+    const bgContainer: HTMLDivElement | null = document.getElementById(
+      `equalizer-bg-${this.vcId}`
+    ) as any;
+    if (!bgContainer) {
+      return;
+    }
+    const svg: SVGSVGElement = bgContainer.getElementsByClassName('eq-mag-response-plot')[0] as any;
+    const path: SVGPathElement = svg.getElementsByClassName('eq-mag-response-plot-path')[0] as any;
+
+    const responses = await this.worker.computeResponses(
+      RESPONSES_GRID_SIZE,
+      bgContainer.clientWidth,
+      bgContainer.clientHeight
+    );
+    path.setAttribute('d', responses.magResponsePath);
+  };
+
   public setBand(bandIx: number, band: EqualizerBand) {
     this.state.bands[bandIx] = band;
     if (this.ready) {
       (this.awpHandle as AudioWorkletNode).port.postMessage({ type: 'setBand', bandIx, band });
       this.worker.setBand(bandIx, band);
-      // TODO: Compute response + update viz
+      this.maybeComputeAndPlotResponse();
     }
   }
 
@@ -90,5 +128,6 @@ export class EqualizerInstance {
     if (this.awpHandle instanceof AudioWorkletNode) {
       this.awpHandle.port.postMessage({ type: 'shutdown' });
     }
+    this.unsubscribeUIState();
   }
 }

@@ -794,14 +794,21 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
       const newWidth = curSelectedNodeRef.current
         ? window.innerWidth - 500 - 44
         : window.innerWidth - 44;
-      lGraphCanvasRef.current?.resize(newWidth, newHeight);
+
+      const isHidden = getIsVcHidden(vcId);
+      if (isHidden) {
+        deferredSize.current = { width: newWidth, height: newHeight };
+      } else {
+        lGraphCanvasRef.current?.resize(newWidth, newHeight);
+      }
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [vcId]);
 
   const smallViewDOMId = `graph-editor_${vcId}_small-view-dom-id`;
 
+  const deferredSize = useRef<{ width: number; height: number } | undefined>();
   useEffect(() => {
     if (!lGraphInstance) {
       return;
@@ -812,6 +819,11 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
         lGraphInstance.stop();
       } else {
         lGraphInstance.start();
+
+        if (deferredSize.current) {
+          lGraphCanvasRef.current?.resize(deferredSize.current.width, deferredSize.current.height);
+          deferredSize.current = undefined;
+        }
       }
     };
 
