@@ -1,3 +1,3 @@
-import { curveMonotoneX, scaleLinear, scaleLog, line } from 'd3';
+import { curveMonotoneX, scaleLinear, scaleLog, line, axisBottom, axisLeft, select } from 'd3';
 
-export default { curveMonotoneX, scaleLinear, scaleLog, line };
+export default { curveMonotoneX, scaleLinear, scaleLog, line, axisBottom, axisLeft, select };

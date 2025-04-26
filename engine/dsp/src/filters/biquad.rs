@@ -236,6 +236,8 @@ impl BiquadFilter {
     for i in 0..grid_points {
       let freq = start_freq * multiplier.powi(i as i32);
       let omega = 2. * PI * freq / sample_rate;
+      // TODO: Need a batch version of this function with hard-coded min/max frequency range and
+      // grid size so that much of the math can be pre-computed for efficiency
       let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
       freqs.push(freq);
       mags.push(mag_db);

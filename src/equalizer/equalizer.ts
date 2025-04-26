@@ -61,7 +61,7 @@ export const init_equalizer = (stateKey: string) => {
   elem.id = domId;
   elem.setAttribute(
     'style',
-    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0; display: none;'
+    'z-index: 2; width: 100%; height: calc(100vh - 34px); position: absolute; top: 0; left: 0; display: none;'
   );
   document.getElementById('content')!.appendChild(elem);
 

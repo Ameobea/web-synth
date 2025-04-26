@@ -2,8 +2,7 @@ import * as Comlink from 'comlink';
 
 import type { EqualizerBand, EqualizerState } from 'src/equalizer/equalizer';
 import d3 from './d3';
-
-const SAMPLE_RATE = 44_100;
+import { EQ_X_DOMAIN, EQ_Y_DOMAIN } from 'src/equalizer/conf';
 
 export class EqualizerWorker {
   private wasmInstance!: WebAssembly.Instance;
@@ -63,7 +62,13 @@ export class EqualizerWorker {
     );
   };
 
-  public computeResponses = (gridSize: number, widthPx: number, heightPx: number) => {
+  public computeResponses = (
+    gridSize: number,
+    widthPx: number,
+    heightPx: number,
+    xDomain: [number, number] = EQ_X_DOMAIN,
+    yDomain: [number, number] = EQ_Y_DOMAIN
+  ) => {
     (this.wasmInstance.exports.equalizer_compute_responses as Function)(this.ctxPtr, gridSize);
 
     const freqsPtr = (this.wasmInstance.exports.equalizer_get_response_freqs_ptr as Function)(
@@ -81,12 +86,9 @@ export class EqualizerWorker {
     const mags = new Float32Array(memory.buffer, magsPtr, gridSize);
     // const phases = new Float32Array(memory.buffer, phasesPtr, gridSize);
 
-    const xScale = d3
-      .scaleLog()
-      .domain([10, SAMPLE_RATE / 2])
-      .range([0, widthPx]);
+    const xScale = d3.scaleLog().domain(xDomain).range([0, widthPx]);
     // TODO: Verify if this domain is good for response plot and unify with FFT viz
-    const yScale = d3.scaleLinear([heightPx, 0]).domain([-50, 50]);
+    const yScale = d3.scaleLinear([heightPx, 0]).domain(yDomain);
     const magResponsePath = d3
       .line<number>()
       .x((_d, i) => xScale(freqs[i]))

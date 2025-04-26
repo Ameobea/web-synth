@@ -37,6 +37,21 @@ pub enum EqualizerFilterType {
   // TODO: Bell
 }
 
+impl Into<FilterMode> for EqualizerFilterType {
+  fn into(self) -> FilterMode {
+    match self {
+      EqualizerFilterType::Lowpass => FilterMode::Lowpass,
+      EqualizerFilterType::Highpass => FilterMode::Highpass,
+      EqualizerFilterType::Bandpass => FilterMode::Bandpass,
+      EqualizerFilterType::Notch => FilterMode::Notch,
+      EqualizerFilterType::Peak => FilterMode::Peak,
+      EqualizerFilterType::Lowshelf => FilterMode::Lowshelf,
+      EqualizerFilterType::Highshelf => FilterMode::Highshelf,
+      EqualizerFilterType::Allpass => FilterMode::Allpass,
+    }
+  }
+}
+
 impl EqualizerFilterType {
   fn from_usize(filter_type: usize) -> Self {
     if filter_type > 7 {
@@ -74,33 +89,6 @@ impl EqualizerBand {
   pub fn apply(&mut self, sample: f32) -> f32 {
     match self {
       EqualizerBand::Biquad { filter, .. } => filter.apply(sample),
-    }
-  }
-
-  fn new(filter_type: usize, frequency: f32, q: f32, gain: f32) -> Self {
-    let filter_type = EqualizerFilterType::from_usize(filter_type);
-    match filter_type {
-      _ => {
-        let mode = match filter_type {
-          EqualizerFilterType::Lowpass => FilterMode::Lowpass,
-          EqualizerFilterType::Highpass => FilterMode::Highpass,
-          EqualizerFilterType::Bandpass => FilterMode::Bandpass,
-          EqualizerFilterType::Notch => FilterMode::Notch,
-          EqualizerFilterType::Peak => FilterMode::Peak,
-          EqualizerFilterType::Lowshelf => FilterMode::Lowshelf,
-          EqualizerFilterType::Highshelf => FilterMode::Highshelf,
-          EqualizerFilterType::Allpass => FilterMode::Allpass,
-        };
-        EqualizerBand::Biquad {
-          filter: BiquadFilter::new(mode, q, frequency, gain),
-          params: BiquadFilterParams {
-            mode,
-            q,
-            gain,
-            freq: frequency,
-          },
-        }
-      },
     }
   }
 }
@@ -152,13 +140,20 @@ pub extern "C" fn equalizer_set_band(
   gain: f32,
 ) {
   let ctx = unsafe { &mut *ctx };
-  while ctx.bands.len() < band_ix {
+  while ctx.bands.len() <= band_ix {
     ctx.bands.push(EqualizerBand::default());
   }
 
-  ctx
-    .bands
-    .push(EqualizerBand::new(filter_type, frequency, q, gain));
+  match &mut ctx.bands[band_ix] {
+    EqualizerBand::Biquad { filter, params } => {
+      let mode = EqualizerFilterType::from_usize(filter_type).into();
+      filter.set_coefficients(mode, q, frequency, gain);
+      params.mode = mode;
+      params.q = q;
+      params.freq = frequency;
+      params.gain = gain;
+    },
+  }
 }
 
 #[no_mangle]
