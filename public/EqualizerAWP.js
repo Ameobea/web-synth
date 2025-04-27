@@ -1,8 +1,18 @@
 const FRAME_SIZE = 128;
 
+// this needs to stay in sync with `EQ_MAX_AUTOMATED_PARAM_COUNT` from the UI-thread code
+const EQ_MAX_AUTOMATED_PARAM_COUNT = 4;
+const AutomationParamKeys = new Array(EQ_MAX_AUTOMATED_PARAM_COUNT)
+  .fill(null)
+  .map((_, i) => `automation_${i}`);
+
 class EqualizerAWP extends AudioWorkletProcessor {
   static get parameterDescriptors() {
-    return [];
+    return new Array(EQ_MAX_AUTOMATED_PARAM_COUNT).fill(null).map((_, i) => ({
+      name: AutomationParamKeys[i],
+      defaultValue: 0,
+      automationRate: 'a-rate',
+    }));
   }
 
   constructor(_options) {
@@ -12,6 +22,10 @@ class EqualizerAWP extends AudioWorkletProcessor {
     this.ctxPtr = 0;
     this.wasmInstance = null;
     this.wasmMemoryBuffer = null;
+    this.automationParamBuf = null;
+    this.automationSAB = null;
+    this.automationSABView = null;
+    this.wasmSideSAB = null;
 
     this.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -30,34 +44,58 @@ class EqualizerAWP extends AudioWorkletProcessor {
             state: { bands },
           } = evt.data;
           for (let bandIx = 0; bandIx < bands.length; bandIx++) {
-            const { filterType, frequency, q, gain } = bands[bandIx];
-            this.wasmInstance.exports.equalizer_set_band(
-              this.ctxPtr,
-              bandIx,
-              filterType,
-              frequency,
-              q,
-              gain
+            this.commitBand(bandIx, bands[bandIx]);
+          }
+          const automationParamBufPtr = this.wasmInstance.exports.equalizer_get_automation_bufs_ptr(
+            this.ctxPtr
+          );
+          this.automationParamBuf = this.wasmMemoryBuffer.subarray(
+            automationParamBufPtr / Float32Array.BYTES_PER_ELEMENT,
+            automationParamBufPtr / Float32Array.BYTES_PER_ELEMENT +
+              FRAME_SIZE * EQ_MAX_AUTOMATED_PARAM_COUNT
+          );
+          if (typeof SharedArrayBuffer !== 'undefined') {
+            this.automationSAB = new SharedArrayBuffer(
+              Float32Array.BYTES_PER_ELEMENT * EQ_MAX_AUTOMATED_PARAM_COUNT
             );
+            this.automationSABView = new Float32Array(this.automationSAB);
+            this.port.postMessage({
+              type: 'setAutomationSAB',
+              sab: this.automationSABView,
+            });
           }
           break;
         }
         case 'setBand': {
-          const { bandIx, filterType, frequency, q, gain } = evt.data;
-          this.wasmInstance.exports.equalizer_set_band(
-            this.ctxPtr,
-            bandIx,
-            filterType,
-            frequency,
-            q,
-            gain
-          );
+          const { bandIx, band } = evt.data;
+          this.commitBand(bandIx, band);
           break;
         }
         default:
           console.error('Unknown message type in EqualizerAWP', evt.data.type);
       }
     };
+  }
+
+  commitBand(
+    bandIx,
+    { filterType, frequency, q, gain, freqAutomationBufIx, qAutomationBufIx, gainAutomationBufIx }
+  ) {
+    this.wasmInstance.exports.equalizer_set_band(
+      this.ctxPtr,
+      bandIx,
+      filterType,
+      frequency,
+      q,
+      gain,
+      typeof freqAutomationBufIx === 'number' && freqAutomationBufIx >= 0
+        ? freqAutomationBufIx
+        : 99999,
+      typeof qAutomationBufIx === 'number' && qAutomationBufIx >= 0 ? qAutomationBufIx : 99999,
+      typeof gainAutomationBufIx === 'number' && gainAutomationBufIx >= 0
+        ? gainAutomationBufIx
+        : 99999
+    );
   }
 
   logWasmErr = (ptr, len) => {
@@ -86,10 +124,10 @@ class EqualizerAWP extends AudioWorkletProcessor {
    *
    * @param {Float32Array[][]} inputs
    * @param {Float32Array[][]} outputs
-   * @param {{[key: string]: Float32Array}} _params
+   * @param {{[key: string]: Float32Array}} params
    * @returns {boolean}
    */
-  process(inputs, outputs, _params) {
+  process(inputs, outputs, params) {
     const input = inputs[0]?.[0];
     if (!input) {
       return true;
@@ -109,6 +147,15 @@ class EqualizerAWP extends AudioWorkletProcessor {
     const wasmMemory = this.getWasmMemoryBuffer();
     const inputPtr = this.wasmInstance.exports.equalizer_get_io_buf_ptr(this.ctxPtr);
     wasmMemory.set(input, inputPtr / Float32Array.BYTES_PER_ELEMENT);
+
+    for (let i = 0; i < AutomationParamKeys.length; i++) {
+      const paramKey = AutomationParamKeys[i];
+      const param = params[paramKey];
+      this.automationParamBuf.set(param, i * FRAME_SIZE);
+      if (this.automationSABView) {
+        this.automationSABView[i] = param[param.length - 1];
+      }
+    }
 
     this.wasmInstance.exports.equalizer_process(this.ctxPtr);
 

@@ -37,6 +37,8 @@
   };
 
   $: drawAxesAndGrid(stageWidth, stageHeight);
+
+  $: y0Px = d3.scaleLinear().domain(EQ_Y_DOMAIN).range([stageHeight, 0])(0);
 </script>
 
 <div class="equalizer-bg" id="equalizer-bg-{vcId}">
@@ -44,6 +46,7 @@
     <g transform={`translate(${EQ_AXIS_MARGIN.left},${EQ_AXIS_MARGIN.top})`}>
       <g class="x-axis" bind:this={xAxisContainer} transform={`translate(0, ${stageHeight})`} />
       <g class="y-axis" bind:this={yAxisContainer} />
+      <line x1={0} y1={y0Px} x2={stageWidth} y2={y0Px} class="y0-line" />
       <g class="grid" bind:this={gridContainer} />
     </g>
     <g transform={`translate(${EQ_AXIS_MARGIN.left},${EQ_AXIS_MARGIN.top})`}>
@@ -83,5 +86,11 @@
     fill: #ccc;
     font-size: 12px;
     font-family: 'IBM Plex Sans', 'Open Sans', 'Roboto', monospace, sans-serif;
+  }
+
+  :global(.equalizer-bg line.y0-line) {
+    stroke: #03d7fc;
+    stroke-width: 1px;
+    stroke-opacity: 0.7;
   }
 </style>

@@ -9,6 +9,12 @@
   export let inst: EqualizerInstance;
   $: stateStore = inst.state;
   $: state = $stateStore;
+  $: automatedParamsStore = inst.automatedParams;
+  $: automatedParams = $automatedParamsStore;
+  $: automationValsSABStore = inst.automationValsSAB;
+  $: automationValsSAB = $automationValsSABStore;
+  $: uiStateStore = inst.uiState;
+  $: eqUIHidden = $uiStateStore.hidden;
 
   let container: HTMLDivElement;
   let containerWidth: number = 0;
@@ -28,6 +34,30 @@
   });
 
   onDestroy(() => resizeObs.disconnect());
+
+  $: automatedParamsByBand = (() => {
+    const automatedParamsByBand: { freq: number | null; gain: number | null; q: number | null }[] =
+      state.bands.map(() => ({
+        freq: null,
+        gain: null,
+        q: null,
+      }));
+    for (
+      let automationSlotIx = 0;
+      automationSlotIx < automatedParams.length;
+      automationSlotIx += 1
+    ) {
+      const automationSlot = automatedParams[automationSlotIx];
+      if (!automationSlot) {
+        continue;
+      }
+
+      const { bandIx, param } = automationSlot;
+      automatedParamsByBand[bandIx][param] = automationSlotIx;
+    }
+
+    return automatedParamsByBand;
+  })();
 </script>
 
 <div class="root" bind:this={container}>
@@ -37,9 +67,14 @@
       <EqHandle
         {band}
         {bandIx}
+        isActive={state.activeBandIx === bandIx}
+        onClick={() => inst.state.update(state => ({ ...state, activeBandIx: bandIx }))}
         onChange={newBand => inst.setBand(bandIx, newBand)}
         {stageHeight}
         {stageWidth}
+        automatedParams={automatedParamsByBand[bandIx]}
+        {automationValsSAB}
+        {eqUIHidden}
       />
     {/each}
   </div>

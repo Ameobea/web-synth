@@ -1,6 +1,4 @@
-import { Map as ImmMap } from 'immutable';
-
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+import type { AudioConnectables } from 'src/patchNetwork';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import EqualizerUI from 'src/equalizer/EqualizerUI/EqualizerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
@@ -28,6 +26,7 @@ export interface EqualizerBand {
 
 export interface EqualizerState {
   bands: EqualizerBand[];
+  activeBandIx?: number;
 }
 
 const buildDefaultEqualizerState = (): EqualizerState => ({
@@ -112,17 +111,7 @@ export const get_equalizer_audio_connectables = (stateKey: string): AudioConnect
     throw new Error(`No equalizer ctx found for vcId ${vcId}`);
   }
 
-  return {
-    vcId,
-    inputs: ImmMap<string, ConnectableInput>().set('input', {
-      type: 'customAudio',
-      node: ctx.inst.awpHandle,
-    }),
-    outputs: ImmMap<string, ConnectableOutput>().set('output', {
-      type: 'customAudio',
-      node: ctx.inst.awpHandle,
-    }),
-  };
+  return ctx.inst.buildAudioConnectables();
 };
 
 export const hide_equalizer = (stateKey: string) => {

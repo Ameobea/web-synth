@@ -6,6 +6,7 @@ import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { writable, type Writable } from 'svelte/store';
 
 export const SAMPLE_RATE = 44_100;
+export const NYQUIST = SAMPLE_RATE / 2;
 
 export const clamp = (min: number, max: number, val: number) => Math.min(Math.max(val, min), max);
 

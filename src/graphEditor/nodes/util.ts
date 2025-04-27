@@ -235,5 +235,16 @@ export class OverridableAudioNode extends GainNode {
       this.manualControl.disconnect(this.output);
       this.connect(this.output);
     }
+
+    this.overrideStatusChangeCbs.forEach(cb => cb(isOverridden));
+  }
+
+  private overrideStatusChangeCbs: ((isOverridden: boolean) => void)[] = [];
+  public registerOverrideStatusChangeCb(cb: (isOverridden: boolean) => void) {
+    this.overrideStatusChangeCbs.push(cb);
+  }
+
+  public deregisterOverrideStatusChangeCb(cb: (isOverridden: boolean) => void) {
+    this.overrideStatusChangeCbs = this.overrideStatusChangeCbs.filter(c => c !== cb);
   }
 }

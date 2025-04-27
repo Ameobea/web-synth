@@ -4,11 +4,20 @@ import type { EqualizerBand, EqualizerState } from 'src/equalizer/equalizer';
 import d3 from './d3';
 import { EQ_X_DOMAIN, EQ_Y_DOMAIN } from 'src/equalizer/conf';
 
+const FRAME_SIZE = 128;
+
+interface EqualizerBandWithAutomationBufIxs extends EqualizerBand {
+  freqAutomationBufIx: number | null;
+  qAutomationBufIx: number | null;
+  gainAutomationBufIx: number | null;
+}
+
 export class EqualizerWorker {
   private wasmInstance!: WebAssembly.Instance;
   private textDecoder = new TextDecoder('utf-8');
   private ctxPtr = 0;
   private wasmMemoryBuffer: Float32Array = new Float32Array(0);
+  private automationValsSAB: Float32Array | null = null;
 
   private getWasmMemoryBuffer() {
     if (
@@ -33,32 +42,54 @@ export class EqualizerWorker {
     this.wasmInstance = await WebAssembly.instantiate(wasmModule, importObj);
   };
 
-  public setInitialState = ({ bands }: EqualizerState) => {
+  public setAutomationValsSAB = (automationValsSAB: Float32Array) => {
+    this.automationValsSAB = automationValsSAB;
+  };
+
+  public setInitialState = ({
+    bands,
+  }: EqualizerState & { bands: EqualizerBandWithAutomationBufIxs[] }) => {
     this.ctxPtr = (this.wasmInstance.exports.equalizer_init as Function)();
     this.wasmMemoryBuffer = new Float32Array(
       (this.wasmInstance.exports.memory as WebAssembly.Memory).buffer
     );
     for (let bandIx = 0; bandIx < bands.length; bandIx++) {
-      const { filterType, frequency, q, gain } = bands[bandIx];
-      (this.wasmInstance.exports.equalizer_set_band as Function)(
-        this.ctxPtr,
-        bandIx,
-        filterType,
-        frequency,
-        q,
-        gain
-      );
+      this.setBand(bandIx, bands[bandIx]);
     }
   };
 
-  public setBand = (bandIx: number, { filterType, frequency, q, gain }: EqualizerBand) => {
+  public setBand = (
+    bandIx: number,
+    {
+      filterType,
+      frequency,
+      q,
+      gain,
+      freqAutomationBufIx,
+      qAutomationBufIx,
+      gainAutomationBufIx,
+    }: EqualizerBandWithAutomationBufIxs
+  ) => {
     (this.wasmInstance.exports.equalizer_set_band as Function)(
       this.ctxPtr,
       bandIx,
       filterType,
       frequency,
       q,
-      gain
+      gain,
+      !!this.automationValsSAB &&
+        typeof freqAutomationBufIx === 'number' &&
+        freqAutomationBufIx >= 0
+        ? freqAutomationBufIx
+        : 99999,
+      !!this.automationValsSAB && typeof qAutomationBufIx === 'number' && qAutomationBufIx >= 0
+        ? qAutomationBufIx
+        : 99999,
+      !!this.automationValsSAB &&
+        typeof gainAutomationBufIx === 'number' &&
+        gainAutomationBufIx >= 0
+        ? gainAutomationBufIx
+        : 99999
     );
   };
 
@@ -69,6 +100,26 @@ export class EqualizerWorker {
     xDomain: [number, number] = EQ_X_DOMAIN,
     yDomain: [number, number] = EQ_Y_DOMAIN
   ) => {
+    const memory = this.getWasmMemoryBuffer();
+
+    if (this.automationValsSAB) {
+      const automationBufsPtr = (
+        this.wasmInstance.exports.equalizer_get_automation_bufs_ptr as Function
+      )(this.ctxPtr);
+      const automationBufs = memory.subarray(
+        automationBufsPtr / Float32Array.BYTES_PER_ELEMENT,
+        automationBufsPtr / Float32Array.BYTES_PER_ELEMENT +
+          this.automationValsSAB.length * FRAME_SIZE
+      );
+      for (
+        let automationSlotIx = 0;
+        automationSlotIx < this.automationValsSAB.length;
+        automationSlotIx += 1
+      ) {
+        automationBufs[automationSlotIx * FRAME_SIZE] = this.automationValsSAB[automationSlotIx];
+      }
+    }
+
     (this.wasmInstance.exports.equalizer_compute_responses as Function)(this.ctxPtr, gridSize);
 
     const freqsPtr = (this.wasmInstance.exports.equalizer_get_response_freqs_ptr as Function)(
@@ -80,7 +131,6 @@ export class EqualizerWorker {
     // const phasesPtr = (this.wasmInstance.exports.equalizer_get_response_phases_ptr as Function)(
     //   this.ctxPtr
     // );
-    const memory = this.getWasmMemoryBuffer();
 
     const freqs = new Float32Array(memory.buffer, freqsPtr, gridSize);
     const mags = new Float32Array(memory.buffer, magsPtr, gridSize);

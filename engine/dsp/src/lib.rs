@@ -1,6 +1,7 @@
 #![feature(portable_simd)]
 
 use fastapprox::fast;
+use num_traits::{Float, FloatConst};
 
 pub mod band_splitter;
 pub mod circular_buffer;
@@ -39,7 +40,7 @@ pub fn smooth(state: &mut f32, new_val: f32, smooth_factor: f32) -> f32 {
 }
 
 #[inline]
-pub fn clamp(min: f32, max: f32, val: f32) -> f32 {
+pub fn clamp<T: Float>(min: T, max: T, val: T) -> T {
   if val > max {
     max
   } else if val < min {
@@ -125,16 +126,16 @@ pub fn midi_number_to_frequency(midi_number: usize) -> f32 {
 }
 
 #[inline]
-pub fn linear_to_db_checked(res: f32) -> f32 {
-  let db = 20. * res.ln() / std::f32::consts::LN_10;
-  if db > 100. {
-    return 100.;
-  } else if db < -100. {
-    return -100.;
+pub fn linear_to_db_checked<T: Float + FloatConst>(res: T) -> T {
+  let db = T::from(20.).unwrap() * res.ln() / T::LN_10();
+  if db > T::from(100.).unwrap() {
+    return T::from(100.).unwrap();
+  } else if db < T::from(-100.).unwrap() {
+    return T::from(-100.).unwrap();
   }
 
   if db.is_nan() {
-    -100.
+    T::from(-100.).unwrap()
   } else {
     db
   }
@@ -151,6 +152,11 @@ pub fn pow10(x: f32) -> f32 {
 pub fn db_to_gain(db: f32) -> f32 {
   // 10f32.powf(db / 20.)
   pow10(db / 20.)
+}
+
+#[inline]
+pub fn db_to_gain_generic<T: Float>(db: T) -> T {
+  T::powf(T::from(10.).unwrap(), db / T::from(20.).unwrap())
 }
 
 #[inline]

@@ -1,17 +1,19 @@
 use std::f32::consts::PI;
 
+use num_traits::{Float, FloatConst};
+
 use crate::{linear_to_db_checked, FRAME_SIZE, NYQUIST};
 
 /// Second-order biquad filter
 #[derive(Clone, Copy, Default)]
-pub struct BiquadFilter {
-  pub b0_over_a0: f32,
-  pub b1_over_a0: f32,
-  pub b2_over_a0: f32,
-  pub a1_over_a0: f32,
-  pub a2_over_a0: f32,
-  pub x: [f32; 2],
-  pub y: [f32; 2],
+pub struct BiquadFilter<T: Float + FloatConst + Default = f32> {
+  pub b0_over_a0: T,
+  pub b1_over_a0: T,
+  pub b2_over_a0: T,
+  pub a1_over_a0: T,
+  pub a2_over_a0: T,
+  pub x: [T; 2],
+  pub y: [T; 2],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -72,20 +74,19 @@ impl FilterMode {
   }
 }
 
-impl BiquadFilter {
+impl<T: Float + FloatConst + Default> BiquadFilter<T> {
   #[inline]
-  pub fn compute_coefficients(
-    mode: FilterMode,
-    mut q: f32,
-    freq: f32,
-    gain: f32,
-  ) -> (f32, f32, f32, f32, f32) {
+  pub fn compute_coefficients(mode: FilterMode, mut q: T, freq: T, gain: T) -> (T, T, T, T, T) {
     // From: https://webaudio.github.io/web-audio-api/#filters-characteristics
-    let computed_frequency = crate::clamp(10., 21_830., freq);
-    let normalized_freq = computed_frequency / NYQUIST;
-    let w0 = PI * normalized_freq;
+    let computed_frequency =
+      crate::clamp::<T>(T::from(10.).unwrap(), T::from(21_830.).unwrap(), freq);
+    let normalized_freq = computed_frequency / T::from(NYQUIST).unwrap();
+    let w0 = T::PI() * normalized_freq;
     #[allow(non_snake_case)]
-    let A = 10.0_f32.powf(gain / 40.);
+    let A = T::powf(
+      T::from(10.0_f64).unwrap(),
+      gain / T::from(40.0_f64).unwrap(),
+    );
     let w0_sin = w0.sin();
 
     // for bandpass, notch, allpass, and peak filters, Q is a linear value with a minimum of 0.0001
@@ -94,86 +95,93 @@ impl BiquadFilter {
       mode,
       FilterMode::Bandpass | FilterMode::Notch | FilterMode::Allpass | FilterMode::Peak
     ) {
-      q = crate::clamp(0.0001, 1000., crate::db_to_gain(q));
+      q = crate::clamp(
+        T::from(0.0001).unwrap(),
+        T::from(1000.).unwrap(),
+        crate::db_to_gain_generic(q),
+      );
     }
 
-    let aq = w0_sin / (2. * q);
-    let aqdb = w0_sin / (2. * 10.0f32.powf(q / 20.));
+    let aq = w0_sin / (T::from(2.).unwrap() * q);
+    let aqdb =
+      w0_sin / (T::from(2.).unwrap() * T::powf(T::from(10.).unwrap(), q / T::from(20.).unwrap()));
     #[allow(non_snake_case)]
-    let S = 1.;
-    let a_s = (w0_sin / 2.) * ((A + (1. / A)) * ((1. / S) - 1.) + 2.).sqrt();
+    let S = T::one();
+    let a_s = (w0_sin / T::from(2.).unwrap())
+      * ((A + T::from(1.).unwrap() / A) * ((T::one() / S) - T::one()) + T::from(2.).unwrap())
+        .sqrt();
 
     let (b0, b1, b2, a0, a1, a2);
 
     let w0_cos = w0.cos();
     match mode {
       FilterMode::Lowpass => {
-        b0 = (1. - w0_cos) / 2.;
-        b1 = 1. - w0_cos;
-        b2 = (1. - w0_cos) / 2.;
-        a0 = 1. + aqdb;
-        a1 = -2. * w0_cos;
-        a2 = 1. - aqdb;
+        b0 = (T::one() - w0_cos) / T::from(2.).unwrap();
+        b1 = T::one() - w0_cos;
+        b2 = (T::one() - w0_cos) / T::from(2.).unwrap();
+        a0 = T::one() + aqdb;
+        a1 = T::from(-2.).unwrap() * w0_cos;
+        a2 = T::one() - aqdb;
       },
       FilterMode::Highpass => {
-        b0 = (1. + w0_cos) / 2.;
-        b1 = -(1. + w0_cos);
-        b2 = (1. + w0_cos) / 2.;
-        a0 = 1. + aqdb;
-        a1 = -2. * w0_cos;
-        a2 = 1. - aqdb;
+        b0 = (T::one() + w0_cos) / T::from(2.).unwrap();
+        b1 = -(T::one() + w0_cos);
+        b2 = (T::one() + w0_cos) / T::from(2.).unwrap();
+        a0 = T::one() + aqdb;
+        a1 = T::from(-2.).unwrap() * w0_cos;
+        a2 = T::one() - aqdb;
       },
       FilterMode::Bandpass => {
         b0 = aq;
-        b1 = 0.;
+        b1 = T::zero();
         b2 = -aq;
-        a0 = 1. + aq;
-        a1 = -2. * w0_cos;
-        a2 = 1. - aq;
+        a0 = T::one() + aq;
+        a1 = T::from(-2.).unwrap() * w0_cos;
+        a2 = T::one() - aq;
       },
       FilterMode::Notch => {
-        b0 = 1.;
-        b1 = -2. * w0_cos;
-        b2 = 1.;
-        a0 = 1. + aq;
-        a1 = -2. * w0_cos;
-        a2 = 1. - aq;
+        b0 = T::one();
+        b1 = T::from(-2.).unwrap() * w0_cos;
+        b2 = T::one();
+        a0 = T::one() + aq;
+        a1 = T::from(-2.).unwrap() * w0_cos;
+        a2 = T::one() - aq;
       },
       FilterMode::Peak => {
-        b0 = 1. + aq * A;
-        b1 = -2. * w0_cos;
-        b2 = 1. - aq * A;
-        a0 = 1. + aq / A;
-        a1 = -2. * w0_cos;
-        a2 = 1. - aq / A;
+        b0 = T::one() + aq * A;
+        b1 = T::from(-2.).unwrap() * w0_cos;
+        b2 = T::one() - aq * A;
+        a0 = T::one() + aq / A;
+        a1 = T::from(-2.).unwrap() * w0_cos;
+        a2 = T::one() - aq / A;
       },
       FilterMode::Lowshelf => {
         #[allow(non_snake_case)]
         let A_sqrt = A.sqrt();
-        b0 = A * ((A + 1.) - (A - 1.) * w0_cos + 2. * a_s * A_sqrt);
-        b1 = 2. * A * ((A - 1.) - (A + 1.) * w0_cos);
-        b2 = A * ((A + 1.) - (A - 1.) * w0_cos - 2. * a_s * A_sqrt);
-        a0 = (A + 1.) + (A - 1.) * w0_cos + 2. * a_s * A_sqrt;
-        a1 = -2. * ((A - 1.) + (A + 1.) * w0_cos);
-        a2 = (A + 1.) + (A - 1.) * w0_cos - 2. * a_s * A_sqrt;
+        b0 = A * ((A + T::one()) - (A - T::one()) * w0_cos + T::from(2.).unwrap() * a_s * A_sqrt);
+        b1 = T::from(2.).unwrap() * A * ((A - T::one()) - (A + T::one()) * w0_cos);
+        b2 = A * ((A + T::one()) - (A - T::one()) * w0_cos - T::from(2.).unwrap() * a_s * A_sqrt);
+        a0 = (A + T::one()) + (A - T::one()) * w0_cos + T::from(2.).unwrap() * a_s * A_sqrt;
+        a1 = T::from(-2.).unwrap() * ((A - T::one()) + (A + T::one()) * w0_cos);
+        a2 = (A + T::one()) + (A - T::one()) * w0_cos - T::from(2.).unwrap() * a_s * A_sqrt;
       },
       FilterMode::Highshelf => {
         #[allow(non_snake_case)]
         let A_sqrt = A.sqrt();
-        b0 = A * ((A + 1.) + (A - 1.) * w0_cos + 2. * a_s * A_sqrt);
-        b1 = -2. * A * ((A - 1.) + (A + 1.) * w0_cos);
-        b2 = A * ((A + 1.) + (A - 1.) * w0_cos - 2. * a_s * A_sqrt);
-        a0 = (A + 1.) - (A - 1.) * w0_cos + 2. * a_s * A_sqrt;
-        a1 = 2. * ((A - 1.) - (A + 1.) * w0_cos);
-        a2 = (A + 1.) - (A - 1.) * w0_cos - 2. * a_s * A_sqrt;
+        b0 = A * ((A + T::one()) + (A - T::one()) * w0_cos + T::from(2.).unwrap() * a_s * A_sqrt);
+        b1 = T::from(-2.).unwrap() * A * ((A - T::one()) + (A + T::one()) * w0_cos);
+        b2 = A * ((A + T::one()) + (A - T::one()) * w0_cos - T::from(2.).unwrap() * a_s * A_sqrt);
+        a0 = (A + T::one()) - (A - T::one()) * w0_cos + T::from(2.).unwrap() * a_s * A_sqrt;
+        a1 = T::from(2.).unwrap() * ((A - T::one()) - (A + T::one()) * w0_cos);
+        a2 = (A + T::one()) - (A - T::one()) * w0_cos - T::from(2.).unwrap() * a_s * A_sqrt;
       },
       FilterMode::Allpass => {
-        b0 = 1. - aq;
-        b1 = -2. * w0_cos;
-        b2 = 1. + aq;
-        a0 = 1. + aq;
-        a1 = -2. * w0_cos;
-        a2 = 1. - aq;
+        b0 = T::one() - aq;
+        b1 = T::from(-2.).unwrap() * w0_cos;
+        b2 = T::one() + aq;
+        a0 = T::one() + aq;
+        a1 = T::from(-2.).unwrap() * w0_cos;
+        a2 = T::one() - aq;
       },
     }
 
@@ -185,14 +193,14 @@ impl BiquadFilter {
   /// Returns `(magnitude_db, phase_rads)`.
   pub fn compute_response(
     mode: FilterMode,
-    q: f32,
-    cutoff_freq: f32,
-    gain: f32,
-    test_freq: f32,
-    sample_rate: f32,
-  ) -> (f32, f32) {
+    q: T,
+    cutoff_freq: T,
+    gain: T,
+    test_freq: T,
+    sample_rate: T,
+  ) -> (T, T) {
     let (b0, b1, b2, a1, a2) = Self::compute_coefficients(mode, q, cutoff_freq, gain);
-    let omega = 2. * PI * test_freq / sample_rate;
+    let omega = T::from(2.).unwrap() * T::PI() * test_freq / sample_rate;
     Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega)
   }
 
@@ -204,16 +212,16 @@ impl BiquadFilter {
   /// Returns (frequencies_hz, magnitude_db, phase_rads)
   pub fn compute_response_grid(
     mode: FilterMode,
-    q: f32,
-    cutoff_freq: f32,
-    gain: f32,
-    start_freq: f32,
-    sample_rate: f32,
+    q: T,
+    cutoff_freq: T,
+    gain: T,
+    start_freq: T,
+    sample_rate: T,
     grid_points: usize,
-  ) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
-    assert!(start_freq > 0., "start frequency must be > 0");
+  ) -> (Vec<T>, Vec<T>, Vec<T>) {
+    assert!(start_freq > T::zero(), "start frequency must be > 0");
     assert!(
-      start_freq < NYQUIST,
+      start_freq < T::from(NYQUIST).unwrap(),
       "start frequency must be less than the nyquist"
     );
     assert!(grid_points > 0, "need at least one grid point to sample");
@@ -224,7 +232,7 @@ impl BiquadFilter {
     let mut mags = Vec::with_capacity(grid_points);
     let mut phases = Vec::with_capacity(grid_points);
     if grid_points == 1 {
-      let omega = 2. * PI * start_freq / sample_rate;
+      let omega = T::from(2.).unwrap() * T::PI() * start_freq / sample_rate;
       let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
       freqs.push(start_freq);
       mags.push(mag_db);
@@ -232,10 +240,11 @@ impl BiquadFilter {
       return (freqs, mags, phases);
     }
 
-    let multiplier = (NYQUIST / start_freq).powf(1. / ((grid_points - 1) as f32));
+    let multiplier =
+      (T::from(NYQUIST).unwrap() / start_freq).powf(T::one() / (T::from(grid_points - 1).unwrap()));
     for i in 0..grid_points {
       let freq = start_freq * multiplier.powi(i as i32);
-      let omega = 2. * PI * freq / sample_rate;
+      let omega = T::from(2.).unwrap() * T::PI() * freq / sample_rate;
       // TODO: Need a batch version of this function with hard-coded min/max frequency range and
       // grid size so that much of the math can be pre-computed for efficiency
       let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
@@ -252,29 +261,22 @@ impl BiquadFilter {
   /// `omega` is the angular frequency (in rads/sample) at which to sample the response.
   ///
   /// Returns `(magnitude_db, phase_rads)`
-  fn compute_response_from_coefficients(
-    b0: f32,
-    b1: f32,
-    b2: f32,
-    a1: f32,
-    a2: f32,
-    omega: f32,
-  ) -> (f32, f32) {
+  fn compute_response_from_coefficients(b0: T, b1: T, b2: T, a1: T, a2: T, omega: T) -> (T, T) {
     let cos_omega = omega.cos();
     let sin_omega = omega.sin();
-    let cos_2omega = (2. * omega).cos();
-    let sin_2omega = (2. * omega).sin();
+    let cos_2omega = (omega + omega).cos();
+    let sin_2omega = (omega + omega).sin();
 
     let num_re = b0 + b1 * cos_omega + b2 * cos_2omega;
     let num_im = -(b1 * sin_omega + b2 * sin_2omega);
 
-    let den_re = 1. + a1 * cos_omega + a2 * cos_2omega;
+    let den_re = T::one() + a1 * cos_omega + a2 * cos_2omega;
     let den_im = -(a1 * sin_omega + a2 * sin_2omega);
 
     let num_mag = (num_re * num_re + num_im * num_im).sqrt();
     let den_mag = (den_re * den_re + den_im * den_im).sqrt();
     let h_mag = num_mag / den_mag;
-    let magnitude_db = 20. * h_mag.log10();
+    let magnitude_db = T::from(20.).unwrap() * h_mag.log10();
 
     let num_phase = num_im.atan2(num_re);
     let den_phase = den_im.atan2(den_re);
@@ -284,7 +286,7 @@ impl BiquadFilter {
   }
 
   #[inline]
-  pub fn set_coefficients(&mut self, mode: FilterMode, q: f32, freq: f32, gain: f32) {
+  pub fn set_coefficients(&mut self, mode: FilterMode, q: T, freq: T, gain: T) {
     let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
       Self::compute_coefficients(mode, q, freq, gain);
 
@@ -296,7 +298,7 @@ impl BiquadFilter {
   }
 
   #[inline]
-  pub fn new(mode: FilterMode, q: f32, freq: f32, gain: f32) -> BiquadFilter {
+  pub fn new(mode: FilterMode, q: T, freq: T, gain: T) -> BiquadFilter<T> {
     let mut filter = BiquadFilter::default();
     filter.set_coefficients(mode, q, freq, gain);
     filter
@@ -306,12 +308,12 @@ impl BiquadFilter {
   /// been fed silence for an infinite amount of time.
   #[inline]
   pub fn reset(&mut self) {
-    self.x = [0.; 2];
-    self.y = [0.; 2];
+    self.x = [T::zero(); 2];
+    self.y = [T::zero(); 2];
   }
 
   #[inline]
-  pub fn apply(&mut self, input: f32) -> f32 {
+  pub fn apply(&mut self, input: T) -> T {
     let output =
       self.b0_over_a0 * input + self.b1_over_a0 * self.x[0] + self.b2_over_a0 * self.x[1]
         - self.a1_over_a0 * self.y[0]
@@ -326,13 +328,13 @@ impl BiquadFilter {
   #[inline]
   pub fn apply_with_coefficients(
     &mut self,
-    input: f32,
-    b0_over_a0: f32,
-    b1_over_a0: f32,
-    b2_over_a0: f32,
-    a1_over_a0: f32,
-    a2_over_a0: f32,
-  ) -> f32 {
+    input: T,
+    b0_over_a0: T,
+    b1_over_a0: T,
+    b2_over_a0: T,
+    a1_over_a0: T,
+    a2_over_a0: T,
+  ) -> T {
     let output = b0_over_a0 * input + b1_over_a0 * self.x[0] + b2_over_a0 * self.x[1]
       - a1_over_a0 * self.y[0]
       - a2_over_a0 * self.y[1];
@@ -347,11 +349,11 @@ impl BiquadFilter {
   pub fn compute_coefficients_and_apply(
     &mut self,
     mode: FilterMode,
-    q: f32,
-    freq: f32,
-    gain: f32,
-    input: f32,
-  ) -> f32 {
+    q: T,
+    freq: T,
+    gain: T,
+    input: T,
+  ) -> T {
     let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
       Self::compute_coefficients(mode, q, freq, gain);
 
@@ -364,11 +366,11 @@ impl BiquadFilter {
   pub fn compute_coefficients_and_apply_frame(
     &mut self,
     mode: FilterMode,
-    base_q: f32,
-    qs: &[f32; FRAME_SIZE],
-    freqs: &[f32; FRAME_SIZE],
-    gains: &[f32; FRAME_SIZE],
-    frame: &mut [f32; FRAME_SIZE],
+    base_q: T,
+    qs: &[T; FRAME_SIZE],
+    freqs: &[T; FRAME_SIZE],
+    gains: &[T; FRAME_SIZE],
+    frame: &mut [T; FRAME_SIZE],
   ) {
     let mut x = self.x;
     let mut y = self.y;
@@ -398,9 +400,9 @@ impl BiquadFilter {
   pub fn compute_coefficients_and_apply_frame_minimal(
     &mut self,
     mode: FilterMode,
-    cutoff_freq: &[f32; FRAME_SIZE],
-    q: f32,
-    frame: &mut [f32; FRAME_SIZE],
+    cutoff_freq: &[T; FRAME_SIZE],
+    q: T,
+    frame: &mut [T; FRAME_SIZE],
   ) {
     let mut x = self.x;
     let mut y = self.y;
@@ -408,7 +410,7 @@ impl BiquadFilter {
     for i in 0..FRAME_SIZE {
       let freq = cutoff_freq[i];
       let (b0_over_a0, b1_over_a0, b2_over_a0, a1_over_a0, a2_over_a0) =
-        Self::compute_coefficients(mode, q, freq, 0.);
+        Self::compute_coefficients(mode, q, freq, T::zero());
 
       let input = frame[i];
       let output = b0_over_a0 * input + b1_over_a0 * x[0] + b2_over_a0 * x[1]
@@ -428,10 +430,10 @@ impl BiquadFilter {
   pub fn compute_coefficients_and_apply_frame_static_q(
     &mut self,
     mode: FilterMode,
-    q: f32,
-    freqs: &[f32; FRAME_SIZE],
-    gains: &[f32; FRAME_SIZE],
-    frame: &mut [f32; FRAME_SIZE],
+    q: T,
+    freqs: &[T; FRAME_SIZE],
+    gains: &[T; FRAME_SIZE],
+    frame: &mut [T; FRAME_SIZE],
   ) {
     let mut x = self.x;
     let mut y = self.y;

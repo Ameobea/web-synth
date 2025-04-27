@@ -139,6 +139,7 @@ name = "dsp"
 version = "0.1.0"
 dependencies = [
  "fastapprox",
+ "num-traits",
 ]
 
 [[package]]
@@ -228,6 +229,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "dsp",
+ "num-traits",
 ]
 
 [[package]]
