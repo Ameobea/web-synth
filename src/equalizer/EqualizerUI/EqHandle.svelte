@@ -1,42 +1,16 @@
-<script lang="ts" context="module">
-  const getParamControlledByAxis = (
-    filterType: EqualizerFilterType,
-    axis: 'x' | 'y'
-  ): 'freq' | 'gain' | 'q' => {
-    if (axis === 'x') {
-      return 'freq';
-    }
-
-    switch (filterType) {
-      case EqualizerFilterType.Peak:
-      case EqualizerFilterType.Lowshelf:
-      case EqualizerFilterType.Highshelf:
-        return 'gain';
-      case EqualizerFilterType.Highpass:
-      case EqualizerFilterType.Lowpass:
-      case EqualizerFilterType.Bandpass:
-      case EqualizerFilterType.Notch:
-      case EqualizerFilterType.Allpass:
-        return 'q';
-      default:
-        filterType satisfies never;
-        throw new Error(`Unknown filter type: ${filterType}`);
-    }
-  };
-</script>
-
 <script lang="ts">
   import { onDestroy } from 'svelte';
 
-  import { EQ_X_DOMAIN, EQ_Y_DOMAIN } from 'src/equalizer/conf';
-  import { EqualizerFilterType, type EqualizerBand } from 'src/equalizer/equalizer';
-  import { clamp, NYQUIST } from 'src/util';
+  import { EQ_X_DOMAIN, HANDLE_COLOR_BY_FILTER_TYPE } from 'src/equalizer/conf';
+  import { type EqualizerBand } from 'src/equalizer/equalizer';
+  import { clamp } from 'src/util';
   import d3 from '../d3';
+  import { getEqAxes } from 'src/equalizer/eqHelpers';
 
   export let band: EqualizerBand;
   export let bandIx: number;
   export let isActive: boolean;
-  export let onClick: () => void;
+  export let setActive: () => void;
   export let onChange: (band: EqualizerBand) => void;
   export let stageWidth: number;
   export let stageHeight: number;
@@ -44,37 +18,39 @@
   export let automatedParams: { freq: number | null; gain: number | null; q: number | null };
   export let eqUIHidden: boolean;
 
+  $: axesParams = getEqAxes(band.filterType);
+  const xParam = 'freq' as const;
+  $: yParam = axesParams.yParam;
+  $: yDomain = axesParams.yDomain;
+  $: scrollParam = axesParams.scrollParam;
+  $: scrollDomain = axesParams.scrollDomain;
+
   $: xScale = d3.scaleLog().domain(EQ_X_DOMAIN).range([0, stageWidth]);
-  // TODO: Need to handle both gain and q for y axis
-  $: yScale = d3.scaleLinear().domain(EQ_Y_DOMAIN).range([stageHeight, 0]);
+  $: yScale = d3.scaleLinear().domain(yDomain).range([stageHeight, 0]);
 
   $: canControlX = automatedParams[xParam] === null;
   $: canControlY = automatedParams[yParam] === null;
 
   $: computeHandlePos = (
     automatedParams: { freq: number | null; gain: number | null; q: number | null },
-    xParam: 'freq' | 'gain' | 'q',
-    yParam: 'freq' | 'gain' | 'q',
+    yParam: 'gain' | 'q',
     band: EqualizerBand
   ): { x: number; y: number } => {
     const x = xScale(
       canControlX || !automationValsSAB
         ? band.frequency
-        : clamp(10, NYQUIST, automationValsSAB[automatedParams[xParam]!])
+        : clamp(EQ_X_DOMAIN[0], EQ_X_DOMAIN[1], automationValsSAB[automatedParams[xParam]!])
     );
     const y = yScale(
       canControlY || !automationValsSAB
-        ? band.gain
-        : clamp(EQ_Y_DOMAIN[0], EQ_Y_DOMAIN[1], automationValsSAB[automatedParams[yParam]!])
+        ? band[yParam]
+        : clamp(yDomain[0], yDomain[1], automationValsSAB[automatedParams[yParam]!])
     );
-    return { x, y };
+    return { x: clamp(0, stageWidth, x), y: clamp(0, stageHeight, y) };
   };
 
-  $: xParam = getParamControlledByAxis(band.filterType, 'x');
-  $: yParam = getParamControlledByAxis(band.filterType, 'y');
-
   let position: { x: number; y: number } = { x: 0, y: 0 };
-  $: position = computeHandlePos(automatedParams, xParam, yParam, band);
+  $: position = computeHandlePos(automatedParams, yParam, band);
 
   let automationAnimationHandle: number | null = null;
   $: if (eqUIHidden || (canControlX && canControlY)) {
@@ -85,7 +61,7 @@
   } else {
     if (automationAnimationHandle === null) {
       automationAnimationHandle = requestAnimationFrame(() => {
-        position = computeHandlePos(automatedParams, xParam, yParam, band);
+        position = computeHandlePos(automatedParams, yParam, band);
         automationAnimationHandle = null;
       });
     }
@@ -100,11 +76,7 @@
   $: updateBandFromPosition = (band: EqualizerBand, x: number, y: number) => {
     const newBand = { ...band };
     newBand.frequency = clamp(EQ_X_DOMAIN[0], EQ_X_DOMAIN[1], xScale.invert(x));
-    if (yParam === 'gain') {
-      newBand.gain = clamp(EQ_Y_DOMAIN[0], EQ_Y_DOMAIN[1], yScale.invert(y));
-    } else {
-      console.warn('unimplemented yParam:', yParam);
-    }
+    newBand[yParam] = clamp(yDomain[0], yDomain[1], yScale.invert(y));
     onChange(newBand);
   };
 
@@ -135,7 +107,7 @@
 
   const handleMouseDown = (evt: MouseEvent) => {
     evt.preventDefault();
-    onClick();
+    setActive();
     dragState = {
       startPosLocal: { x: position.x, y: position.y },
       lastPosScreen: { x: evt.clientX, y: evt.clientY },
@@ -153,17 +125,24 @@
   };
 
   $: handleScroll = (evt: WheelEvent) => {
+    setActive();
+    if (!scrollParam || !scrollDomain) {
+      return;
+    }
+
     evt.preventDefault();
-    const deltaQ = evt.deltaY > 0 ? -0.1 : 0.1;
-    const newQ = clamp(0.1, 30, band.q + deltaQ);
-    onChange({ ...band, q: newQ });
+    const scrollMag = clamp(0, 0.5, Math.abs(evt.deltaY) / 10);
+    const deltaY = Math.sign(evt.deltaY) * -scrollMag;
+    const newScrollParamVal = clamp(scrollDomain[0], scrollDomain[1], band[scrollParam] + deltaY);
+    onChange({ ...band, [scrollParam]: newScrollParamVal });
   };
 </script>
 
 <div
   class="eq-handle"
   style={`transform: translate(${position.x - 14}px, ${position.y - 14}px);`}
-  style:border={isActive ? '2px solid #45efff' : 'none'}
+  style:border={isActive ? '2px dashed #fff' : 'none'}
+  style:background={HANDLE_COLOR_BY_FILTER_TYPE[band.filterType]}
   on:mousedown={handleMouseDown}
   on:wheel={handleScroll}
   role="button"
@@ -177,7 +156,6 @@
     position: absolute;
     width: 28px;
     height: 28px;
-    background-color: #2059cc;
     border-radius: 50%;
     color: white;
     font-size: 12px;

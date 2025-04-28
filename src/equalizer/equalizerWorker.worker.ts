@@ -2,7 +2,7 @@ import * as Comlink from 'comlink';
 
 import type { EqualizerBand, EqualizerState } from 'src/equalizer/equalizer';
 import d3 from './d3';
-import { EQ_X_DOMAIN, EQ_Y_DOMAIN } from 'src/equalizer/conf';
+import { EQ_X_DOMAIN, EQ_GAIN_DOMAIN } from 'src/equalizer/conf';
 
 const FRAME_SIZE = 128;
 
@@ -58,6 +58,14 @@ export class EqualizerWorker {
     }
   };
 
+  public setState = ({ bands }: { bands: EqualizerBandWithAutomationBufIxs[] }) => {
+    (this.wasmInstance.exports.equalizer_set_band_count as Function)(this.ctxPtr, bands.length);
+    for (let bandIx = 0; bandIx < bands.length; bandIx++) {
+      const band = bands[bandIx];
+      this.setBand(bandIx, band);
+    }
+  };
+
   public setBand = (
     bandIx: number,
     {
@@ -98,7 +106,7 @@ export class EqualizerWorker {
     widthPx: number,
     heightPx: number,
     xDomain: [number, number] = EQ_X_DOMAIN,
-    yDomain: [number, number] = EQ_Y_DOMAIN
+    yDomain: [number, number] = EQ_GAIN_DOMAIN
   ) => {
     const memory = this.getWasmMemoryBuffer();
 

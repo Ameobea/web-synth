@@ -66,6 +66,16 @@ class EqualizerAWP extends AudioWorkletProcessor {
           }
           break;
         }
+        case 'setState': {
+          const {
+            state: { bands },
+          } = evt.data;
+          this.wasmInstance.exports.equalizer_set_band_count(this.ctxPtr, bands.length);
+          for (let bandIx = 0; bandIx < bands.length; bandIx++) {
+            this.commitBand(bandIx, bands[bandIx]);
+          }
+          break;
+        }
         case 'setBand': {
           const { bandIx, band } = evt.data;
           this.commitBand(bandIx, band);

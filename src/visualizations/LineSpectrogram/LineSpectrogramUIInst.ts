@@ -13,8 +13,8 @@ const defaultSide = 'top-left' as 'top-left' | 'bottom-left' | 'top-right' | 'bo
 
 export class LineSpectrumUIInst {
   private svg: d3t.Selection<SVGSVGElement, unknown, null, any>;
-  private xAxis: d3t.Axis<d3t.NumberValue>;
-  private yAxis: d3t.Axis<d3t.NumberValue>;
+  private xAxis?: d3t.Axis<d3t.NumberValue>;
+  private yAxis?: d3t.Axis<d3t.NumberValue>;
   private xScale: d3t.ScaleLogarithmic<number, number>;
   private yScale: d3t.ScaleLinear<number, number>;
   private crosshair: d3t.Selection<SVGGElement, unknown, null, any>;
@@ -26,7 +26,8 @@ export class LineSpectrumUIInst {
     private container: HTMLElement,
     private size: { width: number; height: number },
     private minDb: number,
-    private maxDb: number
+    private maxDb: number,
+    enableAxes: boolean = true
   ) {
     this.svg = d3
       .select<HTMLElement, unknown>(this.container)
@@ -42,20 +43,22 @@ export class LineSpectrumUIInst {
 
     this.xScale = d3
       .scaleLog()
-      .domain([20, SAMPLE_RATE / 2])
+      .domain([10, SAMPLE_RATE / 2])
       .range([0, this.size.width]);
     this.yScale = d3.scaleLinear().domain([this.minDb, this.maxDb]).range([this.size.height, 0]);
 
-    this.xAxis = d3.axisBottom(this.xScale).ticks(50);
-    this.yAxis = d3.axisLeft(this.yScale);
+    if (enableAxes) {
+      this.xAxis = d3.axisBottom(this.xScale).ticks(50);
+      this.yAxis = d3.axisLeft(this.yScale);
 
-    this.svg
-      .append('g')
-      .attr('class', 'x-axis')
-      .attr('transform', `translate(0,${this.size.height})`)
-      .call(this.xAxis);
+      this.svg
+        .append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0,${this.size.height})`)
+        .call(this.xAxis);
 
-    this.svg.append('g').attr('class', 'y-axis').call(this.yAxis);
+      this.svg.append('g').attr('class', 'y-axis').call(this.yAxis);
+    }
 
     this.crosshair = this.svg
       .append<SVGGElement>('g')
@@ -109,6 +112,10 @@ export class LineSpectrumUIInst {
   }
 
   private updateAxes() {
+    if (!this.xAxis || !this.yAxis) {
+      return;
+    }
+
     this.svg
       .select<SVGGElement>('g.x-axis')
       .attr('transform', `translate(0,${this.size.height})`)
@@ -118,7 +125,6 @@ export class LineSpectrumUIInst {
   }
 
   public onMouseMove(xPx: number, yPx: number) {
-    // Update crosshair lines
     this.crosshair
       .style('display', null)
       .select<SVGLineElement>('.x')
@@ -147,7 +153,7 @@ export class LineSpectrumUIInst {
       labelX = xPx - labelMarginX - labelWidth;
     }
 
-    // Adjust label position if it goes off the screen
+    // handle wrapping at edges of the plot
     if (xPx + labelWidth + labelMarginX > this.size.width) {
       labelX = xPx - labelMarginX - labelWidth + 8;
     } else if (xPx - labelWidth - labelMarginX < 0) {
@@ -160,12 +166,10 @@ export class LineSpectrumUIInst {
       labelY = yPx - labelMarginY + 8;
     }
 
-    // Update label group position
     this.crosshair
       .select<SVGGElement>('g.label-group')
       .attr('transform', `translate(${labelX},${labelY})`);
 
-    // Update label text
     this.crosshairXLabel.text(`${xValue.toFixed(1)} Hz`);
     this.crosshairYLabel.attr('y', labelTextYOffset).text(`${yValue.toFixed(1)} dB`);
   }

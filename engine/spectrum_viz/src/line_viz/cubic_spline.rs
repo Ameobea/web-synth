@@ -76,14 +76,14 @@ pub const SAMPLE_RATE: f32 = 44_100.;
 pub const NYQUIST: f32 = SAMPLE_RATE / 2.;
 
 fn frequency_bin_to_pixel(bin_ix: usize, num_bins: usize, canvas_width: f32) -> Option<f32> {
-  let min_log_freq = 20.0f32;
+  let min_log_freq = 10.0f32;
 
   let bin_frequency = (bin_ix as f32) * NYQUIST / ((num_bins - 1) as f32);
   if bin_frequency < min_log_freq {
     return None;
   }
 
-  let log_min_freq = (min_log_freq).log10();
+  let log_min_freq = min_log_freq.log10();
   let log_max_freq = NYQUIST.log10();
   let log_freq_range = log_max_freq - log_min_freq;
 

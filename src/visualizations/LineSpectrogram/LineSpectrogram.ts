@@ -101,6 +101,10 @@ export class LineSpectrogram {
   }
 
   public start() {
+    if (this.running) {
+      return;
+    }
+
     this.running = true;
     this.animate();
   }

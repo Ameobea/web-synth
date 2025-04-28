@@ -15,7 +15,7 @@ const MAX_AUTOMATED_PARAM_COUNT: usize = 4;
 
 const MIN_FREQ: f64 = 10.;
 const MAX_FREQ: f64 = NYQUIST as f64;
-const MIN_Q: f64 = 0.1;
+const MIN_Q: f64 = -100.;
 const MAX_Q: f64 = 100.;
 const MIN_GAIN: f64 = -100.;
 const MAX_GAIN: f64 = 100.;
@@ -284,6 +284,14 @@ pub extern "C" fn equalizer_set_band(
       params.gain = gain;
     },
   }
+}
+
+#[no_mangle]
+pub extern "C" fn equalizer_set_band_count(ctx: *mut EqualizerInstT, band_count: usize) {
+  let ctx = unsafe { &mut *ctx };
+  ctx
+    .bands
+    .resize_with(band_count, || EqualizerBand::default());
 }
 
 #[no_mangle]

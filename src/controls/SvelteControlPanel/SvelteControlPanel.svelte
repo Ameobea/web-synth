@@ -21,7 +21,7 @@
     | {
         type: 'select';
         label: string;
-        options: string[] | Record<any, any>;
+        options: string[] | Record<string, any>;
         initial?: string | number;
       }
     | {

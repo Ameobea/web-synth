@@ -89,7 +89,11 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
     );
     let w0_sin = w0.sin();
 
-    // for bandpass, notch, allpass, and peak filters, Q is a linear value with a minimum of 0.0001
+    // For lowpass and highpass filters the Q value is interpreted to be in dB.
+    //
+    // For the bandpass, notch, allpass, and peaking filters, Q is a linear value. The value is
+    // related to the bandwidth of the filter and hence should be a positive value.
+    //
     // https://webaudio.github.io/web-audio-api/#dom-biquadfilternode-q
     if matches!(
       mode,
@@ -108,8 +112,7 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
     #[allow(non_snake_case)]
     let S = T::one();
     let a_s = (w0_sin / T::from(2.).unwrap())
-      * ((A + T::from(1.).unwrap() / A) * ((T::one() / S) - T::one()) + T::from(2.).unwrap())
-        .sqrt();
+      * ((A + T::one() / A) * ((T::one() / S) - T::one()) + T::from(2.).unwrap()).sqrt();
 
     let (b0, b1, b2, a0, a1, a2);
 
@@ -188,7 +191,7 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
     (b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
   }
 
-  /// Computes the frequency and phase response of the biquad filter at a specified test frequency.
+  /// Computes the frequency and phase response of the biquad filter at a specified frequency.
   ///
   /// Returns `(magnitude_db, phase_rads)`.
   pub fn compute_response(
@@ -258,20 +261,20 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
 
   /// Helper function that computes the magnitude and phase response given precomputed coefficients.
   ///
-  /// `omega` is the angular frequency (in rads/sample) at which to sample the response.
+  /// `ω` is the angular frequency (in rads/sample) at which to sample the response.
   ///
   /// Returns `(magnitude_db, phase_rads)`
-  fn compute_response_from_coefficients(b0: T, b1: T, b2: T, a1: T, a2: T, omega: T) -> (T, T) {
-    let cos_omega = omega.cos();
-    let sin_omega = omega.sin();
-    let cos_2omega = (omega + omega).cos();
-    let sin_2omega = (omega + omega).sin();
+  fn compute_response_from_coefficients(b0: T, b1: T, b2: T, a1: T, a2: T, ω: T) -> (T, T) {
+    let cos_ω = ω.cos();
+    let sin_ω = ω.sin();
+    let cos_2ω = (ω + ω).cos();
+    let sin_2ω = (ω + ω).sin();
 
-    let num_re = b0 + b1 * cos_omega + b2 * cos_2omega;
-    let num_im = -(b1 * sin_omega + b2 * sin_2omega);
+    let num_re = b0 + b1 * cos_ω + b2 * cos_2ω;
+    let num_im = -(b1 * sin_ω + b2 * sin_2ω);
 
-    let den_re = T::one() + a1 * cos_omega + a2 * cos_2omega;
-    let den_im = -(a1 * sin_omega + a2 * sin_2omega);
+    let den_re = T::one() + a1 * cos_ω + a2 * cos_2ω;
+    let den_im = -(a1 * sin_ω + a2 * sin_2ω);
 
     let num_mag = (num_re * num_re + num_im * num_im).sqrt();
     let den_mag = (den_re * den_re + den_im * den_im).sqrt();

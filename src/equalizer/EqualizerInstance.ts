@@ -11,8 +11,10 @@ import { EQ_AXIS_MARGIN, EQ_MAX_AUTOMATED_PARAM_COUNT } from 'src/equalizer/conf
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioNode } from 'src/graphEditor/nodes/util';
 import { getValidParamsForFilterType } from 'src/equalizer/eqHelpers';
+import { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
+import { LineSpectrogramFFTSize } from 'src/visualizations/LineSpectrogram/conf';
 
-const RESPONSES_GRID_SIZE = 256;
+const RESPONSES_GRID_SIZE = 512;
 
 const EqualizerAWPInitialized = new AsyncOnce(
   () =>
@@ -36,6 +38,7 @@ const EqualizerWasm = new AsyncOnce(
 export class EqualizerInstance {
   private ctx: AudioContext;
   public vcId: string;
+  public lineSpectrogram: LineSpectrogram;
   public state: TransparentWritable<EqualizerState>;
   /**
    * Holds the last seen value from the audio thread for each automation slot
@@ -49,6 +52,7 @@ export class EqualizerInstance {
   public uiState: TransparentWritable<{ hidden: boolean }>;
   private unsubscribeUIState: Unsubscriber;
   public awpHandle: AudioWorkletNode | DummyNode;
+  private analyzerNode: AnalyserNode;
   private worker: Comlink.Remote<EqualizerWorker>;
   private workerReadyP!: Promise<void>;
   private ready = false;
@@ -76,12 +80,26 @@ export class EqualizerInstance {
     this.state = rwritable(R.clone(initialState));
     this.bandOANs = initialState.bands.map((_band, bandIx) => this.buildOANsForBand(bandIx));
     this.uiState = uiState;
-    this.unsubscribeUIState = uiState.subscribe(_newUIState => {
-      this.maybeComputeAndPlotResponse();
-      this.maybeStartOrStopResponseAnimation();
-    });
     this.awpHandle = new DummyNode('equalizer');
     this.worker = Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url)));
+    this.analyzerNode = ctx.createAnalyser();
+    this.analyzerNode.fftSize = LineSpectrogramFFTSize;
+    this.analyzerNode.minDecibels = initialState.lineSpectrogramUIState.rangeDb[0];
+    this.analyzerNode.maxDecibels = initialState.lineSpectrogramUIState.rangeDb[1];
+    this.analyzerNode.smoothingTimeConstant = initialState.lineSpectrogramUIState.smoothingCoeff;
+    this.lineSpectrogram = new LineSpectrogram(
+      initialState.lineSpectrogramUIState,
+      this.analyzerNode
+    );
+    this.unsubscribeUIState = uiState.subscribe(newUIState => {
+      this.maybeComputeAndPlotResponse();
+      this.maybeStartOrStopResponseAnimation();
+      if (newUIState.hidden) {
+        this.lineSpectrogram.stop();
+      } else {
+        this.lineSpectrogram.start();
+      }
+    });
 
     this.init();
   }
@@ -96,6 +114,7 @@ export class EqualizerInstance {
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
     });
+    this.awpHandle.connect(this.analyzerNode);
 
     for (
       let automationSlotIx = 0;
@@ -164,7 +183,6 @@ export class EqualizerInstance {
         const param = (this.awpHandle.parameters as Map<string, AudioParam>).get(
           `automation_${emptySlotIx}`
         )!;
-        console.log('connecting in status change cb');
         node.connect(param);
       }
     } else {
@@ -327,6 +345,62 @@ export class EqualizerInstance {
     }
   }
 
+  public addBand(newBand: EqualizerBand) {
+    this.bandOANs.push(this.buildOANsForBand(this.state.current.bands.length));
+
+    this.state.update(state => {
+      const newState = { ...state, bands: [...state.bands] };
+      newState.bands.push(newBand);
+      newState.activeBandIx = newState.bands.length - 1;
+      return newState;
+    });
+
+    this.setBand(this.state.current.bands.length - 1, newBand);
+
+    updateConnectables(this.vcId, this.buildAudioConnectables());
+  }
+
+  public async deleteBand(bandIx: number) {
+    this.bandOANs.splice(bandIx, 1);
+    this.automatedParams.update(params =>
+      params.map(p => {
+        if (!p) {
+          return null;
+        }
+        if (p.bandIx === bandIx) {
+          return null;
+        }
+        if (p.bandIx > bandIx) {
+          return { ...p, bandIx: p.bandIx - 1 };
+        }
+        return p;
+      })
+    );
+
+    this.state.update(state => {
+      const newState = { ...state, bands: [...state.bands] };
+      newState.bands.splice(bandIx, 1);
+      if (bandIx === newState.activeBandIx) {
+        newState.activeBandIx = newState.bands.length === 0 ? undefined : Math.max(0, bandIx - 1);
+      }
+      return newState;
+    });
+
+    if (this.ready) {
+      const encodedState = {
+        bands: this.state.current.bands.map((_band, bandIx) => this.buildAWPBandState(bandIx)),
+      };
+      (this.awpHandle as AudioWorkletNode).port.postMessage({
+        type: 'setState',
+        state: encodedState,
+      });
+      await this.worker.setState(encodedState);
+      this.maybeComputeAndPlotResponse();
+    }
+
+    updateConnectables(this.vcId, this.buildAudioConnectables());
+  }
+
   private animateResponse = () => {
     this.maybeComputeAndPlotResponse();
     this.responseAnimationFrameHandle = requestAnimationFrame(this.animateResponse);
@@ -352,7 +426,7 @@ export class EqualizerInstance {
     });
     const outputs = ImmMap<string, ConnectableOutput>().set('output', {
       type: 'customAudio',
-      node: this.awpHandle,
+      node: this.analyzerNode,
     });
 
     for (let bandIx = 0; bandIx < this.state.current.bands.length; bandIx += 1) {

@@ -25,6 +25,9 @@
       const newState = { ...state };
       switch (key) {
         case 'min/max dB':
+          if (value[1] >= value[0]) {
+            value[1] += 0.0001;
+          }
           newState.rangeDb = value;
           analyserNode.minDecibels = value[0];
           analyserNode.maxDecibels = value[1];
