@@ -2,11 +2,15 @@
 
 #[derive(Clone, Default)]
 pub struct DCBlocker {
-  last_sample: f32,
+  last_input: f32,
+  last_output: f32,
 }
 
 impl DCBlocker {
   pub fn apply(&mut self, sample: f32) -> f32 {
-    sample - self.last_sample + 0.995 * self.last_sample
+    let out = sample - self.last_input + 0.9975 * self.last_output;
+    self.last_input = sample;
+    self.last_output = out;
+    out
   }
 }

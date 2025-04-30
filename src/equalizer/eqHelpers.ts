@@ -9,6 +9,12 @@ export enum EqualizerFilterType {
   Lowshelf = 5,
   Highshelf = 6,
   Allpass = 7,
+  Order4Lowpass = 8,
+  Order8Lowpass = 9,
+  Order16Lowpass = 10,
+  Order4Highpass = 11,
+  Order8Highpass = 12,
+  Order16Highpass = 13,
 }
 
 export const getValidParamsForFilterType = (
@@ -20,6 +26,12 @@ export const getValidParamsForFilterType = (
     case EqualizerFilterType.Bandpass:
     case EqualizerFilterType.Notch:
     case EqualizerFilterType.Allpass:
+    case EqualizerFilterType.Order4Lowpass:
+    case EqualizerFilterType.Order8Lowpass:
+    case EqualizerFilterType.Order16Lowpass:
+    case EqualizerFilterType.Order4Highpass:
+    case EqualizerFilterType.Order8Highpass:
+    case EqualizerFilterType.Order16Highpass:
       return ['freq', 'q'];
     case EqualizerFilterType.Peak:
       return ['freq', 'gain', 'q'];
@@ -59,6 +71,12 @@ export const getEqAxes = (
     case EqualizerFilterType.Bandpass:
     case EqualizerFilterType.Notch:
     case EqualizerFilterType.Allpass:
+    case EqualizerFilterType.Order4Lowpass:
+    case EqualizerFilterType.Order8Lowpass:
+    case EqualizerFilterType.Order16Lowpass:
+    case EqualizerFilterType.Order4Highpass:
+    case EqualizerFilterType.Order8Highpass:
+    case EqualizerFilterType.Order16Highpass:
       return {
         yParam: 'q' as const,
         yDomain: EQ_Q_DOMAIN,

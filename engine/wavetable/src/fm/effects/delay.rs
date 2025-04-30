@@ -1,4 +1,4 @@
-use dsp::circular_buffer::CircularBuffer;
+use dsp::{circular_buffer::CircularBuffer, filters::dc_blocker::DCBlocker};
 
 use super::Effect;
 use crate::fm::{ParamSource, SAMPLE_RATE};
@@ -12,6 +12,7 @@ pub struct Delay {
   pub wet: ParamSource,
   pub dry: ParamSource,
   pub feedback: ParamSource,
+  pub dc_blocker: DCBlocker,
 }
 
 impl Effect for Delay {
@@ -30,7 +31,8 @@ impl Effect for Delay {
     let delayed_sample = self.buffer.read_interpolated(-delay_samples);
     self.buffer.set(sample + (delayed_sample * feedback));
 
-    (sample * dry) + (delayed_sample * wet)
+    let sample = (sample * dry) + (delayed_sample * wet);
+    self.dc_blocker.apply(sample)
   }
 
   fn reset(&mut self) { self.buffer.fill(0.); }

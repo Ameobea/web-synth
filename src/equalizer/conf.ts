@@ -21,7 +21,13 @@ export const EQ_MAX_AUTOMATED_PARAM_COUNT = 4;
 
 export const HANDLE_COLOR_BY_FILTER_TYPE: Record<EqualizerFilterType, string> = {
   [EqualizerFilterType.Lowpass]: '#18a324',
+  [EqualizerFilterType.Order4Lowpass]: '#18a324',
+  [EqualizerFilterType.Order8Lowpass]: '#18a324',
+  [EqualizerFilterType.Order16Lowpass]: '#18a324',
   [EqualizerFilterType.Highpass]: '#a12f13',
+  [EqualizerFilterType.Order4Highpass]: '#a12f13',
+  [EqualizerFilterType.Order8Highpass]: '#a12f13',
+  [EqualizerFilterType.Order16Highpass]: '#a12f13',
   [EqualizerFilterType.Bandpass]: '#9024ad',
   [EqualizerFilterType.Notch]: '#838f18',
   [EqualizerFilterType.Peak]: '#abab11',

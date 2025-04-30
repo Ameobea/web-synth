@@ -1,8 +1,12 @@
-use std::f32::consts::PI;
+use std::{
+  f32::consts::PI,
+  ops::{AddAssign, MulAssign},
+};
 
+use num_complex::Complex;
 use num_traits::{Float, FloatConst};
 
-use crate::{linear_to_db_checked, FRAME_SIZE, NYQUIST};
+use crate::{db_to_gain_generic, linear_to_db_checked, FRAME_SIZE, NYQUIST};
 
 /// Second-order biquad filter
 #[derive(Clone, Copy, Default)]
@@ -74,7 +78,13 @@ impl FilterMode {
   }
 }
 
-impl<T: Float + FloatConst + Default> BiquadFilter<T> {
+pub struct ComputeGridFilterParams<T: Float + FloatConst + Default> {
+  pub q: T,
+  pub cutoff_freq: T,
+  pub gain: T,
+}
+
+impl<T: Float + FloatConst + Default + MulAssign + AddAssign> BiquadFilter<T> {
   #[inline]
   pub fn compute_coefficients(mode: FilterMode, mut q: T, freq: T, gain: T) -> (T, T, T, T, T) {
     // From: https://webaudio.github.io/web-audio-api/#filters-characteristics
@@ -212,8 +222,8 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
   ///
   /// `start_freq` must be non-zero and smaller than the nyquist (`sample_rate/2`).
   ///
-  /// Returns (frequencies_hz, magnitude_db, phase_rads)
-  pub fn compute_response_grid(
+  /// Returns (frequencies_hz, magnitude_linear, phase_rads)
+  pub fn compute_response_grid<O: Float>(
     mode: FilterMode,
     q: T,
     cutoff_freq: T,
@@ -221,7 +231,7 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
     start_freq: T,
     sample_rate: T,
     grid_points: usize,
-  ) -> (Vec<T>, Vec<T>, Vec<T>) {
+  ) -> (Vec<O>, Vec<O>, Vec<O>) {
     assert!(start_freq > T::zero(), "start frequency must be > 0");
     assert!(
       start_freq < T::from(NYQUIST).unwrap(),
@@ -237,9 +247,9 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
     if grid_points == 1 {
       let omega = T::from(2.).unwrap() * T::PI() * start_freq / sample_rate;
       let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
-      freqs.push(start_freq);
-      mags.push(mag_db);
-      phases.push(phase);
+      freqs.push(O::from(start_freq).unwrap());
+      mags.push(db_to_gain_generic(O::from(mag_db).unwrap()));
+      phases.push(O::from(phase).unwrap());
       return (freqs, mags, phases);
     }
 
@@ -251,9 +261,63 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
       // TODO: Need a batch version of this function with hard-coded min/max frequency range and
       // grid size so that much of the math can be pre-computed for efficiency
       let (mag_db, phase) = Self::compute_response_from_coefficients(b0, b1, b2, a1, a2, omega);
-      freqs.push(freq);
-      mags.push(mag_db);
-      phases.push(phase);
+      freqs.push(O::from(freq).unwrap());
+      mags.push(db_to_gain_generic(O::from(mag_db).unwrap()));
+      phases.push(O::from(phase).unwrap());
+    }
+
+    (freqs, mags, phases)
+  }
+
+  pub fn compute_chain_response_grid<O: Float + MulAssign + AddAssign, const LEN: usize>(
+    mode: FilterMode,
+    params: [ComputeGridFilterParams<T>; LEN],
+    start_freq: T,
+    sample_rate: T,
+    grid_points: usize,
+  ) -> (Vec<O>, Vec<O>, Vec<O>) {
+    if LEN == 0 {
+      panic!("LEN must be > 0");
+    } else if LEN == 1 {
+      return Self::compute_response_grid(
+        mode,
+        params[0].q,
+        params[0].cutoff_freq,
+        params[0].gain,
+        start_freq,
+        sample_rate,
+        grid_points,
+      );
+    }
+
+    let base_q = params[0].q;
+    let base_freq = params[0].cutoff_freq;
+    let base_gain = params[0].gain;
+    let (freqs, mut mags, mut phases) = Self::compute_response_grid(
+      mode,
+      base_q,
+      base_freq,
+      base_gain,
+      start_freq,
+      sample_rate,
+      grid_points,
+    );
+
+    for i in 1..LEN {
+      let (_o_freqs, o_mags, o_phases) = Self::compute_response_grid(
+        mode,
+        params[i].q,
+        params[i].cutoff_freq,
+        params[i].gain,
+        start_freq,
+        sample_rate,
+        grid_points,
+      );
+
+      for j in 0..grid_points {
+        mags[j] *= o_mags[j];
+        phases[j] += o_phases[j];
+      }
     }
 
     (freqs, mags, phases)
@@ -265,25 +329,23 @@ impl<T: Float + FloatConst + Default> BiquadFilter<T> {
   ///
   /// Returns `(magnitude_db, phase_rads)`
   fn compute_response_from_coefficients(b0: T, b1: T, b2: T, a1: T, a2: T, ω: T) -> (T, T) {
-    let cos_ω = ω.cos();
-    let sin_ω = ω.sin();
-    let cos_2ω = (ω + ω).cos();
-    let sin_2ω = (ω + ω).sin();
+    let j = Complex::<T>::i();
+    // let e_jω = (-j * ω).exp();
+    // the `Complex::exp()` impl handles a lot of edge cases that aren't necessary.
+    let neg_jω = -j * ω;
+    let e_jω = Complex::from_polar(neg_jω.re.exp(), neg_jω.im);
+    let e_j2ω = e_jω * e_jω;
 
-    let num_re = b0 + b1 * cos_ω + b2 * cos_2ω;
-    let num_im = -(b1 * sin_ω + b2 * sin_2ω);
+    let num = Complex::new(b0, T::zero())
+      + Complex::new(b1, T::zero()) * e_jω
+      + Complex::new(b2, T::zero()) * e_j2ω;
+    let den = Complex::new(T::one(), T::zero())
+      + Complex::new(a1, T::zero()) * e_jω
+      + Complex::new(a2, T::zero()) * e_j2ω;
 
-    let den_re = T::one() + a1 * cos_ω + a2 * cos_2ω;
-    let den_im = -(a1 * sin_ω + a2 * sin_2ω);
-
-    let num_mag = (num_re * num_re + num_im * num_im).sqrt();
-    let den_mag = (den_re * den_re + den_im * den_im).sqrt();
-    let h_mag = num_mag / den_mag;
-    let magnitude_db = T::from(20.).unwrap() * h_mag.log10();
-
-    let num_phase = num_im.atan2(num_re);
-    let den_phase = den_im.atan2(den_re);
-    let phase = num_phase - den_phase;
+    let h = num / den;
+    let magnitude_db = T::from(20.).unwrap() * h.norm().log10();
+    let phase = h.arg();
 
     (magnitude_db, phase)
   }

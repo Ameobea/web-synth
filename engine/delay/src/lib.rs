@@ -1,4 +1,4 @@
-use dsp::filters::butterworth::ButterworthFilter;
+use dsp::filters::{butterworth::ButterworthFilter, dc_blocker::DCBlocker};
 
 const SAMPLE_RATE: usize = 44_100;
 const FRAME_SIZE: usize = 128;
@@ -19,6 +19,7 @@ pub struct DelayCtx {
   pub last_highpass_cutoff: f32,
   pub highpass_cutoff: Box<[f32; FRAME_SIZE]>,
   pub highpass_filter: ButterworthFilter,
+  pub dc_blocker: DCBlocker,
 }
 
 #[inline(always)]
@@ -39,6 +40,7 @@ pub extern "C" fn init_delay_ctx() -> *mut DelayCtx {
     last_highpass_cutoff: 0.,
     highpass_cutoff: Box::new(uninit()),
     highpass_filter: ButterworthFilter::default(),
+    dc_blocker: DCBlocker::default(),
   };
   Box::into_raw(Box::new(delay_ctx))
 }
@@ -95,6 +97,7 @@ pub extern "C" fn process_delay(ctx: *mut DelayCtx) {
       .delay_line
       .set(highpassed_sample + delayed_sample * feedback);
     ctx.delay_output_buffer[sample_ix] = delayed_sample;
-    ctx.main_io_buffer[sample_ix] = sample + delayed_sample * delay_gain;
+    let out_sample = ctx.dc_blocker.apply(sample + delayed_sample * delay_gain);
+    ctx.main_io_buffer[sample_ix] = out_sample;
   }
 }

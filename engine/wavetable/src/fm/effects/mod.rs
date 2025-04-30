@@ -1,7 +1,10 @@
 use ::compressor::MultibandCompressor;
 use dsp::{
   circular_buffer::CircularBuffer,
-  filters::biquad::{BiquadFilter, FilterMode},
+  filters::{
+    biquad::{BiquadFilter, FilterMode},
+    dc_blocker::DCBlocker,
+  },
 };
 use rand::Rng;
 use soft_clipper::SoftClipper;
@@ -309,6 +312,7 @@ impl EffectInstance {
             param_4_float_val_2,
             param_4_float_val_3,
           ),
+          dc_blocker: DCBlocker::default(),
         };
 
         EffectInstance::Delay(delay)

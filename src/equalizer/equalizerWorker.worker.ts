@@ -108,7 +108,7 @@ export class EqualizerWorker {
     xDomain: [number, number] = EQ_X_DOMAIN,
     yDomain: [number, number] = EQ_GAIN_DOMAIN
   ) => {
-    const memory = this.getWasmMemoryBuffer();
+    let memory = this.getWasmMemoryBuffer();
 
     if (this.automationValsSAB) {
       const automationBufsPtr = (
@@ -139,6 +139,9 @@ export class EqualizerWorker {
     // const phasesPtr = (this.wasmInstance.exports.equalizer_get_response_phases_ptr as Function)(
     //   this.ctxPtr
     // );
+
+    // have to re-acquire memory in case computing the responses caused it to grow
+    memory = this.getWasmMemoryBuffer();
 
     const freqs = new Float32Array(memory.buffer, freqsPtr, gridSize);
     const mags = new Float32Array(memory.buffer, magsPtr, gridSize);

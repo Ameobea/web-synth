@@ -1,6 +1,7 @@
+use std::ops::{AddAssign, MulAssign};
+
 use dsp::{
-  db_to_gain_generic,
-  filters::biquad::{BiquadFilter, FilterMode},
+  filters::biquad::{BiquadFilter, ComputeGridFilterParams, FilterMode},
   linear_to_db_checked, FRAME_SIZE, NYQUIST, SAMPLE_RATE,
 };
 use num_traits::{Float, FloatConst};
@@ -34,6 +35,7 @@ fn maybe_init() {
   common::set_raw_panic_hook(log_err);
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum EqualizerFilterType {
   Lowpass = 0,
   Highpass = 1,
@@ -43,7 +45,33 @@ pub enum EqualizerFilterType {
   Lowshelf = 5,
   Highshelf = 6,
   Allpass = 7,
-  // TODO: Bell
+  Order4Lowpass = 8,
+  Order8Lowpass = 9,
+  Order16Lowpass = 10,
+  Order4Highpass = 11,
+  Order8Highpass = 12,
+  Order16Highpass = 13,
+}
+
+impl EqualizerFilterType {
+  pub fn get_lower_order_mode(&self) -> FilterMode {
+    match self {
+      EqualizerFilterType::Lowpass => FilterMode::Lowpass,
+      EqualizerFilterType::Highpass => FilterMode::Highpass,
+      EqualizerFilterType::Bandpass => FilterMode::Bandpass,
+      EqualizerFilterType::Notch => FilterMode::Notch,
+      EqualizerFilterType::Peak => FilterMode::Peak,
+      EqualizerFilterType::Lowshelf => FilterMode::Lowshelf,
+      EqualizerFilterType::Highshelf => FilterMode::Highshelf,
+      EqualizerFilterType::Allpass => FilterMode::Allpass,
+      EqualizerFilterType::Order4Lowpass => FilterMode::Lowpass,
+      EqualizerFilterType::Order8Lowpass => FilterMode::Lowpass,
+      EqualizerFilterType::Order16Lowpass => FilterMode::Lowpass,
+      EqualizerFilterType::Order4Highpass => FilterMode::Highpass,
+      EqualizerFilterType::Order8Highpass => FilterMode::Highpass,
+      EqualizerFilterType::Order16Highpass => FilterMode::Highpass,
+    }
+  }
 }
 
 impl Into<FilterMode> for EqualizerFilterType {
@@ -57,13 +85,14 @@ impl Into<FilterMode> for EqualizerFilterType {
       EqualizerFilterType::Lowshelf => FilterMode::Lowshelf,
       EqualizerFilterType::Highshelf => FilterMode::Highshelf,
       EqualizerFilterType::Allpass => FilterMode::Allpass,
+      _ => panic!("Invalid filter type: {self:?}"),
     }
   }
 }
 
 impl EqualizerFilterType {
   fn from_usize(filter_type: usize) -> Self {
-    if filter_type > 7 {
+    if filter_type > 13 {
       panic!("Invalid filter type: {filter_type}");
     }
     unsafe { std::mem::transmute(filter_type as u8) }
@@ -83,6 +112,29 @@ pub enum EqualizerBandInner<T: Float + FloatConst + Default> {
     filter: BiquadFilter<T>,
     params: BiquadFilterParams<T>,
   },
+  Biquad4 {
+    filter: [BiquadFilter<T>; 2],
+    params: BiquadFilterParams<T>,
+  },
+  Biquad8 {
+    filter: [BiquadFilter<T>; 4],
+    params: BiquadFilterParams<T>,
+  },
+  Biquad16 {
+    filter: [BiquadFilter<T>; 8],
+    params: BiquadFilterParams<T>,
+  },
+}
+
+impl<T: Float + FloatConst + Default> EqualizerBandInner<T> {
+  pub fn get_params(&self) -> &BiquadFilterParams<T> {
+    match self {
+      EqualizerBandInner::Biquad { params, .. } => params,
+      EqualizerBandInner::Biquad4 { params, .. } => params,
+      EqualizerBandInner::Biquad8 { params, .. } => params,
+      EqualizerBandInner::Biquad16 { params, .. } => params,
+    }
+  }
 }
 
 impl<T: Float + FloatConst + Default> Default for EqualizerBandInner<T> {
@@ -94,17 +146,99 @@ impl<T: Float + FloatConst + Default> Default for EqualizerBandInner<T> {
   }
 }
 
-impl<T: Float + FloatConst + Default> EqualizerBandInner<T> {
+// computed with `compute_higher_order_biquad_q_factors`, converted to dB from linear values
+const ORDER_4_Q_FACTORS: [f64; 2] = [-5.332906831698536, 2.3226068750587237];
+const ORDER_8_Q_FACTORS: [f64; 4] = [
+  -5.852078700167258,
+  -4.417527547217123,
+  -0.9153792844814148,
+  8.174685575225983,
+];
+const ORDER_16_Q_FACTORS: [f64; 8] = [
+  -5.978673956900887,
+  -5.638297129212715,
+  -4.929196196746187,
+  -3.7843072510784115,
+  -2.0677714490888492,
+  0.5116686495290655,
+  4.722917844731299,
+  14.15335953212686,
+];
+
+fn apply_filter_chain<T: Float + FloatConst + Default + MulAssign + AddAssign, const LEN: usize>(
+  filter_chain: &mut [BiquadFilter<T>; LEN],
+  mut sample: T,
+) -> T {
+  for filter in filter_chain {
+    sample = filter.apply(sample);
+  }
+  sample
+}
+
+fn apply_filter_chain_dynamic<
+  T: Float + FloatConst + Default + MulAssign + AddAssign,
+  const LEN: usize,
+>(
+  mode: FilterMode,
+  filter_chain: &mut [BiquadFilter<T>; LEN],
+  base_qs: &[f64; LEN],
+  q_offset: T,
+  freq: T,
+  gain: T,
+  mut sample: T,
+) -> T {
+  for (filter_ix, filter) in filter_chain.iter_mut().enumerate() {
+    let q = T::from(base_qs[filter_ix]).unwrap() + q_offset / T::from(LEN).unwrap();
+    let coeffs = BiquadFilter::compute_coefficients(mode, q, freq, gain);
+    sample =
+      filter.apply_with_coefficients(sample, coeffs.0, coeffs.1, coeffs.2, coeffs.3, coeffs.4);
+  }
+  sample
+}
+
+impl<T: Float + FloatConst + Default + MulAssign + AddAssign> EqualizerBandInner<T> {
   pub fn apply_static(&mut self, sample: T) -> T {
     match self {
       EqualizerBandInner::Biquad { filter, .. } => filter.apply(sample),
+      EqualizerBandInner::Biquad4 { filter, .. } => apply_filter_chain(filter, sample),
+      EqualizerBandInner::Biquad8 { filter, .. } => apply_filter_chain(filter, sample),
+      EqualizerBandInner::Biquad16 { filter, .. } => apply_filter_chain(filter, sample),
     }
   }
 
   pub fn apply_dynamic(&mut self, freq: T, q: T, gain: T, sample: T) -> T {
     match self {
-      EqualizerBandInner::Biquad { filter, params } =>
-        filter.compute_coefficients_and_apply(params.mode, q, freq, gain, sample),
+      EqualizerBandInner::Biquad { filter, params } => {
+        let coeffs = BiquadFilter::compute_coefficients(params.mode, q, freq, gain);
+        filter.apply_with_coefficients(sample, coeffs.0, coeffs.1, coeffs.2, coeffs.3, coeffs.4)
+      },
+      EqualizerBandInner::Biquad4 { filter, params } => apply_filter_chain_dynamic(
+        params.mode,
+        filter,
+        &ORDER_4_Q_FACTORS,
+        q,
+        freq,
+        gain,
+        sample,
+      ),
+      EqualizerBandInner::Biquad8 { filter, params } => apply_filter_chain_dynamic(
+        params.mode,
+        filter,
+        &ORDER_8_Q_FACTORS,
+        q,
+        freq,
+        gain,
+        sample,
+      ),
+      EqualizerBandInner::Biquad16 { filter, params } => apply_filter_chain_dynamic(
+        params.mode,
+        filter,
+        &ORDER_16_Q_FACTORS,
+        q,
+        freq,
+        gain,
+        sample,
+      ),
     }
   }
 }
@@ -146,7 +280,7 @@ pub struct EqualizerBand<T: Float + FloatConst + Default> {
   pub param_overrides: EqBandParamOverrides,
 }
 
-impl<T: Float + FloatConst + Default> EqualizerBand<T> {
+impl<T: Float + FloatConst + Default + MulAssign + AddAssign> EqualizerBand<T> {
   fn apply(
     &mut self,
     automation_bufs: &[[f32; FRAME_SIZE]; MAX_AUTOMATED_PARAM_COUNT],
@@ -165,17 +299,13 @@ impl<T: Float + FloatConst + Default> EqualizerBand<T> {
         raw_freq,
       )
     } else {
-      match &self.inner {
-        EqualizerBandInner::Biquad { params, .. } => params.freq,
-      }
+      self.inner.get_params().freq
     };
     let q = if let Some(q_ix) = self.param_overrides.q.as_opt() {
       let raw_q = T::from(automation_bufs[q_ix][sample_ix]).unwrap();
       dsp::clamp(T::from(MIN_Q).unwrap(), T::from(MAX_Q).unwrap(), raw_q)
     } else {
-      match &self.inner {
-        EqualizerBandInner::Biquad { params, .. } => params.q,
-      }
+      self.inner.get_params().q
     };
     let gain = if let Some(gain_ix) = self.param_overrides.gain.as_opt() {
       let raw_gain = T::from(automation_bufs[gain_ix][sample_ix]).unwrap();
@@ -185,9 +315,7 @@ impl<T: Float + FloatConst + Default> EqualizerBand<T> {
         raw_gain,
       )
     } else {
-      match &self.inner {
-        EqualizerBandInner::Biquad { params, .. } => params.gain,
-      }
+      self.inner.get_params().gain
     };
     return self.inner.apply_dynamic(freq, q, gain, sample);
   }
@@ -274,14 +402,135 @@ pub extern "C" fn equalizer_set_band(
     NonMaxUsizeOpt(freq_automation_ix)
   };
 
-  match &mut band.inner {
-    EqualizerBandInner::Biquad { filter, params } => {
-      let mode = EqualizerFilterType::from_usize(filter_type).into();
+  fn set_chain_params<T: Float + FloatConst + Default + MulAssign + AddAssign, const LEN: usize>(
+    filter_chain: &mut [BiquadFilter<T>; LEN],
+    params: &mut BiquadFilterParams<T>,
+    mode: FilterMode,
+    base_qs: &[T; LEN],
+    q_offset: T,
+    frequency: T,
+    gain: T,
+  ) {
+    for (filter_ix, filter) in filter_chain.iter_mut().enumerate() {
+      let q = base_qs[filter_ix] + q_offset / T::from(LEN).unwrap();
+      filter.set_coefficients(mode, q, frequency, gain);
+    }
+
+    params.mode = mode;
+    params.q = q_offset;
+    params.freq = frequency;
+    params.gain = gain;
+  }
+
+  let filter_type = EqualizerFilterType::from_usize(filter_type);
+  match filter_type {
+    EqualizerFilterType::Lowpass
+    | EqualizerFilterType::Highpass
+    | EqualizerFilterType::Bandpass
+    | EqualizerFilterType::Notch
+    | EqualizerFilterType::Peak
+    | EqualizerFilterType::Lowshelf
+    | EqualizerFilterType::Highshelf
+    | EqualizerFilterType::Allpass => {
+      let (filter, params) = if let EqualizerBandInner::Biquad { filter, params } = &mut band.inner
+      {
+        (filter, params)
+      } else {
+        band.inner = EqualizerBandInner::Biquad {
+          filter: BiquadFilter::default(),
+          params: BiquadFilterParams::default(),
+        };
+        if let EqualizerBandInner::Biquad { filter, params } = &mut band.inner {
+          (filter, params)
+        } else {
+          unreachable!()
+        }
+      };
+
+      let mode = filter_type.into();
       filter.set_coefficients(mode, q, frequency, gain);
       params.mode = mode;
       params.q = q;
       params.freq = frequency;
       params.gain = gain;
+    },
+    EqualizerFilterType::Order4Lowpass | EqualizerFilterType::Order4Highpass => {
+      let (filter_chain, params) =
+        if let EqualizerBandInner::Biquad4 { filter, params } = &mut band.inner {
+          (filter, params)
+        } else {
+          band.inner = EqualizerBandInner::Biquad4 {
+            filter: [BiquadFilter::default(); 2],
+            params: BiquadFilterParams::default(),
+          };
+          if let EqualizerBandInner::Biquad4 { filter, params } = &mut band.inner {
+            (filter, params)
+          } else {
+            unreachable!()
+          }
+        };
+
+      set_chain_params(
+        filter_chain,
+        params,
+        filter_type.get_lower_order_mode(),
+        &ORDER_4_Q_FACTORS,
+        q,
+        frequency,
+        gain,
+      );
+    },
+    EqualizerFilterType::Order8Lowpass | EqualizerFilterType::Order8Highpass => {
+      let (filter_chain, params) =
+        if let EqualizerBandInner::Biquad8 { filter, params } = &mut band.inner {
+          (filter, params)
+        } else {
+          band.inner = EqualizerBandInner::Biquad8 {
+            filter: [BiquadFilter::default(); 4],
+            params: BiquadFilterParams::default(),
+          };
+          if let EqualizerBandInner::Biquad8 { filter, params } = &mut band.inner {
+            (filter, params)
+          } else {
+            unreachable!()
+          }
+        };
+
+      set_chain_params(
+        filter_chain,
+        params,
+        filter_type.get_lower_order_mode(),
+        &ORDER_8_Q_FACTORS,
+        q,
+        frequency,
+        gain,
+      );
+    },
+    EqualizerFilterType::Order16Lowpass | EqualizerFilterType::Order16Highpass => {
+      let (filter_chain, params) =
+        if let EqualizerBandInner::Biquad16 { filter, params } = &mut band.inner {
+          (filter, params)
+        } else {
+          band.inner = EqualizerBandInner::Biquad16 {
+            filter: [BiquadFilter::default(); 8],
+            params: BiquadFilterParams::default(),
+          };
+          if let EqualizerBandInner::Biquad16 { filter, params } = &mut band.inner {
+            (filter, params)
+          } else {
+            unreachable!()
+          }
+        };
+
+      set_chain_params(
+        filter_chain,
+        params,
+        filter_type.get_lower_order_mode(),
+        &ORDER_16_Q_FACTORS,
+        q,
+        frequency,
+        gain,
+      );
     },
   }
 }
@@ -307,14 +556,41 @@ pub extern "C" fn equalizer_process(ctx: *mut EqualizerInstT) {
   }
 }
 
+fn compute_chain_response<
+  T: Float + FloatConst + Default + MulAssign + AddAssign,
+  O: Float + MulAssign + AddAssign,
+  const LEN: usize,
+>(
+  mode: FilterMode,
+  base_qs: &[T; LEN],
+  q_offset: T,
+  freq: T,
+  gain: T,
+  grid_size: usize,
+) -> (Vec<O>, Vec<O>, Vec<O>) {
+  BiquadFilter::compute_chain_response_grid(
+    mode,
+    std::array::from_fn::<ComputeGridFilterParams<T>, LEN, _>(|i| ComputeGridFilterParams {
+      q: base_qs[i] + q_offset / T::from(LEN).unwrap(),
+      cutoff_freq: freq,
+      gain,
+    }),
+    T::from(10.).unwrap(),
+    T::from(SAMPLE_RATE).unwrap(),
+    grid_size,
+  )
+}
+
 #[no_mangle]
 pub extern "C" fn equalizer_compute_responses(ctx: *mut EqualizerInstT, grid_size: usize) {
   let ctx = unsafe { &mut *ctx };
 
   if ctx.bands.is_empty() {
     ctx.response_buffers.freqs.clear();
-    ctx.response_buffers.magnitudes_db = vec![0.; grid_size];
-    ctx.response_buffers.phases_rads = vec![0.; grid_size];
+    ctx.response_buffers.magnitudes_db.resize(grid_size, 0.);
+    ctx.response_buffers.magnitudes_db.fill(0.);
+    ctx.response_buffers.phases_rads.resize(grid_size, 0.);
+    ctx.response_buffers.phases_rads.fill(0.);
 
     let start_freq = 10.;
     let freq_multiplier = (NYQUIST as f64 / start_freq).powf(1. / ((grid_size - 1) as f64));
@@ -325,57 +601,63 @@ pub extern "C" fn equalizer_compute_responses(ctx: *mut EqualizerInstT, grid_siz
     return;
   }
 
-  let mut responses = ctx
-    .bands
-    .iter()
-    .map(|band| match &band.inner {
-      EqualizerBandInner::Biquad {
-        params:
-          BiquadFilterParams {
-            mode,
-            q,
-            gain,
-            freq,
-          },
-        ..
-      } => {
-        let maybe_automated_q = match band.param_overrides.q.as_opt() {
-          Some(q_ix) => ctx.automation_bufs[q_ix][0] as f64,
-          None => *q,
-        };
-        let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
-          Some(freq_ix) => ctx.automation_bufs[freq_ix][0] as f64,
-          None => *freq,
-        };
-        let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
-          Some(gain_ix) => ctx.automation_bufs[gain_ix][0] as f64,
-          None => *gain,
-        };
+  let mut responses = ctx.bands.iter().map(|band| {
+    let mode = band.inner.get_params().mode;
+    let maybe_automated_q = match band.param_overrides.q.as_opt() {
+      Some(q_ix) => ctx.automation_bufs[q_ix][0] as f64,
+      None => band.inner.get_params().q,
+    };
+    let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
+      Some(freq_ix) => ctx.automation_bufs[freq_ix][0] as f64,
+      None => band.inner.get_params().freq,
+    };
+    let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
+      Some(gain_ix) => ctx.automation_bufs[gain_ix][0] as f64,
+      None => band.inner.get_params().gain,
+    };
 
-        BiquadFilter::compute_response_grid(
-          *mode,
-          maybe_automated_q,
-          maybe_automated_freq,
-          maybe_automated_gain,
-          10.,
-          SAMPLE_RATE as f64,
-          grid_size,
-        )
-      },
-    })
-    .collect::<Vec<_>>();
+    match &band.inner {
+      EqualizerBandInner::Biquad { .. } => BiquadFilter::compute_response_grid::<f32>(
+        mode,
+        maybe_automated_q,
+        maybe_automated_freq,
+        maybe_automated_gain,
+        10.,
+        SAMPLE_RATE as f64,
+        grid_size,
+      ),
+      EqualizerBandInner::Biquad4 { .. } => compute_chain_response(
+        mode,
+        &ORDER_4_Q_FACTORS,
+        maybe_automated_q,
+        maybe_automated_freq,
+        maybe_automated_gain,
+        grid_size,
+      ),
+      EqualizerBandInner::Biquad8 { .. } => compute_chain_response(
+        mode,
+        &ORDER_8_Q_FACTORS,
+        maybe_automated_q,
+        maybe_automated_freq,
+        maybe_automated_gain,
+        grid_size,
+      ),
+      EqualizerBandInner::Biquad16 { .. } => compute_chain_response(
+        mode,
+        &ORDER_16_Q_FACTORS,
+        maybe_automated_q,
+        maybe_automated_freq,
+        maybe_automated_gain,
+        grid_size,
+      ),
+    }
+  });
 
-  let freqs = std::mem::take(&mut responses.first_mut().unwrap().0);
-  let mut mags = std::mem::take(&mut responses.first_mut().unwrap().1);
-  for mag in &mut mags {
-    *mag = db_to_gain_generic(*mag);
-  }
-  let mut angles = std::mem::take(&mut responses.first_mut().unwrap().2);
+  let (freqs, mut mags, mut angles) = responses.next().unwrap();
 
-  for (_o_freqs, o_mags, o_angles) in &responses[1..] {
+  for (_o_freqs, o_mags, o_angles) in responses {
     for i in 0..mags.len() {
-      let mag_linear = db_to_gain_generic(o_mags[i]);
-      mags[i] *= mag_linear;
+      mags[i] *= o_mags[i];
       angles[i] += o_angles[i];
     }
   }
