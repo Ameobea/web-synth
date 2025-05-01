@@ -67,7 +67,7 @@ impl SoftClipperAlgorithm {
         },
       SoftClipperAlgorithm::Tanh =>
         for sample in samples {
-          *sample = fastapprox::fast::tanh(*sample);
+          *sample = sample.tanh();
         },
       SoftClipperAlgorithm::XOverOnePlusAbsX =>
         for sample in samples {

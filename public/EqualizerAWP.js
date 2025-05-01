@@ -26,6 +26,7 @@ class EqualizerAWP extends AudioWorkletProcessor {
     this.automationSAB = null;
     this.automationSABView = null;
     this.wasmSideSAB = null;
+    this.isBypassed = false;
 
     this.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -79,6 +80,10 @@ class EqualizerAWP extends AudioWorkletProcessor {
         case 'setBand': {
           const { bandIx, band } = evt.data;
           this.commitBand(bandIx, band);
+          break;
+        }
+        case 'setBypassed': {
+          this.isBypassed = evt.data.isBypassed;
           break;
         }
         default:
@@ -167,14 +172,18 @@ class EqualizerAWP extends AudioWorkletProcessor {
       }
     }
 
-    this.wasmInstance.exports.equalizer_process(this.ctxPtr);
+    if (this.isBypassed) {
+      output.set(input);
+    } else {
+      this.wasmInstance.exports.equalizer_process(this.ctxPtr);
 
-    output.set(
-      wasmMemory.subarray(
-        inputPtr / Float32Array.BYTES_PER_ELEMENT,
-        inputPtr / Float32Array.BYTES_PER_ELEMENT + FRAME_SIZE
-      )
-    );
+      output.set(
+        wasmMemory.subarray(
+          inputPtr / Float32Array.BYTES_PER_ELEMENT,
+          inputPtr / Float32Array.BYTES_PER_ELEMENT + FRAME_SIZE
+        )
+      );
+    }
 
     return true;
   }

@@ -2,13 +2,10 @@ import type { AudioConnectables } from 'src/patchNetwork';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import EqualizerUI from 'src/equalizer/EqualizerUI/EqualizerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { EqualizerInstance } from 'src/equalizer/EqualizerInstance';
+import { buildDefaultEqualizerState, EqualizerInstance } from 'src/equalizer/EqualizerInstance';
 import { rwritable, type TransparentWritable } from 'src/util';
-import { EqualizerFilterType } from 'src/equalizer/eqHelpers';
-import {
-  buildDefaultLineSpecrogramUIState,
-  type LineSpectrogramUIState,
-} from 'src/visualizations/LineSpectrogram/types';
+import type { EqualizerFilterType } from 'src/equalizer/eqHelpers';
+import { type LineSpectrogramUIState } from 'src/visualizations/LineSpectrogram/types';
 
 export interface EqualizerBand {
   filterType: EqualizerFilterType;
@@ -21,23 +18,9 @@ export interface EqualizerState {
   bands: EqualizerBand[];
   activeBandIx?: number;
   lineSpectrogramUIState: LineSpectrogramUIState;
+  isBypassed?: boolean;
+  animateAutomatedParams: boolean;
 }
-
-const buildDefaultEqualizerState = (): EqualizerState => ({
-  bands: [
-    { filterType: EqualizerFilterType.Lowshelf, frequency: 60, q: 1, gain: 0 },
-    { filterType: EqualizerFilterType.Peak, frequency: 400, q: 1, gain: 0 },
-    { filterType: EqualizerFilterType.Peak, frequency: 1600, q: 1, gain: 0 },
-    { filterType: EqualizerFilterType.Highshelf, frequency: 6400, q: 1, gain: 0 },
-  ],
-  activeBandIx: 0,
-  lineSpectrogramUIState: {
-    ...buildDefaultLineSpecrogramUIState(),
-    // this doesn't match the actual range of the eq's y axis, but the magnitudes of individual buckets
-    // are so small that they barely show up if it does match.
-    rangeDb: [-80, -20],
-  },
-});
 
 const EqualizerCtxById = new Map<
   string,

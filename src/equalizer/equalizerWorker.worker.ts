@@ -106,7 +106,8 @@ export class EqualizerWorker {
     widthPx: number,
     heightPx: number,
     xDomain: [number, number] = EQ_X_DOMAIN,
-    yDomain: [number, number] = EQ_GAIN_DOMAIN
+    yDomain: [number, number] = EQ_GAIN_DOMAIN,
+    animateAutomatedParams = true
   ) => {
     let memory = this.getWasmMemoryBuffer();
 
@@ -128,7 +129,11 @@ export class EqualizerWorker {
       }
     }
 
-    (this.wasmInstance.exports.equalizer_compute_responses as Function)(this.ctxPtr, gridSize);
+    (this.wasmInstance.exports.equalizer_compute_responses as Function)(
+      this.ctxPtr,
+      gridSize,
+      animateAutomatedParams
+    );
 
     const freqsPtr = (this.wasmInstance.exports.equalizer_get_response_freqs_ptr as Function)(
       this.ctxPtr

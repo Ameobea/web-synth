@@ -17,6 +17,7 @@
   export let automationValsSAB: Float32Array | null;
   export let automatedParams: { freq: number | null; gain: number | null; q: number | null };
   export let eqUIHidden: boolean;
+  export let animateAutomatedParams: boolean;
 
   $: axesParams = getEqAxes(band.filterType);
   const xParam = 'freq' as const;
@@ -37,12 +38,12 @@
     band: EqualizerBand
   ): { x: number; y: number } => {
     const x = xScale(
-      canControlX || !automationValsSAB
+      canControlX || !automationValsSAB || !animateAutomatedParams
         ? band.frequency
         : clamp(EQ_X_DOMAIN[0], EQ_X_DOMAIN[1], automationValsSAB[automatedParams[xParam]!])
     );
     const y = yScale(
-      canControlY || !automationValsSAB
+      canControlY || !automationValsSAB || !animateAutomatedParams
         ? band[yParam]
         : clamp(yDomain[0], yDomain[1], automationValsSAB[automatedParams[yParam]!])
     );

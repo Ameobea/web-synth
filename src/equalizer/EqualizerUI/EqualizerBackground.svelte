@@ -15,6 +15,7 @@
   $: vcId = inst.vcId;
   $: instStateStore = inst.state;
   $: activeBandIx = $instStateStore.activeBandIx;
+  $: isBypassed = $instStateStore.isBypassed;
   $: activeBandFilterType =
     typeof activeBandIx === 'number' ? $instStateStore.bands[activeBandIx].filterType : null;
   $: lineSpectrogramStore = derived(inst.state, state => state.lineSpectrogramUIState);
@@ -109,7 +110,10 @@
       transform={`translate(${EQ_AXIS_MARGIN.left},${EQ_AXIS_MARGIN.top})`}
       style="user-select: none; pointer-events: none;"
     >
-      <path class="eq-mag-response-plot-path" />
+      <path
+        class="eq-mag-response-plot-path"
+        style:stroke={isBypassed ? '#444444cc' : '#cccccccc'}
+      />
     </g>
   </svg>
 </div>
@@ -130,23 +134,17 @@
   }
 
   .eq-mag-response-plot path {
-    stroke: #cccccccc;
     fill: none;
     stroke-width: 1px;
   }
 
-  :global(.equalizer-bg .grid) {
-    stroke: #888;
-    stroke-opacity: 0.1;
-  }
-
   :global(.equalizer-bg .grid line) {
     stroke: #cccccc;
-    stroke-opacity: 0.1;
+    stroke-opacity: 0.45;
   }
 
   :global(.equalizer-bg path, .equalizer-bg line) {
-    stroke: #888;
+    stroke: #aaa;
   }
 
   :global(.equalizer-bg .x-axis text, .equalizer-bg .y-axis text) {

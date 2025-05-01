@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-  const AVAILABLE_UNITS = ['samples', 'beats', 'seconds', 'milliseconds', 'hz'];
+  const AVAILABLE_UNITS = ['samples', 'beats', 'seconds', 'milliseconds', 'hz', 'bpm'];
 </script>
 
 <script lang="ts">

@@ -582,7 +582,11 @@ fn compute_chain_response<
 }
 
 #[no_mangle]
-pub extern "C" fn equalizer_compute_responses(ctx: *mut EqualizerInstT, grid_size: usize) {
+pub extern "C" fn equalizer_compute_responses(
+  ctx: *mut EqualizerInstT,
+  grid_size: usize,
+  use_automated_params: bool,
+) {
   let ctx = unsafe { &mut *ctx };
 
   if ctx.bands.is_empty() {
@@ -604,16 +608,16 @@ pub extern "C" fn equalizer_compute_responses(ctx: *mut EqualizerInstT, grid_siz
   let mut responses = ctx.bands.iter().map(|band| {
     let mode = band.inner.get_params().mode;
     let maybe_automated_q = match band.param_overrides.q.as_opt() {
-      Some(q_ix) => ctx.automation_bufs[q_ix][0] as f64,
-      None => band.inner.get_params().q,
+      Some(q_ix) if use_automated_params => ctx.automation_bufs[q_ix][0] as f64,
+      _ => band.inner.get_params().q,
     };
     let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
-      Some(freq_ix) => ctx.automation_bufs[freq_ix][0] as f64,
-      None => band.inner.get_params().freq,
+      Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
+      _ => band.inner.get_params().freq,
     };
     let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
-      Some(gain_ix) => ctx.automation_bufs[gain_ix][0] as f64,
-      None => band.inner.get_params().gain,
+      Some(gain_ix) if use_automated_params => ctx.automation_bufs[gain_ix][0] as f64,
+      _ => band.inner.get_params().gain,
     };
 
     match &band.inner {

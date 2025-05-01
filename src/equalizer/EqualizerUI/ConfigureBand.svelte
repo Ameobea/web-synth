@@ -6,6 +6,11 @@
   import { type EqualizerBand } from 'src/equalizer/equalizer';
   import { mkBandParamDisplay } from './BandParamDisplay';
 
+  export let isBypassed: boolean;
+  export let setIsBypassed: (isBypassed: boolean) => void;
+  export let animateAutomatedParams: boolean;
+  export let setAnimateAutomatedParams: (animate: boolean) => void;
+  export let reset: () => void;
   export let band: EqualizerBand;
   export let bandIx: number;
   export let onChange: (newBand: EqualizerBand) => void;
@@ -46,6 +51,7 @@
   let settings: ControlPanelSetting[] = [];
   $: settings = (() => {
     const settings: ControlPanelSetting[] = [
+      { type: 'checkbox', label: 'bypass' },
       {
         type: 'select',
         options: {
@@ -99,7 +105,9 @@
   })();
 
   $: state = {
+    bypass: isBypassed,
     'filter type': `${lowOrderFilterType}`,
+    'filter order': `${curFilterOrder}`,
     freq: band.frequency,
     gain: band.gain,
     q: band.q,
@@ -108,6 +116,9 @@
   const handleChange = (key: string, value: any) => {
     const newBand = { ...band };
     switch (key) {
+      case 'bypass':
+        setIsBypassed(value);
+        return;
       case 'filter type':
         newBand.filterType = +value;
         switch (newBand.filterType) {
@@ -180,14 +191,50 @@
 
     onChange(newBand);
   };
+
+  $: globalState = {
+    bypass: isBypassed,
+    'animate automated params': animateAutomatedParams,
+  };
+
+  const handleGlobalChange = (key: string, value: any) => {
+    switch (key) {
+      case 'bypass':
+        setIsBypassed(value);
+        break;
+      case 'animate automated params':
+        setAnimateAutomatedParams(value);
+        break;
+      default:
+        console.warn(`Unknown setting: ${key}`);
+    }
+  };
+
+  const globalSettings: ControlPanelSetting[] = [
+    {
+      type: 'checkbox',
+      label: 'bypass',
+    },
+    {
+      type: 'checkbox',
+      label: 'animate automated params',
+    },
+    { type: 'button', label: 'reset', action: reset },
+  ];
 </script>
 
 <div class="root">
   <SvelteControlPanel
+    settings={globalSettings}
+    state={globalState}
+    onChange={handleGlobalChange}
+    width={460}
+  />
+  <SvelteControlPanel
     {settings}
     {state}
     onChange={handleChange}
-    width={500}
+    width={460}
     title={`Band ${bandIx + 1}`}
   />
 </div>
@@ -196,5 +243,6 @@
   .root {
     display: flex;
     flex-direction: column;
+    width: 500px;
   }
 </style>

@@ -154,8 +154,10 @@ export default class NoteLine {
   private installNoteCreationHandlers() {
     this.uninstallNoteCreationHandlers?.();
     this.uninstallNoteCreationHandlers = undefined;
+    console.log('UNINSTALLING HANDLERS');
 
     const handlePointerDown = (evt: FederatedPointerEvent) => {
+      console.log('pointerdown');
       if (evt.button !== 0 || this.app.selectionBoxButtonDown) {
         return;
       }
@@ -192,7 +194,10 @@ export default class NoteLine {
     this.background.on('pointerdown', handlePointerDown);
     const lines = this.lines;
     if (lines) {
+      console.log('INSTALLING ON LINES');
       lines.on('pointerdown', handlePointerDown);
+    } else {
+      console.log('NO LINES');
     }
 
     this.app.app.stage.on('pointermove', this.handlePointerMove);
@@ -336,7 +341,7 @@ export default class NoteLine {
       this.container.addChild(this.lines);
       this.lastWidthPx = this.app.width;
 
-      if (this.enableNoteCreation) {
+      if (dbg(this.enableNoteCreation)) {
         this.installNoteCreationHandlers();
       }
     }

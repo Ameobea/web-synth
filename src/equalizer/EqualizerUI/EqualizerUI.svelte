@@ -90,6 +90,7 @@
           automatedParams={automatedParamsByBand[bandIx]}
           {automationValsSAB}
           {eqUIHidden}
+          animateAutomatedParams={state.animateAutomatedParams ?? false}
         />
       {/each}
     </div>
@@ -110,6 +111,12 @@
           }
         }}
         automatedParams={automatedParamsByBand[state.activeBandIx]}
+        isBypassed={state.isBypassed ?? false}
+        setIsBypassed={isBypassed => inst.setBypassed(isBypassed)}
+        reset={() => inst.reset()}
+        animateAutomatedParams={state.animateAutomatedParams ?? false}
+        setAnimateAutomatedParams={animateAutomatedParams =>
+          inst.state.update(state => ({ ...state, animateAutomatedParams }))}
       />
     {/if}
   </div>

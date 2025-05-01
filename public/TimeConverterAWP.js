@@ -110,6 +110,9 @@ class TimeConverterAWP extends AudioWorkletProcessor {
           case 'hz':
             inputInSeconds = 1 / input[0];
             break;
+          case 'bpm':
+            inputInSeconds = 60 / input[0];
+            break;
           default:
             inputInSeconds = input[0] * getToSecondsMultiplier(this.state.fromUnit);
         }
@@ -117,6 +120,9 @@ class TimeConverterAWP extends AudioWorkletProcessor {
         switch (this.state.toUnit) {
           case 'hz':
             output.fill(1 / inputInSeconds);
+            break;
+          case 'bpm':
+            output.fill(60 / inputInSeconds);
             break;
           default:
             output.fill(inputInSeconds / getToSecondsMultiplier(this.state.toUnit));
@@ -134,6 +140,11 @@ class TimeConverterAWP extends AudioWorkletProcessor {
               output[i] = 1 / input[i];
             }
             break;
+          case 'bpm':
+            for (let i = 0; i < FRAME_SIZE; i++) {
+              output[i] = 60 / input[i];
+            }
+            break;
           default:
             const multiplier = getToSecondsMultiplier(this.state.fromUnit);
             for (let i = 0; i < FRAME_SIZE; i++) {
@@ -145,6 +156,11 @@ class TimeConverterAWP extends AudioWorkletProcessor {
           case 'hz':
             for (let i = 0; i < FRAME_SIZE; i++) {
               output[i] = 1 / output[i];
+            }
+            break;
+          case 'bpm':
+            for (let i = 0; i < FRAME_SIZE; i++) {
+              output[i] = 60 / output[i];
             }
             break;
           default:

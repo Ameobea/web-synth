@@ -7,12 +7,18 @@ import type { EqualizerWorker } from 'src/equalizer/equalizerWorker.worker';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { AsyncOnce, rwritable, type TransparentWritable } from 'src/util';
 import type { Unsubscriber } from 'svelte/store';
-import { EQ_AXIS_MARGIN, EQ_MAX_AUTOMATED_PARAM_COUNT } from 'src/equalizer/conf';
+import {
+  EQ_AXIS_MARGIN,
+  EQ_GAIN_DOMAIN,
+  EQ_MAX_AUTOMATED_PARAM_COUNT,
+  EQ_X_DOMAIN,
+} from 'src/equalizer/conf';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { OverridableAudioNode } from 'src/graphEditor/nodes/util';
-import { getValidParamsForFilterType } from 'src/equalizer/eqHelpers';
+import { EqualizerFilterType, getValidParamsForFilterType } from 'src/equalizer/eqHelpers';
 import { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
 import { LineSpectrogramFFTSize } from 'src/visualizations/LineSpectrogram/conf';
+import { buildDefaultLineSpecrogramUIState } from 'src/visualizations/LineSpectrogram/types';
 
 const RESPONSES_GRID_SIZE = 512;
 
@@ -34,6 +40,24 @@ const EqualizerWasm = new AsyncOnce(
     ).then(res => res.arrayBuffer()),
   true
 );
+
+export const buildDefaultEqualizerState = (): EqualizerState => ({
+  bands: [
+    { filterType: EqualizerFilterType.Lowshelf, frequency: 60, q: 1, gain: 0 },
+    { filterType: EqualizerFilterType.Peak, frequency: 400, q: 1, gain: 0 },
+    { filterType: EqualizerFilterType.Peak, frequency: 1600, q: 1, gain: 0 },
+    { filterType: EqualizerFilterType.Highshelf, frequency: 6400, q: 1, gain: 0 },
+  ],
+  activeBandIx: 0,
+  lineSpectrogramUIState: {
+    ...buildDefaultLineSpecrogramUIState(),
+    // this doesn't match the actual range of the eq's y axis, but the magnitudes of individual buckets
+    // are so small that they barely show up if it does match.
+    rangeDb: [-80, -20],
+  },
+  isBypassed: false,
+  animateAutomatedParams: true,
+});
 
 export class EqualizerInstance {
   private ctx: AudioContext;
@@ -135,6 +159,10 @@ export class EqualizerInstance {
 
     this.awpHandle.port.onmessage = (evt: MessageEvent) => this.handleAWPMessage(evt);
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
+    this.awpHandle.port.postMessage({
+      type: 'setBypassed',
+      isBypassed: this.state.current.isBypassed,
+    });
     updateConnectables(this.vcId, this.buildAudioConnectables());
   }
 
@@ -308,7 +336,10 @@ export class EqualizerInstance {
     const promise = this.worker.computeResponses(
       RESPONSES_GRID_SIZE,
       bgContainer.clientWidth - EQ_AXIS_MARGIN.left - EQ_AXIS_MARGIN.right,
-      bgContainer.clientHeight - EQ_AXIS_MARGIN.top - EQ_AXIS_MARGIN.bottom
+      bgContainer.clientHeight - EQ_AXIS_MARGIN.top - EQ_AXIS_MARGIN.bottom,
+      EQ_X_DOMAIN,
+      EQ_GAIN_DOMAIN,
+      this.state.current.animateAutomatedParams
     );
     this.curResponseComputePromise = promise;
     const responses = await promise;
@@ -401,6 +432,33 @@ export class EqualizerInstance {
     updateConnectables(this.vcId, this.buildAudioConnectables());
   }
 
+  public setBypassed(isBypassed: boolean) {
+    this.state.update(state => ({ ...state, isBypassed }));
+    if (this.awpHandle instanceof AudioWorkletNode) {
+      this.awpHandle.port.postMessage({ type: 'setBypassed', isBypassed });
+    }
+  }
+
+  public reset = () => {
+    const newState = buildDefaultEqualizerState();
+    this.state.set(newState);
+    this.bandOANs = newState.bands.map((_band, bandIx) => this.buildOANsForBand(bandIx));
+    this.automatedParams.set(new Array(EQ_MAX_AUTOMATED_PARAM_COUNT).fill(null));
+    this.setBypassed(newState.isBypassed ?? false);
+    if (this.ready && this.awpHandle instanceof AudioWorkletNode) {
+      const encodedState = {
+        bands: this.state.current.bands.map((_band, bandIx) => this.buildAWPBandState(bandIx)),
+      };
+      this.awpHandle.port.postMessage({
+        type: 'setState',
+        state: encodedState,
+      });
+      this.worker.setState(encodedState);
+    }
+
+    this.maybeComputeAndPlotResponse();
+  };
+
   private animateResponse = () => {
     this.maybeComputeAndPlotResponse();
     this.responseAnimationFrameHandle = requestAnimationFrame(this.animateResponse);
@@ -433,7 +491,7 @@ export class EqualizerInstance {
       const filterType = this.state.current.bands[bandIx].filterType;
       const params = getValidParamsForFilterType(filterType);
       for (const param of params) {
-        inputs = inputs.set(`band_${bandIx}_${param}`, {
+        inputs = inputs.set(`band_${bandIx + 1}_${param}`, {
           type: 'number',
           node: this.bandOANs[bandIx][param],
         });
