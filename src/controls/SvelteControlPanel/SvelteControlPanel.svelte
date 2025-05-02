@@ -21,6 +21,9 @@
     | {
         type: 'select';
         label: string;
+        /**
+         * If as a map, it's `label: value`
+         */
         options: string[] | Record<string, any>;
         initial?: string | number;
       }

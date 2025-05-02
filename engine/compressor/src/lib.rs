@@ -28,10 +28,12 @@ pub enum LogLevel {
   Info = 2,
 }
 
+#[cfg(feature = "exports")]
 extern "C" {
   pub fn log_raw(ptr: *const u8, len: usize, level: LogLevel);
 }
 
+#[cfg(feature = "exports")]
 fn error(msg: &str) {
   unsafe {
     log_raw(msg.as_ptr(), msg.len(), LogLevel::Error);

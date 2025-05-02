@@ -43,10 +43,10 @@ const EqualizerWasm = new AsyncOnce(
 
 export const buildDefaultEqualizerState = (): EqualizerState => ({
   bands: [
-    { filterType: EqualizerFilterType.Lowshelf, frequency: 60, q: 1, gain: 0 },
-    { filterType: EqualizerFilterType.Peak, frequency: 400, q: 1, gain: 0 },
-    { filterType: EqualizerFilterType.Peak, frequency: 1600, q: 1, gain: 0 },
-    { filterType: EqualizerFilterType.Highshelf, frequency: 6400, q: 1, gain: 0 },
+    { filterType: EqualizerFilterType.Lowshelf, frequency: 60, q: 0, gain: 0 },
+    { filterType: EqualizerFilterType.Peak, frequency: 400, q: 0, gain: 0 },
+    { filterType: EqualizerFilterType.Peak, frequency: 1600, q: 0, gain: 0 },
+    { filterType: EqualizerFilterType.Highshelf, frequency: 6400, q: 0, gain: 0 },
   ],
   activeBandIx: 0,
   lineSpectrogramUIState: {
@@ -392,22 +392,32 @@ export class EqualizerInstance {
   }
 
   public async deleteBand(bandIx: number) {
-    this.bandOANs.splice(bandIx, 1);
-    this.automatedParams.update(params =>
-      params.map(p => {
-        if (!p) {
-          return null;
-        }
-        if (p.bandIx === bandIx) {
-          return null;
-        }
-        if (p.bandIx > bandIx) {
-          return { ...p, bandIx: p.bandIx - 1 };
-        }
-        return p;
-      })
-    );
+    const deletedOANs = this.bandOANs.pop()!;
+    const deletedBandIx = this.bandOANs.length;
+    deletedOANs.freq.overrideStatusChangeCbs.length = 0;
+    deletedOANs.q.overrideStatusChangeCbs.length = 0;
+    deletedOANs.gain.overrideStatusChangeCbs.length = 0;
+    if (!deletedOANs.freq.getIsOverridden()) {
+      this.handleBandParamOverrideStatusChange(
+        deletedBandIx,
+        'freq',
+        deletedOANs.freq.output,
+        false
+      );
+    }
+    if (!deletedOANs.q.getIsOverridden()) {
+      this.handleBandParamOverrideStatusChange(deletedBandIx, 'q', deletedOANs.q.output, false);
+    }
+    if (!deletedOANs.gain.getIsOverridden()) {
+      this.handleBandParamOverrideStatusChange(
+        deletedBandIx,
+        'gain',
+        deletedOANs.gain.output,
+        false
+      );
+    }
 
+    const newBandCount = this.state.current.bands.length - 1;
     this.state.update(state => {
       const newState = { ...state, bands: [...state.bands] };
       newState.bands.splice(bandIx, 1);
@@ -416,6 +426,15 @@ export class EqualizerInstance {
       }
       return newState;
     });
+
+    this.automatedParams.update(params =>
+      params.map(p => {
+        if (!p || p.bandIx === newBandCount) {
+          return null;
+        }
+        return p;
+      })
+    );
 
     if (this.ready) {
       const encodedState = {
@@ -429,7 +448,7 @@ export class EqualizerInstance {
       this.maybeComputeAndPlotResponse();
     }
 
-    updateConnectables(this.vcId, this.buildAudioConnectables());
+    setTimeout(() => updateConnectables(this.vcId, this.buildAudioConnectables()));
   }
 
   public setBypassed(isBypassed: boolean) {

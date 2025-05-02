@@ -341,7 +341,7 @@ export default class NoteLine {
       this.container.addChild(this.lines);
       this.lastWidthPx = this.app.width;
 
-      if (dbg(this.enableNoteCreation)) {
+      if (this.enableNoteCreation) {
         this.installNoteCreationHandlers();
       }
     }

@@ -437,6 +437,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lfo"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dsp",
+ "wavetable",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.161"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,9 +1,10 @@
-use dsp::circular_buffer::CircularBuffer;
+use dsp::{circular_buffer::CircularBuffer, FRAME_SIZE, SAMPLE_RATE};
+
+use crate::fm::param_source::ParamSource;
 
 use super::Effect;
-use crate::fm::{ParamSource, FRAME_SIZE, SAMPLE_RATE};
 
-pub const MAX_DELAY_SAMPLES: usize = SAMPLE_RATE * 4;
+pub const MAX_DELAY_SAMPLES: usize = SAMPLE_RATE as usize * 4;
 
 #[derive(Clone)]
 pub struct CombFilter {

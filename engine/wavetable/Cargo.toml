@@ -8,14 +8,15 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-adsr = { path = "../adsr" }
+adsr = { path = "../adsr", default-features = false, features = [] }
 dsp = { path = "../dsp" }
 fastapprox = "0.3"
 common = { path = "../common" }
-compressor = { path = "../compressor" }
+compressor = { path = "../compressor", default-features = false, features = []}
 polysynth = { path = "../polysynth", default-features = false }
 rand = "0.7"
 
 [features]
-default = []
+default = ["exports"]
 simd = []
+exports = []

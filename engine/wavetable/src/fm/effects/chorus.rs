@@ -1,10 +1,11 @@
 use std::f32::consts::PI;
 
-use super::Effect;
-use crate::fm::{ParamSource, SAMPLE_RATE};
-use dsp::circular_buffer::CircularBuffer;
+use crate::fm::param_source::ParamSource;
 
-pub const MAX_CHORUS_DELAY_SAMPLES: usize = SAMPLE_RATE / 20; // 50ms
+use super::Effect;
+use dsp::{circular_buffer::CircularBuffer, SAMPLE_RATE};
+
+pub const MAX_CHORUS_DELAY_SAMPLES: usize = SAMPLE_RATE as usize / 20; // 50ms
 const NUM_TAPS: usize = 8;
 
 const TWO_PI: f32 = PI * 2.;
@@ -24,7 +25,7 @@ pub struct ChorusEffect {
 }
 
 impl Effect for ChorusEffect {
-  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut crate::fm::ParamSource>; 4]) {
+  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
     buf[0] = Some(&mut self.modulation_depth);
     buf[1] = Some(&mut self.wet);
     buf[2] = Some(&mut self.dry);

@@ -1,7 +1,8 @@
-use dsp::circular_buffer::CircularBuffer;
+use dsp::{circular_buffer::CircularBuffer, SAMPLE_RATE};
+
+use crate::fm::{oscillator::ExponentialOscillator, param_source::ParamSource};
 
 use super::Effect;
-use crate::fm::{ExponentialOscillator, ParamSource, SAMPLE_RATE};
 
 pub const SPECTRAL_WARPING_BUFFER_SIZE: usize = 44100 * 2;
 

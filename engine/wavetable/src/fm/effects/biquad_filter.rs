@@ -1,6 +1,9 @@
-use dsp::filters::biquad::{BiquadFilter, FilterMode};
+use dsp::{
+  filters::biquad::{BiquadFilter, FilterMode},
+  FRAME_SIZE,
+};
 
-use crate::fm::{ParamSource, FRAME_SIZE};
+use crate::fm::param_source::ParamSource;
 
 use super::Effect;
 

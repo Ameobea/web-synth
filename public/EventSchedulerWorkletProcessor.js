@@ -95,6 +95,8 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     this.pendingEvents = [];
     this.lastRecordedTime = 0;
     this.isStarted = false;
+    // This is incremented each time playback is re/started
+    globalThis.playbackSeq = 0;
 
     this.port.onmessage = event => {
       switch (event.data.type) {
@@ -111,6 +113,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
           globalThis.curBeat = event.data.startBeat;
           this.lastRecordedTime = currentTime;
           globalThis.globalBeatCounterStarted = true;
+          globalThis.playbackSeq += 1;
           this.isStarted = true;
           break;
         }

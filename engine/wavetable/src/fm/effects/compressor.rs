@@ -1,6 +1,7 @@
 use compressor::MultibandCompressor;
+use dsp::FRAME_SIZE;
 
-use crate::fm::FRAME_SIZE;
+use crate::fm::param_source::ParamSource;
 
 use super::Effect;
 
@@ -14,7 +15,7 @@ pub struct CompressorEffect {
 }
 
 impl Effect for CompressorEffect {
-  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut crate::fm::ParamSource>; 4]) {
+  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
     // TODO
     for i in 0..buf.len() {
       buf[i] = None;

@@ -4,9 +4,6 @@ pub mod fm;
 
 pub static mut CUR_BPM: f32 = 0.;
 
-#[no_mangle]
-pub unsafe extern "C" fn set_cur_bpm(bpm: f32) { CUR_BPM = bpm; }
-
 pub fn get_cur_bpm() -> f32 { unsafe { CUR_BPM } }
 
 pub struct WaveTableSettings {
@@ -298,107 +295,115 @@ impl WaveTableHandle {
   }
 }
 
-#[no_mangle]
-pub fn init_wavetable(
-  waveforms_per_dimension: usize,
-  dimension_count: usize,
-  waveform_length: usize,
-  base_frequency: f32,
-) -> *mut WaveTable {
-  common::set_raw_panic_hook(crate::fm::log_panic);
+#[cfg(feature = "exports")]
+pub mod exports {
+  use super::*;
 
-  let settings = WaveTableSettings {
-    waveforms_per_dimension,
-    dimension_count,
-    waveform_length,
-    base_frequency,
-  };
+  #[no_mangle]
+  pub unsafe extern "C" fn set_cur_bpm(bpm: f32) { CUR_BPM = bpm; }
 
-  Box::into_raw(Box::new(WaveTable::new(settings)))
-}
+  #[no_mangle]
+  pub fn init_wavetable(
+    waveforms_per_dimension: usize,
+    dimension_count: usize,
+    waveform_length: usize,
+    base_frequency: f32,
+  ) -> *mut WaveTable {
+    common::set_raw_panic_hook(crate::fm::synth::log_panic);
 
-#[no_mangle]
-pub fn get_data_table_ptr(handle_ptr: *mut WaveTable) -> *mut f32 {
-  unsafe { (*handle_ptr).samples.as_mut_ptr() }
-}
+    let settings = WaveTableSettings {
+      waveforms_per_dimension,
+      dimension_count,
+      waveform_length,
+      base_frequency,
+    };
 
-#[no_mangle]
-pub extern "C" fn set_base_frequency(handle_ptr: *mut WaveTable, base_frequency: f32) {
-  unsafe { (*handle_ptr).settings.base_frequency = base_frequency }
-}
-
-#[no_mangle]
-pub extern "C" fn resize_wavetable(
-  handle_ptr: *mut WaveTable,
-  waveforms_per_dimension: usize,
-  dimension_count: usize,
-  waveform_length: usize,
-) {
-  let ctx = unsafe { &mut *handle_ptr };
-  ctx.resize(waveforms_per_dimension, dimension_count, waveform_length);
-}
-
-#[no_mangle]
-pub unsafe fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
-  Box::into_raw(Box::new(WaveTableHandle::new(std::mem::transmute(table))))
-}
-
-#[no_mangle]
-pub fn get_mixes_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
-  let handle = unsafe { &mut *handle_ptr };
-
-  while handle.sample_buffer.len() < sample_count {
-    handle.sample_buffer.push(0.0);
+    Box::into_raw(Box::new(WaveTable::new(settings)))
   }
 
-  while handle.mixes.len() < sample_count * handle.table.settings.dimension_count * 2 {
-    handle.mixes.push(0.0);
+  #[no_mangle]
+  pub fn get_data_table_ptr(handle_ptr: *mut WaveTable) -> *mut f32 {
+    unsafe { (*handle_ptr).samples.as_mut_ptr() }
   }
 
-  let mixes_ptr = handle.mixes.as_mut_ptr();
-
-  mixes_ptr
-}
-
-#[no_mangle]
-pub fn get_frequencies_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
-  let handle = unsafe { &mut *handle_ptr };
-
-  while handle.frequencies_buffer.len() < sample_count {
-    handle.frequencies_buffer.push(440.0);
+  #[no_mangle]
+  pub extern "C" fn set_base_frequency(handle_ptr: *mut WaveTable, base_frequency: f32) {
+    unsafe { (*handle_ptr).settings.base_frequency = base_frequency }
   }
 
-  let frequencies_ptr = handle.frequencies_buffer.as_mut_ptr();
-
-  frequencies_ptr
-}
-
-#[no_mangle]
-pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *const f32 {
-  let handle = unsafe { &mut *handle_ptr };
-
-  while handle.sample_buffer.len() < sample_count {
-    handle.sample_buffer.push(0.0);
+  #[no_mangle]
+  pub extern "C" fn resize_wavetable(
+    handle_ptr: *mut WaveTable,
+    waveforms_per_dimension: usize,
+    dimension_count: usize,
+    waveform_length: usize,
+  ) {
+    let ctx = unsafe { &mut *handle_ptr };
+    ctx.resize(waveforms_per_dimension, dimension_count, waveform_length);
   }
 
-  for sample_ix in 0..sample_count {
-    let frequency = handle.frequencies_buffer[sample_ix];
-    if frequency == 0.0 {
-      handle.sample_buffer[sample_ix] = 0.0;
-      continue;
+  #[no_mangle]
+  pub unsafe fn init_wavetable_handle(table: *mut WaveTable) -> *mut WaveTableHandle {
+    Box::into_raw(Box::new(WaveTableHandle::new(std::mem::transmute(table))))
+  }
+
+  #[no_mangle]
+  pub fn get_mixes_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
+    let handle = unsafe { &mut *handle_ptr };
+
+    while handle.sample_buffer.len() < sample_count {
+      handle.sample_buffer.push(0.0);
     }
 
-    for dimension_ix in 0..handle.table.settings.dimension_count {
-      handle.mixes_for_sample[dimension_ix * 2] =
-        handle.mixes[(dimension_ix * 2 * sample_count) + sample_ix];
-      handle.mixes_for_sample[dimension_ix * 2 + 1] =
-        handle.mixes[(dimension_ix * 2 * sample_count) + sample_count + sample_ix];
+    while handle.mixes.len() < sample_count * handle.table.settings.dimension_count * 2 {
+      handle.mixes.push(0.0);
     }
 
-    handle.sample_buffer[sample_ix] = handle.get_sample(frequency);
+    let mixes_ptr = handle.mixes.as_mut_ptr();
+
+    mixes_ptr
   }
 
-  let sample_buf_ptr = handle.sample_buffer.as_ptr();
+  #[no_mangle]
+  pub fn get_frequencies_ptr(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *mut f32 {
+    let handle = unsafe { &mut *handle_ptr };
 
-  sample_buf_ptr
+    while handle.frequencies_buffer.len() < sample_count {
+      handle.frequencies_buffer.push(440.0);
+    }
+
+    let frequencies_ptr = handle.frequencies_buffer.as_mut_ptr();
+
+    frequencies_ptr
+  }
+
+  #[no_mangle]
+  pub fn get_samples(handle_ptr: *mut WaveTableHandle, sample_count: usize) -> *const f32 {
+    let handle = unsafe { &mut *handle_ptr };
+
+    while handle.sample_buffer.len() < sample_count {
+      handle.sample_buffer.push(0.0);
+    }
+
+    for sample_ix in 0..sample_count {
+      let frequency = handle.frequencies_buffer[sample_ix];
+      if frequency == 0.0 {
+        handle.sample_buffer[sample_ix] = 0.0;
+        continue;
+      }
+
+      for dimension_ix in 0..handle.table.settings.dimension_count {
+        handle.mixes_for_sample[dimension_ix * 2] =
+          handle.mixes[(dimension_ix * 2 * sample_count) + sample_ix];
+        handle.mixes_for_sample[dimension_ix * 2 + 1] =
+          handle.mixes[(dimension_ix * 2 * sample_count) + sample_count + sample_ix];
+      }
+
+      handle.sample_buffer[sample_ix] = handle.get_sample(frequency);
+    }
+
+    let sample_buf_ptr = handle.sample_buffer.as_ptr();
+
+    sample_buf_ptr
+  }
 }

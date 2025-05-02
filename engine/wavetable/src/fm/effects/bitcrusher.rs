@@ -1,7 +1,8 @@
 use std::cell::Cell;
 
+use crate::fm::param_source::ParamSource;
+
 use super::Effect;
-use crate::fm::ParamSource;
 
 #[derive(Clone)]
 pub struct Bitcrusher {

@@ -9,7 +9,7 @@ use dsp::{
 
 use self::dynabandpass::DynabandpassFilter;
 
-use super::{AdsrState, ParamSource, RenderRawParams, FILTER_PARAM_BUFFER_COUNT};
+use super::param_source::{AdsrState, ParamSource, RenderRawParams};
 
 pub mod dynabandpass;
 
@@ -287,7 +287,7 @@ impl FilterModule {
   #[inline]
   pub fn reset(&mut self) { self.filter_state.reset(); }
 
-  pub fn apply_frame(
+  pub fn apply_frame<const FILTER_PARAM_BUFFER_COUNT: usize>(
     &mut self,
     filter_envelope_generator: &mut ManagedAdsr,
     frame: &mut [f32; FRAME_SIZE],

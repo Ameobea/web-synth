@@ -5,14 +5,13 @@ use dsp::{
     biquad::{BiquadFilter, FilterMode},
     dc_blocker::DCBlocker,
   },
+  uninit, FRAME_SIZE,
 };
 use rand::Rng;
 use soft_clipper::SoftClipper;
 use spectral_warping::SpectralWarpingParams;
 
 use crate::fm::effects::comb_filter::CombFilter;
-
-use super::{uninit, ParamSource, RenderRawParams, FRAME_SIZE};
 
 pub mod biquad_filter;
 pub mod bitcrusher;
@@ -37,6 +36,8 @@ use self::{
   spectral_warping::SpectralWarping,
   wavefolder::{Wavecruncher, Wavefolder},
 };
+
+use super::param_source::{ParamSource, RenderRawParams};
 
 pub trait Effect {
   /// Should populate the provided buffer with pointers to internal `ParamSource`s for this

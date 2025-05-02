@@ -1,9 +1,10 @@
-use dsp::{circular_buffer::CircularBuffer, filters::dc_blocker::DCBlocker};
+use dsp::{circular_buffer::CircularBuffer, filters::dc_blocker::DCBlocker, SAMPLE_RATE};
+
+use crate::fm::param_source::ParamSource;
 
 use super::Effect;
-use crate::fm::{ParamSource, SAMPLE_RATE};
 
-pub const MAX_DELAY_SAMPLES: usize = SAMPLE_RATE * 10;
+pub const MAX_DELAY_SAMPLES: usize = SAMPLE_RATE as usize * 10;
 
 #[derive(Clone)]
 pub struct Delay {
@@ -16,7 +17,7 @@ pub struct Delay {
 }
 
 impl Effect for Delay {
-  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut crate::fm::ParamSource>; 4]) {
+  fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
     buf[0] = Some(&mut self.delay_samples);
     buf[1] = Some(&mut self.wet);
     buf[2] = Some(&mut self.dry);

@@ -1,6 +1,6 @@
-use dsp::filters::butterworth::ButterworthFilter as InnerButterworthFilter;
+use dsp::{filters::butterworth::ButterworthFilter as InnerButterworthFilter, FRAME_SIZE};
 
-use crate::fm::{ParamSource, FRAME_SIZE};
+use crate::fm::param_source::ParamSource;
 
 use super::Effect;
 

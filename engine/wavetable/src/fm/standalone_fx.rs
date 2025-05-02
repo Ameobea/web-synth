@@ -2,8 +2,12 @@
 //! FM synth.
 
 use adsr::Adsr;
+use dsp::FRAME_SIZE;
 
-use super::{effects::EffectChain, AdsrParams, RenderRawParams, FRAME_SIZE};
+use super::{
+  effects::EffectChain,
+  param_source::{AdsrParams, RenderRawParams},
+};
 
 const FM_SYNTH_PARAM_BUFFER_COUNT: usize = 4;
 

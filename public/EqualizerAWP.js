@@ -166,7 +166,11 @@ class EqualizerAWP extends AudioWorkletProcessor {
     for (let i = 0; i < AutomationParamKeys.length; i++) {
       const paramKey = AutomationParamKeys[i];
       const param = params[paramKey];
-      this.automationParamBuf.set(param, i * FRAME_SIZE);
+      if (param.length === 1) {
+        this.automationParamBuf.fill(param[0], i * FRAME_SIZE, (i + 1) * FRAME_SIZE);
+      } else {
+        this.automationParamBuf.set(param, i * FRAME_SIZE);
+      }
       if (this.automationSABView) {
         this.automationSABView[i] = param[param.length - 1];
       }

@@ -1,4 +1,4 @@
-use crate::fm::OPERATOR_COUNT;
+use crate::fm::synth::OPERATOR_COUNT;
 
 use super::sample_manager;
 

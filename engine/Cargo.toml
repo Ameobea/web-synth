@@ -33,7 +33,8 @@ members = [
   "canvas_utils",
   "sampler",
   "safety_limiter",
-  "equalizer"
+  "equalizer",
+  "lfo"
 ]
 
 [profile.release]

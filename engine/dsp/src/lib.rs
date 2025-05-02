@@ -168,6 +168,9 @@ pub fn gain_to_db(threshold: f32) -> f32 {
   20. * threshold.log10()
 }
 
+#[inline(always)]
+pub fn uninit<T>() -> T { unsafe { std::mem::MaybeUninit::uninit().assume_init() } }
+
 #[test]
 fn db_conversion() {
   assert_eq!(gain_to_db(1.), 0.);

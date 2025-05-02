@@ -89,6 +89,7 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/lfo.wasm ./public
   cp ./engine/build/* ./src
 
   just build-sinsy
@@ -154,6 +155,7 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
+  cp ./engine/target/wasm32-unknown-unknown/release/lfo.wasm ./public
 
   just debug-sinsy
 
@@ -340,3 +342,7 @@ build-equalizer:
 debug-equalizer:
   cd ./engine/equalizer && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/equalizer.wasm ../../public
+
+build-lfo:
+  cd ./engine/lfo && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/lfo.wasm ../../public

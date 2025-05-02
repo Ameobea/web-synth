@@ -1,7 +1,8 @@
-use dsp::filters::dc_blocker::DCBlocker;
+use dsp::{filters::dc_blocker::DCBlocker, FRAME_SIZE};
+
+use crate::fm::param_source::ParamSource;
 
 use super::Effect;
-use crate::fm::{ParamSource, FRAME_SIZE};
 
 #[derive(Clone)]
 pub struct Wavecruncher {

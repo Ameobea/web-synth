@@ -20,8 +20,11 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 use std::f32::consts::PI;
 
+use dsp::{FRAME_SIZE, SAMPLE_RATE};
+
+use crate::fm::param_source::ParamSource;
+
 use super::Effect;
-use crate::fm::{ParamSource, FRAME_SIZE, SAMPLE_RATE};
 
 // Thermal voltage (26 milliwats at room temperature)
 const VT: f32 = 0.312;
@@ -78,26 +81,26 @@ impl Effect for MoogFilter {
       let cutoff = dsp::clamp(1., 22_100., cutoff);
       let resonance = dsp::clamp(0., 20., resonance);
 
-      let x = (PI * cutoff) / (SAMPLE_RATE * 2) as f32;
+      let x = (PI * cutoff) / (SAMPLE_RATE * 2.);
       let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
       let new_dV0 = -g * (tanh((drive * sample + resonance * V3) / (2. * VT)) + tV0);
-      V0 += (new_dV0 + dV0) / (2. * (SAMPLE_RATE * 2) as f32);
+      V0 += (new_dV0 + dV0) / (2. * SAMPLE_RATE * 2.);
       dV0 = new_dV0;
       tV0 = tanh(V0 / (2. * VT));
 
       let new_dV1 = g * (tV0 - tV1);
-      V1 += (new_dV1 + dV1) / (2. * (SAMPLE_RATE * 2) as f32);
+      V1 += (new_dV1 + dV1) / (2. * SAMPLE_RATE * 2.);
       dV1 = new_dV1;
       tV1 = tanh(V1 / (2. * VT));
 
       let new_dV2 = g * (tV1 - tV2);
-      V2 += (new_dV2 + dV2) / (2. * (SAMPLE_RATE * 2) as f32);
+      V2 += (new_dV2 + dV2) / (2. * SAMPLE_RATE * 2.);
       dV2 = new_dV2;
       tV2 = tanh(V2 / (2. * VT));
 
       let new_dV3 = g * (tV2 - tV3);
-      V3 += (new_dV3 + dV3) / (2. * (SAMPLE_RATE * 2) as f32);
+      V3 += (new_dV3 + dV3) / (2. * SAMPLE_RATE * 2.);
       dV3 = new_dV3;
       tV3 = tanh(V3 / (2. * VT));
 
@@ -145,26 +148,26 @@ impl Effect for MoogFilter {
         let resonance = dsp::clamp(0., 20., resonances[sample_ix]);
         let drive = drives[sample_ix];
 
-        let x = (PI * cutoff) / (2 * SAMPLE_RATE) as f32;
+        let x = (PI * cutoff) / (2. * SAMPLE_RATE);
         let g = 4. * PI * VT * cutoff * (1. - x) / (1. + x);
 
         let new_dV0 = -g * (tanh((drive * sample + resonance * V3) / (2. * VT)) + tV0);
-        V0 += (new_dV0 + dV0) / (2. * (SAMPLE_RATE * 2) as f32);
+        V0 += (new_dV0 + dV0) / (2. * SAMPLE_RATE * 2.);
         dV0 = new_dV0;
         tV0 = tanh(V0 / (2. * VT));
 
         let new_dV1 = g * (tV0 - tV1);
-        V1 += (new_dV1 + dV1) / (2. * (SAMPLE_RATE * 2) as f32);
+        V1 += (new_dV1 + dV1) / (2. * SAMPLE_RATE * 2.);
         dV1 = new_dV1;
         tV1 = tanh(V1 / (2. * VT));
 
         let new_dV2 = g * (tV1 - tV2);
-        V2 += (new_dV2 + dV2) / (2. * (SAMPLE_RATE * 2) as f32);
+        V2 += (new_dV2 + dV2) / (2. * SAMPLE_RATE * 2.);
         dV2 = new_dV2;
         tV2 = tanh(V2 / (2. * VT));
 
         let new_dV3 = g * (tV2 - tV3);
-        V3 += (new_dV3 + dV3) / (2. * (SAMPLE_RATE * 2) as f32);
+        V3 += (new_dV3 + dV3) / (2. * SAMPLE_RATE * 2.);
         dV3 = new_dV3;
         tV3 = tanh(V3 / (2. * VT));
 
