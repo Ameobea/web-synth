@@ -1,5 +1,3 @@
-#[cfg(feature = "simd")]
-use core::arch::wasm32::*;
 use polysynth::{PolySynth, SynthCallbacks};
 use rand::Rng;
 use std::{mem::MaybeUninit, rc::Rc};

@@ -1,3 +1,5 @@
+#[cfg(feature = "simd")]
+use std::arch::wasm32::*;
 use std::cell::Cell;
 
 use adsr::Adsr;
