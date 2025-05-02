@@ -9,6 +9,7 @@ use palette::{
   rgb::Rgb,
 };
 
+#[cfg(feature = "bindgen")]
 mod conf;
 #[cfg(feature = "line_viz")]
 mod line_viz;

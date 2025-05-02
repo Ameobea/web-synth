@@ -1,5 +1,6 @@
 pub mod effects;
 pub mod fast;
+#[cfg(feature = "exports")]
 mod filter;
 pub mod oscillator;
 pub mod param_source;

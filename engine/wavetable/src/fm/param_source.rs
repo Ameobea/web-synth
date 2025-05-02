@@ -3,6 +3,8 @@ use std::arch::wasm32::*;
 use std::cell::Cell;
 
 use adsr::Adsr;
+#[cfg(feature = "simd")]
+use common::ref_static_mut;
 use dsp::{FRAME_SIZE, SAMPLE_RATE};
 use rand::Rng;
 
@@ -342,7 +344,9 @@ impl ParamSource {
         shift,
       } => {
         let value = unsafe {
-          f32x4_splat(*MIDI_CONTROL_VALUES.get_unchecked(*control_index) * scale + shift)
+          f32x4_splat(
+            *ref_static_mut!(MIDI_CONTROL_VALUES).get_unchecked(*control_index) * scale + shift,
+          )
         };
 
         let base_output_ptr = output_buf.as_ptr() as *mut v128;

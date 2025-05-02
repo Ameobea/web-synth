@@ -2,16 +2,13 @@ use adsr::{managed_adsr::ManagedAdsr, Adsr};
 use dsp::{
   filters::{
     biquad::{BiquadFilter, FilterMode},
+    dynabandpass::DynabandpassFilter,
     filter_chain::apply_filter_chain_and_compute_coefficients,
   },
   FRAME_SIZE,
 };
 
-use self::dynabandpass::DynabandpassFilter;
-
 use super::param_source::{AdsrState, ParamSource, RenderRawParams};
-
-pub mod dynabandpass;
 
 const ZERO_FRAME: [f32; FRAME_SIZE] = [0.; FRAME_SIZE];
 

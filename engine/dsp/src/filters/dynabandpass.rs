@@ -1,4 +1,5 @@
-use dsp::{
+use crate::{
+  clamp,
   filters::{
     biquad::{BiquadFilter, FilterMode},
     filter_chain::apply_filter_chain_and_compute_coefficients_minimal,
@@ -9,24 +10,14 @@ use dsp::{
 /// Frequency is a log scale, so we need to increase the bandwidth as the base frequency increases.
 ///
 /// Given the frequency of the center of a band and its width when the band's center is 10 Hz,
-/// this function returns the width of the band when the base frequency is the given frequency.
-///
-/// # Arguments
-///
-/// * `base_frequency` - The base frequency.
-/// * `base_bandwidth` - The base bandwidth.
-/// * `frequency` - The frequency for which to compute the modified bandwidth.
-///
-/// # Returns
-///
-/// * The computed modified bandwidth.
+/// this function returns the width of the band at `frequency`.
 #[inline]
 fn compute_modified_dynabandpass_filter_bandwidth(
   base_frequency: f32,
   base_bandwidth: f32,
   frequency: f32,
 ) -> f32 {
-  let log_base_frequency = (base_frequency + base_bandwidth / 2.0).log10();
+  let log_base_frequency = (base_frequency + base_bandwidth / 2.).log10();
   let log_frequency = frequency.log10();
   let log_base_bandwidth = base_bandwidth.log10();
 
@@ -39,8 +30,8 @@ fn compute_modified_dynabandpass_filter_bandwidth(
 fn compute_filter_cutoff_frequencies(center_frequency: f32, base_bandwidth: f32) -> (f32, f32) {
   let bandwidth =
     compute_modified_dynabandpass_filter_bandwidth(10., base_bandwidth, center_frequency);
-  let highpass_freq = dsp::clamp(10., NYQUIST - 100., center_frequency - bandwidth / 2.);
-  let lowpass_freq = dsp::clamp(10., NYQUIST - 100., center_frequency + bandwidth / 2.);
+  let highpass_freq = clamp(10., NYQUIST - 100., center_frequency - bandwidth / 2.);
+  let lowpass_freq = clamp(10., NYQUIST - 100., center_frequency + bandwidth / 2.);
   (lowpass_freq, highpass_freq)
 }
 
@@ -50,7 +41,7 @@ const DYNABANDPASS_FILTER_ORDER: usize = 8;
 const PRECOMPUTED_BASE_Q_FACTORS: [f32; 4] = [-5.852078, -4.417527, -0.91537845, 8.174685];
 
 #[derive(Clone)]
-pub(crate) struct DynabandpassFilter {
+pub struct DynabandpassFilter {
   lowpass_filter_chain: [BiquadFilter; DYNABANDPASS_FILTER_ORDER / 2],
   highpass_filter_chain: [BiquadFilter; DYNABANDPASS_FILTER_ORDER / 2],
   bandwidth: f32,

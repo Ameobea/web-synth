@@ -56,7 +56,17 @@ class SamplerAWP extends AudioWorkletProcessor {
 
   async initWasmInstance(wasmBytes) {
     const compiledModule = await WebAssembly.compile(wasmBytes);
-    this.wasmInstance = await WebAssembly.instantiate(compiledModule, { env: {} });
+    this.wasmInstance = await WebAssembly.instantiate(compiledModule, {
+      env: {
+        log_err: (ptr, len) => {
+          const memory = new Uint8Array(this.wasmInstance.exports.memory.buffer);
+          const str = Array.from(memory.subarray(ptr, ptr + len))
+            .map(v => String.fromCharCode(v))
+            .join('');
+          console.error(str);
+        },
+      },
+    });
 
     this.ctxPtr = this.wasmInstance.exports.init_sampler_ctx();
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);

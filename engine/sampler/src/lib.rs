@@ -1,5 +1,16 @@
 use dsp::FRAME_SIZE;
 
+extern "C" {
+  fn log_err(ptr: *const u8, len: usize);
+}
+
+fn error(msg: &str) {
+  let bytes = msg.as_bytes();
+  let len = bytes.len();
+  let ptr = bytes.as_ptr();
+  unsafe { log_err(ptr, len) }
+}
+
 #[derive(Clone, Copy)]
 pub struct CrossfadeConfig {
   /// How many samples are in the crossfade at the start of the grain playback.  The reverse flag
@@ -129,8 +140,30 @@ impl Default for SamplerCtx {
   }
 }
 
+static mut DID_INIT: bool = false;
+
 #[no_mangle]
 pub extern "C" fn init_sampler_ctx() -> *mut SamplerCtx {
+  let needs_init = unsafe {
+    if !DID_INIT {
+      DID_INIT = true;
+      true
+    } else {
+      false
+    }
+  };
+  if needs_init {
+    let hook = move |info: &std::panic::PanicHookInfo| {
+      let msg = format!("PANIC: {}", info.to_string());
+      let bytes = msg.into_bytes();
+      let len = bytes.len();
+      let ptr = bytes.as_ptr();
+      unsafe { log_err(ptr, len) }
+    };
+
+    std::panic::set_hook(Box::new(hook))
+  }
+
   let ctx = SamplerCtx::default();
   Box::into_raw(Box::new(ctx))
 }
@@ -173,11 +206,12 @@ pub extern "C" fn sampler_set_selection(
   crossfade_end_len_samples: f32,
   playback_rate: f32,
   reverse: bool,
-) -> usize {
+) {
   let ctx = unsafe { &mut *ctx };
 
   if start_sample_ix >= end_sample_ix {
-    panic!("start_sample_ix must be less than end_sample_ix");
+    error("start_sample_ix must be less than end_sample_ix");
+    return;
   }
 
   let config: GrainConfig = GrainConfig {
@@ -191,7 +225,6 @@ pub extern "C" fn sampler_set_selection(
     reverse,
   };
   ctx.selections_by_midi_number[midi_number] = Some(config);
-  midi_number
 }
 
 #[no_mangle]
