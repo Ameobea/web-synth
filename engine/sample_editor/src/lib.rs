@@ -184,7 +184,8 @@ pub extern "C" fn write_sample_data(
 
 #[no_mangle]
 pub extern "C" fn get_sample_data_buf_ptr(ctx: *mut SampleEditorCtx, buf_ix: usize) -> *mut f32 {
-  unsafe { (*ctx).sample_data[buf_ix].as_mut_ptr() }
+  let ctx = unsafe { &mut *ctx };
+  ctx.sample_data[buf_ix].as_mut_ptr()
 }
 
 static mut GAIN_ENVELOPE_BUF: [f32; 255] = [0.; 255];

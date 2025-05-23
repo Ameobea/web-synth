@@ -74,7 +74,7 @@ impl NoteContainer {
     return true;
   }
 
-  pub fn add_note(&mut self, start_point: f64, note: Note) {
+  pub fn add_note(&mut self, mut start_point: f64, note: Note) {
     debug_assert!(note.length.is_normal() && note.length > 0.);
     if !note.length.is_normal() {
       error!(
@@ -87,6 +87,11 @@ impl NoteContainer {
     if start_point < 0. {
       error!("Found note with invalid start point of {start_point}; ignoring");
       return;
+    }
+
+    // sometimes we get -0. and that causes issues
+    if start_point <= 0. {
+      start_point = 0.;
     }
 
     let end_point = start_point + note.length;
@@ -145,9 +150,14 @@ impl NoteContainer {
       });
   }
 
-  pub fn remove_note(&mut self, note_start: f64, note_id: u32) -> Note {
+  pub fn remove_note(&mut self, mut note_start: f64, note_id: u32) -> Note {
     assert!(!note_start.is_nan() && note_start >= 0.);
     assert!(note_start >= 0.);
+
+    // sometimes we get -0. and that causes issues
+    if note_start <= 0. {
+      note_start = 0.;
+    }
 
     let (removed_note, removed_note_length) = match self.inner.get_mut(&FloatOrd(note_start)) {
       Some(entry) => match entry.clone() {
@@ -236,7 +246,7 @@ impl NoteContainer {
   /// note, which will be the same as the current starting point if no move is possible.
   pub fn move_note_horizontal(
     &mut self,
-    start_point: f64,
+    mut start_point: f64,
     note_id: u32,
     new_start_point: f64,
   ) -> f64 {
@@ -244,6 +254,10 @@ impl NoteContainer {
       panic!()
     }
     assert!(start_point >= 0. && new_start_point >= 0.);
+    // sometimes we get -0. and that causes issues
+    if start_point <= 0. {
+      start_point = 0.;
+    }
     if start_point == new_start_point {
       return new_start_point;
     }
@@ -353,13 +367,19 @@ impl NoteContainer {
 
   /// Tries to resize the note by moving its end point.  Returns the new end point that was
   /// actually set after accounting for blocks etc.
-  pub fn resize_note_end(&mut self, start_point: f64, note_id: u32, new_end_point: f64) -> f64 {
+  pub fn resize_note_end(&mut self, mut start_point: f64, note_id: u32, new_end_point: f64) -> f64 {
     assert!(!new_end_point.is_nan());
+
+    // sometimes we get -0. and that causes issues
+    if start_point <= 0. {
+      start_point = 0.;
+    }
+
     assert!(new_end_point > start_point);
 
     let start_entry = self
       .inner
-      .get(&FloatOrd(start_point))
+      .get(&FloatOrd(start_point.abs()))
       .unwrap_or_else(|| panic!("No note found with start point={}", start_point))
       .clone();
     let note = match start_entry {
@@ -458,10 +478,20 @@ impl NoteContainer {
 
   /// Tries to resize the note by moving its start point.  Returns the new start point that was
   /// actually set after account for blocks etc.
-  pub fn resize_note_start(&mut self, start_point: f64, note_id: u32, new_start_point: f64) -> f64 {
+  pub fn resize_note_start(
+    &mut self,
+    mut start_point: f64,
+    note_id: u32,
+    new_start_point: f64,
+  ) -> f64 {
     assert!(!new_start_point.is_nan());
     if start_point == new_start_point {
       return new_start_point;
+    }
+
+    // sometimes we get -0. and that causes issues
+    if start_point <= 0. {
+      start_point = 0.;
     }
 
     let start_entry = self
@@ -550,7 +580,16 @@ impl NoteContainer {
     real_new_start_point
   }
 
-  pub fn set_note_velocity(&mut self, start_point: f64, note_id: u32, new_velocity: u8) {
+  pub fn set_note_velocity(&mut self, mut start_point: f64, note_id: u32, new_velocity: u8) {
+    if start_point < 0. {
+      error!("Tried to set velocity for note with invalid start point of {start_point}");
+      return;
+    }
+
+    if start_point <= 0. {
+      start_point = 0.;
+    }
+
     let entry = self
       .inner
       .get_mut(&FloatOrd(start_point))

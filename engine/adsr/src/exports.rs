@@ -174,7 +174,9 @@ pub unsafe extern "C" fn update_adsr_steps(ctx: *mut AdsrContext) {
   for adsr in &mut (*ctx).adsrs {
     adsr.adsr.set_steps(decoded_steps.clone());
   }
-  (*ctx).adsrs[0].render();
+
+  let ctx = &mut *ctx;
+  ctx.adsrs[0].render();
 }
 
 #[no_mangle]
@@ -191,13 +193,15 @@ pub unsafe extern "C" fn update_adsr_len_ms(
 
 #[no_mangle]
 pub unsafe extern "C" fn gate_adsr(ctx: *mut AdsrContext, index: usize, cur_beat: f32) {
-  (*ctx).adsrs[index].adsr.gate(cur_beat);
-  (*ctx).most_recent_gated_ix = index;
+  let ctx = &mut *ctx;
+  ctx.adsrs[index].adsr.gate(cur_beat);
+  ctx.most_recent_gated_ix = index;
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ungate_adsr(ctx: *mut AdsrContext, index: usize) {
-  (*ctx).adsrs[index].adsr.ungate()
+  let ctx = &mut *ctx;
+  ctx.adsrs[index].adsr.ungate()
 }
 
 /// Updates all ADSRs, rendering them to their respective output buffers.  Returns the current phase
@@ -210,13 +214,14 @@ pub unsafe extern "C" fn process_adsr(
   cur_bpm: f32,
   cur_beat: f32,
 ) -> f32 {
+  let ctx = &mut *ctx;
   let shift = output_range_min;
   let scale = output_range_max - output_range_min;
-  for adsr in &mut (*ctx).adsrs {
+  for adsr in &mut ctx.adsrs {
     adsr.render_frame(scale, shift, cur_bpm, cur_beat);
   }
 
-  (*ctx).adsrs[(*ctx).most_recent_gated_ix].adsr.phase
+  ctx.adsrs[(*ctx).most_recent_gated_ix].adsr.phase
 }
 
 #[no_mangle]
@@ -252,7 +257,8 @@ pub unsafe extern "C" fn adsr_get_output_buf_ptr(
   ctx: *const AdsrContext,
   index: usize,
 ) -> *const f32 {
-  (*ctx).adsrs[index].adsr.get_cur_frame_output().as_ptr()
+  let ctx = &*ctx;
+  ctx.adsrs[index].adsr.get_cur_frame_output().as_ptr()
 }
 
 /// If the ADSR is in the "Done" state, meaning it will output a constant value forever until gated

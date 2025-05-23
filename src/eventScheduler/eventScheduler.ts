@@ -132,7 +132,6 @@ export const stopAll = () => {
     console.error('Tried to stop scheduler before it was initialized');
     return;
   } else if (!isStarted) {
-    console.warn("Tried to stop global beat counter, but it's not running");
     return;
   }
 

@@ -11,27 +11,19 @@ const ASSET_PATH = process.env.ASSET_PATH || 'https://ameo.dev/web-synth-headles
  */
 const config = {
   ...baseConfig,
-  entry: {
-    headless: {
-      import: './src/headless/index.tsx',
-      library: {
-        // name: 'web-synth-headless',
-        type: 'module',
-      },
-    },
-  },
+  entry: './src/headless/index.tsx',
   output: {
     path: path.resolve(__dirname, 'dist/headless'),
-    // filename: '[name].[contenthash].js',
-    filename: '[name].js',
+    filename: 'headless.js',
     publicPath: ASSET_PATH,
     library: {
-      // name: 'web-synth-headless',
-      type: 'module',
+      type: 'modern-module',
     },
-    libraryTarget: 'module',
   },
-  plugins: [...baseConfig.plugins, new webpack.EnvironmentPlugin({ ASSET_PATH })],
+  plugins: [
+    new webpack.EnvironmentPlugin(['BACKEND_BASE_URL', 'FAUST_COMPILER_ENDPOINT']),
+    new webpack.EnvironmentPlugin({ ASSET_PATH }),
+  ],
   mode: 'production',
   devtool: 'source-map',
   experiments: {

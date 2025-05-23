@@ -416,9 +416,31 @@ impl OscillatorSource {
         },
       OscillatorSource::ParamBuffer(_) => false,
       OscillatorSource::ExponentialOscillator(_) => false,
-      OscillatorSource::Square(_) => false,
-      OscillatorSource::Triangle(_) => false,
-      OscillatorSource::Sawtooth(_) => false,
+      OscillatorSource::Square(sq) =>
+        if let OscillatorSource::Square(other) = other {
+          sq.duty_cycle.replace(other.duty_cycle.clone());
+          sq.fir_downsampler = other.fir_downsampler.clone();
+          sq.phase = other.phase;
+          true
+        } else {
+          false
+        },
+      OscillatorSource::Triangle(tri) =>
+        if let OscillatorSource::Triangle(other) = other {
+          tri.fir_downsampler = other.fir_downsampler.clone();
+          tri.phase = other.phase;
+          true
+        } else {
+          false
+        },
+      OscillatorSource::Sawtooth(saw) =>
+        if let OscillatorSource::Sawtooth(other) = other {
+          saw.fir_downsampler = other.fir_downsampler.clone();
+          saw.phase = other.phase;
+          true
+        } else {
+          false
+        },
       OscillatorSource::UnisonSine(osc) =>
         if let OscillatorSource::UnisonSine(other) = other {
           osc
@@ -460,6 +482,14 @@ impl OscillatorSource {
           for osc in &mut osc.oscillators {
             osc.duty_cycle.replace(duty_cycle.clone());
           }
+
+          if other.oscillators.len() == osc.oscillators.len() {
+            for (osc, o_osc) in osc.oscillators.iter_mut().zip(other.oscillators.iter()) {
+              osc.fir_downsampler = o_osc.fir_downsampler.clone();
+              osc.phase = o_osc.phase;
+            }
+          }
+
           true
         } else {
           false
@@ -469,6 +499,14 @@ impl OscillatorSource {
           osc
             .unison_detune_range_semitones
             .replace(other.unison_detune_range_semitones.clone());
+
+          if other.oscillators.len() == osc.oscillators.len() {
+            for (osc, o_osc) in osc.oscillators.iter_mut().zip(other.oscillators.iter()) {
+              osc.fir_downsampler = o_osc.fir_downsampler.clone();
+              osc.phase = o_osc.phase;
+            }
+          }
+
           true
         } else {
           false
@@ -478,6 +516,14 @@ impl OscillatorSource {
           osc
             .unison_detune_range_semitones
             .replace(other.unison_detune_range_semitones.clone());
+
+          if other.oscillators.len() == osc.oscillators.len() {
+            for (osc, o_osc) in osc.oscillators.iter_mut().zip(other.oscillators.iter()) {
+              osc.fir_downsampler = o_osc.fir_downsampler.clone();
+              osc.phase = o_osc.phase;
+            }
+          }
+
           true
         } else {
           false
@@ -1360,12 +1406,15 @@ fn build_oscillator_source(
         param_0_val_float_3,
       ),
       phase: old_phases.get(0).copied().unwrap_or_default(),
+      fir_downsampler: Default::default(),
     }),
     5 => OscillatorSource::Triangle(TriangleOscillator {
       phase: old_phases.get(0).copied().unwrap_or_default(),
+      fir_downsampler: Default::default(),
     }),
     6 => OscillatorSource::Sawtooth(SawtoothOscillator {
       phase: old_phases.get(0).copied().unwrap_or_default(),
+      fir_downsampler: Default::default(),
     }),
     7 => OscillatorSource::SampleMapping(SampleMappingEmitter::new()),
     8 => OscillatorSource::TunedSample(TunedSampleEmitter {}),
@@ -1434,7 +1483,8 @@ fn build_oscillator_source(
             param_0_val_float_2,
             param_0_val_float_3,
           ),
-          phase: 0.
+          phase: 0.,
+          fir_downsampler: Default::default(),
         };
         unison
       ]),
@@ -1447,7 +1497,13 @@ fn build_oscillator_source(
         param_4_val_float_2,
         param_4_val_float_3,
       ),
-      initialize_phases(old_phases, vec![TriangleOscillator { phase: 0. }; unison]),
+      initialize_phases(old_phases, vec![
+        TriangleOscillator {
+          phase: 0.,
+          fir_downsampler: Default::default()
+        };
+        unison
+      ]),
     )),
     56 => OscillatorSource::UnisonSawtooth(UnisonOscillator::new(
       ParamSource::from_parts(
@@ -1457,7 +1513,13 @@ fn build_oscillator_source(
         param_4_val_float_2,
         param_4_val_float_3,
       ),
-      initialize_phases(old_phases, vec![SawtoothOscillator { phase: 0. }; unison]),
+      initialize_phases(old_phases, vec![
+        SawtoothOscillator {
+          phase: 0.,
+          fir_downsampler: FirDownsampler::default()
+        };
+        unison
+      ]),
     )),
     _ => panic!("Invalid operator type: {}", operator_type),
   }
@@ -1786,10 +1848,11 @@ pub unsafe extern "C" fn set_adsr(
   loop_point: f32,
   log_scale: bool,
 ) {
+  let ctx = &mut *ctx;
   let shared_buffer = Box::new([0.0f32; RENDERED_BUFFER_SIZE]);
   let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
 
-  for voice in &mut *(*ctx).voices {
+  for voice in &mut *ctx.voices {
     let mut new_adsr = Adsr::new(
       ADSR_STEP_BUFFER[..step_count].to_owned(),
       if loop_point < 0. {
@@ -1879,11 +1942,11 @@ pub unsafe extern "C" fn set_adsr(
   }
   // Render the ADSR's shared buffer
   if adsr_ix == -1 {
-    (*ctx).voices[0].gain_envelope_generator.render();
+    ctx.voices[0].gain_envelope_generator.render();
   } else if adsr_ix == -2 {
-    (*ctx).voices[0].filter_envelope_generator.render();
+    ctx.voices[0].filter_envelope_generator.render();
   } else {
-    (*ctx).voices[0].adsrs[adsr_ix as usize].render();
+    ctx.voices[0].adsrs[adsr_ix as usize].render();
   }
 }
 

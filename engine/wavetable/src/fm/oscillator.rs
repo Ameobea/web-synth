@@ -7,6 +7,87 @@ use crate::WaveTable;
 
 use super::param_source::ParamSource;
 
+const FIR_COEFFS: [f32; 31] = [
+  -1.20388000e-03,
+  -2.05336094e-03,
+  -2.07962901e-03,
+  1.64050411e-18,
+  4.76490069e-03,
+  9.89603364e-03,
+  9.97846427e-03,
+  -4.80775224e-18,
+  -1.89637895e-02,
+  -3.62933212e-02,
+  -3.47620350e-02,
+  8.28597812e-18,
+  6.86322821e-02,
+  1.53265764e-01,
+  2.23458463e-01,
+  2.50720214e-01,
+  2.23458463e-01,
+  1.53265764e-01,
+  6.86322821e-02,
+  8.28597812e-18,
+  -3.47620350e-02,
+  -3.62933212e-02,
+  -1.89637895e-02,
+  -4.80775224e-18,
+  9.97846427e-03,
+  9.89603364e-03,
+  4.76490069e-03,
+  1.64050411e-18,
+  -2.07962901e-03,
+  -2.05336094e-03,
+  -1.20388000e-03,
+];
+
+const FIR_TAP_COUNT: usize = const { FIR_COEFFS.len() };
+
+#[derive(Clone)]
+pub struct FirDownsampler {
+  buf: [f32; FIR_TAP_COUNT],
+  pos: usize,
+}
+
+impl Default for FirDownsampler {
+  fn default() -> Self {
+    FirDownsampler {
+      buf: [0.; FIR_TAP_COUNT],
+      pos: 0,
+    }
+  }
+}
+
+const ENABLE_FIR_DOWNSAMPLER: bool = true;
+
+impl FirDownsampler {
+  #[inline]
+  fn process(&mut self, sample: f32) -> f32 {
+    self.buf[self.pos] = sample;
+    self.pos = (self.pos + 1) % FIR_TAP_COUNT;
+
+    let mut out = 0.0;
+    for i in 0..FIR_TAP_COUNT {
+      let index = (self.pos + i) % FIR_TAP_COUNT;
+      out += self.buf[index] * FIR_COEFFS[i];
+    }
+    out
+  }
+
+  #[inline]
+  pub fn downsample(&mut self, input: &[f32; 4]) -> f32 {
+    if !ENABLE_FIR_DOWNSAMPLER {
+      return (input[0] + input[1] + input[2] + input[3]) / 4.;
+    }
+
+    for i in 0..(input.len() - 1) {
+      self.process(input[i]);
+    }
+
+    self.process(input[input.len() - 1])
+  }
+}
+
 pub trait Oscillator {
   fn gen_sample(
     &mut self,
@@ -63,6 +144,7 @@ impl Oscillator for SineOscillator {
 pub struct SquareOscillator {
   pub duty_cycle: ParamSource,
   pub phase: f32,
+  pub fir_downsampler: FirDownsampler,
 }
 
 impl Default for SquareOscillator {
@@ -73,6 +155,7 @@ impl Default for SquareOscillator {
         cur_val: 0.5,
       },
       phase: 0.,
+      fir_downsampler: FirDownsampler::default(),
     }
   }
 }
@@ -94,7 +177,6 @@ impl Oscillator for SquareOscillator {
     base_frequency: f32,
   ) -> f32 {
     // 4x oversampling to avoid aliasing
-    let mut out = 0.;
     let mut phase = self.phase;
     let duty_cycle =
       self
@@ -103,23 +185,24 @@ impl Oscillator for SquareOscillator {
     let duty_cycle = dsp::clamp(0.0001, 0.9999, duty_cycle);
 
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < duty_cycle { 0.25 } else { -0.25 };
+    let s0 = if phase < duty_cycle { 1. } else { -1. };
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < duty_cycle { 0.25 } else { -0.25 };
+    let s1 = if phase < duty_cycle { 1. } else { -1. };
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < duty_cycle { 0.25 } else { -0.25 };
+    let s2 = if phase < duty_cycle { 1. } else { -1. };
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    out += if phase < duty_cycle { 0.25 } else { -0.25 };
+    let s3 = if phase < duty_cycle { 1. } else { -1. };
 
     self.phase = phase;
 
-    out
+    self.fir_downsampler.downsample(&[s0, s1, s2, s3])
   }
 }
 
 #[derive(Clone, Default)]
 pub struct TriangleOscillator {
   pub phase: f32,
+  pub fir_downsampler: FirDownsampler,
 }
 
 impl PhasedOscillator for TriangleOscillator {
@@ -140,32 +223,73 @@ impl Oscillator for TriangleOscillator {
   ) -> f32 {
     // 4x oversampling to avoid aliasing
     let oversample_factor = 4usize;
-    let mut out = 0.;
     let mut phase = self.phase;
-    for _ in 0..oversample_factor {
-      phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-      out += if phase < 0.25 {
-        4. * phase
-      } else if phase < 0.5 {
-        let adjusted_phase = phase - 0.25;
-        1. - 4. * adjusted_phase
-      } else if phase < 0.75 {
-        let adjusted_phase = phase - 0.5;
-        -adjusted_phase * 4.
-      } else {
-        let adjusted_phase = phase - 0.75;
-        -1. + (adjusted_phase * 4.)
-      }
-    }
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s0 = if phase < 0.25 {
+      4. * phase
+    } else if phase < 0.5 {
+      let adjusted_phase = phase - 0.25;
+      1. - 4. * adjusted_phase
+    } else if phase < 0.75 {
+      let adjusted_phase = phase - 0.5;
+      -adjusted_phase * 4.
+    } else {
+      let adjusted_phase = phase - 0.75;
+      -1. + (adjusted_phase * 4.)
+    };
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s1 = if phase < 0.25 {
+      4. * phase
+    } else if phase < 0.5 {
+      let adjusted_phase = phase - 0.25;
+      1. - 4. * adjusted_phase
+    } else if phase < 0.75 {
+      let adjusted_phase = phase - 0.5;
+      -adjusted_phase * 4.
+    } else {
+      let adjusted_phase = phase - 0.75;
+      -1. + (adjusted_phase * 4.)
+    };
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s2 = if phase < 0.25 {
+      4. * phase
+    } else if phase < 0.5 {
+      let adjusted_phase = phase - 0.25;
+      1. - 4. * adjusted_phase
+    } else if phase < 0.75 {
+      let adjusted_phase = phase - 0.5;
+      -adjusted_phase * 4.
+    } else {
+      let adjusted_phase = phase - 0.75;
+      -1. + (adjusted_phase * 4.)
+    };
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s3 = if phase < 0.25 {
+      4. * phase
+    } else if phase < 0.5 {
+      let adjusted_phase = phase - 0.25;
+      1. - 4. * adjusted_phase
+    } else if phase < 0.75 {
+      let adjusted_phase = phase - 0.5;
+      -adjusted_phase * 4.
+    } else {
+      let adjusted_phase = phase - 0.75;
+      -1. + (adjusted_phase * 4.)
+    };
 
     self.phase = phase;
-    out / oversample_factor as f32
+    self.fir_downsampler.downsample(&[s0, s1, s2, s3])
   }
 }
 
 #[derive(Clone, Default)]
 pub struct SawtoothOscillator {
   pub phase: f32,
+  pub fir_downsampler: FirDownsampler,
 }
 
 impl PhasedOscillator for SawtoothOscillator {
@@ -186,19 +310,38 @@ impl Oscillator for SawtoothOscillator {
   ) -> f32 {
     // 4x oversampling to reduce aliasing
     let oversample_factor = 4usize;
-    let mut out = 0.;
     let mut phase = self.phase;
-    for _ in 0..oversample_factor {
-      phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-      out += if phase < 0.5 {
-        2. * phase
-      } else {
-        -1. + (2. * (phase - 0.5))
-      };
-    }
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s0 = if phase < 0.5 {
+      2. * phase
+    } else {
+      -1. + (2. * (phase - 0.5))
+    };
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s1 = if phase < 0.5 {
+      2. * phase
+    } else {
+      -1. + (2. * (phase - 0.5))
+    };
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s2 = if phase < 0.5 {
+      2. * phase
+    } else {
+      -1. + (2. * (phase - 0.5))
+    };
+
+    phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
+    let s3 = if phase < 0.5 {
+      2. * phase
+    } else {
+      -1. + (2. * (phase - 0.5))
+    };
 
     self.phase = phase;
-    out / oversample_factor as f32
+    self.fir_downsampler.downsample(&[s0, s1, s2, s3])
   }
 }
 

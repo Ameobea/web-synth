@@ -1,8 +1,7 @@
 import React from 'react';
-import { Tooltip, type Position } from 'react-tippy';
-
-import 'react-tippy/dist/tippy.css';
+import { Tooltip } from 'react-tooltip';
 import './HelpIcon.css';
+import { useUniqueId } from 'src/reactUtils';
 
 interface HelpIconIconProps
   extends React.DetailedHTMLProps<React.HTMLAttributes<SVGSVGElement>, SVGSVGElement> {
@@ -51,7 +50,7 @@ interface HelpIconProps {
   tooltipStyle?: React.CSSProperties;
   color?: string;
   arrow?: boolean;
-  position?: Position;
+  position?: 'top' | 'right' | 'bottom' | 'left';
 }
 
 const HelpIcon: React.FC<HelpIconProps> = ({
@@ -60,35 +59,37 @@ const HelpIcon: React.FC<HelpIconProps> = ({
   style,
   tooltipStyle,
   color,
-  arrow = true,
-  position,
+  position = 'top',
 }) => {
-  const content = (
-    <a href={link.startsWith('http') ? link : `/docs/${link}`} target='_blank'>
+  const isExternal = link.startsWith('http');
+  const tooltipId = useUniqueId();
+
+  const anchor = (
+    <a
+      href={isExternal ? link : `/docs/${link}`}
+      target='_blank'
+      rel='noopener noreferrer'
+      data-tooltip-id={tooltipId}
+      data-tooltip-html={`web synth docs: <code>${link}</code>`}
+    >
       <HelpIconIcon style={style} size={size} color={color} />
     </a>
   );
 
-  if (link.startsWith('http')) {
-    return content;
-  }
-
   return (
-    <Tooltip
-      interactive
-      distance={6}
-      duration={200}
-      arrow={arrow}
-      position={position}
-      style={tooltipStyle}
-      html={
-        <>
-          web synth docs: <code>{link}</code>
-        </>
-      }
-    >
-      {content}
-    </Tooltip>
+    <>
+      {anchor}
+      {!isExternal ? (
+        <Tooltip
+          id={tooltipId}
+          place={position}
+          variant='dark'
+          style={{ zIndex: 99999, backgroundColor: '#171717', ...(tooltipStyle ?? {}) }}
+          offset={2}
+          wrapper='span'
+        />
+      ) : null}
+    </>
   );
 };
 

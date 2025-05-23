@@ -169,7 +169,6 @@ export class LFOInstance {
 
     this.awp.port.postMessage({ type: 'setWasmBytes', wasmBytes });
 
-    console.log('awp set');
     updateConnectables(this.vcId, this.buildAudioConnectables());
   }
 

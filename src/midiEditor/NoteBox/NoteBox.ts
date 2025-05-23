@@ -37,7 +37,9 @@ export class NoteBox {
       this.line.app.gateAllSelectedNotes();
       this.line.app.addMouseUpCB(() => this.line.app.ungateAllSelectedNotes());
 
-      this.line.app.startDraggingSelectedNotes(evt);
+      if (!this.line.app.selectionBoxButtonDown) {
+        this.line.app.startDraggingSelectedNotes(evt);
+      }
     });
 
     return graphics;

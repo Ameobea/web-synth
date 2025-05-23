@@ -975,13 +975,18 @@ class ConfigureEffects extends React.Component<ConfigureEffectsProps, ConfigureE
             operatorIx === null ? (
               <>
                 {'main effect chain '}
-                <HelpIcon link='fm-synth-main-effect-chain' color='rgb(161, 161, 161)' size={12} />
+                <HelpIcon
+                  link='fm-synth-main-effect-chain'
+                  color='rgb(161, 161, 161)'
+                  size={12}
+                  position='right'
+                />
               </>
             ) : (
               `operator ${operatorIx + 1} effects`
             )
           }
-          style={{ width: 500 }}
+          style={{ width: 500, overflow: 'visible', opacity: 1 }}
         />
         <div className='effects-controls'>
           {filterNils(state).map((effect, i) => (

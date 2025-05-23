@@ -224,6 +224,10 @@ impl ViewContextManager {
 
     js::add_view_context(&uuid.to_string(), &name, &subgraph_id.to_string());
 
+    if self.contexts.len() == 1 {
+      self.set_active_view(uuid, false);
+    }
+
     self.save_all();
     created_ix
   }
@@ -335,26 +339,31 @@ impl ViewContextManager {
       self.active_context_id = self.contexts[0].id;
     }
 
-    self.get_active_view_mut().unhide();
+    if let Some(active_view) = self.get_active_view_mut() {
+      active_view.unhide();
+    }
 
     self.init_vcs();
   }
 
   /// Retrieves the active `ViewContextManager`
-  pub fn get_active_view_mut(&mut self) -> &mut dyn ViewContext {
+  pub fn get_active_view_mut(&mut self) -> Option<&mut dyn ViewContext> {
     let active_vc_id = self.active_context_id;
-    self
-      .contexts
-      .iter_mut()
-      .find(|vc| vc.id == active_vc_id)
-      .unwrap_or_else(|| {
-        panic!(
-          "Tried to get active VC with ID {} but it wasn't found",
-          active_vc_id
-        )
-      })
-      .context
-      .as_mut()
+    if active_vc_id == Uuid::nil() {
+      return None;
+    }
+
+    Some(
+      self
+        .contexts
+        .iter_mut()
+        .find(|vc| vc.id == active_vc_id)
+        .unwrap_or_else(|| {
+          panic!("Tried to get active VC with ID {active_vc_id} but it wasn't found",)
+        })
+        .context
+        .as_mut(),
+    )
   }
 
   /// Updates the UI with an up-to-date listing of active view contexts and persist the current
@@ -1351,7 +1360,15 @@ impl ViewContextManager {
 
   pub fn set_active_view(&mut self, view_id: Uuid, skip_history: bool) {
     self.save_all();
-    self.get_active_view_mut().hide();
+    if let Some(active_view) = self.get_active_view_mut() {
+      active_view.hide();
+    }
+
+    if !self.contexts.iter().any(|vc| vc.id == view_id) {
+      error!("Tried to set active view to vcId={view_id} but it doesn't exist",);
+      return;
+    }
+
     self.active_context_id = view_id;
     match self.subgraphs_by_id.get_mut(&self.active_subgraph_id) {
       Some(subgraph) => subgraph.active_vc_id = view_id,
@@ -1367,7 +1384,9 @@ impl ViewContextManager {
         .active_view_history
         .set_active_view(self.active_subgraph_id, view_id);
     }
-    self.get_active_view_mut().unhide();
+    if let Some(active_view) = self.get_active_view_mut() {
+      active_view.unhide();
+    }
     js::set_active_vc_id(&view_id.to_string());
   }
 

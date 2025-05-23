@@ -29,8 +29,9 @@ pub unsafe extern "C" fn init(frame_size: usize) -> *mut f32 {
 
 #[no_mangle]
 pub unsafe extern "C" fn process() {
-  for i in 0..(*INPUT_BUFFER).len() {
-    let sample = (*INPUT_BUFFER)[i];
+  let input_buf = &mut *INPUT_BUFFER;
+  for i in 0..input_buf.len() {
+    let sample = input_buf[i];
 
     // Update buffers, removing maxs/mins that are outside the current window
     loop {
@@ -74,7 +75,7 @@ pub unsafe extern "C" fn process() {
     // Apply lowpass to our output and write back into the input buffer in-place
     let range = (*MAXS_BUFFER).front().unwrap().val - (*MINS_BUFFER).front().unwrap().val;
     RANGE_ACC = RANGE_ACC * LOWPASS_COEFFICIENT + range * (1. - LOWPASS_COEFFICIENT);
-    (*INPUT_BUFFER)[i] = dsp::clamp(-1., 1., RANGE_ACC * RANGE_MULTIPLIER);
+    input_buf[i] = dsp::clamp(-1., 1., RANGE_ACC * RANGE_MULTIPLIER);
 
     CUR_SAMPLE_IX += 1;
   }

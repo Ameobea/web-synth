@@ -41,7 +41,10 @@ impl OscillatorInst {
         *self = OscillatorInst::Sine(SineOscillator { phase });
       },
       OscillatorType::Triangle => {
-        *self = OscillatorInst::Triangle(TriangleOscillator { phase });
+        *self = OscillatorInst::Triangle(TriangleOscillator {
+          phase,
+          fir_downsampler: Default::default(),
+        });
       },
       OscillatorType::Square =>
         if let OscillatorInst::Square(ref mut osc) = *self {
@@ -59,10 +62,14 @@ impl OscillatorInst {
               last_val: Cell::new(param0),
               cur_val: param0,
             },
+            fir_downsampler: Default::default(),
           });
         },
       OscillatorType::Sawtooth => {
-        *self = OscillatorInst::Sawtooth(SawtoothOscillator { phase });
+        *self = OscillatorInst::Sawtooth(SawtoothOscillator {
+          phase,
+          fir_downsampler: Default::default(),
+        });
       },
     }
   }

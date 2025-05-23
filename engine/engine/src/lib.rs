@@ -34,7 +34,7 @@ pub(crate) fn get_vcm() -> &'static mut ViewContextManager {
 /// the last saved composition from the user.
 #[wasm_bindgen]
 pub fn init() {
-  common::maybe_init(Some(unsafe { std::mem::transmute(js_random()) }));
+  common::maybe_init(Some(f64::to_bits(js_random())));
   wbg_logging::maybe_init();
 
   // Check if we have an existing VCM and drop it if we do
@@ -59,7 +59,11 @@ pub fn init() {
 ///
 /// Returns the created view context's ID.
 #[wasm_bindgen]
-pub fn create_view_context(vc_name: String, display_name: String, initial_state: Option<String>) -> String {
+pub fn create_view_context(
+  vc_name: String,
+  display_name: String,
+  initial_state: Option<String>,
+) -> String {
   let uuid = uuid_v4();
   debug!("Creating VC with name {} with vcId {}", vc_name, uuid);
   let view_context = build_view(&vc_name, uuid);
@@ -79,7 +83,7 @@ pub fn create_view_context(vc_name: String, display_name: String, initial_state:
 pub fn handle_window_close() {
   let vcm = get_vcm();
   for vc_entry in &mut vcm.contexts {
-    vc_entry.context.cleanup();
+    vc_entry.context.persist_state();
   }
   vcm.save_all();
 }
