@@ -32,6 +32,7 @@ fn maybe_init() {
     DID_INIT = true;
   }
 
+  #[cfg(target_arch = "wasm32")]
   common::set_raw_panic_hook(log_err);
 }
 

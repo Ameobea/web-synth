@@ -6,9 +6,13 @@ use crate::{
   managed_adsr::ManagedAdsr, Adsr, AdsrLengthMode, AdsrStep, RampFn, RENDERED_BUFFER_SIZE,
 };
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn log_err(msg: *const u8, len: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+fn log_err(_msg: *const u8, _len: usize) {}
 
 pub struct AdsrContext {
   pub adsrs: Vec<ManagedAdsr>,
@@ -41,8 +45,8 @@ fn decode_steps(encoded_steps: &[f32]) -> Vec<AdsrStep> {
     0,
     "`encoded_steps` length must be divisible by {STEP_F32_COUNT}"
   );
-  encoded_steps
-    .array_chunks::<STEP_F32_COUNT>()
+  unsafe { encoded_steps.as_chunks_unchecked::<STEP_F32_COUNT>() }
+    .iter()
     .map(
       |&[x, y, ramp_fn_type, ramp_fn_param_0, ramp_fn_param_1, ramp_fn_param_2, ramp_fn_param_3]| {
         let ramper = match ramp_fn_type {

@@ -7,10 +7,17 @@ pub(crate) mod conf;
 pub(crate) mod f0_estimation;
 pub(crate) mod oscilloscope;
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
   fn log_info(ptr: *const u8, len: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn log_err(_ptr: *const u8, _len: usize) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn log_info(_ptr: *const u8, _len: usize) {}
 
 pub(crate) fn log(msg: &str) {
   let bytes = msg.as_bytes();

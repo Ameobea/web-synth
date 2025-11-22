@@ -4,6 +4,7 @@ use common::ref_static_mut;
 use float_ord::FloatOrd;
 use heapless::binary_heap::{BinaryHeap, Min};
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn run_callback(cb_id: i32);
 
@@ -12,6 +13,17 @@ extern "C" {
   #[allow(dead_code)]
   fn debug1(v: i32);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn run_callback(_cb_id: i32) { unimplemented!() }
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn run_midi_callback(_mailbox_ix: usize, _event_type: u8, _param_0: f32, _param_1: f32) {
+  unimplemented!()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn debug1(_v: i32) {}
 
 #[derive(Clone, PartialEq, Debug)]
 struct MidiEvent {

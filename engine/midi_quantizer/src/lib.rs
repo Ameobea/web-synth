@@ -1,10 +1,17 @@
 use common::ref_static_mut;
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn play_note(note: usize);
 
   fn release_note(note: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn play_note(_note: usize) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn release_note(_note: usize) {}
 
 const NOTES_PER_OCTAVE: usize = 12;
 const C0: usize = 24;

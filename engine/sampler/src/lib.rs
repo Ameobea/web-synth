@@ -1,8 +1,12 @@
 use dsp::FRAME_SIZE;
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+fn log_err(_ptr: *const u8, _len: usize) {}
 
 fn error(msg: &str) {
   let bytes = msg.as_bytes();

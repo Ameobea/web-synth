@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked, new_zeroed_alloc)]
+#![feature(get_mut_unchecked)]
 
 pub mod fm;
 
@@ -67,10 +67,8 @@ impl WaveTable {
       + (waveform_ix * self.settings.waveform_length);
 
     let sample_mix = sample_ix.fract();
-    let (sample_low_ix, sample_hi_ix) = (
-      sample_ix.floor() as usize,
-      (sample_ix.ceil() as usize).min(self.samples.len() - 1),
-    );
+    let sample_low_ix = sample_ix.floor() as usize;
+    let sample_hi_ix = (sample_low_ix + 1) % self.settings.waveform_length;
 
     if cfg!(debug_assertions) && waveform_offset_samples + sample_hi_ix >= self.samples.len() {
       panic!(
@@ -118,10 +116,8 @@ impl WaveTable {
     let mut sample_acc = 0.;
     for sample_ix in sample_indices {
       let sample_mix = sample_ix.fract();
-      let (sample_low_ix, sample_hi_ix) = (
-        sample_ix.floor() as usize,
-        (sample_ix.ceil() as usize).min(self.samples.len() - 1),
-      );
+      let sample_low_ix = sample_ix.floor() as usize;
+      let sample_hi_ix = (sample_low_ix + 1) % self.settings.waveform_length;
 
       let (low_sample, high_sample) = (
         unsafe {
@@ -181,7 +177,7 @@ impl WaveTable {
 
   pub fn get_sample(&self, sample_ix: f32, mixes: &[f32]) -> f32 {
     if cfg!(debug_assertions) {
-      if sample_ix < 0.0 || sample_ix >= (self.settings.waveform_length - 1) as f32 {
+      if sample_ix < 0.0 || sample_ix >= (self.settings.waveform_length) as f32 {
         panic!(
           "sample_ix: {}, waveform_length: {}",
           sample_ix, self.settings.waveform_length
@@ -287,8 +283,8 @@ impl WaveTableHandle {
       .get_sample(self.sample_ix, &self.mixes_for_sample);
 
     self.sample_ix += self.get_sample_ix_offset(frequency);
-    if self.sample_ix >= (self.table.settings.waveform_length - 1) as f32 {
-      self.sample_ix %= (self.table.settings.waveform_length - 1) as f32;
+    if self.sample_ix >= (self.table.settings.waveform_length) as f32 {
+      self.sample_ix %= (self.table.settings.waveform_length) as f32;
     }
 
     sample

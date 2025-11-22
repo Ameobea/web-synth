@@ -1,5 +1,6 @@
 use float_ord::FloatOrd;
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn play_note(module_ix: usize, note: u8);
 
@@ -7,6 +8,15 @@ extern "C" {
 
   fn set_active_bank_ix(module_ix: usize, bank_ix: isize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+fn play_note(_module_ix: usize, _note: u8) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn release_note(_module_ix: usize, _note: u8) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn set_active_bank_ix(_module_ix: usize, _bank_ix: isize) {}
 
 #[derive(Debug, Clone, PartialEq)]
 struct MIDIEvent {

@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked, array_windows, array_chunks)]
+#![feature(get_mut_unchecked, array_windows)]
 
 use std::rc::Rc;
 

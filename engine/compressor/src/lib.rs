@@ -28,17 +28,23 @@ pub enum LogLevel {
   Info = 2,
 }
 
-#[cfg(feature = "exports")]
+#[cfg(all(feature = "exports", target_arch = "wasm32"))]
 extern "C" {
   pub fn log_raw(ptr: *const u8, len: usize, level: LogLevel);
 }
 
-#[cfg(feature = "exports")]
+#[cfg(all(feature = "exports", target_arch = "wasm32"))]
 fn error(msg: &str) {
   unsafe {
     log_raw(msg.as_ptr(), msg.len(), LogLevel::Error);
   }
 }
+
+#[cfg(all(feature = "exports", not(target_arch = "wasm32")))]
+extern "C" fn log_raw(_ptr: *const u8, _len: usize, _level: LogLevel) {}
+
+#[cfg(all(feature = "exports", not(target_arch = "wasm32")))]
+fn error(_msg: &str) {}
 
 // SAB Layout:
 // 0: low band detected level

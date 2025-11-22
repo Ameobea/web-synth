@@ -25,6 +25,7 @@ use super::{
   },
 };
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   pub(crate) fn log_panic(ptr: *const u8, len: usize);
 
@@ -34,6 +35,18 @@ extern "C" {
 
   fn on_ungate_cb(midi_number: usize, voice_ix: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) unsafe extern "C" fn log_panic(_msg: *const u8, _len: usize) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) unsafe extern "C" fn log_err(_msg: *const u8, _len: usize) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn on_gate_cb(_midi_number: usize, _voice_ix: usize) {}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn on_ungate_cb(_midi_number: usize, _voice_ix: usize) {}
 
 pub fn log_err_str(s: &str) { unsafe { log_err(s.as_ptr(), s.len()) } }
 
@@ -211,7 +224,7 @@ impl Oscillator for WaveTableHandle {
     let mut phase = self.phase;
     let sample_indices: [f32; OVERSAMPLE_FACTOR] = std::array::from_fn(|_| {
       phase = Self::compute_new_phase_oversampled(phase, OVERSAMPLE_FACTOR as f32, frequency);
-      phase * (wavetable.settings.waveform_length - 1) as f32
+      phase * (wavetable.settings.waveform_length) as f32
     });
 
     let sample = wavetable.get_sample_oversampled::<OVERSAMPLE_FACTOR>(sample_indices, &mixes);
@@ -679,15 +692,26 @@ pub struct FMSynthVoice {
 /// frequency
 fn compute_modulated_frequency(
   last_samples: &[f32; OPERATOR_COUNT],
+  current_samples: &[f32; OPERATOR_COUNT],
   operator_ix: usize,
   sample_ix_within_frame: usize,
   carrier_base_frequency: f32,
-  last_sample_modulator_frequencies: &[f32; OPERATOR_COUNT],
+  current_sample_modulator_frequencies: &[f32; OPERATOR_COUNT],
   modulation_indices: &[[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
+  operator_base_frequencies: &[[f32; FRAME_SIZE]; OPERATOR_COUNT],
 ) -> f32 {
   let mut output_freq = carrier_base_frequency;
   for modulator_operator_ix in 0..OPERATOR_COUNT {
-    let modulator_output = unsafe { last_samples.get_unchecked(modulator_operator_ix) };
+    // If the modulator comes before the carrier in the processing order, we can use its output
+    // from the current frame.  Otherwise, we have to use the output from the previous frame.
+    let use_current = modulator_operator_ix < operator_ix;
+
+    let modulator_output = if use_current {
+      unsafe { *current_samples.get_unchecked(modulator_operator_ix) }
+    } else {
+      unsafe { *last_samples.get_unchecked(modulator_operator_ix) }
+    };
+
     let modulation_index = unsafe {
       *modulation_indices
         .get_unchecked(modulator_operator_ix)
@@ -695,9 +719,17 @@ fn compute_modulated_frequency(
         .get_unchecked(sample_ix_within_frame)
     };
 
-    output_freq += modulator_output
-      * modulation_index
-      * unsafe { *last_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) };
+    let modulator_frequency = if use_current {
+      unsafe { *current_sample_modulator_frequencies.get_unchecked(modulator_operator_ix) }
+    } else {
+      unsafe {
+        *operator_base_frequencies
+          .get_unchecked(modulator_operator_ix)
+          .get_unchecked(sample_ix_within_frame)
+      }
+    };
+
+    output_freq += modulator_output * modulation_index * modulator_frequency;
     debug_assert!(output_freq == 0. || output_freq.is_normal());
   }
   output_freq
@@ -913,11 +945,13 @@ impl FMSynthVoice {
         };
         let modulated_frequency = compute_modulated_frequency(
           &last_samples_per_operator,
+          &samples_per_operator,
           operator_ix,
           sample_ix_within_frame,
           carrier_base_frequency,
-          &last_frequencies_per_operator,
+          &frequencies_per_operator,
           &self.cached_modulation_indices,
+          &operator_base_frequencies,
         );
         *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } = modulated_frequency;
 

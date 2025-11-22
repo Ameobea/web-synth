@@ -3,9 +3,13 @@ use std::f32::consts::PI;
 use common::ref_static_mut;
 use waveform_renderer::WaveformRendererCtx;
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn log_err(s: *const u8, len: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+extern "C" fn log_err(_s: *const u8, _len: usize) {}
 
 const WAVEFORM_LENGTH_SAMPLES: usize = 1024 * 4;
 const HARMONIC_COUNT: usize = 64;

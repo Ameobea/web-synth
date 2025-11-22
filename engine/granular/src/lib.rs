@@ -31,9 +31,13 @@ impl Default for ReverseState {
 static mut SCRATCH: [(f32, f32); 8192] = [(0.0, 0.0); 8192];
 fn scratch() -> &'static mut [(f32, f32); 8192] { ref_static_mut!(SCRATCH) }
 
+#[cfg(target_arch = "wasm32")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+unsafe extern "C" fn log_err(_ptr: *const u8, _len: usize) {}
 
 #[derive(Clone)]
 pub struct GranularVoice {

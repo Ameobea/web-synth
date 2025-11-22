@@ -62,10 +62,13 @@ const ENABLE_FIR_DOWNSAMPLER: bool = true;
 
 impl FirDownsampler {
   #[inline]
-  fn process(&mut self, sample: f32) -> f32 {
+  fn push(&mut self, sample: f32) {
     self.buf[self.pos] = sample;
     self.pos = (self.pos + 1) % FIR_TAP_COUNT;
+  }
 
+  #[inline]
+  fn compute(&self) -> f32 {
     let mut out = 0.0;
     for i in 0..FIR_TAP_COUNT {
       let index = (self.pos + i) % FIR_TAP_COUNT;
@@ -80,11 +83,12 @@ impl FirDownsampler {
       return (input[0] + input[1] + input[2] + input[3]) / 4.;
     }
 
-    for i in 0..(input.len() - 1) {
-      self.process(input[i]);
-    }
+    self.push(input[0]);
+    self.push(input[1]);
+    self.push(input[2]);
+    self.push(input[3]);
 
-    self.process(input[input.len() - 1])
+    self.compute()
   }
 }
 
@@ -131,7 +135,7 @@ impl Oscillator for SineOscillator {
       phase = Self::compute_new_phase_oversampled(phase, oversample_ratio as f32, frequency);
       out += dsp::read_interpolated(
         sine_lookup_table,
-        phase * (sine_lookup_table.len() - 2) as f32,
+        phase * (sine_lookup_table.len() - 1) as f32,
       );
     }
 
