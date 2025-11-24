@@ -93,6 +93,17 @@ impl FirDownsampler {
 }
 
 pub trait Oscillator {
+  fn gen_sample_with_phase_mod(
+    &mut self,
+    frequency: f32,
+    phase_modulation: f32,
+    wavetables: &[WaveTable],
+    param_buffers: &[[f32; FRAME_SIZE]],
+    adsrs: &[Adsr],
+    sample_ix_within_frame: usize,
+    base_frequency: f32,
+  ) -> f32;
+
   fn gen_sample(
     &mut self,
     frequency: f32,
@@ -101,7 +112,17 @@ pub trait Oscillator {
     adsrs: &[Adsr],
     sample_ix_within_frame: usize,
     base_frequency: f32,
-  ) -> f32;
+  ) -> f32 {
+    self.gen_sample_with_phase_mod(
+      frequency,
+      0.0,
+      wavetables,
+      param_buffers,
+      adsrs,
+      sample_ix_within_frame,
+      base_frequency,
+    )
+  }
 }
 
 #[derive(Clone, Default)]
@@ -116,9 +137,10 @@ impl PhasedOscillator for SineOscillator {
 }
 
 impl Oscillator for SineOscillator {
-  fn gen_sample(
+  fn gen_sample_with_phase_mod(
     &mut self,
     frequency: f32,
+    phase_modulation: f32,
     _wavetables: &[WaveTable],
     _param_buffers: &[[f32; FRAME_SIZE]],
     _adsrs: &[Adsr],
@@ -133,9 +155,11 @@ impl Oscillator for SineOscillator {
     let oversample_ratio = 4usize;
     for _ in 0..oversample_ratio {
       phase = Self::compute_new_phase_oversampled(phase, oversample_ratio as f32, frequency);
+      let mut lookup_phase = phase + phase_modulation;
+      lookup_phase -= lookup_phase.floor();
       out += dsp::read_interpolated(
         sine_lookup_table,
-        phase * (sine_lookup_table.len() - 1) as f32,
+        lookup_phase * (sine_lookup_table.len() - 1) as f32,
       );
     }
 
@@ -171,9 +195,10 @@ impl PhasedOscillator for SquareOscillator {
 }
 
 impl Oscillator for SquareOscillator {
-  fn gen_sample(
+  fn gen_sample_with_phase_mod(
     &mut self,
     frequency: f32,
+    phase_modulation: f32,
     _wavetables: &[WaveTable],
     param_buffers: &[[f32; FRAME_SIZE]],
     adsrs: &[Adsr],
@@ -189,13 +214,24 @@ impl Oscillator for SquareOscillator {
     let duty_cycle = dsp::clamp(0.0001, 0.9999, duty_cycle);
 
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    let s0 = if phase < duty_cycle { 1. } else { -1. };
+    let mut mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s0 = if mod_phase < duty_cycle { 1. } else { -1. };
+
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    let s1 = if phase < duty_cycle { 1. } else { -1. };
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s1 = if mod_phase < duty_cycle { 1. } else { -1. };
+
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    let s2 = if phase < duty_cycle { 1. } else { -1. };
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s2 = if mod_phase < duty_cycle { 1. } else { -1. };
+
     phase = Self::compute_new_phase_oversampled(phase, 4., frequency);
-    let s3 = if phase < duty_cycle { 1. } else { -1. };
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s3 = if mod_phase < duty_cycle { 1. } else { -1. };
 
     self.phase = phase;
 
@@ -216,9 +252,10 @@ impl PhasedOscillator for TriangleOscillator {
 }
 
 impl Oscillator for TriangleOscillator {
-  fn gen_sample(
+  fn gen_sample_with_phase_mod(
     &mut self,
     frequency: f32,
+    phase_modulation: f32,
     _wavetables: &[WaveTable],
     _param_buffers: &[[f32; FRAME_SIZE]],
     _adsrs: &[Adsr],
@@ -230,58 +267,66 @@ impl Oscillator for TriangleOscillator {
     let mut phase = self.phase;
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s0 = if phase < 0.25 {
-      4. * phase
-    } else if phase < 0.5 {
-      let adjusted_phase = phase - 0.25;
+    let mut mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s0 = if mod_phase < 0.25 {
+      4. * mod_phase
+    } else if mod_phase < 0.5 {
+      let adjusted_phase = mod_phase - 0.25;
       1. - 4. * adjusted_phase
-    } else if phase < 0.75 {
-      let adjusted_phase = phase - 0.5;
+    } else if mod_phase < 0.75 {
+      let adjusted_phase = mod_phase - 0.5;
       -adjusted_phase * 4.
     } else {
-      let adjusted_phase = phase - 0.75;
+      let adjusted_phase = mod_phase - 0.75;
       -1. + (adjusted_phase * 4.)
     };
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s1 = if phase < 0.25 {
-      4. * phase
-    } else if phase < 0.5 {
-      let adjusted_phase = phase - 0.25;
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s1 = if mod_phase < 0.25 {
+      4. * mod_phase
+    } else if mod_phase < 0.5 {
+      let adjusted_phase = mod_phase - 0.25;
       1. - 4. * adjusted_phase
-    } else if phase < 0.75 {
-      let adjusted_phase = phase - 0.5;
+    } else if mod_phase < 0.75 {
+      let adjusted_phase = mod_phase - 0.5;
       -adjusted_phase * 4.
     } else {
-      let adjusted_phase = phase - 0.75;
+      let adjusted_phase = mod_phase - 0.75;
       -1. + (adjusted_phase * 4.)
     };
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s2 = if phase < 0.25 {
-      4. * phase
-    } else if phase < 0.5 {
-      let adjusted_phase = phase - 0.25;
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s2 = if mod_phase < 0.25 {
+      4. * mod_phase
+    } else if mod_phase < 0.5 {
+      let adjusted_phase = mod_phase - 0.25;
       1. - 4. * adjusted_phase
-    } else if phase < 0.75 {
-      let adjusted_phase = phase - 0.5;
+    } else if mod_phase < 0.75 {
+      let adjusted_phase = mod_phase - 0.5;
       -adjusted_phase * 4.
     } else {
-      let adjusted_phase = phase - 0.75;
+      let adjusted_phase = mod_phase - 0.75;
       -1. + (adjusted_phase * 4.)
     };
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s3 = if phase < 0.25 {
-      4. * phase
-    } else if phase < 0.5 {
-      let adjusted_phase = phase - 0.25;
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s3 = if mod_phase < 0.25 {
+      4. * mod_phase
+    } else if mod_phase < 0.5 {
+      let adjusted_phase = mod_phase - 0.25;
       1. - 4. * adjusted_phase
-    } else if phase < 0.75 {
-      let adjusted_phase = phase - 0.5;
+    } else if mod_phase < 0.75 {
+      let adjusted_phase = mod_phase - 0.5;
       -adjusted_phase * 4.
     } else {
-      let adjusted_phase = phase - 0.75;
+      let adjusted_phase = mod_phase - 0.75;
       -1. + (adjusted_phase * 4.)
     };
 
@@ -303,9 +348,10 @@ impl PhasedOscillator for SawtoothOscillator {
 }
 
 impl Oscillator for SawtoothOscillator {
-  fn gen_sample(
+  fn gen_sample_with_phase_mod(
     &mut self,
     frequency: f32,
+    phase_modulation: f32,
     _wavetables: &[WaveTable],
     _param_buffers: &[[f32; FRAME_SIZE]],
     _adsrs: &[Adsr],
@@ -317,31 +363,39 @@ impl Oscillator for SawtoothOscillator {
     let mut phase = self.phase;
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s0 = if phase < 0.5 {
-      2. * phase
+    let mut mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s0 = if mod_phase < 0.5 {
+      2. * mod_phase
     } else {
-      -1. + (2. * (phase - 0.5))
+      -1. + (2. * (mod_phase - 0.5))
     };
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s1 = if phase < 0.5 {
-      2. * phase
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s1 = if mod_phase < 0.5 {
+      2. * mod_phase
     } else {
-      -1. + (2. * (phase - 0.5))
+      -1. + (2. * (mod_phase - 0.5))
     };
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s2 = if phase < 0.5 {
-      2. * phase
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s2 = if mod_phase < 0.5 {
+      2. * mod_phase
     } else {
-      -1. + (2. * (phase - 0.5))
+      -1. + (2. * (mod_phase - 0.5))
     };
 
     phase = Self::compute_new_phase_oversampled(phase, oversample_factor as f32, frequency);
-    let s3 = if phase < 0.5 {
-      2. * phase
+    mod_phase = phase + phase_modulation;
+    mod_phase -= mod_phase.floor();
+    let s3 = if mod_phase < 0.5 {
+      2. * mod_phase
     } else {
-      -1. + (2. * (phase - 0.5))
+      -1. + (2. * (mod_phase - 0.5))
     };
 
     self.phase = phase;
@@ -400,6 +454,46 @@ impl ExponentialOscillator {
 
     // Re-apply sign
     // output is from -1 to 1
+    val * extended_phase.signum()
+  }
+
+  pub fn gen_sample_with_phase_mod(
+    &mut self,
+    frequency: f32,
+    phase_modulation: f32,
+    param_buffers: &[[f32; FRAME_SIZE]],
+    adsrs: &[Adsr],
+    sample_ix_within_frame: usize,
+    base_frequency: f32,
+  ) -> f32 {
+    self.update_phase(frequency);
+
+    let stretch_factor =
+      self
+        .stretch_factor
+        .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
+
+    let stretch_factor = dsp::clamp(0., 1., stretch_factor);
+
+    let exponent_numerator = 10.0f32.powf(4.0 * (stretch_factor * 0.8 + 0.35)) + 1.;
+    let exponent_denominator = 999.0f32;
+    let exponent = exponent_numerator / exponent_denominator;
+
+    // Apply phase modulation
+    let mut phase = self.phase + phase_modulation;
+    phase -= phase.floor();
+
+    // Transform phase into [-1, 1] range
+    let extended_phase = phase * 2. - 1.;
+    let absolute_phase = extended_phase.abs();
+
+    let val = if cfg!(debug_assertions) {
+      let val = absolute_phase.powf(exponent);
+      val
+    } else {
+      dsp::clamp(-1., 1., super::fast::pow(absolute_phase, exponent))
+    };
+
     val * extended_phase.signum()
   }
 

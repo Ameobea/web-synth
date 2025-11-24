@@ -69,14 +69,14 @@ pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: us
 #[derive(Clone)]
 pub struct UnisonOscillator<T> {
   pub oscillators: Vec<T>,
-  pub unison_detune_range_semitones: ParamSource,
+  pub unison_detune_range_cents: ParamSource,
   pub middle_oscillator_ix: f32,
   pub middle_gain_pct: f32,
   pub outer_gain_pct: f32,
 }
 
 impl<T> UnisonOscillator<T> {
-  pub fn new(unison_detune_range_semitones: ParamSource, oscillators: Vec<T>) -> Self {
+  pub fn new(unison_detune_range_cents: ParamSource, oscillators: Vec<T>) -> Self {
     // TODO: This may need to be optimized
     let middle_oscillator_ix = (oscillators.len() - 1) as f32 / 2.;
     let middle_count = if oscillators.len() % 2 == 0 { 2 } else { 1 };
@@ -92,7 +92,7 @@ impl<T> UnisonOscillator<T> {
 
     Self {
       oscillators,
-      unison_detune_range_semitones,
+      unison_detune_range_cents,
       middle_oscillator_ix,
       middle_gain_pct,
       outer_gain_pct,
@@ -121,6 +121,52 @@ impl<T: PhasedOscillator> UnisonOscillator<T> {
 }
 
 impl<T: Oscillator + PhasedOscillator> UnisonOscillator<T> {
+  fn gen_sample_with_phase_mod(
+    &mut self,
+    frequency: f32,
+    phase_modulation: f32,
+    wavetables: &[WaveTable],
+    param_buffers: &[[f32; FRAME_SIZE]],
+    adsrs: &[Adsr],
+    sample_ix_within_frame: usize,
+    base_frequency: f32,
+  ) -> f32 {
+    let mut out = 0.;
+    let unison_detune_range_cents = dsp::clamp(
+      0.,
+      1200.,
+      self
+        .unison_detune_range_cents
+        .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
+        .abs(),
+    );
+    let unison_detune_cents_start = -unison_detune_range_cents / 2.;
+    let unison_detune_step_cents = unison_detune_range_cents / (self.oscillators.len() - 1) as f32;
+
+    for (i, osc) in self.oscillators.iter_mut().enumerate() {
+      let frequency = compute_detune(
+        frequency,
+        unison_detune_cents_start + i as f32 * unison_detune_step_cents,
+      );
+      let is_middle = ((i as f32) - self.middle_oscillator_ix).abs() < 1.;
+      let gain = if is_middle {
+        self.middle_gain_pct
+      } else {
+        self.outer_gain_pct
+      };
+      out += osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ) * gain;
+    }
+    out
+  }
+
   fn gen_sample(
     &mut self,
     frequency: f32,
@@ -130,40 +176,15 @@ impl<T: Oscillator + PhasedOscillator> UnisonOscillator<T> {
     sample_ix_within_frame: usize,
     base_frequency: f32,
   ) -> f32 {
-    let mut out = 0.;
-    let unison_detune_range_semitones = dsp::clamp(
-      0.,
-      1200.,
-      self
-        .unison_detune_range_semitones
-        .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency)
-        .abs(),
-    );
-    let unison_detune_semitones_start = -unison_detune_range_semitones / 2.;
-    let unison_detune_step_semitones =
-      unison_detune_range_semitones / (self.oscillators.len() - 1) as f32;
-
-    for (i, osc) in self.oscillators.iter_mut().enumerate() {
-      let frequency = compute_detune(
-        frequency,
-        unison_detune_semitones_start + i as f32 * unison_detune_step_semitones,
-      );
-      let is_middle = ((i as f32) - self.middle_oscillator_ix).abs() < 1.;
-      let gain = if is_middle {
-        self.middle_gain_pct
-      } else {
-        self.outer_gain_pct
-      };
-      out += osc.gen_sample(
-        frequency,
-        wavetables,
-        param_buffers,
-        adsrs,
-        sample_ix_within_frame,
-        base_frequency,
-      ) * gain;
-    }
-    out
+    self.gen_sample_with_phase_mod(
+      frequency,
+      0.0,
+      wavetables,
+      param_buffers,
+      adsrs,
+      sample_ix_within_frame,
+      base_frequency,
+    )
   }
 }
 
@@ -184,9 +205,10 @@ pub struct WaveTableHandle {
 }
 
 impl Oscillator for WaveTableHandle {
-  fn gen_sample(
+  fn gen_sample_with_phase_mod(
     &mut self,
     frequency: f32,
+    phase_modulation: f32,
     wavetables: &[WaveTable],
     param_buffers: &[[f32; FRAME_SIZE]],
     adsrs: &[Adsr],
@@ -224,7 +246,9 @@ impl Oscillator for WaveTableHandle {
     let mut phase = self.phase;
     let sample_indices: [f32; OVERSAMPLE_FACTOR] = std::array::from_fn(|_| {
       phase = Self::compute_new_phase_oversampled(phase, OVERSAMPLE_FACTOR as f32, frequency);
-      phase * (wavetable.settings.waveform_length) as f32
+      let mut mod_phase = phase + phase_modulation;
+      mod_phase -= mod_phase.floor();
+      mod_phase * (wavetable.settings.waveform_length) as f32
     });
 
     let sample = wavetable.get_sample_oversampled::<OVERSAMPLE_FACTOR>(sample_indices, &mixes);
@@ -249,6 +273,39 @@ pub struct Operator {
 }
 
 impl Operator {
+  pub fn gen_sample_with_phase_mod(
+    &mut self,
+    frequency: f32,
+    phase_modulation: f32,
+    wavetables: &[WaveTable],
+    param_buffers: &[[f32; FRAME_SIZE]],
+    adsrs: &[Adsr],
+    sample_ix_within_frame: usize,
+    midi_number: usize,
+    base_frequency: f32,
+    sample_mapping_config: &SampleMappingOperatorConfig,
+  ) -> f32 {
+    if !self.enabled {
+      return 0.;
+    }
+
+    let sample = self.oscillator_source.gen_sample_with_phase_mod(
+      frequency,
+      phase_modulation,
+      wavetables,
+      param_buffers,
+      adsrs,
+      sample_ix_within_frame,
+      midi_number,
+      base_frequency,
+      sample_mapping_config,
+    );
+
+    self
+      .effect_chain
+      .apply(sample_ix_within_frame, base_frequency, sample)
+  }
+
   pub fn gen_sample(
     &mut self,
     frequency: f32,
@@ -457,8 +514,8 @@ impl OscillatorSource {
       OscillatorSource::UnisonSine(osc) =>
         if let OscillatorSource::UnisonSine(other) = other {
           osc
-            .unison_detune_range_semitones
-            .replace(other.unison_detune_range_semitones.clone());
+            .unison_detune_range_cents
+            .replace(other.unison_detune_range_cents.clone());
           true
         } else {
           false
@@ -466,8 +523,8 @@ impl OscillatorSource {
       OscillatorSource::UnisonWavetable(uwt) =>
         if let OscillatorSource::UnisonWavetable(other) = other {
           uwt
-            .unison_detune_range_semitones
-            .replace(other.unison_detune_range_semitones.clone());
+            .unison_detune_range_cents
+            .replace(other.unison_detune_range_cents.clone());
 
           for (osc_ix, osc) in uwt.oscillators.iter_mut().enumerate() {
             let o_osc = match other.oscillators.get(osc_ix) {
@@ -488,8 +545,8 @@ impl OscillatorSource {
       OscillatorSource::UnisonSquare(osc) =>
         if let OscillatorSource::UnisonSquare(other) = other {
           osc
-            .unison_detune_range_semitones
-            .replace(other.unison_detune_range_semitones.clone());
+            .unison_detune_range_cents
+            .replace(other.unison_detune_range_cents.clone());
 
           let duty_cycle = other.oscillators[0].duty_cycle.clone();
           for osc in &mut osc.oscillators {
@@ -510,8 +567,8 @@ impl OscillatorSource {
       OscillatorSource::UnisonTriangle(osc) =>
         if let OscillatorSource::UnisonTriangle(other) = other {
           osc
-            .unison_detune_range_semitones
-            .replace(other.unison_detune_range_semitones.clone());
+            .unison_detune_range_cents
+            .replace(other.unison_detune_range_cents.clone());
 
           if other.oscillators.len() == osc.oscillators.len() {
             for (osc, o_osc) in osc.oscillators.iter_mut().zip(other.oscillators.iter()) {
@@ -527,8 +584,8 @@ impl OscillatorSource {
       OscillatorSource::UnisonSawtooth(osc) =>
         if let OscillatorSource::UnisonSawtooth(other) = other {
           osc
-            .unison_detune_range_semitones
-            .replace(other.unison_detune_range_semitones.clone());
+            .unison_detune_range_cents
+            .replace(other.unison_detune_range_cents.clone());
 
           if other.oscillators.len() == osc.oscillators.len() {
             for (osc, o_osc) in osc.oscillators.iter_mut().zip(other.oscillators.iter()) {
@@ -553,6 +610,133 @@ impl Default for OscillatorSource {
 }
 
 impl OscillatorSource {
+  pub fn gen_sample_with_phase_mod(
+    &mut self,
+    frequency: f32,
+    phase_modulation: f32,
+    wavetables: &[WaveTable],
+    param_buffers: &[[f32; FRAME_SIZE]],
+    adsrs: &[Adsr],
+    sample_ix_within_frame: usize,
+    midi_number: usize,
+    base_frequency: f32,
+    sample_mapping_config: &SampleMappingOperatorConfig,
+  ) -> f32 {
+    match self {
+      OscillatorSource::Wavetable(handle) => handle.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      &mut OscillatorSource::ParamBuffer(buf_ix) =>
+        if cfg!(debug_assertions) {
+          param_buffers[buf_ix][sample_ix_within_frame]
+        } else {
+          *unsafe {
+            param_buffers
+              .get_unchecked(buf_ix)
+              .get_unchecked(sample_ix_within_frame)
+          }
+        },
+      OscillatorSource::Sine(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::ExponentialOscillator(osc) => osc.gen_sample(
+        frequency,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::Square(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::Triangle(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::Sawtooth(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::UnisonSine(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::UnisonWavetable(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::UnisonSquare(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::UnisonTriangle(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::UnisonSawtooth(osc) => osc.gen_sample_with_phase_mod(
+        frequency,
+        phase_modulation,
+        wavetables,
+        param_buffers,
+        adsrs,
+        sample_ix_within_frame,
+        base_frequency,
+      ),
+      OscillatorSource::SampleMapping(emitter) =>
+        emitter.gen_sample(midi_number, sample_mapping_config),
+      OscillatorSource::TunedSample(_) => todo!(),
+      OscillatorSource::WhiteNoise(emitter) => emitter.gen_sample(),
+    }
+  }
+
   pub fn gen_sample(
     &mut self,
     frequency: f32,
@@ -735,16 +919,49 @@ fn compute_modulated_frequency(
   output_freq
 }
 
+fn compute_phase_modulation(
+  last_samples: &[f32; OPERATOR_COUNT],
+  current_samples: &[f32; OPERATOR_COUNT],
+  operator_ix: usize,
+  sample_ix_within_frame: usize,
+  modulation_indices: &[[[f32; FRAME_SIZE]; OPERATOR_COUNT]; OPERATOR_COUNT],
+) -> f32 {
+  let mut phase_mod = 0.;
+  for modulator_operator_ix in 0..OPERATOR_COUNT {
+    // If the modulator comes before the carrier in the processing order, we can use its output
+    // from the current frame.  Otherwise, we have to use the output from the previous frame.
+    let use_current = modulator_operator_ix < operator_ix;
+
+    let modulator_output = if use_current {
+      unsafe { *current_samples.get_unchecked(modulator_operator_ix) }
+    } else {
+      unsafe { *last_samples.get_unchecked(modulator_operator_ix) }
+    };
+
+    let modulation_index = unsafe {
+      *modulation_indices
+        .get_unchecked(modulator_operator_ix)
+        .get_unchecked(operator_ix)
+        .get_unchecked(sample_ix_within_frame)
+    };
+    // this brings the level of modulation more in line with frequency modulation
+    let modulation_index = modulation_index / (2. * std::f32::consts::PI);
+
+    phase_mod += modulator_output * modulation_index;
+  }
+  phase_mod
+}
+
 /// Based off of WebAudio's detune:
 /// https://www.w3.org/TR/webaudio/#computedfrequency
 ///
 /// computedFrequency(t) = frequency(t) * pow(2, detune(t) / 1200)
-fn compute_detune(freq: f32, detune_semitones: f32) -> f32 {
-  if detune_semitones == 0. {
+fn compute_detune(freq: f32, detune_cents: f32) -> f32 {
+  if detune_cents == 0. {
     return freq;
   }
-  freq * fastapprox::fast::pow2(detune_semitones / 1200.)
-  // freq * 2.0f32.powf(detune_semitones / 1200.)
+  freq * fastapprox::fast::pow2(detune_cents / 1200.)
+  // freq * 2.0f32.powf(detune_cents / 1200.)
 }
 
 fn build_default_gain_adsr_steps() -> Vec<AdsrStep> {
@@ -816,6 +1033,7 @@ impl FMSynthVoice {
 
   pub fn gen_samples(
     &mut self,
+    modulation_mode: ModulationMode,
     modulation_matrix: &mut ModulationMatrix,
     wavetables: &[WaveTable],
     param_buffers: &[[f32; FRAME_SIZE]],
@@ -943,28 +1161,57 @@ impl FMSynthVoice {
             .get_unchecked(operator_ix)
             .get_unchecked(sample_ix_within_frame)
         };
-        let modulated_frequency = compute_modulated_frequency(
-          &last_samples_per_operator,
-          &samples_per_operator,
-          operator_ix,
-          sample_ix_within_frame,
-          carrier_base_frequency,
-          &frequencies_per_operator,
-          &self.cached_modulation_indices,
-          &operator_base_frequencies,
-        );
-        *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } = modulated_frequency;
 
-        let sample = carrier_operator.gen_sample(
-          modulated_frequency,
-          wavetables,
-          param_buffers,
-          &self.adsrs,
-          sample_ix_within_frame,
-          self.last_gated_midi_number,
-          base_frequency,
-          &sample_mapping_manager.config_by_operator[operator_ix],
-        );
+        let sample = match modulation_mode {
+          ModulationMode::Frequency => {
+            let modulated_frequency = compute_modulated_frequency(
+              &last_samples_per_operator,
+              &samples_per_operator,
+              operator_ix,
+              sample_ix_within_frame,
+              carrier_base_frequency,
+              &frequencies_per_operator,
+              &self.cached_modulation_indices,
+              &operator_base_frequencies,
+            );
+            *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
+              modulated_frequency;
+
+            carrier_operator.gen_sample(
+              modulated_frequency,
+              wavetables,
+              param_buffers,
+              &self.adsrs,
+              sample_ix_within_frame,
+              self.last_gated_midi_number,
+              base_frequency,
+              &sample_mapping_manager.config_by_operator[operator_ix],
+            )
+          },
+          ModulationMode::Phase => {
+            let phase_mod = compute_phase_modulation(
+              &last_samples_per_operator,
+              &samples_per_operator,
+              operator_ix,
+              sample_ix_within_frame,
+              &self.cached_modulation_indices,
+            );
+            *unsafe { frequencies_per_operator.get_unchecked_mut(operator_ix) } =
+              carrier_base_frequency;
+
+            carrier_operator.gen_sample_with_phase_mod(
+              carrier_base_frequency,
+              phase_mod,
+              wavetables,
+              param_buffers,
+              &self.adsrs,
+              sample_ix_within_frame,
+              self.last_gated_midi_number,
+              base_frequency,
+              &sample_mapping_manager.config_by_operator[operator_ix],
+            )
+          },
+        };
 
         *unsafe { samples_per_operator.get_unchecked_mut(operator_ix) } = sample;
 
@@ -1041,8 +1288,16 @@ impl ModulationMatrix {
   }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(C)]
+pub enum ModulationMode {
+  Frequency = 0,
+  Phase = 1,
+}
+
 pub struct FMSynthContext {
   pub voices: Box<[FMSynthVoice; VOICE_COUNT]>,
+  pub modulation_mode: ModulationMode,
   pub modulation_matrix: ModulationMatrix,
   /// Generic param buffers containing values routed in from other modules.  Can be used to
   /// modulate operators, etc.
@@ -1097,6 +1352,7 @@ impl FMSynthContext {
       }
 
       voice.gen_samples(
+        self.modulation_mode,
         &mut self.modulation_matrix,
         &self.wavetables,
         &self.param_buffers,
@@ -1212,6 +1468,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
   unsafe {
     let voices_ptr = &mut (*ctx.as_mut_ptr()).voices;
     std::ptr::write(voices_ptr, Box::new_uninit().assume_init());
+    (*ctx.as_mut_ptr()).modulation_mode = ModulationMode::Frequency;
     let modulation_matrix_ptr = &mut (*ctx.as_mut_ptr()).modulation_matrix;
     std::ptr::write(modulation_matrix_ptr, ModulationMatrix::default());
     let base_frequency_input_buffer_ptr = &mut (*ctx.as_mut_ptr()).base_frequency_input_buffer;
@@ -1307,6 +1564,16 @@ pub unsafe extern "C" fn fm_synth_generate(
 ) -> *const f32 {
   (*ctx).generate(cur_bpm, cur_frame_start_beat);
   (*ctx).main_output_buffer.as_ptr()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_synth_set_modulation_mode(ctx: *mut FMSynthContext, mode: usize) {
+  let mode = match mode {
+    0 => ModulationMode::Frequency,
+    1 => ModulationMode::Phase,
+    _ => ModulationMode::Frequency,
+  };
+  (*ctx).modulation_mode = mode;
 }
 
 #[no_mangle]
