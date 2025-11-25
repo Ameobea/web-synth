@@ -3,8 +3,6 @@
 //! container as well as a wrapper container to hold note containers for multiple rows/lines as is
 //! needed by these use cases.
 
-#![feature(vec_into_raw_parts)]
-
 #[macro_use]
 extern crate log;
 
