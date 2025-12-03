@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
+import { List, type RowComponentProps } from 'react-window';
 
 import './SampleLibraryUI.css';
 import type { SvelteComponent } from 'svelte';
@@ -25,8 +25,10 @@ const PlaySampleIcon: React.FC<PlaySampleIconProps> = ({ isPlaying, onClick }) =
   </div>
 );
 
-interface SampleRowProps
-  extends React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement> {
+interface SampleRowProps extends React.DetailedHTMLProps<
+  React.HTMLAttributes<HTMLDivElement>,
+  HTMLDivElement
+> {
   isPlaying: boolean;
   togglePlaying: () => void;
   descriptor: SampleDescriptor;
@@ -72,8 +74,11 @@ const mkDefaultSampleListingRowRenderer = ({
   sampleDescriptors,
   playingSampleName,
   togglePlaying,
-}: MkSampleListingRowRendererArgs): React.FC<ListChildComponentProps> => {
-  const DefaultSampleListingRowRenderer: React.FC<ListChildComponentProps> = ({ style, index }) => (
+}: MkSampleListingRowRendererArgs): ((props: RowComponentProps) => React.ReactElement) => {
+  const DefaultSampleListingRowRenderer: (props: RowComponentProps) => React.ReactElement = ({
+    style,
+    index,
+  }) => (
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
       isPlaying={sampleDescriptors[index].name === playingSampleName}
@@ -98,7 +103,9 @@ const SampleSearch: React.FC<SampleSearchProps> = ({ value, onChange }) => (
 
 interface SampleListingProps {
   sampleDescriptors: SampleDescriptor[];
-  mkRowRenderer?: (args: MkSampleListingRowRendererArgs) => React.FC<ListChildComponentProps>;
+  mkRowRenderer?: (
+    args: MkSampleListingRowRendererArgs
+  ) => (props: RowComponentProps) => React.ReactElement;
   height?: number;
   width?: number;
   selectedSample: { sample: SampleDescriptor; index: number } | null;
@@ -219,15 +226,21 @@ export const SampleListing: React.FC<SampleListingProps> = ({
         <div className='sample-local'>Location</div>
         <div className='sample-cached'>Cached</div>
       </div>
-      <List height={height} itemSize={20} itemCount={filteredSamples.length} width={width}>
-        {RowRenderer}
-      </List>
+      <List
+        rowComponent={RowRenderer}
+        rowHeight={20}
+        rowCount={filteredSamples.length}
+        style={{ height, width }}
+        rowProps={{}}
+      ></List>
     </div>
   );
 };
 
-interface LoadSamplesButtonsProps
-  extends React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement> {
+interface LoadSamplesButtonsProps extends React.DetailedHTMLProps<
+  React.HTMLAttributes<HTMLDivElement>,
+  HTMLDivElement
+> {
   localSamplesLoaded: boolean;
   loadLocalSamples: () => void;
 }

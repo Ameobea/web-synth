@@ -2,7 +2,7 @@
  * React component that renders a list of samples and allows users to select one along with previewing them
  */
 import React, { useState } from 'react';
-import type { ListChildComponentProps } from 'react-window';
+import type { RowComponentProps } from 'react-window';
 
 import { renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
@@ -23,8 +23,11 @@ const mkSampleListingRowRenderer = ({
   togglePlaying,
   selectedSample,
   setSelectedSample,
-}: MkSampleListingRowRendererArgs): React.FC<ListChildComponentProps> => {
-  const SampleListingRowRenderer: React.FC<ListChildComponentProps> = ({ style, index }) => (
+}: MkSampleListingRowRendererArgs): ((props: RowComponentProps) => React.ReactElement) => {
+  const SampleListingRowRenderer: (props: RowComponentProps) => React.ReactElement = ({
+    style,
+    index,
+  }) => (
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
       isPlaying={sampleDescriptors[index].name === playingSampleName}

@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import React, { useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 import { useSelector } from 'react-redux';
-import { FixedSizeList as List } from 'react-window';
+import { List, type RowComponentProps } from 'react-window';
 
 import { Tag } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
@@ -47,13 +47,12 @@ export interface PresetDescriptor<T> {
   isFeatured?: boolean;
 }
 
-interface PresetRowProps {
-  index: number;
-  style: React.CSSProperties;
-}
+type PresetRowProps = RowComponentProps;
 
-function mkPresetRow<T>(filteredPresets: PresetDescriptor<T>[]): React.FC<PresetRowProps> {
-  const PresetRow: React.FC<PresetRowProps> = ({ index, style }) => {
+function mkPresetRow<T>(
+  filteredPresets: PresetDescriptor<T>[]
+): (props: PresetRowProps) => React.ReactElement {
+  const PresetRow: (props: PresetRowProps) => React.ReactElement = ({ index, style }) => {
     const preset = filteredPresets[index];
     const isSelected = useSelector(
       (state: ReduxStore) => state.genericPresetPicker.selectedPresetID === preset.id
@@ -76,7 +75,7 @@ function mkPresetRow<T>(filteredPresets: PresetDescriptor<T>[]): React.FC<Preset
       </div>
     );
   };
-  return React.memo(PresetRow);
+  return React.memo(PresetRow) as (props: PresetRowProps) => React.ReactElement;
 }
 
 interface PresetInfoProps {
@@ -225,14 +224,13 @@ export function mkGenericPresetPicker<T>(
         <div style={{ width: presetListWidth + 12, height: '100%' }} ref={leftBarContainerRef}>
           <SearchBar value={searchValue} onChange={setSearchValue} />
           <List
+            rowComponent={PresetRow}
             className='preset-list'
-            height={Math.max(leftBarContainerSize.height - 38, 200)}
-            width={presetListWidth}
-            itemSize={24}
-            itemCount={filteredPresets?.length ?? 0}
-          >
-            {PresetRow}
-          </List>
+            style={{ height: leftBarContainerSize.height - 38, width: presetListWidth }}
+            rowHeight={24}
+            rowCount={filteredPresets?.length ?? 0}
+            rowProps={{}}
+          />
         </div>
         <div className='preset-info-wrapper'>
           {selectedPreset ? (
