@@ -546,7 +546,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
         lenSamples.valParamFloat3,
         releasePoint,
         loopPoint ?? -1.0,
-        logScale
+        logScale ?? false
       );
     });
     modulationMatrix.forEach((indices, srcOperatorIx) =>

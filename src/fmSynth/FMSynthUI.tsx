@@ -32,6 +32,7 @@ interface FMSynthState {
   mainEffectChain: (Effect | null)[];
   adsrs: AdsrParams[];
   detune: ParamSource | null;
+  pmModeEnabled?: boolean;
   wavetableState: WavetableState;
 }
 
@@ -152,6 +153,7 @@ interface FMSynthUIProps {
   adsrs: AdsrParams[];
   onAdsrChange: AdsrChangeHandler;
   detune: ParamSource | null;
+  pmModeEnabled?: boolean;
   wavetableState: WavetableState;
   setWavetableState: (newState: WavetableState) => void;
   handleDetuneChange: (newDetune: ParamSource | null) => void;
@@ -184,6 +186,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
   onAdsrChange,
   handleDetuneChange,
   detune,
+  pmModeEnabled,
   wavetableState,
   setWavetableState,
   getFMSynthOutput,
@@ -205,6 +208,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     mainEffectChain,
     adsrs,
     detune,
+    pmModeEnabled,
     wavetableState,
   });
   const [selectedUI, setSelectedUIInner] = useState<UISelection | null>(initialSelectedUI ?? null);
@@ -516,7 +520,7 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
           position='top-start'
         /> */}
         <ControlPanel
-          state={{ 'enable detune': !!state.detune }}
+          state={{ 'enable detune': !!state.detune, 'PM mode': !!state.pmModeEnabled }}
           settings={[{ type: 'checkbox', label: 'enable detune' }]}
           onChange={(_key: string, val: boolean) => {
             if (val) {

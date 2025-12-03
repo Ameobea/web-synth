@@ -196,10 +196,10 @@ pub struct Adsr {
   loop_start_point: Option<f32>,
   /// Contains the rendered waveform the for ADSR from start to end, used as an optimization to
   /// avoid having to compute ramp points every sample
-  rendered: Rc<[f32; RENDERED_BUFFER_SIZE]>,
+  pub rendered: Rc<[f32; RENDERED_BUFFER_SIZE]>,
   /// A buffer into which the current output for the ADSR is rendered each frame
   cur_frame_output: Box<[f32; FRAME_SIZE]>,
-  len_samples: f32,
+  pub len_samples: f32,
   /// Beat on which the current gate started.  If loop is enabled, this is the beat on which the
   /// current loop started.
   gated_beat: f32,
@@ -365,7 +365,7 @@ impl Adsr {
     let mut prev_step_opt: Option<&AdsrStep> = None;
     let mut next_step_opt: Option<&AdsrStep> = self.steps.get(0);
     let mut next_step_ix = 0usize;
-    let buf = unsafe { Rc::get_mut_unchecked(&mut self.rendered) };
+    let buf = Rc::get_mut(&mut self.rendered).unwrap();
 
     for i in 0..RENDERED_BUFFER_SIZE {
       let phase = i as f32 / RENDERED_BUFFER_SIZE as f32;

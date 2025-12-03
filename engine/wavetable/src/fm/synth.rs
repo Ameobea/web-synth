@@ -1468,7 +1468,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
   unsafe {
     let voices_ptr = &mut (*ctx.as_mut_ptr()).voices;
     std::ptr::write(voices_ptr, Box::new_uninit().assume_init());
-    (*ctx.as_mut_ptr()).modulation_mode = ModulationMode::Frequency;
+    (*ctx.as_mut_ptr()).modulation_mode = ModulationMode::Phase;
     let modulation_matrix_ptr = &mut (*ctx.as_mut_ptr()).modulation_matrix;
     std::ptr::write(modulation_matrix_ptr, ModulationMatrix::default());
     let base_frequency_input_buffer_ptr = &mut (*ctx.as_mut_ptr()).base_frequency_input_buffer;
@@ -1545,8 +1545,24 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
     );
   }
   // Render the default gain and filter envelope for all voices
+  let shared_buffer = Rc::new([0.0f32; RENDERED_BUFFER_SIZE]);
+  (*ctx).voices[0].gain_envelope_generator.adsr.rendered = shared_buffer;
   (*ctx).voices[0].gain_envelope_generator.render();
+  for voice_ix in 1..VOICE_COUNT {
+    (*ctx).voices[voice_ix]
+      .gain_envelope_generator
+      .adsr
+      .rendered = Rc::clone(&(*ctx).voices[0].gain_envelope_generator.adsr.rendered);
+  }
+  let shared_buffer = Rc::new([0.0f32; RENDERED_BUFFER_SIZE]);
+  (*ctx).voices[0].filter_envelope_generator.adsr.rendered = shared_buffer;
   (*ctx).voices[0].filter_envelope_generator.render();
+  for voice_ix in 1..VOICE_COUNT {
+    (*ctx).voices[voice_ix]
+      .filter_envelope_generator
+      .adsr
+      .rendered = Rc::clone(&(*ctx).voices[0].filter_envelope_generator.adsr.rendered);
+  }
 
   ctx
 }
@@ -2150,24 +2166,23 @@ pub unsafe extern "C" fn set_adsr(
   log_scale: bool,
 ) {
   let ctx = &mut *ctx;
-  let shared_buffer = Box::new([0.0f32; RENDERED_BUFFER_SIZE]);
-  let shared_buffer: Rc<[f32; RENDERED_BUFFER_SIZE]> = shared_buffer.into();
+
+  let new_adsr = Adsr::new(
+    ADSR_STEP_BUFFER[..step_count].to_owned(),
+    if loop_point < 0. {
+      None
+    } else {
+      Some(loop_point)
+    },
+    0.,   // This will be overridden when ADSRs are rendered
+    None, // Maybe we want to set this later?
+    release_start_phase,
+    Rc::new([0.0f32; RENDERED_BUFFER_SIZE]), // temp
+    EarlyReleaseConfig::default(),
+    log_scale,
+  );
 
   for voice in &mut *ctx.voices {
-    let mut new_adsr = Adsr::new(
-      ADSR_STEP_BUFFER[..step_count].to_owned(),
-      if loop_point < 0. {
-        None
-      } else {
-        Some(loop_point)
-      },
-      0.,   // This will be overridden when ADSRs are rendered
-      None, // Maybe we want to set this later?
-      release_start_phase,
-      shared_buffer.clone(),
-      EarlyReleaseConfig::default(),
-      log_scale,
-    );
     let params = AdsrParams {
       len_samples: ParamSource::from_parts(
         len_samples_type,
@@ -2199,6 +2214,8 @@ pub unsafe extern "C" fn set_adsr(
     } else {
       voice.adsrs.get_mut(adsr_ix as usize)
     };
+
+    let mut new_adsr = new_adsr.clone();
 
     if let Some(old_adsr) = old_adsr {
       let old_phase = old_adsr.phase;
@@ -2241,13 +2258,30 @@ pub unsafe extern "C" fn set_adsr(
       voice.adsr_params.push(params);
     }
   }
+
   // Render the ADSR's shared buffer
+  let shared_buffer = Rc::new([0.0f32; RENDERED_BUFFER_SIZE]);
   if adsr_ix == -1 {
+    ctx.voices[0].gain_envelope_generator.adsr.rendered = shared_buffer;
     ctx.voices[0].gain_envelope_generator.render();
+    for voice_ix in 1..VOICE_COUNT {
+      ctx.voices[voice_ix].gain_envelope_generator.adsr.rendered =
+        Rc::clone(&ctx.voices[0].gain_envelope_generator.adsr.rendered);
+    }
   } else if adsr_ix == -2 {
+    ctx.voices[0].filter_envelope_generator.adsr.rendered = shared_buffer;
     ctx.voices[0].filter_envelope_generator.render();
+    for voice_ix in 1..VOICE_COUNT {
+      ctx.voices[voice_ix].filter_envelope_generator.adsr.rendered =
+        Rc::clone(&ctx.voices[0].filter_envelope_generator.adsr.rendered);
+    }
   } else {
+    ctx.voices[0].adsrs[adsr_ix as usize].rendered = shared_buffer;
     ctx.voices[0].adsrs[adsr_ix as usize].render();
+    for voice_ix in 1..VOICE_COUNT {
+      ctx.voices[voice_ix].adsrs[adsr_ix as usize].rendered =
+        Rc::clone(&ctx.voices[0].adsrs[adsr_ix as usize].rendered);
+    }
   }
 }
 

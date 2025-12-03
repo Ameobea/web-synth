@@ -29,7 +29,7 @@
     "handlebars-loader": "^1.7.3",
     "html-webpack-plugin": "^5.6",
     "http-server": "^14.1.1",
-    "prettier": "^3.6.2",
+    "prettier": "^3.7.3",
     "prettier-plugin-svelte": "^3.4.0",
     "style-loader": "^4.0.0",
     "svelte-loader": "^3.2.4",
@@ -38,8 +38,8 @@
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
     "webpack": "^5.103.0",
-    "webpack-bundle-analyzer": "^4.10.2",
-    "webpack-cli": "^5.1.4",
+    "webpack-bundle-analyzer": "^5.0.1",
+    "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2"
   },
   "scripts": {
@@ -79,7 +79,7 @@
     "dexie": "^4.2.1",
     "downloadjs": "^1.4.7",
     "funfix-core": "^7.0.1",
-    "immutable": "^4.3.7",
+    "immutable": "^5.1.4",
     "jantix": "^0.3.0",
     "litegraph.js": "^0.7.18",
     "numbro": "^2.5.0",
