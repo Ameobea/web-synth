@@ -63,6 +63,7 @@
           lowshelf: `${EqualizerFilterType.Lowshelf}`,
           highshelf: `${EqualizerFilterType.Highshelf}`,
           allpass: `${EqualizerFilterType.Allpass}`,
+          dynabandpass: `${EqualizerFilterType.Dynabandpass}`,
         },
         label: 'filter type',
       },

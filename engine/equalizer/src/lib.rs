@@ -1,7 +1,10 @@
 use std::ops::{AddAssign, MulAssign};
 
 use dsp::{
-  filters::biquad::{BiquadFilter, ComputeGridFilterParams, FilterMode},
+  filters::{
+    biquad::{BiquadFilter, ComputeGridFilterParams, FilterMode},
+    dynabandpass::DynabandpassFilter,
+  },
   linear_to_db_checked, FRAME_SIZE, NYQUIST, SAMPLE_RATE,
 };
 use num_traits::{Float, FloatConst};
@@ -20,6 +23,17 @@ const MIN_Q: f64 = -100.;
 const MAX_Q: f64 = 100.;
 const MIN_GAIN: f64 = -100.;
 const MAX_GAIN: f64 = 100.;
+
+const DYNABANDPASS_MIN_BANDWIDTH: f64 = 5.;
+const DYNABANDPASS_MAX_BANDWIDTH: f64 = 10_000.;
+
+/// Converts Q (in dB, in [-50, 25]) to bandwidth (in Hz, in [5, 10_000]).
+/// Higher Q -> narrower bandwidth. The mapping is logarithmic.
+fn dynabandpass_q_to_bandwidth(q: f64) -> f64 {
+  let q_clamped = q.clamp(-50., 25.);
+  DYNABANDPASS_MIN_BANDWIDTH
+    * (DYNABANDPASS_MAX_BANDWIDTH / DYNABANDPASS_MIN_BANDWIDTH).powf((25. - q_clamped) / 75.0)
+}
 
 static mut DID_INIT: bool = false;
 
@@ -52,6 +66,7 @@ pub enum EqualizerFilterType {
   Order4Highpass = 11,
   Order8Highpass = 12,
   Order16Highpass = 13,
+  Dynabandpass = 14,
 }
 
 impl EqualizerFilterType {
@@ -71,6 +86,7 @@ impl EqualizerFilterType {
       EqualizerFilterType::Order4Highpass => FilterMode::Highpass,
       EqualizerFilterType::Order8Highpass => FilterMode::Highpass,
       EqualizerFilterType::Order16Highpass => FilterMode::Highpass,
+      EqualizerFilterType::Dynabandpass => FilterMode::Bandpass,
     }
   }
 }
@@ -93,7 +109,7 @@ impl Into<FilterMode> for EqualizerFilterType {
 
 impl EqualizerFilterType {
   fn from_usize(filter_type: usize) -> Self {
-    if filter_type > 13 {
+    if filter_type > 14 {
       panic!("Invalid filter type: {filter_type}");
     }
     unsafe { std::mem::transmute(filter_type as u8) }
@@ -125,6 +141,11 @@ pub enum EqualizerBandInner<T: Float + FloatConst + Default> {
     filter: [BiquadFilter<T>; 8],
     params: BiquadFilterParams<T>,
   },
+  Dynabandpass {
+    filter: DynabandpassFilter,
+    center_freq: T,
+    bandwidth: T,
+  },
 }
 
 impl<T: Float + FloatConst + Default> EqualizerBandInner<T> {
@@ -134,6 +155,20 @@ impl<T: Float + FloatConst + Default> EqualizerBandInner<T> {
       EqualizerBandInner::Biquad4 { params, .. } => params,
       EqualizerBandInner::Biquad8 { params, .. } => params,
       EqualizerBandInner::Biquad16 { params, .. } => params,
+      EqualizerBandInner::Dynabandpass { .. } => {
+        panic!("get_params() called on Dynabandpass filter; use `get_dynabandpass_params` instead")
+      },
+    }
+  }
+
+  pub fn get_dynabandpass_params(&self) -> Option<(T, T)> {
+    match self {
+      EqualizerBandInner::Dynabandpass {
+        center_freq,
+        bandwidth,
+        ..
+      } => Some((*center_freq, *bandwidth)),
+      _ => None,
     }
   }
 }
@@ -204,6 +239,17 @@ impl<T: Float + FloatConst + Default + MulAssign + AddAssign> EqualizerBandInner
       EqualizerBandInner::Biquad4 { filter, .. } => apply_filter_chain(filter, sample),
       EqualizerBandInner::Biquad8 { filter, .. } => apply_filter_chain(filter, sample),
       EqualizerBandInner::Biquad16 { filter, .. } => apply_filter_chain(filter, sample),
+      EqualizerBandInner::Dynabandpass {
+        filter,
+        center_freq,
+        bandwidth,
+      } => {
+        let center_freq_f32 = center_freq.to_f32().unwrap_or(1000.0);
+        let bandwidth_f32 = bandwidth.to_f32().unwrap_or(100.0);
+        let sample_f32 = sample.to_f32().unwrap_or(0.0);
+        let result = filter.apply_single(sample_f32, center_freq_f32, bandwidth_f32);
+        T::from(result).unwrap()
+      },
     }
   }
 
@@ -240,6 +286,15 @@ impl<T: Float + FloatConst + Default + MulAssign + AddAssign> EqualizerBandInner
         gain,
         sample,
       ),
+      EqualizerBandInner::Dynabandpass { filter, .. } => {
+        let q_f64 = q.to_f64().unwrap_or(0.0);
+        let bandwidth_hz = dynabandpass_q_to_bandwidth(q_f64);
+        let center_freq_f32 = freq.to_f32().unwrap_or(1000.0);
+        let bandwidth_f32 = bandwidth_hz as f32;
+        let sample_f32 = sample.to_f32().unwrap_or(0.0);
+        let result = filter.apply_single(sample_f32, center_freq_f32, bandwidth_f32);
+        T::from(result).unwrap()
+      },
     }
   }
 }
@@ -533,6 +588,26 @@ pub extern "C" fn equalizer_set_band(
         gain,
       );
     },
+    EqualizerFilterType::Dynabandpass => {
+      let bandwidth_hz = dynabandpass_q_to_bandwidth(q);
+
+      if !matches!(band.inner, EqualizerBandInner::Dynabandpass { .. }) {
+        band.inner = EqualizerBandInner::Dynabandpass {
+          filter: DynabandpassFilter::new(bandwidth_hz as f32),
+          center_freq: frequency,
+          bandwidth: bandwidth_hz,
+        };
+      } else if let EqualizerBandInner::Dynabandpass {
+        filter,
+        center_freq,
+        bandwidth,
+      } = &mut band.inner
+      {
+        *center_freq = frequency;
+        *bandwidth = bandwidth_hz;
+        filter.set_bandwidth(bandwidth_hz as f32);
+      }
+    },
   }
 }
 
@@ -607,54 +682,84 @@ pub extern "C" fn equalizer_compute_responses(
   }
 
   let mut responses = ctx.bands.iter().map(|band| {
-    let mode = band.inner.get_params().mode;
-    let maybe_automated_q = match band.param_overrides.q.as_opt() {
-      Some(q_ix) if use_automated_params => ctx.automation_bufs[q_ix][0] as f64,
-      _ => band.inner.get_params().q,
-    };
-    let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
-      Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
-      _ => band.inner.get_params().freq,
-    };
-    let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
-      Some(gain_ix) if use_automated_params => ctx.automation_bufs[gain_ix][0] as f64,
-      _ => band.inner.get_params().gain,
-    };
-
     match &band.inner {
-      EqualizerBandInner::Biquad { .. } => BiquadFilter::compute_response_grid::<f32>(
-        mode,
-        maybe_automated_q,
-        maybe_automated_freq,
-        maybe_automated_gain,
-        10.,
-        SAMPLE_RATE as f64,
-        grid_size,
-      ),
-      EqualizerBandInner::Biquad4 { .. } => compute_chain_response(
-        mode,
-        &ORDER_4_Q_FACTORS,
-        maybe_automated_q,
-        maybe_automated_freq,
-        maybe_automated_gain,
-        grid_size,
-      ),
-      EqualizerBandInner::Biquad8 { .. } => compute_chain_response(
-        mode,
-        &ORDER_8_Q_FACTORS,
-        maybe_automated_q,
-        maybe_automated_freq,
-        maybe_automated_gain,
-        grid_size,
-      ),
-      EqualizerBandInner::Biquad16 { .. } => compute_chain_response(
-        mode,
-        &ORDER_16_Q_FACTORS,
-        maybe_automated_q,
-        maybe_automated_freq,
-        maybe_automated_gain,
-        grid_size,
-      ),
+      EqualizerBandInner::Dynabandpass {
+        center_freq,
+        bandwidth,
+        ..
+      } => {
+        let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
+          Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
+          _ => *center_freq,
+        };
+        let maybe_automated_bandwidth = match band.param_overrides.q.as_opt() {
+          Some(q_ix) if use_automated_params => {
+            let q_db = ctx.automation_bufs[q_ix][0] as f64;
+            dynabandpass_q_to_bandwidth(q_db)
+          },
+          _ => *bandwidth,
+        };
+
+        DynabandpassFilter::compute_response_grid::<f32>(
+          maybe_automated_freq as f32,
+          maybe_automated_bandwidth as f32,
+          10.,
+          SAMPLE_RATE,
+          grid_size,
+        )
+      },
+      _ => {
+        let mode = band.inner.get_params().mode;
+        let maybe_automated_q = match band.param_overrides.q.as_opt() {
+          Some(q_ix) if use_automated_params => ctx.automation_bufs[q_ix][0] as f64,
+          _ => band.inner.get_params().q,
+        };
+        let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
+          Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
+          _ => band.inner.get_params().freq,
+        };
+        let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
+          Some(gain_ix) if use_automated_params => ctx.automation_bufs[gain_ix][0] as f64,
+          _ => band.inner.get_params().gain,
+        };
+
+        match &band.inner {
+          EqualizerBandInner::Biquad { .. } => BiquadFilter::compute_response_grid::<f32>(
+            mode,
+            maybe_automated_q,
+            maybe_automated_freq,
+            maybe_automated_gain,
+            10.,
+            SAMPLE_RATE as f64,
+            grid_size,
+          ),
+          EqualizerBandInner::Biquad4 { .. } => compute_chain_response(
+            mode,
+            &ORDER_4_Q_FACTORS,
+            maybe_automated_q,
+            maybe_automated_freq,
+            maybe_automated_gain,
+            grid_size,
+          ),
+          EqualizerBandInner::Biquad8 { .. } => compute_chain_response(
+            mode,
+            &ORDER_8_Q_FACTORS,
+            maybe_automated_q,
+            maybe_automated_freq,
+            maybe_automated_gain,
+            grid_size,
+          ),
+          EqualizerBandInner::Biquad16 { .. } => compute_chain_response(
+            mode,
+            &ORDER_16_Q_FACTORS,
+            maybe_automated_q,
+            maybe_automated_freq,
+            maybe_automated_gain,
+            grid_size,
+          ),
+          EqualizerBandInner::Dynabandpass { .. } => unreachable!(),
+        }
+      },
     }
   });
 

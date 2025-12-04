@@ -34,4 +34,5 @@ export const HANDLE_COLOR_BY_FILTER_TYPE: Record<EqualizerFilterType, string> = 
   [EqualizerFilterType.Lowshelf]: '#18a35c',
   [EqualizerFilterType.Highshelf]: '#a14c13',
   [EqualizerFilterType.Allpass]: '#8b8b8b',
+  [EqualizerFilterType.Dynabandpass]: '#ad186cff',
 };
