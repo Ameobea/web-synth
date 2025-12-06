@@ -33,7 +33,7 @@ export interface CompressorNodeUIState {
   postGain: number;
   bottomRatio: number;
   topRatio: number;
-  knee: number;
+  kneeDb: number;
   sab: Float32Array | null;
   bypass: boolean;
   mix: number;
@@ -62,7 +62,7 @@ export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   postGain: 1,
   bottomRatio: 0.2,
   topRatio: 12,
-  knee: 30,
+  kneeDb: 6,
   sab: null,
   bypass: false,
   mix: 1,
@@ -384,7 +384,7 @@ export class CompressorNode implements ForeignNode {
       newState.mid.top_ratio;
     (this.highBandTopRatio as OverridableAudioParam).manualControl.offset.value =
       newState.high.top_ratio;
-    (this.knee as OverridableAudioParam).manualControl.offset.value = newState.knee;
+    (this.knee as OverridableAudioParam).manualControl.offset.value = newState.kneeDb ?? 6;
     (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lowLatencyMode
       ? samplesToMs(DEFAULT_LOOKAHEAD_SAMPLES / 2.5)
       : samplesToMs(DEFAULT_LOOKAHEAD_SAMPLES);
@@ -417,7 +417,7 @@ export class CompressorNode implements ForeignNode {
       },
       bottomRatio: params.bottomRatio ?? 0.2,
       topRatio: params.topRatio ?? 12,
-      knee: params.knee ?? 0,
+      kneeDb: params.kneeDb ?? 0,
       sab: null,
       mix: params.mix ?? 1,
       lowLatencyMode: params.lowLatencyMode ?? false,

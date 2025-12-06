@@ -315,6 +315,7 @@ class CompressorAWP extends AudioWorkletProcessor {
     const midBandTopRatio = params.mid_band_top_ratio[0];
     const highBandTopRatio = params.high_band_top_ratio[0];
     const knee = params.knee[0];
+    console.log({ knee });
     const lookaheadSamples = Math.floor(params.lookahead_ms[0] * 0.001 * SAMPLE_RATE);
 
     this.wasmInstance.exports.process_compressor(
