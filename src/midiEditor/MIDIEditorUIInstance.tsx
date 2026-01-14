@@ -734,13 +734,13 @@ export default class MIDIEditorUIInstance {
       }
 
       const snappedStart = this.parentInstance.snapBeat(note.startPoint);
-      const snappedEnd = this.parentInstance.snapBeat(note.startPoint + note.length);
-
       if (snappedStart > note.startPoint) {
         this.resizeNoteHorizontalStart(line.index, note.startPoint, note.id, snappedStart);
       }
 
-      if (snappedEnd < note.startPoint + note.length) {
+      const currentEnd = note.startPoint + note.length;
+      const snappedEnd = this.parentInstance.snapBeat(currentEnd);
+      if (snappedEnd > note.startPoint && snappedEnd < currentEnd) {
         this.resizeNoteHorizontalEnd(line.index, note.startPoint, note.id, snappedEnd);
       }
     }

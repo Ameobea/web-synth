@@ -112,20 +112,21 @@ impl NoteContainer {
         },
         end @ NoteEntry::NoteEnd { .. } => panic!(
           "Found note end intersecting note we're trying to insert that isn't at the start point: \
-           {:?}",
-          end
+           start_point={}, end_point={}, entry={:?}",
+          start_point, end_point, end
         ),
         NoteEntry::NoteStart { note } if intersected_point.0 == end_point => {
           end_touched_note = Some(*note);
         },
         start @ NoteEntry::NoteStart { .. } => panic!(
           "Found note start intersecting note we're trying to insert that isn't at the end point: \
-           {:?}",
-          start
+           start_point={}, end_point={}, entry={:?}",
+          start_point, end_point, start
         ),
         start_and_end @ NoteEntry::StartAndEnd { .. } => panic!(
-          "Found start and end entry intersecting note we're trying to insert: {:?}",
-          start_and_end
+          "Found start and end entry intersecting note we're trying to insert: \
+           start_point={}, end_point={}, entry={:?}",
+          start_point, end_point, start_and_end
         ),
       }
     }
@@ -375,7 +376,18 @@ impl NoteContainer {
       start_point = 0.;
     }
 
-    assert!(new_end_point > start_point);
+    if new_end_point <= start_point {
+      error!(
+        "Invalid resize_note_end request: new_end_point <= start_point (start_point={}, \
+         new_end_point={}, note_id={})",
+        start_point, new_end_point, note_id
+      );
+      panic!(
+        "Invalid resize_note_end request: new_end_point <= start_point (start_point={}, \
+         new_end_point={}, note_id={})",
+        start_point, new_end_point, note_id
+      );
+    }
 
     let start_entry = self
       .inner
@@ -525,7 +537,18 @@ impl NoteContainer {
     );
 
     let end_point = start_point + note.length;
-    assert!(new_start_point < end_point);
+    if new_start_point >= end_point {
+      error!(
+        "Invalid resize_note_start request: new_start_point >= end_point (start_point={}, \
+         end_point={}, new_start_point={}, note_id={})",
+        start_point, end_point, new_start_point, note_id
+      );
+      panic!(
+        "Invalid resize_note_start request: new_start_point >= end_point (start_point={}, \
+         end_point={}, new_start_point={}, note_id={})",
+        start_point, end_point, new_start_point, note_id
+      );
+    }
 
     let real_new_start_point = if new_start_point > start_point {
       // If we're moving the start point up, it's infallible since nothing can block it since
