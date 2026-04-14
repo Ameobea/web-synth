@@ -14,7 +14,7 @@ fastapprox = "0.3"
 common = { path = "../common" }
 compressor = { path = "../compressor", default-features = false, features = []}
 polysynth = { path = "../polysynth", default-features = false }
-rand = "0.7"
+rand = "0.9"
 
 [features]
 default = ["exports"]

@@ -10,5 +10,5 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 dsp = { path = "../dsp" }
 common = { path = "../common", default-features = false, features = [] }
-rand = "0.7"
+rand = "0.9"
 hound = "3.4"
