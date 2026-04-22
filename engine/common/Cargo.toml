@@ -6,5 +6,5 @@ edition = "2021"
 
 [dependencies]
 uuid = { version = "1.2" }
-rand = "0.7.3"
+rand = "0.8.6"
 rand_pcg = "0.2.1"
