@@ -37,7 +37,12 @@ const CustomBiquadFilterNodeSmallView: React.FC<CustomBiquadFilterNodeSmallViewP
         if (key === 'type') {
           node.node!.type = val;
         } else {
-          node.paramOverrides[key].override.offset.value = val;
+          const override = node.paramOverrides[key]?.override;
+          if (override) {
+            override.offset.value = val;
+          } else {
+            console.warn(`Received change for unknown biquad filter param "${key}"`);
+          }
         }
 
         // Force re-render.  This component needs to be stateless (can't even have hooks state)

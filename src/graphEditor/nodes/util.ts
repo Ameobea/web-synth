@@ -72,6 +72,17 @@ const buildManualControl = (ctx: AudioContext) => {
   return manualControl;
 };
 
+const tryDisconnect = (src: AudioNode, dst: AudioNode | AudioParam) => {
+  try {
+    (src as any).disconnect(dst);
+  } catch (err) {
+    if (err instanceof DOMException && err.message.includes('is not connected')) {
+      return;
+    }
+    throw err;
+  }
+};
+
 /**
  * Wraps an `AudioParm` with a switch that toggles between a `manualControl` input and everything connected to
  * the created `OverridableAudioParam` itself.
@@ -140,10 +151,10 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     this.isOverridden = isOverridden;
 
     if (isOverridden) {
-      this.disconnect(this.wrappedParam);
+      tryDisconnect(this, this.wrappedParam);
       this.manualControl.connect(this.wrappedParam);
     } else {
-      this.manualControl.disconnect(this.wrappedParam);
+      tryDisconnect(this.manualControl, this.wrappedParam);
       this.connect(this.wrappedParam);
     }
 
@@ -169,9 +180,9 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
    */
   public replaceParam(newParam: AudioParam) {
     if (this.isOverridden) {
-      this.manualControl.disconnect(this.wrappedParam);
+      tryDisconnect(this.manualControl, this.wrappedParam);
     } else {
-      this.disconnect(this.wrappedParam);
+      tryDisconnect(this, this.wrappedParam);
     }
     this.wrappedParam = newParam;
     if (this.isOverridden) {
@@ -184,7 +195,7 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
   public dispose() {
     this.disconnect();
     if (this.isOverridden) {
-      this.manualControl.disconnect(this.wrappedParam);
+      tryDisconnect(this.manualControl, this.wrappedParam);
     }
     if (this.outputCSN) {
       this.outputCSN.disconnect();
@@ -229,10 +240,10 @@ export class OverridableAudioNode extends GainNode {
     this.isOverridden = isOverridden;
 
     if (isOverridden) {
-      this.disconnect(this.output);
+      tryDisconnect(this, this.output);
       this.manualControl.connect(this.output);
     } else {
-      this.manualControl.disconnect(this.output);
+      tryDisconnect(this.manualControl, this.output);
       this.connect(this.output);
     }
 

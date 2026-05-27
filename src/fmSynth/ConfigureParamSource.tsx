@@ -154,7 +154,7 @@ interface ConfigureParamSourceProps {
 }
 
 export interface ConfigureParamSourceInnerProps extends ConfigureParamSourceProps {
-  midiNode: MIDINode;
+  midiNode: MIDINode | null;
 }
 
 const ConfigureParamSourceInnerInner: React.FC<ConfigureParamSourceInnerProps> = ({
@@ -363,12 +363,12 @@ const ConfigureParamSourceInner = React.memo(ConfigureParamSourceInnerInner);
 
 const ConfigureParamSource: React.FC<ConfigureParamSourceProps> = props => {
   if (props.state.type !== 'midi control') {
-    return <ConfigureParamSourceInner {...props} midiNode={null as any} />;
+    return <ConfigureParamSourceInner {...props} midiNode={null} />;
   }
 
   return (
     <TrainingMIDIControlIndexContext.Consumer>
-      {({ midiNode }) => <ConfigureParamSourceInner {...props} midiNode={midiNode!} />}
+      {({ midiNode }) => <ConfigureParamSourceInner {...props} midiNode={midiNode ?? null} />}
     </TrainingMIDIControlIndexContext.Consumer>
   );
 };

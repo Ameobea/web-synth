@@ -70,7 +70,18 @@ export const connectNodes = (
     dst.setIsOverridden(false);
   }
 
-  (src as any).connect(dst, src instanceof PlaceholderOutput ? dstDescriptor : undefined);
+  try {
+    (src as any).connect(dst, src instanceof PlaceholderOutput ? dstDescriptor : undefined);
+  } catch (err) {
+    console.error('Error connecting nodes; likely an incompatible connection: ', {
+      err,
+      src,
+      dst,
+      srcDescriptor,
+      dstDescriptor,
+    });
+    return;
+  }
 
   if (dst instanceof PlaceholderInput) {
     dst.connect(src, srcDescriptor);

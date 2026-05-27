@@ -362,7 +362,8 @@ class RampHandle {
     g.cursor = 'pointer';
 
     const handlePointerMove = () => {
-      if (!this.dragData) {
+      if (!this.dragData || !this.graphics.parent) {
+        document.removeEventListener('pointermove', handlePointerMove);
         return;
       }
 
@@ -637,7 +638,13 @@ class StepHandle {
     g.cursor = 'pointer';
     g.interactive = true;
 
-    const handlePointerMove = () => this.handlePointerMove();
+    const handlePointerMove = () => {
+      if (!this.dragData || !this.graphics.parent) {
+        document.removeEventListener('pointermove', handlePointerMove);
+        return;
+      }
+      this.handlePointerMove();
+    };
 
     g.on('pointerdown', (evt: FederatedPointerEvent) => {
       const originalEvent = evt.nativeEvent as PointerEvent;
@@ -753,7 +760,8 @@ class DragBar {
     g.cursor = 'pointer';
 
     const handlePointerMove = () => {
-      if (!this.dragData) {
+      if (!this.dragData || !g.parent) {
+        document.removeEventListener('pointermove', handlePointerMove);
         return;
       }
 

@@ -223,20 +223,19 @@ export const buildDefaultAdsr = (audioThreadData?: AudioThreadData): AdsrParams 
   logScale: false,
 });
 
-interface BuildConfigureParamSourceSettingsArgs
-  extends Pick<
-    ConfigureParamSourceInnerProps,
-    | 'state'
-    | 'excludedTypes'
-    | 'min'
-    | 'max'
-    | 'scale'
-    | 'step'
-    | 'adsrs'
-    | 'onAdsrChange'
-    | 'midiNode'
-    | 'onChange'
-  > {
+interface BuildConfigureParamSourceSettingsArgs extends Pick<
+  ConfigureParamSourceInnerProps,
+  | 'state'
+  | 'excludedTypes'
+  | 'min'
+  | 'max'
+  | 'scale'
+  | 'step'
+  | 'adsrs'
+  | 'onAdsrChange'
+  | 'midiNode'
+  | 'onChange'
+> {
   paramBufferCount: number;
 }
 
@@ -331,6 +330,10 @@ export const buildConfigureParamSourceSettings = ({
           type: 'button',
           label: state.midiControlIndex === 'LEARNING' ? 'cancel learning' : 'learn midi',
           action: () => {
+            if (!midiNode) {
+              return;
+            }
+
             if (state.midiControlIndex === 'LEARNING') {
               midiNode.disconnect(state.dstMIDINode);
               onChange({ ...state, midiControlIndex: null, dstMIDINode: undefined });

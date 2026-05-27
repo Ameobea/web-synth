@@ -64,7 +64,9 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
     ((ctx2D: CanvasRenderingContext2D) => () => void) | null
   >(null);
   const animationFrameHandle = useRef<number | null>(null);
-  const lockedHeight = useRef(height);
+  const lockedHeight = useRef(
+    Number.isFinite(height) ? Math.min(BUFFER_SIZE, Math.max(1, Math.trunc(height))) : BUFFER_SIZE
+  );
   const isInView = useRef(true);
 
   useEffect(() => {
