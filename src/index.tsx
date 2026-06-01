@@ -11,6 +11,7 @@ import {
 import { getReactQueryClient } from 'src/reactUtils';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
+import { installSpy } from 'src/spy';
 import { initGlobals, isSafari, setEngine } from 'src/util';
 import { registerMainReduxGetState } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { getState, store } from './redux';
@@ -102,5 +103,7 @@ if (typeof WebAssembly === 'undefined' || typeof AudioWorkletNode === 'undefined
 
       createGlobalUI(engine);
     }
+
+    installSpy();
   });
 }

@@ -7,6 +7,7 @@ use dsp::{
 };
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
 }

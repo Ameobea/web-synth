@@ -1,4 +1,5 @@
 use dsp::{
+  circular_buffer::CircularBuffer,
   db_to_gain,
   filters::{
     biquad::{BiquadFilter, FilterMode},
@@ -16,6 +17,9 @@ const LOW_BAND_CUTOFF: f32 = 88.3;
 const MID_BAND_CUTOFF: f32 = 2500.;
 const SAB_SIZE: usize = 16;
 
+// Must hold >= FRAME_SIZE + max runtime lookahead; UI caps lookahead at ~33 ms.
+pub const MAX_LOOKAHEAD_SAMPLES: usize = SAMPLE_RATE as usize / 15;
+
 #[repr(C)]
 pub enum LogLevel {
   Error = 0,
@@ -24,6 +28,7 @@ pub enum LogLevel {
 }
 
 #[cfg(all(feature = "exports", target_arch = "wasm32"))]
+#[link(wasm_import_module = "env")]
 extern "C" {
   pub fn log_raw(ptr: *const u8, len: usize, level: LogLevel);
 }
@@ -63,6 +68,8 @@ pub struct Compressor {
   pub last_applied_gain: f32,
   pub rms_filter_state: f32,
   pub rms_dc_blocker: DCBlocker,
+  /// Per-sample gain reduction in dB.
+  pub gr_buf: CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
 }
 
 impl Default for Compressor {
@@ -74,6 +81,7 @@ impl Default for Compressor {
       last_applied_gain: 1.,
       rms_filter_state: 0.,
       rms_dc_blocker: DCBlocker::default(),
+      gr_buf: CircularBuffer::new(),
     }
   }
 }
@@ -81,9 +89,9 @@ impl Default for Compressor {
 #[derive(Clone)]
 pub struct MultibandCompressor {
   pub input_buffer: [f32; FRAME_SIZE],
-  pub low_band_io_buf: [f32; FRAME_SIZE],
-  pub mid_band_io_buf: [f32; FRAME_SIZE],
-  pub high_band_io_buf: [f32; FRAME_SIZE],
+  pub low_band_lookahead_buf: CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
+  pub mid_band_lookahead_buf: CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
+  pub high_band_lookahead_buf: CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
   pub low_band_filter_chain: [BiquadFilter; BAND_SPLITTER_FILTER_CHAIN_LENGTH],
   pub mid_band_filter_chain: [BiquadFilter; BAND_SPLITTER_FILTER_CHAIN_LENGTH * 2],
   pub high_band_filter_chain: [BiquadFilter; BAND_SPLITTER_FILTER_CHAIN_LENGTH],
@@ -157,9 +165,9 @@ impl Default for MultibandCompressor {
 
     Self {
       input_buffer: [0.0; FRAME_SIZE],
-      low_band_io_buf: [0.0; FRAME_SIZE],
-      mid_band_io_buf: [0.0; FRAME_SIZE],
-      high_band_io_buf: [0.0; FRAME_SIZE],
+      low_band_lookahead_buf: CircularBuffer::new(),
+      mid_band_lookahead_buf: CircularBuffer::new(),
+      high_band_lookahead_buf: CircularBuffer::new(),
       low_band_filter_chain,
       mid_band_filter_chain,
       high_band_filter_chain,
@@ -173,16 +181,20 @@ impl Default for MultibandCompressor {
   }
 }
 
-fn apply_filter_chain_full<const N: usize>(
+fn apply_filter_chain_to_lookahead_buf<const N: usize>(
   chain: &mut [BiquadFilter; N],
   input_buf: &[f32; FRAME_SIZE],
-  output_buf: &mut [f32; FRAME_SIZE],
+  lookahead_buf: &mut CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
   gain: f32,
 ) {
+  let mut frame = *input_buf;
   for filter in chain.iter_mut() {
     for i in 0..FRAME_SIZE {
-      output_buf[i] = filter.apply(input_buf[i]) * gain;
+      frame[i] = filter.apply(frame[i]);
     }
+  }
+  for i in 0..FRAME_SIZE {
+    lookahead_buf.set(frame[i] * gain);
   }
 }
 
@@ -195,7 +207,8 @@ fn compute_one_pole_filter_coefficient(time_ms: f32) -> f32 {
 impl Compressor {
   pub fn apply(
     &mut self,
-    input_buf: &[f32; FRAME_SIZE],
+    input_buf: &CircularBuffer<MAX_LOOKAHEAD_SAMPLES>,
+    lookahead_samples: isize,
     output_buf: &mut [f32; FRAME_SIZE],
     attack_ms: f32,
     release_ms: f32,
@@ -206,6 +219,7 @@ impl Compressor {
     knee_db: f32,
     post_gain: f32,
     rms_level_detector_coefficient: f32,
+    backwards_ramp: bool,
   ) -> f32 {
     let attack_coeff = compute_one_pole_filter_coefficient(attack_ms);
     let release_coeff = compute_one_pole_filter_coefficient(release_ms);
@@ -223,12 +237,14 @@ impl Compressor {
 
     let top_slope_factor = 1. - 1. / top_ratio.max(1.);
 
-    for (i, sample) in input_buf.iter().enumerate() {
-      // RMS level detection, using non-delayed samples
-      let detected_level_linear = {
-        // eliminate DC offset before applying level detection
-        let x = self.rms_dc_blocker.apply(*sample);
+    // After the bandsplitter wrote FRAME_SIZE samples to `input_buf`, sample i of the new frame
+    // sits at offset -(FRAME_SIZE-1-i) from head.
+    for i in 0..FRAME_SIZE {
+      let newest_off = -((FRAME_SIZE - 1 - i) as isize);
+      let newest_sample = input_buf.get(newest_off);
 
+      let detected_level_linear = {
+        let x = self.rms_dc_blocker.apply(newest_sample);
         let x = x * x;
         let y =
           rms_level_detector_coefficient * x + (1. - rms_level_detector_coefficient) * rms_state;
@@ -239,7 +255,6 @@ impl Compressor {
       let detected_db = gain_to_db(detected_level_linear.max(1e-10));
       last_detected_db = detected_db;
 
-      // envelope following, smoothing based on attack/release times
       let coeff = if detected_db > envelope {
         attack_coeff
       } else {
@@ -247,39 +262,71 @@ impl Compressor {
       };
       envelope += coeff * (detected_db - envelope);
 
-      // upwards/downwards compression calculation.
       let mut total_gain_db = 0.;
 
-      // Downward Compression (Top)
       if envelope > top_knee_lower {
-        let overshoot_db;
-
-        if envelope < top_knee_upper {
+        let overshoot_db = if envelope < top_knee_upper {
           let distance_into_knee = envelope - top_knee_lower;
-          overshoot_db = (distance_into_knee * distance_into_knee) / (2.0 * knee_width);
+          (distance_into_knee * distance_into_knee) / (2.0 * knee_width)
         } else {
-          overshoot_db = envelope - top_threshold_db;
-        }
+          envelope - top_threshold_db
+        };
 
-        // Apply the ratio logic
         total_gain_db += -overshoot_db * top_slope_factor;
       }
 
-      // Upward Compression (Bottom)
       if envelope < bottom_threshold_db {
         let diff = bottom_threshold_db - envelope.max(-100.);
         let raw_boost = diff * (1. - bottom_ratio);
         total_gain_db += raw_boost.min(MAX_UPWARD_GAIN_DB);
       }
 
-      let gain_linear = db_to_gain(total_gain_db);
-      last_gain = gain_linear;
-
-      let output_sample = sample * gain_linear * post_gain;
-
-      output_buf[i] += output_sample;
+      self.gr_buf.set(total_gain_db);
 
       last_output_db = detected_db + total_gain_db;
+    }
+
+    // Backwards-ramp smoothing, based on:
+    // https://github.com/DanielRudrich/SimpleCompressor/blob/master/docs/lookAheadLimiter.md
+    //
+    // Walks the GR buffer backwards applying a linear dB ramp into each local minimum so the
+    // envelope fades into peaks instead of snapping.  Only the downward component is smoothed;
+    // upward expansion passes through.
+    if backwards_ramp && lookahead_samples > 0 {
+      let lookahead = lookahead_samples as f32;
+      let mut next_gr_db = 0.0f32;
+      let mut step_db = 0.0f32;
+      let total = FRAME_SIZE + lookahead_samples as usize;
+      for offset in 0..total {
+        let ix = -(offset as isize);
+        let smpl = self.gr_buf.get(ix);
+        let smpl_neg = smpl.min(0.0);
+
+        if smpl_neg > next_gr_db {
+          // overwrite with ramp value; preserve upward component
+          let smpl_pos = smpl - smpl_neg;
+          self.gr_buf.set_at(ix, next_gr_db + smpl_pos);
+          next_gr_db += step_db;
+        } else if offset < FRAME_SIZE {
+          // deeper peak in new frame; restart ramp toward it
+          step_db = -smpl_neg / lookahead;
+          next_gr_db = smpl_neg + step_db;
+        } else {
+          // deeper peak in already-smoothed history; prior call ramped it
+          break;
+        }
+      }
+    }
+
+    // Snap mode reads gain at the newest offset (leads delayed audio by lookahead_samples =
+    // brick-wall). Backwards-ramp reads at the delayed offset since the ramp was applied in place.
+    for i in 0..FRAME_SIZE {
+      let newest_off = -((FRAME_SIZE - 1 - i) as isize);
+      let delayed_off = newest_off - lookahead_samples;
+      let gr_off = if backwards_ramp { delayed_off } else { newest_off };
+      let gain_linear = db_to_gain(self.gr_buf.get(gr_off));
+      last_gain = gain_linear;
+      output_buf[i] += input_buf.get(delayed_off) * gain_linear * post_gain;
     }
 
     self.envelope = envelope;
@@ -300,22 +347,22 @@ impl MultibandCompressor {
     mid_band_gain: f32,
     high_band_gain: f32,
   ) {
-    apply_filter_chain_full(
+    apply_filter_chain_to_lookahead_buf(
       &mut self.low_band_filter_chain,
       &self.input_buffer,
-      &mut self.low_band_io_buf,
+      &mut self.low_band_lookahead_buf,
       low_band_gain,
     );
-    apply_filter_chain_full(
+    apply_filter_chain_to_lookahead_buf(
       &mut self.mid_band_filter_chain,
       &self.input_buffer,
-      &mut self.mid_band_io_buf,
+      &mut self.mid_band_lookahead_buf,
       mid_band_gain,
     );
-    apply_filter_chain_full(
+    apply_filter_chain_to_lookahead_buf(
       &mut self.high_band_filter_chain,
       &self.input_buffer,
-      &mut self.high_band_io_buf,
+      &mut self.high_band_lookahead_buf,
       high_band_gain,
     );
   }
@@ -348,8 +395,12 @@ impl MultibandCompressor {
     mid_band_top_ratio: f32,
     high_band_top_ratio: f32,
     knee_db: f32,
+    low_band_post_gain: f32,
+    mid_band_post_gain: f32,
+    high_band_post_gain: f32,
+    lookahead_samples: usize,
+    backwards_ramp: bool,
   ) {
-    // apply pre gain
     if pre_gain != 1. {
       for i in 0..FRAME_SIZE {
         self.input_buffer[i] *= pre_gain;
@@ -360,17 +411,18 @@ impl MultibandCompressor {
 
     self.output_buffer.fill(0.);
 
+    let lookahead = (lookahead_samples.min(MAX_LOOKAHEAD_SAMPLES - FRAME_SIZE - 1)) as isize;
+
     if mix < 1.0 {
       let dry_gain = 1. - mix;
-
-      for input_buf in &[
-        &self.low_band_io_buf,
-        &self.mid_band_io_buf,
-        &self.high_band_io_buf,
+      for buf in &[
+        &self.low_band_lookahead_buf,
+        &self.mid_band_lookahead_buf,
+        &self.high_band_lookahead_buf,
       ] {
         for i in 0..FRAME_SIZE {
-          let sample = input_buf[i];
-          self.output_buffer[i] += sample * dry_gain;
+          let off = -((FRAME_SIZE - 1 - i) as isize) - lookahead;
+          self.output_buffer[i] += buf.get(off) * dry_gain;
         }
       }
     }
@@ -383,7 +435,8 @@ impl MultibandCompressor {
       compute_one_pole_filter_coefficient(high_band_attack_ms.min(1.));
 
     let low_level = self.low_band_compressor.apply(
-      &mut self.low_band_io_buf,
+      &self.low_band_lookahead_buf,
+      lookahead,
       &mut self.output_buffer,
       low_band_attack_ms,
       low_band_release_ms,
@@ -392,8 +445,9 @@ impl MultibandCompressor {
       low_band_bottom_ratio,
       low_band_top_ratio,
       knee_db,
-      mix,
+      low_band_post_gain * mix,
       low_band_rms_level_detector_coefficient,
+      backwards_ramp,
     );
     self.sab[0] = low_level;
     self.sab[3] = self.low_band_compressor.envelope;
@@ -401,7 +455,8 @@ impl MultibandCompressor {
     self.sab[9] = self.low_band_compressor.last_applied_gain;
 
     let mid_level = self.mid_band_compressor.apply(
-      &mut self.mid_band_io_buf,
+      &self.mid_band_lookahead_buf,
+      lookahead,
       &mut self.output_buffer,
       mid_band_attack_ms,
       mid_band_release_ms,
@@ -410,8 +465,9 @@ impl MultibandCompressor {
       mid_band_bottom_ratio,
       mid_band_top_ratio,
       knee_db,
-      mix,
+      mid_band_post_gain * mix,
       mid_band_rms_level_detector_coefficient,
+      backwards_ramp,
     );
     self.sab[1] = mid_level;
     self.sab[4] = self.mid_band_compressor.envelope;
@@ -419,7 +475,8 @@ impl MultibandCompressor {
     self.sab[10] = self.mid_band_compressor.last_applied_gain;
 
     let high_level = self.high_band_compressor.apply(
-      &mut self.high_band_io_buf,
+      &self.high_band_lookahead_buf,
+      lookahead,
       &mut self.output_buffer,
       high_band_attack_ms,
       high_band_release_ms,
@@ -428,15 +485,15 @@ impl MultibandCompressor {
       high_band_bottom_ratio,
       high_band_top_ratio,
       knee_db,
-      mix,
+      high_band_post_gain * mix,
       high_band_rms_level_detector_coefficient,
+      backwards_ramp,
     );
     self.sab[2] = high_level;
     self.sab[5] = self.high_band_compressor.envelope;
     self.sab[8] = self.high_band_compressor.last_output_level_db;
     self.sab[11] = self.high_band_compressor.last_applied_gain;
 
-    // apply post gain
     if post_gain != 1. {
       for i in 0..FRAME_SIZE {
         self.output_buffer[i] *= post_gain;
@@ -509,6 +566,11 @@ pub extern "C" fn process_compressor(
   mid_band_top_ratio: f32,
   high_band_top_ratio: f32,
   knee: f32,
+  low_band_post_gain: f32,
+  mid_band_post_gain: f32,
+  high_band_post_gain: f32,
+  lookahead_samples: usize,
+  backwards_ramp: u32,
 ) {
   let compressor = unsafe { &mut *compressor };
   compressor.apply(
@@ -537,5 +599,10 @@ pub extern "C" fn process_compressor(
     mid_band_top_ratio,
     high_band_top_ratio,
     knee,
+    low_band_post_gain,
+    mid_band_post_gain,
+    high_band_post_gain,
+    lookahead_samples,
+    backwards_ramp != 0,
   );
 }

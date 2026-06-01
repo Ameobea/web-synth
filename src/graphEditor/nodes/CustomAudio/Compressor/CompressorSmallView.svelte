@@ -31,8 +31,12 @@
     store.set(newState);
   };
 
+  const TOP_PANEL_KEY_ALIASES: Record<string, string> = {
+    'lookahead ms': 'lookaheadMs',
+    'backwards ramp': 'backwardsRampLookahead',
+  };
   const handleTopControlPanelChange = (rawKey: string, val: any) => {
-    const key = rawKey === 'low latency mode' ? 'lowLatencyMode' : rawKey;
+    const key = TOP_PANEL_KEY_ALIASES[rawKey] ?? rawKey;
     store.update(state => ({ ...state, [key]: val }));
   };
 </script>
@@ -44,17 +48,23 @@
       { label: 'bypass', type: 'checkbox' },
       { label: 'reset', type: 'button', action: reset },
       { label: 'mix', type: 'range', min: 0, max: 1, step: 0.005 },
-      { label: 'low latency mode', type: 'checkbox' },
+      { label: 'lookahead ms', type: 'range', min: 0, max: 20, step: 0.1 },
+      { label: 'backwards ramp', type: 'checkbox' },
     ]}
-    state={{ bypass: $store.bypass, mix: $store.mix, 'low latency mode': $store.lowLatencyMode }}
+    state={{
+      bypass: $store.bypass,
+      mix: $store.mix,
+      'lookahead ms': $store.lookaheadMs,
+      'backwards ramp': $store.backwardsRampLookahead,
+    }}
     onChange={handleTopControlPanelChange}
   />
   {#await MultibandCompressorControlsPromise then ControlsModule}
     <canvas
       use:renderMultibandCompressor={ControlsModule.MultibandCompressorControls}
       width={500}
-      height={800}
-      style="min-width: 500px; min-height: 800px"
+      height={930}
+      style="min-width: 500px; min-height: 930px"
     />
   {/await}
 

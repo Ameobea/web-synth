@@ -32,6 +32,7 @@ static mut SCRATCH: [(f32, f32); 8192] = [(0.0, 0.0); 8192];
 fn scratch() -> &'static mut [(f32, f32); 8192] { ref_static_mut!(SCRATCH) }
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
 }

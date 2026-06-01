@@ -4,6 +4,7 @@ use common::ref_static_mut;
 use waveform_renderer::WaveformRendererCtx;
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn log_err(s: *const u8, len: usize);
 }

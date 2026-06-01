@@ -30,6 +30,11 @@ const config = {
         },
       },
       {
+        test: /init-composition\.json$/,
+        type: 'javascript/auto',
+        use: [path.resolve(__dirname, 'webpack-loaders/json-as-parsed-string-loader.js')],
+      },
+      {
         test: /\.m?js/,
         resolve: {
           fullySpecified: false,

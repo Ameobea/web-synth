@@ -9,9 +9,9 @@ import { delay } from 'src/util';
 import * as PIXI from './pixi';
 import type { FederatedPointerEvent } from '@pixi/events';
 
-const MARGIN_TOP_PX = 122;
+const MARGIN_TOP_PX = 152;
 const COMPRESSOR_CONTROLS_HEIGHT_PX = 120;
-const COMPRESSOR_MARGIN_PX = 140;
+const COMPRESSOR_MARGIN_PX = 168;
 const COMPRESSOR_BG_COLOR = 0x141414;
 
 const MIN_VALUE_DB = -60;

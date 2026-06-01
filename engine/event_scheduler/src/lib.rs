@@ -5,6 +5,7 @@ use float_ord::FloatOrd;
 use heapless::binary_heap::{BinaryHeap, Min};
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn run_callback(cb_id: i32);
 

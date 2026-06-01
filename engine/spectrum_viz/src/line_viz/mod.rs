@@ -7,6 +7,7 @@ pub(self) mod conf;
 pub(crate) mod cubic_spline;
 pub(self) mod viz;
 
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
   fn log_info(ptr: *const u8, len: usize);

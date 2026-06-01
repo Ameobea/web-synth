@@ -100,6 +100,11 @@ export const get_equalizer_audio_connectables = (stateKey: string): AudioConnect
   return ctx.inst.buildAudioConnectables();
 };
 
+export const getEqualizerInstance = (vcId: string): EqualizerInstance | undefined =>
+  EqualizerCtxById.get(vcId)?.inst;
+
+export const listEqualizerVcIds = (): string[] => [...EqualizerCtxById.keys()];
+
 export const hide_equalizer = (stateKey: string) => {
   mkContainerHider(getEqualizerDOMElementId)(stateKey);
 

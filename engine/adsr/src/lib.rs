@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked, array_windows)]
+#![feature(get_mut_unchecked)]
 
 use std::rc::Rc;
 
@@ -10,6 +10,7 @@ pub mod managed_adsr;
 #[cfg(test)]
 mod tests;
 
+#[link(wasm_import_module = "env")]
 extern "C" {
   pub fn debug1(v1: f32, v2: f32, v3: f32);
 }
@@ -365,7 +366,7 @@ impl Adsr {
     let mut prev_step_opt: Option<&AdsrStep> = None;
     let mut next_step_opt: Option<&AdsrStep> = self.steps.get(0);
     let mut next_step_ix = 0usize;
-    let buf = Rc::get_mut(&mut self.rendered).unwrap();
+    let buf = unsafe { Rc::get_mut_unchecked(&mut self.rendered) };
 
     for i in 0..RENDERED_BUFFER_SIZE {
       let phase = i as f32 / RENDERED_BUFFER_SIZE as f32;

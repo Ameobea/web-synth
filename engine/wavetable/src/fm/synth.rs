@@ -26,6 +26,7 @@ use super::{
 };
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   pub(crate) fn log_panic(ptr: *const u8, len: usize);
 

@@ -14,7 +14,8 @@ import CompressorSmallView from './CompressorSmallView.svelte';
 import type { LGraphNode } from 'litegraph.js';
 
 export interface CompressorBandState {
-  gain: number;
+  pre_gain: number;
+  post_gain: number;
   bottom_ratio: number;
   top_ratio: number;
   attack_ms: number;
@@ -23,6 +24,12 @@ export interface CompressorBandState {
   top_threshold: number;
   mix: number;
 }
+
+const DEFAULT_POST_GAIN = {
+  low: 3.273406948788382,
+  mid: 1.9275249131909362,
+  high: 3.273406948788382,
+} as const;
 
 export interface CompressorNodeUIState {
   preGain: number;
@@ -37,13 +44,13 @@ export interface CompressorNodeUIState {
   sab: Float32Array | null;
   bypass: boolean;
   mix: number;
-  lowLatencyMode: boolean;
+  lookaheadMs: number;
+  backwardsRampLookahead: boolean;
 }
 
-const DEFAULT_LOOKAHEAD_SAMPLES = SAMPLE_RATE / 10 / 3;
-
 const buildDefaultCompressorBandState = (band: 'low' | 'mid' | 'high'): CompressorBandState => ({
-  gain: 1,
+  pre_gain: 1,
+  post_gain: DEFAULT_POST_GAIN[band],
   bottom_ratio: { low: 1, mid: 1, high: 1 }[band],
   top_ratio: { low: 444, mid: 66.7, high: 66.7 }[band],
   attack_ms: 3,
@@ -66,7 +73,8 @@ export const buildDefaultCompressorNodeUIState = (): CompressorNodeUIState => ({
   sab: null,
   bypass: false,
   mix: 1,
-  lowLatencyMode: false,
+  lookaheadMs: 0,
+  backwardsRampLookahead: false,
 });
 
 const CompressorWasmBytes = new AsyncOnce(
@@ -96,9 +104,12 @@ export class CompressorNode implements ForeignNode {
   private mix: OverridableAudioParam | DummyNode = new DummyNode();
   private preGain: OverridableAudioParam | DummyNode = new DummyNode();
   private postGain: OverridableAudioParam | DummyNode = new DummyNode();
-  private lowBandGain: OverridableAudioParam | DummyNode = new DummyNode();
-  private midBandGain: OverridableAudioParam | DummyNode = new DummyNode();
-  private highBandGain: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandPreGain: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandPreGain: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandPreGain: OverridableAudioParam | DummyNode = new DummyNode();
+  private lowBandPostGain: OverridableAudioParam | DummyNode = new DummyNode();
+  private midBandPostGain: OverridableAudioParam | DummyNode = new DummyNode();
+  private highBandPostGain: OverridableAudioParam | DummyNode = new DummyNode();
   private lowBandAttackMs: OverridableAudioParam | DummyNode = new DummyNode();
   private midBandAttackMs: OverridableAudioParam | DummyNode = new DummyNode();
   private highBandAttackMs: OverridableAudioParam | DummyNode = new DummyNode();
@@ -119,6 +130,7 @@ export class CompressorNode implements ForeignNode {
   private highBandTopRatio: OverridableAudioParam | DummyNode = new DummyNode();
   private knee: OverridableAudioParam | DummyNode = new DummyNode();
   private lookaheadMs: OverridableAudioParam | DummyNode = new DummyNode();
+  private backwardsRampLookahead: OverridableAudioParam | DummyNode = new DummyNode();
 
   static typeName = 'Multi Compressor';
   public nodeType = 'customAudio/compressor';
@@ -200,21 +212,39 @@ export class CompressorNode implements ForeignNode {
     this.mix = new OverridableAudioParam(ctx, params.get('mix')!, undefined, true);
     this.preGain = new OverridableAudioParam(ctx, params.get('pre_gain')!, undefined, true);
     this.postGain = new OverridableAudioParam(ctx, params.get('post_gain')!, undefined, true);
-    this.lowBandGain = new OverridableAudioParam(
+    this.lowBandPreGain = new OverridableAudioParam(
       ctx,
-      params.get('low_band_gain')!,
+      params.get('low_band_pre_gain')!,
       undefined,
       true
     );
-    this.midBandGain = new OverridableAudioParam(
+    this.midBandPreGain = new OverridableAudioParam(
       ctx,
-      params.get('mid_band_gain')!,
+      params.get('mid_band_pre_gain')!,
       undefined,
       true
     );
-    this.highBandGain = new OverridableAudioParam(
+    this.highBandPreGain = new OverridableAudioParam(
       ctx,
-      params.get('high_band_gain')!,
+      params.get('high_band_pre_gain')!,
+      undefined,
+      true
+    );
+    this.lowBandPostGain = new OverridableAudioParam(
+      ctx,
+      params.get('low_band_post_gain')!,
+      undefined,
+      true
+    );
+    this.midBandPostGain = new OverridableAudioParam(
+      ctx,
+      params.get('mid_band_post_gain')!,
+      undefined,
+      true
+    );
+    this.highBandPostGain = new OverridableAudioParam(
+      ctx,
+      params.get('high_band_post_gain')!,
       undefined,
       true
     );
@@ -328,6 +358,12 @@ export class CompressorNode implements ForeignNode {
     );
     this.knee = new OverridableAudioParam(ctx, params.get('knee')!, undefined, true);
     this.lookaheadMs = new OverridableAudioParam(ctx, params.get('lookahead_ms')!, undefined, true);
+    this.backwardsRampLookahead = new OverridableAudioParam(
+      ctx,
+      params.get('backwards_ramp_lookahead')!,
+      undefined,
+      true
+    );
 
     const state = get(this.store);
     this.awpHandle.port.postMessage({ type: 'setBypassed', bypass: state.bypass });
@@ -345,9 +381,18 @@ export class CompressorNode implements ForeignNode {
     (this.mix as OverridableAudioParam).manualControl.offset.value = newState.mix;
     (this.preGain as OverridableAudioParam).manualControl.offset.value = newState.preGain;
     (this.postGain as OverridableAudioParam).manualControl.offset.value = newState.postGain;
-    (this.lowBandGain as OverridableAudioParam).manualControl.offset.value = newState.low.gain;
-    (this.midBandGain as OverridableAudioParam).manualControl.offset.value = newState.mid.gain;
-    (this.highBandGain as OverridableAudioParam).manualControl.offset.value = newState.high.gain;
+    (this.lowBandPreGain as OverridableAudioParam).manualControl.offset.value =
+      newState.low.pre_gain;
+    (this.midBandPreGain as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.pre_gain;
+    (this.highBandPreGain as OverridableAudioParam).manualControl.offset.value =
+      newState.high.pre_gain;
+    (this.lowBandPostGain as OverridableAudioParam).manualControl.offset.value =
+      newState.low.post_gain;
+    (this.midBandPostGain as OverridableAudioParam).manualControl.offset.value =
+      newState.mid.post_gain;
+    (this.highBandPostGain as OverridableAudioParam).manualControl.offset.value =
+      newState.high.post_gain;
     (this.lowBandAttackMs as OverridableAudioParam).manualControl.offset.value =
       newState.low.attack_ms;
     (this.midBandAttackMs as OverridableAudioParam).manualControl.offset.value =
@@ -385,9 +430,9 @@ export class CompressorNode implements ForeignNode {
     (this.highBandTopRatio as OverridableAudioParam).manualControl.offset.value =
       newState.high.top_ratio;
     (this.knee as OverridableAudioParam).manualControl.offset.value = newState.kneeDb ?? 6;
-    (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lowLatencyMode
-      ? samplesToMs(DEFAULT_LOOKAHEAD_SAMPLES / 2.5)
-      : samplesToMs(DEFAULT_LOOKAHEAD_SAMPLES);
+    (this.lookaheadMs as OverridableAudioParam).manualControl.offset.value = newState.lookaheadMs;
+    (this.backwardsRampLookahead as OverridableAudioParam).manualControl.offset.value =
+      newState.backwardsRampLookahead ? 1 : 0;
   };
 
   private deserialize(params: CompressorNodeUIState) {
@@ -395,32 +440,37 @@ export class CompressorNode implements ForeignNode {
       return;
     }
 
+    const band = (
+      b: Partial<CompressorBandState> | undefined,
+      side: 'low' | 'mid' | 'high'
+    ): CompressorBandState => {
+      const d = buildDefaultCompressorBandState(side);
+      return {
+        ...d,
+        ...b,
+        pre_gain: b?.pre_gain ?? (b as any)?.gain ?? d.pre_gain,
+        post_gain: b?.post_gain ?? DEFAULT_POST_GAIN[side],
+      };
+    };
     this.store.set({
       ...params,
-      high: {
-        ...params.high,
-        bottom_threshold: params.high.bottom_threshold ?? -34,
-        top_threshold: params.high.top_threshold ?? -24,
-        mix: params.high.mix ?? 1,
-      },
-      mid: {
-        ...params.mid,
-        bottom_threshold: params.mid.bottom_threshold ?? -34,
-        top_threshold: params.mid.top_threshold ?? -24,
-        mix: params.mid.mix ?? 1,
-      },
-      low: {
-        ...params.low,
-        bottom_threshold: params.low.bottom_threshold ?? -34,
-        top_threshold: params.low.top_threshold ?? -24,
-        mix: params.low.mix ?? 1,
-      },
+      high: band(params.high, 'high'),
+      mid: band(params.mid, 'mid'),
+      low: band(params.low, 'low'),
       bottomRatio: params.bottomRatio ?? 0.2,
       topRatio: params.topRatio ?? 12,
       kneeDb: params.kneeDb ?? 0,
       sab: null,
       mix: params.mix ?? 1,
-      lowLatencyMode: params.lowLatencyMode ?? false,
+      lookaheadMs:
+        params.lookaheadMs ??
+        // legacy back-compat
+        ((params as any).lowLatencyMode === true
+          ? samplesToMs(SAMPLE_RATE / 25)
+          : (params as any).lowLatencyMode === false
+            ? samplesToMs(SAMPLE_RATE / 10 / 3)
+            : 0),
+      backwardsRampLookahead: params.backwardsRampLookahead ?? false,
     });
   }
 

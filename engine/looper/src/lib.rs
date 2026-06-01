@@ -1,6 +1,7 @@
 use float_ord::FloatOrd;
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn play_note(module_ix: usize, note: u8);
 

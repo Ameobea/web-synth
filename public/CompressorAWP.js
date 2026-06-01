@@ -28,25 +28,25 @@ class CompressorAWP extends AudioWorkletProcessor {
         maxValue: 20,
       },
       {
-        name: 'low_band_gain',
+        name: 'low_band_pre_gain',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 20,
       },
       {
-        name: 'mid_band_gain',
+        name: 'mid_band_pre_gain',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 20,
       },
       {
-        name: 'high_band_gain',
+        name: 'high_band_pre_gain',
         defaultValue: 0,
         automationRate: 'k-rate',
         minValue: 0,
-        maxValue: 1000,
+        maxValue: 20,
       },
       {
         name: 'low_band_attack_ms',
@@ -175,6 +175,27 @@ class CompressorAWP extends AudioWorkletProcessor {
         maxValue: 1024,
       },
       {
+        name: 'low_band_post_gain',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 20,
+      },
+      {
+        name: 'mid_band_post_gain',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 20,
+      },
+      {
+        name: 'high_band_post_gain',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 20,
+      },
+      {
         name: 'knee',
         defaultValue: 0,
         automationRate: 'k-rate',
@@ -187,6 +208,13 @@ class CompressorAWP extends AudioWorkletProcessor {
         automationRate: 'k-rate',
         minValue: 0,
         maxValue: 100,
+      },
+      {
+        name: 'backwards_ramp_lookahead',
+        defaultValue: 0,
+        automationRate: 'k-rate',
+        minValue: 0,
+        maxValue: 1,
       },
     ];
   }
@@ -293,9 +321,9 @@ class CompressorAWP extends AudioWorkletProcessor {
     const mix = params.mix[0];
     const preGain = params.pre_gain[0];
     const postGain = params.post_gain[0];
-    const lowBandGain = params.low_band_gain[0];
-    const midBandGain = params.mid_band_gain[0];
-    const highBandGain = params.high_band_gain[0];
+    const lowBandPreGain = params.low_band_pre_gain[0];
+    const midBandPreGain = params.mid_band_pre_gain[0];
+    const highBandPreGain = params.high_band_pre_gain[0];
     const lowBandAttackMs = params.low_band_attack_ms[0];
     const lowBandReleaseMs = params.low_band_release_ms[0];
     const midBandAttackMs = params.mid_band_attack_ms[0];
@@ -314,18 +342,21 @@ class CompressorAWP extends AudioWorkletProcessor {
     const lowBandTopRatio = params.low_band_top_ratio[0];
     const midBandTopRatio = params.mid_band_top_ratio[0];
     const highBandTopRatio = params.high_band_top_ratio[0];
+    const lowBandPostGain = params.low_band_post_gain[0];
+    const midBandPostGain = params.mid_band_post_gain[0];
+    const highBandPostGain = params.high_band_post_gain[0];
     const knee = params.knee[0];
-    console.log({ knee });
-    const lookaheadSamples = Math.floor(params.lookahead_ms[0] * 0.001 * SAMPLE_RATE);
+    const lookaheadSamples = Math.round((params.lookahead_ms[0] * SAMPLE_RATE) / 1000);
+    const backwardsRampLookahead = params.backwards_ramp_lookahead[0] > 0.5 ? 1 : 0;
 
     this.wasmInstance.exports.process_compressor(
       this.ctxPtr,
       mix,
       preGain,
       postGain,
-      lowBandGain,
-      midBandGain,
-      highBandGain,
+      lowBandPreGain,
+      midBandPreGain,
+      highBandPreGain,
       lowBandAttackMs,
       lowBandReleaseMs,
       midBandAttackMs,
@@ -345,7 +376,11 @@ class CompressorAWP extends AudioWorkletProcessor {
       midBandTopRatio,
       highBandTopRatio,
       knee,
-      lookaheadSamples
+      lowBandPostGain,
+      midBandPostGain,
+      highBandPostGain,
+      lookaheadSamples,
+      backwardsRampLookahead
     );
 
     const outputBuffer = wasmMemory.subarray(

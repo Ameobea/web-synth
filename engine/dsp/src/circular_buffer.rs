@@ -38,6 +38,14 @@ impl<const LENGTH: usize> CircularBuffer<LENGTH> {
     }
   }
 
+  /// Overwrites the slot at `head + ix` (`ix <= 0`) without advancing the head.
+  #[inline]
+  pub fn set_at(&mut self, ix: isize, val: f32) {
+    debug_assert!(ix <= 0);
+    let ix = (self.head as isize + ix).rem_euclid(LENGTH as isize) as usize;
+    self.buffer[ix] = val;
+  }
+
   #[inline]
   pub fn read_interpolated(&self, sample_ix: f32) -> f32 {
     if cfg!(debug_assertions) {

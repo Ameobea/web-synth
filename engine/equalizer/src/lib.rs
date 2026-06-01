@@ -10,6 +10,7 @@ use dsp::{
 use num_traits::{Float, FloatConst};
 
 #[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn log_err(ptr: *const u8, len: usize);
 }
@@ -681,86 +682,84 @@ pub extern "C" fn equalizer_compute_responses(
     return;
   }
 
-  let mut responses = ctx.bands.iter().map(|band| {
-    match &band.inner {
-      EqualizerBandInner::Dynabandpass {
-        center_freq,
-        bandwidth,
-        ..
-      } => {
-        let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
-          Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
-          _ => *center_freq,
-        };
-        let maybe_automated_bandwidth = match band.param_overrides.q.as_opt() {
-          Some(q_ix) if use_automated_params => {
-            let q_db = ctx.automation_bufs[q_ix][0] as f64;
-            dynabandpass_q_to_bandwidth(q_db)
-          },
-          _ => *bandwidth,
-        };
+  let mut responses = ctx.bands.iter().map(|band| match &band.inner {
+    EqualizerBandInner::Dynabandpass {
+      center_freq,
+      bandwidth,
+      ..
+    } => {
+      let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
+        Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
+        _ => *center_freq,
+      };
+      let maybe_automated_bandwidth = match band.param_overrides.q.as_opt() {
+        Some(q_ix) if use_automated_params => {
+          let q_db = ctx.automation_bufs[q_ix][0] as f64;
+          dynabandpass_q_to_bandwidth(q_db)
+        },
+        _ => *bandwidth,
+      };
 
-        DynabandpassFilter::compute_response_grid::<f32>(
-          maybe_automated_freq as f32,
-          maybe_automated_bandwidth as f32,
+      DynabandpassFilter::compute_response_grid::<f32>(
+        maybe_automated_freq as f32,
+        maybe_automated_bandwidth as f32,
+        10.,
+        SAMPLE_RATE,
+        grid_size,
+      )
+    },
+    _ => {
+      let mode = band.inner.get_params().mode;
+      let maybe_automated_q = match band.param_overrides.q.as_opt() {
+        Some(q_ix) if use_automated_params => ctx.automation_bufs[q_ix][0] as f64,
+        _ => band.inner.get_params().q,
+      };
+      let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
+        Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
+        _ => band.inner.get_params().freq,
+      };
+      let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
+        Some(gain_ix) if use_automated_params => ctx.automation_bufs[gain_ix][0] as f64,
+        _ => band.inner.get_params().gain,
+      };
+
+      match &band.inner {
+        EqualizerBandInner::Biquad { .. } => BiquadFilter::compute_response_grid::<f32>(
+          mode,
+          maybe_automated_q,
+          maybe_automated_freq,
+          maybe_automated_gain,
           10.,
-          SAMPLE_RATE,
+          SAMPLE_RATE as f64,
           grid_size,
-        )
-      },
-      _ => {
-        let mode = band.inner.get_params().mode;
-        let maybe_automated_q = match band.param_overrides.q.as_opt() {
-          Some(q_ix) if use_automated_params => ctx.automation_bufs[q_ix][0] as f64,
-          _ => band.inner.get_params().q,
-        };
-        let maybe_automated_freq = match band.param_overrides.freq.as_opt() {
-          Some(freq_ix) if use_automated_params => ctx.automation_bufs[freq_ix][0] as f64,
-          _ => band.inner.get_params().freq,
-        };
-        let maybe_automated_gain = match band.param_overrides.gain.as_opt() {
-          Some(gain_ix) if use_automated_params => ctx.automation_bufs[gain_ix][0] as f64,
-          _ => band.inner.get_params().gain,
-        };
-
-        match &band.inner {
-          EqualizerBandInner::Biquad { .. } => BiquadFilter::compute_response_grid::<f32>(
-            mode,
-            maybe_automated_q,
-            maybe_automated_freq,
-            maybe_automated_gain,
-            10.,
-            SAMPLE_RATE as f64,
-            grid_size,
-          ),
-          EqualizerBandInner::Biquad4 { .. } => compute_chain_response(
-            mode,
-            &ORDER_4_Q_FACTORS,
-            maybe_automated_q,
-            maybe_automated_freq,
-            maybe_automated_gain,
-            grid_size,
-          ),
-          EqualizerBandInner::Biquad8 { .. } => compute_chain_response(
-            mode,
-            &ORDER_8_Q_FACTORS,
-            maybe_automated_q,
-            maybe_automated_freq,
-            maybe_automated_gain,
-            grid_size,
-          ),
-          EqualizerBandInner::Biquad16 { .. } => compute_chain_response(
-            mode,
-            &ORDER_16_Q_FACTORS,
-            maybe_automated_q,
-            maybe_automated_freq,
-            maybe_automated_gain,
-            grid_size,
-          ),
-          EqualizerBandInner::Dynabandpass { .. } => unreachable!(),
-        }
-      },
-    }
+        ),
+        EqualizerBandInner::Biquad4 { .. } => compute_chain_response(
+          mode,
+          &ORDER_4_Q_FACTORS,
+          maybe_automated_q,
+          maybe_automated_freq,
+          maybe_automated_gain,
+          grid_size,
+        ),
+        EqualizerBandInner::Biquad8 { .. } => compute_chain_response(
+          mode,
+          &ORDER_8_Q_FACTORS,
+          maybe_automated_q,
+          maybe_automated_freq,
+          maybe_automated_gain,
+          grid_size,
+        ),
+        EqualizerBandInner::Biquad16 { .. } => compute_chain_response(
+          mode,
+          &ORDER_16_Q_FACTORS,
+          maybe_automated_q,
+          maybe_automated_freq,
+          maybe_automated_gain,
+          grid_size,
+        ),
+        EqualizerBandInner::Dynabandpass { .. } => unreachable!(),
+      }
+    },
   });
 
   let (freqs, mut mags, mut angles) = responses.next().unwrap();
