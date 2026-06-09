@@ -6,7 +6,7 @@ import type { ADSRValues } from 'src/controls/adsr';
 import { type AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequencySmallView.svelte';
+import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/RegateMode';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';

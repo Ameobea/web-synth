@@ -46,7 +46,6 @@ import { connect, removeNode } from 'src/patchNetwork/interface';
 import { SubgraphPortalNode } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
 import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
 import ConfirmReset from 'src/sampler/SamplerUI/ConfirmReset.svelte';
-import type { SveltePropTypesOf } from 'src/svelteUtils';
 import { persistAllVCsAndFCs } from 'src/persistance';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import {
@@ -76,15 +75,11 @@ const confirmAndDeleteSubgraph = async (subgraphID: string) => {
 
   if (!isEmpty) {
     try {
-      await renderSvelteModalWithControls<void, SveltePropTypesOf<typeof ConfirmReset>>(
-        ConfirmReset,
-        true,
-        {
-          message: `Are you sure you want to delete the subgraph "${subgraphName}"?`,
-          cancelMessage: 'Cancel',
-          resetMessage: 'Delete',
-        }
-      );
+      await renderSvelteModalWithControls<void, any>(ConfirmReset, true, {
+        message: `Are you sure you want to delete the subgraph "${subgraphName}"?`,
+        cancelMessage: 'Cancel',
+        resetMessage: 'Delete',
+      });
     } catch (_err) {
       return; // cancelled
     }
@@ -808,7 +803,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
 
   const smallViewDOMId = `graph-editor_${vcId}_small-view-dom-id`;
 
-  const deferredSize = useRef<{ width: number; height: number } | undefined>();
+  const deferredSize = useRef<{ width: number; height: number } | undefined>(undefined);
   useEffect(() => {
     if (!lGraphInstance) {
       return;

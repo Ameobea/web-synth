@@ -65,7 +65,11 @@ class OscilloscopeRendererWorker {
     }
     // TODO: Store separate uint8clampedarray view of memory
     const memoryF32 = this.getWasmMemoryBufferF32();
-    const imageData = new Uint8ClampedArray(memoryF32.buffer, imageDataPtr, imageDataLenBytes);
+    const imageData = new Uint8ClampedArray(
+      memoryF32.buffer as ArrayBuffer,
+      imageDataPtr,
+      imageDataLenBytes
+    );
     // TODO: Only write changed portion of image data
     const imageDataObj = new ImageData(imageData, this.view.width, this.view.height);
     this.ctx.putImageData(imageDataObj, 0, 0);

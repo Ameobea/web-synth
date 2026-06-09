@@ -19,6 +19,8 @@
   $: activeBandFilterType =
     typeof activeBandIx === 'number' ? $instStateStore.bands[activeBandIx].filterType : null;
   $: lineSpectrogramStore = derived(inst.state, state => state.lineSpectrogramUIState);
+  // non-null in any UI-mount path; `init_equalizer` skips the mount in headless
+  $: lineSpectrogram = inst.lineSpectrogram!;
 
   let xAxisContainer: SVGGElement;
   let yAxisContainer: SVGGElement;
@@ -82,7 +84,7 @@
     style={`transform: translate(${EQ_AXIS_MARGIN.left}px, ${EQ_AXIS_MARGIN.top}px);`}
   >
     <LineSpectrogramUi
-      inst={inst.lineSpectrogram}
+      inst={lineSpectrogram}
       store={lineSpectrogramStore}
       forcedWidth={stageWidth}
       forcedHeight={stageHeight}

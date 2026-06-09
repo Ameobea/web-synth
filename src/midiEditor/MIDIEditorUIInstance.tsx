@@ -284,6 +284,10 @@ export default class MIDIEditorUIInstance {
     const linesWithIDs: Note[][] = new Array(newState.lines.length).fill(null).map(() => []);
     for (const { midiNumber, notes } of newState.lines) {
       const lineIx = newState.lines.length - midiNumber;
+      if (lineIx < 0 || lineIx >= newState.lines.length) {
+        console.error(`Invalid midiNumber=${midiNumber} in serialized state; skipping`);
+        continue;
+      }
       for (const { length, startPoint, velocity } of notes) {
         const id = this.wasm.instance.create_note(
           this.wasm.noteLinesCtxPtr,
@@ -293,7 +297,7 @@ export default class MIDIEditorUIInstance {
           0,
           velocity ?? 90
         );
-        linesWithIDs[lineIx].push({ id, startPoint, length });
+        linesWithIDs[lineIx].push({ id, startPoint, length, velocity });
       }
     }
     this.lines = this.buildNoteLines(linesWithIDs);
@@ -821,7 +825,7 @@ export default class MIDIEditorUIInstance {
             note.velocity ?? 90
           );
         } else {
-          note.length += snappedStart - note.startPoint;
+          note.length += note.startPoint - snappedStart;
           note.startPoint = snappedStart;
           wasm.instance.create_note(
             wasm.noteLinesCtxPtr,

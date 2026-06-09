@@ -19,7 +19,7 @@ import { getState } from 'src/redux';
 import { noop } from 'src/util';
 import HamburgerMenuIcon from '../ViewContextManager/Icons/HamburgerMenu.svg';
 import HelpIcon from 'src/misc/HelpIcon';
-import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import TapInBPMSvelte from './TapInBPM.svelte';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 

@@ -8,7 +8,8 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { midiToFrequency } from 'src/util';
-import MidiToFrequencySmallView, { RegateMode } from './MIDIToFrequencySmallView.svelte';
+import MidiToFrequencySmallView from './MIDIToFrequencySmallView.svelte';
+import { RegateMode } from './RegateMode';
 
 export interface MIDIToFrequencyState {
   regateMode: RegateMode;

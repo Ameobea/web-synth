@@ -1,53 +1,9 @@
 <script lang="ts" context="module">
-  export type ControlPanelSetting =
-    | {
-        type: 'range';
-        label: string;
-        min: number;
-        max: number;
-        step?: number;
-        steps?: number;
-        scale?: 'log';
-        initial?: number;
-      }
-    | {
-        type: 'interval';
-        label: string;
-        min: number;
-        max: number;
-        step?: number;
-        initial?: [number, number];
-      }
-    | {
-        type: 'select';
-        label: string;
-        /**
-         * If as a map, it's `label: value`
-         */
-        options: string[] | Record<string, any>;
-        initial?: string | number;
-      }
-    | {
-        type: 'interval';
-        label: string;
-        min: number;
-        max: number;
-        step?: number;
-        initial?: [number, number];
-      }
-    | { type: 'button'; label: string; action: () => void; disabled?: boolean }
-    | { type: 'checkbox'; label: string; initial?: boolean }
-    | { type: 'text'; label: string; initial?: string }
-    | { type: 'custom'; label: string; Comp: React.FC<any>; initial?: any };
-
-  export interface ControlPanelTheme {
-    background1: string;
-    background2: string;
-    background2hover: string;
-    foreground1: string;
-    text1: string;
-    text2: string;
-  }
+  import type {
+    ControlPanelSetting,
+    ControlPanelTheme,
+  } from 'src/controls/SvelteControlPanel/types';
+  export type { ControlPanelSetting, ControlPanelTheme };
 
   const BaseTheme: ControlPanelTheme = {
     background1: 'rgb(35,35,35)',

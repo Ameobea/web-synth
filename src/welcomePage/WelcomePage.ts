@@ -1,10 +1,13 @@
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import WelcomePageWrapper from './WelcomePageWrapper.svelte';
 
 const buildWelcomePageDOMNodeID = (vcId: string) => `welcomePage-${vcId}`;
 
-export const init_welcome_page = (stateKey: string) => {
+export const init_welcome_page = async (stateKey: string) => {
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   const vcId = stateKey.split('_')[1]!;
   const welcomePageBase = document.createElement('div');
   welcomePageBase.id = buildWelcomePageDOMNodeID(vcId);
@@ -15,6 +18,7 @@ export const init_welcome_page = (stateKey: string) => {
 
   document.getElementById('content')!.appendChild(welcomePageBase);
 
+  const { default: WelcomePageWrapper } = await import('./WelcomePageWrapper.svelte');
   mkSvelteContainerRenderHelper({ Comp: WelcomePageWrapper, getProps: () => ({ vcId }) })(
     buildWelcomePageDOMNodeID(vcId)
   );

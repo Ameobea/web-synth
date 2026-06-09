@@ -201,7 +201,7 @@ export function useWindowSize() {
 export function useWhyDidYouUpdate<T extends { [key: string]: any }>(name: string, props: T) {
   // Get a mutable ref object where we can store props ...
   // ... for comparison next time this hook runs.
-  const previousProps = useRef<T | undefined>();
+  const previousProps = useRef<T | undefined>(undefined);
 
   useEffect(() => {
     if (previousProps.current) {

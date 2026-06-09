@@ -3,10 +3,10 @@ import ControlPanel from 'react-control-panel';
 import { get, type Writable } from 'svelte/store';
 
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';
-import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import type { EnvelopeGeneratorState } from 'src/graphEditor/nodes/CustomAudio/EnvelopeGenerator';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
-import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequencySmallView.svelte';
+import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/RegateMode';
 import { samplesToMs } from 'src/util';
 
 interface EnvelopeGeneratorSmallViewProps {

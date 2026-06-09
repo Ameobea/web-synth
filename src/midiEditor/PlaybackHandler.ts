@@ -60,6 +60,9 @@ class RecordingContext {
       const startBeat = noteBox.note.startPoint;
       const newLength = curBeat - startBeat;
       const lineIx = uiInstance.lines.length - midiNumber;
+      if (lineIx < 0 || lineIx >= uiInstance.lines.length) {
+        continue;
+      }
 
       // handle wrapping around when looping
       if (newLength < 0) {
@@ -88,6 +91,9 @@ class RecordingContext {
     }
 
     const lineIx = uiInstance.lines.length - midiNumber;
+    if (lineIx < 0 || lineIx >= uiInstance.lines.length) {
+      return;
+    }
     const canAdd = wasm.instance.check_can_add_note(wasm.noteLinesCtxPtr, lineIx, curBeat, 0.001);
     if (!canAdd) {
       return;
@@ -111,13 +117,17 @@ class RecordingContext {
     }
     const noteBox = uiInstance.allNotesByID.get(noteID);
     if (R.isNil(noteBox)) {
-      console.error(`Not was in down map but didn't exist in all notes mapping; id=${noteID}`);
-      this.downNoteIdsByMIDINumber.delete(noteID);
+      console.error(`Note was in down map but didn't exist in all notes mapping; id=${noteID}`);
+      this.downNoteIdsByMIDINumber.delete(midiNumber);
       return;
     }
     const startBeat = noteBox.note.startPoint;
     const newLength = curBeat - startBeat;
     const lineIx = uiInstance.lines.length - midiNumber;
+    if (lineIx < 0 || lineIx >= uiInstance.lines.length) {
+      this.downNoteIdsByMIDINumber.delete(midiNumber);
+      return;
+    }
     uiInstance.resizeNoteHorizontalEnd(lineIx, startBeat, noteID, startBeat + newLength);
     this.downNoteIdsByMIDINumber.delete(midiNumber);
   }

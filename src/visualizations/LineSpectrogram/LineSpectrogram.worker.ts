@@ -2,7 +2,7 @@ import type { LineSpectrogramWorkerMessage } from 'src/visualizations/LineSpectr
 
 class LineSpectrogramWorker {
   private wasmInstance: WebAssembly.Instance | null = null;
-  private wasmMemoryBufferU8Clamped: Uint8ClampedArray = new Uint8ClampedArray(0);
+  private wasmMemoryBufferU8Clamped: Uint8ClampedArray<ArrayBuffer> = new Uint8ClampedArray(0);
   private notifySABI32: Int32Array | null = null;
   private frequencyDataSABU8: Uint8Array | null = null;
   private canvas: OffscreenCanvas | null = null;
@@ -47,14 +47,14 @@ class LineSpectrogramWorker {
     this.maybeStartAnimationLoop();
   }
 
-  private getWasmMemoryBufferU8Clamped(): Uint8ClampedArray {
+  private getWasmMemoryBufferU8Clamped(): Uint8ClampedArray<ArrayBuffer> {
     if (!this.wasmInstance) {
       throw new Error('Tried to get wasm memory buffer before wasm instance was initialized');
     }
 
     const memory = this.wasmInstance.exports.memory as WebAssembly.Memory;
     if (this.wasmMemoryBufferU8Clamped.buffer !== memory.buffer) {
-      this.wasmMemoryBufferU8Clamped = new Uint8ClampedArray(memory.buffer);
+      this.wasmMemoryBufferU8Clamped = new Uint8ClampedArray(memory.buffer as ArrayBuffer);
     }
     return this.wasmMemoryBufferU8Clamped;
   }

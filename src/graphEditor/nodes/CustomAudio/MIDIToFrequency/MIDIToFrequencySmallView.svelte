@@ -1,8 +1,6 @@
 <script lang="ts" context="module">
-  export enum RegateMode {
-    AnyAttack = 'AnyAttack',
-    NoNotesHeld = 'NoNotesHeld',
-  }
+  import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/RegateMode';
+  export { RegateMode };
 
   const settings: ControlPanelSetting[] = [
     {

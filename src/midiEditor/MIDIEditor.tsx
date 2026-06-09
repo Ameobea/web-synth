@@ -21,6 +21,7 @@ import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce, clamp } from 'src/util';
+import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
 import CollapsedMIDIEditor from 'src/midiEditor/CollapsedMIDIEditor.svelte';
@@ -607,7 +608,7 @@ const MIDIEditorInstanceComp: React.FC<MIDIEditorInstanceCompProps> = ({
         <EditableInstanceNameShim
           left={PIANO_KEYBOARD_WIDTH + 2}
           name={inst.name}
-          setName={newName => parentInstance.uiManager.renameInstance(inst.name, newName)}
+          setName={(newName: string) => parentInstance.uiManager.renameInstance(inst.name, newName)}
         />
         <button
           className='delete-cv-output-button'
@@ -668,14 +669,14 @@ const CVOutputInstanceComp: React.FC<CVOutputInstanceCompProps> = ({ output, par
         name={output.name}
         state={output.state}
         deleteOutput={() => parentInstance.deleteCVOutput(output.name)}
-        setName={newName => parentInstance.renameCVOutput(output.name, newName)}
-        registerInstance={uiInstance => output.registerUIInstance(uiInstance)}
-        setFrozenOutputValue={newFrozenOutputValue =>
+        setName={(newName: string) => parentInstance.renameCVOutput(output.name, newName)}
+        registerInstance={(uiInstance: ADSR2Instance) => output.registerUIInstance(uiInstance)}
+        setFrozenOutputValue={(newFrozenOutputValue: number) =>
           output.backend.setFrozenOutputValue(newFrozenOutputValue)
         }
         view={parentInstance.baseView.store}
         getCursorPosBeats={() => parentInstance.playbackHandler.getCursorPosBeats()}
-        setCursorPosBeats={newCursorPosBeats =>
+        setCursorPosBeats={(newCursorPosBeats: number) =>
           void parentInstance.playbackHandler.setCursorPosBeats(newCursorPosBeats)
         }
         activateDrag={activateDrag}

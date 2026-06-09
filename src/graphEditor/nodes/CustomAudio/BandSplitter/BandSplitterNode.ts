@@ -24,7 +24,6 @@ export default class BandSplitterNode implements ForeignNode {
   private inputGainNode: GainNode;
   private gainParams: [OverridableAudioParam, OverridableAudioParam, OverridableAudioParam];
   private outputGainNodes: [GainNode, GainNode, GainNode];
-  private filterChains: [BiquadFilterNode[], BiquadFilterNode[], BiquadFilterNode[]];
 
   static typeName = 'Band Splitter';
   public nodeType = 'customAudio/bandSplitter';
@@ -56,7 +55,7 @@ export default class BandSplitterNode implements ForeignNode {
       this.deserialize(params);
     }
 
-    this.filterChains = buildBandSplitterPreset().filterGroups.map((group, bandIx) => {
+    buildBandSplitterPreset().filterGroups.forEach((group, bandIx) => {
       const constructedFilters = group.map(params => {
         const filter = new BiquadFilterNode(ctx);
         setFilter(filter, undefined, params, params.frequency);
@@ -66,8 +65,7 @@ export default class BandSplitterNode implements ForeignNode {
       connectFilterChain(constructedFilters);
       this.inputGainNode.connect(constructedFilters[0]);
       constructedFilters[constructedFilters.length - 1].connect(this.outputGainNodes[bandIx]);
-      return constructedFilters;
-    }) as [BiquadFilterNode[], BiquadFilterNode[], BiquadFilterNode[]];
+    });
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: BandSplitterSmallView,

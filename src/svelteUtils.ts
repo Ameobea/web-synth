@@ -207,9 +207,9 @@ export function mkSvelteComponentShim<Props extends Record<string, any>>(
 ) {
   class SvelteComponentShim extends React.Component<Props> {
     private instance: SvelteComponent<Props> | null = null;
-    private container: RefObject<ReactElement<Record<string, never>>>;
+    private container: RefObject<ReactElement<Record<string, never>> | null>;
     private div: ReactElement<{
-      ref: RefObject<ReactElement<Record<string, never>, string | JSXElementConstructor<any>>>;
+      ref: RefObject<ReactElement<Record<string, never>, string | JSXElementConstructor<any>> | null>;
     }>;
 
     constructor(props: Props) {

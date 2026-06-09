@@ -3,7 +3,7 @@ import ControlPanel from 'react-control-panel';
 import type { Writable } from 'svelte/store';
 
 import { renderModalWithControls, renderSvelteModalWithControls } from 'src/controls/Modal';
-import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
 import ConfigureParamSource, { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/Effect';
@@ -204,7 +204,7 @@ const ConfigureWavetableIndex: React.FC<ConfigureWavetableIndexProps> = ({
               bank => bank.name === selectedWavetableName
             );
             try {
-              const newBank = await renderSvelteModalWithControls(
+              const newBank = await renderSvelteModalWithControls<WavetableBank, any>(
                 WavetableConfigurator,
                 undefined,
                 { curPreset: curBank?.preset }

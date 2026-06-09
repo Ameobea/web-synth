@@ -59,10 +59,18 @@ export const buildDefaultEqualizerState = (): EqualizerState => ({
   animateAutomatedParams: true,
 });
 
+/**
+ * In headless mode, the viz worker and `LineSpectrogram` are skipped — no DOM means no
+ * response plot or spectrogram to render. Returns a Comlink-shaped no-op whose methods
+ * all resolve to `null`, which `maybeComputeAndPlotResponse` already handles (line ~346).
+ */
+const makeNoopEqWorker = (): Comlink.Remote<EqualizerWorker> =>
+  new Proxy({}, { get: () => () => Promise.resolve(null) }) as any;
+
 export class EqualizerInstance {
   private ctx: AudioContext;
   public vcId: string;
-  public lineSpectrogram: LineSpectrogram;
+  public lineSpectrogram: LineSpectrogram | null;
   public state: TransparentWritable<EqualizerState>;
   /**
    * Holds the last seen value from the audio thread for each automation slot
@@ -104,26 +112,30 @@ export class EqualizerInstance {
     this.state = rwritable(R.clone(initialState));
     this.bandOANs = initialState.bands.map((_band, bandIx) => this.buildOANsForBand(bandIx));
     this.uiState = uiState;
+    const isHeadless = !!(window as any).isHeadless;
     this.awpHandle = new DummyNode('equalizer');
-    this.worker = Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url)));
+    this.worker = isHeadless
+      ? makeNoopEqWorker()
+      : Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url)));
     this.analyzerNode = ctx.createAnalyser();
     this.analyzerNode.fftSize = LineSpectrogramFFTSize;
     this.analyzerNode.minDecibels = initialState.lineSpectrogramUIState.rangeDb[0];
     this.analyzerNode.maxDecibels = initialState.lineSpectrogramUIState.rangeDb[1];
     this.analyzerNode.smoothingTimeConstant = initialState.lineSpectrogramUIState.smoothingCoeff;
-    this.lineSpectrogram = new LineSpectrogram(
-      initialState.lineSpectrogramUIState,
-      this.analyzerNode
-    );
-    this.unsubscribeUIState = uiState.subscribe(newUIState => {
-      this.maybeComputeAndPlotResponse();
-      this.maybeStartOrStopResponseAnimation();
-      if (newUIState.hidden) {
-        this.lineSpectrogram.stop();
-      } else {
-        this.lineSpectrogram.start();
-      }
-    });
+    this.lineSpectrogram = isHeadless
+      ? null
+      : new LineSpectrogram(initialState.lineSpectrogramUIState, this.analyzerNode);
+    this.unsubscribeUIState = isHeadless
+      ? () => {}
+      : uiState.subscribe(newUIState => {
+          this.maybeComputeAndPlotResponse();
+          this.maybeStartOrStopResponseAnimation();
+          if (newUIState.hidden) {
+            this.lineSpectrogram?.stop();
+          } else {
+            this.lineSpectrogram?.start();
+          }
+        });
 
     this.init();
   }

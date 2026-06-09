@@ -8,7 +8,6 @@ import type { SerializedLooperInstState } from 'src/redux/modules/looper';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry, logError } from 'src/sentry';
-import type { Without } from 'src/util';
 
 const buildURL = (path: string) => `${BACKEND_BASE_URL}${path}`;
 

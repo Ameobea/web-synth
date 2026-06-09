@@ -1,9 +1,6 @@
-import { createRoot, type Root } from 'react-dom/client';
-import { Provider } from 'react-redux';
+import type { Root } from 'react-dom/client';
 
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
-import { store } from '../redux';
-import CompositionSharing from './CompositionSharing';
 
 interface CompositionSharingCtx {
   root: Root;
@@ -13,7 +10,11 @@ const CtxsByVcId: Map<string, CompositionSharingCtx> = new Map();
 
 const buildCompositionSharingDOMNodeID = (vcId: string) => `compositionSharing-${vcId}`;
 
-export const init_composition_sharing = (stateKey: string) => {
+export const init_composition_sharing = async (stateKey: string) => {
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   const vcId = stateKey.split('_')[1]!;
   // Create the base dom node to render the composition sharing interface
   const compositionSharingBase = document.createElement('div');
@@ -24,6 +25,14 @@ export const init_composition_sharing = (stateKey: string) => {
   );
 
   document.getElementById('content')!.appendChild(compositionSharingBase);
+
+  const [{ createRoot }, { Provider }, { store }, { default: CompositionSharing }] =
+    await Promise.all([
+      import('react-dom/client'),
+      import('react-redux'),
+      import('../redux'),
+      import('./CompositionSharing'),
+    ]);
 
   const root = createRoot(compositionSharingBase);
   root.render(

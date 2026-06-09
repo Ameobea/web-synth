@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import ReactControlPanel from 'react-control-panel';
 
 import './RangeInput.css';
-import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
+import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import type { Writable } from 'svelte/store';
 import ResponsePlotSvelte from './ResponsePlot.svelte';
 import { mkSvelteComponentShim } from 'src/svelteUtils';

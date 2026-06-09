@@ -75,6 +75,10 @@ export class ManagedMIDIEditorUIInstance {
     const linesWithIDs: Note[][] = new Array(lines.length).fill(null).map(() => []);
     for (const { midiNumber, notes } of lines) {
       const lineIx = lines.length - midiNumber;
+      if (lineIx < 0 || lineIx >= lines.length) {
+        console.error(`Invalid midiNumber=${midiNumber} in serialized state; skipping`);
+        continue;
+      }
       for (const { length, startPoint, velocity } of notes) {
         const id = wasm.create_note(noteLinesCtxPtr, lineIx, startPoint, length, 0, velocity ?? 90);
         linesWithIDs[lineIx].push({ id, startPoint, length, velocity });

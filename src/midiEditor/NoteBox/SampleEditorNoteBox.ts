@@ -36,7 +36,7 @@ class SampleEditorNoteBoxLabel {
 
 export default class SampleEditorNoteBox extends NoteBox {
   constructor(line: NoteLine, note: Note) {
-    super(line, note);
+    super(line, note, false);
   }
 
   private lastLabelWidthPx = 0;

@@ -19,7 +19,7 @@ import { updateConnectables } from 'src/patchNetwork/interface';
 import { useWindowSize } from 'src/reactUtils';
 import type { Effect } from 'src/redux/modules/effects';
 import { getSentry } from 'src/sentry';
-import { filterNils, type ValueOf, type Without } from 'src/util';
+import { filterNils, type ValueOf } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
 export type FaustEditorReduxStore = ReturnType<

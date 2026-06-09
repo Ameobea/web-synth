@@ -289,7 +289,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
   dispatch,
   voiceTarget,
 }) => {
-  const InputComp = InputCompByTargetType[voiceTarget.type];
+  const InputComp = InputCompByTargetType[voiceTarget.type] as React.FC<any>;
 
   return (
     <div className='voice-input'>

@@ -240,10 +240,11 @@ export default class MIDINoteBox extends NoteBox {
     this.velocityDisplay?.render();
   }
 
-  public destory() {
-    super.destroy();
-
+  public destroy() {
     this.leftDragHandle.destroy();
     this.rightDragHandle.destroy();
+    this.velocityDisplay?.destroy();
+    this.velocityDisplay = null;
+    super.destroy();
   }
 }

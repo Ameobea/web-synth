@@ -2,9 +2,11 @@ import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import { delay, UnreachableError, type IterableValueOf } from 'src/util';
+import { delay, UnreachableError } from 'src/util';
 
-export type BuiltinMIDIInput = IterableValueOf<MIDIAccess['inputs']>;
+export type BuiltinMIDIInput = globalThis.MIDIInput;
+
+type IterableMIDIInputMap = MIDIInputMap & Iterable<[string, globalThis.MIDIInput]>;
 
 /**
  * Processes MIDI events from some hardware MIDI device
@@ -58,7 +60,7 @@ export class MIDIInput {
 
     const input = Option.of(this.selectedInputName)
       .flatMap(inputName => {
-        for (const [, input] of access.inputs) {
+        for (const [, input] of access.inputs as IterableMIDIInputMap) {
           if (input.name === inputName) {
             return Option.of(input);
           }
@@ -68,7 +70,7 @@ export class MIDIInput {
       })
       .getOrElseL(() => {
         // If no input was pre-selected, pick an arbitrary one
-        for (const [, input] of access.inputs) {
+        for (const [, input] of access.inputs as IterableMIDIInputMap) {
           return input;
         }
 
@@ -148,11 +150,13 @@ export class MIDIInput {
   public async getMidiInputNames(): Promise<string[]> {
     if (this.midiAccess) {
       const inputNames: string[] = [];
-      for (const [, input] of this.midiAccess.inputs) {
-        if (input.name.toLowerCase().includes('midi through port')) {
+      for (const [, input] of this.midiAccess.inputs as IterableMIDIInputMap) {
+        if (input.name?.toLowerCase().includes('midi through port')) {
           continue;
         }
-        inputNames.push(input.name);
+        if (input.name) {
+          inputNames.push(input.name);
+        }
       }
       return inputNames;
     }

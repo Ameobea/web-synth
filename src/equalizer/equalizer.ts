@@ -60,6 +60,10 @@ export const init_equalizer = (stateKey: string) => {
   const inst = new EqualizerInstance(ctx, vcId, initialState, uiState);
   EqualizerCtxById.set(vcId, { inst, uiState });
 
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   mkSvelteContainerRenderHelper({
     Comp: EqualizerUI,
     getProps: () => ({ inst }),

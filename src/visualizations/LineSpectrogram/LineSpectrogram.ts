@@ -31,7 +31,7 @@ export class LineSpectrogram {
   private notifySABI32: Int32Array;
   private frequencyDataSAB: SharedArrayBuffer;
   private frequencyDataSABU8: Uint8Array;
-  private frequencyDataBufTemp: Uint8Array;
+  private frequencyDataBufTemp: Uint8Array<ArrayBuffer>;
   private running = false;
   private frameIx = 0;
 

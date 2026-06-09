@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
+import type { RampFn } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import * as PIXI from 'src/controls/pixi';
 import { destroyPIXIApp } from 'src/controls/pixiUtils';
 import {
@@ -304,7 +305,7 @@ class RampHandle {
           left: x,
           onCancel: () => this.closeConfigurator(),
           initialRampFnType: this.endStep.ramper.type,
-          onSubmit: newRampFnType => {
+          onSubmit: (newRampFnType: RampFn['type']) => {
             switch (newRampFnType) {
               case 'bezier': {
                 this.endStep.ramper.type = 'bezier';
@@ -1550,7 +1551,7 @@ export class ADSR2Instance {
             value: this.infiniteMode ? this.renderedRegion.end : this.lengthMs,
           },
           onCancel: () => this.closeStepHandleConfigurator(),
-          onSubmit: newStep => {
+          onSubmit: (newStep: Point) => {
             this.closeStepHandleConfigurator();
             onSubmit(newStep);
           },
