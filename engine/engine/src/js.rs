@@ -174,16 +174,6 @@ extern "C" {
   pub fn get_filter_designer_audio_connectables(vc_id: &str) -> JsValue;
 }
 
-#[wasm_bindgen(raw_module = "./vocalSynthesis/sinsyViewContext")]
-extern "C" {
-  pub fn init_sinsy(state_key: &str);
-  pub fn hide_sinsy(vc_id: &str);
-  pub fn unhide_sinsy(vc_id: &str);
-  pub fn persist_sinsy(state_key: &str);
-  pub fn cleanup_sinsy(state_key: &str);
-  pub fn get_sinsy_audio_connectables(vc_id: &str) -> JsValue;
-}
-
 #[wasm_bindgen(raw_module = "./looper/Looper")]
 extern "C" {
   pub fn init_looper(state_key: &str);

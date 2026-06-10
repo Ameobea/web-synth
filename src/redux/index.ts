@@ -11,7 +11,6 @@ import presetsModule, {
   fetchSynthPresets,
   fetchSynthVoicePresets,
 } from 'src/redux/modules/presets';
-import sinsyModule from 'src/redux/modules/sinsy';
 import viewContextManagerModule from 'src/redux/modules/viewContextManager';
 import type { ValueOf } from 'src/util';
 
@@ -20,7 +19,6 @@ const modules = {
   midiKeyboard: midiKeyboardModule,
   presets: presetsModule,
   controlPanel: controlPanelModule,
-  sinsy: sinsyModule,
 };
 
 export const {

@@ -19,7 +19,7 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ['src/engine.js', 'src/engine_bg.d.ts', '**/*webpack*', 'src/vocalSynthesis'],
+    ignores: ['src/engine.js', 'src/engine_bg.d.ts', '**/*webpack*'],
   },
   ...compat.extends(
     'plugin:@typescript-eslint/recommended',

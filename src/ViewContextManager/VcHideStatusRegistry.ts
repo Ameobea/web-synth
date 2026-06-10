@@ -43,7 +43,7 @@ export const useIsVcHidden = (vcId: string): boolean => {
 
 // TODO: I feel like this would be an actually good use of Runes in Svelte 5
 export const createVcIsHiddenStore = (vcId: string): Readable<boolean> => {
-  const store = writable(getState().viewContextManager.activeViewContextId === vcId);
+  const store = writable(getState().viewContextManager.activeViewContextId !== vcId);
   const cb = (newIsHidden: boolean) => store.set(newIsHidden);
   onMount(() => registerVcHideCb(vcId, cb));
   onDestroy(() => unregisterVcHideCb(vcId, cb));

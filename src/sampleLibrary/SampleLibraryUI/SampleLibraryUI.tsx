@@ -7,8 +7,7 @@ import type { SvelteComponent } from 'svelte';
 
 import Loading from 'src/misc/Loading';
 import EmbeddingBrowserUI from 'src/sampleLibrary/embeddingBrowser/EmbeddingBrowserUI/EmbeddingBrowserUI.svelte';
-import { getIsSampleCached } from 'src/sampleLibrary/sampleCache';
-import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { PlayingSampleManager } from 'src/sampleLibrary/SampleLibraryUI/PlayingSampleManager';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 // import tempEmbedding from '../embeddingBrowser/example-res-3.json';
@@ -30,6 +29,7 @@ interface SampleRowProps extends React.DetailedHTMLProps<
   HTMLDivElement
 > {
   isPlaying: boolean;
+  isCached: boolean;
   togglePlaying: () => void;
   descriptor: SampleDescriptor;
   style?: React.CSSProperties;
@@ -40,13 +40,10 @@ export const SampleRow: React.FC<SampleRowProps> = ({
   style,
   togglePlaying,
   isPlaying,
+  isCached,
   ...rest
 }) => {
   const parsedName = getSampleDisplayName(descriptor);
-  const [isCached, setIsCached] = useState<string>('?');
-  useEffect(() => {
-    getIsSampleCached(descriptor).then(isCached => setIsCached(isCached ? 'Yes' : 'No'));
-  }, [descriptor]);
 
   return (
     <div className='sample-row' {...rest} style={style}>
@@ -55,13 +52,14 @@ export const SampleRow: React.FC<SampleRowProps> = ({
         {parsedName}
       </div>
       <div className='sample-local'>{descriptor.isLocal ? 'Local' : 'Remote'}</div>
-      <div className='sample-cached'>{isCached}</div>
+      <div className='sample-cached'>{isCached ? 'Yes' : 'No'}</div>
     </div>
   );
 };
 
 export interface MkSampleListingRowRendererArgs {
   sampleDescriptors: SampleDescriptor[];
+  cachedHashes: Set<string>;
   playingSampleName: string | null;
   togglePlaying: (descriptor: SampleDescriptor) => void;
   selectedSample: { sample: SampleDescriptor; index: number } | null;
@@ -72,6 +70,7 @@ export interface MkSampleListingRowRendererArgs {
 
 const mkDefaultSampleListingRowRenderer = ({
   sampleDescriptors,
+  cachedHashes,
   playingSampleName,
   togglePlaying,
 }: MkSampleListingRowRendererArgs): ((props: RowComponentProps) => React.ReactElement) => {
@@ -82,6 +81,7 @@ const mkDefaultSampleListingRowRenderer = ({
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
       isPlaying={sampleDescriptors[index].name === playingSampleName}
+      isCached={cachedHashes.has(hashSampleDescriptor(sampleDescriptors[index]))}
       descriptor={sampleDescriptors[index]}
       style={style}
     />
@@ -103,6 +103,7 @@ const SampleSearch: React.FC<SampleSearchProps> = ({ value, onChange }) => (
 
 interface SampleListingProps {
   sampleDescriptors: SampleDescriptor[];
+  cachedHashes: Set<string>;
   mkRowRenderer?: (
     args: MkSampleListingRowRendererArgs
   ) => (props: RowComponentProps) => React.ReactElement;
@@ -116,6 +117,7 @@ interface SampleListingProps {
 
 export const SampleListing: React.FC<SampleListingProps> = ({
   sampleDescriptors,
+  cachedHashes,
   mkRowRenderer = mkDefaultSampleListingRowRenderer,
   height = 800,
   width = 500,
@@ -203,6 +205,7 @@ export const SampleListing: React.FC<SampleListingProps> = ({
     () =>
       mkRowRenderer({
         sampleDescriptors: filteredSamples,
+        cachedHashes,
         playingSampleName,
         togglePlaying: playingSampleManager.current.togglePlaying.bind(
           playingSampleManager.current
@@ -210,7 +213,14 @@ export const SampleListing: React.FC<SampleListingProps> = ({
         selectedSample,
         setSelectedSample,
       }),
-    [filteredSamples, playingSampleName, selectedSample, setSelectedSample, mkRowRenderer]
+    [
+      filteredSamples,
+      cachedHashes,
+      playingSampleName,
+      selectedSample,
+      setSelectedSample,
+      mkRowRenderer,
+    ]
   );
 
   if (R.isEmpty(sampleDescriptors)) {
@@ -271,7 +281,7 @@ interface SelectedSampleState {
 }
 
 const SampleLibraryUI: React.FC = () => {
-  const { includeLocalSamples, setIncludeLocalSamples, allSamples } = useAllSamples();
+  const { includeLocalSamples, setIncludeLocalSamples, allSamples, cachedHashes } = useAllSamples();
 
   const [selectedSample, setSelectedSample] = useState<SelectedSampleState | null>(null);
 
@@ -299,6 +309,7 @@ const SampleLibraryUI: React.FC = () => {
           selectedSample={selectedSample}
           setSelectedSample={setSelectedSample}
           sampleDescriptors={allSamples}
+          cachedHashes={cachedHashes}
         />
 
         {/* TODO: Proper integration */}

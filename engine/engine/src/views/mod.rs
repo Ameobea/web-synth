@@ -12,6 +12,5 @@ pub mod sample_library;
 pub mod sampler;
 pub mod sequencer;
 pub mod signal_analyzer;
-pub mod sinsy;
 pub mod synth_designer;
 pub mod welcome_page;

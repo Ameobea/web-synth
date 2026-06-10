@@ -31,10 +31,10 @@ const ctx = new AudioContext();
 // Web browsers like to disable audio contexts when they first exist to prevent auto-play video/audio ads.
 //
 // We explicitly re-enable it whenever the user does something on the page.
-document.addEventListener('keydown', () => ctx.resume(), { once: true });
-document.addEventListener('mousedown', () => ctx.resume(), { once: true });
-document.addEventListener('touchstart', () => ctx.resume(), { once: true });
-document.addEventListener('touchend', () => ctx.resume(), { once: true });
+document.addEventListener('keydown', () => ctx.resume(), { once: true, capture: true });
+document.addEventListener('mousedown', () => ctx.resume(), { once: true, capture: true });
+document.addEventListener('touchstart', () => ctx.resume(), { once: true, capture: true });
+document.addEventListener('touchend', () => ctx.resume(), { once: true, capture: true });
 
 const createViewContextManagerUI = (engine: typeof import('./engine')) => {
   const vcmNode = document.getElementById('view-context-manager');

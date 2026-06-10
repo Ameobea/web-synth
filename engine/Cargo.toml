@@ -14,7 +14,6 @@ members = [
   "noise_gen",
   "distortion",
   "adsr",
-  "note_container",
   "sample_editor",
   "delay",
   "sample_player",

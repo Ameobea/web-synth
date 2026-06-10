@@ -5,6 +5,7 @@ import { derived, get, type Readable, type Writable, writable } from 'svelte/sto
 import { type SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
 import MIDIEditor from 'src/midiEditor/MIDIEditor';
 import { MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
+import type NoteStore from 'src/midiEditor/NoteStore';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import {
@@ -84,6 +85,22 @@ export interface SerializedMIDIEditorState {
   cursorPosBeats: number;
   velocityDisplayEnabled?: boolean;
 }
+
+export const serializeNoteStore = (notes: NoteStore): SerializedMIDILine[] => {
+  const lineCount = notes.lineCount;
+  const out: SerializedMIDILine[] = new Array(lineCount);
+  for (let lineIx = 0; lineIx < lineCount; lineIx++) {
+    out[lineIx] = {
+      midiNumber: lineCount - lineIx,
+      notes: notes.getLine(lineIx).map(n => ({
+        startPoint: n.startPoint,
+        length: n.length,
+        velocity: n.velocity,
+      })),
+    };
+  }
+  return out;
+};
 
 const buildDefaultMIDIEditorInstanceState = (): SerializedMIDIEditorInstance => {
   const maxMIDINumber = 120;

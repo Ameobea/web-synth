@@ -3,20 +3,20 @@ import * as R from 'ramda';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 
-import { listSamples, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
-
-const buildSampleDescriptorKey = (desc: SampleDescriptor): string =>
-  `${desc.id ?? ''}${desc.isLocal}${desc.name}`;
+import {
+  hashSampleDescriptor,
+  listSamples,
+  type SampleDescriptor,
+} from 'src/sampleLibrary/sampleLibrary';
 
 const dedupSampleDescriptors = (descriptors: SampleDescriptor[]): SampleDescriptor[] => {
-  const seenKeys = new Set();
+  const seen = new Set<string>();
   return descriptors.filter(desc => {
-    const key = buildSampleDescriptorKey(desc);
-    const exists = seenKeys.has(key);
-    if (exists) {
+    const key = hashSampleDescriptor(desc);
+    if (seen.has(key)) {
       return false;
     }
-    seenKeys.add(key);
+    seen.add(key);
     return true;
   });
 };
@@ -75,10 +75,21 @@ export const useAllSamples = () => {
     [includeLocalSamples, localSamples, remoteSamples, cachedSamples]
   );
 
+  const cachedHashes = useMemo(
+    () =>
+      new Set(
+        cachedSamples && typeof cachedSamples !== 'string'
+          ? cachedSamples.map(hashSampleDescriptor)
+          : []
+      ),
+    [cachedSamples]
+  );
+
   return {
     includeLocalSamples,
     setIncludeLocalSamples,
     allSamples,
+    cachedHashes,
   };
 };
 

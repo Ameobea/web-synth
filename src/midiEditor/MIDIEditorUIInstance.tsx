@@ -9,60 +9,24 @@ import type {
   SerializedMIDIEditorInstance,
   SerializedMIDILine,
 } from 'src/midiEditor';
+import BackgroundRenderer from 'src/midiEditor/BackgroundRenderer';
 import { BookmarkCursor, Cursor, CursorGutter, LoopCursor } from 'src/midiEditor/Cursor';
+import InteractionManager from 'src/midiEditor/InteractionManager';
 import type { ManagedMIDIEditorUIInstance } from 'src/midiEditor/MIDIEditorUIManager';
-import MIDINoteBox, {
-  type NoteDragHandle,
-  NoteDragHandleSide,
-} from 'src/midiEditor/NoteBox/MIDINoteBox';
-import type { NoteBox } from 'src/midiEditor/NoteBox/NoteBox';
-import NoteLine from 'src/midiEditor/NoteLine';
+import NoteRenderer from 'src/midiEditor/NoteRenderer';
 import PianoKeys from 'src/midiEditor/PianoKeyboard';
-import SelectionBox from 'src/midiEditor/SelectionBox';
-import {
-  getIsVcHidden,
-  registerVcHideCb,
-  unregisterVcHideCb,
-} from 'src/ViewContextManager/VcHideStatusRegistry';
 import * as conf from './conf';
-import type { FederatedPointerEvent } from '@pixi/events';
-import { UnreachableError } from 'src/util';
+import { UnreachableError, clamp } from 'src/util';
 import type { Unsubscribe } from 'redux';
 import { subscribeToConnections, type ConnectionDescriptor } from 'src/redux/modules/vcmUtils';
 import { MIDINode, type MIDINodeMetadata } from 'src/patchNetwork/midiNode';
 import { get } from 'svelte/store';
 import { BookmarkPosBeats } from 'src/eventScheduler';
 
-export interface Note {
-  id: number;
-  startPoint: number;
-  /**
-   * Length of the note in beats
-   */
-  length: number;
-  velocity?: number;
-}
+export type { Note } from 'src/midiEditor/NoteStore';
 
 if (PIXI.settings.RENDER_OPTIONS) {
   PIXI.settings.RENDER_OPTIONS.hello = false;
-}
-
-interface MIDIEditorPanningView {
-  scrollHorizontalBeats: number;
-  scrollVerticalPx: number;
-}
-
-interface DragData {
-  globalStartPoint: PIXI.Point;
-  originalPosBeatsByNoteId: Map<number, number>;
-  startLineIx: number;
-}
-
-interface ResizeData {
-  globalStartPoint: PIXI.Point;
-  side: NoteDragHandleSide;
-  originalPosBeatsByNoteId: Map<number, number>;
-  dragHandlesByNoteID: Map<number, NoteDragHandle>;
 }
 
 const dpr = window.devicePixelRatio ?? 1;
@@ -73,14 +37,17 @@ export default class MIDIEditorUIInstance {
   public parentInstance: MIDIEditorInstance;
   public managedInst: ManagedMIDIEditorUIInstance;
   public app: PIXI.Application;
-  public get wasm() {
-    return this.managedInst.wasm;
+  public get notes() {
+    return this.managedInst.notes;
   }
-  public linesContainer: PIXI.Container;
-  public lines: NoteLine[] = [];
-  public allNotesByID: Map<number, NoteBox> = new Map();
   public selectedNoteIDs: Set<number> = new Set();
   public multiSelectEnabled = false;
+  public selectionBoxButtonDown = false;
+  /** Holds the selection box graphics + line labels; positioned at the note grid's origin */
+  public overlayContainer: PIXI.Container;
+  private backgroundRenderer: BackgroundRenderer;
+  private noteRenderer: NoteRenderer;
+  private interactionManager: InteractionManager;
   private eventHandlerCBs!: {
     keyUp: (evt: KeyboardEvent) => void;
     keyDown: (evt: KeyboardEvent) => void;
@@ -88,12 +55,6 @@ export default class MIDIEditorUIInstance {
     wheel: (evt: WheelEvent) => void;
   };
   private mouseUpCBs: (() => void)[] = [];
-  private panningData: { startPoint: PIXI.Point; startView: MIDIEditorPanningView } | null = null;
-  private resizeData: ResizeData | null = null;
-  private dragData: DragData | null = null;
-  private handlePointerMove: (evt: FederatedPointerEvent) => void;
-  private selectionBox: SelectionBox | null = null;
-  public selectionBoxButtonDown = false;
   public cursor: Cursor;
   private pianoKeys: PianoKeys | undefined;
   private cursorGutter: CursorGutter;
@@ -103,21 +64,14 @@ export default class MIDIEditorUIInstance {
   private clipboard: { startPoint: number; length: number; lineIx: number; velocity: number }[] =
     [];
   public vcId: string;
-  private isHidden: boolean;
-  /**
-   * Used to lazily resize when the instance is unhidden to avoid doing expensive resize work when
-   * the instance is hidden
-   */
-  private deferredSize: { width: number; height: number } | undefined;
   private unsubscribeConnectablesUpdates: Unsubscribe;
   private midiMetadataUnsubscribers: (() => void)[] = [];
   private isUnsubscribingMIDIMetadataListeners = false;
   private connectedOutputMIDINodeMetadataStores: { [outputName: string]: MIDINodeMetadata } = {};
+  private labelsByLineIx: Map<number, PIXI.Text> = new Map();
   private destroyed = false;
-  /**
-   * A cache used by note lines for storing line marker sprites keyed by `${pxPerBeat}-${beatsPerMeasure}`
-   */
-  public markersCache: Map<string, PIXI.Texture> = new Map();
+  private needsRender = true;
+  private notesDirty = true;
 
   private get beatSnapInterval(): number {
     return this.parentInstance.beatSnapInterval;
@@ -154,89 +108,107 @@ export default class MIDIEditorUIInstance {
       eventFeatures: { wheel: false },
     });
 
-    // The default wheel event handler installed by PIXI is passive, and we need to be able to
-    // prevent default on wheel events to support scrolling on elements without scrolling the
-    // page.  So, we override the default event with a custom one that is forced to not be passive.
-    const events = this.app.renderer.events;
-    events.domElement.removeEventListener('wheel', (events as any).onWheel);
-    events.domElement.addEventListener(
-      'wheel',
-      nativeEvent => {
-        const wheelEvent = (events as any).normalizeWheelEvent(nativeEvent);
-        events.rootBoundary.rootTarget = events.renderer.lastObjectRendered as any;
-        events.rootBoundary.mapEvent(wheelEvent);
-      },
-      { passive: false }
-    );
-
     this.handleBookmarkPosBeatsChange(get(BookmarkPosBeats));
     this.unsubBookmarkPosBeatsChanges = BookmarkPosBeats.subscribe(
       this.handleBookmarkPosBeatsChange
     );
 
-    registerVcHideCb(this.vcId, this.onHiddenStatusChanged);
-    this.isHidden = getIsVcHidden(this.vcId);
-    this.onHiddenStatusChanged(this.isHidden);
-
     this.initEventHandlers();
-    this.linesContainer = new PIXI.Container();
-    this.linesContainer.interactive = true;
-    this.linesContainer.interactiveChildren = true;
 
-    this.handlePointerMove = (evt: FederatedPointerEvent) => {
-      this.handlePan(evt);
-      this.handleResize(evt);
-      this.handleDrag(evt);
-      if (this.selectionBox) {
-        this.selectionBox.update(evt.getLocalPosition(this.linesContainer));
-      }
-    };
+    this.backgroundRenderer = new BackgroundRenderer(this);
+    this.noteRenderer = new NoteRenderer(this);
+    this.overlayContainer = new PIXI.Container();
+    this.overlayContainer.x = conf.PIANO_KEYBOARD_WIDTH;
+    this.overlayContainer.y = conf.CURSOR_GUTTER_HEIGHT;
+    this.app.stage.addChild(this.backgroundRenderer);
+    this.app.stage.addChild(this.noteRenderer);
+    this.app.stage.addChild(this.overlayContainer);
+
+    // PIXI's event system owns the piano keyboard strip and cursor gutter; the
+    // InteractionManager owns all pointer handling within the note grid
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.interactive = true;
-    this.app.stage.on('pointermove', this.handlePointerMove);
+    this.interactionManager = new InteractionManager(this);
 
-    this.linesContainer.on('pointerdown', (evt: FederatedPointerEvent) => {
-      if (evt.button === 0) {
-        if (this.selectionBoxButtonDown && !this.selectionBox) {
-          this.selectionBox = new SelectionBox(this, evt.getLocalPosition(this.linesContainer));
-        }
-      } else if (evt.button === 1) {
-        this.startPanning(evt);
-      }
-    });
-
-    this.linesContainer.x = conf.PIANO_KEYBOARD_WIDTH;
-    this.linesContainer.y = conf.CURSOR_GUTTER_HEIGHT;
-    this.app.stage.addChild(this.linesContainer);
-
-    // Cursor gutter
     this.cursorGutter = new CursorGutter(this);
 
     this.cursor = new Cursor(this);
     this.cursor.setPosBeats(parentInstance.getCursorPosBeats());
-    this.app.ticker.add(() => {
-      this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
-      this.parentInstance.playbackHandler?.recordingCtx?.tick();
-    });
+
+    // render-on-demand: unhook the ticker's automatic render and only render when dirty
+    this.app.ticker.remove(this.app.render, this.app);
+    this.app.ticker.add(this.onTick);
 
     this.unsubscribeConnectablesUpdates = subscribeToConnections(this.vcId, newConnections =>
       this.handleConnectionsChanged(newConnections)
     );
 
-    this.init().then(() => {
-      if (this.destroyed) {
-        return;
-      }
-      this.pianoKeys = new PianoKeys(this);
+    this.pianoKeys = new PianoKeys(this);
+    this.app.stage.addChild(this.cursor.graphics);
+    if (this.loopCursor) {
+      this.app.stage.addChild(this.loopCursor.graphics);
+    }
+    if (this.bookmarkCursor) {
+      this.app.stage.addChild(this.bookmarkCursor.graphics);
+    }
 
-      this.app.stage.addChild(this.cursor.graphics);
-      if (this.loopCursor) {
-        this.app.stage.addChild(this.loopCursor.graphics);
-      }
-      if (this.bookmarkCursor) {
-        this.app.stage.addChild(this.bookmarkCursor.graphics);
-      }
-    });
+    this.handleViewChange();
+    this.refreshOnFontLoad();
+  }
+
+  /**
+   * Canvas text rendering neither triggers CSS `@font-face` loading nor re-rasterizes once a
+   * font arrives, so labels rendered before the fonts load get stuck with a fallback font.
+   */
+  private refreshOnFontLoad() {
+    const fonts = ['12px Hack', '13px "IBM Plex Sans"'];
+    if (!document.fonts || fonts.every(font => document.fonts.check(font))) {
+      return;
+    }
+
+    Promise.all(fonts.map(font => document.fonts.load(font)))
+      .then(() => {
+        if (this.destroyed) {
+          return;
+        }
+        for (const text of this.labelsByLineIx.values()) {
+          text.dirty = true;
+        }
+        this.pianoKeys?.destroy();
+        this.pianoKeys = new PianoKeys(this);
+        this.markDirty();
+      })
+      .catch(() => {});
+  }
+
+  private onTick = () => {
+    const oldCursorX = this.cursor.graphics.x;
+    const oldCursorAlpha = this.cursor.graphics.alpha;
+    this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
+    if (this.cursor.graphics.x !== oldCursorX || this.cursor.graphics.alpha !== oldCursorAlpha) {
+      this.markDirty();
+    }
+
+    this.parentInstance.playbackHandler?.recordingCtx?.tick();
+
+    if (this.notesDirty) {
+      this.notesDirty = false;
+      this.noteRenderer.sync();
+    }
+    if (this.needsRender) {
+      this.needsRender = false;
+      this.app.render();
+    }
+  };
+
+  public markDirty() {
+    this.needsRender = true;
+  }
+
+  /** Marks the note instance buffer as stale; it will be re-written from the store next frame */
+  public onNotesChanged() {
+    this.notesDirty = true;
+    this.needsRender = true;
   }
 
   private handleBookmarkPosBeatsChange = (newBookmarkPosBeats: number | null) => {
@@ -254,34 +226,14 @@ export default class MIDIEditorUIInstance {
         this.bookmarkCursor = null;
       }
     }
+    this.markDirty();
   };
 
-  private buildNoteLines = (linesWithIDs: readonly Note[][]): NoteLine[] =>
-    linesWithIDs.map((notes, lineIx) => new NoteLine(this, notes, lineIx));
+  public reInitialize(newState: SerializedMIDIEditorInstance) {
+    this.selectedNoteIDs.clear();
 
-  private async init() {
-    const linesWithIDs = await new Promise<readonly Note[][]>(resolve =>
-      this.managedInst.onWasmLoaded(linesWithIDs => resolve(linesWithIDs))
-    );
-
-    this.lines = this.buildNoteLines(linesWithIDs);
-  }
-
-  public async reInitialize(newState: SerializedMIDIEditorInstance) {
-    if (!this.wasm) {
-      console.error('Tried to re-initialize MIDI editor state before Wasm initialized');
-      return;
-    }
-
-    // Delete all existing notes
-    for (const noteID of this.allNotesByID.keys()) {
-      this.deleteNote(noteID);
-    }
-
-    this.lines.forEach(line => line.destroy());
-    this.wasm.instance.set_line_count(this.wasm.noteLinesCtxPtr, newState.lines.length);
-
-    const linesWithIDs: Note[][] = new Array(newState.lines.length).fill(null).map(() => []);
+    this.notes.clear();
+    this.notes.setLineCount(newState.lines.length);
     for (const { midiNumber, notes } of newState.lines) {
       const lineIx = newState.lines.length - midiNumber;
       if (lineIx < 0 || lineIx >= newState.lines.length) {
@@ -289,35 +241,24 @@ export default class MIDIEditorUIInstance {
         continue;
       }
       for (const { length, startPoint, velocity } of notes) {
-        const id = this.wasm.instance.create_note(
-          this.wasm.noteLinesCtxPtr,
-          lineIx,
-          startPoint,
-          length,
-          0,
-          velocity ?? 90
-        );
-        linesWithIDs[lineIx].push({ id, startPoint, length, velocity });
+        this.notes.addNote(lineIx, startPoint, length, velocity ?? 90);
       }
     }
-    this.lines = this.buildNoteLines(linesWithIDs);
 
     // Destroy + re-create piano notes
     this.pianoKeys?.destroy();
     this.pianoKeys = new PianoKeys(this);
 
     // Adjust the view to match
-    this.parentInstance.baseView.beatsPerMeasure = this.parentInstance.baseView.beatsPerMeasure;
-    this.parentInstance.baseView.pxPerBeat = this.parentInstance.baseView.pxPerBeat;
-    this.parentInstance.baseView.scrollHorizontalBeats =
-      this.parentInstance.baseView.scrollHorizontalBeats;
     this.view.scrollVerticalPx = newState.view.scrollVerticalPx;
+    this.handleMIDIOutputMetadataChange();
     this.handleViewChange();
 
     // Set other misc. state
     this.setLoopPoint(this.parentInstance.playbackHandler.getLoopPoint());
     this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
     this.managedInst.lastSetNoteVelocity = newState.lastSetNoteVelocity ?? 90;
+    this.onNotesChanged();
   }
 
   public pxToBeats(px: number) {
@@ -329,16 +270,11 @@ export default class MIDIEditorUIInstance {
   }
 
   public setSize(width: number, height: number) {
-    // If the instance is hidden, defer running this expensive code until the instance
-    // is unhidden again.  This makes resizing more responsive for other VCs
-    if (this.isHidden) {
-      this.deferredSize = { width, height };
-      return;
-    }
-
     this.width = width;
     this.height = height;
     this.app.renderer.resize(width, height);
+    this.backgroundRenderer.handleResize();
+    this.noteRenderer.handleResize();
 
     this.pianoKeys?.destroy();
     this.pianoKeys = new PianoKeys(this);
@@ -347,6 +283,7 @@ export default class MIDIEditorUIInstance {
     this.app.stage.removeChild(this.cursor.graphics);
     this.cursor.destroy();
     this.cursor = new Cursor(this);
+    this.cursor.setPosBeats(this.parentInstance.getCursorPosBeats());
     this.app.stage.addChild(this.cursor.graphics);
 
     // need to destroy and re-create since the height is different and the
@@ -371,55 +308,20 @@ export default class MIDIEditorUIInstance {
   /**
    * @returns ID of the created note
    */
-  public addNote(
-    lineIx: number,
-    startPoint: number,
-    length: number,
-    velocity: number,
-    NoteBoxClass: typeof NoteBox = MIDINoteBox
-  ): number {
-    if (!this.wasm) {
-      throw new UnreachableError('Tried to create note before Wasm initialized');
-    }
-    const id = this.wasm.instance.create_note(
-      this.wasm.noteLinesCtxPtr,
-      lineIx,
-      startPoint,
-      length,
-      0,
-      velocity
-    );
-    const noteBox = new NoteBoxClass(
-      this.lines[lineIx],
-      { id, startPoint, length, velocity },
-      this.parentInstance.uiManager.velocityDisplayEnabled
-    );
-    this.lines[lineIx].notesByID.set(id, noteBox);
-    this.allNotesByID.set(id, noteBox);
+  public addNote(lineIx: number, startPoint: number, length: number, velocity: number): number {
+    const id = this.notes.addNote(lineIx, startPoint, length, velocity);
     this.selectNote(id);
+    this.onNotesChanged();
     return id;
   }
 
   public deleteNote(id: number) {
+    if (!this.notes.getNote(id)) {
+      throw new UnreachableError(`Tried to delete note with id=${id} but it isn't in the store`);
+    }
     this.selectedNoteIDs.delete(id);
-    const note = this.allNotesByID.get(id);
-    if (!note) {
-      throw new UnreachableError(
-        `Tried to delete note with id=${id} but it wasn't in the all notes map`
-      );
-    }
-    if (!this.wasm) {
-      throw new UnreachableError('Tried to delete note before wasm initialized');
-    }
-    this.wasm.instance.delete_note(
-      this.wasm.noteLinesCtxPtr,
-      note.line.index,
-      note.note.startPoint,
-      note.note.id
-    );
-    note.line.notesByID.delete(id);
-    note.destroy();
-    this.allNotesByID.delete(id);
+    this.notes.deleteNote(id);
+    this.onNotesChanged();
   }
 
   public selectNote(id: number) {
@@ -427,235 +329,83 @@ export default class MIDIEditorUIInstance {
       this.deselectAllNotes();
     }
 
-    const note = this.allNotesByID.get(id);
-    if (!note) {
-      throw new UnreachableError(`Tried to select note id=${id} but no note in map with that id`);
+    if (!this.notes.getNote(id)) {
+      throw new UnreachableError(`Tried to select note id=${id} but no note in store with that id`);
     }
-    note.setIsSelected(true);
     this.selectedNoteIDs.add(id);
+    this.onNotesChanged();
   }
 
   public deselectNote(id: number) {
-    const note = this.allNotesByID.get(id);
-    if (!note) {
-      throw new UnreachableError(`Tried to deselect note id=${id} but no note in map with that id`);
-    }
-    note.setIsSelected(false);
     const wasRemoved = this.selectedNoteIDs.delete(id);
     if (!wasRemoved) {
       console.warn(`Note id=${id} wasn't in the selected notes set when deselecting`);
     }
+    this.onNotesChanged();
   }
 
   public deselectAllNotes() {
-    for (const id of this.selectedNoteIDs) {
-      this.deselectNote(id);
-    }
+    this.selectedNoteIDs.clear();
+    this.onNotesChanged();
   }
 
-  public resizeNoteHorizontalStart(
-    lineIx: number,
-    startPoint: number,
-    id: number,
-    newStartPoint: number
-  ) {
-    const note = this.allNotesByID.get(id);
+  public resizeNoteHorizontalStart(id: number, newStartPoint: number): number {
+    const note = this.notes.getNote(id);
     if (!note) {
-      throw new UnreachableError(
-        `Tried to resize note id=${id} but not found in all notes mapping`
-      );
-    } else if (!this.wasm) {
-      throw new UnreachableError('Tried to resize note before Wasm initialized');
+      throw new UnreachableError(`Tried to resize note id=${id} but not found in store`);
     }
 
-    // Prevent the note from being resized to be too small by forcing its length to remain above
-    // the minimum note size by modifying the desired new start point
-    const endPoint = note.note.startPoint + note.note.length;
+    const endPoint = note.startPoint + note.length;
     const newLengthPx = Math.max(
       this.beatsToPx(endPoint - newStartPoint),
       conf.MIN_DRAWING_NOTE_WIDTH_PX
     );
-    const newLengthBeats = this.pxToBeats(newLengthPx);
-    newStartPoint = endPoint - newLengthBeats;
+    newStartPoint = endPoint - this.pxToBeats(newLengthPx);
 
-    const realNewStartPoint = this.wasm.instance.resize_note_horizontal_start(
-      this.wasm.noteLinesCtxPtr,
-      lineIx,
-      startPoint,
-      id,
-      newStartPoint
-    );
-    note.note.length += note.note.startPoint - realNewStartPoint;
-    note.note.startPoint = realNewStartPoint;
-    note.render();
+    const realNewStartPoint = this.notes.resizeNoteStart(id, newStartPoint);
+    this.onNotesChanged();
     return realNewStartPoint;
   }
 
-  /**
-   * @returns the actual new endpoint of the note after requesting resize
-   */
-  public resizeNoteHorizontalEnd(
-    lineIx: number,
-    startPoint: number,
-    id: number,
-    newEndPoint: number
-  ): number {
-    const note = this.allNotesByID.get(id);
+  public resizeNoteHorizontalEnd(id: number, newEndPoint: number): number {
+    const note = this.notes.getNote(id);
     if (!note) {
-      throw new UnreachableError(
-        `Tried to resize note id=${id} but not found in all notes mapping`
-      );
-    } else if (!this.wasm) {
-      throw new UnreachableError('Tried to resize note before Wasm initialized');
+      throw new UnreachableError(`Tried to resize note id=${id} but not found in store`);
     }
 
-    // Prevent the note from being resized to be too small by forcing its length to remain above
-    // the minimum note size by modifying the desired new end point
+    const startPoint = note.startPoint;
     const newLengthPx = Math.max(
       this.beatsToPx(newEndPoint - startPoint),
       conf.MIN_DRAWING_NOTE_WIDTH_PX
     );
-    const newLengthBeats = this.pxToBeats(newLengthPx);
-    newEndPoint = startPoint + newLengthBeats;
+    newEndPoint = startPoint + this.pxToBeats(newLengthPx);
 
-    const realNewEndPoint = this.wasm.instance.resize_note_horizontal_end(
-      this.wasm.noteLinesCtxPtr,
-      lineIx,
-      startPoint,
-      id,
-      newEndPoint
-    );
-    note.note.length = realNewEndPoint - startPoint;
-    note.render();
+    const realNewEndPoint = this.notes.resizeNoteEnd(id, newEndPoint);
+    this.onNotesChanged();
     return realNewEndPoint;
   }
 
   public setNoteVelocity(noteID: number, newVelocity: number) {
-    const note = this.allNotesByID.get(noteID);
-    if (!note) {
-      throw new UnreachableError(
-        `Tried to set velocity of note id=${noteID} but not found in all notes mapping`
-      );
-    }
-    note.note.velocity = newVelocity;
-    this.wasm!.instance.set_note_velocity(
-      this.wasm!.noteLinesCtxPtr,
-      note.line.index,
-      note.note.startPoint,
-      noteID,
-      newVelocity
-    );
-    note.render();
+    this.notes.setNoteVelocity(noteID, newVelocity);
+    this.onNotesChanged();
   }
 
-  private startPanning(data: FederatedPointerEvent) {
-    this.panningData = {
-      startPoint: data.getLocalPosition(this.linesContainer),
-      startView: {
-        scrollHorizontalBeats: this.parentInstance.baseView.scrollHorizontalBeats,
-        scrollVerticalPx: this.view.scrollVerticalPx,
-      },
-    };
-  }
-
-  private get maxVerticalScrollPx() {
+  public get maxVerticalScrollPx() {
     return Math.max(
-      this.lines.length * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT,
+      this.notes.lineCount * conf.LINE_HEIGHT - this.height + conf.CURSOR_GUTTER_HEIGHT,
       0
     );
-  }
-
-  private handlePan(data: FederatedPointerEvent) {
-    if (!this.panningData) {
-      return;
-    }
-    const newPoint = data.getLocalPosition(this.linesContainer);
-    const xDiffPx = -(newPoint.x - this.panningData.startPoint.x);
-    const yDiffPx = -(newPoint.y - this.panningData.startPoint.y);
-
-    this.view.scrollVerticalPx = R.clamp(
-      0,
-      this.maxVerticalScrollPx,
-      this.panningData.startView.scrollVerticalPx + yDiffPx
-    );
-
-    // This triggers `handleViewChange` on all instances
-    this.parentInstance.setScrollHorizontalBeats(
-      Math.max(this.panningData.startView.scrollHorizontalBeats + this.pxToBeats(xDiffPx), 0)
-    );
-    // this.handleViewChange();
-  }
-
-  private stopPanning() {
-    this.panningData = null;
-  }
-
-  public startResizingSelectedNotes(data: FederatedPointerEvent, side: NoteDragHandleSide) {
-    this.resizeData = {
-      globalStartPoint: data.global.clone(),
-      side,
-      originalPosBeatsByNoteId: new Map(),
-      dragHandlesByNoteID: new Map(),
-    };
-    for (const noteId of this.selectedNoteIDs.values()) {
-      const note = this.allNotesByID.get(noteId);
-      if (!note) {
-        throw new UnreachableError(
-          `Note id ${noteId} is selected but is not in the global mapping`
-        );
-      }
-
-      const originalPosBeats =
-        side === NoteDragHandleSide.Left
-          ? note.note.startPoint
-          : note.note.startPoint + note.note.length;
-      this.resizeData.originalPosBeatsByNoteId.set(noteId, originalPosBeats);
-      const specializedNote = (() => {
-        if (note instanceof MIDINoteBox) {
-          return note as MIDINoteBox;
-        }
-        throw new UnreachableError("Cannot resize notes that don't have drag handles");
-      })();
-      this.resizeData.dragHandlesByNoteID.set(
-        noteId,
-        side === NoteDragHandleSide.Left
-          ? specializedNote.leftDragHandle
-          : specializedNote.rightDragHandle
-      );
-    }
-  }
-
-  private handleResize(data: FederatedPointerEvent) {
-    if (!this.resizeData) {
-      return;
-    }
-
-    for (const noteId of this.selectedNoteIDs.values()) {
-      const note = this.allNotesByID.get(noteId);
-      if (!note) {
-        throw new UnreachableError(
-          `Note id ${noteId} is selected but is not in the global mapping`
-        );
-      }
-      const handle = this.resizeData.dragHandlesByNoteID.get(noteId)!;
-
-      const originalPosBeats = this.resizeData.originalPosBeatsByNoteId.get(noteId);
-      if (R.isNil(originalPosBeats)) {
-        throw new UnreachableError(`No original pos beats recorded for note id ${noteId}`);
-      }
-      handle.handleDrag(this.resizeData.globalStartPoint, data.global, originalPosBeats);
-    }
   }
 
   public copySelection() {
     this.clipboard = [];
     for (const noteID of this.selectedNoteIDs.values()) {
-      const note = this.allNotesByID.get(noteID)!;
+      const note = this.notes.getNote(noteID)!;
       this.clipboard.push({
-        lineIx: note.line.index,
-        startPoint: note.note.startPoint,
-        length: note.note.length,
-        velocity: note.note.velocity ?? 90,
+        lineIx: this.notes.getLineIx(noteID)!,
+        startPoint: note.startPoint,
+        length: note.length,
+        velocity: note.velocity,
       });
     }
   }
@@ -669,32 +419,22 @@ export default class MIDIEditorUIInstance {
   }
 
   public pasteSelection() {
-    if (R.isEmpty(this.clipboard) || !this.wasm) {
+    if (R.isEmpty(this.clipboard)) {
       return;
     }
-    const wasm = this.wasm;
 
     const cursorPosBeats = this.parentInstance.playbackHandler.getCursorPosBeats();
     const startBeat = Math.min(...this.clipboard.map(R.prop('startPoint')));
     const endBeat = Math.max(...this.clipboard.map(note => note.startPoint + note.length));
 
-    // First we deselect all selected notes since we'll be selecting all pasted notes after creating them
     this.deselectAllNotes();
 
     const createdNoteIDs: number[] = [];
-    // Then we create + select all notes
     this.clipboard.forEach(note => {
       const normalizedStartPoint = note.startPoint - startBeat + cursorPosBeats;
-      const canCreate = wasm.instance.check_can_add_note(
-        wasm.noteLinesCtxPtr,
-        note.lineIx,
-        normalizedStartPoint,
-        note.length
-      );
-      if (!canCreate) {
+      if (!this.notes.checkCanAddNote(note.lineIx, normalizedStartPoint, note.length)) {
         return;
       }
-
       const id = this.addNote(note.lineIx, normalizedStartPoint, note.length, note.velocity);
       createdNoteIDs.push(id);
     });
@@ -703,6 +443,12 @@ export default class MIDIEditorUIInstance {
     createdNoteIDs.forEach(id => this.selectNote(id));
     const normalizedEndBeat = endBeat - startBeat + cursorPosBeats;
     this.parentInstance.playbackHandler.setCursorPosBeats(normalizedEndBeat);
+  }
+
+  public clearAllNotes() {
+    this.selectedNoteIDs.clear();
+    this.notes.clear();
+    this.onNotesChanged();
   }
 
   /**
@@ -714,172 +460,65 @@ export default class MIDIEditorUIInstance {
     if (this.beatSnapInterval === 0) {
       return;
     }
-    const wasm = this.wasm;
-    if (!wasm) {
-      return;
-    }
-    const selectedNotesByLineIx: Map<number, NoteBox[]> = new Map();
+    const halfSnap = this.beatSnapInterval / 2;
+    const snap = (b: number) => this.parentInstance.snapBeat(b);
 
-    // Step 1: Perform all operations that shorten notes since those are guarenteed to be conflict-free.
+    // shrink-only pass (conflict-free): move start later, move end earlier
     for (const noteID of this.selectedNoteIDs.values()) {
-      const noteBox = this.allNotesByID.get(noteID)!;
-      const { note, line } = noteBox;
-
-      let entries = selectedNotesByLineIx.get(line.index);
-      if (!entries) {
-        entries = [];
-        selectedNotesByLineIx.set(line.index, entries);
-      }
-      entries.push(noteBox);
-
-      // Ignore notes that are < half the beat snap interval for now since they need special handling
-      if (note.length <= this.beatSnapInterval / 2) {
+      const note = this.notes.getNote(noteID)!;
+      if (note.length <= halfSnap) {
         continue;
       }
-
-      const snappedStart = this.parentInstance.snapBeat(note.startPoint);
+      const snappedStart = snap(note.startPoint);
       if (snappedStart > note.startPoint) {
-        this.resizeNoteHorizontalStart(line.index, note.startPoint, note.id, snappedStart);
+        this.notes.resizeNoteStart(note.id, snappedStart);
       }
-
-      const currentEnd = note.startPoint + note.length;
-      const snappedEnd = this.parentInstance.snapBeat(currentEnd);
-      if (snappedEnd > note.startPoint && snappedEnd < currentEnd) {
-        this.resizeNoteHorizontalEnd(line.index, note.startPoint, note.id, snappedEnd);
+      const curEnd = note.startPoint + note.length;
+      const snappedEnd = snap(curEnd);
+      if (snappedEnd > note.startPoint && snappedEnd < curEnd) {
+        this.notes.resizeNoteEnd(note.id, snappedEnd);
       }
     }
 
-    // Step 2: Move all small notes that are < half the beat snap interval where possible, leaving them in
-    // place in case of conflicts.  We do not change their lengths to avoid them collapsing into zero length.
-    for (const [lineIx, notes] of selectedNotesByLineIx.entries()) {
-      // Sort the notes to make them in order by start beat
-      notes.sort((note1, note2) => note1.note.startPoint - note2.note.startPoint);
-
-      const shortNotes = notes.filter(({ note }) => note.length <= this.beatSnapInterval / 2);
-      shortNotes.forEach(({ note }) => {
-        wasm.instance.delete_note(wasm.noteLinesCtxPtr, lineIx, note.startPoint, note.id);
-        const snappedStart = this.parentInstance.snapBeat(note.startPoint);
-        const canMove = wasm.instance.check_can_add_note(
-          wasm.noteLinesCtxPtr,
-          lineIx,
-          snappedStart,
-          note.length
-        );
-
-        if (!canMove) {
-          // Re-insert the note where it was before in case of conflict
-          wasm.instance.create_note(
-            wasm.noteLinesCtxPtr,
-            lineIx,
-            note.startPoint,
-            note.length,
-            note.id,
-            note.velocity ?? 90
-          );
-          return;
-        }
-
-        // We're good to move the note, so re-insert at the snapped start point
-        note.startPoint = snappedStart;
-        wasm.instance.create_note(
-          wasm.noteLinesCtxPtr,
-          lineIx,
-          snappedStart,
-          note.length,
-          note.id,
-          note.velocity ?? 90
-        );
-      });
-    }
-
-    // Now, we extend notes wherever possible, falling back to leaving them as-is in case of any conflict
+    // small-note move pass: only commit if exact snap fits, else leave in place
     for (const noteID of this.selectedNoteIDs.values()) {
-      const noteBox = this.allNotesByID.get(noteID)!;
-      const { note, line } = noteBox;
-
-      // Ignore notes that are < half the beat snap interval since we've already handled them
-      if (note.length <= this.beatSnapInterval / 2) {
+      const note = this.notes.getNote(noteID)!;
+      if (note.length > halfSnap) {
         continue;
       }
-
-      const snappedStart = this.parentInstance.snapBeat(note.startPoint);
-      const snappedEnd = this.parentInstance.snapBeat(note.startPoint + note.length);
-
-      if (snappedStart < note.startPoint) {
-        wasm.instance.delete_note(wasm.noteLinesCtxPtr, line.index, note.startPoint, note.id);
-        const canMove = wasm.instance.check_can_add_note(
-          wasm.noteLinesCtxPtr,
-          line.index,
-          snappedStart,
-          note.length
-        );
-
-        if (!canMove) {
-          // Re-insert the note where it was before in case of conflict
-          wasm.instance.create_note(
-            wasm.noteLinesCtxPtr,
-            line.index,
-            note.startPoint,
-            note.length,
-            note.id,
-            note.velocity ?? 90
-          );
-        } else {
-          note.length += note.startPoint - snappedStart;
-          note.startPoint = snappedStart;
-          wasm.instance.create_note(
-            wasm.noteLinesCtxPtr,
-            line.index,
-            note.startPoint,
-            note.length,
-            note.id,
-            note.velocity ?? 90
-          );
-        }
+      const snappedStart = snap(note.startPoint);
+      if (snappedStart === note.startPoint) {
+        continue;
       }
-
-      if (snappedEnd > note.startPoint + note.length) {
-        wasm.instance.delete_note(wasm.noteLinesCtxPtr, line.index, note.startPoint, note.id);
-        const newLength = note.length + (snappedEnd - (note.startPoint + note.length));
-        const canMove = wasm.instance.check_can_add_note(
-          wasm.noteLinesCtxPtr,
-          line.index,
-          note.startPoint,
-          newLength
-        );
-
-        if (!canMove) {
-          // Re-insert the note where it was before in case of conflict
-          wasm.instance.create_note(
-            wasm.noteLinesCtxPtr,
-            line.index,
-            note.startPoint,
-            note.length,
-            note.id,
-            note.velocity ?? 90
-          );
-        } else {
-          note.length = newLength;
-          wasm.instance.create_note(
-            wasm.noteLinesCtxPtr,
-            line.index,
-            note.startPoint,
-            note.length,
-            note.id,
-            note.velocity ?? 90
-          );
-        }
+      const original = note.startPoint;
+      const real = this.notes.moveNoteHorizontal(note.id, snappedStart);
+      if (real !== snappedStart) {
+        this.notes.moveNoteHorizontal(note.id, original);
       }
     }
 
-    // Since we manually updated note lengths, re-render everything
-    this.handleViewChange();
+    // extend pass: grow start left / end right where possible (resize already clamps to neighbours)
+    for (const noteID of this.selectedNoteIDs.values()) {
+      const note = this.notes.getNote(noteID)!;
+      if (note.length <= halfSnap) {
+        continue;
+      }
+      const snappedStart = snap(note.startPoint);
+      if (snappedStart < note.startPoint) {
+        this.notes.resizeNoteStart(note.id, snappedStart);
+      }
+      const snappedEnd = snap(note.startPoint + note.length);
+      if (snappedEnd > note.startPoint + note.length) {
+        this.notes.resizeNoteEnd(note.id, snappedEnd);
+      }
+    }
+
+    this.onNotesChanged();
   }
 
   public setVelocityDisplayEnabled(velocityDisplayEnabled: boolean) {
-    this.lines.forEach(line =>
-      line.notesByID.forEach(note => note.setVelocityDisplayEnabled(velocityDisplayEnabled))
-    );
+    this.noteRenderer.setVelocityDisplayEnabled(velocityDisplayEnabled);
+    this.markDirty();
   }
 
   public computeLineIndex(localY: number) {
@@ -887,58 +526,38 @@ export default class MIDIEditorUIInstance {
     return Math.floor(adjustedY / conf.LINE_HEIGHT);
   }
 
-  public startDraggingSelectedNotes(data: FederatedPointerEvent) {
-    const localY = data.getLocalPosition(this.linesContainer).y;
-    this.dragData = {
-      globalStartPoint: data.global.clone(),
-      originalPosBeatsByNoteId: new Map(),
-      startLineIx: this.computeLineIndex(localY),
-    };
-
-    for (const noteId of this.selectedNoteIDs.values()) {
-      const note = this.allNotesByID.get(noteId);
-      if (!note) {
-        throw new UnreachableError(
-          `Note id ${noteId} is selected but is not in the global mapping`
-        );
-      }
-
-      const originalPosBeats = note.note.startPoint;
-      this.dragData.originalPosBeatsByNoteId.set(noteId, originalPosBeats);
-    }
-  }
-
   public gate(lineIx: number, velocity: number) {
     this.parentInstance.gate(this.managedInst.id, lineIx, velocity);
     this.pianoKeys?.setNotePlaying(lineIx, true);
+    this.markDirty();
   }
 
   public onGated(lineIx: number) {
     this.pianoKeys?.setNotePlaying(lineIx, true);
+    this.markDirty();
   }
 
   public onUngated(lineIx: number) {
     this.pianoKeys?.setNotePlaying(lineIx, false);
+    this.markDirty();
   }
 
   public ungate(lineIx: number) {
     this.parentInstance.ungate(this.managedInst.id, lineIx);
     this.pianoKeys?.setNotePlaying(lineIx, false);
+    this.markDirty();
   }
 
   public gateAllSelectedNotes() {
     const gatedVelocitiesByLineIx: Map<number, number> = new Map();
     for (const noteID of this.selectedNoteIDs) {
-      const noteBox = this.allNotesByID.get(noteID)!;
-      const lineIx = noteBox.line.index;
-      if (!gatedVelocitiesByLineIx.has(lineIx)) {
-        gatedVelocitiesByLineIx.set(lineIx, noteBox.note.velocity ?? 90);
-      } else {
-        gatedVelocitiesByLineIx.set(
-          lineIx,
-          Math.max(gatedVelocitiesByLineIx.get(lineIx)!, noteBox.note.velocity ?? 90)
-        );
-      }
+      const note = this.notes.getNote(noteID)!;
+      const lineIx = this.notes.getLineIx(noteID)!;
+      const prev = gatedVelocitiesByLineIx.get(lineIx);
+      gatedVelocitiesByLineIx.set(
+        lineIx,
+        prev === undefined ? note.velocity : Math.max(prev, note.velocity)
+      );
     }
     for (const [lineIx, velocity] of gatedVelocitiesByLineIx) {
       this.gate(lineIx, velocity);
@@ -947,115 +566,11 @@ export default class MIDIEditorUIInstance {
 
   public ungateAllSelectedNotes() {
     const allGatedLineIndices = new Set(
-      [...this.selectedNoteIDs].map(noteId => this.allNotesByID.get(noteId)!.line.index)
+      [...this.selectedNoteIDs].map(noteId => this.notes.getLineIx(noteId)!)
     );
     for (const lineIx of allGatedLineIndices) {
       this.ungate(lineIx);
     }
-  }
-
-  public handleDrag(data: FederatedPointerEvent) {
-    if (!this.dragData) {
-      return;
-    }
-
-    const xDiffPx = data.global.x - this.dragData.globalStartPoint.x;
-    const xDiffBeats = this.pxToBeats(xDiffPx);
-
-    // We first move all of the notes horizontally before attempting any vertical movement
-    for (const noteId of this.selectedNoteIDs.values()) {
-      const note = this.allNotesByID.get(noteId);
-      if (!note) {
-        throw new UnreachableError(`Note id ${noteId} is selected but not in global mapping`);
-      }
-
-      const originalPosBeats = this.dragData.originalPosBeatsByNoteId.get(noteId);
-      if (R.isNil(originalPosBeats)) {
-        throw new UnreachableError(`Note id ${noteId} is selected but not in original pos mapping`);
-      }
-      const newDesiredStartPosBeats = Math.max(
-        this.parentInstance.snapBeat(originalPosBeats + xDiffBeats),
-        0
-      );
-      note.handleDrag(newDesiredStartPosBeats);
-    }
-
-    const newStartLineIndex = this.computeLineIndex(data.getLocalPosition(this.linesContainer).y);
-    const lineDiff = newStartLineIndex - this.dragData.startLineIx;
-    if (lineDiff === 0) {
-      return;
-    }
-
-    // We check to see if *all* of the selected notes can successfully be moved to their new vertical positions
-    // and only move them if there are no conflicts.
-    if (!this.wasm) {
-      throw new UnreachableError('Tried to drag notes before wasm initialized');
-    }
-    const allSelectedNotes: NoteBox[] = [];
-    const ungatedLineIndices: Set<number> = new Set();
-    const gatedLineIndicesToVelocity: Map<number, number> = new Map();
-    for (const noteId of this.selectedNoteIDs.values()) {
-      const note = this.allNotesByID.get(noteId)!;
-      allSelectedNotes.push(note);
-
-      ungatedLineIndices.add(note.line.index);
-      const newLineIndex = note.line.index + lineDiff;
-      const velocity = note.note.velocity ?? 90;
-      const newVelocity = Math.max(gatedLineIndicesToVelocity.get(newLineIndex) ?? 0, velocity);
-      gatedLineIndicesToVelocity.set(newLineIndex, newVelocity);
-      if (newLineIndex < 0 || newLineIndex >= this.lines.length) {
-        return;
-      }
-
-      const canMove = this.wasm.instance.check_can_add_note(
-        this.wasm.noteLinesCtxPtr,
-        newLineIndex,
-        note.note.startPoint,
-        note.note.length
-      );
-      if (!canMove) {
-        return;
-      }
-    }
-    this.dragData.startLineIx = newStartLineIndex;
-
-    for (const lineIx of ungatedLineIndices) {
-      this.ungate(lineIx);
-    }
-    for (const [lineIx, velocity] of gatedLineIndicesToVelocity) {
-      this.gate(lineIx, velocity);
-    }
-
-    // No conflicts, we can move all of them!  However, we need to make sure that we move them in order of
-    // line index to ensure we don't move them into each other.
-    allSelectedNotes.sort((a, b) => {
-      // Return a negative number if first argument is less than second argument
-      const diff = a.line.index - b.line.index;
-      return diff * (lineDiff > 0 ? -1 : 1);
-    });
-    allSelectedNotes.forEach(note => this.moveNoteToLine(note, note.line.index + lineDiff));
-  }
-
-  private moveNoteToLine(note: NoteBox, newLineIx: number) {
-    note.line.container.removeChild(note.graphics);
-    note.line.notesByID.delete(note.note.id);
-    this.wasm!.instance.delete_note(
-      this.wasm!.noteLinesCtxPtr,
-      note.line.index,
-      note.note.startPoint,
-      note.note.id
-    );
-    this.wasm!.instance.create_note(
-      this.wasm!.noteLinesCtxPtr,
-      newLineIx,
-      note.note.startPoint,
-      note.note.length,
-      note.note.id,
-      note.note.velocity ?? 90
-    );
-    note.line = this.lines[newLineIx];
-    note.line.container.addChild(note.graphics);
-    note.line.notesByID.set(note.note.id, note);
   }
 
   public setLoopPoint(loopPoint?: number | null | undefined) {
@@ -1063,6 +578,7 @@ export default class MIDIEditorUIInstance {
       loopPoint ??
         this.parentInstance.getCursorPosBeats() + this.parentInstance.baseView.beatsPerMeasure
     );
+    this.markDirty();
 
     if (this.loopCursor) {
       if (R.isNil(loopPoint)) {
@@ -1083,26 +599,7 @@ export default class MIDIEditorUIInstance {
   }
 
   public serializeLines(): SerializedMIDILine[] {
-    return this.lines.map((line, lineIx) => ({
-      midiNumber: this.lines.length - lineIx,
-      notes: [...line.notesByID.values()]
-        .map(note => ({
-          startPoint: note.note.startPoint,
-          length: note.note.length,
-          velocity: note.note.velocity,
-        }))
-        .filter(note => {
-          if (note.startPoint < 0) {
-            console.error(
-              'Found invalid note with start point < 0 when serializing MIDI lines',
-              note
-            );
-            return false;
-          }
-
-          return true;
-        }),
-    }));
+    return this.managedInst.serializeLines();
   }
 
   public serialize(isExpanded: boolean): SerializedMIDIEditorInstance {
@@ -1121,26 +618,26 @@ export default class MIDIEditorUIInstance {
    * This is passed into Wasm and used export MIDI files.
    */
   public exportToRawNoteDataBuffer(): Uint8Array {
-    const totalNoteCount = this.allNotesByID.size;
+    const totalNoteCount = this.notes.noteCount;
     const rawNoteSizeBytes = 4 + 8 + 8 + 4; // note number, start_beat, length, padding
     const buffer = new Uint8Array(rawNoteSizeBytes * totalNoteCount);
     const u32View = new Uint32Array(buffer.buffer);
     const f64View = new Float64Array(buffer.buffer);
 
     let entryCount = 0;
-    this.lines.forEach((line, lineIx) => {
-      for (const note of line.notesByID.values()) {
+    for (let lineIx = 0; lineIx < this.notes.lineCount; lineIx++) {
+      const midiNumber = this.notes.lineCount - lineIx;
+      for (const note of this.notes.getLine(lineIx)) {
         const u32BufferOffset = entryCount * 6;
-        const midiNumber = this.lines.length - lineIx;
         u32View[u32BufferOffset] = midiNumber;
 
         const f64BufferOffset = entryCount * 3;
-        f64View[f64BufferOffset + 1] = note.note.startPoint;
-        f64View[f64BufferOffset + 2] = note.note.length;
+        f64View[f64BufferOffset + 1] = note.startPoint;
+        f64View[f64BufferOffset + 2] = note.length;
 
         entryCount += 1;
       }
-    });
+    }
 
     return buffer;
   }
@@ -1148,11 +645,14 @@ export default class MIDIEditorUIInstance {
   public handleViewChange() {
     this.view.scrollVerticalPx = R.clamp(0, this.maxVerticalScrollPx, this.view.scrollVerticalPx);
 
-    this.lines.forEach(line => line.handleViewChange());
+    this.backgroundRenderer.handleViewChange();
+    this.noteRenderer.handleViewChange();
+    this.updateLabelPositions();
     this.cursor.handleViewChange();
     this.loopCursor?.handleViewChange();
     this.bookmarkCursor?.handleViewChange();
     this.pianoKeys?.handleViewChange();
+    this.markDirty();
   }
 
   private handleZoom(evt: WheelEvent) {
@@ -1186,10 +686,6 @@ export default class MIDIEditorUIInstance {
   private initEventHandlers() {
     this.eventHandlerCBs = {
       keyDown: (evt: KeyboardEvent) => {
-        if (this.isHidden) {
-          return;
-        }
-
         switch (evt.code) {
           case 'ControlLeft':
           case 'ControlRight': {
@@ -1230,23 +726,17 @@ export default class MIDIEditorUIInstance {
             this.parentInstance.setScrollHorizontalBeats(
               Math.max(this.parentInstance.baseView.scrollHorizontalBeats - 1, 0)
             );
-            this.handleViewChange();
             break;
           }
           case 'ArrowRight': {
             this.parentInstance.setScrollHorizontalBeats(
               this.parentInstance.baseView.scrollHorizontalBeats + 1
             );
-            this.handleViewChange();
             break;
           }
         }
       },
       keyUp: (evt: KeyboardEvent) => {
-        if (this.isHidden) {
-          return;
-        }
-
         if (evt.key === 'Control') {
           this.multiSelectEnabled = false;
         } else if (evt.key === 'Shift') {
@@ -1254,31 +744,12 @@ export default class MIDIEditorUIInstance {
         }
       },
       mouseUp: (evt: MouseEvent) => {
-        if (this.isHidden) {
-          return;
-        }
-
         if (evt.button === 0) {
-          this.mouseUpCBs.forEach(cb => cb());
-          this.mouseUpCBs = [];
-
-          this.resizeData = null;
-          this.dragData = null;
-
-          if (this.selectionBox) {
-            this.selectionBox.destroy();
-            this.selectionBox = null;
-          }
-        } else if (evt.button === 1) {
-          this.stopPanning();
+          this.flushMouseUpCBs();
         }
       },
       wheel: (evt: WheelEvent) => {
-        if (this.isHidden) {
-          return;
-        }
-
-        if (evt.target !== this.app.renderer.view || this.panningData) {
+        if (evt.target !== this.app.renderer.view) {
           return;
         }
 
@@ -1289,11 +760,10 @@ export default class MIDIEditorUIInstance {
 
         let stopPropagation = true;
         if (evt.shiftKey || evt.metaKey) {
-          const maxVerticalScrollPx = Math.max(this.maxVerticalScrollPx, 0);
           this.view.scrollVerticalPx = Math.max(
             0,
             Math.min(
-              maxVerticalScrollPx,
+              this.maxVerticalScrollPx,
               this.view.scrollVerticalPx + evt.deltaY / conf.SCROLL_VERTICAL_FACTOR
             )
           );
@@ -1307,6 +777,13 @@ export default class MIDIEditorUIInstance {
           );
         } else if (evt.ctrlKey) {
           this.handleZoom(evt);
+        } else if (this.parentInstance.uiManager.velocityDisplayEnabled) {
+          const note = this.interactionManager.noteAtCanvasPos(evt.offsetX, evt.offsetY);
+          if (note) {
+            this.setNoteVelocity(note.id, clamp(0, 127, note.velocity - Math.sign(evt.deltaY)));
+          } else {
+            stopPropagation = false;
+          }
         } else {
           stopPropagation = false;
         }
@@ -1327,30 +804,19 @@ export default class MIDIEditorUIInstance {
     this.mouseUpCBs.push(cb);
   }
 
+  public flushMouseUpCBs() {
+    const cbs = this.mouseUpCBs;
+    this.mouseUpCBs = [];
+    cbs.forEach(cb => cb());
+  }
+
   private cleanupEventHandlers() {
     document.removeEventListener('keydown', this.eventHandlerCBs.keyDown);
     document.removeEventListener('keyup', this.eventHandlerCBs.keyUp);
     document.removeEventListener('mouseup', this.eventHandlerCBs.mouseUp);
     document.removeEventListener('wheel', this.eventHandlerCBs.wheel);
-    this.app.stage.off('pointermove', this.handlePointerMove);
     this.unsubBookmarkPosBeatsChanges();
   }
-
-  public onHiddenStatusChanged = (isHidden: boolean) => {
-    this.isHidden = isHidden;
-    if (isHidden) {
-      this.app.ticker.stop();
-    } else {
-      this.app.ticker.start();
-
-      if (this.deferredSize) {
-        if (this.deferredSize.width !== this.width || this.deferredSize.height !== this.height) {
-          this.setSize(this.deferredSize.width, this.deferredSize.height);
-        }
-        this.deferredSize = undefined;
-      }
-    }
-  };
 
   private handleConnectionsChanged = (
     newConnections:
@@ -1394,20 +860,48 @@ export default class MIDIEditorUIInstance {
     }
 
     const labelByLineIx: Map<number, string> = new Map();
-
     for (const metadata of Object.values(this.connectedOutputMIDINodeMetadataStores)) {
       for (const [midiNumber, noteMetadata] of metadata.noteMetadata) {
-        const lineIx = this.lines.length - midiNumber;
+        const lineIx = this.notes.lineCount - midiNumber;
         if (noteMetadata.name && !labelByLineIx.has(lineIx)) {
           labelByLineIx.set(lineIx, noteMetadata.name);
         }
       }
     }
 
-    this.lines.forEach((line, lineIx) => {
-      const label = labelByLineIx.get(lineIx);
-      line.setLabel(label);
-    });
+    for (const [lineIx, text] of [...this.labelsByLineIx.entries()]) {
+      if (!labelByLineIx.has(lineIx)) {
+        this.overlayContainer.removeChild(text);
+        text.destroy();
+        this.labelsByLineIx.delete(lineIx);
+      }
+    }
+    for (const [lineIx, label] of labelByLineIx) {
+      const existing = this.labelsByLineIx.get(lineIx);
+      if (existing) {
+        existing.text = label;
+      } else {
+        const text = new PIXI.Text(label, {
+          fontSize: 12,
+          fill: conf.LINE_LABEL_COLOR,
+          fontFamily: 'Hack',
+        });
+        text.x = 4;
+        this.overlayContainer.addChild(text);
+        this.labelsByLineIx.set(lineIx, text);
+      }
+    }
+
+    this.updateLabelPositions();
+    this.markDirty();
+  }
+
+  private updateLabelPositions() {
+    for (const [lineIx, text] of this.labelsByLineIx) {
+      const y = lineIx * conf.LINE_HEIGHT - this.view.scrollVerticalPx + 1;
+      text.y = y;
+      text.visible = y > -conf.LINE_HEIGHT && y < this.height;
+    }
   }
 
   public destroy() {
@@ -1418,6 +912,7 @@ export default class MIDIEditorUIInstance {
 
     this.destroyed = true;
     this.cleanupEventHandlers();
+    this.interactionManager.destroy();
     this.unsubscribeConnectablesUpdates();
     this.unsubMIDIMetadataListeners();
     try {
@@ -1425,6 +920,5 @@ export default class MIDIEditorUIInstance {
     } catch (err) {
       console.warn('Error destroying MIDI editor PIXI instance: ', err);
     }
-    unregisterVcHideCb(this.vcId, this.onHiddenStatusChanged);
   }
 }

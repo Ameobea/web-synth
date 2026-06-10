@@ -91,11 +91,6 @@ export const ViewContextDescriptors: ViewContextDescriptor[] = [
       'Build-your-own equalizer by composing many biquad filters in series or parallel.  Supports filter parameter modulation.',
   },
   {
-    name: 'sinsy',
-    displayName: 'Sinsy',
-    description: 'DEPRECATED and likely not working experiment with vocal synthesis using Sinsy',
-  },
-  {
     name: 'looper',
     displayName: 'Looper',
     description: 'Supports playback and sequencing of MIDI compositions',

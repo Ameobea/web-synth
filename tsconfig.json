@@ -40,7 +40,6 @@
     "deprecated",
     "backend",
     "faust-compiler",
-    "engine",
-    "src/vocalSynthesis"
+    "engine"
   ]
 }

@@ -19,6 +19,7 @@ import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionMo
 import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
 import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
+import { getIsVcHidden } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
 import { AsyncOnce, clamp } from 'src/util';
 import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';
@@ -399,9 +400,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             return;
           }
 
-          for (const noteId of activeInstance.current.allNotesByID.keys()) {
-            activeInstance.current.deleteNote(noteId);
-          }
+          activeInstance.current.clearAllNotes();
         }}
         title='Clear all notes'
         label='✕'
@@ -619,6 +618,7 @@ const MIDIEditorInstanceComp: React.FC<MIDIEditorInstanceCompProps> = ({
         </button>
       </div>
       <canvas
+        key={`${inst.id}-${inst.uiGen}`}
         ref={canvas => {
           if (!canvas) {
             return;
@@ -627,6 +627,12 @@ const MIDIEditorInstanceComp: React.FC<MIDIEditorInstanceCompProps> = ({
             return;
           }
           lastCanvasRefsByInstID.current[inst.id] = canvas;
+
+          // While the VC is hidden no UI instance exists; one is built against a fresh canvas
+          // (via the uiGen key) when the VC is unhidden
+          if (getIsVcHidden(vcId)) {
+            return;
+          }
 
           parentInstance.uiManager.getUIInstanceByID(inst.id)?.destroy();
           const managedInst = parentInstance.uiManager.getMIDIEditorInstanceByID(inst.id)!;

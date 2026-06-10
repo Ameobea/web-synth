@@ -21,8 +21,8 @@ export interface SampleDescriptor {
   url?: string;
 }
 
-export const hashSampleDescriptor = ({ isLocal, name }: SampleDescriptor): string =>
-  `${isLocal}-${name}`;
+export const hashSampleDescriptor = ({ isLocal, name, id }: SampleDescriptor): string =>
+  `${isLocal}-${name}-${id ?? ''}`;
 
 const GLOBAL_SAMPLE_MANAGER = new SampleManager();
 (window as any).SampleManager = GLOBAL_SAMPLE_MANAGER;
@@ -39,6 +39,10 @@ const traverseDir = async (
   const childDirs: Promise<SampleDescriptor[]>[] = [];
 
   for await (const [, entry] of entries) {
+    if (entry.name.startsWith('.')) {
+      continue;
+    }
+
     if (entry.kind === 'directory') {
       childDirs.push(traverseDir(entry, prefix + entry.name + '/'));
       continue;
@@ -157,26 +161,27 @@ export const getSample = async (descriptor: SampleDescriptor): Promise<AudioBuff
     return buf;
   }
 
-  const activeFetch = ActiveFetchesByHash.get(hashSampleDescriptor(descriptor));
+  const hash = hashSampleDescriptor(descriptor);
+  const activeFetch = ActiveFetchesByHash.get(hash);
   if (activeFetch) {
     return activeFetch;
   }
 
-  const prom = new Promise<AudioBuffer>(async resolve => {
-    // We don't have the sample available, so we load it from its original source
+  const prom = (async () => {
     const sampleData = await (descriptor.isLocal
       ? loadLocalSample(descriptor)
       : loadRemoteSample(descriptor));
     const buf = await ctx.decodeAudioData(sampleData.slice(0));
 
-    // Add it to both levels of cache
     cacheSample(descriptor, sampleData);
     GLOBAL_SAMPLE_MANAGER.setSample(descriptor, buf);
 
-    resolve(buf);
+    return buf;
+  })().finally(() => {
+    ActiveFetchesByHash.delete(hash);
   });
 
-  ActiveFetchesByHash.set(hashSampleDescriptor(descriptor), prom);
+  ActiveFetchesByHash.set(hash, prom);
   return prom;
 };
 

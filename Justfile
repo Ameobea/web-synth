@@ -19,14 +19,6 @@ build-docs:
   rm -rf ./dist/docs
   cp -r ./docs/_layouts/public ./dist/docs
 
-debug-sinsy:
-  cd src/vocalSynthesis && just debug
-  cp src/vocalSynthesis/build/sinsy.* ./public
-
-build-sinsy:
-  # cd src/vocalSynthesis && just build
-  # cp src/vocalSynthesis/build/sinsy.* ./public
-
 fix-litegraph:
   #!/usr/bin/env bash
   set -euxo pipefail
@@ -59,7 +51,6 @@ build-all:
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
 
   cd -
@@ -71,7 +62,6 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
@@ -91,8 +81,6 @@ build-all:
   cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/lfo.wasm ./public
   cp ./engine/build/* ./src
-
-  just build-sinsy
 
   yarn build || npm build
 
@@ -117,14 +105,12 @@ run:
     && cp ./target/wasm32-unknown-unknown/release/*.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/release/note_container.wasm /tmp/wasm \
     && cp ./target/wasm32-unknown-unknown/release/wav_decoder.wasm /tmp/wasm \
     && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/note_container.wasm --browser --remove-producers-section --out-dir ./build \
     && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
 
   cd -
@@ -137,7 +123,6 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/note_container.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
@@ -157,8 +142,6 @@ run:
   cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
   cp ./engine/target/wasm32-unknown-unknown/release/lfo.wasm ./public
 
-  just debug-sinsy
-
   yarn start
 
 run-frontend:
@@ -173,7 +156,7 @@ deploy-headless:
   phost update web-synth-headless-test patch dist/headless
 
 loc:
-  tokei --exclude src/vocalSynthesis/hts_engine_API --exclude src/vocalSynthesis/sinsy .
+  tokei .
 
 debug-engine:
   cd ./engine/engine && cargo build --target wasm32-unknown-unknown && \
@@ -214,16 +197,6 @@ build-midi:
   cd ./engine/midi && cargo build --target wasm32-unknown-unknown && \
     cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/midi.wasm --browser --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/midi* ./src/
-
-build-note-container:
-  cd ./engine/note_container && cargo build --release --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/note_container.wasm --browser --remove-producers-section --out-dir ./engine/build
-  cp ./engine/build/note_container* ./src/
-
-debug-note-container:
-  cd ./engine/note_container && cargo build --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/note_container.wasm --browser --remove-producers-section --out-dir ./engine/build
-  cp ./engine/build/note_container* ./src/
 
 build-granular:
   cd ./engine/granular && cargo build --release --target wasm32-unknown-unknown && \

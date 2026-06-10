@@ -1,16 +1,13 @@
-import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
-
-const buildSampleKey = ({ isLocal, name }: SampleDescriptor): string =>
-  `${isLocal ? 'local' : 'remote'}-${name}`;
+import { hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 
 export default class SampleManager {
   private samples: Map<string, AudioBuffer> = new Map();
 
   public setSample(descriptor: SampleDescriptor, buffer: AudioBuffer) {
-    this.samples.set(buildSampleKey(descriptor), buffer);
+    this.samples.set(hashSampleDescriptor(descriptor), buffer);
   }
 
   public getSample(descriptor: SampleDescriptor): AudioBuffer | undefined {
-    return this.samples.get(buildSampleKey(descriptor));
+    return this.samples.get(hashSampleDescriptor(descriptor));
   }
 }

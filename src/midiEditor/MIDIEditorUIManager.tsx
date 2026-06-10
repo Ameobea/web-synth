@@ -5,6 +5,7 @@ import {
   get_midi_editor_audio_connectables,
   type MIDIEditorInstance,
   type MIDIEditorInstanceView,
+  serializeNoteStore,
   type SerializedMIDIEditorBaseInstance,
   type SerializedMIDIEditorInstance,
   type SerializedMIDIEditorState,
@@ -12,14 +13,12 @@ import {
 } from 'src/midiEditor';
 import { buildDefaultCVOutputState, CVOutput } from 'src/midiEditor/CVOutput/CVOutput';
 import type MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
-import type { Note } from 'src/midiEditor/MIDIEditorUIInstance';
+import NoteStore from 'src/midiEditor/NoteStore';
 import { renderMIDIMinimap } from 'src/midiEditor/Minimap/MinimapRenderer';
 import { connect, updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode, mkBuildPasthroughInputCBs, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
-import { AsyncOnce } from 'src/util';
 import { getState } from 'src/redux';
-
-const NoteContainerWasm = new AsyncOnce(() => import('src/note_container'), true);
+import { registerVcHideCb, unregisterVcHideCb } from 'src/ViewContextManager/VcHideStatusRegistry';
 
 export class ManagedMIDIEditorUIInstance {
   public manager: MIDIEditorUIManager;
@@ -30,17 +29,14 @@ export class ManagedMIDIEditorUIInstance {
   public midiInput: MIDINode;
   public midiOutput: MIDINode;
   public midiInputCBs: MIDIInputCbs;
-  public lines: SerializedMIDILine[];
+  public notes: NoteStore;
   public lastSetNoteVelocity: number;
-  private onWasmInitCBs: ((linesWithIDs: readonly Note[][]) => void)[] = [];
-  public wasm:
-    | {
-        instance: typeof import('src/note_container');
-        noteLinesCtxPtr: number;
-        linesWithIDs: readonly Note[][];
-      }
-    | undefined;
   public renderedMinimap: SVGSVGElement | undefined;
+  /**
+   * Incremented when the VC is unhidden to force React to mount a fresh canvas.  The old canvas
+   * can't be re-used because destroying the PIXI app on hide force-loses its WebGL context.
+   */
+  public uiGen = 0;
 
   constructor(
     manager: MIDIEditorUIManager,
@@ -54,25 +50,15 @@ export class ManagedMIDIEditorUIInstance {
     this.id = id;
     this.name = name;
     this.view = view;
-    this.lines = lines;
     this.lastSetNoteVelocity = lastSetNoteVelocity ?? 90;
     this.midiInputCBs = this.buildInstanceMIDIInputCbs();
 
     this.midiInput = new MIDINode(() => this.midiInputCBs);
     this.midiOutput = new MIDINode();
     this.midiOutput.getInputCbs = mkBuildPasthroughInputCBs(this.midiOutput);
-    // By default, we pass MIDI events through from the input to the output
     this.midiInput.connect(this.midiOutput);
 
-    this.initWasm(lines);
-  }
-
-  public async initWasm(lines: SerializedMIDILine[]) {
-    const wasm = await NoteContainerWasm.get();
-
-    const noteLinesCtxPtr = wasm.create_note_lines(lines.length);
-
-    const linesWithIDs: Note[][] = new Array(lines.length).fill(null).map(() => []);
+    this.notes = new NoteStore(lines.length);
     for (const { midiNumber, notes } of lines) {
       const lineIx = lines.length - midiNumber;
       if (lineIx < 0 || lineIx >= lines.length) {
@@ -80,36 +66,44 @@ export class ManagedMIDIEditorUIInstance {
         continue;
       }
       for (const { length, startPoint, velocity } of notes) {
-        const id = wasm.create_note(noteLinesCtxPtr, lineIx, startPoint, length, 0, velocity ?? 90);
-        linesWithIDs[lineIx].push({ id, startPoint, length, velocity });
+        this.notes.addNote(lineIx, startPoint, length, velocity ?? 90);
       }
     }
 
-    if (this.wasm) {
-      this.wasm.instance.free_note_lines(this.wasm.noteLinesCtxPtr);
+    registerVcHideCb(this.manager.vcId, this.onVcHiddenStatusChanged);
+  }
+
+  /**
+   * The UI instance (PIXI app + GL context) is destroyed while the VC is hidden and rebuilt
+   * against a fresh canvas when it's unhidden.
+   */
+  private onVcHiddenStatusChanged = (isHidden: boolean) => {
+    if (isHidden) {
+      if (this.uiInst) {
+        if (this.manager.activeUIInstance === this.uiInst) {
+          this.manager.activeUIInstance = undefined;
+        }
+        this.uiInst.destroy();
+        this.uiInst = undefined;
+      }
+      return;
     }
 
-    this.wasm = {
-      instance: wasm,
-      noteLinesCtxPtr,
-      linesWithIDs,
-    };
-
-    this.onWasmInitCBs.forEach(cb => cb(linesWithIDs));
-    this.onWasmInitCBs = [];
-  }
-
-  public get lineCount(): number {
-    return this.lines.length;
-  }
-
-  public onWasmLoaded = (cb: (linesWithIDs: readonly Note[][]) => void) => {
-    if (this.wasm) {
-      cb(this.wasm.linesWithIDs);
-    } else {
-      this.onWasmInitCBs.push(cb);
+    const instances = get(this.manager.instances);
+    const wrapper = instances.find(inst => inst.id === this.id);
+    if (wrapper?.isExpanded && !this.uiInst) {
+      this.uiGen += 1;
+      this.manager.instances.set(instances);
     }
   };
+
+  public get lineCount(): number {
+    return this.notes.lineCount;
+  }
+
+  public serializeLines(): SerializedMIDILine[] {
+    return serializeNoteStore(this.notes);
+  }
 
   private buildInstanceMIDIInputCbs = (): MIDIInputCbs => ({
     onAttack: (note, velocity) => {
@@ -154,26 +148,9 @@ export class ManagedMIDIEditorUIInstance {
   public iterNotesWithCB = (
     startBeatInclusive: number | null | undefined,
     endBeatExclusive: number | null | undefined,
-    cb: (
-      isAttack: boolean,
-      lineIx: number,
-      rawBeat: number,
-      noteID: number,
-      velocity: number
-    ) => void
+    cb: (isAttack: boolean, lineIx: number, beat: number, velocity: number) => void
   ) => {
-    if (!this.wasm) {
-      throw new Error('Wasm instance not initialized; cannot get Wasm instance');
-    }
-    const { instance, noteLinesCtxPtr } = this.wasm;
-
-    instance.iter_notes_with_cb(
-      noteLinesCtxPtr,
-      startBeatInclusive ?? 0,
-      endBeatExclusive ?? -1,
-      cb,
-      true
-    );
+    this.notes.iterEvents(startBeatInclusive ?? 0, endBeatExclusive ?? null, cb);
   };
 
   public gate(lineIx: number, velocity: number) {
@@ -191,15 +168,16 @@ export class ManagedMIDIEditorUIInstance {
   public serialize(isExpanded: boolean): SerializedMIDIEditorInstance {
     return {
       isExpanded,
-      lines: this.uiInst?.serializeLines() ?? this.lines,
+      lines: this.serializeLines(),
       name: this.name,
       view: this.view,
     };
   }
 
   public destroy() {
+    unregisterVcHideCb(this.manager.vcId, this.onVcHiddenStatusChanged);
     this.uiInst?.destroy();
-    this.wasm?.instance.free_note_lines(this.wasm.noteLinesCtxPtr);
+    this.uiInst = undefined;
   }
 }
 
@@ -222,7 +200,7 @@ export class MIDIEditorUIManager {
   public scrollHorizontalPx: Writable<number>;
   private silentOutput: GainNode;
   private ctx: AudioContext;
-  private vcId: string;
+  public readonly vcId: string;
   public activeUIInstance: MIDIEditorUIInstance | undefined;
   public velocityDisplayEnabled: boolean;
 
@@ -301,9 +279,8 @@ export class MIDIEditorUIManager {
     }
 
     if (inst.type === 'midiEditor' && inst.instance.uiInst) {
-      inst.instance.lines = inst.instance.uiInst.serializeLines();
       const renderMinimapPromise = renderMIDIMinimap(
-        inst.instance.lines,
+        inst.instance.serializeLines(),
         this.parentInst.baseView.beatsPerMeasure
       );
 
@@ -336,7 +313,6 @@ export class MIDIEditorUIManager {
 
     inst.isExpanded = true;
     if (inst.type === 'midiEditor') {
-      inst.instance.initWasm(inst.instance.lines);
       inst.instance.renderedMinimap = undefined;
     }
 
@@ -402,29 +378,6 @@ export class MIDIEditorUIManager {
     this.resizeInstances(instances);
     this.instances.set(instances);
     updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId));
-  }
-
-  public removeInstanceByID(id: string) {
-    const instances = get(this.instances);
-    const inst = instances.find(inst => inst.id === id);
-    if (!inst) {
-      console.error(`Could not find UI instance with ID ${id}`);
-      return;
-    }
-
-    if (inst.type === 'midiEditor') {
-      if (inst.instance.uiInst) {
-        if (this.activeUIInstance === inst.instance.uiInst) {
-          this.activeUIInstance = undefined;
-        }
-        inst.instance.uiInst.destroy();
-      }
-    } else if (inst.type === 'cvOutput') {
-      inst.instance.destroy();
-    }
-    instances.splice(instances.indexOf(inst), 1);
-    this.resizeInstances(instances);
-    this.instances.set(instances);
   }
 
   public addCVOutput() {

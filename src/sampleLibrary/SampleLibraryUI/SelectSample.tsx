@@ -8,7 +8,7 @@ import { renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { withReactQueryClient } from 'src/reactUtils';
-import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import {
   LoadSamplesButtons,
   SampleListing,
@@ -19,6 +19,7 @@ import useAllSamples from './useAllSamples';
 
 const mkSampleListingRowRenderer = ({
   sampleDescriptors,
+  cachedHashes,
   playingSampleName,
   togglePlaying,
   selectedSample,
@@ -31,6 +32,7 @@ const mkSampleListingRowRenderer = ({
     <SampleRow
       togglePlaying={() => togglePlaying(sampleDescriptors[index])}
       isPlaying={sampleDescriptors[index].name === playingSampleName}
+      isCached={cachedHashes.has(hashSampleDescriptor(sampleDescriptors[index]))}
       descriptor={sampleDescriptors[index]}
       style={{
         ...(style || {}),
@@ -63,7 +65,7 @@ interface SelectSampleProps {
 }
 
 const SelectSample: React.FC<SelectSampleProps> = ({ selectedSample, setSelectedSample }) => {
-  const { allSamples, includeLocalSamples, setIncludeLocalSamples } = useAllSamples();
+  const { allSamples, cachedHashes, includeLocalSamples, setIncludeLocalSamples } = useAllSamples();
 
   return (
     <>
@@ -77,6 +79,7 @@ const SelectSample: React.FC<SelectSampleProps> = ({ selectedSample, setSelected
         setSelectedSample={setSelectedSample}
         mkRowRenderer={mkSampleListingRowRenderer}
         sampleDescriptors={allSamples}
+        cachedHashes={cachedHashes}
         height={600}
         width={800}
       />

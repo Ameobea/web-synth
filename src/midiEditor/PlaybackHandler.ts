@@ -42,94 +42,75 @@ class RecordingContext {
 
   public tick() {
     const curBeat = this.getCurBeat();
-    const uiInstance = this.activeInstance.uiInst;
-    if (!uiInstance) {
-      return;
-    }
+    const notes = this.activeInstance.notes;
 
-    // Udpate the lengths of all down notes
+    // Update the lengths of all down notes
     for (const [midiNumber, noteID] of this.downNoteIdsByMIDINumber.entries()) {
-      const noteBox = uiInstance.allNotesByID.get(noteID);
-      if (!noteBox) {
+      const note = notes.getNote(noteID);
+      if (!note) {
         console.error(
           `Did not find down note id=${noteID} midiNumber=${midiNumber} in playback handler tick`
         );
+        this.downNoteIdsByMIDINumber.delete(midiNumber);
         continue;
       }
 
-      const startBeat = noteBox.note.startPoint;
-      const newLength = curBeat - startBeat;
-      const lineIx = uiInstance.lines.length - midiNumber;
-      if (lineIx < 0 || lineIx >= uiInstance.lines.length) {
-        continue;
-      }
-
+      const newLength = curBeat - note.startPoint;
       // handle wrapping around when looping
       if (newLength < 0) {
         this.onRelease(midiNumber);
         return;
       }
 
-      uiInstance.resizeNoteHorizontalEnd(lineIx, startBeat, noteID, startBeat + newLength);
+      if (newLength > 0) {
+        notes.resizeNoteEnd(noteID, note.startPoint + newLength);
+      }
+    }
+    if (this.downNoteIdsByMIDINumber.size > 0) {
+      this.activeInstance.uiInst?.onNotesChanged();
     }
   }
 
   public onAttack(midiNumber: number) {
     if (this.downNoteIdsByMIDINumber.has(midiNumber)) {
-      // console.warn('Ignoring duplicate note down event for note id=' + midiNumber);
       return;
     }
 
     const curBeat = this.getCurBeat();
-    const uiInstance = this.activeInstance.uiInst;
-    if (!uiInstance) {
+    const inst = this.activeInstance;
+    const lineIx = inst.lineCount - midiNumber;
+    if (lineIx < 0 || lineIx >= inst.lineCount) {
       return;
     }
-    const wasm = uiInstance.wasm;
-    if (!wasm) {
-      return;
-    }
-
-    const lineIx = uiInstance.lines.length - midiNumber;
-    if (lineIx < 0 || lineIx >= uiInstance.lines.length) {
-      return;
-    }
-    const canAdd = wasm.instance.check_can_add_note(wasm.noteLinesCtxPtr, lineIx, curBeat, 0.001);
-    if (!canAdd) {
+    if (!inst.notes.checkCanAddNote(lineIx, curBeat, 0.001)) {
       return;
     }
 
-    const noteID = uiInstance.addNote(lineIx, curBeat, 0.001, 90);
+    const noteID = inst.notes.addNote(lineIx, curBeat, 0.001, 90);
     this.downNoteIdsByMIDINumber.set(midiNumber, noteID);
+    inst.uiInst?.onNotesChanged();
   }
 
   public onRelease(midiNumber: number) {
     const curBeat = this.getCurBeat();
-    const uiInstance = this.activeInstance.uiInst;
-    if (!uiInstance) {
-      return;
-    }
+    const inst = this.activeInstance;
 
     const noteID = this.downNoteIdsByMIDINumber.get(midiNumber);
     if (R.isNil(noteID)) {
-      // console.warn('Note is not down when released: ', midiNumber);
       return;
     }
-    const noteBox = uiInstance.allNotesByID.get(noteID);
-    if (R.isNil(noteBox)) {
-      console.error(`Note was in down map but didn't exist in all notes mapping; id=${noteID}`);
-      this.downNoteIdsByMIDINumber.delete(midiNumber);
-      return;
-    }
-    const startBeat = noteBox.note.startPoint;
-    const newLength = curBeat - startBeat;
-    const lineIx = uiInstance.lines.length - midiNumber;
-    if (lineIx < 0 || lineIx >= uiInstance.lines.length) {
-      this.downNoteIdsByMIDINumber.delete(midiNumber);
-      return;
-    }
-    uiInstance.resizeNoteHorizontalEnd(lineIx, startBeat, noteID, startBeat + newLength);
     this.downNoteIdsByMIDINumber.delete(midiNumber);
+
+    const note = inst.notes.getNote(noteID);
+    if (R.isNil(note)) {
+      console.error(`Note was in down map but didn't exist in the note store; id=${noteID}`);
+      return;
+    }
+    const newLength = curBeat - note.startPoint;
+    if (newLength > 0) {
+      inst.notes.resizeNoteEnd(noteID, note.startPoint + newLength);
+    }
+    inst.uiInst?.onNotesChanged();
   }
 
   public destroy() {
@@ -288,9 +269,8 @@ export default class MIDIEditorPlaybackHandler {
             managedInst.uiInst?.onUngated(lineIx);
             this.removeHeldLineIndex(managedInst.id, lineIx);
           }
-
-          this.scheduledEventHandles.delete(handle.current);
         });
+        this.scheduledEventHandles.delete(handle.current);
       };
 
       for (const { isAttack, lineIx, velocity } of entries) {

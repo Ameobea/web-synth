@@ -19,7 +19,7 @@ export default class PianoKeys {
 
   private drawKey(lineIx: number, g: PIXI.Graphics) {
     const baseY = lineIx * conf.LINE_HEIGHT;
-    const noteName = midiNumberToNoteName(this.app.lines.length - lineIx);
+    const noteName = midiNumberToNoteName(this.app.notes.lineCount - lineIx);
     const isBlackKey = noteName.includes('♭') || noteName.includes('♯');
 
     g.beginFill(isBlackKey ? conf.BLACK_NOTE_COLOR : conf.WHITE_NOTE_COLOR);
@@ -37,7 +37,7 @@ export default class PianoKeys {
 
   private drawLabel(lineIx: number, g: PIXI.Graphics) {
     const baseY = lineIx * conf.LINE_HEIGHT;
-    const noteName = midiNumberToNoteName(this.app.lines.length - lineIx);
+    const noteName = midiNumberToNoteName(this.app.notes.lineCount - lineIx);
     const isBlackKey = noteName.includes('♭') || noteName.includes('♯');
 
     const text = new PIXI.Text(noteName, {
@@ -53,7 +53,9 @@ export default class PianoKeys {
   private buildKeysLayer(): PIXI.Graphics {
     const g = new PIXI.Graphics();
 
-    this.app.lines.forEach((_line, lineIx) => this.drawKey(lineIx, g));
+    for (let lineIx = 0; lineIx < this.app.notes.lineCount; lineIx++) {
+      this.drawKey(lineIx, g);
+    }
 
     return g;
   }
@@ -67,7 +69,9 @@ export default class PianoKeys {
   private buildLabelsLayer(): PIXI.Graphics {
     const g = new PIXI.Graphics();
 
-    this.app.lines.forEach((_line, lineIx) => this.drawLabel(lineIx, g));
+    for (let lineIx = 0; lineIx < this.app.notes.lineCount; lineIx++) {
+      this.drawLabel(lineIx, g);
+    }
 
     g.zIndex = 2;
     return g;
