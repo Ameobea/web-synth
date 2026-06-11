@@ -84,7 +84,7 @@
   align-items: flex-end;
 }
 
-#root div.fm-synth-main-control-panel > div:nth-child(1) > div:nth-child(1) > div.draggable > span {
+#root div.fm-synth-main-control-panel > div:nth-child(1) > div:nth-child(1) > div.control-panel-draggable > span {
   color: rgb(216, 36, 36) !important;
 }
 

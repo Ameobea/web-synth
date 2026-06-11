@@ -90,12 +90,13 @@
     uiInst?.updateYRange($store.rangeDb[0], $store.rangeDb[1]);
   });
 
+  // canvas size must be set before transfer; after that the worker owns the
+  // backing store size (`inst.resizeView`) and width/height writes throw
   const useLineSpectrogram = (canvas: HTMLCanvasElement) => {
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
     const offscreenCanvas = canvas.transferControlToOffscreen();
-
-    if (canvas) {
-      inst.setCanvas(offscreenCanvas, dpr);
-    }
+    inst.setCanvas(offscreenCanvas, dpr);
   };
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -118,8 +119,6 @@
   style={`margin-top: ${containerMargins.top}px; margin-left: ${containerMargins.left}px; margin-right: ${containerMargins.right}px; margin-bottom: ${containerMargins.bottom}px;`}
 >
   <canvas
-    width={width * dpr}
-    height={height * dpr}
     style="width: {width}px; height: {height}px;"
     use:useLineSpectrogram
     onmousemove={handleMouseMove}

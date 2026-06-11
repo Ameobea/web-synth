@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
       target: 'es2022',
       sourcemap: true,
       outDir: 'dist/headless',
-      rollupOptions: {
+      rolldownOptions: {
         input: resolve(__dirname, 'src/headless/index.tsx'),
         preserveEntrySignatures: 'exports-only' as const,
         output: {

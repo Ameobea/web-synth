@@ -166,6 +166,7 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
               'looper-viz',
               'control-panel',
               'draggable',
+              'control-panel-draggable',
               'active-composition-name',
               'loop-length',
             ].includes(cls)

@@ -23,10 +23,10 @@ h5 {
   font-family: 'IBM Plex Sans', 'Open Sans', 'Roboto', sans-serif;
 }
 
-.control-panel .container input {
+.control-panel .control-panel-container input {
   margin-top: 0;
 }
 
-.control-panel .container input[type='text'] {
+.control-panel .control-panel-container input[type='text'] {
   height: 18px !important;
 }

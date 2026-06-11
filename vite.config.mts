@@ -29,7 +29,7 @@ export const svgRaw = (): Plugin => ({
       /<svg([^>]*)>/,
       (_m, attrs) => `<svg${attrs.replace(/\s(?:width|height)="[^"]*"/g, '')}>`
     );
-    return `export default ${JSON.stringify(svg)};`;
+    return { code: `export default ${JSON.stringify(svg)};`, moduleType: 'js' };
   },
 });
 
@@ -62,6 +62,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { src: resolve(__dirname, 'src') },
     },
+    // react-ace is CJS-with-__esModule which the vite 8 dep optimizer no longer auto-detects;
+    // without this, its default import resolves to the exports namespace in dev
+    optimizeDeps: {
+      needsInterop: ['react-ace'],
+    },
     // Large JSON (init-composition) ships as JSON.parse("...") which parses faster than an object literal
     json: { stringify: true, namedExports: false },
     define: {
@@ -72,7 +77,7 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'es2022',
       sourcemap: true,
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           index: resolve(__dirname, 'index.html'),
           fm: resolve(__dirname, 'fm.html'),

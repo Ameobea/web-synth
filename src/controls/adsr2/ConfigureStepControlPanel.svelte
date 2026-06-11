@@ -123,11 +123,11 @@
     margin-bottom: -1px;
   }
 
-  :global(.adsr2-configure-step-control-panel .control-panel > .container > :first-child) {
+  :global(.adsr2-configure-step-control-panel .control-panel > .control-panel-container > :first-child) {
     width: 10% !important;
   }
 
-  :global(.adsr2-configure-step-control-panel .control-panel > .container > :nth-child(3)) {
+  :global(.adsr2-configure-step-control-panel .control-panel > .control-panel-container > :nth-child(3)) {
     width: 37% !important;
   }
 </style>

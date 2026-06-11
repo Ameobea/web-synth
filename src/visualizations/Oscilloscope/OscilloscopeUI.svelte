@@ -27,23 +27,19 @@
     inst.resizeView(width, height);
   });
 
+  // canvas size must be set before transfer; after that the worker owns the
+  // backing store size (`inst.resizeView`) and width/height writes throw
   const useOscilloscopeViz = (canvas: HTMLCanvasElement) => {
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
     const offscreenCanvas = canvas.transferControlToOffscreen();
-
-    if (canvas) {
-      inst.setView(offscreenCanvas, dpr);
-    }
+    inst.setView(offscreenCanvas, dpr);
   };
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} />
 <div class="root">
-  <canvas
-    width={width * dpr}
-    height={height * dpr}
-    style="width: {width}px; height: {height}px;"
-    use:useOscilloscopeViz
-></canvas>
+  <canvas style="width: {width}px; height: {height}px;" use:useOscilloscopeViz></canvas>
   <OscilloscopeControls {inst} state={uiState} />
 </div>
 

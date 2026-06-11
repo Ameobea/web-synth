@@ -10,7 +10,7 @@
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
     "@sentry/vite-plugin": "^5.3.0",
-    "@sveltejs/vite-plugin-svelte": "^5",
+    "@sveltejs/vite-plugin-svelte": "^7",
     "@types/d3": "^7.4.3",
     "@types/downloadjs": "^1.4.6",
     "@types/node": "^24.10.1",
@@ -29,8 +29,8 @@
     "svelte-check": "^4.6.0",
     "svelte-preprocess": "^6.0.3",
     "typescript": "^5.9.3",
-    "vite": "^6",
-    "vite-plugin-css-injected-by-js": "^3"
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5"
   },
   "scripts": {
     "start": "vite",
@@ -78,7 +78,7 @@
     "ramda": "^0.32.0",
     "react": "19.2.0",
     "react-ace": "^14.0.1",
-    "react-control-panel": ">=0.12.5",
+    "react-control-panel": "=0.14.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "19.2.0",
