@@ -1,7 +1,6 @@
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import type { SampleDescriptor } from 'src/sampleLibrary';
-import SamplerUI from 'src/sampler/SamplerUI/SamplerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { Map as ImmMap } from 'immutable';
 import { SamplerInstance } from 'src/sampler/SamplerInstance';
@@ -62,6 +61,18 @@ const deserializeSampler = (serialized: string): SerializedSampler => {
 export const init_sampler = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
+  const serialized = localStorage.getItem(stateKey);
+  const initialState: SerializedSampler = serialized
+    ? deserializeSampler(serialized)
+    : buildDefaultSamplerState();
+
+  const inst = new SamplerInstance(vcId, initialState);
+  SamplerInstancesById.set(vcId, inst);
+
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   const domId = getSamplerDOMElementId(vcId);
   const elem = document.createElement('div');
   elem.id = domId;
@@ -71,18 +82,16 @@ export const init_sampler = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  const serialized = localStorage.getItem(stateKey);
-  const initialState: SerializedSampler = serialized
-    ? deserializeSampler(serialized)
-    : buildDefaultSamplerState();
+  void import('src/sampler/SamplerUI/SamplerUI.svelte').then(({ default: SamplerUI }) => {
+    if (!elem.isConnected) {
+      return;
+    }
 
-  const inst = new SamplerInstance(vcId, initialState);
-  SamplerInstancesById.set(vcId, inst);
-
-  mkSvelteContainerRenderHelper({
-    Comp: SamplerUI,
-    getProps: () => ({ inst }),
-  })(domId);
+    mkSvelteContainerRenderHelper({
+      Comp: SamplerUI,
+      getProps: () => ({ inst }),
+    })(domId);
+  });
 };
 
 export const persist_sampler = (stateKey: string) => {

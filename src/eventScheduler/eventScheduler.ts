@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-
-import { globalTempoCSN } from 'src/globalMenu/GlobalMenu';
+import { globalTempoCSN } from 'src/globalMenu/globalTempo';
 import { getSentry } from 'src/sentry';
 import { UnimplementedError, UnreachableError, retryAsync } from 'src/util';
 import { writable, type Writable } from 'svelte/store';
@@ -78,24 +76,6 @@ export const unregisterStartCB = (cb: (startBeat: number) => void) => {
 
 export const unregisterStopCB = (cb: () => void) => {
   StopCBs = StopCBs.filter(ocb => ocb !== cb);
-};
-
-export const useIsGlobalBeatCounterStarted = () => {
-  const [isStarted, setIsStarted] = useState(getIsGlobalBeatCounterStarted());
-
-  useEffect(() => {
-    const startCb = () => setIsStarted(true);
-    const stopCb = () => setIsStarted(false);
-    registerGlobalStartCB(startCb);
-    registerGlobalStopCB(stopCb);
-
-    return () => {
-      unregisterStartCB(startCb);
-      unregisterStopCB(stopCb);
-    };
-  }, []);
-
-  return isStarted;
 };
 
 /**

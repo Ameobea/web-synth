@@ -6,7 +6,7 @@ import {
   type MappedOutput,
   type MIDIKeyboardCtx,
   MidiKeyboardCtxByStateKey,
-} from 'src/midiKeyboard';
+} from 'src/midiKeyboard/midiKeyboardCtx';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { UnreachableError, mkLinearToLog } from 'src/util';

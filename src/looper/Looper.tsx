@@ -1,10 +1,9 @@
 import { Option } from 'funfix-core';
-import { Map as ImmMap } from 'immutable';
 import React, { Suspense } from 'react';
 
 import { LooperNode } from 'src/looper/LooperNode';
+import { LooperCtxsByVcId, type LooperCtx } from 'src/looper/looperCtx';
 import type { LooperUIProps } from 'src/looper/LooperUI/LooperUI';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import {
   mkContainerCleanupHelper,
   mkContainerHider,
@@ -19,7 +18,8 @@ import {
   serializeLooper,
   type LooperInstState,
 } from 'src/redux/modules/looper';
-import { UnreachableError } from 'src/util';
+
+export { get_looper_audio_connectables } from 'src/looper/looperCtx';
 
 const LazyLooperUI = React.lazy(() => import('src/looper/LooperUI/LooperUI'));
 
@@ -29,13 +29,7 @@ const LooperUI: React.FC<LooperUIProps> = props => (
   </Suspense>
 );
 
-interface LooperCtx {
-  looperNode: LooperNode;
-}
-
 const getLooperDOMElementId = (vcId: string) => `looper_${vcId}`;
-
-const LooperCtxsByVcId: Map<string, LooperCtx> = new Map();
 
 export const init_looper = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
@@ -71,6 +65,10 @@ export const init_looper = (stateKey: string) => {
   looperDispatch(
     looperActions.setLooperInstState({ vcId, state: { ...initialState, looperNode } })
   );
+
+  if ((window as any).isHeadless) {
+    return;
+  }
 
   mkContainerRenderHelper({
     Comp: LooperUI,
@@ -122,23 +120,3 @@ export const unhide_looper = (stateKey: string) => {
   mkContainerUnhider(getLooperDOMElementId)(stateKey);
 };
 
-export const get_looper_audio_connectables = (vcId: string): AudioConnectables => {
-  const ctx = LooperCtxsByVcId.get(vcId);
-  if (!ctx) {
-    throw new UnreachableError('Missing state for looper vcId=' + vcId);
-  }
-  const moduleCount = getState().looper.stateByVcId[vcId].modules.length;
-
-  return {
-    vcId,
-    inputs: ImmMap<string, ConnectableInput>(),
-    outputs: new Array(moduleCount).fill(null).reduce((acc, _, moduleIx) => {
-      const midiNode = ctx.looperNode.midiNodes[moduleIx];
-      if (!midiNode) {
-        return acc;
-      }
-      const moduleName = getState().looper.stateByVcId[vcId].modules[moduleIx].name;
-      return acc.set(moduleName, { type: 'midi', node: midiNode });
-    }, ImmMap<string, ConnectableOutput>()),
-  };
-};

@@ -8,7 +8,7 @@
 
     <!-- Opengraph -->
     <meta property="og:title" content="Web Synth">
-    <meta property="og:site_name" content="{{ htmlWebpackPlugin.options.title }}">
+    <meta property="og:site_name" content="Web Synth - Realtime Browser Audio Synthesis Plaform">
     <meta property="og:description" content="Web-based audio synthesis, music production, and sound experimentation platform. Built using modern web tech (Rust, WebAssembly, Web Audio, and more)">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://synth.ameo.dev/web-synth-splash.jpg">
@@ -34,7 +34,7 @@
       content="Combined screenshots of the Web Synth application showing the graph editor for the audio patch network and a part of the synth designer UI with envelope generators, param controls, and the FM modulatin matrix"
     />
 
-    <title>{{ htmlWebpackPlugin.options.title }}</title>
+    <title>Web Synth - Realtime Browser Audio Synthesis Plaform</title>
     <script type="text/javascript">
       window.RealAudioContext = window.AudioContext;
       // There's an anoying issue where the `AudioContext`s of the various different libraries I'm using differ from each
@@ -86,11 +86,11 @@
     </script>
     <link rel="preconnect" href="https://web-synth.b-cdn.net" crossorigin>
     <style>
-      {{{ fontCSS }}}
+      <!--inline-css:ibm-plex-sans.css-->
     </style>
     <script src="/wavyjones.js" type="text/javascript"></script>
     <style>
-      {{{ indexCSS }}}
+      <!--inline-css:index.css-->
     </style>
     <link rel="stylesheet" href="/hack-subset.css" media="print" onload="this.media='all'" />
 
@@ -102,5 +102,6 @@
     <div id="view-context-switcher"></div>
     <main id="content"></main>
     <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

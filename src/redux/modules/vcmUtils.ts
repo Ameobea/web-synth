@@ -1,7 +1,6 @@
 import { Option } from 'funfix-core';
 import { Map } from 'immutable';
 import * as R from 'ramda';
-import { shallowEqual } from 'react-redux';
 import type { Unsubscribe } from 'redux';
 
 import { PlaceholderOutput } from 'src/controlPanel/PlaceholderOutput';
@@ -19,7 +18,7 @@ import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { reinitializeWithComposition, setCurLoadedCompositionId } from 'src/persistance';
 import { getState, store } from 'src/redux';
 import { filterNils, getEngine, UnreachableError } from 'src/util';
-import { setGlobalVolume } from 'src/ViewContextManager/GlobalVolumeSlider';
+import { setGlobalVolume } from 'src/ViewContextManager/globalVolume';
 
 /**
  * Commits the state of the provided `patchNetwork`'s foreign connectables to the Rust/Wasm engine,
@@ -298,6 +297,11 @@ export const subscribeToConnections = (
         conns
       ).map(buildConnectionDescriptor)
     );
+  };
+
+  const shallowEqual = (a: ConnectionDescriptor, b: ConnectionDescriptor): boolean => {
+    const aKeys = Object.keys(a) as (keyof ConnectionDescriptor)[];
+    return aKeys.length === Object.keys(b).length && aKeys.every(k => a[k] === b[k]);
   };
 
   const connectionsEqual = (a: ConnectionDescriptor[], b: ConnectionDescriptor[]): boolean => {

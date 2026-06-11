@@ -41,6 +41,11 @@ const EqualizerWasm = new AsyncOnce(
   true
 );
 
+export const prefetchEqualizerAssets = () => {
+  void EqualizerAWPInitialized.get();
+  void EqualizerWasm.get();
+};
+
 export const buildDefaultEqualizerState = (): EqualizerState => ({
   bands: [
     { filterType: EqualizerFilterType.Lowshelf, frequency: 60, q: 0, gain: 0 },
@@ -116,7 +121,7 @@ export class EqualizerInstance {
     this.awpHandle = new DummyNode('equalizer');
     this.worker = isHeadless
       ? makeNoopEqWorker()
-      : Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url)));
+      : Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url), { type: 'module' }));
     this.analyzerNode = ctx.createAnalyser();
     this.analyzerNode.fftSize = LineSpectrogramFFTSize;
     this.analyzerNode.minDecibels = initialState.lineSpectrogramUIState.rangeDb[0];

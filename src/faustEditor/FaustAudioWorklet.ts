@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import { FAUST_COMPILER_ENDPOINT } from 'src/conf';
 import type { faustEditorContextMap } from 'src/faustEditor';
 import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
-import { mapUiGroupToControlPanelFields } from 'src/faustEditor/uiBuilder';
+import { mapUiGroupToControlPanelFields } from 'src/faustEditor/faustUiFields';
 import type { ValueOf } from 'src/util';
 
 export class FaustWorkletNode extends AudioWorkletNode implements DynamicCodeWorkletNode {

@@ -9,8 +9,8 @@ import {
   compileSoulInstance,
   mkCompileButtonClickHandler,
   mkStopInstanceHandler,
-  type FaustEditorReduxStore,
-} from 'src/faustEditor/FaustEditor';
+} from 'src/faustEditor/compileHandlers';
+import type { FaustEditorReduxStore } from 'src/faustEditor/FaustEditor';
 import FlatButton from 'src/misc/FlatButton';
 
 export const mkFaustEditorSmallView = (vcId: string) => {

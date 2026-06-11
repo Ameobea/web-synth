@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 
-import ADSR2 from 'src/controls/adsr2/adsr2';
 import type { Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
+
+const ADSR2 = React.lazy(() => import('src/controls/adsr2/adsr2'));
 
 export interface ADSRWithOutputRange extends Adsr {
   outputRange: readonly [number, number];
@@ -33,14 +34,16 @@ export const mkControlPanelADSR2WithSize = (
     }
 
     return (
-      <ADSR2
-        initialState={value}
-        onChange={onChange}
-        height={heightPx}
-        width={widthPx}
-        vcId={vcId}
-        debugName={debugName}
-      />
+      <Suspense fallback={null}>
+        <ADSR2
+          initialState={value}
+          onChange={onChange}
+          height={heightPx}
+          width={widthPx}
+          vcId={vcId}
+          debugName={debugName}
+        />
+      </Suspense>
     );
   };
   return ControlPanelADSR2;

@@ -17,6 +17,6 @@ polysynth = { path = "../polysynth", default-features = false }
 rand = "0.7"
 
 [features]
-default = ["exports"]
+default = ["exports", "simd"]
 simd = []
 exports = []

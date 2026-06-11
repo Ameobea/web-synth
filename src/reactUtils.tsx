@@ -1,9 +1,7 @@
 import * as R from 'ramda';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { Provider, useStore } from 'react-redux';
-import type { AnyAction, Store } from 'redux';
+import type { Root } from 'react-dom/client';
+import type { Store } from 'redux';
 import { type Readable, type Writable, get } from 'svelte/store';
 
 interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<any, never>> {
@@ -30,6 +28,14 @@ interface ContainerRenderHelperArgs<P extends { [key: string]: any } = Record<an
 }
 
 const RootsByID: Map<string, Root> = new Map();
+// Tracks invocation generations per DOM ID so that renders which resolve after a cleanup or a
+// newer render don't mount stale content
+const RenderGensByDomID: Map<string, number> = new Map();
+const bumpRenderGen = (domID: string): number => {
+  const gen = (RenderGensByDomID.get(domID) ?? 0) + 1;
+  RenderGensByDomID.set(domID, gen);
+  return gen;
+};
 
 /**
  * Higher order function that returns a function that handles rendering the provided `Comp` into the container with the
@@ -50,51 +56,68 @@ export function mkContainerRenderHelper<P extends { [key: string]: any } = Recor
     }
 
     const props = getProps();
+    const gen = bumpRenderGen(domID);
 
-    // Check to see if we've already created a root for this node and unmount it if so
-    let root: Root;
-    const existingRootID = node.getAttribute('data-react-root-id');
-    if (existingRootID) {
-      root = RootsByID.get(existingRootID)!;
-      if (!root) {
-        throw new Error(
-          'Node was marked as having a root, but entry has been removed from the roots map'
-        );
+    // react-dom and friends are imported lazily to keep them out of the headless bundle
+    void Promise.all([
+      import('react-dom/client'),
+      import('react-redux'),
+      import('react-query'),
+      import('src/reactProviders'),
+    ]).then(([{ createRoot }, { Provider }, { QueryClientProvider }, { getReactQueryClient }]) => {
+      if (RenderGensByDomID.get(domID) !== gen || !node.isConnected) {
+        return;
       }
-      root.render(<></>);
-    } else {
-      root = createRoot(node);
-      const rootID = genRandomStringID();
-      node.setAttribute('data-react-root-id', rootID);
-      RootsByID.set(rootID, root);
-    }
 
-    const wrap = R.compose(
-      (rendered: React.ReactNode) => {
-        if (store) {
-          return <Provider store={store}>{rendered}</Provider>;
-        }
-        return rendered;
-      },
-      (rendered: React.ReactNode) => {
-        if (enableReactQuery) {
-          return (
-            <QueryClientProvider client={getReactQueryClient()}>{rendered}</QueryClientProvider>
+      // Check to see if we've already created a root for this node and unmount it if so
+      let root: Root;
+      const existingRootID = node.getAttribute('data-react-root-id');
+      if (existingRootID) {
+        root = RootsByID.get(existingRootID)!;
+        if (!root) {
+          throw new Error(
+            'Node was marked as having a root, but entry has been removed from the roots map'
           );
         }
-        return rendered;
+        root.render(<></>);
+      } else {
+        root = createRoot(node);
+        const rootID = genRandomStringID();
+        node.setAttribute('data-react-root-id', rootID);
+        RootsByID.set(rootID, root);
       }
-    );
-    const rendered = wrap(<Comp {...props} />);
-    // This seems to be necessary to get small views using the same component to update correctly
-    // when selecting a different node of the same type in the graph editor.
-    //
-    // It works in conjunction with rendering the empty fragment above.
-    setTimeout(() => root.render(rendered));
 
-    if (predicate) {
-      predicate(domID, node);
-    }
+      const wrap = R.compose(
+        (rendered: React.ReactNode) => {
+          if (store) {
+            return <Provider store={store}>{rendered}</Provider>;
+          }
+          return rendered;
+        },
+        (rendered: React.ReactNode) => {
+          if (enableReactQuery) {
+            return (
+              <QueryClientProvider client={getReactQueryClient()}>{rendered}</QueryClientProvider>
+            );
+          }
+          return rendered;
+        }
+      );
+      const rendered = wrap(<Comp {...props} />);
+      // This seems to be necessary to get small views using the same component to update correctly
+      // when selecting a different node of the same type in the graph editor.
+      //
+      // It works in conjunction with rendering the empty fragment above.
+      setTimeout(() => {
+        if (RenderGensByDomID.get(domID) === gen) {
+          root.render(rendered);
+        }
+      });
+
+      if (predicate) {
+        predicate(domID, node);
+      }
+    });
   };
 }
 
@@ -115,11 +138,14 @@ export const mkContainerCleanupHelper =
   (domID: string) => {
     const node = document.getElementById(domID);
     if (!node) {
-      console.error(`No node with id ${domID} found when trying to clean up small view`);
+      if (!(window as any).isHeadless) {
+        console.error(`No node with id ${domID} found when trying to clean up small view`);
+      }
       return;
     }
 
     predicate?.(domID, node);
+    bumpRenderGen(domID);
 
     const rootID = node.getAttribute('data-react-root-id');
     if (!rootID) {
@@ -146,7 +172,9 @@ export const mkContainerHider =
     const elemID = getContainerID(vcId);
     const elem = document.getElementById(elemID);
     if (!elem) {
-      console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
+      if (!(window as any).isHeadless) {
+        console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't hide.`);
+      }
       return;
     }
 
@@ -160,6 +188,9 @@ export const mkContainerUnhider =
     const elemID = getContainerID(vcId);
     const elem = document.getElementById(elemID);
     if (!elem) {
+      if ((window as any).isHeadless) {
+        return;
+      }
       console.error(`Unable to find DOM element with vcId=${vcId} id=${elemID}; can't unhide.`);
       return;
     }
@@ -232,32 +263,6 @@ export function useWhyDidYouUpdate<T extends { [key: string]: any }>(name: strin
   });
 }
 
-const ReactQueryClient = new QueryClient();
-
-export const getReactQueryClient = (): QueryClient => ReactQueryClient;
-
-export function withReactQueryClient<T>(Comp: React.ComponentType<T>): React.ComponentType<T> {
-  const client = new QueryClient();
-  const WithReactQueryClient: React.FC<T> = ({ ...props }) => (
-    <QueryClientProvider client={client}>
-      <Comp {...(props as any)} />
-    </QueryClientProvider>
-  );
-  return WithReactQueryClient;
-}
-
-export function withReduxProvider<T>(
-  store: Store<any, AnyAction>,
-  Comp: React.ComponentType<T>
-): React.ComponentType<T> {
-  const WithReduxProvider: React.FC<T> = ({ ...props }) => (
-    <Provider store={store}>
-      <Comp {...(props as any)} />
-    </Provider>
-  );
-  return WithReduxProvider;
-}
-
 export const useDraggable = (
   onDrag: (newPos: { x: number; y: number }) => void,
   position: { x: number; y: number }
@@ -309,10 +314,6 @@ export const useDraggable = (
   );
   return { isDragging, onMouseDown };
 };
-
-export function useGetState<T>(): () => T {
-  return useStore().getState;
-}
 
 type ImageLoadPlaceholderProps = React.DetailedHTMLProps<
   React.ImgHTMLAttributes<HTMLImageElement>,

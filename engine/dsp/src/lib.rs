@@ -1,5 +1,3 @@
-#![feature(portable_simd)]
-
 use fastapprox::fast;
 use num_traits::{Float, FloatConst};
 

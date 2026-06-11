@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ADSR2, { type ADSR2Instance } from 'src/controls/adsr2/adsr2';
+  import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';
   import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
   import ReactShim from 'src/misc/ReactShim.svelte';
 
@@ -15,22 +15,26 @@
   export let disablePhaseVisualization: boolean | undefined = false;
   export let setFrozenOutputValue: ((frozenOutputValue: number) => void) | undefined;
   export let beatsPerMeasure: number | undefined = undefined;
+
+  const ADSR2Promise = import('src/controls/adsr2/adsr2').then(m => m.default);
 </script>
 
-<ReactShim
-  Component={ADSR2}
-  props={{
-    width,
-    height,
-    initialState,
-    onChange,
-    vcId,
-    debugName,
-    disableControlPanel,
-    instanceCb,
-    enableInfiniteMode,
-    disablePhaseVisualization,
-    setFrozenOutputValue,
-    beatsPerMeasure,
-  }}
-/>
+{#await ADSR2Promise then ADSR2}
+  <ReactShim
+    Component={ADSR2}
+    props={{
+      width,
+      height,
+      initialState,
+      onChange,
+      vcId,
+      debugName,
+      disableControlPanel,
+      instanceCb,
+      enableInfiniteMode,
+      disablePhaseVisualization,
+      setFrozenOutputValue,
+      beatsPerMeasure,
+    }}
+  />
+{/await}

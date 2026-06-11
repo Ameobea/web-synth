@@ -3,7 +3,7 @@ import * as R from 'ramda';
 import { get, writable, type Writable } from 'svelte/store';
 
 import type { ADSRValues } from 'src/controls/adsr';
-import { type AudioThreadData } from 'src/controls/adsr2/adsr2';
+import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import { AdsrLengthMode, type Adsr } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/RegateMode';

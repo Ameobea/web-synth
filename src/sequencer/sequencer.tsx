@@ -22,7 +22,6 @@ import { getSample } from 'src/sampleLibrary';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
-import { SequencerSmallView } from 'src/sequencer/SequencerUI/SequencerUI';
 import { AsyncOnce, UnreachableError, filterNils } from 'src/util';
 import {
   buildInitialState,
@@ -43,6 +42,14 @@ import type {
 const ctx = new AudioContext();
 
 const SequencerUI = React.lazy(() => import('./SequencerUI'));
+const LazySequencerSmallView = React.lazy(() =>
+  import('src/sequencer/SequencerUI/SequencerUI').then(m => ({ default: m.SequencerSmallView }))
+);
+const SequencerSmallView: React.FC<any> = props => (
+  <Suspense fallback={null}>
+    <LazySequencerSmallView {...props} />
+  </Suspense>
+);
 
 interface SerializedSequencer {
   currentEditingVoiceIx: number;
@@ -347,6 +354,10 @@ export const init_sequencer = (stateKey: string) => {
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
   updateConnectables(vcId, get_sequencer_audio_connectables(vcId));
+
+  if ((window as any).isHeadless) {
+    return;
+  }
 
   mkContainerRenderHelper({
     Comp: LazySequencerUI,

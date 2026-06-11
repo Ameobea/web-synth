@@ -8,7 +8,7 @@ import {
   maybeRestoreLocalComposition,
   onBeforeUnload,
 } from 'src/persistance';
-import { getReactQueryClient } from 'src/reactUtils';
+import { getReactQueryClient } from 'src/reactProviders';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
 import { installSpy } from 'src/spy';
@@ -24,7 +24,10 @@ import { createSafariNotification } from 'src/misc/SafariNotification';
 
 initGlobals();
 
-const wasm = import('./engine');
+const wasm = import('./engine').then(async engine => {
+  await engine.default();
+  return engine;
+});
 
 const ctx = new AudioContext();
 

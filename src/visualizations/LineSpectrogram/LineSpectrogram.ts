@@ -43,7 +43,7 @@ export class LineSpectrogram {
       );
     }
     this.analyserNode = analyserNode;
-    this.renderWorker = new Worker(new URL('./LineSpectrogram.worker', import.meta.url));
+    this.renderWorker = new Worker(new URL('./LineSpectrogram.worker.ts', import.meta.url), { type: 'module' });
 
     this.notifySAB = new SharedArrayBuffer(4);
     this.notifySABI32 = new Int32Array(this.notifySAB);

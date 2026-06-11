@@ -21,7 +21,8 @@ import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
 import { getIsVcHidden } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
-import { AsyncOnce, clamp } from 'src/util';
+import { MIDIWasmModule } from 'src/midiWasmModule';
+import { clamp } from 'src/util';
 import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
@@ -32,8 +33,6 @@ import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEd
 import type MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
 import EditableInstanceName from './EditableInstanceName.svelte';
 import { DragActivationContext, DraggableInstance, DragHandle } from './DnD';
-
-const MIDIWasmModule = new AsyncOnce(() => import('src/midi'));
 
 interface MIDIEditorControlsState {
   bpm: number;

@@ -11,9 +11,9 @@ import {
   type OperatorConfig,
   type WavetableBank,
   type WavetableState,
-} from 'src/fmSynth/ConfigureOperator';
+} from 'src/fmSynth/operatorConfig';
 import { encodeEffect, type Effect } from 'src/fmSynth/Effect';
-import { ConnectedFMSynthUI, type UISelection } from 'src/fmSynth/FMSynthUI';
+import type { UISelection } from 'src/fmSynth/FMSynthUI';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
 import {
   buildDefaultAdsr,
@@ -58,6 +58,11 @@ const RegisterFMSynthAWP = new AsyncOnce(
     ),
   true
 );
+
+export const prefetchFMSynthAssets = () => {
+  void WavetableWasmBytes.get();
+  void RegisterFMSynthAWP.get();
+};
 
 const buildDefaultModulationIndices = (): ParamSource[][] => {
   const indices = new Array(OPERATOR_COUNT).fill(null);
@@ -353,6 +358,9 @@ export default class FMSynth implements ForeignNode {
       getSentry()?.captureException(err);
     });
 
+    const LazyFMSynthUI = React.lazy(() =>
+      import('src/fmSynth/FMSynthUI').then(m => ({ default: m.ConnectedFMSynthUI }))
+    );
     const FMSynthSmallView: React.FC<any> = props => (
       <div>
         <div style={{ color: '#ee6666', padding: 4 }}>
@@ -363,7 +371,9 @@ export default class FMSynth implements ForeignNode {
           Use the <strong>Synth Designer</strong> instead, which embeds this FM synth along with a
           bunch of other functionality.
         </div>
-        <ConnectedFMSynthUI {...props} />
+        <React.Suspense fallback={null}>
+          <LazyFMSynthUI {...props} />
+        </React.Suspense>
       </div>
     );
 

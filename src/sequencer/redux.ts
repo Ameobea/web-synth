@@ -1,7 +1,7 @@
 import { buildActionGroup, buildModule, buildStore } from 'jantix';
 import * as R from 'ramda';
 
-import { setConnectionFlowingStatus } from 'src/graphEditor/GraphEditor';
+import { setConnectionFlowingStatus } from 'src/graphEditor/instances';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { buildGateOutput } from 'src/sequencer';

@@ -26,7 +26,7 @@ const getWorker = ():
   }
 
   const wasmBytes = MIDIRendererWasmBytes.get();
-  worker = Comlink.wrap(new Worker(new URL('./MinimapRenderer.worker.ts', import.meta.url)));
+  worker = Comlink.wrap(new Worker(new URL('./MinimapRenderer.worker.ts', import.meta.url), { type: 'module' }));
   return wasmBytes
     .then(async wasmBytes => {
       await worker!.setWasmBytes(wasmBytes);

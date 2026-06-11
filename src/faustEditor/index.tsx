@@ -2,7 +2,7 @@ import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 
 import type { DynamicCodeWorkletNode } from 'src/faustEditor/DymanicCodeWorkletNode';
-import { mkFaustEditorSmallView } from 'src/faustEditor/FaustEditorSmallView';
+import React from 'react';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { createPassthroughNode, OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -12,7 +12,6 @@ import {
   buildFaustEditorReduxInfra,
   type SerializedFaustEditor,
 } from 'src/redux/modules/faustEditor';
-import FaustEditor from './FaustEditor';
 
 const ctx = new AudioContext();
 
@@ -86,6 +85,28 @@ export const init_faust_editor = (stateKey: string) => {
     compileOnMount: serializedEditor.isRunning,
   };
 
+  if ((window as any).isHeadless) {
+    // Compiling the active Faust/Soul instance is normally triggered by the editor UI mounting
+    if (serializedEditor.isRunning) {
+      void import('src/faustEditor/compileHandlers').then(
+        ({ compileFaustInstance, compileSoulInstance, mkCompileButtonClickHandler }) => {
+          const language = reduxInfra.getState().faustEditor.language;
+          void mkCompileButtonClickHandler({
+            setErrMessage: msg => {
+              if (msg) {
+                console.error(`Error compiling ${language} code for vcId=${vcId}: ${msg}`);
+              }
+            },
+            vcId,
+            analyzerNode,
+            compiler: language === 'faust' ? compileFaustInstance : compileSoulInstance,
+          })();
+        }
+      );
+    }
+    return;
+  }
+
   // Create the base dom node for the faust editor
   const faustEditorBase = document.createElement('div');
 
@@ -98,11 +119,17 @@ export const init_faust_editor = (stateKey: string) => {
   // Mount the newly created Faust editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(faustEditorBase);
 
-  mkContainerRenderHelper({
-    Comp: FaustEditor,
-    getProps: () => ({ vcId }),
-    store: reduxInfra.store,
-  })(buildRootNodeId(vcId));
+  void import('./FaustEditor').then(({ default: FaustEditor }) => {
+    if (!faustEditorBase.isConnected) {
+      return;
+    }
+
+    mkContainerRenderHelper({
+      Comp: FaustEditor,
+      getProps: () => ({ vcId }),
+      store: reduxInfra.store,
+    })(buildRootNodeId(vcId));
+  });
 };
 
 export const get_faust_editor_content = (vcId: string) => {
@@ -198,8 +225,16 @@ export const render_faust_editor_small_view = (vcId: string, domId: string) => {
     throw new Error(`No context for Faust editor with vcId ${vcId} when rendering small view`);
   }
 
+  const LazySmallView = React.lazy(() =>
+    import('src/faustEditor/FaustEditorSmallView').then(m => ({
+      default: m.mkFaustEditorSmallView(vcId),
+    }))
+  );
+  const SmallView: React.FC = () =>
+    React.createElement(React.Suspense, { fallback: null }, React.createElement(LazySmallView));
+
   mkContainerRenderHelper({
-    Comp: mkFaustEditorSmallView(vcId),
+    Comp: SmallView,
     getProps: () => ({}),
     store: context.reduxInfra.store,
   })(domId);

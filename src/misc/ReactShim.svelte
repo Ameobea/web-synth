@@ -1,14 +1,24 @@
 <script lang="ts" generics="T extends Record<string, any>">
-  import React from 'react';
-  import { createRoot } from 'react-dom/client';
+  import type React from 'react';
+  import type { createRoot, Root } from 'react-dom/client';
   import { onDestroy } from 'svelte';
 
   export let Component: React.FC<T> | React.ComponentClass<T>;
   export let props: T;
 
+  let ReactMod: typeof React | null = null;
+  let createRootFn: typeof createRoot | null = null;
+  void Promise.all([import('react'), import('react-dom/client')]).then(([react, reactDom]) => {
+    ReactMod = react.default;
+    createRootFn = reactDom.createRoot;
+  });
+
   let container: HTMLDivElement | null = null;
-  $: root = container ? createRoot(container) : null;
-  $: root?.render(React.createElement(Component, props));
+  let root: Root | null = null;
+  $: if (container && ReactMod && createRootFn && !root) {
+    root = createRootFn(container);
+  }
+  $: root?.render(ReactMod!.createElement(Component, props));
 
   onDestroy(() => root?.unmount());
 </script>

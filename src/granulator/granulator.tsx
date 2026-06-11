@@ -2,10 +2,10 @@ import { Option } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
 import React, { Suspense } from 'react';
 
-import {
-  ActiveSamplesByVcId,
-  type GranulatorUIProps,
-  type GranulatorControlPanelState,
+import { ActiveSamplesByVcId } from 'src/granulator/activeSamples';
+import type {
+  GranulatorUIProps,
+  GranulatorControlPanelState,
 } from 'src/granulator/GranulatorUI';
 import { WaveformRenderer } from 'src/granulator/GranulatorUI/WaveformRenderer';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
@@ -183,15 +183,6 @@ const GranularWasm = new AsyncOnce(
 export const init_granulator = async (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
-  const domId = getGranulatorDOMElementId(vcId);
-  const elem = document.createElement('div');
-  elem.id = domId;
-  elem.setAttribute(
-    'style',
-    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0; display: none;'
-  );
-  document.getElementById('content')!.appendChild(elem);
-
   const serialized = localStorage.getItem(stateKey);
   const initialState: SerializedGranulator = Option.of(serialized)
     .map(deserializeGranulator)
@@ -260,6 +251,19 @@ export const init_granulator = async (stateKey: string) => {
 
   // Since we asynchronously init, we need to update our connections manually once we've created a valid internal state
   updateConnectables(vcId, build_granulator_audio_connectables(vcId));
+
+  if ((window as any).isHeadless) {
+    return;
+  }
+
+  const domId = getGranulatorDOMElementId(vcId);
+  const elem = document.createElement('div');
+  elem.id = domId;
+  elem.setAttribute(
+    'style',
+    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: scroll; position: absolute; top: 0; left: 0; display: none;'
+  );
+  document.getElementById('content')!.appendChild(elem);
 
   mkContainerRenderHelper({
     Comp: LazyGranulatorUI,

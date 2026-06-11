@@ -22,10 +22,9 @@ import HelpIcon from 'src/misc/HelpIcon';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import TapInBPMSvelte from './TapInBPM.svelte';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { globalTempoCSN, setGlobalBpm } from './globalTempo';
 
 const TapInBPM = mkSvelteComponentShim<{ onSubmit: (bpm: number) => void }>(TapInBPMSvelte);
-
-const ctx = new AudioContext();
 
 interface GlobalMenuItemProps {
   onClick?: () => void;
@@ -48,18 +47,6 @@ const RetractGlobalMenuButton: React.FC<RetractGlobalMenuButtonProps> = ({ onClo
     &#x226b;
   </button>
 );
-
-export const globalTempoCSN = new ConstantSourceNode(ctx);
-(window as any).globalTempoCSN = globalTempoCSN;
-globalTempoCSN.offset.value = +(localStorage.getItem('globalTempo') ?? 120);
-globalTempoCSN.start();
-
-export const getGlobalBpm = () => globalTempoCSN.offset.value;
-
-export const setGlobalBpm = (newGlobalTempo: number) => {
-  globalTempoCSN.offset.value = newGlobalTempo;
-  localStorage.globalTempo = newGlobalTempo.toFixed(1);
-};
 
 const GlobalTempoControl: React.FC = () => {
   const [tempo, setTempo] = useState<string>(globalTempoCSN.offset.value.toFixed(1));

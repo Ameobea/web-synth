@@ -8,7 +8,10 @@ export class WaveformRendererWorker {
   private ctxPtr: number = 0;
 
   constructor() {
-    this.inst = import('../../waveform_renderer');
+    this.inst = import('../../waveform_renderer').then(async inst => {
+      await inst.default();
+      return inst;
+    });
   }
 
   private get memory() {

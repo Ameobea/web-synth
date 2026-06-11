@@ -17,10 +17,10 @@
 
 <script lang="ts">
   import type { CSSProperties } from 'react';
-  import React from 'react';
-  import ControlPanel from 'react-control-panel';
 
   import ReactShim from 'src/misc/ReactShim.svelte';
+
+  const ControlPanelPromise = import('react-control-panel').then(m => m.default);
 
   export let settings: ControlPanelSetting[];
   export let state: Record<string, any> | undefined = undefined;
@@ -33,15 +33,17 @@
   export let title: string | undefined = undefined;
 </script>
 
-<ReactShim
-  Component={ControlPanel}
-  props={{
-    settings,
-    state,
-    onChange,
-    style,
-    theme: theme ? { ...BaseTheme, ...theme } : undefined,
-    width,
-    title,
-  }}
-/>
+{#await ControlPanelPromise then ControlPanel}
+  <ReactShim
+    Component={ControlPanel}
+    props={{
+      settings,
+      state,
+      onChange,
+      style,
+      theme: theme ? { ...BaseTheme, ...theme } : undefined,
+      width,
+      title,
+    }}
+  />
+{/await}

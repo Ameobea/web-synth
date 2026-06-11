@@ -8,158 +8,27 @@ import ConfigureEffects, { type AdsrChangeHandler } from 'src/fmSynth/ConfigureE
 import ConfigureParamSource, { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
 import type { Effect } from 'src/fmSynth/Effect';
 import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types';
-import { buildDefaultParamSource, type ParamSource } from 'src/fmSynth/ParamSource';
 import type { UploadWavetableModalProps } from 'src/fmSynth/Wavetable/UploadWavetable';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 import { mkSvelteComponentShim } from 'src/svelteUtils';
-import { UnreachableError, base64ArrayBuffer, base64ToArrayBuffer } from 'src/util';
 import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
-import type { WavetablePreset } from 'src/api';
 
-interface UnisonPhaseRandomizationConfig {
-  enabled: boolean;
-}
+export {
+  buildDefaultOperatorConfig,
+  serializeWavetableState,
+  deserializeWavetableState,
+  type OperatorConfig,
+  type WavetableBank,
+  type WavetableState,
+} from 'src/fmSynth/operatorConfig';
+import {
+  buildDefaultOperatorConfig,
+  type OperatorConfig,
+  type WavetableBank,
+  type WavetableState,
+} from 'src/fmSynth/operatorConfig';
 
-/**
- * The algorithm used to produce the output for the operator.
- */
-export type OperatorConfig =
-  | {
-      type: 'wavetable';
-      wavetableName: string | null;
-      frequency: ParamSource;
-      dim0IntraMix: ParamSource;
-      dim1IntraMix: ParamSource;
-      interDimMix: ParamSource;
-      unison: number;
-      unisonDetune: ParamSource;
-      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
-    }
-  | {
-      type: 'sine oscillator';
-      frequency: ParamSource;
-      unison: number;
-      unisonDetune: ParamSource;
-      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
-    }
-  | {
-      type: 'exponential oscillator';
-      frequency: ParamSource;
-      stretchFactor: ParamSource;
-      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
-    }
-  | { type: 'param buffer'; bufferIx: number }
-  | {
-      type: 'square oscillator';
-      frequency: ParamSource;
-      unison: number;
-      unisonDetune: ParamSource;
-      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
-      dutyCycle?: ParamSource;
-    }
-  | {
-      type: 'triangle oscillator';
-      frequency: ParamSource;
-      unison: number;
-      unisonDetune: ParamSource;
-      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
-    }
-  | {
-      type: 'sawtooth oscillator';
-      frequency: ParamSource;
-      unison: number;
-      unisonDetune: ParamSource;
-      unisonPhaseRandomization: UnisonPhaseRandomizationConfig;
-    }
-  | { type: 'sample mapping' }
-  | { type: 'tuned sample' }
-  | { type: 'white noise' };
-
-export const buildDefaultOperatorConfig = (
-  type: OperatorConfig['type'] = 'sine oscillator'
-): OperatorConfig => {
-  switch (type) {
-    case 'sine oscillator':
-    case 'square oscillator':
-    case 'triangle oscillator':
-    case 'sawtooth oscillator': {
-      return {
-        type,
-        frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
-        unison: 1,
-        unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
-        unisonPhaseRandomization: { enabled: false },
-      };
-    }
-    case 'exponential oscillator': {
-      return {
-        type,
-        frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
-        stretchFactor: { type: 'constant', value: 0.5 },
-        unisonPhaseRandomization: { enabled: false },
-      };
-    }
-    case 'param buffer': {
-      return { type, bufferIx: 0 };
-    }
-    case 'wavetable': {
-      return {
-        type,
-        wavetableName: null,
-        frequency: buildDefaultParamSource('base frequency multiplier', 10, 20_000),
-        dim0IntraMix: buildDefaultParamSource('constant', 0, 1, 0.5),
-        dim1IntraMix: buildDefaultParamSource('constant', 0, 1, 0.5),
-        interDimMix: buildDefaultParamSource('constant', 0, 1, 0.5),
-        unison: 1,
-        unisonDetune: buildDefaultParamSource('constant', 0, 300, 1),
-        unisonPhaseRandomization: { enabled: false },
-      };
-    }
-    case 'sample mapping': {
-      return { type };
-    }
-    case 'white noise': {
-      return { type };
-    }
-    default: {
-      throw new UnreachableError('Unhandled type in `buildDefaultOperatorConfig`: ' + type);
-    }
-  }
-};
-
-export interface WavetableBank {
-  name: string;
-  samples: Float32Array;
-  samplesPerWaveform: number;
-  waveformsPerDimension: number;
-  baseFrequency: number;
-  preset?: WavetablePreset;
-}
-
-export interface WavetableState {
-  wavetableBanks: readonly WavetableBank[];
-}
-
-export const serializeWavetableState = (state: WavetableState) => {
-  return {
-    wavetableBanks: state.wavetableBanks.map(bank => ({
-      ...bank,
-      samples: base64ArrayBuffer(bank.samples.buffer),
-    })),
-  };
-};
-
-export const deserializeWavetableState = (
-  serialized: ReturnType<typeof serializeWavetableState>
-): WavetableState => {
-  return {
-    wavetableBanks: serialized.wavetableBanks.map(bank => ({
-      ...bank,
-      samples: new Float32Array(base64ToArrayBuffer(bank.samples)),
-    })),
-  };
-};
 
 interface ConfigureWavetableIndexProps {
   selectedWavetableName: string | null;

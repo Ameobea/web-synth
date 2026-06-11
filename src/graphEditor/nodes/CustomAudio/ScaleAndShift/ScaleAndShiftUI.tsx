@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useState } from 'react';
-import ReactControlPanel from 'react-control-panel';
+import ReactControlPanel from 'src/controls/LazyControlPanel';
 
 import './RangeInput.css';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';

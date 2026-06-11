@@ -1,6 +1,5 @@
 import * as R from 'ramda';
-import React, { useCallback } from 'react';
-import { Range } from 'react-control-panel';
+import React, { Suspense, useCallback } from 'react';
 
 import type { AudioThreadData } from 'src/controls/adsr2/adsr2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
@@ -8,6 +7,15 @@ import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { FilterType } from 'src/synthDesigner/FilterType';
 import { clamp, dbToLinear, filterNils, linearToDb } from 'src/util';
+
+const LazyRange = React.lazy(() =>
+  import('react-control-panel').then(m => ({ default: m.Range }))
+);
+const Range: React.FC<any> = props => (
+  <Suspense fallback={null}>
+    <LazyRange {...props} />
+  </Suspense>
+);
 
 /**
  * @returns `true` if the filter type is a primitive filter type (one which is natively supported by WebAudio's

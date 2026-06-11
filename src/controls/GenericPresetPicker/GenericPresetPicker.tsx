@@ -7,12 +7,8 @@ import { List, type RowComponentProps } from 'react-window';
 import { Tag } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
-import {
-  useContainerSize,
-  useWindowSize,
-  withReactQueryClient,
-  withReduxProvider,
-} from 'src/reactUtils';
+import { withReactQueryClient, withReduxProvider } from 'src/reactProviders';
+import { useContainerSize, useWindowSize } from 'src/reactUtils';
 import { genericPresetDispatch, store, type ReduxStore } from 'src/redux';
 import { genericPresetPickerActions } from 'src/redux/modules/genericPresetPicker';
 import StarIcon from './Star.svg';

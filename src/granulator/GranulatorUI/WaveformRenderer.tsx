@@ -61,9 +61,11 @@ export class WaveformRenderer {
   }
 
   constructor(sample?: AudioBuffer | null) {
-    this.worker = Comlink.wrap(
-      new Worker(new URL('./WaveformRendererWorker.worker.ts', import.meta.url))
-    );
+    // No waveform will ever be displayed in headless mode, so the render worker is replaced
+    // with a no-op stand-in
+    this.worker = (window as any).isHeadless
+      ? (new Proxy({}, { get: () => async () => undefined }) as any)
+      : Comlink.wrap(new Worker(new URL('./WaveformRendererWorker.worker.ts', import.meta.url), { type: 'module' }));
     if (sample) {
       this.sampleCount = sample.length;
     }

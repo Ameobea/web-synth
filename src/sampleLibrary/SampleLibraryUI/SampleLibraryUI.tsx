@@ -3,14 +3,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { List, type RowComponentProps } from 'react-window';
 
 import './SampleLibraryUI.css';
-import type { SvelteComponent } from 'svelte';
-
 import Loading from 'src/misc/Loading';
-import EmbeddingBrowserUI from 'src/sampleLibrary/embeddingBrowser/EmbeddingBrowserUI/EmbeddingBrowserUI.svelte';
 import { hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import { PlayingSampleManager } from 'src/sampleLibrary/SampleLibraryUI/PlayingSampleManager';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
-// import tempEmbedding from '../embeddingBrowser/example-res-3.json';
 import useAllSamples, { getSampleDisplayName } from './useAllSamples';
 
 interface PlaySampleIconProps {
@@ -268,12 +263,6 @@ export const LoadSamplesButtons: React.FC<LoadSamplesButtonsProps> = ({
     ) : null}
   </div>
 );
-
-type EmbeddingBrowserUIProps =
-  EmbeddingBrowserUI extends SvelteComponent<infer Props, any> ? Props : never;
-
-const EmbeddingBrowserReactShim =
-  mkSvelteComponentShim<EmbeddingBrowserUIProps>(EmbeddingBrowserUI);
 
 interface SelectedSampleState {
   sample: SampleDescriptor;

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import ControlPanel from 'react-control-panel';
+import ControlPanel from 'src/controls/LazyControlPanel';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 

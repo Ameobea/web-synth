@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import ControlPanel from 'react-control-panel';
+import ControlPanel from 'src/controls/LazyControlPanel';
 import { get, type Writable } from 'svelte/store';
 
 import { mkControlPanelADSR2WithSize } from 'src/controls/adsr2/ControlPanelADSR2';

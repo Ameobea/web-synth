@@ -1,7 +1,15 @@
-import React from 'react';
-import { Tooltip } from 'react-tooltip';
+import React, { Suspense } from 'react';
 import './HelpIcon.css';
 import { useUniqueId } from 'src/reactUtils';
+
+const LazyTooltip = React.lazy(() =>
+  import('react-tooltip').then(m => ({ default: m.Tooltip }))
+);
+const Tooltip: React.FC<any> = props => (
+  <Suspense fallback={null}>
+    <LazyTooltip {...props} />
+  </Suspense>
+);
 
 interface HelpIconIconProps
   extends React.DetailedHTMLProps<React.HTMLAttributes<SVGSVGElement>, SVGSVGElement> {

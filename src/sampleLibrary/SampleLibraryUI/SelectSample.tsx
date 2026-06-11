@@ -7,7 +7,7 @@ import type { RowComponentProps } from 'react-window';
 import { renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
-import { withReactQueryClient } from 'src/reactUtils';
+import { withReactQueryClient } from 'src/reactProviders';
 import { hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
 import {
   LoadSamplesButtons,

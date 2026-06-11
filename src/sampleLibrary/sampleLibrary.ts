@@ -10,7 +10,6 @@ import {
   mkContainerUnhider,
 } from 'src/reactUtils';
 import { cacheSample, getAllCachedSamples, getCachedSample } from 'src/sampleLibrary/sampleCache';
-import SampleLibraryUI from 'src/sampleLibrary/SampleLibraryUI/SampleLibraryUI';
 import SampleManager from 'src/sampleLibrary/SampleManager';
 import { UnimplementedError } from 'src/util';
 
@@ -195,6 +194,11 @@ export const addLocalSample = async (descriptor: SampleDescriptor, sampleData: A
 };
 
 export const init_sample_library = (stateKey: string) => {
+  // Pure UI VC with no connectables; nothing to do in headless mode
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   const elem = document.createElement('div');
   elem.id = stateKey;
   elem.setAttribute(
@@ -203,11 +207,19 @@ export const init_sample_library = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  mkContainerRenderHelper({
-    Comp: SampleLibraryUI,
-    getProps: () => ({}),
-    enableReactQuery: true,
-  })(stateKey);
+  void import('src/sampleLibrary/SampleLibraryUI/SampleLibraryUI').then(
+    ({ default: SampleLibraryUI }) => {
+      if (!elem.isConnected) {
+        return;
+      }
+
+      mkContainerRenderHelper({
+        Comp: SampleLibraryUI,
+        getProps: () => ({}),
+        enableReactQuery: true,
+      })(stateKey);
+    }
+  );
 };
 
 export const cleanup_sample_library = mkContainerCleanupHelper();

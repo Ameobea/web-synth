@@ -1,2 +1,5 @@
 [registries.crates-io]
 protocol = "sparse"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-Ctarget-feature=+simd128"]

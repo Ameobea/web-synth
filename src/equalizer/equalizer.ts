@@ -1,6 +1,5 @@
 import type { AudioConnectables } from 'src/patchNetwork';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
-import EqualizerUI from 'src/equalizer/EqualizerUI/EqualizerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
 import { buildDefaultEqualizerState, EqualizerInstance } from 'src/equalizer/EqualizerInstance';
 import { rwritable, type TransparentWritable } from 'src/util';
@@ -64,10 +63,16 @@ export const init_equalizer = (stateKey: string) => {
     return;
   }
 
-  mkSvelteContainerRenderHelper({
-    Comp: EqualizerUI,
-    getProps: () => ({ inst }),
-  })(domId);
+  void import('src/equalizer/EqualizerUI/EqualizerUI.svelte').then(({ default: EqualizerUI }) => {
+    if (!elem.isConnected) {
+      return;
+    }
+
+    mkSvelteContainerRenderHelper({
+      Comp: EqualizerUI,
+      getProps: () => ({ inst }),
+    })(domId);
+  });
 };
 
 export const persist_equalizer = (stateKey: string) => {

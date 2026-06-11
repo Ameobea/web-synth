@@ -1,7 +1,7 @@
 import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import React, { useMemo } from 'react';
-import ControlPanel from 'react-control-panel';
+import ControlPanel from 'src/controls/LazyControlPanel';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';

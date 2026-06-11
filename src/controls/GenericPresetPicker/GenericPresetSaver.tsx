@@ -7,7 +7,7 @@ import { useQuery } from 'react-query';
 import type { PresetDescriptor } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { type ModalCompProps, renderModalWithControls } from 'src/controls/Modal';
 import BasicModal from 'src/misc/BasicModal';
-import { withReactQueryClient } from 'src/reactUtils';
+import { withReactQueryClient } from 'src/reactProviders';
 import './GenericPresetPicker.css';
 
 interface GenericPresetSaverArgs {

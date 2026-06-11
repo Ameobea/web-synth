@@ -1,8 +1,6 @@
 import * as R from 'ramda';
 
-import { renderModalWithControls } from 'src/controls/Modal';
 import type { FSAccessDriver } from 'src/fsAccess/driver';
-import FSAccessDialog from 'src/fsAccess/drivers/nativeFS/FSAccessDialog';
 import type {
   FileSystemDirectoryHandle,
   FileSystemFileHandle,
@@ -22,6 +20,10 @@ export default class NativeFSDriver implements FSAccessDriver {
   }
 
   public async init(): Promise<void> {
+    const [{ renderModalWithControls }, { default: FSAccessDialog }] = await Promise.all([
+      import('src/controls/Modal'),
+      import('src/fsAccess/drivers/nativeFS/FSAccessDialog'),
+    ]);
     await renderModalWithControls(FSAccessDialog);
 
     const dataDirHandle = await patchedWindow.showDirectoryPicker();

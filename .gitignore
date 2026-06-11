@@ -6,15 +6,9 @@ node_modules/
 src/midi*
 !src/midiKeyboard
 src/spectrum_viz*
-src/polysynth.js
-src/polysynth_bg.js
-src/polysynth_bg.d.ts
-src/polysynth_bg.wasm
 src/waveform_renderer*
 .env
 !src/midiEditor*
-polysynth.d.ts
-litegraph.js
 cypress/videos
 public/wavetable.wasm
 public/granular.wasm
@@ -27,9 +21,9 @@ public/adsr.wasm
 public/sample_editor.wasm
 public/delay.wasm
 !src/midiUtils.ts
+!src/midiWasmModule.ts
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
-src/polysynth_bg.wasm.d.ts
 public/sample_player.wasm
 src/wav_decoder*
 **/.DS_Store
@@ -38,7 +32,6 @@ public/midi_quantizer.wasm
 public/dsp.wasm
 public/engine.wasm
 public/midi.wasm
-public/polysynth.wasm
 public/quantizer.wasm
 public/spectrum_viz.wasm
 public/wav_decoder.wasm

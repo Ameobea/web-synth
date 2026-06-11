@@ -1,5 +1,5 @@
 import { Map as ImmMap } from 'immutable';
-import { globalTempoCSN } from 'src/globalMenu';
+import { globalTempoCSN } from 'src/globalMenu/globalTempo';
 import BpmNodeSmallView from 'src/graphEditor/nodes/CustomAudio/BPM/BPMNodeSmallView.svelte';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';

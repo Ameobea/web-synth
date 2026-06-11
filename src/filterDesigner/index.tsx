@@ -95,6 +95,10 @@ export const init_filter_designer = async (stateKey: string) => {
     StatesByVcId.set(vcId, newState);
   };
 
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   mkContainerRenderHelper({
     Comp: LazyFilterDesignerUI,
     getProps: () => ({

@@ -1,9 +1,6 @@
 import { Option, Try } from 'funfix-core';
 import { Map as ImmMap } from 'immutable';
-import { createRoot } from 'react-dom/client';
-import { Provider } from 'react-redux';
-
-import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ConfigureParamSource';
+import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ParamSource';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { MIDINode } from 'src/patchNetwork/midiNode';
@@ -15,7 +12,6 @@ import buildSynthDesignerRedux, {
   SynthDesignerStateByStateKey,
   type SynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
-import SynthDesigner from './SynthDesigner';
 import { UnreachableError } from 'src/util';
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
@@ -98,6 +94,18 @@ export const init_synth_designer = (stateKey: string) => {
     reduxInfra.dispatch(reduxInfra.actionCreators.synthDesigner.SET_STATE(initialState));
   }
 
+  if ((window as any).isHeadless) {
+    // The React tree normally dispatches this with a WavyJones oscilloscope (or a plain
+    // `AnalyserNode` when WebGL is unavailable); it's what wires voice outputs through to
+    // `spectrumNode`, so the audio path depends on it.
+    reduxInfra.dispatch(
+      reduxInfra.actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(
+        new AnalyserNode(new AudioContext())
+      )
+    );
+    return;
+  }
+
   // Create the base dom node for the faust editor
   const synthDesignerBase = document.createElement('div');
   synthDesignerBase.id = getRootNodeId(vcId);
@@ -109,13 +117,23 @@ export const init_synth_designer = (stateKey: string) => {
   // Mount the newly created Faust editor and all of its accompanying components to the DOM
   document.getElementById('content')!.appendChild(synthDesignerBase);
 
-  const reactRoot = createRoot(synthDesignerBase);
-  reactRoot.render(
-    <Provider store={reduxInfra.store}>
-      <SynthDesigner stateKey={stateKey} />
-    </Provider>
-  );
-  SynthDesignerStateByStateKey.get(stateKey)!.reactRoot = reactRoot;
+  void Promise.all([
+    import('./SynthDesigner'),
+    import('react-dom/client'),
+    import('react-redux'),
+  ]).then(([{ default: SynthDesigner }, { createRoot }, { Provider }]) => {
+    if (!synthDesignerBase.isConnected) {
+      return;
+    }
+
+    const reactRoot = createRoot(synthDesignerBase);
+    reactRoot.render(
+      <Provider store={reduxInfra.store}>
+        <SynthDesigner stateKey={stateKey} />
+      </Provider>
+    );
+    SynthDesignerStateByStateKey.get(stateKey)!.reactRoot = reactRoot;
+  });
 };
 
 export const hide_synth_designer = (stateKey: string) => {
@@ -125,7 +143,9 @@ export const hide_synth_designer = (stateKey: string) => {
 
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
-    console.warn(`Tried to hide synth designer with id ${vcId} but it wasn't mounted`);
+    if (!(window as any).isHeadless) {
+      console.warn(`Tried to hide synth designer with id ${vcId} but it wasn't mounted`);
+    }
     return;
   }
 
@@ -139,7 +159,9 @@ export const unhide_synth_designer = (stateKey: string) => {
 
   const rootNode = document.getElementById(getRootNodeId(vcId));
   if (!rootNode) {
-    console.warn(`Tried to unhide synth designer with id ${vcId} but it wasn't mounted`);
+    if (!(window as any).isHeadless) {
+      console.warn(`Tried to unhide synth designer with id ${vcId} but it wasn't mounted`);
+    }
     return;
   }
 
@@ -159,10 +181,6 @@ export const persist_synth_designer = (stateKey: string) => {
 export const cleanup_synth_designer = (stateKey: string): string => {
   const designerState = serializeSynthDesigner(stateKey);
   const vcId = stateKey.split('_')[1]!;
-  const rootNode = document.getElementById(getRootNodeId(vcId));
-  if (!rootNode) {
-    return designerState;
-  }
 
   const state = SynthDesignerStateByStateKey.get(stateKey);
   if (!state) {
@@ -170,15 +188,14 @@ export const cleanup_synth_designer = (stateKey: string): string => {
       'Missing state map entry for synth designer when cleaning up, stateKey=' + stateKey
     );
   } else {
-    if (state.reactRoot === 'NOT_LOADED') {
-      console.warn('React root not loaded when synth designer cleaned up');
-    } else {
+    if (state.reactRoot !== 'NOT_LOADED') {
       state.reactRoot.unmount();
     }
 
     state.getState().synthDesigner.synths.forEach(synth => synth.fmSynth.shutdown());
   }
-  rootNode.remove();
+
+  document.getElementById(getRootNodeId(vcId))?.remove();
   return designerState;
 };
 

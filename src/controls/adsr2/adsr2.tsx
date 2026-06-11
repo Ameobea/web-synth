@@ -7,6 +7,7 @@ import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
 import type { RampFn } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import * as PIXI from 'src/controls/pixi';
 import { destroyPIXIApp } from 'src/controls/pixiUtils';
+import { LEFT_GUTTER_WIDTH_PX } from 'src/controls/adsr2/adsr2Helpers';
 import {
   AdsrLengthMode,
   type Adsr,
@@ -1046,7 +1047,6 @@ export interface RenderedRegion {
   end: number;
 }
 
-export const LEFT_GUTTER_WIDTH_PX = 27 * dpr;
 const RIGHT_GUTTER_WIDTH_PX = 7 * dpr;
 const TOP_GUTTER_WIDTH_PX = 10 * dpr;
 const BOTTOM_GUTTER_WIDTH_PX = 10 * dpr;
@@ -1299,17 +1299,19 @@ export class ADSR2Instance {
     if (!debugName) {
       console.trace('No debug name provided for ADSR');
     }
-    try {
-      this.app = new PIXI.Application({
-        antialias: true,
-        autoDensity: true,
-        view: canvas as PIXI.ICanvas,
-        height: height * dpr,
-        width: width * dpr,
-        backgroundColor: BACKGROUND_COLOR,
-      });
-    } catch (_err) {
-      console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
+    if (!(window as any).isHeadless) {
+      try {
+        this.app = new PIXI.Application({
+          antialias: true,
+          autoDensity: true,
+          view: canvas as PIXI.ICanvas,
+          height: height * dpr,
+          width: width * dpr,
+          backgroundColor: BACKGROUND_COLOR,
+        });
+      } catch (_err) {
+        console.error('Failed to initialize PixiJS applicationl; WebGL not supported?');
+      }
     }
 
     if (vcId) {

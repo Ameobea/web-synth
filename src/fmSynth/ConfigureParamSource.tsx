@@ -13,7 +13,8 @@ import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSyn
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { msToSamples, samplesToMs, UnreachableError } from 'src/util';
 
-export const PARAM_BUFFER_COUNT = 8;
+import { PARAM_BUFFER_COUNT } from 'src/fmSynth/ParamSource';
+export { PARAM_BUFFER_COUNT };
 
 const LazyADSR2 = React.lazy(() => import('src/controls/adsr2/adsr2'));
 

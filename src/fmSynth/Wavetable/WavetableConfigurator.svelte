@@ -31,7 +31,7 @@
   export let curPreset: WavetablePreset | undefined = undefined;
 
   const worker: Comlink.Remote<WavetableConfiguratorWorker> = Comlink.wrap(
-    new Worker(new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url))
+    new Worker(new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url), { type: 'module' })
   );
 
   let initialPreset = curPreset;

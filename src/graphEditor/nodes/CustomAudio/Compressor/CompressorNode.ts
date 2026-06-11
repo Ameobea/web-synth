@@ -92,6 +92,11 @@ const CompressorAWPRegistered = new AsyncOnce(
   true
 );
 
+export const prefetchCompressorAssets = () => {
+  void CompressorWasmBytes.get();
+  void CompressorAWPRegistered.get();
+};
+
 export class CompressorNode implements ForeignNode {
   private dummyInput = new DummyNode('CompressorNodeInput');
   private dummyOutput = new DummyNode('CompressorNodeOutput');

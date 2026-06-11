@@ -6,7 +6,7 @@
   import { getState } from 'src/redux';
   import { getSentry } from 'src/sentry';
   import { getEngine } from 'src/util';
-  import { setGlobalVolume } from '../ViewContextManager/GlobalVolumeSlider';
+  import { setGlobalVolume } from '../ViewContextManager/globalVolume';
 
   export let title: string;
   export let description: string;

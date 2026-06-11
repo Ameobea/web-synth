@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import React, { useCallback, useMemo, useReducer, useRef } from 'react';
-import ControlPanel from 'react-control-panel';
+import ControlPanel from 'src/controls/LazyControlPanel';
 
 import type {
   SampleCrossfadeParams,

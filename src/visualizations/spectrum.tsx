@@ -20,17 +20,17 @@ interface SettingDefinition {
   id: number;
 }
 
-const RawWasmModule = new AsyncOnce(() =>
-  (import('src/spectrum_viz_bg.wasm' as any) as Promise<{ memory: WebAssembly.Memory }>).then(
-    wasmModule => {
-      type Return = typeof wasmModule & { wasmMemory: Uint8Array };
-      (wasmModule as any).wasmMemory = new Uint8Array(wasmModule.memory.buffer);
-      return wasmModule as Return;
-    }
-  )
-);
+const WasmModule = new AsyncOnce(async () => {
+  const mod = await import('src/spectrum_viz');
+  await mod.default();
+  return mod;
+});
 
-const WasmModule = new AsyncOnce(() => import('src/spectrum_viz'));
+const RawWasmModule = new AsyncOnce(async () => {
+  const mod = await WasmModule.get();
+  const out = await mod.default();
+  return { memory: out.memory, wasmMemory: new Uint8Array(out.memory.buffer) };
+});
 
 interface SpectrumVisualizationProps {
   initialConf?: SpectrumVizSettings;

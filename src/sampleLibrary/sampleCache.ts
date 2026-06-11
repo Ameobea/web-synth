@@ -2,17 +2,22 @@
  * Implements a cache for samples that are stored directly in the browser via IndexedDB.  This removes the need for
  * samples to be re-fetched via the internet or loaded from local disk which requires permissions and user action.
  */
-import Dexie from 'dexie';
+import type { Table } from 'dexie';
 import * as R from 'ramda';
 
 import type { SampleDescriptor } from 'src/sampleLibrary/sampleLibrary';
+import { AsyncOnce } from 'src/util';
 
 const MAX_CACHE_SIZE_BYTES = 1024 * 1024 * 500; // 500MB
 
-const dbClient = new Dexie('sampleCache');
-
-dbClient.version(1).stores({
-  samples: '[isLocal+name+id], lastAccessed, sizeBytes, url',
+// Dexie is lazy-loaded to keep it out of entrypoint bundles
+const SamplesTable = new AsyncOnce(async () => {
+  const { default: Dexie } = await import('dexie');
+  const dbClient = new Dexie('sampleCache');
+  dbClient.version(1).stores({
+    samples: '[isLocal+name+id], lastAccessed, sizeBytes, url',
+  });
+  return (dbClient as any).samples as Table<SampleRow, any>;
 });
 
 interface SampleRow {
@@ -24,8 +29,6 @@ interface SampleRow {
   lastAccessed: Date;
   sampleData: ArrayBuffer;
 }
-
-const samplesTable = (dbClient as any).samples as Dexie.Table<SampleRow, any>;
 
 const buildWhereClause = (descriptor: SampleDescriptor) => ({
   name: descriptor.name,
@@ -41,6 +44,7 @@ const buildDescriptor = (row: any): SampleDescriptor => ({
 });
 
 const getTotalUsedCacheSpace = async () => {
+  const samplesTable = await SamplesTable.get();
   let totalBytesUsed = 0;
   await samplesTable.each(row => {
     totalBytesUsed += row.sizeBytes;
@@ -49,6 +53,7 @@ const getTotalUsedCacheSpace = async () => {
 };
 
 const maybePruneOldEntries = async (neededBytes: number) => {
+  const samplesTable = await SamplesTable.get();
   const usedSpace = await getTotalUsedCacheSpace();
   if (MAX_CACHE_SIZE_BYTES - usedSpace >= neededBytes) {
     return;
@@ -82,6 +87,8 @@ export const cacheSample = async (descriptor: SampleDescriptor, sampleData: Arra
   // Check to see if out cache is out of space.  If it is, we have to evict entries until we have enough space.
   await maybePruneOldEntries(sampleData.byteLength);
 
+  const samplesTable = await SamplesTable.get();
+
   await samplesTable.put({
     ...descriptor,
     id: descriptor.id ? descriptor.id : '',
@@ -95,6 +102,7 @@ export const cacheSample = async (descriptor: SampleDescriptor, sampleData: Arra
 export const getCachedSample = async (
   descriptor: SampleDescriptor
 ): Promise<ArrayBuffer | null> => {
+  const samplesTable = await SamplesTable.get();
   const whereClause = buildWhereClause(descriptor);
   const row = await samplesTable.where(whereClause).first();
   if (R.isNil(row)) {
@@ -112,6 +120,7 @@ export const getCachedSample = async (
 };
 
 export const getAllCachedSamples = async (): Promise<SampleDescriptor[]> => {
+  const samplesTable = await SamplesTable.get();
   const allSamples = await samplesTable.toArray();
   return allSamples.map(buildDescriptor);
 };

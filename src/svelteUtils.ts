@@ -48,7 +48,9 @@ export const mkSvelteContainerCleanupHelper =
   (domID: string) => {
     const BuiltComp = RenderedSvelteComponentsByDomID.get(domID);
     if (!BuiltComp) {
-      console.error(`No built svelte component found with domID=${domID} when cleaning up`);
+      if (!(window as any).isHeadless) {
+        console.error(`No built svelte component found with domID=${domID} when cleaning up`);
+      }
     } else {
       BuiltComp.$destroy();
     }

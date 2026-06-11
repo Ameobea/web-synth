@@ -2,7 +2,6 @@
   import type { Writable } from 'svelte/store';
 
   import type { AdsrChangeHandler } from 'src/fmSynth/ConfigureEffects';
-  import ConfigureEffects from 'src/fmSynth/ConfigureEffects.svelte';
   import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
   import type { FMSynthFxState } from 'src/graphEditor/nodes/CustomAudio/FMSynthFx/FMSynthFxNode';
   import type { Effect } from 'src/fmSynth/Effect';
@@ -22,18 +21,25 @@
   let onAdsrChange: AdsrChangeHandler = (adsrIx: number, newParams: AdsrParams) => {
     // TODO
   };
+
+  const ConfigureEffectsPromise = import('src/fmSynth/ConfigureEffects.svelte').then(
+    m => m.default
+  );
 </script>
 
 <div class="root">
-  <ConfigureEffects
-    {state}
-    {onChange}
-    operatorIx={null}
-    vcId={undefined}
-    {setOperatorEffects}
-    {adsrs}
-    {onAdsrChange}
-  />
+  {#await ConfigureEffectsPromise then ConfigureEffects}
+    <svelte:component
+      this={ConfigureEffects}
+      {state}
+      {onChange}
+      operatorIx={null}
+      vcId={undefined}
+      {setOperatorEffects}
+      {adsrs}
+      {onAdsrChange}
+    />
+  {/await}
 </div>
 
 <style lang="css">

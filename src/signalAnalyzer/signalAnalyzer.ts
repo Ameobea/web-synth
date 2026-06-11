@@ -6,23 +6,21 @@ import {
   type SerializedSignalAnalyzerInst,
   SignalAnalyzerInst,
 } from 'src/signalAnalyzer/SignalAnalyzerInst';
-import SignalAnalyzerUI from 'src/signalAnalyzer/SignalAnalyzerUI.svelte';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
-import { tryParseJson } from 'src/util';
+import { noop, tryParseJson } from 'src/util';
 
-const SignalAnalyzerInstsByStateKey = new Map<string, SignalAnalyzerInst>();
+interface SignalAnalyzerHandle {
+  input: AnalyserNode;
+  pause: () => void;
+  resume: () => void;
+  serialize: () => SerializedSignalAnalyzerInst;
+}
+
+const SignalAnalyzerInstsByStateKey = new Map<string, SignalAnalyzerHandle>();
 
 const ctx = new AudioContext();
 
 export const init_signal_analyzer = (stateKey: string) => {
-  const elem = document.createElement('div');
-  elem.id = stateKey;
-  elem.setAttribute(
-    'style',
-    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: hidden; position: absolute; top: 0; left: 0; display: none;'
-  );
-  document.getElementById('content')!.appendChild(elem);
-
   const initialState =
     tryParseJson<SerializedSignalAnalyzerInst, undefined>(
       localStorage.getItem(stateKey)!,
@@ -31,22 +29,51 @@ export const init_signal_analyzer = (stateKey: string) => {
     ) ?? buildDefaultSignalAnalyzerInstState();
   initialState.oscilloscopeUIState.frozen = false;
 
+  if ((window as any).isHeadless) {
+    // This VC is a pure sink with no outputs, so all that's needed in headless mode is an input
+    // node for connections to target; the AWP, oscilloscope + spectrogram workers, and UI are
+    // all skipped.
+    SignalAnalyzerInstsByStateKey.set(stateKey, {
+      input: ctx.createAnalyser(),
+      pause: noop,
+      resume: noop,
+      serialize: () => initialState,
+    });
+    return;
+  }
+
+  const elem = document.createElement('div');
+  elem.id = stateKey;
+  elem.setAttribute(
+    'style',
+    'z-index: 2; width: 100%; height: calc(100vh - 34px); overflow-y: hidden; position: absolute; top: 0; left: 0; display: none;'
+  );
+  document.getElementById('content')!.appendChild(elem);
+
   const inst = new SignalAnalyzerInst(ctx, initialState);
   SignalAnalyzerInstsByStateKey.set(stateKey, inst);
 
-  mkSvelteContainerRenderHelper({
-    Comp: SignalAnalyzerUI,
-    getProps: () => ({ inst }),
-  })(stateKey);
+  void import('src/signalAnalyzer/SignalAnalyzerUI.svelte').then(
+    ({ default: SignalAnalyzerUI }) => {
+      if (!elem.isConnected) {
+        return;
+      }
+
+      mkSvelteContainerRenderHelper({
+        Comp: SignalAnalyzerUI,
+        getProps: () => ({ inst }),
+      })(stateKey);
+    }
+  );
 };
 
 export const hide_signal_analyzer = (stateKey: string) => {
   const elem = document.getElementById(stateKey);
-  if (!elem) {
+  if (elem) {
+    elem.style.display = 'none';
+  } else if (!(window as any).isHeadless) {
     console.error(`No element found for state key ${stateKey} when hiding signal analyzer`);
-    return;
   }
-  elem.style.display = 'none';
 
   const inst = SignalAnalyzerInstsByStateKey.get(stateKey);
   if (!inst) {
@@ -57,11 +84,11 @@ export const hide_signal_analyzer = (stateKey: string) => {
 
 export const unhide_signal_analyzer = (stateKey: string) => {
   const elem = document.getElementById(stateKey);
-  if (!elem) {
+  if (elem) {
+    elem.style.display = 'block';
+  } else if (!(window as any).isHeadless) {
     console.error(`No element found for state key ${stateKey} when un-hiding signal analyzer`);
-    return;
   }
-  elem.style.display = 'block';
 
   const inst = SignalAnalyzerInstsByStateKey.get(stateKey);
   if (!inst) {

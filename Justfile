@@ -1,147 +1,51 @@
 set dotenv-load := true
 
-opt:
-  for file in `ls ./dist | grep "\\.wasm"`; do wasm-opt ./dist/$file -g --strip-dwarf -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/$file; done
-  for file in `ls ./dist/headless | grep "\\.wasm"`; do wasm-opt ./dist/headless/$file -g --strip-dwarf -O4 --enable-simd --precompute-propagate --fast-math --detect-features --strip-dwarf -c -o ./dist/headless/$file; done
+# .wasm modules copied raw into public/ and fetched at runtime
+wasm_modules := "wavetable granular event_scheduler sidechain noise_gen distortion adsr sample_editor delay sample_player looper midi_quantizer quantizer compressor vocoder level_detector wavegen multiband_diode_ladder_distortion midi_renderer oscilloscope spectrum_viz_full sampler safety_limiter equalizer lfo"
+# modules run through wasm-bindgen; JS glue + _bg.wasm land in src/
+bindgen_modules := "engine midi spectrum_viz waveform_renderer wav_decoder"
+
+# -g + --strip-dwarf keeps the name section (profiling/Sentry) while dropping DWARF
+wasm_opt_flags := "-g --detect-features --fast-math --zero-filled-memory --converge --strip-dwarf -O4 --precompute-propagate"
+
+opt: opt-headless
+  for file in `ls ./dist/*.wasm ./dist/assets/*.wasm 2>/dev/null`; do wasm-opt $file {{wasm_opt_flags}} -o $file; done
   svgo -p 1 --multipass -f ./dist -o ./dist
   svgo -p 1 --multipass -f ./dist/icons/music_notes -o ./dist/icons/music_notes
 
-opt-public:
-  # for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done
-  for file in `ls ./public | grep "\\.wasm"`; do echo $file && wasm-opt ./public/$file -O4 --enable-simd --precompute-propagate --fast-math --detect-features -g --strip-dwarf -c -o ./public/$file; done
-
-opt-public-profiling:
-  # for file in `ls ./public | grep "\\.wasm"`; do wasm-snip ./public/$file -o ./public/$file --snip-rust-fmt-code --snip-rust-panicking-code; done
-  for file in `ls ./public | grep "\\.wasm"`; do echo $file && wasm-opt ./public/$file -O4 --enable-simd --precompute-propagate --fast-math --detect-features -g -c -o ./public/$file; done
+opt-headless:
+  for file in `ls ./dist/headless/*.wasm ./dist/headless/assets/*.wasm 2>/dev/null`; do wasm-opt $file {{wasm_opt_flags}} -o $file; done
 
 build-docs:
   cd docs/_layouts && yarn build
   rm -rf ./dist/docs
   cp -r ./docs/_layouts/public ./dist/docs
 
-fix-litegraph:
-  #!/usr/bin/env bash
-  set -euxo pipefail
-  if ! command -v gsed &> /dev/null
-  then
-      sed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
-  else
-      gsed -i '/No glmatrix found/c\0;' node_modules/litegraph.js/build/litegraph.js
-  fi
-
-  # https://github.com/jagenjo/litegraph.js/pull/287
-  if ! command -v gsed &> /dev/null
-  then
-      sed -i '/e.deltaX = e.localX - this.last_mouse_position\[0\];/c\// e.deltaX = e.localX - this.last_mouse_position[0];' node_modules/litegraph.js/build/litegraph.js
-      sed -i '/e.deltaY = e.localY - this.last_mouse_position\[1\];/c\// e.deltaY = e.localY - this.last_mouse_position[1];' node_modules/litegraph.js/build/litegraph.js
-  else
-      gsed -i '/e.deltaX = e.localX - this.last_mouse_position\[0\];/c\// e.deltaX = e.localX - this.last_mouse_position[0];' node_modules/litegraph.js/build/litegraph.js
-      gsed -i '/e.deltaY = e.localY - this.last_mouse_position\[1\];/c\// e.deltaY = e.localY - this.last_mouse_position[1];' node_modules/litegraph.js/build/litegraph.js
-  fi
-
-build-all:
+build-wasm:
   #!/bin/bash
+  set -euo pipefail
+  cd engine
+  ./release.sh
+  rm -rf ./build/*
+  for module in {{bindgen_modules}}; do
+    wasm-bindgen ./target/wasm32-unknown-unknown/release/$module.wasm --target web --remove-producers-section --out-dir ./build
+  done
+  cd ..
+  cp ./engine/build/* ./src/
+  for module in {{wasm_modules}}; do
+    cp ./engine/target/wasm32-unknown-unknown/release/$module.wasm ./public/
+  done
 
-  just fix-litegraph
-
-  cd engine \
-    && ./release.sh \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/engine.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/midi.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen ./target/wasm32-unknown-unknown/release/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
-
-  cd -
-  cp ./engine/target/wasm32-unknown-unknown/release/*.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/vocoder.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/lfo.wasm ./public
-  cp ./engine/build/* ./src
-
-  yarn build || npm build
-
+build-all: build-wasm
+  yarn build
   just build-headless
-
   just opt
-
   just build-docs
 
 build-headless:
-  yarn build-headless || npm build-headless
+  yarn build-headless
 
-run:
-  #!/bin/bash
-
-  just fix-litegraph
-
-  cd engine \
-    && ./release.sh \
-    && rm -rf /tmp/wasm \
-    && mkdir /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/release/*.wasm /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/release/spectrum_viz.wasm /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/release/waveform_renderer.wasm /tmp/wasm \
-    && cp ./target/wasm32-unknown-unknown/release/wav_decoder.wasm /tmp/wasm \
-    && wasm-bindgen /tmp/wasm/engine.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/midi.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/polysynth.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./build \
-    && wasm-bindgen /tmp/wasm/wav_decoder.wasm --browser --remove-producers-section --out-dir ./build
-
-  cd -
-  cp ./engine/build/* ./src/
-  cp ./engine/target/wasm32-unknown-unknown/release/wavetable.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/wavetable_no_simd.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/granular.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/event_scheduler.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sidechain.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/noise_gen.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/distortion.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/adsr.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sample_editor.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/delay.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sample_player.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/looper.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/midi_quantizer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/quantizer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/compressor.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/vocoder.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/level_detector.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/wavegen.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/multiband_diode_ladder_distortion.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/midi_renderer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/oscilloscope.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/spectrum_viz_full.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/sampler.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/safety_limiter.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/equalizer.wasm ./public
-  cp ./engine/target/wasm32-unknown-unknown/release/lfo.wasm ./public
-
+run: build-wasm
   yarn start
 
 run-frontend:
@@ -152,7 +56,7 @@ deploy:
 
   rsync -Prv -e "ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -F /dev/null" ./dist/* debian@synth.ameo.dev:/var/www/synth.ameo.dev/
 
-deploy-headless:
+deploy-headless: opt-headless
   phost update web-synth-headless-test patch dist/headless
 
 loc:
@@ -160,12 +64,12 @@ loc:
 
 debug-engine:
   cd ./engine/engine && cargo build --target wasm32-unknown-unknown && \
-  cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/debug/engine.wasm --browser --remove-producers-section --out-dir ./build && \
+  cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/debug/engine.wasm --target web --remove-producers-section --out-dir ./build && \
   cp ./build/* ../src
 
 build-engine:
   cd ./engine/engine && cargo build --release --target wasm32-unknown-unknown && \
-  cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/release/engine.wasm --browser --remove-producers-section --out-dir ./build && \
+  cd .. && wasm-bindgen ./target/wasm32-unknown-unknown/release/engine.wasm --target web --remove-producers-section --out-dir ./build && \
   cp ./build/* ../src
 
 build-wavetable:
@@ -190,12 +94,12 @@ build-scheduler:
 
 build-spectrum-viz:
   cd ./engine/spectrum_viz && cargo build --release --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/spectrum_viz.wasm --browser --remove-producers-section --out-dir ./engine/build
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/spectrum_viz.wasm --target web --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/spectrum* ./src/
 
 build-midi:
   cd ./engine/midi && cargo build --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/midi.wasm --browser --remove-producers-section --out-dir ./engine/build
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/midi.wasm --target web --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/midi* ./src/
 
 build-granular:
@@ -220,7 +124,7 @@ debug-sample-player:
 
 build-wav-decoder:
   cd ./engine/wav_decoder && cargo build --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/wav_decoder.wasm --browser --remove-producers-section --out-dir ./engine/build
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/debug/wav_decoder.wasm --target web --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/wav_decoder* ./src/
 
 build-event-scheduler:
@@ -247,16 +151,12 @@ debug-compressor:
   cd ./engine/compressor && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/compressor.wasm ../../public
 
-build-polysynth:
-  cd ./engine/polysynth && cargo build --release --target wasm32-unknown-unknown && \
-    cp ../target/wasm32-unknown-unknown/release/polysynth.wasm ../../public
-
 build-vocoder:
-  cd ./engine/vocoder && RUSTFLAGS="-Ctarget-feature=+simd128" cargo build --release --target wasm32-unknown-unknown && \
+  cd ./engine/vocoder && cargo build --release --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/release/vocoder.wasm ../../public
 
 debug-vocoder:
-  cd ./engine/vocoder && RUSTFLAGS="-Ctarget-feature=+simd128" cargo build --target wasm32-unknown-unknown && \
+  cd ./engine/vocoder && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/vocoder.wasm ../../public
 
 build-level-detector:
@@ -293,7 +193,7 @@ build-line-spectrogram:
 
 build-waveform-renderer:
   cd ./engine/waveform_renderer && cargo build --release --target wasm32-unknown-unknown && \
-    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/waveform_renderer.wasm --browser --remove-producers-section --out-dir ./engine/build
+    cd - && wasm-bindgen ./engine/target/wasm32-unknown-unknown/release/waveform_renderer.wasm --target web --remove-producers-section --out-dir ./engine/build
   cp ./engine/build/waveform_renderer* ./src/
 
 build-sampler:

@@ -8,7 +8,11 @@ import { AsyncOnce } from 'src/util';
 
 const SAMPLE_RATE = 44_100;
 
-const WavDecoder = new AsyncOnce(() => import('src/wav_decoder'));
+const WavDecoder = new AsyncOnce(async () => {
+  const mod = await import('src/wav_decoder');
+  await mod.default();
+  return mod;
+});
 
 interface WavetableUploadInfo {
   samples: Float32Array;

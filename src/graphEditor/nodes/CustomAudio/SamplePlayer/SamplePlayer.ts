@@ -1,8 +1,8 @@
 import { Map as ImmMap } from 'immutable';
+import React from 'react';
 import * as R from 'ramda';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import SamplePlayerUI from 'src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayerUI';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
@@ -72,6 +72,16 @@ export default class SamplePlayerNode implements ForeignNode {
     if (params) {
       this.deserialize(params);
     }
+
+    const LazySamplePlayerUI = React.lazy(
+      () => import('src/graphEditor/nodes/CustomAudio/SamplePlayer/SamplePlayerUI')
+    );
+    const SamplePlayerUI: React.FC<any> = props =>
+      React.createElement(
+        React.Suspense,
+        { fallback: null },
+        React.createElement(LazySamplePlayerUI, props)
+      );
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: SamplePlayerUI,

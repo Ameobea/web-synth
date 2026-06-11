@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActiveSamplesByVcId } from 'src/granulator/activeSamples';
 import ControlPanel from 'react-control-panel';
 
 import './Granulator.css';
@@ -181,7 +182,6 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
   );
 };
 
-export const ActiveSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();
 
 const msToSamples = (ms: number | null, sampleRate: number): number | null => {
   if (ms === null) {

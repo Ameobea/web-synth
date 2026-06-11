@@ -4,6 +4,8 @@ import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
 import { UnimplementedError, UnreachableError, filterNils } from 'src/util';
 
+export const PARAM_BUFFER_COUNT = 8;
+
 /**
  * A parameter/value generator function.  Used to produce the frequency input values for
  * operators.

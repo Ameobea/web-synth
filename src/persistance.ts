@@ -1,15 +1,14 @@
 import * as R from 'ramda';
-import Dexie from 'dexie';
 import download from 'downloadjs';
 import { Either } from 'funfix-core';
 
 import { getLoadedComposition } from 'src/api';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { stopAll } from 'src/eventScheduler/eventScheduler';
-import { setGlobalBpm } from 'src/globalMenu';
+import { setGlobalBpm } from 'src/globalMenu/globalTempo';
 import { actionCreators, dispatch, getState } from 'src/redux';
 import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
-import { getEngine } from 'src/util';
+import { AsyncOnce, getEngine } from 'src/util';
 
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
@@ -67,13 +66,19 @@ export const reinitializeWithComposition = (
   return Either.right(void 0);
 };
 
-const localCompDbClient = new Dexie('savedLocalComposition');
-localCompDbClient.version(1).stores({
-  localComposition: '',
-  currentLoadedCompositionId: '',
+// Dexie is lazy-loaded to keep it out of entrypoint bundles
+const LocalCompDB = new AsyncOnce(async () => {
+  const { default: Dexie } = await import('dexie');
+  const client = new Dexie('savedLocalComposition');
+  client.version(1).stores({
+    localComposition: '',
+    currentLoadedCompositionId: '',
+  });
+  return {
+    localComposition: client.table('localComposition'),
+    currentLoadedCompositionId: client.table('currentLoadedCompositionId'),
+  };
 });
-const localCompositionTable = localCompDbClient.table('localComposition');
-const currentLoadedCompositionIdTable = localCompDbClient.table('currentLoadedCompositionId');
 
 export const persistAllVCsAndFCs = () => {
   const engine = getEngine()!;
@@ -108,23 +113,29 @@ export const loadSharedComposition = async (
   force?: boolean,
   retainLocalStorage?: boolean
 ) => {
-  // If we already have a local composition saved in the DB, we don't want to overwrite it.
-  const hasSavedLocalComposition = (await localCompositionTable.count()) > 0;
-  if (!hasSavedLocalComposition) {
-    const serialized = JSON.stringify(localStorage);
-    await localCompositionTable.add(serialized, ['']);
-  }
+  // Headless never restores local compositions, so skip the Dexie bookkeeping and keep it off
+  // the critical loading path
+  if (!(window as any).isHeadless) {
+    const db = await LocalCompDB.get();
 
-  // If the shared composition is already loaded, we will use whatever forked version the user
-  // has locally rather than refresh again.
-  const [prevLoadedCompId] = await currentLoadedCompositionIdTable.toArray();
-  if (prevLoadedCompId === composition.id && !force) {
-    console.log('Loaded comp id matches existing; not refreshing from scratch');
-    return;
-  }
+    // If we already have a local composition saved in the DB, we don't want to overwrite it.
+    const hasSavedLocalComposition = (await db.localComposition.count()) > 0;
+    if (!hasSavedLocalComposition) {
+      const serialized = JSON.stringify(localStorage);
+      await db.localComposition.add(serialized, ['']);
+    }
 
-  await currentLoadedCompositionIdTable.clear();
-  await currentLoadedCompositionIdTable.add(composition.id, ['']);
+    // If the shared composition is already loaded, we will use whatever forked version the user
+    // has locally rather than refresh again.
+    const [prevLoadedCompId] = await db.currentLoadedCompositionId.toArray();
+    if (prevLoadedCompId === composition.id && !force) {
+      console.log('Loaded comp id matches existing; not refreshing from scratch');
+      return;
+    }
+
+    await db.currentLoadedCompositionId.clear();
+    await db.currentLoadedCompositionId.add(composition.id, ['']);
+  }
 
   const deserialized = JSON.parse(composition.content);
   const keysToRetain = ['globalVolume'];
@@ -151,31 +162,34 @@ export const loadSharedComposition = async (
 };
 
 export const getCurLoadedCompositionId = async (): Promise<number | null> => {
-  const [id] = await currentLoadedCompositionIdTable.toArray();
+  const db = await LocalCompDB.get();
+  const [id] = await db.currentLoadedCompositionId.toArray();
   return id ? +id : null;
 };
 
 export const setCurLoadedCompositionId = async (id: number | null) => {
-  await currentLoadedCompositionIdTable.clear();
+  const db = await LocalCompDB.get();
+  await db.currentLoadedCompositionId.clear();
   if (id !== null) {
-    await currentLoadedCompositionIdTable.add(id, ['']);
+    await db.currentLoadedCompositionId.add(id, ['']);
   }
 };
 
-export const clearLocalComposition = () => localCompositionTable.clear();
+export const clearLocalComposition = async () => (await LocalCompDB.get()).localComposition.clear();
 
 export const maybeRestoreLocalComposition = async () => {
-  const hasSavedLocalComposition = (await localCompositionTable.count()) > 0;
+  const db = await LocalCompDB.get();
+  const hasSavedLocalComposition = (await db.localComposition.count()) > 0;
   if (!hasSavedLocalComposition) {
     return;
   }
 
-  const [serializedSavedComp] = (await localCompositionTable.toArray()) as string[];
+  const [serializedSavedComp] = (await db.localComposition.toArray()) as string[];
   const savedComp: Record<string, string> = JSON.parse(serializedSavedComp);
   localStorage.clear();
   Object.entries(savedComp).forEach(([key, val]) => localStorage.setItem(key, val as any));
 
-  await currentLoadedCompositionIdTable.clear();
+  await db.currentLoadedCompositionId.clear();
   await clearLocalComposition();
 };
 
@@ -199,12 +213,15 @@ export const fetchAndLoadSharedComposition = async (
   await loadSharedComposition(composition, force, retainLocalStorage);
 };
 
-const LoginTokenDBClient = new Dexie('loginToken');
-LoginTokenDBClient.version(1).stores({
-  loginToken: '',
+const LoginTokenTable = new AsyncOnce(async () => {
+  const { default: Dexie } = await import('dexie');
+  const client = new Dexie('loginToken');
+  client.version(1).stores({
+    loginToken: '',
+  });
+  return client.table('loginToken');
 });
 
-const LoginTokenTable = LoginTokenDBClient.table('loginToken');
 let cachedLoginToken: string | null = null;
 // only one token fetched at a time
 let fetchingLoginToken: Promise<string> | null = null;
@@ -217,7 +234,8 @@ export const getLoginToken = async (): Promise<string> => {
   }
 
   fetchingLoginToken = new Promise(async resolve => {
-    const [token] = await LoginTokenTable.toArray();
+    const table = await LoginTokenTable.get();
+    const [token] = await table.toArray();
     cachedLoginToken = token || '';
     resolve(token || '');
     fetchingLoginToken = null;
@@ -227,7 +245,8 @@ export const getLoginToken = async (): Promise<string> => {
 };
 
 export const setLoginToken = async (token: string) => {
-  await LoginTokenTable.clear();
-  await LoginTokenTable.add(token, ['']);
+  const table = await LoginTokenTable.get();
+  await table.clear();
+  await table.add(token, ['']);
   cachedLoginToken = token;
 };

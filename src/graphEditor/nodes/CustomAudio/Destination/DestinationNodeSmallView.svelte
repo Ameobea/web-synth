@@ -14,8 +14,12 @@
     CustomDestinationNode,
     CustomDestinationNodeState,
   } from 'src/graphEditor/nodes/CustomAudio/Destination/CustomDestinationNode';
-  import { MixerLevelsViz } from 'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz';
+  import type { MixerLevelsViz } from 'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz';
   import { onDestroy } from 'svelte';
+
+  const MixerLevelsVizPromise = import(
+    'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz'
+  ).then(m => m.MixerLevelsViz);
 
   export let node: CustomDestinationNode;
   export let state: Writable<CustomDestinationNodeState>;
@@ -42,8 +46,15 @@
     if (!canvasRef || !$sab) {
       vizInst?.destroy();
     } else {
-      vizInst = new MixerLevelsViz(canvasRef, 1);
-      vizInst.setAudioThreadBuffer($sab);
+      const canvas = canvasRef;
+      const sabVal = $sab;
+      MixerLevelsVizPromise.then(MixerLevelsViz => {
+        if (!canvas.isConnected) {
+          return;
+        }
+        vizInst = new MixerLevelsViz(canvas, 1);
+        vizInst.setAudioThreadBuffer(sabVal);
+      });
     }
   }
 

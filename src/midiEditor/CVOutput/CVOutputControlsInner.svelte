@@ -5,7 +5,8 @@
 <script lang="ts">
   import type { Writable } from 'svelte/store';
 
-  import { ADSR2Instance, LEFT_GUTTER_WIDTH_PX } from 'src/controls/adsr2/adsr2';
+  import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';
+  import { LEFT_GUTTER_WIDTH_PX } from 'src/controls/adsr2/adsr2Helpers';
   import SvelteADSR2 from 'src/controls/adsr2/SvelteADSR2.svelte';
   import { renderModalWithControls } from 'src/controls/Modal';
   import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';

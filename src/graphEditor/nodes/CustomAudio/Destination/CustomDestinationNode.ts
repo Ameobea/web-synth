@@ -27,6 +27,11 @@ const SafetyLimiterWasm = new AsyncOnce(
   true
 );
 
+export const prefetchSafetyLimiterAssets = () => {
+  void SafetyLimiterAWPInitialized.get();
+  void SafetyLimiterWasm.get();
+};
+
 export interface CustomDestinationNodeState {
   safetyLimiterEnabled: boolean;
 }

@@ -111,6 +111,10 @@ export const init_control_panel = (stateKey: string) => {
     )
   );
 
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   mkContainerRenderHelper({ Comp: ControlPanelUI, getProps: () => ({ stateKey }), store })(
     getRootNodeID(vcId)
   );

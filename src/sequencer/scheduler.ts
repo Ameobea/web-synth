@@ -1,7 +1,7 @@
 import * as R from 'ramda';
 
 import { scheduleEventTimeAbsolute } from 'src/eventScheduler';
-import { getGlobalBpm } from 'src/globalMenu';
+import { getGlobalBpm } from 'src/globalMenu/globalTempo';
 import type { SequencerMark, SequencerReduxState, VoiceTarget } from 'src/sequencer/redux';
 
 const ctx = new AudioContext();

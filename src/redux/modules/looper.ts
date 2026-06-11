@@ -2,7 +2,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { SavedMIDIComposition } from 'src/api';
 import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
-import { get_looper_audio_connectables } from 'src/looper/Looper';
+import { get_looper_audio_connectables } from 'src/looper/looperCtx';
 import type { LooperNode } from 'src/looper/LooperNode';
 import { updateConnectables } from 'src/patchNetwork/interface';
 

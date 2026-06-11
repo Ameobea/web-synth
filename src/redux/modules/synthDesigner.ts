@@ -26,11 +26,6 @@ export interface FilterParams {
   gain: number;
 }
 
-interface PolysynthContext {
-  module: typeof import('src/polysynth');
-  ctxPtr: number;
-}
-
 export interface SynthModule {
   filterBypassed: boolean;
   filterEnvelopeEnabled?: boolean;
@@ -735,10 +730,6 @@ const actionGroups = {
 
       return setSynth(synthIx, { ...targetSynth, filterEnvelopeEnabled: enabled }, state);
     },
-  }),
-  SET_POLYSYNTH_CTX: buildActionGroup({
-    actionCreator: (ctx: PolysynthContext) => ({ type: 'SET_POLYSYNTH_CTX', ctx }),
-    subReducer: (state: SynthDesignerState, { ctx }) => ({ ...state, polysynthCtx: ctx }),
   }),
   SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS: buildActionGroup({
     actionCreator: (

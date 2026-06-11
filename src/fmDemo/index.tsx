@@ -9,7 +9,7 @@ const root = createRoot(document.getElementById('root')!);
 const environmentIsValid =
   typeof AudioWorkletNode !== 'undefined' && typeof ConstantSourceNode !== 'undefined';
 if (environmentIsValid) {
-  require('./FMSynthDemo');
+  import('./FMSynthDemo');
 } else {
   getSentry()?.captureException(
     new Error('Browser does not support `AudioWorkletNode`; displaying not supported message')

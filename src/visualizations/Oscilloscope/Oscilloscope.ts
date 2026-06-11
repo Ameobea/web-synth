@@ -21,7 +21,7 @@ export class Oscilloscope {
   private sab: Int32Array = new Int32Array(8);
 
   constructor(initialState: OscilloscopeUIState) {
-    this.renderWorker = new Worker(new URL('./OscilloscopeRenderer.worker', import.meta.url));
+    this.renderWorker = new Worker(new URL('./OscilloscopeRenderer.worker.ts', import.meta.url), { type: 'module' });
     this.init().catch(err => {
       logError('Error initializing oscilloscope', err);
     });

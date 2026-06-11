@@ -3,17 +3,17 @@
  * connected to MIDI modules.
  */
 
-import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
-import type { GenericControlCb } from 'src/midiKeyboard/MidiKeyboardOutputMappingConfigurator';
 import {
-  MidiKeyboardVC,
-  type MidiKeyboardVCProps,
-  mkMidiKeyboardSmallView,
-} from 'src/midiKeyboard/MidiKeyboardVC';
-import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
+  MidiKeyboardCtxByStateKey,
+  type MappedOutput,
+  type MIDIKeyboardCtx,
+} from 'src/midiKeyboard/midiKeyboardCtx';
+import React from 'react';
+
+import type { MidiKeyboardVCProps } from 'src/midiKeyboard/MidiKeyboardVC';
 import { type MIDIInputCbs, MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { actionCreators, dispatch, getState, store } from 'src/redux';
@@ -27,6 +27,13 @@ import {
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
 import { tryParseJson, UnreachableError } from 'src/util';
 
+export {
+  MidiKeyboardCtxByStateKey,
+  get_midi_keyboard_audio_connectables,
+  type MappedOutput,
+  type MIDIKeyboardCtx,
+} from 'src/midiKeyboard/midiKeyboardCtx';
+
 const ctx = new AudioContext();
 
 interface SerializedMidiKeyboardState extends Omit<MidiKeyboardStateItem, 'midiInput'> {
@@ -36,27 +43,6 @@ interface SerializedMidiKeyboardState extends Omit<MidiKeyboardStateItem, 'midiI
   midiInput?: null;
   mappedOutputs: (MidiKeyboardMappedOutputDescriptor & { name: string })[];
 }
-
-export interface MappedOutput {
-  csn: ConstantSourceNode;
-  name: string;
-}
-
-export interface MIDIKeyboardCtx {
-  midiNode: MIDINode;
-  lastSeenPitchBend: number;
-  lastSeenModWheel: number;
-  mappedOutputs: MappedOutput[];
-  lastSeenRawMIDIControlValuesByControlIndex: Map<number, number>;
-  outputDescriptorsByControlIndex: Map<
-    number,
-    { output: MappedOutput; outputDescriptor: MidiKeyboardMappedOutputDescriptor }[]
-  >;
-  registerGenericControlCb: (cb: GenericControlCb) => void;
-  deregisterGenericControlCb: (cb: GenericControlCb) => void;
-}
-
-export const MidiKeyboardCtxByStateKey: Map<string, MIDIKeyboardCtx> = new Map();
 
 const getMidiKeyboardDomId = (vcId: string) => `midiKeyboard_${vcId}`;
 
@@ -175,16 +161,26 @@ export const init_midi_keyboard = (stateKey: string) => {
 
   dispatch(actionCreators.midiKeyboard.ADD_MIDI_KEYBOARD(stateKey, initialReduxState));
 
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   const props: MidiKeyboardVCProps = {
     stateKey,
     registerGenericControlCb: midiKeyboardCtx.registerGenericControlCb,
     deregisterGenericControlCb: midiKeyboardCtx.deregisterGenericControlCb,
   };
-  mkContainerRenderHelper({
-    Comp: MidiKeyboardVC,
-    getProps: () => props,
-    store,
-  })(getMidiKeyboardDomId(vcId));
+  void import('src/midiKeyboard/MidiKeyboardVC').then(({ MidiKeyboardVC }) => {
+    if (!elem.isConnected) {
+      return;
+    }
+
+    mkContainerRenderHelper({
+      Comp: MidiKeyboardVC,
+      getProps: () => props,
+      store,
+    })(getMidiKeyboardDomId(vcId));
+  });
 };
 
 const getMidiKeyboardDomElem = (stateKey: string): HTMLDivElement | null => {
@@ -281,39 +277,6 @@ export const unhide_midi_keyboard = (stateKey: string) => {
   }
 };
 
-export const get_midi_keyboard_audio_connectables = (stateKey: string): AudioConnectables => {
-  const vcId = stateKey.split('_')[1]!;
-  const ctx = MidiKeyboardCtxByStateKey.get(stateKey);
-  if (!ctx) {
-    console.warn(`No ctx found for midi keyboard VC with VC ID "${vcId}"`);
-    return create_empty_audio_connectables(vcId);
-  }
-  const reduxState = getState().midiKeyboard[stateKey];
-
-  let baseOutputs = ImmMap<string, ConnectableOutput>().set('midi out', {
-    node: ctx.midiNode,
-    type: 'midi',
-  });
-  if (reduxState.midiInput && reduxState.mode === MidiKeyboardMode.MidiInput) {
-    baseOutputs = baseOutputs
-      .set('pitch bend', { type: 'number', node: reduxState.midiInput.pitchBendNode })
-      .set('mod wheel', { type: 'number', node: reduxState.midiInput.modWheelNode });
-  }
-  const outputs =
-    reduxState.mode === MidiKeyboardMode.MidiInput
-      ? ctx.mappedOutputs.reduce(
-          (acc, output) => acc.set(output.name, { type: 'number', node: output.csn }),
-          baseOutputs
-        )
-      : baseOutputs;
-
-  return {
-    vcId,
-    inputs: ImmMap<string, ConnectableInput>(),
-    outputs,
-  };
-};
-
 export const render_midi_keyboard_small_view = (stateKey: string, domId: string) => {
   const vcId = stateKey.split('_')[1]!;
   const ctx = MidiKeyboardCtxByStateKey.get(stateKey);
@@ -322,14 +285,21 @@ export const render_midi_keyboard_small_view = (stateKey: string, domId: string)
     return create_empty_audio_connectables(vcId);
   }
 
-  const props = {};
+  const LazySmallView = React.lazy(() =>
+    import('src/midiKeyboard/MidiKeyboardVC').then(m => ({
+      default: m.mkMidiKeyboardSmallView(
+        stateKey,
+        ctx.registerGenericControlCb,
+        ctx.deregisterGenericControlCb
+      ),
+    }))
+  );
+  const SmallView: React.FC = () =>
+    React.createElement(React.Suspense, { fallback: null }, React.createElement(LazySmallView));
+
   mkContainerRenderHelper({
-    Comp: mkMidiKeyboardSmallView(
-      stateKey,
-      ctx.registerGenericControlCb,
-      ctx.deregisterGenericControlCb
-    ),
-    getProps: () => props,
+    Comp: SmallView,
+    getProps: () => ({}),
     store,
   })(domId);
 };

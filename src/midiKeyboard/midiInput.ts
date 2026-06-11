@@ -2,6 +2,7 @@ import { Option } from 'funfix-core';
 import * as R from 'ramda';
 
 import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDIWasmModule } from 'src/midiWasmModule';
 import { delay, UnreachableError } from 'src/util';
 
 export type BuiltinMIDIInput = globalThis.MIDIInput;
@@ -41,7 +42,7 @@ export class MIDIInput {
       // Request MIDI access and load the Wasm MIDI module at the same time
       [access, midiModule] = await Promise.all([
         accessPromise,
-        this.midiModule || import('src/midi'),
+        this.midiModule || MIDIWasmModule.get(),
       ] as [Promise<typeof access>, Promise<typeof midiModule>]);
     } catch (err) {
       console.error(`Error while attempting to initialize MIDI input node: ${err}`);

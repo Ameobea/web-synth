@@ -3,7 +3,15 @@
  * side with callbacks into Wasm for value changes.
  */
 import React, { Fragment, type SVGAttributes, useMemo, useRef } from 'react';
-import { Value } from 'react-control-panel';
+
+const LazyValue = React.lazy(() =>
+  import('react-control-panel').then(m => ({ default: m.Value }))
+);
+const Value: React.FC<any> = props => (
+  <React.Suspense fallback={null}>
+    <LazyValue {...props} />
+  </React.Suspense>
+);
 
 import { clamp, roundTo } from '../util';
 

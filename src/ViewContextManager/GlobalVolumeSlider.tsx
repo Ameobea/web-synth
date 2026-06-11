@@ -2,13 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import './GlobalVolume.css';
-
-const ctx = new AudioContext();
-
-export const setGlobalVolume = (newGlobalVolume: number) => {
-  localStorage.setItem('globalVolume', newGlobalVolume.toString());
-  ((ctx as any).globalVolume as GainNode).gain.value = newGlobalVolume / 100;
-};
+import { setGlobalVolume } from './globalVolume';
 
 interface GlobalVolumeSliderProps {
   onClose: () => void;

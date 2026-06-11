@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import ControlPanel from 'react-control-panel';
+import ControlPanel from 'src/controls/LazyControlPanel';
 
 import './DistortionUI.css';
 

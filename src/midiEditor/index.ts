@@ -3,7 +3,6 @@ import { Map as ImmMap } from 'immutable';
 import { derived, get, type Readable, type Writable, writable } from 'svelte/store';
 
 import { type SerializedCVOutputState } from 'src/midiEditor/CVOutput/CVOutput';
-import MIDIEditor from 'src/midiEditor/MIDIEditor';
 import { MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
 import type NoteStore from 'src/midiEditor/NoteStore';
 import MIDIEditorPlaybackHandler from 'src/midiEditor/PlaybackHandler';
@@ -367,6 +366,10 @@ export const init_midi_editor = (vcId: string) => {
   const inst = new MIDIEditorInstance(new AudioContext(), vcId, initialState);
   Instances.set(vcId, inst);
 
+  if ((window as any).isHeadless) {
+    return;
+  }
+
   const domID = getContainerID(vcId);
   const elem = document.createElement('div');
   elem.id = domID;
@@ -376,11 +379,17 @@ export const init_midi_editor = (vcId: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
-  mkContainerRenderHelper({
-    Comp: MIDIEditor,
-    getProps: () => ({ vcId, initialState, instance: inst }),
-    enableReactQuery: true,
-  })(domID);
+  void import('src/midiEditor/MIDIEditor').then(({ default: MIDIEditor }) => {
+    if (!elem.isConnected) {
+      return;
+    }
+
+    mkContainerRenderHelper({
+      Comp: MIDIEditor,
+      getProps: () => ({ vcId, initialState, instance: inst }),
+      enableReactQuery: true,
+    })(domID);
+  });
 };
 
 export const persist_midi_editor = (stateKey: string) => {
